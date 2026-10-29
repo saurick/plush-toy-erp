@@ -1,5 +1,4 @@
 import React from 'react'
-import { useOutletContext } from 'react-router-dom'
 
 import {
   CheckCircleOutlined,
@@ -7,13 +6,13 @@ import {
   UpOutlined,
 } from '@ant-design/icons'
 import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import WorkflowTaskActionDrawer, {
-  getWorkflowTaskActionMeta,
-} from '../workflow/WorkflowTaskActionDrawer.jsx'
+import WorkflowTaskActionDrawer from '../workflow/WorkflowTaskActionDrawer.jsx'
+import { getWorkflowTaskActionMeta } from '../../utils/workflowTaskActionPresentation.mjs'
 import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess.js'
 import { isWorkflowTaskMutationResultUnknown } from '../../utils/workflowTaskMutation.mjs'
 import {
@@ -161,7 +160,7 @@ export function CollaborationTaskPanel({
   urgingTaskID,
   taskActionLoadingID,
 }) {
-  const { mobileTaskBusiness } = useOutletContext() || {}
+  const { taskBusiness } = useBusinessPageContext() || {}
   const [expanded, setExpanded] = React.useState(false)
   const [activeTaskTab, setActiveTaskTab] = React.useState('current')
   const [panelHeight, setPanelHeight] = React.useState(
@@ -511,7 +510,7 @@ export function CollaborationTaskPanel({
     )
   }
 
-  if (mobileTaskBusiness) return null
+  if (taskBusiness) return null
   if (!hasFocusedRecord || taskPanelModel.activeTaskCount === 0) return null
 
   return (

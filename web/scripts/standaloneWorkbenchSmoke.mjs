@@ -206,11 +206,62 @@ try {
     'login restores deep link and the built standalone diagnostic branch'
   )
 
-  await page.goto(`${origin}/__dev/testing?view=server`)
+  await page.goto(
+    `${origin}/__dev/business-topics?flow_topic=purchase_to_inventory&flow_topic_node=purchase_quality&flow_topic_step=purchase_quality%3Aposts_fact%3Apurchase_accepted`
+  )
+  const purchaseStep = page.getByRole('region', {
+    name: '交接规则与验证',
+    exact: true,
+  })
+  await purchaseStep.waitFor()
+  assert.match(await purchaseStep.innerText(), /库存由仓库另行入账/u)
+  assert.equal(
+    await purchaseStep.getByRole('button', { name: /运行/u }).count(),
+    0
+  )
+  assert.equal(await purchaseStep.getByRole('link').count(), 0)
+  assert.equal(await purchaseStep.evaluate((element) => Boolean(element.closest('[data-topic-relation]'))), true)
+  await page.getByRole('button', { name: '收起IQC 确认本行检验通过的规则与验证', exact: true }).click()
+  await page.locator('[data-graph-node="purchase_accepted"]').click()
   await page
-    .getByRole('region', { name: 'GitLab CI 记录', exact: true })
-    .getByText('完整 CI 通过', { exact: true })
+    .getByRole('button', {
+      name: '查看仓库确认本次合格行入库的规则与验证',
+      exact: true,
+    })
+    .click()
+  await purchaseStep
+    .getByText('合格行入库与异常收尾', { exact: true })
     .waitFor()
+  checks.push(
+    'built procurement graph separates quality from inbound and links exact-step evidence without writes'
+  )
+
+  await page.goto(`${origin}/__dev/business-rules?view=states&flow=fact.finance_credit_note`)
+  await page.getByRole('heading', { name: '业务规则', exact: true }).waitFor()
+  const creditNote = page.locator('[data-selected-flow="fact.finance_credit_note"]')
+  await creditNote.locator('[data-business-flow][data-graph-status="rendered"]').waitFor()
+  assert.equal(await creditNote.locator('[data-graph-node]').count(), 2)
+  assert.equal(await creditNote.locator('[data-graph-wire]').count(), 1)
+  assert.equal(await creditNote.locator('[data-source-reference]').count(), 0)
+  assert.match(await creditNote.innerText(), /不修改原行状态/u)
+  const rulesTabs = page.getByRole('tablist', { name: '关联信息类型' })
+  await rulesTabs.getByRole('tab', { name: '事实规则', exact: true }).click()
+  await rulesTabs.getByRole('tab', { name: '状态流转', exact: true }).click()
+  await creditNote.waitFor()
+  assert.equal(await rulesTabs.getByRole('tab', { name: '状态流转', exact: true }).evaluate((node) => node.ownerDocument.activeElement === node), true)
+  await page.screenshot({ path: path.join(output, 'business-rules-credit-note-4k.png'), fullPage: true })
+  checks.push('built business rules preserve classification selection and immutable red-entry references')
+
+  await page.goto(`${origin}/__dev/testing?view=server`)
+  const targetResults = page.getByRole('table', { name: '目标服务器验证结果', exact: true })
+  await targetResults.getByText('历史 CI 通过', { exact: true }).waitFor()
+  assert.equal(await targetResults.getByText('完整 CI 通过', { exact: true }).count(), 0)
+  await targetResults.getByRole('button', { name: '查看 CI', exact: true }).click()
+  const ciDetails = page.getByRole('dialog', { name: 'GitLab CI 证据', exact: true })
+  await ciDetails.getByText('本条是对应提交的 CI 记录，未证明当前工作区通过。', { exact: true }).waitFor()
+  await ciDetails.getByText('完整 CI 通过', { exact: true }).waitFor()
+  await ciDetails.locator('.ant-drawer-close').click()
+  await ciDetails.waitFor({ state: 'hidden' })
   await page
     .getByText('目标服务器状态读取失败，请重新读取。', { exact: true })
     .waitFor()
@@ -219,7 +270,7 @@ try {
       .getByRole('table', { name: '目标服务器验证结果', exact: true })
       .locator('tbody tr')
       .count(),
-    3
+    4
   )
   for (const width of [1024, 1280, 1920]) {
     await page.setViewportSize({ width, height: 1080 })
@@ -278,7 +329,7 @@ try {
   )
   await login()
   await page.getByRole('tab', { name: '诊断历史', exact: true }).waitFor()
-  await page.getByRole('button', { name: '页面工具', exact: true }).click()
+  assert.equal(await page.getByRole('button', { name: '页面工具', exact: true }).count(), 0)
   await page.getByRole('button', { name: '退出登录', exact: true }).click()
   await page.getByRole('button', { name: '登录工作台', exact: true }).waitFor()
   checks.push(
@@ -320,6 +371,11 @@ try {
     `[workbench:browser] passed ${checks.length} task paths; built artifact, no target connections`
   )
 } catch (error) {
+  const failedPage = browser?.contexts().flatMap((context) => context.pages()).at(-1)
+  if (failedPage && !failedPage.isClosed()) {
+    await writeFile(path.join(output, 'failure-page.txt'), await failedPage.locator('body').innerText()).catch(() => {})
+    await failedPage.screenshot({ path: path.join(output, 'failure-page.png'), fullPage: true }).catch(() => {})
+  }
   await writeFile(
     path.join(output, 'failure.json'),
     JSON.stringify({ checks, requests, error: error.message }, null, 2)

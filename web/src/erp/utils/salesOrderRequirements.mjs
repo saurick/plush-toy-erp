@@ -9,12 +9,6 @@ export const SALES_ORDER_CATEGORY_OPTIONS = [
   { value: 'REPEAT', label: '返单' },
 ]
 
-export const SALES_ORDER_ENGINEERING_OPTIONS = [
-  { value: 'PREPARING', label: '工程准备' },
-  { value: 'SAMPLING', label: '打样中' },
-  { value: 'CONFIRMED', label: '样品已确认' },
-]
-
 export function salesOrderRequirementName(item = {}) {
   return (
     item.requested_product_name ||
@@ -32,9 +26,5 @@ export function salesOrderProductionQuantity(item = {}) {
 
 export function salesOrderEngineeringLabel(item = {}) {
   if (!Number(item.product_id)) return '待工程建档'
-  return (
-    SALES_ORDER_ENGINEERING_OPTIONS.find(
-      (option) => option.value === item.engineering_status
-    )?.label || '工程准备'
-  )
+  return item.bom_id ? '已关联工程 BOM' : '待编制 BOM'
 }

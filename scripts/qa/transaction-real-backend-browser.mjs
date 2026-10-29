@@ -8,6 +8,7 @@ import {
   businessURL,
   flowKey,
   openMobileTaskCard,
+  openMobileTaskList,
   openMobileSourceTask,
   openDesktopTaskRow,
   assertMobileLayout,
@@ -25,6 +26,7 @@ import {
   faultEvidence,
 } from "./transaction-browser-ui.mjs";
 import { resolveMobileActionLabel } from "../../web/src/erp/mobile/utils/mobileRoleTaskModel.mjs";
+import { workflowTaskActionRequiresReason } from "../../web/src/erp/utils/workflowTaskActionContract.mjs";
 import { waitForFiniteAnimations } from "../../web/scripts/style-l1/browserReadiness.mjs";
 import { correctQualityThroughBrowser } from "./transaction-quality-correction-browser.mjs";
 import { assertRequestCancellationEvidence, runRequestCancellationBrowser } from './transaction-request-cancellation-browser.mjs';
@@ -43,7 +45,7 @@ import {
   prepareTransactionPurchase,
   prepareTransactionReceivable,
   prepareTransactionSalesOrder,
-  prepareTransactionSourceTask,
+  postTransactionInventoryCount,
 } from "./transaction-real-backend-fixture.mjs";
 
 const require = createRequire(
@@ -116,6 +118,22 @@ export function assertTransactionBrowserReport(report) {
     report.browserRPC.filter((call) => call.code !== 0 || call.http !== 200),
     [],
   );
+  for (const flow of report.flows.filter(({ key }) => key.endsWith('inventory'))) {
+    assert.equal(flow.draftSurface, 'desktop browser');
+    assert.equal(flow.postSurface, 'desktop browser');
+    if (flow.key === 'mobile_inventory') {
+      assert.equal(flow.completedInboundReadOnly, true);
+      assert.equal(flow.mobileAdjustmentUnavailable, true);
+    }
+  }
+  for (const flow of report.flows.filter(({ key }) => /^(?:mobile_)?(?:finance_|refund_)/u.test(key))) {
+    const mobile = flow.key.startsWith('mobile_');
+    assert.equal(flow.registrationSurface, 'desktop browser');
+    assert.equal(flow.postSurface, 'desktop browser');
+    assert.equal(flow.approvalSurface, mobile ? 'mobile task' : 'desktop browser');
+    assert.equal(flow.reversalSurface, 'desktop browser');
+    if (mobile) assert.equal(flow.completedTaskReadOnly, true);
+  }
   for (const flow of report.flows.filter(
     ({ key }) => !key.endsWith("quality"),
   )) {
@@ -139,13 +157,13 @@ export function assertTransactionBrowserReport(report) {
   }
   assert.equal(
     report.mobileTasks?.length,
-    16,
-    "all mobile approval and execution steps must run",
+    8,
+    "all mobile payment approvals must run",
   );
   assert.ok(report.mobileTasks.every(({ confirmed }) => confirmed === true));
   assert.equal(
     new Set(report.mobileTasks.map(({ taskID }) => taskID)).size,
-    16,
+    8,
   );
   const payments = new Map();
   for (const { paymentID, role, taskID } of report.mobileTasks) {
@@ -157,8 +175,35 @@ export function assertTransactionBrowserReport(report) {
   }
   assert.equal(payments.size, 8);
   for (const roles of payments.values())
-    assert.deepEqual(roles.sort(), ["boss", "finance"]);
+    assert.deepEqual(roles, ["boss"]);
+  assert.equal(report.mobileDesktopTasks?.length, 8);
+  assert.equal(new Set(report.mobileDesktopTasks.map(item => item.taskID)).size, 8);
+  assert.deepEqual(report.mobileDesktopTasks.map(item => item.paymentID).sort((a, b) => a - b), [...payments.keys()].sort((a, b) => a - b));
+  for (const item of report.mobileDesktopTasks) {
+    assert.equal(item.role, 'finance');
+    assert.equal(item.unchanged, true);
+    assert.ok(Number.isSafeInteger(item.taskID) && item.taskID > 0);
+  }
   assertProductionShipmentEvidence(report);
+}
+
+async function verifyMobileDesktopTask(page, options, client, task) {
+  const role = task.owner_role_key;
+  assert.equal(task.task_status_key, 'ready');
+  await openMobileTaskList(page, options, role);
+  await page.getByLabel('任务状态', { exact: true }).getByText('待办', { exact: true }).click();
+  await page.getByRole('searchbox').fill(task.source_no);
+  await page.getByRole('searchbox').press('Enter');
+  await openMobileTaskCard(page, task.id);
+  await page.getByTestId('mobile-task-detail-screen').getByRole('button', { name: '查看办理资料', exact: true }).click();
+  const review = page.getByTestId('mobile-task-desktop-review');
+  await expect(review).toBeVisible();
+  await expect(review).toContainText('请在电脑办理');
+  await expect(review.getByRole('button', { name: /确认完成|过账|核销|确认实际收付/u })).toHaveCount(0);
+  const { task: current } = await client.rpc(role, 'workflow', 'get_task', { task_id: task.id });
+  assert.equal(current.version, task.version);
+  assert.equal(current.task_status_key, 'ready');
+  await page.screenshot({ path: path.join(options.outputDir, `mobile-desktop-required-${task.id}.png`), fullPage: true });
 }
 
 export async function completePaymentTask(
@@ -178,9 +223,16 @@ export async function completePaymentTask(
     (item) => item.owner_role_key === role && item.task_status_key === "ready",
   );
   assert.ok(task, `${role} must have an active task for this payment`);
-  const { page, context } = await login(browser, options, role, report);
+  if (options.mobile && role === 'finance') {
+    const phone = await login(browser, options, role, report);
+    try { await verifyMobileDesktopTask(phone.page, options, client, task); }
+    finally { await closePage(phone.page, phone.context); }
+    (report.mobileDesktopTasks ??= []).push({ taskID: task.id, paymentID: payment.id, role, unchanged: true });
+  }
+  const taskOptions = { ...options, mobile: options.mobile && role === 'boss' };
+  const { page, context } = await login(browser, taskOptions, role, report);
   try {
-    if (options.mobile) {
+    if (taskOptions.mobile) {
       await navigate(page, `${options.baseURL}/m/${role}/tasks`);
       const search = page.getByRole("searchbox");
       await search.fill(payment.payment_no);
@@ -264,10 +316,11 @@ export async function completePaymentTask(
         exact: true,
       });
       const reasonLabel = role === "boss" ? "审批意见" : "完成反馈";
-      await submit.click();
-      await expect(
-        action.getByText(`${reasonLabel}为必填项`, { exact: true }),
-      ).toBeVisible();
+      const reasonRequired = workflowTaskActionRequiresReason(task, 'complete');
+      if (reasonRequired) {
+        await submit.click();
+        await expect(action.getByText(`${reasonLabel}为必填项`, { exact: true })).toBeVisible();
+      }
       const before = (
         await client.rpc(role, "workflow", "get_task", { task_id: task.id })
       ).task;
@@ -277,8 +330,10 @@ export async function completePaymentTask(
         name: reasonLabel,
         exact: true,
       });
-      await expect(reasonInput).toBeFocused();
-      await expect(reasonInput).toHaveAttribute("aria-invalid", "true");
+      if (reasonRequired) {
+        await expect(reasonInput).toBeFocused();
+        await expect(reasonInput).toHaveAttribute("aria-invalid", "true");
+      }
       await reasonInput.fill("模拟手机核对收付款来源与审批结果");
       await clickRPC(page, "complete_task_action", () => submit.click());
       await expect(
@@ -314,8 +369,12 @@ export async function completePaymentTask(
     await openDesktopTaskRow(page, task, payment.payment_no);
     const drawer = page.locator(".erp-task-action-drawer:visible");
     await drawer
-      .getByRole("button", { name: "选择处理方式", exact: true })
+      .getByRole("button", { name: "任务办理", exact: true })
       .click();
+    if (role === "finance") {
+      await expect(drawer.getByTestId("mobile-task-fact-form")).toBeVisible();
+      await pageAction(drawer, "任务协作");
+    }
     await drawer
       .getByRole("radio")
       .filter({ hasText: role === "boss" ? "审批通过" : "处理完成" })
@@ -354,6 +413,23 @@ async function openFinancePayment(page, options, client, paymentID) {
   await selectRow(page, paymentID);
 }
 
+async function verifyCompletedPaymentTask(browser, options, client, paymentID, report) {
+  const { page, context } = await login(browser, options, 'finance', report);
+  try {
+    const { tasks } = await client.rpc('finance', 'workflow', 'list_tasks', { source_type: 'finance_payment', source_id: paymentID, limit: 100 });
+    const own = tasks.filter(task => task.owner_role_key === 'finance');
+    assert.equal(own.length, 1);
+    assert.equal(own[0].task_status_key, 'done');
+    await openMobileTaskList(page, options, 'finance');
+    await page.getByLabel('任务状态', { exact: true }).getByText('已办', { exact: true }).click();
+    await page.getByRole('searchbox').fill(own[0].source_no);
+    await page.getByRole('searchbox').press('Enter');
+    await openMobileTaskCard(page, own[0].id);
+    await expect(page.getByTestId('mobile-task-detail-screen')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(确认实际收付|选择应收 \/ 应付核销|冲销收付款|登记实际退款)$/u })).toHaveCount(0);
+  } finally { await closePage(page, context); }
+}
+
 export async function financeFlow(
   browser,
   options,
@@ -375,7 +451,9 @@ export async function financeFlow(
     options,
     scenario.key || `finance_${direction.toLowerCase()}`,
   );
-  const { page, context } = await login(browser, options, "finance", report);
+  const entrySession = await login(browser, { ...options, mobile: false }, "finance", report);
+  let page = entrySession.page;
+  const followupOptions = { ...options, mobile: false };
   const paymentNo = `${fixture.prefix}-${scenario.suffix || (advance ? "RECEIPT" : "PAYMENT")}`;
   let fact = scenario.fact;
   if (!advance && !fact) {
@@ -405,27 +483,13 @@ export async function financeFlow(
       `SELECT json_build_object('status',status,'version',version,'direction',direction,'kind',kind,'amount',amount,'distinctActors',approved_by<>created_by,'posted',posted_at IS NOT NULL,'reversed',reversed_at IS NOT NULL,'allocations',(SELECT count(*) FROM finance_allocations WHERE payment_id=${id}),'netAllocated',(SELECT COALESCE(sum(CASE WHEN reversal_of_allocation_id IS NULL THEN amount ELSE -amount END),0) FROM finance_allocations WHERE payment_id=${id})) FROM finance_payments WHERE id=${id}`,
     );
   try {
-    if (options.mobile) {
-      const type = receipt ? 'sales_order' : 'purchase_order';
-      const id = receipt ? fixture.salesOrder.id : fixture.order.id;
-      await prepareTransactionSourceTask(client, 'finance', type, id, fixture.prefix);
-      await openMobileSourceTask(page, options, client, 'finance', type, id, ['business_followup']);
-      await page.getByRole('button', { name: '登记本次实际收付', exact: true }).click();
-      if (!advance) await selectOption(page, page.getByRole('combobox', { name: '本次收付款用途', exact: true }), '应收 / 应付结算');
-      await page.getByRole('button', { name: '填写收付款', exact: true }).click();
-    } else {
-      await navigate(page, businessURL(options, "finance", "finance/payments"));
-      await page.getByRole("button", { name: "登记收付款", exact: true }).click();
-    }
-    await assertMobileLayout(page, options);
+    await navigate(page, businessURL(followupOptions, "finance", "finance/payments"));
+    await page.getByRole("button", { name: "登记收付款", exact: true }).click();
     const dialog = page.getByRole("region", {
       name: "登记收付款",
       exact: true,
     });
     await expect(dialog).toBeVisible();
-    if (options.mobile) {
-      for (const field of ['款项用途', '收付款方向', receipt ? '客户' : '供应商']) await expect(dialog.getByLabel(field, { exact: true })).toBeDisabled();
-    } else {
     if (advance)
       await selectOption(
         page,
@@ -459,7 +523,6 @@ export async function financeFlow(
         dialog.getByLabel("币种", { exact: true }),
         "人民币（CNY）",
       );
-    }
     await dialog.getByLabel("收付款单号", { exact: true }).fill(paymentNo);
     await dialog.getByLabel("实收 / 实付金额", { exact: true }).fill("0");
     await dialog
@@ -520,7 +583,7 @@ export async function financeFlow(
       "task completion must not post funds",
     );
     assert.equal(paymentRow(created.id).posted, false);
-    await openFinancePayment(page, options, client, created.id);
+    await openFinancePayment(page, followupOptions, client, created.id);
     if (!advance) {
       await pageAction(page, "选择应收 / 应付核销");
       const allocation = await modal(page, "选择核销记录");
@@ -594,9 +657,10 @@ export async function financeFlow(
       posted,
       "lost response replay must not double post or allocate",
     );
+    if (options.mobile) await verifyCompletedPaymentTask(browser, options, client, created.id, report);
     if (scenario.refund) {
       for (const amount of [7.25, 20]) {
-        await openFinancePayment(page, options, client, created.id);
+        await openFinancePayment(page, followupOptions, client, created.id);
         await refundFlow(
           browser,
           options,
@@ -620,7 +684,7 @@ export async function financeFlow(
         { ...posted, version: posted.version + 4 },
         "refund posting and reversal each advance the original payment version",
       );
-      await openFinancePayment(page, options, client, created.id);
+      await openFinancePayment(page, followupOptions, client, created.id);
     }
     const beforeReverse = paymentRow(created.id);
     const reason = "模拟冲销恢复余额";
@@ -695,6 +759,11 @@ export async function financeFlow(
       key,
       passed: true,
       paymentID: created.id,
+      registrationSurface: 'desktop browser',
+      postSurface: 'desktop browser',
+      approvalSurface: options.mobile ? 'mobile task' : 'desktop browser',
+      reversalSurface: 'desktop browser',
+      ...(options.mobile ? { completedTaskReadOnly: true } : {}),
       posted,
       reversed,
       transportFault: faultEvidence(lost.state),
@@ -707,7 +776,7 @@ export async function financeFlow(
     await captureFailure(page, options, report, error);
     throw error;
   } finally {
-    await closePage(page, context);
+    await closePage(entrySession.page, entrySession.context);
   }
 }
 
@@ -770,7 +839,7 @@ async function refundFlow(
   ).toBeVisible();
   assert.equal(writes(), before);
   assert.deepEqual(refundRows(), { rows: 0, posted: 0, amount: 0 });
-  await assertMobileLayout(page, options);
+  await assertMobileLayout(page, { ...options, mobile: false });
   await page.screenshot({
     path: path.join(options.outputDir, `${key}-validation.png`),
     fullPage: true,
@@ -817,20 +886,24 @@ async function refundFlow(
     20,
     "approval must not refund money",
   );
-  await openFinancePayment(page, options, client, refund.id);
-  const lost = await dropRealResponse(
-    page,
+  let lost;
+  let posted;
+  const postPage = page;
+  const postOptions = { ...options, mobile: false };
+  await openFinancePayment(postPage, postOptions, client, refund.id);
+  lost = await dropRealResponse(
+    postPage,
     options,
     "customer_config",
     "execute_finance_payment_post",
   );
-  await pageAction(page, "确认实际收付");
+  await pageAction(postPage, "确认实际收付");
   await expect(
-    page.getByText("已重新读取实际收付结果", { exact: true }),
+    postPage.getByText("已重新读取实际收付结果", { exact: true }),
   ).toBeVisible();
   assert.equal(lost.state.backendCode, 0);
   await lost.remove();
-  const posted = (
+  posted = (
     await client.rpc("finance", "operational_fact", "get_finance_payment", {
       id: refund.id,
     })
@@ -857,8 +930,11 @@ async function refundFlow(
     "refund replay cannot debit the source twice",
   );
   assert.deepEqual(refundRows(), { rows: 1, posted: 1, amount });
+  if (options.mobile) await verifyCompletedPaymentTask(browser, options, client, refund.id, report);
+  const followupOptions = { ...options, mobile: false };
+  await openFinancePayment(page, followupOptions, client, refund.id);
   if (amount === 20) {
-    await openFinancePayment(page, options, client, source.id);
+    await openFinancePayment(page, followupOptions, client, source.id);
     const refundAction = page
       .locator("button:visible")
       .filter({ hasText: "登记实际退款" });
@@ -867,7 +943,7 @@ async function refundFlow(
         .getByRole("button", { name: /^更多操作(?:，共 \d+ 项)?$/u })
         .click();
     await expect(refundAction).toBeDisabled();
-    await openFinancePayment(page, options, client, refund.id);
+    await openFinancePayment(page, followupOptions, client, refund.id);
   }
   const reverseParams = {
     id: refund.id,
@@ -923,11 +999,16 @@ async function refundFlow(
     40920,
   );
   assert.deepEqual(await sourceReadback(), restored);
-  await assertMobileLayout(page, options);
+  await assertMobileLayout(page, { ...options, mobile: false });
   report.flows.push({
     key,
     passed: true,
     paymentID: refund.id,
+    registrationSurface: 'desktop browser',
+    postSurface: 'desktop browser',
+    approvalSurface: options.mobile ? 'mobile task' : 'desktop browser',
+    reversalSurface: 'desktop browser',
+    ...(options.mobile ? { completedTaskReadOnly: true } : {}),
     sourcePaymentID: source.id,
     direction: refund.direction,
     postedBalance: { refunded: amount, available: 20 - amount },
@@ -955,7 +1036,7 @@ export async function qualityFlow(browser, options, client, fixture, report) {
   try {
     if (options.mobile) await openMobileSourceTask(page, options, client, 'quality', 'quality_inspection', id, ['handoff_receipt_quality']);
     else await navigate(page, businessURL(options, "quality", "production/quality-inspections"));
-    await assertMobileLayout(page, options);
+    await assertMobileLayout(page, { ...options, mobile: false });
     await selectRow(page, id);
     await pageAction(page, "判定不合格");
     const dialog = await modal(page, "判定不合格");
@@ -1148,7 +1229,9 @@ export async function qualityFlow(browser, options, client, fixture, report) {
 }
 
 export async function inventoryFlow(browser, options, client, fixture, report) {
-  const { page, context } = await login(browser, options, "warehouse", report);
+  const entrySession = await login(browser, options, "warehouse", report);
+  let { page } = entrySession;
+  let preparationSession;
   const lotID = fixture.receipt.items[0].lot_id;
   const ledger = () =>
     client.query(
@@ -1177,18 +1260,21 @@ export async function inventoryFlow(browser, options, client, fixture, report) {
     );
     if (options.mobile) {
       await selectRow(page, balanceID);
-    } else {
-      const row = page.locator(
-        `.ant-table-row[data-row-key="balances-${balanceID}"]:visible`,
-      );
-      await expect(row).toHaveCount(1);
-      await row.getByRole("radio").check();
-      await expect(row.getByRole("radio")).toBeChecked();
+      await expect(page.getByRole("button", { name: /^盘\s*点$/u })).toHaveCount(0);
+      // A completed inbound task only exposes its stock readback. Prepare the
+      // new count on desktop; mobile can review the source and desktop-only boundary.
+      preparationSession = await login(browser, { ...options, mobile: false }, "warehouse", report);
+      page = preparationSession.page;
+      await navigate(page, businessURL({ ...options, mobile: false }, "warehouse", "warehouse/inventory"));
     }
+    const row = page.locator(`.ant-table-row[data-row-key="balances-${balanceID}"]:visible`);
+    await expect(row).toHaveCount(1);
+    await row.getByRole("checkbox").check();
+    await expect(row.getByRole("checkbox")).toBeChecked();
     await page.getByRole("button", { name: /盘\s*点/u }).click();
     const dialog = await modal(page, "登记库存盘点");
     const submit = dialog.getByRole("button", {
-      name: "生成盘点作业",
+      name: "提交盘点复核",
       exact: true,
     });
     const countWrites = () =>
@@ -1237,15 +1323,26 @@ export async function inventoryFlow(browser, options, client, fixture, report) {
     assert.equal(created.status, "DRAFT");
     assert.equal(created.items.length, 1);
     assert.deepEqual(ledger(), { balance: 10, txns: 1, net: 10 });
-    const receipt = page.locator(".erp-inventory-operation-receipt");
+    let receipt = page.locator(".erp-inventory-operation-receipt");
+    await expect(receipt).toContainText("待审批");
+    await expect(receipt.getByRole("button", { name: /^过\s*账$/u })).toHaveCount(0);
+    await postTransactionInventoryCount(client, created, fixture.prefix, {
+      post: false,
+      beforeExecution: options.mobile ? async (task) => {
+        await verifyMobileDesktopTask(entrySession.page, options, client, task);
+        assert.deepEqual(ledger(), { balance: 10, txns: 1, net: 10 });
+      } : undefined,
+    });
+    assert.deepEqual(ledger(), { balance: 10, txns: 1, net: 10 });
+    await clickRPC(page, "get_inventory_operation", () => receipt.getByRole("button", { name: "重新读取", exact: true }).click());
     await receipt.getByRole("button", { name: /^过\s*账$/u }).click();
-    const result = await clickRPC(page, "post_inventory_operation", () =>
+    const result = await clickRPC(page, "execute_inventory_adjustment_post", () =>
       page
         .locator(".ant-popover:visible")
         .getByRole("button", { name: "确认过账", exact: true })
         .click(),
     );
-    assert.equal(result.inventory_operation.status, "POSTED");
+    assert.equal(result.source_readback.status, "POSTED");
     assert.deepEqual(ledger(), { balance: 8, txns: 2, net: 8 });
     await receipt
       .getByRole("button", { name: "核对并取消", exact: true })
@@ -1269,6 +1366,9 @@ export async function inventoryFlow(browser, options, client, fixture, report) {
       key: flowKey(options, "inventory"),
       passed: true,
       operationID: created.id,
+      draftSurface: 'desktop browser',
+      postSurface: 'desktop browser',
+      ...(options.mobile ? { completedInboundReadOnly: true, mobileAdjustmentUnavailable: true } : {}),
       transportFault: faultEvidence(lost.state),
       final: ledger(),
     });
@@ -1283,7 +1383,8 @@ export async function inventoryFlow(browser, options, client, fixture, report) {
     await captureFailure(page, options, report, error);
     throw error;
   } finally {
-    await closePage(page, context);
+    if (preparationSession) await closePage(preparationSession.page, preparationSession.context);
+    await closePage(entrySession.page, entrySession.context);
   }
 }
 

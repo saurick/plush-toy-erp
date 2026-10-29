@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { financePaymentFilterParams } from '../../utils/financePaymentFilters.mjs'
 
 import { showPageLoadError } from '../PageLoadFeedback.jsx'
 
@@ -62,6 +63,8 @@ export default function useFinancePaymentRecords({
   const [referenceLoading, setReferenceLoading] = useState(false)
 
   const [paymentTotal, setPaymentTotal] = useState(0)
+  const [paymentTotals, setPaymentTotals] = useState([])
+  const [paymentFilters, setPaymentFilters] = useBusinessPageState('paymentFilters', {})
 
   const [paymentStatusCounts, setPaymentStatusCounts] = useState(null)
 
@@ -142,10 +145,13 @@ export default function useFinancePaymentRecords({
     const request = beginLatestRequest('finance-payment-list')
     setTableLoading((current) => ({ ...current, payments: true }))
     setPaymentStatusCounts(null)
+    setPaymentTotals([])
     try {
       const result = await listFinancePayments(
         compactParams({
           include_status_counts: true,
+          include_totals: true,
+          ...financePaymentFilterParams(paymentFilters),
           status: paymentStatusFilter,
           keyword: paymentKeyword.trim(),
           direction: paymentDirectionFilter,
@@ -157,6 +163,7 @@ export default function useFinancePaymentRecords({
       const nextRows = Array.isArray(result?.payments) ? result.payments : []
       setPayments(nextRows)
       setPaymentTotal(Number(result?.total || 0))
+      setPaymentTotals(Array.isArray(result?.totals) ? result.totals : [])
       setPaymentStatusCounts(resolveBusinessStatusCounts(result))
       setCurrentPayment((current) =>
         current?.id
@@ -166,6 +173,8 @@ export default function useFinancePaymentRecords({
       )
     } catch (error) {
       if (!request.isCurrent() || isRpcAbortError(error)) return
+      setPayments([])
+      setPaymentTotal(0)
       showPageLoadError(error, '加载收付款记录')
     } finally {
       if (request.isCurrent()) {
@@ -176,6 +185,7 @@ export default function useFinancePaymentRecords({
   }, [
     beginLatestRequest,
     paymentDirectionFilter,
+    paymentFilters,
     paymentPagination,
     paymentStatusFilter,
     paymentKeyword,
@@ -372,6 +382,9 @@ export default function useFinancePaymentRecords({
     referenceLoading,
     setReferenceLoading,
     paymentTotal,
+    paymentTotals,
+    paymentFilters,
+    setPaymentFilters,
     paymentStatusCounts,
     creditTotal,
     creditStatusCounts,

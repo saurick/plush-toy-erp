@@ -18,7 +18,7 @@ export function createDevQualityGateLayoutScenarios({
   expectHeading,
 }) {
   const states = new WeakMap()
-  return [
+  const scenarios = [
     {
       name: 'dev-quality-gates-layout-desktop-light',
       path: '/__dev/quality-gates?view=run',
@@ -54,6 +54,12 @@ export function createDevQualityGateLayoutScenarios({
             return route.fulfill({ status: 503, body: '{}' })
           }
           const summary = createQualityGateStyleSummary(state.mode)
+          if (state.historyCount) {
+            summary.operations = Array.from({ length: state.historyCount }, (_, index) => ({
+              ...summary.operations[index % summary.operations.length],
+              id: `${String(index + 1).padStart(8, '0')}-1111-4111-8111-111111111111`,
+            }))
+          }
           const input = {
             changedFiles: state.empty
               ? []
@@ -121,6 +127,37 @@ export function createDevQualityGateLayoutScenarios({
             `${selector} should be fully visible in the first screen: ${JSON.stringify(box)}`
           )
         }
+        const verifyRunRecovery = async () => {
+          state.mode = 'running'
+          await refresh()
+          const cancel = page.getByRole('button', { name: /取消运行/u })
+          await cancel.waitFor()
+          await page.locator('.erp-dev-quality-flow__table').waitFor()
+          await page.locator('.erp-dev-quality-operation .ant-progress').waitFor()
+          await page.locator('.erp-dev-quality-operation').getByText('预计剩余', { exact: true }).waitFor()
+          assert.equal(await page.getByRole('button', { name: '运行本机严格诊断', exact: true }).isEnabled(), false)
+          assert.equal(await page.getByRole('combobox', { name: '诊断范围', exact: true }).isEnabled(), false)
+          await cancel.click()
+          await page.getByRole('button', { name: '继续运行', exact: true }).click()
+          await page.getByRole('dialog').waitFor({ state: 'hidden' })
+          assert(await cancel.evaluate((node) => document.activeElement === node), '取消确认关闭后恢复原操作焦点')
+          state.mode = 'failed'
+          await refresh()
+          await page.locator('.erp-dev-quality-operation [role="alert"]').waitFor()
+          assert.equal(await page.locator('.erp-dev-quality-flow__step').count(), 13)
+          assert.equal(await page.locator('.erp-dev-quality-operation .ant-progress').count(), 0)
+          assert.equal(await page.locator('.erp-dev-quality-operation').getByText('预计剩余', { exact: true }).count(), 0)
+          state.mode = 'idle'
+          state.error = 'summary'
+          await refresh()
+          await page.getByText('质量门禁状态读取失败', { exact: true }).waitFor()
+          state.error = ''
+          await refresh()
+          await page.getByRole('heading', { name: '诊断结果', exact: true }).waitFor()
+          assert.equal(await page.locator('.erp-dev-quality-flow__step').count(), 13)
+          assert.equal(await page.getByText('质量门禁状态读取失败', { exact: true }).count(), 0)
+          assert.equal(state.writes, 0, 'layout verification must not run or cancel diagnostics')
+        }
         await expectHeading(page, '质量门禁')
         await page.getByRole('tab', { name: '本地检查', exact: true }).waitFor()
         assert.equal(await page.getByRole('tab', { name: '本地检查', exact: true }).getAttribute('aria-selected'), 'true')
@@ -134,16 +171,16 @@ export function createDevQualityGateLayoutScenarios({
           await page.setViewportSize(viewport)
           await inFirstScreen('.erp-dev-quality-actions')
           await inFirstScreen('.erp-dev-quality-operation [role="alert"]')
-          const flow = await page.locator('.erp-dev-quality-flow').boundingBox()
+          const flow = await page.locator('.erp-dev-quality-flow__heading').boundingBox()
           assert(
-            flow.y < viewport.height - 90,
-            'diagnostic track must begin in the first screen'
+            flow && flow.y >= 0 && flow.y + flow.height <= viewport.height,
+            `stage details remain reachable below the result: ${JSON.stringify(flow)}`
           )
           const summary = await page
             .locator('.erp-dev-quality-context')
             .boundingBox()
           assert(
-            summary.height <= 140,
+            summary.height <= 44,
             `status and identity remain compact: ${summary.height}`
           )
           assert.equal(
@@ -159,26 +196,95 @@ export function createDevQualityGateLayoutScenarios({
                 parseFloat(getComputedStyle(node).fontSize)
               )) <= 18
           )
+          const operationBox = await page.locator('.erp-dev-quality-operation').boundingBox()
+          const historyBox = await page.locator('.erp-dev-quality-history').boundingBox()
+          if (viewport.width >= 1280) {
+            assert(historyBox.x >= operationBox.x + operationBox.width + 8, '历史与当前结果并排，保留清楚的栏间距')
+            assert(Math.abs(historyBox.y - operationBox.y) <= 1, '两栏顶端对齐')
+          } else {
+            assert(historyBox.y >= operationBox.y + operationBox.height, '窄桌面自然转为上下布局')
+          }
+          const factGeometry = await page.locator('.erp-dev-quality-operation__facts > div').evaluateAll((nodes) => nodes.map((node) => ({
+            labelBottom: node.querySelector('dt').getBoundingClientRect().bottom,
+            valueTop: node.querySelector('dd').getBoundingClientRect().top,
+          })))
+          assert(factGeometry.every((item) => item.valueTop >= item.labelBottom - 1), '结果字段标签与值按列对齐')
           await assertNoHorizontalOverflow(
             page,
             `quality layout ${viewport.width}`
           )
         }
         await page.setViewportSize({ width: 1280, height: 720 })
-        await page.locator('.erp-dev-quality-context .erp-workbench-notice__details summary').click()
-        await page
-          .getByText('尚未证明：干净 exact SHA、目标环境发布、客户 UAT', {
-            exact: true,
-          })
-          .waitFor()
-        await page.locator('.erp-dev-quality-context .erp-workbench-notice__details summary').click()
+        await page.getByRole('button', { name: '工作区判断依据', exact: true }).click()
+        await page.locator('.erp-dev-quality-context-help .erp-workbench-notice__details summary').click()
+        await page.getByText('尚未证明：干净 exact SHA、目标环境发布、客户 UAT', { exact: true }).waitFor()
+        await page.getByRole('button', { name: '工作区判断依据', exact: true }).click()
+        assert.equal(await page.locator('.erp-dev-quality-context .erp-dev-quality-status-banner').count(), 0, '普通工作区状态不占用警告框')
+        assert.equal(await page.locator('.erp-dev-quality-operation .ant-progress').count(), 0, '已结束的诊断不显示运行中进度')
+        await page.getByText('已完成清理读回', { exact: true }).first().waitFor()
         const stages = page.locator('.erp-dev-quality-flow__step')
         assert.equal(await stages.count(), 13)
-        await stages.first().locator('summary').click()
-        await stages.first().locator('details[open]').waitFor()
+        assert.equal(await stages.last().isVisible(), true, '阶段直接展示，不依赖整体展开')
+        await stages.first().getByRole('button').click()
+        await page.locator('.erp-dev-quality-flow__expanded').waitFor()
         await assertNoHorizontalOverflow(page, 'expanded stage evidence')
-        await page.locator('.erp-dev-quality-technical summary').click()
-        await page.getByText('工作区指纹', { exact: true }).waitFor()
+        await stages.first().getByRole('button').click()
+        await page.getByRole('button', { name: '技术详情', exact: true }).click()
+        const technicalDrawer = page.locator('.ant-drawer:visible')
+        await technicalDrawer.getByText('工作区指纹', { exact: true }).waitFor()
+        await technicalDrawer.locator('.ant-drawer-close').click()
+        await technicalDrawer.waitFor({ state: 'hidden' })
+        await page.getByRole('button', { name: '运行说明', exact: true }).click()
+        const helpDrawer = page.locator('.ant-drawer:visible')
+        await helpDrawer.getByText('静态工作原理，不代表当前运行状态', { exact: true }).waitFor()
+        await assertNoHorizontalOverflow(page, 'diagnostic scope and database guide')
+        await helpDrawer.locator('.ant-drawer-close').click()
+        await helpDrawer.waitFor({ state: 'hidden' })
+
+        state.mode = 'history'
+        state.historyCount = 12
+        await refresh()
+        await page.getByText('历史版本，不代表当前工作区', { exact: true }).waitFor()
+        const historyRows = page.locator('.erp-dev-quality-history .ant-table-row')
+        assert.equal(await historyRows.count(), 5, '默认只显示最近 5 条，分页保留所有记录')
+        const firstPageTime = await historyRows.first().locator('time').first().getAttribute('datetime')
+        await page.locator('.erp-dev-quality-history .ant-pagination-item-2').click()
+        assert.equal(await historyRows.count(), 5)
+        assert.notEqual(await historyRows.first().locator('time').first().getAttribute('datetime'), firstPageTime)
+        await page.locator('.erp-dev-quality-history .ant-pagination-item-3').click()
+        assert.equal(await historyRows.count(), 2)
+        await page.locator('.erp-dev-quality-history-analysis > summary').click()
+        await page.locator('.erp-dev-quality-history-trend').waitFor()
+        await assertNoHorizontalOverflow(page, 'history pagination and trend')
+        await page.locator('.erp-dev-quality-history-analysis > summary').click()
+        state.historyCount = 0
+        state.mode = 'failed'
+        await refresh()
+        await page.locator('.erp-dev-quality-operation [role="alert"]').waitFor()
+
+        if (state.localOnly) {
+          await verifyRunRecovery()
+          const profile = page.getByRole('combobox', { name: '诊断范围', exact: true })
+          await profile.press('ArrowDown')
+          await page.locator('.ant-select-dropdown:visible').getByText('完整诊断', { exact: true }).click()
+          await page.getByRole('button', { name: '运行本机完整诊断', exact: true }).waitFor()
+          assert.equal(new URL(page.url()).searchParams.get('profile'), 'full')
+          await page.reload()
+          await page.getByRole('button', { name: '运行本机完整诊断', exact: true }).waitFor()
+          await page.locator('.erp-dev-quality-flow__heading').getByText('9 个阶段', { exact: true }).waitFor()
+          assert.equal(await page.locator('.erp-dev-quality-flow__step').count(), 9)
+          await assertNoHorizontalOverflow(page, 'diagnostic range restored')
+          await profile.press('ArrowDown')
+          await page.locator('.ant-select-dropdown:visible').getByText('严格诊断', { exact: true }).click()
+          await verifySlidingMotion(page, assert, '.erp-dev-quality-workspace-tabs', 1)
+          await page.locator('.erp-dev-quality-coverage').waitFor()
+          await verifySlidingMotion(page, assert, '.erp-dev-quality-workspace-tabs', 0)
+          await page.getByRole('button', { name: '运行本机严格诊断', exact: true }).waitFor()
+          state.mode = 'failed'
+          await refresh()
+          await page.setViewportSize({ width: 1920, height: 1080 })
+          return
+        }
 
         await verifySlidingMotion(page, assert, '.erp-dev-quality-tabs', 2)
         await page
@@ -220,7 +326,7 @@ export function createDevQualityGateLayoutScenarios({
         await verifySlidingMotion(page, assert, '[aria-label="门禁范围"]', 2)
         await page.waitForURL((url) => url.searchParams.get('filter') === 'all')
         await page.locator('.ant-table-row-expand-icon').first().click()
-        await page.getByText('替代或退出条件', { exact: true }).waitFor()
+        await page.getByText('调整条件', { exact: true }).waitFor()
         await assertNoHorizontalOverflow(page, 'expanded governance evidence')
         state.empty = true
         await page.getByText('与当前改动有关', { exact: true }).click()
@@ -292,9 +398,8 @@ export function createDevQualityGateLayoutScenarios({
         state.unknown = true
         await refresh()
         await page.getByText('当前改动没有匹配门禁', { exact: true }).waitFor()
-        await page
-          .getByRole('link', { name: '核对验证范围', exact: true })
-          .waitFor()
+        await page.getByText('未知改动需要人工核对验证范围，必要时运行完整门禁。', { exact: true }).waitFor()
+        assert.equal(await page.getByRole('link', { name: '核对验证范围', exact: true }).count(), 0, '未知改动保留范围核对说明，不重复提供跨页入口')
         await verifySlidingMotion(page, assert, '[aria-label="风险范围"]', 1)
         await page
           .getByText('当前筛选下没有高风险匹配项', { exact: true })
@@ -324,34 +429,46 @@ export function createDevQualityGateLayoutScenarios({
         await refresh()
         await page.locator('.erp-dev-quality-coverage').waitFor()
 
-        state.mode = 'running'
         await verifySlidingMotion(page, assert, '.erp-dev-quality-workspace-tabs', 0)
-        await refresh()
-        await page.getByRole('button', { name: /取消运行/u }).waitFor()
-        assert.equal(
-          await page
-            .getByRole('button', { name: '运行本机严格诊断', exact: true })
-            .isEnabled(),
-          false
-        )
-        state.mode = 'idle'
-        state.error = 'summary'
-        await refresh()
-        await page.getByText('质量门禁状态读取失败', { exact: true }).waitFor()
-        state.error = ''
-        await refresh()
-        await page
-          .getByRole('heading', { name: '本机严格诊断流程预览', exact: true })
-          .waitFor()
-        assert.equal(
-          await page.getByText('质量门禁状态读取失败', { exact: true }).count(),
-          0
-        )
-        assert.equal(
-          state.writes,
-          0,
-          'layout verification must not run or cancel diagnostics'
-        )
+        await verifyRunRecovery()
+      },
+    },
+  ]
+  return [
+    ...scenarios,
+    {
+      ...scenarios[0],
+      name: 'dev-quality-gates-local-diagnostics-desktop-light',
+      deviceScaleFactor: 2,
+      expectedConsoleErrorPatterns: [
+        /console error.*status of 503.*\/__dev\/api\/qa\/quality-gates:0:0$/u,
+      ],
+      verify: async (page) => {
+        states.get(page).localOnly = true
+        await scenarios[0].verify(page)
+      },
+    },
+    {
+      ...scenarios[0],
+      name: 'dev-workbench-content-desktop-light',
+      path: '/__dev/quality-gates?view=governance&filter=all',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      expectedConsoleErrorPatterns: [],
+      verify: async (page) => {
+        const view = page.locator('.erp-dev-quality-governance-view')
+        await view.locator('.ant-table-row').first().waitFor()
+        await view.locator('.ant-table-row-expand-icon').first().click()
+        const detail = view.locator('.ant-table-expanded-row')
+        await detail.waitFor()
+        assert.equal(await detail.locator('[data-source-reference]').count(), 0)
+        for (const label of ['适用范围', '失败影响', '与其他门禁关系', '调整条件']) await detail.getByText(label, { exact: true }).waitFor()
+        assert(!/Stable key|正式执行入口引用|唯一验证记录/u.test(await detail.innerText()))
+        for (const width of [1024, 1280, 1920]) {
+          await page.setViewportSize({ width, height: 1080 })
+          await assertNoHorizontalOverflow(page, '门禁规则摘要')
+        }
+        assert.equal(states.get(page).writes, 0)
       },
     },
   ]

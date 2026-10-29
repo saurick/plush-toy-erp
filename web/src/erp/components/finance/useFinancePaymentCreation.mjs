@@ -7,7 +7,7 @@ import {
   FinancePaymentStatus,
 } from '../../../common/consts/statuses.generated.mjs'
 
-import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
+import { useProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -35,6 +35,7 @@ export default function useFinancePaymentCreation({
   sourceContext = null,
 }) {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
   const [paymentOpen, setPaymentOpen] = useState(false)
 
   const [refundSource, setRefundSource] = useState(null)

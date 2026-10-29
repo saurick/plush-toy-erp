@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { purchaseFollowupFixture } from './purchaseFollowupFixtures.mjs'
 
 const orders = Array.from({ length: 251 }, (_, index) => ({
   id: index + 1,
@@ -98,6 +99,7 @@ export function createSalesOrderExportScenarios({ assert, customerRuntimeEffecti
         page.purchaseExportRows = rows
         await page.route('**/rpc/purchase_order', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
+          if (method === 'list_purchase_followups') return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(purchaseFollowupFixture([{ key: 'unscheduled:8801:1', source_type: 'purchase_order', source_id: 8801, source_no: 'PO-EXPORT-EMPTY', order_id: 8801, order_no: 'PO-EXPORT-EMPTY', supplier_id: 0, supplier_name: '', line_id: 1, line_no: '1', material_code: '', material_name: '', unit_name: '', quantity: '', due_date: '', date_source: '', kind: 'unscheduled' }], params)) } })
           if (method !== 'list_purchase_orders') return route.fallback()
           await route.fulfill({ json: {
             jsonrpc: '2.0',
@@ -125,7 +127,7 @@ export function createSalesOrderExportScenarios({ assert, customerRuntimeEffecti
         await page.getByText('已导出 1 条采购订单', { exact: true }).waitFor()
         page.purchaseExportRows[0] = { ...page.purchaseExportRows[0], supplier_id: 0, supplier_snapshot: {} }
         await page.getByText('到货计划', { exact: true }).click()
-        await page.getByText('供应商未填写', { exact: true }).waitFor()
+        await page.getByRole('region', { name: '采购到货计划' }).getByText('PO-EXPORT-EMPTY', { exact: true }).waitFor()
         const arrivalDownloadPromise = page.waitForEvent('download')
         await page.getByRole('button', { name: '导出当前结果', exact: true }).click()
         const arrivalDownload = await arrivalDownloadPromise
@@ -134,9 +136,8 @@ export function createSalesOrderExportScenarios({ assert, customerRuntimeEffecti
           .replace(/^\uFEFF/u, '').split('\n').map((line) => line.split(','))
         const arrivalRow = Object.fromEntries(arrivalHeader.map((label, index) => [label, arrivalValues[index]]))
         assert.equal(arrivalRow['供应商'], '')
-        assert.equal(arrivalRow['到货日期'], '')
-        assert.equal(arrivalRow['日期确认'], '待供应商确认')
-        assert.equal(arrivalRow['交期提醒'], '未填到货日')
+        assert.equal(arrivalRow['交期'], '')
+        assert.equal(arrivalRow['需跟进事项'], '未排交期')
       },
     },
     {

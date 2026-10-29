@@ -66,7 +66,12 @@ func (r *purchaseOrderRepo) CreatePurchaseOrder(ctx context.Context, in *biz.Pur
 }
 
 func (r *purchaseOrderRepo) UpdatePurchaseOrder(ctx context.Context, id int, in *biz.PurchaseOrderMutation) (*biz.PurchaseOrder, error) {
-	update := r.data.postgres.PurchaseOrder.UpdateOneID(id).
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	update := tx.PurchaseOrder.UpdateOneID(id).
 		SetPurchaseOrderNo(in.PurchaseOrderNo).
 		SetSupplierID(in.SupplierID).
 		SetCurrency(in.Currency).
@@ -121,6 +126,13 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrder(ctx context.Context, id int, in 
 		}
 		return nil, err
 	}
+	if err := validatePurchaseOrderMaterialSuppliers(ctx, tx.Client(), id, in.SupplierID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entPurchaseOrderToBiz(row), nil
 }
 
@@ -292,6 +304,11 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrderLifecycle(ctx context.Context, id
 	if affected == 0 && row.LifecycleStatus != lifecycleStatus {
 		return nil, biz.ErrSourceOrderStateInvalid
 	}
+	if lifecycleStatus == biz.PurchaseOrderStatusSubmitted || lifecycleStatus == biz.PurchaseOrderStatusApproved {
+		if err := validatePurchaseOrderMaterialSuppliers(ctx, tx.Client(), row.ID, row.SupplierID); err != nil {
+			return nil, err
+		}
+	}
 	if err := syncPurchaseOrderHandoffs(ctx, tx.Client(), id, 0); err != nil {
 		return nil, err
 	}
@@ -455,6 +472,11 @@ func (r *purchaseOrderRepo) updatePurchaseOrderForProcessCommand(
 	}
 	if current.LifecycleStatus != expectedStatus {
 		return nil, biz.ErrSourceOrderStateInvalid
+	}
+	if nextStatus == biz.PurchaseOrderStatusSubmitted || nextStatus == biz.PurchaseOrderStatusApproved {
+		if err := validatePurchaseOrderMaterialSuppliers(ctx, tx.Client(), current.ID, current.SupplierID); err != nil {
+			return nil, err
+		}
 	}
 	row, err := tx.PurchaseOrder.UpdateOneID(purchaseOrderID).
 		Where(purchaseorder.Version(current.Version), purchaseorder.LifecycleStatus(expectedStatus)).
@@ -1426,6 +1448,13 @@ func entPurchaseOrderItemsToBiz(rows []*ent.PurchaseOrderItem) []*biz.PurchaseOr
 // Source identity changes take a fresh snapshot; ordinary edits preserve the saved
 // contract values, including unknown values on orders created before these fields.
 func preparePurchaseItemPrintSnapshots(ctx context.Context, client *ent.Client, in *biz.PurchaseOrderItemMutation, current *ent.PurchaseOrderItem) error {
+	order, err := client.PurchaseOrder.Get(ctx, in.PurchaseOrderID)
+	if err != nil {
+		return err
+	}
+	if err := validatePurchaseMaterialSupplier(ctx, client, order.SupplierID, []int{in.MaterialID}); err != nil {
+		return err
+	}
 	if current != nil && current.MaterialID == in.MaterialID {
 		in.MaterialSpecSnapshot = current.MaterialSpecSnapshot
 		in.SupplierItemNoSnapshot = current.SupplierItemNoSnapshot

@@ -74,7 +74,7 @@ func (*documentedInventoryRepo) ListInventoryLotsForAccess(context.Context, biz.
 }
 
 func (*documentedInventoryRepo) ListInventoryBalancesForAccess(context.Context, biz.InventoryBalanceFilter, biz.WarehouseDataScope) ([]*biz.InventoryBalance, int, error) {
-	return []*biz.InventoryBalance{{ID: 2, SubjectType: "PRODUCT", SubjectID: 1, WarehouseID: 2, UnitID: 1, Quantity: decimal.RequireFromString("12.5"), ActiveReservedQuantity: decimal.NewFromInt(4), AvailableQuantity: decimal.RequireFromString("8.5"), ReadyToShipQuantity: decimal.RequireFromString("8.5"), UpdatedAt: time.Date(2026, 6, 17, 8, 0, 0, 0, time.UTC)}}, 1, nil
+	return []*biz.InventoryBalance{{ID: 2, SubjectType: "PRODUCT", SubjectID: 1, WarehouseID: 2, UnitID: 1, Quantity: decimal.RequireFromString("12.5"), ActiveReservedQuantity: decimal.NewFromInt(4), AvailableQuantity: decimal.RequireFromString("8.5"), LotStatus: "ACTIVE", ReadyToShipQuantity: decimal.RequireFromString("8.5"), UpdatedAt: time.Date(2026, 6, 17, 8, 0, 0, 0, time.UTC)}}, 1, nil
 }
 
 func (*documentedInventoryRepo) ListInventoryTxnsForAccess(context.Context, biz.InventoryTxnFilter, biz.WarehouseDataScope) ([]*biz.InventoryTxn, int, error) {

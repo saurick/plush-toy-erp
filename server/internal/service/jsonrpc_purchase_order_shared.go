@@ -153,6 +153,8 @@ func (d *jsonrpcDispatcher) purchaseOrderErrorResult(ctx context.Context, err er
 	}
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrPurchaseOrderMaterialSupplierMismatch):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "材料所属厂商与采购供应商不一致，请更换材料或供应商后重试"}
 	case errors.Is(err, biz.ErrPurchaseOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrPurchaseOrderPriceFrozen):

@@ -102,9 +102,9 @@ test('fact ledger catalog is complete, read-only, and source-backed', () => {
 test('fact ledger catalog explicitly refuses unsupported runtime proof lookup', () => {
   assert.deepEqual(DEV_FACT_LEDGER_RUNTIME_QUERY, {
     availability: 'unavailable',
-    label: '未提供运行凭证查询',
+    label: '未提供通用跨领域凭证查询',
     reason:
-      '当前后端没有跨领域、按事实凭证 ID 读取 Fact/Ledger 的统一只读接口；观察台只展示定义和代码证据。',
+      '当前没有通用跨领域凭证查询；此页展示定义与代码依据。财务记录可在实例跟踪中按账款查询已有领域关联，不代表完整跨域历史。',
   })
 })
 

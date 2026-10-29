@@ -502,6 +502,7 @@ func TestFinishedGoodsQualityProcessDomainCommandDecideBindsShipmentLinkedInspec
 			"defect_rate_operator":  QualityInspectionDefectRateOperatorApprox,
 			"defect_rate_percent":   "5.0",
 			"decision_note":         "成品质检通过，进入财务放行",
+			"check_items":           []map[string]any{{"name": "外观", "requirement": "符合确认样", "observation": "无异常", "scope": "FULL", "result": "PASS"}},
 		},
 	}, 7)
 	if err != nil {
@@ -509,6 +510,9 @@ func TestFinishedGoodsQualityProcessDomainCommandDecideBindsShipmentLinkedInspec
 	}
 	if inventoryRepo.passInput == nil {
 		t.Fatal("expected finished goods quality pass usecase input")
+	}
+	if len(inventoryRepo.passInput.CheckItems) != 1 || inventoryRepo.passInput.CheckItems[0].Observation != "无异常" {
+		t.Fatalf("process command lost inspection evidence: %+v", inventoryRepo.passInput)
 	}
 	if inventoryRepo.passInput.InspectionID != 8001 {
 		t.Fatalf("expected inspection id 8001, got %d", inventoryRepo.passInput.InspectionID)
@@ -641,4 +645,38 @@ func (r *qualityInspectionProcessInventoryRepoStub) RejectQualityInspection(_ co
 func (r *qualityInspectionProcessInventoryRepoStub) PostPurchaseReceipt(context.Context, int) (*PurchaseReceipt, error) {
 	r.postCalled = true
 	return nil, errors.New("post purchase receipt must not be called by quality_inspection.aggregate_gate")
+}
+
+func TestFinishedGoodsQualityProcessDomainCommandRequiresAndComparesEvidence(t *testing.T) {
+	sourceType, inspectionType, result := QualityInspectionSourceShipment, QualityInspectionTypeFinishedGoods, QualityInspectionResultPass
+	sourceID, actorID := 9001, 7
+	inspection := &QualityInspection{ID: 8001, SourceType: &sourceType, SourceID: &sourceID, InspectionType: &inspectionType, InventoryLotID: 7001, Status: QualityInspectionStatusSubmitted}
+	handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewQualityInspectionUsecase(&qualityInspectionProcessInventoryRepoStub{inspection: inspection})}
+	payload := map[string]any{"shipment_id": 9001, "quality_inspection_id": 8001, "result": result, "defect_rate_operator": "APPROX", "defect_rate_percent": "0", "inspected_at": "2026-10-26"}
+	input := &ProcessDomainCommandInput{ProcessInstance: &ProcessInstance{ID: 11, BusinessRefType: "shipment", BusinessRefID: 9001}, CommandKey: ProcessDomainCommandFinishedGoodsQualityDecide, Payload: payload}
+	if err := handler.ValidateProcessDomainCommand(context.Background(), input, actorID); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("missing process evidence: %v", err)
+	}
+	checks := []map[string]any{{"name": "外观", "requirement": "符合确认样", "observation": "无异常", "scope": "FULL", "result": "PASS"}}
+	payload["check_items"] = checks
+	if err := handler.ValidateProcessDomainCommand(context.Background(), input, actorID); err != nil {
+		t.Fatalf("valid process evidence: %v", err)
+	}
+	normalized, err := handler.NormalizeProcessDomainCommandPayload(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := processDomainCommandFingerprint(input.CommandKey, "same", normalized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks[0]["observation"] = "已改变"
+	normalized, err = handler.NormalizeProcessDomainCommandPayload(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := processDomainCommandFingerprint(input.CommandKey, "same", normalized)
+	if err != nil || first == second {
+		t.Fatal("changed evidence did not change immutable command intent")
+	}
 }

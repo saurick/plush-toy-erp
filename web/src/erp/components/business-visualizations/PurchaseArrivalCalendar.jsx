@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useCallback } from 'react'
 import {
   DownloadOutlined,
   LeftOutlined,
@@ -7,368 +7,363 @@ import {
 import { Button } from 'antd'
 import dayjs from 'dayjs'
 import { currentBusinessDate } from '../../utils/businessDate.mjs'
+import { moveBusinessDate } from '../../utils/businessVisualizationModels.mjs'
 import {
-  buildPurchaseArrivalModel,
-  filterPurchaseArrivalRows,
-  moveBusinessDate,
-  paginateVisualizationRows,
-} from '../../utils/businessVisualizationModels.mjs'
+  PURCHASE_FOLLOWUP_LABELS,
+  PURCHASE_FOLLOWUP_NEXT_ACTIONS,
+  purchaseFollowupPageChange,
+} from '../../utils/purchaseFollowup.mjs'
 import {
-  PURCHASE_ORDER_STATUS_LABELS,
-  statusText,
-} from '../../utils/masterDataOrderView.mjs'
-import { BusinessDataTable } from '../business-list/BusinessListLayout.jsx'
+  BusinessDataTable,
+  BusinessOperationPanel,
+  SearchInput,
+  SelectFilter,
+} from '../business-list/BusinessListLayout.jsx'
 import { DateInput } from '../business-list/BusinessDateInputs.jsx'
-import { downloadBusinessListCSV } from '../business-list/BusinessListToolbarActions.jsx'
+import useBusinessListExport from '../../hooks/useBusinessListExport.js'
+import { listAllPurchaseFollowups } from '../../api/masterDataOrderApi.mjs'
 import {
   BusinessVisualizationFrame,
   VisualizationState,
 } from './BusinessVisualizationFrame.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
+import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 
-const confirmationLabel = (row) =>
-  row.confirmedDate ? '供应商已确认' : '待供应商确认'
+const dateSourceLabel = {
+  line: '明细交期',
+  confirmed: '供应商已确认',
+  expected: '整单预计',
+}
 const columns = [
-  { title: '采购单号', dataIndex: 'orderNo', width: 190, copyable: true, render: (value) => value || '采购订单未编号' },
-  { title: '供应商', dataIndex: 'supplierName', width: 200, copyable: true, render: (value) => value || '供应商未填写' },
+  { title: '来源单号', dataIndex: 'source_no', width: 190, copyable: true },
+  { title: '供应商', dataIndex: 'supplier_name', width: 170, copyable: true },
   {
-    title: '订单状态',
-    dataIndex: 'lifecycleStatus',
-    width: 100,
-    render: (value) => statusText(value, PURCHASE_ORDER_STATUS_LABELS),
+    title: '材料',
+    key: 'material',
+    width: 210,
+    render: (_, row) =>
+      [row.material_code, row.material_name].filter(Boolean).join(' · ') ||
+      '整张收货单',
     exportValue: (row) =>
-      statusText(row.lifecycleStatus, PURCHASE_ORDER_STATUS_LABELS, undefined, { emptyText: '' }),
+      [row.material_code, row.material_name].filter(Boolean).join(' · '),
   },
   {
-    title: '到货日期',
-    dataIndex: 'arrivalDate',
-    width: 160,
-    render: (value, row) => (
-      <span className="erp-arrival-calendar__date">
-        <span>{value || '未填日期'}</span>
-        {row.confirmedDate &&
-        row.expectedDate &&
-        row.confirmedDate !== row.expectedDate ? (
-          <small>原预计 {row.expectedDate}</small>
-        ) : null}
-      </span>
-    ),
-    exportValue: (row) => row.arrivalDate || '',
+    title: '待办数量',
+    key: 'quantity',
+    width: 120,
+    render: (_, row) =>
+      row.quantity ? `${row.quantity} ${row.unit_name}` : '—',
+    exportValue: (row) =>
+      row.quantity ? `${row.quantity} ${row.unit_name}` : '',
   },
   {
-    title: '日期确认',
-    key: 'confirmation',
-    width: 150,
-    render: (_, row) => confirmationLabel(row),
-    exportValue: confirmationLabel,
-  },
-  {
-    title: '交期提醒',
-    key: 'reminder',
+    title: '交期',
+    dataIndex: 'due_date',
     width: 140,
-    render: (_, row) => (
-      <span
-        className={`erp-business-visual-status erp-business-visual-status--${row.status.key}`}
-      >
-        {row.status.label}
+    render: (date, row) => (
+      <span className="erp-arrival-calendar__date">
+        <span>{date || '—'}</span>
+        {date && <small>{dateSourceLabel[row.date_source]}</small>}
       </span>
     ),
-    exportValue: (row) => row.status.label,
+  },
+  {
+    title: '需跟进事项',
+    dataIndex: 'kind',
+    width: 130,
+    render: (kind) => PURCHASE_FOLLOWUP_LABELS[kind],
+    exportValue: (row) => PURCHASE_FOLLOWUP_LABELS[row.kind],
+  },
+  {
+    title: '岗位与下一步',
+    dataIndex: 'kind',
+    key: 'next',
+    width: 260,
+    render: (kind) => PURCHASE_FOLLOWUP_NEXT_ACTIONS[kind],
+    exportValue: (row) => PURCHASE_FOLLOWUP_NEXT_ACTIONS[row.kind],
   },
 ]
 
 export default function PurchaseArrivalCalendar({
-  orders,
+  board,
+  view = 'arrival',
   loading,
   error,
   onRetry,
   onOpen,
-  onSelect,
-  selectedRowKeys = [],
-  selectionDisabled = false,
-  onClearQuery,
-  hasQueryFilters = false,
-  switcher,
   viewState = {},
   onViewStateChange,
+  keyword = '',
+  onKeywordChange,
+  supplierFilter = '',
+  supplierOptions = [],
+  onSupplierChange,
+  queryParams,
 }) {
-  const today = currentBusinessDate()
+  const arrival = view === 'arrival'
+  const today = board?.as_of_date || currentBusinessDate()
   const startDate = viewState.startDate || today
+  const endDate = moveBusinessDate(startDate, 13)
   const filter = viewState.filter || 'all'
   const confirmation = viewState.confirmation || 'all'
   const change = (patch) =>
-    onViewStateChange?.({ ...viewState, page: 1, ...patch })
-  const model = useMemo(
-    () => buildPurchaseArrivalModel(orders, { startDate, today, confirmation }),
-    [orders, startDate, today, confirmation]
+    onViewStateChange?.(purchaseFollowupPageChange(viewState, patch))
+  const counts = board?.counts || {}
+  const rows = board?.rows || []
+  const loadExportRows = useCallback(
+    async ({ signal }) => {
+      const result = await listAllPurchaseFollowups(queryParams, { signal })
+      return result.rows
+    },
+    [queryParams]
   )
-  const filtered = useMemo(
-    () =>
-      filterPurchaseArrivalRows(model, {
-        filter,
-        selectedDate: viewState.selectedDate,
-      }),
-    [model, filter, viewState.selectedDate]
-  )
-  const pagination = paginateVisualizationRows(filtered, viewState.page)
-  const selectionLabel =
-    filter === 'date'
-      ? `${viewState.selectedDate} 到货安排`
-      : {
-          all: '全部到货安排',
-          period: '当前 14 天',
-          overdue: '已逾期',
-          dueSoon: '7 天内到货',
-          unscheduled: '未填日期',
-        }[filter]
-  const movePeriod = (delta) =>
-    change({
-      startDate: moveBusinessDate(model.startDate, delta),
-      filter: 'period',
-      selectedDate: '',
-    })
-  const resetPlan = () =>
-    change({
-      filter: 'all',
-      confirmation: 'all',
-      selectedDate: '',
-      startDate: today,
-    })
-  const choose = (row) => {
-    if (!selectionDisabled) onSelect?.(row)
-  }
-  const emptyDescription = (
-    <div className="erp-arrival-calendar__empty">
-      <span>
-        {filter === 'date'
-          ? '所选日期暂无到货安排'
-          : filter === 'period'
-            ? '当前 14 天暂无到货安排'
-            : '当前条件暂无采购订单'}
-      </span>
-      <div className="erp-arrival-calendar__empty-actions">
-        {filter !== 'all' || confirmation !== 'all' ? (
-          <Button onClick={resetPlan}>查看全部到货安排</Button>
-        ) : null}
-        {hasQueryFilters ? (
-          <Button
-            onClick={() => {
-              resetPlan()
-              onClearQuery?.()
-            }}
-          >
-            清除查询条件
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  )
+  const { exporting, exportRows } = useBusinessListExport({
+    requestKey: 'purchase-followups-export',
+    loadRows: loadExportRows,
+    filename: `采购跟进_${today}.csv`,
+    columns,
+    recordLabel: '采购跟进事项',
+  })
+  const kinds = arrival
+    ? ['overdue', 'due_soon', 'unscheduled', 'scheduled']
+    : [
+        'overdue',
+        'unscheduled',
+        ...(board?.access?.quality
+          ? ['pending_inspection', 'rejected', 'ready_inbound']
+          : []),
+        ...(board?.access?.commercial ? ['missing_price'] : []),
+        ...(board?.access?.finance ? ['unsettled'] : []),
+      ]
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0)
+  const actionColumns = [
+    ...columns,
+    {
+      title: '办理入口',
+      key: 'action',
+      fixed: 'right',
+      width: 125,
+      render: (_, row) => (
+        <Button type="link" onClick={() => onOpen?.(row)}>
+          {row.source_type === 'purchase_order' ? '打开采购单' : '打开收货单'}
+        </Button>
+      ),
+    },
+  ]
   return (
-    <BusinessVisualizationFrame
-      className="erp-purchase-arrival-visual"
-      switcher={switcher}
-      title="采购到货计划"
-      loading={loading}
-      error={error}
-      metricsLabel="到货安排"
-      countUnit="张"
-      metrics={[
-        { key: 'all', label: '全部', value: model.counts.total },
-        {
-          key: 'overdue',
-          label: '已逾期',
-          value: model.counts.overdue,
-          tone: 'danger',
-        },
-        {
-          key: 'dueSoon',
-          label: '7 天内',
-          value: model.counts.dueSoon,
-          tone: 'warning',
-        },
-        {
-          key: 'unscheduled',
-          label: '未填日期',
-          value: model.counts.unscheduled,
-        },
-        { key: 'period', label: '当前 14 天', value: model.counts.period },
-      ].map((metric) => ({
-        ...metric,
-        selected: filter === metric.key,
-        onClick: () => change({ filter: metric.key, selectedDate: '' }),
-      }))}
-    >
-      <div className="erp-arrival-calendar__toolbar">
-        <div className="erp-arrival-calendar__period">
-          <Button
-            aria-label="前 14 天"
-            icon={<LeftOutlined aria-hidden="true" />}
-            onClick={() => movePeriod(-14)}
-          />
-          <strong>
-            {model.startDate} — {model.endDate}
-          </strong>
-          <Button
-            aria-label="后 14 天"
-            icon={<RightOutlined aria-hidden="true" />}
-            onClick={() => movePeriod(14)}
-          />
-          <Button
-            onClick={() =>
-              change({ startDate: today, filter: 'date', selectedDate: today })
-            }
-          >
-            今天
-          </Button>
-        </div>
-        <div className="erp-arrival-calendar__filters">
-          <div className="erp-arrival-calendar__date-jump">
-            <DateInput
-              aria-label="跳转到货日期"
-              placeholder="跳转日期"
-              value={viewState.selectedDate || ''}
-              onChange={(date) =>
-                change(
-                  date
-                    ? { startDate: date, selectedDate: date, filter: 'date' }
-                    : { selectedDate: '', filter: 'period' }
-                )
-              }
+    <>
+      <BusinessOperationPanel
+        filters={
+          <>
+            <SearchInput
+              value={keyword}
+              placeholder="搜索单号、供应商或材料"
+              onSearch={(value) => {
+                change({})
+                onKeywordChange?.(value)
+              }}
             />
-          </div>
-          <FilterSelect
-            emptyValue="all"
-            label="到货日期确认状态"
-            placeholder="到货日期确认状态"
-            aria-label="到货日期确认状态"
-            value={confirmation}
-            onChange={(value) => change({ confirmation: value })}
-            options={[
-              { value: 'all', label: '全部确认状态' },
-              { value: 'confirmed', label: '供应商已确认' },
-              { value: 'unconfirmed', label: '待供应商确认' },
-            ]}
-          />
-          {filter !== 'all' || confirmation !== 'all' || startDate !== today ? (
-            <Button onClick={resetPlan}>重置到货筛选</Button>
-          ) : null}
-        </div>
-      </div>
-      <VisualizationState loading={loading} error={error} onRetry={onRetry} />
-      {!loading && !error ? (
-        <>
-          <div className="erp-arrival-calendar__calendar">
-            <div
-              className="erp-arrival-calendar__days"
-              aria-label="14 天到货安排"
-            >
-              {model.days.map((day) => {
-                const selected =
-                  filter === 'date' && day.dateKey === viewState.selectedDate
-                return (
-                  <button
-                    key={day.dateKey}
-                    type="button"
-                    aria-label={`${day.dateKey}，${day.items.length} 张采购订单`}
-                    aria-current={day.dateKey === today ? 'date' : undefined}
-                    aria-pressed={selected}
-                    className={[
-                      'erp-arrival-calendar__day',
-                      day.dateKey === today
-                        ? 'erp-arrival-calendar__day--today'
-                        : '',
-                      selected ? 'erp-arrival-calendar__day--selected' : '',
-                      day.items.length
-                        ? ''
-                        : 'erp-arrival-calendar__day--muted',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    onClick={() =>
-                      change(
-                        selected
-                          ? { selectedDate: '', filter: 'period' }
-                          : { selectedDate: day.dateKey, filter: 'date' }
-                      )
-                    }
-                  >
-                    <span className="erp-arrival-calendar__day-label">
-                      <span className="erp-arrival-calendar__day-number">
-                        {dayjs(day.dateKey).format('MM-DD')}
-                      </span>
-                      <small>
-                        周{'日一二三四五六'[dayjs(day.dateKey).day()]}
-                      </small>
-                    </span>
-                    <strong>
-                      {day.items.length} <small>单</small>
-                    </strong>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-          <div className="erp-arrival-calendar__detail">
-            <div className="erp-arrival-calendar__detail-head">
-              <div>
-                <strong>{selectionLabel}</strong>
-                <span>
-                  {filtered.length} 张订单
-                  {confirmation !== 'all'
-                    ? ` · ${confirmation === 'confirmed' ? '供应商已确认' : '待供应商确认'}`
-                    : ''}
-                </span>
-              </div>
+            <RemoteReferenceSelect
+              referenceType="suppliers"
+              component={SelectFilter}
+              aria-label="跟进供应商"
+              value={supplierFilter}
+              options={[{ label: '全部供应商', value: '' }, ...supplierOptions]}
+              placeholder="供应商"
+              showSearch
+              onChange={(value) => {
+                change({})
+                onSupplierChange?.(value || '')
+              }}
+            />
+          </>
+        }
+      />
+      <BusinessVisualizationFrame
+        title={arrival ? '采购到货计划' : '采购异常汇总'}
+        className="erp-arrival-calendar"
+        loading={loading}
+        error={error}
+        metricsLabel={arrival ? '待到货明细' : '需跟进事项'}
+        countUnit="项"
+        metrics={[
+          { key: 'all', label: '全部', value: total },
+          ...kinds.map((key) => ({
+            key,
+            label: PURCHASE_FOLLOWUP_LABELS[key],
+            value: counts[key] || 0,
+            tone:
+              key === 'overdue' || key === 'rejected' ? 'danger' : 'neutral',
+          })),
+        ].map((metric) => ({
+          ...metric,
+          selected: filter === metric.key,
+          onClick: () => change({ filter: metric.key, selectedDate: '' }),
+        }))}
+      >
+        {arrival && (
+          <div className="erp-arrival-calendar__toolbar">
+            <div className="erp-arrival-calendar__period">
               <Button
-                icon={<DownloadOutlined aria-hidden="true" />}
-                disabled={filtered.length === 0}
+                aria-label="前 14 天"
+                icon={<LeftOutlined />}
                 onClick={() =>
-                  downloadBusinessListCSV({
-                    filename: `采购到货计划_${today}.csv`,
-                    columns,
-                    rows: filtered,
+                  change({
+                    startDate: moveBusinessDate(startDate, -14),
+                    filter: 'period',
+                    selectedDate: '',
+                  })
+                }
+              />
+              <strong>
+                {startDate} — {endDate}
+              </strong>
+              <Button
+                aria-label="后 14 天"
+                icon={<RightOutlined />}
+                onClick={() =>
+                  change({
+                    startDate: moveBusinessDate(startDate, 14),
+                    filter: 'period',
+                    selectedDate: '',
+                  })
+                }
+              />
+              <Button
+                onClick={() =>
+                  change({
+                    startDate: today,
+                    selectedDate: today,
+                    filter: 'date',
                   })
                 }
               >
-                导出当前结果
+                今天
               </Button>
             </div>
-            <BusinessDataTable
-              rowKey="id"
-              columns={columns}
-              dataSource={filtered}
-              rowSelection={{
-                type: 'radio',
-                selectedRowKeys,
-                getCheckboxProps: () => ({ disabled: selectionDisabled }),
-                onChange: (_, rows) => choose(rows[0]),
-              }}
-              rowClassName={(row) =>
-                selectedRowKeys.includes(row.id) ? 'ant-table-row-selected' : ''
-              }
-              onRow={(row) => ({ onClick: () => choose(row) })}
-              onOpenRecord={(row) => {
-                if (!selectionDisabled) onOpen?.(row)
-              }}
-              pagination={
-                filtered.length
-                  ? {
-                      current: pagination.page,
-                      pageSize: pagination.pageSize,
-                      total: pagination.total,
-                      showSizeChanger: false,
-                      onChange: (page) => change({ page }),
-                    }
-                  : false
-              }
-              emptyDescription={emptyDescription}
-            />
-            <p className="erp-arrival-calendar__note">
-              按订单交期提醒，供应商确认日期优先；实际到货以收货记录为准。
-            </p>
+            <div className="erp-arrival-calendar__filters">
+              <div className="erp-arrival-calendar__date-jump">
+                <DateInput
+                  aria-label="跳转到货日期"
+                  placeholder="跳转日期"
+                  value={viewState.selectedDate || ''}
+                  onChange={(date) =>
+                    change({
+                      startDate: date || today,
+                      selectedDate: date || '',
+                      filter: date ? 'date' : 'all',
+                    })
+                  }
+                />
+              </div>
+              <FilterSelect
+                emptyValue="all"
+                label="交期来源"
+                placeholder="交期来源"
+                aria-label="交期来源"
+                value={confirmation}
+                onChange={(value) => change({ confirmation: value })}
+                options={[
+                  { value: 'all', label: '全部交期来源' },
+                  { value: 'confirmed', label: '供应商确认交期' },
+                  { value: 'unconfirmed', label: '明细或整单预计' },
+                ]}
+              />
+              <Button
+                onClick={() =>
+                  change({
+                    filter: 'all',
+                    confirmation: 'all',
+                    selectedDate: '',
+                    startDate: today,
+                  })
+                }
+              >
+                重置到货筛选
+              </Button>
+            </div>
           </div>
-        </>
-      ) : null}
-    </BusinessVisualizationFrame>
+        )}
+        <VisualizationState loading={loading} error={error} onRetry={onRetry} />
+        {!loading && !error && (
+          <>
+            {arrival && (
+              <div className="erp-arrival-calendar__calendar">
+                <div
+                  className="erp-arrival-calendar__days"
+                  aria-label="14 天到货安排"
+                >
+                  {Array.from({ length: 14 }, (_, index) =>
+                    moveBusinessDate(startDate, index)
+                  ).map((date) => (
+                    <button
+                      key={date}
+                      type="button"
+                      aria-label={`${date}，${board?.days?.[date] || 0} 条待到货明细`}
+                      aria-current={date === today ? 'date' : undefined}
+                      aria-pressed={
+                        filter === 'date' && viewState.selectedDate === date
+                      }
+                      className={`erp-arrival-calendar__day ${date === today ? 'erp-arrival-calendar__day--today' : ''} ${viewState.selectedDate === date ? 'erp-arrival-calendar__day--selected' : ''}`}
+                      onClick={() =>
+                        change({ selectedDate: date, filter: 'date' })
+                      }
+                    >
+                      <span className="erp-arrival-calendar__day-label">
+                        <span className="erp-arrival-calendar__day-number">
+                          {dayjs(date).format('MM-DD')}
+                        </span>
+                        <small>周{'日一二三四五六'[dayjs(date).day()]}</small>
+                      </span>
+                      <strong>
+                        {board?.days?.[date] || 0} <small>条</small>
+                      </strong>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="erp-arrival-calendar__detail">
+              <div className="erp-arrival-calendar__detail-head">
+                <strong>
+                  {filter === 'date'
+                    ? viewState.selectedDate
+                    : PURCHASE_FOLLOWUP_LABELS[filter] ||
+                      (arrival ? '到货安排' : '采购异常')}{' '}
+                  · {board?.total || 0} 项
+                </strong>
+                <Button
+                  icon={<DownloadOutlined aria-hidden="true" />}
+                  disabled={!board?.total || exporting}
+                  loading={exporting}
+                  onClick={exportRows}
+                >
+                  导出当前结果
+                </Button>
+              </div>
+              <BusinessDataTable
+                rowKey="key"
+                columns={actionColumns}
+                dataSource={rows}
+                onOpenRecord={onOpen}
+                pagination={{
+                  current: Math.max(1, Number(viewState.page) || 1),
+                  pageSize: 25,
+                  total: board?.total || 0,
+                  showSizeChanger: false,
+                  onChange: (page) => change({ page }),
+                }}
+                emptyDescription="当前范围没有需要跟进的事项"
+              />
+              <p className="erp-arrival-calendar__note">
+                {arrival
+                  ? '只提醒已审核且尚需到货的明细。已登记待检与已入库数量均扣除；明细交期优先，其次供应商确认交期、整单预计日期。'
+                  : '按原单据事实汇总，同一明细可有多项待办。仅显示有权查看的事项；待核对应付不表示已满足结算条件。'}
+              </p>
+            </div>
+          </>
+        )}
+      </BusinessVisualizationFrame>
+    </>
   )
 }

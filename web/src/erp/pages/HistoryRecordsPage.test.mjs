@@ -8,7 +8,7 @@ const source = fs.readFileSync(
 )
 
 test('历史记录中心按菜单与读取权限选择真实来源并固定只读 history 合同', () => {
-  assert.match(source, /getAvailableHistorySources/u)
+  assert.match(source, /getHistoryCenterSources/u)
   assert.match(source, /visibleMenuPaths/u)
   assert.match(source, /hasActionPermission/u)
   assert.match(source, /buildHistoryListParams/u)

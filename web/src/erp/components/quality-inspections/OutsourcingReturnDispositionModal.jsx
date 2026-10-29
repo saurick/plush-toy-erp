@@ -198,6 +198,8 @@ export default function OutsourcingReturnDispositionModal({
   }
   return (
     <BusinessModal
+      taskInline
+      form={form}
       title={readOnly ? '查看委外不合格处置' : '委外不合格返厂'}
       open={open}
       size="recordDetails"

@@ -48,6 +48,11 @@ var _ biz.SalesOrderLifecycleActionRepo = (*salesOrderRepo)(nil)
 var _ biz.SalesOrderCommercialReadinessRepo = (*salesOrderRepo)(nil)
 
 func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
+	tx, err := beginSalesOrderDraftTx(ctx, r.data)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.rollback(ctx, r.log)
 	goodsAmount, taxAmount, orderTotal, err := biz.CalculateSalesOrderAmounts(
 		in.TaxMode,
 		in.TaxRate,
@@ -58,8 +63,15 @@ func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrde
 	if err != nil {
 		return nil, err
 	}
-	row, err := r.data.postgres.SalesOrder.Create().
-		SetOrderNo(in.OrderNo).
+	orderNo := in.OrderNo
+	if orderNo == "" {
+		orderNo, err = allocateSalesOrderNumber(ctx, tx.Client, in.OrderDate)
+		if err != nil {
+			return nil, err
+		}
+	}
+	row, err := tx.SalesOrder.Create().
+		SetOrderNo(orderNo).
 		SetCustomerID(in.CustomerID).
 		SetCurrency(in.Currency).
 		SetNillableCustomerOrderNo(in.CustomerOrderNo).
@@ -85,11 +97,19 @@ func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrde
 	if err != nil {
 		return nil, err
 	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return entSalesOrderToBiz(row), nil
 }
 
 func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
-	amounts, err := salesOrderOpenItemAmounts(ctx, r.data.postgres, id)
+	tx, err := beginSalesOrderDraftTx(ctx, r.data)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.rollback(ctx, r.log)
+	amounts, err := salesOrderOpenItemAmounts(ctx, tx.Client, id)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +123,7 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 	if err != nil {
 		return nil, err
 	}
-	update := r.data.postgres.SalesOrder.UpdateOneID(id).
+	update := tx.SalesOrder.UpdateOneID(id).
 		SetOrderNo(in.OrderNo).
 		SetCustomerID(in.CustomerID).
 		SetCurrency(in.Currency).
@@ -154,6 +174,9 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 		}
 		return nil, err
 	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return entSalesOrderToBiz(row), nil
 }
 
@@ -165,7 +188,11 @@ func (r *salesOrderRepo) GetSalesOrder(ctx context.Context, id int) (*biz.SalesO
 		}
 		return nil, err
 	}
-	return entSalesOrderToBiz(row), nil
+	order := entSalesOrderToBiz(row)
+	if err := r.populateSalesOrderItemCounts(ctx, []*biz.SalesOrder{order}); err != nil {
+		return nil, err
+	}
+	return order, nil
 }
 
 func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOrderFilter) ([]*biz.SalesOrder, int, error) {
@@ -208,8 +235,8 @@ func (r *salesOrderRepo) salesOrderListQuery(filter biz.SalesOrderFilter) *ent.S
 	if filter.CustomerID > 0 {
 		query = query.Where(salesorder.CustomerID(filter.CustomerID))
 	}
-	if filter.SampleBOMID > 0 {
-		query = query.Where(salesorder.HasItemsWith(salesorderitem.SampleBomID(filter.SampleBOMID)))
+	if filter.BOMID > 0 {
+		query = query.Where(salesorder.HasItemsWith(salesorderitem.BomID(filter.BOMID)))
 	}
 	if filter.LifecycleStatus != "" {
 		query = query.Where(salesorder.LifecycleStatus(filter.LifecycleStatus))
@@ -741,6 +768,9 @@ func (r *salesOrderRepo) ActivateSalesOrderForProcessCommand(
 		}
 		return nil, err
 	}
+	if err := r.submitReadyEngineeringMaterials(ctx, tx.Client(), row, actorID); err != nil {
+		return nil, err
+	}
 	if _, err := recordProcessNodeDomainCommandResultWithClient(ctx, tx.Client(), record, actorID); err != nil {
 		return nil, err
 	}
@@ -1132,13 +1162,13 @@ func (r *salesOrderRepo) ListSalesOrderItems(ctx context.Context, filter biz.Sal
 }
 
 func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in *biz.SalesOrderMutation, items []*biz.SalesOrderItemSaveMutation) (*biz.SalesOrderWithItems, error) {
-	tx, err := r.data.postgres.Tx(ctx)
+	tx, err := beginSalesOrderDraftTx(ctx, r.data)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		if tx != nil {
-			rollbackEntTx(ctx, tx, r.log)
+			tx.rollback(ctx, r.log)
 		}
 	}()
 
@@ -1219,8 +1249,15 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			return nil, err
 		}
 	} else {
+		orderNo := in.OrderNo
+		if orderNo == "" {
+			orderNo, err = allocateSalesOrderNumber(ctx, tx.Client, in.OrderDate)
+			if err != nil {
+				return nil, err
+			}
+		}
 		orderRow, err = tx.SalesOrder.Create().
-			SetOrderNo(in.OrderNo).
+			SetOrderNo(orderNo).
 			SetCustomerID(in.CustomerID).
 			SetCurrency(in.Currency).
 			SetNillableCustomerOrderNo(in.CustomerOrderNo).
@@ -1280,7 +1317,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 				return nil, biz.ErrSourceOrderStateInvalid
 			}
 			mutation.LineNo = current.LineNo
-			if _, err := saveSalesOrderItemUpdate(ctx, tx, item.ID, displayOrder, &mutation); err != nil {
+			if _, err := saveSalesOrderItemUpdate(ctx, tx.Client, item.ID, displayOrder, &mutation); err != nil {
 				return nil, err
 			}
 			submittedIDs[item.ID] = struct{}{}
@@ -1414,8 +1451,8 @@ func (r *salesOrderRepo) UnitIsActive(ctx context.Context, id int) (bool, error)
 	return row.IsActive, nil
 }
 
-func saveSalesOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, displayOrder int, in *biz.SalesOrderItemMutation) (*ent.SalesOrderItem, error) {
-	if err := validateSalesOrderCommercialEngineeringChange(ctx, tx.Client(), id, in); err != nil {
+func saveSalesOrderItemUpdate(ctx context.Context, tx *ent.Client, id int, displayOrder int, in *biz.SalesOrderItemMutation) (*ent.SalesOrderItem, error) {
+	if err := validateSalesOrderCommercialEngineeringChange(ctx, tx, id, in); err != nil {
 		return nil, err
 	}
 	update := tx.SalesOrderItem.UpdateOneID(id).
@@ -1538,11 +1575,7 @@ func entSalesOrderItemToBiz(row *ent.SalesOrderItem) *biz.SalesOrderItem {
 		PreShipmentSampleQuantity: row.PreShipmentSampleQuantity,
 		ProcessRequirement:        row.ProcessRequirement,
 		ImportSource:              row.ImportSource,
-		SampleBOMID:               row.SampleBomID,
-		EngineeringStatus:         row.EngineeringStatus,
-		SampleNote:                row.SampleNote,
-		SampleConfirmedAt:         row.SampleConfirmedAt,
-		SampleConfirmedBy:         row.SampleConfirmedBy,
+		BOMID:                     row.BomID,
 		ProductSkuID:              row.ProductSkuID,
 		UnitID:                    row.UnitID,
 		ProductCodeSnapshot:       row.ProductCodeSnapshot,

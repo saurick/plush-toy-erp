@@ -1,7 +1,29 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { canonicalBusinessPath, mobileBusinessPath, mobileBusinessRole } from './businessTaskRoute.mjs'
-import { consumeWorkflowTaskReturn, readWorkflowTaskNavigation, readWorkflowTaskReturn, workflowTaskEntryNavigation, workflowTaskReturnNavigation } from './workflowTaskNavigation.mjs'
+import { consumeWorkflowTaskReturn, readWorkflowTaskNavigation, readWorkflowTaskReturn, workflowTaskBusinessReceipt, workflowTaskEntryNavigation, workflowTaskReturnNavigation } from './workflowTaskNavigation.mjs'
+
+test('任务业务回执保留正式单号，未返回单号时不补造', () => {
+  for (const record of [
+    { id: 3, outsourcing_order_no: 'OUT-003' },
+    { id: 4, purchase_order_no: 'PO-004' },
+    { id: 5, payment_no: 'PAY-005' },
+    { id: 6, operation_no: 'INV-006' },
+    { id: 7, decision_no: 'EX-007' },
+  ]) {
+    const receipt = workflowTaskBusinessReceipt('办理已记录', record)
+    assert.equal(receipt.recordID, record.id)
+    assert.equal(receipt.recordNo, Object.values(record)[1])
+  }
+  const empty = workflowTaskBusinessReceipt('办理已记录')
+  assert.equal(empty.message, '办理已记录')
+  assert.equal(empty.recordID, null)
+  assert.equal(empty.recordNo, '')
+  assert.equal(empty.actorLabel, '')
+  assert.equal(empty.timeLabel, '')
+  assert.equal(empty.fields.length, 0)
+  assert.equal(empty.items.length, 0)
+})
 
 test('task navigation keeps account, source record and original history when returning from a document', () => {
   const previous = globalThis.window

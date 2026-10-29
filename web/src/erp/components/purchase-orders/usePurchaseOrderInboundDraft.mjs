@@ -1,6 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
+import { loadReferenceIDs } from '../../utils/remoteReferences.mjs'
 import { buildArrivalItems } from '../../utils/incomingAcceptance.mjs'
 import {
   materialWarehouseOptions,
@@ -17,6 +19,8 @@ import {
   isPurchaseReceiptMutationResultUnknown,
 } from '../../utils/purchaseReceiptMutation.mjs'
 import { routeWithQuery } from '../../utils/routeQuery.mjs'
+import { PurchaseSourceActions } from '../../../common/consts/purchaseSourceActions.mjs'
+import { sourceActionAccess, isSourceActionPermissionDenied, SOURCE_ACCESS_REVOKED_MESSAGE } from '../../utils/sourceActionAccess.mjs'
 import {
   buildInboundDraftPreviewRows,
   todayInputValue,
@@ -26,11 +30,14 @@ export function usePurchaseOrderInboundDraft({
   form,
   navigate,
   selectedOrder,
-  materials = [],
   warehouseOptions = [],
 }) {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
-  const taskBusiness = useOutletContext()?.mobileTaskBusiness
+  const outletContext = useBusinessPageContext()
+  const taskBusiness = outletContext?.taskBusiness
+  const access = sourceActionAccess(outletContext?.adminProfile, PurchaseSourceActions.receipt)
+  const accessRef = useRef(access)
+  accessRef.current = access
   const [generatingInboundDraft, setGeneratingInboundDraft] = useState(false)
   const [inboundDraftModalOpen, setInboundDraftModalOpen] = useState(false)
   const [inboundDraftPreviewLoading, setInboundDraftPreviewLoading] =
@@ -38,6 +45,11 @@ export function usePurchaseOrderInboundDraft({
   const [inboundDraftPreviewRows, setInboundDraftPreviewRows] = useState([])
   const [inboundDraftPreviewError, setInboundDraftPreviewError] = useState('')
   const previewRequestRef = useRef(0)
+  const previewAbortRef = useRef(null)
+  useEffect(() => () => {
+    previewRequestRef.current += 1
+    previewAbortRef.current?.abort()
+  }, [])
   const submittingRef = useRef(false)
   const mutationAttemptsRef = useRef(
     createPurchaseReceiptMutationAttemptStore()
@@ -45,19 +57,35 @@ export function usePurchaseOrderInboundDraft({
 
   const closeInboundDraftModal = useCallback(() => {
     previewRequestRef.current += 1
+    previewAbortRef.current?.abort()
     setInboundDraftModalOpen(false)
     setInboundDraftPreviewRows([])
     setInboundDraftPreviewError('')
     setInboundDraftPreviewLoading(false)
-  }, [])
+    form.resetFields()
+  }, [form])
+
+  useEffect(() => {
+    if (inboundDraftModalOpen && !access.allowed) {
+      closeInboundDraftModal()
+      message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+    }
+  }, [access.allowed, closeInboundDraftModal, inboundDraftModalOpen])
 
   const openInboundDraftModal = useCallback(
     async (record) => {
       if (!record) {
         return
       }
+      if (!accessRef.current.allowed) {
+        message.warning(accessRef.current.reason)
+        return
+      }
       setInboundDraftPreviewRows([])
       setInboundDraftPreviewError('')
+      previewAbortRef.current?.abort()
+      const controller = new AbortController()
+      previewAbortRef.current = controller
       const request = ++previewRequestRef.current
       form.resetFields()
       form.setFieldsValue({
@@ -73,9 +101,16 @@ export function usePurchaseOrderInboundDraft({
       try {
         const progress = await getPurchaseOrderReceiptProgress({
           id: record.id,
-        })
+        }, { signal: controller.signal })
         if (request !== previewRequestRef.current) return
-        const rows = buildInboundDraftPreviewRows(progress).map((row) => {
+        const previewRows = buildInboundDraftPreviewRows(progress)
+        const { materials } = await loadReferenceIDs(
+          'materials',
+          previewRows.map((row) => row.materialID),
+          { signal: controller.signal }
+        )
+        if (request !== previewRequestRef.current) return
+        const rows = previewRows.map((row) => {
           const material = materials.find(
             (item) => Number(item.id) === row.materialID
           )
@@ -103,7 +138,12 @@ export function usePurchaseOrderInboundDraft({
             }))
         )
       } catch (error) {
-        if (request !== previewRequestRef.current) return
+        if (controller.signal.aborted || request !== previewRequestRef.current) return
+        if (isSourceActionPermissionDenied(error)) {
+          closeInboundDraftModal()
+          message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+          return
+        }
         setInboundDraftPreviewRows([])
         setInboundDraftPreviewError(
           getActionErrorMessage(error, '到货材料加载失败，请重试')
@@ -114,18 +154,25 @@ export function usePurchaseOrderInboundDraft({
         }
       }
     },
-    [form, materials, warehouseOptions]
+    [closeInboundDraftModal, form, warehouseOptions]
   )
 
   const createInboundDraftFromOrder = useCallback(async () => {
-    if (!selectedOrder || submittingRef.current) {
+    if (!selectedOrder || submittingRef.current || !inboundDraftModalOpen) {
+      return
+    }
+    if (!accessRef.current.allowed) {
+      closeInboundDraftModal()
+      message.warning(accessRef.current.reason)
       return
     }
     submittingRef.current = true
     const scope = `create-from-purchase-order:${selectedOrder.id}`
+    const previewRequest = previewRequestRef.current
     let attempt
     try {
       const values = await form.validateFields()
+      if (!accessRef.current.allowed || previewRequest !== previewRequestRef.current) return
       let items
       try {
         items = buildArrivalItems(values.arrival_items)
@@ -171,7 +218,10 @@ export function usePurchaseOrderInboundDraft({
       const retained = attempt
         ? mutationAttemptsRef.current.settle(scope, attempt, error)
         : isPurchaseReceiptMutationResultUnknown(error)
-      if (retained) {
+      if (isSourceActionPermissionDenied(error)) {
+        closeInboundDraftModal()
+        message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+      } else if (retained) {
         message.warning(
           '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
         )
@@ -182,7 +232,7 @@ export function usePurchaseOrderInboundDraft({
       submittingRef.current = false
       setGeneratingInboundDraft(false)
     }
-  }, [closeInboundDraftModal, form, navigate, selectedOrder, reportBusinessResult, taskBusiness])
+  }, [closeInboundDraftModal, form, inboundDraftModalOpen, navigate, selectedOrder, reportBusinessResult, taskBusiness])
 
   const hasInboundDraftRemaining = useMemo(
     () => inboundDraftPreviewRows.some((row) => row.canGenerate),

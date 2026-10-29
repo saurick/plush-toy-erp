@@ -25,8 +25,7 @@ func (ProductionOrderItem) Annotations() []schema.Annotation {
 				"production_order_items_sku_id_positive":     "product_sku_id IS NULL OR product_sku_id > 0",
 				"production_order_items_sales_line_positive": "sales_order_item_id IS NULL OR sales_order_item_id > 0",
 				"production_order_items_bom_header_positive": "bom_header_id IS NULL OR bom_header_id > 0",
-				"production_order_items_route_allowed":       "route_code IS NULL OR route_code = 'PLUSH_SEW_HAND_V1'",
-				"production_order_items_customer_gate_route": "NOT customer_inspection_required OR route_code IS NOT NULL",
+				"production_order_items_route_allowed":       "route_code = 'PLUSH_SEW_HAND_V1'",
 			},
 		},
 	}
@@ -56,7 +55,6 @@ func (ProductionOrderItem) Fields() []ent.Field {
 			Nillable().
 			Positive(),
 		field.String("route_code").
-			Optional().
 			Nillable().
 			MaxLen(64),
 		field.Bool("customer_inspection_required").

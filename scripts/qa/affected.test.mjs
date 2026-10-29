@@ -87,6 +87,20 @@ test("workbench shared patterns retain task acceptance for the sample and real c
   assert.doesNotMatch(unrelated.followUps.find(({ id }) => id === "browser-regression")?.text || "", /dev-workbench-patterns/u);
 });
 
+test("workbench header changes retain all-route geometry and view lifecycle checks", () => {
+  for (const file of [
+    "web/src/dev-workbench/components/DevPageHeader.jsx",
+    "web/src/dev-workbench/styles/dev-workbench-density.css",
+    "web/src/dev-workbench/styles/dev-workbench-layout.css",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const text = plan.followUps.find(({ id }) => id === "browser-regression")?.text || "";
+    for (const scenario of ["dev-workbench-action-placement-desktop-light", "dev-workbench-density-desktop-light", "dev-workbench-patterns-desktop-light", "dev-ui-design-workbench-navigation-sync", "dev-version-center-tabs-pagination-desktop", "dev-version-center-plan-lifecycle-desktop"]) assert(text.includes(scenario), file);
+    assert(selectedTests(plan).includes("web/src/dev-workbench/components/DevPageHeader.test.mjs"), file);
+    assert(!ids(plan).includes("full"), file);
+  }
+});
+
 test("work-center sample and shared adapter changes retain isolation checks and focused browser coverage", () => {
   for (const file of [
     "web/src/dev-workbench/components/DevWorkCenterDesign.jsx",
@@ -954,6 +968,19 @@ test("affected: 接口清单模型复用同名测试并选择对应浏览器场�
   assert.match(browser.text, /dev-page-integration-desktop-light/u);
 });
 
+test("affected: 财务规则选择业务口径阅读与关联总览回归", () => {
+  for (const file of [
+    "web/src/dev-workbench/config/devFinanceWorkbench.mjs",
+    "web/src/dev-workbench/components/flow-state/FinanceRulesView.jsx",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const browser = plan.followUps.find((item) => item.id === "browser-regression");
+    assert(browser, file);
+    assert.match(browser.text, /dev-finance-rules-reading-desktop/u, file);
+    assert.match(browser.text, /dev-finance-prototype-alignment/u, file);
+  }
+});
+
 test("affected: shared DEV navigation expands only to the canonical desktop scenario set", () => {
   const plan = buildAffectedPlan(
     ["web/src/dev-workbench/config/devRoutes.mjs"],
@@ -969,6 +996,9 @@ test("affected: shared DEV navigation expands only to the canonical desktop scen
   assert.match(browser.text, /dev-quality-gates-desktop-light/u);
   assert.match(browser.text, /dev-version-center-tabs-pagination-desktop/u);
   assert.match(browser.text, /dev-pressure-desktop/u);
+  assert.match(browser.text, /dev-business-rules-navigation-desktop/u);
+  assert.match(browser.text, /dev-business-rules-context-return-desktop/u);
+  assert.match(browser.text, /dev-business-rules-selection-recovery-desktop/u);
   assert.doesNotMatch(browser.text, /mobile|dark/u);
 });
 
@@ -1498,6 +1528,11 @@ test("affected: explicit full can only escalate a focused plan", () => {
 test('workbench consumers select task regressions directly and independent builds retain artifact acceptance', () => {
   for (const [file, scenario] of [
     ['components/DevVerificationEvidence.jsx', 'dev-server-verification-layout-desktop-light'],
+    ['components/quality-gates/QualityGateRunView.jsx', 'dev-quality-gates-local-diagnostics-desktop-light'],
+    ['components/quality-gates/QualityGateContextStrip.jsx', 'dev-quality-gates-local-diagnostics-desktop-light'],
+    ['components/quality-gates/QualityGateExecutionFlow.jsx', 'dev-quality-gates-local-diagnostics-desktop-light'],
+    ['styles/dev-quality-gates.css', 'dev-quality-gates-local-diagnostics-desktop-light'],
+    ['pages/DevQualityGatesPage.jsx', 'dev-quality-gates-local-diagnostics-desktop-light'],
     ['components/quality-gates/QualityGateGovernanceViews.jsx', 'dev-quality-gates-layout-desktop-light'],
     ['pages/DevDataPreparationPage.jsx', 'dev-data-preparation-workflow-desktop'],
     ['components/flow-state/RuntimeView.jsx', 'dev-flow-state-details-desktop-light'],

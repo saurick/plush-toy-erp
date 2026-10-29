@@ -1120,7 +1120,7 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert.match(pageSource, /exact confirmation/u)
   assert.match(
     pageSource,
-    /<DevPageNav sourcePath=\{DEV_DATA_PREPARATION_SOURCE_PATH\}/u
+    /<DevPageNav\s*\/>/u
   )
   assert.match(pageSource, /selectRecoverableDataPreparationOperation/u)
   assert.match(pageSource, /profileTargetKey\(selectedProfileKey/u)

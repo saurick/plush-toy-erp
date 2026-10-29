@@ -94,9 +94,11 @@ const WORK_CENTER_SAMPLE_SOURCES = new Set([
   "web/src/erp/utils/businessProgress.mjs",
 ]);
 const DEV_DESKTOP_SCENARIOS = Object.freeze([
+  "dev-workbench-action-placement-desktop-light",
   "dev-business-usability-desktop-light",
   "dev-drill-recovery-desktop-light",
   "dev-flow-state-observatory-desktop-light",
+  "dev-business-topics-navigation-desktop",
   "dev-page-task-handling-desktop-light",
   "dev-quality-gates-desktop-light",
   "dev-version-center-tabs-pagination-desktop",
@@ -675,7 +677,7 @@ function isDevPageGovernancePath(file) {
     /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
       file,
     ) ||
-    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageNav|PipelineTimingPanel|PressurePanel|PressureDataset|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FlowState|BusinessChainCustomerReview|Hub|Integration|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
+    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageHeader|PageNav|PipelineTimingPanel|PressurePanel|PressureDataset|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FinanceWorkbench|FlowState|BusinessChainCustomerReview|Hub|Integration|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
       file,
     ) ||
     /^web\/scripts\/style-l1\/(?:scenarios|dev[A-Z][^/]*)\.mjs$/u.test(file)
@@ -700,8 +702,21 @@ function devBrowserScenarioNames(file) {
   const growth = GROWTH_VALIDATION_EVIDENCE_SOURCES.has(file)
     ? [GROWTH_VALIDATION_SCENARIO]
     : [];
+  const relations = /devFulfillmentRelations|BusinessRelationFilters|BusinessActionRelations|businessRelations|devFlowViewContext|devFlowStateQuery|DevFlowStateObservatoryPage|BusinessChainInstanceView|FulfillmentSubflow|TaskFulfillmentGuide/u.test(file)
+    ? ["dev-business-relations-desktop", "dev-finished-quality-responsibility"]
+    : [];
+  const topics = /BusinessTopics|BusinessChainTopics|TaskFulfillmentGuide|devFlowViewContext|devFlowStateQuery|DevFlowStateObservatoryPage/u.test(file)
+    ? ["dev-business-topics-navigation-desktop"]
+    : [];
+  const rules = /BusinessRules|business-rules|stateRules\.css|StateRulesView|FlowRuleTables|devFlowViewContext|devFlowState(?:Query|RulePresentation)|DevFlowStateObservatoryPage|devRoutes|devHub|DevWorkbenchRoutes|devRelationshipPerspectives|BusinessActionRelations|TaskFulfillmentGuide|BusinessChainViews/u.test(file)
+    ? ["dev-business-rules-navigation-desktop", "dev-business-rules-context-return-desktop", "dev-business-rules-selection-recovery-desktop"]
+    : [];
   const mappings = [
+    [/DevPageHeader|styles\/dev-workbench-(?:density|layout)\.css/u, ["dev-workbench-action-placement-desktop-light", "dev-workbench-density-desktop-light", "dev-workbench-patterns-desktop-light", "dev-ui-design-workbench-navigation-sync", "dev-version-center-tabs-pagination-desktop", "dev-version-center-plan-lifecycle-desktop"]],
+    [/DevSourceReferences|dev-source-references/u, ["dev-workbench-content-desktop-light", "dev-workbench-patterns-desktop-light", "dev-flow-rules-complete", "dev-page-integration-desktop-light", "dev-project-skills-guidance-desktop-light"]],
     [/TaskHandling|taskHandlingMatrix|devTaskHandling/u, ["dev-page-task-handling-desktop-light"]],
+    [/FinanceRelationshipsView|FinanceRulesView|devFinanceWorkbench|financeWorkbench\.css/u, ["dev-finance-prototype-alignment", "dev-finance-rules-reading-desktop"]],
+    [/BusinessChainStepVerification|BusinessChainTopics|BusinessTopicDetails|TaskFulfillmentGuide|devBusinessChain(?:Catalog|StepContracts|Verification|Audit)|DevBusinessChainAuditPage|businessChainStepVerification|devFlowStateQuery/u, ["dev-purchase-chain-verification"]],
     [
       /BusinessChainCustomerReview|devBusinessChainPrint/u,
       ["dev-business-chain-customer-review-print"],
@@ -720,7 +735,8 @@ function devBrowserScenarioNames(file) {
       ["dev-flow-state-observatory-desktop-light"],
     ],
     [/DevVerificationEvidence|devVerificationEvidence|dev-verification-evidence/u, ["dev-server-verification-layout-desktop-light"]],
-    [/QualityGateGovernanceViews|QualityGateEvidenceCharts|QualityGateRunView|DevQualityGatesPage/u, ["dev-quality-gates-layout-desktop-light", "dev-quality-gates-desktop-light"]],
+    [/QualityGateContextStrip|QualityGateExecutionFlow|dev-quality-gates\.css/u, ["dev-quality-gates-local-diagnostics-desktop-light", "dev-quality-gates-desktop-light"]],
+    [/QualityGateGovernanceViews|QualityGateEvidenceCharts|QualityGateRunView|DevQualityGatesPage/u, ["dev-quality-gates-layout-desktop-light", "dev-quality-gates-desktop-light", "dev-quality-gates-local-diagnostics-desktop-light"]],
     [/DevProjectSkills|devProjectSkills|dev-project-skills/u, ["dev-project-skills-guidance-desktop-light"]],
     [/DevDataPreparationPage|devDataPreparation|useDataPreparation/u, ["dev-data-preparation-workflow-desktop", "dev-data-preparation-4k"]],
     [/flow-state\/(?:FactsView|RuntimeView|WorkflowView|StateRulesView)/u, ["dev-flow-state-details-desktop-light", "dev-flow-state-observatory-instance", "dev-flow-rules-complete"]],
@@ -734,9 +750,12 @@ function devBrowserScenarioNames(file) {
     [/DevIntegration|devIntegration|dev-integration/u, ["dev-page-integration-desktop-light"]],
     [/DevProjectGraphView|DevProjectRelationships|devProjectGraph|devRelationshipPerspectives/u, ["dev-page-development-resources-desktop-light", "dev-page-integration-desktop-light"]],
     [
-      /PermissionRelationship|permission-relationships/u,
-      ["dev-page-permission-relationships-desktop-light"],
+      /PermissionRelationship|permissionRelationship|DevPermissionNavigation|permission-relationships/u,
+      ["dev-page-permission-relationships-desktop-light", "permission-relationship-empty-module-desktop", "permission-relationship-consistency-desktop", "permission-relationship-mermaid-tools-desktop", "permission-relationship-responsibilities-desktop", "permission-role-entrypoints-desktop", "permission-account-role-choice-desktop", "permission-duty-entrypoints-desktop"],
     ],
+    [/DevRoleResponsibilityGraph|devRoleResponsibilities/u, ["permission-relationship-responsibilities-desktop", "permission-duty-entrypoints-desktop"]],
+    [/RoleResponsibilit|roleResponsibilit|RolePermissionPolicy|rolePermissionPolicy|role-permission-policy|usePermissionRoleSettings|usePermissionFullscreen/u,
+      ["role-responsibilities-desktop", "role-responsibilities-mobile-dark", "role-policy-desktop", "role-policy-mobile-dark", "role-policy-explicit-repair", "permission-center-fullscreen-short-dark"]],
     [/DevDocs|devDocs|dev-docs/u, ["dev-page-docs-desktop-light"]],
     [/UIDesign|ui-design/u, ["dev-page-ui-design-desktop-light"]],
     [/DevPressure|devPressure|dev-pressure/u, ["dev-pressure-desktop"]],
@@ -773,15 +792,15 @@ function devBrowserScenarioNames(file) {
     [/dev-delivery-workflow/u, ["dev-page-delivery-desktop-light"]],
   ];
   const match = mappings.find(([pattern]) => pattern.test(file));
-  if (match) return uniqueSorted([...match[1], ...growth]);
+  if (match) return uniqueSorted([...match[1], ...growth, ...relations, ...topics, ...rules]);
   if (
     /(?:DevWorkbenchRoutes|DevPageNav|DevTaskNav|devRoutes|dev-navigation|dev-workbench-density|styles\/index\.css|style-l1\/scenarios\.mjs)/u.test(
       file,
     )
   ) {
-    return DEV_DESKTOP_SCENARIOS;
+    return uniqueSorted([...DEV_DESKTOP_SCENARIOS, ...rules]);
   }
-  return growth;
+  return uniqueSorted([...growth, ...relations, ...topics, ...rules]);
 }
 
 function devBrowserFollowUpText(file) {
@@ -879,6 +898,16 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       );
     }
     if ([
+      "web/src/dev-workbench/components/DevPageHeader.jsx",
+      "web/src/dev-workbench/styles/dev-workbench-density.css",
+      "web/src/dev-workbench/styles/dev-workbench-layout.css",
+    ].includes(file)) {
+      addNodeTests(state, ["web/src/dev-workbench/components/DevPageHeader.test.mjs", "web/src/dev-workbench/config/devUIDesign.test.mjs"], file, "T5");
+      addFollowUp(state, "browser-regression", "T5",
+        "运行 STYLE_L1_SCENARIOS=dev-workbench-action-placement-desktop-light,dev-workbench-density-desktop-light,dev-workbench-patterns-desktop-light,dev-ui-design-workbench-navigation-sync,dev-version-center-tabs-pagination-desktop,dev-version-center-plan-lifecycle-desktop pnpm --dir web style:l1，核对全部注册入口的三种桌面宽度、一级页签往返、样板与原型同步，以及版本视图状态和焦点恢复。",
+        file);
+    }
+    if ([
       "web/src/dev-workbench/components/WorkbenchPattern.jsx",
       "web/src/dev-workbench/components/DevWorkbenchStandards.jsx",
       "web/src/dev-workbench/styles/dev-workbench-pattern.css",
@@ -888,11 +917,13 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       "web/scripts/style-l1/devWorkbenchPatternScenarios.mjs",
     ].includes(file)) {
       addNodeTests(state, [
+        "web/src/dev-workbench/components/DevPageHeader.test.mjs",
+        "web/src/dev-workbench/components/WorkbenchPattern.test.mjs",
         "web/src/dev-workbench/config/devUIDesign.test.mjs",
         "web/src/dev-workbench/styles/dev-quality-gates.test.mjs",
       ], file, "T5");
       addFollowUp(state, "browser-regression", "T5",
-        "运行 STYLE_L1_SCENARIOS=dev-workbench-patterns-desktop-light,dev-testing-report-layout-desktop-light,dev-quality-gates-layout-desktop-light,dev-server-verification-layout-desktop-light,dev-data-preparation-workflow-desktop,dev-data-preparation-4k,dev-flow-state-details-desktop-light,dev-flow-state-observatory-instance,dev-flow-rules-complete,dev-project-skills-guidance-desktop-light pnpm --dir web style:l1，完成统一样板与真实消费者的搜索恢复、失败重试、证据时效及桌面布局验收；设计样板不得调用写接口。",
+        "运行 STYLE_L1_SCENARIOS=dev-workbench-action-placement-desktop-light,dev-workbench-patterns-desktop-light,dev-page-product-core-desktop-light,dev-page-integration-desktop-light,dev-page-testing-desktop-light,dev-testing-report-layout-desktop-light,dev-quality-gates-layout-desktop-light,dev-server-verification-layout-desktop-light,dev-data-preparation-workflow-desktop,dev-data-preparation-4k,dev-flow-state-details-desktop-light,dev-flow-state-observatory-instance,dev-flow-rules-complete,dev-project-skills-guidance-desktop-light pnpm --dir web style:l1，完成统一样板与真实消费者的搜索恢复、失败重试、证据时效及桌面布局验收；设计样板不得调用写接口。",
         file);
     }
     if (/devWorkbenchRequest|devQualityGates|DevQualityGatesPage|DevVerificationEvidence|devVerificationEvidence/u.test(file)) {

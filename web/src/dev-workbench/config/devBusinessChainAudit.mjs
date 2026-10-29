@@ -3,7 +3,7 @@ import { DEV_STATUS_FLOWS_ROUTE } from './devRoutes.mjs'
 export const DEV_CHAIN_AUDIT_API = '/__dev/api/qa/business-chain-audit'
 export const CHAIN_AUDIT_BATCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/u
 export const CHAIN_AUDIT_TABS = Object.freeze([
-  { value: 'chains', label: '链路结果' },
+  { value: 'chains', label: '报告概况' },
   { value: 'findings', label: '问题与复验' },
   { value: 'evidence', label: '执行与证据' },
 ])
@@ -230,7 +230,7 @@ export function chainDefinitionURL(chain = 'all') {
 
 export function filterChainAuditSteps(
   report,
-  { chain = 'all', status = 'all', keyword = '' } = {}
+  { chain = 'all', status = 'all', keyword = '', stepKey = '' } = {}
 ) {
   const query = keyword.trim().toLowerCase()
   return report.chains
@@ -245,6 +245,7 @@ export function filterChainAuditSteps(
     )
     .filter(
       (step) =>
+        (!stepKey || step.key === stepKey) &&
         (status === 'all' || step.status === status) &&
         (!query ||
           [

@@ -3,9 +3,47 @@ package service
 import (
 	"testing"
 
+	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
 )
+
+func TestPurchaseSourceReadPolicyKeepsRoleQuantitiesWithoutLeakingPrices(t *testing.T) {
+	for _, role := range biz.BuiltinRoles() {
+		if role.Key != biz.WarehouseRoleKey && role.Key != biz.QualityRoleKey && role.Key != biz.FinanceRoleKey {
+			continue
+		}
+		t.Run(role.Key, func(t *testing.T) {
+			admin := workflowJSONRPCAdmin([]string{role.Key}, role.Permissions...)
+			ctx := withAdminPermissionCache(biz.WithCurrentAdmin(workflowJSONRPCAdminContext(), admin))
+			dispatcher := &jsonrpcDispatcher{}
+			for _, endpoint := range [][2]string{{"purchase_order", "get_purchase_order"}, {"purchase", "get_purchase_receipt"}} {
+				result := &v1.JsonrpcResult{Data: newDataStruct(map[string]any{
+					"source": map[string]any{"id": 71, "currency": "CNY", "total_amount": "123.45", "payment_term_days": 30,
+						"items": []any{map[string]any{"material_id": 8, "quantity": "10", "unit_price_snapshot": "12.345", "amount": "123.45"}}},
+				})}
+				dispatcher.applySensitiveFieldReadPolicy(ctx, endpoint[0], endpoint[1], result)
+				source := result.Data.AsMap()["source"].(map[string]any)
+				item := source["items"].([]any)[0].(map[string]any)
+				if source["id"] != float64(71) || item["material_id"] != float64(8) || item["quantity"] != "10" {
+					t.Fatalf("source linkage or quantity removed: %#v", source)
+				}
+				for _, field := range []string{"currency", "total_amount", "payment_term_days"} {
+					_, present := source[field]
+					if present != (role.Key == biz.FinanceRoleKey) {
+						t.Fatalf("%s commercial field visibility mismatch: %s", role.Key, field)
+					}
+				}
+				for _, field := range []string{"unit_price_snapshot", "amount"} {
+					_, present := item[field]
+					if present != (role.Key == biz.FinanceRoleKey) {
+						t.Fatalf("%s nested commercial field visibility mismatch: %s", role.Key, field)
+					}
+				}
+			}
+		})
+	}
+}
 
 func TestRedactSensitiveFieldMapRemovesNestedPrivateAndCommercialFields(t *testing.T) {
 	data := map[string]any{

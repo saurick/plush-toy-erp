@@ -32,6 +32,11 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 	if !valid {
 		return nil, false
 	}
+	if raw, exists := pm["order_no"]; exists {
+		if _, ok := raw.(string); !ok {
+			return nil, false
+		}
+	}
 	orderDate, ok := getRequiredJSONRPCTime(pm, "order_date")
 	if !ok {
 		return nil, false
@@ -189,10 +194,12 @@ func (d *jsonrpcDispatcher) salesOrderErrorResult(ctx context.Context, err error
 	switch {
 	case errors.Is(err, biz.ErrForbidden):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "当前用料待办已指定其他处理人，请刷新后核对"}
+	case errors.Is(err, biz.ErrBOMActiveConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "同一产品只能使用一个有效 BOM 版本，请核对本单各行的 BOM"}
 	case errors.Is(err, biz.ErrSalesOrderEngineeringNotReady):
-		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请先关联有效产品、上传产品主图并补齐该产品的 BOM 物料，再开始打样"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请先为本单所有产品补齐有效的工程 BOM，再完成工程资料"}
 	case errors.Is(err, biz.ErrMaterialRequestNotReady):
-		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请先核对订单、样品确认、材料厂商和单位，再提交用料审批"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请先核对订单、工程 BOM、材料厂商和单位，再完成工程资料"}
 	case errors.Is(err, biz.ErrMaterialRequestConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "订单、材料或审批资料已变化，请重新读取后核对"}
 	case errors.Is(err, biz.ErrMaterialRequestNotFound):
@@ -202,7 +209,7 @@ func (d *jsonrpcDispatcher) salesOrderErrorResult(ctx context.Context, err error
 	case errors.Is(err, biz.ErrMaterialRequestReviewInvalid):
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前审批条件不满足，请核对审批顺序和两位审批人"}
 	case errors.Is(err, biz.ErrSalesOrderEngineeringTransition):
-		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请依次保存工程资料、开始打样、确认样品；确认或退回重做时请填写打样说明，切换产品或 BOM 后需重新准备"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "工程资料已完成，请通过工程资料入口更换产品或 BOM"}
 	case errors.Is(err, biz.ErrSalesOrderEngineeringDependency):
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "订单明细已有用料审批、生产、备货或出货记录，请先处理关联单据再更换工程资料"}
 	case errors.Is(err, biz.ErrSalesOrderConflict):
@@ -371,11 +378,7 @@ func salesOrderItemToMap(item *biz.SalesOrderItem) map[string]any {
 		"unshipped_quantity":           optionalDecimalString(item.UnshippedQuantity),
 		"process_requirement":          optionalStringValue(item.ProcessRequirement),
 		"import_source":                item.ImportSource,
-		"sample_bom_id":                optionalIntValue(item.SampleBOMID),
-		"engineering_status":           item.EngineeringStatus,
-		"sample_note":                  optionalStringValue(item.SampleNote),
-		"sample_confirmed_at":          optionalTimeUnix(item.SampleConfirmedAt),
-		"sample_confirmed_by":          optionalIntValue(item.SampleConfirmedBy),
+		"bom_id":                       optionalIntValue(item.BOMID),
 		"designer":                     optionalStringValue(item.Designer),
 		"product_image_attachment_id":  optionalIntValue(item.ProductImageAttachmentID),
 		"product_sku_id":               optionalIntValue(item.ProductSkuID),

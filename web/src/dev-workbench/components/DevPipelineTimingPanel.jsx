@@ -1,4 +1,4 @@
-import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
+import { Card, Empty, Space, Tag, Typography } from 'antd'
 
 import DevTimestamp from './DevTimestamp.jsx'
 import { formatDevTimestamp, isDevTimestamp } from '../config/devTimestamp.mjs'
@@ -122,7 +122,6 @@ export function DevPipelineStatusStrip({
   timings,
   versions = [],
   operations = [],
-  onOpenDetails,
 }) {
   const summary = summarizePipelineStatus(timings)
   const { latest: latestRun, latestFullRelease } = summary
@@ -138,13 +137,6 @@ export function DevPipelineStatusStrip({
         size="small"
         className="erp-dev-pipeline-status-strip"
         title="最近发布与部署"
-        extra={
-          typeof onOpenDetails === 'function' ? (
-            <Button type="link" onClick={onOpenDetails}>
-              查看耗时详情
-            </Button>
-          ) : null
-        }
       >
         <div className="erp-dev-pipeline-status-strip__metrics">
           <div>

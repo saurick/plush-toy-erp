@@ -8,25 +8,42 @@ function renderSectionPopup(menu) {
   return <div onMouseDown={(event) => event.stopPropagation()}>{menu}</div>
 }
 
-export default function BusinessFormBody({ open, loading, busy, children }) {
+function formSectionScroller(body) {
+  let candidate = body
+  while (candidate && candidate !== document.body) {
+    if (/(auto|scroll)/u.test(window.getComputedStyle(candidate).overflowY)) return candidate
+    candidate = candidate.parentElement
+  }
+  return body
+}
+
+export default function BusinessFormBody({ open, active: presented = true, loading, busy, children, navigation = true }) {
   const bodyRef = useRef(null)
   const navigationAnchor = useRef(null)
+  const rememberedScroll = useRef(0)
   const [sections, setSections] = useState([])
   const [active, setActive] = useState('')
+  const [scrollArea, setScrollArea] = useState({ shared: false, top: 0, height: 0 })
 
   useEffect(() => {
-    if (!open || loading) return undefined
+    if (!open) rememberedScroll.current = 0
+    if (!open || !presented || loading || !navigation) return undefined
     const body = bodyRef.current
+    const page = body.closest('[data-business-form-page]')
+    const scroller = formSectionScroller(body)
     let frame = 0
     const update = () => {
       frame = 0
-      const nodes = [...body.querySelectorAll('[data-form-section]')].filter(
-        (node) => node.getClientRects().length > 0
+      const workspaceNavigation = page?.closest('[data-business-editor-workspace]')?.querySelector(':scope > [data-business-editor-navigation]')
+      const top = (scroller.querySelector('.erp-task-action-drawer__navigation')?.offsetHeight || 0) + (scroller !== body ? workspaceNavigation?.offsetHeight || 0 : 0)
+      const height = Math.max(0, scroller.clientHeight - top)
+      const shared = scroller !== body
+      setScrollArea((previous) => previous.shared === shared && previous.top === top && previous.height === height ? previous : { shared, top, height })
+      const nodes = [...body.querySelectorAll('[data-form-section]')].filter((node) =>
+        node.getClientRects().length > 0 &&
+        node.closest('[data-business-form-page]') === page
       )
-      const next = nodes.map((node) => ({
-        id: node.id,
-        title: node.dataset.formSection,
-      }))
+      const next = nodes.map((node) => ({ id: node.id, title: node.dataset.formSection }))
       setSections((previous) =>
         previous.length === next.length &&
         previous.every(
@@ -36,17 +53,21 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
           ? previous
           : next
       )
-      const { top } = body.getBoundingClientRect()
+      const scrollerTop = scroller.getBoundingClientRect().top
+      const sectionNavigation = body.parentElement.querySelector(':scope > .erp-business-form-page__navigation')
+      const picker = sectionNavigation?.querySelector('.erp-business-form-page__section-picker')
+      const pickerHeight = shared && picker?.getClientRects().length ? sectionNavigation.offsetHeight : 0
+      const readingInset = shared ? top + pickerHeight : 0
       const index = activeFormSectionIndex(
         nodes.map(
-          (node) => node.getBoundingClientRect().top - top + body.scrollTop
+          (node) => node.getBoundingClientRect().top - scrollerTop + scroller.scrollTop
         ),
-        body.scrollTop,
-        body.clientHeight,
-        body.scrollHeight
+        scroller.scrollTop + readingInset,
+        Math.max(0, scroller.clientHeight - readingInset),
+        scroller.scrollHeight
       )
       const anchor = navigationAnchor.current
-      if (anchor && Math.abs(body.scrollTop - anchor.top) <= 2) {
+      if (anchor && Math.abs(scroller.scrollTop - anchor.top) <= 2) {
         setActive(anchor.id)
       } else {
         navigationAnchor.current = null
@@ -55,6 +76,10 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
     }
     const schedule = () => {
       if (!frame) frame = window.requestAnimationFrame(update)
+    }
+    const onScroll = () => {
+      rememberedScroll.current = scroller.scrollTop
+      schedule()
     }
     const mutation = new MutationObserver(schedule)
     mutation.observe(body, {
@@ -65,52 +90,64 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
     })
     const resize = new ResizeObserver(schedule)
     resize.observe(body)
+    if (scroller !== body) resize.observe(scroller)
     if (body.firstElementChild) resize.observe(body.firstElementChild)
-    body.addEventListener('scroll', schedule, { passive: true })
+    scroller.addEventListener('scroll', onScroll, { passive: true })
     navigationAnchor.current = null
-    body.scrollTop = 0
+    scroller.scrollTop = rememberedScroll.current
     update()
     return () => {
       mutation.disconnect()
       resize.disconnect()
-      body.removeEventListener('scroll', schedule)
+      scroller.removeEventListener('scroll', onScroll)
       window.cancelAnimationFrame(frame)
     }
-  }, [loading, open])
+  }, [loading, open, presented, navigation])
 
   const navigate = (id) => {
     const body = bodyRef.current
+    const scroller = formSectionScroller(body)
     const section = [...body.querySelectorAll('[data-form-section]')].find(
       (node) => node.id === id
     )
     if (!section) return
     window.requestAnimationFrame(() => {
       if (!section.isConnected) return
+      const navigation = scroller.querySelector('.erp-task-action-drawer__navigation')
+      const workspaceNavigation = body.closest('[data-business-editor-workspace]')?.querySelector(':scope > [data-business-editor-navigation]')
+      const sectionNavigation = body.parentElement.querySelector(':scope > .erp-business-form-page__navigation')
+      const picker = sectionNavigation?.querySelector('.erp-business-form-page__section-picker')
+      const pickerHeight = scroller !== body && picker?.getClientRects().length ? sectionNavigation.offsetHeight : 0
+      const fixedBottom = Math.max(navigation?.getBoundingClientRect().bottom || 0, scroller !== body ? workspaceNavigation?.getBoundingClientRect().bottom || 0 : 0)
+      const offset = Math.max(12, fixedBottom ? fixedBottom - scroller.getBoundingClientRect().top + pickerHeight + 12 : pickerHeight + 12)
       const top = Math.max(
         0,
         Math.min(
           section.getBoundingClientRect().top -
-            body.getBoundingClientRect().top +
-            body.scrollTop -
-            12,
-          body.scrollHeight - body.clientHeight
+            scroller.getBoundingClientRect().top +
+            scroller.scrollTop -
+            offset,
+          scroller.scrollHeight - scroller.clientHeight
         )
       )
       // Keep the chosen section active when the viewport cannot align it at the top.
       navigationAnchor.current = { id, top }
-      body.scrollTo({ top, behavior: 'instant' })
+      rememberedScroll.current = top
+      scroller.scrollTo({ top, behavior: 'instant' })
       setActive(id)
       const heading =
-        section.querySelector('[role="heading"][tabindex]') || section
+        section.querySelector('h2[tabindex], [role="heading"][tabindex]') || section
       heading?.focus({ preventScroll: true })
     })
   }
-  const showNavigation = open && !loading && sections.length >= 3
+  const showNavigation = navigation && open && !loading && sections.length >= 3
 
   return (
     <div
       className="erp-business-form-page__main"
       data-section-navigation={showNavigation ? 'true' : undefined}
+      data-shared-scroll={scrollArea.shared ? 'true' : undefined}
+      style={scrollArea.shared ? { '--erp-form-section-top': `${scrollArea.top}px`, '--erp-form-section-height': `${scrollArea.height}px` } : undefined}
     >
       {showNavigation ? (
         <nav
@@ -118,38 +155,40 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
           aria-label="表单分区"
           inert={busy ? '' : undefined}
         >
-          <div className="erp-business-form-page__section-links">
-            {sections.map((section) => (
-              <button
-                key={section.id}
-                type="button"
-                aria-current={section.id === active ? 'location' : undefined}
-                aria-controls={section.id}
-                onClick={() => navigate(section.id)}
-              >
-                {section.title}
-              </button>
-            ))}
+          <div className="erp-business-form-page__navigation-content">
+            <div className="erp-business-form-page__section-links">
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  type="button"
+                  aria-current={section.id === active ? 'location' : undefined}
+                  aria-controls={section.id}
+                  onClick={() => navigate(section.id)}
+                >
+                  {section.title}
+                </button>
+              ))}
+            </div>
+            <label className="erp-business-form-page__section-picker">
+              跳转到
+              <Select
+                allowClear={false /* 不可清空：此值反映当前滚动位置，文档分区始终存在，清空不会改变当前位置。 */}
+                placeholder="跳转到"
+                aria-label="跳转到"
+                disabled={busy}
+                virtual={false}
+                data-value={active}
+                value={active}
+                onSelect={navigate}
+                popupRender={renderSectionPopup}
+                options={sections.map(({ id, title }) => ({
+                  value: id,
+                  label: title,
+                  'data-select-value': id,
+                }))}
+              />
+            </label>
           </div>
-          <label className="erp-business-form-page__section-picker">
-            跳转到
-            <Select
-              allowClear={false /* 不可清空：此值反映当前滚动位置，文档分区始终存在，清空不会改变当前位置。 */}
-              placeholder="跳转到"
-              aria-label="跳转到"
-              disabled={busy}
-              virtual={false}
-              data-value={active}
-              value={active}
-              onSelect={navigate}
-              popupRender={renderSectionPopup}
-              options={sections.map(({ id, title }) => ({
-                value: id,
-                label: title,
-                'data-select-value': id,
-              }))}
-            />
-          </label>
         </nav>
       ) : null}
       <div

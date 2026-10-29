@@ -19,6 +19,7 @@ const FINANCE_FACT_TYPE_LABELS = Object.freeze({
 
 function sourceNo(action, source = {}) {
   const record = source && typeof source === 'object' ? source : {}
+  if (action === FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE) return record.outsourcing_order_no || '委外合同待核对'
   return action === FINANCE_BUSINESS_SOURCE_ACTIONS.PURCHASE_RECEIPT_PAYABLE
     ? record.receipt_no || '采购入库单待核对'
     : record.fact_no || '业务记录待核对'
@@ -29,6 +30,7 @@ function sourcePartner(action, source = {}) {
   if (action === FINANCE_BUSINESS_SOURCE_ACTIONS.PURCHASE_RECEIPT_PAYABLE) {
     return record.supplier_name || '供应商由入库单确定'
   }
+  if (action === FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE) return record.supplier_snapshot?.name || '加工厂由委外合同确定'
   if (action === FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_RETURN_PAYABLE) {
     return record.supplier_name || '加工厂由委外订单确定'
   }
@@ -50,7 +52,7 @@ function sourceSummaryItems(action, source = {}) {
           : action ===
               FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_RETURN_PAYABLE
             ? '委外回货'
-            : '待核对记录',
+            : action === FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE ? '工序委外合同' : '待核对记录',
       children: sourceNo(action, record),
     },
     {
@@ -108,11 +110,16 @@ export default function FinanceBusinessSourceModal({
   const effectiveAction =
     action || FINANCE_BUSINESS_SOURCE_ACTIONS.PURCHASE_RECEIPT_PAYABLE
   const config = financeBusinessSourceActionConfig(effectiveAction)
+  const isReconciliation =
+    effectiveAction ===
+    FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION
   const formInitialValues = {
     fact_no: suggestedFinanceBusinessNo(effectiveAction, source),
-    occurred_at: localFinanceDateTimeInputValue(),
     note: '',
     ...(initialValues || {}),
+    occurred_at: isReconciliation
+      ? initialValues?.occurred_at ?? localFinanceDateTimeInputValue()
+      : undefined,
   }
 
   const submit = async () => {
@@ -124,12 +131,10 @@ export default function FinanceBusinessSourceModal({
     }
   }
 
-  const isReconciliation =
-    effectiveAction ===
-    FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION
-
   return (
     <BusinessModal
+      taskInline
+      form={form}
       title={config.title}
       open={open}
       size="localAction"
@@ -154,7 +159,9 @@ export default function FinanceBusinessSourceModal({
         message={
           isReconciliation
             ? '本次只核对一条已确认记录；往来方、金额和币种由系统沿用，不是多单据核销。'
-            : '来源、供应商、金额和币种由系统核算；提交后只生成待确认草稿。'
+            : effectiveAction === FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE
+              ? '全部关联工序验收后，按合同金额生成一笔应付草稿；发生时间取最后一批验收完成时间。'
+              : '来源、供应商、金额和币种由系统核算，发生时间沿用来源单据；提交后只生成待确认草稿。'
         }
       />
       <Descriptions
@@ -182,9 +189,11 @@ export default function FinanceBusinessSourceModal({
         >
           <Input autoComplete="off" maxLength={64} showCount />
         </Form.Item>
-        <Form.Item name="occurred_at" label="发生时间">
-          <DateTimeInput />
-        </Form.Item>
+        {isReconciliation ? (
+          <Form.Item name="occurred_at" label="发生时间">
+            <DateTimeInput />
+          </Form.Item>
+        ) : null}
         <Form.Item name="note" label="备注">
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>

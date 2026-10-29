@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createReactTestHarness } from '../../../scripts/test/reactRuntime.mjs'
 import { installRpcCallHarness } from '../../../scripts/test/rpcApiTestHarness.mjs'
+import { getRequestScopeCancellation } from '../../common/utils/requestScopeCancellation.mjs'
 
 async function harness(t, handler) {
   const view = await createReactTestHarness(t)
@@ -60,8 +61,33 @@ test('identity changes cancel old hydration and an unreadable scope never fetche
   await view.renderReferences({ ids: [1], profile: { id: 1 } })
   await view.renderReferences({ ids: [1], enabled: false, profile: { id: 2 } })
   assert.equal(view.calls[0].request.init.signal.aborted, true)
+  assert.equal(getRequestScopeCancellation(view.calls[0].request.init.signal.reason)?.cause, 'superseded')
   await view.act(async () => complete())
   await view.flush()
   assert.deepEqual(view.records, [])
   assert.equal(view.calls.length, 1)
+})
+
+test('a replaced reference read cannot overwrite the latest result and unmount records disposal', async (t) => {
+  const pending = new Map()
+  const view = await harness(t, (params) => new Promise((resolve) => {
+    pending.set(params.ids[0], () => resolve(materialPage(params)))
+  }))
+  await view.renderReferences({ ids: [1] })
+  const firstSignal = view.calls[0].request.init.signal
+  await view.renderReferences({ ids: [2] })
+  assert.equal(firstSignal.aborted, true)
+  assert.equal(getRequestScopeCancellation(firstSignal.reason)?.cause, 'superseded')
+  await view.act(async () => pending.get(2)())
+  await view.flush()
+  assert.deepEqual(view.records.map((row) => row.id), [2])
+  await view.act(async () => pending.get(1)())
+  await view.flush()
+  assert.deepEqual(view.records.map((row) => row.id), [2])
+  await view.renderReferences({ ids: [3] })
+  const finalSignal = view.calls[2].request.init.signal
+  await view.unmount()
+  assert.equal(finalSignal.aborted, true)
+  assert.equal(getRequestScopeCancellation(finalSignal.reason)?.cause, 'disposed')
+  await view.act(async () => pending.get(3)())
 })

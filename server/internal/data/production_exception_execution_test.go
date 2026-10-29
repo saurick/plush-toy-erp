@@ -251,10 +251,10 @@ func verifyExceptionOutsourcingExecution(t *testing.T, ctx context.Context, f pr
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = contracts.SubmitOutsourcingOrder(ctx, order.ID); err != nil {
+	if _, err = applyOutsourcingLifecycleUsecaseForTest(ctx, contracts, order.ID, biz.SourceOrderActionSubmit); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = contracts.ConfirmOutsourcingOrder(ctx, order.ID); err != nil {
+	if _, err = applyOutsourcingLifecycleUsecaseForTest(ctx, contracts, order.ID, biz.SourceOrderActionConfirm); err != nil {
 		t.Fatal(err)
 	}
 	action := &biz.ProductionWIPAction{ProductionOrderID: flow.ProductionOrderID, BatchID: batch.ID, ExpectedVersion: batch.Version, ActorID: f.actorID, IdempotencyKey: "exception-assign", ExecutionMode: biz.ProductionWIPExecutionOutsourced, OutsourcingAllocations: allocations}
@@ -274,6 +274,17 @@ func verifyExceptionOutsourcingExecution(t *testing.T, ctx context.Context, f pr
 			}
 			if _, err = facts.PostOutsourcingFact(ctx, operationalFactStatusMutation(issue.ID, issue.Version, f.actorID, "")); err != nil {
 				t.Fatal(err)
+			}
+		}
+	}
+	if batch.FlowType == biz.ProductionWIPFlowRemake {
+		requirements, err := facts.ListProductionOrderMaterialRequirements(ctx, flow.ProductionOrderID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, requirement := range requirements {
+			if !requirement.IssuedQuantity.IsZero() {
+				t.Fatal("approved remake consumed normal material allowance")
 			}
 		}
 	}

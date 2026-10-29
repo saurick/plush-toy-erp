@@ -13,9 +13,9 @@ import {
 import {
   PlayCircleOutlined,
   ReloadOutlined,
-  FileTextOutlined,
 } from '@ant-design/icons'
 import Select from '@/common/components/select/AppSelect'
+import DevTestingDetails from './DevTestingDetails.jsx'
 import DevTimestamp from './DevTimestamp.jsx'
 import DevPressureDataset from './DevPressureDataset.jsx'
 import { PRESSURE_DATA_SCALES } from '../config/devPressureData.mjs'
@@ -235,7 +235,7 @@ function MethodLatency({ level }) {
     </section>
   )
 }
-function PressureReport({ report, reports }) {
+function PressureReportDetails({ report, reports }) {
   const main = pressureMainLevel(report)
   const readMain = pressureMainLevel(report, 'reads')
   const p95Values =
@@ -247,16 +247,11 @@ function PressureReport({ report, reports }) {
   const status = DEV_PRESSURE_STATUS[report.status]
   const freshness = DEV_PRESSURE_FRESHNESS[report.freshness]
   return (
-    <div className="erp-dev-pressure-report" aria-label="压力测试报告">
+    <div className="erp-dev-pressure-report" aria-label="压力测试详细结果">
       <section className="erp-dev-pressure-identity">
         <div>
-          <Space wrap>
-            <Tag color={status.color}>{status.label}</Tag>
-            <Tag color={freshness.color}>{freshness.label}</Tag>
-            <Tag>
-              {report.profile === 'capacity' ? '10 分钟容量' : '短档回归'}
-            </Tag>
-          </Space>
+          <p>结果：{status.label} · {freshness.label} · {report.profile === 'capacity' ? '10 分钟容量' : '短档回归'}</p>
+
           <p>
             候选{' '}
             <code>{report.candidate.commit?.slice(0, 12) || '未记录'}</code> ·{' '}
@@ -324,18 +319,6 @@ function PressureReport({ report, reports }) {
         <p className="erp-dev-pressure-note">
           这是历史候选的运行证据；当前源码的容量结论需要重新运行对应档位。
         </p>
-      ) : null}
-      {report.status !== 'passed' ? (
-        <Alert
-          type="error"
-          showIcon
-          message="该次压力测试未形成完整通过证据"
-          description={
-            report.failureStage
-              ? `停止于：${DEV_PRESSURE_PHASES[report.failureStage] || '未识别阶段'}。已保留可读报告，请核对失败项后重新运行。`
-              : '请核对阶段结果、业务对账与资源清理。'
-          }
-        />
       ) : null}
       <div className="erp-dev-pressure-metrics">
         <Metric
@@ -459,13 +442,41 @@ function PressureReport({ report, reports }) {
   )
 }
 
+function PressureReport({ report, reports }) {
+  const main = pressureMainLevel(report)
+  const p95 = main?.methods.map((method) => method.p95Ms).filter(Number.isFinite) || []
+  const status = DEV_PRESSURE_STATUS[report.status]
+  const freshness = DEV_PRESSURE_FRESHNESS[report.freshness]
+  return (
+    <section className="erp-dev-pressure-report erp-dev-pressure-report--summary" aria-label="压力测试报告">
+      <div className="erp-dev-pressure-summary-status">
+        <Tag color={status.color}>{status.label}</Tag>
+        <Tag color={freshness.color}>{freshness.label}</Tag>
+        <span>{report.profile === 'capacity' ? '10 分钟容量' : '短档回归'}</span>
+        <DevTimestamp value={report.completedAt} action="完成于" />
+      </div>
+      {report.status !== 'passed' ? <Alert type="error" showIcon message="该次压力测试未形成完整通过证据" description={report.failureStage ? `停止于：${DEV_PRESSURE_PHASES[report.failureStage] || '未识别阶段'}。` : undefined} /> : null}
+      <table data-table-lines="appearance" className="erp-dev-tool-table erp-dev-testing-simple-table" aria-label="压力测试关键结果">
+        <thead><tr><th scope="col">指标</th><th scope="col">结果</th></tr></thead>
+        <tbody>{[
+          ['混合操作吞吐', `${format(main?.operations.successfulRps, 2)} 次 / 秒`],
+          ['实际 API 吞吐', `${format(main?.rpc.successfulRps, 2)} 次 / 秒`],
+          ['完整业务流程', `${format(main?.completedBusinessFlows)} 条`],
+          ['最高 API p95', `${format(p95.length ? Math.max(...p95) : null)} ms`],
+        ].map(([label, value]) => <tr key={label}><th scope="row">{label}</th><td>{value}</td></tr>)}
+        </tbody>
+      </table>
+      <DevTestingDetails id="pressure-report" label="报告详情" title="压力测试报告详情"><PressureReportDetails report={report} reports={reports} /></DevTestingDetails>
+    </section>
+  )
+}
+
 export default function DevPressurePanel({
   summary,
   summaryError,
   actionStarting,
   onRun,
   onReloadTesting,
-  onOpenDocs,
 }) {
   const [state, setState] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -588,9 +599,9 @@ export default function DevPressurePanel({
     >
       <div className="erp-dev-pressure-actions">
         <Space wrap>
-          <label htmlFor="dev-pressure-scale">数据规模</label>
           <Select
             allowClear={false /* 不可清空：执行压测必须指定数据规模，不能用空值隐式扩大运行成本。 */}
+            label="数据规模"
             placeholder="数据规模"
             id="dev-pressure-scale"
             aria-label="数据规模"
@@ -600,9 +611,9 @@ export default function DevPressurePanel({
             options={Object.entries(PRESSURE_DATA_SCALES).map(([value, scale]) =>
               ({ value, label: `${scale.label} · ${scale.historyOrders} 张历史单` }))}
           />
-          <label htmlFor="dev-pressure-load">负载档位</label>
           <Select
             allowClear={false /* 不可清空：执行压测必须明确短档或容量档位，空值无法确定运行合同。 */}
+            label="负载档位"
             placeholder="负载档位"
             id="dev-pressure-load"
             aria-label="负载档位"
@@ -641,7 +652,7 @@ export default function DevPressurePanel({
               ? '正在核对任务状态'
               : summary.busy?.active && !active
                 ? '已有其他 QA 任务运行，结束后可启动压测'
-                : '使用隔离环境；构建、造数与清理时间另计。')}
+                : '')}
         </Text>
       </div>
       {latest ? (
@@ -700,8 +711,8 @@ export default function DevPressurePanel({
       ) : null}
       {options.length ? (
         <div className="erp-dev-pressure-report-select">
-          <label htmlFor="dev-pressure-report">选择运行报告</label>
           <Select
+            label="报告"
             id="dev-pressure-report"
             aria-label="选择运行报告"
             value={reportCleared ? undefined : requested || state?.report?.id || undefined}
@@ -718,22 +729,15 @@ export default function DevPressurePanel({
         </p>
       ) : null}
       {loading && !state ? (
-        <Skeleton active paragraph={{ rows: 6 }} />
+        <Skeleton active paragraph={{ rows: 2 }} />
       ) : report ? (
         <PressureReport report={report} reports={state.reports} />
       ) : (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={
-            reportCleared && options.length ? '请选择运行报告' : active
-              ? '本次压测正在执行，完成并清理后发布报告。'
-              : '暂无报告，可先运行短档回归。'
-          }
-        />
+        <p className="erp-dev-pressure-note" role="status">
+          {reportCleared && options.length ? '请选择运行报告' : active ? '本次压测正在执行，完成并清理后发布报告。' : '暂无报告，可先运行短档回归。'}
+        </p>
       )}
-      <details className="erp-dev-disclosure erp-dev-pressure-guide">
-        <summary>档位、指标与维护规则</summary>
-        <Button type="link" icon={<FileTextOutlined />} onClick={onOpenDocs}>完整使用说明</Button>
+      <DevTestingDetails id="pressure-guide" label="档位、指标与维护规则" title="压测说明">
         <Paragraph>用料计算 → 提交 → 老板审批 → 财务审批 → 采购读回。每次新建隔离 PostgreSQL、S3、后端及模拟订单池；切换页面后任务继续执行。</Paragraph>
         <ol>
           <li>
@@ -759,7 +763,7 @@ export default function DevPressurePanel({
             当前范围不含库存抵扣、打印、生产硬件容量、固定到达率、数小时稳定性和客户验收。
           </li>
         </ol>
-      </details>
+      </DevTestingDetails>
     </div>
   )
 }

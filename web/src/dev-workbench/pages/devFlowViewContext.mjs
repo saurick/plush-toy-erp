@@ -5,8 +5,15 @@ import { normalizeFulfillmentRole } from '../../erp/utils/workflowFulfillment.mj
 import { DEV_FLOW_STATE_QUERY_KEYS as keys } from './devFlowStateQuery.mjs'
 
 export const FLOW_READING_CONTEXT_KEYS = [
+  keys.financeFact,
+  keys.financeRule,
+  keys.financeTopic,
+  keys.financeStep,
+  keys.financeStage,
+  keys.financeChange,
   keys.roleStage,
   keys.roleSubstep,
+  keys.relationAction,
   keys.roleTab,
   keys.roleTopic,
   keys.roleTopicNode,
@@ -18,11 +25,28 @@ export const FLOW_READING_CONTEXT_KEYS = [
   keys.exceptionStep,
 ]
 
+// Main tabs share the reading position; task status/group and selected rule
+// objects belong to their own view. A changed context invalidates old objects.
+export function restoreDevFlowPrimaryContext(previous, current, { independentKeys = [] } = {}) {
+  const next = new URLSearchParams(previous)
+  const shared = [...FLOW_READING_CONTEXT_KEYS, keys.chain, keys.node, keys.role, keys.relationMachine, keys.relationPermission]
+    .filter((key) => !independentKeys.includes(key))
+  const contextValue = (params, key) => key === keys.chain ? params.get(key) || 'all' : params.get(key)
+  const changed = shared.some((key) => contextValue(next, key) !== contextValue(current, key))
+  for (const key of shared) {
+    if (current.has(key)) next.set(key, current.get(key))
+    else next.delete(key)
+  }
+  if (changed) [keys.flow, keys.state, keys.ruleAction, keys.process, keys.fact].forEach((key) => next.delete(key))
+  return { searchParams: next, changed }
+}
+
 export function resolveDevFlowViewContext({
   catalog,
   searchParams,
   task,
   taskScoped = false,
+  topics = false,
 }) {
   let chainKey = null
   let nodeKey = null
@@ -45,7 +69,7 @@ export function resolveDevFlowViewContext({
     chainKey = tasks.exception_guides.find(
       (item) => item.key === searchParams.get(keys.exception)
     )?.business_chain
-  } else if (searchParams.get(keys.roleTab) === 'topics') {
+  } else if (topics) {
     const topicKey = searchParams.has(keys.roleTopic)
       ? searchParams.get(keys.roleTopic)
       : buildDevBusinessChainTopics(

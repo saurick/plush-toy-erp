@@ -1,17 +1,17 @@
 import React, { useEffect, useMemo, useRef } from 'react'
-import { AppstoreOutlined, ArrowLeftOutlined, FileTextOutlined } from '@ant-design/icons'
-import { Alert, Button, Drawer, Empty, Tag, Typography } from 'antd'
+import { AppstoreOutlined, CloseOutlined } from '@ant-design/icons'
+import { Alert, Button, Empty, Tag, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_PRODUCT_CORE_ROUTE } from '../config/devRoutes.mjs'
 import SearchInput from '@/common/components/SearchInput'
 import FilterChip from '@/common/components/navigation/FilterChip'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
+import { WorkbenchReading } from '../components/WorkbenchPattern.jsx'
 import {
-  DEV_PRODUCT_CORE_DOCS_HREF,
   DEV_PRODUCT_CORE_MEMBERSHIP_ALL,
   DEV_PRODUCT_CORE_MEMBERSHIP_ORDER,
-  DEV_PRODUCT_CORE_SOURCE_PATH,
   DEV_PRODUCT_CORE_STATUS_PRESENTATION,
   buildProductCoreSummary,
   filterProductCoreCapabilities,
@@ -111,7 +111,6 @@ export default function DevProductCorePage() {
 
   const handleMembershipChange = (nextMembership) => {
     const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('capability')
     if (nextMembership === DEV_PRODUCT_CORE_MEMBERSHIP_ALL) {
       nextParams.delete('status')
     } else {
@@ -122,7 +121,6 @@ export default function DevProductCorePage() {
 
   const handleKeywordSearch = (nextKeyword) => {
     const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('capability')
     if (nextKeyword.trim()) {
       nextParams.set('q', nextKeyword)
     } else {
@@ -147,6 +145,11 @@ export default function DevProductCorePage() {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.delete('capability')
     setSearchParams(nextParams, { replace: true })
+    requestAnimationFrame(() => {
+      const target = detailOpener.current?.isConnected
+        ? detailOpener.current : document.querySelector('input[aria-label="搜索产品能力"]')
+      target?.focus({ preventScroll: true })
+    })
   }
 
   const hasActiveFilter =
@@ -154,23 +157,23 @@ export default function DevProductCorePage() {
 
   return (
     <div className="erp-dev-product-core-page erp-dev-workspace-page erp-dev-tool-page">
-      <DevPageNav sourcePath={DEV_PRODUCT_CORE_SOURCE_PATH} />
+      <DevPageNav />
 
-      <header className="erp-dev-product-core-header">
-        <div className="erp-dev-product-core-header__copy">
-          <span
-            className="erp-dev-product-core-header__icon"
-            aria-hidden="true"
-          >
-            <AppstoreOutlined />
-          </span>
-          <div>
-            <Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_PRODUCT_CORE_ROUTE]}</Title>
+      <DevPageHeader
+        className="erp-dev-product-core-header"
+        title={
+          <div className="erp-dev-product-core-header__copy">
+            <span className="erp-dev-product-core-header__icon" aria-hidden="true">
+              <AppstoreOutlined />
+            </span>
+            <div>
+              <Title level={1}>
+                {DEV_PAGE_TITLE_BY_ROUTE[DEV_PRODUCT_CORE_ROUTE]}
+              </Title>
+            </div>
           </div>
-        </div>
-      </header>
-
-      <main className="erp-dev-product-core-shell">
+        }
+      >
         <div className="erp-dev-product-core-toolbar">
           <div
             className="erp-dev-product-core-filters"
@@ -200,27 +203,36 @@ export default function DevProductCorePage() {
               value={keyword}
               onSearch={handleKeywordSearch}
             />
-            <Text className="erp-dev-product-core-result-count" type="secondary" aria-live="polite">{filteredCapabilities.length} 项</Text>
-            <Button disabled={!hasActiveFilter} onClick={handleReset}>清除筛选</Button>
+            <Text
+              className="erp-dev-product-core-result-count"
+              type="secondary"
+              aria-live="polite"
+            >
+              {filteredCapabilities.length} 项
+            </Text>
+            <Button disabled={!hasActiveFilter} onClick={handleReset}>
+              清除筛选
+            </Button>
           </div>
         </div>
+      </DevPageHeader>
+
+      <main className="erp-dev-product-core-shell">
 
         {capabilities.length === 0 ? (
           <Alert
             type="error"
             showIcon
             message="暂时无法读取产品能力台账"
-            description="请打开能力台账，核对表格格式与状态。"
-            action={
-              <Button href={DEV_PRODUCT_CORE_DOCS_HREF}>查看能力台账</Button>
-            }
+            description="请核对来源文件中的表格格式与状态。"
           />
         ) : (
-          <section
+          <WorkbenchReading
             className="erp-dev-product-core-inventory"
-            aria-label="产品能力目录"
-          >
-            {filteredCapabilities.length > 0 ? (
+            label="产品能力目录"
+            detailLabel="当前能力详情"
+            detailVisible={Boolean(selectedCapability)}
+            catalog={filteredCapabilities.length > 0 ? (
               <div className="erp-dev-product-core-groups">
                 {capabilityGroups.map((group) => (
                   <section className="erp-dev-product-core-group" key={group.key} data-membership={group.key}>
@@ -231,7 +243,7 @@ export default function DevProductCorePage() {
                           <button
                             type="button"
                             className="erp-dev-directory-item erp-dev-directory-item--nested"
-                            aria-haspopup="dialog"
+                            aria-pressed={selectedCapability?.key === item.key}
                             onClick={(event) => selectCapability(item, event)}
                           >
                             <span>{item.capability}</span>
@@ -250,7 +262,32 @@ export default function DevProductCorePage() {
                 />
               </div>
             )}
-          </section>
+          >
+            {selectedCapability ? (
+              <div
+                className="erp-dev-product-core-detail"
+                onKeyDown={(event) => {
+                  if (event.key !== 'Escape') return
+                  event.stopPropagation()
+                  closeCapability()
+                }}
+              >
+                <header className="erp-dev-product-core-detail__heading">
+                  <Title level={2}>{selectedCapability.capability}</Title>
+                  <Button type="text" icon={<CloseOutlined aria-hidden="true" />} aria-label="收起能力详情" onClick={closeCapability}>收起</Button>
+                </header>
+                <Tag color={STATUS_COLOR_BY_MEMBERSHIP[selectedCapability.membershipKey]}>{selectedCapability.membership}</Tag>
+                <section>
+                  <Title level={3}>当前可用范围</Title>
+                  <ul>{selectedCapability.availableScope.split('；').map((text, index) => <li key={index}>{text}</li>)}</ul>
+                </section>
+                <section className="erp-dev-product-core-detail__boundary">
+                  <Title level={3}>当前边界</Title>
+                  <p>{selectedCapability.boundary}</p>
+                </section>
+              </div>
+            ) : null}
+          </WorkbenchReading>
         )}
 
         <DevStaticGuidance title="状态说明">
@@ -258,34 +295,6 @@ export default function DevProductCorePage() {
           <Text>{summary.boundary}</Text>
         </DevStaticGuidance>
       </main>
-      <Drawer
-        rootClassName="erp-dev-product-core-drawer"
-        title={selectedCapability?.capability || '能力详情'}
-        open={Boolean(selectedCapability)}
-        width={680}
-        styles={{ wrapper: { maxWidth: '100%' } }}
-        closable={false}
-        extra={<Button type="text" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={closeCapability}>返回能力目录</Button>}
-        onClose={closeCapability}
-        afterOpenChange={(open) => {
-          if (!open && detailOpener.current?.isConnected) detailOpener.current.focus({ preventScroll: true })
-        }}
-      >
-        {selectedCapability ? (
-          <article className="erp-dev-product-core-detail" aria-label="当前能力详情">
-            <Tag color={STATUS_COLOR_BY_MEMBERSHIP[selectedCapability.membershipKey]}>{selectedCapability.membership}</Tag>
-            <section>
-              <Title level={3}>当前可用范围</Title>
-              <ul>{selectedCapability.availableScope.split('；').map((text, index) => <li key={index}>{text}</li>)}</ul>
-            </section>
-            <section className="erp-dev-product-core-detail__boundary">
-              <Title level={3}>当前边界</Title>
-              <p>{selectedCapability.boundary}</p>
-            </section>
-            <Button icon={<FileTextOutlined />} href={DEV_PRODUCT_CORE_DOCS_HREF}>查看能力台账</Button>
-          </article>
-        ) : null}
-      </Drawer>
     </div>
   )
 }

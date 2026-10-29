@@ -52,6 +52,13 @@ func TestInventoryOperationListBatchQueriesAndWarehouseScope(t *testing.T) {
 				t.Fatalf("unexpected ordering: %d", row.ID)
 			}
 			detail, err := inventoryOperationByID(ctx, client, row.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The detail projection additionally resolves human-readable identities.
+			for _, item := range detail.Items {
+				item.SubjectName, item.SKUCode, item.WarehouseName, item.ToWarehouseName, item.LotNo, item.UnitName = "", "", "", "", "", ""
+			}
 			if err != nil || !reflect.DeepEqual(detail, row) {
 				t.Fatalf("list lost detail/category fields: %#v error=%v", row, err)
 			}

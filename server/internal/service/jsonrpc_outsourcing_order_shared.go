@@ -205,9 +205,9 @@ func (d *jsonrpcDispatcher) outsourcingOrderErrorResult(ctx context.Context, err
 	case errors.Is(err, biz.ErrSourceOrderStateInvalid):
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "委外合同当前状态不允许此操作，请刷新后核对可办理的操作"}
 	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
-		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "委外合同尚未全部回货；若确定不再履行剩余数量，请改用短关闭并填写原因"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "委外合同尚未全部回货或完成工序验收；若确定不再履行剩余数量，请改用短关闭并填写原因"}
 	case errors.Is(err, biz.ErrOutsourcingOrderIncomplete):
-		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "加工合同信息不完整，请补齐甲乙方信息、预计回货日期和每条明细的加工项目后再提交或确认"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "加工合同信息不完整，请补齐甲乙方信息、预计回货日期、加工项目、数量及单价，并核对金额后再提交或确认"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[outsourcing_order] invalid param err=%v", err)
 		return invalidParamResult()
@@ -311,6 +311,9 @@ func outsourcingOrderItemToMap(item *biz.OutsourcingOrderItem) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
+		"production_order_id":       optionalIntValue(item.ProductionOrderID),
+		"production_wip_batch_id":   optionalIntValue(item.ProductionWIPBatchID),
+		"production_wip_status":     optionalStringValue(item.ProductionWIPStatus),
 		"id":                        item.ID,
 		"outsourcing_order_id":      item.OutsourcingOrderID,
 		"line_no":                   item.LineNo,

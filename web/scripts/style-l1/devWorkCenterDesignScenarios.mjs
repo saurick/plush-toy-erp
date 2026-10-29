@@ -22,7 +22,7 @@ export function createDevWorkCenterDesignScenarios({ assert, assertNoHorizontalO
       verify: async (page) => {
         const guide = page.getByRole('region', { name: '工作中心界面说明', exact: true })
         await guide.waitFor()
-        assert.equal(await page.locator('.erp-dev-ui-design-header').getByRole('tab').count(), 3)
+        assert.equal(await page.locator('.erp-dev-ui-design-page > .erp-dev-workbench-toolbar').getByRole('tab').count(), 3)
         assert.equal(await page.getByRole('tab', { name: '字段图解', exact: true }).count(), 0)
         assert.equal(await page.locator('iframe').count(), 0)
         for (const topic of WORK_CENTER_DESIGN_TOPICS) {
@@ -129,8 +129,8 @@ export function createDevWorkCenterDesignScenarios({ assert, assertNoHorizontalO
         await page.locator('iframe[title="ERP 最新可交互设计"]').waitFor()
         await page.getByRole('tab', { name: '设计说明', exact: true }).click()
         await guide.waitFor()
-        await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-header .ant-tabs', 0)
-        await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-header .ant-tabs', 1)
+        await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-page > .erp-dev-workbench-toolbar .ant-tabs', 0)
+        await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-page > .erp-dev-workbench-toolbar .ant-tabs', 1)
         await guide.waitFor()
         await assertNoHorizontalOverflow(page, '界面说明恢复阅读')
         assert.deepEqual(businessRequests.get(page), [], '刷新与前进后退不请求业务数据')

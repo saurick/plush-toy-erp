@@ -1137,7 +1137,7 @@ func validateProductionEngineeringRelease(ctx context.Context, client *ent.Clien
 		if err != nil {
 			return err
 		}
-		if line.EngineeringStatus != biz.SalesOrderEngineeringConfirmed || line.SampleBomID == nil || item.BOMHeaderID == nil || *line.SampleBomID != *item.BOMHeaderID || line.SampleBomFingerprint == nil || line.SampleImageAttachmentID == nil {
+		if line.BomID == nil || item.BOMHeaderID == nil || *line.BomID != *item.BOMHeaderID || line.BomFingerprint == nil {
 			return biz.ErrSalesOrderEngineeringNotReady
 		}
 		header, err := client.BOMHeader.Query().Where(bomheader.ID(*item.BOMHeaderID)).Where(func(s *entsql.Selector) { applyBOMReferenceShareLock(s, sqlDialect) }).Only(ctx)
@@ -1148,11 +1148,7 @@ func validateProductionEngineeringRelease(ctx context.Context, client *ent.Clien
 		if err != nil {
 			return err
 		}
-		imageID, err := currentSalesOrderSampleImage(ctx, client, line.ProductID)
-		if err != nil {
-			return err
-		}
-		if fingerprint != *line.SampleBomFingerprint || imageID != *line.SampleImageAttachmentID {
+		if fingerprint != *line.BomFingerprint {
 			return biz.ErrSalesOrderEngineeringNotReady
 		}
 		approved, err := client.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.SalesOrderID(line.SalesOrderID), engineeringmaterialrequest.Status(biz.MaterialRequestApproved)).Exist(ctx)
@@ -1183,6 +1179,9 @@ func replaceProductionOrderItems(ctx context.Context, client *ent.Client, orderI
 }
 
 func createProductionOrderItem(ctx context.Context, client *ent.Client, orderID int, item biz.ProductionOrderDraftItem, snapshot productionOrderReferenceSnapshot) (*ent.ProductionOrderItem, error) {
+	if item.RouteCode == nil {
+		return nil, biz.ErrProductionWIPInvalidRoute
+	}
 	return client.ProductionOrderItem.Create().
 		SetProductionOrderID(orderID).
 		SetLineNo(item.LineNo).
@@ -1192,7 +1191,7 @@ func createProductionOrderItem(ctx context.Context, client *ent.Client, orderID 
 		SetPlannedQuantity(item.PlannedQuantity).
 		SetNillableSalesOrderItemID(item.SalesOrderItemID).
 		SetNillableBomHeaderID(item.BOMHeaderID).
-		SetNillableRouteCode(item.RouteCode).
+		SetRouteCode(*item.RouteCode).
 		SetCustomerInspectionRequired(item.CustomerInspectionRequired).
 		SetProductCodeSnapshot(snapshot.productCode).
 		SetProductNameSnapshot(snapshot.productName).
@@ -1410,7 +1409,10 @@ func loadProductionOrderMaterialRequirements(ctx context.Context, client *ent.Cl
 	if err != nil {
 		return nil, err
 	}
-	issuedByRequirement := make(map[int]decimal.Decimal, len(rows))
+	issuedByRequirement, err := productionMaterialIssuedQuantities(ctx, client, rows)
+	if err != nil {
+		return nil, err
+	}
 	approvedOverIssueByRequirement := make(map[int]decimal.Decimal, len(rows))
 	if len(rows) > 0 {
 		requirementIDs := make([]int, 0, len(rows))
@@ -1418,29 +1420,6 @@ func loadProductionOrderMaterialRequirements(ctx context.Context, client *ent.Cl
 		for _, row := range rows {
 			requirementIDs = append(requirementIDs, row.ID)
 			requirementByID[row.ID] = row
-		}
-		facts, err := client.ProductionFact.Query().Where(
-			productionfact.SourceType(biz.ProductionOrderSourceType),
-			productionfact.SourceID(orderID),
-			productionfact.FactType(biz.ProductionFactMaterialIssue),
-			productionfact.Status(biz.OperationalFactStatusPosted),
-		).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, fact := range facts {
-			if fact.SourceLineID == nil {
-				return nil, biz.ErrProductionOrderMaterialRequirementInvalid
-			}
-			requirement := requirementByID[*fact.SourceLineID]
-			if requirement == nil ||
-				fact.SubjectType != biz.InventorySubjectMaterial ||
-				fact.SubjectID != requirement.MaterialID ||
-				fact.ProductSkuID != nil ||
-				fact.UnitID != requirement.UnitID {
-				return nil, biz.ErrProductionOrderMaterialRequirementInvalid
-			}
-			issuedByRequirement[*fact.SourceLineID] = issuedByRequirement[*fact.SourceLineID].Add(fact.Quantity)
 		}
 		allowancePredicates := append(
 			activeProductionOverIssuePredicates(),

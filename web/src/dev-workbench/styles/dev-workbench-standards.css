@@ -5,13 +5,7 @@
   padding: 10px 12px;
 }
 
-.erp-workbench-standards__intro {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-}
-
-.erp-workbench-standards__intro > span {
+.erp-workbench-standards__note {
   color: var(--erp-text-muted);
 }
 

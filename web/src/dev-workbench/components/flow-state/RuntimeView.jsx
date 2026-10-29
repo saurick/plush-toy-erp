@@ -5,7 +5,7 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Empty, Spin, Tag } from 'antd'
-import { WorkbenchEmpty, WorkbenchFacts, WorkbenchSection } from '../WorkbenchPattern.jsx'
+import { WorkbenchEmpty, WorkbenchFacts, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import Select from '@/common/components/select/AppSelect'
 import {
   getProcessOwnerPoolLabel,
@@ -16,7 +16,6 @@ import {
   DEFINITION_SELECT_CLASS_NAMES,
   formatQueryTime,
   Text,
-  Title,
   useDefinitionSelectSearch,
   renderDefinitionSelectOption,
   asArray,
@@ -50,14 +49,14 @@ const PROCESS_STATUS_COLORS = Object.freeze({
 
 function ProcessDefinitionCard({ definition }) {
   const nodeByKey = new Map(definition.nodes.map((node) => [node.key, node]))
-  const [selectedKey, select] = useState(definition.initial)
-  const selected = nodeByKey.get(selectedKey) || definition.nodes[0]
+  const [selectedKey, select] = useState(null)
+  const selected = nodeByKey.get(selectedKey)
   const flow = useMemo(
     () => ({
       entryNodeKeys: [definition.initial],
       nodes: definition.nodes.map((node) => ({
         ...node,
-        kind: 'process_runtime',
+        kind: 'state',
         terminal: node.type === 'end',
         role: node.ownerPool ? getProcessOwnerPoolLabel(node.ownerPool) : null,
       })),
@@ -70,51 +69,33 @@ function ProcessDefinitionCard({ definition }) {
     [definition]
   )
   return (
-    <section className="erp-dev-flow-process-definition">
-      <div className="erp-dev-flow-section-heading">
-        <div>
-          <Text className="erp-dev-flow-eyebrow">流程定义与 variant</Text>
-          <Title level={2}>{definition.label}</Title>
-
-        </div>
-        <Text type="secondary">流程定义</Text>
-      </div>
-
+    <WorkbenchSection flat className="erp-dev-flow-process-definition" aria-label={definition.label}>
+      <h2 className="erp-dev-flow-print-title">{definition.label}</h2>
       <BusinessFlowDiagram
+        relationships
+        legend="实线：办理路径 · 虚线：分支或回接。"
         flow={flow}
         label={`${definition.label}定义图`}
-        selectedKey={selected.key}
-        onSelect={select}
+        selectedKey={selectedKey}
+        onSelect={(key) => select(key === selectedKey ? null : key)}
       />
-      <div className="erp-dev-fulfillment-guide__focus" aria-live="polite">
-        <strong>{selected.label}</strong>
-        <p>
-          {selected.type === 'human_task' || selected.type === 'approval'
+      {selected ? (
+        <div className="erp-dev-fulfillment-guide__focus" aria-live="polite">
+          <strong>{selected.label}</strong>
+          <p>
+            {selected.type === 'human_task' || selected.type === 'approval'
             ? '人工协同节点'
             : selected.type === 'domain_command'
               ? '领域命令节点'
               : '流程结束节点'}
-          {selected.ownerPool
+            {selected.ownerPool
             ? ` · ${getProcessOwnerPoolLabel(selected.ownerPool)}`
             : ''}
-        </p>
-      </div>
-      <EvidenceDisclosure value={definition} label="定义与代码依据">
-        <WorkbenchFacts items={[
-          { label: '流程标识', value: <KeyValue value={definition.key} /> },
-          { label: '流程版本', value: definition.processVersion },
-        ]}
-        />
-        <ul>
-          {definition.edges.map((edge) => (
-            <li key={edge.key}>
-              <strong>{nodeByKey.get(edge.from)?.label || edge.from} → {nodeByKey.get(edge.to)?.label || edge.to}</strong>
-              <span>{edge.branchPolicy ? edge.branchLabel || '结果分支' : '顺序推进'}</span>
-            </li>
-          ))}
-        </ul>
-      </EvidenceDisclosure>
-    </section>
+          </p>
+        </div>
+      ) : null}
+
+    </WorkbenchSection>
   )
 }
 
@@ -192,8 +173,8 @@ function RuntimeView({
   onSelectDefinition,
   onBackToChain,
   onClearChainContext,
-  onLocateTask,
   onBrowseDefinitions,
+  ruleTools,
 }) {
   const definitions = projection ? projection.processDefinitions : catalog.processDefinitions
   const scopedCatalog = useMemo(() => ({ ...catalog, processDefinitions: definitions }), [catalog, definitions])
@@ -214,15 +195,10 @@ function RuntimeView({
   const currentNodes = asArray(runtime.context?.current_nodes)
   return (
     <div className="erp-dev-flow-view-stack">
-      <BusinessChainProjectionContext projection={projection} onBackToChain={onBackToChain} onClearChainContext={onClearChainContext} />
+      {taskId ? <BusinessChainProjectionContext projection={projection} onBackToChain={onBackToChain} onClearChainContext={onClearChainContext} /> : null}
       {!taskId ? (
         <>
-          <div className="erp-dev-flow-inline-note">
-            <Text type="secondary">当前查看流程定义；实际进度按任务查询。</Text>
-            <Button onClick={onLocateTask}>定位任务</Button>
-          </div>
-          <section className="erp-dev-flow-definition-selector">
-            <label htmlFor="dev-flow-process-select">选择流程定义</label>
+          <WorkbenchToolbar className="erp-dev-flow-definition-selector">
             {definitions.length > 0 ? (
               <Select
                 placeholder="选择流程定义"
@@ -230,6 +206,7 @@ function RuntimeView({
                 aria-label="选择流程定义"
                 showSearch
                 virtual={false}
+                popupMatchSelectWidth={false}
                 classNames={DEFINITION_SELECT_CLASS_NAMES}
                 {...searchProps}
                 filterOption={optionFilter}
@@ -241,7 +218,8 @@ function RuntimeView({
                 onChange={onSelectDefinition}
               />
             ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前业务没有登记流程定义，可查看状态与流转规则或事实定义。" />}
-          </section>
+            {ruleTools}
+          </WorkbenchToolbar>
           {definition ? <ProcessDefinitionCard key={definition.key} definition={definition} /> : definitions.length > 0 ? <WorkbenchEmpty title="请选择流程定义" /> : null}
         </>
       ) : null}

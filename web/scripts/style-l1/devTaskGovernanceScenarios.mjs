@@ -172,6 +172,13 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
       await field('counted').fill('240')
       await submit()
       await frame.getByText(/成品仓库存增加 240/u).waitFor()
+      if (mobile) {
+        await frame.locator('[data-action="mobile-step"][data-value="process"]').click()
+        assert.equal(await field('counted').inputValue(), '240', '回看办理资料保留原结果')
+        assert.equal(await frame.locator('[data-action="handling-fulfillment"]').count(), 0, '已结束操作不能重新提交')
+        await frame.locator('[data-action="mobile-step"][data-value="receipt"]').click()
+        await frame.getByText(/成品仓库存增加 240/u).waitFor()
+      }
       await close()
       await open('H09', '办理成品质量关口')
       await chooseSelectOption(field('inspection'), 'passed')

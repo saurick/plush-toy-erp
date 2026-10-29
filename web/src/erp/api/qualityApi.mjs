@@ -192,7 +192,7 @@ export async function correctQualityInspectionResult(params = {}) {
   return inspection
 }
 
-export async function getQualityInspection(params = {}) {
-  const result = await qualityRpc.call(RpcMethod.quality.GET_QUALITY_INSPECTION, params)
+export async function getQualityInspection(params = {}, options = {}) {
+  const result = await qualityRpc.call(RpcMethod.quality.GET_QUALITY_INSPECTION, params, options)
   return dataOf(result)?.quality_inspection || null
 }

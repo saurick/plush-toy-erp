@@ -1,5 +1,5 @@
 import React from 'react'
-import { CheckOutlined, DownOutlined, RightOutlined } from '@ant-design/icons'
+import { CheckOutlined, RightOutlined } from '@ant-design/icons'
 import { buildWorkflowProcessStageModel } from '../../utils/processRuntimePresentation.mjs'
 import WorkflowResponsibilities from './WorkflowResponsibilities.jsx'
 import './workflowProcessStageTrack.css'
@@ -19,7 +19,6 @@ export default function WorkflowProcessStageTrack({
   focusCurrent = false,
   compact = false,
   hideLinkedCurrent = false,
-  defaultExpanded = true,
 }) {
   const [expandedStep, setExpandedStep] = React.useState(null)
   const model = suppliedModel || buildWorkflowProcessStageModel(context)
@@ -104,13 +103,12 @@ export default function WorkflowProcessStageTrack({
 
       {model.handoffLabel && !repeatsCurrent ? <p className="workflow-process-stage__handoff">{model.handoffLabel}</p> : null}
       {history.length ? (
-        <details className="workflow-process-stage__history" open={defaultExpanded}>
-          <summary>
-            <span>{history.every((item) => item.tone === 'completed') ? `前序 ${history.length} 步已完成` : `已结束步骤 ${history.length}`}</span>
-            <DownOutlined className="workflow-process-stage__history-toggle" aria-hidden="true" />
-          </summary>
+        <div className="workflow-process-stage__history">
+          <p className="workflow-process-stage__history-heading">
+            {history.every((item) => item.tone === 'completed') ? `前序 ${history.length} 步已完成` : `已结束步骤 ${history.length}`}
+          </p>
           {renderItems(history, `${model.processLabel}已结束步骤，最近在前`, numbered)}
-        </details>
+        </div>
       ) : null}
     </div>
   )

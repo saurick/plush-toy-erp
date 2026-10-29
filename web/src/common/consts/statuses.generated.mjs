@@ -7,6 +7,11 @@ export const BOMLossSource = Object.freeze({
   UNRESOLVED: 'unresolved',
 })
 
+export const FinanceAdjustmentDirection = Object.freeze({
+  DECREASE: 'DECREASE',
+  INCREASE: 'INCREASE',
+})
+
 export const FinanceAllocationStatus = Object.freeze({
   POSTED: 'POSTED',
   REVERSED: 'REVERSED',

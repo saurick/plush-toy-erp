@@ -126,7 +126,8 @@ func (FinanceFact) Annotations() []schema.Annotation {
     AND settled_at IS NOT NULL AND settled_by IS NOT NULL)
   OR
   (status = 'CANCELLED'
-    AND settled_at IS NULL AND settled_by IS NULL
+    AND ((settled_at IS NULL AND settled_by IS NULL)
+      OR (fact_type = 'RECONCILIATION' AND settled_at IS NOT NULL AND settled_by IS NOT NULL))
     AND ((posted_at IS NULL AND posted_by IS NULL)
       OR (posted_at IS NOT NULL AND posted_by IS NOT NULL)))
 )`,

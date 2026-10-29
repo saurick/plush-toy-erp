@@ -1,12 +1,6 @@
 import React from 'react'
 import { Button } from 'antd'
-import { Link } from 'react-router-dom'
 import { describeDevBusinessChainResponsibility } from '../../config/devBusinessChainProjection.mjs'
-import {
-  DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
-  DEV_DATA_PREPARATION_ROUTE,
-  DEV_TESTING_ROUTE,
-} from '../../config/devRoutes.mjs'
 import './businessTopicDetails.css'
 
 const evidenceLabels = {
@@ -19,12 +13,16 @@ export default function BusinessTopicDetails({
   topic,
   node,
   onSelect,
-  onExploreChain,
+  selectedStepKey,
+  onInspectStep,
+  visibleStepKeys,
+  stepDetails,
 }) {
+  const detailsId = React.useId()
   const nodes = new Map(topic.nodes.map((item) => [item.key, item]))
   const steps = new Map(topic.steps.map((item) => [item.key, item]))
   const relations = topic.edges.filter(
-    (edge) => edge.from === node.key || edge.to === node.key
+    (edge) => (!visibleStepKeys || visibleStepKeys.has(edge.key)) && (edge.from === node.key || edge.to === node.key)
   )
   return (
     <aside
@@ -36,7 +34,7 @@ export default function BusinessTopicDetails({
         {node.summary ? <p>{node.summary}</p> : null}
       </div>
       <ul className="erp-dev-chain-topics__relations" aria-label="当前对象的关联条件">
-        {relations.map((edge) => {
+        {relations.map((edge, index) => {
           const outgoing = edge.from === node.key
           const related = nodes.get(outgoing ? edge.to : edge.from)
           const step = steps.get(edge.key)
@@ -63,15 +61,23 @@ export default function BusinessTopicDetails({
                   {responsibility}
                 </p>
               ) : null}
+              {step?.verificationRuleIds?.length && onInspectStep ? (
+                <Button
+                  type="link"
+                  aria-label={`${selectedStepKey === step.key ? '收起' : '查看'}${edge.label}的规则与验证`}
+                  aria-expanded={selectedStepKey === step.key}
+                  aria-controls={`${detailsId}-${index}`}
+                  onClick={(event) => onInspectStep(selectedStepKey === step.key ? null : step.key, event.currentTarget)}
+                >
+                  {selectedStepKey === step.key ? '收起规则与验证' : '规则与验证'}
+                </Button>
+              ) : null}
+              {step && selectedStepKey === step.key ? <div id={`${detailsId}-${index}`}>{stepDetails}</div> : null}
             </li>
           )
         })}
       </ul>
-      {onExploreChain ? (
-        <Button type="link" onClick={() => onExploreChain(topic.key, node.key)}>
-          查看规则
-        </Button>
-      ) : null}
+
     </aside>
   )
 }
@@ -94,13 +100,6 @@ export function BusinessTopicVerification({ topic }) {
           ))}
         </tbody>
       </table>
-      <nav aria-label="专题数据与验证入口">
-        <Link to={DEV_DATA_PREPARATION_ROUTE}>打开测试数据</Link>
-        <Link to={DEV_TESTING_ROUTE}>打开测试执行</Link>
-        <Link to={`${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?chain=${encodeURIComponent(topic.key)}`}>
-          查看本专题实测报告
-        </Link>
-      </nav>
     </details>
   )
 }

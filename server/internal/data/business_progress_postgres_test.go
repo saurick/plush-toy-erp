@@ -20,7 +20,7 @@ func TestBusinessDocumentSearchPostgresProgress(t *testing.T) {
 	so := client.SalesOrder.Create().SetOrderNo("SO-PROGRESS-" + suffix).SetCustomerID(customer.ID).SetOrderDate(due).SetPlannedDeliveryDate(due).SetLifecycleStatus("active").SetSalesOwner("进度负责人").SaveX(ctx)
 	line := client.SalesOrderItem.Create().SetSalesOrderID(so.ID).SetLineNo(1).SetProductID(product.ID).SetProductNameSnapshot("进度产品").SetCustomerProductNo("客户款号").SetUnitID(unit.ID).SetOrderedQuantity(decimal.NewFromInt(20)).SaveX(ctx)
 	po := client.ProductionOrder.Create().SetOrderNo("MO-PROGRESS-" + suffix).SetCreatedBy(actor.ID).SetPlannedEndAt(due).SaveX(ctx)
-	client.ProductionOrderItem.Create().SetProductionOrderID(po.ID).SetLineNo(1).SetProductID(product.ID).SetUnitID(unit.ID).SetSalesOrderItemID(line.ID).SetPlannedQuantity(decimal.NewFromInt(20)).SaveX(ctx)
+	client.ProductionOrderItem.Create().SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SetProductionOrderID(po.ID).SetLineNo(1).SetProductID(product.ID).SetUnitID(unit.ID).SetSalesOrderItemID(line.ID).SetPlannedQuantity(decimal.NewFromInt(20)).SaveX(ctx)
 	client.WorkflowTask.Create().SetTaskCode("progress-pg-" + suffix).SetTaskName("等待确认").SetTaskGroup("test").SetSourceType("sales_order").SetSourceID(so.ID).SetOwnerRoleKey("pmc").SetTaskStatusKey("blocked").SaveX(ctx)
 	uc := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(data))
 	q := biz.BusinessProgressQuery{Keyword: suffix, SnapshotAt: due.Add(time.Hour), DateFrom: "2026-09-24", DateTo: "2026-09-24", Access: biz.BusinessProgressAccess{Sales: true, Production: true, WIP: true, Tasks: true}, TaskVisibility: &biz.WorkflowTaskVisibilityScope{StandaloneVisibleOwnerRoleKeys: []string{"pmc"}}}

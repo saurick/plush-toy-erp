@@ -65,7 +65,12 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-chain-topics__relations p {
+.erp-dev-chain-topics__verification > p {
+  margin: 10px 0;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-chain-topics__relations > li > p {
   margin: 4px 0 0;
   font-size: var(--erp-font-small);
   line-height: 1.6;
@@ -79,11 +84,6 @@
 .erp-dev-chain-topics__detail > .ant-btn {
   margin-top: 12px;
   padding-inline: 0;
-}
-
-.erp-dev-chain-topics__verification > p {
-  margin: 10px 0;
-  color: var(--erp-text-muted);
 }
 
 .erp-dev-chain-topics__verification table {
@@ -103,16 +103,9 @@
   background: var(--erp-surface-bg-soft);
 }
 
-.erp-dev-chain-topics__verification nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  margin-top: 12px;
-}
-
-@media (min-width: 1440px) {
+@media (min-width: 1024px) {
   .erp-dev-chain-topics__reading {
-    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, min(32%, 340px));
   }
 
   .erp-dev-chain-topics__detail {

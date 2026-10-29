@@ -8,6 +8,7 @@ import { ROLE_DISPLAY_NAMES } from '../../erp/utils/roleKeys.mjs'
 import { DEV_FLOW_STATE_CATALOG } from './devFlowStateCatalog.mjs'
 import { buildFulfillmentRelations } from './devFulfillmentRelations.mjs'
 import { TASK_HANDLING_DUTIES } from './devTaskHandlingResponsibilities.mjs'
+import { getWorkflowTaskActionMeta } from '../../erp/utils/workflowTaskActionPresentation.mjs'
 
 export const MOBILE_HANDLING_LABELS = {
   full: '可办理',
@@ -79,6 +80,9 @@ export function buildTaskHandlingRows(catalog) {
           : definition.label,
         roleKeys: [roleForPool(node.ownerPool)].filter(Boolean),
         processRefs: [{ definition, node }],
+        operationLabels: node.type === 'approval' || node.key === 'order_review'
+          ? ['complete', 'reject'].map((mode) => getWorkflowTaskActionMeta({ task_group: node.key, required_capability_key: node.permission[0] }, mode).title)
+          : [],
         input: node.type === 'approval'
           ? '核对来源和依据，选择通过或退回并填写意见'
           : node.key === 'order_review'
@@ -112,9 +116,11 @@ export function buildTaskHandlingRows(catalog) {
       kindLabel: policy.label,
       roleKeys: node.role_keys,
       relationRef: { stage: 'sales_order', substepKey },
+      operationLabels: [substepKey === 'boss_review' ? '确认通过，交财务' : '批准并生成采购订单', '确认退回工程'],
+      input: '核对自动汇总的用料数量、供应商和来源，填写审批意见；退回须说明原因',
       handoff: substepKey === 'boss_review'
         ? '通过后交另一位财务复核；退回交工程修改'
-        : '通过后按厂商生成采购单；退回交工程重提',
+        : '通过后按厂商生成采购单；退回交工程修订原资料',
     }
   })
   return [...rows, ...processRows.values(), ...materialRows]

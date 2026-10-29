@@ -16,6 +16,7 @@ import (
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/financefact"
+	"server/internal/data/model/ent/financepayment"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/product"
@@ -167,7 +168,7 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		return nil, err
 	}
 	if productImageWrite {
-		if err := requireUnreferencedProductImage(ctx, tx, in.OwnerID, *in.SlotKey); err != nil {
+		if err := requireUnreferencedProductImage(ctx, tx, in.OwnerID, *in.SlotKey, r.data.sqlDialect); err != nil {
 			return nil, err
 		}
 	}
@@ -401,7 +402,7 @@ func (r *businessAttachmentRepo) ClearProductImage(ctx context.Context, productI
 		}
 		return err
 	}
-	if err := requireUnreferencedProductImage(ctx, tx, productID, slotKey); err != nil {
+	if err := requireUnreferencedProductImage(ctx, tx, productID, slotKey, r.data.sqlDialect); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, businessAttachmentProductImageDeleteSQL(r.data.sqlDialect), productID, slotKey); err != nil {
@@ -410,12 +411,19 @@ func (r *businessAttachmentRepo) ClearProductImage(ctx context.Context, productI
 	return tx.Commit()
 }
 
-func requireUnreferencedProductImage(ctx context.Context, tx *stdsql.Tx, productID int, slotKey string) error {
+// Frozen approvals can reference historical product images. New engineering
+// completion does not bind images, but existing audit evidence remains protected.
+func requireUnreferencedProductImage(ctx context.Context, tx *stdsql.Tx, productID int, slotKey, sqlDialect string) error {
+	query := `SELECT EXISTS (SELECT 1 FROM business_attachments a
+ JOIN engineering_material_requests r ON EXISTS (SELECT 1 FROM jsonb_array_elements(r.source_snapshot) source WHERE source->>'sample_image_attachment_id' = a.id::text)
+ WHERE a.owner_type = 'product' AND a.owner_id = $1 AND a.attachment_type = 'product_image' AND a.slot_key = $2)`
+	if sqlDialect == "sqlite3" {
+		query = `SELECT EXISTS (SELECT 1 FROM business_attachments a
+ JOIN engineering_material_requests r ON EXISTS (SELECT 1 FROM json_each(r.source_snapshot) source WHERE json_extract(source.value, '$.sample_image_attachment_id') = a.id)
+ WHERE a.owner_type = 'product' AND a.owner_id = ? AND a.attachment_type = 'product_image' AND a.slot_key = ?)`
+	}
 	var referenced bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (
- SELECT 1 FROM business_attachments a JOIN sales_order_items i ON i.sample_image_attachment_id = a.id
- WHERE a.owner_type = 'product' AND a.owner_id = $1 AND a.attachment_type = 'product_image' AND a.slot_key = $2
- )`, productID, slotKey).Scan(&referenced); err != nil {
+	if err := tx.QueryRowContext(ctx, query, productID, slotKey).Scan(&referenced); err != nil {
 		return err
 	}
 	if referenced {
@@ -440,6 +448,7 @@ func businessAttachmentOwnerTable(ownerType string) (string, bool) {
 		biz.BusinessAttachmentOwnerQualityInspection: "quality_inspections",
 		biz.BusinessAttachmentOwnerShipment:          "shipments",
 		biz.BusinessAttachmentOwnerFinanceFact:       "finance_facts",
+		biz.BusinessAttachmentOwnerFinancePayment:    "finance_payments",
 		biz.BusinessAttachmentOwnerProductionFact:    "production_facts",
 		biz.BusinessAttachmentOwnerOutsourcingFact:   "outsourcing_facts",
 		biz.BusinessAttachmentOwnerProduct:           "products",
@@ -589,6 +598,8 @@ func (r *businessAttachmentRepo) BusinessAttachmentOwnerExists(ctx context.Conte
 		return r.data.postgres.QualityInspection.Query().Where(qualityinspection.ID(ownerID)).Exist(ctx)
 	case biz.BusinessAttachmentOwnerShipment:
 		return r.data.postgres.Shipment.Query().Where(shipment.ID(ownerID)).Exist(ctx)
+	case biz.BusinessAttachmentOwnerFinancePayment:
+		return r.data.postgres.FinancePayment.Query().Where(financepayment.ID(ownerID)).Exist(ctx)
 	case biz.BusinessAttachmentOwnerFinanceFact:
 		return r.data.postgres.FinanceFact.Query().Where(financefact.ID(ownerID)).Exist(ctx)
 	case biz.BusinessAttachmentOwnerProductionFact:

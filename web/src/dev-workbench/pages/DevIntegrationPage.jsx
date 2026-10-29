@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftOutlined } from '@ant-design/icons'
-import { Button, Drawer, Empty, Space, Tag, Typography } from 'antd'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { CloseOutlined } from '@ant-design/icons'
+import { Button, Empty, Space, Tag, Typography } from 'antd'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import Table from '@/common/components/table/AppTable'
@@ -12,7 +12,10 @@ import {
 } from '@/common/consts/rpcMethods.generated.mjs'
 import apiSource from '../../../../server/docs/api.md?raw'
 import integrationGuideSource from '../../../../docs/engineering/跨层公共契约与生成规范.md?raw'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import { WorkbenchReading } from '../components/WorkbenchPattern.jsx'
+
 import DevProjectGraphView from '../components/DevProjectGraphView.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevIntegrationCallDetails from '../components/DevIntegrationCallDetails.jsx'
@@ -24,10 +27,6 @@ import { buildProjectGraph } from '../config/devProjectGraph.mjs'
 import { readPermissionRelationshipSnapshot } from '../config/devPermissionRelationshipApi.mjs'
 import { createDevQualityGateClient } from '../config/devQualityGates.mjs'
 import { qualityGateViewStatus } from '../config/qualityGatePresentation.mjs'
-import {
-  DEV_PERMISSION_RELATIONSHIPS_ROUTE,
-  DEV_QUALITY_GATES_ROUTE,
-} from '../config/devRoutes.mjs'
 import { buildDevDocsLocation, resolveDevDocsMarkdownHref } from './devDocsNavigation.mjs'
 import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import {
@@ -35,7 +34,6 @@ import {
   INTEGRATION_GUIDE_DOCUMENT,
   buildIntegrationEntries,
   filterIntegrationEntries,
-  integrationContractLocation,
   integrationEndpoint,
   integrationPermissions,
   parseIntegrationSearch,
@@ -53,10 +51,7 @@ const entries = buildIntegrationEntries(RpcMethod, apiSource, RpcInspection)
 const integrationGuide = readIntegrationGuide(integrationGuideSource)
 const integrationBoundary = readIntegrationBoundary(apiSource)
 const relationshipExamples = readIntegrationRelationshipExamples(integrationGuideSource)
-const identityContractLocation = buildDevDocsLocation({
-  path: INTEGRATION_GUIDE_DOCUMENT,
-  headingId: '系统接入边界--integration-boundary',
-})
+
 const emptyPermissions = new Map()
 const views = [
   ['inventory', '接口清单'],
@@ -81,7 +76,6 @@ export default function DevIntegrationPage() {
   const [params, setParams] = useSearchParams()
   const inventorySurface = useRef(null)
   const detailOpener = useRef(null)
-  const closeButton = useRef(null)
   const query = parseIntegrationSearch(params)
   const guideSurface = useRef(null)
   const pendingParams = useRef(params)
@@ -209,9 +203,16 @@ export default function DevIntegrationPage() {
   const selectNode = useCallback((node) => updateQuery({ node }), [updateQuery])
   const openMethod = (event, entry) => {
     detailOpener.current = { element: event.currentTarget, key: entry.key }
-    updateQuery({ rpc: entry.key, detail: '', section: '' })
+    updateQuery({ rpc: entry.key, section: '' })
   }
-  const closeDetails = () => updateQuery({ rpc: '', detail: '', section: '' })
+  const closeDetails = () => {
+    updateQuery({ rpc: '', detail: '', section: '' })
+    requestAnimationFrame(() => {
+      const target = detailOpener.current?.element.isConnected
+        ? detailOpener.current.element : document.getElementById('integration-search')
+      target?.focus({ preventScroll: true })
+    })
+  }
   const updateFilters = (values, replace = false) =>
     updateQuery({ ...values, page: query.rpc ? 1 : '' }, replace)
   const clearFilters = () => updateFilters({ domain: '', q: '' })
@@ -248,24 +249,19 @@ export default function DevIntegrationPage() {
   useLayoutEffect(() => {
     const surface = inventorySurface.current
     if (!selected || !surface) return undefined
-    const fitDrawer = () => {
+    const fitDetail = () => {
       const bounds = surface.getBoundingClientRect()
-      const top = Math.max(0, 12 - bounds.top)
-      const available = Math.max(240, window.innerHeight - Math.max(12, bounds.top) - 12)
-      const height = Math.min(bounds.height - top, available)
-      surface.style.setProperty('--integration-available-height', `${available}px`)
-      surface.style.setProperty('--integration-drawer-top', `${top}px`)
-      surface.style.setProperty('--integration-drawer-height', `${Math.max(240, height)}px`)
+      const documentTop = bounds.top + window.scrollY
+      const available = Math.max(240, window.innerHeight - Math.max(12, documentTop) - 12)
+      surface.style.setProperty('--integration-detail-height', `${available}px`)
     }
-    fitDrawer()
-    const observer = new ResizeObserver(fitDrawer)
+    fitDetail()
+    const observer = new ResizeObserver(fitDetail)
     observer.observe(surface)
-    window.addEventListener('resize', fitDrawer)
-    window.addEventListener('scroll', fitDrawer, { passive: true, capture: true })
+    window.addEventListener('resize', fitDetail)
     return () => {
       observer.disconnect()
-      window.removeEventListener('resize', fitDrawer)
-      window.removeEventListener('scroll', fitDrawer, true)
+      window.removeEventListener('resize', fitDetail)
     }
   }, [selected])
   const gateStatus = gateState.data
@@ -328,9 +324,6 @@ export default function DevIntegrationPage() {
           <span className={!entry.contract || entry.contract.kind === 'chapter' ? 'erp-dev-integration__contract--missing' : ''}>
             {entry.contract ? contractLabel(entry.contract) : '未逐项登记'}
           </span>
-          <span className="erp-dev-integration__note">
-            {entry.contract?.references.length ? `${entry.contract.references.length} 项来源` : '未关联来源'}
-          </span>
         </Space>
       ),
     },
@@ -338,30 +331,35 @@ export default function DevIntegrationPage() {
 
   return (
     <div className="erp-dev-workspace-page erp-dev-tool-page erp-dev-integration">
-      <DevPageNav sourcePath="server/docs/api.md" />
-      <header className="erp-dev-integration__header">
-        <Typography.Title level={1}>接口与集成</Typography.Title>
-        <SlidingTabList
-          className="erp-navigation-tabs erp-navigation-tabs--options erp-dev-integration__tabs"
-          aria-label="接口与集成查看方式"
-        >
-          {views.map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              id={`integration-tab-${key}`}
-              aria-controls={`integration-panel-${key}`}
-              aria-selected={query.view === key}
-              onClick={() => {
-                if (query.view !== key) updateQuery({ view: key, rpc: '', detail: '', section: '' })
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </SlidingTabList>
-      </header>
+      <DevPageNav />
+      <DevPageHeader
+        className="erp-dev-integration__header"
+        title={<Typography.Title level={1}>接口与集成</Typography.Title>}
+        navigation={
+          <SlidingTabList
+            className="erp-navigation-tabs erp-navigation-tabs--options erp-dev-integration__tabs"
+            aria-label="接口与集成查看方式"
+          >
+            {views.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                id={`integration-tab-${key}`}
+                aria-controls={`integration-panel-${key}`}
+                aria-selected={query.view === key}
+                onClick={() => {
+                  if (query.view !== key)
+                    { updateQuery({ view: key, rpc: '', detail: '', section: '' }) }
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </SlidingTabList>
+        }
+      />
+
       <main className="erp-dev-integration__main">
         <div
           className="erp-dev-integration__panel"
@@ -414,18 +412,24 @@ export default function DevIntegrationPage() {
                   ) : null}
                 </div>
               </div>
-              <div className={`erp-dev-integration__inventory-surface${selected ? ' erp-dev-integration__inventory-surface--open' : ''}`} ref={inventorySurface}>
-                <section aria-label="接口清单" className="erp-dev-integration__table">
-                  <Table
-                    rowKey="key"
-                    rowClassName={(entry) => entry.key === selected?.key ? 'erp-dev-integration__row--selected' : ''}
-                    onRow={(entry) => ({ 'aria-selected': entry.key === selected?.key })}
-                    size="middle"
-                    bordered
-                    columns={columns}
-                    dataSource={filtered}
-                    scroll={{ x: 700 }}
-                    pagination={{
+              <div className="erp-dev-integration__inventory-surface" ref={inventorySurface}>
+                <WorkbenchReading
+                  className="erp-dev-integration__reading"
+                  label="接口清单目录"
+                  detailLabel="当前接口详情"
+                  detailVisible={Boolean(selected)}
+                  catalog={
+                    <section aria-label="接口清单" className="erp-dev-integration__table">
+                      <Table
+                        rowKey="key"
+                        rowClassName={(entry) => entry.key === selected?.key ? 'erp-dev-integration__row--selected' : ''}
+                        onRow={(entry) => ({ 'aria-selected': entry.key === selected?.key })}
+                        size="middle"
+                        bordered
+                        columns={columns}
+                        dataSource={filtered}
+                        scroll={{ x: 700 }}
+                        pagination={{
                     ...DEV_PAGINATION,
                     current: page,
                     pageSize: INTEGRATION_PAGE_SIZE,
@@ -433,212 +437,174 @@ export default function DevIntegrationPage() {
                     hideOnSinglePage: true,
                     onChange: (nextPage) => updateQuery({ page: nextPage === 1 && !query.rpc ? '' : nextPage }),
                   }}
-                    locale={{
+                        locale={{
                     emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的接口，请调整或清除筛选" />,
                   }}
-                  />
-                  <div className="erp-dev-integration__source erp-dev-integration__permission-source" aria-label="权限来源">
-                    {permissionState.loading ? (
-                      <span>正在读取登记开发库的权限关联，接口清单仍可查询。</span>
-                ) : null}
-                    {permissionState.error ? (
-                      <span role="alert">权限关联读取失败，当前不能判断是否已登记。</span>
-                ) : null}
-                    {permissionState.data ? (
-                      <DevTimestamp
-                        value={permissionState.data.readAt}
-                        action="权限登记读取于"
                       />
+                      <div className="erp-dev-integration__source erp-dev-integration__permission-source" aria-label="权限来源">
+                        {permissionState.loading ? (
+                          <span>正在读取登记开发库的权限关联，接口清单仍可查询。</span>
                 ) : null}
-                    <Button
-                      size="small"
-                      loading={permissionState.loading}
-                      onClick={() => setPermissionReload((value) => value + 1)}
-                    >
-                      {permissionState.error ? '重试权限读取' : '刷新权限关联'}
-                    </Button>
-                  </div>
-                </section>
-                <Drawer
-                  rootClassName="erp-dev-integration-drawer"
-                  title={
-          selected ? (
-            <div className="erp-dev-integration__drawer-identity">
-              <h2>{selected.label || selected.method}</h2>
-              <span>{selected.domainLabel}</span>
-              <code>{selected.domain} / {selected.method}</code>
-              <p>{selected.description || '当前方法用途尚未登记。'}</p>
-            </div>
-          ) : '接口依据'
-        }
-                  open={Boolean(selected)}
-                  getContainer={false}
-                  rootStyle={{ position: 'absolute' }}
-                  styles={{ wrapper: { top: 'var(--integration-drawer-top, 0px)', bottom: 'auto', height: 'var(--integration-drawer-height, 600px)', maxWidth: '100%' } }}
-                  width={640}
-                  closable={false}
-                  extra={<Button ref={closeButton} type="text" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={closeDetails}>返回接口清单</Button>}
-                  onClose={closeDetails}
-                  afterOpenChange={(open) => {
-                    if (document.activeElement?.closest('.erp-dev-integration__filters')) return
-                    if (open) {
-                      const target = query.detail === 'governance' && query.section
-                        ? inventorySurface.current?.querySelector(`[data-integration-section="${query.section}"]`)
-                        : closeButton.current
-                      if (target?.dataset?.integrationSection) {
-                        inventorySurface.current?.querySelector('.erp-dev-integration__detail-panel')?.scrollTo(0, target.offsetTop)
-                      }
-                      target?.focus({ preventScroll: true })
-                    } else if (query.view === 'inventory') {
-                      const target = detailOpener.current?.element.isConnected
-                        ? detailOpener.current.element : document.getElementById('integration-search')
-                      target?.focus({ preventScroll: true })
-                    }
-                  }}
+                        {permissionState.error ? (
+                          <span role="alert">权限关联读取失败，当前不能判断是否已登记。</span>
+                ) : null}
+                        {permissionState.data ? (
+                          <DevTimestamp
+                            value={permissionState.data.readAt}
+                            action="权限登记读取于"
+                          />
+                ) : null}
+                        <Button
+                          size="small"
+                          loading={permissionState.loading}
+                          onClick={() => setPermissionReload((value) => value + 1)}
+                        >
+                          {permissionState.error ? '重试权限读取' : '刷新权限关联'}
+                        </Button>
+                      </div>
+                    </section>
+                  }
                 >
                   {selected ? (
-                    <div className="erp-dev-integration__detail">
-                      <div className="erp-dev-integration__endpoint">
-                        <strong>{RpcTransport.method}</strong>
-                        <code>{integrationEndpoint(selected.domain, RpcTransport)}</code>
-                        <span className="erp-dev-integration__note">JSON-RPC</span>
-                        <Tag>业务接口</Tag>
-                      </div>
-                      <div className="erp-dev-integration__access-summary">
-                        <span>按正式合同鉴权 · 未关联实际适配器</span>
-                      </div>
-                      {selectedPosition < 0 ? (
-                        <div className="erp-dev-integration__access-summary" role="status">
-                          <span>当前接口不在筛选结果中。</span>
-                          <Button type="link" onClick={() => updateQuery({ domain: selected.domain, q: '', page: '' })}>在清单中定位接口</Button>
+                    <section
+                      className="erp-dev-integration__reader"
+                      onKeyDown={(event) => {
+                      if (event.key !== 'Escape') return
+                      event.stopPropagation()
+                      closeDetails()
+                    }}
+                    >
+                      <header className="erp-dev-integration__reader-heading">
+                        <div className="erp-dev-integration__detail-identity">
+                          <h2>{selected.label || selected.method}</h2>
+                          <span>{selected.domainLabel}</span>
+                          <code>{selected.domain} / {selected.method}</code>
+                          <p>{selected.description || '当前方法用途尚未登记。'}</p>
                         </div>
+                        <Button type="text" icon={<CloseOutlined aria-hidden="true" />} aria-label="收起接口详情" onClick={closeDetails}>收起</Button>
+                      </header>
+                      <div className="erp-dev-integration__detail">
+                        <div className="erp-dev-integration__endpoint">
+                          <strong>{RpcTransport.method}</strong>
+                          <code>{integrationEndpoint(selected.domain, RpcTransport)}</code>
+                          <span className="erp-dev-integration__note">JSON-RPC</span>
+                          <Tag>业务接口</Tag>
+                        </div>
+                        <div className="erp-dev-integration__access-summary">
+                          <span>按正式合同鉴权 · 未关联实际适配器</span>
+                        </div>
+                        {selectedPosition < 0 ? (
+                          <div className="erp-dev-integration__access-summary" role="status">
+                            <span>当前接口不在筛选结果中。</span>
+                            <Button type="link" onClick={() => updateQuery({ domain: selected.domain, q: '', page: '' })}>在清单中定位接口</Button>
+                          </div>
                       ) : null}
-                      <SlidingTabList
-                        className="erp-navigation-tabs erp-navigation-tabs--options erp-dev-integration__detail-tabs"
-                        aria-label="接口详情资料"
-                      >
-                        {detailViews.map(([key, label]) => (
-                          <button
-                            key={key}
-                            type="button"
-                            role="tab"
-                            id={`integration-detail-tab-${key}`}
-                            aria-controls={`integration-detail-panel-${key}`}
-                            aria-selected={query.detail === key}
-                            onClick={() => {
+                        <SlidingTabList
+                          className="erp-navigation-tabs erp-navigation-tabs--options erp-dev-integration__detail-tabs"
+                          aria-label="接口详情资料"
+                        >
+                          {detailViews.map(([key, label]) => (
+                            <button
+                              key={key}
+                              type="button"
+                              role="tab"
+                              id={`integration-detail-tab-${key}`}
+                              aria-controls={`integration-detail-panel-${key}`}
+                              aria-selected={query.detail === key}
+                              onClick={() => {
                     if (query.detail !== key) updateQuery({ detail: key, section: '' })
                   }}
-                          >
-                            {label}
-                          </button>
+                            >
+                              {label}
+                            </button>
               ))}
-                      </SlidingTabList>
-                      <div
-                        className="erp-dev-integration__detail-panel"
-                        role="tabpanel"
-                        id={`integration-detail-panel-${query.detail}`}
-                        aria-labelledby={`integration-detail-tab-${query.detail}`}
-                      >
-                        {query.detail === 'governance' ? (
-                          <div className="erp-dev-integration__governance-detail">
-                            <section data-integration-section="access" tabIndex={-1} className={query.section === 'access' ? 'erp-dev-integration__section--target' : ''}>
-                              <DevIntegrationAccess
-                                boundary={integrationBoundary}
-                                method
-                                guide={integrationGuide}
-                              />
-                            </section>
-                            <section data-integration-section="permissions" tabIndex={-1} className={query.section === 'permissions' ? 'erp-dev-integration__section--target' : ''}>
-                              <div className="erp-dev-integration__section-heading">
-                                <h2>权限登记</h2>
-                                <Tag>{permissionState.loading ? '正在读取' : permissionState.error ? '读取失败' : selectedPermissions.length ? '已关联登记' : '未登记'}</Tag>
-                              </div>
-                              <p>{permissionText(selected)}</p>
-                              {permissionState.error ? <Button size="small" onClick={() => setPermissionReload((value) => value + 1)}>重试权限读取</Button> : null}
-                              <div className="erp-dev-integration__permission-codes">
-                                {selectedPermissions.map((permission) => <code key={permission.key}>{permission.key}</code>)}
-                              </div>
-                              {selected.contract?.kind === 'detail' ? (
-                                <div className="erp-dev-integration__method-authorization">
-                                  <Markdown source={selected.contract.authorization} />
+                        </SlidingTabList>
+                        <div
+                          className="erp-dev-integration__detail-panel"
+                          role="tabpanel"
+                          id={`integration-detail-panel-${query.detail}`}
+                          aria-labelledby={`integration-detail-tab-${query.detail}`}
+                        >
+                          {query.detail === 'governance' ? (
+                            <div className="erp-dev-integration__governance-detail">
+                              <section data-integration-section="access" tabIndex={-1} className={query.section === 'access' ? 'erp-dev-integration__section--target' : ''}>
+                                <DevIntegrationAccess
+                                  boundary={integrationBoundary}
+                                  method
+                                  guide={integrationGuide}
+                                />
+                              </section>
+                              <section data-integration-section="permissions" tabIndex={-1} className={query.section === 'permissions' ? 'erp-dev-integration__section--target' : ''}>
+                                <div className="erp-dev-integration__section-heading">
+                                  <h2>权限登记</h2>
+                                  <Tag>{permissionState.loading ? '正在读取' : permissionState.error ? '读取失败' : selectedPermissions.length ? '已关联登记' : '未登记'}</Tag>
                                 </div>
+                                <p>{permissionText(selected)}</p>
+                                {permissionState.error ? <Button size="small" onClick={() => setPermissionReload((value) => value + 1)}>重试权限读取</Button> : null}
+                                <div className="erp-dev-integration__permission-codes">
+                                  {selectedPermissions.map((permission) => <code key={permission.key}>{permission.key}</code>)}
+                                </div>
+                                {selected.contract?.kind === 'detail' ? (
+                                  <div className="erp-dev-integration__method-authorization">
+                                    <Markdown source={selected.contract.authorization} />
+                                  </div>
                     ) : null}
-                              {selectedPermissions.some((permission) => permission.conditions.length) ? (
-                                <details className="erp-dev-disclosure erp-dev-integration__permission-conditions">
-                                  <summary>权限登记的补充条件</summary>
-                                  {selectedPermissions.filter((permission) => permission.conditions.length).map((permission) => (
-                                    <div key={permission.key}>
-                                      <strong>{permission.name}</strong>
-                                      {[...new Set(permission.conditions)].map((condition) => <p key={condition}>{condition}</p>)}
-                                    </div>
+                                {selectedPermissions.some((permission) => permission.conditions.length) ? (
+                                  <details className="erp-dev-disclosure erp-dev-integration__permission-conditions">
+                                    <summary>权限登记的补充条件</summary>
+                                    {selectedPermissions.filter((permission) => permission.conditions.length).map((permission) => (
+                                      <div key={permission.key}>
+                                        <strong>{permission.name}</strong>
+                                        {[...new Set(permission.conditions)].map((condition) => <p key={condition}>{condition}</p>)}
+                                      </div>
                         ))}
-                                </details>
+                                  </details>
                     ) : null}
-                              <p>
-                                <Link to={`${DEV_PERMISSION_RELATIONSHIPS_ROUTE}?mode=account`}>
-                                  按账号核对权限
-                                </Link>
-                                {' · '}
-                                <Link to={identityContractLocation}>身份与授权规则</Link>
-                              </p>
-                            </section>
-                            <section data-integration-section="contract" tabIndex={-1} className={query.section === 'contract' ? 'erp-dev-integration__section--target' : ''}>
-                              <div className="erp-dev-integration__section-heading">
-                                <h2>正式合同</h2>
-                                <Tag>{selected.contract ? contractLabel(selected.contract) : '未逐项登记'}</Tag>
-                              </div>
-                              {selected.contract ? (
-                                <Link to={integrationContractLocation(selected.contract)}>
-                                  打开{contractLabel(selected.contract)}：
-                                  {selected.contract.documentation?.heading.title || selected.contract.heading.title}
-                                </Link>
+                              </section>
+                              <section data-integration-section="contract" tabIndex={-1} className={query.section === 'contract' ? 'erp-dev-integration__section--target' : ''}>
+                                <div className="erp-dev-integration__section-heading">
+                                  <h2>正式合同</h2>
+                                  <Tag>{selected.contract ? contractLabel(selected.contract) : '未逐项登记'}</Tag>
+                                </div>
+                                {selected.contract ? (
+                                  <p>
+                                    {contractLabel(selected.contract)}：
+                                    {selected.contract.documentation?.heading.title || selected.contract.heading.title}
+                                  </p>
                     ) : (
-                      <>
-                        <p>未逐项登记，需回到所属 handler 与领域合同核对。</p>
-                        {selected.purposeLocation ? <Link to={selected.purposeLocation}>查看名称与用途说明</Link> : null}
-                      </>
+                      <p>未逐项登记，需核对所属处理逻辑与领域合同。</p>
                     )}
-                              {selected.contract?.kind === 'detail' ? (
-                                <>
-                                  {!selected.contract.documentation ? (
-                                    <>
-                                      <h3>入参与边界</h3>
-                                      <Markdown source={selected.contract.fields} />
-                                    </>
+                                {selected.contract?.kind === 'detail' ? (
+                                  <>
+                                    {!selected.contract.documentation ? (
+                                      <>
+                                        <h3>入参与边界</h3>
+                                        <Markdown source={selected.contract.fields} />
+                                      </>
                         ) : null}
-                                  <h3>并发与重试</h3>
-                                  <Markdown source={selected.contract.retry} />
-                                </>
+                                    <h3>并发与重试</h3>
+                                    <Markdown source={selected.contract.retry} />
+                                  </>
                     ) : selected.contract ? (
                       <p>当前仅关联方法所在章节，不能据此认定字段合同完整。</p>
                     ) : null}
-                            </section>
-                            <section data-integration-section="evidence" tabIndex={-1} className={query.section === 'evidence' ? 'erp-dev-integration__section--target' : ''}>
-                              <div className="erp-dev-integration__section-heading">
-                                <h2>验证依据</h2>
-                                <Tag>需核对运行证据</Tag>
-                              </div>
-                              {evidenceState.error ? <p role="alert">场景运行证据读取失败，请重试或到质量门禁核对。</p> : null}
-                              {evidenceState.loading ? <p role="status">正在读取关联场景证据。</p> : null}
-                              {selected.contract?.references.length ? (
-                                <ul>
-                                  {selected.contract.references.map((reference) => (
-                                    <li key={reference}>
-                                      <code>{reference}</code>
-                                    </li>
+                              </section>
+                              <section data-integration-section="evidence" tabIndex={-1} className={query.section === 'evidence' ? 'erp-dev-integration__section--target' : ''}>
+                                <div className="erp-dev-integration__section-heading">
+                                  <h2>验证依据</h2>
+                                  <Tag>需核对运行证据</Tag>
+                                </div>
+                                {evidenceState.error ? <p role="alert">场景运行证据读取失败，请重试或到质量门禁核对。</p> : null}
+                                {evidenceState.loading ? <p role="status">正在读取关联场景证据。</p> : null}
+
+                                {associatedScenarios.length ? (
+                                  <ul>
+                                    {associatedScenarios.map((row) => (
+                                      <li key={row.test}>
+                                        {row.label}：{scenarioStatus(row.status)}
+                                      </li>
                         ))}
-                                </ul>
-                    ) : (
-                      <p>未关联回归来源。</p>
-                    )}
-                              {associatedScenarios.length ? (
-                                <ul>
-                                  {associatedScenarios.map((row) => (
-                                    <li key={row.test}>
-                                      {row.label}：{scenarioStatus(row.status)}
-                                    </li>
-                        ))}
-                                </ul>
+                                  </ul>
                     ) : (
                       <p>
                         {evidenceState.data
@@ -646,19 +612,18 @@ export default function DevIntegrationPage() {
                           : '尚未读取场景运行证据，当前接口验证结果为未验证。'}
                       </p>
                     )}
-                              <p>关联场景不等于该接口全部参数和授权条件已验证。</p>
-                              {evidenceState.data?.run ? (
-                                <p className="erp-dev-integration__note">
-                                  {evidenceState.data.current ? '源码身份与当前工作区一致' : '历史证据，未覆盖当前工作区'}
-                                  {evidenceState.data.run.finishedAt ? <DevTimestamp value={evidenceState.data.run.finishedAt} action=" · 运行完成于" /> : null}
-                                </p>
+                                <p>关联场景不等于该接口全部参数和授权条件已验证。</p>
+                                {evidenceState.data?.run ? (
+                                  <p className="erp-dev-integration__note">
+                                    {evidenceState.data.current ? '源码身份与当前工作区一致' : '历史证据，未覆盖当前工作区'}
+                                    {evidenceState.data.run.finishedAt ? <DevTimestamp value={evidenceState.data.run.finishedAt} action=" · 运行完成于" /> : null}
+                                  </p>
                               ) : null}
-                              <Button size="small" loading={evidenceState.loading} onClick={() => setEvidenceReload((value) => value + 1)}>
-                                {evidenceState.error ? '重试关联场景证据' : evidenceState.data ? '刷新关联场景证据' : '读取关联场景证据'}
-                              </Button>
-                              <Link to={DEV_QUALITY_GATES_ROUTE}>核对原始门禁与源码身份</Link>
-                            </section>
-                          </div>
+                                <Button size="small" loading={evidenceState.loading} onClick={() => setEvidenceReload((value) => value + 1)}>
+                                  {evidenceState.error ? '重试关联场景证据' : evidenceState.data ? '刷新关联场景证据' : '读取关联场景证据'}
+                                </Button>
+                              </section>
+                            </div>
               ) : (
                 <DevIntegrationCallDetails
                   entry={selected}
@@ -668,10 +633,11 @@ export default function DevIntegrationPage() {
                   onContract={() => updateQuery({ detail: 'governance', section: 'contract' })}
                 />
               )}
+                        </div>
                       </div>
-                    </div>
+                    </section>
         ) : null}
-                </Drawer>
+                </WorkbenchReading>
               </div>
               {query.rpc && !selected ? (
                 <p role="status">
@@ -695,7 +661,6 @@ export default function DevIntegrationPage() {
                     <details className="erp-dev-disclosure erp-dev-integration__guide-notes">
                       <summary>登记与验收说明</summary>
                       <Markdown source={integrationGuide.detailsSource} />
-                      <Link to={integrationGuide.location}>查看正式接入规范</Link>
                     </details>
                   </>
                 ) : (
@@ -734,11 +699,6 @@ export default function DevIntegrationPage() {
         >
           <summary>正式文档与验证依据</summary>
           <div className="erp-dev-integration__evidence-content">
-            <nav className="erp-dev-project-relationships__links" aria-label="合同与验证入口">
-              {graph.destinations.map((destination) => (
-                <Link key={destination.route} to={destination.route}>{destination.label}</Link>
-              ))}
-            </nav>
             <p className="erp-dev-integration__note">
               权限登记供核对，回归来源与整体门禁不能证明逐接口验证通过。
             </p>
@@ -778,7 +738,6 @@ export default function DevIntegrationPage() {
               >
                 {gateReload ? '刷新门禁证据' : '读取门禁证据'}
               </Button>
-              <Link to={DEV_QUALITY_GATES_ROUTE}>到质量门禁核对</Link>
             </section>
             <section
               className="erp-dev-integration__table"
@@ -811,7 +770,7 @@ export default function DevIntegrationPage() {
                         {evidenceState.data.run.repository
                             ? ` · 提交 ${evidenceState.data.run.repository.commit.slice(0, 12)} · 指纹 ${evidenceState.data.run.repository.fingerprint.slice(0, 12)}`
                             : ' · 缺少源码身份'}
-                        {` · 门禁${evidenceState.data.run.status === 'passed' ? '通过' : '未通过'} · 清理${evidenceState.data.run.cleanupComplete ? '完成' : '未证明完成'}`}
+                        {` · ${evidenceState.data.run.scopeLabel || '数据库验证'}${evidenceState.data.run.status === 'passed' ? '通过' : '未通过'} · 清理${evidenceState.data.run.cleanupComplete ? '完成' : '未证明完成'}`}
                       </>
                       ) : (
                         '尚无可关联的隔离数据库运行回执。'

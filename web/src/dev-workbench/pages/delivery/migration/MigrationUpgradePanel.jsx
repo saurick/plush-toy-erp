@@ -1,6 +1,7 @@
 import { Alert, Button, Card, Space, Typography } from 'antd'
 import { StatusTag } from './shared.jsx'
 import DevStaticGuidance from '../../../components/DevStaticGuidance.jsx'
+import DevTimestamp from '../../../components/DevTimestamp.jsx'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -10,6 +11,7 @@ export function MigrationUpgradePanel({
   activeView,
   isLatest,
   migrationFlow,
+  onViewRuntime,
   pathOperation,
   readOnly,
   readyOperation,
@@ -39,11 +41,13 @@ export function MigrationUpgradePanel({
             <Title level={2}>{upgradeState.label}</Title>
             {!isLatest ? <Text type="secondary">{upgradeState.description}</Text> : null}
           </div>
+          {isLatest ? <Button onClick={onViewRuntime}>查看运行检查</Button> : null}
         </div>
       ) : null}
 
       {pathOperation?.status === 'passed' && !activeOperation ? (
-        <DevStaticGuidance title="最近一次升级" hint="已完成 · 查看步骤与恢复证据">
+        <DevStaticGuidance defaultOpen title="最近一次升级" hint="已完成 · 查看步骤与恢复证据">
+          <DevTimestamp value={pathOperation.updatedAt} action="记录更新于" missing="记录更新时间未证明" />
           {migrationFlow}
         </DevStaticGuidance>
       ) : (
@@ -83,7 +87,7 @@ export function MigrationUpgradePanel({
                 ? '当前没有待执行迁移。进入运行检查核对后端健康与开发工具。'
                 : '先检查候选版本、备份恢复和业务验证，生成计划后再确认升级。'}
             </Paragraph>
-            <DevStaticGuidance title="查看升级步骤" hint="准备、确认与事务边界">
+            <DevStaticGuidance defaultOpen title="查看升级步骤" hint="准备、确认与事务边界">
               {migrationFlow}
             </DevStaticGuidance>
           </div>

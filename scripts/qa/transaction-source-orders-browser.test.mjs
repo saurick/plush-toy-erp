@@ -8,7 +8,7 @@ import { runIsolatedTransactionBrowser, verifyTransactionRequestLogs } from "./t
 
 function completed() {
   const flows = SOURCE_ORDER_FLOW_KEYS.map((key, index) => ({
-    key, sourceID: index + 1,
+    key, sourceID: index + 1, authoringSurface: "desktop", ...(key.startsWith("mobile_") ? { mobileAuthoringUnavailable: true } : {}),
     passed: true, draftCAS: true, conflictMessageShownOnce: true, forbiddenUnchanged: true, invalidQuantityUnchanged: true,
     saveRecovered: true, saveKeptBusinessValues: true, submitRecovered: true, replayExact: true, changedIntentRejected: true,
     factsUnchanged: true, frozenAfterSubmit: true, terminalGuard: true, blockResume: true,
@@ -19,7 +19,7 @@ function completed() {
   }));
   const expectedFailures = flows.map((flow, index) => ({ actor: `actor-${index}`, method: `save-${index}`, browser: true, code: CODE.RESOURCE_VERSION_CONFLICT }));
   const browserRPC = expectedFailures.map(entry => ({ role: entry.actor, method: entry.method, code: entry.code, http: 200 }));
-  const engineering = ["desktop", "mobile"].map(surface => ({ surface, passed: true, staleSourceRejected: true, permissionDenied: true, rejectReasonRequired: true, rejectedResubmitted: true, approvalOrdered: true, financeRecovered: true, replayExact: true, changedReviewRejected: true, purchaseSourceVerified: true, factsUnchanged: true, purchaseOrders: 1, financeFault: { injected: true, backendCode: 0, requestID: `finance-${surface}` } }));
+  const engineering = ["desktop", "mobile"].map(surface => ({ surface, preparationSurface: "desktop", passed: true, staleSourceRejected: true, permissionDenied: true, rejectReasonRequired: true, rejectedResubmitted: true, approvalOrdered: true, financeRecovered: true, replayExact: true, changedReviewRejected: true, purchaseSourceVerified: true, factsUnchanged: true, purchaseOrders: 1, financeFault: { injected: true, backendCode: 0, requestID: `finance-${surface}` } }));
   const tables = ["inventory_txns", "inventory_balances", "inventory_lots", "inventory_operations", "inventory_operation_items", "stock_reservations", "purchase_receipts", "purchase_receipt_items", "purchase_returns", "purchase_return_items", "purchase_receipt_adjustments", "purchase_receipt_adjustment_items", "outsourcing_facts", "quality_inspections", "finance_facts", "finance_payments", "finance_allocations", "finance_credit_notes", "production_facts", "production_wip_batches", "production_wip_events", "production_order_operations", "production_packaging_confirmations", "shipments", "shipment_items"];
   const factsBefore = Object.fromEntries(tables.map(table => [table, "frozen"]));
   return { flows, engineering, pageErrors: [], expectedFailures, browserRPC, unexpectedRPC: [], factsBefore, factsAfter: structuredClone(factsBefore) };
@@ -53,6 +53,9 @@ test("a missed backend fault, unexpected rejection or duplicate failure cannot b
     report => { delete report.factsBefore.inventory_txns; },
     report => { report.factsAfter.inventory_balances = "changed"; },
     report => report.engineering.pop(),
+    report => { report.flows[1].authoringSurface = 'mobile'; },
+    report => { report.flows[1].mobileAuthoringUnavailable = false; },
+    report => { report.engineering[1].preparationSurface = 'mobile'; },
     report => { report.engineering[0].rejectedResubmitted = false; },
     report => { report.engineering[1].purchaseOrders = 2; },
     report => { report.engineering[1].financeFault.backendCode = CODE.INVALID_PARAM; },

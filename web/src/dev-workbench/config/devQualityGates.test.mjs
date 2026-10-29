@@ -897,7 +897,6 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.run, /aria-label="诊断范围"/u)
   assert.match(sources.run, /本机最近诊断/u)
   assertNoSourceMatches(/严格门禁：发版前验证/u)
-  assert.match(sources.run, /\? '预计剩余'[\s\S]*?: '运行状态'/u)
   assertNoSourceMatches(/Fixed quality evidence/u)
   assert.match(taskNavSource, /aria-controls/u)
   assert.match(taskNavSource, /-panel-/u)

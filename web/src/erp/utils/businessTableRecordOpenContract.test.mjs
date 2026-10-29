@@ -207,7 +207,7 @@ test('库存台账主表双击打开当前记录主操作面', () => {
     1,
     `${basename(filePath)} must keep one primary inventory table`
   )
-  assert.match(source, /mobileTaskBusiness \? BusinessDataTable : Table/u)
+  assert.match(source, /taskBusiness \? BusinessDataTable : Table/u)
   assert.match(source, /const inventoryRecordOpen = useBusinessTableRecordOpen\(\{/u)
   assert.match(source, /onOpenRecord: openInventoryDetails/u)
   assert.match(tags[0], /onRow=\{inventoryRecordOpen\.onRow\}/u)

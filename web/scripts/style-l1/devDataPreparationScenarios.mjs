@@ -616,7 +616,8 @@ terminal: true,
         await pending.getByText('目标未记录', { exact: true }).waitFor()
         await pending.locator('summary').first().click()
         await pending.getByText('22222222-2222-4222-8222-222222222222', { exact: true }).waitFor()
-        assert.match(await pending.getByRole('link', { name: '查看核对与恢复说明', exact: true }).first().getAttribute('href'), /#data-preparation-recovery$/u)
+        await pending.getByText('按操作编号核对原执行日志、目标运行状态及实际数据结果；未确认前不要重跑或改写原回执。', { exact: true }).first().waitFor()
+        assert.equal(await pending.getByRole('link').count(), 0, '恢复说明原位阅读，不需要离开当前记录')
         assert.equal(await page.getByText('展开只读历史记录（1）', { exact: true }).isVisible(), true)
         for (const width of [1024, 1280, 1920]) {
           await page.setViewportSize({ width, height: 1080 })

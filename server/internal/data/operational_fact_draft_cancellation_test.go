@@ -27,7 +27,6 @@ func TestProductionOrderLinkedDraftFactsCancelWithoutInventory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, created.Order.ID)
 		released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "mo-completion-draft-cancel-release"})
 		if err != nil {
 			t.Fatal(err)
@@ -35,9 +34,11 @@ func TestProductionOrderLinkedDraftFactsCancelWithoutInventory(t *testing.T) {
 		completeProductionSchedulingTaskForTest(t, ctx, f.data, f.client, released.Order.ID, f.actorID)
 		warehouse := createTestWarehouse(t, ctx, f.client, "completion-draft-cancel-wh")
 		lotNo := "completion-draft-cancel-lot"
+		batchID := prepareProductionHandworkBatchForFactTest(t, ctx, f.client, released.Items[0].ID, f.actorID)
 		factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard)))
 		fact, err := factUC.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 			FactNo: "PF-COMPLETION-DRAFT-CANCEL", ProductionOrderID: released.Order.ID,
+			ProductionWIPBatchID:  batchID,
 			ProductionOrderItemID: released.Items[0].ID, WarehouseID: warehouse.ID, NewLotNo: &lotNo,
 			Quantity: decimal.NewFromInt(1), IdempotencyKey: "pf-completion-draft-cancel",
 		})
@@ -125,7 +126,7 @@ func TestOutsourcingOrderLinkedDraftFactsCancelWithoutInventoryAndReleaseParent(
 		}
 		assertOperationalFactHasZeroInventoryTxns(t, ctx, client, biz.OutsourcingFactSourceType, fact.ID)
 	}
-	closed, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusClosed)
+	closed, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, source.order.ID, biz.OutsourcingOrderStatusClosed)
 	if err != nil || closed.LifecycleStatus != biz.OutsourcingOrderStatusClosed {
 		t.Fatalf("close outsourcing parent after draft cancellations=%#v err=%v", closed, err)
 	}
@@ -142,7 +143,7 @@ func TestOutsourcingOrderLinkedDraftFactsCancelWithoutInventoryAndReleaseParent(
 	if _, err := factUC.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(cancelIssue.ID, cancelIssue.Version, actor.ID, "委外发料草稿作废")); err != nil {
 		t.Fatalf("cancel draft outsourcing issue before parent cancellation: %v", err)
 	}
-	cancelledParent, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, cancelSource.order.ID, biz.OutsourcingOrderStatusCanceled)
+	cancelledParent, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, cancelSource.order.ID, biz.OutsourcingOrderStatusCanceled)
 	if err != nil || cancelledParent.LifecycleStatus != biz.OutsourcingOrderStatusCanceled {
 		t.Fatalf("cancel outsourcing parent after draft cancellation=%#v err=%v", cancelledParent, err)
 	}
@@ -205,7 +206,6 @@ func TestDraftOperationalFactCancellationRejectsMalformedSourceCoordinates(t *te
 		if err != nil {
 			t.Fatal(err)
 		}
-		markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, created.Order.ID)
 		released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
 			ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID,
 			IdempotencyKey: "mo-draft-cancel-wrong-source-release",
@@ -215,9 +215,11 @@ func TestDraftOperationalFactCancellationRejectsMalformedSourceCoordinates(t *te
 		}
 		warehouse := createTestWarehouse(t, ctx, f.client, "draft-cancel-wrong-source-wh")
 		lotNo := "draft-cancel-wrong-source-lot"
+		batchID := prepareProductionHandworkBatchForFactTest(t, ctx, f.client, released.Items[0].ID, f.actorID)
 		uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard)))
 		fact, err := uc.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 			FactNo: "PF-DRAFT-CANCEL-WRONG-SOURCE", ProductionOrderID: released.Order.ID,
+			ProductionWIPBatchID:  batchID,
 			ProductionOrderItemID: released.Items[0].ID, WarehouseID: warehouse.ID, NewLotNo: &lotNo,
 			Quantity: decimal.NewFromInt(1), IdempotencyKey: "pf-draft-cancel-wrong-source",
 		})

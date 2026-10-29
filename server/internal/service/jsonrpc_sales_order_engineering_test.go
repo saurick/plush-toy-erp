@@ -34,7 +34,7 @@ func TestSalesOrderEngineeringRequiresOwnPermissionAndRejectsCommercialFields(t 
 			d := newSalesOrderJSONRPCTestData(t, base, admin)
 			repo := &salesEngineeringJSONRPCRepo{stubSalesOrderJSONRPCRepo: base}
 			d.salesOrderUC = biz.NewSalesOrderUsecase(repo)
-			item := map[string]any{"id": 3, "product_id": nil, "engineering_status": "PREPARING"}
+			item := map[string]any{"id": 3, "product_id": nil}
 			if tc.extra {
 				item["unit_price"] = "0"
 			}
@@ -87,5 +87,47 @@ func TestSalesOrderDemandParametersPreserveMeaningAndRejectInvalidReferences(t *
 		if _, ok := salesOrderItemMutationFromParams(params); ok {
 			t.Fatalf("accepted invalid or unauthorized fields: %v", patch)
 		}
+	}
+}
+
+func TestEngineeringCompletionRequiresActivationPermissionAndRejectsSamplingFields(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		activate bool
+		patch    map[string]any
+		allowed  bool
+	}{
+		{"engineering only", false, nil, false},
+		{"complete", true, nil, true},
+		{"removed progress", true, map[string]any{"engineering_status": "CONFIRMED"}, false},
+		{"removed note", true, map[string]any{"sample_note": "旧打样说明"}, false},
+		{"removed reuse", true, map[string]any{"reuse_confirmed_sample": true}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			permissions := []string{biz.PermissionSalesOrderEngineeringUpdate}
+			if tc.activate {
+				permissions = append(permissions, biz.PermissionBOMActivate)
+			}
+			admin := workflowJSONRPCAdmin([]string{biz.EngineeringRoleKey}, permissions...)
+			base := &stubSalesOrderJSONRPCRepo{}
+			d := newSalesOrderJSONRPCTestData(t, base, admin)
+			repo := &salesEngineeringJSONRPCRepo{stubSalesOrderJSONRPCRepo: base}
+			d.salesOrderUC = biz.NewSalesOrderUsecase(repo)
+			item := map[string]any{"id": 3, "product_id": 7, "bom_id": 9, "expected_bom_version": 123}
+			for k, v := range tc.patch {
+				item[k] = v
+			}
+			params := mustJSONRPCStruct(t, map[string]any{"id": 1, "expected_version": 2, "complete": true, "items": []any{item}})
+			_, result, err := d.handleSalesOrder(workflowJSONRPCAdminContext(), "save_sales_order_engineering", "engineering", params)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (result.Code == errcode.OK.Code) != tc.allowed || (repo.mutation != nil) != tc.allowed {
+				t.Fatalf("completion permission/contract: %+v", result)
+			}
+			if tc.allowed && !repo.mutation.Complete {
+				t.Fatal("completion intent lost")
+			}
+		})
 	}
 }

@@ -209,6 +209,7 @@ export const customerPackageCatalog = Object.freeze({
         "pmc.risk.read",
         "production.fact.read",
         "production.exception.submit",
+        "production.over_issue.submit",
         "production.exception.approve",
       ],
     },

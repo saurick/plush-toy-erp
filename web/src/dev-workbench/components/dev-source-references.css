@@ -1,0 +1,30 @@
+.erp-dev-source-references {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-dev-source-reference {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.erp-dev-source-reference__kind {
+  flex: none;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-source-reference__file {
+  min-width: 0;
+}
+
+.erp-dev-source-reference .erp-dev-source-reference__file code {
+  display: inline;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

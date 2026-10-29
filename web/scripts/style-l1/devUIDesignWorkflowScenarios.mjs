@@ -7,6 +7,7 @@ import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { createDevTaskGovernanceScenarios } from './devTaskGovernanceScenarios.mjs'
 import { createDevRoleFlowScenarios } from './devRoleFlowScenarios.mjs'
+import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 
 export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }) {
   const open = async (page) => {
@@ -26,7 +27,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
       toolbarBackground: 'rgba(0, 0, 0, 0)',
       padding: '5px 12px',
     }, 'UI 设计预览操作由完整白色操作区承载')
-    await page.locator('.erp-dev-ui-design-page > header').getByRole('tab', { name: '可交互设计', exact: true }).waitFor()
+    await page.locator('.erp-dev-ui-design-header').getByRole('tab', { name: '可交互设计', exact: true }).waitFor()
     await page.getByRole('button', { name: /全屏预览/ }).click()
     const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
     await frame.getByRole('button', { name: '业务汇总', exact: true }).waitFor()
@@ -130,6 +131,127 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
   return [
     ...createDevTaskGovernanceScenarios({ assert, outputDir, path }),
     ...createDevRoleFlowScenarios({ assert, outputDir, path }),
+    {
+      name: 'dev-ui-design-print-template-guide',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const frame = await open(page)
+        await frame.getByRole('button', { name: '模板打印中心', exact: true }).click()
+        const directory = frame.getByRole('navigation', { name: '打印模板目录' })
+        const guide = frame.getByRole('region', { name: '当前模板说明' })
+        const choice = (key) => directory.locator(`[data-value="${key}"]`)
+        const back = () => frame.getByRole('button', { name: '返回模板列表', exact: true }).click()
+        assert.equal(await directory.locator('button').count(), printTemplateCatalog.length)
+        assert.equal(await choice(printTemplateCatalog[0].key).getAttribute('aria-pressed'), 'true')
+        await directory.evaluate((node) => { node.dataset.retainedDirectory = 'true' })
+        for (const template of printTemplateCatalog) {
+          await choice(template.key).press('Enter')
+          assert.equal(await directory.getAttribute('data-retained-directory'), 'true', '切换模板不重建目录')
+          assert.equal(await choice(template.key).evaluate((node) => node === document.activeElement), true)
+          assert.equal(await directory.locator('[aria-pressed="true"]').count(), 1)
+          assert.equal(await guide.locator('h3').innerText(), template.title)
+          assert.equal(await guide.locator('.print-template-purpose').innerText(), template.summary)
+          assert.deepEqual(await guide.locator('.print-template-parts h4').allTextContents(), template.guide.map((part) => part.title))
+          assert.deepEqual(await guide.locator('.print-template-parts p').allTextContents(), template.guide.map((part) => part.description))
+          assert.deepEqual(await guide.locator('.print-guide-number').allTextContents(), ['1', '2', '3'])
+          const metrics = await guide.evaluate((node) => {
+            const paper = node.querySelector('.print-guide-paper')
+            const figure = node.querySelector('figure').getBoundingClientRect()
+            return {
+              inert: paper.inert,
+              editableCount: paper.querySelectorAll('input, textarea, button, [contenteditable="true"]').length,
+              regions: [...paper.querySelectorAll('[data-guide-region]')].map((region) => {
+                const marker = region.querySelector('.print-guide-marker')
+                const box = marker.getBoundingClientRect()
+                const target = region.getBoundingClientRect()
+                return {
+                  number: marker.textContent,
+                  region: region.dataset.guideRegion,
+                  aligned: Math.abs(box.y + box.height / 2 - target.y - target.height / 2) < 1,
+                  fits: box.right <= figure.right + 1,
+                }
+              }),
+            }
+          })
+          assert.equal(metrics.inert, true)
+          assert.equal(metrics.editableCount, 0)
+          assert.equal(metrics.regions.length, 3)
+          assert(metrics.regions.every((part) => part.number === part.region && part.aligned && part.fits), JSON.stringify(metrics))
+        }
+        await choice('engineering-color-card').dblclick()
+        await frame.locator('.print-paper').waitFor()
+        assert.match(await frame.locator('.print-controls').innerText(), /模板样张 · 色卡/)
+        await frame.locator('[data-form-field="print-title"]').fill('色卡打印演示核对稿')
+        await frame.locator('[data-action="print-save-draft"]').click()
+        const downloadEvent = page.waitForEvent('download')
+        await frame.locator('[data-action="print-download"]').click()
+        const download = await downloadEvent
+        assert.equal(download.suggestedFilename(), '模板样张 · 色卡-色卡.html')
+        const downloadedFile = path.join(outputDir, 'print-guide-color-card.html')
+        await download.saveAs(downloadedFile)
+        assert.match(await readFile(downloadedFile, 'utf8'), /色卡打印演示核对稿/)
+        await back()
+        assert.equal(await choice('engineering-color-card').getAttribute('aria-pressed'), 'true')
+        assert.equal(await guide.locator('h3').innerText(), '色卡')
+        await frame.getByRole('button', { name: '打开编辑与打印', exact: true }).click()
+        assert.equal(await frame.locator('[data-form-field="print-title"]').inputValue(), '色卡打印演示核对稿')
+        await back()
+        await frame.locator('.nav-item[data-page="engineering-hub"]').click()
+        await frame.locator('.table-wrap [data-action="select-row"][data-id="bom-1"]').check()
+        const sourceRow = await frame.locator('.table-wrap tr[data-row="bom-1"]').innerText()
+        const sourceNo = sourceRow.match(/BOM-\d{8}-\d+/u)?.[0]
+        assert(sourceNo, '带值打印前必须识别当前来源单据')
+        for (const id of ['print-material', 'print-color', 'print-instruction']) {
+          await frame.locator(`.business-record-actions [data-operation="${id}"]`).click()
+          await frame.locator('.print-paper').waitFor()
+          assert((await frame.locator('.paper-meta').innerText()).includes(sourceNo))
+          if (id === 'print-material') {
+            await frame.locator('[data-form-field="print-title"]').fill('BOM 带值打印核对稿')
+            await frame.locator('[data-action="print-save-draft"]').click()
+            const event = page.waitForEvent('download')
+            await frame.locator('[data-action="print-download"]').click()
+            const document = await event
+            assert.equal(document.suggestedFilename(), `${sourceNo}-物料分析明细表.html`)
+            const file = path.join(outputDir, 'print-guide-bom-material.html')
+            await document.saveAs(file)
+            const source = await readFile(file, 'utf8')
+            assert(source.includes(sourceNo))
+            assert(source.includes('BOM 带值打印核对稿'))
+          }
+          await frame.getByRole('button', { name: '返回业务页面', exact: true }).click()
+          assert.equal(await frame.locator('.table-wrap [data-action="select-row"][data-id="bom-1"]').isChecked(), true)
+        }
+        await frame.locator('.business-record-actions [data-operation="print-material"]').click()
+        await frame.getByRole('button', { name: '返回业务页面', exact: true }).waitFor()
+        await back()
+        assert.match(await guide.locator('.print-guide-paper').textContent(), /样例编号/)
+        await frame.getByRole('button', { name: '打开编辑与打印', exact: true }).click()
+        assert.match(await frame.locator('.print-controls').innerText(), /模板样张 · 物料分析明细表/)
+        assert.equal(await frame.getByRole('button', { name: '返回业务页面', exact: true }).count(), 0, '模板样张不继承单据返回上下文')
+        await back()
+        await choice('material-purchase-contract').click()
+        await page.screenshot({ path: path.join(outputDir, 'print-template-guide-4k.png'), scale: 'device' })
+        for (const width of [960, 390]) {
+          await page.setViewportSize({ width, height: 1080 })
+          const layout = await guide.evaluate((node) => {
+            const figure = node.querySelector('figure').getBoundingClientRect()
+            const parts = node.querySelector('ol').getBoundingClientRect()
+            const view = document.querySelector('#view')
+            return {
+              stacked: parts.top >= figure.bottom - 1,
+              noOverflow: view.scrollWidth <= view.clientWidth + 1,
+              parts: [...node.querySelectorAll('li')].every((part) => part.scrollWidth <= part.clientWidth + 1),
+              markersFit: [...node.querySelectorAll('.print-guide-marker')].every((marker) => marker.getBoundingClientRect().right <= figure.right + 1),
+            }
+          })
+          assert.deepEqual(layout, { stacked: true, noOverflow: true, parts: true, markersFit: true }, `${width}px: ${JSON.stringify(layout)}`)
+          assert.equal(await frame.getByRole('button', { name: '打开编辑与打印', exact: true }).isVisible(), true)
+          await assertNoHorizontalOverflow(page)
+        }
+      },
+    },
     {
       name: 'ui-design-persistent-operation-bar',
       path: '/__style-l1/persistent-operation-bar',
@@ -495,8 +617,8 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         page.setDefaultTimeout(8000)
         await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
         await page.getByText('任务处理', { exact: true }).waitFor()
-        await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-header .erp-sliding-tabs', 1)
-        await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-header .erp-sliding-tabs', 0, true)
+        await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-page > .erp-dev-workbench-toolbar .erp-sliding-tabs', 1)
+        await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-page > .erp-dev-workbench-toolbar .erp-sliding-tabs', 0, true)
         await page.frameLocator('iframe[title="ERP 最新可交互设计"]').locator('.task-handling-board').waitFor()
         await page.screenshot({ path: path.join(outputDir, 'task-handling-workbench-4k.png'), scale: 'device' })
         await page.getByRole('button', { name: /全屏预览/ }).click()

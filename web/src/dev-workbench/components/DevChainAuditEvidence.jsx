@@ -1,8 +1,8 @@
 import React from 'react'
 import { Alert, Collapse, Space, Tag, Typography } from 'antd'
-import { Link } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import { DEV_PAGINATION } from '../config/devPagination.mjs'
+import DevSourceReferences from './DevSourceReferences.jsx'
 import {
   chainAuditArtifactURL,
   CHAIN_AUDIT_STATES,
@@ -64,9 +64,7 @@ export function ChainAuditFindings({ data }) {
             <ChainAuditState status={retest.status} />
           </h2>
           <p>{retest.summary}</p>
-          <Link to={`?${new URLSearchParams({ batch: retest.sourceBatch, view: 'findings' })}`}>
-            查看原失败批次
-          </Link>
+          <p>原失败批次：{retest.sourceBatch}</p>
           <ChainAuditEvidenceLinks data={data} items={retest.evidence} />
         </section>
       ))}
@@ -106,15 +104,7 @@ export function ChainAuditFindings({ data }) {
             {Array.isArray(finding.source) ? (
               <details className="erp-dev-disclosure">
                 <summary>报告对应的源码位置</summary>
-                <ul>
-                  {finding.source.map((item) => (
-                    <li key={`${item.path}:${item.line}`}>
-                      <code>
-                        {text(item.path)}:{text(item.line)}
-                      </code>
-                    </li>
-                  ))}
-                </ul>
+                <DevSourceReferences references={finding.source.map((item) => `${text(item.path)}:${text(item.line)}`)} />
               </details>
             ) : null}
           </section>

@@ -112,6 +112,7 @@ status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
 | 明确不负责 | 不保存委外或车间执行归属。单位用量已包含该部位片数，汇总按生产数量乘单位用量乘一加损耗率；片数不再重复相乘。 |
 | 生命周期 / 删除语义 | 仅所属 BOM 为 DRAFT 时可新增、修改、替换或移除；激活或归档后不得直接编辑。 |
 | 写入边界 | InventoryUsecase 的 BOM 聚合保存事务维护；不允许独立绕过 BOM 状态写入。 |
+| Catalog 敏感字段 | `source_snapshot` |
 
 ### 字段
 
@@ -124,8 +125,8 @@ status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
 | `loss_rate` | `numeric` | `other` | 非空 | — | — |
 | `position` | `varchar` | `string` | 可空 | — | — |
 | `piece_count` | `varchar` | `string` | 可空 | — | — |
-| `total_usage_snapshot` | `varchar` | `string` | 可空 | — | 业务发生时冻结的显示快照，不回写上游主数据。 |
-| `source_snapshot` | `jsonb` | `json.RawMessage` | 可空 | — | 业务发生时冻结的显示快照，不回写上游主数据。 |
+| `total_usage_snapshot` | `varchar` | `string` | 可空 | — | 保留原表长小数总量，在订单数量及计算输入未变时使用；显示位数不改变原始数值精度。 |
+| `source_snapshot` | `jsonb` | `json.RawMessage` | 可空 | 敏感 | Excel 来源数值、显示格式、行号和损耗依据，仅供核对；业务用量仍取 quantity。 |
 | `process_base` | `varchar` | `string` | 可空 | — | — |
 | `process_method` | `varchar` | `string` | 可空 | — | — |
 | `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |

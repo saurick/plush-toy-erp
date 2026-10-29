@@ -86,7 +86,8 @@ func TestInventoryPostgresCycleCountStaleRecovery(t *testing.T) {
 	defer cancel()
 	data, client := openInventoryPostgresTestData(t)
 	f := createInventoryPostgresFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	repo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewInventoryUsecase(repo)
 	seed := func(quantity int64, key string) {
 		t.Helper()
 		if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID,
@@ -103,32 +104,34 @@ func TestInventoryPostgresCycleCountStaleRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	operation = approveInventoryCountForTest(t, ctx, repo, operation)
 	seed(1, "pg-count-change-")
-	if _, err := uc.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operation.ID, ExpectedVersion: operation.Version, ActorID: 1}); !errors.Is(err, biz.ErrInventoryOperationStaleCount) {
+	if _, err := repo.postInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operation.ID, ExpectedVersion: operation.Version, ActorID: 1}, nil, nil); !errors.Is(err, biz.ErrInventoryOperationStaleCount) {
 		t.Fatalf("stale count error=%v", err)
 	}
 	current, err := uc.GetInventoryOperation(ctx, operation.ID)
-	if err != nil || current.Version != operation.Version || current.Status != biz.InventoryOperationStatusDraft || !current.Items[0].ExpectedQuantity.Equal(expected) {
+	if err != nil || current.Version != operation.Version || current.Status != biz.InventoryOperationStatusApproved || !current.Items[0].ExpectedQuantity.Equal(expected) {
 		t.Fatalf("stale post changed document=%+v err=%v", current, err)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SubjectType(biz.InventorySubjectMaterial), inventorytxn.SubjectID(f.materialID)).CountX(ctx); count != 2 {
 		t.Fatalf("stale count left ledger: %d", count)
 	}
-	counted = decimal.NewFromInt(9)
-	saved, err := uc.SaveInventoryOperationDraft(ctx, &biz.InventoryOperationDraftSave{ID: operation.ID, ExpectedVersion: operation.Version,
-		OperationNo: operation.OperationNo, Reason: "重新核对盘点", Items: []biz.InventoryOperationDraftItemSave{{ID: operation.Items[0].ID, CountedQuantity: &counted}}}, 1)
-	if err != nil || saved.Version != operation.Version+1 || !saved.Items[0].ExpectedQuantity.Equal(decimal.NewFromInt(11)) || !saved.Items[0].AdjustmentQuantity.Equal(decimal.NewFromInt(-2)) {
-		t.Fatalf("save must refresh from current database balance: %+v err=%v", saved, err)
+	if _, err := uc.CancelInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operation.ID, ExpectedVersion: operation.Version, ActorID: 1, Reason: "盘点期间库存变化，重新盘点"}); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := uc.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operation.ID, ExpectedVersion: operation.Version, ActorID: 1}); !errors.Is(err, biz.ErrInventoryOperationVersionConflict) {
-		t.Fatalf("old version error=%v", err)
+	expected, counted = decimal.NewFromInt(11), decimal.NewFromInt(9)
+	saved, err := uc.CreateInventoryOperation(ctx, &biz.InventoryOperationCreate{OperationNo: "PG-RECOUNT-" + f.suffix, OperationType: biz.InventoryOperationCycleCount, Reason: "重新核对盘点", CreatedBy: 1, IdempotencyKey: "pg-recount-" + f.suffix,
+		Items: []biz.InventoryOperationItemCreate{{LineNo: "1", SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID, FromWarehouseID: f.warehouseID, UnitID: f.unitID, ExpectedQuantity: &expected, CountedQuantity: &counted}}})
+	if err != nil {
+		t.Fatal(err)
 	}
+	saved = approveInventoryCountForTest(t, ctx, repo, saved)
 	post := &biz.InventoryOperationMutation{ID: saved.ID, ExpectedVersion: saved.Version, ActorID: 1}
-	posted, err := uc.PostInventoryOperation(ctx, post)
+	posted, err := repo.postInventoryOperation(ctx, post, nil, nil)
 	if err != nil || posted.Status != biz.InventoryOperationStatusPosted || posted.Version != saved.Version+1 {
 		t.Fatalf("post after refresh=%+v err=%v", posted, err)
 	}
-	if replay, err := uc.PostInventoryOperation(ctx, post); err != nil || replay.Version != posted.Version {
+	if replay, err := repo.postInventoryOperation(ctx, post, nil, nil); err != nil || replay.Version != posted.Version {
 		t.Fatalf("replay=%+v err=%v", replay, err)
 	}
 	balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID, WarehouseID: f.warehouseID, UnitID: f.unitID})
@@ -137,5 +140,46 @@ func TestInventoryPostgresCycleCountStaleRecovery(t *testing.T) {
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SubjectType(biz.InventorySubjectMaterial), inventorytxn.SubjectID(f.materialID)).CountX(ctx); count != 3 {
 		t.Fatalf("recovery/replay ledger count=%d", count)
+	}
+}
+
+func TestInventoryPostgresCycleCountZeroCompletion(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	data, client := openInventoryPostgresTestData(t)
+	f := createInventoryPostgresFixtures(t, ctx, client)
+	repo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewInventoryUsecase(repo)
+	quantity := decimal.NewFromInt(10)
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID, WarehouseID: f.warehouseID, UnitID: f.unitID, TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: quantity, SourceType: "TEST", IdempotencyKey: "zero-seed-" + f.suffix}); err != nil {
+		t.Fatal(err)
+	}
+	operation, err := uc.CreateInventoryOperation(ctx, &biz.InventoryOperationCreate{OperationNo: "ZERO-" + f.suffix, OperationType: biz.InventoryOperationCycleCount, Reason: "零差异盘点", IdempotencyKey: "zero-count-" + f.suffix, CreatedBy: 1, Items: []biz.InventoryOperationItemCreate{{LineNo: "1", SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID, FromWarehouseID: f.warehouseID, UnitID: f.unitID, ExpectedQuantity: &quantity, CountedQuantity: &quantity}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := uc.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operation.ID, ExpectedVersion: operation.Version, ActorID: 1}); !errors.Is(err, biz.ErrProcessRuntimeRequired) {
+		t.Fatalf("direct post bypass: %v", err)
+	}
+	approved := approveInventoryCountForTest(t, ctx, repo, operation)
+	mutation := &biz.InventoryOperationMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: 1}
+	posted, err := repo.postInventoryOperation(ctx, mutation, nil, nil)
+	if err != nil || posted.Status != biz.InventoryOperationStatusPosted || posted.Items[0].SubjectName == "" {
+		t.Fatalf("completion=%+v error=%v", posted, err)
+	}
+	replay, err := repo.postInventoryOperation(ctx, mutation, nil, nil)
+	if err != nil || replay.Version != posted.Version {
+		t.Fatalf("replay=%+v error=%v", replay, err)
+	}
+	cancelled, err := uc.CancelInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: posted.ID, ExpectedVersion: posted.Version, ActorID: 1, Reason: "撤销完成记录"})
+	if err != nil || cancelled.Status != biz.InventoryOperationStatusCancelled {
+		t.Fatalf("cancel=%+v error=%v", cancelled, err)
+	}
+	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.InventoryOperationSourceType), inventorytxn.SourceID(posted.ID)).CountX(ctx); count != 0 {
+		t.Fatalf("zero count invented %d transactions", count)
+	}
+	balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID, WarehouseID: f.warehouseID, UnitID: f.unitID})
+	if err != nil || !balance.Quantity.Equal(quantity) {
+		t.Fatalf("zero count changed balance: %+v %v", balance, err)
 	}
 }

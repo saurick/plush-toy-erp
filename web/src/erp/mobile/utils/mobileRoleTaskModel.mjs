@@ -1,3 +1,4 @@
+import { getWorkflowTaskActionMeta } from '../../utils/workflowTaskActionPresentation.mjs'
 import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import {
   formatMobileTaskTime,
@@ -312,13 +313,9 @@ export function requiresMobileActionFeedback(action) {
   return action === 'done'
 }
 
-export function resolveMobileActionLabel(action) {
-  if (action === 'blocked' || action === 'block') return '标记阻塞'
-  if (action === 'done' || action === 'complete') return '完成本岗'
-  if (action === 'rejected' || action === 'reject') return '退回'
-  if (action === 'resume') return '解除阻塞'
-  if (action === 'urge') return '催办'
-  return '移动处理'
+export function resolveMobileActionLabel(action, task = {}) {
+  const mode = { blocked: 'block', done: 'complete', rejected: 'reject' }[action] || action
+  return getWorkflowTaskActionMeta(task, mode)?.title || '移动处理'
 }
 
 export function resolveMobileActionDisplayLabel(action = {}) {

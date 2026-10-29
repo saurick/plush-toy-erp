@@ -209,7 +209,20 @@
       "purpose": "保存材料在各部位的单位用量、损耗、片数和工艺资料；界面按材料分组复用主数据。",
       "boundary": "不保存委外或车间执行归属。单位用量已包含该部位片数，汇总按生产数量乘单位用量乘一加损耗率；片数不再重复相乘。",
       "lifecycle": "仅所属 BOM 为 DRAFT 时可新增、修改、替换或移除；激活或归档后不得直接编辑。",
-      "writeBoundary": "InventoryUsecase 的 BOM 聚合保存事务维护；不允许独立绕过 BOM 状态写入。"
+      "writeBoundary": "InventoryUsecase 的 BOM 聚合保存事务维护；不允许独立绕过 BOM 状态写入。",
+      "sensitiveFields": [
+        "source_snapshot"
+      ],
+      "fieldNotes": [
+        {
+          "name": "source_snapshot",
+          "note": "Excel 来源数值、显示格式、行号和损耗依据，仅供核对；业务用量仍取 quantity。"
+        },
+        {
+          "name": "total_usage_snapshot",
+          "note": "保留原表长小数总量，在订单数量及计算输入未变时使用；显示位数不改变原始数值精度。"
+        }
+      ]
     },
     {
       "name": "business_attachments",

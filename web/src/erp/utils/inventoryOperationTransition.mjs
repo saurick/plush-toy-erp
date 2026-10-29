@@ -49,14 +49,18 @@ export function inventoryOperationMutationReceiptMatches({
   )
 }
 
+export function inventoryOperationRequiresApproval(operationType) {
+  return ['CYCLE_COUNT', 'MANUAL_ADJUSTMENT'].includes(operationType)
+}
+
 function usesAdjustmentApproval(operation, action) {
   return (
-    operation.operation_type === 'MANUAL_ADJUSTMENT' &&
+    inventoryOperationRequiresApproval(operation.operation_type) &&
     (action === 'submit' || action === 'post')
   )
 }
 
-async function executeManualAdjustmentTransition({
+async function executeAdjustmentTransition({
   operation,
   action,
   customerKey,
@@ -135,7 +139,7 @@ export async function executeInventoryOperationTransition({
   try {
     let next
     if (usesAdjustmentApproval(operation, action)) {
-      next = await executeManualAdjustmentTransition({
+      next = await executeAdjustmentTransition({
         operation,
         action,
         customerKey,

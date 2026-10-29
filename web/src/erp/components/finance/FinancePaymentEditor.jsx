@@ -3,6 +3,9 @@ import { Form, Input } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 
 import { FinancePaymentKind } from '../../../common/consts/statuses.generated.mjs'
+import FinancePaymentEvidenceFields from './FinancePaymentEvidenceFields.jsx'
+import { hasActionPermission, BUSINESS_CURRENCY_OPTIONS } from '../../utils/masterDataOrderView.mjs'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import FinancePaymentSourceFields from './FinancePaymentSourceFields.jsx'
 
 import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
@@ -13,8 +16,6 @@ import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 
-import { BUSINESS_CURRENCY_OPTIONS } from '../../utils/masterDataOrderView.mjs'
-
 import {
   compareNumeric20Scale6Units,
   isPositiveNumeric20Scale6Units,
@@ -22,6 +23,7 @@ import {
 } from '../../utils/numeric20Scale6.mjs'
 
 export function FinancePaymentEditor({
+  accountSuggestions = [],
   adminProfile,
   customerKey,
   loading,
@@ -210,28 +212,7 @@ export function FinancePaymentEditor({
           <DateTimeInput />
         </Form.Item>
         <BusinessFormSectionTitle>账户与凭据</BusinessFormSectionTitle>
-        <Form.Item
-          name="account_ref"
-          label="收付款账户摘要"
-          rules={[
-            { required: true, whitespace: true, message: '请填写账户摘要' },
-          ]}
-        >
-          <Input maxLength={128} />
-        </Form.Item>
-        <Form.Item
-          name="evidence_ref"
-          label="业务凭据"
-          rules={[
-            {
-              required: true,
-              whitespace: true,
-              message: '请填写回单或凭据摘要',
-            },
-          ]}
-        >
-          <Input maxLength={255} />
-        </Form.Item>
+        <FinancePaymentEvidenceFields form={paymentForm} open={paymentOpen} accountSuggestions={accountSuggestions} canRead={hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYMENT_READ)} />
       </Form>
     </BusinessFormPage>
   )

@@ -18,12 +18,14 @@ const permissions = [
     permission_class: 'business',
     assignable: true,
   },
+  { permission_key: 'erp.print_template.read', permission_class: 'business', assignable: true },
 ]
 const roles = [
-  { role_key: 'sales', name: '业务', permissions: ['customer.read'] },
+  { role_key: 'sales', name: '业务', permissions: ['customer.read', 'erp.print_template.read'] },
   { role_key: 'finance', name: '财务', permissions: ['sales_order.read'] },
 ].map((role) => ({
   ...role,
+  permission_policy: { template_key: role.role_key, registered: true, required_permissions: role.permissions.filter((key) => key !== 'erp.print_template.read'), optional_permissions: ['erp.print_template.read'] },
   version: 1,
   role_type: 'business_default',
   permissions_editable_by_current_admin: true,
@@ -109,7 +111,7 @@ function findElement(node, predicate) {
 function checklist(view) {
   return findElement(
     view.state.roleTemplateTab,
-    (node) => node.type?.name === 'PermissionChecklist'
+    (node) => node.type?.name === 'RolePermissionPolicyPanel'
   ).props
 }
 
@@ -165,7 +167,7 @@ test('clean role changes and refreshed or cleared data never commit phantom edit
 test('permission edits still require confirmation and reverting or discarding clears them', async (t) => {
   const view = await mountSettings(t)
   await view.render({ permissions, roles })
-  await act(async () => checklist(view).onChange([]))
+  await act(async () => checklist(view).onChange(['customer.read']))
   assert.equal(view.state.roleConfigurationDirty, true)
   let kept = false
   let left = false
@@ -182,15 +184,15 @@ test('permission edits still require confirmation and reverting or discarding cl
   assert.equal(kept, true)
   assert.equal(view.state.roleConfigurationDirty, true)
 
-  await act(async () => checklist(view).onChange(['customer.read']))
+  await act(async () => checklist(view).onChange(['customer.read', 'erp.print_template.read']))
   assert.equal(view.state.roleConfigurationDirty, false)
-  await act(async () => checklist(view).onChange([]))
+  await act(async () => checklist(view).onChange(['customer.read']))
   await selectRole(view, 'finance')
   await act(async () => view.confirmations.at(-1).onOk())
   assert.equal(view.state.roleConfigurationDirty, false)
   assert.deepEqual(checklist(view).value, ['sales_order.read'])
   await selectRole(view, 'sales')
-  assert.deepEqual(checklist(view).value, ['customer.read'])
+  assert.deepEqual(checklist(view).value, ['customer.read', 'erp.print_template.read'])
 })
 
 test('warehouse edits participate in dirty protection and revert with the whole draft', async (t) => {
@@ -237,7 +239,7 @@ test('conflict refresh preserves an actual draft until the user discards it', as
   const { message } = await import('../../../common/utils/antdApp.js')
   t.mock.method(message, 'warning', () => {})
   await view.render({ permissions, roles })
-  await act(async () => checklist(view).onChange([]))
+  await act(async () => checklist(view).onChange(['customer.read']))
   const save = findElement(
     view.state.roleTemplateTab,
     (node) => node.props.children === '保存岗位设置'
@@ -250,10 +252,31 @@ test('conflict refresh preserves an actual draft until the user discards it', as
       permissions: ['customer.read', 'sales_order.read'],
     })),
   })
-  assert.deepEqual(checklist(view).value, [])
+  assert.deepEqual(checklist(view).value, ['customer.read'])
   assert.equal(view.state.roleConfigurationDirty, true)
   view.state.confirmDiscardRoleChanges({})
   await act(async () => view.confirmations.at(-1).onOk())
   assert.deepEqual(checklist(view).value, ['customer.read', 'sales_order.read'])
+  assert.equal(view.state.roleConfigurationDirty, false)
+})
+
+
+test('role deep link survives asynchronous option loading', async (t) => {
+  const view = await mountSettings(t, { initialRoleKey: 'finance' })
+  await view.render({ permissions, roles })
+  assert.deepEqual(checklist(view).value, ['sales_order.read'])
+})
+
+
+test('missing server responsibility policy keeps permissions and data scopes read-only', async (t) => {
+  const view = await mountSettings(t)
+  await view.render({ permissions, roles: [{ ...roles[0], permission_policy: undefined }] })
+  assert.equal(checklist(view).disabled, true)
+  const scopeButton = findElement(view.state.roleTemplateTab, (node) => node.props.children === '配置数据范围')
+  await act(async () => scopeButton.props.onClick())
+  const scope = findElement(view.state.roleTemplateTab, (node) => node.type?.name === 'DataScopeOverview')
+  assert.equal(scope.props.disabled, true)
+  const save = findElement(view.state.roleTemplateTab, (node) => node.props.children === '保存岗位设置')
+  assert.equal(save.props.disabled, true)
   assert.equal(view.state.roleConfigurationDirty, false)
 })

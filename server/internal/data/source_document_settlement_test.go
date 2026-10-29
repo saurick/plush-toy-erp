@@ -46,12 +46,12 @@ func TestSalesOrderCancellationRejectsLiveDownstreamAndAllowsSettledDownstream(t
 		}},
 		{name: "draft production blocks", want: biz.ErrSalesOrderCancellationProductionDependency, seed: func(order *ent.SalesOrder, item *ent.SalesOrderItem) {
 			production := client.ProductionOrder.Create().SetOrderNo("PROD-DRAFT-" + order.OrderNo).SetStatus(biz.ProductionOrderStatusDraft).SetCreatedBy(actor.ID).SaveX(ctx)
-			client.ProductionOrderItem.Create().SetProductionOrderID(production.ID).SetLineNo(1).SetProductID(fixtures.productID).SetUnitID(fixtures.unitID).SetPlannedQuantity(decimal.NewFromInt(1)).SetSalesOrderItemID(item.ID).SaveX(ctx)
+			client.ProductionOrderItem.Create().SetProductionOrderID(production.ID).SetLineNo(1).SetProductID(fixtures.productID).SetUnitID(fixtures.unitID).SetPlannedQuantity(decimal.NewFromInt(1)).SetSalesOrderItemID(item.ID).SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SaveX(ctx)
 		}},
 		{name: "cancelled production allows", seed: func(order *ent.SalesOrder, item *ent.SalesOrderItem) {
 			now := time.Now().UTC()
 			production := client.ProductionOrder.Create().SetOrderNo("PROD-CANCELLED-" + order.OrderNo).SetStatus(biz.ProductionOrderStatusCancelled).SetCreatedBy(actor.ID).SetCancelledBy(actor.ID).SetCancelledAt(now).SetCancelReason("test settled dependency").SaveX(ctx)
-			client.ProductionOrderItem.Create().SetProductionOrderID(production.ID).SetLineNo(1).SetProductID(fixtures.productID).SetUnitID(fixtures.unitID).SetPlannedQuantity(decimal.NewFromInt(1)).SetSalesOrderItemID(item.ID).SaveX(ctx)
+			client.ProductionOrderItem.Create().SetProductionOrderID(production.ID).SetLineNo(1).SetProductID(fixtures.productID).SetUnitID(fixtures.unitID).SetPlannedQuantity(decimal.NewFromInt(1)).SetSalesOrderItemID(item.ID).SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SaveX(ctx)
 		}},
 		{name: "active process blocks", want: biz.ErrSalesOrderCancellationProcessDependency, seed: func(order *ent.SalesOrder, _ *ent.SalesOrderItem) {
 			createSettlementProcessInstance(t, ctx, client, biz.ProcessKeySalesOrderAcceptance, "sales_order", order.ID, biz.ProcessStatusActive, "sales-active-"+order.OrderNo)

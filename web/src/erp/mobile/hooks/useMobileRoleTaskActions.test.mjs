@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import vm from 'node:vm'
+import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import { retainWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
+import { workflowTaskActionRequiresReason } from '../../utils/workflowTaskActionContract.mjs'
 
 import {
   createTaskMutationAttemptStore,
@@ -238,6 +240,7 @@ module.exports = { useMobileRoleTaskActions }`,
         '../../utils/workflowTaskActionSubmitGuard.mjs': {
           verifyWorkflowTaskActionAccessBeforeSubmit,
         },
+        '../../utils/workflowTaskLifecycle.mjs': { isTerminalWorkflowTask },
         '../../utils/workflowTaskIdentity.mjs': { retainWorkflowTaskIdentity },
         '../../utils/workflowTaskMutation.mjs': {
           createTaskMutationAttemptStore,
@@ -246,6 +249,7 @@ module.exports = { useMobileRoleTaskActions }`,
           verifyNewWorkflowTaskMutationAttempt,
         },
         '../../utils/workflowTaskActionContract.mjs': {
+          workflowTaskActionRequiresReason,
           isWorkflowProcessDecisionTask: (task) =>
             [
               'finance.payment.approve',
@@ -462,11 +466,12 @@ test('useMobileRoleTaskActions: new actions do not copy historical evidence refs
   assert.deepEqual(Array.from(view.actionReceipt.evidence_refs), [])
 })
 
-test('useMobileRoleTaskActions: completion is blocked when feedback is missing', async () => {
+test('useMobileRoleTaskActions: followup completion is blocked when feedback is missing', async () => {
   let actionCalls = 0
   const messages = { errors: [], successes: [], warnings: [] }
   const harness = createHookHarness({
     initialReason: '',
+    selectedTask: { id: 42, owner_role_key: 'warehouse', task_group: 'business_followup', version: 5 },
     messages,
     completeWorkflowTaskAction: async () => {
       actionCalls += 1
@@ -479,7 +484,7 @@ test('useMobileRoleTaskActions: completion is blocked when feedback is missing',
   assert.deepEqual(messages.warnings, ['请先填写完成反馈'])
 })
 
-test('useMobileRoleTaskActions: result step never fabricates a receipt from task status', async () => {
+test('useMobileRoleTaskActions: completed tasks open recorded history without fabricating a submission receipt', () => {
   const selectedTask = {
     id: 42,
     owner_role_key: 'warehouse',
@@ -489,11 +494,23 @@ test('useMobileRoleTaskActions: result step never fabricates a receipt from task
   const harness = createHookHarness({ selectedTask })
 
   let view = harness.render()
-  assert.equal(view.selectedTaskReceipt, null)
-  assert.equal(view.showTaskReceipt(selectedTask), null)
+  assert.equal(view.selectedTaskReceipt.status, 'recorded')
+  assert.equal(view.showTaskReceipt(selectedTask).status, 'recorded')
 
   view = harness.render()
-  assert.equal(view.actionReceipt, null)
+  assert.equal(view.actionReceipt.status, 'recorded')
+  assert.equal(view.actionReceipt.feedback, '')
+  assert.equal(view.actionReceipt.reason, '')
+  assert.equal(view.actionReceiptRetryable, false)
+})
+
+test('useMobileRoleTaskActions: finished task receipts stay viewable without granting submission rights', () => {
+  for (const status of ['done', 'rejected', 'withdrawn']) {
+    const task = { id: 42, task_status_key: status }
+    const harness = createHookHarness({ selectedTask: task })
+    const view = harness.render()
+    assert.equal(view.showTaskReceipt(task).status, 'recorded')
+  }
 })
 
 test('useMobileRoleTaskActions: history receipt requires an exact account scope', () => {
@@ -1099,4 +1116,25 @@ test('useMobileRoleTaskActions: task A completion does not clear task B action',
   await firstSubmit
 
   assert.deepEqual(harness.detailActionChanges, ['blocked'])
+})
+
+test('useMobileRoleTaskActions: ordinary completion accepts optional feedback like desktop', async () => {
+  let actionCalls = 0
+  const harness = createHookHarness({ initialReason: '',
+completeWorkflowTaskAction: async () => {
+    actionCalls += 1
+    return { task: { id: 42, task_status_key: 'done', version: 6 } }
+  } })
+  await harness.render().submitDetailAction()
+  assert.equal(actionCalls, 1)
+})
+
+test('useMobileRoleTaskActions: pending task cannot open an empty receipt and preserves the action draft', () => {
+  const task = { id: 42, task_status_key: 'ready' }
+  const harness = createHookHarness({ selectedTask: task, detailAction: 'blocked', initialReason: '等待到料' })
+  harness.render().showTaskReceipt(task)
+  const view = harness.render()
+  assert.equal(view.actionReceipt, null)
+  assert.equal(view.selectedTaskReceipt, null)
+  assert.equal(view.detailReasonValue, '等待到料')
 })

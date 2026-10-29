@@ -74,6 +74,7 @@ var formalWorkflowTaskSourceAccessRules = []formalWorkflowTaskSourceAccessRule{
 			PermissionPMCRiskRead,
 			PermissionProductionFactRead,
 			PermissionProductionExceptionSubmit,
+			PermissionProductionOverIssueSubmit,
 			PermissionProductionExceptionApprove,
 		},
 	},

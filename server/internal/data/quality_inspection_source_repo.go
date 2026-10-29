@@ -108,6 +108,9 @@ func (r *inventoryRepo) CreateQualityInspectionFromOutsourcingReturn(
 		}
 		return nil, err
 	}
+	if err := validateOutsourcingFactAccess(ctx, preview); err != nil {
+		return nil, err
+	}
 	orderID, itemID, err := outsourcingOrderSourceIDsFromFact(preview)
 	if err != nil {
 		return nil, biz.ErrQualityInspectionSourceInvalid
@@ -199,6 +202,9 @@ func qualityInspectionCreateFromOutsourcingReturn(
 	if client == nil || fact == nil || in == nil || fact.ID != in.OutsourcingFactID {
 		return nil, biz.ErrBadParam
 	}
+	if err := validateOutsourcingFactAccess(ctx, fact); err != nil {
+		return nil, err
+	}
 	if fact.Status != biz.OperationalFactStatusPosted {
 		return nil, biz.ErrQualityInspectionSourceState
 	}
@@ -245,6 +251,11 @@ func qualityInspectionCreateFromOutsourcingReturn(
 }
 
 func validateOutsourcingReturnQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
+	if in != nil {
+		if err := validateQualityWarehouseAccess(ctx, in.SourceType, in.WarehouseID); err != nil {
+			return err
+		}
+	}
 	if client == nil || in == nil ||
 		in.SourceType != biz.QualityInspectionSourceOutsourcingFact ||
 		in.SourceID <= 0 ||
@@ -308,6 +319,9 @@ func findQualityInspectionCreateReplay(
 			return nil, false, nil
 		}
 		return nil, false, err
+	}
+	if err := validateQualityInspectionAccess(ctx, row); err != nil {
+		return nil, true, err
 	}
 	if !qualityInspectionMatchesCreate(row, in) {
 		return nil, true, biz.ErrIdempotencyConflict

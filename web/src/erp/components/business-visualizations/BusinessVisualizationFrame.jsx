@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react'
-import { useLocation, useOutletContext } from 'react-router-dom'
+import { useLocation, } from 'react-router-dom'
 import { Button, Empty } from 'antd'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Pagination from '@/common/components/pagination/AppPagination'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -40,7 +41,7 @@ export function BusinessViewSurface({
   loading = false,
 }) {
   const rootRef = useRef(null)
-  const context = useOutletContext()
+  const context = useBusinessPageContext()
   const { pathname } = useLocation()
   const localPositions = useRef(new Map())
   const positions = context?.pageUIState?.values || localPositions.current

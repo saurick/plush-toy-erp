@@ -13,7 +13,7 @@ const operation = {
   id: 7,
   version: 2,
   status: 'DRAFT',
-  operation_type: 'CYCLE_COUNT',
+  operation_type: 'TRANSFER',
 }
 const posted = { ...operation, version: 3, status: 'POSTED', posted_by: 9 }
 

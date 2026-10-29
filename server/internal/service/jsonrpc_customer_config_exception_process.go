@@ -117,7 +117,11 @@ func (d *jsonrpcDispatcher) startCustomerConfigExceptionProcess(
 	) {
 		return invalidParamResult()
 	}
-	if res := d.RequireAdminPermission(ctx, contract.startPermission); res != nil {
+	permissions := []string{contract.startPermission}
+	if contract.processKey == biz.ProcessKeyProductionExceptionApproval {
+		permissions = append(permissions, biz.PermissionProductionOverIssueSubmit)
+	}
+	if res := d.RequireAdminAnyPermission(ctx, permissions...); res != nil {
 		return res
 	}
 	businessRefID := exceptionProcessBusinessRefID(pm, contract.idParam)
@@ -464,6 +468,15 @@ func (d *jsonrpcDispatcher) requireExceptionProcessSourceRead(
 		if err != nil {
 			return d.mapOperationalFactError(ctx, err)
 		}
+		if method == "start_production_exception_approval_process" {
+			permission, valid := biz.ProductionExceptionSubmissionPermission(item.DecisionType)
+			if !valid {
+				return invalidParamResult()
+			}
+			if res := d.RequireAdminPermission(ctx, permission); res != nil {
+				return res
+			}
+		}
 		condition := biz.SourceReadConditionProductionExceptionWIP
 		if item.DecisionType == biz.ProductionExceptionOverIssue {
 			condition = biz.SourceReadConditionProductionExceptionIssue
@@ -518,7 +531,7 @@ func (d *jsonrpcDispatcher) exceptionProcessSourceReadback(
 		if err != nil {
 			return nil, d.mapInventoryError(ctx, err)
 		}
-		if item.OperationType != biz.InventoryOperationManualAdjustment {
+		if !biz.InventoryOperationRequiresApproval(item.OperationType) {
 			return nil, invalidParamResult()
 		}
 		return inventoryOperationToAny(item), nil

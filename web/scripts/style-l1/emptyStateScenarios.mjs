@@ -384,11 +384,13 @@ export function createEmptyStateScenarios({
         await sidebar
           .getByRole('button', { name: '测试验证', exact: true })
           .click()
-        await frame.getByRole('button', { name: '开始验证', exact: true }).click()
+        assert.equal(await frame.getByRole('button', { name: '开始验证', exact: true }).count(), 0)
+        await sidebar.getByRole('button', { name: '测试执行', exact: true }).click()
+        await frame.getByRole('tab', { name: '本轮验证', exact: true }).click()
         await frame
           .getByRole('button', { name: '演示本轮验证', exact: true })
           .click()
-        await frame.getByRole('tab', { name: '证据与覆盖', exact: true }).click()
+        await frame.getByRole('tab', { name: '覆盖报告', exact: true }).click()
         await frame
           .getByText('定向页面检查 · 样例完成', { exact: true })
           .waitFor()

@@ -784,7 +784,7 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId: 'FL_sales_order_order_no__prefills_order_no_from_blank',
-    title: '销售订单新建空白单号使用共享内部编号生成',
+    title: '销售订单新建空白单号交由服务端保存时分配',
     fieldKeys: ['orderNo'],
     scenarioKey: 'source_prefill_rebuilds_from_blank',
     layer: 'web',

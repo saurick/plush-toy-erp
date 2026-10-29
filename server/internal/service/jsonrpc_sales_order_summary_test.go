@@ -32,6 +32,12 @@ func TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction(t *testing.T) {
 		allowed, disabled, anonymous, super bool
 	}{
 		{name: "source reader", permissions: reads, allowed: true, params: map[string]any{"customer": " 模拟客户 ", "offset": 20, "limit": 20}},
+		{name: "exact customer", permissions: reads, allowed: true, params: map[string]any{"customer_id": 42}},
+		{name: "cleared customer", permissions: reads, allowed: true, params: map[string]any{"customer_id": 0}},
+		{name: "negative customer", permissions: reads, params: map[string]any{"customer_id": -1}},
+		{name: "fractional customer", permissions: reads, params: map[string]any{"customer_id": 1.5}},
+		{name: "string customer", permissions: reads, params: map[string]any{"customer_id": "42"}},
+		{name: "null customer", permissions: reads, params: map[string]any{"customer_id": nil}},
 		{name: "commercial role", permissions: append(append([]string{}, reads...), biz.PermissionFieldSalesCommercialRead), allowed: true},
 		{name: "super admin", super: true, allowed: true},
 		{name: "missing workbench", permissions: reads[1:]},
@@ -66,6 +72,9 @@ func TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction(t *testing.T) {
 			}
 			if !tc.allowed {
 				return
+			}
+			if tc.name == "exact customer" && repo.filter.CustomerID != 42 {
+				t.Fatalf("exact customer filter was lost: %+v", repo.filter)
 			}
 			d.applySensitiveFieldReadPolicy(ctx, "sales_order", "list_sales_order_summary", result)
 			row := result.Data.AsMap()["items"].([]any)[0].(map[string]any)

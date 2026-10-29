@@ -4,6 +4,7 @@ import {
   engineeringMaterialTaskEntryPath,
   canReadEngineeringMaterial,
   canListEngineeringMaterial,
+  canProcessEngineeringMaterialTask,
   getEngineeringMaterialOrderContext,
   getEngineeringMaterialPermissions,
   getEngineeringMaterialTaskContext,
@@ -70,6 +71,7 @@ test('each material stage opens its exact source; approval stages appear in the 
       '/erp/sales/project-orders/sales-orders?material_request_id=3&sales_order_id=8'
     )
     assert.equal(isWorkflowApprovalTask(task), stage !== 'revision')
+    assert.equal(canProcessEngineeringMaterialTask(profile, task), stage !== 'revision')
     assert.equal(canViewWorkflowApprovalInbox(profile), stage !== 'revision')
     const permissions = getEngineeringMaterialPermissions(profile, task)
     assert.equal(permissions[stage === 'revision' ? 'submit' : stage], true)

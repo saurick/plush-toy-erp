@@ -1,17 +1,11 @@
 import { SafetyCertificateOutlined } from '@ant-design/icons'
-import { Button, Typography } from 'antd'
-import { Link } from 'react-router-dom'
+import { Typography } from 'antd'
 import { DeliveryTaskPath } from '../DeliveryTaskPath.jsx'
-import { DEV_VERSION_CENTER_ROUTE } from '../../../config/devDelivery.mjs'
-import { DEV_DRILL_RECOVERY_SOURCE_PATH } from '../../../config/devRecovery.mjs'
-import { DEV_DOCS_ROUTE } from '../../../config/devRoutes.mjs'
 
 const { Paragraph } = Typography
 
 export function EmergencyPanel({
   activeView,
-  customerReady,
-  navigateWithinCustomerScope,
 }) {
   return (
     <section
@@ -49,11 +43,6 @@ export function EmergencyPanel({
               },
             ]}
           />
-          <Link
-            to={`${DEV_DOCS_ROUTE}?path=${encodeURIComponent(DEV_DRILL_RECOVERY_SOURCE_PATH)}#incident-response`}
-          >
-            阅读事件处置与恢复边界
-          </Link>
         </div>
       </section>
 
@@ -72,15 +61,6 @@ export function EmergencyPanel({
           <Paragraph type="secondary">
             演练结果须有正式回执；普通成功部署不自动算作演练。
           </Paragraph>
-          <Button
-            type="link"
-            disabled={!customerReady}
-            onClick={() =>
-              navigateWithinCustomerScope(DEV_VERSION_CENTER_ROUTE)
-            }
-          >
-            查看版本中心的手动操作指引
-          </Button>
         </div>
       </details>
     </section>

@@ -228,6 +228,7 @@ function isOrderLineQuantityValidForUnit(line, quantityField, unitOptions) {
 }
 
 export function SalesOrderFormFields({
+  orderID,
   form,
   itemsSection,
   attachmentPanel,
@@ -261,12 +262,26 @@ export function SalesOrderFormFields({
           className="erp-business-action-form__field"
           label="订单号（自动）"
           name="order_no"
-          rules={[{ required: true, message: '请填写或保留自动订单号' }]}
+          rules={
+            orderID
+              ? [
+                  {
+                    required: true,
+                    whitespace: true,
+                    message: '请保留或填写订单号',
+                  },
+                ]
+              : []
+          }
         >
           <Input
             allowClear
             autoComplete="off"
-            placeholder="自动生成，可按需要调整"
+            placeholder={
+              orderID
+                ? '请保留或填写订单号'
+                : '留空时保存自动编号，也可手工填写'
+            }
           />
         </Form.Item>
         <Form.Item

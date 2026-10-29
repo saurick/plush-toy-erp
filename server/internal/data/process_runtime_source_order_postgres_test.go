@@ -474,6 +474,7 @@ func TestInventoryLotStatusPostgresQualityDecisionWritesNamedEvidence(t *testing
 		InspectionID: inspection.ID, Result: biz.QualityInspectionResultReject,
 		InspectorID: &actor.ID, DefectRateOperator: &operator, DefectRatePercent: &percent,
 		DecisionNote: processTestStringPointer("抽检不合格"),
+		CheckItems:   incomingEvidenceForTest(biz.QualityInspectionResultReject),
 	}); err != nil {
 		t.Fatalf("reject quality inspection: %v", err)
 	}

@@ -206,171 +206,43 @@ func (_u *SalesOrderItemUpdate) ClearProcessRequirement() *SalesOrderItemUpdate 
 	return _u
 }
 
-// SetSampleBomID sets the "sample_bom_id" field.
-func (_u *SalesOrderItemUpdate) SetSampleBomID(v int) *SalesOrderItemUpdate {
-	_u.mutation.SetSampleBomID(v)
+// SetBomID sets the "bom_id" field.
+func (_u *SalesOrderItemUpdate) SetBomID(v int) *SalesOrderItemUpdate {
+	_u.mutation.SetBomID(v)
 	return _u
 }
 
-// SetNillableSampleBomID sets the "sample_bom_id" field if the given value is not nil.
-func (_u *SalesOrderItemUpdate) SetNillableSampleBomID(v *int) *SalesOrderItemUpdate {
+// SetNillableBomID sets the "bom_id" field if the given value is not nil.
+func (_u *SalesOrderItemUpdate) SetNillableBomID(v *int) *SalesOrderItemUpdate {
 	if v != nil {
-		_u.SetSampleBomID(*v)
+		_u.SetBomID(*v)
 	}
 	return _u
 }
 
-// ClearSampleBomID clears the value of the "sample_bom_id" field.
-func (_u *SalesOrderItemUpdate) ClearSampleBomID() *SalesOrderItemUpdate {
-	_u.mutation.ClearSampleBomID()
+// ClearBomID clears the value of the "bom_id" field.
+func (_u *SalesOrderItemUpdate) ClearBomID() *SalesOrderItemUpdate {
+	_u.mutation.ClearBomID()
 	return _u
 }
 
-// SetSampleBomFingerprint sets the "sample_bom_fingerprint" field.
-func (_u *SalesOrderItemUpdate) SetSampleBomFingerprint(v string) *SalesOrderItemUpdate {
-	_u.mutation.SetSampleBomFingerprint(v)
+// SetBomFingerprint sets the "bom_fingerprint" field.
+func (_u *SalesOrderItemUpdate) SetBomFingerprint(v string) *SalesOrderItemUpdate {
+	_u.mutation.SetBomFingerprint(v)
 	return _u
 }
 
-// SetNillableSampleBomFingerprint sets the "sample_bom_fingerprint" field if the given value is not nil.
-func (_u *SalesOrderItemUpdate) SetNillableSampleBomFingerprint(v *string) *SalesOrderItemUpdate {
+// SetNillableBomFingerprint sets the "bom_fingerprint" field if the given value is not nil.
+func (_u *SalesOrderItemUpdate) SetNillableBomFingerprint(v *string) *SalesOrderItemUpdate {
 	if v != nil {
-		_u.SetSampleBomFingerprint(*v)
+		_u.SetBomFingerprint(*v)
 	}
 	return _u
 }
 
-// ClearSampleBomFingerprint clears the value of the "sample_bom_fingerprint" field.
-func (_u *SalesOrderItemUpdate) ClearSampleBomFingerprint() *SalesOrderItemUpdate {
-	_u.mutation.ClearSampleBomFingerprint()
-	return _u
-}
-
-// SetSampleReusedFromItemID sets the "sample_reused_from_item_id" field.
-func (_u *SalesOrderItemUpdate) SetSampleReusedFromItemID(v int) *SalesOrderItemUpdate {
-	_u.mutation.SetSampleReusedFromItemID(v)
-	return _u
-}
-
-// SetNillableSampleReusedFromItemID sets the "sample_reused_from_item_id" field if the given value is not nil.
-func (_u *SalesOrderItemUpdate) SetNillableSampleReusedFromItemID(v *int) *SalesOrderItemUpdate {
-	if v != nil {
-		_u.SetSampleReusedFromItemID(*v)
-	}
-	return _u
-}
-
-// ClearSampleReusedFromItemID clears the value of the "sample_reused_from_item_id" field.
-func (_u *SalesOrderItemUpdate) ClearSampleReusedFromItemID() *SalesOrderItemUpdate {
-	_u.mutation.ClearSampleReusedFromItemID()
-	return _u
-}
-
-// SetSampleImageAttachmentID sets the "sample_image_attachment_id" field.
-func (_u *SalesOrderItemUpdate) SetSampleImageAttachmentID(v int) *SalesOrderItemUpdate {
-	_u.mutation.ResetSampleImageAttachmentID()
-	_u.mutation.SetSampleImageAttachmentID(v)
-	return _u
-}
-
-// SetNillableSampleImageAttachmentID sets the "sample_image_attachment_id" field if the given value is not nil.
-func (_u *SalesOrderItemUpdate) SetNillableSampleImageAttachmentID(v *int) *SalesOrderItemUpdate {
-	if v != nil {
-		_u.SetSampleImageAttachmentID(*v)
-	}
-	return _u
-}
-
-// AddSampleImageAttachmentID adds value to the "sample_image_attachment_id" field.
-func (_u *SalesOrderItemUpdate) AddSampleImageAttachmentID(v int) *SalesOrderItemUpdate {
-	_u.mutation.AddSampleImageAttachmentID(v)
-	return _u
-}
-
-// ClearSampleImageAttachmentID clears the value of the "sample_image_attachment_id" field.
-func (_u *SalesOrderItemUpdate) ClearSampleImageAttachmentID() *SalesOrderItemUpdate {
-	_u.mutation.ClearSampleImageAttachmentID()
-	return _u
-}
-
-// SetEngineeringStatus sets the "engineering_status" field.
-func (_u *SalesOrderItemUpdate) SetEngineeringStatus(v string) *SalesOrderItemUpdate {
-	_u.mutation.SetEngineeringStatus(v)
-	return _u
-}
-
-// SetNillableEngineeringStatus sets the "engineering_status" field if the given value is not nil.
-func (_u *SalesOrderItemUpdate) SetNillableEngineeringStatus(v *string) *SalesOrderItemUpdate {
-	if v != nil {
-		_u.SetEngineeringStatus(*v)
-	}
-	return _u
-}
-
-// SetSampleNote sets the "sample_note" field.
-func (_u *SalesOrderItemUpdate) SetSampleNote(v string) *SalesOrderItemUpdate {
-	_u.mutation.SetSampleNote(v)
-	return _u
-}
-
-// SetNillableSampleNote sets the "sample_note" field if the given value is not nil.
-func (_u *SalesOrderItemUpdate) SetNillableSampleNote(v *string) *SalesOrderItemUpdate {
-	if v != nil {
-		_u.SetSampleNote(*v)
-	}
-	return _u
-}
-
-// ClearSampleNote clears the value of the "sample_note" field.
-func (_u *SalesOrderItemUpdate) ClearSampleNote() *SalesOrderItemUpdate {
-	_u.mutation.ClearSampleNote()
-	return _u
-}
-
-// SetSampleConfirmedAt sets the "sample_confirmed_at" field.
-func (_u *SalesOrderItemUpdate) SetSampleConfirmedAt(v time.Time) *SalesOrderItemUpdate {
-	_u.mutation.SetSampleConfirmedAt(v)
-	return _u
-}
-
-// SetNillableSampleConfirmedAt sets the "sample_confirmed_at" field if the given value is not nil.
-func (_u *SalesOrderItemUpdate) SetNillableSampleConfirmedAt(v *time.Time) *SalesOrderItemUpdate {
-	if v != nil {
-		_u.SetSampleConfirmedAt(*v)
-	}
-	return _u
-}
-
-// ClearSampleConfirmedAt clears the value of the "sample_confirmed_at" field.
-func (_u *SalesOrderItemUpdate) ClearSampleConfirmedAt() *SalesOrderItemUpdate {
-	_u.mutation.ClearSampleConfirmedAt()
-	return _u
-}
-
-// SetSampleConfirmedBy sets the "sample_confirmed_by" field.
-func (_u *SalesOrderItemUpdate) SetSampleConfirmedBy(v int) *SalesOrderItemUpdate {
-	_u.mutation.ResetSampleConfirmedBy()
-	_u.mutation.SetSampleConfirmedBy(v)
-	return _u
-}
-
-// SetNillableSampleConfirmedBy sets the "sample_confirmed_by" field if the given value is not nil.
-func (_u *SalesOrderItemUpdate) SetNillableSampleConfirmedBy(v *int) *SalesOrderItemUpdate {
-	if v != nil {
-		_u.SetSampleConfirmedBy(*v)
-	}
-	return _u
-}
-
-// AddSampleConfirmedBy adds value to the "sample_confirmed_by" field.
-func (_u *SalesOrderItemUpdate) AddSampleConfirmedBy(v int) *SalesOrderItemUpdate {
-	_u.mutation.AddSampleConfirmedBy(v)
-	return _u
-}
-
-// ClearSampleConfirmedBy clears the value of the "sample_confirmed_by" field.
-func (_u *SalesOrderItemUpdate) ClearSampleConfirmedBy() *SalesOrderItemUpdate {
-	_u.mutation.ClearSampleConfirmedBy()
+// ClearBomFingerprint clears the value of the "bom_fingerprint" field.
+func (_u *SalesOrderItemUpdate) ClearBomFingerprint() *SalesOrderItemUpdate {
+	_u.mutation.ClearBomFingerprint()
 	return _u
 }
 
@@ -582,11 +454,6 @@ func (_u *SalesOrderItemUpdate) SetUpdatedAt(v time.Time) *SalesOrderItemUpdate 
 	return _u
 }
 
-// SetSampleReusedFromItem sets the "sample_reused_from_item" edge to the SalesOrderItem entity.
-func (_u *SalesOrderItemUpdate) SetSampleReusedFromItem(v *SalesOrderItem) *SalesOrderItemUpdate {
-	return _u.SetSampleReusedFromItemID(v.ID)
-}
-
 // SetSalesOrder sets the "sales_order" edge to the SalesOrder entity.
 func (_u *SalesOrderItemUpdate) SetSalesOrder(v *SalesOrder) *SalesOrderItemUpdate {
 	return _u.SetSalesOrderID(v.ID)
@@ -597,9 +464,9 @@ func (_u *SalesOrderItemUpdate) SetProduct(v *Product) *SalesOrderItemUpdate {
 	return _u.SetProductID(v.ID)
 }
 
-// SetSampleBom sets the "sample_bom" edge to the BOMHeader entity.
-func (_u *SalesOrderItemUpdate) SetSampleBom(v *BOMHeader) *SalesOrderItemUpdate {
-	return _u.SetSampleBomID(v.ID)
+// SetBom sets the "bom" edge to the BOMHeader entity.
+func (_u *SalesOrderItemUpdate) SetBom(v *BOMHeader) *SalesOrderItemUpdate {
+	return _u.SetBomID(v.ID)
 }
 
 // SetProductSku sets the "product_sku" edge to the ProductSKU entity.
@@ -647,12 +514,6 @@ func (_u *SalesOrderItemUpdate) Mutation() *SalesOrderItemMutation {
 	return _u.mutation
 }
 
-// ClearSampleReusedFromItem clears the "sample_reused_from_item" edge to the SalesOrderItem entity.
-func (_u *SalesOrderItemUpdate) ClearSampleReusedFromItem() *SalesOrderItemUpdate {
-	_u.mutation.ClearSampleReusedFromItem()
-	return _u
-}
-
 // ClearSalesOrder clears the "sales_order" edge to the SalesOrder entity.
 func (_u *SalesOrderItemUpdate) ClearSalesOrder() *SalesOrderItemUpdate {
 	_u.mutation.ClearSalesOrder()
@@ -665,9 +526,9 @@ func (_u *SalesOrderItemUpdate) ClearProduct() *SalesOrderItemUpdate {
 	return _u
 }
 
-// ClearSampleBom clears the "sample_bom" edge to the BOMHeader entity.
-func (_u *SalesOrderItemUpdate) ClearSampleBom() *SalesOrderItemUpdate {
-	_u.mutation.ClearSampleBom()
+// ClearBom clears the "bom" edge to the BOMHeader entity.
+func (_u *SalesOrderItemUpdate) ClearBom() *SalesOrderItemUpdate {
+	_u.mutation.ClearBom()
 	return _u
 }
 
@@ -803,39 +664,14 @@ func (_u *SalesOrderItemUpdate) check() error {
 			return &ValidationError{Name: "process_requirement", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.process_requirement": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.SampleBomID(); ok {
-		if err := salesorderitem.SampleBomIDValidator(v); err != nil {
-			return &ValidationError{Name: "sample_bom_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_bom_id": %w`, err)}
+	if v, ok := _u.mutation.BomID(); ok {
+		if err := salesorderitem.BomIDValidator(v); err != nil {
+			return &ValidationError{Name: "bom_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.bom_id": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.SampleBomFingerprint(); ok {
-		if err := salesorderitem.SampleBomFingerprintValidator(v); err != nil {
-			return &ValidationError{Name: "sample_bom_fingerprint", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_bom_fingerprint": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.SampleReusedFromItemID(); ok {
-		if err := salesorderitem.SampleReusedFromItemIDValidator(v); err != nil {
-			return &ValidationError{Name: "sample_reused_from_item_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_reused_from_item_id": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.SampleImageAttachmentID(); ok {
-		if err := salesorderitem.SampleImageAttachmentIDValidator(v); err != nil {
-			return &ValidationError{Name: "sample_image_attachment_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_image_attachment_id": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.EngineeringStatus(); ok {
-		if err := salesorderitem.EngineeringStatusValidator(v); err != nil {
-			return &ValidationError{Name: "engineering_status", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.engineering_status": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.SampleNote(); ok {
-		if err := salesorderitem.SampleNoteValidator(v); err != nil {
-			return &ValidationError{Name: "sample_note", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_note": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.SampleConfirmedBy(); ok {
-		if err := salesorderitem.SampleConfirmedByValidator(v); err != nil {
-			return &ValidationError{Name: "sample_confirmed_by", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_confirmed_by": %w`, err)}
+	if v, ok := _u.mutation.BomFingerprint(); ok {
+		if err := salesorderitem.BomFingerprintValidator(v); err != nil {
+			return &ValidationError{Name: "bom_fingerprint", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.bom_fingerprint": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ProductSkuID(); ok {
@@ -936,44 +772,11 @@ func (_u *SalesOrderItemUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if _u.mutation.ImportSourceCleared() {
 		_spec.ClearField(salesorderitem.FieldImportSource, field.TypeJSON)
 	}
-	if value, ok := _u.mutation.SampleBomFingerprint(); ok {
-		_spec.SetField(salesorderitem.FieldSampleBomFingerprint, field.TypeString, value)
+	if value, ok := _u.mutation.BomFingerprint(); ok {
+		_spec.SetField(salesorderitem.FieldBomFingerprint, field.TypeString, value)
 	}
-	if _u.mutation.SampleBomFingerprintCleared() {
-		_spec.ClearField(salesorderitem.FieldSampleBomFingerprint, field.TypeString)
-	}
-	if value, ok := _u.mutation.SampleImageAttachmentID(); ok {
-		_spec.SetField(salesorderitem.FieldSampleImageAttachmentID, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.AddedSampleImageAttachmentID(); ok {
-		_spec.AddField(salesorderitem.FieldSampleImageAttachmentID, field.TypeInt, value)
-	}
-	if _u.mutation.SampleImageAttachmentIDCleared() {
-		_spec.ClearField(salesorderitem.FieldSampleImageAttachmentID, field.TypeInt)
-	}
-	if value, ok := _u.mutation.EngineeringStatus(); ok {
-		_spec.SetField(salesorderitem.FieldEngineeringStatus, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.SampleNote(); ok {
-		_spec.SetField(salesorderitem.FieldSampleNote, field.TypeString, value)
-	}
-	if _u.mutation.SampleNoteCleared() {
-		_spec.ClearField(salesorderitem.FieldSampleNote, field.TypeString)
-	}
-	if value, ok := _u.mutation.SampleConfirmedAt(); ok {
-		_spec.SetField(salesorderitem.FieldSampleConfirmedAt, field.TypeTime, value)
-	}
-	if _u.mutation.SampleConfirmedAtCleared() {
-		_spec.ClearField(salesorderitem.FieldSampleConfirmedAt, field.TypeTime)
-	}
-	if value, ok := _u.mutation.SampleConfirmedBy(); ok {
-		_spec.SetField(salesorderitem.FieldSampleConfirmedBy, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.AddedSampleConfirmedBy(); ok {
-		_spec.AddField(salesorderitem.FieldSampleConfirmedBy, field.TypeInt, value)
-	}
-	if _u.mutation.SampleConfirmedByCleared() {
-		_spec.ClearField(salesorderitem.FieldSampleConfirmedBy, field.TypeInt)
+	if _u.mutation.BomFingerprintCleared() {
+		_spec.ClearField(salesorderitem.FieldBomFingerprint, field.TypeString)
 	}
 	if value, ok := _u.mutation.ProductCodeSnapshot(); ok {
 		_spec.SetField(salesorderitem.FieldProductCodeSnapshot, field.TypeString, value)
@@ -1025,35 +828,6 @@ func (_u *SalesOrderItemUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(salesorderitem.FieldUpdatedAt, field.TypeTime, value)
-	}
-	if _u.mutation.SampleReusedFromItemCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: false,
-			Table:   salesorderitem.SampleReusedFromItemTable,
-			Columns: []string{salesorderitem.SampleReusedFromItemColumn},
-			Bidi:    true,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(salesorderitem.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.SampleReusedFromItemIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: false,
-			Table:   salesorderitem.SampleReusedFromItemTable,
-			Columns: []string{salesorderitem.SampleReusedFromItemColumn},
-			Bidi:    true,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(salesorderitem.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.SalesOrderCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1113,12 +887,12 @@ func (_u *SalesOrderItemUpdate) sqlSave(ctx context.Context) (_node int, err err
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if _u.mutation.SampleBomCleared() {
+	if _u.mutation.BomCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   salesorderitem.SampleBomTable,
-			Columns: []string{salesorderitem.SampleBomColumn},
+			Table:   salesorderitem.BomTable,
+			Columns: []string{salesorderitem.BomColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomheader.FieldID, field.TypeInt),
@@ -1126,12 +900,12 @@ func (_u *SalesOrderItemUpdate) sqlSave(ctx context.Context) (_node int, err err
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := _u.mutation.SampleBomIDs(); len(nodes) > 0 {
+	if nodes := _u.mutation.BomIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   salesorderitem.SampleBomTable,
-			Columns: []string{salesorderitem.SampleBomColumn},
+			Table:   salesorderitem.BomTable,
+			Columns: []string{salesorderitem.BomColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomheader.FieldID, field.TypeInt),
@@ -1480,171 +1254,43 @@ func (_u *SalesOrderItemUpdateOne) ClearProcessRequirement() *SalesOrderItemUpda
 	return _u
 }
 
-// SetSampleBomID sets the "sample_bom_id" field.
-func (_u *SalesOrderItemUpdateOne) SetSampleBomID(v int) *SalesOrderItemUpdateOne {
-	_u.mutation.SetSampleBomID(v)
+// SetBomID sets the "bom_id" field.
+func (_u *SalesOrderItemUpdateOne) SetBomID(v int) *SalesOrderItemUpdateOne {
+	_u.mutation.SetBomID(v)
 	return _u
 }
 
-// SetNillableSampleBomID sets the "sample_bom_id" field if the given value is not nil.
-func (_u *SalesOrderItemUpdateOne) SetNillableSampleBomID(v *int) *SalesOrderItemUpdateOne {
+// SetNillableBomID sets the "bom_id" field if the given value is not nil.
+func (_u *SalesOrderItemUpdateOne) SetNillableBomID(v *int) *SalesOrderItemUpdateOne {
 	if v != nil {
-		_u.SetSampleBomID(*v)
+		_u.SetBomID(*v)
 	}
 	return _u
 }
 
-// ClearSampleBomID clears the value of the "sample_bom_id" field.
-func (_u *SalesOrderItemUpdateOne) ClearSampleBomID() *SalesOrderItemUpdateOne {
-	_u.mutation.ClearSampleBomID()
+// ClearBomID clears the value of the "bom_id" field.
+func (_u *SalesOrderItemUpdateOne) ClearBomID() *SalesOrderItemUpdateOne {
+	_u.mutation.ClearBomID()
 	return _u
 }
 
-// SetSampleBomFingerprint sets the "sample_bom_fingerprint" field.
-func (_u *SalesOrderItemUpdateOne) SetSampleBomFingerprint(v string) *SalesOrderItemUpdateOne {
-	_u.mutation.SetSampleBomFingerprint(v)
+// SetBomFingerprint sets the "bom_fingerprint" field.
+func (_u *SalesOrderItemUpdateOne) SetBomFingerprint(v string) *SalesOrderItemUpdateOne {
+	_u.mutation.SetBomFingerprint(v)
 	return _u
 }
 
-// SetNillableSampleBomFingerprint sets the "sample_bom_fingerprint" field if the given value is not nil.
-func (_u *SalesOrderItemUpdateOne) SetNillableSampleBomFingerprint(v *string) *SalesOrderItemUpdateOne {
+// SetNillableBomFingerprint sets the "bom_fingerprint" field if the given value is not nil.
+func (_u *SalesOrderItemUpdateOne) SetNillableBomFingerprint(v *string) *SalesOrderItemUpdateOne {
 	if v != nil {
-		_u.SetSampleBomFingerprint(*v)
+		_u.SetBomFingerprint(*v)
 	}
 	return _u
 }
 
-// ClearSampleBomFingerprint clears the value of the "sample_bom_fingerprint" field.
-func (_u *SalesOrderItemUpdateOne) ClearSampleBomFingerprint() *SalesOrderItemUpdateOne {
-	_u.mutation.ClearSampleBomFingerprint()
-	return _u
-}
-
-// SetSampleReusedFromItemID sets the "sample_reused_from_item_id" field.
-func (_u *SalesOrderItemUpdateOne) SetSampleReusedFromItemID(v int) *SalesOrderItemUpdateOne {
-	_u.mutation.SetSampleReusedFromItemID(v)
-	return _u
-}
-
-// SetNillableSampleReusedFromItemID sets the "sample_reused_from_item_id" field if the given value is not nil.
-func (_u *SalesOrderItemUpdateOne) SetNillableSampleReusedFromItemID(v *int) *SalesOrderItemUpdateOne {
-	if v != nil {
-		_u.SetSampleReusedFromItemID(*v)
-	}
-	return _u
-}
-
-// ClearSampleReusedFromItemID clears the value of the "sample_reused_from_item_id" field.
-func (_u *SalesOrderItemUpdateOne) ClearSampleReusedFromItemID() *SalesOrderItemUpdateOne {
-	_u.mutation.ClearSampleReusedFromItemID()
-	return _u
-}
-
-// SetSampleImageAttachmentID sets the "sample_image_attachment_id" field.
-func (_u *SalesOrderItemUpdateOne) SetSampleImageAttachmentID(v int) *SalesOrderItemUpdateOne {
-	_u.mutation.ResetSampleImageAttachmentID()
-	_u.mutation.SetSampleImageAttachmentID(v)
-	return _u
-}
-
-// SetNillableSampleImageAttachmentID sets the "sample_image_attachment_id" field if the given value is not nil.
-func (_u *SalesOrderItemUpdateOne) SetNillableSampleImageAttachmentID(v *int) *SalesOrderItemUpdateOne {
-	if v != nil {
-		_u.SetSampleImageAttachmentID(*v)
-	}
-	return _u
-}
-
-// AddSampleImageAttachmentID adds value to the "sample_image_attachment_id" field.
-func (_u *SalesOrderItemUpdateOne) AddSampleImageAttachmentID(v int) *SalesOrderItemUpdateOne {
-	_u.mutation.AddSampleImageAttachmentID(v)
-	return _u
-}
-
-// ClearSampleImageAttachmentID clears the value of the "sample_image_attachment_id" field.
-func (_u *SalesOrderItemUpdateOne) ClearSampleImageAttachmentID() *SalesOrderItemUpdateOne {
-	_u.mutation.ClearSampleImageAttachmentID()
-	return _u
-}
-
-// SetEngineeringStatus sets the "engineering_status" field.
-func (_u *SalesOrderItemUpdateOne) SetEngineeringStatus(v string) *SalesOrderItemUpdateOne {
-	_u.mutation.SetEngineeringStatus(v)
-	return _u
-}
-
-// SetNillableEngineeringStatus sets the "engineering_status" field if the given value is not nil.
-func (_u *SalesOrderItemUpdateOne) SetNillableEngineeringStatus(v *string) *SalesOrderItemUpdateOne {
-	if v != nil {
-		_u.SetEngineeringStatus(*v)
-	}
-	return _u
-}
-
-// SetSampleNote sets the "sample_note" field.
-func (_u *SalesOrderItemUpdateOne) SetSampleNote(v string) *SalesOrderItemUpdateOne {
-	_u.mutation.SetSampleNote(v)
-	return _u
-}
-
-// SetNillableSampleNote sets the "sample_note" field if the given value is not nil.
-func (_u *SalesOrderItemUpdateOne) SetNillableSampleNote(v *string) *SalesOrderItemUpdateOne {
-	if v != nil {
-		_u.SetSampleNote(*v)
-	}
-	return _u
-}
-
-// ClearSampleNote clears the value of the "sample_note" field.
-func (_u *SalesOrderItemUpdateOne) ClearSampleNote() *SalesOrderItemUpdateOne {
-	_u.mutation.ClearSampleNote()
-	return _u
-}
-
-// SetSampleConfirmedAt sets the "sample_confirmed_at" field.
-func (_u *SalesOrderItemUpdateOne) SetSampleConfirmedAt(v time.Time) *SalesOrderItemUpdateOne {
-	_u.mutation.SetSampleConfirmedAt(v)
-	return _u
-}
-
-// SetNillableSampleConfirmedAt sets the "sample_confirmed_at" field if the given value is not nil.
-func (_u *SalesOrderItemUpdateOne) SetNillableSampleConfirmedAt(v *time.Time) *SalesOrderItemUpdateOne {
-	if v != nil {
-		_u.SetSampleConfirmedAt(*v)
-	}
-	return _u
-}
-
-// ClearSampleConfirmedAt clears the value of the "sample_confirmed_at" field.
-func (_u *SalesOrderItemUpdateOne) ClearSampleConfirmedAt() *SalesOrderItemUpdateOne {
-	_u.mutation.ClearSampleConfirmedAt()
-	return _u
-}
-
-// SetSampleConfirmedBy sets the "sample_confirmed_by" field.
-func (_u *SalesOrderItemUpdateOne) SetSampleConfirmedBy(v int) *SalesOrderItemUpdateOne {
-	_u.mutation.ResetSampleConfirmedBy()
-	_u.mutation.SetSampleConfirmedBy(v)
-	return _u
-}
-
-// SetNillableSampleConfirmedBy sets the "sample_confirmed_by" field if the given value is not nil.
-func (_u *SalesOrderItemUpdateOne) SetNillableSampleConfirmedBy(v *int) *SalesOrderItemUpdateOne {
-	if v != nil {
-		_u.SetSampleConfirmedBy(*v)
-	}
-	return _u
-}
-
-// AddSampleConfirmedBy adds value to the "sample_confirmed_by" field.
-func (_u *SalesOrderItemUpdateOne) AddSampleConfirmedBy(v int) *SalesOrderItemUpdateOne {
-	_u.mutation.AddSampleConfirmedBy(v)
-	return _u
-}
-
-// ClearSampleConfirmedBy clears the value of the "sample_confirmed_by" field.
-func (_u *SalesOrderItemUpdateOne) ClearSampleConfirmedBy() *SalesOrderItemUpdateOne {
-	_u.mutation.ClearSampleConfirmedBy()
+// ClearBomFingerprint clears the value of the "bom_fingerprint" field.
+func (_u *SalesOrderItemUpdateOne) ClearBomFingerprint() *SalesOrderItemUpdateOne {
+	_u.mutation.ClearBomFingerprint()
 	return _u
 }
 
@@ -1856,11 +1502,6 @@ func (_u *SalesOrderItemUpdateOne) SetUpdatedAt(v time.Time) *SalesOrderItemUpda
 	return _u
 }
 
-// SetSampleReusedFromItem sets the "sample_reused_from_item" edge to the SalesOrderItem entity.
-func (_u *SalesOrderItemUpdateOne) SetSampleReusedFromItem(v *SalesOrderItem) *SalesOrderItemUpdateOne {
-	return _u.SetSampleReusedFromItemID(v.ID)
-}
-
 // SetSalesOrder sets the "sales_order" edge to the SalesOrder entity.
 func (_u *SalesOrderItemUpdateOne) SetSalesOrder(v *SalesOrder) *SalesOrderItemUpdateOne {
 	return _u.SetSalesOrderID(v.ID)
@@ -1871,9 +1512,9 @@ func (_u *SalesOrderItemUpdateOne) SetProduct(v *Product) *SalesOrderItemUpdateO
 	return _u.SetProductID(v.ID)
 }
 
-// SetSampleBom sets the "sample_bom" edge to the BOMHeader entity.
-func (_u *SalesOrderItemUpdateOne) SetSampleBom(v *BOMHeader) *SalesOrderItemUpdateOne {
-	return _u.SetSampleBomID(v.ID)
+// SetBom sets the "bom" edge to the BOMHeader entity.
+func (_u *SalesOrderItemUpdateOne) SetBom(v *BOMHeader) *SalesOrderItemUpdateOne {
+	return _u.SetBomID(v.ID)
 }
 
 // SetProductSku sets the "product_sku" edge to the ProductSKU entity.
@@ -1921,12 +1562,6 @@ func (_u *SalesOrderItemUpdateOne) Mutation() *SalesOrderItemMutation {
 	return _u.mutation
 }
 
-// ClearSampleReusedFromItem clears the "sample_reused_from_item" edge to the SalesOrderItem entity.
-func (_u *SalesOrderItemUpdateOne) ClearSampleReusedFromItem() *SalesOrderItemUpdateOne {
-	_u.mutation.ClearSampleReusedFromItem()
-	return _u
-}
-
 // ClearSalesOrder clears the "sales_order" edge to the SalesOrder entity.
 func (_u *SalesOrderItemUpdateOne) ClearSalesOrder() *SalesOrderItemUpdateOne {
 	_u.mutation.ClearSalesOrder()
@@ -1939,9 +1574,9 @@ func (_u *SalesOrderItemUpdateOne) ClearProduct() *SalesOrderItemUpdateOne {
 	return _u
 }
 
-// ClearSampleBom clears the "sample_bom" edge to the BOMHeader entity.
-func (_u *SalesOrderItemUpdateOne) ClearSampleBom() *SalesOrderItemUpdateOne {
-	_u.mutation.ClearSampleBom()
+// ClearBom clears the "bom" edge to the BOMHeader entity.
+func (_u *SalesOrderItemUpdateOne) ClearBom() *SalesOrderItemUpdateOne {
+	_u.mutation.ClearBom()
 	return _u
 }
 
@@ -2090,39 +1725,14 @@ func (_u *SalesOrderItemUpdateOne) check() error {
 			return &ValidationError{Name: "process_requirement", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.process_requirement": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.SampleBomID(); ok {
-		if err := salesorderitem.SampleBomIDValidator(v); err != nil {
-			return &ValidationError{Name: "sample_bom_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_bom_id": %w`, err)}
+	if v, ok := _u.mutation.BomID(); ok {
+		if err := salesorderitem.BomIDValidator(v); err != nil {
+			return &ValidationError{Name: "bom_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.bom_id": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.SampleBomFingerprint(); ok {
-		if err := salesorderitem.SampleBomFingerprintValidator(v); err != nil {
-			return &ValidationError{Name: "sample_bom_fingerprint", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_bom_fingerprint": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.SampleReusedFromItemID(); ok {
-		if err := salesorderitem.SampleReusedFromItemIDValidator(v); err != nil {
-			return &ValidationError{Name: "sample_reused_from_item_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_reused_from_item_id": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.SampleImageAttachmentID(); ok {
-		if err := salesorderitem.SampleImageAttachmentIDValidator(v); err != nil {
-			return &ValidationError{Name: "sample_image_attachment_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_image_attachment_id": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.EngineeringStatus(); ok {
-		if err := salesorderitem.EngineeringStatusValidator(v); err != nil {
-			return &ValidationError{Name: "engineering_status", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.engineering_status": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.SampleNote(); ok {
-		if err := salesorderitem.SampleNoteValidator(v); err != nil {
-			return &ValidationError{Name: "sample_note", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_note": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.SampleConfirmedBy(); ok {
-		if err := salesorderitem.SampleConfirmedByValidator(v); err != nil {
-			return &ValidationError{Name: "sample_confirmed_by", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_confirmed_by": %w`, err)}
+	if v, ok := _u.mutation.BomFingerprint(); ok {
+		if err := salesorderitem.BomFingerprintValidator(v); err != nil {
+			return &ValidationError{Name: "bom_fingerprint", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.bom_fingerprint": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ProductSkuID(); ok {
@@ -2240,44 +1850,11 @@ func (_u *SalesOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrd
 	if _u.mutation.ImportSourceCleared() {
 		_spec.ClearField(salesorderitem.FieldImportSource, field.TypeJSON)
 	}
-	if value, ok := _u.mutation.SampleBomFingerprint(); ok {
-		_spec.SetField(salesorderitem.FieldSampleBomFingerprint, field.TypeString, value)
+	if value, ok := _u.mutation.BomFingerprint(); ok {
+		_spec.SetField(salesorderitem.FieldBomFingerprint, field.TypeString, value)
 	}
-	if _u.mutation.SampleBomFingerprintCleared() {
-		_spec.ClearField(salesorderitem.FieldSampleBomFingerprint, field.TypeString)
-	}
-	if value, ok := _u.mutation.SampleImageAttachmentID(); ok {
-		_spec.SetField(salesorderitem.FieldSampleImageAttachmentID, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.AddedSampleImageAttachmentID(); ok {
-		_spec.AddField(salesorderitem.FieldSampleImageAttachmentID, field.TypeInt, value)
-	}
-	if _u.mutation.SampleImageAttachmentIDCleared() {
-		_spec.ClearField(salesorderitem.FieldSampleImageAttachmentID, field.TypeInt)
-	}
-	if value, ok := _u.mutation.EngineeringStatus(); ok {
-		_spec.SetField(salesorderitem.FieldEngineeringStatus, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.SampleNote(); ok {
-		_spec.SetField(salesorderitem.FieldSampleNote, field.TypeString, value)
-	}
-	if _u.mutation.SampleNoteCleared() {
-		_spec.ClearField(salesorderitem.FieldSampleNote, field.TypeString)
-	}
-	if value, ok := _u.mutation.SampleConfirmedAt(); ok {
-		_spec.SetField(salesorderitem.FieldSampleConfirmedAt, field.TypeTime, value)
-	}
-	if _u.mutation.SampleConfirmedAtCleared() {
-		_spec.ClearField(salesorderitem.FieldSampleConfirmedAt, field.TypeTime)
-	}
-	if value, ok := _u.mutation.SampleConfirmedBy(); ok {
-		_spec.SetField(salesorderitem.FieldSampleConfirmedBy, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.AddedSampleConfirmedBy(); ok {
-		_spec.AddField(salesorderitem.FieldSampleConfirmedBy, field.TypeInt, value)
-	}
-	if _u.mutation.SampleConfirmedByCleared() {
-		_spec.ClearField(salesorderitem.FieldSampleConfirmedBy, field.TypeInt)
+	if _u.mutation.BomFingerprintCleared() {
+		_spec.ClearField(salesorderitem.FieldBomFingerprint, field.TypeString)
 	}
 	if value, ok := _u.mutation.ProductCodeSnapshot(); ok {
 		_spec.SetField(salesorderitem.FieldProductCodeSnapshot, field.TypeString, value)
@@ -2329,35 +1906,6 @@ func (_u *SalesOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrd
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(salesorderitem.FieldUpdatedAt, field.TypeTime, value)
-	}
-	if _u.mutation.SampleReusedFromItemCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: false,
-			Table:   salesorderitem.SampleReusedFromItemTable,
-			Columns: []string{salesorderitem.SampleReusedFromItemColumn},
-			Bidi:    true,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(salesorderitem.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.SampleReusedFromItemIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: false,
-			Table:   salesorderitem.SampleReusedFromItemTable,
-			Columns: []string{salesorderitem.SampleReusedFromItemColumn},
-			Bidi:    true,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(salesorderitem.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.SalesOrderCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -2417,12 +1965,12 @@ func (_u *SalesOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrd
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if _u.mutation.SampleBomCleared() {
+	if _u.mutation.BomCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   salesorderitem.SampleBomTable,
-			Columns: []string{salesorderitem.SampleBomColumn},
+			Table:   salesorderitem.BomTable,
+			Columns: []string{salesorderitem.BomColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomheader.FieldID, field.TypeInt),
@@ -2430,12 +1978,12 @@ func (_u *SalesOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrd
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := _u.mutation.SampleBomIDs(); len(nodes) > 0 {
+	if nodes := _u.mutation.BomIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   salesorderitem.SampleBomTable,
-			Columns: []string{salesorderitem.SampleBomColumn},
+			Table:   salesorderitem.BomTable,
+			Columns: []string{salesorderitem.BomColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomheader.FieldID, field.TypeInt),

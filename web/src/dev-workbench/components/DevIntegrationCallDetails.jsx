@@ -9,24 +9,14 @@ import { buildIntegrationCurl } from '../config/devIntegration.mjs'
 
 function FieldDescription({ field }) {
   const source = field.description || ''
-  if (!/依据：`[^`]+`。$/u.test(source)) return <Markdown source={source} />
   const guard = /拒绝条件：“([\s\S]*?)”。/u.exec(source)
-  const constraint = source
+  const description = source
     .replace(/^解析器 `[^`]+`；调用 `[^`]+`。\s*/u, '')
     .replace(/\s*拒绝条件：“[\s\S]*?”。/u, '')
     .replace(/\s*依据：`[^`]+`。$/u, '')
     .replace(/^后端返回映射字段；/u, '')
     .trim()
-  const summary = constraint || (guard && /[<>]|\b(?:len|TrimSpace|Trunc)\(/u.test(guard[1]) ? `拒绝条件：${guard[1]}` : '')
-  return (
-    <>
-      {summary ? <Markdown source={summary} /> : null}
-      <details className="erp-dev-disclosure erp-dev-integration__field-source">
-        <summary aria-label={`${field.name} 的解析依据`}>解析依据</summary>
-        <Markdown source={source} />
-      </details>
-    </>
-  )
+  return <Markdown source={[description, guard ? `拒绝条件：${guard[1]}` : ''].filter(Boolean).join('\n\n')} />
 }
 
 export default function DevIntegrationCallDetails({ entry, view, format, onFormatChange, onContract }) {
@@ -173,11 +163,7 @@ export default function DevIntegrationCallDetails({ entry, view, format, onForma
           {fields?.length || emptyShape || part?.notesSource ? <Button type="link" onClick={onContract}>查看正式文档关联</Button> : null}
         </div>
       )}
-      {inspection?.entry ? (
-        <p className="erp-dev-integration__source-entry">
-          实际处理入口：<code>{inspection.entry.path}:{inspection.entry.line}</code>
-        </p>
-      ) : null}
+
     </section>
   )
 }

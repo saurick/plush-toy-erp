@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Form } from 'antd'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import {
   buildUnitSelectOptions,
@@ -72,6 +74,9 @@ export function useOutsourcingOrderEditor({
   loadOrders,
 }) {
   const [form] = Form.useForm()
+  const taskBusiness = useBusinessPageContext()?.taskBusiness
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const [editorRevision, setEditorRevision] = useState(0)
 
   const [itemsLoading, setItemsLoading] = useState(false)
 
@@ -615,9 +620,16 @@ export function useOutsourcingOrderEditor({
           ? editingRow
             ? '加工合同已更新'
             : '加工合同已创建'
-          : '加工合同已保存，未上传的附件请重新选择'
+          : taskBusiness ? '加工合同已保存，部分附件尚未上传，请保留当前内容重试' : '加工合同已保存，未上传的附件请重新选择'
       )
-      closeModal()
+      if (taskBusiness) {
+        const details = await settleSourceDocumentPostSaveEffect(() => loadOrderItems(savedOrder))
+        if (details.status === 'fulfilled') {
+          form.setFieldValue('items', selectOpenSourceDocumentItems(details.value || []).map(normalizeOutsourcingLineFormValue))
+          setEditorRevision((value) => value + 1)
+        } else message.warning(getActionErrorMessage(details.error, '刷新加工合同明细'))
+      } else closeModal()
+      await reportBusinessResult(attachmentSaved ? '加工合同已保存' : '加工合同已保存，部分附件尚未上传', savedOrder)
       const refreshEffect = await settleSourceDocumentPostSaveEffect(
         async () => {
           if (isCreatingOrder) {
@@ -643,6 +655,7 @@ export function useOutsourcingOrderEditor({
   return {
     form,
     itemsLoading,
+    editorRevision,
     modalOpen,
     editingRow,
     detailOrder,

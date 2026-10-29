@@ -187,6 +187,7 @@ async function readBatch(root, batch) {
 export function createDevBusinessChainAuditService({
   projectRoot,
   readIdentity = readRepositoryIdentity,
+  readDefinition = async () => buildManualAcceptanceBusinessChainContract().definitionSnapshot,
 } = {}) {
   const root = () => realpath(path.resolve(projectRoot || process.cwd()))
   return {
@@ -239,8 +240,7 @@ export function createDevBusinessChainAuditService({
       const project = await root()
       const { report, files } = await readBatch(project, batch)
       const currentRepository = await readIdentity(project).catch(() => null)
-      const currentDefinition =
-        buildManualAcceptanceBusinessChainContract().definitionSnapshot
+      const currentDefinition = await readDefinition(project)
       const { git: _git, scope, ...observations } = report
       const {
         frozenCopy: _frozenCopy,
@@ -369,7 +369,14 @@ export function createDevBusinessChainAuditPlugin(options) {
   return {
     name: 'plush-dev-business-chain-audit',
     configureServer(server) {
-      server.middlewares.use(createDevBusinessChainAuditMiddleware(options))
+      server.middlewares.use(createDevBusinessChainAuditMiddleware({
+        ...options,
+        readDefinition: async (project) => {
+          // Vite invalidates this module and its source dependencies on change.
+          const contract = await server.ssrLoadModule(path.join(project, 'scripts/qa/manual-acceptance-business-chain-contract.mjs'))
+          return contract.buildManualAcceptanceBusinessChainContract().definitionSnapshot
+        },
+      }))
     },
   }
 }

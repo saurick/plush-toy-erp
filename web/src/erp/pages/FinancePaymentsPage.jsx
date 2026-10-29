@@ -1,6 +1,11 @@
 import React, { useRef, useState } from 'react'
 import { Alert, Button } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+
+import FinanceStatementPanel from '../components/finance/FinanceStatementPanel.jsx'
+import FinanceSourceAdjustmentsPanel from '../components/finance/FinanceSourceAdjustmentsPanel.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
+import { BUSINESS_CURRENCY_OPTIONS, hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 
 import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
@@ -40,7 +45,6 @@ import {
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { createBusinessTablePagination } from '../utils/businessPagination.mjs'
-import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 
 import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
 import {
@@ -78,7 +82,7 @@ import { FinancePaymentDetails } from '../components/finance/FinancePaymentDetai
 
 export default function FinancePaymentsPage() {
   const [searchParams] = useBusinessSearchParams()
-  const outletContext = useOutletContext()
+  const outletContext = useBusinessPageContext()
   const adminProfile = outletContext?.adminProfile || {}
   const customerKey = adminProfile?.effective_session?.customer?.key || ''
   const adminID = Number(adminProfile?.id || 0)
@@ -144,6 +148,9 @@ export default function FinancePaymentsPage() {
     referenceLoading,
     setReferenceLoading,
     paymentTotal,
+    paymentTotals,
+    paymentFilters,
+    setPaymentFilters,
     paymentStatusCounts,
     creditTotal,
     creditStatusCounts,
@@ -283,6 +290,7 @@ export default function FinancePaymentsPage() {
   const { exportingTab, exportPaymentRows, exportCreditRows } =
     useFinancePaymentExports({
       paymentKeyword,
+      paymentFilters,
       creditKeyword,
       paymentStatusFilter,
       paymentDirectionFilter,
@@ -303,10 +311,17 @@ export default function FinancePaymentsPage() {
     currentCredit.status === FinanceAllocationStatus.POSTED &&
     !currentCredit.reversal_of_credit_note_id &&
     !currentCreditHasReversal
+  const canReadReceivables = hasActionPermission(adminProfile, PermissionCode.FINANCE_RECEIVABLE_READ)
+  const canReadPayables = hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYABLE_READ)
+  const canReadSourceAdjustments = canReadPayables && [PermissionCode.PURCHASE_RECEIPT_READ, PermissionCode.PURCHASE_RETURN_READ, PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_READ].every((permission) => hasActionPermission(adminProfile, permission))
+  const changePaymentFilter = (patch) => {
+    setPaymentFilters((current) => ({ ...current, ...patch }))
+    setPaymentPagination((current) => ({ ...current, current: 1 }))
+  }
   const financeViewTabs = (
     <Tabs
       activeKey={activeTab}
-      items={FINANCE_VIEW_ITEMS}
+      items={FINANCE_VIEW_ITEMS.filter((item) => item.key !== 'source-adjustments' || canReadSourceAdjustments).filter((item) => item.key !== 'statement' || canReadReceivables || canReadPayables)}
       onChange={setActiveTab}
     />
   )
@@ -357,9 +372,10 @@ export default function FinancePaymentsPage() {
         <>
           <BusinessOperationPanel
             compact
-            activeFilterCount={Number(Boolean(paymentDirectionFilter))}
+            activeFilterCount={Number(Boolean(paymentDirectionFilter)) + Object.values(paymentFilters).filter(Boolean).length}
             onClearFilters={() => {
               setPaymentDirectionFilter('')
+              setPaymentFilters({})
               setPaymentPagination((current) => ({ ...current, current: 1 }))
             }}
             filters={
@@ -391,6 +407,10 @@ export default function FinancePaymentsPage() {
                     }))
                   }}
                 />
+                <SelectFilter aria-label="收付款币种" value={paymentFilters.currency || ''} options={[{ value: '', label: '全部币种' }, ...BUSINESS_CURRENCY_OPTIONS]} onChange={(value) => changePaymentFilter({ currency: value })} />
+                <SelectFilter aria-label="款项用途筛选" value={paymentFilters.kind || ''} options={[{ value: '', label: '全部用途' }, { value: 'SETTLEMENT', label: '结算款' }, { value: 'ADVANCE', label: '预收 / 预付' }, { value: 'REFUND', label: '退款' }]} onChange={(value) => changePaymentFilter({ kind: value })} />
+                <SelectFilter aria-label="收付款往来方" showSearch optionFilterProp="label" value={paymentFilters.party || ''} options={[{ value: '', label: '全部往来方' }, ...customers.map((item) => ({ value: `CUSTOMER:${item.id}`, label: `客户 · ${item.name}` })), ...suppliers.map((item) => ({ value: `SUPPLIER:${item.id}`, label: `供应商 · ${item.name}` }))]} onChange={(value) => changePaymentFilter({ party: value })} />
+                <DateRangeFilter options={[{ value: 'occurred', label: '收付日期' }]} value="occurred" startValue={paymentFilters.dateFrom} endValue={paymentFilters.dateTo} onStartChange={(value) => changePaymentFilter({ dateFrom: value })} onEndChange={(value) => changePaymentFilter({ dateTo: value })} />
                 <SelectFilter
                   aria-label="收付款方向"
                   className="erp-business-filter-control--status"
@@ -685,8 +705,9 @@ export default function FinancePaymentsPage() {
             onOpenRecord={(record) => setPaymentDetail(record)}
             emptyDescription="暂无收付款记录"
           />
+          {!outletContext?.taskBusiness && paymentTotals.length ? <p className="erp-business-inline-note" aria-label="收付款筛选汇总">筛选合计（含全部分页）：{paymentTotals.map((item) => `${item.currency} ${item.direction === 'RECEIPT' ? '收款' : '付款'} · ${PAYMENT_STATUS_META[item.status]?.[0] || item.status} ${item.amount}（${item.count} 笔）`).join('；')}</p> : null}
         </>
-      ) : (
+      ) : activeTab === 'credits' ? (
         <>
           <BusinessOperationPanel
             compact
@@ -733,9 +754,9 @@ export default function FinancePaymentsPage() {
                   exportingTab
                     ? '正在准备导出，请稍候'
                     : tableLoading.credits
-                      ? '红冲记录加载完成后可导出'
+                      ? '调整记录加载完成后可导出'
                       : creditTotal === 0
-                        ? '当前筛选没有可导出的红冲记录'
+                        ? '当前筛选没有可导出的调整记录'
                         : ''
                 }
                 onOpenColumnOrder={openCreditColumnOrder}
@@ -759,18 +780,18 @@ export default function FinancePaymentsPage() {
               selectedCount={currentCredit ? 1 : 0}
               selectedLabel={
                 currentCredit
-                  ? `${currentCredit.credit_note_no || '红冲已登记'} / ${
+                  ? `${currentCredit.credit_note_no || '调整已登记'} / ${
                       currentCredit.status === FinanceAllocationStatus.REVERSED
                         ? '冲销记录'
-                        : '已红冲'
+                        : '已调整'
                     }`
-                  : '请选择一条红冲记录'
+                  : '请选择一条调整记录'
               }
-              boundaryText="红冲只调整应收、应付未核销金额并保留独立审计；不删除原记录，也不替代总账凭证或税控处理。"
+              boundaryText="账款调整保留原金额、来源和独立审计；采购差额可调增或调减，人工红冲只调减。"
             >
               <SelectionClearAction
                 selectedCount={currentCredit ? 1 : 0}
-                selectionLabel="红冲记录"
+                selectionLabel="调整记录"
                 onClear={() => setCurrentCredit(null)}
               />
               <BusinessActionTooltip
@@ -797,9 +818,9 @@ export default function FinancePaymentsPage() {
                         ? '冲销记录不能再次冲销'
                         : currentCredit.status !==
                             FinanceAllocationStatus.POSTED
-                          ? '只有已红冲记录可以冲销'
+                          ? '只有已生效调整可以冲销'
                           : currentCreditHasReversal
-                            ? '当前红冲记录已经完成冲销'
+                            ? '当前调整已经完成冲销'
                             : '当前操作完成后可冲销'
                   }
                 >
@@ -814,7 +835,7 @@ export default function FinancePaymentsPage() {
                       openCredit(true)
                     }}
                   >
-                    冲销当前红冲
+                    冲回当前调整
                   </Button>
                 </BusinessActionTooltip>
               ) : null}
@@ -841,15 +862,20 @@ export default function FinancePaymentsPage() {
             })}
             onOpenRecord={(record) => setCreditDetail(record)}
             scroll={{ x: 1450 }}
-            emptyDescription="暂无红冲记录"
+            emptyDescription="暂无账款调整"
           />
         </>
-      )}
+      ) : activeTab === 'statement' ? (
+        <FinanceStatementPanel canReadReceivables={canReadReceivables} canReadPayables={canReadPayables} />
+      ) : canReadSourceAdjustments ? (
+        <FinanceSourceAdjustmentsPanel customerKey={customerKey} canCreate={canCreateCredit} attemptsRef={attemptsRef} onChanged={loadReferences} />
+      ) : null}
 
       {paymentColumnOrderModal}
       {creditColumnOrderModal}
 
       <FinancePaymentEditor
+        accountSuggestions={payments.map((item) => item.account_ref)}
         adminProfile={adminProfile}
         customerKey={customerKey}
         loading={loading}
@@ -911,6 +937,8 @@ export default function FinancePaymentsPage() {
         submitCredit={submitCredit}
       />
       <FinancePaymentDetails
+        canUploadEvidence={canCreatePayment || canPostPayment}
+        canWithdrawEvidence={canPostPayment}
         paymentDetail={paymentDetail}
         setPaymentDetail={setPaymentDetail}
         creditDetail={creditDetail}

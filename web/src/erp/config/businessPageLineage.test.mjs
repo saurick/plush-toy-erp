@@ -65,7 +65,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'get_purchase_receipt',
   'get_purchase_receipt_adjustment',
   'get_purchase_return',
-  'get_quality_inspection',
+  'get_finance_fact',
   'get_finance_payment',
   'get_finance_credit_note',
   'get_inventory_operation',
@@ -99,11 +99,11 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_products',
   'list_purchase_order_items',
   'list_purchase_orders',
+  'list_purchase_followups',
   'list_purchase_receipt_adjustments',
   'list_purchase_receipts',
   'list_purchase_rejection_dispositions',
   'list_purchase_returns',
-  'list_quality_inspections',
   'list_sales_order_items',
   'list_sales_order_summary',
   'list_sales_orders',
@@ -173,7 +173,7 @@ const FORMAL_UI_PROCESS_RUNTIME_ACTIONS = Object.freeze([
   'execute_production_exception_process',
 ])
 
-const BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS = Object.freeze([
+const RETIRED_PROCESS_RUNTIME_ACTIONS = Object.freeze([
   'execute_material_supply_purchase_receipt_create',
   'execute_material_supply_quality_gate',
   'execute_material_supply_post_inbound',
@@ -213,9 +213,12 @@ test('business page lineage: allocation candidates, posting and reversal keep di
   assert.deepEqual(
     businessPageFlowDefinitions
       .filter((flow) => actions.includes(flow.action))
-      .map(({ fromPageKey, toPageKey, action, flowType }) =>
-        [fromPageKey, toPageKey, action, flowType]
-      ),
+      .map(({ fromPageKey, toPageKey, action, flowType }) => [
+        fromPageKey,
+        toPageKey,
+        action,
+        flowType,
+      ]),
     [
       ['receivables', 'finance-payments', actions[0], 'source_query'],
       ['payables', 'finance-payments', actions[0], 'source_query'],
@@ -536,7 +539,10 @@ test('business page lineage: source-driven producers match domain-generate flows
   const shipment = getBusinessPageLineage('shipments')
   assert.equal(shipment?.pageRole, BUSINESS_PAGE_ROLES.FACT_OWNER)
   assert.equal(shipment?.allowsGenericPageCreate, true)
-  assert.deepEqual(shipment?.producerActions, ['create_shipment_with_items', 'start_finished_goods_delivery_process'])
+  assert.deepEqual(shipment?.producerActions, [
+    'create_shipment_with_items',
+    'start_finished_goods_delivery_process',
+  ])
   assert.deepEqual(
     shipment?.incomingFlows
       .filter(
@@ -700,10 +706,7 @@ test('business page lineage: real source and lifecycle service actions are class
     true,
     '出货来源候选必须由真实 operational_fact RPC 提供，不能回退前端全量拼接'
   )
-  for (const processRuntimeAction of [
-    ...FORMAL_UI_PROCESS_RUNTIME_ACTIONS,
-    ...BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS,
-  ]) {
+  for (const processRuntimeAction of [...FORMAL_UI_PROCESS_RUNTIME_ACTIONS]) {
     assert.equal(
       serviceActions.has(processRuntimeAction),
       true,
@@ -735,23 +738,20 @@ test('business page lineage: real source and lifecycle service actions are class
   }
 })
 
-test('business page lineage: legacy process commands never claim current formal UI reachability', () => {
-  assert.equal(BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS.length, 6)
-
-  for (const action of BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS) {
-    const actionFlows = businessPageFlowDefinitions.filter(
-      (flowDefinition) => flowDefinition.action === action
+test('business page lineage: retired fact-writing process commands have no current source or recovery alias', () => {
+  for (const action of RETIRED_PROCESS_RUNTIME_ACTIONS) {
+    assert.equal(
+      businessPageFlowDefinitions.some((flow) => flow.action === action),
+      false,
+      action
     )
-    assert.equal(actionFlows.length > 0, true, action)
-    for (const flowDefinition of actionFlows) {
-      assert.equal(
-        flowDefinition.availability,
-        BUSINESS_PAGE_AVAILABILITY.PARTIAL,
-        `${flowDefinition.flowKey} must remain legacy-only`
-      )
-      assert.match(flowDefinition.availabilityNote, /冻结的旧在途/u)
-      assert.match(flowDefinition.availabilityNote, /当前新建流程图/u)
-    }
+    assert.equal(
+      businessPageLineageDefinitions.some((page) =>
+        page.producerActions.includes(action)
+      ),
+      false,
+      action
+    )
   }
 
   const addItemFlows = businessPageFlowDefinitions.filter(
@@ -965,7 +965,6 @@ test('business page lineage: carry-over, generation, WIP quality, and reversal s
     'start_sales_order_acceptance_process',
     'start_material_supply_purchase_order_process',
     'start_finished_goods_delivery_process',
-    'execute_material_supply_quality_gate',
   ]) {
     assert.equal(
       flowsForAction(action)[0]?.flowType,
@@ -975,7 +974,6 @@ test('business page lineage: carry-over, generation, WIP quality, and reversal s
   }
   for (const action of [
     'create_purchase_receipt_from_purchase_order',
-    'execute_material_supply_purchase_receipt_create',
     'add_purchase_receipt_item',
   ]) {
     assert.equal(
@@ -1022,16 +1020,12 @@ test('business page lineage: carry-over, generation, WIP quality, and reversal s
     '释放预留只结束预留事实，不伪造库存交易冲正'
   )
   assert.equal(
-    flowsForAction('execute_finished_goods_delivery_quality_decide').some(
+    flowsForAction('create_finished_goods_quality_inspection_draft').some(
       (flowDefinition) =>
         flowDefinition.fromPageKey === 'shipments' &&
         flowDefinition.toPageKey === 'quality-inspections'
     ),
     true
-  )
-  assert.equal(
-    flowsForAction('execute_material_supply_quality_gate')[0]?.fromPageKey,
-    'inbound'
   )
   assert.equal(
     businessPageFlowDefinitions.some(
@@ -1120,7 +1114,6 @@ test('business page lineage: draft lot creation is visible without claiming inve
     )
   const draftLotActions = [
     'create_purchase_receipt_from_purchase_order',
-    'execute_material_supply_purchase_receipt_create',
     'add_purchase_receipt_item',
     'create_production_completion_from_order',
     'create_outsourcing_return_receipt_from_order',
@@ -1349,18 +1342,12 @@ test('business page lineage: workflow inboxes declare exact source task producer
   )
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.taskGroups[0]),
-    [
-      'production_scheduling',
-      'production_exception_decision_approval',
-    ]
+    ['production_scheduling', 'production_exception_decision_approval']
   )
 
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.upstreamPageKeys),
-    [
-      ['production-orders'],
-      ['production-orders', 'quality-inspections'],
-    ]
+    [['production-orders'], ['production-orders', 'quality-inspections']]
   )
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.producerActions),
@@ -1435,4 +1422,14 @@ test('business page registry keeps current quality and WIP source facts complete
     )
     assert.match(productionOrders.factSource, new RegExp(sourceRef, 'u'))
   }
+})
+
+test('business page lineage: accepted outsourcing stages generate a contract payable without an inventory return', () => {
+  const flow = businessPageFlowDefinitions.find((item) => item.action === 'create_payable_from_outsourcing_order')
+  assert.equal(flow?.flowType, BUSINESS_FLOW_TYPES.DOMAIN_GENERATE)
+  assert.equal(flow?.fromPageKey, 'processing-contracts')
+  assert.equal(flow?.toPageKey, 'payables')
+  const payables = getBusinessPageLineage('payables')
+  assert.ok(payables.producerActions.includes(flow.action))
+  assert.ok(payables.sourceTypes.includes('OUTSOURCING_ORDER'))
 })

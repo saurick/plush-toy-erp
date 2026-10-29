@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Form } from 'antd'
-import { initialIncomingChecks } from '../../utils/incomingAcceptance.mjs'
+import { initialQualityChecks } from '../../utils/qualityInspectionEvidence.mjs'
 import { buildSequentialDraftCode } from '../../utils/masterDataOrderView.mjs'
 import { currentBusinessDate } from '../../utils/businessDate.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -37,9 +37,8 @@ export default function useQualityInspectionEditor({
         defect_rate_selection: undefined,
         defect_rate_custom_percent: undefined,
         check_items:
-          inspectionModal?.mode !== 'cancel' &&
-          inspectionModal?.inspection?.purchase_receipt_item_id
-            ? initialIncomingChecks()
+          inspectionModal?.mode !== 'cancel'
+            ? initialQualityChecks(inspectionModal?.inspection)
             : undefined,
         decision_note: '',
       })

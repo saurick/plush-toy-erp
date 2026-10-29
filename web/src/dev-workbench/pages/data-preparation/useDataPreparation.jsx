@@ -65,7 +65,13 @@ export function useDataPreparation() {
   const selectedIsScenarioDemo = selectedProfileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
   const customerScope = useDevCustomerScope({ searchParams, setSearchParams, normalize: selectedIsScenarioDemo })
   const customerReady = customerScope.status === 'ready'
-  const [selectedChainKey, setSelectedChainKey] = useState('')
+  const selectedChainKey = searchParams.get('planChain') || ''
+  const setSelectedChainKey = (value) => setSearchParams((current) => {
+    const next = new URLSearchParams(current)
+    if (value) next.set('planChain', value)
+    else next.delete('planChain')
+    return next
+  })
   const [currentOperation, setCurrentOperation] = useState(null)
   const dataView = requestedDataView === 'confirm'
     ? !currentOperation ? 'scope' : currentOperation.terminal ? 'receipts' : 'confirm'

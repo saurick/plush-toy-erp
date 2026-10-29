@@ -442,6 +442,8 @@ func businessAttachmentOwnerModuleKeys(ownerType string) []string {
 		return []string{"quality_inspections"}
 	case biz.BusinessAttachmentOwnerShipment:
 		return []string{"shipments"}
+	case biz.BusinessAttachmentOwnerFinancePayment:
+		return []string{"finance", "finance_payments"}
 	case biz.BusinessAttachmentOwnerFinanceFact:
 		return []string{"finance"}
 	case biz.BusinessAttachmentOwnerProductionFact:
@@ -461,6 +463,8 @@ func businessAttachmentOwnerModuleKeys(ownerType string) []string {
 
 func businessAttachmentReadPermissions(ownerType string) []string {
 	switch ownerType {
+	case biz.BusinessAttachmentOwnerFinancePayment:
+		return []string{biz.PermissionFinancePaymentRead}
 	case biz.BusinessAttachmentOwnerSalesOrder:
 		return []string{biz.PermissionSalesOrderRead}
 	case biz.BusinessAttachmentOwnerPurchaseOrder:
@@ -509,6 +513,8 @@ func (d *jsonrpcDispatcher) requireBusinessAttachmentWithdrawalAccess(ctx contex
 
 func businessAttachmentWritePermissions(ownerType string) []string {
 	switch ownerType {
+	case biz.BusinessAttachmentOwnerFinancePayment:
+		return []string{biz.PermissionFinancePaymentCreate, biz.PermissionFinancePaymentPost}
 	case biz.BusinessAttachmentOwnerSalesOrder:
 		return []string{biz.PermissionSalesOrderCreate, biz.PermissionSalesOrderUpdate}
 	case biz.BusinessAttachmentOwnerPurchaseOrder:

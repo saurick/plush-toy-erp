@@ -261,10 +261,20 @@ const businessSamplePresentationImports = new Set([
   "components/business-list/BusinessDateInputs.jsx",
   "components/business-list/SourceImportPickerModal.jsx",
 ]);
+const businessSampleFormStateDependencies = [
+  "components/business-list/BusinessEditorGroup.jsx",
+  "components/business-list/businessFormReadOnly.mjs",
+  "hooks/useWorkflowTaskBusinessBusy.js",
+];
 const allowedERPImportsByFile = new Map([
+  ["web/src/dev-workbench/components/flow-state/FinanceRelationshipsView.jsx", new Set(["utils/roleKeys.mjs"])],
+  ["web/src/dev-workbench/components/flow-state/FinanceTraceView.jsx", new Set(["api/operationalFactApi.mjs", "components/finance/financePaymentPresentation.jsx"])],
+  ["web/src/dev-workbench/config/devFulfillmentRelations.mjs", new Set(["utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/config/devTaskHandling.mjs", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/config/devTaskHandlingResponsibilities.test.mjs", new Set(["utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs"])],
+  ["web/src/dev-workbench/config/devPermissionRelationshipGraph.mjs", new Set(["utils/rolePermissionPolicy.mjs"])],
+  ["web/src/dev-workbench/config/devRoleResponsibilities.mjs", new Set(["utils/rolePermissionPolicy.mjs"])],
   [
     "web/src/dev-workbench/components/DevUIBusinessExamples.jsx",
     businessSamplePresentationImports,
@@ -402,6 +412,7 @@ const allowedERPImportsByFile = new Map([
       "config/roleGuidedNavigation.mjs",
       "config/customerMenuConfig.mjs",
       "utils/businessModuleGroups.mjs",
+      "utils/historyRecordCatalog.mjs",
     ]),
   ],
   [
@@ -431,6 +442,83 @@ function isAllowedERPImport(file, specifier) {
     allowedERPImportsByFile.get(file)?.has(module) === true
   );
 }
+
+test("role responsibilities reuse the pure policy adapter only in relationship models", () => {
+  const adapter = "../../erp/utils/rolePermissionPolicy.mjs";
+  for (const file of [
+    "web/src/dev-workbench/config/devPermissionRelationshipGraph.mjs",
+  ]) {
+    assert.equal(isAllowedERPImport(file, adapter), true);
+  }
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/rolePermissionPolicy.mjs"), false);
+  assert.doesNotMatch(read("web/src/erp/utils/rolePermissionPolicy.mjs"), /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b/u);
+});
+
+test("finance role labels reuse a pure display helper with an explicit consumer boundary", () => {
+  const file = "web/src/dev-workbench/components/flow-state/FinanceRelationshipsView.jsx";
+  for (const prefix of ["@/erp/", "../../../erp/"]) {
+    assert.equal(isAllowedERPImport(file, `${prefix}utils/roleKeys.mjs`), true);
+  }
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/roleKeys.mjs"), false);
+  assert.equal(isAllowedERPImport(file, "@/erp/api/masterDataOrderApi.mjs"), false);
+  const source = read("web/src/erp/utils/roleKeys.mjs");
+  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+  assert.equal([...source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)].length, 0);
+});
+
+test("history navigation reuses source projection only in the permission navigation model", () => {
+  const file = "web/src/dev-workbench/config/devPermissionNavigation.mjs";
+  assert.equal(isAllowedERPImport(file, "../../erp/utils/historyRecordCatalog.mjs"), true);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/historyRecordCatalog.mjs"), false);
+  assert.equal(isAllowedERPImport(file, "@/erp/api/masterDataOrderApi.mjs"), false);
+  assert.doesNotMatch(read("web/src/erp/utils/historyRecordCatalog.mjs"), /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+});
+
+test("finance trace imports only registered reads and presentation metadata", () => {
+  const file = "web/src/dev-workbench/components/flow-state/FinanceTraceView.jsx";
+  const source = read(file);
+  const imports = [...source.matchAll(/import\s*\{([^}]+)\}\s*from\s*['"]@\/erp\/api\/operationalFactApi\.mjs['"]/gu)];
+  assert.equal(imports.length, 1);
+  assert.deepEqual(imports[0][1].split(',').map((name) => name.trim()).filter(Boolean).sort(), [
+    "getFinanceFact", "listFinanceCreditNotes", "listFinanceFacts", "listFinancePayments", "listFinanceSourceAdjustments",
+  ]);
+  assert.equal((source.match(/from\s*['"]@\/erp\/api\/operationalFactApi\.mjs['"]/gu) || []).length, 1);
+  const apiImports = [...source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)]
+    .map((match) => match[1])
+    .map((specifier) => specifier.startsWith("@/") ? path.posix.join("web/src", specifier.slice(2)) : path.posix.join(path.posix.dirname(file), specifier))
+    .filter((specifier) => specifier.startsWith("web/src/erp/api/"));
+  assert.deepEqual(apiImports, ["web/src/erp/api/operationalFactApi.mjs"]);
+  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b/u);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/api/operationalFactApi.mjs"), false);
+  const presentation = read("web/src/erp/components/finance/financePaymentPresentation.jsx");
+  assert.doesNotMatch(presentation, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+  assert.deepEqual([...presentation.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)].map((match) => match[1]), [
+    "react", "antd", "../../../common/consts/statuses.generated.mjs",
+  ]);
+});
+
+test("task handling projections keep pure classification helpers consumer scoped", () => {
+  for (const file of ["web/src/dev-workbench/config/devTaskHandling.mjs", "web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx"]) {
+    assert.equal(isAllowedERPImport(file, "@/erp/utils/taskHandlingPolicy.mjs"), true);
+    assert.equal(isAllowedERPImport(file, "@/erp/api/masterDataOrderApi.mjs"), false);
+  }
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/taskHandlingPolicy.mjs"), false);
+  const pending = ["web/src/erp/utils/taskHandlingPolicy.mjs"];
+  const visited = new Set();
+  while (pending.length) {
+    const file = pending.pop();
+    if (visited.has(file)) continue;
+    visited.add(file);
+    assert(file.startsWith("web/src/erp/utils/") || file.startsWith("web/src/common/consts/") || file === "server/internal/unitpolicy/units.json", `${file} is outside the presentation dependency graph`);
+    const source = read(file);
+    assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+    for (const match of source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)) {
+      const specifier = match[1];
+      assert(specifier.startsWith("."), `${file} imports a non-local dependency: ${specifier}`);
+      pending.push(path.posix.join(path.posix.dirname(file), specifier));
+    }
+  }
+});
 
 test("dev workbench boundary: ERP imports stay on explicit adapters and presentation samples", () => {
   const workbenchSources = listFiles("web/src/dev-workbench")
@@ -463,9 +551,10 @@ test("shared component consumers read only page presentation metadata", () => {
   }
 });
 
-test("business component samples retain a closed presentation dependency graph", () => {
+function assertBusinessSamplePresentationGraph(readSource = read) {
   const dependencies = [
     ...businessSamplePresentationImports,
+    ...businessSampleFormStateDependencies,
     "components/business-list/BusinessFormBody.jsx",
     "components/business-list/BusinessFormPageContext.js",
     "components/business-list/BusinessFormSectionTitle.jsx",
@@ -479,6 +568,8 @@ test("business component samples retain a closed presentation dependency graph",
     "utils/dateRange.mjs",
     "utils/modalSizes.mjs",
     "styles/app/business-form-page.css",
+    "hooks/useBusinessPageContext.js",
+    "components/business-list/businessLineItemCards.css",
   ].map((file) => `web/src/erp/${file}`);
   const allowed = new Set([
     ...dependencies,
@@ -496,8 +587,12 @@ test("business component samples retain a closed presentation dependency graph",
   ]);
   const sample = "web/src/dev-workbench/components/DevUIBusinessExamples.jsx";
   for (const file of [sample, ...dependencies]) {
-    const source = read(file);
-    assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+    const source = readSource(file);
+    assert.doesNotMatch(
+      source,
+      /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u,
+      `${file} must not perform business I/O or browser persistence`,
+    );
     if (file === sample) continue;
     for (const match of source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)) {
       const specifier = match[1];
@@ -509,20 +604,75 @@ test("business component samples retain a closed presentation dependency graph",
       assert(allowed.has(resolved), `${file} imports a non-presentation dependency: ${specifier}`);
     }
   }
+}
+
+test("business component samples retain a closed presentation dependency graph", () => {
+  assertBusinessSamplePresentationGraph();
+  const sample = "web/src/dev-workbench/components/DevUIBusinessExamples.jsx";
   for (const module of businessSamplePresentationImports) {
     assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", `@/erp/${module}`), false);
+  }
+  for (const module of businessSampleFormStateDependencies) {
+    for (const consumer of [sample, "web/src/dev-workbench/pages/DevTestingPage.jsx"]) {
+      for (const specifier of [
+        `@/erp/${module}`,
+        path.posix.relative(path.posix.dirname(consumer), `web/src/erp/${module}`),
+      ]) {
+        assert.equal(isAllowedERPImport(consumer, specifier), false);
+      }
+    }
   }
   for (const module of ["pages/PurchaseOrdersPage.jsx", "api/masterDataOrderApi.mjs", "config/businessModules.mjs", "config/commandCenter.mjs"]) {
     assert.equal(isAllowedERPImport(sample, `@/erp/${module}`), false);
   }
 });
 
+test("business form presentation dependencies reject unregistered imports", () => {
+  for (const module of businessSampleFormStateDependencies) {
+    const file = `web/src/erp/${module}`;
+    const specifier = "./UnregisteredPresentation.jsx";
+    for (const injection of [
+      `import UnregisteredPresentation from '${specifier}';`,
+      `import('${specifier}');`,
+    ]) {
+      assert.throws(
+        () => assertBusinessSamplePresentationGraph((candidate) => (
+          candidate === file ? `${read(candidate)}\n${injection}` : read(candidate)
+        )),
+        { code: "ERR_ASSERTION", message: `${file} imports a non-presentation dependency: ${specifier}` },
+      );
+    }
+  }
+});
+
+test("business form presentation dependencies reject business I/O and persistence", () => {
+  for (const module of businessSampleFormStateDependencies) {
+    const file = `web/src/erp/${module}`;
+    for (const injection of [
+      "import { listOrders } from '@/erp/api/masterDataOrderApi.mjs';",
+      "fetch('/business-records');",
+      "window.localStorage.setItem('draft', 'value');",
+      "window.sessionStorage.setItem('draft', 'value');",
+    ]) {
+      assert.throws(
+        () => assertBusinessSamplePresentationGraph((candidate) => (
+          candidate === file ? `${read(candidate)}\n${injection}` : read(candidate)
+        )),
+        { code: "ERR_ASSERTION", message: `${file} must not perform business I/O or browser persistence` },
+      );
+    }
+  }
+});
+
 test("feedback sample modal dependencies remain presentation-only", () => {
   const allowed = new Set([
     "react",
+    "react-router-dom",
     "antd",
     "../../utils/modalSizes.mjs",
     "./BusinessModal.jsx",
+    "./BusinessFormPage.jsx",
+    "../../hooks/useBusinessPageContext.js",
     "../../common/utils/feedbackConfig.mjs",
     "@/common/components/modal/AppModal",
     "@/common/components/layout/SurfacePanel",
@@ -534,6 +684,7 @@ test("feedback sample modal dependencies remain presentation-only", () => {
     "web/src/common/utils/feedbackConfig.mjs",
     "web/src/common/components/modal/AppModal.jsx",
     "web/src/common/components/layout/SurfacePanel.jsx",
+    "web/src/erp/hooks/useBusinessPageContext.js",
   ]) {
     const source = read(file);
     for (const match of source.matchAll(
@@ -543,6 +694,7 @@ test("feedback sample modal dependencies remain presentation-only", () => {
     }
     assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b/u);
   }
+  assert(businessSamplePresentationImports.has("components/business-list/BusinessFormPage.jsx"));
   assert.equal(
     isAllowedERPImport(
       "web/src/dev-workbench/pages/DevTestingPage.jsx",
@@ -733,27 +885,4 @@ test("dev workbench boundary: resolved imports preserve module and file scope", 
     ),
     false,
   );
-});
-
-test("task handling projections keep pure classification helpers consumer scoped", () => {
-  for (const file of ["web/src/dev-workbench/config/devTaskHandling.mjs", "web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx"]) {
-    assert.equal(isAllowedERPImport(file, "@/erp/utils/taskHandlingPolicy.mjs"), true);
-    assert.equal(isAllowedERPImport(file, "@/erp/api/masterDataOrderApi.mjs"), false);
-  }
-  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/taskHandlingPolicy.mjs"), false);
-  const pending = ["web/src/erp/utils/taskHandlingPolicy.mjs"];
-  const visited = new Set();
-  while (pending.length) {
-    const file = pending.pop();
-    if (visited.has(file)) continue;
-    visited.add(file);
-    assert(file.startsWith("web/src/erp/utils/") || file.startsWith("web/src/common/consts/") || file === "server/internal/unitpolicy/units.json", `${file} is outside the presentation dependency graph`);
-    const source = read(file);
-    assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
-    for (const match of source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)) {
-      const specifier = match[1];
-      assert(specifier.startsWith("."), `${file} imports a non-local dependency: ${specifier}`);
-      pending.push(path.posix.join(path.posix.dirname(file), specifier));
-    }
-  }
 });

@@ -100,7 +100,7 @@ test('finance payments: lists real payments, allocates multiple facts and preser
   assert.match(financeAdjustments, /reverseFinancePayment/u)
   assert.match(financeCreditSubmission, /createFinanceCreditNote/u)
   assert.match(financeCreditSubmission, /reverseFinanceCreditNote/u)
-  assert.match(financePaymentsPage, /不(?:会)?删除原记录/u)
+  assert.match(read('../components/finance/FinancePaymentAdjustmentModals.jsx'), /保留原收付款及核销记录/u)
   assert.match(financePaymentsPage, /getFinancePaymentApprovalProcess/u)
   assert.match(financeCreation, /startFinancePaymentApprovalProcess/u)
   assert.match(financePaymentsPage, />\s*核对审批流\s*</u)

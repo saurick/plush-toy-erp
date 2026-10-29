@@ -1,4 +1,6 @@
 import { WorkflowTaskDiscoveryCatalog as tasks } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
+import { PermissionLabel } from '../../common/consts/permissions.generated.mjs'
+import { getRoleDisplayName } from '../../erp/utils/roleKeys.mjs'
 import { buildDevBusinessChainProjection } from './devBusinessChainProjection.mjs'
 
 const chainStep = (chainKey, stepKey) => ({ chainKey, stepKey })
@@ -47,11 +49,7 @@ export const FULFILLMENT_RELATION_REFS = Object.freeze({
     order_approval: [
       sales('sales_tasks:calls_domain_command:sales_acceptance'),
     ],
-    engineering: [
-      transition('source.sales_order_engineering', 'PREPARING->SAMPLING'),
-      transition('source.sales_order_engineering', 'SAMPLING->CONFIRMED'),
-      transition('source.sales_order_engineering', 'PREPARING->CONFIRMED'),
-    ],
+    engineering: [sales('sales_acceptance:requires:effective_bom')],
     ready: [sales('sales_acceptance:requires:effective_bom')],
     boss_review: [
       transition('source.engineering_material_request', 'SUBMITTED->BOSS_APPROVED'),
@@ -166,6 +164,14 @@ const requireValue = (value, key) => {
   if (!value) throw new Error(`Unknown fulfillment relation: ${key}`)
   return value
 }
+export const EMPTY_RELATION_FILTERS = Object.freeze({
+  role: 'all',
+  machine: 'all',
+  permission: 'all',
+})
+export const relationFiltersActive = (filters) =>
+  Object.values(filters).some((value) => value && value !== 'all')
+
 export function buildChainActionRelations(catalog, chain) {
   return chain.steps.map((step) => {
     const input = requireValue(
@@ -292,4 +298,137 @@ export function buildFulfillmentRelations(catalog) {
       }),
     }
   })
+}
+
+export function relationMatches(action, filters = EMPTY_RELATION_FILTERS) {
+  return (
+    (!filters.role ||
+      filters.role === 'all' ||
+      action.roleKeys.includes(filters.role)) &&
+    (!filters.machine ||
+      filters.machine === 'all' ||
+      action.machineKeys.includes(filters.machine)) &&
+    (!filters.permission ||
+      filters.permission === 'all' ||
+      action.permissionKeys.includes(filters.permission))
+  )
+}
+
+export function buildRelationFacets(catalog, actions, filters) {
+  const dimensions = {
+    role: {
+      keys: 'roleKeys',
+      label: (key) => getRoleDisplayName(key, '已配置岗位'),
+    },
+    machine: {
+      keys: 'machineKeys',
+      label: (key) =>
+        catalog.flows.find((flow) => flow.key === key)?.label || key,
+    },
+    permission: {
+      keys: 'permissionKeys',
+      label: (key) => PermissionLabel[key] || key,
+    },
+  }
+  return Object.fromEntries(
+    Object.entries(dimensions).map(([dimension, { keys, label }]) => [
+      dimension,
+      unique([
+        ...actions.flatMap((action) => action[keys]),
+        filters[dimension] === 'all' ? '' : filters[dimension],
+      ]).map((key) => {
+        const count = actions.filter((action) =>
+          relationMatches(action, { ...filters, [dimension]: key })
+        ).length
+        return {
+          value: key,
+          label: label(key),
+          count,
+          disabled: count === 0 && filters[dimension] !== key,
+        }
+      }),
+    ])
+  )
+}
+
+export function projectFulfillmentRelations(
+  catalog,
+  relation,
+  filters,
+  actionKey
+) {
+  const matches = relation.actions.filter((action) =>
+    relationMatches(action, filters)
+  )
+  const chosen = actionKey
+    ? matches.filter((action) => action.key === actionKey)
+    : matches
+  const base = buildDevBusinessChainProjection({
+    catalog,
+    chainKey: relation.stage.business_chain,
+  })
+  return projectActions(catalog, base, chosen, relation.stage.label)
+}
+
+export function projectChainRelations(catalog, chainKey, nodeKey, filters, actionKey) {
+  const base = buildDevBusinessChainProjection({ catalog, chainKey, nodeKey })
+  if (!relationFiltersActive(filters) && !actionKey) return base
+  const chosen = buildChainActionRelations(catalog, base.chain).filter(
+    (action) =>
+      (!actionKey || action.key === actionKey) &&
+      (!nodeKey || action.nodeKeys.includes(nodeKey)) &&
+      relationMatches(action, filters)
+  )
+  return projectActions(catalog, base, chosen)
+}
+
+export function projectAllActionRelations(catalog, actions, filters) {
+  if (!relationFiltersActive(filters)) return null
+  return projectActions(
+    catalog,
+    { chain: null, node: null, readOnly: true, allowsActionExecution: false },
+    actions.filter((action) => relationMatches(action, filters)),
+    '全部关联动作'
+  )
+}
+
+function projectActions(catalog, base, chosen, contextLabel) {
+  const machineKeys = unique(
+    chosen.flatMap((action) => action.relatedMachineKeys)
+  )
+  const processDefinitionKeys = unique(
+    chosen.flatMap(
+      (action) =>
+        action.step?.processNodeRefs.map((ref) => ref.processDefinitionKey) ||
+        []
+    )
+  )
+  const factKeys = unique(
+    [
+      ...chosen.flatMap((action) => action.step?.factKeys || []),
+      ...catalog.factDefinitions
+        .filter((fact) => machineKeys.includes(fact.machineKey))
+        .map((fact) => fact.factKey),
+    ]
+  )
+  return {
+    ...base,
+    contextLabel,
+    steps: chosen.flatMap((action) => (action.step ? [action.step] : [])),
+    machineKeys,
+    processDefinitionKeys,
+    factKeys,
+    flows: catalog.flows.filter((flow) => machineKeys.includes(flow.key)),
+    processDefinitions: catalog.processDefinitions.filter((definition) =>
+      processDefinitionKeys.includes(definition.key)
+    ),
+    factDefinitions: catalog.factDefinitions.filter((fact) =>
+      factKeys.includes(fact.factKey)
+    ),
+    responsibility: {
+      modes: unique(chosen.map((action) => action.responsibilityMode)),
+      ownerPoolKeys: unique(chosen.flatMap((action) => action.roleKeys)),
+      capabilityKeys: unique(chosen.flatMap((action) => action.permissionKeys)),
+    },
+  }
 }

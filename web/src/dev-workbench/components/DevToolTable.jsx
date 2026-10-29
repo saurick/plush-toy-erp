@@ -1,7 +1,6 @@
-import React, { useState } from 'react'
-import { Button, Empty, Popover, Tooltip } from 'antd'
+import React from 'react'
+import { Button, Empty, Tooltip } from 'antd'
 import {
-  InfoCircleOutlined,
   PushpinFilled,
   PushpinOutlined,
 } from '@ant-design/icons'
@@ -10,39 +9,6 @@ import {
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_WORKSPACE_NAV_ITEMS,
 } from '../config/devRoutes.mjs'
-
-export function DevToolInfo({ item, title, open, onOpenChange }) {
-  return (
-    <Popover
-      trigger="click"
-      open={open}
-      onOpenChange={onOpenChange}
-      title={`${title} · 来源与边界`}
-      content={
-        <div className="erp-dev-tool-table__source">
-          <p>{item.description}</p>
-          <p>{item.source}</p>
-          <p>{item.truthSource}</p>
-          <ul>
-            {item.guardrails.map((rule) => (
-              <li key={rule}>{rule.split(' / ')[0]}</li>
-            ))}
-          </ul>
-        </div>
-      }
-    >
-      <Button
-        size="small"
-        type="text"
-        icon={<InfoCircleOutlined />}
-        aria-label={`查看${title}来源与边界`}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') onOpenChange(false)
-        }}
-      />
-    </Popover>
-  )
-}
 
 export default function DevToolTable({
   items,
@@ -53,7 +19,6 @@ export default function DevToolTable({
   onReset,
   emptyDescription = '没有匹配的工具',
 }) {
-  const [openInfo, setOpenInfo] = useState('')
   if (!items.length) {
     return (
       <Empty
@@ -88,12 +53,6 @@ export default function DevToolTable({
                 <th scope="row">
                   <div className="erp-dev-tool-table__identity">
                     <Link to={item.route}>{title}</Link>
-                    <DevToolInfo
-                      item={item}
-                      title={title}
-                      open={openInfo === item.key}
-                      onOpenChange={(open) => setOpenInfo(open ? item.key : '')}
-                    />
                   </div>
                 </th>
                 {showGroup ? (

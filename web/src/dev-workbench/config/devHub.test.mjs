@@ -18,10 +18,12 @@ import {
 } from './devHub.mjs'
 import {
   DEV_SECONDARY_NAV_ITEMS,
+  DEV_TESTING_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_WORKBENCH_AREA_KEYS,
   DEV_WORKSPACE_NAV_ITEMS,
   getDevSecondaryNavItems,
+  resolveDevNavigationRoute,
   resolveDevPageTitle,
   resolveDevWorkbenchAreaKey,
 } from './devRoutes.mjs'
@@ -36,10 +38,10 @@ const devPageSources = [
   'DevPermissionRelationshipsPage.jsx',
   'DevIntegrationPage.jsx',
   'DevFlowStateObservatoryPage.jsx',
+  'DevTaskHandlingPage.jsx',
   'DevBusinessUsabilityPage.jsx',
   'DevDocsPage.jsx',
   'DevTestingPage.jsx',
-  'DevBusinessChainAuditPage.jsx',
   'DevQualityGatesPage.jsx',
   'DevDataPreparationPage.jsx',
   'DevUIDesignPage.jsx',
@@ -156,6 +158,8 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
     [
       ['product-engineering', '产品能力'],
       ['product-engineering', '业务链路'],
+      ['product-engineering', '业务规则'],
+      ['product-engineering', '业务专题'],
       ['product-engineering', '任务办理'],
       ['product-engineering', '权限关系'],
       ['product-engineering', '交互设计'],
@@ -216,7 +220,7 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
     false,
     '页面说明检查保留登记和深链，通过测试执行按需进入'
   )
-  assert.equal(getDevSecondaryNavItems('product-engineering').length, 5)
+  assert.equal(getDevSecondaryNavItems('product-engineering').length, 7)
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/integration'), 'development-resources')
   assert.deepEqual(
     getDevSecondaryNavItems('quality').map((item) => item.key),
@@ -247,11 +251,11 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
   )
 })
 
-test('devHub: quality area offers the change validation path and registered tool comparison', () => {
+test('devHub: quality area uses the registered tool directory without a duplicate header shortcut', () => {
   assert.doesNotMatch(devWorkbenchAreaPageSource, /<Navigate/u)
-  assert.match(devWorkbenchAreaPageSource, /开始验证/u)
+  assert.doesNotMatch(devWorkbenchAreaPageSource, /开始验证|href=\{DEV_TESTING_ROUTE\}/u)
   assert.match(devWorkbenchAreaPageSource, /<DevToolTable/u)
-  assert.match(devWorkbenchAreaPageSource, /DEV_TESTING_ROUTE/u)
+  assert.ok(getDevSecondaryNavItems(DEV_WORKBENCH_AREA_KEYS.quality).some((item) => item.route === DEV_TESTING_ROUTE))
 })
 
 test('devHub: area tools follow navigation order and development resources own project graphs', () => {
@@ -273,6 +277,26 @@ test('devHub: area tools follow navigation order and development resources own p
   assert.match(devWorkbenchAreaPageSource, /<DevProjectRelationships/u)
   assert.match(devToolTableSource, /DEV_PAGE_TITLE_BY_ROUTE\[item.route\]/u)
   assert.match(devToolTableSource, /<th scope="col">用来做什么<\/th>/u)
+})
+
+test('devHub: report details select their visible parent without changing page identity', () => {
+  assert.equal(resolveDevNavigationRoute('/__dev/business-chain-audit'), '/__dev/testing')
+  assert.equal(resolveDevNavigationRoute('/__dev/business-chain-audit/'), '/__dev/testing')
+  assert.equal(resolveDevPageTitle('/__dev/business-chain-audit', 'ERP'), '链路实测报告 · ERP')
+
+  for (const item of [...DEV_WORKSPACE_NAV_ITEMS, ...DEV_SECONDARY_NAV_ITEMS]) {
+    if (!item.navigationParentRoute) {
+      assert.equal(resolveDevNavigationRoute(item.route), item.route)
+      continue
+    }
+    const parent = getDevSecondaryNavItems(item.areaKey).find(
+      (entry) => entry.route === item.navigationParentRoute
+    )
+    assert(parent, `${item.label} 的所属菜单应为同一责任区的可见入口`)
+    assert.equal(parent.navigationParentRoute, undefined, '所属菜单必须直接可见，不递归委托')
+  }
+  assert.equal(resolveDevNavigationRoute('/__dev/unregistered'), '/__dev/unregistered')
+  assert.equal(resolveDevNavigationRoute(), '')
 })
 
 test('devHub: tools share one area registry without duplicate overview stage inventories', () => {
@@ -332,11 +356,15 @@ test('devHub: dev pages share the backend-style workspace shell', () => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
   })
+  const routes = readFileSync(new URL('../DevWorkbenchRoutes.jsx', import.meta.url), 'utf8')
+  const report = readFileSync(new URL('../pages/DevBusinessChainAuditPage.jsx', import.meta.url), 'utf8')
+  assert.match(routes, /<Route element=\{<DevTestingPage \/>\}>\s*<Route path="testing" \/>\s*<Route path="business-chain-audit" element=\{<DevBusinessChainAuditPage \/>\} \/>\s*<\/Route>/u)
+  assert.doesNotMatch(report, /erp-dev-workspace-page|<DevPageNav/u, '链路报告复用测试执行布局，不能嵌套侧栏或工作台根节点')
 })
 
 test('devHub: delivery overview owns the local, demo, test, and isolated evidence comparison', () => {
   assert.doesNotMatch(devPageNavSource, /DevEnvironmentEvidencePanel/u)
-  assert.match(devPageNavSource, /开发工具仅供维护使用/u)
+  assert.doesNotMatch(devPageNavSource, /页面工具|开发工具仅供维护使用/u)
   assert.match(
     devWorkbenchAreaPageSource,
     /import DevEnvironmentEvidencePanel from '..\/components\/DevEnvironmentEvidencePanel\.jsx'/u
@@ -371,7 +399,7 @@ test('devHub: delivery overview owns the local, demo, test, and isolated evidenc
   )
 })
 
-test('devHub: tool tables keep technical paths behind an accessible disclosure', () => {
+test('devHub: tool tables explain purpose without reference disclosures', () => {
   for (const pageSource of [devHubPageSource, devWorkbenchAreaPageSource]) {
     assert.match(pageSource, /<DevToolTable/u)
     assert.doesNotMatch(
@@ -379,10 +407,8 @@ test('devHub: tool tables keep technical paths behind an accessible disclosure',
       /<Text className="erp-dev-hub-card__(?:route|source)">/u
     )
   }
-  assert.match(devToolTableSource, /aria-label=\{`查看\$\{title\}来源与边界`\}/u)
-  assert.match(devToolTableSource, /item\.source/u)
-  assert.match(devToolTableSource, /item\.truthSource/u)
-  assert.match(devToolTableSource, /item\.guardrails\.map/u)
+  assert.match(devToolTableSource, /item\.description/u)
+  assert.doesNotMatch(devToolTableSource, /DevToolInfo|item\.source|item\.truthSource|item\.guardrails/u)
 })
 
 test('devHub: lists existing dev-only entry routes without backend assumptions', () => {
@@ -391,6 +417,8 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     [
       '/__dev/product-core',
       '/__dev/status-flows',
+      '/__dev/business-rules',
+      '/__dev/business-topics',
       '/__dev/task-handling',
       '/__dev/permission-relationships',
       '/__dev/ui-design',
@@ -553,7 +581,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 17)
+  assert.equal(summary.entryCount, 19)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)

@@ -1,13 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReloadOutlined } from '@ant-design/icons'
 import { Button, Skeleton, Tag, theme, Typography } from 'antd'
-import { Link as RouterLink } from 'react-router-dom'
 import DevTimestamp from './DevTimestamp.jsx'
 import { createDevDataPreparationClient } from '../config/devDataPreparation.mjs'
 import {
   createDevDeliveryClient,
-  DEV_VERSION_CENTER_ROUTE,
-  DEV_VERSION_CENTER_VIEW_HISTORY,
 } from '../config/devDelivery.mjs'
 import {
   buildDevDeliveryOperationOverview,
@@ -195,21 +192,11 @@ function DeliveryOperationOverview({ summary, error, loading }) {
               action="读回于"
               missing="最后核对时间未证明"
             />
-            <RouterLink
-              to={`${DEV_VERSION_CENTER_ROUTE}?view=${DEV_VERSION_CENTER_VIEW_HISTORY}`}
-            >
-              查看工作台操作记录
-            </RouterLink>
+
           </article>
         </div>
       )}
-      {overview.state === 'loading' ? (
-        <RouterLink
-          to={`${DEV_VERSION_CENTER_ROUTE}?view=${DEV_VERSION_CENTER_VIEW_HISTORY}`}
-        >
-          查看工作台操作记录
-        </RouterLink>
-      ) : null}
+
       <details className="erp-dev-disclosure erp-dev-delivery-inline-details">
         <summary>记录范围</summary>
         <Text type="secondary">

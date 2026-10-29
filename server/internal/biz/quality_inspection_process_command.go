@@ -1,8 +1,13 @@
 package biz
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"slices"
 	"strings"
+
+	"server/internal/core/qualitycheck"
 
 	"github.com/shopspring/decimal"
 )
@@ -25,6 +30,7 @@ const (
 	qualityInspectionProcessCommandPayloadDefectRateOperator = "defect_rate_operator"
 	qualityInspectionProcessCommandPayloadDefectRatePercent  = "defect_rate_percent"
 	qualityInspectionProcessCommandPayloadDecisionNote       = "decision_note"
+	qualityInspectionProcessCommandPayloadCheckItems         = "check_items"
 )
 
 type incomingQualityGateProcessCommandHandler struct {
@@ -49,6 +55,13 @@ func (*finishedGoodsQualityDecideProcessCommandHandler) NormalizeProcessDomainCo
 	if operator != nil && percent != nil {
 		normalized[qualityInspectionProcessCommandPayloadDefectRateOperator] = *operator
 		normalized[qualityInspectionProcessCommandPayloadDefectRatePercent] = percent.String()
+	}
+	if _, present := payload[qualityInspectionProcessCommandPayloadCheckItems]; present {
+		checks, err := qualityInspectionChecksFromProcessPayload(payload)
+		if err != nil {
+			return nil, err
+		}
+		normalized[qualityInspectionProcessCommandPayloadCheckItems] = checks
 	}
 	return normalized, nil
 }
@@ -165,6 +178,7 @@ func (h *finishedGoodsQualityDecideProcessCommandHandler) ValidateProcessDomainC
 		qualityInspectionProcessCommandPayloadDefectRateOperator,
 		qualityInspectionProcessCommandPayloadDefectRatePercent,
 		qualityInspectionProcessCommandPayloadDecisionNote,
+		qualityInspectionProcessCommandPayloadCheckItems,
 	); err != nil {
 		return err
 	}
@@ -205,8 +219,18 @@ func (h *finishedGoodsQualityDecideProcessCommandHandler) ValidateProcessDomainC
 	if err != nil {
 		return err
 	}
+	checks, err := qualityInspectionChecksFromProcessPayload(in.Payload)
+	if err != nil {
+		return err
+	}
 	if inspection.Status == QualityInspectionStatusSubmitted {
-		return nil
+		return ValidateQualityInspectionDecisionEvidence(&QualityInspectionDecision{
+			Result: result, CheckItems: checks,
+			DecisionNote: processCommandOptionalStringPtrFromPayload(in.Payload, qualityInspectionProcessCommandPayloadDecisionNote),
+		})
+	}
+	if !slices.Equal(inspection.CheckItems, checks) {
+		return ErrIdempotencyConflict
 	}
 	if !qualityInspectionDefectRateMatchesInspection(inspection, defectRateOperator, defectRatePercent) {
 		return ErrIdempotencyConflict
@@ -261,8 +285,13 @@ func (h *finishedGoodsQualityDecideProcessCommandHandler) ExecuteProcessDomainCo
 	if err != nil {
 		return nil, err
 	}
+	checks, err := qualityInspectionChecksFromProcessPayload(in.Payload)
+	if err != nil {
+		return nil, err
+	}
 	inspectorID := actorID
 	decision := &QualityInspectionDecision{
+		CheckItems:         checks,
 		InspectionID:       inspectionID,
 		Result:             result,
 		InspectedAt:        inspectedAt,
@@ -428,4 +457,23 @@ func isShipmentLinkedFinishedGoodsQualityInspection(inspection *QualityInspectio
 		return false
 	}
 	return true
+}
+
+func qualityInspectionChecksFromProcessPayload(payload map[string]any) ([]qualitycheck.Item, error) {
+	raw, present := payload[qualityInspectionProcessCommandPayloadCheckItems]
+	if !present {
+		return nil, nil
+	}
+	encoded, err := json.Marshal(raw)
+	if err != nil || raw == nil || len(encoded) > 100000 {
+		return nil, ErrBadParam
+	}
+	var items []qualitycheck.Item
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&items); err != nil {
+		return nil, ErrBadParam
+	}
+	result := strings.ToUpper(processCommandStringFromPayload(payload, qualityInspectionProcessCommandPayloadResult))
+	return NormalizeQualityCheckItems(items, result)
 }

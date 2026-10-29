@@ -17,6 +17,17 @@ const task = {
   },
 }
 
+test('the task header menu contains only copies and clears removed product information', async (t) => {
+  const { container, render, act } = await createReactTestHarness(t)
+  const { WorkflowTaskCopySummary } = await import('./WorkflowTaskCopy.jsx')
+  await render(createElement(WorkflowTaskCopySummary, { task, compact: true }))
+  await act(async () => container.querySelector('[aria-label="更多操作"]').click())
+  const labels = () => [...document.querySelectorAll('[role="menuitem"]')].map((node) => node.textContent)
+  assert.deepEqual(labels(), ['复制任务链接', '复制任务信息', '复制产品信息'])
+  await render(createElement(WorkflowTaskCopySummary, { task: { ...task, display_context: { available: true, items: [] } }, compact: true }))
+  assert.deepEqual(labels(), ['复制任务链接', '复制任务信息'])
+})
+
 test('source number copy is separate from the desktop source action and never opens its parent', async (t) => {
   const { container, render, act } = await createReactTestHarness(t)
   const { WorkflowTaskSource } = await import('./WorkflowTaskCopy.jsx')

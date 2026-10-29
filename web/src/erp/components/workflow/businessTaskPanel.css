@@ -86,6 +86,52 @@
 }
 
 @media (max-width: 575px) {
+  .business-task-panel--mobile .business-task-panel__content {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .business-task-panel--mobile .business-task-panel__context,
+  .business-task-panel--mobile .business-task-panel__mobile-list {
+    padding: 14px;
+    border: 1px solid var(--erp-border);
+    border-radius: 10px;
+    background: var(--erp-surface-bg);
+  }
+
+  .business-task-panel--mobile .business-task-panel__source {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .business-task-panel--mobile .business-task-panel__mobile-task:first-child {
+    padding-top: 0;
+  }
+
+  .business-task-panel--mobile .business-task-panel__mobile-task:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .business-task-panel--mobile .ant-btn {
+    min-height: 44px;
+    height: auto;
+    white-space: normal;
+  }
+
+  .business-task-panel--mobile .business-task-panel__footer {
+    display: flex;
+  }
+
+  .business-task-panel--mobile .business-task-panel__footer > .ant-space-item {
+    flex: 1;
+  }
+
+  .business-task-panel--mobile .business-task-panel__footer .ant-btn {
+    width: 100%;
+  }
+
   .business-task-panel__order {
     grid-template-columns: minmax(0, 1fr) auto;
   }

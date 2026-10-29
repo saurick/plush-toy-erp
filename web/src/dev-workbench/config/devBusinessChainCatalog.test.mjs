@@ -26,6 +26,22 @@ import { yoyoosunRoleFlowMatrix } from '../../../../config/customers/yoyoosun/ro
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
+test('采购质检纠正关联新记录并重新判定，不重开原检验或自动入库', () => {
+  const chain = DEV_FLOW_STATE_CATALOG.businessChains.find((item) => item.key === 'purchase_to_inventory')
+  const correction = chain.nodes.find((item) => item.key === 'purchase_quality_correction')
+  assert.match(correction.summary, /保留原检验判定/u)
+  const create = chain.steps.find((item) => item.fromNodeKey === 'purchase_quality' && item.toNodeKey === correction.key)
+  assert(create.responsibility.capabilityKeys.includes('quality.exception.handle'))
+  assert.equal(create.stateTransitionRefs.length, 0)
+  assert(create.resultStateRefs.some((item) => item.machineKey === 'fact.quality_inspection' && item.stateKey === 'SUBMITTED'))
+  const decision = chain.steps.find((item) => item.fromNodeKey === correction.key)
+  assert.equal(decision.toNodeKey, 'purchase_accepted')
+  assert(decision.stateTransitionRefs.some((item) => item.transitionKey === 'SUBMITTED->PASSED'))
+  assert.match(chain.edges.find((item) => item.to === correction.key).condition, /不适用于在制批次/u)
+  assert.match(chain.edges.find((item) => item.from === correction.key).condition, /不自动增加库存/u)
+  assert(chain.acceptanceScenarios.find((item) => item.kind === 'correction').stepKeys.includes(create.key))
+})
+
 const EXPECTED_CHAIN_KEYS = [
   'sales_to_production',
   'purchase_to_inventory',
@@ -53,14 +69,15 @@ test('sales preparation records approved material demand and keeps stock reserva
   assert(DEV_FLOW_STATE_CATALOG.businessChainOverview.relations.some((relation) => relation.fromChainKey === chain.key && relation.toChainKey === 'purchase_to_inventory' && /用料批准/u.test(relation.label)))
 })
 
-test('inventory keeps direct count and transfer posting separate from manual adjustment approval', () => {
+test('inventory requires count and adjustment review while transfers post directly', () => {
   const chain = DEV_FLOW_STATE_CATALOG.businessChains.find((item) => item.key === 'inventory_adjustment')
   assert.match(chain.label, /盘点、调拨/u)
   const direct = chain.steps.find((item) => item.key === 'inventory_operation:posts_fact:adjusted_inventory_lot')
   assert(direct.stateTransitionRefs.some((ref) => ref.transitionKey === 'DRAFT->POSTED'))
   assert.equal(direct.processNodeRefs.length, 0)
   const approval = chain.edges.find((edge) => edge.from === 'inventory_operation' && edge.kind === 'starts_process')
-  assert.match(approval.condition, /仅人工调整/u)
+  assert.match(approval.condition, /盘点与人工调整必须复核/u)
+  assert.match(chain.edges.find((edge) => edge.from === 'inventory_operation' && edge.kind === 'posts_fact').condition, /仅调拨草稿/u)
   assert(chain.edges.some((edge) => edge.kind === 'reverses' && edge.action === 'InventoryUsecase.CancelInventoryOperation'))
 })
 
@@ -227,7 +244,7 @@ test('business chain catalog covers every business machine and process variant',
   assert.equal(catalog.businessChainCoverage.overviewComplete, true)
   assert.equal(catalog.businessChainCoverage.overviewKey, 'all')
   assert.equal(catalog.businessChainCoverage.overviewLaneCount, 4)
-  assert.equal(catalog.businessChainCoverage.overviewRelationCount, 17)
+  assert.equal(catalog.businessChainCoverage.overviewRelationCount, 18)
   assert.deepEqual(
     new Set(catalog.businessChainCoverage.overviewChainKeys),
     new Set(EXPECTED_CHAIN_KEYS)
@@ -459,8 +476,16 @@ test('business chain steps bind formal responsibility, state, action, process, F
   )
   const roleProfiles = yoyoosunRoleFlowMatrix.roles
 
-  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 85)
-  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.scenarioCount, 66)
+  assert.equal(
+    DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount,
+    DEV_FLOW_STATE_CATALOG.businessChains.flatMap((chain) => chain.steps).length
+  )
+  assert.equal(
+    DEV_FLOW_STATE_CATALOG.businessChainCoverage.scenarioCount,
+    DEV_FLOW_STATE_CATALOG.businessChains.flatMap(
+      (chain) => chain.acceptanceScenarios
+    ).length
+  )
   assert.equal(
     DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepContractComplete,
     true

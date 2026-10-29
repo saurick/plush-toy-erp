@@ -27,8 +27,8 @@ func TestPurchaseReceiptPostgresWarehouseAccessReadWriteAndReplay(t *testing.T) 
 func runPurchaseReceiptWarehouseAccessReadWriteAndReplay(t *testing.T, data *Data, client *ent.Client) {
 	t.Helper()
 	ctx := context.Background()
-	f := createInventoryTestFixtures(t, ctx, client)
-	otherWarehouse := createTestWarehouse(t, ctx, client, "WH-ACCESS-OTHER")
+	f := createInventoryPostgresFixtures(t, ctx, client)
+	otherWarehouse := createTestWarehouse(t, ctx, client, "WH-ACCESS-OTHER-"+f.suffix)
 	repo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	uc := biz.NewInventoryUsecase(repo)
 	assigned := biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{f.warehouseID}}
@@ -40,7 +40,7 @@ func runPurchaseReceiptWarehouseAccessReadWriteAndReplay(t *testing.T, data *Dat
 		for _, warehouseID := range warehouses {
 			items = append(items, &biz.PurchaseReceiptItemCreate{MaterialID: f.materialID, WarehouseID: warehouseID, UnitID: f.unitID, Quantity: decimal.NewFromInt(1)})
 		}
-		receipt, err := uc.CreatePurchaseReceiptWithItems(ctx, &biz.PurchaseReceiptCreate{ReceiptNo: no, SupplierName: "模拟供应商"}, items)
+		receipt, err := uc.CreatePurchaseReceiptWithItems(ctx, &biz.PurchaseReceiptCreate{ReceiptNo: no + "-" + f.suffix, SupplierName: "模拟供应商"}, items)
 		if err != nil {
 			t.Fatal(err)
 		}

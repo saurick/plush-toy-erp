@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
 import { ProductionExceptionStatus } from '../../../common/consts/statuses.generated.mjs'
-import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
+import { useProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
 import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
@@ -43,6 +43,7 @@ export default function ProductionOverIssueRequestModal({
   onChanged,
 }) {
   const [form] = Form.useForm()
+  const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
   const quantityUnitOptions = useQuantityUnits(open)
   const [loading, setLoading] = useState(false)
   const attempts = useRef(createSourceBusinessActionAttemptStore())
@@ -106,7 +107,7 @@ export default function ProductionOverIssueRequestModal({
       }
       const next = processData.source_readback
       attempts.current.settle(scope, attempt, null)
-      showProcessSubmissionReceipt({ result: processData, title: '超领申请已提交；批准额度须在正式领料时使用' })
+      showProcessSubmissionReceipt({ result: processData, record: next, title: '超领申请已提交；批准额度须在正式领料时使用' })
       onChanged?.(next)
       onClose?.()
     } catch (error) {

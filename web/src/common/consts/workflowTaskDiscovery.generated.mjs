@@ -490,22 +490,22 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       passed: '订单生效，继续工程与用料准备。',
       rejected: '保留拒绝原因，取消本次已提交订单，不继续激活。',
     }), Object.freeze({
-      condition: '工程提交 → 老板审核 → 另一位财务人员审核。',
+      condition: '自动送审 → 老板审核 → 另一位财务人员审核。',
       label: '工程用料两级审核',
       passed: '按厂商生成已批准采购订单，不重复走采购审批。',
-      rejected: '交工程修改后重新提交，重新经过老板和财务审核。',
+      rejected: '交工程修改，完成工程资料后自动重新送审，重新经过老板和财务审核。',
     })]),
     business_chain: 'sales_to_production',
     handling: Object.freeze({
       action: '业务与工程补齐来源资料；用料退回后修改重提。订单审批拒绝按原单规则结束本次申请。',
       guides: Object.freeze([]),
-      issues: '订单资料、样品或 BOM 未就绪，用料审核退回。',
-      resume: '订单生效、样品确认、BOM 启用且用料审核通过后再采购。',
+      issues: '订单资料或工程 BOM 未就绪，用料审核退回。',
+      resume: '订单生效、工程资料完成且用料审核通过后再采购。',
       task_stages: Object.freeze(['engineering']),
     }),
-    handoffs: Object.freeze(['业务接单并提交订单，工程资料、BOM 与打样可并行准备。', '订单已生效、样品已确认、BOM 已启用后，工程提交用料。', '老板审核后，另一位财务人员审核；通过后按厂商生成已批准采购订单。']),
+    handoffs: Object.freeze(['业务接单并提交订单，工程资料与 BOM 可并行准备。', '完成工程资料时统一校验并启用 BOM；订单生效后，系统自动汇总用料并送审。', '老板审核后，另一位财务人员审核；通过后按厂商生成已批准采购订单。']),
     label: '接单、工程与用料审批',
-    result: '订单、样品和 BOM 满足条件，工程用料经老板、财务审核通过。',
+    result: '订单生效且工程 BOM 完成，工程用料经老板、财务审核通过。',
     role: '业务 / 工程 / 老板 / 财务',
     role_keys: Object.freeze(['sales', 'engineering', 'boss', 'finance']),
     stage: 'sales_order',
@@ -524,7 +524,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         to: 'ready',
       }), Object.freeze({
         from: 'engineering',
-        label: '样品确认、BOM 启用',
+        label: '工程资料完成',
         to: 'ready',
       }), Object.freeze({
         from: 'ready',
@@ -569,16 +569,16 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       }), Object.freeze({
         detail_refs: Object.freeze(['handoff:0']),
         key: 'engineering',
-        label: '工程资料、BOM 与打样',
+        label: '工程资料与 BOM',
         role_keys: Object.freeze(['engineering']),
       }), Object.freeze({
         detail_refs: Object.freeze(['handoff:1']),
         key: 'ready',
-        label: '订单、样品、BOM 就绪',
+        label: '订单与工程 BOM 就绪',
       }), Object.freeze({
         detail_refs: Object.freeze(['handoff:1']),
         key: 'material_submit',
-        label: '工程提交用料',
+        label: '自动送审用料',
         role_keys: Object.freeze(['engineering']),
       }), Object.freeze({
         detail_refs: Object.freeze(['approval:1']),
@@ -601,10 +601,10 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       }), Object.freeze({
         detail_refs: Object.freeze(['approval_rejected:1']),
         key: 'revise',
-        label: '工程修改并重新提交',
+        label: '修订并完成工程资料',
         role_keys: Object.freeze(['engineering']),
       })]),
-      summary: '订单审批与工程准备可并行；订单、样品和 BOM 满足条件后，再提交工程用料审核。',
+      summary: '订单审批与工程准备可并行；订单生效且工程 BOM 完成后，自动送工程用料审核。',
     }),
   }), Object.freeze({
     approvals: Object.freeze([Object.freeze({
@@ -716,7 +716,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       resume: '采购来源已批准，供应商、合同和到货安排核对完成后登记实际到货。',
       task_stages: Object.freeze([]),
     }),
-    handoffs: Object.freeze(['采购核对供应商、合同与到货安排并跟进供应商。', '工程用料审批生成的采购单已经批准；独立人工采购单另行提交审批。', '采购通过“补齐价格与交期”补缺价、维护交期，批准数量不变；补价可与到货跟进并行，缺价不阻止实物收货，财务生成应付前须有完整价格依据。']),
+    handoffs: Object.freeze(['采购核对供应商、合同与到货安排并跟进供应商。', '工程用料审批生成的采购单已经批准；独立人工采购单另行提交审批。', '采购通过“维护交期”独立安排日期，通过“补齐价格与交期”补缺价，批准数量不变；到货计划按剩余到货明细提醒，异常汇总回到原单办理。缺价不阻止实物收货，财务生成应付前须有完整价格依据。']),
     label: '采购',
     result: '按用料需求向供应商采购。',
     role: '采购',
@@ -948,7 +948,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       resume: '合同、来源、批次、可用数量和超领额度满足校验后再发料；任务结束不代表已经出库。',
       task_stages: Object.freeze(['production_exception']),
     }),
-    handoffs: Object.freeze(['PMC 安排排期，生产经理提出加工材料、厂商及回货要求。', '有合同权限的财务兼采购经办人确认加工合同。', '仓库核对可用材料、批次和数量，实际发料至委外厂商裁片。', 'PMC 根据有效来源建立生产订单；PMC 或有权限的生产负责人核对样品、BOM 和用料审批后显式发布，冻结用料、工艺路线和检验条件，并生成排程任务。', '发布不代表物料齐套或已经领料；排程与到货可按前置条件并行，实际发料前仍须核对合同、批次和可用量。']),
+    handoffs: Object.freeze(['PMC 安排排期，生产经理提出加工材料、厂商及回货要求。', '有合同权限的财务兼采购经办人确认加工合同。', '仓库核对可用材料、批次和数量，实际发料至委外厂商裁片。', 'PMC 根据有效来源建立生产订单；PMC 或有权限的生产负责人核对工程 BOM 和用料审批后显式发布，冻结用料、工艺路线和检验条件，并生成排程任务。', '发布不代表物料齐套或已经领料；排程与到货可按前置条件并行，实际发料前仍须核对合同、批次和可用量。']),
     label: '发料外发裁片',
     result: '仓库发料至委外厂商裁片。',
     role: 'PMC / 生产经理 / 财务兼采购 / 仓库',

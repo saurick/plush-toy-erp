@@ -5,7 +5,6 @@ import EngineeringMaterialPurchaseOrders from './EngineeringMaterialPurchaseOrde
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import {
   getEngineeringMaterialRequest,
-  submitEngineeringMaterialRequest,
   reviewEngineeringMaterialRequest,
 } from '../../api/masterDataOrderApi.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -102,16 +101,9 @@ export default function EngineeringMaterialRequestForm({
     !taskSettled &&
     request?.status === MaterialRequestStatus.SUBMITTED &&
     permissions.boss
-  const canSubmit =
-    !readOnly &&
-    !orderClosed &&
-    !taskSettled &&
-    request?.status === 'PREVIEW' &&
-    permissions.submit
   const act = async (action) => {
     if (readOnly || submitting.current || saving || loading || !request) return
     if (
-      (action === 'SUBMIT' && !canSubmit) ||
       (action === 'BOSS_APPROVE' && !canBoss) ||
       (action === 'FINANCE_APPROVE' && !canFinance) ||
       (action === 'REJECT' && !canBoss && !canFinance)
@@ -140,26 +132,11 @@ export default function EngineeringMaterialRequestForm({
         }
       : {}
     try {
-      const value =
-        action === 'SUBMIT'
-          ? await submitEngineeringMaterialRequest({
-              sales_order_id: orderID,
-              expected_version: request.source_order_version,
-              expected_source_hash: request.source_hash,
-              ...taskVersion,
-            })
-          : await reviewEngineeringMaterialRequest(
-              {
-                id: request.id,
-                expected_version: request.version,
-                action,
-                ...taskVersion,
-                note: values.note || null,
-              },
-              canBoss ? 'boss' : 'finance'
-            )
+      const value = await reviewEngineeringMaterialRequest(
+        { id: request.id, expected_version: request.version, action, ...taskVersion, note: values.note || null },
+        canBoss ? 'boss' : 'finance'
+      )
       const expectedStatus = {
-        SUBMIT: 'SUBMITTED',
         BOSS_APPROVE: 'BOSS_APPROVED',
         FINANCE_APPROVE: 'APPROVED',
         REJECT: 'REJECTED',
@@ -174,8 +151,7 @@ export default function EngineeringMaterialRequestForm({
         (action === 'FINANCE_APPROVE' &&
           (!Array.isArray(value.purchase_orders) ||
             !value.purchase_orders.length)) ||
-        (action !== 'SUBMIT' &&
-          (value.id !== request.id || value.version <= request.version))
+        (value.id !== request.id || value.version <= request.version)
       ) {
         throw new Error('用料办理结果尚未确认，请重新读取后核对')
       }
@@ -188,9 +164,7 @@ export default function EngineeringMaterialRequestForm({
           ? `已批准，已生成 ${value.purchase_orders.length} 张采购订单`
           : action === 'REJECT'
             ? '已退回工程修改'
-            : action === 'SUBMIT'
-              ? '已提交老板审核'
-              : '审核已通过，已交财务审核'
+            : '审核已通过，已交财务审核'
       onChanged?.(value, { action, reason: values.note || '', successMessage })
       if (!mobile || !taskProcessing) message.success(successMessage)
     } catch (cause) {
@@ -244,41 +218,24 @@ export default function EngineeringMaterialRequestForm({
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [saving])
-  const selectedAction = canSubmit
-    ? 'SUBMIT'
-    : decision === 'reject'
+  const selectedAction = decision === 'reject'
       ? 'REJECT'
       : canBoss
         ? 'BOSS_APPROVE'
         : 'FINANCE_APPROVE'
-  const selectedLabel = canSubmit
-    ? '提交老板审核'
-    : decision === 'reject'
+  const selectedLabel = decision === 'reject'
       ? '确认退回工程'
       : canBoss
         ? '确认通过，交财务'
         : '批准并生成采购订单'
   const footer = taskProcessing ? (
     <div className="erp-material-task-action__footer">
-      {!orderClosed &&
-      !taskSettled &&
-      request?.status === MaterialRequestStatus.REJECTED &&
-      permissions.submit ? (
-        <Button
-          disabled={saving || loading}
-          onClick={() =>
-            discardThen(() => setReload({ key: reload.key + 1, preview: true }))
-          }
-        >
-          按当前资料重新整理
-        </Button>
-      ) : null}
-      {canBoss || canFinance || canSubmit ? (
+      {canBoss || canFinance ? (
         <Button
           type="primary"
           danger={decision === 'reject'}
           loading={saving}
-          disabled={loading || (canSubmit && request.issues.length > 0)}
+          disabled={loading}
           onClick={() => act(selectedAction)}
         >
           {selectedLabel}
@@ -301,31 +258,6 @@ export default function EngineeringMaterialRequestForm({
             }
           >
             重新读取
-          </Button>
-        ) : null}
-        {!orderClosed &&
-        !taskSettled &&
-        request?.status === MaterialRequestStatus.REJECTED &&
-        permissions.submit ? (
-          <Button
-            disabled={saving}
-            onClick={() =>
-              discardThen(() =>
-                setReload({ key: reload.key + 1, preview: true })
-              )
-            }
-          >
-            按当前资料重新整理
-          </Button>
-        ) : null}
-        {canSubmit ? (
-          <Button
-            type="primary"
-            loading={saving}
-            disabled={request.issues.length > 0}
-            onClick={() => act('SUBMIT')}
-          >
-            提交老板审核
           </Button>
         ) : null}
         {canBoss || canFinance ? (
@@ -396,13 +328,13 @@ export default function EngineeringMaterialRequestForm({
             ) : null}
             {request.status === 'PREVIEW' ? (
               <p className="erp-material-summary-hint">
-                尚未提交审批，当前为已保存订单与 BOM 的用料预览。
+                根据订单与 BOM 自动统计；完成工程资料且订单生效后自动送审。
               </p>
             ) : null}
             {request.issues.length ? (
               <Alert
                 type="warning"
-                message="提交前请补齐"
+                message="待补齐资料"
                 description={
                   <ul>
                     {[...new Set(request.issues)].map((issue) => (
@@ -434,18 +366,16 @@ export default function EngineeringMaterialRequestForm({
                 />
               </Form.Item>
             ) : null}
-            {!taskProcessing ? (
-              <EngineeringMaterialSummarySheet
-                request={request}
-                onReload={() =>
-                  discardThen(() =>
-                    setReload({ key: reload.key + 1, preview: reload.preview })
-                  )
-                }
-                mobile={mobile}
-                saving={saving}
-              />
-            ) : null}
+            <EngineeringMaterialSummarySheet
+              request={request}
+              onReload={() =>
+                discardThen(() =>
+                  setReload({ key: reload.key + 1, preview: reload.preview })
+                )
+              }
+              mobile={mobile}
+              saving={saving}
+            />
             {!taskProcessing &&
             request.status === MaterialRequestStatus.REJECTED &&
             request.review_note ? (
@@ -492,5 +422,5 @@ export default function EngineeringMaterialRequestForm({
       </Form>
     </Spin>
   )
-  return render({ content, footer, title, request, saving, discardThen })
+  return render({ content, footer, title, request, saving, discardThen, form })
 }

@@ -1,15 +1,21 @@
 .erp-dev-fulfillment-guide { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--erp-border); border-radius: 10px; background: var(--erp-surface-bg); container: fulfillment-guide / inline-size; }
-.erp-dev-fulfillment-guide__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.erp-dev-fulfillment-guide__heading { display: flex; align-items: baseline; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
+.erp-dev-fulfillment-guide__heading > .erp-dev-relation-filters { flex: 1 1 100px; }
 .erp-dev-fulfillment-guide :is(h2,h3) { margin: 0; font-size: 17px; }
 .erp-dev-fulfillment-guide p:where(:not(.erp-markdown-mermaid p)) { margin: 0; line-height: 1.7; }
 .erp-dev-fulfillment-guide__panel { min-width: 0; display: grid; gap: 16px; padding-top: 20px; border-top: 1px solid var(--erp-border); scroll-margin-top: 20px; }
 .erp-dev-fulfillment-guide__detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .erp-dev-fulfillment-guide__detail-title { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; min-width: 0; }
 .erp-dev-fulfillment-guide__detail-content, .erp-dev-fulfillment-guide__exception, .erp-dev-fulfillment-guide__subflow { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; min-width: 0; }
+.erp-dev-fulfillment-guide__subflow-detail { display: grid; align-content: start; gap: 12px; min-width: 0; }
+@container fulfillment-guide (min-width: 1100px) {
+  .erp-dev-fulfillment-guide__subflow { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; gap: 24px; }
+}
 .erp-dev-fulfillment-guide__role { display: flex; align-items: center; gap: 10px; }
 .erp-dev-fulfillment-guide__role .ant-select { width: 160px; }
 .erp-dev-fulfillment-guide__scope-bar, .erp-dev-fulfillment-guide__hint, .erp-dev-fulfillment-guide__empty { color: var(--erp-text-muted); font-size: var(--erp-font-small); }
 .erp-dev-fulfillment-guide__stage-picker, .erp-dev-fulfillment-guide__choices { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.erp-dev-exception-directory > .ant-select,
 .erp-dev-fulfillment-guide__choices > .ant-select { width: 260px; max-width: 100%; }
 .erp-dev-fulfillment-guide__choices > span { color: var(--erp-text-muted); }
 .erp-dev-fulfillment-guide__focus { padding: 12px 16px; border-left: 2px solid var(--erp-primary); background: var(--erp-surface-bg-soft); font-size: var(--erp-font-small); line-height: 1.7; }

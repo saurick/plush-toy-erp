@@ -28,12 +28,6 @@
   font-size: 22px;
 }
 
-.erp-dev-docs-title.ant-typography {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.2;
-}
-
 .erp-dev-docs-summary.ant-typography {
   margin: 8px 0 0;
   color: var(--erp-text-muted);

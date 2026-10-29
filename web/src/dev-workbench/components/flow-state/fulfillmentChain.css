@@ -7,19 +7,18 @@
 .erp-dev-chain__wires .erp-dev-chain__wire--main { stroke: var(--erp-border-strong); }
 .erp-dev-chain__wires [data-conditional-wire] { stroke-dasharray: 4 4; }
 .erp-dev-chain__arrow--main { fill: var(--erp-text-muted); }
-.erp-dev-chain__phase { position: relative; padding: 16px 0 22px; }
-.erp-dev-chain__phase + .erp-dev-chain__phase { border-top: 1px solid var(--erp-border); }
-.erp-dev-chain__phase-heading { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 34px; margin-bottom: 16px; background: var(--erp-surface-bg); }
-.erp-dev-chain__phase-heading h3 { margin: 0; font-size: var(--erp-font-body); }
+.erp-dev-chain__phase { position: relative; padding: 8px 0 12px; }
+.erp-dev-chain__phase-heading { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; margin-bottom: 20px; padding: 4px 10px; border-radius: 4px; background: color-mix(in srgb, var(--erp-border) 50%, var(--erp-surface-bg)); }
+.erp-dev-chain__phase-heading h3 { margin: 0; font-size: var(--erp-font-body); font-weight: 500; }
 .erp-dev-chain__phase-heading :where(h3) > small { margin-left: 10px; color: var(--erp-text-muted); font-size: var(--erp-font-caption); font-weight: 400; }
 .erp-dev-chain__grid { display: grid; grid-template-columns: repeat(var(--chain-columns),minmax(0,1fr)); align-items: start; gap: 14px 18px; min-width: 0; }
 .erp-dev-chain__stage { position: relative; z-index: 1; min-width: 0; }
-.erp-dev-chain__stage[data-conditional] { padding-top: 44px; }
-.erp-dev-chain__stage-card { position: relative; min-height: 64px; border: 1px solid var(--erp-border); border-radius: 6px; background: var(--erp-surface-bg); }
+.erp-dev-chain__stage[data-conditional] { padding-top: 28px; }
+.erp-dev-chain__stage-card { position: relative; min-height: 52px; border: 1px solid var(--erp-border); border-radius: 6px; background: var(--erp-surface-bg); }
 .erp-dev-chain__stage[data-conditional] .erp-dev-chain__stage-card { border-style: dashed; }
 .erp-dev-chain__stage[data-role-match="true"] .erp-dev-chain__stage-card { border-color: color-mix(in srgb, var(--erp-primary) 36%, var(--erp-border)); background: var(--erp-primary-soft); }
 .erp-dev-chain__stage-card[data-selected] { outline: 2px solid var(--erp-text); outline-offset: 2px; }
-.erp-dev-chain__stage-main { display: grid; grid-template-columns: 20px minmax(0,1fr); align-content: start; align-items: start; gap: 5px; width: 100%; padding: 10px 7px; color: var(--erp-text); text-align: left; font: inherit; font-size: var(--erp-font-small); line-height: 1.5; cursor: pointer; }
+.erp-dev-chain__stage-main { display: grid; grid-template-columns: 20px minmax(0,1fr); align-content: center; align-items: start; gap: 5px; width: 100%; padding: 8px 7px; color: var(--erp-text); text-align: left; font: inherit; font-size: var(--erp-font-small); line-height: 1.5; cursor: pointer; }
 .erp-dev-chain__stage-main > span { color: var(--erp-text-muted); font-variant-numeric: tabular-nums; }
 .erp-dev-chain__stage-main > strong { overflow-wrap: anywhere; font-weight: 500; }
 .erp-dev-chain__stage-main > small { grid-column: 2; color: var(--erp-text-muted); font-size: var(--erp-font-caption); }

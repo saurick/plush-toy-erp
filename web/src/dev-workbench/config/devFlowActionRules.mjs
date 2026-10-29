@@ -13,6 +13,24 @@ const sourceActionAuthority =
   '由具有对应单据动作权限的人员办理；后端复核当前版本、原因、幂等回执和关联对象。'
 
 export const DEV_FLOW_ACTION_RULES = {
+  'fact.quality_inspection': [
+    {
+      key: 'correct',
+      label: '纠正原判定并重新检验',
+      states: ['PASSED', 'REJECTED'],
+      permission: [PermissionCode.QUALITY_EXCEPTION_HANDLE],
+      authority: '办理人须有质检异常处置及来源读取权限；生产在制批次检验不适用此入口。',
+      condition: '原检验已有正式判定且未被替代，填写原因和新检验单号；采购行尚未实际入库，相关拒收处置和委外应付已解除，关联出货仍为草稿。',
+      blocked: '原检验待检、已被替代或属于在制批次；采购行已入库，存在有效拒收处置、委外应付，或关联出货已发生。',
+      effect: '原判定继续保留并记录被替代；另建引用原检验的待检记录，关联库存批次冻结。新记录重新检查并判定，不把原记录改回待检，也不自动入库。',
+      recovery: '先按来源处理依赖，再从原检验发起纠正；相同纠正意图重试读回同一新记录。通过关联查看中的“纠正后新待检记录”核对新旧检验关系。',
+      sourceRefs: [
+        `${BIZ}quality_inspection_correction.go`,
+        `${DATA}quality_inspection_correction_repo.go`,
+        `${SERVICE}jsonrpc_quality.go`,
+      ],
+    },
+  ],
   'workflow.task': [
     {
       key: 'reassign',
@@ -162,13 +180,14 @@ export const DEV_FLOW_ACTION_RULES = {
       states: ['confirmed'],
       authority: sourceActionAuthority,
       condition:
-        '关联在制批次已结束，委外事实均已过账或取消；正常关单还须满足逐行结清数量，短结必须填写原因。',
+        '关联在制批次已结束，委外事实均已过账或取消；正常关单按普通回货净量或已验收工序分配逐行结清，材料工序还须足量发料；短结必须填写原因。',
       blocked: '存在未结束在制批次、未结算事实草稿或未满足正常结清数量。',
       effect: '关闭委外订单与开放行，已发生发料、回货、质检及应付继续留存。',
       recovery:
         '先处理批次和事实；确定不再继续的欠量按短结办理，不伪造回货或结算。',
       sourceRefs: [
         `${DATA}outsourcing_order_repo.go`,
+        `${DATA}outsourcing_order_settlement.go`,
         `${BIZ}source_order_lifecycle.go`,
       ],
     },
@@ -198,11 +217,12 @@ export const DEV_FLOW_ACTION_RULES = {
         '无未解决异常和活动在制批次，生产事实均已过账或取消；成品未足量入库时必须填写关闭原因。',
       blocked: '异常处置、在制批次或事实草稿尚未结束；欠量关闭未说明原因。',
       effect:
-        '关闭生产承诺，保留冻结的生产依据与全部已发生事实；关闭不等于补足产量。',
+        '关闭生产承诺并按有效原始完工量保留销售占量，释放未完成部分供补排；成品返工保留原占量，补完工不重复占量。',
       recovery:
         '按实际阻断处理异常、批次和事实，再关闭；不通过修改汇总数量绕过检查。',
       sourceRefs: [
         `${DATA}production_order_repo.go`,
+        `${DATA}production_order_sales_planning.go`,
         `${BIZ}production_order.go`,
       ],
     },
@@ -218,6 +238,7 @@ export const DEV_FLOW_ACTION_RULES = {
       recovery: '先按各事实的依赖规则取消或冲正，再取消生产单。',
       sourceRefs: [
         `${DATA}production_order_repo.go`,
+        `${DATA}production_order_sales_planning.go`,
         `${BIZ}production_order.go`,
       ],
     },
@@ -269,7 +290,7 @@ export const DEV_FLOW_ACTION_RULES = {
       authority:
         '从正式领料、成品入库或返工入口办理，复核权限、版本与重复执行回执。',
       condition:
-        '来源生产单、明细、冻结材料或在制批次匹配；按事实类型核对可领量、可入库量和可用库存。返工使用自己的来源及新批次规则。',
+        '来源生产单、明细、冻结材料或在制批次匹配；普通领料与正常委外发料合并核对冻结需求及有效超领额度，再检查可用库存；完工与返工按确切批次办理。',
       blocked:
         '来源或批次不匹配、超可办理量、库存不足、重复请求意图不一致；不能仅凭任务完成过账。',
       effect:
@@ -277,6 +298,7 @@ export const DEV_FLOW_ACTION_RULES = {
       recovery: '修正来源、数量和库存条件后再办理；已生效错误走正式冲正。',
       sourceRefs: [
         `${DATA}operational_fact_production_repo.go`,
+        `${DATA}production_material_usage.go`,
         `${BIZ}operational_fact.go`,
       ],
     },
@@ -301,7 +323,7 @@ export const DEV_FLOW_ACTION_RULES = {
       states: ['DRAFT'],
       authority: '按委外事实入口校验权限、版本、来源和幂等回执。',
       condition:
-        '来源委外订单、明细、工序、数量及在制分配一致；发料满足库存，回货按来源可回数量和批次约束办理。',
+        '来源委外订单、明细、工序、数量及在制分配一致；正常材料发料与普通生产领料共用冻结额度，批准的补料重做独立计算；普通回货按合同量扣除净回货计算可补回量，只有已过账返厂释放额度；工序明细只能在工序批次办理回货。',
       blocked: '来源不允许继续、数量越界、在制分配不匹配或可用库存不足。',
       effect:
         '只产生本次发料／回货事实及对应库存、批次影响；回货不自动等于质检通过或应付已生成。',
@@ -326,13 +348,13 @@ export const DEV_FLOW_ACTION_RULES = {
   'fact.finance': [
     {
       key: 'cancel',
-      label: '取消财务草稿或已过账事实',
-      states: ['DRAFT', 'POSTED'],
+      label: '取消财务记录',
+      states: ['DRAFT', 'POSTED', 'SETTLED'],
       authority: '财务取消动作校验权限、版本、原因和重复请求意图。',
       condition:
-        '没有有效对账、核销和红冲依赖；已结清事实不能直接取消，须先由正式反向记录恢复可处理余额。',
-      blocked: '仍有有效对账、核销或红冲；状态为已结清；版本或取消意图不一致。',
-      effect: '保留原记录与取消依据，不删除核销流水，不把已结清直接改回草稿。',
+        '没有有效对账、核销和账款调整依赖；已完成单笔核对可以取消，其余已结清事实须先由正式反向记录恢复余额。',
+      blocked: '仍有有效对账、核销或账款调整；已结清且不是单笔核对；版本或取消意图不一致。',
+      effect: '保留原记录与取消依据；取消已完成单笔核对时保留原完成审计，不删除核销流水。',
       recovery:
         '按实际依赖先做冲正或反向红冲；余额恢复时由后端重新计算结清状态，再判断能否取消。',
       sourceRefs: [
@@ -386,7 +408,7 @@ export const DEV_FLOW_ACTION_RULES = {
       blocked:
         '生产单已结束、未批准、已执行、数量／版本不符、批次或目标不合格，或把超领当成普通执行。',
       effect:
-        '按方案写批次、库存和执行回执；审批通过本身不能证明处置已经发生。',
+        '按方案写批次、库存和执行回执；让步仅放行关联的不合格检验，保留原结果并继续后续必检关口，最后一关才放行批次。审批通过本身不能证明处置已经发生。',
       recovery:
         '先补齐具体条件再继续；需要纠正已执行结果时走异常撤销，保留原方案与批次关联。',
       sourceRefs: [
@@ -402,9 +424,9 @@ export const DEV_FLOW_ACTION_RULES = {
       condition:
         '生产单仍已发布且方案已批准；普通方案须已执行，超领须仍待执行且额度未使用；返工／重做新批次、让步接收及库存须满足对应反向条件。',
       blocked:
-        '额度已使用、后续批次已推进、已有依赖事实、可冲回数量不足或生产单已结束。',
+        '额度已使用、后续批次已推进、让步后的下一关已提交或判定、已有依赖事实、可冲回数量不足或生产单已结束。',
       effect:
-        '记录已撤销及补偿证据；按类型恢复原批次状态或追加反向库存，保留原审批和执行历史。',
+        '记录已撤销及补偿证据；让步只可取消尚未提交的下一关草稿并恢复不合格批次，其余按类型恢复状态或追加反向库存，保留原审批和执行历史。',
       recovery:
         '先处理可合法解除的后续依赖；不提供任意回退状态。需要新方案时按重新决策规则办理。',
       sourceRefs: [

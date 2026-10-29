@@ -33,19 +33,43 @@ export async function openMobileTaskCard(page, taskID) {
     x: titleBox.x + titleBox.width / 2,
     y: titleBox.y + titleBox.height / 2,
   };
-  assert.equal(
-    await open.evaluate(
+  await expect.poll(
+    () => open.evaluate(
       (element, position) =>
         document.elementFromPoint(position.x, position.y) === element,
       point,
     ),
-    true,
-    "task title must hit its primary open button",
-  );
+    { message: "task title must hit its primary open button after transient feedback clears" },
+  ).toBe(true);
   // The thumbnail has its own image-preview action; touch the task heading.
   await open.tap({
     position: { x: point.x - buttonBox.x, y: point.y - buttonBox.y },
   });
+}
+
+export async function openMobileTaskList(page, options, role) {
+  assert.equal(options.mobile, true);
+  const taskURL = `${options.baseURL}/m/${role}/tasks`;
+  // Preserve a closed form when switching tasks in the same screen; reloading
+  // restores the source task and opens its focused form again.
+  if (page.url() !== taskURL) await navigate(page, taskURL);
+  else await settleRPCPage(page);
+  for (const screenID of ['mobile-task-action-screen', 'mobile-task-desktop-review']) {
+    const screen = page.getByTestId(screenID);
+    if (await screen.isVisible()) {
+      await screen.getByRole('button', { name: '返回任务详情', exact: true }).first().click();
+      await expect(page.getByTestId('mobile-task-detail-screen')).toBeVisible();
+      await settleRPCPage(page);
+    }
+  }
+  const receiptScreen = page.getByTestId("mobile-task-receipt-screen");
+  if (await receiptScreen.isVisible()) {
+    await receiptScreen.getByRole("button", { name: "返回任务列表", exact: true }).first().click();
+  } else if (await page.getByTestId("mobile-task-detail-screen").isVisible()) {
+    await page.getByTestId("mobile-task-detail-screen").getByRole("button", { name: "返回任务列表", exact: true }).first().click();
+  }
+  await page.getByTestId("mobile-role-nav-tasks").click();
+  await expect(page.getByTestId('mobile-role-task-list')).toBeVisible();
 }
 
 export async function openMobileSourceTask(page, options, client, role, sourceType, sourceID, groups) {
@@ -59,22 +83,8 @@ export async function openMobileSourceTask(page, options, client, role, sourceTy
   assert.equal(candidates.length, 1, `${sourceType}:${sourceID} must have one authoritative task for ${groups.join(",")}`);
   const [task] = candidates;
   assert.ok(resolveMobileTaskBusinessEntry(task), "the actual source task must resolve to an exact task form");
-  await navigate(page, `${options.baseURL}/m/${role}/tasks`);
-  // Reloading the same phone URL restores the current task screen. Return
-  // through its real controls before choosing a different source task.
+  await openMobileTaskList(page, options, role);
   const actionScreen = page.getByTestId("mobile-task-action-screen");
-  if (await actionScreen.isVisible()) {
-    await actionScreen.getByRole("button", { name: "返回任务详情", exact: true }).click();
-    await expect(page.getByTestId("mobile-task-detail-screen")).toBeVisible();
-    await settleRPCPage(page);
-  }
-  const receiptScreen = page.getByTestId("mobile-task-receipt-screen");
-  if (await receiptScreen.isVisible()) {
-    await receiptScreen.getByRole("button", { name: "返回任务列表", exact: true }).first().click();
-  } else if (await page.getByTestId("mobile-task-detail-screen").isVisible()) {
-    await page.getByTestId("mobile-task-detail-screen").getByRole("button", { name: "返回任务列表", exact: true }).first().click();
-  }
-  await page.getByTestId("mobile-role-nav-tasks").click();
   await page.getByLabel("任务状态", { exact: true }).getByText(
     ["done", "withdrawn", "cancelled"].includes(task.task_status_key) ? "已办" : "待办",
     { exact: true },
@@ -86,19 +96,19 @@ export async function openMobileSourceTask(page, options, client, role, sourceTy
   await openMobileTaskCard(page, task.id);
   const detail = page.getByTestId("mobile-task-detail-screen");
   await expect(detail).toBeVisible();
-  const entry = detail.getByRole("button", { name: /^(填写办理表单|选择处理方式)$/u });
+  const entry = detail.locator('.mobile-role-action-bar').getByRole("button", { name: /^(任务办理|选择处理方式)$/u });
   await expect(entry).toHaveCount(1);
   await expect(entry).toBeEnabled();
   if ((await entry.textContent()).trim() === "选择处理方式") {
     await entry.click();
-    await page.getByTestId("mobile-task-action-screen").getByRole("button", { name: "填写办理表单", exact: true }).click();
+    await page.getByTestId("mobile-task-action-screen").getByRole('main').getByRole("button", { name: "任务办理", exact: true }).click();
   } else await entry.click();
   assert.equal(new URL(page.url()).pathname, `/m/${role}/tasks`, "fact handling must remain inside the current mobile task screen");
   const form = page.getByTestId("mobile-task-fact-form");
   await expect(form).toBeVisible();
   await expect(form).toHaveAttribute("data-source-type", sourceType);
   await expect(form).toHaveAttribute("data-source-id", String(sourceID));
-  await expect(page.getByTestId("mobile-task-flow-steps").locator("[data-step-key]")).toHaveCount(3);
+  await expect(actionScreen.getByTestId("mobile-task-flow-steps").locator("[data-step-key]")).toHaveCount(3);
   await assertMobileLayout(page, options);
   await settleRPCPage(page);
   return task;
@@ -116,8 +126,9 @@ export async function openDesktopTaskRow(page, task, sourceNo) {
 
 export async function assertMobileLayout(page, options) {
   if (!options.mobile) return;
+  const taskScreen = /^\/m\/[a-z_]+\/tasks$/u.test(new URL(page.url()).pathname);
   await expect(
-    page.locator('[data-mobile-business-page="true"]'),
+    page.locator(taskScreen ? '[data-task-business-page="true"]' : '[data-mobile-business-page="true"]'),
   ).toBeVisible();
   const metrics = await page.evaluate(() => ({
     width: window.innerWidth,
@@ -168,14 +179,20 @@ export async function selectRow(page, id) {
   await expect(radio).toBeChecked();
 }
 export async function pageAction(page, label) {
+  const browserPage = typeof page.page === 'function' ? page.page() : page;
   const direct = page.locator("button:visible").filter({ hasText: label });
   const more = page.getByRole("button", { name: /^更多操作，共 \d+ 项$/u });
-  await expect.poll(async () => (await direct.count()) > 0 || await more.isVisible()).toBe(true);
+  const otherActions = page.locator('details.mobile-task-business-other-actions:not([open])')
+    .filter({ has: browserPage.locator('button').filter({ hasText: label }) });
+  await expect.poll(async () => (await direct.count()) > 0 || await more.isVisible() || (await otherActions.count()) > 0).toBe(true);
   if ((await direct.count()) > 0) {
     await expect(direct).toHaveCount(1);
     return direct.click();
   }
-  await more.click();
+  if (await otherActions.count()) {
+    await expect(otherActions).toHaveCount(1);
+    await otherActions.locator('summary').click();
+  } else await more.click();
   await expect(direct).toHaveCount(1);
   await direct.click();
 }
@@ -419,6 +436,13 @@ export async function captureFailure(page, options, report, error) {
         .innerText()
         .catch(() => "")
     ).slice(0, 20000),
+    dialogs: await page.locator('.ant-modal').evaluateAll((nodes) => nodes.map((node) => ({
+      title: node.querySelector('.ant-modal-title')?.textContent,
+      role: node.getAttribute('role'),
+      hiddenBy: node.closest('[aria-hidden="true"], [inert]')?.className || null,
+      visible: Boolean(node.getClientRects().length),
+      buttons: [...node.querySelectorAll('button')].map((button) => ({ text: button.textContent, disabled: button.disabled, hidden: Boolean(button.closest('[aria-hidden="true"], [inert]')), visible: Boolean(button.getClientRects().length) })),
+    }))),
   };
   report.failures.push(failure);
   await page

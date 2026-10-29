@@ -30,7 +30,7 @@ function TrackingExceptions({ trackingRef, onOpenTask, refreshKey }) {
   )
 }
 
-export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTask, onAfterClose, refreshKey = '', closeLabel = '返回列表', open = Boolean(trackingRef), overview = null, navigation = null }) {
+export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTask, onAfterClose, refreshKey = '', closeLabel = '返回列表', open = Boolean(trackingRef), overview = null, overviewFooter = null, navigation = null }) {
   const [result, setResult] = useState(null)
   const [reload, setReload] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -185,7 +185,7 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
             {availableTasks.length ? <Button type={selectedTask?.canHandle ? 'primary' : 'default'} className="erp-workflow-tracking-open-task" aria-label={taskActionLabel} aria-haspopup="dialog" disabled={!selectedTask} loading={Boolean(openingTask)} onClick={() => openTask(selectedTask.task_id)}>{taskActionLabel}</Button> : null}
           </div>
         </div>
-      ) : null}
+      ) : overviewFooter}
     >
       {navigation}
       {!trackingRef ? overview : !current ? <Spin tip="正在读取任务进度"><div className="erp-workflow-tracking-loading" /></Spin> : current.error ? (

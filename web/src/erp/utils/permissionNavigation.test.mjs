@@ -10,6 +10,30 @@ import {
 const path = (key) =>
   businessModuleDefinitions.find((item) => item.key === key).path
 
+test('岗位导航预览按最终能力和来源投影历史入口，不以 RBAC 授权或历史页标记放行', () => {
+  const access = {
+    is_final: true,
+    pages: [
+      { path: path('processes'), effective: true },
+      { path: '/erp/history', effective: true },
+    ],
+    permissions: [
+      { permission_key: 'process.read', effective: true },
+      { permission_key: 'process.update', rbac_granted: true, effective: false },
+    ],
+  }
+  const visible = () => buildPermissionNavigationPlacement({ access }).pages.some((page) => page.path === '/erp/history')
+  assert.equal(visible(), false)
+  access.permissions[1].effective = true
+  assert.equal(visible(), true)
+  assert.equal(buildPermissionNavigationPlacement({
+    access,
+    navigationSections: [{ items: [{ key: 'history-records', path: '/erp/history', access: 'history' }] }],
+  }).pages.length, 0, '配置隐藏唯一来源后不能保留集中入口')
+  access.pages[0].effective = false
+  assert.equal(visible(), false)
+})
+
 test('岗位实际菜单沿用四区导航，财务多页面合并且默认入口只取获准页面', () => {
   const result = buildPermissionNavigationPlacement({
     access: {
@@ -38,7 +62,7 @@ test('岗位实际菜单沿用四区导航，财务多页面合并且默认入�
     result.pages.some((item) => item.path === path('receivables')),
     false
   )
-  assert.ok(result.pages.some((item) => item.path === '/erp/history'))
+  assert.equal(result.pages.some((item) => item.path === '/erp/history'), false)
   assert.ok(result.pages.some((item) => item.path === '/erp/help-center'))
 })
 

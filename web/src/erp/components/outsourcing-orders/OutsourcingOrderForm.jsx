@@ -12,6 +12,7 @@ import {
   InputNumber,
   Space,
 } from 'antd'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import {
@@ -189,6 +190,7 @@ export default function OutsourcingOrderForm({
   onProcessChange,
   onUnitChange,
 }) {
+  const taskReadOnly = useBusinessPageContext()?.taskBusiness?.readOnly === true
   const orderDate = Form.useWatch('order_date', form)
   const expectedReturnDate = Form.useWatch('expected_return_date', form)
   const { registerLineItemRow, requestLineItemScroll } =
@@ -206,8 +208,8 @@ export default function OutsourcingOrderForm({
     <Form
       form={form}
       name="outsourcing-order-editor"
+      disabled={taskReadOnly}
       layout="vertical"
-      preserve={false}
       className="erp-business-action-form erp-outsourcing-contract-form"
     >
       <BusinessFormSection title="合同与加工厂">
@@ -349,7 +351,7 @@ export default function OutsourcingOrderForm({
                     danger
                     type="text"
                     icon={<DeleteOutlined />}
-                    disabled={fields.length <= 1}
+                    disabled={taskReadOnly || fields.length <= 1}
                     onClick={() => remove(field.name)}
                   >
                     移除行
@@ -568,7 +570,7 @@ export default function OutsourcingOrderForm({
                     >
                       <Select
                         placeholder="请选择单位"
-                        disabled={Boolean(
+                        disabled={taskReadOnly || Boolean(
                           getFieldValue(['items', field.name, 'product_sku_id'])
                         )}
                         showSearch
@@ -738,7 +740,7 @@ export default function OutsourcingOrderForm({
                           placeholder="请选择产品规格"
                           allowClear
                           showSearch
-                          disabled={!productID}
+                          disabled={taskReadOnly || !productID}
                           options={options}
                           optionFilterProp="label"
                           onChange={(value) =>

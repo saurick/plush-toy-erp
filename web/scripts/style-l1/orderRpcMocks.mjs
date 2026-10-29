@@ -1,4 +1,5 @@
 import { buildProductionWipActionParams } from '../../src/erp/utils/productionWipModel.mjs'
+import { purchaseFollowupFixture } from './purchaseFollowupFixtures.mjs'
 import {
   stylePaginatedRpcData,
   styleRpcResult,
@@ -176,6 +177,9 @@ export async function installOrderRpcMocks(page, context) {
     switch (method) {
       case 'list_purchase_orders':
         data = stylePaginatedRpcData([purchaseOrder], 'purchase_orders', params)
+        break
+      case 'list_purchase_followups':
+        data = purchaseFollowupFixture([], params)
         break
       case 'list_purchase_order_items':
         data = stylePaginatedRpcData(

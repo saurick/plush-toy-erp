@@ -2517,16 +2517,13 @@ export function createMobileTaskScenarios({
           payload: { product_name: '云朵小熊', blocked_reason: '排期待核对' },
         },
       ],
+      beforeNavigate: async (page) => {
+        await page.addInitScript(() => localStorage.setItem(
+          'plush_erp_appearance',
+          JSON.stringify({ accent: 'pink', density: 'standard' })
+        ))
+      },
       verify: async (page) => {
-        const previousAppearance = await page.evaluate(() => {
-          const previous = localStorage.getItem('plush_erp_appearance')
-          localStorage.setItem(
-            'plush_erp_appearance',
-            JSON.stringify({ accent: 'pink', density: 'standard' })
-          )
-          return previous
-        })
-        await page.reload({ waitUntil: 'domcontentloaded' })
         const row = page
           .locator('.erp-mobile-list-item')
           .filter({ hasText: '确认重点订单排期' })
@@ -2560,7 +2557,7 @@ export function createMobileTaskScenarios({
         )
         const actionViewport = page.viewportSize()
         await page.setViewportSize({ width: 393, height: 500 })
-        assert.equal(await assertMobileBackToTop(page, action.locator('.mobile-role-tasks-page__detail-main')), false, '简短任务办理不显示回顶按钮')
+        assert.equal(await assertMobileBackToTop(page, action.locator('.mobile-role-tasks-page__detail-main')), true, '短屏中任务信息与办理表单共用正文滚动，回顶保留填写内容')
         await page.setViewportSize(actionViewport)
         await action.screenshot({
           path: path.join(outputDir, 'mobile-resume-action-pink-393.png'),
@@ -2585,12 +2582,6 @@ export function createMobileTaskScenarios({
           .locator('.mobile-role-action-bar')
           .getByRole('button', { name: '返回任务列表', exact: true })
           .click()
-        await expectText(page, '确认重点订单排期')
-        await page.evaluate((previous) => {
-          if (previous === null) localStorage.removeItem('plush_erp_appearance')
-          else localStorage.setItem('plush_erp_appearance', previous)
-        }, previousAppearance)
-        await page.reload({ waitUntil: 'domcontentloaded' })
         await expectText(page, '确认重点订单排期')
       },
     },

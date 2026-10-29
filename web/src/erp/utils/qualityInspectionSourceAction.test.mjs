@@ -14,6 +14,7 @@ import {
   isRejectedIncomingInspection,
   OUTSOURCING_RETURN_QUALITY_GATE_STATES,
   qualityInspectionRouteSourceParams,
+  qualityInspectionTypeForRouteSource,
   resolveOutsourcingReturnQualityGate,
 } from './qualityInspectionSourceAction.mjs'
 
@@ -43,6 +44,21 @@ test('quality source checks keep receipt, inspection and fact status contracts i
   assert.equal(consumer.canCreatePurchaseReturnFromRejectedInspection(inspection, { id: 2, status: 'FACT_POSTED' }), false)
   assert.equal(consumer.isPostedOutsourcingReturn({ id: 4, fact_type: 'RETURN_RECEIPT', status: 'FACT_POSTED' }), true)
   assert.equal(consumer.isPostedOutsourcingReturn({ id: 4, fact_type: 'RETURN_RECEIPT', status: 'RECEIPT_POSTED' }), false)
+})
+
+test('source entry selects the same inspection family used by the exact-source query', () => {
+  for (const [source, inspectionType] of [
+    ['SHIPMENT', 'FINISHED_GOODS'],
+    ['PURCHASE_RECEIPT', 'INCOMING'],
+    ['OUTSOURCING_FACT', 'OUTSOURCING_RETURN'],
+  ]) {
+    const selected = qualityInspectionTypeForRouteSource(source)
+    assert.equal(selected, inspectionType)
+    assert.equal(isQualityInspectionRouteSourceCompatible(selected, source), true)
+    assert.deepEqual(qualityInspectionRouteSourceParams({ inspectionType: selected, sourceType: source, sourceID: 42 }),
+      source === 'OUTSOURCING_FACT' ? { fact_id: 42 } : { source_type: source, source_id: 42 })
+  }
+  assert.equal(qualityInspectionTypeForRouteSource('UNKNOWN'), '')
 })
 
 test('quality inspection route source compatibility follows inspection grain', () => {

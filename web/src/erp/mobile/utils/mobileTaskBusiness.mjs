@@ -2,16 +2,18 @@ import { resolveWorkflowTaskEntryPath } from '../../utils/dashboardTaskDisplay.m
 import { canOpenWorkflowTaskEntry } from '../../utils/workflowTaskEntryAccess.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { BUSINESS_ROUTE_PATHS, hasActionPermission } from '../../utils/masterDataOrderView.mjs'
+import { workflowTaskBusinessContract } from '../../utils/workflowTaskBusinessContract.mjs'
 
 const RELATED = Object.freeze([
   { kind: 'production_plan', sourceType: 'sales_order', label: '办理关联生产计划', path: BUSINESS_ROUTE_PATHS.productionOrders, permission: PermissionCode.PMC_PLAN_CREATE },
   { kind: 'shipment', sourceType: 'sales_order', label: '办理关联出货', path: BUSINESS_ROUTE_PATHS.shipments, permission: PermissionCode.SHIPMENT_CREATE },
-  { kind: 'inventory', sourceType: 'purchase_receipt', label: '核对已入库批次', path: BUSINESS_ROUTE_PATHS.inventory, permission: PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE },
-  { kind: 'inventory', sourceType: 'production_fact', label: '核对已入库批次', path: BUSINESS_ROUTE_PATHS.inventory, permission: PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE },
+  { kind: 'inventory', sourceType: 'purchase_receipt', label: '核对已入库批次', path: BUSINESS_ROUTE_PATHS.inventory, permission: PermissionCode.WAREHOUSE_INVENTORY_READ, readOnlyAvailable: true },
+  { kind: 'inventory', sourceType: 'production_fact', label: '核对已入库批次', path: BUSINESS_ROUTE_PATHS.inventory, permission: PermissionCode.WAREHOUSE_INVENTORY_READ, readOnlyAvailable: true },
 ])
 
-export function mobileTaskRelatedCommands(task, profile, sourceAccess) {
+export function mobileTaskRelatedCommands(task, profile, sourceAccess, { readOnly = false } = {}) {
   return RELATED.filter((command) => task?.source_type === command.sourceType &&
+    (!readOnly || command.readOnlyAvailable) &&
     hasActionPermission(profile, command.permission) && canOpenWorkflowTaskEntry(profile, command.path, sourceAccess))
 }
 
@@ -44,7 +46,9 @@ export function resolveMobileTaskBusinessEntry(task) {
 }
 
 export function canOpenMobileTaskBusiness(task, profile, sourceAccess) {
-  return canOpenWorkflowTaskEntry(profile, resolveMobileTaskBusinessEntry(task), sourceAccess)
+  return Boolean(Number.isSafeInteger(profile?.id) && profile.id > 0 && !profile.disabled && workflowTaskBusinessContract(task).containedBusiness &&
+    resolveMobileTaskBusinessEntry(task) && sourceAccess?.applicable === true &&
+    sourceAccess.resolved === true && sourceAccess.allowed === true)
 }
 
 export function selectMobileRelatedBusinessTask(page, source, roleKey) {

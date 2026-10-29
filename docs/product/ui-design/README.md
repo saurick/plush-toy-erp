@@ -42,6 +42,7 @@
 | 业务界面 | `/__dev/ui-design` | 单据、列表、表单与来源下钻 |
 | 生产管理 | `/__dev/ui-design?page=production-hub` | 生产订单、生产执行、生产记录、异常处理四入口；任务直达与返回合同见交互设计说明 |
 | 任务处理 | `/__dev/ui-design?page=task-handling` | 任务中心与业务页就地办理、工程整页编制、审批退回、入库确认与结果；BOM 版本操作、三种打印及主要业务动作共用同一份稿 |
+| 模板打印中心 | 业务界面 → 工具与查询 → 模板打印中心 | 五种模板、纸面三处编号与分区短说明；单击切换、双击或主按钮进入编辑，返回保留选择，见[打印交互合同](交互设计说明.md#print-template-center) |
 | 工作中心界面说明 | `/__dev/ui-design?view=specification&topic=task-cards` | 电脑与手机共用内容，按需切换；值的含义、条件差异与布局原因一次解释一处 |
 | 手机版任务 | `/__dev/ui-design?page=mobile-tasks` | 任务管理内的待办、已办、流程跟踪；流转详情、当前任务办理与返回 |
 | 效能工作台 | `/__dev/ui-design?page=workbench` | 四类共享页面样板与状态操作；“整体交互预览”保留总览、工具导航、证据详情与操作确认 |
@@ -93,6 +94,7 @@
 1. **保留唯一来源**：本目录仅一份最新 HTML；不增加重复查看器、图片方案或历史版本目录。
 2. **分清演示与事实**：固定日期和虚构数据仅用于审查；正式页面以 API、权限、状态、共享组件和实际证据为准。
 3. **同步相关内容**：同时核对设计稿、说明、共享实现和受影响的浏览器场景。
+   打印中心的 `printTemplates` 内容快照逐项对齐正式 `printTemplateCatalog` 的名称、用途和 `guide`；`devUIDesign.test.mjs` 守住内容同步，`dev-ui-design-print-template-guide` 浏览器场景核对选择、编号、只读、编辑返回、BOM 三种带值打印与收窄布局。
 4. **核对帮助快照**：`web/src/dev-workbench/config/devUIDesign.test.mjs` 检查岗位内容同步及概览有效性；内容变化后复核交接、异常和完成条件。
 5. **保留业务边界**：不放宽 API/RBAC、取消/冲正、未保存保护或 Workflow 与事实的区分。快照检查不自动证明后端逻辑一致。
 

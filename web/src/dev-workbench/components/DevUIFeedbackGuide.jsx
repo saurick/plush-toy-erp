@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { Alert, Button, Form, Input, Slider } from 'antd'
-import { Link } from 'react-router-dom'
 import Select from '@/common/components/select/AppSelect'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { MermaidDiagram } from '@/common/components/markdown'
@@ -458,18 +457,6 @@ export default function DevUIFeedbackGuide({ topic, chapters, view }) {
         <StateGuide topic={topic} chapters={chapters} rationale={rationale} />
       )}
       <DevUIFeedbackExamples topic={topic.key} size={size} />
-      <nav className="erp-feedback-crosslinks" aria-label="对应说明与示例">
-        <Link
-          to={`/__dev/ui-design?view=${rationale ? 'specification' : 'rationale'}&topic=${topic.key}`}
-        >
-          {rationale ? '查看使用说明' : '查看设计依据'}
-        </Link>
-        <Link
-          to="/__dev/ui-design?page=controls&control=feedback"
-        >
-          打开控件设计
-        </Link>
-      </nav>
     </section>
   )
 }

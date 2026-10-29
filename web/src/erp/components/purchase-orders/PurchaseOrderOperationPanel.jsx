@@ -66,6 +66,7 @@ export default function PurchaseOrderOperationPanel({
   openEditModal,
   openTermsModal,
   canCompleteTerms = false,
+  openDeliveryModal,
   openDetails,
   openInboundDraftModal,
   openRelatedTable,
@@ -286,6 +287,11 @@ export default function PurchaseOrderOperationPanel({
             查看详情
           </Button>
         </BusinessActionTooltip>
+        {canUpdate && selectedLifecycleStatus === 'approved' ? (
+          <Button size="small" data-business-action-key="purchase-update-delivery" disabled={recordActionBusy} onClick={() => openDeliveryModal(singleSelectedOrder)}>
+            维护交期
+          </Button>
+        ) : null}
         {canCompleteTerms && (selectedLifecycleStatus === 'approved' || (selectedLifecycleStatus === 'closed' && selectedItems.some((item) => item.unit_price == null))) ? (
           <Button size="small" data-business-action-key="purchase-complete-terms" disabled={recordActionBusy} onClick={() => openTermsModal(singleSelectedOrder)}>
             补齐价格与交期

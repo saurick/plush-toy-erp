@@ -47,6 +47,8 @@ import {
   Typography,
 } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { TaskBusinessWorkspaceContext } from '../hooks/useBusinessPageContext.js'
+import WorkflowTaskBusinessWorkspace from './workflow/WorkflowTaskBusinessWorkspace.jsx'
 import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import BusinessModuleTabs from './BusinessModuleTabs.jsx'
 import {
@@ -108,7 +110,7 @@ import {
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
 import { buildRoleGuidedNavigation } from '../config/roleGuidedNavigation.mjs'
 import {
-  getAuthenticatedNavigationSections,
+  getUtilityNavigationSections,
   getNavigationSections,
   getProductCoreNavigationSections,
 } from '../config/seedData.mjs'
@@ -119,6 +121,8 @@ import {
   resolveDesktopHomeEntry,
 } from '../utils/currentNavigationEntry.mjs'
 import { getAdminAccountName } from '../utils/adminIdentity.mjs'
+import { getHistoryCenterSources } from '../utils/historyRecordCatalog.mjs'
+import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import {
   CUSTOMER_RUNTIME_GATE,
   attachEffectiveSessionToAdminProfile,
@@ -481,7 +485,7 @@ export default function ERPLayout({ legalNotice }) {
   const routeNavigationSections = useMemo(
     () => [
       ...getNavigationSections(isSuperAdmin ? null : undefined),
-      ...getAuthenticatedNavigationSections(),
+      ...getUtilityNavigationSections(),
     ],
     [isSuperAdmin]
   )
@@ -491,7 +495,7 @@ export default function ERPLayout({ legalNotice }) {
     }
     return [
       ...getProductCoreNavigationSections(),
-      ...getAuthenticatedNavigationSections(),
+      ...getUtilityNavigationSections(),
     ]
   }, [routeNavigationSections, shouldUseProductCoreNavigation])
   const currentNavigationEntry = useMemo(
@@ -852,21 +856,29 @@ export default function ERPLayout({ legalNotice }) {
         }))
         .filter((section) => section.items.length > 0)
     const permissionGovernedSections = buildSectionsByAccess(
-      (item) => item.access !== 'authenticated'
+      (item) => !item.access
     )
-    const authenticatedSections = buildSectionsByAccess(
-      (item) => item.access === 'authenticated'
-    )
+    const businessSections = shouldUseProductCoreNavigation
+      ? permissionGovernedSections
+      : filterNavigationSectionsByAdminProfile({
+          navigationSections: permissionGovernedSections,
+          adminProfile,
+          allowedMenuPaths,
+          isSuperAdmin,
+        })
+    const historyAvailable = getHistoryCenterSources({
+      visibleMenuPaths: businessSections.flatMap((section) =>
+        section.items.map((item) => item.path)
+      ),
+      canReadPermission: (permission) => hasActionPermission(adminProfile, permission),
+      isSuperAdmin,
+    }).length > 0
     return [
-      ...(shouldUseProductCoreNavigation
-        ? permissionGovernedSections
-        : filterNavigationSectionsByAdminProfile({
-            navigationSections: permissionGovernedSections,
-            adminProfile,
-            allowedMenuPaths,
-            isSuperAdmin,
-          })),
-      ...authenticatedSections,
+      ...businessSections,
+      ...buildSectionsByAccess((item) =>
+        item.access === 'authenticated' ||
+        (item.access === 'history' && historyAvailable)
+      ),
     ]
   }, [
     adminProfile,
@@ -905,7 +917,7 @@ export default function ERPLayout({ legalNotice }) {
         .map((section) => ({
           ...section,
           items: (section.items || []).filter(
-            (item) => item.access !== 'authenticated'
+            (item) => !item.access
           ),
         }))
         .filter((section) => section.items.length > 0),
@@ -959,6 +971,11 @@ export default function ERPLayout({ legalNotice }) {
   )
 
   const currentPageShouldRedirect = useMemo(() => {
+    if (currentEntry?.access === 'history') {
+      return !profileLoading && !visibleSections.some((section) =>
+        section.items.some((item) => item.path === currentEntry.path)
+      )
+    }
     if (currentEntry?.access === 'authenticated') {
       return false
     }
@@ -983,6 +1000,8 @@ export default function ERPLayout({ legalNotice }) {
     currentNavigationEntry.pageKey,
     currentNavigationEntry.matched,
     currentEntry?.access,
+    currentEntry?.path,
+    visibleSections,
     shouldUseProductCoreNavigation,
   ])
 
@@ -1620,7 +1639,9 @@ export default function ERPLayout({ legalNotice }) {
                       />
                     }
                   >
-                    <Outlet context={outletContext} key={businessPageGeneration} />
+                    <TaskBusinessWorkspaceContext.Provider value={WorkflowTaskBusinessWorkspace}>
+                      <Outlet context={outletContext} key={businessPageGeneration} />
+                    </TaskBusinessWorkspaceContext.Provider>
                   </Suspense>
                 )}
               </div>

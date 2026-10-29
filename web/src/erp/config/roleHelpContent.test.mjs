@@ -77,6 +77,13 @@ test('roleHelpContent: 快捷入口全部来自当前正式导航', () => {
   })
 })
 
+test('roleHelpContent: 加工环节资料由 PMC 维护，工程引用与实际生产安排分开', () => {
+  const processPath = '/erp/engineering/processes'
+  assert.ok(getRoleHelpGuide('pmc').priorities.some((item) => item.path === processPath))
+  assert.ok(!getRoleHelpGuide('engineering').priorities.some((item) => item.path === processPath))
+  assert.match(getRoleHelpGuide('pmc').workflow.join(' '), /具体订单由生产决定加工方及厂内或委外安排/u)
+})
+
 test('roleHelpContent: 当前有效岗位优先，多岗位按稳定顺序展示', () => {
   const guides = getRoleHelpGuidesForProfile({
     roles: [

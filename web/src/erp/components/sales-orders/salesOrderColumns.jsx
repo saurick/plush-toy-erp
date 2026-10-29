@@ -96,7 +96,7 @@ function engineeringMaterialStatusLabel(value) {
       BOSS_APPROVED: '待财务审核',
       APPROVED: '已批准采购',
       REJECTED: '已退回工程',
-    }[value] || '待工程提交'
+    }[value] || '待资料齐全'
   )
 }
 

@@ -204,7 +204,7 @@ test('FL_processing_contract_business_draft__does_not_fill_missing_business_fiel
   assert.deepEqual(draft.merges, [])
 })
 
-test('processingContractTemplate: 旧版固定附件按左右顺序迁入共享末尾附图', () => {
+test('processingContractTemplate: 不读取或保存退役的固定附件字段', () => {
   const draft = normalizeProcessingContractDraft({
     attachments: {
       'attachment-2': {
@@ -220,10 +220,7 @@ test('processingContractTemplate: 旧版固定附件按左右顺序迁入共享�
     },
   })
 
-  assert.deepEqual(
-    draft.appendixImages.map((image) => image.name),
-    ['左图.png', '右图.png']
-  )
+  assert.deepEqual(draft.appendixImages, [])
   assert(!Object.hasOwn(draft, 'attachments'))
 })
 
@@ -253,6 +250,87 @@ test('processingContractTemplate: 显式清空末尾附图后不会从旧版附�
   assert.deepEqual(businessDraft.appendixImages, [])
   assert(!Object.hasOwn(normalizedDraft, 'attachments'))
   assert(!Object.hasOwn(businessDraft, 'attachments'))
+})
+
+test('processingContractTemplate: 当前合同编辑内容保存恢复后完整保留，未登记字段不进入草稿', () => {
+  const current = {
+    ...createBlankProcessingContractDraft(),
+    contractNo: 'SIM-OUT-EDIT',
+    currency: 'HKD',
+    orderDateText: '2026/10/25',
+    returnDateText: '',
+    supplierName: '示例加工方',
+    supplierContact: '加工方联系人',
+    supplierPhone: '020-00000000',
+    supplierAddress: '示例加工区',
+    supplierSigner: '',
+    supplierSignDateText: '',
+    buyerCompany: '示例委托方',
+    buyerContact: '委外负责人',
+    buyerPhone: '020-11111111',
+    buyerAddress: '示例办公区',
+    buyerSigner: '委托方签字人',
+    buyerSignDateText: '现场签字',
+    lines: [
+      {
+        contractNo: 'SIM-OUT-EDIT',
+        productOrderNo: 'SIM-SO-EDIT',
+        productNo: 'SIM-MATERIAL-EDIT',
+        productName: '示例材料',
+        processingItem: '手工编辑工序',
+        supplierAlias: '示例加工方',
+        processCategory: '车缝',
+        unit: '片',
+        unitPrice: '1.234567',
+        quantity: '2',
+        amount: '9.75',
+        remark: '保留手工确认金额',
+      },
+    ],
+    clauses: [
+      {
+        key: 'delivery',
+        label: '编辑后的来货要求',
+        items: ['第一条', '', '第三条'],
+      },
+      { key: 'settlement', label: '', items: [] },
+    ],
+    merges: [{ rowStart: 0, rowEnd: 0, colStart: 2, colEnd: 3 }],
+    appendixImages: [
+      {
+        id: 'current-image',
+        name: '当前附图.png',
+        dataURL: 'data:image/png;base64,Y3VycmVudA==',
+        mimeType: 'image/png',
+        width: 640,
+        height: 480,
+        layoutMode: 'half',
+        segments: [],
+      },
+    ],
+  }
+  const stored = JSON.parse(
+    JSON.stringify({
+      ...current,
+      attachments: { 'attachment-1': current.appendixImages[0] },
+      unregisteredField: '不应保存',
+    })
+  )
+
+  for (const restore of [
+    normalizeProcessingContractDraft,
+    createProcessingContractBusinessDraft,
+  ]) {
+    const restored = restore(stored)
+    assert.deepEqual(restored, current)
+    assert.deepEqual(restore(JSON.parse(JSON.stringify(restored))), current)
+    assert.deepEqual(
+      restore({ ...stored, appendixImages: [] }).appendixImages,
+      []
+    )
+  }
+  assert.equal(stored.unregisteredField, '不应保存')
+  assert.equal(stored.lines[0].amount, '9.75')
 })
 
 test('processingContractTemplate: 委外事实只带入合同打印可确认快照字段', () => {

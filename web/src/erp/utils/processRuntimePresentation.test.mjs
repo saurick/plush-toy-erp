@@ -110,7 +110,7 @@ test('process runtime presentation covers every current Product Core process', (
   )
   assert.equal(
     getProcessLabel({ process_key: 'inventory_adjustment_approval' }),
-    '人工库存调整'
+    '库存盘点与调整'
   )
   assert.equal(
     getProcessLabel({ process_key: 'production_exception_approval' }),
@@ -138,12 +138,12 @@ test('process runtime presentation covers every current Product Core process', (
     finance_payment_execution: '收付款执行交接',
     post_finance_payment: '收付款过账核销',
     reject_finance_payment: '退回收付款申请',
-    submit_inventory_adjustment: '提交人工库存调整',
-    inventory_adjustment_approval: '人工库存调整审批',
-    approve_inventory_adjustment: '确认人工库存调整',
-    inventory_adjustment_execution: '人工库存调整执行交接',
-    post_inventory_adjustment: '人工库存调整过账',
-    reject_inventory_adjustment: '退回人工库存调整',
+    submit_inventory_adjustment: '提交库存盘点与调整',
+    inventory_adjustment_approval: '库存盘点与调整审批',
+    approve_inventory_adjustment: '确认库存盘点与调整',
+    inventory_adjustment_execution: '库存盘点与调整执行交接',
+    post_inventory_adjustment: '库存盘点与调整过账',
+    reject_inventory_adjustment: '退回库存盘点与调整',
     production_exception_decision_approval: '生产异常审批',
     approve_production_exception: '确认生产异常处置',
     production_exception_execution: '生产异常执行交接',

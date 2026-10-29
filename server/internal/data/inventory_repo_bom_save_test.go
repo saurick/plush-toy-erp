@@ -18,6 +18,64 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func TestInventoryRepo_BOMEditorFieldsPersistAndClear(t *testing.T) {
+	ctx := t.Context()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_bom_editor_fields")
+	f := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 1, 0)
+	printed := start.AddDate(0, 0, 26)
+	in := &biz.BOMVersionMutation{ProductID: f.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{
+		Version: "编辑器完整字段", EffectiveFrom: &start, EffectiveTo: &end, PrintDate: &printed,
+		SourceOrderNo: stringPtr("SO-EDITOR-1"), QuantityText: stringPtr("100"), SpareText: stringPtr("5"),
+		Designer: stringPtr("工程设计员"), Maker: stringPtr("工程制表员"), Auditor: stringPtr("工程审核员"),
+		HairDirection: stringPtr("单方向"), Note: stringPtr("待清空表头"),
+	}}
+	part := biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: decimal.RequireFromString("1.25"), LossRate: decimal.RequireFromString("0.1"),
+		Position: stringPtr("身体"), PieceCount: stringPtr("2"), TotalUsageSnapshot: stringPtr("137.5"), ProcessBase: stringPtr("贴衬"), ProcessMethod: stringPtr("车缝"), Note: stringPtr("待清空明细"),
+	}
+	created, err := uc.SaveBOMWithItems(ctx, 0, in, []*biz.BOMItemSaveMutation{{BOMItemUpdate: part}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	read, err := uc.GetBOMVersion(ctx, created.Header.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"source": "SO-EDITOR-1", "quantity": "100", "spare": "5", "designer": "工程设计员", "maker": "工程制表员", "auditor": "工程审核员", "hair": "单方向", "note": "待清空表头"}
+	actual := map[string]*string{"source": read.Header.SourceOrderNo, "quantity": read.Header.QuantityText, "spare": read.Header.SpareText, "designer": read.Header.Designer, "maker": read.Header.Maker, "auditor": read.Header.Auditor, "hair": read.Header.HairDirection, "note": read.Header.Note}
+	for key, value := range actual {
+		if value == nil || *value != want[key] {
+			t.Fatalf("header field %s did not persist", key)
+		}
+	}
+	if read.Header.EffectiveFrom == nil || !read.Header.EffectiveFrom.Equal(start) || read.Header.EffectiveTo == nil || !read.Header.EffectiveTo.Equal(end) || read.Header.PrintDate == nil || !read.Header.PrintDate.Equal(printed) {
+		t.Fatal("BOM date fields did not persist")
+	}
+	if len(read.Items) != 1 || read.Items[0].ProcessBase == nil || *read.Items[0].ProcessBase != "贴衬" || read.Items[0].ProcessMethod == nil || *read.Items[0].ProcessMethod != "车缝" || read.Items[0].TotalUsageSnapshot == nil || *read.Items[0].TotalUsageSnapshot != "137.5" {
+		t.Fatal("BOM part fields did not persist")
+	}
+	assertDecimalEqual(t, read.Items[0].Quantity, "1.25")
+	assertDecimalEqual(t, read.Items[0].LossRate, "0.1")
+	_, err = uc.SaveBOMWithItems(ctx, read.Header.ID, &biz.BOMVersionMutation{ProductID: f.productID, ExpectedVersion: read.Header.EditVersion, BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: in.Version}}, []*biz.BOMItemSaveMutation{{ID: read.Items[0].ID, BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: decimal.NewFromInt(2)}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleared, err := uc.GetBOMVersion(ctx, read.Header.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for key, value := range map[string]*string{"source": cleared.Header.SourceOrderNo, "quantity": cleared.Header.QuantityText, "spare": cleared.Header.SpareText, "designer": cleared.Header.Designer, "maker": cleared.Header.Maker, "auditor": cleared.Header.Auditor, "hair": cleared.Header.HairDirection, "note": cleared.Header.Note, "position": cleared.Items[0].Position, "pieces": cleared.Items[0].PieceCount, "total": cleared.Items[0].TotalUsageSnapshot, "base": cleared.Items[0].ProcessBase, "method": cleared.Items[0].ProcessMethod, "part_note": cleared.Items[0].Note} {
+		if value != nil {
+			t.Fatalf("cleared field %s retained a stale value", key)
+		}
+	}
+	if cleared.Header.EffectiveFrom != nil || cleared.Header.EffectiveTo != nil || cleared.Header.PrintDate != nil || cleared.Items[0].ID != read.Items[0].ID || cleared.Header.Status != biz.BOMStatusDraft {
+		t.Fatal("clearing fields changed identity/state or retained dates")
+	}
+}
+
 func TestInventoryRepo_BOMSourceValuesPersistCopyAndClear(t *testing.T) {
 	ctx := t.Context()
 	data, client := openInventoryRepoTestData(t, "bom_source_values")

@@ -180,8 +180,19 @@ func TestProductionWIPQualityInspectionSequentialPassAndProjection(t *testing.T)
 		}
 	}
 
-	if _, err := f.uc.PassQualityInspection(f.ctx, approximateQualityInspectionDecision(current.ID, biz.QualityInspectionResultPass)); !errors.Is(err, biz.ErrProductionWIPInvalidTransition) {
-		t.Fatalf("duplicate WIP decision must fail closed, got %v", err)
+	if _, err := f.uc.PassQualityInspection(f.ctx, approximateQualityInspectionDecision(current.ID, biz.QualityInspectionResultPass)); err != nil {
+		t.Fatalf("identical final decision retry: %v", err)
+	}
+	if _, err := f.uc.PassQualityInspection(f.ctx, approximateQualityInspectionDecision(fixture.inspection.ID, biz.QualityInspectionResultPass)); err != nil {
+		t.Fatalf("identical earlier gate retry after all gates completed: %v", err)
+	}
+	conflicting := approximateQualityInspectionDecision(current.ID, biz.QualityInspectionResultPass)
+	conflicting.CheckItems[0].Observation = "changed observation"
+	if _, err := f.uc.PassQualityInspection(f.ctx, conflicting); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("changed decision retry must conflict: %v", err)
+	}
+	if batch := f.client.ProductionWIPBatch.GetX(f.ctx, fixture.batch.ID); batch.Version != initialBatchVersion+1 {
+		t.Fatalf("retry advanced batch twice: %+v", batch)
 	}
 	if count := f.client.InventoryLot.Query().CountX(f.ctx); count != 0 {
 		t.Fatalf("WIP quality must not create or mutate inventory lots, count=%d", count)
@@ -285,8 +296,8 @@ func TestProductionWIPQualityInspectionRejectsBatch(t *testing.T) {
 	if batch.Status != biz.ProductionWIPStatusRejected || batch.Version != fixture.batch.Version+1 {
 		t.Fatalf("rejected inspection did not reject batch: %+v", batch)
 	}
-	if _, err := f.uc.RejectQualityInspection(f.ctx, approximateQualityInspectionDecision(fixture.inspection.ID, biz.QualityInspectionResultReject)); !errors.Is(err, biz.ErrProductionWIPInvalidTransition) {
-		t.Fatalf("duplicate reject must fail closed, got %v", err)
+	if _, err := f.uc.RejectQualityInspection(f.ctx, approximateQualityInspectionDecision(fixture.inspection.ID, biz.QualityInspectionResultReject)); err != nil {
+		t.Fatalf("identical rejected decision retry: %v", err)
 	}
 }
 
@@ -376,24 +387,39 @@ func TestProductionWIPQualityInspectionPostgresConcurrentDecision(t *testing.T) 
 	close(start)
 	wg.Wait()
 	close(errs)
-	succeeded := 0
-	rejected := 0
 	for err := range errs {
-		switch {
-		case err == nil:
-			succeeded++
-		case errors.Is(err, biz.ErrProductionWIPInvalidTransition):
-			rejected++
-		default:
-			t.Fatalf("unexpected concurrent WIP quality decision error: %v", err)
+		if err != nil {
+			t.Fatalf("identical concurrent WIP decision must replay successfully: %v", err)
 		}
-	}
-	if succeeded != 1 || rejected != 1 {
-		t.Fatalf("concurrent decision outcomes succeeded=%d rejected=%d", succeeded, rejected)
 	}
 	batch := client.ProductionWIPBatch.GetX(ctx, fixture.batch.ID)
 	inspection := client.QualityInspection.GetX(ctx, fixture.inspection.ID)
 	if batch.Status != biz.ProductionWIPStatusAccepted || batch.Version != fixture.batch.Version+1 || inspection.Status != biz.QualityInspectionStatusPassed {
 		t.Fatalf("concurrent decision did not converge: batch=%+v inspection=%+v", batch, inspection)
+	}
+}
+
+func TestProductionWIPQualityInspectionRequiresEvidence(t *testing.T) {
+	f := openProductionWIPQualityTestFixture(t, "wip_required_evidence")
+	fixture := f.createWaitingBatch(t, "EVIDENCE", []string{biz.ProductionWIPQualityGateNeedle})
+	if _, err := f.uc.SubmitQualityInspection(f.ctx, fixture.inspection.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, missing := range []string{"checks", "reason"} {
+		input := approximateQualityInspectionDecision(fixture.inspection.ID, biz.QualityInspectionResultReject)
+		if missing == "checks" {
+			input.CheckItems = nil
+		} else {
+			input.DecisionNote = nil
+		}
+		if _, err := f.uc.RejectQualityInspection(f.ctx, input); !errors.Is(err, biz.ErrBadParam) {
+			t.Fatalf("missing %s accepted: %v", missing, err)
+		}
+		if row := f.client.QualityInspection.GetX(f.ctx, fixture.inspection.ID); row.Status != biz.QualityInspectionStatusSubmitted || row.Result != nil {
+			t.Fatalf("invalid evidence changed decision: %+v", row)
+		}
+		if batch := f.client.ProductionWIPBatch.GetX(f.ctx, fixture.batch.ID); batch.Status != biz.ProductionWIPStatusWaitingQuality || batch.Version != fixture.batch.Version {
+			t.Fatal("invalid evidence changed batch")
+		}
 	}
 }

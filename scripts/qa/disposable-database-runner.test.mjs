@@ -244,3 +244,18 @@ if (name === 'bash') {
     await assert.rejects(readFile(path.join(root, "server", relative)), { code: "ENOENT" });
   }
 });
+
+
+test("purchase selection reuses isolated migration and cleanup without claiming the full gate", () => {
+  const executor = runtime();
+  executor.verifyCriticalPostgres = (_url, workflow) => {
+    assert.equal(workflow, "purchase-chain-postgres");
+    return { outputLines: 20, status: "passed" };
+  };
+  const report = runDisposableDatabaseLifecycle({ baseDatabaseURL: BASE_URL, profile: "ci", runID: "purchase_chain", workflow: "purchase-chain-postgres", runtime: executor });
+  assert.equal(report.status, "passed");
+  assert.equal(report.workflow, "purchase-chain-postgres");
+  assert.ok(report.stages.some(stage => stage.stage === "verify-purchase-chain-postgres"));
+  assert.equal(report.cleanup.residualDatabase, "");
+  assert.throws(() => validateDisposableWorkflow("acceptance", "purchase-chain-postgres"));
+});

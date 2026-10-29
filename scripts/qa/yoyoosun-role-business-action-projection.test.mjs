@@ -55,6 +55,28 @@ function roleByKey(roleKey) {
   return yoyoosunRoleFlowMatrix.roles.find((role) => role.roleKey === roleKey);
 }
 
+test("业务链路修正：九岗位的越权、缺授与待确认边界", () => {
+  const expected = {
+    sales: { allow: ["stock.reservation.create", "stock.reservation.release", "customer.disable", "production.exception.submit"], deny: ["production.over_issue.submit", "warehouse.outbound.confirm"] },
+    purchase: { allow: ["supplier.disable", "outsourcing.order.confirm"], deny: ["quality.inspection.update", "production.over_issue.submit"] },
+    warehouse: { allow: ["production.material_issue.create", "warehouse.outbound.confirm", "pmc.plan.read", "warehouse.manage"], deny: ["production.fact.post", "production.fact.cancel", "field.procurement_commercial.read"] },
+    quality: { allow: ["quality.inspection.update", "quality.exception.handle"], deny: ["production.exception.submit", "production.over_issue.submit", "field.procurement_commercial.read"] },
+    finance: { allow: ["pmc.plan.read", "production.wip.read", "quality.inspection.read"], deny: ["quality.inspection.update", "quality.exception.handle", "outsourcing.order.confirm"] },
+    production: { allow: ["production.over_issue.submit", "production.wip.execute", "field.procurement_commercial.read", "field.party_private.read"], deny: ["production.exception.submit", "production.material_issue.create", "warehouse.outbound.confirm"] },
+    engineering: { allow: ["process.read", "product.disable", "product_sku.disable"], deny: ["process.create", "process.update", "process.disable", "quality.inspection.update", "production.exception.submit"] },
+    pmc: { allow: ["process.read", "process.create", "process.update", "process.disable", "pmc.plan.update", "workflow.task.supervise"], deny: ["production.wip.assign", "production.fact.post", "production.material_issue.create"] },
+    boss: { allow: ["workflow.task.supervise", "workflow.task.assign"], deny: ["production.material_issue.create", "production.exception.submit"] },
+  };
+  assert.deepEqual(Object.keys(expected).sort(), yoyoosunRoleFlowMatrix.roles.map((r) => r.roleKey).sort());
+  for (const [roleKey, checks] of Object.entries(expected)) {
+    const capabilities = new Set(roleByKey(roleKey).capabilityKeys);
+    for (const key of checks.allow) assert.ok(capabilities.has(key), `${roleKey} 缺少 ${key}`);
+    for (const key of checks.deny) assert.ok(!capabilities.has(key), `${roleKey} 多授 ${key}`);
+  }
+  const combined = yoyoosunRoleFlowMatrix.roleAssignmentProfiles.find((p) => p.profileKey === "finance_purchase_contract_operator");
+  assert.deepEqual([...combined.roleKeys].sort(), ["finance", "purchase"]);
+});
+
 test("永绅九岗位：每个角色至少一个本域动作可用，跨域写动作保持不可用", () => {
   assert.deepEqual(
     yoyoosunRoleFlowMatrix.roles.map((role) => role.roleKey).sort(),

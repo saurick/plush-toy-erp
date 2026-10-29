@@ -25,11 +25,6 @@
   font-weight: 720;
 }
 
-.erp-dev-business-usability-header h1.ant-typography {
-  margin: 0;
-  font-size: clamp(24px, 2.5vw, 32px);
-}
-
 .erp-dev-business-usability-heading {
   display: flex;
   flex-wrap: wrap;
@@ -84,7 +79,9 @@
   line-height: 1;
 }
 
-.erp-dev-business-usability-filters .ant-card-body {
+.erp-dev-business-usability-filters {
+  flex: 1 1 auto;
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(240px, 1fr) 180px 210px 9em;
   align-items: center;
@@ -205,7 +202,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .erp-dev-business-usability-filters .ant-card-body {
+  .erp-dev-business-usability-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -213,7 +210,7 @@
 @media (max-width: 767px) {
 
   .erp-dev-business-usability-summary,
-  .erp-dev-business-usability-filters .ant-card-body {
+  .erp-dev-business-usability-filters {
     grid-template-columns: minmax(0, 1fr);
   }
 

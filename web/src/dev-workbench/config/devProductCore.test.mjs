@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
-  DEV_PRODUCT_CORE_DOCS_HREF,
   DEV_PRODUCT_CORE_MEMBERSHIP_ALL,
   DEV_PRODUCT_CORE_ROUTE,
   DEV_PRODUCT_CORE_SOURCE_PATH,
@@ -31,10 +30,6 @@ const ledgerEntries = [...ledgerSection.matchAll(
 test('devProductCore: route and source stay inside the DEV-only workbench', () => {
   assert.equal(DEV_PRODUCT_CORE_ROUTE, '/__dev/product-core')
   assert.equal(DEV_PRODUCT_CORE_SOURCE_PATH, 'docs/product/产品能力进度台账.md')
-  assert.equal(
-    DEV_PRODUCT_CORE_DOCS_HREF,
-    '/__dev/docs?path=docs%2Fproduct%2F%E4%BA%A7%E5%93%81%E8%83%BD%E5%8A%9B%E8%BF%9B%E5%BA%A6%E5%8F%B0%E8%B4%A6.md'
-  )
   assert.equal(isDevProductCoreEnabled({ DEV: true }), true)
   assert.equal(isDevProductCoreEnabled({ DEV: false }), false)
   assert.equal(isDevProductCoreEnabled({}), false)
@@ -139,7 +134,7 @@ test('devProductCore: filters distinguish membership and readable keywords', () 
     filterProductCoreCapabilities(capabilities, {
       keyword: '核销',
     }).map((item) => item.capability),
-    ['应收、应付、发票、收付款、核销与红冲']
+    ['应收、应付、发票、收付款、核销与账款调整']
   )
   assert.equal(normalizeProductCoreMembership('unknown'), 'all')
   assert.equal(normalizeProductCoreMembership('pending'), 'all')

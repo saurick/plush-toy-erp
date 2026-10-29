@@ -19,6 +19,7 @@ import SearchInput from '@/common/components/SearchInput'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
@@ -924,34 +925,40 @@ export default function DevDocsPage() {
   return (
     <div className="erp-dev-docs-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav />
-      <header className="erp-dev-docs-header">
-        <div className="erp-dev-docs-header__copy">
-          <Space align="center" size={10} wrap>
-            <BookOutlined className="erp-dev-docs-header__icon" />
-            <Title level={1} className="erp-dev-docs-title">
-              {DEV_PAGE_TITLE_BY_ROUTE[DEV_DOCS_ROUTE]}
-            </Title>
-          </Space>
-          <Button
-            type="link"
-            onClick={() => {
-              setKeyword('')
-              selectDoc(`doc:${DEV_DOCS_HOME_PATH}`)
-            }}
-          >
-            文档首页
-          </Button>
-          <details className="erp-dev-disclosure erp-dev-docs-boundary-details">
-            <summary>收录范围</summary>
-            <Paragraph>
-              {
-                '只读加载当前工作区的 Markdown；历史正文在打开或全文搜索时加载。 '
-              }
-              收录不代表已纳入 Git；实现、运行和验收仍需核对对应证据。
-            </Paragraph>
-          </details>
-        </div>
-        <div className="erp-dev-docs-controls" role="group" aria-label="项目文档检索">
+      <DevPageHeader
+        className="erp-dev-docs-header"
+        title={
+          <div className="erp-dev-docs-header__copy">
+            <Space align="center" size={10} wrap>
+              <BookOutlined className="erp-dev-docs-header__icon" />
+              <Title level={1} className="erp-dev-docs-title">
+                {DEV_PAGE_TITLE_BY_ROUTE[DEV_DOCS_ROUTE]}
+              </Title>
+            </Space>
+            <Button
+              type="link"
+              onClick={() => {
+                setKeyword('')
+                selectDoc(`doc:${DEV_DOCS_HOME_PATH}`)
+              }}
+            >
+              文档首页
+            </Button>
+            <details className="erp-dev-disclosure erp-dev-docs-boundary-details">
+              <summary>收录范围</summary>
+              <Paragraph>
+                {'只读加载当前工作区的 Markdown；历史正文在打开或全文搜索时加载。 '}
+                收录不代表已纳入 Git；实现、运行和验收仍需核对对应证据。
+              </Paragraph>
+            </details>
+          </div>
+        }
+      >
+        <div
+          className="erp-dev-docs-controls"
+          role="group"
+          aria-label="项目文档检索"
+        >
           <div className="erp-dev-docs-lifecycle">
             <Segmented
               size="small"
@@ -986,7 +993,7 @@ export default function DevDocsPage() {
             />
           </div>
         </div>
-      </header>
+      </DevPageHeader>
 
       <main className="erp-dev-docs-shell">
         <aside className="erp-dev-docs-sidebar">

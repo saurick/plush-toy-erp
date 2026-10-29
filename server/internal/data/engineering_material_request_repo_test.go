@@ -7,14 +7,12 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
 	"io"
-	"server/internal/attachmentstore"
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/workflowtaskevent"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -46,12 +44,10 @@ func prepareProductionEngineeringFixture(t *testing.T, ctx context.Context, data
 			client.Material.UpdateOneID(m.ID).SetSupplierID(s.ID).SaveX(ctx)
 		}
 	}
-	client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerProduct).SetOwnerID(line.ProductID).SetAttachmentType(biz.BusinessAttachmentTypeProductImage).SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("fixture.png").SetMimeType("image/png").SetFileSize(1).SetObjectKey(attachmentstore.NewKey()).SetSha256(strings.Repeat("b", 64)).SaveX(ctx)
 	uc := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
-	for _, state := range []string{biz.SalesOrderEngineeringPreparing, biz.SalesOrderEngineeringSampling, biz.SalesOrderEngineeringConfirmed} {
+	{
 		order := client.SalesOrder.GetX(ctx, line.SalesOrderID)
-		note := "测试样品已确认"
-		_, err := uc.SaveSalesOrderEngineering(ctx, &biz.SalesOrderEngineeringMutation{SalesOrderID: order.ID, ExpectedVersion: order.Version, ActorID: 11, Items: []biz.SalesOrderEngineeringItemMutation{{ID: line.ID, ProductID: line.ProductID, ProductSkuID: line.ProductSkuID, SampleBOMID: &bom.ID, ExpectedBOMVersion: bom.UpdatedAt.UnixMicro(), EngineeringStatus: state, SampleNote: &note}}})
+		_, err := uc.SaveSalesOrderEngineering(ctx, &biz.SalesOrderEngineeringMutation{SalesOrderID: order.ID, ExpectedVersion: order.Version, ActorID: 11, Complete: true, Items: []biz.SalesOrderEngineeringItemMutation{{ID: line.ID, ProductID: line.ProductID, ProductSkuID: line.ProductSkuID, BOMID: &bom.ID, ExpectedBOMVersion: bom.UpdatedAt.UnixMicro()}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,17 +95,15 @@ func prepareMaterialRequestFixtureWithDemand(t *testing.T, ctx context.Context, 
 			client.BOMItem.Create().SetBomHeaderID(bom.ID).SetMaterialID(material.ID).SetUnitID(materialUnit.ID).SetPosition(fmt.Sprintf("部位%d", j)).SetNote(fmt.Sprintf("按样核对部位%d", j)).SetPieceCount("2").SetQuantity(decimal.RequireFromString(demand.usage)).SetLossRate(decimal.RequireFromString(demand.loss)).SaveX(ctx)
 		}
 	}
-	client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerProduct).SetOwnerID(product.ID).SetAttachmentType(biz.BusinessAttachmentTypeProductImage).SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("sample.png").SetMimeType("image/png").SetFileSize(1).SetObjectKey(attachmentstore.NewKey()).SetSha256(strings.Repeat("a", 64)).SaveX(ctx)
-	for _, state := range []string{biz.SalesOrderEngineeringPreparing, biz.SalesOrderEngineeringSampling, biz.SalesOrderEngineeringConfirmed} {
-		note := "样品已核对"
+	{
 		order = client.SalesOrder.GetX(ctx, order.ID)
-		_, err := uc.SaveSalesOrderEngineering(ctx, &biz.SalesOrderEngineeringMutation{SalesOrderID: order.ID, ExpectedVersion: order.Version, ActorID: 11, Items: []biz.SalesOrderEngineeringItemMutation{{ID: line.ID, ProductID: product.ID, SampleBOMID: &bom.ID, ExpectedBOMVersion: bom.UpdatedAt.UnixMicro(), EngineeringStatus: state, SampleNote: &note}}})
+		_, err := uc.SaveSalesOrderEngineering(ctx, &biz.SalesOrderEngineeringMutation{SalesOrderID: order.ID, ExpectedVersion: order.Version, ActorID: 11, Complete: true, Items: []biz.SalesOrderEngineeringItemMutation{{ID: line.ID, ProductID: product.ID, BOMID: &bom.ID, ExpectedBOMVersion: bom.UpdatedAt.UnixMicro()}}})
 		if err != nil {
-			t.Fatalf("draft engineering %s: %v", state, err)
+			t.Fatalf("complete engineering: %v", err)
 		}
 	}
-	// Status activation is not a change to the sampled manufacturing content.
-	client.BOMHeader.UpdateOneID(bom.ID).SetStatus(biz.BOMStatusActive).SaveX(ctx)
+	// Completion prepares the BOM before the commercial order becomes active.
+	bom = client.BOMHeader.GetX(ctx, bom.ID)
 	order = client.SalesOrder.UpdateOneID(order.ID).SetLifecycleStatus(biz.SalesOrderStatusActive).SaveX(ctx)
 	return materialRequestFixture{repo: repo, uc: uc, order: order, line: line, bom: bom}
 }
@@ -183,7 +177,7 @@ func TestEngineeringMaterialRequestApprovalAndPurchaseGeneration(t *testing.T) {
 		t.Fatal("approval fabricated warehouse facts")
 	}
 	before := client.SalesOrder.GetX(ctx, f.order.ID)
-	_, err = f.uc.SaveSalesOrderEngineering(ctx, &biz.SalesOrderEngineeringMutation{SalesOrderID: before.ID, ExpectedVersion: before.Version, ActorID: 11, Items: []biz.SalesOrderEngineeringItemMutation{{ID: f.line.ID, EngineeringStatus: biz.SalesOrderEngineeringPreparing, SampleNote: &note}}})
+	_, err = f.uc.SaveSalesOrderEngineering(ctx, &biz.SalesOrderEngineeringMutation{SalesOrderID: before.ID, ExpectedVersion: before.Version, ActorID: 11, Items: []biz.SalesOrderEngineeringItemMutation{{ID: f.line.ID}}})
 	if !errors.Is(err, biz.ErrSalesOrderEngineeringDependency) {
 		t.Fatalf("approved source replacement: %v", err)
 	}
@@ -216,31 +210,6 @@ func TestEngineeringMaterialRequestSourceChangeAndRejection(t *testing.T) {
 	}
 }
 
-func TestSalesOrderRepeatReusesOnlySameCustomerConfirmedSample(t *testing.T) {
-	ctx := context.Background()
-	_, client := openSalesOrderRepoTest(t, "repeat_sample")
-	defer mustCloseEntClient(t, client)
-	f := prepareMaterialRequestFixture(t, ctx, &Data{postgres: client}, "REPEAT-SOURCE")
-	prior := client.SalesOrderItem.GetX(ctx, f.line.ID)
-	bom := client.BOMHeader.GetX(ctx, f.bom.ID)
-	order := client.SalesOrder.Create().SetOrderNo("REPEAT-NEXT").SetCustomerID(f.order.CustomerID).SetOrderDate(time.Now()).SaveX(ctx)
-	line := client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetRequestedProductName("同款返单").SetOrderCategory("REPEAT").SetUnitID(prior.UnitID).SetOrderedQuantity(decimal.NewFromInt(20)).SaveX(ctx)
-	note := "客户确认资料无变化，沿用已确认样品"
-	in := &biz.SalesOrderEngineeringMutation{SalesOrderID: order.ID, ExpectedVersion: order.Version, ActorID: 11, Items: []biz.SalesOrderEngineeringItemMutation{{ID: line.ID, ProductID: prior.ProductID, ProductSkuID: prior.ProductSkuID, SampleBOMID: &bom.ID, ExpectedBOMVersion: bom.UpdatedAt.UnixMicro(), ReuseConfirmedSample: true, EngineeringStatus: biz.SalesOrderEngineeringConfirmed, SampleNote: &note}}}
-	if _, err := f.uc.SaveSalesOrderEngineering(ctx, in); err != nil {
-		t.Fatal(err)
-	}
-	actual := client.SalesOrderItem.GetX(ctx, line.ID)
-	if actual.SampleReusedFromItemID == nil || *actual.SampleReusedFromItemID != prior.ID {
-		t.Fatal("repeat did not preserve confirmation source")
-	}
-	other := createSalesOrderTestCustomer(t, ctx, client, "REPEAT-OTHER-CUSTOMER", true)
-	client.SalesOrder.UpdateOneID(order.ID).SetCustomerID(other.ID).SaveX(ctx)
-	in.ExpectedVersion = client.SalesOrder.GetX(ctx, order.ID).Version
-	if _, err := f.uc.SaveSalesOrderEngineering(ctx, in); !errors.Is(err, biz.ErrSalesOrderEngineeringNotReady) {
-		t.Fatalf("another customer's sample was reused: %v", err)
-	}
-}
 func TestSourceDocumentPostgresEngineeringMaterialConcurrentApproval(t *testing.T) {
 	data, _ := openPurchaseReceiptPostgresTestData(t)
 	ctx := context.Background()
@@ -303,7 +272,7 @@ func TestSourceDocumentPostgresEngineeringMaterialConcurrentApproval(t *testing.
 
 }
 
-func TestProductionReleaseRequiresMaterialApprovalAndCurrentSample(t *testing.T) {
+func TestProductionReleaseRequiresMaterialApprovalAndCurrentEngineeringBOM(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "production_engineering_gate")
 	createProductionWIPRouteProcesses(t, ctx, client)

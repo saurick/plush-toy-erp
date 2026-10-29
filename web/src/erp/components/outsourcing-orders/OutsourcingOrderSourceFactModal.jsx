@@ -153,6 +153,8 @@ export default function OutsourcingOrderSourceFactModal({
 
   return (
     <BusinessModal
+      taskInline
+      form={form}
       className="erp-outsourcing-source-fact-modal"
       title={editing ? `编辑${copy.title}草稿` : copy.title}
       open={open}

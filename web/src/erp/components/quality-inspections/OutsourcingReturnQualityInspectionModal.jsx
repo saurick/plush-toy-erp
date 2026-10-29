@@ -56,6 +56,8 @@ export default function OutsourcingReturnQualityInspectionModal({
 
   return (
     <BusinessModal
+      taskInline
+      form={form}
       className="erp-outsourcing-return-quality-modal"
       title="发起委外回货质检"
       open={open}

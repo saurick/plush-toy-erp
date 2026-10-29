@@ -16,7 +16,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "list_finance_payment_allocation_candidates", "allocate_finance_payment", "reverse_finance_allocation", "create_finance_payment", "cancel_finance_payment", "reverse_finance_payment", "get_finance_payment", "list_finance_payments", "get_finance_credit_note", "list_finance_credit_notes", "create_finance_credit_note", "reverse_finance_credit_note":
+	case "get_finance_statement", "list_finance_source_adjustments", "create_finance_source_adjustment", "list_finance_payment_allocation_candidates", "allocate_finance_payment", "reverse_finance_allocation", "create_finance_payment", "cancel_finance_payment", "reverse_finance_payment", "get_finance_payment", "list_finance_payments", "get_finance_credit_note", "list_finance_credit_notes", "create_finance_credit_note", "reverse_finance_credit_note":
 		return d.handleFinancePayment(ctx, method, id, pm, actorID)
 	}
 	switch method {
@@ -95,6 +95,25 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 			return id, invalidParamResult(), nil
 		}
 		item, err := d.operationalFactUC.CreatePayableFromOutsourcingReturn(ctx, in)
+		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
+	case "create_payable_from_outsourcing_order":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionFinancePayableConfirm); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "outsourcing_orders", "production_orders"); res != nil {
+			return id, res, nil
+		}
+		in, ok := financeFactFromOutsourcingOrderCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.CreatePayableFromOutsourcingOrder(ctx, in)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "create_reconciliation_from_finance_fact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceReconciliationConfirm); res != nil {
@@ -192,6 +211,23 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		pkglogger.SetRequestObject(ctx, "finance_fact", mutation.ID)
 		item, err := d.operationalFactUC.CancelPostedFinanceFact(ctx, mutation)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
+	case "get_finance_fact":
+		scope, res := d.financeFactReadAccessScope(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		factID, valid := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !valid || !jsonRPCParamsAllowed(pm, "customer_key", "id") {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.GetFinanceFact(ctx, factID)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		if item == nil || !scope.AllowsType(item.FactType) {
+			return id, financeFactPermissionDeniedResult(), nil
+		}
+		return id, okData(map[string]any{"finance_fact": financeFactToAny(item)}), nil
 	case "list_finance_facts":
 		scope, res := d.financeFactReadAccessScope(ctx)
 		if res != nil {
@@ -319,6 +355,18 @@ func financeFactFromOutsourcingReturnCreateFromParams(pm map[string]any) (*biz.F
 		OutsourcingFactID: getInt(pm, "outsourcing_fact_id", 0),
 		IdempotencyKey:    getString(pm, "idempotency_key"),
 		Note:              getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func financeFactFromOutsourcingOrderCreateFromParams(pm map[string]any) (*biz.FinanceFactFromOutsourcingOrderCreate, bool) {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_no", "outsourcing_order_id", "idempotency_key", "note") {
+		return nil, false
+	}
+	return &biz.FinanceFactFromOutsourcingOrderCreate{
+		FactNo:             getString(pm, "fact_no"),
+		OutsourcingOrderID: getInt(pm, "outsourcing_order_id", 0),
+		IdempotencyKey:     getString(pm, "idempotency_key"),
+		Note:               getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 

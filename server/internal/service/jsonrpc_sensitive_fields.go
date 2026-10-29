@@ -44,18 +44,22 @@ func (d *jsonrpcDispatcher) requireSensitiveFieldMutationPermission(
 		// prices are derived from the locked source and redacted on readback.
 		switch normalizedMethod {
 		case "create_purchase_receipt_from_purchase_order", "create_purchase_return_from_receipt",
-			"create_purchase_return_from_quality_inspection":
+			"create_purchase_return_from_quality_inspection", "create_purchase_receipt_adjustment_from_receipt":
 			return nil
 		}
 		permissionKey = biz.PermissionFieldProcurementCommercialRead
 	case "purchase_order", "outsourcing_order":
+		// Delivery-only input forbids commercial fields and readback is redacted.
+		if url == "purchase_order" && normalizedMethod == "update_purchase_order_delivery" {
+			return nil
+		}
 		permissionKey = biz.PermissionFieldProcurementCommercialRead
 	case "operational_fact":
 		// These source-bound commands accept only warehouse facts. Their strict
 		// parameter contracts reject commercial fields before the usecase runs.
 		switch normalizedMethod {
 		case "create_outsourcing_material_issue_from_order", "create_outsourcing_return_receipt_from_order",
-			"save_outsourcing_material_issue_draft", "save_outsourcing_return_receipt_draft":
+			"save_outsourcing_material_issue_draft", "save_outsourcing_return_receipt_draft", "create_outsourcing_return_disposition":
 			return nil
 		}
 		switch {

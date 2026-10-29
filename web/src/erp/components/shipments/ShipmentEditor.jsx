@@ -12,6 +12,8 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import TaskSourceFacts from '../business-list/TaskSourceFacts.jsx'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { ShipmentStatus } from '../../../common/consts/statuses.generated.mjs'
@@ -132,6 +134,7 @@ function ShipmentFormFields({
   form,
   disabled = false,
   copyShipmentNo = '',
+  requireIdempotencyKey = false,
   customerOptions = [],
   salesOrderOptions = [],
   sourceCurrency = '',
@@ -143,6 +146,7 @@ function ShipmentFormFields({
   itemsSection,
   attachmentPanel,
 }) {
+  const { taskBusiness } = useBusinessPageContext() || {}
   const normalizedSourceCurrency = String(sourceCurrency || '')
     .trim()
     .toUpperCase()
@@ -155,9 +159,19 @@ function ShipmentFormFields({
 
   return (
     <>
-      <BusinessFormSection title="单据与客户">
+      <BusinessFormSection title={taskBusiness ? '本次出货' : '单据与客户'}>
+        {taskBusiness ? <TaskSourceFacts
+          form={form}
+          fields={[
+          { name: 'shipment_no', label: '出货单号' },
+          { name: 'sales_order_id', label: '销售订单', options: salesOrderOptions },
+          { name: 'customer_snapshot', label: '客户' },
+          { name: 'currency', label: '币种', value: normalizedSourceCurrency },
+        ]}
+        /> : null}
         <Form.Item
           className="erp-business-action-form__field"
+          hidden={Boolean(taskBusiness)}
           label="出货单号（自动）"
           name="shipment_no"
           rules={[{ required: true, message: '请填写或保留自动出货单号' }]}
@@ -177,6 +191,7 @@ function ShipmentFormFields({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
+          hidden={Boolean(taskBusiness)}
           label="销售订单"
           name="sales_order_id"
         >
@@ -191,6 +206,7 @@ function ShipmentFormFields({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
+          hidden={Boolean(taskBusiness)}
           label="客户"
           name="customer_id"
         >
@@ -205,6 +221,7 @@ function ShipmentFormFields({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
+          hidden={Boolean(taskBusiness)}
           label="单据客户名称"
           name="customer_snapshot"
         >
@@ -216,6 +233,7 @@ function ShipmentFormFields({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
+          hidden={Boolean(taskBusiness)}
           label="币种（跟随销售订单）"
         >
           <Input
@@ -225,7 +243,7 @@ function ShipmentFormFields({
             value={normalizedSourceCurrency}
           />
         </Form.Item>
-        <Form.Item name="idempotency_key" hidden rules={[{ required: true }]}>
+        <Form.Item name="idempotency_key" hidden rules={[{ required: requireIdempotencyKey, message: '出货标识尚未准备，请重新打开后再保存' }]}>
           <Input disabled={disabled} />
         </Form.Item>
 
@@ -965,6 +983,8 @@ export default function ShipmentEditor({
   modalSelectedShipment,
   onCancel,
   onOk,
+  taskFocused = false,
+  onSubmitApproval = null,
   onOpenSalesOrderImport,
   products = [],
   productOptions = [],
@@ -1014,9 +1034,10 @@ export default function ShipmentEditor({
   return (
     <BusinessFormPage
       form={form}
+      baselineKey={`${modalSelectedShipment?.id || ''}:${modalSelectedShipment?.version || ''}`}
       readOnly={isViewModal}
       title={
-        isCreateModal
+        taskFocused ? '核对本次出货' : isCreateModal
           ? '新建出货单'
           : isEditModal
             ? '编辑出货草稿'
@@ -1024,8 +1045,10 @@ export default function ShipmentEditor({
       }
       open={Boolean(isWritableModal || isViewModal)}
       onCancel={onCancel}
-      onOk={isWritableModal ? onOk : undefined}
-      okText="保存"
+      onOk={isWritableModal ? onSubmitApproval || onOk : undefined}
+      okText={onSubmitApproval ? '保存并提交审批' : taskFocused ? '保存草稿' : '保存'}
+      showCancel={!taskFocused}
+      secondaryAction={onSubmitApproval ? <Button disabled={saving || !canSave} onClick={onOk}>保存草稿</Button> : null}
       confirmLoading={saving}
       okButtonProps={{ disabled: !canSave, hidden: isViewModal }}
     >
@@ -1053,6 +1076,7 @@ export default function ShipmentEditor({
           productSKUs={productSKUs}
           customerOptions={customerOptions}
           disabled={!isWritableModal}
+          requireIdempotencyKey={isCreateModal}
           copyShipmentNo={isViewModal ? modalSelectedShipment?.shipment_no : ''}
           salesOrderOptions={salesOrderOptions}
           sourceCurrency={
@@ -1124,16 +1148,18 @@ export default function ShipmentEditor({
                         description="确认出货时才会扣减相应库存。"
                         addLabel="添加出货明细"
                         addDisabled={Boolean(selectedSalesOrder)}
-                        onAdd={() => appendShipmentItem(add, fields.length)}
+                        onAdd={taskFocused ? undefined : () => appendShipmentItem(add, fields.length)}
                       >
-                        <Button
-                          icon={<FolderOpenOutlined aria-hidden="true" />}
-                          className="erp-line-items-form__import-button erp-action-button"
-                          disabled={!canImportSalesOrderSource}
-                          onClick={onOpenSalesOrderImport}
-                        >
-                          从销售订单导入
-                        </Button>
+                        {!taskFocused ? (
+                          <Button
+                            icon={<FolderOpenOutlined aria-hidden="true" />}
+                            className="erp-line-items-form__import-button erp-action-button"
+                            disabled={!canImportSalesOrderSource}
+                            onClick={onOpenSalesOrderImport}
+                          >
+                            从销售订单导入
+                          </Button>
+                        ) : null}
                       </BusinessLineItemsHeader>
                       <SourceImportPickerModal
                         open={salesOrderImportOpen}
@@ -1208,7 +1234,7 @@ export default function ShipmentEditor({
                       <BusinessLineItemsFooter
                         addDisabled={Boolean(selectedSalesOrder)}
                         addLabel="添加出货明细"
-                        onAdd={() => appendShipmentItem(add, fields.length)}
+                        onAdd={taskFocused ? undefined : () => appendShipmentItem(add, fields.length)}
                         stats={[
                           {
                             key: 'count',

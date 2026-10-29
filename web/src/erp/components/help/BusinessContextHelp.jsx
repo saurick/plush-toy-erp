@@ -166,16 +166,16 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
   )
 }
 
-export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', description = '' }) {
+export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', description = '', iconOnly = false }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef(null)
   const contentRef = useRef(null)
   const item = getBusinessHelpItem(pageKey, itemKey)
-  if (!item && !description) return label
+  if (!item && !description) return iconOnly ? null : label
 
   return (
     <span className="erp-business-help-label">
-      <span>{label}</span>
+      {iconOnly ? null : <span>{label}</span>}
       <Popover
         destroyOnHidden
         trigger={description ? 'click' : ['hover', 'click']}
@@ -222,6 +222,7 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', descripti
           type="text"
           size="small"
           className="erp-business-inline-help-trigger"
+          disabled={false}
           icon={<QuestionCircleOutlined />}
           aria-label={`查看${label}说明`}
           aria-expanded={open}

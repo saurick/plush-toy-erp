@@ -137,8 +137,6 @@ export const engineeringImageSlots = {
   ],
 }
 
-const LEGACY_MATERIAL_DETAIL_FOOTER_IMAGE_KEYS = ['footer_left', 'footer_right']
-
 export function createEmptyEngineeringImageSlot() {
   return {
     name: '',
@@ -211,17 +209,6 @@ function normalizeImageMap(raw = {}, slots = []) {
         },
       ]
     })
-  )
-}
-
-function resolveMaterialDetailAppendixImages(input = {}) {
-  if (hasOwn(input, 'appendixImages')) {
-    return normalizePrintAppendixImages(input.appendixImages)
-  }
-  const legacyImages =
-    input?.images && typeof input.images === 'object' ? input.images : {}
-  return normalizePrintAppendixImages(
-    LEGACY_MATERIAL_DETAIL_FOOTER_IMAGE_KEYS.map((key) => legacyImages[key])
   )
 }
 
@@ -873,7 +860,7 @@ export function createMaterialDetailDraft(input = {}) {
       input.images,
       engineeringImageSlots.materialDetail
     ),
-    appendixImages: resolveMaterialDetailAppendixImages(input),
+    appendixImages: normalizePrintAppendixImages(input.appendixImages),
   }
 }
 

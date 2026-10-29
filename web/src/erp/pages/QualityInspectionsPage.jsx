@@ -21,7 +21,9 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
+
 import { useReferenceHydration } from '../hooks/useReferenceRecords.js'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
 import { canReadReference } from '../utils/remoteReferences.mjs'
@@ -135,6 +137,7 @@ import {
   canCreatePurchaseReturnFromRejectedInspection,
   canCreatePurchaseRejectionDispositionFromInspection,
   isQualityInspectionRouteSourceCompatible,
+  qualityInspectionTypeForRouteSource,
   isRejectedIncomingInspection,
 } from '../utils/qualityInspectionSourceAction.mjs'
 import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
@@ -142,6 +145,11 @@ import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import { loadQualityInspectionList as queryQualityInspections, loadQualityInspectionExport } from '../components/quality-inspections/qualityInspectionQueries.mjs'
 import useQualityInspectionEditor from '../components/quality-inspections/useQualityInspectionEditor.js'
 import useQualityInspectionActions from '../components/quality-inspections/useQualityInspectionActions.js'
+import { PurchaseSourceActions } from '../../common/consts/purchaseSourceActions.mjs'
+import { SourceActionReadPermissions } from '../../common/consts/sourceActionPermissions.generated.mjs'
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
+import { sourceActionAccess, isSourceActionPermissionDenied, SOURCE_ACCESS_REVOKED_MESSAGE } from '../utils/sourceActionAccess.mjs'
+import SourceActionAccessNotice from '../components/SourceActionAccessNotice.jsx'
 
 const EMPTY_ADMIN_PROFILE = Object.freeze({})
 const PURCHASE_RECEIPT_STATUS_LABELS = Object.freeze({
@@ -251,9 +259,11 @@ function buildDecisionSourceSummary({
 }
 
 export default function QualityInspectionsPage() {
-  const outletContext = useOutletContext()
+  const outletContext = useBusinessPageContext()
   const reportBusinessResult = useWorkflowTaskBusinessResult()
-  const taskHandling = outletContext?.workflowTaskNavigation?.productionHandling
+  const taskHandling = useMemo(() => outletContext?.taskBusiness?.task
+    ? { taskID: outletContext.taskBusiness.task.id, group: outletContext.taskBusiness.task.task_group }
+    : outletContext?.workflowTaskNavigation?.productionHandling, [outletContext?.taskBusiness?.task, outletContext?.workflowTaskNavigation?.productionHandling])
   const taskEntryRef = useRef(0)
   const [qualityTaskFocusOpen, setQualityTaskFocusOpen] = useState(false)
   const navigate = useBusinessNavigate()
@@ -268,7 +278,8 @@ export default function QualityInspectionsPage() {
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [resultFilter, setResultFilter] = useState('')
-  const [inspectionTypeFilter, setInspectionTypeFilter] = useState('')
+  const [selectedTypeFilter, setInspectionTypeFilter] = useState('INCOMING')
+  const [includeSuperseded, setIncludeSuperseded] = useState(false)
   const [dateFilterField, setDateFilterField] = useState('inspected_at')
   const [dateFilterStart, setDateFilterStart] = useState('')
   const [dateFilterEnd, setDateFilterEnd] = useState('')
@@ -313,6 +324,7 @@ export default function QualityInspectionsPage() {
     saving, inspectionModal, inspectionForm, decisionForm, inspectionAttachmentRef,
     openCreate, openDecision, closeModal, handleReceiptChange,
   } = inspectionEditor
+  useWorkflowTaskBusinessBusy(saving)
   const correctionDisabled = saving || !selectedRow || Boolean(selectedRow?.superseded_at || selectedRow?.production_wip_batch_id) || ![QualityInspectionStatus.PASSED, QualityInspectionStatus.REJECTED].includes(selectedRow?.status)
   const purchaseReturnInFlightRef = useRef(false)
   const purchaseReturnAttemptsRef = useRef(
@@ -340,6 +352,7 @@ export default function QualityInspectionsPage() {
   )
   const routeSourceType = searchParamText(searchParams, 'source_type')
   const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
+  const inspectionTypeFilter = qualityInspectionTypeForRouteSource(routeSourceType) || selectedTypeFilter
   const linkedKeyword = linkedDocumentContext(searchParams).keyword
   const resolvedRouteKeyword =
     routeQualityInspectionID &&
@@ -370,18 +383,42 @@ export default function QualityInspectionsPage() {
     inspectionForm
   )
 
-  const canCreate = hasActionPermission(
-    adminProfile,
-    PermissionCode.QUALITY_INSPECTION_CREATE
+  const qualitySourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.quality)
+  const canReadInspectionList = hasActionPermission(adminProfile, PermissionCode.QUALITY_INSPECTION_READ) && (
+    routeQualityInspectionID > 0 ||
+    ['OUTSOURCING_RETURN', 'FINISHED_GOODS', 'PRODUCTION_STAGE'].includes(inspectionTypeFilter) ||
+    SourceActionReadPermissions[`${RpcDomain.QUALITY}.${RpcMethod.quality.LIST_QUALITY_INSPECTIONS}`].every(({ permission }) => hasActionPermission(adminProfile, permission))
   )
+  const canCreate = qualitySourceAccess.allowed
+  useEffect(() => {
+    if (inspectionModal?.mode === 'create' && !canCreate) {
+      inspectionForm.resetFields()
+      closeModal()
+      message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+    }
+  }, [canCreate, closeModal, inspectionForm, inspectionModal?.mode])
   const canUpdate = hasActionPermission(
     adminProfile,
     PermissionCode.QUALITY_INSPECTION_UPDATE
   )
-  const canCreatePurchaseReturn = hasActionPermission(
-    adminProfile,
-    PermissionCode.PURCHASE_RETURN_CREATE
-  )
+  const qualityReturnAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.qualityReturn)
+  const rejectionSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.rejectionDisposition)
+  const canCreatePurchaseReturn = qualityReturnAccess.allowed
+  const canCreateRejectionDisposition = rejectionSourceAccess.allowed
+  const qualityReturnAccessRef = useRef(qualityReturnAccess)
+  qualityReturnAccessRef.current = qualityReturnAccess
+  const beginPurchaseReturnRequest = useLatestRequestCoordinator()
+  const closePurchaseReturnSource = useCallback(() => {
+    beginPurchaseReturnRequest('purchase-return').finish()
+    setPurchaseReturnModal(null)
+    setPurchaseReturnLoading(false)
+  }, [beginPurchaseReturnRequest])
+  useEffect(() => {
+    if (!canCreatePurchaseReturn) {
+      closePurchaseReturnSource()
+      if (purchaseReturnModal) message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+    }
+  }, [canCreatePurchaseReturn, closePurchaseReturnSource, purchaseReturnModal])
   const canReadPurchaseReturn = hasActionPermission(
     adminProfile,
     PermissionCode.PURCHASE_RETURN_READ
@@ -550,7 +587,7 @@ export default function QualityInspectionsPage() {
     selectedIsOutsourcingInspection ||
     selectedIsProductionInspection
   const selectedDispositionAuthorized = selectedIsIncomingInspection
-    ? canCreatePurchaseReturn
+    ? selectedRowCanCreateRejectionDisposition ? canCreateRejectionDisposition : canCreatePurchaseReturn
     : selectedIsOutsourcingInspection
       ? canManageOutsourcingDisposition
       : selectedIsProductionInspection
@@ -563,6 +600,7 @@ export default function QualityInspectionsPage() {
       returnedInspectionIDs.has(selectedRow.id))
   const hasAnyDispositionCapability =
     canCreatePurchaseReturn ||
+    canCreateRejectionDisposition ||
     canManageOutsourcingDisposition ||
     canSubmitProductionException
   const showQualityDispositionAction =
@@ -733,7 +771,7 @@ export default function QualityInspectionsPage() {
 
   const qualityQuery = useMemo(
     () => ({
-      filters: { dateFilterEnd, dateFilterField, dateFilterStart, inspectionTypeFilter, keyword, lotFilter, materialFilter, purchaseReceiptFilter, resultFilter, statusFilter, warehouseFilter },
+      filters: { dateFilterEnd, dateFilterField, dateFilterStart, inspectionTypeFilter, includeSuperseded, keyword, lotFilter, materialFilter, purchaseReceiptFilter, resultFilter, statusFilter, warehouseFilter },
       context: { linkedKeyword, routePurchaseOrderID, routePurchaseReceiptID, routeQualityInspectionID, routeSourceID, routeSourceType },
       pagination,
       customerKey: activeCustomerKey,
@@ -744,6 +782,7 @@ export default function QualityInspectionsPage() {
       dateFilterField,
       dateFilterStart,
       inspectionTypeFilter,
+      includeSuperseded,
       keyword,
       linkedKeyword,
       lotFilter,
@@ -769,14 +808,20 @@ export default function QualityInspectionsPage() {
     const request = beginLatestRequest('rows')
     setLoading(true)
     setStatusCounts(null)
+    if (!canReadInspectionList) {
+      setRows([])
+      setSelectedRow(null)
+      setTotal(0)
+      setDetailInspection(null)
+      setCorrectionInspection(null)
+      detailRequestRef.current += 1
+      setLoading(false)
+      request.finish()
+      return false
+    }
     try {
       const routeSelectedID = Number(routeQualityInspectionID || 0)
-      const [data, routeInspection] = await Promise.all([
-        loadQualityInspectionList({ signal: request.signal }),
-        routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE'
-          ? getQualityInspection({ id: routeSelectedID })
-          : Promise.resolve(null),
-      ])
+      const data = await loadQualityInspectionList({ signal: request.signal })
       if (!request.isCurrent()) {
         return false
       }
@@ -788,12 +833,12 @@ export default function QualityInspectionsPage() {
           ? listedRows.find((item) => Number(item?.id) === routeSelectedID) ||
             null
           : null
-      const selectedRouteInspection = routeInspection || listedRouteInspection
+      const selectedRouteInspection = listedRouteInspection
       const exactPage = resolveExactRecordPage({
         records: listedRows,
         exactRecord: selectedRouteInspection,
         hasExactContext:
-          routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE',
+          routeSelectedID > 0,
         total: Number(data?.total || 0),
       })
       const nextRows = exactPage.records
@@ -808,7 +853,7 @@ export default function QualityInspectionsPage() {
       setStatusCounts(
         resolveBusinessStatusCounts(data, {
           hasExactContext:
-            routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE',
+            routeSelectedID > 0,
           exactRecord: selectedRouteInspection,
           statusField: 'status',
         })
@@ -817,6 +862,14 @@ export default function QualityInspectionsPage() {
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return false
+      }
+      if (isSourceActionPermissionDenied(error)) {
+        setRows([])
+        setSelectedRow(null)
+        setTotal(0)
+        setDetailInspection(null)
+        setCorrectionInspection(null)
+        detailRequestRef.current += 1
       }
       showPageLoadError(error, '加载质量检验单')
       return false
@@ -828,7 +881,7 @@ export default function QualityInspectionsPage() {
     }
   }, [
     beginLatestRequest,
-    inspectionTypeFilter,
+    canReadInspectionList,
     loadQualityInspectionList,
     routeQualityInspectionID,
   ])
@@ -843,13 +896,14 @@ export default function QualityInspectionsPage() {
     selectedRowPurchaseReceiptRequestRef.current = requestID
     setSelectedRowPurchaseReceipt(null)
 
-    if (!receiptID || !isRejectedIncomingInspection(selectedRow)) {
+    if (!receiptID || !isRejectedIncomingInspection(selectedRow) || (!canCreatePurchaseReturn && !canCreateRejectionDisposition)) {
       setSelectedRowPurchaseReceiptLoading(false)
       return undefined
     }
 
     setSelectedRowPurchaseReceiptLoading(true)
-    getPurchaseReceipt({ id: receiptID })
+    const request = beginPurchaseReturnRequest('selected-receipt')
+    getPurchaseReceipt({ id: receiptID }, { signal: request.signal })
       .then((receipt) => {
         if (selectedRowPurchaseReceiptRequestRef.current !== requestID) return
         setSelectedRowPurchaseReceipt(
@@ -858,21 +912,29 @@ export default function QualityInspectionsPage() {
       })
       .catch((error) => {
         if (selectedRowPurchaseReceiptRequestRef.current !== requestID) return
-        message.error(getActionErrorMessage(error, '核对来源收货状态'))
+        if (isSourceActionPermissionDenied(error)) {
+          closePurchaseReturnSource()
+          setRejectionDispositionOpen(false)
+          message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+        } else {
+          message.error(getActionErrorMessage(error, '核对来源收货状态'))
+        }
         setSelectedRowPurchaseReceipt(null)
       })
       .finally(() => {
+        request.finish()
         if (selectedRowPurchaseReceiptRequestRef.current === requestID) {
           setSelectedRowPurchaseReceiptLoading(false)
         }
       })
 
     return () => {
+      beginPurchaseReturnRequest('selected-receipt').finish()
       if (selectedRowPurchaseReceiptRequestRef.current === requestID) {
         selectedRowPurchaseReceiptRequestRef.current += 1
       }
     }
-  }, [selectedRow])
+  }, [selectedRow, canCreatePurchaseReturn, canCreateRejectionDisposition, closePurchaseReturnSource, beginPurchaseReturnRequest])
 
   const clearRouteContext = useCallback(
     (keys) => {
@@ -932,6 +994,7 @@ export default function QualityInspectionsPage() {
   const { handleCreateInspection, runInspectionAction, handleDecision } =
     useQualityInspectionActions({
       editor: inspectionEditor,
+      sourceAccess: qualitySourceAccess,
       activeCustomerKey,
       loadRows,
       reportBusinessResult,
@@ -951,6 +1014,10 @@ export default function QualityInspectionsPage() {
 
   const openPurchaseReturn = useCallback(
     async (inspection) => {
+      if (!qualityReturnAccessRef.current.allowed) {
+        message.warning(qualityReturnAccessRef.current.reason)
+        return
+      }
       if (referenceDataState !== 'ready') {
         message.warning(
           referenceDataState === 'loading'
@@ -983,14 +1050,16 @@ export default function QualityInspectionsPage() {
         return
       }
       setPurchaseReturnLoading(true)
+      const request = beginPurchaseReturnRequest('purchase-return')
       try {
         if (canReadPurchaseReturn) {
           const data = await listAllPurchaseReturns(
             compactParams({
-              customer_key: activeCustomerKey || undefined,
               quality_inspection_id: inspection.id,
-            })
+            }),
+            { signal: request.signal }
           )
+          if (!request.isCurrent() || !qualityReturnAccessRef.current.allowed) return
           const activeReturn = (
             Array.isArray(data?.purchase_returns) ? data.purchase_returns : []
           ).find(
@@ -1002,21 +1071,31 @@ export default function QualityInspectionsPage() {
             return
           }
         }
-        setPurchaseReturnModal({ inspection })
+        if (request.isCurrent() && qualityReturnAccessRef.current.allowed) setPurchaseReturnModal({ inspection })
       } catch (error) {
-        message.error(getActionErrorMessage(error, '核对采购退货状态'))
+        if (!request.isCurrent()) return
+        if (isSourceActionPermissionDenied(error)) {
+          closePurchaseReturnSource()
+          message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+        } else {
+          message.error(getActionErrorMessage(error, '核对采购退货状态'))
+        }
       } finally {
-        setPurchaseReturnLoading(false)
+        if (request.isCurrent()) {
+          setPurchaseReturnLoading(false)
+          request.finish()
+        }
       }
     },
     [
-      activeCustomerKey,
       canCreatePurchaseReturn,
       canReadPurchaseReturn,
       markInspectionReturned,
       referenceDataState,
       returnedInspectionIDs,
       selectedRowPurchaseReceipt,
+      beginPurchaseReturnRequest,
+      closePurchaseReturnSource,
     ]
   )
 
@@ -1047,7 +1126,8 @@ export default function QualityInspectionsPage() {
   useEffect(() => {
     if (!taskHandling || taskEntryRef.current === taskHandling.taskID || !selectedRow ||
       Number(selectedRow.id) !== routeQualityInspectionID || outletContext?.workflowTaskNavigation?.businessReceipt) return
-    if (taskHandling.group === 'handoff_production_quality' && canUpdate && [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status)) {
+    if (['handoff_production_quality', 'handoff_receipt_quality', 'handoff_outsourcing_quality'].includes(taskHandling.group) &&
+        !outletContext?.taskBusiness?.readOnly && canUpdate && [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status)) {
       taskEntryRef.current = taskHandling.taskID
       setQualityTaskFocusOpen(true)
     } else if (taskHandling.group === 'handoff_production_exception' && !qualityDispositionDisabled && selectedDispositionKind === 'production') {
@@ -1055,12 +1135,12 @@ export default function QualityInspectionsPage() {
       openSelectedQualityDisposition()
     }
   }, [taskHandling, selectedRow, routeQualityInspectionID, canUpdate, openDecision,
-    qualityDispositionDisabled, selectedDispositionKind, openSelectedQualityDisposition, outletContext?.workflowTaskNavigation?.businessReceipt])
+    qualityDispositionDisabled, selectedDispositionKind, openSelectedQualityDisposition, outletContext?.workflowTaskNavigation?.businessReceipt, outletContext?.taskBusiness?.readOnly])
 
   const closePurchaseReturn = useCallback(() => {
     if (purchaseReturnInFlightRef.current) return
-    setPurchaseReturnModal(null)
-  }, [])
+    closePurchaseReturnSource()
+  }, [closePurchaseReturnSource])
 
   const submitPurchaseReturn = useCallback(
     async (values) => {
@@ -1069,6 +1149,11 @@ export default function QualityInspectionsPage() {
         purchaseReturnInFlightRef.current ||
         !isRejectedIncomingInspection(inspection)
       ) {
+        return
+      }
+      if (!qualityReturnAccessRef.current.allowed) {
+        closePurchaseReturnSource()
+        message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
         return
       }
       let scope
@@ -1087,6 +1172,7 @@ export default function QualityInspectionsPage() {
       }
 
       purchaseReturnInFlightRef.current = true
+      const request = beginPurchaseReturnRequest('purchase-return')
       setPurchaseReturnLoading(true)
       try {
         const created = await createPurchaseReturnFromQualityInspection(
@@ -1102,8 +1188,9 @@ export default function QualityInspectionsPage() {
           throw error
         }
         purchaseReturnAttemptsRef.current.settle(scope, attempt, null)
+        if (!request.isCurrent() || !qualityReturnAccessRef.current.allowed) return
         markInspectionReturned(inspection.id)
-        setPurchaseReturnModal(null)
+        closePurchaseReturnSource()
         message.success('采购退货草稿已生成，请到采购退货记录核对并确认')
         await loadRows()
       } catch (error) {
@@ -1112,6 +1199,12 @@ export default function QualityInspectionsPage() {
           attempt,
           error
         )
+        if (!request.isCurrent()) return
+        if (isSourceActionPermissionDenied(error)) {
+          closePurchaseReturnSource()
+          message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+          return
+        }
         if (retained) {
           message.warning(
             '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
@@ -1121,10 +1214,13 @@ export default function QualityInspectionsPage() {
         }
       } finally {
         purchaseReturnInFlightRef.current = false
-        setPurchaseReturnLoading(false)
+        if (request.isCurrent()) {
+          setPurchaseReturnLoading(false)
+          request.finish()
+        }
       }
     },
-    [activeCustomerKey, loadRows, markInspectionReturned, purchaseReturnModal]
+    [activeCustomerKey, loadRows, markInspectionReturned, purchaseReturnModal, beginPurchaseReturnRequest, closePurchaseReturnSource]
   )
 
   const selectedRowLabel = selectedRow
@@ -1157,7 +1253,7 @@ export default function QualityInspectionsPage() {
 
   const modalDescription = {
     pass: decisionIsProductionStage
-      ? '生产阶段质量关口当前只允许合格放行；让步接收需另有按关口审批策略和审计，在该能力落地前保持阻断。'
+      ? '生产阶段检验只办理合格或不合格；不合格后的让步须提交生产异常审批。批准仅放行本次关口，后续关口仍需检验。'
       : '选择合格或让步接收，并按来源记录估算不良比例；这里只登记质量结论，后续由对应来源规则处理。',
     reject:
       '记录不合格及来源的估算不良比例；后续返工、退货或阻断仍由对应来源业务办理。',
@@ -1252,7 +1348,8 @@ export default function QualityInspectionsPage() {
 
   const activeFilterCount = [
     resultFilter,
-    inspectionTypeFilter,
+    inspectionTypeFilter !== 'INCOMING' && inspectionTypeFilter,
+    includeSuperseded,
     purchaseReceiptFilter,
     materialFilter,
     warehouseFilter,
@@ -1265,7 +1362,8 @@ export default function QualityInspectionsPage() {
   ].filter(Boolean).length
   const clearFilters = useCallback(() => {
     setResultFilter('')
-    setInspectionTypeFilter('')
+    setInspectionTypeFilter('INCOMING')
+    setIncludeSuperseded(false)
     setPurchaseReceiptFilter('')
     setMaterialFilter('')
     setWarehouseFilter('')
@@ -1289,6 +1387,12 @@ export default function QualityInspectionsPage() {
   return (
     <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ ...referenceRecords }} className="erp-quality-inspections-page">
       <PageHeaderCard compact helpKey="quality-inspections" title="质量检验" />
+      {((!routeQualityInspectionID && inspectionTypeFilter === 'INCOMING') || selectedIsIncomingInspection) && (
+        <>
+          <SourceActionAccessNotice access={qualitySourceAccess} />
+          <SourceActionAccessNotice access={selectedRowCanCreatePurchaseReturn ? qualityReturnAccess : selectedRowCanCreateRejectionDisposition ? rejectionSourceAccess : qualityReturnAccess.blocked ? qualityReturnAccess : rejectionSourceAccess} />
+        </>
+      )}
 
       <BusinessOperationPanel
         compact
@@ -1342,12 +1446,25 @@ export default function QualityInspectionsPage() {
               }}
             />
             <SelectFilter
+              aria-label="记录范围"
+              className="erp-business-filter-control--status"
+              value={includeSuperseded ? 'history' : 'current'}
+              options={[
+                { label: '当前记录', value: 'current' },
+                { label: '含已替代记录', value: 'history' },
+              ]}
+              onChange={(value) => {
+                setIncludeSuperseded(value === 'history')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
               aria-label="检验类型"
               className="erp-business-filter-control--status"
               value={inspectionTypeFilter}
               options={QUALITY_INSPECTION_TYPE_FILTER_OPTIONS}
               onChange={(nextType) => {
-                const normalizedType = nextType || ''
+                const normalizedType = nextType || 'INCOMING'
                 const routeKeysToClear = []
                 setInspectionTypeFilter(normalizedType)
                 if (normalizedType && normalizedType !== 'INCOMING') {
@@ -1799,8 +1916,8 @@ export default function QualityInspectionsPage() {
         </SelectionActionBar>
       </BusinessOperationPanel>
 
-      {outletContext?.mobileTaskBusiness?.task?.source_type === 'purchase_receipt' &&
-      routePurchaseReceiptID === outletContext.mobileTaskBusiness.task.source_id ? (
+      {outletContext?.taskBusiness?.task?.source_type === 'purchase_receipt' &&
+      routePurchaseReceiptID === outletContext.taskBusiness.task.source_id ? (
         <label className="mobile-detail-section">
           选择本次收货的质检单
           <Select
@@ -1852,6 +1969,7 @@ export default function QualityInspectionsPage() {
       }}
       />
       <BusinessModal
+        taskInline
         title="办理本次质检"
         open={qualityTaskFocusOpen}
         onCancel={saving ? undefined : () => setQualityTaskFocusOpen(false)}
@@ -1859,13 +1977,13 @@ export default function QualityInspectionsPage() {
           <Space>
             <Button disabled={saving} onClick={() => setQualityTaskFocusOpen(false)}>关闭</Button>
             {selectedRow?.status === QualityInspectionStatus.DRAFT ? (
-              <Button type="primary" loading={saving} onClick={() => runInspectionAction(selectedRow, submitQualityInspection, '质量检验已提交')}>
+              <Button key="submit" type="primary" loading={saving} onClick={() => runInspectionAction(selectedRow, submitQualityInspection, '质量检验已提交')}>
                 提交质检
               </Button>
             ) : selectedRow?.status === QualityInspectionStatus.SUBMITTED ? (
               <>
-                <Button onClick={() => { setQualityTaskFocusOpen(false); openDecision('reject', selectedRow) }}>判定不合格</Button>
-                <Button type="primary" onClick={() => { setQualityTaskFocusOpen(false); openDecision('pass', selectedRow) }}>判定合格</Button>
+                <Button key="reject" onClick={() => { setQualityTaskFocusOpen(false); openDecision('reject', selectedRow) }}>判定不合格</Button>
+                <Button key="pass" type="primary" onClick={() => { setQualityTaskFocusOpen(false); openDecision('pass', selectedRow) }}>判定合格</Button>
               </>
             ) : null}
           </Space>
@@ -1885,7 +2003,7 @@ export default function QualityInspectionsPage() {
 
       {columnOrderModal}
 
-      <QualityInspectionPurchaseReturnModal
+      {purchaseReturnModal && <QualityInspectionPurchaseReturnModal
         open={Boolean(purchaseReturnModal)}
         inspection={purchaseReturnModal?.inspection}
         sourceSummary={purchaseReturnSourceSummary}
@@ -1893,11 +2011,12 @@ export default function QualityInspectionsPage() {
         referenceDataReady={referenceDataState === 'ready'}
         onCancel={closePurchaseReturn}
         onSubmit={submitPurchaseReturn}
-      />
+      />}
 
       <PurchaseRejectionDispositionModal
         open={rejectionDispositionOpen}
         inspection={selectedRow}
+        sourceAccess={rejectionSourceAccess}
         canPost={canPostPurchaseReturn}
         canReceiveReplacement={hasActionPermission(
           adminProfile,
@@ -1938,6 +2057,28 @@ export default function QualityInspectionsPage() {
         title="质量检验详情"
         onClose={closeQualityInspectionDetails}
       >
+        {detailInspection?.superseded_at || detailInspection?.correction_of_inspection_id ? (
+          <Alert
+            showIcon
+            type={detailInspection?.superseded_at ? 'warning' : 'info'}
+            message={detailInspection?.superseded_at ? '本单已被更正替代，原判定仅供追溯' : '本单为更正后的复检记录'}
+            description={
+              <Space direction="vertical" size={4}>
+                {detailInspection?.superseded_reason ? <span>更正原因：{detailInspection.superseded_reason}</span> : null}
+                {detailInspection?.correction_of_inspection_id ? (
+                  <Button type="link" onClick={() => openQualityInspectionDetails({ id: detailInspection.correction_of_inspection_id })}>
+                    查看原单 {detailInspection.correction_of_inspection_no || ''}
+                  </Button>
+                ) : null}
+                {detailInspection?.corrected_inspection_id ? (
+                  <Button type="link" onClick={() => openQualityInspectionDetails({ id: detailInspection.corrected_inspection_id })}>
+                    查看替代单 {detailInspection.corrected_inspection_no || ''}
+                  </Button>
+                ) : null}
+              </Space>
+            }
+          />
+        ) : null}
         <IncomingCheckItemsDetails items={detailInspection?.check_items} />
         <BusinessAttachmentPanel
           ownerType="quality_inspection"
@@ -1951,9 +2092,11 @@ export default function QualityInspectionsPage() {
       </BusinessDetailsModal>
 
       <InspectionEditor
+        taskInline={!isCreatingInspection}
         {...(isCreatingInspection
           ? { form: inspectionForm, loading: referenceDataState === 'loading' }
           : {
+              form: decisionForm,
               destroyOnHidden: true,
               cancelText: '关闭',
               description: modalDescription,
@@ -2091,9 +2234,6 @@ export default function QualityInspectionsPage() {
               form={decisionForm}
               mode={inspectionModal?.mode}
               disabled={saving}
-              incoming={Boolean(
-                inspectionModal?.inspection?.purchase_receipt_item_id
-              )}
               allowConcession={!decisionIsProductionStage}
             />
           </>

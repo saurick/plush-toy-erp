@@ -512,3 +512,18 @@ test('outsourcing source result must echo the locked source and derived subject 
     )
   )
 })
+
+test('stage-linked orders cannot create parallel inventory returns', () => {
+  for (const [header, line] of [[{ ...order, source_wip_batch_id: 4 }, productItem], [order, { ...productItem, production_wip_batch_id: 4 }]]) {
+    assert.equal(isOutsourcingSourceActionEligible(OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT, header, line), false)
+    assert.throws(() => buildOutsourcingSourceFactPayload(OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT, { warehouse_id: 3, quantity: '1', new_lot_no: 'NEW' }, header, line))
+  }
+  assert.equal(isOutsourcingSourceActionEligible(OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE, { ...order, source_wip_batch_id: 4 }, materialItem), true)
+})
+
+test('posted vendor returns release replacement capacity with exact quantities', () => {
+  const fact = { fact_type: 'RETURN_RECEIPT', status: 'POSTED', source_id: order.id, source_line_id: productItem.id, quantity: '10', returned_to_vendor_quantity: '0.000001' }
+  const summary = outsourcingSourceActionQuantitySummary(OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT, order, productItem, [fact])
+  assert.equal(summary.remaining, '0.000001')
+  assert.throws(() => buildOutsourcingSourceFactPayload(OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT, { warehouse_id: 3, quantity: '0.000002', new_lot_no: 'NEW' }, order, productItem, [fact]))
+})

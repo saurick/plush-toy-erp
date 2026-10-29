@@ -3,7 +3,7 @@ import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 
 export const ENGINEERING_MATERIAL_STATUS = Object.freeze({
-  PREVIEW: '待提交',
+  PREVIEW: '待资料齐全',
   [MaterialRequestStatus.SUBMITTED]: '待老板审核',
   [MaterialRequestStatus.BOSS_APPROVED]: '待财务审核',
   [MaterialRequestStatus.APPROVED]: '已批准采购',
@@ -46,7 +46,7 @@ export function engineeringMaterialTaskEntryLabel(task) {
 export function canProcessEngineeringMaterialTask(profile, task) {
   if (!getEngineeringMaterialTaskContext(task)) return false
   const permissions = getEngineeringMaterialPermissions(profile, task)
-  return permissions.boss || permissions.finance || permissions.submit
+  return permissions.boss || permissions.finance
 }
 
 const STAGES = Object.freeze({

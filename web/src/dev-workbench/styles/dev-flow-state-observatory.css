@@ -13,6 +13,22 @@
   min-width: 0;
 }
 
+.erp-dev-flow-rule-detail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.erp-dev-flow-rule-detail h4 {
+  margin: 0 0 8px;
+}
+
+@media (max-width: 1100px) {
+  .erp-dev-flow-rule-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .erp-dev-flow-rule-table .app-table.ant-table-wrapper .ant-table-tbody > tr > .ant-table-cell {
   vertical-align: top;
   overflow-wrap: anywhere;
@@ -28,7 +44,6 @@
 
 .erp-dev-flow-header,
 .erp-dev-flow-memory,
-.erp-dev-flow-nav,
 .erp-dev-flow-global-search,
 .erp-dev-flow-context,
 .erp-dev-flow-main {
@@ -61,10 +76,7 @@
 }
 
 .erp-dev-flow-header h1.ant-typography {
-  margin: 0;
   color: var(--erp-text);
-  font-size: clamp(24px, 3vw, 32px);
-  line-height: 1.2;
 }
 
 .erp-dev-flow-header p.ant-typography {
@@ -218,7 +230,6 @@
   color: var(--erp-text, #26332a);
 }
 
-.erp-dev-flow-nav,
 .erp-dev-flow-global-search,
 .erp-dev-flow-context,
 .erp-dev-flow-main {
@@ -556,6 +567,10 @@
   width: 100%;
 }
 
+.erp-dev-flow-definition-select-popup {
+  width: min(560px, calc(100vw - 32px));
+}
+
 .erp-dev-flow-definition-select-popup .ant-select-item-group {
   min-height: 32px;
   padding: 8px 12px 6px;
@@ -581,12 +596,10 @@
 }
 
 .erp-dev-flow-definition-option {
-  display: flex;
+  display: grid;
   width: 100%;
   min-width: 0;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
+  gap: 2px;
 }
 
 .erp-dev-flow-definition-option__label {
@@ -604,7 +617,7 @@
   font-size: var(--erp-font-caption);
   font-weight: 400;
   overflow-wrap: anywhere;
-  text-align: right;
+  text-align: left;
   white-space: normal;
 }
 
@@ -617,11 +630,8 @@
 .erp-dev-flow-specialist-summary,
 .erp-dev-flow-responsibility,
 .erp-dev-flow-events,
-.erp-dev-flow-process-definition,
 .erp-dev-flow-runtime-query,
 .erp-dev-flow-runtime-instance,
-.erp-dev-flow-fact-detail,
-.erp-dev-flow-state-rule,
 .erp-dev-flow-unlinked-task {
   display: grid;
   gap: 10px;
@@ -629,6 +639,22 @@
   border: 1px solid var(--erp-border);
   border-radius: 12px;
   background: var(--erp-surface-bg, #fff);
+}
+
+.erp-dev-flow-process-definition,
+.erp-dev-flow-fact-detail,
+.erp-dev-flow-state-rule {
+  gap: 16px;
+}
+
+.erp-dev-flow-print-title {
+  display: none;
+}
+
+[data-flow-print-current] .erp-dev-flow-print-title {
+  display: block;
+  margin: 0;
+  font-size: var(--erp-font-emphasis);
 }
 
 .erp-dev-flow-chain-runtime > p {
@@ -956,7 +982,6 @@
 .erp-dev-flow-specialist-summary dl,
 .erp-dev-flow-responsibility dl,
 .erp-dev-flow-runtime-instance > dl,
-.erp-dev-flow-fact-detail > dl,
 .erp-dev-flow-unlinked-task > dl,
 .erp-dev-flow-transitions details dl {
   display: grid;
@@ -970,7 +995,6 @@
 .erp-dev-flow-specialist-summary dl > div,
 .erp-dev-flow-responsibility dl > div,
 .erp-dev-flow-runtime-instance > dl > div,
-.erp-dev-flow-fact-detail > dl > div,
 .erp-dev-flow-unlinked-task > dl > div,
 .erp-dev-flow-transitions details dl > div {
   min-width: 0;
@@ -1098,22 +1122,45 @@
 }
 
 .erp-dev-flow-definition-selector {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 420px);
-  gap: 7px 12px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--erp-border);
+}
+
+.erp-dev-flow-definition-selector > .erp-workbench-toolbar__controls {
+  flex: 1 1 100%;
   align-items: center;
-  padding: 12px;
-  border: 1px solid var(--erp-border);
-  border-radius: 12px;
-  background: var(--erp-surface-bg-soft);
+  gap: 8px 12px;
 }
 
-.erp-dev-flow-definition-selector label {
-  font-weight: 600;
+.erp-dev-flow-definition-selector > .erp-workbench-toolbar__controls > .ant-select {
+  flex: 0 1 420px;
+  width: min(100%, 420px);
+  min-width: min(100%, 320px);
 }
 
-.erp-dev-flow-definition-selector > .ant-typography {
-  grid-column: 1 / -1;
+.erp-dev-flow-rule-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.erp-dev-flow-rule-tools > span {
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-flow-fact-detail > .erp-workbench-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.erp-dev-flow-fact-detail > .erp-workbench-facts > div {
+  display: grid;
+  grid-template-columns: 6em minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
 }
 
 .erp-dev-flow-process-layout,
@@ -1191,16 +1238,6 @@
 
 .erp-dev-flow-runtime-nodes small {
   color: var(--erp-text-muted);
-}
-
-.erp-dev-flow-fact-detail > dl {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.erp-dev-flow-fact-detail > dl > div:first-child,
-.erp-dev-flow-fact-detail > dl > div:nth-child(4),
-.erp-dev-flow-fact-detail > dl > div:nth-child(7) {
-  grid-column: 1 / -1;
 }
 
 .erp-dev-flow-state-overview {
@@ -1470,10 +1507,9 @@
   gap: 9px 12px;
 }
 
-.erp-dev-flow-transition-toolbar > div:not(.erp-dev-flow-transition-filters) {
-  display: grid;
-  min-width: min(100%, 320px);
-  gap: 2px;
+.erp-dev-flow-transition-toolbar > .ant-select {
+  flex: 0 1 220px;
+  width: 220px;
 }
 
 .erp-dev-flow-transition-filters {
@@ -1486,11 +1522,6 @@
   min-height: 32px;
   height: auto;
   white-space: normal;
-}
-
-.erp-dev-flow-transition-result-count {
-  font-size: var(--erp-font-caption);
-  text-align: right;
 }
 
 .erp-dev-flow-transitions li {
@@ -2102,7 +2133,6 @@
   }
 
   .erp-dev-flow-task-finder__controls,
-  .erp-dev-flow-definition-selector,
   .erp-dev-flow-selected-state {
     grid-template-columns: 1fr;
   }
@@ -2146,10 +2176,6 @@
     width: 100%;
   }
 
-  .erp-dev-flow-transition-result-count {
-    text-align: left;
-  }
-
   .erp-dev-flow-transition-heading {
     grid-template-columns: 28px minmax(0, 1fr);
   }
@@ -2160,7 +2186,7 @@
   }
 
   .erp-dev-flow-task-finder__controls > .ant-btn,
-  .erp-dev-flow-definition-selector > .ant-select {
+  .erp-dev-flow-definition-selector > .erp-workbench-toolbar__controls > .ant-select {
     width: 100%;
   }
 
@@ -2195,15 +2221,15 @@
     text-align: left;
   }
 
-  .erp-dev-flow-nav .erp-dev-task-nav,
-  .erp-dev-flow-nav .erp-dev-task-nav--compact {
+  .erp-dev-flow-workspace-nav .erp-dev-task-nav,
+  .erp-dev-flow-workspace-nav .erp-dev-task-nav--compact {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     overflow: visible;
   }
 
-  .erp-dev-flow-nav .erp-dev-task-nav__item,
-  .erp-dev-flow-nav .erp-dev-task-nav--compact .erp-dev-task-nav__item {
+  .erp-dev-flow-workspace-nav .erp-dev-task-nav__item,
+  .erp-dev-flow-workspace-nav .erp-dev-task-nav--compact .erp-dev-task-nav__item {
     min-width: 0;
     min-height: 62px;
   }
@@ -2244,7 +2270,7 @@
   .erp-dev-flow-main,
   .erp-dev-flow-global-search,
   .erp-dev-flow-context,
-  .erp-dev-flow-nav {
+  .erp-dev-flow-workspace-nav {
     padding: 11px;
   }
 
@@ -2264,17 +2290,6 @@
   }
 }
 
-.erp-dev-flow-state-page .erp-dev-flow-workspace-nav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  width: auto;
-  padding: 0;
-  margin: 0;
-  border: 0;
-  background: transparent;
-}
 
 .erp-dev-flow-state-page > .erp-dev-flow-task-finder {
   margin-bottom: 0;
@@ -2424,7 +2439,7 @@ body:has([data-flow-print-current]) > :not(#root) {
   background: white;
 }
 
-[data-flow-print-current] :is(nav, button, .ant-select, .erp-dev-flow-header a, .erp-dev-flow-definition-selector, .erp-dev-flow-header-actions, .erp-dev-flow-nav, .erp-dev-flow-task-finder, .erp-dev-flow-chain-heading__actions, .erp-dev-flow-guidance, .erp-dev-flow-developer-details, .erp-dev-flow-evidence, .erp-dev-flow-node-technical, .erp-dev-flow-overview-relations) {
+[data-flow-print-current] :is(nav, button, .ant-select, .erp-dev-flow-header a, .erp-dev-flow-definition-selector, .erp-dev-flow-header-actions, .erp-dev-flow-workspace-nav, .erp-dev-flow-task-finder, .erp-dev-flow-chain-heading__actions, .erp-dev-flow-guidance, .erp-dev-flow-developer-details, .erp-dev-flow-evidence, .erp-dev-flow-node-technical, .erp-dev-flow-overview-relations) {
   display: none;
 }
 

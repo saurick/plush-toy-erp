@@ -24,8 +24,10 @@ export default function BusinessFlowDiagram({
   selectedKey,
   onSelect,
   role = 'all',
+  matchingKeys,
   runtimeKey,
   relationships = false,
+  legend,
 }) {
   const root = useRef(null)
   const marker = `business-flow-${useId().replaceAll(':', '')}`
@@ -155,7 +157,7 @@ export default function BusinessFlowDiagram({
                       data-risk={node.risk || undefined}
                       data-runtime-current={node.key === runtimeKey || undefined}
                       data-role-match={
-                        (role !== 'all' && node.role_keys?.includes(role)) ||
+                        (matchingKeys ? matchingKeys.has(node.key) : role !== 'all' && node.role_keys?.includes(role)) ||
                         undefined
                       }
                       aria-pressed={node.key === selectedKey}
@@ -240,9 +242,9 @@ export default function BusinessFlowDiagram({
       </div>
       <p className="erp-dev-business-flow__legend">
         <span className="erp-dev-business-flow__screen-legend">
-          {relationships
+          {legend ?? (relationships
             ? '实线：依赖 · 虚线：分支或纠正 · 点选对象查看条件。'
-            : '实线：办理路径 · 虚线：分支或回接。'}
+            : '实线：办理路径 · 虚线：分支或回接。')}
         </span>
         <span className="erp-dev-business-flow__print-legend">
           箭头表示路径，按起止节点衔接。

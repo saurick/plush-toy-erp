@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react'
 import { Checkbox, Empty, Tag } from 'antd'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import Select from '@/common/components/select/AppSelect'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import DevProjectGraphView from './DevProjectGraphView.jsx'
@@ -111,12 +111,9 @@ export default function DevProjectRelationships() {
           {graph ? <DevProjectGraphView graph={graph} selectedNodeId={selected.nodeId} onNodeSelect={selectNode} /> : <Empty description="请选择项目示例" />}
           {graph ? (
             <details className="erp-dev-disclosure erp-dev-project-relationships__evidence">
-              <summary>图模型说明与对应工具</summary>
+              <summary>图模型说明</summary>
               <p><strong>{model.title}</strong> · {model.definition}</p>
               <p>{judgment}</p>
-              <div className="erp-dev-project-relationships__links">
-                {graph.destinations.map((destination) => <Link key={destination.route} to={destination.route}>{destination.label}</Link>)}
-              </div>
             </details>
           ) : null}
         </section>

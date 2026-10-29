@@ -1,6 +1,10 @@
 import React from 'react'
 import { Form } from 'antd'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import './businessLineItemCards.css'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
+
+const LineItemCardsContext = React.createContext(null)
 
 function LineItemSummary({ name, fields }) {
   const form = Form.useFormInstance()
@@ -27,6 +31,8 @@ export default function BusinessLineItemsTable({
   children,
   label = '单据明细',
 }) {
+  const { taskBusiness } = useBusinessPageContext() || {}
+  if (taskBusiness?.device === 'mobile') return <LineItemCardsContext.Provider value={columns}><div className="erp-task-line-cards" role="region" aria-label={label}>{children}</div></LineItemCardsContext.Provider>
   return (
     <TableScrollRegion
       className="erp-sales-order-lines-form__list"
@@ -95,6 +101,19 @@ export function BusinessLineItemRow({
   summaryFields = [],
   evidence,
 }) {
+  const cardColumns = React.useContext(LineItemCardsContext)
+  if (cardColumns) { return (
+    <details className="erp-task-line-card erp-line-item-details" open={index === 0 || detailsOpen || undefined} ref={rowRef}>
+      <summary><strong>第 {index + 1} 条明细</strong>{summaryFields.length ? <LineItemSummary name={name} fields={summaryFields} /> : null}{status}</summary>
+      <div className="erp-task-line-card__fields">
+        {hiddenFields}
+        {cells.map((cell, cellIndex) => <div className="erp-task-line-card__field" key={cellIndex}><div className="erp-task-line-card__label">{cardColumns[cellIndex]?.label}{cardColumns[cellIndex]?.required ? <span aria-label="必填"> *</span> : null}</div>{cell}</div>)}
+        {children ? <details className="erp-line-item-details" open={detailsOpen || undefined}><summary>{detailsLabel}</summary><div className="erp-line-item-details__fields">{children}</div></details> : null}
+        {evidence}
+        {actions ? <div className="erp-task-line-card__actions">{actions}</div> : null}
+      </div>
+    </details>
+  ) }
   return (
     <tbody
       className="erp-sales-order-lines-form__row"

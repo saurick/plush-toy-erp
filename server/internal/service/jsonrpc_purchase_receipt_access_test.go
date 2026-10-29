@@ -35,7 +35,7 @@ func (h *receiptProcessAccessHandler) ExecuteProcessDomainCommand(_ context.Cont
 	return &biz.ProcessDomainCommandResult{Outcome: "checked", EffectState: biz.ProcessDomainCommandEffectStateNone}, nil
 }
 
-func TestPurchaseReceiptProcessJSONRPCChecksScopeBeforeExecutionAndReplay(t *testing.T) {
+func TestRetiredPurchaseReceiptProcessJSONRPCRejectsEveryWarehouseScope(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "jsonrpc_receipt_process_access")
 	f := createInventoryTestFixtures(t, ctx, client)
@@ -87,20 +87,17 @@ func TestPurchaseReceiptProcessJSONRPCChecksScopeBeforeExecutionAndReplay(t *tes
 			t.Fatalf("scope=%v result=%#v err=%v want=%d", scope, result, err, code)
 		}
 	}
-	call(biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{f.warehouseID + 1000}}, errcode.PermissionDenied.Code)
-	call(biz.WarehouseDataScope{Mode: biz.DataScopeModeNone}, errcode.PermissionDenied.Code)
+	call(biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{f.warehouseID + 1000}}, errcode.UnknownMethod.Code)
+	call(biz.WarehouseDataScope{Mode: biz.DataScopeModeNone}, errcode.UnknownMethod.Code)
 	if handler.calls != 0 || processRepo.nodes[node.ID].DomainCommandFingerprint != nil {
 		t.Fatal("denied process call claimed or executed a command")
 	}
 	assigned := biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{f.warehouseID}}
-	call(assigned, errcode.OK.Code)
-	if handler.calls != 1 || handler.scope == nil || !handler.scope.Allows(f.warehouseID) || handler.scope.IsAll() {
-		t.Fatal("authorized process command lost its warehouse scope")
-	}
-	call(biz.WarehouseDataScope{Mode: biz.DataScopeModeNone}, errcode.PermissionDenied.Code)
-	call(assigned, errcode.OK.Code)
-	if handler.calls != 1 || client.InventoryTxn.Query().CountX(ctx) != 0 {
-		t.Fatal("scope checks or stored-result replay executed the simulated handler twice or wrote inventory")
+	call(assigned, errcode.UnknownMethod.Code)
+	call(biz.WarehouseDataScope{Mode: biz.DataScopeModeNone}, errcode.UnknownMethod.Code)
+	call(assigned, errcode.UnknownMethod.Code)
+	if handler.calls != 0 || client.InventoryTxn.Query().CountX(ctx) != 0 {
+		t.Fatal("retired process command reached a handler or wrote inventory")
 	}
 }
 

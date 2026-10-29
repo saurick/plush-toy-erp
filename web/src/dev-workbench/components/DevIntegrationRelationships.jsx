@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { Descriptions, Tag } from 'antd'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Markdown } from '@/common/components/markdown'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { buildDevDocsLocation, resolveDevDocsMarkdownHref } from '../pages/devDocsNavigation.mjs'
@@ -60,7 +60,6 @@ export function DevIntegrationAccess({ boundary, method = false, guide }) {
         <details className="erp-dev-disclosure erp-dev-integration__guide-notes">
           <summary>接入方式与规则</summary>
           {guide.choiceTableSource ? <Markdown source={guide.choiceTableSource} /> : null}
-          <Link to={guide.location}>打开正式接入规范</Link>
         </details>
       ) : null}
     </section>
@@ -105,7 +104,6 @@ export default function DevIntegrationRelationshipExamples({ examples, value, on
             ))}
           </div>
           <p className="erp-dev-integration__note" aria-live="polite">{selected.note}</p>
-          <Link to={examples.location}>查看接入关系正式说明</Link>
         </div>
       ) : (
         <p role="status">尚未登记接入关系展示说明。</p>

@@ -128,9 +128,9 @@ export function getFulfillmentSupplement(step) {
 const SUBSTEP_COPY = Object.freeze({
   接单与资料准备: '接单准备',
   销售订单审批: '订单审批',
-  '工程资料、BOM 与打样': '工程 / BOM / 打样',
+  '工程资料与 BOM': '工程 / BOM',
   '订单、样品、BOM 就绪': '订单 / 样品 / BOM 齐备',
-  工程提交用料: '提交用料',
+  自动汇总用料: '自动送审',
   老板审核用料: '老板审核用料',
   按厂商生成采购单: '生成采购单',
   取消本次已提交订单: '取消本次已提交订单',

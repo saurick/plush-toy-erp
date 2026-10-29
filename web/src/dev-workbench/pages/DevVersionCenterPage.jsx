@@ -1,10 +1,5 @@
 import './delivery/delivery-workflow.css'
-import {
-  CloudUploadOutlined,
-  DeploymentUnitOutlined,
-  ReloadOutlined,
-  ToolOutlined,
-} from '@ant-design/icons'
+import { CloudUploadOutlined, DeploymentUnitOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Space, Tooltip, Typography } from 'antd'
 import { CurrentDeliveryOperations } from './delivery/version/CurrentDeliveryOperations.jsx'
 import { useVersionCenter } from './delivery/version/useVersionCenter.jsx'
@@ -17,16 +12,15 @@ import {
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
+import DevPageHeader from '../components/DevPageHeader.jsx'
+import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
-import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
-import { buildDevCustomerScopedRoute } from '../config/devCustomerScope.mjs'
-import { DEV_VERSION_GUIDE_ROUTE } from '../config/devRoutes.mjs'
+
 import {
-  DEV_DELIVERY_SOURCE_PATH,
   DEV_DELIVERY_TARGETS,
 } from '../config/devDelivery.mjs'
 
-const { Paragraph, Text, Title } = Typography
+const { Text, Title } = Typography
 
 export default function DevVersionCenterPage() {
   const {
@@ -133,53 +127,85 @@ export default function DevVersionCenterPage() {
   const workspaceItems = buildWorkspaceItems(notices)
 
   return (
-    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page erp-dev-version-page erp-dev-delivery-workspace">
-      <DevPageNav sourcePath={DEV_DELIVERY_SOURCE_PATH} />
-      <header className="erp-dev-hub-header">
-        <div className="erp-dev-hub-header__copy">
-          <span className="erp-dev-hub-header__icon">
-            <DeploymentUnitOutlined aria-hidden="true" />
-          </span>
-          <Title level={1} className="erp-dev-hub-title">
-            版本发布
-          </Title>
-        </div>
-        <section
-          className="erp-dev-workbench-header-context erp-dev-version-context"
-          aria-label="版本发布范围"
-        >
-          <DevCustomerScopeSelector
-            compact
-            label="客户"
-            note=""
-            scope={customerScope}
-            onChange={customerScope.selectCustomer}
-            disabled={isMutationRunning}
-            invalidDescription="当前甲方没有登记发布目标；版本、部署、回滚与目标状态读取均已停止。"
-          />
-
-          <div className="erp-dev-version-target-context">
-            <Text strong>部署目标</Text>
-            <Segmented
-              aria-label="切换当前操作目标"
-              value={selectedTargetKey}
-              disabled={isMutationRunning}
-              options={DEV_DELIVERY_TARGETS.map((item) => ({
-                label: item.label,
-                value: item.key,
-              }))}
-              onChange={setSelectedTargetKey}
-            />
-            <details className="erp-dev-disclosure erp-dev-target-data-boundary">
-              <summary>数据保留方式</summary>
-              <Text type="secondary">
-                {selectedTargetDefinition.dataBoundary}
-              </Text>
-            </details>
+    <div ref={workspaceRef} className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page erp-dev-version-page erp-dev-delivery-workspace">
+      <DevPageNav />
+      <DevPageHeader
+        className="erp-dev-hub-header"
+        title={
+          <div className="erp-dev-hub-header__copy">
+            <span className="erp-dev-hub-header__icon">
+              <DeploymentUnitOutlined aria-hidden="true" />
+            </span>
+            <Title level={1} className="erp-dev-hub-title">
+              版本发布
+            </Title>
           </div>
-        </section>
-        <div className="erp-dev-version-header-actions">
-          <Space wrap>
+        }
+        navigation={
+          <DevTaskNav
+            compact
+            idPrefix="dev-version"
+            ariaLabel="版本发布视图"
+            items={workspaceItems.map(({ key, label }) => ({ value: key, label }))}
+            value={activeView}
+            onChange={(view) => {
+              if (view !== activeView) selectView(view)
+            }}
+          />
+        }
+        tools={
+          <div className="erp-dev-version-header-actions erp-dev-workbench-tools">
+            <Space wrap>
+              <Button
+                icon={<ReloadOutlined aria-hidden="true" />}
+                loading={refreshBusy}
+                disabled={!customerReady}
+                onClick={refresh}
+              >
+                刷新状态
+              </Button>
+            </Space>
+            <Text type="secondary" role="status" aria-live="polite">
+              {refreshStatusText}
+            </Text>
+          </div>
+        }
+        context={
+          <>
+            <section
+              className="erp-dev-workbench-header-context erp-dev-version-context"
+              aria-label="版本发布范围"
+            >
+              <DevCustomerScopeSelector
+                compact
+                label="客户"
+                note=""
+                scope={customerScope}
+                onChange={customerScope.selectCustomer}
+                disabled={isMutationRunning}
+                invalidDescription="当前甲方没有登记发布目标；版本、部署、回滚与目标状态读取均已停止。"
+              />
+
+              <div className="erp-dev-version-target-context">
+                <Text strong>部署目标</Text>
+                <Segmented
+                  aria-label="切换当前操作目标"
+                  value={selectedTargetKey}
+                  disabled={isMutationRunning}
+                  options={DEV_DELIVERY_TARGETS.map((item) => ({
+                    label: item.label,
+                    value: item.key,
+                  }))}
+                  onChange={setSelectedTargetKey}
+                />
+                <details className="erp-dev-disclosure erp-dev-target-data-boundary">
+                  <summary>数据保留方式</summary>
+                  <Text type="secondary">
+                    {selectedTargetDefinition.dataBoundary}
+                  </Text>
+                </details>
+              </div>
+            </section>
             {['versions', 'overview'].includes(activeView) ? (
               <Tooltip title={canDispatch ? '' : dispatchExplanation}>
                 <Button
@@ -192,58 +218,25 @@ export default function DevVersionCenterPage() {
                 </Button>
               </Tooltip>
             ) : null}
-            <Button
-              icon={<ReloadOutlined aria-hidden="true" />}
-              loading={refreshBusy}
-              disabled={!customerReady}
-              onClick={refresh}
-            >
-              刷新状态
-            </Button>
-            <Button
-              icon={<ToolOutlined aria-hidden="true" />}
-              href={
-                customerReady
-                  ? buildDevCustomerScopedRoute(
-                      DEV_VERSION_GUIDE_ROUTE,
-                      customerScope.customerKey
-                    )
-                  : DEV_VERSION_GUIDE_ROUTE
-              }
-            >
-              操作指引
-            </Button>
-          </Space>
-          <Text type="secondary" role="status" aria-live="polite">
-            {refreshStatusText}
-          </Text>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <main className="erp-dev-hub-shell erp-dev-version-shell">
 
         <section
-          ref={workspaceRef}
           className="erp-dev-version-workspace"
           aria-label="版本发布工作区"
         >
           <Tabs
+            id="dev-version"
+            renderTabBar={() => null}
             activeKey={activeView}
             items={workspaceItems}
             onChange={selectView}
           />
         </section>
-        <DevStaticGuidance title="证据与运行边界" hint="发布职责与安全限制">
-          <Paragraph>
-            <strong>CI/CD 证据分两处查看：</strong>
-            发布与部署耗时汇总 GitLab 的 CI
-            检查、构建和制品发布耗时；操作记录看工作台发起的发布、目标部署、回滚和数据重建结果。
-          </Paragraph>
-          GitLab 负责代码真源、CI 与不可变制品；GitHub 仅接收单向审查镜像；本地
-          Bridge 只接受固定动作；已登记目标
-          均不构建、不接受浏览器传入的命令、目录、仓库或 SSH
-          目标。各目标使用同一不可变版本，但数据库、附件、运行资源、备份与回滚点相互隔离。
-        </DevStaticGuidance>
+
       </main>
 
       <ReleaseModal

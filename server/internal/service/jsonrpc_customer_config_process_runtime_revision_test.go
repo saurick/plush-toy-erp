@@ -124,12 +124,6 @@ func TestCustomerConfigExecuteMethodsAuthorizeInstanceRevision(t *testing.T) {
 	}{
 		{"execute_sales_order_acceptance_submit", biz.ProcessDomainCommandSalesOrderSubmit, biz.ProcessKeySalesOrderAcceptance, "sales_order", map[string]any{"sales_order_id": 1001}},
 		{"execute_material_supply_purchase_order_submit", biz.ProcessDomainCommandPurchaseOrderSubmit, biz.ProcessKeyMaterialSupply, "purchase_order", map[string]any{"purchase_order_id": 1001}},
-		{"execute_material_supply_purchase_receipt_create", biz.ProcessDomainCommandPurchaseReceiptCreate, biz.ProcessKeyMaterialSupply, "purchase_order", map[string]any{"all_remaining": true, "purchase_order_id": 1001, "receipt_no": "RCPT-test", "warehouse_id": 1}},
-		{"execute_material_supply_quality_gate", biz.ProcessDomainCommandIncomingQualityGate, biz.ProcessKeyMaterialSupply, "purchase_order", map[string]any{"purchase_receipt_id": 1001}},
-		{"execute_material_supply_post_inbound", biz.ProcessDomainCommandInventoryPostInbound, biz.ProcessKeyMaterialSupply, "purchase_order", map[string]any{"purchase_receipt_id": 1001}},
-		{"execute_finished_goods_delivery_quality_decide", biz.ProcessDomainCommandFinishedGoodsQualityDecide, biz.ProcessKeyFinishedGoodsDelivery, "shipment", map[string]any{"shipment_id": 1001, "quality_inspection_id": 1, "result": "PASS"}},
-		{"execute_finished_goods_delivery_shipment_ship", biz.ProcessDomainCommandShipmentShip, biz.ProcessKeyFinishedGoodsDelivery, "shipment", map[string]any{"shipment_id": 1001}},
-		{"execute_finished_goods_delivery_receivable_lead", biz.ProcessDomainCommandFinanceReceivableLead, biz.ProcessKeyFinishedGoodsDelivery, "shipment", map[string]any{"shipment_id": 1001, "receivable_source_no": "AR-test", "expected_amount": "1"}},
 	}
 	for _, tc := range cases {
 		for _, allowed := range []bool{true, false} {
@@ -204,7 +198,7 @@ func TestCustomerConfigExecuteMethodsAuthorizeInstanceRevision(t *testing.T) {
 	}
 }
 
-func TestExecuteShipmentShipRejectsReadOnlyWorkflowTasksAtInstanceRevision(t *testing.T) {
+func TestRetiredShipmentCommandRemainsUnknownAtFrozenInstanceRevision(t *testing.T) {
 	t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
 	ctx := customerConfigAdminCtx(7, "shipment-admin")
 	activatedAt := time.Date(2026, 7, 17, 9, 0, 0, 0, time.UTC)
@@ -281,8 +275,8 @@ func TestExecuteShipmentShipRejectsReadOnlyWorkflowTasksAtInstanceRevision(t *te
 	if err != nil {
 		t.Fatalf("execute err: %v", err)
 	}
-	if result == nil || result.Code != errcode.BusinessRuleViolation.Code {
-		t.Fatalf("read_only workflow_tasks result=%#v, want business rule rejection", result)
+	if result == nil || result.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("frozen retired command result=%#v, want unknown method", result)
 	}
 	if handler.executed != 0 {
 		t.Fatalf("read_only workflow_tasks executed shipment handler %d times", handler.executed)

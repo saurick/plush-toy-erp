@@ -1,13 +1,38 @@
+import fs from 'node:fs/promises'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { ShipmentFinanceReleaseStatus, ShipmentStatus } from '../../src/common/consts/statuses.generated.mjs'
-import fs from 'node:fs/promises'
 import { assertTaskCopy } from './taskCopyAssertions.mjs'
 import { createTaskFusedFlowScenarios } from './taskFusedFlowScenarios.mjs'
 import { createTaskDetailVariantScenarios } from './taskDetailVariantScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { chooseSelectOption } from './selectControlActions.mjs'
 
 export function createMobileTaskConsistencyScenarios(deps) {
   const { assert, path, outputDir, assertNoHorizontalOverflow } = deps
+  const checkWholeBodyScroll = async (page, width, kind) => {
+    await page.setViewportSize({ width, height: 568 })
+    const metrics = await page.evaluate(() => {
+      const main = document.querySelector('.mobile-task-business > main')
+      const card = main.querySelector('.workflow-task-info-card')
+      const inner = [...main.querySelectorAll('*')].filter((node) => node.clientHeight > 0 && node.scrollHeight > node.clientHeight + 2 && /^(auto|scroll)$/u.test(getComputedStyle(node).overflowY))
+      main.scrollTop = 0
+      return { height: main.clientHeight, range: main.scrollHeight - main.clientHeight, top: card.getBoundingClientRect().top, inner: inner.map((node) => node.className) }
+    })
+    if (page.context().browser().browserType().name() === 'webkit') {
+      // Mobile WebKit does not expose wheel input; verify its native scroll container geometry.
+      await page.locator('.mobile-task-business > main').evaluate((node) => node.scrollTo({ top: 180, behavior: 'instant' }))
+    } else {
+      await page.mouse.move(width / 2, 240)
+      await page.mouse.wheel(0, 180)
+    }
+    await page.waitForFunction(() => document.querySelector('.mobile-task-business > main').scrollTop >= 179)
+    const moved = metrics.top - await page.locator('.mobile-task-business > main > .workflow-task-info-card').evaluate((node) => node.getBoundingClientRect().top)
+    assert.ok(metrics.height >= 300 && metrics.range > 180 && moved >= 179, `任务信息与业务资料共用正文滚动：${JSON.stringify({ ...metrics, moved })}`)
+    assert.deepEqual(metrics.inner, [], '正文和编辑字段不再嵌套纵向滚动')
+    await check(page, `${kind}-short-body-${width}`)
+    await save(page, `${kind}-short-body-${width}`)
+    await page.setViewportSize({ width, height: 844 })
+  }
   const save = async (page, name) => {
     await waitForFiniteAnimations(page)
     await page.waitForFunction(() => ![...document.querySelectorAll('.ant-message-notice')].some((node) => node.getBoundingClientRect().height > 0))
@@ -144,17 +169,18 @@ export function createMobileTaskConsistencyScenarios(deps) {
           assert.equal(await action.isVisible(), true, '关闭附件只恢复办理页')
           await check(page, `source-action-${width}`)
           await save(page, `source-action-${width}`)
+          await checkWholeBodyScroll(page, width, 'source')
           const missing = page.getByTestId('mobile-task-business-source').locator('details')
           await missing.locator('summary').click()
           await missing.getByText('实际运费', { exact: true }).waitFor()
           await save(page, `source-missing-${width}`)
           await missing.locator('summary').click()
-          await footer.getByRole('button', { name: /^更多操作，共/u }).click()
-          const more = page.getByRole('toolbar', { name: '更多操作', exact: true })
-          await more.waitFor()
-          await save(page, `source-menu-${width}`)
-          assert.equal(await more.getByRole('button', { name: /编辑草稿/u }).count(), 0, '缺少可编辑的正式状态时不开放编辑')
-          await more.press('Escape')
+          assert.equal(await footer.getByRole('button', { name: /^更多操作，共/u }).count(), 0)
+          assert.equal(await action.getByRole('group', { name: '其他业务操作', exact: true }).count(), 0)
+          assert.equal(await action.getByRole('button', { name: /^(?:相关单据|查看返工进度|附件)$/u }).count(), 0, '手机办理页不重复展示来源单据辅助操作')
+          assert.equal(await footer.getByTestId('mobile-task-attachment-action').count(), 1, '附件沿用任务底栏的统一入口')
+          assert.equal(await action.getByRole('button', { name: /编辑草稿/u }).count(), 0, '缺少可编辑的正式状态时不开放编辑')
+          await save(page, `source-bottom-${width}`)
           await assertNoHorizontalOverflow(page, `mobile-task-source-consistency-${width}`)
         },
       },
@@ -204,7 +230,7 @@ export function createMobileTaskConsistencyScenarios(deps) {
     }
   }), ...[390, 320].map((width) => {
     const base = createTaskDetailVariantScenarios(deps).find((item) => item.name === 'task-detail-shipment-mobile-light')
-    const record = { id: 1, shipment_no: 'SHIP-EDIT-20261019-000000001', status: ShipmentStatus.DRAFT, finance_release_status: ShipmentFinanceReleaseStatus.PENDING, finance_release_version: 1, sales_order_id: 1, customer_id: 1, customer_snapshot: '演示客户', note: '核对包装', planned_ship_at: 1792512000, items: [{ id: 1, line_no: 1, product_id: 1, product_name_snapshot: '演示产品', unit: '只', warehouse_id: 1, lot_id: 1, quantity: '10' }] }
+    const record = { id: 1, shipment_no: 'SHIP-EDIT-20261019-000000001', version: 1, idempotency_key: 'SIM-SHIP-EDIT-L1', status: ShipmentStatus.DRAFT, finance_release_status: ShipmentFinanceReleaseStatus.PENDING, finance_release_version: 1, sales_order_id: 1, customer_id: 1, customer_snapshot: '演示客户', note: '核对包装', planned_ship_at: 1792512000, items: [{ id: 1, line_no: 1, product_id: 1, product_name_snapshot: '演示产品', unit: '只', unit_id: 1, warehouse_id: 1, lot_id: 1, quantity: '10' }] }
     base.workflowTaskFixtures[0].source_no = record.shipment_no
     base.workflowTaskFixtures[0].display_context.source_no = record.shipment_no
     return {
@@ -216,8 +242,14 @@ export function createMobileTaskConsistencyScenarios(deps) {
         await base.beforeNavigate(page)
         await page.route('**/rpc/operational_fact', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
-          if (!['get_shipment', 'list_shipments'].includes(method)) return route.fallback()
-          const data = method === 'get_shipment' ? { shipment: record } : stylePaginatedRpcData([record], 'shipments', params)
+          if (!['get_shipment', 'list_shipments', 'save_shipment_draft'].includes(method)) return route.fallback()
+          if (method === 'save_shipment_draft') {
+            assert.equal(params.id, record.id)
+            assert.equal(params.expected_version, record.version)
+            Object.assign(record, params, { version: record.version + 1 })
+            page.savedShipmentDraft = params
+          }
+          const data = method === 'list_shipments' ? stylePaginatedRpcData([record], 'shipments', params) : { shipment: record }
           return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data } } })
         })
       },
@@ -228,7 +260,6 @@ export function createMobileTaskConsistencyScenarios(deps) {
         const action = page.getByTestId('mobile-task-action-screen')
         const footer = action.locator('.mobile-role-action-bar')
         await page.getByTestId('mobile-task-business-source').getByText(record.shipment_no, { exact: true }).waitFor()
-          await footer.getByRole('button', { name: /^更多操作，共/u }).click()
           await page.getByRole('button', { name: /编辑草稿/u }).click()
           const editor = action.locator('[data-business-form-page="true"]:visible')
           await editor.waitFor()
@@ -238,6 +269,14 @@ export function createMobileTaskConsistencyScenarios(deps) {
           await footer.getByText('有未保存修改', { exact: true }).waitFor()
           await check(page, `source-editor-${width}`)
           await save(page, `source-editor-${width}`)
+          await checkWholeBodyScroll(page, width, 'editor')
+          const lastSection = editor.locator('[data-form-section]').last()
+          const sectionID = await lastSection.getAttribute('id')
+          await chooseSelectOption(editor.getByRole('combobox', { name: '跳转到', exact: true }), sectionID)
+          await page.waitForFunction((id) => document.activeElement?.closest('[data-form-section]')?.id === id, sectionID)
+          const sectionBounds = await lastSection.boundingBox()
+          const mainBounds = await action.locator('main').boundingBox()
+          assert.ok(sectionBounds.y >= mainBounds.y && sectionBounds.y < mainBounds.y + mainBounds.height, '分区跳转滚动到可见正文')
           await action.locator('[data-step-key="detail"]').click()
           await page.getByRole('dialog').filter({ hasText: '放弃未保存的修改？' }).getByRole('button', { name: '继续编辑', exact: true }).click()
           assert.equal(await editor.getByRole('textbox', { name: /^备注/u }).inputValue(), '核对包装和运费口径，尚未保存。')
@@ -245,9 +284,22 @@ export function createMobileTaskConsistencyScenarios(deps) {
           await page.getByRole('dialog').filter({ hasText: '放弃未保存的修改？' }).getByRole('button', { name: '放弃修改', exact: true }).click()
           await editor.waitFor({ state: 'hidden' })
           await footer.locator('.erp-business-selection-action-bar__compact-visible button').waitFor()
+          await page.getByRole('button', { name: /编辑草稿/u }).click()
+          await editor.waitFor()
+          const savedNote = '包装与运费已核对。'
+          await editor.getByRole('textbox', { name: /^备注/u }).fill(savedNote)
+          await footer.getByRole('button', { name: '保存', exact: true }).click()
+          await editor.waitFor({ state: 'hidden' })
+          assert.equal(page.savedShipmentDraft?.note, savedNote, '保存沿用正式出货草稿接口和版本')
+          await footer.getByRole('button', { name: '查看办理结果', exact: true }).click()
+          const receipt = page.getByTestId('mobile-task-receipt-screen')
+          await receipt.getByText('出货草稿和明细已更新', { exact: true }).waitFor()
+          await check(page, `source-editor-saved-${width}`)
+          await save(page, `source-editor-saved-${width}`)
+          await receipt.getByRole('button', { name: '任务办理', exact: true }).click()
+          await page.getByRole('button', { name: /编辑草稿/u }).waitFor()
           assert.equal(new URL(page.url()).pathname, '/m/sales/tasks')
       },
     }
   })]
-
 }

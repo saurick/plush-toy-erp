@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 
@@ -88,7 +89,11 @@ func TestInventoryOperationCycleCountStaleAndManualAdjustmentGuard(t *testing.T)
 		t.Fatal(err)
 	}
 	_, _ = uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{SubjectType: biz.InventorySubjectMaterial, SubjectID: fixtures.materialID, WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID, SourceType: "TEST", IdempotencyKey: "count-race"})
-	if _, err := uc.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: count.ID, ExpectedVersion: count.Version, ActorID: 2}); !errors.Is(err, biz.ErrInventoryOperationStaleCount) {
+	if _, err := uc.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: count.ID, ExpectedVersion: count.Version, ActorID: 2}); !errors.Is(err, biz.ErrProcessRuntimeRequired) {
+		t.Fatalf("count bypassed review: %v", err)
+	}
+	count = approveInventoryCountForTest(t, ctx, repo, count)
+	if _, err := repo.postInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: count.ID, ExpectedVersion: count.Version, ActorID: 2}, nil, nil); !errors.Is(err, biz.ErrInventoryOperationStaleCount) {
 		t.Fatalf("stale err=%v", err)
 	}
 	manual := &biz.InventoryOperationCreate{OperationNo: "MA-1", OperationType: biz.InventoryOperationManualAdjustment, Reason: "审批调整", IdempotencyKey: "ma-1", CreatedBy: 1, Items: []biz.InventoryOperationItemCreate{{LineNo: "1", SubjectType: biz.InventorySubjectMaterial, SubjectID: fixtures.materialID, FromWarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, AdjustmentQuantity: decimal.NewFromInt(-20)}}}
@@ -244,5 +249,86 @@ func assertInventoryOperationLotBalance(t *testing.T, ctx context.Context, uc *b
 	got, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectMaterial, SubjectID: materialID, WarehouseID: warehouseID, LotID: &lotID, UnitID: unitID})
 	if err != nil || got.Quantity.String() != want {
 		t.Fatalf("balance warehouse=%d lot=%d got=%v err=%v want=%s", warehouseID, lotID, got, err, want)
+	}
+}
+
+func approveInventoryCountForTest(t *testing.T, ctx context.Context, repo *inventoryRepo, operation *biz.InventoryOperation) *biz.InventoryOperation {
+	t.Helper()
+	submitted, err := repo.submitInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operation.ID, ExpectedVersion: operation.Version, ActorID: operation.CreatedBy}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.approveInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operation.ID, ExpectedVersion: submitted.Version, ActorID: operation.CreatedBy}, nil, nil); !errors.Is(err, biz.ErrInventoryOperationSelfApproval) {
+		t.Fatalf("self approval: %v", err)
+	}
+	approved, err := repo.approveInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operation.ID, ExpectedVersion: submitted.Version, ActorID: operation.CreatedBy + 1}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return approved
+}
+
+func TestInventoryOperationCountZeroAndMixedLinesRetainAudit(t *testing.T) {
+	for _, mixed := range []bool{false, true} {
+		t.Run(fmt.Sprint(mixed), func(t *testing.T) {
+			ctx := context.Background()
+			data, client := openInventoryRepoTestData(t, "count-zero-"+fmt.Sprint(mixed))
+			f := createInventoryTestFixtures(t, ctx, client)
+			second := createTestWarehouse(t, ctx, client, "COUNT-SECOND")
+			repo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+			uc := biz.NewInventoryUsecase(repo)
+			expected := decimal.NewFromInt(10)
+			lines := []biz.InventoryOperationItemCreate{}
+			for index, warehouse := range []int{f.warehouseID, second.ID} {
+				_, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID, WarehouseID: warehouse, UnitID: f.unitID, TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: expected, SourceType: "TEST", IdempotencyKey: fmt.Sprintf("count-seed-%d", index)})
+				if err != nil {
+					t.Fatal(err)
+				}
+				counted := expected
+				if mixed && index == 1 {
+					counted = decimal.NewFromInt(8)
+				}
+				lines = append(lines, biz.InventoryOperationItemCreate{LineNo: fmt.Sprint(index + 1), SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID, FromWarehouseID: warehouse, UnitID: f.unitID, ExpectedQuantity: &expected, CountedQuantity: &counted})
+			}
+			input := &biz.InventoryOperationCreate{OperationNo: "COUNT-ZERO", OperationType: biz.InventoryOperationCycleCount, Reason: "逐行实盘", IdempotencyKey: "count-zero", CreatedBy: 1, Items: lines}
+			created, err := uc.CreateInventoryOperation(ctx, input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			replay, err := uc.CreateInventoryOperation(ctx, input)
+			if err != nil || replay.ID != created.ID {
+				t.Fatalf("create replay: %v", err)
+			}
+			approved := approveInventoryCountForTest(t, ctx, repo, created)
+			mutation := &biz.InventoryOperationMutation{ID: created.ID, ExpectedVersion: approved.Version, ActorID: 1}
+			posted, err := repo.postInventoryOperation(ctx, mutation, nil, nil)
+			if err != nil || posted.Status != biz.InventoryOperationStatusPosted || len(posted.Items) != 2 {
+				t.Fatalf("post: %#v %v", posted, err)
+			}
+			if _, err := repo.postInventoryOperation(ctx, mutation, nil, nil); err != nil {
+				t.Fatal(err)
+			}
+			txns, total, err := repo.ListInventoryTxns(ctx, biz.InventoryTxnFilter{SourceType: biz.InventoryOperationSourceType, SourceID: created.ID, Limit: 50})
+			want := 0
+			if mixed {
+				want = 1
+			}
+			if err != nil || total != want || len(txns) != want {
+				t.Fatalf("zero line wrote txn: %d %v", total, err)
+			}
+			if mixed && (txns[0].SourceNo != "COUNT-ZERO" || txns[0].SourceDocumentID != created.ID) {
+				t.Fatalf("trace lost: %#v", txns[0])
+			}
+			cancelled, err := uc.CancelInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: created.ID, ExpectedVersion: posted.Version, ActorID: 1, Reason: "重新盘点"})
+			if err != nil || cancelled.Status != biz.InventoryOperationStatusCancelled {
+				t.Fatalf("cancel: %v", err)
+			}
+			for _, warehouse := range []int{f.warehouseID, second.ID} {
+				balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID, WarehouseID: warehouse, UnitID: f.unitID})
+				if err != nil || !balance.Quantity.Equal(expected) {
+					t.Fatalf("balance not restored: %#v %v", balance, err)
+				}
+			}
+		})
 	}
 }

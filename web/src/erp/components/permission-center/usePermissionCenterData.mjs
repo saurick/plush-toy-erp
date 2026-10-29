@@ -83,9 +83,7 @@ export function usePermissionCenterData() {
       setPermissionMenuOptions(
         Array.isArray(optionsResult?.data?.menus)
           ? optionsResult.data.menus
-          : Array.isArray(optionsResult?.data?.menu_options)
-            ? optionsResult.data.menu_options
-            : []
+          : []
       )
       setWarehouseScopeOptions(
         Array.isArray(optionsResult?.data?.warehouse_scope_options)

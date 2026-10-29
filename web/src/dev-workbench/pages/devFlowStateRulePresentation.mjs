@@ -1,5 +1,6 @@
 const PATH_GROUP_ORDER = Object.freeze([
   'normal',
+  'outcome',
   'pause_restore',
   'stop',
   'correction',
@@ -7,6 +8,15 @@ const PATH_GROUP_ORDER = Object.freeze([
 ])
 
 export const DEV_FLOW_STATE_PATH_GROUP_PRESENTATION = Object.freeze({
+  outcome: Object.freeze({
+    key: 'outcome',
+    label: '结束结果另记',
+    tone: 'outcome',
+    diagramStroke: '#64748b',
+    diagramStrokeWidth: 2.25,
+    diagramStrokeDasharray: '',
+    description: '结束状态与成功、驳回、取消或补偿结果分别读取。',
+  }),
   normal: Object.freeze({
     key: 'normal',
     label: '正常推进',
@@ -122,6 +132,7 @@ export const DEV_FLOW_STATE_PATH_KIND_PRESENTATION = Object.freeze({
 
 const GROUP_PRIORITY = Object.freeze({
   normal: 0,
+  outcome: 0,
   pause_restore: 1,
   stop: 2,
   correction: 3,
@@ -142,6 +153,26 @@ export const DEV_FLOW_STATE_TRANSITION_FILTERS = Object.freeze({
   exceptional: 'exceptional',
   related: 'related',
 })
+
+export function buildDevFlowRecordRelationship(flow) {
+  if (flow?.factBoundary !== 'immutable_red_entry_fact') return null
+  const original = flow.states.find((item) => item.key === 'POSTED')
+  const reversal = flow.states.find((item) => item.key === 'REVERSED')
+  if (!original || !reversal || flow.transitions.length > 0) return null
+  return {
+    nodes: [
+      { ...original, label: '原记录', role: original.label, kind: 'fact_ledger', summary: '已过账的原记录继续留存，不能更新或删除。' },
+      { ...reversal, label: reversal.label, kind: 'fact_ledger', summary: '另建反向记录，引用原记录并保留纠正依据。' },
+    ],
+    edges: [{
+      key: 'reversal-reference',
+      from: reversal.key,
+      to: original.key,
+      label: '引用原记录',
+      condition: '箭头表示两条记录的引用关系；原记录不会转换为反向记录。',
+    }],
+  }
+}
 
 function asArray(value) {
   return Array.isArray(value) ? value : []
@@ -195,7 +226,7 @@ function getDevFlowStateHumanCondition(value) {
 export function getDevFlowStateHumanActionLabel(value) {
   const action = cleanText(value)
   const mappings = [
-    [/save_sales_order_engineering/iu, '保存工程资料与打样进度'],
+    [/save_sales_order_engineering/iu, '保存工程资料进度'],
     [/boss_review_engineering_material_request/iu, '老板审核用料'],
     [/finance_review_engineering_material_request/iu, '财务审核与审批'],
     [/post_purchase_rejection_disposition/iu, '过账拒收处置'],
@@ -241,11 +272,22 @@ export function getDevFlowStatePathKindPresentation(pathKind) {
   return presentation
 }
 
+function hasStandardPath(transition) {
+  if (transition.outcomeDimensionKey) return asArray(transition.outcomeKeys).includes('succeeded')
+  return asArray(transition.pathKinds).length === 0 || transition.includesStandardPath === true
+}
+
+function hasExceptionalPath(transition) {
+  return asArray(transition.pathKinds).length > 0 || asArray(transition.outcomeKeys).some((key) => key !== 'succeeded')
+}
+
 export function getDevFlowStateTransitionPresentation(flow, transition) {
   const pathKinds = asArray(transition?.pathKinds).map(
     getDevFlowStatePathKindPresentation
   )
-  const groupKey = pathKinds.reduce(
+  const rawCondition = cleanText(transition.pathKindWhen)
+  const outcomeDimension = asArray(flow.dimensions).find((item) => item.key === transition.outcomeDimensionKey)
+  const groupKey = outcomeDimension ? 'outcome' : transition.includesStandardPath ? 'normal' : pathKinds.reduce(
     (current, item) =>
       GROUP_PRIORITY[item.groupKey] > GROUP_PRIORITY[current]
         ? item.groupKey
@@ -272,16 +314,15 @@ export function getDevFlowStateTransitionPresentation(flow, transition) {
     destinationSummary = `进入“${targetLabel}”；当前目录未登记后续转换。`
   }
 
-  const rawCondition = cleanText(transition.pathKindWhen)
   return Object.freeze({
     key: transition.key,
-    actionLabel: getDevFlowStateHumanActionLabel(transition.action),
-    conditional: Boolean(rawCondition),
-    condition: getDevFlowStateHumanCondition(rawCondition),
+    actionLabel: cleanText(transition.label) || getDevFlowStateHumanActionLabel(transition.action),
+    conditional: Boolean(rawCondition || outcomeDimension),
+    condition: outcomeDimension ? `${transition.outcomeKeys.map((key) => outcomeDimension.states.find((item) => item.key === key).label).join('、')}分别留证；结束不代表成功，按实际结果判断。` : getDevFlowStateHumanCondition(rawCondition),
     destinationSummary,
     group,
     groupKey,
-    isExceptional: pathKinds.length > 0,
+    isExceptional: hasExceptionalPath(transition),
     pathKinds: Object.freeze(pathKinds),
     targetIsTerminal,
     targetOutgoingCount: targetOutgoing.length,
@@ -289,17 +330,17 @@ export function getDevFlowStateTransitionPresentation(flow, transition) {
 }
 
 export function getDevFlowStateTransitionDiagramLabel(transition) {
-  const actionLabel = getDevFlowStateHumanActionLabel(transition?.action)
+  const actionLabel = cleanText(transition?.label) || getDevFlowStateHumanActionLabel(transition?.action)
   const pathKinds = asArray(transition?.pathKinds).map(
     getDevFlowStatePathKindPresentation
   )
   if (pathKinds.length === 0) return actionLabel
+  if (cleanText(transition.pathKindWhen)) return `${actionLabel}（${pathKinds.map((item) => item.label).join('、')}按条件）`
 
   const labels = pathKinds.map((item) => item.diagramLabel)
   if (!labels.some((label) => label.includes(actionLabel))) {
     labels.unshift(actionLabel)
   }
-  if (cleanText(transition.pathKindWhen)) labels.push('条件适用')
   return unique(labels).join(' · ')
 }
 
@@ -398,9 +439,7 @@ export function buildDevFlowStateRuleMermaid(
 
 export function buildDevFlowStateRuleSummary(flow) {
   const transitions = asArray(flow?.transitions)
-  const exceptionalTransitionCount = transitions.filter(
-    (item) => asArray(item.pathKinds).length > 0
-  ).length
+  const exceptionalTransitionCount = transitions.filter(hasExceptionalPath).length
   return Object.freeze({
     stateCount: asArray(flow?.states).length,
     transitionCount: transitions.length,
@@ -427,14 +466,10 @@ export function buildDevFlowStateNodeSummary(flow, state) {
           : '中间状态'
   return Object.freeze({
     incoming: Object.freeze(incoming),
-    incomingExceptionalCount: incoming.filter(
-      (item) => asArray(item.pathKinds).length > 0
-    ).length,
+    incomingExceptionalCount: incoming.filter(hasExceptionalPath).length,
     initial,
     outgoing: Object.freeze(outgoing),
-    outgoingExceptionalCount: outgoing.filter(
-      (item) => asArray(item.pathKinds).length > 0
-    ).length,
+    outgoingExceptionalCount: outgoing.filter(hasExceptionalPath).length,
     positionLabel,
     terminal,
   })
@@ -443,8 +478,12 @@ export function buildDevFlowStateNodeSummary(flow, state) {
 export function listDevFlowStatePathGroups(flow) {
   const groupKeys = new Set()
   for (const transition of asArray(flow?.transitions)) {
+    if (transition.outcomeDimensionKey) {
+      groupKeys.add('outcome')
+      continue
+    }
     const pathKinds = asArray(transition.pathKinds)
-    if (pathKinds.length === 0) groupKeys.add('normal')
+    if (hasStandardPath(transition)) groupKeys.add('normal')
     for (const pathKind of pathKinds) {
       groupKeys.add(getDevFlowStatePathKindPresentation(pathKind).groupKey)
     }
@@ -463,10 +502,10 @@ export function filterDevFlowStateTransitions(
 ) {
   const transitions = asArray(flow?.transitions)
   if (filterKey === DEV_FLOW_STATE_TRANSITION_FILTERS.standard) {
-    return transitions.filter((item) => asArray(item.pathKinds).length === 0)
+    return transitions.filter(hasStandardPath)
   }
   if (filterKey === DEV_FLOW_STATE_TRANSITION_FILTERS.exceptional) {
-    return transitions.filter((item) => asArray(item.pathKinds).length > 0)
+    return transitions.filter(hasExceptionalPath)
   }
   if (filterKey === DEV_FLOW_STATE_TRANSITION_FILTERS.related && stateKey) {
     return transitions.filter(

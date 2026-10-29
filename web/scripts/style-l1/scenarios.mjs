@@ -22,6 +22,11 @@ import { createDevUIDesignWorkflowScenarios } from './devUIDesignWorkflowScenari
 import { createDevUIDesignMobileTrackingScenario } from './devUIDesignMobileTrackingScenario.mjs'
 import { createMobileEntryAuditScenarios } from './mobileEntryAuditScenarios.mjs'
 import { createMobileTaskBusinessScenarios } from './mobileTaskBusinessScenarios.mjs'
+import { createMobileTaskHandlingCoverageScenarios } from './mobileTaskHandlingCoverageScenarios.mjs'
+import { createTaskUnifiedHandlingScenarios } from './taskUnifiedHandlingScenarios.mjs'
+import { createTaskEditorCompletenessScenarios } from './taskEditorCompletenessScenarios.mjs'
+import { createEngineeringWorkspaceChainScenarios } from './engineeringWorkspaceChainScenarios.mjs'
+import { createTaskSourceEditorSaveScenarios } from './taskSourceEditorSaveScenarios.mjs'
 import { createMobileProgressScenarios } from './mobileProgressScenarios.mjs'
 import { createMobileScrollScenarios } from './mobileScrollScenarios.mjs'
 import { createFilterConflictScenarios } from './filterConflictScenarios.mjs'
@@ -66,12 +71,14 @@ import { createWorkflowModuleSelectionScenarios } from './workflowModuleSelectio
 import { createBusinessDetailsScenarios } from './businessDetailsScenarios.mjs'
 import { createDevBusinessUsabilityScenarios } from './devBusinessUsabilityScenarios.mjs'
 import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservatoryScenarios.mjs'
+import { createDevPurchaseChainVerificationScenarios } from './devPurchaseChainVerificationScenarios.mjs'
 import { createDevBusinessChainPrintScenarios } from './devBusinessChainPrintScenarios.mjs'
 import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs'
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 import { createDevQualityGateLayoutScenarios } from './devQualityGateLayoutScenarios.mjs'
 import { createDevWorkbenchPatternScenarios } from './devWorkbenchPatternScenarios.mjs'
 import { createDevServerVerificationScenarios } from './devServerVerificationScenarios.mjs'
+import { createDevTestingGuideScenarios } from './devTestingGuideScenarios.mjs'
 import { createDevWorkbenchDesktopScenarios } from './devWorkbenchDesktopScenarios.mjs'
 import { createDevWorkbenchDensityScenarios } from './devWorkbenchDensityScenarios.mjs'
 import { createDevProjectSkillsScenarios } from './devProjectSkillsScenarios.mjs'
@@ -88,6 +95,7 @@ import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliverySce
 
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
 import { createPurchaseFlowRepairScenarios } from './purchaseFlowRepairScenarios.mjs'
+import { createPurchaseFollowupScenarios } from './purchaseFollowupScenarios.mjs'
 import { createProductPaginationScenarios } from './productPaginationScenarios.mjs'
 import { createSalesOrderImportScenarios } from './salesOrderImportScenarios.mjs'
 import { createWorkbenchSummaryScenarios } from './workbenchSummaryScenarios.mjs'
@@ -391,6 +399,7 @@ export function createStyleL1Scenarios(deps) {
     }
   }
 
+  const taskHandlingScenarios = createTaskUnifiedHandlingScenarios({ ...deps, customerRuntimeEffectiveSession })
   const scenarios = [
     ...createSearchSubmissionScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createBusinessFollowupScenarios({
@@ -500,6 +509,7 @@ export function createStyleL1Scenarios(deps) {
     ...createDevQualityGateLayoutScenarios({ assert, assertNoHorizontalOverflow, expectHeading }),
     ...createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevServerVerificationScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createDevTestingGuideScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevVersionCenterScenarios({
       assert,
       assertNoHorizontalOverflow,
@@ -550,6 +560,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
+    ...createDevPurchaseChainVerificationScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createBusinessActionStabilityScenarios({
       assert,
       assertERPThemeMode,
@@ -686,6 +697,11 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createMobileEntryAuditScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileTaskBusinessScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createMobileTaskHandlingCoverageScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...taskHandlingScenarios,
+    ...createTaskEditorCompletenessScenarios({ ...deps, customerRuntimeEffectiveSession }, taskHandlingScenarios),
+    ...createEngineeringWorkspaceChainScenarios({ ...deps, customerRuntimeEffectiveSession }, taskHandlingScenarios),
+    ...createTaskSourceEditorSaveScenarios({ ...deps, customerRuntimeEffectiveSession }, taskHandlingScenarios),
     ...createMobileTaskConsistencyScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileScrollScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileWorkflowTrackingScenarios({ ...deps, customerRuntimeEffectiveSession }),
@@ -807,6 +823,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
     }),
     ...createPurchaseFlowRepairScenarios({ assert, customerRuntimeEffectiveSession, outputDir }),
+    ...createPurchaseFollowupScenarios({ assert, customerRuntimeEffectiveSession, outputDir }),
     ...createPurchaseReceiptScenarios({
       assert,
       assertAntdModalCentered,

@@ -4,6 +4,9 @@ import test from 'node:test'
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
   buildOutsourcingReturnPayablePayload,
+  buildOutsourcingOrderPayablePayload,
+  normalizeOutsourcingOrderPayableRequest,
+  validateOutsourcingOrderPayableResult,
   buildPurchaseReceiptPayablePayload,
   buildSingleFactReconciliationPayload,
   financeBusinessSourceActionConfig,
@@ -39,7 +42,6 @@ test('finance source payloads keep only operator-owned fields plus one locked so
   assert.deepEqual(Object.keys(purchase).sort(), [
     'fact_no',
     'note',
-    'occurred_at',
     'purchase_receipt_id',
   ])
   assert.equal(purchase.fact_no, 'AP-SOURCE-001')
@@ -55,7 +57,6 @@ test('finance source payloads keep only operator-owned fields plus one locked so
   assert.deepEqual(Object.keys(outsourcing).sort(), [
     'fact_no',
     'note',
-    'occurred_at',
     'outsourcing_fact_id',
   ])
   assert.equal(outsourcing.outsourcing_fact_id, 71)
@@ -182,7 +183,6 @@ test('strict request normalizers drop server-owned and unknown fields', () => {
     {
       customer_key: 'yoyoosun',
       fact_no: 'AP-001',
-      occurred_at: '2026-07-14T02:30:00.000Z',
       note: '核对',
       purchase_receipt_id: 61,
       idempotency_key: 'request-key-001',
@@ -269,6 +269,31 @@ test('source result validators require the expected draft type and source', () =
   )
 })
 
+test('payable requests discard retained dates while reconciliation preserves an explicit or cleared date', () => {
+  const request = {
+    fact_no: 'AP-61',
+    idempotency_key: 'request-key-061',
+    occurred_at: 'invalid retained form value',
+  }
+  for (const [normalize, source] of [
+    [normalizePurchaseReceiptPayableRequest, { purchase_receipt_id: 61 }],
+    [normalizeOutsourcingReturnPayableRequest, { outsourcing_fact_id: 71 }],
+  ]) {
+    assert.equal('occurred_at' in normalize({ ...request, ...source }), false)
+  }
+  assert.throws(() => normalizeSingleFactReconciliationRequest({
+    ...request, finance_fact_id: 81,
+  }), /发生时间无效/u)
+  assert.equal(normalizeSingleFactReconciliationRequest({
+    ...request, finance_fact_id: 81, occurred_at: '2026-07-14T02:30:00Z',
+  }).occurred_at, '2026-07-14T02:30:00.000Z')
+  for (const occurred_at of ['', undefined]) {
+    assert.equal('occurred_at' in normalizeSingleFactReconciliationRequest({
+      ...request, finance_fact_id: 81, occurred_at,
+    }), false)
+  }
+})
+
 test('action configuration and suggested numbers stay business-readable', () => {
   const config = financeBusinessSourceActionConfig(
     FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION
@@ -281,4 +306,20 @@ test('action configuration and suggested numbers stay business-readable', () => 
     ),
     'AP-PR-2026-0714'
   )
+})
+
+test('accepted stage contract payable preserves source and discards caller financial fields', () => {
+ const source = { id: 12, outsourcing_order_no: 'OC-12', lifecycle_status: 'confirmed' }
+ const payload = buildOutsourcingOrderPayablePayload({ ...operatorValues, amount: '999', currency: 'USD' }, source)
+ assert.equal(payload.outsourcing_order_id, 12)
+ assert.equal(payload.amount, undefined)
+ assert.equal(payload.occurred_at, undefined)
+ const request = normalizeOutsourcingOrderPayableRequest({ ...payload, idempotency_key: 'stage-ap', source_type: 'OUTSOURCING_FACT' })
+ assert.equal(request.source_type, undefined)
+ assert.equal(suggestedFinanceBusinessNo(FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE, source), 'AP-OC-12')
+ const result = { id: 13, fact_no: request.fact_no, fact_type: 'PAYABLE', status: 'DRAFT', source_type: 'OUTSOURCING_ORDER', source_id: 12, idempotency_key: 'stage-ap' }
+ assert.equal(validateOutsourcingOrderPayableResult(result, request), result)
+ assert.throws(() => validateOutsourcingOrderPayableResult({ ...result, source_type: 'OUTSOURCING_FACT' }, request))
+ assert.equal(hasValidFinanceTransitionSource(result), true)
+ assert.throws(() => buildOutsourcingOrderPayablePayload(operatorValues, { ...source, lifecycle_status: 'draft' }))
 })

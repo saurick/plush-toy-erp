@@ -11,7 +11,7 @@ export function MigrationRuntimePanel({
   isLatest,
   pendingFiles,
   performAction,
-  recoveryActive,
+
   runtime,
   runtimeState,
   summaryFresh,
@@ -85,11 +85,6 @@ export function MigrationRuntimePanel({
                     <p>运行制品：{runtime.bundleId}</p>
                   ) : null}
                   <Space wrap>
-                    {summaryFresh &&
-                    runtime?.available &&
-                    (!recoveryActive || isLatest) ? (
-                      <Button href="/erp">进入业务系统</Button>
-                    ) : null}
                     {!runtime?.available ? (
                       <Button
                         icon={<SyncOutlined aria-hidden="true" />}

@@ -512,6 +512,27 @@ export async function completePurchaseOrderTerms(params = {}) {
   return dataOf(result)?.purchase_order || null
 }
 
+export async function listPurchaseFollowups(params = {}, options = {}) {
+  const result = await purchaseOrderRpc.call(RpcMethod.purchase_order.LIST_PURCHASE_FOLLOWUPS, params, options)
+  const data = dataOf(result)
+  if (!Array.isArray(data?.rows) || !Number.isSafeInteger(data.total) || !data.counts || !data.days || !data.access || !data.as_of_date) {
+    throw Object.assign(new Error('采购跟进结果不完整'), { isInvalidResponse: true })
+  }
+  return data
+}
+
+export async function listAllPurchaseFollowups(params = {}, options = {}) {
+  return listAllPaginatedRecords(listPurchaseFollowups, params, 'rows', options, {
+    recordIdentityKey: (row) => row.key,
+    invalidResponseMessage: '采购跟进清单已变化或返回不完整，请刷新后重试',
+  })
+}
+
+export async function updatePurchaseOrderDelivery(params = {}) {
+  const result = await purchaseOrderRpc.call(RpcMethod.purchase_order.UPDATE_PURCHASE_ORDER_DELIVERY, params)
+  return dataOf(result)?.purchase_order || null
+}
+
 export async function getPurchaseOrderReceiptProgress(
   params = {},
   options = {}

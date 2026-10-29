@@ -208,6 +208,8 @@ test('办理手册逐页保留真实操作来源，新增规则同时进入全�
     ['实盘数量', 'inventory', '盘点填实盘数量'],
     ['分批抵扣', 'finance-payments', '订单预收 / 预付'],
     ['版本 修订', 'material-bom', '已有订单引用不自动切换'],
+    ['委外发料', 'outbound', '确认发料过账后再核对库存扣减'],
+    ['预留和释放', 'outbound', '预留和释放都不产生库存出库记录'],
   ]) {
     assert(
       searchHelpDocuments(catalog, query).some((entry) => entry.id === key),

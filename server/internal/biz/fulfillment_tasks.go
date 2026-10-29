@@ -22,7 +22,7 @@ var fulfillmentTaskSpecs = map[string]FulfillmentTaskSpec{
 	"receipt_inbound":               {"确认材料入库", "purchase_receipt", WarehouseRoleKey, PermissionWarehouseInboundConfirm, PermissionPurchaseReceiptRead, "/erp/warehouse/inbound?receipt_id=%d"},
 	"receipt_exception":             {"处理来料不合格", "purchase_receipt", PurchaseRoleKey, PermissionPurchaseReturnCreate, PermissionQualityInspectionRead, "/erp/production/quality-inspections?purchase_receipt_id=%d"},
 	"receipt_replacement":           {"补换到货点数", "purchase_rejection_disposition", WarehouseRoleKey, PermissionPurchaseReceiptCreate, PermissionPurchaseReturnRead, ""},
-	"outsourcing_contract":          {"补价并确认加工合同", "outsourcing_order", FinanceRoleKey, PermissionOutsourcingOrderConfirm, PermissionOutsourcingOrderRead, "/erp/purchase/processing-contracts?outsourcing_order_id=%d"},
+	"outsourcing_contract":          {"补价并确认加工合同", "outsourcing_order", PurchaseRoleKey, PermissionOutsourcingOrderConfirm, PermissionOutsourcingOrderRead, "/erp/purchase/processing-contracts?outsourcing_order_id=%d"},
 	"outsourcing_issue":             {"办理加工发料", "outsourcing_order", WarehouseRoleKey, PermissionOutsourcingMaterialIssueCreate, PermissionOutsourcingOrderRead, "/erp/purchase/processing-contracts?outsourcing_order_id=%d"},
 	"outsourcing_return":            {"登记加工回货", "outsourcing_order", WarehouseRoleKey, PermissionOutsourcingReturnReceiptCreate, PermissionOutsourcingOrderRead, "/erp/purchase/processing-contracts?outsourcing_order_id=%d"},
 	"outsourcing_quality":           {"办理加工回货检验", "quality_inspection", QualityRoleKey, PermissionQualityInspectionUpdate, PermissionQualityInspectionRead, "/erp/production/quality-inspections?quality_inspection_id=%d"},

@@ -68,6 +68,20 @@ type ProductionExceptionSubmit struct {
 	RequestedBy                                                                int
 }
 
+// Quality dispositions and additional material requests have different owners.
+// The permission follows the authoritative decision type, including cancellation
+// and process startup, so access to one kind never authorizes the other.
+func ProductionExceptionSubmissionPermission(decisionType string) (string, bool) {
+	switch strings.ToUpper(strings.TrimSpace(decisionType)) {
+	case ProductionExceptionOverIssue:
+		return PermissionProductionOverIssueSubmit, true
+	case ProductionExceptionScrap, ProductionExceptionWIPConcession, ProductionExceptionReworkOriginal, ProductionExceptionReworkSwitch, ProductionExceptionRemake:
+		return PermissionProductionExceptionSubmit, true
+	default:
+		return "", false
+	}
+}
+
 type ProductionExceptionMutation struct {
 	WarehouseScope               *WarehouseDataScope `json:"-"`
 	ID, ExpectedVersion, ActorID int

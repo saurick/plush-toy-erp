@@ -188,7 +188,7 @@ export async function runRequestCancellationBrowser(browser, options, client, fi
       await openMobileTaskCard(page, task.id);
       const screen = page.getByTestId('mobile-task-detail-screen');
       await expect(screen.getByText('暂时无法确认处理权限，请点击下方重试。', { exact: true })).toBeVisible();
-      await expect(screen.getByRole('button', { name: '填写办理表单', exact: true })).toHaveCount(0);
+      await expect(screen.locator('.mobile-role-action-bar').getByRole('button', { name: '任务办理', exact: true })).toHaveCount(0);
       const retry = screen.getByRole('button', { name: '重新确认', exact: true });
       await expect(retry).toBeEnabled();
       entry.errorVisible = true;
@@ -197,7 +197,7 @@ export async function runRequestCancellationBrowser(browser, options, client, fi
       await settleRPCPage(page);
       await retry.click();
       await settleRPCPage(page);
-      await expect(screen.getByRole('button', { name: '填写办理表单', exact: true })).toBeEnabled();
+      await expect(screen.locator('.mobile-role-action-bar').getByRole('button', { name: '任务办理', exact: true })).toBeEnabled();
       entry.recovered = true;
       assertInjected();
       await saveScreen(page, entry, 'retry-recovered');

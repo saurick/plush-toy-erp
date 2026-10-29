@@ -10,7 +10,9 @@ import {
   RollbackOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Input, Popconfirm, Tag } from 'antd'
-import { useOutletContext, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { OperationalFactStatus, ShipmentStatus, StockReservationStatus } from '../../common/consts/statuses.generated.mjs'
@@ -85,6 +87,7 @@ import {
 } from '../utils/printWorkspace.js'
 import { buildProcessingContractDraftFromOutsourcingFact } from '../data/processingContractTemplate.mjs'
 import { canConfirmFinanceFact } from '../utils/financeFactPermissions.mjs'
+import { canCancelFinanceFact } from '../utils/financeCancellation.mjs'
 
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
@@ -135,7 +138,7 @@ export function OperationalFactWorkspace({
   viewOverrides = EMPTY_VIEW_OVERRIDES,
   showTabs = true,
 }) {
-  const outletContext = useOutletContext()
+  const outletContext = useBusinessPageContext()
   const productionRecordsWorkspace =
     outletContext?.productionRecordsWorkspace || null
   const navigate = useBusinessNavigate()
@@ -247,6 +250,8 @@ export function OperationalFactWorkspace({
     activeSelectedRow,
     activeConfig,
   })
+
+  useWorkflowTaskBusinessBusy(saving)
 
   const resolvedRouteRecord = useMemo(
     () =>
@@ -1359,18 +1364,18 @@ export function OperationalFactWorkspace({
             <BusinessActionTooltip
               visible={
                 !activeSelectedRow ||
-                [OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status)
+                canCancelFinanceFact(activeSelectedRow)
               }
               disabled={
                 !activeSelectedRow ||
-                ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status) ||
+                !canCancelFinanceFact(activeSelectedRow) ||
                 financeDraftTransitionBlocked ||
                 saving
               }
               disabledReason={
                 !activeSelectedRow
                   ? '请先选择一条财务记录'
-                  : ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status)
+                  : !canCancelFinanceFact(activeSelectedRow)
                     ? '当前财务状态不能取消'
                     : financeDraftTransitionBlocked
                       ? '该历史草稿缺少可核对来源，不能确认或作废'
@@ -1388,7 +1393,7 @@ export function OperationalFactWorkspace({
                 data-business-action-role="danger"
                 disabled={
                   !activeSelectedRow ||
-                  ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status) ||
+                  !canCancelFinanceFact(activeSelectedRow) ||
                   financeDraftTransitionBlocked ||
                   saving
                 }
@@ -1458,6 +1463,7 @@ export function OperationalFactWorkspace({
                         ])
                       : hasAnyPermission(adminProfile, [
                           PermissionCode.PRODUCTION_FACT_POST,
+                          PermissionCode.WAREHOUSE_OUTBOUND_CONFIRM,
                           PermissionCode.PRODUCTION_FACT_CANCEL,
                         ])
               }

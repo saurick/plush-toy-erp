@@ -9,6 +9,7 @@ import {
   WorkbenchSection,
   WorkbenchToolbar,
 } from '../WorkbenchPattern.jsx'
+import { WORKFLOW_TASK_COLLABORATION_ACTIONS } from '../../../erp/utils/workflowTaskActionFlow.mjs'
 import { TASK_HANDLING_KINDS } from '../../../erp/utils/taskHandlingPolicy.mjs'
 import { getRoleDisplayName } from '../../../erp/utils/roleKeys.mjs'
 import BusinessActionRelations from './BusinessActionRelations.jsx'
@@ -61,6 +62,14 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
             ? '电脑可编制与修改，手机仅查看资料和结果。'
             : '电脑可完成本次办理；手机提供相同规则下的适用操作。')}
       </p>
+      <WorkbenchFacts
+        aria-label="本项操作分工"
+        items={[
+          { label: '业务办理', value: selected.operationLabels?.length ? selected.operationLabels.join(' / ') : selected.input },
+          { label: '提交结果', value: selected.handoff },
+          { label: '任务协作', value: '按当前任务状态与后端权限显示；不代替本项业务提交。' },
+        ]}
+      />
       {selected.processRefs ? (
         <WorkbenchFacts
           aria-label="当前任务节点"
@@ -245,6 +254,7 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
             title: '本次办理',
             dataIndex: 'input',
             key: 'input',
+            render: (input, row) => row.operationLabels?.length ? <><strong>{row.operationLabels.join(' / ')}</strong><small>{input}</small></> : input,
           },
           { title: '审批与交接', dataIndex: 'handoff', key: 'handoff' },
           {
@@ -263,6 +273,15 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
           },
         ]}
       />
+      <WorkbenchSection title="操作分组与显示条件">
+        <p>第二步底部将通用任务协作与当前业务办理分开。业务办理使用原编辑器的保存、提交、审批或执行动作；当前对象、状态及权限决定具体按钮。附件作为资料入口保留，复制操作放在页头。</p>
+        <dl className="erp-dev-task-matrix__collaboration" aria-label="通用任务协作条件">
+          {Object.entries(WORKFLOW_TASK_COLLABORATION_ACTIONS).map(([key, item]) => (
+            <div key={key}><dt>{item.label}</dt><dd>{item.condition}</dd></div>
+          ))}
+        </dl>
+        <p>审批通过、审批退回、退回工程、实际发货、入库过账等属于本项业务。标记任务受阻只记录协作卡点，解除任务阻塞只恢复任务办理；两者都不能替代业务退回、冲正或过账。</p>
+      </WorkbenchSection>
     </section>
   )
 }

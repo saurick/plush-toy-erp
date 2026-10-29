@@ -109,14 +109,6 @@ func (_c *ProductionOrderItemCreate) SetRouteCode(v string) *ProductionOrderItem
 	return _c
 }
 
-// SetNillableRouteCode sets the "route_code" field if the given value is not nil.
-func (_c *ProductionOrderItemCreate) SetNillableRouteCode(v *string) *ProductionOrderItemCreate {
-	if v != nil {
-		_c.SetRouteCode(*v)
-	}
-	return _c
-}
-
 // SetCustomerInspectionRequired sets the "customer_inspection_required" field.
 func (_c *ProductionOrderItemCreate) SetCustomerInspectionRequired(v bool) *ProductionOrderItemCreate {
 	_c.mutation.SetCustomerInspectionRequired(v)
@@ -437,6 +429,9 @@ func (_c *ProductionOrderItemCreate) check() error {
 		if err := productionorderitem.BomHeaderIDValidator(v); err != nil {
 			return &ValidationError{Name: "bom_header_id", err: fmt.Errorf(`ent: validator failed for field "ProductionOrderItem.bom_header_id": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.RouteCode(); !ok {
+		return &ValidationError{Name: "route_code", err: errors.New(`ent: missing required field "ProductionOrderItem.route_code"`)}
 	}
 	if v, ok := _c.mutation.RouteCode(); ok {
 		if err := productionorderitem.RouteCodeValidator(v); err != nil {

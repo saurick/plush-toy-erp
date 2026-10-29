@@ -153,7 +153,7 @@ export function checkEngineeringDemand(request, order, receipt, status = request
     positions.add(key); lines.set(source.sales_order_item_id, (lines.get(source.sales_order_item_id) || 0) + 1);
     lineIDs.set(source.line_no, source.sales_order_item_id); bomIDs.set(position, source.bom_item_id);
     requireResult(part && source.material_id === refs[part.material].id && source.unit_id === refs[part.material].unitId &&
-      source.product_sku_id === product.skuId && Number.isSafeInteger(source.sample_image_attachment_id) && source.sample_image_attachment_id > 0 &&
+      source.product_sku_id === product.skuId &&
       quantity6(source.ordered_quantity) === quantity6(recipe.ordered) &&
       quantity6(source.pre_shipment_sample_quantity) === quantity6(recipe.samples) &&
       quantity6(source.unit_usage) === quantity6(part.quantity) && quantity6(source.loss_rate) === quantity6(part.loss_rate), "source_material_unit_inputs");
@@ -224,9 +224,10 @@ export async function readEngineeringPurchaseResult({ client, order, receipt, op
 export async function prepareEngineeringHistoryOrder({ client, order, receipt, signal }) {
   const options = { signal };
   let request = await client.requireCall("preview", { sales_order_id: order.id }, {
-    ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "PREVIEW"),
+    ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "SUBMITTED"),
   });
-  if (order.status === "PREVIEW") return;
+  if (order.status === "SUBMITTED") return;
+  // Completion already submitted; this call verifies the existing idempotent receipt.
   request = await client.requireCall("submit", submitParams(order, request), {
     ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "SUBMITTED"),
   });
@@ -245,8 +246,9 @@ export async function prepareEngineeringHistoryOrder({ client, order, receipt, s
 export async function runEngineeringBusinessFlow({ client, order, receipt, observe, signal }) {
   const options = { observe, signal };
   let request = await client.requireCall("preview", { sales_order_id: order.id }, {
-    ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "PREVIEW"),
+    ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "SUBMITTED"),
   });
+  // Completion already submitted; this call verifies the existing idempotent receipt.
   request = await client.requireCall("submit", submitParams(order, request), {
     ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "SUBMITTED"),
   });
@@ -267,7 +269,7 @@ function checkCompetitionResults(results, allowedCode, operation) {
 export async function runEngineeringCompetition({ client, receipt, signal }) {
   const order = receipt.orders[0], options = { signal }, conflict = RpcErrorCode.RESOURCE_VERSION_CONFLICT;
   const preview = await client.requireCall("preview", { sales_order_id: order.id }, {
-    ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "PREVIEW"),
+    ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "SUBMITTED"),
   });
   const submits = await Promise.all(Array.from({ length: 20 }, () => client.call("submit", submitParams(order, preview), options)));
   checkCompetitionResults(submits, conflict, "submit");

@@ -131,7 +131,7 @@ test('mobile material task separates on-demand reading from versioned task proce
     calls.filter(({ method }) => method === 'get_engineering_material_request').length,
     1
   )
-  assert.match(document.querySelector('[aria-label="任务处理链"]').textContent, /工程提交用料/)
+  assert.match(document.querySelector('[aria-label="任务处理链"]').textContent, /自动生成用料汇总/)
   assert.match(document.querySelector('[aria-label="任务处理链"]').textContent, /老板审核/)
   await click(button('查看材料汇总'))
   assert.equal(document.querySelectorAll('.ant-modal-footer').length, 0)

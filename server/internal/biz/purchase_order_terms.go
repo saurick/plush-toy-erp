@@ -13,6 +13,7 @@ import (
 )
 
 const PurchaseOrderActionCompleteTerms = "complete_terms"
+const PurchaseOrderActionUpdateDelivery = "update_delivery"
 
 var ErrPurchaseOrderPriceFrozen = errors.New("confirmed purchase price cannot be changed")
 
@@ -30,6 +31,7 @@ type PurchaseOrderTermsCompletion struct {
 	ActorID                      int
 	IdempotencyKey               string
 	IntentHash                   string
+	DeliveryOnly                 bool
 	ExpectedArrivalDate          *time.Time
 	SupplierConfirmedArrivalDate *time.Time
 	Items                        []PurchaseOrderTermsItem
@@ -55,7 +57,7 @@ func (uc *PurchaseOrderUsecase) CompletePurchaseOrderTerms(ctx context.Context, 
 	n.Items = append([]PurchaseOrderTermsItem(nil), in.Items...)
 	sort.Slice(n.Items, func(i, j int) bool { return n.Items[i].ID < n.Items[j].ID })
 	for i, item := range n.Items {
-		if item.ID <= 0 || item.UnitPrice == nil || (i > 0 && n.Items[i-1].ID == item.ID) {
+		if item.ID <= 0 || (!n.DeliveryOnly && item.UnitPrice == nil) || (n.DeliveryOnly && item.UnitPrice != nil) || (i > 0 && n.Items[i-1].ID == item.ID) {
 			return nil, ErrBadParam
 		}
 		if err := value.ValidateOptionalNonNegativeMoney(item.UnitPrice); err != nil {
@@ -63,7 +65,7 @@ func (uc *PurchaseOrderUsecase) CompletePurchaseOrderTerms(ctx context.Context, 
 		}
 	}
 	hash, err := processCanonicalSHA256(map[string]any{
-		"action": PurchaseOrderActionCompleteTerms, "id": n.ID, "version": n.ExpectedVersion,
+		"action": n.ActionKey(), "id": n.ID, "version": n.ExpectedVersion,
 		"actor": n.ActorID, "idempotency_key": n.IdempotencyKey, "items": n.Items,
 		"expected_arrival_date": n.ExpectedArrivalDate, "supplier_confirmed_arrival_date": n.SupplierConfirmedArrivalDate,
 	})
@@ -72,4 +74,11 @@ func (uc *PurchaseOrderUsecase) CompletePurchaseOrderTerms(ctx context.Context, 
 	}
 	n.IntentHash = hash
 	return repo.CompletePurchaseOrderTerms(ctx, &n)
+}
+
+func (in *PurchaseOrderTermsCompletion) ActionKey() string {
+	if in.DeliveryOnly {
+		return PurchaseOrderActionUpdateDelivery
+	}
+	return PurchaseOrderActionCompleteTerms
 }

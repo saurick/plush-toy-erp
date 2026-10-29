@@ -39,6 +39,7 @@ const BusinessDatePicker = React.forwardRef(
       quickOptions = [],
       quickOptionsLabel = '快捷选择',
       renderExtraFooter,
+      popupAlign,
       ...restProps
     },
     ref
@@ -158,6 +159,17 @@ const BusinessDatePicker = React.forwardRef(
     return (
       <DatePicker
         {...restProps}
+        popupAlign={{
+          offset: [0, 0],
+          ...popupAlign,
+          overflow: {
+            adjustX: true,
+            adjustY: true,
+            shiftX: true,
+            shiftY: true,
+            ...popupAlign?.overflow,
+          },
+        }}
         ref={ref}
         needConfirm={false}
         showTime={showTime}
@@ -189,6 +201,16 @@ export const DateInput = React.forwardRef((props, ref) => (
   <BusinessDatePicker
     {...props}
     ref={ref}
+    classNames={{
+      ...props.classNames,
+      popup: {
+        ...props.classNames?.popup,
+        root: joinClassNames(
+          'erp-business-date-picker-dropdown',
+          props.classNames?.popup?.root || ''
+        ),
+      },
+    }}
     displayFormat={DATE_INPUT_DISPLAY_FORMAT}
     parseValue={parseDateInputValue}
     placeholder={props.placeholder || '选择日期'}

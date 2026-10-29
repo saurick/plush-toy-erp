@@ -42,8 +42,8 @@ export const yoyoosunMenuConfig = Object.freeze({
         items: ["production-orders", "production-progress"],
       },
       {
-        title: "库存管理",
-        items: ["inbound", "inventory"],
+        title: "仓储管理",
+        items: ["inventory", "inbound", "outbound"],
       },
       {
         title: "质检管理",
@@ -51,7 +51,7 @@ export const yoyoosunMenuConfig = Object.freeze({
       },
       {
         title: "出货管理",
-        items: ["shipments", "outbound"],
+        items: ["shipments"],
       },
       {
         title: "财务管理",

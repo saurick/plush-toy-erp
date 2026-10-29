@@ -6,7 +6,7 @@ import { showPageLoadError } from '../PageLoadFeedback.jsx'
 
 import { FinancePaymentStatus } from '../../../common/consts/statuses.generated.mjs'
 
-import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
+import { useProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -43,6 +43,7 @@ export default function useFinancePaymentAllocation({
   allocationCandidates,
 }) {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
   const [allocationOpen, setAllocationOpen] = useState(false)
 
   const [allocationForm] = Form.useForm()
@@ -86,6 +87,7 @@ export default function useFinancePaymentAllocation({
       await loadReferences()
       showProcessSubmissionReceipt({
         result: processData,
+        record: processData.source_readback,
         title: alreadyStarted ? '收付款审批流已存在' : '收付款审批流已恢复发起',
       })
     } catch (error) {

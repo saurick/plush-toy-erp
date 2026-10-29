@@ -78,10 +78,10 @@ test('手机回执去重相同意见，同时保留不同说明、未知结果�
   const task = { id: 1, task_name: '核对包装', task_group: 'business_followup', task_status_key: 'blocked', owner_role_key: 'sales', source_type: 'sales_order', source_no: 'SO-COPY-001', payload: {}, display_context: { available: true, items: [] } }
   const props = { task, action: 'resume', feedback: '规格已核对。', reason: '规格已核对。', outcome: 'unknown', onRetryConfirm() {} }
   await harness.render(h(Receipt, props))
-  const fields = () => [...document.querySelectorAll('.mobile-task-receipt-row dd')].map((item) => item.textContent)
+  const fields = () => [...document.querySelectorAll('.workflow-task-receipt dd')].map((item) => item.textContent)
   assert.equal(fields().filter((text) => text === '规格已核对。').length, 1)
   assert.match(document.querySelector('[data-outcome="unknown"]').textContent, /尚未确认本次提交是否生效/u)
-  assert.match(document.querySelector('.workflow-task-info-card__badges').textContent, /已知状态：/u)
+  assert.match(document.querySelector('.workflow-task-receipt__heading').textContent, /已知状态：/u)
   assert.ok(harness.button('重新确认结果'))
   assert.ok(harness.button('查看附件'))
   await harness.render(h(Receipt, { ...props, reason: '仓库尚未复核。', outcome: 'failed' }))

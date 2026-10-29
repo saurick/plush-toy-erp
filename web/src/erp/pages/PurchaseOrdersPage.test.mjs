@@ -203,10 +203,7 @@ test('purchase selection actions keep one authorized catalog across record state
     /disabledReason=\{lifecycleActionStates\[action.key\]\?\.disabledReason\}/u
   )
   assert.match(operationPanel, /disabled=\{primaryLifecycleState\.disabled\}/u)
-  assert.doesNotMatch(
-    operationPanel,
-    /canUpdate\s*&&[\s\S]{0,100}selectedLifecycleStatus/u
-  )
+  assert.match(operationPanel, /\{canUpdate \? \([\s\S]*?data-business-action-key="purchase-edit"/u)
   assert.doesNotMatch(
     operationPanel,
     /canCreateInboundDraftAction\s*&&[\s\S]{0,140}selectedLifecycleStatus/u

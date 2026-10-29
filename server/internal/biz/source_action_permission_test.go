@@ -113,3 +113,21 @@ func TestFinanceAllocationSourcePermissionsFollowAuthoritativeParty(t *testing.T
 		}
 	}
 }
+
+func TestRetiredFactWritingProcessCommandsHaveNoSourceReadAlias(t *testing.T) {
+	for _, method := range []string{
+		"execute_material_supply_purchase_receipt_create",
+		"execute_material_supply_quality_gate",
+		"execute_material_supply_post_inbound",
+		"execute_finished_goods_delivery_quality_decide",
+		"execute_finished_goods_delivery_shipment_ship",
+		"execute_finished_goods_delivery_receivable_lead",
+	} {
+		if keys, ok := SourceActionReadPermissions("customer_config", method); ok || len(keys) != 0 {
+			t.Errorf("retired method %s still resolves source permissions", method)
+		}
+		if keys, ok := SourceActionReadPermissionCandidates("customer_config", method); ok || len(keys) != 0 {
+			t.Errorf("retired method %s still advertises source permissions", method)
+		}
+	}
+}

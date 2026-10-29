@@ -140,7 +140,7 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create SKU production order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, order.Order.ID)
+	prepareProductionOrderFactMaterialsForTest(t, ctx, client, order.Order.ID)
 	order, err = orderUC.Release(ctx, &biz.ProductionOrderAction{
 		ID: order.Order.ID, ExpectedVersion: order.Order.Version, ActorID: actor.ID, IdempotencyKey: "MO-SKU-GRAIN:RELEASE",
 	})
@@ -148,9 +148,11 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 		t.Fatalf("release SKU production order: %v", err)
 	}
 
+	batchID := prepareProductionHandworkBatchForFactTest(t, ctx, client, order.Items[0].ID, actor.ID)
 	production, err := uc.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 		FactNo: "PF-SKU-GRAIN", ProductionOrderID: order.Order.ID, ProductionOrderItemID: order.Items[0].ID,
-		WarehouseID: fixtures.productWarehouseID, LotID: &lot.ID, Quantity: decimal.NewFromInt(3), IdempotencyKey: "PF-SKU-GRAIN",
+		ProductionWIPBatchID: batchID,
+		WarehouseID:          fixtures.productWarehouseID, LotID: &lot.ID, Quantity: decimal.NewFromInt(3), IdempotencyKey: "PF-SKU-GRAIN",
 	})
 	if err != nil {
 		t.Fatalf("create SKU production fact: %v", err)

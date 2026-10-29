@@ -17,7 +17,7 @@ func (d *jsonrpcDispatcher) exportSalesOrders(ctx context.Context, pm map[string
 	if res := d.requireCustomerConfigModulesReadable(ctx, "sales_orders"); res != nil {
 		return res
 	}
-	if !jsonRPCParamsAllowed(pm, "id", "keyword", "customer_id", "sample_bom_id", "lifecycle_status", "lifecycle_scope", "date_field", "date_from", "date_to", "sort_by", "sort_direction") {
+	if !jsonRPCParamsAllowed(pm, "id", "keyword", "customer_id", "bom_id", "lifecycle_status", "lifecycle_scope", "date_field", "date_from", "date_to", "sort_by", "sort_direction") {
 		return invalidParamResult()
 	}
 	query := biz.SalesOrderExportQuery{}
@@ -85,9 +85,9 @@ func (d *jsonrpcDispatcher) salesOrderExportError(ctx context.Context, err error
 
 func salesOrderListFilterFromParams(pm map[string]any) (biz.SalesOrderFilter, bool) {
 	sampleBOMID := 0
-	if _, exists := pm["sample_bom_id"]; exists {
+	if _, exists := pm["bom_id"]; exists {
 		var valid bool
-		sampleBOMID, valid = getRequiredJSONRPCPositiveInt(pm, "sample_bom_id")
+		sampleBOMID, valid = getRequiredJSONRPCPositiveInt(pm, "bom_id")
 		if !valid {
 			return biz.SalesOrderFilter{}, false
 		}
@@ -101,7 +101,7 @@ func salesOrderListFilterFromParams(pm map[string]any) (biz.SalesOrderFilter, bo
 		return biz.SalesOrderFilter{}, false
 	}
 	return biz.SalesOrderFilter{
-		Keyword: getString(pm, "keyword"), CustomerID: getInt(pm, "customer_id", 0), SampleBOMID: sampleBOMID,
+		Keyword: getString(pm, "keyword"), CustomerID: getInt(pm, "customer_id", 0), BOMID: sampleBOMID,
 		LifecycleStatus: getString(pm, "lifecycle_status"), LifecycleScope: getString(pm, "lifecycle_scope"),
 		DateField: getString(pm, "date_field"), DateFrom: dateFrom, DateTo: dateTo,
 		SortBy: getString(pm, "sort_by"), SortDirection: getString(pm, "sort_direction"),

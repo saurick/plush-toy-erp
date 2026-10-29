@@ -1,3 +1,4 @@
+import { openTestingDetails, closeTestingDetails } from './devTestingDetailsActions.mjs'
 import {
   DEV_PRESSURE_CHECKS,
   DEV_PRESSURE_FINGERPRINTS,
@@ -306,7 +307,7 @@ export function createDevPressureScenarios({
         for (const width of [1024, 1920, 3840]) {
           await page.setViewportSize({ ...originalViewport, width })
           const selectors = panel.locator('.erp-dev-pressure-report-select .ant-select')
-          assert.equal(await selectors.count(), 2)
+          assert.equal(await selectors.count(), 1)
           for (const selector of await selectors.all()) {
             const bounds = await selector.boundingBox()
             assert(bounds.width >= 240 && bounds.width <= 560, `报告选择框在 ${width}px 视口应有合理上限：${bounds.width}`)
@@ -323,41 +324,43 @@ export function createDevPressureScenarios({
         await panel.getByRole('combobox', { name: '选择运行报告' }).click()
         await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
         await panel.getByText('历史候选 · 源码已变化', { exact: true }).waitFor()
-        assert.equal(await panel.locator('.erp-dev-pressure-metric').count(), 4)
-        await panel.getByRole('table', { name: '每方法延迟与样本' }).waitFor()
-        await panel.getByText(/本次完整订单导出每次核对 762 张/u).waitFor()
-        const paginationTable = panel.getByRole('table', { name: '销售订单分页容量' })
+        assert.equal(await panel.getByRole('table', { name: '压力测试关键结果', exact: true }).locator('tbody tr').count(), 4)
+        const reportDetails = await openTestingDetails(page, panel.getByRole('button', { name: '报告详情', exact: true }), '压力测试报告详情')
+        assert.equal(await reportDetails.locator('.erp-dev-pressure-metric').count(), 4)
+        await reportDetails.getByRole('table', { name: '每方法延迟与样本' }).waitFor()
+        await reportDetails.getByText(/本次完整订单导出每次核对 762 张/u).waitFor()
+        const paginationTable = reportDetails.getByRole('table', { name: '销售订单分页容量' })
         await paginationTable.getByRole('rowheader', { name: '整页（500 行）', exact: true }).waitFor()
         await paginationTable.getByRole('rowheader', { name: '末页（262 行）', exact: true }).waitFor()
-        await panel.getByText(/主段每页最少 50 次成功校验/u).waitFor()
-        await panel
+        await reportDetails.getByText(/主段每页最少 50 次成功校验/u).waitFor()
+        await reportDetails
           .getByRole('table', { name: '历史背景与当轮订单池' })
           .waitFor()
-        await panel
+        await reportDetails
           .getByRole('combobox', { name: '比较基准报告' })
           .press('ArrowDown')
         await page
           .locator('.ant-select-dropdown:visible')
           .getByText('基础 · 容量 · history-baseline', { exact: true })
           .click()
-        await panel
+        await reportDetails
           .getByRole('table', { name: '不同数据规模的 API 延迟变化' })
           .waitFor()
         await assertNoHorizontalOverflow(page, '压力报告长方法与规模比较')
-        await panel
+        await reportDetails
           .getByRole('combobox', { name: '比较基准报告' })
           .press('ArrowDown')
         await page
           .locator('.ant-select-dropdown:visible')
           .getByText('基础 · 容量 · different-host', { exact: true })
           .click()
-        await panel
+        await reportDetails
           .getByText('源码、负载或运行环境不同，不能归因于数据规模。', {
             exact: true,
           })
           .waitFor()
         assert.equal(
-          await panel
+          await reportDetails
             .getByRole('table', { name: '不同数据规模的 API 延迟变化' })
             .count(),
           0
@@ -365,16 +368,22 @@ export function createDevPressureScenarios({
         await assertNoHorizontalOverflow(page, '压力报告长方法与摘要')
         const nav = page.locator('.erp-dev-testing-primary-nav')
         const before = await nav.boundingBox()
-        const reload = () =>
-          panel
-            .getByRole('button', { name: '重新读取报告', exact: true })
-            .click()
+        const reload = async (showDetails = true) => {
+          if (await page.getByRole('dialog', { name: '压力测试报告详情', exact: true }).isVisible()) await closeTestingDetails(page)
+          await panel.getByRole('button', { name: '重新读取报告', exact: true }).click()
+          if (mode === 'deferred') return
+          await page.waitForFunction(() => {
+            const button = [...document.querySelectorAll('.erp-dev-pressure-actions button')].find((node) => node.textContent.includes('重新读取报告'))
+            return button && !button.classList.contains('ant-btn-loading')
+          })
+          if (showDetails && mode !== 'empty') await openTestingDetails(page, panel.getByRole('button', { name: '报告详情', exact: true }), '压力测试报告详情')
+        }
         mode = 'no-pagination'
         await reload()
-        await panel.getByText('该报告未记录分页样本，不能用于证明 500 行满页容量。', { exact: true }).waitFor()
+        await reportDetails.getByText('该报告未记录分页样本，不能用于证明 500 行满页容量。', { exact: true }).waitFor()
         assert.equal(await paginationTable.count(), 0)
         mode = 'failed'
-        await reload()
+        await reload(false)
         await panel
           .getByText('该次压力测试未形成完整通过证据', { exact: true })
           .waitFor()
@@ -382,14 +391,14 @@ export function createDevPressureScenarios({
           .getByText('停止于：业务负载与对账。', { exact: false })
           .waitFor()
         mode = 'read-error'
-        await reload()
+        await reload(false)
         await panel
           .getByText('压力测试报告读取失败，请重新读取或检查当前工作台服务。', {
             exact: true,
           })
           .waitFor()
         assert.equal(
-          await panel.locator('.erp-dev-pressure-metric').count(),
+          await panel.getByRole('table', { name: '压力测试关键结果', exact: true }).locator('tbody tr').count(),
           4,
           '读失败应保留已读历史结果'
         )
@@ -424,7 +433,7 @@ export function createDevPressureScenarios({
         await loadPicker.press('ArrowDown')
         await page.locator('.ant-select-dropdown:visible').getByText('短档回归', { exact: true }).click()
         mode = 'history'
-        await reload()
+        await reload(false)
         await panel
           .getByText('历史候选 · 源码已变化', { exact: true })
           .waitFor()

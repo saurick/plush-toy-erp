@@ -1463,21 +1463,14 @@ test('FL_sales_order_order_no__retains_order_no_snapshot masterDataOrderView: sa
   )
 })
 
-test('FL_sales_order_order_no__prefills_order_no_from_blank masterDataOrderView: sales order create draft uses shared internal sequence', () => {
-  const now = new Date('2026-06-18T10:00:00+08:00')
-
-  assert.equal(
-    buildSequentialDraftCode(
-      [
-        { order_no: 'SO-20260618-001' },
-        { order_no: 'SO-20260618-009' },
-        { order_no: 'SO-20260617-999' },
-        { order_no: 'CUS-PO-EXTERNAL-001' },
-      ],
-      { prefix: 'SO', field: 'order_no', now }
-    ),
-    'SO-20260618-010'
-  )
+test('FL_sales_order_order_no__prefills_order_no_from_blank masterDataOrderView: blank draft number is allocated by the server', () => {
+  const params = buildSalesOrderParams({
+    order_no: '   ',
+    customer_id: 3,
+    order_date: '2026-06-18',
+  })
+  assert.equal(Object.hasOwn(params, 'order_no'), false)
+  assert.equal(params.customer_id, 3)
 })
 
 test('masterDataOrderView: purchase order print draft maps current purchase facts only', () => {

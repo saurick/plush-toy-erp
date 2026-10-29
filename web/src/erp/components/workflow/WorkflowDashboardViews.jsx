@@ -254,7 +254,6 @@ export function TaskLane({ lane, keyword = '', loading = false, onOpenTask }) {
             width: '45%',
             render: (_, task) => (
               <div className="erp-workbench-task-cell">
-                {task.returnedToPosition ? <Tag color="green">刚办理，保留原位置</Tag> : null}
                 <WorkflowTaskIdentity
                   task={task}
                   keyword={keyword}

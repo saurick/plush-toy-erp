@@ -4,11 +4,13 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import { TaskBusinessInformationContext } from '../../hooks/useBusinessPageContext.js'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import WorkflowFollowupDetails, { hasWorkflowFollowupDetails } from '../../components/workflow/WorkflowFollowupDetails.jsx'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import WorkflowTaskInfoCard from '../../components/workflow/WorkflowTaskInfoCard.jsx'
+import { taskDeviceNotice, taskNeedsDesktop } from '../../utils/taskHandlingPolicy.mjs'
 import WorkflowTaskCurrentSummary from '../../components/workflow/WorkflowTaskCurrentSummary.jsx'
 import useWorkflowTaskAssignmentAccess from '../../hooks/useWorkflowTaskAssignmentAccess.js'
 import { formatAdminIdentity } from '../../utils/adminIdentity.mjs'
@@ -60,6 +62,7 @@ export default function MobileTaskDetailScreen({
   onOpenLinkedTask,
   processingComplete = false,
   onOpenAction,
+  onOpenRecordedAction = null,
   onOpenTaskForm = null,
   onViewReceipt,
   savedEvidenceRefs,
@@ -71,6 +74,8 @@ export default function MobileTaskDetailScreen({
   selectedTask,
 }) {
   const { adminProfile } = useOutletContext() || {}
+  const information = React.useContext(TaskBusinessInformationContext)
+  const desktopHandling = taskNeedsDesktop(selectedTask)
   const materialContext = React.useMemo(
     () => getEngineeringMaterialTaskContext(selectedTask),
     [selectedTask]
@@ -105,7 +110,7 @@ export default function MobileTaskDetailScreen({
     PermissionCode.OUTSOURCING_ORDER_READ
   )
   const canOpenProductionArrangement = Boolean(
-    productionArrangementContext &&
+    !desktopHandling && productionArrangementContext &&
     selectedCanOperate &&
     canReadProductionWip &&
     canAssignProductionWip
@@ -212,7 +217,8 @@ export default function MobileTaskDetailScreen({
   const completeCondition = selectedTask.complete_condition
   const canManageAttachments = selectedCanManageAttachments === true
   const canOpenBusiness = typeof onOpenTaskForm === 'function'
-  const canOpenProcess = canOpenBusiness || (materialContext
+  const canOpenRecorded = typeof onOpenRecordedAction === 'function'
+  const canOpenProcess = canOpenRecorded || canOpenBusiness || (materialContext
     ? canProcessMaterial || selectedCanUrge
     : selectedCanOperate || selectedCanUrge)
   const canViewReceipt = typeof onViewReceipt === 'function'
@@ -257,7 +263,7 @@ export default function MobileTaskDetailScreen({
         currentStep="detail"
         onBack={onBack}
         onOpenProcess={() =>
-          canOpenBusiness ? onOpenTaskForm() : canProcessMaterial
+          canOpenRecorded ? onOpenRecordedAction() : canOpenBusiness ? onOpenTaskForm() : canProcessMaterial
             ? onOpenAction?.()
             : onOpenAction?.(
                 selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
@@ -265,7 +271,6 @@ export default function MobileTaskDetailScreen({
         }
         onOpenReceipt={onViewReceipt}
         processUnavailableLabel={processUnavailableLabel}
-        receiptUnavailableLabel="暂无可信回执"
         title="任务详情"
         trailing={<WorkflowTaskCopySummary task={selectedTask} assigneeLabel={assigneeLabel} compact />}
       />
@@ -290,6 +295,7 @@ export default function MobileTaskDetailScreen({
           ) : null}
         />
 
+        <div ref={information?.setHost} data-testid="workflow-task-business-information">{information?.retained}</div>
         <section className="workflow-task-info-card">
           <WorkflowTaskHandlingChain
             task={selectedTask}
@@ -324,6 +330,8 @@ export default function MobileTaskDetailScreen({
           </section>
         ) : null}
 
+        {taskDeviceNotice(selectedTask) ? <p>{taskDeviceNotice(selectedTask)}</p> : null}
+
         <WorkflowTaskEventTrail
           className="mobile-detail-section workflow-task-info-card workflow-task-info-card--records"
           approvalTask={approvalTask}
@@ -334,7 +342,7 @@ export default function MobileTaskDetailScreen({
           truncated={taskEventsTruncated}
           variant="mobile"
           showResponsibility={false}
-          collapsible
+          compact
         />
 
         {selectedTask.mobile_exception_report ? (
@@ -404,17 +412,19 @@ export default function MobileTaskDetailScreen({
       <div className={`mobile-role-action-bar${canReadMaterials ? ' mobile-role-action-bar--with-resources' : ''}`}>
         {taskAttachments}
         {taskResources}
-        {canProcessMaterial ? (
+        {canOpenRecorded ? (
+          <button type="button" className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white" onClick={onOpenRecordedAction}>查看办理资料</button>
+        ) : canProcessMaterial ? (
           <button
             type="button"
             className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
             onClick={() => onOpenAction?.()}
           >
-            处理任务
+            {desktopHandling ? '查看办理资料' : '处理任务'}
           </button>
         ) : canOpenBusiness ? (
           <button type="button" className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white" onClick={onOpenTaskForm}>
-            填写办理表单
+            {desktopHandling ? '查看办理资料' : '任务办理'}
           </button>
         ) : canOpenProcess ? (
           <button
@@ -426,7 +436,7 @@ export default function MobileTaskDetailScreen({
               )
             }
           >
-            {selectedCanUrge && !selectedCanOperate ? '催办任务' : '选择处理方式'}
+            {selectedCanUrge && !selectedCanOperate ? '催办任务' : desktopHandling ? '查看办理资料' : '选择处理方式'}
           </button>
         ) : canViewReceipt ? (
           <button

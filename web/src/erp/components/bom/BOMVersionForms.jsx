@@ -90,6 +90,7 @@ export function BOMHeaderFormFields({
   disabled = false,
   productDisabled = false,
   productOptions = [],
+  productActions,
   versionSuggestion = '',
   versionSuggestionLoading = false,
   onUseVersionSuggestion,
@@ -149,13 +150,16 @@ export function BOMHeaderFormFields({
             className="erp-business-action-form__field"
             label="产品"
             extra={
-              productID ? (
-                <ProductIdentity
-                  productId={productID}
-                  name={selectedProduct?.label || '当前产品'}
-                  compact
-                />
-              ) : null
+              <>
+                {productID ? (
+                  <ProductIdentity
+                    productId={productID}
+                    name={selectedProduct?.label || '当前产品'}
+                    compact
+                  />
+                ) : null}
+                {productActions}
+              </>
             }
             name="product_id"
             rules={[{ required: true, message: '请选择产品' }]}

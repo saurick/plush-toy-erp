@@ -37,7 +37,7 @@ func assertBusinessProgressIdentitySearch(t *testing.T, data *Data, client *ent.
 		product := createSalesOrderTestProduct(t, ctx, client, unitID, "IDENTITY-"+suffix+string(rune('A'+index)), true)
 		products[index] = product.Update().SetName("主档已改名").SetStyleNo("MATCH-STYLE-" + string(rune('A'+index))).SaveX(ctx)
 		line := client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(index + 1).SetProductID(product.ID).SetProductNameSnapshot(name).SetProductCodeSnapshot("FROZEN-" + string(rune('A'+index))).SetUnitID(unitID).SetOrderedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
-		client.ProductionOrderItem.Create().SetProductionOrderID(production.ID).SetLineNo(index + 1).SetProductID(product.ID).SetProductNameSnapshot(name).SetProductCodeSnapshot("FROZEN-" + string(rune('A'+index))).SetSalesOrderItemID(line.ID).SetUnitID(unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
+		client.ProductionOrderItem.Create().SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SetProductionOrderID(production.ID).SetLineNo(index + 1).SetProductID(product.ID).SetProductNameSnapshot(name).SetProductCodeSnapshot("FROZEN-" + string(rune('A'+index))).SetSalesOrderItemID(line.ID).SetUnitID(unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
 	}
 	// Repeated order lines for the same product remain one style; canceled
 	// requirements cannot make an active order match a product search.

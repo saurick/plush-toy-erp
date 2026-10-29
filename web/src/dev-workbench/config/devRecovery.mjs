@@ -1,5 +1,3 @@
-import { DEV_VERSION_CENTER_ROUTE } from './devRoutes.mjs'
-
 export const DEV_DRILL_RECOVERY_SOURCE_PATH =
   'docs/security/运维安全与勒索恢复.md'
 
@@ -543,9 +541,8 @@ export function buildDevRecoveryOverview(
           ? Object.freeze({ type: 'refresh', label: '刷新只读核验' })
           : drill.surface === 'version_center'
             ? Object.freeze({
-                type: 'route',
-                label: '到版本中心按门禁操作',
-                route: DEV_VERSION_CENTER_ROUTE,
+                type: 'disabled',
+                label: '按演练方案核对目标、门禁与执行回执。',
               })
             : Object.freeze({ type: 'disabled', label: '暂不在页面执行' }),
     })

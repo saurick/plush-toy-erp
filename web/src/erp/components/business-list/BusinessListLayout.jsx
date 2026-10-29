@@ -1,6 +1,5 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { useOutletContext } from 'react-router-dom'
 
 import {
   CheckCircleOutlined,
@@ -29,6 +28,7 @@ import {
   Typography,
   theme,
 } from 'antd'
+import useBusinessPageContext, { BusinessPageContext } from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import { filterSelectOptions, isEmptyFilterValue } from '@/common/components/select/filterSelectOptions.mjs'
@@ -39,6 +39,8 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
 import './businessFilterChoices.css'
 import BusinessRecordDetails from './BusinessRecordDetails.jsx'
+import { taskBusinessActionNode } from './taskBusinessActions.mjs'
+import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import ERPPageActions from '../ERPPageActions.jsx'
 import useBusinessListStickyHeader from './useBusinessListStickyHeader.js'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
@@ -154,6 +156,7 @@ function inspectSelectionAction(action) {
   return {
     actionable,
     group,
+    authoring: ['edit', 'create'].includes(role) || action.type?.taskHandlingKind === 'authoring' || (nestedActions.length > 0 && nestedActions.every((item) => item.authoring)),
     pinned: role === 'collaboration' || nestedActions.some((item) => item.pinned),
     dangerous: role === 'danger' || action.props.danger === true || action.props.action?.danger === true || (!role && nestedActions.length > 0 && nestedActions.every((item) => item.dangerous)),
     enabled: action.props.disabled !== true && action.props.loading !== true && (nestedActions.length === 0 || nestedActions.some((item) => item.enabled)),
@@ -190,11 +193,14 @@ function partitionSelectionActions(children, space, mobile = false) {
     .sort((left, right) => Number(right.pinned) - Number(left.pinned) || Number(left.dangerous) - Number(right.dangerous) || left.index - right.index)
   if (mobile) {
     const mobileScore = (item) => item.pinned ? SELECTION_ACTION_PRIORITIES.related : item.score
-    const primary = [...actions].sort((left, right) => Number(left.dangerous) - Number(right.dangerous) || Number(right.enabled) - Number(left.enabled) || mobileScore(right) - mobileScore(left) || left.index - right.index)[0]
+    // 手机任务的查询、追踪与附件由任务界面统一提供。
+    const handling = actions.filter((item) => ['business', 'collaboration', 'lifecycle'].includes(item.group))
+    const primary = [...handling].sort((left, right) => Number(left.dangerous) - Number(right.dangerous) || Number(right.enabled) - Number(left.enabled) || mobileScore(right) - mobileScore(left) || left.index - right.index)[0]
     return {
       context: descriptors.filter((item) => !item.actionable).map((item) => item.node),
       visible: primary ? [primary] : [],
-      overflow: actions.filter((item) => item !== primary),
+      additional: handling.filter((item) => item !== primary && !item.pinned && item.enabled),
+      overflow: [],
     }
   }
   const visibleIndexes = new Set(measured
@@ -571,7 +577,7 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
             </div>
           ))}
         </div>
-        {overflow.length > 0 ? (
+        {!mobile && overflow.length > 0 ? (
           <Dropdown
             key={overflowRenderKey}
             trigger={['click']}
@@ -782,9 +788,9 @@ export function PageHeaderCard({
   viewSwitch = null,
   className = '',
 }) {
-  const { moduleWorkspace, mobileTaskBusiness } = useOutletContext() || {}
+  const { moduleWorkspace, taskBusiness } = useBusinessPageContext() || {}
   const insideModule = Boolean(moduleWorkspace?.tabs.length)
-  if (mobileTaskBusiness) return null
+  if (taskBusiness) return null
   if (insideModule && !viewSwitch) return null
 
   return (
@@ -1040,7 +1046,7 @@ export function BusinessOperationPanel({
   filtersOpen: controlledFiltersOpen,
   onFiltersOpenChange,
 }) {
-  const { mobileTaskBusiness, mobileTaskCommand } = useOutletContext() || {}
+  const { taskBusiness, taskCommand } = useBusinessPageContext() || {}
   const selectionAvailability = React.useContext(BusinessSelectionAvailabilityContext)
   const hasToolbar = Boolean(actions || primaryAction)
   const hasClearFilters = typeof onClearFilters === 'function'
@@ -1066,7 +1072,11 @@ export function BusinessOperationPanel({
     setFiltersOpen(false)
     filterTriggerRef.current?.focus({ preventScroll: true })
   }
-  if (mobileTaskBusiness) return <>{mobileTaskCommand ? primaryAction : null}{children}</>
+  if (taskBusiness) {
+    return taskBusiness.readOnly
+      ? <>{childActions.filter((child) => child.type === SelectionActionBar)}</>
+      : <>{taskCommand ? primaryAction : null}{children}</>
+  }
   if (hidden) return null
   const filterControls = React.Children.toArray(
     flattenSelectionActions(filters)
@@ -1266,10 +1276,12 @@ export function SelectionActionBar({
   children,
   embedded = false,
 }) {
-  const { mobileTaskBusiness } = useOutletContext() || {}
+  const { taskBusiness } = useBusinessPageContext() || {}
   const selectionAvailability = React.useContext(BusinessSelectionAvailabilityContext)
   const hasSelection = Number(selectedCount) > 0
-  const actionNodes = flattenSelectionActions(children).filter((action) => !mobileTaskBusiness || !isSourceDocumentDetailsAction(action))
+  const actionNodes = flattenSelectionActions(children)
+    .map((action) => taskBusiness?.contract ? taskBusinessActionNode(action, taskBusiness.contract) : action)
+    .filter((action) => action && (!taskBusiness || !isSourceDocumentDetailsAction(action)))
   const clearActions = actionNodes.filter(
     (child) => child.type === SelectionClearAction
   )
@@ -1283,13 +1295,25 @@ export function SelectionActionBar({
   })
   const visible = hasSelection || (recordActions.length > 0 && (selectionAvailability?.visible ?? true))
   const loading = !hasSelection && selectionAvailability?.loading
-  if (mobileTaskBusiness) {
-    if (!hasSelection || !mobileTaskBusiness.actionHost) return null
-    return createPortal(
-      <div className="mobile-task-business-primary" role="group" aria-label="本次业务操作">
-        <ResponsiveSelectionActions mobile>{recordActions}</ResponsiveSelectionActions>
-      </div>,
-      mobileTaskBusiness.actionHost
+  if (taskBusiness) {
+    if (!hasSelection || !taskBusiness.actionHost || taskBusiness.formEditing) return null
+    const scopedActions = recordActions.filter((action) => {
+      const { pinned, authoring } = inspectSelectionAction(action)
+      return (!taskBusiness.readOnly || pinned) && (!(taskBusiness.onCollaboration || taskBusiness.collaborationExternal) || !pinned) && (taskBusiness.device !== 'mobile' || !authoring)
+    })
+    if (taskBusiness.onCollaboration && !taskBusiness.collaborationExternal) {
+      scopedActions.push(<Button key="task-collaboration" data-business-action-group="collaboration" onClick={taskBusiness.onCollaboration}>任务协作</Button>)
+    }
+    const { visible: primary, additional } = partitionSelectionActions(scopedActions, null, true)
+    return (
+      <>
+        {createPortal(
+          <div className="mobile-task-business-primary" role="group" aria-label="本次业务操作">
+            <ResponsiveSelectionActions mobile>{[...primary, ...additional].map(({ node }) => node)}</ResponsiveSelectionActions>
+          </div>,
+          taskBusiness.actionHost
+        )}
+      </>
     )
   }
   const className = joinClassNames(
@@ -1479,6 +1503,7 @@ function getLifecycleActionGroup({ action }) {
 
 BusinessLifecyclePrimaryAction.selectionActionPriority = ({ action }) => isClosingLifecycleAction(action) ? 20 : 100
 BusinessLifecyclePrimaryAction.selectionActionGroup = getLifecycleActionGroup
+BusinessLifecyclePrimaryAction.taskHandlingKind = 'authoring'
 
 export function BusinessLifecycleSecondaryAction({
   action = null,
@@ -1506,6 +1531,7 @@ export function BusinessLifecycleSecondaryAction({
 
 BusinessLifecycleSecondaryAction.selectionActionRole = 'secondary'
 BusinessLifecycleSecondaryAction.selectionActionGroup = getLifecycleActionGroup
+BusinessLifecycleSecondaryAction.taskHandlingKind = 'authoring'
 
 export function SelectedItemsSummaryTag({
   selectedCount,
@@ -1657,18 +1683,29 @@ export function BusinessDataTable({
   onOpenRecord,
   onChange,
   pagination,
+  taskSourceDetails = null,
   emptyDescription = '暂无匹配记录',
 }) {
-  const { mobileTaskBusiness } = useOutletContext() || {}
+  const pageContext = useBusinessPageContext() || {}
+  const { taskBusiness } = pageContext
+  const informationSnapshot = React.useRef(null)
+  const information = taskBusiness?.mode === 'bom' ? null : taskBusiness?.information
+  const { stage, release, scopeKey } = information || {}
+  React.useLayoutEffect(() => {
+    if (!release) return undefined
+    release(scopeKey)
+    stage(scopeKey, informationSnapshot.current)
+    return undefined
+  })
   const tableCardRef = React.useRef(null)
-  const sticky = useBusinessListStickyHeader(tableCardRef, !mobileTaskBusiness && !scroll?.y)
+  const sticky = useBusinessListStickyHeader(tableCardRef, !taskBusiness && !scroll?.y)
   const selectionContext = React.useContext(BusinessSelectionAvailabilityContext)
   const setSelectionAvailability = selectionContext?.setSelectionAvailability
   const selectionOwner = React.useId()
   const busy = typeof loading === 'object' ? Boolean(loading?.spinning) : Boolean(loading)
   const selectable = Boolean(rowSelection && dataSource?.some((record) => !rowSelection.getCheckboxProps?.(record)?.disabled))
   React.useLayoutEffect(() => {
-    if (mobileTaskBusiness) return
+    if (taskBusiness) return
     // A table without selection (for example in a detail dialog) does not own the page toolbar.
     setSelectionAvailability?.((current) => {
       if (!rowSelection && current.owner !== selectionOwner) return current
@@ -1676,7 +1713,7 @@ export function BusinessDataTable({
       if (current.owner === selectionOwner && current.visible === visible && current.loading === busy) return current
       return { owner: selectionOwner, visible, loading: busy }
     })
-  }, [rowSelection, selectable, busy, mobileTaskBusiness, setSelectionAvailability, selectionOwner])
+  }, [rowSelection, selectable, busy, taskBusiness, setSelectionAvailability, selectionOwner])
   React.useLayoutEffect(() => () => {
     setSelectionAvailability?.((current) => current.owner === selectionOwner ? { visible: false, loading: false } : current)
   }, [setSelectionAvailability, selectionOwner])
@@ -1712,18 +1749,23 @@ export function BusinessDataTable({
   }, [resolvedColumns, resolvedRowSelection, scroll])
   const { onRow: resolvedOnRow, onClickCapture: captureRowClick } = useBusinessTableRecordOpen({ dataSource, rowKey, onRow, onOpenRecord })
 
-  if (mobileTaskBusiness) {
+  if (taskBusiness) {
+    if (taskBusiness.mode === 'bom' && taskBusiness.information) return null
     const selectedKeys = rowSelection?.selectedRowKeys || []
     const selected = (dataSource || []).find((row) => selectedKeys.includes(typeof rowKey === 'function' ? rowKey(row) : row[rowKey || 'id']))
-    return (
+    const sourceDetails = (
       <section className="mobile-task-business-source" data-testid="mobile-task-business-source" data-record-id={selected?.id} aria-busy={busy}>
         <Spin spinning={busy}>
           {selected ? (
-            <BusinessRecordDetails columns={columns} record={selected} presentation="mobile-task" />
+            <><BusinessRecordDetails columns={columns} record={selected} presentation="mobile-task" title={isTerminalWorkflowTask(taskBusiness.task) ? '来源业务当前资料' : '本次业务资料'} />{taskSourceDetails}</>
           ) : <Empty description={busy ? '正在读取任务业务资料' : '未读取到任务对应单据，请返回任务后重新读取。'} />}
         </Spin>
       </section>
     )
+    informationSnapshot.current = <BusinessPageContext.Provider value={pageContext}>{sourceDetails}</BusinessPageContext.Provider>
+    return taskBusiness.information
+      ? taskBusiness.information.host ? createPortal(sourceDetails, taskBusiness.information.host) : null
+      : sourceDetails
   }
 
   return (

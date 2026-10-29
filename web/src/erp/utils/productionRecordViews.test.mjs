@@ -10,7 +10,7 @@ test('production execution requires both fact and WIP read permissions', () => {
   }
 })
 test('exception disposition preserves the existing read, submit and approval capabilities', () => {
-  for (const action of ['pmc.risk.read', 'production.fact.read', 'production.exception.submit', 'production.exception.approve']) {
+  for (const action of ['pmc.risk.read', 'production.fact.read', 'production.exception.submit', 'production.over_issue.submit', 'production.exception.approve']) {
     assert.equal(canReadProductionExceptionDecisions(profile([action])), true)
   }
   assert.equal(canReadProductionExceptionDecisions(profile(['workflow.task.read'])), false)

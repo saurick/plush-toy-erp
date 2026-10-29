@@ -4,7 +4,37 @@ import { act, createElement, useState } from 'react'
 import {
   registerJSXTestLoader,
   installTestDOM,
+  createReactTestHarness,
 } from '../../../../scripts/test/reactRuntime.mjs'
+
+test('task form owns its footer without duplicate page actions or focus jumps, and closed sibling forms do not clear editing', async (t) => {
+  const ui = await createReactTestHarness(t)
+  const [{ createMemoryRouter, RouterProvider }, { default: Page }, { BusinessPageContext }] = await Promise.all([
+    import('react-router-dom'), import('./BusinessFormPage.jsx'), import('../../hooks/useBusinessPageContext.js'),
+  ])
+  const changes = []
+  const context = { taskBusiness: { onFormEditingChange: (value) => changes.push(value) } }
+  const trigger = document.createElement('button')
+  document.body.append(trigger)
+  t.after(() => trigger.remove())
+  trigger.focus()
+  let setOpen
+  function Forms() {
+    const [open, update] = useState(true)
+    setOpen = update
+    return createElement(BusinessPageContext.Provider, { value: context }, createElement(Page, { open, title: '核对本次出货', showCancel: false, okText: '保存并提交审批', secondaryAction: createElement('button', null, '保存草稿'), onOk: () => {} }, createElement('input', { 'aria-label': '数量' })), createElement(Page, { open: false, title: '其他业务表单' }))
+  }
+  const router = createMemoryRouter([{ path: '*', element: createElement(Forms) }])
+  t.after(() => router.dispose())
+  await ui.render(createElement(RouterProvider, { router, future: { v7_startTransition: true } }))
+  await ui.flush()
+  assert.deepEqual(changes, [true])
+  assert.equal(document.activeElement === trigger, true)
+  assert.equal(ui.container.querySelector('.erp-business-form-page:not([hidden]) .erp-business-form-page__header h2')?.textContent, '核对本次出货')
+  assert.deepEqual([...ui.container.querySelectorAll('button')].filter((node) => !node.closest('[hidden]')).map((node) => node.textContent.trim()), ['保存草稿', '保存并提交审批'])
+  await act(async () => setOpen(false))
+  assert.deepEqual(changes, [true, false])
+})
 
 test('deferred form autofocus preserves a field chosen before initialization finishes', async (t) => {
   const dom = installTestDOM()
@@ -91,7 +121,7 @@ test('deferred form autofocus preserves a field chosen before initialization fin
 
   await render({ open: false })
   await flushFrames()
-  assert.equal(document.activeElement, trigger)
+  assert.equal(document.activeElement === trigger, true)
   await render({ open: true })
   await flushFrames()
   assert.equal(
@@ -104,7 +134,7 @@ test('deferred form autofocus preserves a field chosen before initialization fin
   await flushFrames()
   await render({ open: true, loading: true })
   await flushFrames()
-  assert.equal(document.activeElement, trigger)
+  assert.equal(document.activeElement === trigger, true)
   await render({ open: true, loading: false })
   number.focus()
   await flushFrames()
@@ -118,5 +148,5 @@ test('deferred form autofocus preserves a field chosen before initialization fin
   await flushFrames()
   await render({ open: true, readOnly: true })
   await flushFrames()
-  assert.equal(document.activeElement, container.querySelector('h1'))
+  assert.equal(document.activeElement === container.querySelector('h1'), true)
 })

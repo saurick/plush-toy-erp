@@ -122,8 +122,8 @@ export function createDevBusinessUsabilityScenarios({
           '清空筛选恢复第一页'
         )
         await assertNoHorizontalOverflow(page, '工作台分页翻页、筛选与空结果恢复')
-        await page.getByRole('link', { name: '工作中心设计说明', exact: true }).click()
-        await page.getByRole('region', { name: '工作中心界面说明', exact: true }).waitFor()
+        assert.equal(await page.getByRole('link', { name: '工作中心设计说明', exact: true }).count(), 0, '说明覆盖清单沿用常驻目录，不重复提供跨页入口')
+        assert.equal(await table.getByRole('columnheader', { name: '岗位帮助推荐', exact: true }).count(), 1, '只读清单保留岗位帮助的实际来源')
       },
     },
   ]

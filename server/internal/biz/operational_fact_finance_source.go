@@ -16,6 +16,7 @@ var (
 	ErrPurchaseReceiptInboundIncomplete   = errors.New("purchase receipt has unresolved inbound lines")
 	ErrPurchaseReceiptFinanceDependency   = errors.New("purchase receipt has an active payable")
 	ErrOutsourcingReturnFinanceDependency = errors.New("outsourcing return has an active payable")
+	ErrOutsourcingStageNotAccepted        = errors.New("outsourcing contract stage work is not fully accepted")
 	ErrOutsourcingReturnQualityPending    = errors.New("outsourcing return quality inspection is not accepted")
 	ErrOutsourcingReturnQualityRejected   = errors.New("outsourcing return quality inspection is rejected")
 	ErrFinanceReconciliationDependency    = errors.New("finance fact has an active reconciliation")
@@ -43,6 +44,15 @@ type FinanceFactFromOutsourcingReturnCreate struct {
 	Note              *string
 }
 
+// FinanceFactFromOutsourcingOrderCreate bills accepted stage work directly
+// from its frozen contract, without manufacturing an inventory receipt.
+type FinanceFactFromOutsourcingOrderCreate struct {
+	FactNo             string
+	OutsourcingOrderID int
+	IdempotencyKey     string
+	Note               *string
+}
+
 // FinanceReconciliationFromFactCreate is the single-record reconciliation
 // command. It does not model multi-document matching or
 // bank-statement settlement.
@@ -56,6 +66,7 @@ type FinanceReconciliationFromFactCreate struct {
 }
 
 type FinanceFactFromBusinessSourceRepo interface {
+	CreatePayableFromOutsourcingOrder(ctx context.Context, in *FinanceFactFromOutsourcingOrderCreate) (*FinanceFact, error)
 	CreatePayableFromPurchaseReceipt(ctx context.Context, in *FinanceFactFromPurchaseReceiptCreate) (*FinanceFact, error)
 	CreatePayableFromOutsourcingReturn(ctx context.Context, in *FinanceFactFromOutsourcingReturnCreate) (*FinanceFact, error)
 	CreateReconciliationFromFinanceFact(ctx context.Context, in *FinanceReconciliationFromFactCreate) (*FinanceFact, error)
@@ -156,4 +167,19 @@ func normalizeFinanceSourceCommand(
 	}
 	*idempotencyKey = key.String()
 	return nil
+}
+
+func (uc *OperationalFactUsecase) CreatePayableFromOutsourcingOrder(ctx context.Context, in *FinanceFactFromOutsourcingOrderCreate) (*FinanceFact, error) {
+	if in == nil {
+		return nil, ErrBadParam
+	}
+	out := *in
+	if err := normalizeFinanceSourceCommand(&out.FactNo, &out.IdempotencyKey, &out.Note, out.OutsourcingOrderID); err != nil {
+		return nil, err
+	}
+	repo, ok := ucFinanceFactSourceRepo(uc)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.CreatePayableFromOutsourcingOrder(ctx, &out)
 }

@@ -502,6 +502,9 @@ func builtinRoleHasPermission(roleKey, permissionKey string) bool {
 	permissionKey = strings.TrimSpace(permissionKey)
 	for _, role := range BuiltinRoles() {
 		if role.Key == roleKey {
+			if !IsSystemManagedRole(AdminRole{Key: role.Key, Type: role.Type, Builtin: role.Builtin}) && PermissionSetHasAny(PermissionKeySet(optionalRoleAssistance), permissionKey) {
+				return true
+			}
 			return PermissionSetHasAny(PermissionKeySet(role.Permissions), permissionKey)
 		}
 	}

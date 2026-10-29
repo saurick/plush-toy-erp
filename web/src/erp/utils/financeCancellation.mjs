@@ -4,6 +4,13 @@ import {
   validateOperationalFactLifecycleResult,
 } from './operationalFactLifecycle.mjs'
 
+export function canCancelFinanceFact(record) {
+  return Boolean(record && (
+    [OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(record.status) ||
+    (record.fact_type === 'RECONCILIATION' && record.status === OperationalFactStatus.SETTLED)
+  ))
+}
+
 export function normalizeFinanceCancellationRequest(params = {}) {
   return normalizeOperationalFactLifecycleRequest(params, {
     requireReason: true,

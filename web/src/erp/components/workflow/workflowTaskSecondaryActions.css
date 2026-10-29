@@ -1,0 +1,43 @@
+.erp-task-operation-group,
+.erp-task-operation-group__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-task-operation-group[hidden],
+.erp-task-operation-group:not(:has(button, [role='button'])) {
+  display: none;
+}
+
+.erp-task-operation-group--primary {
+  flex: 1 1 0;
+  justify-content: flex-end;
+}
+
+.erp-task-operation-group--primary > .erp-task-operation-group__controls {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+}
+
+@media (max-width: 767px) {
+  .erp-task-operation-group {
+    flex: 1 1 100%;
+    align-items: stretch;
+  }
+
+  .erp-task-operation-group__controls {
+    flex: 1 1 100%;
+  }
+
+  .erp-task-secondary-actions {
+    min-height: 44px;
+    white-space: normal;
+  }
+
+  .erp-task-secondary-menu .ant-dropdown-menu-item {
+    min-height: 44px;
+  }
+}

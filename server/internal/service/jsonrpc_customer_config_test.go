@@ -14,7 +14,6 @@ import (
 	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/shopspring/decimal"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -2792,177 +2791,19 @@ func TestCustomerConfigJSONRPCStartFinishedGoodsDeliveryProcess(t *testing.T) {
 	}
 }
 
-func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideGuardedByMissingHandler(t *testing.T) {
-	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithRuntimeRepo(
-		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		[]string{},
-	)
-	ctx := customerConfigAdminCtx(1, "admin")
-	publishAndActivateCustomerConfigUsecaseForTest(t, dispatcher, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t), 1)
-	instance, node := createLegacyFinishedGoodsDeliveryQualityFixture(t, runtimeRepo, ctx)
-	processInstanceID := instance.ID
-	processNodeInstanceID := node.ID
-	expectedVersion := node.Version
-
-	executeParams, _ := structpb.NewStruct(map[string]any{
-		"process_instance_id":      float64(processInstanceID),
-		"process_node_instance_id": float64(processNodeInstanceID),
-		"expected_version":         float64(expectedVersion),
-		"shipment_id":              float64(9001),
-		"finished_goods_lot_id":    float64(7001),
-		"quality_inspection_id":    float64(8001),
-		"result":                   "PASS",
-		"defect_rate_operator":     "approx",
-		"defect_rate_percent":      "5.0",
-		"idempotency_key":          "finished-goods-delivery/SHIP-9001/quality/PASS",
-		"decision_note":            "guard only",
-	})
-	_, executeRes, err := dispatcher.handleCustomerConfig(ctx, "execute_finished_goods_delivery_quality_decide", "execute", executeParams)
-	if err != nil {
-		t.Fatalf("execute err = %v", err)
+func TestCustomerConfigJSONRPCRetiredFactCommandsAreUnknown(t *testing.T) {
+	for _, super := range []bool{false, true} {
+		dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: super, CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.AdminRoleKey})
+		for _, method := range []string{
+			"execute_material_supply_purchase_receipt_create", "execute_material_supply_quality_gate", "execute_material_supply_post_inbound",
+			"execute_finished_goods_delivery_quality_decide", "execute_finished_goods_delivery_shipment_ship", "execute_finished_goods_delivery_receivable_lead",
+		} {
+			_, result, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "admin"), method, "retired", nil)
+			if err != nil || result == nil || result.Code != errcode.UnknownMethod.Code {
+				t.Fatalf("retired fact command %s (super=%v) = %#v, %v", method, super, result, err)
+			}
+		}
 	}
-	if executeRes.Code != errcode.Internal.Code || executeRes.Message != "当前流程暂时无法办理，请联系管理员" {
-		t.Fatalf("execute result = %#v", executeRes)
-	}
-	nodes, err := dispatcher.processRuntimeUC.ListProcessNodeInstances(ctx, processInstanceID)
-	if err != nil {
-		t.Fatalf("ListProcessNodeInstances err = %v", err)
-	}
-	persistedNode := nodes[0]
-	if persistedNode.ID != processNodeInstanceID || persistedNode.Status != biz.ProcessNodeStatusActive || persistedNode.Version != expectedVersion || persistedNode.CompletedAt != nil {
-		t.Fatalf("node should remain active after missing handler guard: %#v", persistedNode)
-	}
-	if nodes[1].Status != biz.ProcessNodeStatusWaiting {
-		t.Fatalf("next node should remain waiting: %#v", nodes[1])
-	}
-}
-
-func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRunsRegisteredHandler(t *testing.T) {
-	sourceType := biz.QualityInspectionSourceShipment
-	sourceID := 9001
-	inspectionType := biz.QualityInspectionTypeFinishedGoods
-	inventoryRepo := &serviceFinishedGoodsQualityInventoryRepoStub{
-		inspection: &biz.QualityInspection{
-			ID:             8001,
-			InventoryLotID: 7001,
-			SourceType:     &sourceType,
-			SourceID:       &sourceID,
-			InspectionType: &inspectionType,
-			Status:         biz.QualityInspectionStatusSubmitted,
-		},
-	}
-	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
-		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		[]string{},
-		newDefaultServiceSalesOrderRepo(),
-		inventoryRepo,
-		nil,
-	)
-	ctx := customerConfigAdminCtx(1, "admin")
-	publishAndActivateCustomerConfigUsecaseForTest(t, dispatcher, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t), 1)
-	instance, node := createLegacyFinishedGoodsDeliveryQualityFixture(t, runtimeRepo, ctx)
-	processInstanceID := instance.ID
-	processNodeInstanceID := node.ID
-	expectedVersion := node.Version
-
-	executeParams, _ := structpb.NewStruct(map[string]any{
-		"process_instance_id":      float64(processInstanceID),
-		"process_node_instance_id": float64(processNodeInstanceID),
-		"expected_version":         float64(expectedVersion),
-		"shipment_id":              float64(9001),
-		"finished_goods_lot_id":    float64(7001),
-		"quality_inspection_id":    float64(8001),
-		"result":                   "PASS",
-		"defect_rate_operator":     "approx",
-		"defect_rate_percent":      "5.0",
-		"idempotency_key":          "finished-goods-delivery/SHIP-9001/quality/PASS",
-		"decision_note":            "成品质检通过",
-	})
-	_, executeRes, err := dispatcher.handleCustomerConfig(ctx, "execute_finished_goods_delivery_quality_decide", "execute", executeParams)
-	if err != nil {
-		t.Fatalf("execute err = %v", err)
-	}
-	if executeRes.Code != errcode.OK.Code {
-		t.Fatalf("execute code = %d msg=%s", executeRes.Code, executeRes.Message)
-	}
-	if inventoryRepo.passInput == nil || inventoryRepo.passInput.InspectionID != 8001 ||
-		!inventoryRepo.passInput.InspectedAtDefaulted ||
-		inventoryRepo.passInput.DefectRateOperator == nil || *inventoryRepo.passInput.DefectRateOperator != biz.QualityInspectionDefectRateOperatorApprox ||
-		inventoryRepo.passInput.DefectRatePercent == nil || inventoryRepo.passInput.DefectRatePercent.String() != "5" {
-		t.Fatalf("expected quality pass input for inspection 8001, got %#v", inventoryRepo.passInput)
-	}
-	data := executeRes.Data.AsMap()
-	completedNode := data["completed_node"].(map[string]any)
-	if completedNode["node_key"] != "finished_goods_quality" ||
-		completedNode["status"] != biz.ProcessNodeStatusCompleted ||
-		completedNode["outcome"] != biz.FinishedGoodsQualityProcessCommandOutcomePassed {
-		t.Fatalf("completed_node = %#v", completedNode)
-	}
-	boundary := data["runtime_boundary"].(map[string]any)
-	if boundary["writes_quality_fact"] != true ||
-		boundary["writes_shipment_or_finance_fact"] != false ||
-		boundary["workflow_task_done_posts_fact"] != false {
-		t.Fatalf("runtime_boundary = %#v", boundary)
-	}
-	nodes, err := dispatcher.processRuntimeUC.ListProcessNodeInstances(ctx, processInstanceID)
-	if err != nil {
-		t.Fatalf("ListProcessNodeInstances err = %v", err)
-	}
-	if nodes[0].Status != biz.ProcessNodeStatusCompleted || nodes[1].Status != biz.ProcessNodeStatusActive {
-		t.Fatalf("expected quality completed and finance release active, nodes=%#v", nodes)
-	}
-}
-
-func createLegacyFinishedGoodsDeliveryQualityFixture(
-	t *testing.T,
-	runtimeRepo *serviceProcessRuntimeRepo,
-	ctx context.Context,
-) (*biz.ProcessInstance, *biz.ProcessNodeInstance) {
-	t.Helper()
-	instance, nodes, err := runtimeRepo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
-		ProcessKey:             biz.ProcessKeyFinishedGoodsDelivery,
-		ProcessVersion:         "v1",
-		VariantKey:             optionalRPCStringPointer("quality_finance_ship_receivable"),
-		ConfigRevision:         "2026.06.28.1",
-		DefinitionHash:         "legacy-finished-goods-delivery-quality-test",
-		ModuleContractSnapshot: map[string]any{"source": "legacy_in_flight_test", "customer_key": biz.DefaultCustomerKey},
-		BusinessRefType:        "shipment",
-		BusinessRefID:          9001,
-		BusinessRefNo:          optionalRPCStringPointer("SHIP-9001"),
-		IdempotencyKey:         "legacy-finished-goods-delivery/SHIP-9001/quality",
-		Status:                 biz.ProcessStatusActive,
-		Nodes: []biz.ProcessNodeInstanceCreate{
-			{
-				NodeKey:  "finished_goods_quality",
-				NodeType: biz.ProcessNodeTypeDomainCommand,
-				Status:   biz.ProcessNodeStatusActive,
-				PolicySnapshot: map[string]any{
-					"command_key": biz.ProcessDomainCommandFinishedGoodsQualityDecide,
-					"writes_fact": true,
-				},
-			},
-			{
-				NodeKey:               "shipment_finance_approval",
-				NodeType:              biz.ProcessNodeTypeApproval,
-				Status:                biz.ProcessNodeStatusWaiting,
-				OwnerPoolKey:          optionalRPCStringPointer("approval.shipment_finance"),
-				RequiredCapabilityKey: optionalRPCStringPointer(biz.PermissionWorkflowTaskApprove),
-				FormProfileKey:        optionalRPCStringPointer("shipment_finance_approval.default"),
-				ActionSetKey:          optionalRPCStringPointer("shipment_finance_approval"),
-				PolicySnapshot: map[string]any{
-					"approval_key":     biz.ApprovalSettingShipmentFinance,
-					"approval_enabled": true,
-				},
-			},
-		},
-	}, 1)
-	if err != nil {
-		t.Fatalf("seed legacy quality process fixture err = %v", err)
-	}
-	if len(nodes) != 2 {
-		t.Fatalf("legacy quality process nodes = %#v", nodes)
-	}
-	return instance, nodes[0]
 }
 
 func createFinishedGoodsDeliveryPermissionFixture(
@@ -3004,7 +2845,7 @@ func createFinishedGoodsDeliveryPermissionFixture(
 	return instance, nodes[0]
 }
 
-func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRequiresQualityPermission(t *testing.T) {
+func TestCustomerConfigJSONRPCRetiredQualityCommandRejectsFrozenNode(t *testing.T) {
 	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithRuntimeRepo(&biz.AdminUser{ID: 1, Username: "warehouse", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.WarehouseRoleKey})
 	ctx := customerConfigAdminCtx(1, "warehouse")
 	publishAndActivateCustomerConfigUsecaseForTest(t, dispatcher, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t), 1)
@@ -3022,8 +2863,8 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRequiresQ
 	if err != nil {
 		t.Fatalf("handleCustomerConfig err = %v", err)
 	}
-	if res.Code != errcode.PermissionDenied.Code {
-		t.Fatalf("code = %d, want permission denied", res.Code)
+	if res.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("code = %d, want unknown retired method", res.Code)
 	}
 }
 
@@ -3273,7 +3114,7 @@ func createFinishedGoodsDeliveryShipmentExecutionActiveFixture(t *testing.T, run
 	return instance, nodes
 }
 
-func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRunsRegisteredHandler(t *testing.T) {
+func TestCustomerConfigJSONRPCRetiredShipmentCommandCannotExecuteRegisteredHandler(t *testing.T) {
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
 		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusShipped},
 	}
@@ -3298,47 +3139,26 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRunsRegist
 	if err != nil {
 		t.Fatalf("execute err = %v", err)
 	}
-	if executeRes.Code != errcode.OK.Code {
+	if executeRes.Code != errcode.UnknownMethod.Code {
 		t.Fatalf("execute result = %#v", executeRes)
 	}
-	if operationalFactRepo.shippedShipmentID != 9001 {
-		t.Fatalf("expected shipment 9001 to be shipped, got %d", operationalFactRepo.shippedShipmentID)
-	}
-	executeData := executeRes.Data.AsMap()
-	completedNode, ok := executeData["completed_node"].(map[string]any)
-	if !ok {
-		t.Fatalf("completed_node missing: %#v", executeData)
-	}
-	if completedNode["node_key"] != "shipment_execution" ||
-		completedNode["status"] != biz.ProcessNodeStatusCompleted ||
-		completedNode["outcome"] != biz.ShipmentProcessCommandOutcomeShipped {
-		t.Fatalf("completed_node = %#v", completedNode)
-	}
-	boundary, ok := executeData["runtime_boundary"].(map[string]any)
-	if !ok {
-		t.Fatalf("runtime_boundary missing: %#v", executeData)
-	}
-	if boundary["scope"] != "shipment_execution_domain_command" ||
-		boundary["writes_shipment_fact"] != true ||
-		boundary["writes_inventory_fact"] != true ||
-		boundary["writes_finance_fact"] != false ||
-		boundary["workflow_task_done_posts_fact"] != false {
-		t.Fatalf("runtime_boundary = %#v", boundary)
+	if operationalFactRepo.shippedShipmentID != 0 {
+		t.Fatalf("retired command wrote shipment %d", operationalFactRepo.shippedShipmentID)
 	}
 	refreshedNodes, err := dispatcher.processRuntimeUC.ListProcessNodeInstances(ctx, instance.ID)
 	if err != nil {
 		t.Fatalf("ListProcessNodeInstances err = %v", err)
 	}
 	node := refreshedNodes[2]
-	if node.ID != shipmentNode.ID || node.Status != biz.ProcessNodeStatusCompleted || node.Version != shipmentNode.Version+1 || node.CompletedAt == nil {
-		t.Fatalf("shipment node should complete after registered handler: %#v", node)
+	if node.ID != shipmentNode.ID || node.Status != shipmentNode.Status || node.Version != shipmentNode.Version || node.CompletedAt != nil {
+		t.Fatalf("retired command changed frozen node: %#v", node)
 	}
-	if refreshedNodes[3].Status != biz.ProcessNodeStatusActive {
-		t.Fatalf("receivable node should activate after shipment: %#v", refreshedNodes[3])
+	if refreshedNodes[3].Status != biz.ProcessNodeStatusWaiting {
+		t.Fatalf("retired command advanced a downstream node: %#v", refreshedNodes[3])
 	}
 }
 
-func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipUsesInstanceRevisionAfterActiveConfigChanges(t *testing.T) {
+func TestCustomerConfigJSONRPCRetiredShipmentCommandStaysRemovedAfterConfigChange(t *testing.T) {
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
 		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusShipped},
 	}
@@ -3372,11 +3192,11 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipUsesInstan
 	if err != nil {
 		t.Fatalf("execute err = %v", err)
 	}
-	if executeRes.Code != errcode.OK.Code {
-		t.Fatalf("execute code = %d msg=%s, want success from the immutable process revision", executeRes.Code, executeRes.Message)
+	if executeRes.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("execute code = %d msg=%s, want unknown retired method", executeRes.Code, executeRes.Message)
 	}
-	if operationalFactRepo.shippedShipmentID != 9001 {
-		t.Fatalf("shipment usecase should follow the process instance revision, got shipment id %d", operationalFactRepo.shippedShipmentID)
+	if operationalFactRepo.shippedShipmentID != 0 {
+		t.Fatalf("retired command wrote shipment %d", operationalFactRepo.shippedShipmentID)
 	}
 }
 
@@ -3436,7 +3256,7 @@ func TestCustomerConfigJSONRPCEveryCustomerScopedEntryRejectsRuntimeCustomerOver
 	}
 }
 
-func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRequiresShipmentPermission(t *testing.T) {
+func TestCustomerConfigJSONRPCRetiredShipmentCommandRejectsFrozenNode(t *testing.T) {
 	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithRuntimeRepo(&biz.AdminUser{ID: 1, Username: "quality", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.QualityRoleKey})
 	ctx := customerConfigAdminCtx(1, "quality")
 	publishAndActivateCustomerConfigUsecaseForTest(t, dispatcher, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t), 1)
@@ -3452,8 +3272,8 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRequiresSh
 	if err != nil {
 		t.Fatalf("handleCustomerConfig err = %v", err)
 	}
-	if res.Code != errcode.PermissionDenied.Code {
-		t.Fatalf("code = %d, want permission denied", res.Code)
+	if res.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("code = %d, want unknown retired method", res.Code)
 	}
 }
 
@@ -3614,7 +3434,7 @@ func createFinishedGoodsDeliveryReceivableLeadActiveFixture(t *testing.T, runtim
 	return instance, nodes
 }
 
-func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesDraft(t *testing.T) {
+func TestCustomerConfigJSONRPCRetiredReceivableCommandCannotCreateDraft(t *testing.T) {
 	customerID := 501
 	shippedAt := time.Now().UTC()
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
@@ -3650,66 +3470,36 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesD
 	if err != nil {
 		t.Fatalf("execute err = %v", err)
 	}
-	if executeRes.Code != errcode.OK.Code {
+	if executeRes.Code != errcode.UnknownMethod.Code {
 		t.Fatalf("execute result = %#v", executeRes)
 	}
-	if operationalFactRepo.createdFinanceFact == nil {
-		t.Fatalf("expected receivable finance fact draft to be created")
-	}
-	if operationalFactRepo.createdFinanceFact.FactNo != "AR-LEAD-9001" ||
-		operationalFactRepo.createdFinanceFact.FactType != biz.FinanceFactReceivable ||
-		operationalFactRepo.createdFinanceFact.CounterpartyType != biz.FinanceCounterpartyCustomer ||
-		operationalFactRepo.createdFinanceFact.CounterpartyID == nil ||
-		*operationalFactRepo.createdFinanceFact.CounterpartyID != 501 ||
-		!operationalFactRepo.createdFinanceFact.Amount.Equal(decimal.RequireFromString("12888.00")) ||
-		operationalFactRepo.createdFinanceFact.SourceType == nil ||
-		*operationalFactRepo.createdFinanceFact.SourceType != biz.ShipmentSourceType ||
-		operationalFactRepo.createdFinanceFact.SourceID == nil ||
-		*operationalFactRepo.createdFinanceFact.SourceID != 9001 ||
-		operationalFactRepo.createdFinanceFact.PaymentTerm == nil ||
-		*operationalFactRepo.createdFinanceFact.PaymentTerm != biz.FinancePaymentTermEOMDays ||
-		operationalFactRepo.createdFinanceFact.PaymentTermDays == nil ||
-		*operationalFactRepo.createdFinanceFact.PaymentTermDays != 30 ||
-		operationalFactRepo.createdFinanceFact.DueAt == nil ||
-		!operationalFactRepo.createdFinanceFact.DueAt.After(shippedAt) {
-		t.Fatalf("unexpected receivable finance fact create input %#v", operationalFactRepo.createdFinanceFact)
+	if operationalFactRepo.createdFinanceFact != nil {
+		t.Fatalf("retired command created a finance fact: %#v", operationalFactRepo.createdFinanceFact)
 	}
 	if operationalFactRepo.postedFinanceFactID != 0 || operationalFactRepo.settledFinanceFactID != 0 || operationalFactRepo.cancelledFinanceFactID != 0 {
-		t.Fatalf("receivable lead must only create a draft, got post=%d settle=%d cancel=%d", operationalFactRepo.postedFinanceFactID, operationalFactRepo.settledFinanceFactID, operationalFactRepo.cancelledFinanceFactID)
-	}
-	executeData := executeRes.Data.AsMap()
-	boundary, ok := executeData["runtime_boundary"].(map[string]any)
-	if !ok {
-		t.Fatalf("runtime_boundary missing: %#v", executeData)
-	}
-	if boundary["scope"] != "receivable_lead_domain_command" ||
-		boundary["writes_receivable_fact"] != true ||
-		boundary["writes_invoice_fact"] != false ||
-		boundary["writes_finance_fact"] != true ||
-		boundary["workflow_task_done_posts_fact"] != false {
-		t.Fatalf("runtime_boundary = %#v", boundary)
+		t.Fatalf("retired command changed finance facts")
 	}
 	refreshedNodes, err := dispatcher.processRuntimeUC.ListProcessNodeInstances(ctx, instance.ID)
 	if err != nil {
 		t.Fatalf("ListProcessNodeInstances err = %v", err)
 	}
 	node := refreshedNodes[3]
-	if node.ID != receivableNode.ID || node.Status != biz.ProcessNodeStatusCompleted || node.Version != receivableNode.Version+1 || node.CompletedAt == nil {
-		t.Fatalf("receivable node should complete after registered handler: %#v", node)
+	if node.ID != receivableNode.ID || node.Status != receivableNode.Status || node.Version != receivableNode.Version || node.CompletedAt != nil {
+		t.Fatalf("retired command changed frozen node: %#v", node)
 	}
-	if refreshedNodes[4].Status != biz.ProcessNodeStatusCompleted {
-		t.Fatalf("end node should complete after receivable lead: %#v", refreshedNodes[4])
+	if refreshedNodes[4].Status != biz.ProcessNodeStatusWaiting {
+		t.Fatalf("retired command advanced the end node: %#v", refreshedNodes[4])
 	}
 	refreshedInstance, err := dispatcher.processRuntimeUC.GetProcessInstance(ctx, instance.ID)
 	if err != nil {
 		t.Fatalf("GetProcessInstance err = %v", err)
 	}
-	if refreshedInstance.Status != biz.ProcessStatusCompleted {
-		t.Fatalf("process should complete after receivable lead end, got %#v", refreshedInstance)
+	if refreshedInstance.Status != biz.ProcessStatusActive {
+		t.Fatalf("retired command changed the process: %#v", refreshedInstance)
 	}
 }
 
-func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadRequiresFinancePermission(t *testing.T) {
+func TestCustomerConfigJSONRPCRetiredReceivableCommandRejectsFrozenNode(t *testing.T) {
 	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithRuntimeRepo(&biz.AdminUser{ID: 1, Username: "warehouse", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.WarehouseRoleKey})
 	ctx := customerConfigAdminCtx(1, "warehouse")
 	publishAndActivateCustomerConfigUsecaseForTest(t, dispatcher, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t), 1)
@@ -3728,8 +3518,8 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadRequires
 	if err != nil {
 		t.Fatalf("handleCustomerConfig err = %v", err)
 	}
-	if res.Code != errcode.PermissionDenied.Code {
-		t.Fatalf("code = %d, want permission denied", res.Code)
+	if res.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("code = %d, want unknown retired method", res.Code)
 	}
 }
 

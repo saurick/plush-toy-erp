@@ -47,9 +47,17 @@ work_lines AS (
  %s WHERE po.status<>'CANCELLED' AND %s
 ),
 issued AS (
- SELECT source_line_id, SUM(quantity) AS quantity FROM production_facts
- WHERE source_type='PRODUCTION_ORDER' AND fact_type='MATERIAL_ISSUE' AND status='POSTED'
- GROUP BY source_line_id
+ SELECT source_line_id, SUM(quantity) AS quantity FROM (
+  SELECT source_line_id, quantity FROM production_facts
+  WHERE source_type='PRODUCTION_ORDER' AND fact_type='MATERIAL_ISSUE' AND status='POSTED'
+  UNION ALL
+  SELECT a.production_order_material_requirement_id, f.quantity
+  FROM outsourcing_facts f
+  JOIN production_wip_outsourcing_allocations a ON a.outsourcing_order_item_id=f.source_line_id AND a.subject_type='MATERIAL'
+  JOIN production_wip_batches b ON b.id=a.production_wip_batch_id AND b.flow_type='NORMAL'
+  JOIN outsourcing_order_items oi ON oi.id=f.source_line_id AND oi.outsourcing_order_id=f.source_id
+  WHERE f.source_type='OUTSOURCING_ORDER' AND f.fact_type='MATERIAL_ISSUE' AND f.status='POSTED'
+ ) issues GROUP BY source_line_id
 ),
 completion_rework AS (
  SELECT source_id,SUM(quantity) AS quantity FROM production_facts
@@ -115,7 +123,7 @@ sales_summary AS (
  MIN(due_at) AS any_due, COUNT(DISTINCT unit_id) AS unit_count, MIN(unit_name) AS unit_name,
  SUM(ordered_quantity) AS ordered_quantity, SUM(shipped_quantity) AS shipped_quantity,
  SUM(CASE WHEN line_status='open' AND shipped_quantity<ordered_quantity THEN 1 ELSE 0 END) AS unfulfilled,
- SUM(CASE WHEN engineering_status='CONFIRMED' THEN 1 ELSE 0 END) AS engineering_ready
+ SUM(CASE WHEN bom_id IS NOT NULL AND bom_fingerprint IS NOT NULL THEN 1 ELSE 0 END) AS engineering_ready
  FROM sales_lines l GROUP BY l.sales_order_id
 ),
 %s,

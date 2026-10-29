@@ -157,21 +157,21 @@ func TestProductionWIPQualityGateSnapshotKeepsCustomerInspectionConditional(t *t
 	}
 }
 
-func TestProductionWIPInitializationUsesOnlyExplicitReleasedRouteItems(t *testing.T) {
+func TestProductionWIPInitializationRequiresEveryReleasedLineToHaveRoute(t *testing.T) {
 	route := ProductionWIPRoutePlushSewHandV1
 	order := &ProductionOrder{ID: 7, Status: ProductionOrderStatusReleased}
 	legacy := &ProductionOrderItem{ID: 70, ProductionOrderID: 7, LineNo: 1, PlannedQuantity: productionWIPTestDecimal("3")}
 	routedLaterLine := &ProductionOrderItem{ID: 72, ProductionOrderID: 7, LineNo: 3, PlannedQuantity: productionWIPTestDecimal("4"), RouteCode: &route}
 	routedEarlierLine := &ProductionOrderItem{ID: 71, ProductionOrderID: 7, LineNo: 2, PlannedQuantity: productionWIPTestDecimal("5"), RouteCode: &route}
-	routed, err := ValidateProductionWIPInitialization(order, []*ProductionOrderItem{routedLaterLine, legacy, routedEarlierLine})
+	routed, err := ValidateProductionWIPInitialization(order, []*ProductionOrderItem{routedLaterLine, routedEarlierLine})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(routed) != 2 || routed[0].ID != 71 || routed[1].ID != 72 {
 		t.Fatalf("routed=%v", []int{routed[0].ID, routed[1].ID})
 	}
-	if legacy.RouteCode != nil {
-		t.Fatal("legacy route_code must not be inferred")
+	if _, err := ValidateProductionWIPInitialization(order, []*ProductionOrderItem{routedLaterLine, legacy, routedEarlierLine}); !errors.Is(err, ErrProductionWIPInvalidRoute) {
+		t.Fatalf("missing route must reject the entire release: %v", err)
 	}
 	order.Status = ProductionOrderStatusDraft
 	if _, err := ValidateProductionWIPInitialization(order, []*ProductionOrderItem{routedEarlierLine}); !errors.Is(err, ErrProductionWIPInvalidTransition) {

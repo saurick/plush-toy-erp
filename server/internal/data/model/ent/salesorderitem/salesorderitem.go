@@ -35,22 +35,10 @@ const (
 	FieldProcessRequirement = "process_requirement"
 	// FieldImportSource holds the string denoting the import_source field in the database.
 	FieldImportSource = "import_source"
-	// FieldSampleBomID holds the string denoting the sample_bom_id field in the database.
-	FieldSampleBomID = "sample_bom_id"
-	// FieldSampleBomFingerprint holds the string denoting the sample_bom_fingerprint field in the database.
-	FieldSampleBomFingerprint = "sample_bom_fingerprint"
-	// FieldSampleReusedFromItemID holds the string denoting the sample_reused_from_item_id field in the database.
-	FieldSampleReusedFromItemID = "sample_reused_from_item_id"
-	// FieldSampleImageAttachmentID holds the string denoting the sample_image_attachment_id field in the database.
-	FieldSampleImageAttachmentID = "sample_image_attachment_id"
-	// FieldEngineeringStatus holds the string denoting the engineering_status field in the database.
-	FieldEngineeringStatus = "engineering_status"
-	// FieldSampleNote holds the string denoting the sample_note field in the database.
-	FieldSampleNote = "sample_note"
-	// FieldSampleConfirmedAt holds the string denoting the sample_confirmed_at field in the database.
-	FieldSampleConfirmedAt = "sample_confirmed_at"
-	// FieldSampleConfirmedBy holds the string denoting the sample_confirmed_by field in the database.
-	FieldSampleConfirmedBy = "sample_confirmed_by"
+	// FieldBomID holds the string denoting the bom_id field in the database.
+	FieldBomID = "bom_id"
+	// FieldBomFingerprint holds the string denoting the bom_fingerprint field in the database.
+	FieldBomFingerprint = "bom_fingerprint"
 	// FieldProductSkuID holds the string denoting the product_sku_id field in the database.
 	FieldProductSkuID = "product_sku_id"
 	// FieldUnitID holds the string denoting the unit_id field in the database.
@@ -77,14 +65,12 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
-	// EdgeSampleReusedFromItem holds the string denoting the sample_reused_from_item edge name in mutations.
-	EdgeSampleReusedFromItem = "sample_reused_from_item"
 	// EdgeSalesOrder holds the string denoting the sales_order edge name in mutations.
 	EdgeSalesOrder = "sales_order"
 	// EdgeProduct holds the string denoting the product edge name in mutations.
 	EdgeProduct = "product"
-	// EdgeSampleBom holds the string denoting the sample_bom edge name in mutations.
-	EdgeSampleBom = "sample_bom"
+	// EdgeBom holds the string denoting the bom edge name in mutations.
+	EdgeBom = "bom"
 	// EdgeProductSku holds the string denoting the product_sku edge name in mutations.
 	EdgeProductSku = "product_sku"
 	// EdgeUnit holds the string denoting the unit edge name in mutations.
@@ -95,10 +81,6 @@ const (
 	EdgeStockReservations = "stock_reservations"
 	// Table holds the table name of the salesorderitem in the database.
 	Table = "sales_order_items"
-	// SampleReusedFromItemTable is the table that holds the sample_reused_from_item relation/edge.
-	SampleReusedFromItemTable = "sales_order_items"
-	// SampleReusedFromItemColumn is the table column denoting the sample_reused_from_item relation/edge.
-	SampleReusedFromItemColumn = "sample_reused_from_item_id"
 	// SalesOrderTable is the table that holds the sales_order relation/edge.
 	SalesOrderTable = "sales_order_items"
 	// SalesOrderInverseTable is the table name for the SalesOrder entity.
@@ -113,13 +95,13 @@ const (
 	ProductInverseTable = "products"
 	// ProductColumn is the table column denoting the product relation/edge.
 	ProductColumn = "product_id"
-	// SampleBomTable is the table that holds the sample_bom relation/edge.
-	SampleBomTable = "sales_order_items"
-	// SampleBomInverseTable is the table name for the BOMHeader entity.
+	// BomTable is the table that holds the bom relation/edge.
+	BomTable = "sales_order_items"
+	// BomInverseTable is the table name for the BOMHeader entity.
 	// It exists in this package in order to avoid circular dependency with the "bomheader" package.
-	SampleBomInverseTable = "bom_headers"
-	// SampleBomColumn is the table column denoting the sample_bom relation/edge.
-	SampleBomColumn = "sample_bom_id"
+	BomInverseTable = "bom_headers"
+	// BomColumn is the table column denoting the bom relation/edge.
+	BomColumn = "bom_id"
 	// ProductSkuTable is the table that holds the product_sku relation/edge.
 	ProductSkuTable = "sales_order_items"
 	// ProductSkuInverseTable is the table name for the ProductSKU entity.
@@ -163,14 +145,8 @@ var Columns = []string{
 	FieldPreShipmentSampleQuantity,
 	FieldProcessRequirement,
 	FieldImportSource,
-	FieldSampleBomID,
-	FieldSampleBomFingerprint,
-	FieldSampleReusedFromItemID,
-	FieldSampleImageAttachmentID,
-	FieldEngineeringStatus,
-	FieldSampleNote,
-	FieldSampleConfirmedAt,
-	FieldSampleConfirmedBy,
+	FieldBomID,
+	FieldBomFingerprint,
 	FieldProductSkuID,
 	FieldUnitID,
 	FieldProductCodeSnapshot,
@@ -217,22 +193,10 @@ var (
 	DefaultPreShipmentSampleQuantity decimal.Decimal
 	// ProcessRequirementValidator is a validator for the "process_requirement" field. It is called by the builders before save.
 	ProcessRequirementValidator func(string) error
-	// SampleBomIDValidator is a validator for the "sample_bom_id" field. It is called by the builders before save.
-	SampleBomIDValidator func(int) error
-	// SampleBomFingerprintValidator is a validator for the "sample_bom_fingerprint" field. It is called by the builders before save.
-	SampleBomFingerprintValidator func(string) error
-	// SampleReusedFromItemIDValidator is a validator for the "sample_reused_from_item_id" field. It is called by the builders before save.
-	SampleReusedFromItemIDValidator func(int) error
-	// SampleImageAttachmentIDValidator is a validator for the "sample_image_attachment_id" field. It is called by the builders before save.
-	SampleImageAttachmentIDValidator func(int) error
-	// DefaultEngineeringStatus holds the default value on creation for the "engineering_status" field.
-	DefaultEngineeringStatus string
-	// EngineeringStatusValidator is a validator for the "engineering_status" field. It is called by the builders before save.
-	EngineeringStatusValidator func(string) error
-	// SampleNoteValidator is a validator for the "sample_note" field. It is called by the builders before save.
-	SampleNoteValidator func(string) error
-	// SampleConfirmedByValidator is a validator for the "sample_confirmed_by" field. It is called by the builders before save.
-	SampleConfirmedByValidator func(int) error
+	// BomIDValidator is a validator for the "bom_id" field. It is called by the builders before save.
+	BomIDValidator func(int) error
+	// BomFingerprintValidator is a validator for the "bom_fingerprint" field. It is called by the builders before save.
+	BomFingerprintValidator func(string) error
 	// ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
 	ProductSkuIDValidator func(int) error
 	// UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
@@ -310,44 +274,14 @@ func ByProcessRequirement(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProcessRequirement, opts...).ToFunc()
 }
 
-// BySampleBomID orders the results by the sample_bom_id field.
-func BySampleBomID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSampleBomID, opts...).ToFunc()
+// ByBomID orders the results by the bom_id field.
+func ByBomID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBomID, opts...).ToFunc()
 }
 
-// BySampleBomFingerprint orders the results by the sample_bom_fingerprint field.
-func BySampleBomFingerprint(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSampleBomFingerprint, opts...).ToFunc()
-}
-
-// BySampleReusedFromItemID orders the results by the sample_reused_from_item_id field.
-func BySampleReusedFromItemID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSampleReusedFromItemID, opts...).ToFunc()
-}
-
-// BySampleImageAttachmentID orders the results by the sample_image_attachment_id field.
-func BySampleImageAttachmentID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSampleImageAttachmentID, opts...).ToFunc()
-}
-
-// ByEngineeringStatus orders the results by the engineering_status field.
-func ByEngineeringStatus(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldEngineeringStatus, opts...).ToFunc()
-}
-
-// BySampleNote orders the results by the sample_note field.
-func BySampleNote(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSampleNote, opts...).ToFunc()
-}
-
-// BySampleConfirmedAt orders the results by the sample_confirmed_at field.
-func BySampleConfirmedAt(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSampleConfirmedAt, opts...).ToFunc()
-}
-
-// BySampleConfirmedBy orders the results by the sample_confirmed_by field.
-func BySampleConfirmedBy(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSampleConfirmedBy, opts...).ToFunc()
+// ByBomFingerprint orders the results by the bom_fingerprint field.
+func ByBomFingerprint(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBomFingerprint, opts...).ToFunc()
 }
 
 // ByProductSkuID orders the results by the product_sku_id field.
@@ -415,13 +349,6 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
-// BySampleReusedFromItemField orders the results by sample_reused_from_item field.
-func BySampleReusedFromItemField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newSampleReusedFromItemStep(), sql.OrderByField(field, opts...))
-	}
-}
-
 // BySalesOrderField orders the results by sales_order field.
 func BySalesOrderField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -436,10 +363,10 @@ func ByProductField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
-// BySampleBomField orders the results by sample_bom field.
-func BySampleBomField(field string, opts ...sql.OrderTermOption) OrderOption {
+// ByBomField orders the results by bom field.
+func ByBomField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newSampleBomStep(), sql.OrderByField(field, opts...))
+		sqlgraph.OrderByNeighborTerms(s, newBomStep(), sql.OrderByField(field, opts...))
 	}
 }
 
@@ -484,13 +411,6 @@ func ByStockReservations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption
 		sqlgraph.OrderByNeighborTerms(s, newStockReservationsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
-func newSampleReusedFromItemStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(Table, FieldID),
-		sqlgraph.Edge(sqlgraph.O2O, false, SampleReusedFromItemTable, SampleReusedFromItemColumn),
-	)
-}
 func newSalesOrderStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -505,11 +425,11 @@ func newProductStep() *sqlgraph.Step {
 		sqlgraph.Edge(sqlgraph.M2O, false, ProductTable, ProductColumn),
 	)
 }
-func newSampleBomStep() *sqlgraph.Step {
+func newBomStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(SampleBomInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, false, SampleBomTable, SampleBomColumn),
+		sqlgraph.To(BomInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, BomTable, BomColumn),
 	)
 }
 func newProductSkuStep() *sqlgraph.Step {

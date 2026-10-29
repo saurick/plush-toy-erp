@@ -9,6 +9,7 @@ import {
   Typography,
 } from 'antd'
 import DevCiWorkflowGuide from '../DevCiWorkflowGuide.jsx'
+
 import { buildCiDiagnosticText } from '../../config/devCiWorkflow.mjs'
 import { buildQualityGateServerJobGuide } from '../../config/devQualityGates.mjs'
 import {
@@ -196,11 +197,7 @@ export function ServerJobGuideDrawer({
                     </ol>
                   ),
                 },
-                {
-                  key: 'sources',
-                  label: '说明来源',
-                  children: selectedGuide.diagnostics.sources.join('、'),
-                },
+
               ]}
             />
           ) : (

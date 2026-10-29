@@ -280,15 +280,16 @@ type SupplierWithContacts struct {
 }
 
 type MasterDataFilter struct {
-	IDs            []int
-	StockCategory  string
-	WarehouseTypes []string
-	Keyword        string
-	ActiveOnly     bool
-	LifecycleScope string
-	SupplierTypes  []string
-	Limit          int
-	Offset         int
+	PurchaseSupplierID int
+	IDs                []int
+	StockCategory      string
+	WarehouseTypes     []string
+	Keyword            string
+	ActiveOnly         bool
+	LifecycleScope     string
+	SupplierTypes      []string
+	Limit              int
+	Offset             int
 }
 
 type ContactFilter struct {

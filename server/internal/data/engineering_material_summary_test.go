@@ -19,7 +19,7 @@ func TestEngineeringMaterialSummaryPreservesSourceHeaderAndNotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.SalesOrderItem.UpdateOneID(f.line.ID).SetSampleBomFingerprint(fingerprint).
+	client.SalesOrderItem.UpdateOneID(f.line.ID).SetBomFingerprint(fingerprint).
 		SetCustomerProductNo("PRODUCT-REF").SetProcessRequirement("颜色需对样").SaveX(ctx)
 	submitted := submitMaterialRequestFixture(t, ctx, f)
 	firstJSON, _ := json.Marshal(submitted.Sources[0])

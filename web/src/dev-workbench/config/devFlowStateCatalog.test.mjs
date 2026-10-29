@@ -40,7 +40,6 @@ const observatoryPageSource = readFileSync(
 )
 
 const EXPECTED_FLOW_KEYS = [
-  'source.sales_order_engineering',
   'source.engineering_material_request',
   'source.sales_order',
   'source.purchase_order',
@@ -527,12 +526,12 @@ test('devFlowStateCatalog: route 与只读边界使用唯一真源', () => {
   )
 })
 
-test('devFlowStateCatalog: 覆盖清单固定为 35 个当前对象', () => {
+test('devFlowStateCatalog: 覆盖清单固定为 34 个当前对象', () => {
   assert.deepEqual(
     DEV_FLOW_STATE_CATALOG.flows.map((flow) => flow.key),
     EXPECTED_FLOW_KEYS
   )
-  assert.equal(new Set(EXPECTED_FLOW_KEYS).size, 35)
+  assert.equal(new Set(EXPECTED_FLOW_KEYS).size, 34)
 
   for (const flow of DEV_FLOW_STATE_CATALOG.flows) {
     assert.equal(flow.runtimeAuthority, 'backend_domain_contract')
@@ -629,7 +628,7 @@ test('devFlowStateCatalog: 高风险对象登记完整决策、过账、取消�
   )
   assert.deepEqual(
     getDevFlowStateMachine('fact.finance').transitions.map((item) => item.key),
-    ['DRAFT->POSTED', 'DRAFT->CANCELLED', 'POSTED->SETTLED', 'SETTLED->POSTED', 'POSTED->CANCELLED']
+    ['DRAFT->POSTED', 'DRAFT->CANCELLED', 'POSTED->SETTLED', 'SETTLED->POSTED', 'POSTED->CANCELLED', 'SETTLED->CANCELLED']
   )
   assert.deepEqual(getDevFlowStateMachine('fact.finance').terminalStates, [
     'CANCELLED',
@@ -826,6 +825,19 @@ test('devFlowStateCatalog: Process variant、节点、命令与分支边精确�
   }
 })
 
+test('quality facts own automatic WIP result writes without hiding domain transition contracts', () => {
+  const flow = getDevFlowStateMachine('fact.production_wip_batch')
+  for (const to of ['ACCEPTED', 'REJECTED']) {
+    const edge = flow.transitions.find((item) => item.from === 'WAITING_QUALITY' && item.to === to)
+    assert.equal(edge.responsibilityMode, 'system')
+    assert.equal(edge.systemOnly, false)
+    assert.deepEqual(edge.permission, [PermissionCode.QUALITY_INSPECTION_UPDATE])
+    assert.equal(edge.factBoundary, 'quality_fact_updates_wip')
+  }
+  const start = flow.transitions.find((item) => item.key === 'PLANNED->IN_PROGRESS')
+  assert.equal(start.responsibilityMode, 'human')
+})
+
 test('devFlowStateCatalog: Product Core 保持 6 process key / 7 variants', () => {
   assert.equal(processDefinitions.length, 7)
   assert.equal(
@@ -911,7 +923,7 @@ test('devFlowStateCatalog: Fact / Ledger 定义与状态对象一一对应且不
   )
   assert.match(
     DEV_FLOW_STATE_CATALOG.factRuntimeQuery.label,
-    /未提供运行凭证查询/u
+    /未提供通用跨领域凭证查询/u
   )
 })
 
@@ -1056,6 +1068,24 @@ test('devFlowStateCatalog: 动作规则不能脱离真实对象、权限与合�
   assert.throws(() => getDevFlowActionRules({ ...task, states: [] }), /unknown states/u)
 })
 
+test('质检纠正另建记录，权限与适用来源不等同于普通检验判定', () => {
+  const quality = getDevFlowStateMachine('fact.quality_inspection')
+  const correction = quality.actionRules.find((rule) => rule.key === 'correct')
+  assert.deepEqual(correction.states, ['PASSED', 'REJECTED'])
+  assert.deepEqual(correction.permission, [PermissionCode.QUALITY_EXCEPTION_HANDLE])
+  assert.match(correction.authority, /在制批次检验不适用/u)
+  assert.match(correction.effect, /另建引用原检验的待检记录/u)
+  assert.match(correction.blocked, /采购行已入库/u)
+  assert(!quality.transitions.some((edge) => ['PASSED', 'REJECTED'].includes(edge.from) && edge.to === 'SUBMITTED'))
+  const runtime = getDevFlowStateMachine('process.instance')
+  const dimension = runtime.dimensions.find((item) => item.key === 'resolution_kind')
+  for (const edge of runtime.transitions.filter((edge) => edge.outcomeDimensionKey)) {
+    assert.equal(edge.outcomeDimensionKey, dimension.key)
+    assert(Object.isFrozen(edge.outcomeKeys))
+    assert(edge.outcomeKeys.every((key) => dimension.states.some((state) => state.key === key)))
+  }
+})
+
 test('devFlowStateCatalog: 主数据启停逐项绑定布尔字段和后端实际入口', () => {
   const master = DEV_FLOW_STATE_CATALOG.flows.find((flow) => flow.key === 'master.lifecycle')
   assert.deepEqual(master.transitions, [])
@@ -1105,7 +1135,7 @@ test('devFlowStateCatalog: 搜索和筛选返回新对象且不改原目录', ()
     )?.scopeKey,
     'source_document'
   )
-  assert.equal(DEV_FLOW_STATE_CATALOG.flows.length, 35)
+  assert.equal(DEV_FLOW_STATE_CATALOG.flows.length, 34)
 })
 
 test('devFlowStateCatalog: 生产异常决策与执行状态属于同一来源单据且分流执行路径明确', () => {
@@ -1147,7 +1177,7 @@ test('devFlowStateCatalog: 生产异常决策与执行状态属于同一来源�
         'SUBMITTED',
         'CANCELLED',
         'cancel_production_exception',
-        ['production.exception.submit'],
+        ['production.exception.submit', 'production.over_issue.submit'],
       ],
     ]
   )

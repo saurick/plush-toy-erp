@@ -83,10 +83,14 @@ type QualityInspection struct {
 	OriginalLotStatus        string
 	InspectedAt              *time.Time
 	InspectorID              *int
+	InspectorName            *string
 	DefectRateOperator       *string
 	DefectRatePercent        *decimal.Decimal
 	DecisionNote             *string
 	CorrectionOfInspectionID *int
+	CorrectionOfInspectionNo *string
+	CorrectedInspectionID    *int
+	CorrectedInspectionNo    *string
 	SupersededAt             *time.Time
 	SupersededBy             *int
 	SupersededReason         *string
@@ -176,6 +180,7 @@ type QualityInspectionFilter struct {
 	SubjectType              string
 	SubjectID                int
 	CorrectionOfInspectionID int
+	IncludeSuperseded        bool
 	Limit                    int
 	Offset                   int
 }

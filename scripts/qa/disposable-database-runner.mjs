@@ -24,6 +24,10 @@ export const DISPOSABLE_DATABASE_WORKFLOWS = Object.freeze({
     allowedProfiles: Object.freeze(["ci"]),
     verify: "critical-postgres",
   }),
+  "purchase-chain-postgres": Object.freeze({
+    allowedProfiles: Object.freeze(["ci"]),
+    verify: "purchase-chain-postgres",
+  }),
   "migration-smoke": Object.freeze({
     allowedProfiles: Object.freeze([
       "acceptance",
@@ -135,7 +139,7 @@ export function summarizeCriticalPostgresFailure({
   return `process_exit=${Number.isInteger(status) ? status : "unknown"} structured_failure=absent`;
 }
 
-function defaultRuntime(repoRoot, onCriticalResult = () => {}) {
+function defaultRuntime(repoRoot, onCriticalResult = () => {}, purchaseChainRunner) {
   const serverRoot = path.join(repoRoot, "server");
   const queryExists = (adminURL, databaseName) => {
     const output = commandResult(
@@ -225,8 +229,8 @@ function defaultRuntime(repoRoot, onCriticalResult = () => {}) {
         },
       );
     },
-    verifyCriticalPostgres(databaseURL) {
-      const result = spawnSync(
+    verifyCriticalPostgres(databaseURL, workflow = "critical-postgres") {
+      const result = workflow === "purchase-chain-postgres" ? purchaseChainRunner(databaseURL, serverRoot) : spawnSync(
         "bash",
         [
           path.join(repoRoot, "scripts/purchase-receipt-pg.sh"),
@@ -279,6 +283,7 @@ export function runDisposableDatabaseLifecycle({
   runID = createDatabaseRunID(generatedAt),
   runtime,
   onCriticalResult,
+  purchaseChainRunner,
   workflow = "migration-smoke",
 }) {
   const workflowContract = validateDisposableWorkflow(profile, workflow);
@@ -288,7 +293,7 @@ export function runDisposableDatabaseLifecycle({
     runID,
   });
   const adminURL = replaceDatabaseName(baseDatabaseURL, "postgres");
-  const executor = runtime || defaultRuntime(repoRoot, onCriticalResult);
+  const executor = runtime || defaultRuntime(repoRoot, onCriticalResult, purchaseChainRunner);
   const stages = [];
   let created = false;
   let failure = "";
@@ -326,12 +331,12 @@ export function runDisposableDatabaseLifecycle({
       pending: after.pending,
     });
 
-    if (workflowContract.verify === "critical-postgres") {
-      const verification = executor.verifyCriticalPostgres(target.databaseURL);
+    if (["critical-postgres", "purchase-chain-postgres"].includes(workflowContract.verify)) {
+      const verification = executor.verifyCriticalPostgres(target.databaseURL, workflowContract.verify);
       if (verification?.status !== "passed") {
         throw new Error("critical PostgreSQL verification did not pass");
       }
-      record("verify-critical-postgres", "passed", {
+      record(`verify-${workflowContract.verify}`, "passed", {
         outputLines: Number(verification.outputLines || 0),
       });
     } else {
@@ -465,9 +470,12 @@ if (isDirectRun) {
     }
     parseLoopbackDatabaseURL(baseDatabaseURL);
     const repository =
-      options.workflow === "critical-postgres"
+      ["critical-postgres", "purchase-chain-postgres"].includes(options.workflow)
         ? await readRepositoryIdentity(repoRoot)
         : null;
+    const purchaseChainRunner = options.workflow === "purchase-chain-postgres"
+      ? (await import("./purchase-chain-postgres.mjs")).runPurchaseChainPostgres
+      : undefined;
     let criticalOutput = "";
     const report = runDisposableDatabaseLifecycle({
       baseDatabaseURL,
@@ -475,6 +483,7 @@ if (isDirectRun) {
       repoRoot,
       runID: options.runID || undefined,
       workflow: options.workflow,
+      purchaseChainRunner,
       onCriticalResult: (output) => {
         criticalOutput = output;
       },

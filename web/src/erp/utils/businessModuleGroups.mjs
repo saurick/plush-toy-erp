@@ -2,6 +2,8 @@ import {
   businessModuleDefinitions,
   businessNavigationSections,
 } from '../config/businessModules.mjs'
+import { hasActionPermission } from './masterDataOrderView.mjs'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { canReadProductionExceptionDecisions, canReadProductionProcess } from './productionRecordViews.mjs'
 
 const productionTabs = [
@@ -12,6 +14,7 @@ const productionTabs = [
 ]
 
 function moduleRouteKey(pathname, search = '') {
+  if (pathname === '/erp/warehouse/inventory' && new URLSearchParams(search).get('workspace') === 'operations') return `${pathname}?workspace=operations`
   return pathname === '/erp/production/progress' && new URLSearchParams(search).get('display') === 'process'
     ? `${pathname}?display=process`
     : pathname
@@ -155,6 +158,19 @@ export function getBusinessModuleTabs(pathname, sections, { search = '', adminPr
   const match = groupByPath.get(pathname)
   if (!match || match.group.tabs.length === 1) return null
   const visible = sections.flatMap((section) => section.items)
+  if (match.group.key === 'warehouse') {
+    const allowed = new Set(visible.map((item) => item.path))
+    const tabs = ['inventory', 'inbound', 'outbound'].flatMap((key) => {
+      const tab = match.group.tabs.find((item) => item.key === key)
+      return tab && allowed.has(tab.path) ? [tab] : []
+    })
+    if (allowed.has('/erp/warehouse/inventory') && [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE, PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE].some((code) => hasActionPermission(adminProfile, code))) {
+      tabs.push({ key: 'inventory-operations', label: '库存作业', path: '/erp/warehouse/inventory', search: '?workspace=operations' })
+    }
+    const activeKey = pathname === '/erp/warehouse/inventory' && new URLSearchParams(search).get('workspace') === 'operations'
+      ? 'inventory-operations' : match.tab.key
+    return { group: match.group, activeKey, tabs }
+  }
   if (match.group.key === 'production') {
     const tabs = productionTabs.filter((tab) => {
       if (!visible.some((item) => item.path === tab.path)) return false

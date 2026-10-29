@@ -47,7 +47,6 @@ export function buildVersionWorkspace({
   historyTableRef,
   initialLoading,
   loadError,
-  openPipelineDetails,
   operationColumns,
   operationHistoryFilters,
   operationHistoryPresentation,
@@ -155,7 +154,6 @@ export function buildVersionWorkspace({
             timings={summary?.timings}
             versions={versions}
             operations={operations}
-            onOpenDetails={openPipelineDetails}
           />
           <DevPipelineTimingPanel
             timings={summary?.timings}

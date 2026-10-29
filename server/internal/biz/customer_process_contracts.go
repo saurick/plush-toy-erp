@@ -560,7 +560,7 @@ func newInventoryAdjustmentApprovalContract() customerProcessContract {
 		},
 		DomainBoundary: "explicit_source_and_fact_commands",
 		FactBoundary:   "no_fact_posting",
-		Guardrail:      "Submission and approval update only the manual-adjustment source document. The warehouse execution task merely activates the explicit post command; only that command writes inventory transactions and balances.",
+		Guardrail:      "Submission and approval update only the cycle-count or manual-adjustment source document. The warehouse execution task merely activates the explicit post command; only that command writes inventory transactions and balances.",
 		Nodes: []ProcessNodeInstanceCreate{
 			customerDomainCommandNode(
 				"submit_inventory_adjustment",

@@ -1,0 +1,59 @@
+.erp-dev-chain-step-verification {
+  margin-top: 16px;
+  min-width: 0;
+}
+
+.erp-dev-chain-step-verification .erp-workbench-facts {
+  display: grid;
+  gap: 8px;
+}
+
+.erp-dev-chain-step-verification .erp-workbench-facts > div {
+  display: grid;
+  grid-template-columns: 8em minmax(0, 1fr);
+  gap: 12px;
+}
+
+.erp-dev-chain-step-verification__rules {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 16px;
+}
+
+.erp-dev-chain-step-verification__rules > li {
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-dev-chain-step-verification__rule-title,
+.erp-dev-chain-step-verification__evidence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+}
+
+.erp-dev-chain-step-verification table {
+  width: 100%;
+  table-layout: fixed;
+  text-align: left;
+}
+
+.erp-dev-chain-step-verification th,
+.erp-dev-chain-step-verification td {
+  padding: 8px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-chain-step-verification th:first-child {
+  width: 64%;
+}
+
+.erp-dev-chain-step-verification small {
+  display: block;
+  color: var(--erp-text-muted);
+}

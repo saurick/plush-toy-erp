@@ -34,9 +34,9 @@ test('inventory operation draft save uses CAS and verifies the returned aggregat
 
 test('inventory page exposes persistent records while keeping recent recovery supplemental', () => {
   assert.match(source, /InventoryOperationRecordsModal/u)
-  assert.match(source, /operationRecordsOpen/u)
+  assert.match(source, /InventoryOperationRecordsModal inline open/u)
   assert.match(source, /库存作业/u)
-  assert.match(source, /recoverInventoryOperation\(record\?\.id\)/u)
+  assert.match(source, /recoverInventoryOperation\(record\.id\)/u)
   assert.match(source, /window\.sessionStorage/u)
   assert.match(source, /mode=\{editingOperation \? 'edit' : 'create'\}/u)
   assert.match(source, /operation=\{editingOperation\}/u)

@@ -73,12 +73,13 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"create_invoice_from_shipment",
 		"create_payable_from_purchase_receipt",
 		"create_payable_from_outsourcing_return",
+		"create_payable_from_outsourcing_order",
 		"create_reconciliation_from_finance_fact",
 		"post_finance_fact",
 		"settle_finance_fact",
 		"cancel_finance_fact",
-		"list_finance_facts",
-		"list_finance_payment_allocation_candidates", "allocate_finance_payment", "reverse_finance_allocation", "create_finance_payment", "cancel_finance_payment", "reverse_finance_payment", "get_finance_payment", "list_finance_payments", "get_finance_credit_note", "list_finance_credit_notes", "create_finance_credit_note", "reverse_finance_credit_note":
+		"list_finance_facts", "get_finance_fact",
+		"get_finance_statement", "list_finance_source_adjustments", "create_finance_source_adjustment", "list_finance_payment_allocation_candidates", "allocate_finance_payment", "reverse_finance_allocation", "create_finance_payment", "cancel_finance_payment", "reverse_finance_payment", "get_finance_payment", "list_finance_payments", "get_finance_credit_note", "list_finance_credit_notes", "create_finance_credit_note", "reverse_finance_credit_note":
 		return d.handleOperationalFactFinance(ctx, method, id, pm, claims.UserID)
 	default:
 		return id, unknownOperationalFactResult(method), nil

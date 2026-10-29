@@ -27,6 +27,53 @@ test('mobile detail always exposes three steps and keeps gated receipt navigatio
   await render({ currentStep: 'detail', canOpenReceipt: true, onOpenReceipt: () => {} })
   assert.equal(container.querySelector('[data-step-key="result"]').disabled, false)
 })
+
+test('历史回执可返回办理资料，保留终态、提交重试和无入口边界', async (t) => {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [{ createRoot }, { MemoryRouter }, { default: Receipt }, { JsonRpc }] = await Promise.all([
+    import('react-dom/client'), import('react-router-dom'), import('./MobileTaskReceiptScreen.jsx'), import('../../../common/utils/jsonRpc.js'),
+  ])
+  const originalCall = JsonRpc.prototype.call
+  JsonRpc.prototype.call = async (method) => {
+    assert.equal(method, 'list_task_events', '历史回看只读取处理记录')
+    return { data: { items: [], truncated: false } }
+  }
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove(); JsonRpc.prototype.call = originalCall; dom.restore() })
+  let formOpens = 0
+  let retryOpens = 0
+  const onOpenTaskForm = () => { formOpens += 1 }
+  const task = { id: 3414, version: 1, task_name: '查看返工资料', task_status_key: 'done', source_type: 'production-progress', source_id: 42, owner_role_key: 'production' }
+  const render = (props) => act(async () => root.render(createElement(MemoryRouter, null, createElement(Receipt, { task, ...props }))))
+  const processStep = () => container.querySelector('[data-step-key="process"]')
+  await render({ outcome: 'recorded', onOpenTaskForm })
+  assert.equal(processStep().disabled, false)
+  await act(async () => processStep().click())
+  assert.equal(formOpens, 1)
+  assert.doesNotMatch(container.textContent, /继续填写办理表单/u, '历史回看不提示继续提交')
+  assert.ok(container.querySelector('[data-outcome="recorded"]'))
+  await render({ outcome: 'recorded' })
+  assert.equal(processStep().disabled, true, '没有办理入口时不能启用空跳转')
+  await render({ outcome: 'recorded', onOpenTaskForm, busy: true })
+  assert.equal(processStep().disabled, true)
+  await render({ outcome: 'confirmed', onOpenTaskForm })
+  assert.equal(processStep().disabled, false)
+  assert.doesNotMatch(container.textContent, /继续办理/u, '已结束任务不能继续提交')
+  await render({ outcome: 'confirmed', task: { ...task, task_status_key: 'ready' }, onOpenTaskForm })
+  assert.match(container.textContent, /继续办理/u)
+  for (const outcome of ['failed', 'unknown']) {
+    await render({ outcome, onOpenTaskForm })
+    assert.equal(processStep().disabled, true, '待确认或失败沿用提交恢复入口')
+  }
+  await render({ outcome: 'unknown', onOpenTaskForm, onOpenProcess: () => { retryOpens += 1 } })
+  assert.equal(processStep().disabled, false)
+  await act(async () => processStep().click())
+  assert.equal(retryOpens, 1)
+  assert.equal(formOpens, 1, '重试入口不误跳业务表单')
+})
 const attachmentSource = readFileSync(new URL('./MobileTaskAttachments.jsx', import.meta.url), 'utf8')
 const detailScreenSource = readFileSync(
   new URL('./MobileTaskDetailScreen.jsx', import.meta.url),
@@ -86,7 +133,7 @@ const taskListViewSource = readFileSync(new URL('../utils/mobileRoleTaskListView
 
 test('mobile task flow keeps document workspaces outside its detail, action and receipt entries', () => {
   const routerSource = readFileSync(new URL('../../router.jsx', import.meta.url), 'utf8')
-  assert.doesNotMatch(roleTaskPageSource, /onOpenBusiness=|mobileTaskBusinessPath|workflowTaskEntryNavigation/u)
+  assert.doesNotMatch(roleTaskPageSource, /onOpenBusiness=|taskBusinessPath|workflowTaskEntryNavigation/u)
   assert.doesNotMatch(routerSource, /path="tasks\/:taskID\/handle"/u)
   assert.match(routerSource, /path="help-center" element=\{<HelpCenterPage \/>\}/u)
 })
@@ -107,7 +154,7 @@ test('mobile task action screen fails closed and covers every backend-explained 
     actionScreenSource,
     /accessState = MOBILE_TASK_ACTION_ACCESS_STATES\.CHECKING/u
   )
-  assert.match(actionScreenSource, /availableActions\.includes\(option\.key\)/u)
+  assert.match(actionScreenSource, /workflowTaskPrimaryModes\(availableActions\)/u)
 })
 
 test('mobile task action screen separates a single command from multiple choices', () => {
@@ -141,14 +188,14 @@ test('mobile task action screen separates a single command from multiple choices
 test('mobile task action screen validates and focuses the first missing field', () => {
   assert.match(
     actionScreenSource,
-    /REASON_REQUIRED_ACTIONS = new Set\(\[[\s\S]*'done'[\s\S]*'blocked'[\s\S]*'rejected'[\s\S]*'resume'[\s\S]*'urge'/u
+    /workflowTaskActionRequiresReason\(task, effectiveAction\)/u
   )
   assert.match(
     actionScreenSource,
     /if \(action === 'done'\) return approvalTask \? '审批意见' : '完成反馈'/u
   )
   assert.match(actionScreenSource, /isWorkflowApprovalTask\(task\)/u)
-  assert.match(actionScreenSource, /\? '审批通过'/u)
+  assert.match(actionScreenSource, /resolveMobileActionLabel\(key, task\)/u)
   assert.match(actionScreenSource, /说明通过依据、核对结果和需要交接的信息/u)
   assert.match(actionScreenSource, /actionChoiceRef\.current\?\.focus\(\)/u)
   assert.match(actionScreenSource, /reasonRef\.current\?\.focus\(\)/u)
@@ -197,7 +244,7 @@ test('mobile task flow exposes one shared three-step navigation contract', () =>
   assert.match(flowHeaderSource, /data-state=\{\s*current \? 'current'/u)
   assert.match(
     flowHeaderSource,
-    /disabled=\{busy \|\| current \|\| !available\}/u
+    /disabled=\{busy \|\| !available\}/u
   )
   assert.match(
     flowStyleSource,
@@ -387,8 +434,8 @@ test('mobile task detail separates real attachments from historical text referen
     detailScreenSource,
     /data-testid="mobile-role-historical-evidence"/u
   )
-  assert.match(attachmentSource, /buttonText="查看附件"/u)
-  assert.match(attachmentSource, /panelTitle="附件内容"/u)
+  assert.match(attachmentSource, /buttonText="任务附件"/u)
+  assert.match(attachmentSource, /panelTitle="任务附件"/u)
   assert.match(attachmentSource, /showAttachmentCount/u)
   assert.match(attachmentSource, /canUpload=\{canManage\}/u)
   assert.doesNotMatch(detailScreenSource, /PaperClipOutlined/u)
@@ -420,8 +467,8 @@ test('mobile task receipt has explicit outcomes without fabricated actor or time
     /isWorkflowApprovalTask\(task\)[\s\S]*candidateActionKey === 'done'[\s\S]*label: '审批通过'/u
   )
   assert.match(receiptScreenSource, /办理说明/u)
-  assert.match(receiptScreenSource, /历史处理线索/u)
-  assert.match(receiptScreenSource, /confirmed \? taskStatus : `已知状态：\$\{taskStatus\}`/u)
+  assert.match(receiptScreenSource, /办理凭据/u)
+  assert.match(receiptScreenSource, /confirmed \|\| recorded \? taskStatus : `已知状态：\$\{taskStatus\}`/u)
   assert.match(receiptScreenSource, /正在恢复可重试任务/u)
   assert.match(receiptScreenSource, /重新载入任务/u)
   assert.match(receiptScreenSource, /mobile-task-receipt-handoff/u)

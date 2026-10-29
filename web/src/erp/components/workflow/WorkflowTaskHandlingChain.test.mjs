@@ -53,7 +53,7 @@ test('material chain uses recorded approvals and identifies the selected task wi
   const model = buildEngineeringMaterialStageModel(taskFor(), request)
   assert.deepEqual(
     model.items.map(({ label }) => label),
-    ['工程提交用料', '老板审核', '财务审核']
+    ['自动生成用料汇总', '老板审核', '财务审核']
   )
   assert.deepEqual(
     model.items.map(({ tone }) => tone),
@@ -106,7 +106,7 @@ test('approval, both rejection stages, resubmission and order closure preserve t
       },
       rejected
     )
-    assert.match(resubmitted.handoffLabel, /新的用料提交/)
+    assert.match(resubmitted.handoffLabel, /自动重新送审.*新的用料汇总/u)
     assert.equal(resubmitted.items.at(-1).current, false)
     assert.equal(resubmitted.items.at(-1).tone, 'completed')
   }

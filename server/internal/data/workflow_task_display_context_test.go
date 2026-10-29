@@ -212,7 +212,7 @@ func TestWorkflowTaskDisplayContextSourceProducerSearch(t *testing.T) {
 	product.Update().SetStyleNo("SOURCE-STYLE").SaveX(ctx)
 	actor := client.AdminUser.Create().SetUsername("display-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 	order := client.ProductionOrder.Create().SetOrderNo("MO-SOURCE").SetCreatedBy(actor.ID).SaveX(ctx)
-	client.ProductionOrderItem.Create().SetProductionOrderID(order.ID).SetLineNo(1).SetProductID(product.ID).SetUnitID(unit.ID).SetPlannedQuantity(decimal.NewFromInt(1)).SaveX(ctx)
+	client.ProductionOrderItem.Create().SetProductionOrderID(order.ID).SetLineNo(1).SetProductID(product.ID).SetUnitID(unit.ID).SetPlannedQuantity(decimal.NewFromInt(1)).SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SaveX(ctx)
 	row := client.WorkflowTask.Create().SetTaskCode(biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskProductionSchedulingGroup, order.ID)).SetTaskName("安排生产").SetTaskGroup(biz.WorkflowSourceTaskProductionSchedulingGroup).SetSourceType(biz.WorkflowSourceTaskProductionOrderSourceType).SetSourceID(order.ID).SetOwnerRoleKey("pmc").SetTaskStatusKey("ready").SetPayload(map[string]any{
 		"source_task_contract": biz.WorkflowSourceTaskContractV1,
 		"source_task_producer": biz.WorkflowSourceTaskProductionOrderReleaseProducer,

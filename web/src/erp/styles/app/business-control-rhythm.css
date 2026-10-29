@@ -41,17 +41,18 @@
   line-height: calc(var(--erp-form-control-height) - 2px);
 }
 
-body .ant-modal .erp-business-form,
-#root .erp-business-form {
+body :is(.ant-modal, .erp-task-action-drawer) :is(.erp-business-form, .erp-business-action-form),
+#root :is(.erp-business-form, .erp-business-action-form) {
   --erp-control-height: var(--erp-form-control-height);
 }
 
 body
-  .ant-modal
-  .erp-business-form
+  :is(.ant-modal, .erp-task-action-drawer)
+  :is(.erp-business-form, .erp-business-action-form)
   :is(
     .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper),
     .ant-input-number,
+    .ant-input-number-affix-wrapper,
     .ant-picker,
     .ant-select-single,
     .ant-select-single .ant-select-selector,
@@ -60,10 +61,11 @@ body
       )
   ),
 #root
-  .erp-business-form
+  :is(.erp-business-form, .erp-business-action-form)
   :is(
     .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper),
     .ant-input-number,
+    .ant-input-number-affix-wrapper,
     .ant-picker,
     .ant-select-single,
     .ant-select-single .ant-select-selector,
@@ -75,13 +77,13 @@ body
   min-height: var(--erp-control-height);
 }
 
-body .ant-modal .erp-business-form :is(.ant-select-single .ant-select-selector),
+body :is(.ant-modal, .erp-task-action-drawer) .erp-business-form :is(.ant-select-single .ant-select-selector),
 #root .erp-business-form :is(.ant-select-single .ant-select-selector) {
   align-items: center;
 }
 
 body
-  .ant-modal
+  :is(.ant-modal, .erp-task-action-drawer)
   .erp-business-form
   :is(
     .ant-form-item,
@@ -116,7 +118,7 @@ body
 }
 
 body
-  .ant-modal
+  :is(.ant-modal, .erp-task-action-drawer)
   :is(.erp-business-form, .erp-business-action-form)
   .ant-select-single
   .ant-select-selector
@@ -141,7 +143,7 @@ body
 }
 
 body
-  .ant-modal
+  :is(.ant-modal, .erp-task-action-drawer)
   :is(.erp-business-form, .erp-business-action-form)
   .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper),
 #root
@@ -151,7 +153,7 @@ body
 }
 
 body
-  .ant-modal
+  :is(.ant-modal, .erp-task-action-drawer)
   :is(.erp-business-form, .erp-business-action-form)
   .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)
   input.ant-input {
@@ -162,13 +164,13 @@ body
 }
 
 body
-  .ant-modal
+  :is(.ant-modal, .erp-task-action-drawer)
   :is(.erp-business-form, .erp-business-action-form)
   input.ant-input.ant-input-compact-item:not([type='hidden']):not(
     .erp-item-field-unit-suffix
   ),
 body
-  .ant-modal
+  :is(.ant-modal, .erp-task-action-drawer)
   :is(.erp-business-form, .erp-business-action-form)
   .ant-form-item-control-input-content
   > input.ant-input:not([type='hidden']):not(.erp-item-field-unit-suffix) {
@@ -188,7 +190,7 @@ body
   line-height: calc(var(--erp-business-control-height) - 2px);
 }
 
-body .ant-modal .ant-input-affix-wrapper.ant-input-password .ant-input-suffix,
+body :is(.ant-modal, .erp-task-action-drawer) .ant-input-affix-wrapper.ant-input-password .ant-input-suffix,
 #root .ant-input-affix-wrapper.ant-input-password .ant-input-suffix,
 #root .erp-login-card .ant-input-affix-wrapper .ant-input-suffix {
   display: inline-flex;
@@ -234,7 +236,7 @@ body .ant-modal .ant-input-affix-wrapper.ant-input-password .ant-input-suffix,
 }
 
 body
-  .ant-modal
+  :is(.ant-modal, .erp-task-action-drawer)
   .erp-business-form
   :is(.ant-input-number-input, .ant-picker-input > input),
 #root
@@ -373,7 +375,7 @@ body
   border-color: var(--erp-modal-control-hover, #bfbfbf);
 }
 
-body .ant-modal .erp-business-form textarea.ant-input,
+body :is(.ant-modal, .erp-task-action-drawer) .erp-business-form textarea.ant-input,
 #root .erp-business-form textarea.ant-input {
   height: auto;
   min-height: calc(var(--erp-control-height) * var(--erp-textarea-rows, 2));

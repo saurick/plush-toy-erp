@@ -62,7 +62,7 @@ func TestSourceModuleGatesRejectBeforeBusinessRepositoryAccess(t *testing.T) {
 	for _, test := range qualityMethods {
 		t.Run(test.method+" requires exact readable source module", func(t *testing.T) {
 			repo := &sourceModuleQualityRepo{}
-			d := &jsonrpcDispatcher{
+			d := &jsonrpcDispatcher{adminManageUC: newAllWarehouseScopeAdminUsecase(),
 				log:              log.NewHelper(log.NewStdLogger(io.Discard)),
 				adminReader:      stubAdminAccountReader{admin: superAdmin},
 				inventoryUC:      biz.NewInventoryUsecase(repo),

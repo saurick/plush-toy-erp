@@ -82,9 +82,9 @@ func runPurchaseReceiptPayableAndReconciliation(t *testing.T, ctx context.Contex
 		SetLineNo(1).
 		SetMaterialID(fixtures.materialID).
 		SetUnitID(fixtures.unitID).
-		SetPurchasedQuantity(decimal.NewFromInt(5)).
+		SetPurchasedQuantity(decimal.NewFromInt(6)).
 		SetUnitPrice(unitPrice).
-		SetAmount(amount).
+		SetAmount(decimal.NewFromInt(60)).
 		SetLineStatus(biz.PurchaseOrderItemStatusOpen).
 		SaveX(ctx)
 	lotNo := "FIN-LOT-" + suffix
@@ -176,14 +176,21 @@ func runPurchaseReceiptPayableAndReconciliation(t *testing.T, ctx context.Contex
 	if err != nil {
 		t.Fatalf("post reconciliation: %v", err)
 	}
-	if _, err := operationalUC.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(reconciliation.ID, reconciliation.Version, actor.ID, "核对撤销")); err != nil {
-		t.Fatalf("cancel reconciliation: %v", err)
+	reconciliation, err = operationalUC.SettleFinanceFact(ctx, operationalFactStatusMutation(reconciliation.ID, reconciliation.Version, actor.ID, ""))
+	if err != nil {
+		t.Fatalf("complete reconciliation: %v", err)
 	}
+	cancelIntent := operationalFactStatusMutation(reconciliation.ID, reconciliation.Version, actor.ID, "核对撤销")
+	cancelled, err := operationalUC.CancelPostedFinanceFact(ctx, cancelIntent)
+	if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled || cancelled.SettledAt == nil || !cancelled.SettledAt.Equal(*reconciliation.SettledAt) || cancelled.SettledBy == nil || *cancelled.SettledBy != actor.ID || cancelled.PostedAt == nil {
+		t.Fatalf("cancel completed reconciliation preserves audit: %#v err=%v", cancelled, err)
+	}
+	if replay, err := operationalUC.CancelPostedFinanceFact(ctx, cancelIntent); err != nil || replay.Version != cancelled.Version {
+		t.Fatalf("cancel completed reconciliation replay: %#v err=%v", replay, err)
+	}
+	payable = runPostedPurchaseSourceAdjustments(t, ctx, data, client, inventoryUC, operationalUC, payable, receipt, returnDraft.ID, actor.ID, suffix)
 	if _, err := operationalUC.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(payable.ID, payable.Version, actor.ID, "来源更正")); err != nil {
 		t.Fatalf("cancel payable after reconciliation cancellation: %v", err)
-	}
-	if _, err := inventoryUC.PostPurchaseReturn(ctx, returnDraft.ID); err != nil {
-		t.Fatalf("post return after payable cancellation: %v", err)
 	}
 	if _, err := inventoryUC.CancelPostedPurchaseReturn(ctx, returnDraft.ID); err != nil {
 		t.Fatalf("cancel return before receipt cancellation: %v", err)

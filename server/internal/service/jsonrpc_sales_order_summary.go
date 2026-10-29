@@ -17,7 +17,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderSummary(ctx context.Context, id stri
 	if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
 		return id, res, nil
 	}
-	if !sourceOrderAllowsOnly(pm, "customer_key", "keyword", "customer", "sales_owner", "lifecycle_status", "date_field", "date_from", "date_to", "limit", "offset") {
+	if !sourceOrderAllowsOnly(pm, "customer_key", "keyword", "customer_id", "customer", "sales_owner", "lifecycle_status", "date_field", "date_from", "date_to", "limit", "offset") {
 		return id, invalidParamResult(), nil
 	}
 	filter := biz.SalesOrderSummaryFilter{SalesOrderFilter: biz.SalesOrderFilter{Limit: 20, LifecycleScope: "all"}}
@@ -40,6 +40,10 @@ func (d *jsonrpcDispatcher) handleSalesOrderSummary(ctx context.Context, id stri
 		}
 	}
 	var ok bool
+	filter.CustomerID, ok = getOptionalJSONRPCID(pm, "customer_id")
+	if !ok {
+		return id, invalidParamResult(), nil
+	}
 	filter.DateFrom, ok = getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return id, invalidParamResult(), nil

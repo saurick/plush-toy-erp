@@ -38,6 +38,7 @@ export function canReadProductionExceptionDecisions(adminProfile) {
     PermissionCode.PMC_RISK_READ,
     PermissionCode.PRODUCTION_FACT_READ,
     PermissionCode.PRODUCTION_EXCEPTION_SUBMIT,
+    PermissionCode.PRODUCTION_OVER_ISSUE_SUBMIT,
     PermissionCode.PRODUCTION_EXCEPTION_APPROVE,
   ].some((permission) => hasActionPermission(adminProfile, permission))
 }

@@ -3,7 +3,9 @@ import { Alert, Button } from 'antd'
 import { Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
-import { getAuthenticatedNavigationSections, getNavigationSections } from '../config/seedData.mjs'
+import { getUtilityNavigationSections, getNavigationSections } from '../config/seedData.mjs'
+import { getHistoryCenterSources } from '../utils/historyRecordCatalog.mjs'
+import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import { filterNavigationSectionsByAdminProfile } from '../utils/adminProfileSync.mjs'
 import { canonicalBusinessPath } from '../utils/businessTaskRoute.mjs'
 import { readWorkflowTaskNavigation, workflowTaskReturnNavigation } from '../utils/workflowTaskNavigation.mjs'
@@ -41,10 +43,15 @@ export default function MobileBusinessLayout() {
   }, [location.state, location.pathname, parent?.adminProfile?.id])
   const requiredMenu = resolveMenuPermissionKey(canonicalBusinessPath(location.pathname))
   const helpPage = canonicalBusinessPath(location.pathname) === '/erp/help-center'
-  const authenticatedPage = getAuthenticatedNavigationSections().some((section) =>
-    section.items.some((item) => item.path === canonicalBusinessPath(location.pathname))
-  )
-  const allowed = authenticatedPage || Boolean(requiredMenu && allowedMenuPaths.includes(requiredMenu))
+  const utilityPage = getUtilityNavigationSections().flatMap((section) => section.items)
+    .find((item) => item.path === canonicalBusinessPath(location.pathname))
+  const allowed = utilityPage?.access === 'authenticated' || (utilityPage?.access === 'history'
+    ? getHistoryCenterSources({
+        visibleMenuPaths: allowedMenuPaths,
+        isSuperAdmin: parent?.adminProfile?.is_super_admin === true,
+        canReadPermission: (permission) => hasActionPermission(parent?.adminProfile, permission),
+      }).length > 0
+    : Boolean(requiredMenu && allowedMenuPaths.includes(requiredMenu)))
   const back = useCallback(async () => {
     if (guardRef.current && !(await guardRef.current())) return
     if (navigation) {

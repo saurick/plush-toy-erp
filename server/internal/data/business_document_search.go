@@ -55,7 +55,7 @@ func businessDocumentKeyword(kind, keyword string) func(*sql.Selector) {
 		case "lot":
 			match = sql.Or(b.subject(c), b.text(c, "lot_no", "supplier_lot_no", "color_no", "dye_lot_no", "production_lot_no"))
 		case "inventory_txn":
-			match = sql.Or(b.subject(c), b.warehouse(c), b.lot(c("lot_id")), b.sources(c, "PURCHASE_RECEIPT", "PURCHASE_RETURN", "PURCHASE_RECEIPT_ADJUSTMENT", "PRODUCTION_FACT", "OUTSOURCING_FACT", "SHIPMENT", "INVENTORY_OPERATION"))
+			match = sql.Or(b.subject(c), b.warehouse(c), b.lot(c("lot_id")), b.sources(c, "PURCHASE_RECEIPT", "PURCHASE_RETURN", "PURCHASE_RECEIPT_ADJUSTMENT", "PRODUCTION_FACT", "OUTSOURCING_FACT", "SHIPMENT", "INVENTORY_OPERATION", "PRODUCTION_EXCEPTION", "OUTSOURCING_DISPOSITION"))
 		case "bom":
 			match = sql.Or(b.text(c, "version", "source_order_no"), b.product(c, "product_id", "", ""))
 		default:
@@ -364,6 +364,10 @@ func (b *businessSearch) sources(c searchColumns, kinds ...string) *sql.Predicat
 			continue
 		case "INVENTORY_OPERATION":
 			table, match = "inventory_operations", func(h searchColumns) *sql.Predicate { return b.text(h, "operation_no") }
+		case "PRODUCTION_EXCEPTION":
+			table, match = "production_exception_decisions", func(h searchColumns) *sql.Predicate { return b.text(h, "decision_no") }
+		case "OUTSOURCING_DISPOSITION":
+			table, match = "outsourcing_return_dispositions", func(h searchColumns) *sql.Predicate { return b.text(h, "disposition_no") }
 		case "PURCHASE_RETURN":
 			table, match = "purchase_returns", func(h searchColumns) *sql.Predicate { return b.text(h, "return_no", "supplier_name") }
 		case "PURCHASE_RECEIPT_ADJUSTMENT":

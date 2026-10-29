@@ -1,5 +1,6 @@
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { requireWorkflowTaskIdempotencyKey } from './workflowTaskMutation.mjs'
+import { resolveWorkflowTaskEntryPath, workflowTaskSourceForEntryPath } from './dashboardTaskDisplay.mjs'
 
 export const FOLLOWUP_SOURCE_TYPES = Object.freeze([
   'sales_order', 'purchase_order', 'outsourcing_order', 'production_order', 'shipment',
@@ -9,6 +10,17 @@ export const BUSINESS_TASK_SOURCE_TYPES = Object.freeze([...FOLLOWUP_SOURCE_TYPE
 export function businessTaskSource(sourceType, record) {
   if (!BUSINESS_TASK_SOURCE_TYPES.includes(sourceType) || !Number.isSafeInteger(record?.id) || record.id <= 0) return null
   return { source_type: sourceType, source_id: record.id }
+}
+
+export function relatedBusinessTaskSource(sourceType, record, task) {
+  const source = businessTaskSource(sourceType, record)
+  const entrySource = workflowTaskSourceForEntryPath(resolveWorkflowTaskEntryPath(task))
+  // The task's stored source identity owns task queries; the entry binds it to this form.
+  if (source && entrySource?.source_type === source.source_type && entrySource.source_id === source.source_id &&
+      Number.isSafeInteger(task?.source_id) && task.source_id > 0 && task.source_type) {
+    return { source_type: task.source_type, source_id: task.source_id }
+  }
+  return source
 }
 
 export function operationalFactTaskContext(activeKey, record) {

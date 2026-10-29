@@ -16,6 +16,7 @@ import {
   SwapOutlined,
   UserOutlined,
 } from '@ant-design/icons'
+import { taskNeedsDesktop } from '../../utils/taskHandlingPolicy.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import { WORKFLOW_TASK_DUE_OPTIONS, taskListFilterRequest } from '../../utils/workflowTaskListFilters.mjs'
@@ -377,6 +378,7 @@ export default function MobileTaskListScreen({
         {listMeta ? <div className="mobile-task-list-row__meta">{listMeta}</div> : null}
         <div className="erp-task-card__footer mobile-task-list-row__footer">
           {renderTaskAssignee(task)}
+          {!history && taskNeedsDesktop(task) ? <span>电脑办理</span> : null}
           <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} showDueRisk={task.task_status_key === WorkflowTaskStatus.BLOCKED || severity.label !== '超时'} />
         </div>
         <WorkflowTaskReason meta={getWorkflowTaskReasonMeta(task)} />

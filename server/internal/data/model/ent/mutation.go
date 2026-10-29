@@ -16702,6 +16702,10 @@ type FinanceCreditNoteMutation struct {
 	op                       Op
 	typ                      string
 	id                       *int
+	balance_direction        *string
+	source_type              *string
+	source_id                *int
+	addsource_id             *int
 	credit_note_no           *string
 	amount                   *decimal.Decimal
 	currency                 *string
@@ -16821,6 +16825,161 @@ func (m *FinanceCreditNoteMutation) IDs(ctx context.Context) ([]int, error) {
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
+}
+
+// SetBalanceDirection sets the "balance_direction" field.
+func (m *FinanceCreditNoteMutation) SetBalanceDirection(s string) {
+	m.balance_direction = &s
+}
+
+// BalanceDirection returns the value of the "balance_direction" field in the mutation.
+func (m *FinanceCreditNoteMutation) BalanceDirection() (r string, exists bool) {
+	v := m.balance_direction
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceDirection returns the old "balance_direction" field's value of the FinanceCreditNote entity.
+// If the FinanceCreditNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceCreditNoteMutation) OldBalanceDirection(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceDirection is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceDirection requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceDirection: %w", err)
+	}
+	return oldValue.BalanceDirection, nil
+}
+
+// ResetBalanceDirection resets all changes to the "balance_direction" field.
+func (m *FinanceCreditNoteMutation) ResetBalanceDirection() {
+	m.balance_direction = nil
+}
+
+// SetSourceType sets the "source_type" field.
+func (m *FinanceCreditNoteMutation) SetSourceType(s string) {
+	m.source_type = &s
+}
+
+// SourceType returns the value of the "source_type" field in the mutation.
+func (m *FinanceCreditNoteMutation) SourceType() (r string, exists bool) {
+	v := m.source_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceType returns the old "source_type" field's value of the FinanceCreditNote entity.
+// If the FinanceCreditNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceCreditNoteMutation) OldSourceType(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceType: %w", err)
+	}
+	return oldValue.SourceType, nil
+}
+
+// ClearSourceType clears the value of the "source_type" field.
+func (m *FinanceCreditNoteMutation) ClearSourceType() {
+	m.source_type = nil
+	m.clearedFields[financecreditnote.FieldSourceType] = struct{}{}
+}
+
+// SourceTypeCleared returns if the "source_type" field was cleared in this mutation.
+func (m *FinanceCreditNoteMutation) SourceTypeCleared() bool {
+	_, ok := m.clearedFields[financecreditnote.FieldSourceType]
+	return ok
+}
+
+// ResetSourceType resets all changes to the "source_type" field.
+func (m *FinanceCreditNoteMutation) ResetSourceType() {
+	m.source_type = nil
+	delete(m.clearedFields, financecreditnote.FieldSourceType)
+}
+
+// SetSourceID sets the "source_id" field.
+func (m *FinanceCreditNoteMutation) SetSourceID(i int) {
+	m.source_id = &i
+	m.addsource_id = nil
+}
+
+// SourceID returns the value of the "source_id" field in the mutation.
+func (m *FinanceCreditNoteMutation) SourceID() (r int, exists bool) {
+	v := m.source_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceID returns the old "source_id" field's value of the FinanceCreditNote entity.
+// If the FinanceCreditNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceCreditNoteMutation) OldSourceID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceID: %w", err)
+	}
+	return oldValue.SourceID, nil
+}
+
+// AddSourceID adds i to the "source_id" field.
+func (m *FinanceCreditNoteMutation) AddSourceID(i int) {
+	if m.addsource_id != nil {
+		*m.addsource_id += i
+	} else {
+		m.addsource_id = &i
+	}
+}
+
+// AddedSourceID returns the value that was added to the "source_id" field in this mutation.
+func (m *FinanceCreditNoteMutation) AddedSourceID() (r int, exists bool) {
+	v := m.addsource_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSourceID clears the value of the "source_id" field.
+func (m *FinanceCreditNoteMutation) ClearSourceID() {
+	m.source_id = nil
+	m.addsource_id = nil
+	m.clearedFields[financecreditnote.FieldSourceID] = struct{}{}
+}
+
+// SourceIDCleared returns if the "source_id" field was cleared in this mutation.
+func (m *FinanceCreditNoteMutation) SourceIDCleared() bool {
+	_, ok := m.clearedFields[financecreditnote.FieldSourceID]
+	return ok
+}
+
+// ResetSourceID resets all changes to the "source_id" field.
+func (m *FinanceCreditNoteMutation) ResetSourceID() {
+	m.source_id = nil
+	m.addsource_id = nil
+	delete(m.clearedFields, financecreditnote.FieldSourceID)
 }
 
 // SetCreditNoteNo sets the "credit_note_no" field.
@@ -17407,7 +17566,16 @@ func (m *FinanceCreditNoteMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FinanceCreditNoteMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 14)
+	if m.balance_direction != nil {
+		fields = append(fields, financecreditnote.FieldBalanceDirection)
+	}
+	if m.source_type != nil {
+		fields = append(fields, financecreditnote.FieldSourceType)
+	}
+	if m.source_id != nil {
+		fields = append(fields, financecreditnote.FieldSourceID)
+	}
 	if m.credit_note_no != nil {
 		fields = append(fields, financecreditnote.FieldCreditNoteNo)
 	}
@@ -17449,6 +17617,12 @@ func (m *FinanceCreditNoteMutation) Fields() []string {
 // schema.
 func (m *FinanceCreditNoteMutation) Field(name string) (ent.Value, bool) {
 	switch name {
+	case financecreditnote.FieldBalanceDirection:
+		return m.BalanceDirection()
+	case financecreditnote.FieldSourceType:
+		return m.SourceType()
+	case financecreditnote.FieldSourceID:
+		return m.SourceID()
 	case financecreditnote.FieldCreditNoteNo:
 		return m.CreditNoteNo()
 	case financecreditnote.FieldFinanceFactID:
@@ -17480,6 +17654,12 @@ func (m *FinanceCreditNoteMutation) Field(name string) (ent.Value, bool) {
 // database failed.
 func (m *FinanceCreditNoteMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
+	case financecreditnote.FieldBalanceDirection:
+		return m.OldBalanceDirection(ctx)
+	case financecreditnote.FieldSourceType:
+		return m.OldSourceType(ctx)
+	case financecreditnote.FieldSourceID:
+		return m.OldSourceID(ctx)
 	case financecreditnote.FieldCreditNoteNo:
 		return m.OldCreditNoteNo(ctx)
 	case financecreditnote.FieldFinanceFactID:
@@ -17511,6 +17691,27 @@ func (m *FinanceCreditNoteMutation) OldField(ctx context.Context, name string) (
 // type.
 func (m *FinanceCreditNoteMutation) SetField(name string, value ent.Value) error {
 	switch name {
+	case financecreditnote.FieldBalanceDirection:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceDirection(v)
+		return nil
+	case financecreditnote.FieldSourceType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceType(v)
+		return nil
+	case financecreditnote.FieldSourceID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceID(v)
+		return nil
 	case financecreditnote.FieldCreditNoteNo:
 		v, ok := value.(string)
 		if !ok {
@@ -17596,6 +17797,9 @@ func (m *FinanceCreditNoteMutation) SetField(name string, value ent.Value) error
 // this mutation.
 func (m *FinanceCreditNoteMutation) AddedFields() []string {
 	var fields []string
+	if m.addsource_id != nil {
+		fields = append(fields, financecreditnote.FieldSourceID)
+	}
 	if m.addcreated_by != nil {
 		fields = append(fields, financecreditnote.FieldCreatedBy)
 	}
@@ -17607,6 +17811,8 @@ func (m *FinanceCreditNoteMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *FinanceCreditNoteMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case financecreditnote.FieldSourceID:
+		return m.AddedSourceID()
 	case financecreditnote.FieldCreatedBy:
 		return m.AddedCreatedBy()
 	}
@@ -17618,6 +17824,13 @@ func (m *FinanceCreditNoteMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *FinanceCreditNoteMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case financecreditnote.FieldSourceID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSourceID(v)
+		return nil
 	case financecreditnote.FieldCreatedBy:
 		v, ok := value.(int)
 		if !ok {
@@ -17633,6 +17846,12 @@ func (m *FinanceCreditNoteMutation) AddField(name string, value ent.Value) error
 // mutation.
 func (m *FinanceCreditNoteMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(financecreditnote.FieldSourceType) {
+		fields = append(fields, financecreditnote.FieldSourceType)
+	}
+	if m.FieldCleared(financecreditnote.FieldSourceID) {
+		fields = append(fields, financecreditnote.FieldSourceID)
+	}
 	if m.FieldCleared(financecreditnote.FieldReversalOfCreditNoteID) {
 		fields = append(fields, financecreditnote.FieldReversalOfCreditNoteID)
 	}
@@ -17650,6 +17869,12 @@ func (m *FinanceCreditNoteMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *FinanceCreditNoteMutation) ClearField(name string) error {
 	switch name {
+	case financecreditnote.FieldSourceType:
+		m.ClearSourceType()
+		return nil
+	case financecreditnote.FieldSourceID:
+		m.ClearSourceID()
+		return nil
 	case financecreditnote.FieldReversalOfCreditNoteID:
 		m.ClearReversalOfCreditNoteID()
 		return nil
@@ -17661,6 +17886,15 @@ func (m *FinanceCreditNoteMutation) ClearField(name string) error {
 // It returns an error if the field is not defined in the schema.
 func (m *FinanceCreditNoteMutation) ResetField(name string) error {
 	switch name {
+	case financecreditnote.FieldBalanceDirection:
+		m.ResetBalanceDirection()
+		return nil
+	case financecreditnote.FieldSourceType:
+		m.ResetSourceType()
+		return nil
+	case financecreditnote.FieldSourceID:
+		m.ResetSourceID()
+		return nil
 	case financecreditnote.FieldCreditNoteNo:
 		m.ResetCreditNoteNo()
 		return nil
@@ -67832,22 +68066,9 @@ func (m *ProductionOrderItemMutation) OldRouteCode(ctx context.Context) (v *stri
 	return oldValue.RouteCode, nil
 }
 
-// ClearRouteCode clears the value of the "route_code" field.
-func (m *ProductionOrderItemMutation) ClearRouteCode() {
-	m.route_code = nil
-	m.clearedFields[productionorderitem.FieldRouteCode] = struct{}{}
-}
-
-// RouteCodeCleared returns if the "route_code" field was cleared in this mutation.
-func (m *ProductionOrderItemMutation) RouteCodeCleared() bool {
-	_, ok := m.clearedFields[productionorderitem.FieldRouteCode]
-	return ok
-}
-
 // ResetRouteCode resets all changes to the "route_code" field.
 func (m *ProductionOrderItemMutation) ResetRouteCode() {
 	m.route_code = nil
-	delete(m.clearedFields, productionorderitem.FieldRouteCode)
 }
 
 // SetCustomerInspectionRequired sets the "customer_inspection_required" field.
@@ -68982,9 +69203,6 @@ func (m *ProductionOrderItemMutation) ClearedFields() []string {
 	if m.FieldCleared(productionorderitem.FieldBomHeaderID) {
 		fields = append(fields, productionorderitem.FieldBomHeaderID)
 	}
-	if m.FieldCleared(productionorderitem.FieldRouteCode) {
-		fields = append(fields, productionorderitem.FieldRouteCode)
-	}
 	if m.FieldCleared(productionorderitem.FieldProductCodeSnapshot) {
 		fields = append(fields, productionorderitem.FieldProductCodeSnapshot)
 	}
@@ -69025,9 +69243,6 @@ func (m *ProductionOrderItemMutation) ClearField(name string) error {
 		return nil
 	case productionorderitem.FieldBomHeaderID:
 		m.ClearBomHeaderID()
-		return nil
-	case productionorderitem.FieldRouteCode:
-		m.ClearRouteCode()
 		return nil
 	case productionorderitem.FieldProductCodeSnapshot:
 		m.ClearProductCodeSnapshot()
@@ -102755,60 +102970,51 @@ func (m *SalesOrderMutation) ResetEdge(name string) error {
 // SalesOrderItemMutation represents an operation that mutates the SalesOrderItem nodes in the graph.
 type SalesOrderItemMutation struct {
 	config
-	op                             Op
-	typ                            string
-	id                             *int
-	line_no                        *int
-	addline_no                     *int
-	display_order                  *int
-	adddisplay_order               *int
-	requested_product_name         *string
-	customer_product_no            *string
-	order_category                 *string
-	pre_shipment_sample_quantity   *decimal.Decimal
-	process_requirement            *string
-	import_source                  *map[string]interface{}
-	sample_bom_fingerprint         *string
-	sample_image_attachment_id     *int
-	addsample_image_attachment_id  *int
-	engineering_status             *string
-	sample_note                    *string
-	sample_confirmed_at            *time.Time
-	sample_confirmed_by            *int
-	addsample_confirmed_by         *int
-	product_code_snapshot          *string
-	product_name_snapshot          *string
-	color_snapshot                 *string
-	ordered_quantity               *decimal.Decimal
-	unit_price                     *decimal.Decimal
-	amount                         *decimal.Decimal
-	planned_delivery_date          *time.Time
-	line_status                    *string
-	note                           *string
-	created_at                     *time.Time
-	updated_at                     *time.Time
-	clearedFields                  map[string]struct{}
-	sample_reused_from_item        *int
-	clearedsample_reused_from_item bool
-	sales_order                    *int
-	clearedsales_order             bool
-	product                        *int
-	clearedproduct                 bool
-	sample_bom                     *int
-	clearedsample_bom              bool
-	product_sku                    *int
-	clearedproduct_sku             bool
-	unit                           *int
-	clearedunit                    bool
-	shipment_items                 map[int]struct{}
-	removedshipment_items          map[int]struct{}
-	clearedshipment_items          bool
-	stock_reservations             map[int]struct{}
-	removedstock_reservations      map[int]struct{}
-	clearedstock_reservations      bool
-	done                           bool
-	oldValue                       func(context.Context) (*SalesOrderItem, error)
-	predicates                     []predicate.SalesOrderItem
+	op                           Op
+	typ                          string
+	id                           *int
+	line_no                      *int
+	addline_no                   *int
+	display_order                *int
+	adddisplay_order             *int
+	requested_product_name       *string
+	customer_product_no          *string
+	order_category               *string
+	pre_shipment_sample_quantity *decimal.Decimal
+	process_requirement          *string
+	import_source                *map[string]interface{}
+	bom_fingerprint              *string
+	product_code_snapshot        *string
+	product_name_snapshot        *string
+	color_snapshot               *string
+	ordered_quantity             *decimal.Decimal
+	unit_price                   *decimal.Decimal
+	amount                       *decimal.Decimal
+	planned_delivery_date        *time.Time
+	line_status                  *string
+	note                         *string
+	created_at                   *time.Time
+	updated_at                   *time.Time
+	clearedFields                map[string]struct{}
+	sales_order                  *int
+	clearedsales_order           bool
+	product                      *int
+	clearedproduct               bool
+	bom                          *int
+	clearedbom                   bool
+	product_sku                  *int
+	clearedproduct_sku           bool
+	unit                         *int
+	clearedunit                  bool
+	shipment_items               map[int]struct{}
+	removedshipment_items        map[int]struct{}
+	clearedshipment_items        bool
+	stock_reservations           map[int]struct{}
+	removedstock_reservations    map[int]struct{}
+	clearedstock_reservations    bool
+	done                         bool
+	oldValue                     func(context.Context) (*SalesOrderItem, error)
+	predicates                   []predicate.SalesOrderItem
 }
 
 var _ ent.Mutation = (*SalesOrderItemMutation)(nil)
@@ -103388,425 +103594,102 @@ func (m *SalesOrderItemMutation) ResetImportSource() {
 	delete(m.clearedFields, salesorderitem.FieldImportSource)
 }
 
-// SetSampleBomID sets the "sample_bom_id" field.
-func (m *SalesOrderItemMutation) SetSampleBomID(i int) {
-	m.sample_bom = &i
+// SetBomID sets the "bom_id" field.
+func (m *SalesOrderItemMutation) SetBomID(i int) {
+	m.bom = &i
 }
 
-// SampleBomID returns the value of the "sample_bom_id" field in the mutation.
-func (m *SalesOrderItemMutation) SampleBomID() (r int, exists bool) {
-	v := m.sample_bom
+// BomID returns the value of the "bom_id" field in the mutation.
+func (m *SalesOrderItemMutation) BomID() (r int, exists bool) {
+	v := m.bom
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldSampleBomID returns the old "sample_bom_id" field's value of the SalesOrderItem entity.
+// OldBomID returns the old "bom_id" field's value of the SalesOrderItem entity.
 // If the SalesOrderItem object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SalesOrderItemMutation) OldSampleBomID(ctx context.Context) (v *int, err error) {
+func (m *SalesOrderItemMutation) OldBomID(ctx context.Context) (v *int, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldSampleBomID is only allowed on UpdateOne operations")
+		return v, errors.New("OldBomID is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldSampleBomID requires an ID field in the mutation")
+		return v, errors.New("OldBomID requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldSampleBomID: %w", err)
+		return v, fmt.Errorf("querying old value for OldBomID: %w", err)
 	}
-	return oldValue.SampleBomID, nil
+	return oldValue.BomID, nil
 }
 
-// ClearSampleBomID clears the value of the "sample_bom_id" field.
-func (m *SalesOrderItemMutation) ClearSampleBomID() {
-	m.sample_bom = nil
-	m.clearedFields[salesorderitem.FieldSampleBomID] = struct{}{}
+// ClearBomID clears the value of the "bom_id" field.
+func (m *SalesOrderItemMutation) ClearBomID() {
+	m.bom = nil
+	m.clearedFields[salesorderitem.FieldBomID] = struct{}{}
 }
 
-// SampleBomIDCleared returns if the "sample_bom_id" field was cleared in this mutation.
-func (m *SalesOrderItemMutation) SampleBomIDCleared() bool {
-	_, ok := m.clearedFields[salesorderitem.FieldSampleBomID]
+// BomIDCleared returns if the "bom_id" field was cleared in this mutation.
+func (m *SalesOrderItemMutation) BomIDCleared() bool {
+	_, ok := m.clearedFields[salesorderitem.FieldBomID]
 	return ok
 }
 
-// ResetSampleBomID resets all changes to the "sample_bom_id" field.
-func (m *SalesOrderItemMutation) ResetSampleBomID() {
-	m.sample_bom = nil
-	delete(m.clearedFields, salesorderitem.FieldSampleBomID)
+// ResetBomID resets all changes to the "bom_id" field.
+func (m *SalesOrderItemMutation) ResetBomID() {
+	m.bom = nil
+	delete(m.clearedFields, salesorderitem.FieldBomID)
 }
 
-// SetSampleBomFingerprint sets the "sample_bom_fingerprint" field.
-func (m *SalesOrderItemMutation) SetSampleBomFingerprint(s string) {
-	m.sample_bom_fingerprint = &s
+// SetBomFingerprint sets the "bom_fingerprint" field.
+func (m *SalesOrderItemMutation) SetBomFingerprint(s string) {
+	m.bom_fingerprint = &s
 }
 
-// SampleBomFingerprint returns the value of the "sample_bom_fingerprint" field in the mutation.
-func (m *SalesOrderItemMutation) SampleBomFingerprint() (r string, exists bool) {
-	v := m.sample_bom_fingerprint
+// BomFingerprint returns the value of the "bom_fingerprint" field in the mutation.
+func (m *SalesOrderItemMutation) BomFingerprint() (r string, exists bool) {
+	v := m.bom_fingerprint
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldSampleBomFingerprint returns the old "sample_bom_fingerprint" field's value of the SalesOrderItem entity.
+// OldBomFingerprint returns the old "bom_fingerprint" field's value of the SalesOrderItem entity.
 // If the SalesOrderItem object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SalesOrderItemMutation) OldSampleBomFingerprint(ctx context.Context) (v *string, err error) {
+func (m *SalesOrderItemMutation) OldBomFingerprint(ctx context.Context) (v *string, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldSampleBomFingerprint is only allowed on UpdateOne operations")
+		return v, errors.New("OldBomFingerprint is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldSampleBomFingerprint requires an ID field in the mutation")
+		return v, errors.New("OldBomFingerprint requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldSampleBomFingerprint: %w", err)
+		return v, fmt.Errorf("querying old value for OldBomFingerprint: %w", err)
 	}
-	return oldValue.SampleBomFingerprint, nil
+	return oldValue.BomFingerprint, nil
 }
 
-// ClearSampleBomFingerprint clears the value of the "sample_bom_fingerprint" field.
-func (m *SalesOrderItemMutation) ClearSampleBomFingerprint() {
-	m.sample_bom_fingerprint = nil
-	m.clearedFields[salesorderitem.FieldSampleBomFingerprint] = struct{}{}
+// ClearBomFingerprint clears the value of the "bom_fingerprint" field.
+func (m *SalesOrderItemMutation) ClearBomFingerprint() {
+	m.bom_fingerprint = nil
+	m.clearedFields[salesorderitem.FieldBomFingerprint] = struct{}{}
 }
 
-// SampleBomFingerprintCleared returns if the "sample_bom_fingerprint" field was cleared in this mutation.
-func (m *SalesOrderItemMutation) SampleBomFingerprintCleared() bool {
-	_, ok := m.clearedFields[salesorderitem.FieldSampleBomFingerprint]
+// BomFingerprintCleared returns if the "bom_fingerprint" field was cleared in this mutation.
+func (m *SalesOrderItemMutation) BomFingerprintCleared() bool {
+	_, ok := m.clearedFields[salesorderitem.FieldBomFingerprint]
 	return ok
 }
 
-// ResetSampleBomFingerprint resets all changes to the "sample_bom_fingerprint" field.
-func (m *SalesOrderItemMutation) ResetSampleBomFingerprint() {
-	m.sample_bom_fingerprint = nil
-	delete(m.clearedFields, salesorderitem.FieldSampleBomFingerprint)
-}
-
-// SetSampleReusedFromItemID sets the "sample_reused_from_item_id" field.
-func (m *SalesOrderItemMutation) SetSampleReusedFromItemID(i int) {
-	m.sample_reused_from_item = &i
-}
-
-// SampleReusedFromItemID returns the value of the "sample_reused_from_item_id" field in the mutation.
-func (m *SalesOrderItemMutation) SampleReusedFromItemID() (r int, exists bool) {
-	v := m.sample_reused_from_item
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldSampleReusedFromItemID returns the old "sample_reused_from_item_id" field's value of the SalesOrderItem entity.
-// If the SalesOrderItem object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SalesOrderItemMutation) OldSampleReusedFromItemID(ctx context.Context) (v *int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldSampleReusedFromItemID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldSampleReusedFromItemID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldSampleReusedFromItemID: %w", err)
-	}
-	return oldValue.SampleReusedFromItemID, nil
-}
-
-// ClearSampleReusedFromItemID clears the value of the "sample_reused_from_item_id" field.
-func (m *SalesOrderItemMutation) ClearSampleReusedFromItemID() {
-	m.sample_reused_from_item = nil
-	m.clearedFields[salesorderitem.FieldSampleReusedFromItemID] = struct{}{}
-}
-
-// SampleReusedFromItemIDCleared returns if the "sample_reused_from_item_id" field was cleared in this mutation.
-func (m *SalesOrderItemMutation) SampleReusedFromItemIDCleared() bool {
-	_, ok := m.clearedFields[salesorderitem.FieldSampleReusedFromItemID]
-	return ok
-}
-
-// ResetSampleReusedFromItemID resets all changes to the "sample_reused_from_item_id" field.
-func (m *SalesOrderItemMutation) ResetSampleReusedFromItemID() {
-	m.sample_reused_from_item = nil
-	delete(m.clearedFields, salesorderitem.FieldSampleReusedFromItemID)
-}
-
-// SetSampleImageAttachmentID sets the "sample_image_attachment_id" field.
-func (m *SalesOrderItemMutation) SetSampleImageAttachmentID(i int) {
-	m.sample_image_attachment_id = &i
-	m.addsample_image_attachment_id = nil
-}
-
-// SampleImageAttachmentID returns the value of the "sample_image_attachment_id" field in the mutation.
-func (m *SalesOrderItemMutation) SampleImageAttachmentID() (r int, exists bool) {
-	v := m.sample_image_attachment_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldSampleImageAttachmentID returns the old "sample_image_attachment_id" field's value of the SalesOrderItem entity.
-// If the SalesOrderItem object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SalesOrderItemMutation) OldSampleImageAttachmentID(ctx context.Context) (v *int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldSampleImageAttachmentID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldSampleImageAttachmentID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldSampleImageAttachmentID: %w", err)
-	}
-	return oldValue.SampleImageAttachmentID, nil
-}
-
-// AddSampleImageAttachmentID adds i to the "sample_image_attachment_id" field.
-func (m *SalesOrderItemMutation) AddSampleImageAttachmentID(i int) {
-	if m.addsample_image_attachment_id != nil {
-		*m.addsample_image_attachment_id += i
-	} else {
-		m.addsample_image_attachment_id = &i
-	}
-}
-
-// AddedSampleImageAttachmentID returns the value that was added to the "sample_image_attachment_id" field in this mutation.
-func (m *SalesOrderItemMutation) AddedSampleImageAttachmentID() (r int, exists bool) {
-	v := m.addsample_image_attachment_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ClearSampleImageAttachmentID clears the value of the "sample_image_attachment_id" field.
-func (m *SalesOrderItemMutation) ClearSampleImageAttachmentID() {
-	m.sample_image_attachment_id = nil
-	m.addsample_image_attachment_id = nil
-	m.clearedFields[salesorderitem.FieldSampleImageAttachmentID] = struct{}{}
-}
-
-// SampleImageAttachmentIDCleared returns if the "sample_image_attachment_id" field was cleared in this mutation.
-func (m *SalesOrderItemMutation) SampleImageAttachmentIDCleared() bool {
-	_, ok := m.clearedFields[salesorderitem.FieldSampleImageAttachmentID]
-	return ok
-}
-
-// ResetSampleImageAttachmentID resets all changes to the "sample_image_attachment_id" field.
-func (m *SalesOrderItemMutation) ResetSampleImageAttachmentID() {
-	m.sample_image_attachment_id = nil
-	m.addsample_image_attachment_id = nil
-	delete(m.clearedFields, salesorderitem.FieldSampleImageAttachmentID)
-}
-
-// SetEngineeringStatus sets the "engineering_status" field.
-func (m *SalesOrderItemMutation) SetEngineeringStatus(s string) {
-	m.engineering_status = &s
-}
-
-// EngineeringStatus returns the value of the "engineering_status" field in the mutation.
-func (m *SalesOrderItemMutation) EngineeringStatus() (r string, exists bool) {
-	v := m.engineering_status
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldEngineeringStatus returns the old "engineering_status" field's value of the SalesOrderItem entity.
-// If the SalesOrderItem object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SalesOrderItemMutation) OldEngineeringStatus(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldEngineeringStatus is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldEngineeringStatus requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldEngineeringStatus: %w", err)
-	}
-	return oldValue.EngineeringStatus, nil
-}
-
-// ResetEngineeringStatus resets all changes to the "engineering_status" field.
-func (m *SalesOrderItemMutation) ResetEngineeringStatus() {
-	m.engineering_status = nil
-}
-
-// SetSampleNote sets the "sample_note" field.
-func (m *SalesOrderItemMutation) SetSampleNote(s string) {
-	m.sample_note = &s
-}
-
-// SampleNote returns the value of the "sample_note" field in the mutation.
-func (m *SalesOrderItemMutation) SampleNote() (r string, exists bool) {
-	v := m.sample_note
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldSampleNote returns the old "sample_note" field's value of the SalesOrderItem entity.
-// If the SalesOrderItem object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SalesOrderItemMutation) OldSampleNote(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldSampleNote is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldSampleNote requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldSampleNote: %w", err)
-	}
-	return oldValue.SampleNote, nil
-}
-
-// ClearSampleNote clears the value of the "sample_note" field.
-func (m *SalesOrderItemMutation) ClearSampleNote() {
-	m.sample_note = nil
-	m.clearedFields[salesorderitem.FieldSampleNote] = struct{}{}
-}
-
-// SampleNoteCleared returns if the "sample_note" field was cleared in this mutation.
-func (m *SalesOrderItemMutation) SampleNoteCleared() bool {
-	_, ok := m.clearedFields[salesorderitem.FieldSampleNote]
-	return ok
-}
-
-// ResetSampleNote resets all changes to the "sample_note" field.
-func (m *SalesOrderItemMutation) ResetSampleNote() {
-	m.sample_note = nil
-	delete(m.clearedFields, salesorderitem.FieldSampleNote)
-}
-
-// SetSampleConfirmedAt sets the "sample_confirmed_at" field.
-func (m *SalesOrderItemMutation) SetSampleConfirmedAt(t time.Time) {
-	m.sample_confirmed_at = &t
-}
-
-// SampleConfirmedAt returns the value of the "sample_confirmed_at" field in the mutation.
-func (m *SalesOrderItemMutation) SampleConfirmedAt() (r time.Time, exists bool) {
-	v := m.sample_confirmed_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldSampleConfirmedAt returns the old "sample_confirmed_at" field's value of the SalesOrderItem entity.
-// If the SalesOrderItem object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SalesOrderItemMutation) OldSampleConfirmedAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldSampleConfirmedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldSampleConfirmedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldSampleConfirmedAt: %w", err)
-	}
-	return oldValue.SampleConfirmedAt, nil
-}
-
-// ClearSampleConfirmedAt clears the value of the "sample_confirmed_at" field.
-func (m *SalesOrderItemMutation) ClearSampleConfirmedAt() {
-	m.sample_confirmed_at = nil
-	m.clearedFields[salesorderitem.FieldSampleConfirmedAt] = struct{}{}
-}
-
-// SampleConfirmedAtCleared returns if the "sample_confirmed_at" field was cleared in this mutation.
-func (m *SalesOrderItemMutation) SampleConfirmedAtCleared() bool {
-	_, ok := m.clearedFields[salesorderitem.FieldSampleConfirmedAt]
-	return ok
-}
-
-// ResetSampleConfirmedAt resets all changes to the "sample_confirmed_at" field.
-func (m *SalesOrderItemMutation) ResetSampleConfirmedAt() {
-	m.sample_confirmed_at = nil
-	delete(m.clearedFields, salesorderitem.FieldSampleConfirmedAt)
-}
-
-// SetSampleConfirmedBy sets the "sample_confirmed_by" field.
-func (m *SalesOrderItemMutation) SetSampleConfirmedBy(i int) {
-	m.sample_confirmed_by = &i
-	m.addsample_confirmed_by = nil
-}
-
-// SampleConfirmedBy returns the value of the "sample_confirmed_by" field in the mutation.
-func (m *SalesOrderItemMutation) SampleConfirmedBy() (r int, exists bool) {
-	v := m.sample_confirmed_by
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldSampleConfirmedBy returns the old "sample_confirmed_by" field's value of the SalesOrderItem entity.
-// If the SalesOrderItem object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SalesOrderItemMutation) OldSampleConfirmedBy(ctx context.Context) (v *int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldSampleConfirmedBy is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldSampleConfirmedBy requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldSampleConfirmedBy: %w", err)
-	}
-	return oldValue.SampleConfirmedBy, nil
-}
-
-// AddSampleConfirmedBy adds i to the "sample_confirmed_by" field.
-func (m *SalesOrderItemMutation) AddSampleConfirmedBy(i int) {
-	if m.addsample_confirmed_by != nil {
-		*m.addsample_confirmed_by += i
-	} else {
-		m.addsample_confirmed_by = &i
-	}
-}
-
-// AddedSampleConfirmedBy returns the value that was added to the "sample_confirmed_by" field in this mutation.
-func (m *SalesOrderItemMutation) AddedSampleConfirmedBy() (r int, exists bool) {
-	v := m.addsample_confirmed_by
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ClearSampleConfirmedBy clears the value of the "sample_confirmed_by" field.
-func (m *SalesOrderItemMutation) ClearSampleConfirmedBy() {
-	m.sample_confirmed_by = nil
-	m.addsample_confirmed_by = nil
-	m.clearedFields[salesorderitem.FieldSampleConfirmedBy] = struct{}{}
-}
-
-// SampleConfirmedByCleared returns if the "sample_confirmed_by" field was cleared in this mutation.
-func (m *SalesOrderItemMutation) SampleConfirmedByCleared() bool {
-	_, ok := m.clearedFields[salesorderitem.FieldSampleConfirmedBy]
-	return ok
-}
-
-// ResetSampleConfirmedBy resets all changes to the "sample_confirmed_by" field.
-func (m *SalesOrderItemMutation) ResetSampleConfirmedBy() {
-	m.sample_confirmed_by = nil
-	m.addsample_confirmed_by = nil
-	delete(m.clearedFields, salesorderitem.FieldSampleConfirmedBy)
+// ResetBomFingerprint resets all changes to the "bom_fingerprint" field.
+func (m *SalesOrderItemMutation) ResetBomFingerprint() {
+	m.bom_fingerprint = nil
+	delete(m.clearedFields, salesorderitem.FieldBomFingerprint)
 }
 
 // SetProductSkuID sets the "product_sku_id" field.
@@ -104381,33 +104264,6 @@ func (m *SalesOrderItemMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
-// ClearSampleReusedFromItem clears the "sample_reused_from_item" edge to the SalesOrderItem entity.
-func (m *SalesOrderItemMutation) ClearSampleReusedFromItem() {
-	m.clearedsample_reused_from_item = true
-	m.clearedFields[salesorderitem.FieldSampleReusedFromItemID] = struct{}{}
-}
-
-// SampleReusedFromItemCleared reports if the "sample_reused_from_item" edge to the SalesOrderItem entity was cleared.
-func (m *SalesOrderItemMutation) SampleReusedFromItemCleared() bool {
-	return m.SampleReusedFromItemIDCleared() || m.clearedsample_reused_from_item
-}
-
-// SampleReusedFromItemIDs returns the "sample_reused_from_item" edge IDs in the mutation.
-// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// SampleReusedFromItemID instead. It exists only for internal usage by the builders.
-func (m *SalesOrderItemMutation) SampleReusedFromItemIDs() (ids []int) {
-	if id := m.sample_reused_from_item; id != nil {
-		ids = append(ids, *id)
-	}
-	return
-}
-
-// ResetSampleReusedFromItem resets all changes to the "sample_reused_from_item" edge.
-func (m *SalesOrderItemMutation) ResetSampleReusedFromItem() {
-	m.sample_reused_from_item = nil
-	m.clearedsample_reused_from_item = false
-}
-
 // ClearSalesOrder clears the "sales_order" edge to the SalesOrder entity.
 func (m *SalesOrderItemMutation) ClearSalesOrder() {
 	m.clearedsales_order = true
@@ -104462,31 +104318,31 @@ func (m *SalesOrderItemMutation) ResetProduct() {
 	m.clearedproduct = false
 }
 
-// ClearSampleBom clears the "sample_bom" edge to the BOMHeader entity.
-func (m *SalesOrderItemMutation) ClearSampleBom() {
-	m.clearedsample_bom = true
-	m.clearedFields[salesorderitem.FieldSampleBomID] = struct{}{}
+// ClearBom clears the "bom" edge to the BOMHeader entity.
+func (m *SalesOrderItemMutation) ClearBom() {
+	m.clearedbom = true
+	m.clearedFields[salesorderitem.FieldBomID] = struct{}{}
 }
 
-// SampleBomCleared reports if the "sample_bom" edge to the BOMHeader entity was cleared.
-func (m *SalesOrderItemMutation) SampleBomCleared() bool {
-	return m.SampleBomIDCleared() || m.clearedsample_bom
+// BomCleared reports if the "bom" edge to the BOMHeader entity was cleared.
+func (m *SalesOrderItemMutation) BomCleared() bool {
+	return m.BomIDCleared() || m.clearedbom
 }
 
-// SampleBomIDs returns the "sample_bom" edge IDs in the mutation.
+// BomIDs returns the "bom" edge IDs in the mutation.
 // Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// SampleBomID instead. It exists only for internal usage by the builders.
-func (m *SalesOrderItemMutation) SampleBomIDs() (ids []int) {
-	if id := m.sample_bom; id != nil {
+// BomID instead. It exists only for internal usage by the builders.
+func (m *SalesOrderItemMutation) BomIDs() (ids []int) {
+	if id := m.bom; id != nil {
 		ids = append(ids, *id)
 	}
 	return
 }
 
-// ResetSampleBom resets all changes to the "sample_bom" edge.
-func (m *SalesOrderItemMutation) ResetSampleBom() {
-	m.sample_bom = nil
-	m.clearedsample_bom = false
+// ResetBom resets all changes to the "bom" edge.
+func (m *SalesOrderItemMutation) ResetBom() {
+	m.bom = nil
+	m.clearedbom = false
 }
 
 // ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
@@ -104685,7 +104541,7 @@ func (m *SalesOrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesOrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 31)
+	fields := make([]string, 0, 25)
 	if m.sales_order != nil {
 		fields = append(fields, salesorderitem.FieldSalesOrderID)
 	}
@@ -104716,29 +104572,11 @@ func (m *SalesOrderItemMutation) Fields() []string {
 	if m.import_source != nil {
 		fields = append(fields, salesorderitem.FieldImportSource)
 	}
-	if m.sample_bom != nil {
-		fields = append(fields, salesorderitem.FieldSampleBomID)
+	if m.bom != nil {
+		fields = append(fields, salesorderitem.FieldBomID)
 	}
-	if m.sample_bom_fingerprint != nil {
-		fields = append(fields, salesorderitem.FieldSampleBomFingerprint)
-	}
-	if m.sample_reused_from_item != nil {
-		fields = append(fields, salesorderitem.FieldSampleReusedFromItemID)
-	}
-	if m.sample_image_attachment_id != nil {
-		fields = append(fields, salesorderitem.FieldSampleImageAttachmentID)
-	}
-	if m.engineering_status != nil {
-		fields = append(fields, salesorderitem.FieldEngineeringStatus)
-	}
-	if m.sample_note != nil {
-		fields = append(fields, salesorderitem.FieldSampleNote)
-	}
-	if m.sample_confirmed_at != nil {
-		fields = append(fields, salesorderitem.FieldSampleConfirmedAt)
-	}
-	if m.sample_confirmed_by != nil {
-		fields = append(fields, salesorderitem.FieldSampleConfirmedBy)
+	if m.bom_fingerprint != nil {
+		fields = append(fields, salesorderitem.FieldBomFingerprint)
 	}
 	if m.product_sku != nil {
 		fields = append(fields, salesorderitem.FieldProductSkuID)
@@ -104807,22 +104645,10 @@ func (m *SalesOrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.ProcessRequirement()
 	case salesorderitem.FieldImportSource:
 		return m.ImportSource()
-	case salesorderitem.FieldSampleBomID:
-		return m.SampleBomID()
-	case salesorderitem.FieldSampleBomFingerprint:
-		return m.SampleBomFingerprint()
-	case salesorderitem.FieldSampleReusedFromItemID:
-		return m.SampleReusedFromItemID()
-	case salesorderitem.FieldSampleImageAttachmentID:
-		return m.SampleImageAttachmentID()
-	case salesorderitem.FieldEngineeringStatus:
-		return m.EngineeringStatus()
-	case salesorderitem.FieldSampleNote:
-		return m.SampleNote()
-	case salesorderitem.FieldSampleConfirmedAt:
-		return m.SampleConfirmedAt()
-	case salesorderitem.FieldSampleConfirmedBy:
-		return m.SampleConfirmedBy()
+	case salesorderitem.FieldBomID:
+		return m.BomID()
+	case salesorderitem.FieldBomFingerprint:
+		return m.BomFingerprint()
 	case salesorderitem.FieldProductSkuID:
 		return m.ProductSkuID()
 	case salesorderitem.FieldUnitID:
@@ -104878,22 +104704,10 @@ func (m *SalesOrderItemMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldProcessRequirement(ctx)
 	case salesorderitem.FieldImportSource:
 		return m.OldImportSource(ctx)
-	case salesorderitem.FieldSampleBomID:
-		return m.OldSampleBomID(ctx)
-	case salesorderitem.FieldSampleBomFingerprint:
-		return m.OldSampleBomFingerprint(ctx)
-	case salesorderitem.FieldSampleReusedFromItemID:
-		return m.OldSampleReusedFromItemID(ctx)
-	case salesorderitem.FieldSampleImageAttachmentID:
-		return m.OldSampleImageAttachmentID(ctx)
-	case salesorderitem.FieldEngineeringStatus:
-		return m.OldEngineeringStatus(ctx)
-	case salesorderitem.FieldSampleNote:
-		return m.OldSampleNote(ctx)
-	case salesorderitem.FieldSampleConfirmedAt:
-		return m.OldSampleConfirmedAt(ctx)
-	case salesorderitem.FieldSampleConfirmedBy:
-		return m.OldSampleConfirmedBy(ctx)
+	case salesorderitem.FieldBomID:
+		return m.OldBomID(ctx)
+	case salesorderitem.FieldBomFingerprint:
+		return m.OldBomFingerprint(ctx)
 	case salesorderitem.FieldProductSkuID:
 		return m.OldProductSkuID(ctx)
 	case salesorderitem.FieldUnitID:
@@ -104999,61 +104813,19 @@ func (m *SalesOrderItemMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetImportSource(v)
 		return nil
-	case salesorderitem.FieldSampleBomID:
+	case salesorderitem.FieldBomID:
 		v, ok := value.(int)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetSampleBomID(v)
+		m.SetBomID(v)
 		return nil
-	case salesorderitem.FieldSampleBomFingerprint:
+	case salesorderitem.FieldBomFingerprint:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetSampleBomFingerprint(v)
-		return nil
-	case salesorderitem.FieldSampleReusedFromItemID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetSampleReusedFromItemID(v)
-		return nil
-	case salesorderitem.FieldSampleImageAttachmentID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetSampleImageAttachmentID(v)
-		return nil
-	case salesorderitem.FieldEngineeringStatus:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetEngineeringStatus(v)
-		return nil
-	case salesorderitem.FieldSampleNote:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetSampleNote(v)
-		return nil
-	case salesorderitem.FieldSampleConfirmedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetSampleConfirmedAt(v)
-		return nil
-	case salesorderitem.FieldSampleConfirmedBy:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetSampleConfirmedBy(v)
+		m.SetBomFingerprint(v)
 		return nil
 	case salesorderitem.FieldProductSkuID:
 		v, ok := value.(int)
@@ -105160,12 +104932,6 @@ func (m *SalesOrderItemMutation) AddedFields() []string {
 	if m.adddisplay_order != nil {
 		fields = append(fields, salesorderitem.FieldDisplayOrder)
 	}
-	if m.addsample_image_attachment_id != nil {
-		fields = append(fields, salesorderitem.FieldSampleImageAttachmentID)
-	}
-	if m.addsample_confirmed_by != nil {
-		fields = append(fields, salesorderitem.FieldSampleConfirmedBy)
-	}
 	return fields
 }
 
@@ -105178,10 +104944,6 @@ func (m *SalesOrderItemMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedLineNo()
 	case salesorderitem.FieldDisplayOrder:
 		return m.AddedDisplayOrder()
-	case salesorderitem.FieldSampleImageAttachmentID:
-		return m.AddedSampleImageAttachmentID()
-	case salesorderitem.FieldSampleConfirmedBy:
-		return m.AddedSampleConfirmedBy()
 	}
 	return nil, false
 }
@@ -105204,20 +104966,6 @@ func (m *SalesOrderItemMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddDisplayOrder(v)
-		return nil
-	case salesorderitem.FieldSampleImageAttachmentID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddSampleImageAttachmentID(v)
-		return nil
-	case salesorderitem.FieldSampleConfirmedBy:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddSampleConfirmedBy(v)
 		return nil
 	}
 	return fmt.Errorf("unknown SalesOrderItem numeric field %s", name)
@@ -105245,26 +104993,11 @@ func (m *SalesOrderItemMutation) ClearedFields() []string {
 	if m.FieldCleared(salesorderitem.FieldImportSource) {
 		fields = append(fields, salesorderitem.FieldImportSource)
 	}
-	if m.FieldCleared(salesorderitem.FieldSampleBomID) {
-		fields = append(fields, salesorderitem.FieldSampleBomID)
+	if m.FieldCleared(salesorderitem.FieldBomID) {
+		fields = append(fields, salesorderitem.FieldBomID)
 	}
-	if m.FieldCleared(salesorderitem.FieldSampleBomFingerprint) {
-		fields = append(fields, salesorderitem.FieldSampleBomFingerprint)
-	}
-	if m.FieldCleared(salesorderitem.FieldSampleReusedFromItemID) {
-		fields = append(fields, salesorderitem.FieldSampleReusedFromItemID)
-	}
-	if m.FieldCleared(salesorderitem.FieldSampleImageAttachmentID) {
-		fields = append(fields, salesorderitem.FieldSampleImageAttachmentID)
-	}
-	if m.FieldCleared(salesorderitem.FieldSampleNote) {
-		fields = append(fields, salesorderitem.FieldSampleNote)
-	}
-	if m.FieldCleared(salesorderitem.FieldSampleConfirmedAt) {
-		fields = append(fields, salesorderitem.FieldSampleConfirmedAt)
-	}
-	if m.FieldCleared(salesorderitem.FieldSampleConfirmedBy) {
-		fields = append(fields, salesorderitem.FieldSampleConfirmedBy)
+	if m.FieldCleared(salesorderitem.FieldBomFingerprint) {
+		fields = append(fields, salesorderitem.FieldBomFingerprint)
 	}
 	if m.FieldCleared(salesorderitem.FieldProductSkuID) {
 		fields = append(fields, salesorderitem.FieldProductSkuID)
@@ -105322,26 +105055,11 @@ func (m *SalesOrderItemMutation) ClearField(name string) error {
 	case salesorderitem.FieldImportSource:
 		m.ClearImportSource()
 		return nil
-	case salesorderitem.FieldSampleBomID:
-		m.ClearSampleBomID()
+	case salesorderitem.FieldBomID:
+		m.ClearBomID()
 		return nil
-	case salesorderitem.FieldSampleBomFingerprint:
-		m.ClearSampleBomFingerprint()
-		return nil
-	case salesorderitem.FieldSampleReusedFromItemID:
-		m.ClearSampleReusedFromItemID()
-		return nil
-	case salesorderitem.FieldSampleImageAttachmentID:
-		m.ClearSampleImageAttachmentID()
-		return nil
-	case salesorderitem.FieldSampleNote:
-		m.ClearSampleNote()
-		return nil
-	case salesorderitem.FieldSampleConfirmedAt:
-		m.ClearSampleConfirmedAt()
-		return nil
-	case salesorderitem.FieldSampleConfirmedBy:
-		m.ClearSampleConfirmedBy()
+	case salesorderitem.FieldBomFingerprint:
+		m.ClearBomFingerprint()
 		return nil
 	case salesorderitem.FieldProductSkuID:
 		m.ClearProductSkuID()
@@ -105405,29 +105123,11 @@ func (m *SalesOrderItemMutation) ResetField(name string) error {
 	case salesorderitem.FieldImportSource:
 		m.ResetImportSource()
 		return nil
-	case salesorderitem.FieldSampleBomID:
-		m.ResetSampleBomID()
+	case salesorderitem.FieldBomID:
+		m.ResetBomID()
 		return nil
-	case salesorderitem.FieldSampleBomFingerprint:
-		m.ResetSampleBomFingerprint()
-		return nil
-	case salesorderitem.FieldSampleReusedFromItemID:
-		m.ResetSampleReusedFromItemID()
-		return nil
-	case salesorderitem.FieldSampleImageAttachmentID:
-		m.ResetSampleImageAttachmentID()
-		return nil
-	case salesorderitem.FieldEngineeringStatus:
-		m.ResetEngineeringStatus()
-		return nil
-	case salesorderitem.FieldSampleNote:
-		m.ResetSampleNote()
-		return nil
-	case salesorderitem.FieldSampleConfirmedAt:
-		m.ResetSampleConfirmedAt()
-		return nil
-	case salesorderitem.FieldSampleConfirmedBy:
-		m.ResetSampleConfirmedBy()
+	case salesorderitem.FieldBomFingerprint:
+		m.ResetBomFingerprint()
 		return nil
 	case salesorderitem.FieldProductSkuID:
 		m.ResetProductSkuID()
@@ -105474,18 +105174,15 @@ func (m *SalesOrderItemMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *SalesOrderItemMutation) AddedEdges() []string {
-	edges := make([]string, 0, 8)
-	if m.sample_reused_from_item != nil {
-		edges = append(edges, salesorderitem.EdgeSampleReusedFromItem)
-	}
+	edges := make([]string, 0, 7)
 	if m.sales_order != nil {
 		edges = append(edges, salesorderitem.EdgeSalesOrder)
 	}
 	if m.product != nil {
 		edges = append(edges, salesorderitem.EdgeProduct)
 	}
-	if m.sample_bom != nil {
-		edges = append(edges, salesorderitem.EdgeSampleBom)
+	if m.bom != nil {
+		edges = append(edges, salesorderitem.EdgeBom)
 	}
 	if m.product_sku != nil {
 		edges = append(edges, salesorderitem.EdgeProductSku)
@@ -105506,10 +105203,6 @@ func (m *SalesOrderItemMutation) AddedEdges() []string {
 // name in this mutation.
 func (m *SalesOrderItemMutation) AddedIDs(name string) []ent.Value {
 	switch name {
-	case salesorderitem.EdgeSampleReusedFromItem:
-		if id := m.sample_reused_from_item; id != nil {
-			return []ent.Value{*id}
-		}
 	case salesorderitem.EdgeSalesOrder:
 		if id := m.sales_order; id != nil {
 			return []ent.Value{*id}
@@ -105518,8 +105211,8 @@ func (m *SalesOrderItemMutation) AddedIDs(name string) []ent.Value {
 		if id := m.product; id != nil {
 			return []ent.Value{*id}
 		}
-	case salesorderitem.EdgeSampleBom:
-		if id := m.sample_bom; id != nil {
+	case salesorderitem.EdgeBom:
+		if id := m.bom; id != nil {
 			return []ent.Value{*id}
 		}
 	case salesorderitem.EdgeProductSku:
@@ -105548,7 +105241,7 @@ func (m *SalesOrderItemMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *SalesOrderItemMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 8)
+	edges := make([]string, 0, 7)
 	if m.removedshipment_items != nil {
 		edges = append(edges, salesorderitem.EdgeShipmentItems)
 	}
@@ -105580,18 +105273,15 @@ func (m *SalesOrderItemMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *SalesOrderItemMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 8)
-	if m.clearedsample_reused_from_item {
-		edges = append(edges, salesorderitem.EdgeSampleReusedFromItem)
-	}
+	edges := make([]string, 0, 7)
 	if m.clearedsales_order {
 		edges = append(edges, salesorderitem.EdgeSalesOrder)
 	}
 	if m.clearedproduct {
 		edges = append(edges, salesorderitem.EdgeProduct)
 	}
-	if m.clearedsample_bom {
-		edges = append(edges, salesorderitem.EdgeSampleBom)
+	if m.clearedbom {
+		edges = append(edges, salesorderitem.EdgeBom)
 	}
 	if m.clearedproduct_sku {
 		edges = append(edges, salesorderitem.EdgeProductSku)
@@ -105612,14 +105302,12 @@ func (m *SalesOrderItemMutation) ClearedEdges() []string {
 // was cleared in this mutation.
 func (m *SalesOrderItemMutation) EdgeCleared(name string) bool {
 	switch name {
-	case salesorderitem.EdgeSampleReusedFromItem:
-		return m.clearedsample_reused_from_item
 	case salesorderitem.EdgeSalesOrder:
 		return m.clearedsales_order
 	case salesorderitem.EdgeProduct:
 		return m.clearedproduct
-	case salesorderitem.EdgeSampleBom:
-		return m.clearedsample_bom
+	case salesorderitem.EdgeBom:
+		return m.clearedbom
 	case salesorderitem.EdgeProductSku:
 		return m.clearedproduct_sku
 	case salesorderitem.EdgeUnit:
@@ -105636,17 +105324,14 @@ func (m *SalesOrderItemMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *SalesOrderItemMutation) ClearEdge(name string) error {
 	switch name {
-	case salesorderitem.EdgeSampleReusedFromItem:
-		m.ClearSampleReusedFromItem()
-		return nil
 	case salesorderitem.EdgeSalesOrder:
 		m.ClearSalesOrder()
 		return nil
 	case salesorderitem.EdgeProduct:
 		m.ClearProduct()
 		return nil
-	case salesorderitem.EdgeSampleBom:
-		m.ClearSampleBom()
+	case salesorderitem.EdgeBom:
+		m.ClearBom()
 		return nil
 	case salesorderitem.EdgeProductSku:
 		m.ClearProductSku()
@@ -105662,17 +105347,14 @@ func (m *SalesOrderItemMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *SalesOrderItemMutation) ResetEdge(name string) error {
 	switch name {
-	case salesorderitem.EdgeSampleReusedFromItem:
-		m.ResetSampleReusedFromItem()
-		return nil
 	case salesorderitem.EdgeSalesOrder:
 		m.ResetSalesOrder()
 		return nil
 	case salesorderitem.EdgeProduct:
 		m.ResetProduct()
 		return nil
-	case salesorderitem.EdgeSampleBom:
-		m.ResetSampleBom()
+	case salesorderitem.EdgeBom:
+		m.ResetBom()
 		return nil
 	case salesorderitem.EdgeProductSku:
 		m.ResetProductSku()

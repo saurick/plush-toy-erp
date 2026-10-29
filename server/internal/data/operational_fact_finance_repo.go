@@ -709,6 +709,11 @@ func (r *operationalFactRepo) GetFinanceFact(ctx context.Context, id int) (*biz.
 	}
 	out := entFinanceFactToBiz(row)
 	out.OutstandingAmount = outstanding[row.ID]
+	sourceNos, err := resolveBusinessSourceNos(ctx, r.data.postgres, []businessSourceReference{{sourceType: row.SourceType, sourceID: row.SourceID}})
+	if err != nil {
+		return nil, err
+	}
+	out.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
 	return out, nil
 }
 
@@ -826,7 +831,7 @@ func calculateFinanceFactOutstanding(
 	allocatedAmount decimal.Decimal,
 	creditedAmount decimal.Decimal,
 ) (decimal.Decimal, error) {
-	if !originalAmount.GreaterThan(decimal.Zero) || allocatedAmount.IsNegative() || creditedAmount.IsNegative() {
+	if !originalAmount.GreaterThan(decimal.Zero) || allocatedAmount.IsNegative() {
 		return decimal.Zero, biz.ErrBadParam
 	}
 	outstanding := originalAmount.Sub(allocatedAmount).Sub(creditedAmount)
@@ -881,11 +886,15 @@ func financeFactOutstandingAmounts(
 		return nil, err
 	}
 	for _, creditNote := range creditNotes {
+		amount := creditNote.Amount
+		if creditNote.BalanceDirection == biz.FinanceAdjustmentIncrease {
+			amount = amount.Neg()
+		}
 		switch creditNote.Status {
 		case biz.FinanceAllocationStatusPosted:
-			creditedAmounts[creditNote.FinanceFactID] = creditedAmounts[creditNote.FinanceFactID].Add(creditNote.Amount)
+			creditedAmounts[creditNote.FinanceFactID] = creditedAmounts[creditNote.FinanceFactID].Add(amount)
 		case biz.FinanceAllocationStatusReversed:
-			creditedAmounts[creditNote.FinanceFactID] = creditedAmounts[creditNote.FinanceFactID].Sub(creditNote.Amount)
+			creditedAmounts[creditNote.FinanceFactID] = creditedAmounts[creditNote.FinanceFactID].Sub(amount)
 		}
 	}
 	outstanding := make(map[int]decimal.Decimal, len(originalAmounts))
@@ -1006,7 +1015,7 @@ func validateFinanceFactTransitionSource(row *ent.FinanceFact) error {
 			return biz.ErrFinanceFactSourceInvalid
 		}
 	case biz.FinanceFactPayable:
-		if *row.SourceType != biz.PurchaseReceiptSourceType && *row.SourceType != biz.OutsourcingFactSourceType {
+		if *row.SourceType != biz.PurchaseReceiptSourceType && *row.SourceType != biz.OutsourcingFactSourceType && *row.SourceType != biz.OutsourcingOrderSourceType {
 			return biz.ErrFinanceFactSourceInvalid
 		}
 	case biz.FinanceFactReconciliation:
@@ -1047,7 +1056,8 @@ func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, in *b
 		if row.Version != in.ExpectedVersion {
 			return nil, biz.ErrOperationalFactVersionConflict
 		}
-		if row.Status != biz.OperationalFactStatusDraft && row.Status != biz.OperationalFactStatusPosted {
+		completedReconciliation := row.FactType == biz.FinanceFactReconciliation && row.Status == biz.OperationalFactStatusSettled
+		if row.Status != biz.OperationalFactStatusDraft && row.Status != biz.OperationalFactStatusPosted && !completedReconciliation {
 			return nil, biz.ErrBadParam
 		}
 		if row.Status == biz.OperationalFactStatusDraft {

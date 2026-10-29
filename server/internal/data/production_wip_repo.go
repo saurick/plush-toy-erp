@@ -99,24 +99,13 @@ func freezeProductionOrderWIPRoute(ctx context.Context, client *ent.Client, orde
 	}
 	routedItems := make([]*ent.ProductionOrderItem, 0, len(itemRows))
 	for _, item := range itemRows {
-		if item.RouteCode == nil {
-			if item.CustomerInspectionRequired {
-				return biz.ErrProductionWIPInvalidRoute
-			}
-			continue
-		}
-		if strings.TrimSpace(*item.RouteCode) != biz.ProductionWIPRoutePlushSewHandV1 {
+		if item.RouteCode == nil || strings.TrimSpace(*item.RouteCode) != biz.ProductionWIPRoutePlushSewHandV1 {
 			return biz.ErrProductionWIPInvalidRoute
 		}
 		routedItems = append(routedItems, item)
 	}
 	if err := requireProductionWIPRouteEmpty(ctx, client, orderID); err != nil {
 		return err
-	}
-	// Lines without an explicit route do not create WIP objects. Their source
-	// and completion facts remain governed by the production-order contract.
-	if len(routedItems) == 0 {
-		return nil
 	}
 	processes, err := resolveProductionWIPRouteProcesses(ctx, client)
 	if err != nil {
@@ -402,13 +391,7 @@ func validateProductionWIPAggregateShape(aggregate *biz.ProductionWIPAggregate) 
 		confirmationByItem[confirmation.ProductionOrderItemID] = confirmation
 	}
 	for _, item := range aggregate.ProductionOrderItems {
-		if item.RouteCode == nil {
-			if len(operationsByItem[item.ID]) != 0 || confirmationByItem[item.ID] != nil || item.CustomerInspectionRequired {
-				return biz.ErrProductionWIPInvalidRoute
-			}
-			continue
-		}
-		if *item.RouteCode != biz.ProductionWIPRoutePlushSewHandV1 || len(operationsByItem[item.ID]) != 4 || confirmationByItem[item.ID] == nil {
+		if item.RouteCode == nil || *item.RouteCode != biz.ProductionWIPRoutePlushSewHandV1 || len(operationsByItem[item.ID]) != 4 || confirmationByItem[item.ID] == nil {
 			return biz.ErrProductionWIPInvalidRoute
 		}
 		for index, operation := range operationsByItem[item.ID] {
@@ -849,6 +832,24 @@ func applyProductionWIPBatchMutation(
 					return nil, err
 				}
 			}
+			// A WIP allocation replaces the contract's generic inventory-return task.
+			// Keep the existing task history and withdraw any obsolete open entry.
+			orderIDs, err := client.OutsourcingOrderItem.Query().Where(outsourcingorderitem.HasProductionWipOutsourcingAllocationsWith(productionwipoutsourcingallocation.ProductionWipBatchID(batch.ID))).Unique(true).Select(outsourcingorderitem.FieldOutsourcingOrderID).Ints(ctx)
+			if err != nil {
+				return nil, err
+			}
+			for _, orderID := range orderIDs {
+				if err := syncOutsourcingHandoffs(ctx, client, orderID, in.ActorID); err != nil {
+					return nil, err
+				}
+			}
+			// Binding previously issued contract lines must not retroactively exceed
+			// the common demand. The enclosing order/source locks serialize both paths.
+			if batch.FlowType == biz.ProductionWIPFlowNormal {
+				if _, err := loadProductionOrderMaterialRequirements(ctx, client, batch.ProductionOrderID); err != nil {
+					return nil, err
+				}
+			}
 		}
 		affected, err := client.ProductionWIPBatch.Update().Where(
 			productionwipbatch.ID(batch.ID), productionwipbatch.Version(in.ExpectedVersion), productionwipbatch.Status(biz.ProductionWIPStatusPlanned),
@@ -1161,6 +1162,15 @@ func validateProductionWIPOutsourcingAssignment(
 	if item == nil || item.SubjectType != biz.OutsourcingOrderSubjectProduct || item.ProductID == nil || *item.ProductID != orderItem.ProductID ||
 		item.MaterialID != nil || !sameOptionalInt(item.ProductSkuID, orderItem.ProductSkuID) || item.UnitID != orderItem.UnitID ||
 		!item.OutsourcingQuantity.Equal(batch.Quantity) {
+		return nil, biz.ErrProductionWIPOutsourcingAllocationInvalid
+	}
+	// An existing inventory receipt and a WIP return cannot own the same line.
+	// Source locks also serialize this check with ordinary receipt creation.
+	hasReceipt, err := client.OutsourcingFact.Query().Where(outsourcingfact.SourceType(biz.OutsourcingOrderSourceType), outsourcingfact.SourceID(item.OutsourcingOrderID), outsourcingfact.SourceLineID(item.ID), outsourcingfact.FactType(biz.OutsourcingFactReturnReceipt), outsourcingfact.StatusNEQ(biz.OperationalFactStatusCancelled)).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasReceipt {
 		return nil, biz.ErrProductionWIPOutsourcingAllocationInvalid
 	}
 	return []*biz.ProductionWIPOutsourcingAllocation{{

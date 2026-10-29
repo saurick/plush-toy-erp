@@ -77,7 +77,7 @@ test('strict quality decisions do not offer concession and cancellation does not
 })
 
 test('incoming checks retain unchecked status until the operator records evidence and support removing draft rows', async (t) => {
-  const ui = await setup(t, { incoming: true })
+  const ui = await setup(t)
   await ui.render()
   await ui.click(ui.button('添加检查项'))
   assert.equal(ui.values().check_items[0].result, 'NOT_CHECKED')
@@ -88,6 +88,7 @@ test('incoming checks retain unchecked status until the operator records evidenc
   await ui.select('检查范围', '抽检')
   await ui.fill('说明 / 抽检范围', '抽检 10 件')
   await ui.select('判定结果', '让步接收')
+  assert.ok((await ui.validate()).error)
   await ui.fill('判定备注', '按经办确认保留整改记录')
   await ui.click(ui.radio('APPROX:10'))
   const accepted = await ui.validate()
@@ -117,4 +118,10 @@ defect_rate_selection: 'APPROX:0',
   assert.deepEqual(ui.buildInspectionParams(values), { inspection_no: 'QI-7', purchase_receipt_id: 8, purchase_receipt_item_id: 9, decision_note: '需要复核' })
   assert.deepEqual(ui.buildInspectionParams({ inspection_no: '  ', purchase_receipt_id: undefined, purchase_receipt_item_id: 0, decision_note: null }), {})
   assert.equal(values.inventory_lot_id, 999)
+})
+
+test('decision payload never accepts a caller-selected inspector', async (t) => {
+  const ui = await setup(t)
+  const params = ui.buildDecisionParams(7, { result: 'PASS', inspector_id: 999, defect_rate_selection: 'APPROX:0' })
+  assert.equal(Object.hasOwn(params, 'inspector_id'), false)
 })

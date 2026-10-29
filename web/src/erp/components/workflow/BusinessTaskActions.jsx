@@ -1,7 +1,8 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { CalendarOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import { Alert, Button, Empty, Form, Grid, Input, Space, Spin, Tag, Typography } from 'antd'
-import { useLocation } from 'react-router-dom'
+import { CalendarOutlined, LeftOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { Alert, Button, Drawer, Empty, Form, Grid, Input, Space, Spin, Tag, Typography } from 'antd'
+import { useLocation, } from 'react-router-dom'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import useWorkflowTaskAssignmentAccess from '../../hooks/useWorkflowTaskAssignmentAccess.js'
 import EngineeringMaterialTaskAction from '../sales-orders/EngineeringMaterialTaskAction.jsx'
@@ -21,14 +22,15 @@ import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import { SelectionActionOverlayContext } from '../business-list/BusinessListLayout.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
-import WorkflowTaskActionDrawer, { getWorkflowTaskActionMeta } from './WorkflowTaskActionDrawer.jsx'
+import WorkflowTaskActionDrawer from './WorkflowTaskActionDrawer.jsx'
+import { getWorkflowTaskActionMeta } from '../../utils/workflowTaskActionPresentation.mjs'
 import WorkflowFollowupDetails from './WorkflowFollowupDetails.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
 import WorkflowSourceProgressButton from './WorkflowSourceProgressButton.jsx'
 import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess.js'
 import { useSourceOrderWorkflowActions } from './useSourceOrderWorkflowActions.mjs'
 import { getWorkflowTaskCreateOptions, createWorkflowFollowupTask, listWorkflowTasks } from '../../api/workflowApi.mjs'
-import { canCreateFollowupFromRecord, followupSource, businessTaskSource, requireFollowupTaskPage } from '../../utils/workflowFollowup.mjs'
+import { canCreateFollowupFromRecord, followupSource, businessTaskSource, relatedBusinessTaskSource, requireFollowupTaskPage } from '../../utils/workflowFollowup.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { getWorkflowTaskOwnerRoleLabel, getWorkflowTaskStatusMeta, writeWorkflowTaskBoardFiltersToSearch } from '../../utils/workflowTaskBoard.mjs'
 import { isWorkflowTaskMutationResultUnknown, workflowTaskMutationUUID } from '../../utils/workflowTaskMutation.mjs'
@@ -37,9 +39,10 @@ import './businessTaskPanel.css'
 
 const WORKFLOW_DEADLINE_QUICK_OPTIONS = buildWorkflowDeadlineQuickOptions()
 
-export default function BusinessTaskActions({ sourceType, record, adminProfile, disabled = false, allowCreate = true, onCreated, panelOpen, onPanelClose, renderSourceContext, sourceLoading = false, sourceEmptyText = '请先选择来源单据' }) {
+export default function BusinessTaskActions({ collaborationTask = null, collaborationAction = '', onCollaborationClose, sourceType, record, adminProfile, disabled = false, allowCreate = true, onCreated, panelOpen, onPanelClose, renderSourceContext, sourceLoading = false, sourceEmptyText = '请先选择来源单据' }) {
   const navigate = useBusinessNavigate()
   const location = useLocation()
+  const { taskBusiness } = useBusinessPageContext() || {}
   const screens = Grid.useBreakpoint()
   const setActionOverlayOpen = useContext(SelectionActionOverlayContext)
   const compact = screens.sm === false
@@ -58,8 +61,12 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
   const [tasks, setTasks] = useState([])
   const [total, setTotal] = useState(0)
   const [receipt, setReceipt] = useState(null)
-  const [task, setTask] = useState(null)
-  const [actionMode, setActionMode] = useState('')
+  const [task, setTask] = useState(collaborationTask)
+  const [collaborationVisible, setCollaborationVisible] = useState(true)
+  useEffect(() => {
+    if (collaborationTask) setTask((current) => current?.id !== collaborationTask.id || current.version < collaborationTask.version ? collaborationTask : current)
+  }, [collaborationTask])
+  const [actionMode, setActionMode] = useState(collaborationAction)
   const [assignmentTarget, setAssignmentTarget] = useState()
   const [materialSaving, setMaterialSaving] = useState(false)
   const materialLeaveGuardRef = useRef(null)
@@ -75,11 +82,18 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
   const canRead = hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ)
   const canCreate = allowCreate && Boolean(followupSource(sourceType, record)) && hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_CREATE)
   const source = businessTaskSource(sourceType, record)
+  const relatedSource = relatedBusinessTaskSource(sourceType, record, taskBusiness?.task)
+  const relatedType = relatedSource?.source_type
+  const relatedID = relatedSource?.source_id
   const recordID = source?.source_id
   const recordNo = record?.order_no || record?.purchase_order_no || record?.outsourcing_order_no || record?.shipment_no || record?.receipt_no || record?.inspection_no || record?.fact_no || record?.payment_no || record?.operation_no || record?.source_no || ''
+  const relatedNo = taskBusiness?.task && relatedType === taskBusiness.task.source_type && relatedID === taskBusiness.task.source_id
+    ? taskBusiness.task.source_no || recordNo : recordNo
   const sourceID = context?.source_id
   const contextType = context?.source_type
-  const matchingSource = panelOpen === undefined || (sourceID === recordID && contextType === sourceType)
+  const matchingSource = panelOpen === undefined || (view === 'related'
+    ? sourceID === relatedID && contextType === relatedType
+    : sourceID === recordID && contextType === sourceType)
   const visibleTasks = matchingSource ? tasks : []
   const listLoading = loading || sourceLoading || !matchingSource
   const moreTasksRef = useRef(null)
@@ -174,7 +188,9 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
       setContext(attemptRef.current.context)
       setPending(true)
     } else {
-      setContext({ source_type: sourceType, source_id: recordID, source_no: recordNo })
+      setContext(nextView === 'related'
+        ? { source_type: relatedType, source_id: relatedID, source_no: relatedNo }
+        : { source_type: sourceType, source_id: recordID, source_no: recordNo })
       if (nextView === 'create') {
         form.resetFields()
         setPending(false)
@@ -189,7 +205,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
     setReceipt(null)
     setView(nextView)
     setOpen(true)
-  }, [sourceType, recordID, recordNo, form])
+  }, [sourceType, recordID, recordNo, relatedType, relatedID, relatedNo, form])
   useEffect(() => {
     if (panelOpen === undefined) return
     if (panelOpen) openView(attemptRef.current ? 'create' : 'related')
@@ -255,7 +271,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
     } else onLeave()
   }
   const closeModal = () => leaveModal(() => { setOpen(false); onPanelClose?.() })
-  const returnToTasks = () => leaveModal(() => { setError(''); setView('related') })
+  const returnToTasks = () => leaveModal(() => openView('related'))
   const closeTask = () => {
     if (actionSaving || materialSaving) return
     const close = () => {
@@ -284,7 +300,40 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
     } finally { setActionSaving(false) }
   }
 
+  const taskDialog = (
+    <WorkflowTaskActionDrawer
+      collaborationOnly={Boolean(taskBusiness || collaborationTask)}
+      collaborationPopup={Boolean(collaborationTask)}
+      collaborationPopupOpen={collaborationVisible}
+      onCollaborationClosed={onCollaborationClose}
+      onOpenRelatedTask={openTask}
+      assignmentAccess={assignmentAccess}
+      assignmentTarget={assignmentTarget}
+      onAssignmentTargetChange={setAssignmentTarget}
+      sourceSummary={<EngineeringMaterialTaskSummaryEntry key={task?.id} task={task} profile={adminProfile} />}
+      renderSourceAction={!collaborationTask && task && !actionMode && canProcessEngineeringMaterialTask(adminProfile, task) ? (render) => <EngineeringMaterialTaskAction task={task} profile={adminProfile} render={render} leaveGuardRef={materialLeaveGuardRef} draftRef={materialDraftRef} onBusyChange={setMaterialSaving} onChanged={(value, result) => { setActionReceipt({ successMessage: result.successMessage, actionTitle: result.action === 'REJECT' ? '退回工程' : '审批通过', statusLabel: ENGINEERING_MATERIAL_STATUS[value.status], handoffMessage: result.successMessage }); loadTasks(); onCreated?.(value) }} /> : null}
+      canOpenEntry={canOpenEntry}
+      onOpenEntry={openEntry}
+      task={task}
+      profile={adminProfile}
+      actionMode={actionMode}
+      actionReason={actionReason}
+      actionSaving={actionSaving || materialSaving}
+      actionReceipt={actionReceipt}
+      allowedActionModes={allowedModes}
+      actionAvailabilityLoading={access.loading}
+      readonlyReason={access.readonlyReason}
+      onActionModeChange={setActionMode}
+      onActionReasonChange={setActionReason}
+      onClose={collaborationTask ? () => setCollaborationVisible(false) : closeTask}
+      onSubmit={submitTask}
+      canViewAttachments={canRead}
+      canManageAttachments={access.canHandle && hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_UPDATE)}
+    />
+  )
+
   if (!canRead) return null
+  if (collaborationTask) return taskDialog
   const taskColumns = [
     { title: '任务事项', key: 'name', width: '40%', render: (_, item) => <Button type="link" className="business-task-panel__task-name" onClick={() => openTask(item)}>{getWorkflowTaskDisplayName(item)}</Button> },
     { title: '责任岗位', key: 'role', width: '18%', render: (_, item) => getWorkflowTaskOwnerRoleLabel(item) },
@@ -294,25 +343,31 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
   const createAction = canCreate ? (
     <Button size="small" icon={<CalendarOutlined />} data-business-action-key="create-followup" disabled={disabled || sourceLoading || !matchingSource || (!pending && !canCreateFollowupFromRecord(sourceType, record))} title={!source ? '请先选择一张单据' : !canCreateFollowupFromRecord(sourceType, record) ? '当前单据已结束，可查看已有任务' : undefined} onClick={() => openView('create')}>{pending ? '确认创建结果' : '新建跟进任务'}</Button>
   ) : null
+  const Panel = compact ? Drawer : BusinessFormModal
+  const panelProps = compact ? {
+    onClose: closeModal,
+    width: '100%',
+    closeIcon: <LeftOutlined aria-hidden />,
+    closable: !saving && { placement: 'start', 'aria-label': taskBusiness ? '返回任务办理' : '关闭相关任务' },
+    className: 'erp-workflow-drawer erp-workflow-tracking-drawer business-task-panel business-task-panel--mobile',
+  } : { onCancel: closeModal, closable: !saving, className: 'business-task-panel' }
   return (
     <>
       {panelOpen === undefined ? <Button size="small" className="erp-business-task-collaboration-entry" icon={<UnorderedListOutlined />} data-business-action-key="related-tasks" disabled={disabled || (!source && !pending)} title={!source && !pending ? '请先选择一张单据' : undefined} onClick={() => openView(pending ? 'create' : 'related')}>{pending ? '确认任务创建结果' : '任务协作'}</Button> : null}
-      <BusinessFormModal
+      <Panel
+        {...panelProps}
         open={open && !progressOpen}
         forceRender
         title={view === 'related' ? '相关任务' : view === 'receipt' ? '跟进任务已创建' : '新建跟进任务'}
-        className="business-task-panel"
-        onCancel={closeModal}
-        closable={!saving}
         keyboard={!saving}
         maskClosable={!saving}
         footer={
-          <Space wrap>
-            <Button disabled={saving} onClick={closeModal}>关闭</Button>
+          <Space wrap className="business-task-panel__footer">
+            <Button disabled={saving} onClick={closeModal}>{compact && taskBusiness ? '返回任务办理' : '关闭'}</Button>
             {view === 'create' ? <Button disabled={saving} onClick={returnToTasks}>返回相关任务</Button> : null}
             {view === 'create' ? <Button type="primary" loading={saving} disabled={!pending && (loading || !options?.can_create)} onClick={submit}>{pending ? '重试并确认结果' : '新建跟进任务'}</Button> : null}
             {view === 'receipt' ? <Button type="primary" onClick={() => openView('related')}>查看相关任务</Button> : null}
-            {view === 'related' ? <Button disabled={!sourceID || !matchingSource || sourceLoading} onClick={() => openTaskBoard()}>打开任务管理</Button> : null}
+            {view === 'related' && !taskBusiness ? <Button disabled={!sourceID || !matchingSource || sourceLoading} onClick={() => openTaskBoard()}>打开任务管理</Button> : null}
           </Space>
       }
       >
@@ -342,7 +397,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
               {createAction}
               {/* 任务窗口统一保留操作栏，避免子抽屉关闭时提前解锁。 */}
               <SelectionActionOverlayContext.Provider value={null}>
-                <WorkflowSourceProgressButton sourceType={contextType} sourceID={sourceID} profile={adminProfile} disabled={disabled || sourceLoading || !matchingSource} onOpenChange={setProgressOpen} />
+                <WorkflowSourceProgressButton showInMobileTask sourceType={contextType} sourceID={sourceID} sourceNo={context?.source_no} profile={adminProfile} disabled={disabled || sourceLoading || !matchingSource} closeLabel="返回相关任务" onOpenChange={setProgressOpen} />
               </SelectionActionOverlayContext.Provider>
             </Space>
           ) : null}
@@ -356,38 +411,14 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
                     <WorkflowTaskTiming task={item} includeKeys={['due', 'ended']} />
                   </article>
                 ))}
-                {!visibleTasks.length && !listLoading ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={sourceID ? '当前单据暂无可见任务' : sourceEmptyText} /> : null}
+                {!visibleTasks.length && !listLoading && !error ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={sourceID ? '当前单据暂无可见任务' : sourceEmptyText} /> : null}
                 {visibleTasks.length < total ? <div ref={moreTasksRef} className="business-task-panel__more" role="status">{error ? <><span>{error}</span><Button size="small" onClick={loadTasks}>重新读取</Button></> : '继续下滑加载任务'}</div> : null}
               </div>
             </Spin>
           ) : <Table size="small" rowKey="id" loading={listLoading} dataSource={visibleTasks} columns={taskColumns} pagination={{ current: page, pageSize: 10, total, hideOnSinglePage: true, showSizeChanger: false, onChange: setPage }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={sourceID ? '当前单据暂无可见任务' : sourceEmptyText} /> }} /> : null}
         </div>
-      </BusinessFormModal>
-      <WorkflowTaskActionDrawer
-        onOpenRelatedTask={openTask}
-        assignmentAccess={assignmentAccess}
-        assignmentTarget={assignmentTarget}
-        onAssignmentTargetChange={setAssignmentTarget}
-        sourceSummary={<EngineeringMaterialTaskSummaryEntry key={task?.id} task={task} profile={adminProfile} />}
-        renderSourceAction={task && !actionMode && canProcessEngineeringMaterialTask(adminProfile, task) ? (render) => <EngineeringMaterialTaskAction task={task} profile={adminProfile} render={render} leaveGuardRef={materialLeaveGuardRef} draftRef={materialDraftRef} onBusyChange={setMaterialSaving} onChanged={(value, result) => { setActionReceipt({ successMessage: result.successMessage, actionTitle: result.action === 'REJECT' ? '退回工程' : result.action === 'SUBMIT' ? '提交老板审核' : '审批通过', statusLabel: ENGINEERING_MATERIAL_STATUS[value.status], handoffMessage: result.successMessage }); loadTasks(); onCreated?.(value) }} /> : null}
-        canOpenEntry={canOpenEntry}
-        onOpenEntry={openEntry}
-        task={task}
-        profile={adminProfile}
-        actionMode={actionMode}
-        actionReason={actionReason}
-        actionSaving={actionSaving || materialSaving}
-        actionReceipt={actionReceipt}
-        allowedActionModes={allowedModes}
-        actionAvailabilityLoading={access.loading}
-        readonlyReason={access.readonlyReason}
-        onActionModeChange={setActionMode}
-        onActionReasonChange={setActionReason}
-        onClose={closeTask}
-        onSubmit={submitTask}
-        canViewAttachments={canRead}
-        canManageAttachments={access.canHandle && hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_UPDATE)}
-      />
+      </Panel>
+      {taskDialog}
     </>
   )
 }

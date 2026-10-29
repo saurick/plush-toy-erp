@@ -185,7 +185,7 @@ func (f *integrationHTTPFixture) actor(t *testing.T, roleKeys ...string) (*integ
 	for _, key := range roleKeys {
 		registered := f.client.Role.Query().Where(role.RoleKey(key)).OnlyX(t.Context())
 		f.client.AdminUserRole.Create().SetAdminUserID(account.ID).SetRoleID(registered.ID).SaveX(t.Context())
-		if key == biz.WarehouseRoleKey {
+		if key == biz.WarehouseRoleKey || key == biz.QualityRoleKey {
 			// Warehouse access is explicit fixture configuration, independent of
 			// function permissions. Restore the shared role's prior scope afterward.
 			scopes := f.client.RoleDataScope.Query().Where(roledatascope.RoleID(registered.ID), roledatascope.ResourceType("warehouse")).AllX(t.Context())
@@ -448,7 +448,7 @@ func TestSourceDocumentPostgresIntegrationDraftDataCorrection(t *testing.T) {
 	unit := f.client.Unit.Create().SetCode("SIMU" + uuid.NewString()[:8]).SetName("个").SetPrecision(0).SaveX(t.Context())
 	productID, warehouseID := data.IntegrationSaleStock(t, f.db, f.client, unit.ID)
 	line := map[string]any{"line_no": 1, "product_id": productID, "requested_product_name": "模拟毛绒兔", "unit_id": unit.ID, "ordered_quantity": "10", "unit_price": "1.23", "amount": "12.30"}
-	request := map[string]any{"order_no": "SIM-WEB-" + uuid.NewString(), "customer_id": customer.ID, "customer_order_no": "SIM-UPSTREAM-19", "order_date": "2026-10-18T09:00:00+08:00", "currency": "CNY", "payment_term_days": 30, "tax_mode": biz.SalesOrderTaxModeNone, "freight_terms": biz.SalesOrderFreightTermsExcluded, "quoted_freight_amount": "0", "note": "待校对颜色", "items": []any{line}}
+	request := map[string]any{"order_no": "SIM-WEB-" + uuid.NewString(), "customer_id": customer.ID, "customer_order_no": "SIM-UPSTREAM-19", "order_date": "2026-10-18T09:00:00+08:00", "currency": "CNY", "payment_method": "银行转账", "payment_term_days": 30, "tax_mode": biz.SalesOrderTaxModeNone, "freight_terms": biz.SalesOrderFreightTermsExcluded, "quoted_freight_amount": "0", "note": "待校对颜色", "items": []any{line}}
 	created := requireIntegrationCode(t, caller, "sales_order", "save_sales_order_with_items", request, errcode.OK.Code)
 	order := integrationResult(t, created, "sales_order")
 	items := created.Result.Data.AsMap()["sales_order_items"].([]any)

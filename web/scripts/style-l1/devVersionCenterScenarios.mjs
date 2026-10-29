@@ -1,5 +1,6 @@
 import { DEV_DELIVERY_TARGETS, deliveryOperationRetryPolicy, filterDevOperationHistory, validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
 import { CI_WORKFLOW_SECTIONS } from '../../src/dev-workbench/config/devCiWorkflow.mjs'
+import { DEV_VERSION_GUIDE_ROUTE } from '../../src/dev-workbench/config/devRoutes.mjs'
 import { createQualityGateStyleSummary } from './devQualityGateScenarios.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { assertMermaidFits, assertMermaidZoomMode, switchMermaidLayout, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
@@ -699,6 +700,7 @@ export function createDevVersionCenterScenarios({
       },
       verify: async (page) => {
         await waitForView(page, 'pipeline')
+        assert.equal(await page.getByRole('button', { name: '查看耗时详情', exact: true }).count(), 0, '当前耗时页不再提供指向自身的查看入口')
         const panel = page.locator('.erp-dev-pipeline-timing')
         await panel.waitFor({ state: 'visible' })
         assert.equal(await panel.locator('.erp-dev-pipeline-timing__details').count(), 0)
@@ -744,16 +746,16 @@ export function createDevVersionCenterScenarios({
           .waitFor({ state: 'visible' })
         assert.equal(
           await page
-            .locator('.erp-dev-version-workspace > .erp-sliding-tabs > .ant-tabs-nav')
+            .locator('.erp-dev-version-page > .erp-dev-page-header')
             .evaluate((node) => getComputedStyle(node).backgroundColor),
           'rgb(255, 255, 255)',
-          '版本中心导航使用完整白色操作区'
+          '版本中心的标题与导航共用完整白色页头'
         )
         const versionTableBox = await page
           .locator('.erp-dev-version-tab--versions .ant-card-head')
           .boundingBox()
         const tabNavigationBox = await page
-          .locator('.erp-dev-version-workspace .ant-tabs-nav')
+          .locator('.erp-dev-version-page > .erp-dev-page-header [role="tablist"]')
           .boundingBox()
         assert(versionTableBox && tabNavigationBox)
         assert(
@@ -779,13 +781,16 @@ export function createDevVersionCenterScenarios({
         )
         const initialSummaryRequests = summaryRequests
         assert(initialSummaryRequests > 0)
+        const historyLength = await page.evaluate(() => window.history.length)
+        await page.getByRole('tab', { name: '版本与部署', exact: true, selected: true }).click()
+        assert.equal(await page.evaluate(() => window.history.length), historyLength, '重复点击当前页签不新增浏览历史')
 
         const targetSelector = page.getByLabel('切换当前操作目标')
         await targetSelector
           .getByText('test 甲方测试验收', { exact: true })
           .click()
         await waitForView(page, 'versions')
-        await verifySlidingMotion(page, assert, '.erp-dev-version-workspace .ant-tabs-nav-list', 1)
+        await verifySlidingMotion(page, assert, '.erp-dev-version-page > .erp-dev-page-header [role="tablist"]', 1)
         await waitForView(page, 'overview')
         await page.getByText('test 数据方式', { exact: true }).waitFor()
         await page
@@ -868,14 +873,10 @@ export function createDevVersionCenterScenarios({
           'dev-version-center-tabs-pagination-desktop'
         )
 
-        const guideTrigger = page.getByRole('link', {
-          name: /操作指引/u,
-        })
-        assert.notEqual(await guideTrigger.getAttribute('target'), '_blank')
-        assert.match(
-          await guideTrigger.getAttribute('href'),
-          /version-center\/guide\?customer=yoyoosun/u
-        )
+        assert.equal(await page.getByRole('link', { name: /操作指引/u }).count(), 0, '版本页沿用常驻导航，不重复提供跨页指引入口')
+        const originalTargetKey = new URL(page.url()).searchParams.get('target')
+        const guideUrl = new URL(DEV_VERSION_GUIDE_ROUTE, page.url())
+        guideUrl.searchParams.set('customer', new URL(page.url()).searchParams.get('customer'))
         const initialPageCount = page.context().pages().length
         const guideRequests = []
         const isolateGuideApi = async (route) => {
@@ -884,20 +885,15 @@ export function createDevVersionCenterScenarios({
           return route.abort()
         }
         await page.route('**/__dev/api/**', isolateGuideApi)
-        await guideTrigger.click()
-        await page.waitForURL((url) => url.pathname === '/__dev/version-center/guide')
+        await page.goto(guideUrl.href)
+        await page.waitForURL((url) => url.pathname === DEV_VERSION_GUIDE_ROUTE)
         const guidePage = page
         try {
           await expectHeading(guidePage, '手动与应急发布指引')
           await guidePage.reload()
           await expectHeading(guidePage, '手动与应急发布指引')
           assert.match(await guidePage.title(), /手动与应急发布指引/u)
-          assert.match(
-            await guidePage
-              .getByRole('link', { name: '返回版本发布' })
-              .getAttribute('href'),
-            /version-center\?customer=yoyoosun/u
-          )
+          assert.equal(await guidePage.getByRole('link', { name: '返回版本发布' }).count(), 0, '独立阅读页沿用浏览器历史恢复来源')
           const ciGuide = guidePage.getByRole('region', {
             name: 'CI/CD 流程与原理',
           })
@@ -1093,17 +1089,20 @@ export function createDevVersionCenterScenarios({
           await page.unroute('**/__dev/api/**', isolateGuideApi)
         }
         await page.setViewportSize({ width: 1440, height: 900 })
-        await page.getByRole('link', { name: '返回版本发布' }).click()
+        await page.goBack()
         await expectHeading(page, '版本发布')
         await waitForView(page, 'versions')
         assert.equal(new URL(page.url()).searchParams.get('customer'), 'yoyoosun')
+        assert.equal(new URL(page.url()).searchParams.get('target'), originalTargetKey, '浏览器返回恢复原部署目标')
         assert.equal(page.context().pages().length, initialPageCount)
+        await page.getByLabel('切换当前操作目标').getByText('demo 项目演练造数', { exact: true }).click()
+        await page.waitForURL((url) => url.searchParams.get('target') === 'demo-133')
         await page.getByRole('tab', { name: '发布与部署耗时' }).click()
         await waitForView(page, 'pipeline')
         await page
           .locator('.erp-dev-pipeline-timing')
           .waitFor({ state: 'visible' })
-        await verifySlidingMotion(page, assert, '.erp-dev-version-workspace .ant-tabs-nav-list', 3, true)
+        await verifySlidingMotion(page, assert, '.erp-dev-version-page > .erp-dev-page-header [role="tablist"]', 3, true)
         await waitForView(page, 'history')
         assert.equal(new URL(page.url()).searchParams.get('target'), 'demo-133')
         assert.equal(await page.locator('.erp-dev-version-current-operation').count(), 0, 'returning to demo must not display the test operation')

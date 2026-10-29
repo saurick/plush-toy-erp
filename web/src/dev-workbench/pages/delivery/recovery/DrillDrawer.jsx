@@ -5,7 +5,6 @@ export function DrillDrawer({
   customerReady,
   drillTriggerRef,
   loading,
-  navigateWithinCustomerScope,
   overview,
   refresh,
   refreshing,
@@ -35,7 +34,6 @@ export function DrillDrawer({
             refreshing={loading || refreshing}
             disabled={!customerReady}
             onRefresh={refresh}
-            onNavigate={navigateWithinCustomerScope}
           />
         ))}
     </Drawer>

@@ -31,7 +31,7 @@ test('inventory count validates unit precision and allows an explicit zero count
   await ui.fill('作业单号', 'COUNT-7')
   await ui.fill('业务原因', '月末核对')
   await ui.fill('实盘数量', '1.5')
-  await ui.click(ui.button('生成盘点作业'))
+  await ui.click(ui.button('提交盘点复核'))
   // Validation state settles before Ant Design's debounced field feedback.
   await t.waitFor(async () => {
     await ui.flush()
@@ -42,7 +42,7 @@ test('inventory count validates unit precision and allows an explicit zero count
   })
   assert.equal(ui.submissions.length, 0)
   await ui.fill('实盘数量', '0')
-  await ui.click(ui.button('生成盘点作业'))
+  await ui.click(ui.button('提交盘点复核'))
   await t.waitFor(() => assert.equal(ui.submissions.length, 1))
   assert.equal(ui.submissions[0].items[0].counted_quantity, '0')
   assert.equal(ui.submissions[0].reason, '月末核对')
@@ -69,7 +69,7 @@ test('inventory submission suppresses duplicate clicks and preserves the draft a
   await ui.fill('作业单号', 'COUNT-RETRY')
   await ui.fill('业务原因', '复核数量')
   await ui.fill('实盘数量', '9')
-  const submit = ui.button('生成盘点作业')
+  const submit = ui.button('提交盘点复核')
   await ui.click(submit)
   await ui.click(submit)
   await ui.click(ui.button('取消'))
@@ -104,4 +104,19 @@ test('inventory source changes and reopening clear quantities belonging to the p
   await ui.render()
   assert.equal(ui.field('实盘数量').value, '')
   assert.equal(ui.submissions.length, 0)
+})
+
+test('multi-line counts preserve each source and allow zero difference without dropping a line', async (t) => {
+  const ui = await setup(t)
+  ui.props.sourceRecords = [ui.props.sourceRecord, { ...ui.props.sourceRecord, subject_id: 8, quantity: '5' }]
+  await ui.render()
+  await ui.fill('作业单号', 'COUNT-MULTI')
+  await ui.fill('业务原因', '两行盘点')
+  const fields = Array.from(document.querySelectorAll('input[id$="_counted_quantity"]'))
+  assert.equal(fields.length, 2)
+  await ui.fill(fields[0], '10')
+  await ui.fill(fields[1], '3')
+  await ui.click(ui.button('提交盘点复核'))
+  await t.waitFor(() => assert.equal(ui.submissions.length, 1))
+  assert.deepEqual(ui.submissions[0].items.map((row) => row.counted_quantity), ['10', '3'])
 })

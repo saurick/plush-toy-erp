@@ -97,3 +97,17 @@ func (r *inventoryOperationUsecaseRepoStub) GetInventoryOperation(context.Contex
 func (r *inventoryOperationUsecaseRepoStub) ListInventoryOperationsForAccess(context.Context, InventoryOperationFilter, WarehouseDataScope) ([]*InventoryOperation, int, error) {
 	return nil, 0, nil
 }
+
+func TestInventoryOperationCountAllowsZeroButRejectsDuplicateGrain(t *testing.T) {
+	quantity := decimal.NewFromInt(10)
+	item := InventoryOperationItemCreate{LineNo: "1", SubjectType: InventorySubjectMaterial, SubjectID: 1, FromWarehouseID: 2, UnitID: 3, ExpectedQuantity: &quantity, CountedQuantity: &quantity}
+	input := &InventoryOperationCreate{OperationNo: "ZERO", OperationType: InventoryOperationCycleCount, Reason: "复核", IdempotencyKey: "zero", CreatedBy: 1, Items: []InventoryOperationItemCreate{item}}
+	if _, _, err := normalizeInventoryOperationCreate(input); err != nil {
+		t.Fatal(err)
+	}
+	item.LineNo = "2"
+	input.Items = append(input.Items, item)
+	if _, _, err := normalizeInventoryOperationCreate(input); err != ErrBadParam {
+		t.Fatalf("duplicate grain: %v", err)
+	}
+}

@@ -31,7 +31,7 @@ export function IncomingCheckItemsForm() {
               onAdd={() => appendCheckItem(add, fields.length)}
             />
             <BusinessCompactFieldTable
-              label="来料检查项"
+              label="质检检查项"
               showSequence
               columns={[
                 { label: '检查项目', required: true },
@@ -80,7 +80,7 @@ export function IncomingCheckItemsForm() {
                     >
                       <Input
                         maxLength={255}
-                        placeholder="采购约定、确认样或具体要求"
+                        placeholder="订单约定、确认样或具体要求"
                       />
                     </Form.Item>,
                     <Form.Item

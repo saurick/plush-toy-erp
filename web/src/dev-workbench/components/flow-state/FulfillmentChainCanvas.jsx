@@ -12,7 +12,7 @@ const relativeRect = (node, base) => {
   return { x: box.left - base.left, y: box.top - base.top, width: box.width, height: box.height }
 }
 
-export default function FulfillmentChainCanvas({ role, selectedStage, selectedGuide, detailID, overviewRef, onSelectStage, onOpenException }) {
+export default function FulfillmentChainCanvas({ role, matchingStages, selectedStage, selectedGuide, detailID, overviewRef, onSelectStage, onOpenException }) {
   const mapRef = React.useRef(null)
   const [geometry, setGeometry] = React.useState({ width: 0, height: 0, stages: {} })
   const columns = fulfillmentChainColumns(geometry.width || 900)
@@ -62,7 +62,7 @@ export default function FulfillmentChainCanvas({ role, selectedStage, selectedGu
             <div className="erp-dev-chain__phase-heading"><h3>{phase.label}<small>{phase.entries[0].number}—{phase.entries.at(-1).number}</small></h3></div>
             <div className="erp-dev-chain__grid" style={{ '--chain-columns': columns }}>
               {phase.entries.map(({ step, number, label }) => (
-                <div className="erp-dev-chain__stage" key={step.stage} data-chain-stage={step.stage} data-fulfillment-stage={step.stage} data-role-match={role === 'all' ? undefined : fulfillmentStepMatchesRole(step, role)} data-conditional={step.branch || undefined} data-related={selectedGuide && step.handling?.guides.includes(selectedGuide) || undefined}>
+                <div className="erp-dev-chain__stage" key={step.stage} data-chain-stage={step.stage} data-fulfillment-stage={step.stage} data-role-match={matchingStages ? matchingStages.has(step.stage) : role === 'all' ? undefined : fulfillmentStepMatchesRole(step, role)} data-conditional={step.branch || undefined} data-related={selectedGuide && step.handling?.guides.includes(selectedGuide) || undefined}>
                   <button className="erp-dev-chain__stage-card erp-dev-chain__stage-main" data-stage-card data-selected={selectedStage === step.stage || undefined} type="button" title={step.label} aria-label={`${number} ${step.label}`} aria-expanded={selectedStage === step.stage} aria-controls={selectedStage === step.stage ? detailID : undefined} onClick={() => onSelectStage(step.stage)}>
                     <span>{number}</span><strong>{label}</strong>{step.branch ? <small>按约定</small> : null}
                   </button>

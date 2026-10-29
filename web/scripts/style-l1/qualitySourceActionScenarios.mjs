@@ -67,6 +67,120 @@ export function createQualitySourceActionScenarios(deps) {
   }
 
   return [
+    ...[{ name: 'quality-evidence-history-desktop', width: 3840, height: 2160 }, { name: 'quality-evidence-history-narrow', width: 1280, height: 900 }].map((viewport) => {
+      let calls
+      let writes
+      const types = [
+        ['INCOMING', '采购来料', 'list_quality_inspections'],
+        ['OUTSOURCING_RETURN', '委外回货', 'list_outsourcing_return_quality_inspections'],
+        ['FINISHED_GOODS', '成品检验', 'list_finished_goods_quality_inspections'],
+        ['PRODUCTION_STAGE', '生产分段质检', 'list_production_stage_quality_inspections'],
+      ]
+      const records = types.map(([inspection_type], index) => ({
+        id: 9800 + index, inspection_no: `QI-EVIDENCE-${index}`, inspection_type,
+        status: 'SUBMITTED', source_type: ['PURCHASE_RECEIPT', 'OUTSOURCING_FACT', 'SHIPMENT', 'PRODUCTION_WIP'][index],
+        source_id: 9800 + index, source_no: `SOURCE-${index}`,
+        subject_type: index === 3 ? 'WIP' : 'PRODUCT', subject_id: 1,
+        production_wip_batch_id: index === 3 ? 9803 : null,
+        gate_code: index === 3 ? 'NEEDLE' : null,
+        purchase_receipt_item_id: index === 0 ? 9800 : null,
+        wip_batch_no: index === 3 ? 'WIP-EVIDENCE' : null,
+        batch_quantity: '12', product_name: '质检示例产品', unit_name: '件', unit_precision: 0,
+      }))
+      const old = { ...records[0], id: 9890, inspection_no: 'QI-HISTORY-OLD', status: 'REJECTED', result: 'REJECT', inspector_id: 7, inspector_name: '质检员陈', superseded_at: 1790000000, superseded_reason: '仪器校准后重新检查', corrected_inspection_id: 9891, corrected_inspection_no: 'QI-HISTORY-NEW' }
+      const current = { ...records[0], id: 9891, inspection_no: 'QI-HISTORY-NEW', status: 'PASSED', result: 'PASS', inspector_id: 8, inspector_name: '复检员林', correction_of_inspection_id: 9890, correction_of_inspection_no: 'QI-HISTORY-OLD' }
+      const selectFilter = async (page, group, value) => {
+        await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
+        const filters = page.getByRole('dialog', { name: '筛选条件' })
+        await filters.getByRole('group', { name: group, exact: true }).getByRole('button', { name: value, exact: true }).click()
+        await filters.getByRole('button', { name: '完成', exact: true }).click()
+      }
+      return {
+        name: viewport.name, path: '/erp/production/quality-inspections', auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession, viewport: { width: viewport.width, height: viewport.height },
+        beforeNavigate: async (page) => {
+          calls = []; writes = []
+          await page.route('**/rpc/quality', async (route) => {
+            const { id, method, params = {} } = route.request().postDataJSON()
+            calls.push({ method, params })
+            const index = types.findIndex((type) => type[2] === method)
+            let data
+            if (index >= 0) {
+              const rows = index === 0 ? [records[0], current, ...(params.include_superseded ? [old] : [])] : [records[index]]
+              data = stylePaginatedRpcData(rows, 'quality_inspections', params)
+            } else if (method === 'get_quality_inspection') {
+              data = { quality_inspection: [...records, old, current].find((row) => row.id === params.id) }
+            } else if (['pass_quality_inspection', 'reject_quality_inspection'].includes(method)) {
+              writes.push(params)
+              data = { quality_inspection: { ...records.find((row) => row.id === params.id), ...params, status: 'PASSED', inspector_id: 7, inspector_name: '质检员陈' } }
+            } else return route.fallback()
+            await route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(data) } })
+          })
+        },
+        verify: async (page) => {
+          await expectText(page, 'QI-HISTORY-NEW')
+          assert.equal(await page.getByText('QI-HISTORY-OLD', { exact: true }).count(), 0)
+          assert.equal(calls.find((call) => call.method === types[0][2]).params.include_superseded, false)
+          await selectFilter(page, '记录范围', '含已替代记录')
+          await selectRow(page, 'QI-HISTORY-OLD')
+          await expectText(page, '已替代 · 不合格')
+          await expectText(page, '质检员陈')
+          await page.getByRole('row').filter({ has: page.getByText('QI-HISTORY-OLD', { exact: true }) }).dblclick()
+          const detail = page.getByRole('dialog', { name: '质量检验详情' })
+          await detail.getByText('本单已被更正替代，原判定仅供追溯', { exact: true }).waitFor()
+          await detail.getByRole('button', { name: '查看替代单 QI-HISTORY-NEW' }).click()
+          await detail.getByText('本单为更正后的复检记录', { exact: true }).waitFor()
+          await detail.getByRole('button', { name: '查看原单 QI-HISTORY-OLD' }).click()
+          await detail.getByText('本单已被更正替代，原判定仅供追溯', { exact: true }).waitFor()
+          await page.screenshot({ path: path.join(outputDir, `${viewport.name}-history.png`), fullPage: false })
+          await detail.getByRole('button', { name: /关\s*闭/u }).last().click()
+          for (let index = 0; index < types.length; index++) {
+            const [, label, method] = types[index]
+            await selectFilter(page, '检验类型', label)
+            await selectRow(page, records[index].inspection_no)
+            assert(calls.some((call) => call.method === method), `type ${label} must use its own list`)
+            await clickSelectionAction(page, '判定合格')
+            const dialog = page.locator('.ant-modal:visible').filter({ hasText: '判定合格' }).last()
+            await dialog.getByText('检查项目', { exact: true }).waitFor()
+            await dialog.locator('input[type="radio"][value="APPROX:0"]').check()
+            await dialog.getByRole('button', { name: '确认合格', exact: true }).click()
+            assert.equal(writes.length, 0, 'unchecked evidence must not write')
+            await expectText(page, '尚有未检项目，请完成检查或注明不适用原因')
+            if (index === 3) {
+              await dialog.getByLabel('检查结果', { exact: true }).locator("xpath=ancestor::div[contains(@class,'ant-select-selector')][1]").click()
+              await page.locator('.ant-select-dropdown:visible').getByText('符合', { exact: true }).click()
+              await dialog.getByLabel('实际情况', { exact: true }).fill('本批检针未见异常')
+              await dialog.getByLabel('检查范围', { exact: true }).locator("xpath=ancestor::div[contains(@class,'ant-select-selector')][1]").click()
+              await page.locator('.ant-select-dropdown:visible').getByText('全检', { exact: true }).click()
+              await assertNoHorizontalOverflow(page, viewport.name)
+              await page.screenshot({ path: path.join(outputDir, `${viewport.name}-evidence.png`), fullPage: false })
+              await dialog.getByRole('button', { name: '确认合格', exact: true }).click()
+              await dialog.waitFor({ state: 'hidden' })
+              assert.equal(writes.length, 1)
+              assert.equal(writes[0].check_items[0].observation, '本批检针未见异常')
+              assert.equal(Object.hasOwn(writes[0], 'inspector_id'), false)
+            } else {
+              await dialog.getByRole('button', { name: /关\s*闭/u }).click()
+            }
+          }
+          assert.equal(await page.getByText('全部检验类型', { exact: true }).count(), 0)
+          for (const index of [1, 2]) {
+            calls.length = 0
+            const record = records[index]
+            await page.goto(new URL(`/erp/production/quality-inspections?source_type=${record.source_type}&source_id=${record.source_id}`, page.url()).href)
+            await expectText(page, record.inspection_no)
+            const request = calls.find((call) => call.method === types[index][2])
+            assert(request, '来源入口必须选择匹配的检验类型')
+            assert.equal(request.params[index === 1 ? 'fact_id' : 'source_id'], record.source_id)
+            await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
+            const filters = page.getByRole('dialog', { name: '筛选条件' })
+            const selectedType = filters.getByRole('group', { name: '检验类型', exact: true }).getByRole('button', { name: types[index][1], exact: true })
+            assert.equal(await selectedType.getAttribute('aria-pressed'), 'true')
+            await filters.getByRole('button', { name: '完成', exact: true }).click()
+          }
+        },
+      }
+    }),
     {
       name: 'quality-correction-cannot-cancel-desktop',
       path: '/erp/production/quality-inspections',
@@ -735,7 +849,7 @@ export function createQualitySourceActionScenarios(deps) {
           await modal.waitFor({ state: 'visible', timeout: 10_000 })
           await modal.getByText('全检与抽检分别记录，未检不视为合格。', { exact: true }).waitFor()
           await modal.screenshot({ path: path.resolve(outputDir, 'quality-incoming-checks-desktop.png') })
-          const checkRows = modal.getByRole('table', { name: '来料检查项', exact: true }).locator('tbody')
+          const checkRows = modal.getByRole('table', { name: '质检检查项', exact: true }).locator('tbody')
           assert.equal(await checkRows.count(), 3)
           await modal.getByRole('button', { name: '在顶部添加检查项', exact: true }).click()
           assert.equal(await checkRows.count(), 4)
@@ -839,6 +953,10 @@ export function createQualitySourceActionScenarios(deps) {
             .getByText('全检', { exact: true })
             .click()
           await modal.getByRole('button', { name: '确认不合格' }).click()
+          await modal.getByText('请填写异常或让步理由', { exact: true }).waitFor()
+          assert.equal(rejectParams.length, 0, '未填写不合格原因不得提交判定')
+          await modal.getByLabel('判定备注', { exact: true }).fill('明显色差，暂不接收')
+          await modal.getByRole('button', { name: '确认不合格' }).click()
           await expectText(page, '质量检验已判定不合格')
           await modal.waitFor({ state: 'hidden', timeout: 10_000 })
 
@@ -850,6 +968,7 @@ export function createQualitySourceActionScenarios(deps) {
           const params = rejectParams[0]
           assert.deepEqual(Object.keys(params).sort(), [
             'check_items',
+            'decision_note',
             'defect_rate_operator',
             'defect_rate_percent',
             'id',
@@ -858,6 +977,7 @@ export function createQualitySourceActionScenarios(deps) {
           ])
           assert.equal(params.id, 713)
           assert.equal(params.result, 'REJECT')
+          assert.equal(params.decision_note, '明显色差，暂不接收')
           assert.equal(params.defect_rate_operator, 'GT')
           assert.equal(params.defect_rate_percent, '50')
           assert.equal(params.check_items[0].result, 'FAIL')

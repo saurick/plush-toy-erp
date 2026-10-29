@@ -31,8 +31,9 @@ export function buildFulfillmentChainWires(model, geometry) {
     if (!a || !b) continue
     const sameRow = Math.abs(a.y - b.y) < 8 && b.x > a.x
     const endX = sameRow ? b.x : width - 5
-    const crossed = [...boxes.values()].filter((box) => box.x >= a.right && box.right <= endX && box.y < a.y + 31 && box.bottom > a.y)
-    const y = Math.min(a.y + 31, ...crossed.map((box) => box.y - 8))
+    const centerY = a.y + Math.min(31, a.height / 2)
+    const crossed = [...boxes.values()].filter((box) => box.x >= a.right && box.right <= endX && box.y < centerY && box.bottom > a.y)
+    const y = Math.min(centerY, ...crossed.map((box) => box.y - 8))
     const d = sameRow ? `M ${a.right} ${y} H ${b.x - 3}`
       : `M ${a.right} ${y} H ${width - 5} V ${b.y - 8} H ${b.cx} V ${b.y - 3}`
     add(`${edge.from}:${edge.to}`, d, 'main', { from: edge.from, to: edge.to })
@@ -41,8 +42,10 @@ export function buildFulfillmentChainWires(model, geometry) {
     const a = boxes.get(edge.from)
     const b = boxes.get(edge.to)
     if (a && b) {
-      const d = b.x > a.right ? `M ${a.right} ${a.y + 29} H ${b.x - 8} V ${b.y + 29} H ${b.x - 3}`
-        : `M ${a.cx} ${a.y} V ${a.y - 8} H 3 V ${b.y + 29} H ${b.x - 3}`
+      const startY = a.y + Math.min(29, a.height / 2)
+      const endY = b.y + Math.min(29, b.height / 2)
+      const d = b.x > a.right ? `M ${a.right} ${startY} H ${b.x - 8} V ${endY} H ${b.x - 3}`
+        : `M ${a.cx} ${a.y} V ${a.y - 8} H 3 V ${endY} H ${b.x - 3}`
       add(`conditional:${edge.to}`, d, 'main', { conditional: true, from: edge.from, to: edge.to })
     }
   }

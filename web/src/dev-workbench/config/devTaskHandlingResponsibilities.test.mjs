@@ -23,7 +23,7 @@ test('所有正式环节均有本项责任、办理内容和交接说明，不�
     ['engineering_data', 'engineering']
   )
   const material = TASK_HANDLING_ROWS.find(({ key }) => key === 'engineering')
-  assert.match(material.input, /提交用料.*退回.*重提/)
+  assert.match(material.input, /原工程资料.*完成工程资料.*自动送审.*退回.*修订/)
   assert.match(material.handoff, /老板.*财务/)
 })
 
@@ -66,7 +66,7 @@ test('九岗位均有明确职责，审批、发起、执行和检验分别归�
       'shipment',
     ],
     engineering: ['engineering_data', 'engineering'],
-    purchase: ['purchasing', 'incoming_exception'],
+    purchase: ['purchasing', 'incoming_exception', 'outsourcing_contract'],
     warehouse: [
       'purchase_count',
       'material_inbound',
@@ -87,7 +87,6 @@ test('九岗位均有明确职责，审批、发起、执行和检验分别归�
       'finished_goods_rework',
     ],
     finance: [
-      'outsourcing_contract',
       'receivable_registration',
       'payable_registration',
       'reconciliation',

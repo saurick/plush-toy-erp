@@ -55,8 +55,7 @@
 
 .erp-dev-project-relationships__heading,
 .erp-dev-project-relationships__controls,
-.erp-dev-project-relationships__controls label,
-.erp-dev-project-relationships__links {
+.erp-dev-project-relationships__controls label {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -90,10 +89,6 @@
   margin: 4px 0 0;
   color: var(--erp-text-muted);
   overflow-wrap: anywhere;
-}
-
-.erp-dev-project-relationships__links {
-  margin-top: 6px;
 }
 
 @media (max-width: 1100px) {

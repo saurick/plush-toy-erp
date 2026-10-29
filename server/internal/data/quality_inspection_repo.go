@@ -393,6 +393,9 @@ func (r *inventoryRepo) GetQualityInspection(ctx context.Context, id int) (_ *bi
 		}
 		return nil, err
 	}
+	if err := validateQualityInspectionAccess(ctx, row); err != nil {
+		return nil, err
+	}
 	if err := validateProductionWIPQualityInspectionRead(row); err != nil {
 		return nil, err
 	}
@@ -406,12 +409,15 @@ func (r *inventoryRepo) GetQualityInspection(ctx context.Context, id int) (_ *bi
 	if err := enrichQualityQuantityUnits(ctx, r.data.postgres, []*biz.QualityInspection{item}); err != nil {
 		return nil, err
 	}
+	if err := enrichQualityInspectionHistory(ctx, r.data.postgres, []*biz.QualityInspection{item}); err != nil {
+		return nil, err
+	}
 	return item, nil
 }
 
 func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.QualityInspectionFilter) (_ []*biz.QualityInspection, _ int, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrQualityInspectionRecordConflict) }()
-	query := r.qualityInspectionListQuery(filter)
+	query := r.qualityInspectionListQuery(ctx, filter)
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -447,11 +453,17 @@ func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.Q
 	if err := enrichQualityQuantityUnits(ctx, r.data.postgres, out); err != nil {
 		return nil, 0, err
 	}
+	if err := enrichQualityInspectionHistory(ctx, r.data.postgres, out); err != nil {
+		return nil, 0, err
+	}
 	return out, total, nil
 }
 
-func (r *inventoryRepo) qualityInspectionListQuery(filter biz.QualityInspectionFilter) *ent.QualityInspectionQuery {
-	query := r.data.postgres.QualityInspection.Query()
+func (r *inventoryRepo) qualityInspectionListQuery(ctx context.Context, filter biz.QualityInspectionFilter) *ent.QualityInspectionQuery {
+	query := r.data.postgres.QualityInspection.Query().Where(qualityWarehousePredicate(ctx)...)
+	if !filter.IncludeSuperseded {
+		query = query.Where(qualityinspection.SupersededAtIsNil())
+	}
 	if filter.Status != "" {
 		query = query.Where(qualityinspection.Status(filter.Status))
 	}
@@ -554,7 +566,7 @@ func (r *inventoryRepo) qualityInspectionListQuery(filter biz.QualityInspectionF
 
 func (r *inventoryRepo) CountQualityInspectionsByStatus(ctx context.Context, filter biz.QualityInspectionFilter) (map[string]int, error) {
 	filter.Status = ""
-	return scanBusinessStatusCounts(ctx, r.qualityInspectionListQuery(filter).
+	return scanBusinessStatusCounts(ctx, r.qualityInspectionListQuery(ctx, filter).
 		GroupBy(qualityinspection.FieldStatus).Aggregate(ent.Count()).Scan)
 }
 
@@ -896,9 +908,6 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(
 	if err != nil {
 		return nil, err
 	}
-	if row.PurchaseReceiptItemID != nil && len(in.CheckItems) == 0 {
-		return nil, biz.ErrBadParam
-	}
 	transition, ok := corestatus.DecideQualityInspection(row.Status, targetInspectionStatus)
 	if !ok {
 		return nil, biz.ErrBadParam
@@ -915,11 +924,18 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(
 				return nil, err
 			}
 		}
+		item, err := qualityInspectionWithHistory(ctx, tx.client, row)
+		if err != nil {
+			return nil, err
+		}
 		if err := tx.sqlTx.Commit(); err != nil {
 			return nil, err
 		}
 		tx = nil
-		return entQualityInspectionToBiz(row), nil
+		return item, nil
+	}
+	if err := biz.ValidateQualityInspectionDecisionEvidence(in); err != nil {
+		return nil, err
 	}
 	defectRateOperator, defectRatePercent, err := biz.NormalizeQualityInspectionDefectRate(in.DefectRateOperator, in.DefectRatePercent, true)
 	if err != nil {
@@ -988,11 +1004,15 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(
 	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
 		return nil, err
 	}
+	item, err := qualityInspectionWithHistory(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx = nil
-	return entQualityInspectionToBiz(row), nil
+	return item, nil
 }
 
 func qualityInspectionLotStatusReason(note *string, fallback string) string {
@@ -1110,8 +1130,19 @@ func (r *inventoryRepo) decideProductionWIPQualityInspection(
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
 
-	action, err := getProductionWIPQualityActionContext(ctx, tx, preview)
+	action, err := lockProductionWIPQualitySource(ctx, tx, preview)
 	if err != nil {
+		return nil, err
+	}
+	// A successful retry remains valid after the route has advanced. Compare
+	// the stored decision before checking the batch's current gate or status.
+	if action.inspection.Status == biz.QualityInspectionStatusPassed || action.inspection.Status == biz.QualityInspectionStatusRejected {
+		if !qualityInspectionDecisionMatches(action.inspection, in, targetStatus) {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		return qualityInspectionWithHistory(ctx, tx.client, action.inspection)
+	}
+	if err := loadProductionWIPQualityActiveGate(ctx, tx.client, action); err != nil {
 		return nil, err
 	}
 	if action.inspection.Status != biz.QualityInspectionStatusSubmitted {
@@ -1119,9 +1150,7 @@ func (r *inventoryRepo) decideProductionWIPQualityInspection(
 	}
 	switch targetStatus {
 	case biz.QualityInspectionStatusPassed:
-		// Production-stage concession needs a gate-specific approval policy and
-		// audit trail. Until that policy exists, fail closed instead of letting
-		// the generic quality update permission waive a frozen route gate.
+		// Only an approved production exception may waive a rejected gate.
 		if in.Result != biz.QualityInspectionResultPass {
 			return nil, biz.ErrProductionWIPInvalidTransition
 		}
@@ -1131,6 +1160,9 @@ func (r *inventoryRepo) decideProductionWIPQualityInspection(
 		}
 	default:
 		return nil, biz.ErrBadParam
+	}
+	if err := biz.ValidateQualityInspectionDecisionEvidence(in); err != nil {
+		return nil, err
 	}
 	defectRateOperator, defectRatePercent, err := biz.NormalizeQualityInspectionDefectRate(in.DefectRateOperator, in.DefectRatePercent, true)
 	if err != nil {
@@ -1180,11 +1212,15 @@ func (r *inventoryRepo) decideProductionWIPQualityInspection(
 	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
 		return nil, err
 	}
+	item, err := qualityInspectionWithHistory(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx = nil
-	return entQualityInspectionToBiz(row), nil
+	return item, nil
 }
 
 func (r *inventoryRepo) cancelProductionWIPQualityInspection(
@@ -1239,7 +1275,7 @@ func (r *inventoryRepo) cancelProductionWIPQualityInspection(
 // completion: batch first, then inspection. The initial unlocked read is only
 // a routing hint; every source anchor and lifecycle state is checked again
 // after both rows are locked.
-func getProductionWIPQualityActionContext(
+func lockProductionWIPQualitySource(
 	ctx context.Context,
 	tx *inventoryDBTx,
 	preview *ent.QualityInspection,
@@ -1266,43 +1302,66 @@ func getProductionWIPQualityActionContext(
 		preview.ProductionWipBatchID == nil || *preview.ProductionWipBatchID != *inspection.ProductionWipBatchID {
 		return nil, biz.ErrProductionWIPInvalidTransition
 	}
-	operation, err := tx.client.ProductionOrderOperation.Get(ctx, batch.ProductionOrderOperationID)
+	if err := validateProductionWIPQualityInspectionRow(inspection, batch); err != nil {
+		return nil, err
+	}
+	return &productionWIPQualityActionContext{batch: batch, inspection: inspection}, nil
+}
+
+func getProductionWIPQualityActionContext(ctx context.Context, tx *inventoryDBTx, preview *ent.QualityInspection) (*productionWIPQualityActionContext, error) {
+	action, err := lockProductionWIPQualitySource(ctx, tx, preview)
+	if err != nil {
+		return nil, err
+	}
+	if err := loadProductionWIPQualityActiveGate(ctx, tx.client, action); err != nil {
+		return nil, err
+	}
+	return action, nil
+}
+
+func loadProductionWIPQualityActiveGate(ctx context.Context, client *ent.Client, action *productionWIPQualityActionContext) error {
+	batch, inspection := action.batch, action.inspection
+	operation, err := client.ProductionOrderOperation.Get(ctx, batch.ProductionOrderOperationID)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, biz.ErrProductionWIPInvalidRoute
+			return biz.ErrProductionWIPInvalidRoute
 		}
-		return nil, err
+		return err
 	}
 	if batch.Status != biz.ProductionWIPStatusWaitingQuality ||
 		operation.ID != batch.ProductionOrderOperationID ||
 		operation.ProductionOrderID != batch.ProductionOrderID ||
 		operation.ProductionOrderItemID != batch.ProductionOrderItemID ||
 		len(operation.RequiredQualityGates) == 0 {
-		return nil, biz.ErrProductionWIPInvalidTransition
+		return biz.ErrProductionWIPInvalidTransition
 	}
-	rows, err := tx.client.QualityInspection.Query().
+	rows, err := client.QualityInspection.Query().
 		Where(qualityinspection.ProductionWipBatchID(batch.ID)).
 		Order(ent.Asc(qualityinspection.FieldID)).
 		All(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	gateIndex, currentID, err := currentProductionWIPQualityGate(batch, operation, rows)
+	concessions, err := productionWIPQualityConcessions(ctx, client, batch)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	gateIndex, currentID, err := currentProductionWIPQualityGate(batch, operation, rows, concessions)
+	if err != nil {
+		return err
 	}
 	if currentID != inspection.ID {
-		return nil, biz.ErrProductionWIPInvalidTransition
+		return biz.ErrProductionWIPInvalidTransition
 	}
-	return &productionWIPQualityActionContext{
-		batch: batch, operation: operation, inspection: inspection, rows: rows, gateIndex: gateIndex,
-	}, nil
+	action.operation, action.rows, action.gateIndex = operation, rows, gateIndex
+	return nil
 }
 
 func currentProductionWIPQualityGate(
 	batch *ent.ProductionWIPBatch,
 	operation *ent.ProductionOrderOperation,
 	rows []*ent.QualityInspection,
+	concessions map[int]bool,
 ) (int, int, error) {
 	if batch == nil || operation == nil || len(operation.RequiredQualityGates) == 0 {
 		return -1, 0, biz.ErrProductionWIPInvalidRoute
@@ -1348,9 +1407,12 @@ func currentProductionWIPQualityGate(
 		if row == nil {
 			return -1, 0, biz.ErrProductionWIPQualityGateIncomplete
 		}
+		if row.Status == biz.QualityInspectionStatusRejected && concessions[row.ID] {
+			continue
+		}
 		switch row.Status {
 		case biz.QualityInspectionStatusPassed:
-		case biz.QualityInspectionStatusDraft, biz.QualityInspectionStatusSubmitted:
+		case biz.QualityInspectionStatusDraft, biz.QualityInspectionStatusSubmitted, biz.QualityInspectionStatusRejected:
 			for laterIndex := index + 1; laterIndex < len(operation.RequiredQualityGates); laterIndex++ {
 				laterGate := strings.ToUpper(strings.TrimSpace(operation.RequiredQualityGates[laterIndex]))
 				if activeByGate[laterGate] != nil {
@@ -1358,8 +1420,6 @@ func currentProductionWIPQualityGate(
 				}
 			}
 			return index, row.ID, nil
-		case biz.QualityInspectionStatusRejected:
-			return -1, 0, biz.ErrProductionWIPInvalidTransition
 		default:
 			return -1, 0, biz.ErrProductionWIPInvalidTransition
 		}
@@ -1564,6 +1624,11 @@ func validateProductionWIPQualityInspectionReferences(ctx context.Context, clien
 }
 
 func validateIncomingQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
+	if in != nil {
+		if err := validateQualityWarehouseAccess(ctx, in.SourceType, in.WarehouseID); err != nil {
+			return err
+		}
+	}
 	receipt, err := client.PurchaseReceipt.Get(ctx, in.PurchaseReceiptID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -1617,6 +1682,11 @@ func validateIncomingQualityInspectionReferences(ctx context.Context, client *en
 }
 
 func validateFinishedGoodsQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
+	if in != nil {
+		if err := validateQualityWarehouseAccess(ctx, in.SourceType, in.WarehouseID); err != nil {
+			return err
+		}
+	}
 	parent, err := client.Shipment.Get(ctx, in.SourceID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -1724,6 +1794,9 @@ func getLockedQualityInspection(ctx context.Context, tx *inventoryDBTx, inspecti
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrQualityInspectionNotFound
 		}
+		return nil, err
+	}
+	if err := validateQualityInspectionAccess(ctx, row); err != nil {
 		return nil, err
 	}
 	return row, nil

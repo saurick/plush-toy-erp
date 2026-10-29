@@ -8,6 +8,7 @@ import { getBusinessUsabilityEntry } from '../../erp/config/businessUsabilityCat
 import { getRoleHelpScenarios } from '../../erp/config/helpScenarios.mjs'
 import { ROLE_HELP_GUIDES } from '../../erp/config/roleHelpContent.mjs'
 import { HELP_REFERENCE_PAGES } from '../../erp/config/helpManualCatalog.mjs'
+import { printTemplateCatalog } from '../../erp/config/printTemplates.mjs'
 import {
   getBusinessHandbookIntroductions,
   getBusinessPageHandbookSections,
@@ -166,6 +167,23 @@ test('quantity design snapshot follows the canonical unit labels and precision',
       name,
       precision,
     }))
+  )
+})
+
+test('print center design descriptions follow the formal template catalog', () => {
+  const definition = read(UI_DESIGN_ASSET.path).match(
+    /const printTemplates = ([\s\S]*?);\n/u
+  )
+  assert(definition, '打印交互稿必须保留模板目录内容快照')
+  assert.deepEqual(
+    JSON.parse(definition[1]),
+    printTemplateCatalog.map(({ key, title, summary, guide }) => ({
+      key,
+      title,
+      summary,
+      guide: guide.map(({ title, description }) => ({ title, description })),
+    })),
+    '模板或分区说明变化后须同步独立交互稿'
   )
 })
 
@@ -355,7 +373,7 @@ test('UI design keeps persistent page headings concise like the formal ERP', () 
   )
   const viewer = read('web/src/dev-workbench/pages/DevUIDesignPage.jsx')
   const viewerHeading = viewer.match(
-    /<header className="erp-dev-ui-design-header">([\s\S]*?)<\/header>/u
+    /<DevPageHeader\b([\s\S]*?)\n      \/>/u
   )
 
   assert.ok(formHeaders.length >= 9)
@@ -371,8 +389,10 @@ test('UI design keeps persistent page headings concise like the formal ERP', () 
   assert.match(html, /if\(!setup\)return inModule \? '' :/u)
   assert.match(html, /<div class="module-tabs-row"><h1>\$\{hub.title\}<\/h1>/u)
   assert.match(html, /view-mode-row--secondary/u)
-  assert.match(viewerHeading[1], /<Tabs/u)
+  assert.match(viewerHeading[1], /navigation=\{\s*<Tabs/u)
+  assert.doesNotMatch(viewer, /erp-dev-workbench-toolbar/u)
   assert.match(workbenchHeading[1], /dev-design-tabs/u)
+  assert.match(workbenchHeading[1], /dev-design-heading-actions/u)
   assert.match(
     html,
     /function renderTopbarPageTitle\(\)[\s\S]*contentOwnsPageHeading\(\)[\s\S]*class="crumb"/u

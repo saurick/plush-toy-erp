@@ -4,8 +4,7 @@
 }
 
 .erp-feedback-guide-tools,
-.erp-feedback-example-heading,
-.erp-feedback-crosslinks {
+.erp-feedback-example-heading {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -306,10 +305,6 @@
   width: 80%;
   height: 7px;
   background: var(--erp-border, #dce4df);
-}
-
-.erp-feedback-crosslinks {
-  padding-block: 8px;
 }
 
 @media (max-width: 1100px) {

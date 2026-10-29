@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { buildDevCustomerScopedRoute } from '../../config/devCustomerScope.mjs'
 import { DEV_DELIVERY_TARGETS } from '../../config/devDelivery.mjs'
-import { DEV_TESTING_ROUTE } from '../../config/devRoutes.mjs'
 import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
 import { DeliveryTaskPath } from './DeliveryTaskPath.jsx'
 import DevVerificationEvidence from '../../components/DevVerificationEvidence.jsx'
@@ -73,7 +72,6 @@ export function DeliveryWorkspace({ items, scope }) {
         <DevStaticGuidance title="发布顺序">
           <DeliveryTaskPath title="发布上线的顺序" items={path} />
         </DevStaticGuidance>
-        <Link to={`${DEV_TESTING_ROUTE}?view=closeout`}>核对 Git 收口</Link>
       </div>
     </div>
   )

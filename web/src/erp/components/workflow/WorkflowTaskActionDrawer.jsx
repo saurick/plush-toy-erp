@@ -7,6 +7,11 @@ import {
   SendOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Drawer, Input, Tag, Typography } from 'antd'
+import { resolveMobileTaskBusinessEntry } from '../../mobile/utils/mobileTaskBusiness.mjs'
+import WorkflowTaskReceipt from './WorkflowTaskReceipt.jsx'
+import BusinessModal from '../business-list/BusinessModal.jsx'
+import { TaskBusinessWorkspaceContext, TaskBusinessInformationContext } from '../../hooks/useBusinessPageContext.js'
+import InventoryOperationTaskReview from '../inventory/InventoryOperationTaskReview.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import WorkflowFollowupDetails, { hasWorkflowFollowupDetails } from './WorkflowFollowupDetails.jsx'
@@ -22,8 +27,12 @@ import {
   getWorkflowTaskProcessContext,
   listWorkflowTaskEvents,
 } from '../../api/workflowApi.mjs'
-import { isEngineeringMaterialTask } from '../../utils/engineeringMaterialTask.mjs'
 import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
+import { workflowTaskBusinessContract } from '../../utils/workflowTaskBusinessContract.mjs'
+import useWorkflowTaskBusinessReadback from '../../hooks/useWorkflowTaskBusinessReadback.js'
+import useTaskBusinessInformation from '../../hooks/useTaskBusinessInformation.js'
+import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
+import { isEngineeringMaterialTask } from '../../utils/engineeringMaterialTask.mjs'
 import {
   getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
@@ -38,12 +47,16 @@ import {
   isWorkflowTaskActionReady,
   moveWorkflowTaskActionStep,
   orderWorkflowTaskActions,
+  workflowTaskCollaborationModes,
+  workflowTaskHandlingModes,
+  workflowTaskPrimaryModes,
   resolveWorkflowTaskActionInitialStep,
   resolveWorkflowTaskActionStep,
 } from '../../utils/workflowTaskActionFlow.mjs'
 import {
   isWorkflowApprovalTask,
   isWorkflowProcessDecisionTask,
+  workflowTaskActionRequiresReason,
 } from '../../utils/workflowTaskActionContract.mjs'
 import {
   buildWorkflowProcessDecision,
@@ -62,112 +75,28 @@ import { formatAdminIdentity } from '../../utils/adminIdentity.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import BusinessAttachmentModalButton from '../business-list/BusinessAttachmentModalButton.jsx'
-import WorkflowProcessStageTrack from './WorkflowProcessStageTrack.jsx'
 import WorkflowTaskHandlingChain from './WorkflowTaskHandlingChain.jsx'
+import { TASK_ACTION_META, getWorkflowTaskActionMeta } from '../../utils/workflowTaskActionPresentation.mjs'
+import WorkflowTaskSecondaryActions, { WorkflowTaskActionGroup } from './WorkflowTaskSecondaryActions.jsx'
 import WorkflowTaskEventTrail from './WorkflowTaskEventTrail.jsx'
+import WorkflowTaskBlockReason from './WorkflowTaskBlockReason.jsx'
+import { isWorkflowTaskBlockReasonReady } from '../../utils/workflowTaskBlockReason.mjs'
 
 const { Text, Title } = Typography
 const { TextArea } = Input
 
-export const TASK_ACTION_META = Object.freeze({
-  complete: {
-    title: '处理完成',
-    buttonLabel: '确认完成',
-    successMessage: '任务已处理完成',
-    requireReason: false,
-  },
-  block: {
-    title: '标记阻塞',
-    buttonLabel: '提交阻塞',
-    successMessage: '阻塞原因已记录',
-    requireReason: true,
-  },
-  reject: {
-    title: '退回任务',
-    buttonLabel: '提交退回',
-    successMessage: '退回原因已记录',
-    requireReason: true,
-  },
-  resume: {
-    title: '解除阻塞',
-    buttonLabel: '确认恢复待处理',
-    successMessage: '任务已解除阻塞',
-    requireReason: true,
-  },
-  urge: {
-    title: '催办',
-    buttonLabel: '提交催办',
-    successMessage: '催办已记录',
-    requireReason: true,
-  },
-  assign: {
-    title: '转交任务',
-    buttonLabel: '确认转交',
-    successMessage: '任务已转交',
-    requireReason: true,
-  },
-})
-
-export function getWorkflowTaskActionMeta(task = {}, actionMode = '') {
-  const base = TASK_ACTION_META[actionMode]
-  if (!base) return null
-
-  if (task?.task_group === 'business_followup' && actionMode === 'complete') {
-    return { ...base, requireReason: true }
-  }
-  const processLinked = Number(task?.process_instance_id || 0) > 0
-  if (!isWorkflowApprovalTask(task)) {
-    if (!processLinked) return base
-    if (actionMode === 'complete') {
-      return {
-        ...base,
-        successMessage: '任务已处理完成，系统已按结果自动流转',
-      }
-    }
-    if (actionMode === 'reject') {
-      return {
-        ...base,
-        successMessage: '任务已退回，系统已按结果自动流转',
-      }
-    }
-    return base
-  }
-  if (actionMode === 'complete') {
-    return {
-      ...base,
-      title: '审批通过',
-      buttonLabel: '确认通过',
-      successMessage: processLinked
-        ? '审批已通过，系统已按结果自动流转'
-        : '审批已通过',
-      requireReason: true,
-    }
-  }
-  if (actionMode === 'reject') {
-    return {
-      ...base,
-      title: '审批退回',
-      buttonLabel: '确认退回',
-      successMessage: processLinked
-        ? '审批已退回，系统已按结果自动流转'
-        : '审批已退回',
-    }
-  }
-  return base
-}
-
 const TASK_DRAWER_STEPS = Object.freeze([
   {
     key: 'context',
-    title: '核对任务',
+    title: '任务信息',
   },
   {
     key: 'action',
-    title: '选择处理',
+    title: '任务办理',
   },
   {
     key: 'confirm',
-    title: '确认与结果',
+    title: '结果回执',
   },
 ])
 
@@ -182,10 +111,10 @@ const TASK_ACTION_DESCRIPTIONS = Object.freeze({
 
 export function getTaskActionDescription(actionMode = '') {
   if (actionMode === 'complete') {
-    return '确认后只完成当前任务；库存、出货、财务、开票或付款仍需进入对应业务页面处理。'
+    return '确认后关闭当前任务；库存、出货与财务结果以实际业务办理记录为准。'
   }
   if (actionMode === 'block') {
-    return '请写清卡点原因、影响范围和需要谁协助，便于后续处理。'
+    return '选择受阻原因，需要时补充具体情况或需要谁协助。'
   }
   if (actionMode === 'reject') {
     return '请写清退回依据、需补齐事项和需要哪个岗位补充；退回不会撤销已经完成的业务处理。'
@@ -216,11 +145,15 @@ export default function WorkflowTaskActionDrawer({
   onOpenRelatedTask,
   task,
   profile,
-  actionReceipt = null,
+  actionReceipt: submittedReceipt = null,
   actionMode = '',
   startHandling = false,
+  collaborationOnly = false,
+  collaborationPopup = false,
+  collaborationPopupOpen = true,
+  onCollaborationClosed,
   actionReason = '',
-  actionSaving = false,
+  actionSaving: providedActionSaving = false,
   actionAvailabilityLoading = false,
   allowedActionModes = [],
   readonlyReason = '',
@@ -230,7 +163,8 @@ export default function WorkflowTaskActionDrawer({
   canViewAttachments = false,
   canManageAttachments = false,
   sourceSummary = null,
-  renderSourceAction = null,
+  renderSourceAction: providedSourceAction = null,
+  onTaskRead,
   onActionModeChange,
   onActionReasonChange,
   onAssignmentTargetChange,
@@ -240,6 +174,25 @@ export default function WorkflowTaskActionDrawer({
   onOpenEntry,
   onSubmit,
 }) {
+  const WorkflowTaskBusinessWorkspace = React.useContext(TaskBusinessWorkspaceContext)
+  const [businessSaving, setBusinessSaving] = React.useState(false)
+  const actionSaving = providedActionSaving || businessSaving
+  const [businessReceipt, setBusinessReceipt] = React.useState(null)
+  const [collaborationOpen, setCollaborationOpen] = React.useState(false)
+  const collaborationTriggerRef = React.useRef(null)
+  const primaryDraftRef = React.useRef(null)
+  const information = useTaskBusinessInformation(`${workflowTaskAdminAccessRequestIdentity(profile)}:${Boolean(profile?.disabled)}:${task?.id}:${task?.version}:${task?.source_type}:${task?.source_id}`)
+  const [reviewing, setReviewing] = React.useState(false)
+  const businessLeaveGuard = React.useRef(null)
+  const businessReceiptAction = React.useRef(null)
+  const [businessReceiptReady, setBusinessReceiptReady] = React.useState(false)
+  const registerReceiptAction = React.useCallback((action) => {
+    businessReceiptAction.current = action
+    setBusinessReceiptReady(Boolean(action))
+  }, [])
+  const receiptScope = `${profile?.id}:${task?.id}`
+  const actionReceipt = submittedReceipt || (businessReceipt?.scope === receiptScope ? businessReceipt : null)
+  const sourceReadback = useWorkflowTaskBusinessReadback({ task, profile, enabled: !actionReceipt })
   const hasActionReceipt = Boolean(actionReceipt && task)
   const actionMeta = getWorkflowTaskActionMeta(task, actionMode)
   const approvalTask = isWorkflowApprovalTask(task)
@@ -260,18 +213,62 @@ export default function WorkflowTaskActionDrawer({
     ? getWorkflowTaskActionOutcomeHint({ task, actionMode })
     : ''
   const canOpenRelatedEntry = Boolean(task && canOpenEntry && onOpenEntry)
-  const allowedActionModeSet = new Set(allowedActionModes)
+  const handlingActionModes = workflowTaskHandlingModes(allowedActionModes)
+  const allowedActionModeSet = new Set(handlingActionModes)
   const canSubmitAction = Boolean(
     actionMode && allowedActionModeSet.has(actionMode) && !isTerminal
   )
+  const materialTask = isEngineeringMaterialTask(task)
+  const hasBusinessPage = Boolean(WorkflowTaskBusinessWorkspace && resolveMobileTaskBusinessEntry(task)) && workflowTaskBusinessContract(task).containedBusiness && (!approvalTask || materialTask) && !collaborationOnly
+  const renderSourceAction = (materialTask && hasBusinessPage ? null : providedSourceAction) || (hasBusinessPage ? (render) => (
+    <WorkflowTaskBusinessWorkspace controls={{
+      device: 'desktop',
+task,
+profile,
+roleKey: task.owner_role_key,
+      onTaskRead,
+      onBack: () => selectStep('context'),
+      onOpenTask: onOpenRelatedTask,
+      registerLeaveGuard: (guard) => { businessLeaveGuard.current = guard },
+      registerReceiptAction,
+      collaborationExternal: true,
+      onBusyChange: setBusinessSaving,
+      onConfirmTask: allowedActionModes.includes('complete') ? () => { setCollaborationOpen(true); onActionModeChange?.('complete') } : undefined,
+      onReceipt: (result) => {
+        setBusinessReceipt({ ...result, scope: receiptScope, actionTitle: result.message || '业务办理', businessResult: true })
+        setActiveStepKey('confirm')
+      },
+      render: ({ content, footer, actionHostRef }) => render({
+        content,
+        footer: <><div ref={actionHostRef} className="mobile-task-business-action-host" />{footer}</>,
+      }),
+    }}
+    />
+  ) : null)
   const hasSourceAction = typeof renderSourceAction === 'function'
+  const secondaryActions = !isTerminal
+    ? workflowTaskCollaborationModes(allowedActionModes).map((mode) => ({
+        key: mode,
+        label: getWorkflowTaskActionMeta(task, mode).title,
+        onClick: (trigger) => {
+          collaborationTriggerRef.current = trigger
+          primaryDraftRef.current = { mode: actionMode, reason: actionReason, reviewing }
+          setReviewing(false)
+          onActionModeChange?.(mode)
+          onActionReasonChange?.(mode === 'block' ? taskReason : '')
+          setCollaborationOpen(true)
+        },
+      }))
+    : []
   const canChooseActions = hasSourceAction || allowedActionModes.length > 0
   const taskIdentity = task
     ? String(task.id || task.task_code || task.task_name || '')
     : ''
   const [activeStepKey, setActiveStepKey] = React.useState('context')
+  const [businessTaskVisited, setBusinessTaskVisited] = React.useState('')
   const showTaskContext = activeStepKey === 'context'
   const [sourceFooter, setSourceFooter] = React.useState(null)
+  const [reviewedInventoryID, setReviewedInventoryID] = React.useState(0)
   const [taskEvents, setTaskEvents] = React.useState([])
   const [taskEventsTruncated, setTaskEventsTruncated] = React.useState(false)
   const [taskEventsState, setTaskEventsState] = React.useState('idle')
@@ -288,7 +285,7 @@ export default function WorkflowTaskActionDrawer({
   const stepButtonRefs = React.useRef(new Map())
   const actionOptionRefs = React.useRef(new Map())
   const visibleActionModes = orderWorkflowTaskActions({
-    actions: allowedActionModes.filter((mode) => TASK_ACTION_META[mode]),
+    actions: workflowTaskPrimaryModes(handlingActionModes).filter((mode) => TASK_ACTION_META[mode]),
     approvalTask,
   })
   const processDecisionRequired =
@@ -333,38 +330,31 @@ export default function WorkflowTaskActionDrawer({
       ?.label || ''
   const hasVisibleActionSelection = visibleActionModes.includes(actionMode)
   const canConfirm =
+    (actionMode !== 'block' || isWorkflowTaskBlockReasonReady(actionReason)) &&
+    (actionMode !== 'complete' || task?.source_type !== 'inventory_operation' || reviewedInventoryID === Number(task.source_id)) &&
     assignmentTargetValid &&
     processDecisionReady &&
     !approvedQuantityError &&
     isWorkflowTaskActionReady({
       actionMode,
       actionReason,
-      allowedActionModes,
-      requireReason: Boolean(actionMeta?.requireReason),
+      allowedActionModes: handlingActionModes,
+      requireReason: workflowTaskActionRequiresReason(task, actionMode),
     })
-  const actionStepAvailability = React.useMemo(
-    () =>
-      getWorkflowTaskActionStepAvailability({
-        canChooseActions,
-        canConfirm,
-      }),
-    [canChooseActions, canConfirm]
-  )
-  const stepAvailability = React.useMemo(
-    () =>
-      hasActionReceipt
-        ? { context: true, action: false, confirm: true }
-        : hasSourceAction
-          ? { context: true, action: true, confirm: false }
-          : actionStepAvailability,
-    [actionStepAvailability, hasActionReceipt, hasSourceAction]
-  )
+  const stepAvailability = React.useMemo(() => getWorkflowTaskActionStepAvailability({ hasReceipt: hasActionReceipt || businessReceiptReady, isTerminal }), [hasActionReceipt, businessReceiptReady, isTerminal])
+  React.useEffect(() => {
+    if (activeStepKey === 'action') setBusinessTaskVisited(taskIdentity)
+  }, [activeStepKey, taskIdentity])
   React.useEffect(() => {
     if (taskIdentity === previousTaskIdentityRef.current) return
     previousTaskIdentityRef.current = taskIdentity
     setApprovedQuantity('')
+    setBusinessReceipt(null)
+    primaryDraftRef.current = null
+    setCollaborationOpen(!collaborationPopup && workflowTaskCollaborationModes([actionMode]).includes(actionMode))
+    setReviewing(false)
     setActiveStepKey(resolveWorkflowTaskActionInitialStep(actionMode))
-  }, [actionMode, taskIdentity])
+  }, [actionMode, collaborationPopup, taskIdentity])
 
   React.useEffect(() => {
     if (!task) {
@@ -383,7 +373,7 @@ export default function WorkflowTaskActionDrawer({
   }, [startHandling, taskIdentity, actionAvailabilityLoading, canChooseActions, isTerminal, hasActionReceipt])
 
   React.useEffect(() => {
-    if (hasActionReceipt) setActiveStepKey('confirm')
+    if (hasActionReceipt) { setCollaborationOpen(false); setActiveStepKey('confirm') }
   }, [hasActionReceipt, taskIdentity, task?.version])
 
   React.useEffect(() => {
@@ -469,18 +459,24 @@ export default function WorkflowTaskActionDrawer({
     setActiveStepKey('action')
   }
 
-  const selectStep = (stepKey) => {
-    if (actionSaving) return
+  const selectStep = async (stepKey) => {
+    if (actionSaving || stepKey === activeStepKey || !stepAvailability[stepKey]) return
+    if (stepKey === 'confirm' && businessReceiptReady && !submittedReceipt) {
+      await businessReceiptAction.current?.()
+      return
+    }
+    setReviewing(false)
     const nextStep = resolveWorkflowTaskActionStep({
       requestedStep: stepKey,
       availability: stepAvailability,
       fallbackStep: activeStepKey,
     })
     setActiveStepKey(nextStep)
-    if (nextStep === 'context') requestAnimationFrame(() => contextActionRef.current?.focus())
+    if (nextStep === 'context') requestAnimationFrame(() => contextActionRef.current?.focus({ preventScroll: true }))
   }
 
   const submitAction = () => {
+    if (actionSaving || !canSubmitAction || !canConfirm || isTerminal) return
     let processDecision = null
     if (processDecisionRequired) {
       try {
@@ -525,7 +521,7 @@ export default function WorkflowTaskActionDrawer({
       })
     }
     event.preventDefault()
-    setActiveStepKey(nextStepKey)
+    selectStep(nextStepKey)
     requestAnimationFrame(() =>
       (nextStepKey === 'context' ? contextActionRef.current : stepButtonRefs.current.get(nextStepKey))?.focus()
     )
@@ -579,14 +575,17 @@ export default function WorkflowTaskActionDrawer({
   const taskResources = task && showTaskContext && sourceSummary ? (
     <div className="erp-task-action-drawer__resources">{sourceSummary}</div>
   ) : null
-  const taskAttachments = task && showTaskContext && canViewAttachments ? (
+  const taskAttachments = task && canViewAttachments ? (
     <BusinessAttachmentModalButton
       ownerType="workflow_task"
       ownerId={task.id}
       ownerVersion={task.version}
-      buttonText="查看附件"
+      buttonText="任务附件"
+      countLabel="任务附件"
+      emptyUploadLabel="添加任务附件"
+      emptyReadLabel="查看任务附件"
       modalTitle="任务附件"
-      panelTitle="附件内容"
+      panelTitle="任务附件"
       description={canManageAttachments ? '上传照片、异常截图或处理凭证。' : '查看照片、异常截图或处理凭证。'}
       canUpload={canManageAttachments}
       canWithdraw={canManageAttachments}
@@ -597,293 +596,23 @@ export default function WorkflowTaskActionDrawer({
     />
   ) : null
 
-  // 外壳预先挂载，避免入场动画尚未结束就关闭时 Portal 被移除、跳过焦点恢复。
-  // 任务内容仍随 task 清空，不在关闭状态读取任务或附件。
-  return (
-    <Drawer
-      title={
-        <div className="erp-task-action-drawer__heading">
-          <strong className="erp-task-action-drawer__title">
-            {hasActionReceipt
-              ? '办理结果'
-              : approvalTask
-                ? '审批详情'
-                : '任务详情'}
+  const actionWorkspace = (
+    <div className="erp-task-action-drawer__action-workspace">
+      {isTerminal && activeStepKey === 'action' ? <WorkflowTaskReceipt task={task} events={taskEvents} state={taskEventsState} /> : null}
+      <section className="erp-task-action-drawer__action-choices" hidden={Boolean((collaborationOpen || collaborationPopup) && actionMode)}>
+        <div className="erp-task-action-drawer__action-prompt">
+          <strong>
+            {isTerminal ? '已记录的办理资料' : visibleActionModes.length ? '选择处理方式' : secondaryActions.length ? '请在底部选择任务协作操作' : '办理资料'}
           </strong>
+
         </div>
-      }
-      extra={task ? <WorkflowTaskCopySummary task={taskWithSource} assigneeLabel={hasActionReceipt ? '' : currentAssigneeLabel} compact /> : null}
-      width="min(640px, calc(100vw - 24px))"
-      open={Boolean(task)}
-      forceRender
-      closeIcon={<LeftOutlined aria-hidden />}
-      closable={actionSaving ? false : { placement: 'start', 'aria-label': onReturnToTracking ? '返回流程' : closeLabel }}
-      maskClosable={!actionSaving}
-      keyboard={!actionSaving}
-      onClose={() => {
-        if (!actionSaving) (onReturnToTracking || onClose)?.()
-      }}
-      className={`erp-workflow-drawer erp-task-action-drawer${activeStepKey === 'context' ? ' erp-task-action-drawer--context' : ''}`}
-      footer={
-        showFooter ? (
-          <div className="erp-task-action-drawer__footer">
-            <div
-              ref={setSourceFooter}
-              className="erp-material-task-action__footer-host"
-              hidden={
-                !hasSourceAction ||
-                activeStepKey !== 'action' ||
-                hasActionReceipt
-              }
-            />
-            <div
-              className="erp-task-action-drawer__footer-nav"
-              hidden={
-                hasSourceAction &&
-                activeStepKey === 'action' &&
-                !hasActionReceipt
-              }
-            >
-              {taskAttachments}
-              {taskResources}
-              {hasActionReceipt ? <Button onClick={() => selectStep(showTaskContext ? 'confirm' : 'context')}>{showTaskContext ? '查看结果回执' : '回看任务'}</Button> : null}
-              {!hasActionReceipt && activeStepKey !== 'context' ? (
-                <Button
-                  disabled={actionSaving}
-                  onClick={() =>
-                    selectStep(
-                      activeStepKey === 'confirm' ? 'action' : 'context'
-                    )
-                  }
-                >
-                  上一步
-                </Button>
-              ) : null}
-              {showTaskContext && canOpenRelatedEntry ? (
-                <Button
-                  icon={<ExportOutlined aria-hidden="true" />}
-                  disabled={actionSaving}
-                  onClick={() => onOpenEntry(task)}
-                >
-                  {isTerminalWorkflowTask(task) ? '查看单据' : '进入单据办理'}
-                </Button>
-              ) : null}
-
-            </div>
-            <div className="erp-task-action-drawer__footer-primary">
-              {hasActionReceipt ? (
-                <Button type="primary" onClick={() => onClose?.()}>
-                  完成并关闭
-                </Button>
-              ) : activeStepKey === 'context' && canChooseActions ? (
-                <Button
-                  ref={contextActionRef}
-                  type="primary"
-                  disabled={actionSaving}
-                  onClick={() => selectStep('action')}
-                >
-                  {hasSourceAction ? '处理任务' : '选择处理方式'}
-                </Button>
-              ) : null}
-              {!hasActionReceipt &&
-              !hasSourceAction &&
-              activeStepKey === 'action' ? (
-                <Button
-                  type="primary"
-                  disabled={actionSaving || !canConfirm}
-                  title={
-                    canConfirm
-                      ? undefined
-                      : processDecisionRequired && !processDecisionReady
-                        ? '审批表单尚未与当前流程节点核对完成'
-                        : approvedQuantityError ||
-                          (actionMeta?.requireReason
-                            ? '先选择处理方式并填写原因'
-                            : '先选择处理方式')
-                  }
-                  onClick={() => selectStep('confirm')}
-                >
-                  核对并确认
-                </Button>
-              ) : null}
-              {!hasActionReceipt && activeStepKey === 'confirm' ? (
-                <Button
-                  type="primary"
-                  danger={actionMode === 'block' || actionMode === 'reject'}
-                  icon={<SendOutlined />}
-                  loading={actionSaving}
-                  disabled={actionSaving || !canSubmitAction || !canConfirm}
-                  onClick={submitAction}
-                >
-                  {actionMeta?.buttonLabel || '确认提交'}
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        ) : null
-      }
-    >
-      {task ? (
-        <div
-          ref={navigationRef}
-          className="erp-task-action-drawer__navigation"
-        >
-          <section
-            className="erp-task-action-drawer__guide"
-            aria-label="任务处理导引"
+        {!isTerminal && visibleActionModes.length > 0 ? (
+          <div
+            className="erp-task-action-drawer__action-options"
+            role="radiogroup"
+            aria-label="处理方式"
           >
-            <SlidingTabList
-              className="erp-task-action-drawer__guide-steps"
-              role="tablist"
-              aria-label="任务处理步骤"
-            >
-              {TASK_DRAWER_STEPS.map((baseStep, index) => {
-                const step =
-                  hasSourceAction && baseStep.key !== 'context'
-                    ? {
-                        ...baseStep,
-                        title:
-                          baseStep.key === 'action' ? '处理任务' : '办理结果',
-                      }
-                    : baseStep
-                const active = step.key === activeStepKey
-                const available = stepAvailability[step.key]
-                const interactive =
-                  available && !actionSaving && (!hasActionReceipt || step.key !== 'action')
-                return (
-                  <button
-                    type="button"
-                    key={step.key}
-                    ref={(node) => {
-                      if (node) stepButtonRefs.current.set(step.key, node)
-                      else stepButtonRefs.current.delete(step.key)
-                    }}
-                    id={`erp-task-action-step-${step.key}-tab`}
-                    role="tab"
-                    aria-selected={active}
-                    aria-controls={`erp-task-action-step-${step.key}`}
-                    aria-disabled={!interactive}
-                    disabled={!interactive}
-                    tabIndex={active ? 0 : -1}
-                    title={
-                      actionSaving
-                        ? '正在提交，请稍候'
-                        : available
-                          ? `进入${step.title}`
-                          : step.key === 'confirm'
-                            ? '先选择处理方式并补齐必填信息'
-                            : '当前账号没有可用的处理方式'
-                    }
-                    className={[
-                      'erp-task-action-drawer__step',
-                      active ? 'erp-task-action-drawer__step--active' : '',
-                      !interactive
-                        ? 'erp-task-action-drawer__step--disabled'
-                        : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    onClick={() => interactive && selectStep(step.key)}
-                    onKeyDown={(event) => handleStepKeyDown(event, step.key)}
-                  >
-                    <span>{index + 1}</span>
-                    <strong>{step.title}</strong>
-                  </button>
-                )
-              })}
-            </SlidingTabList>
-          </section>
-        </div>
-      ) : null}
-      {task ? (
-        <div className="erp-task-action-drawer__body" aria-busy={actionSaving}>
-          {showTaskContext ? (
-            <WorkflowTaskInfoCard
-              task={taskWithSource}
-              title={taskDisplayName}
-              titleClassName="erp-task-action-drawer__task-title"
-              status={<Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag>}
-              source={<div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} onOpen={canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div>}
-              assigneeLabel={currentAssigneeLabel}
-              events={taskEventsState === 'ready' ? taskEvents : []}
-              businessInfo={hasWorkflowFollowupDetails(task) ? <WorkflowFollowupDetails task={task} /> : null}
-              summary={<WorkflowTaskCurrentSummary appearance="facts" task={task} roleLabel={ownerRoleLabel} assigneeLabel={currentAssigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={taskReason} contact={exceptionContact} guidance={actionAvailabilityLoading ? '正在确认可用的处理方式' : !canChooseActions ? readonlyReason || '当前账号不能直接处理该任务。' : ''} />}
-            />
-          ) : (
-            <section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">
-              <div className="erp-task-copy-heading"><Title level={2} className="erp-task-action-drawer__task-title">{taskDisplayName}</Title><Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag></div>
-              {!hasActionReceipt ? <div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} copyable={false} onOpen={canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div> : null}
-              {hasActionReceipt ? <div className="erp-task-action-drawer__receipt-context"><WorkflowTaskSource task={taskWithSource} copyable={false} /><span>本次责任岗位：{ownerRoleLabel || '待确认'}</span><WorkflowTaskTiming task={task} detail compact events={taskEventsState === 'ready' ? taskEvents : []} /></div> : null}
-            </section>
-          )}
-
-          {(hasActionReceipt && isEngineeringMaterialTask(task)) || activeStepKey === 'context' ? (
-            <section className="workflow-task-info-card">
-              <WorkflowTaskHandlingChain
-                onOpenTracking={onReturnToTracking}
-                onOpenTask={onOpenRelatedTask}
-                task={task}
-                profile={profile}
-                focused
-                processContext={processContext}
-                processContextState={processContextState}
-                onRetryProcess={() => setProcessContextReloadKey((current) => current + 1)}
-              />
-            </section>
-          ) : null}
-
-          <section
-            id="erp-task-action-step-context"
-            role="tabpanel"
-            aria-labelledby="erp-task-action-step-context-tab"
-            hidden={activeStepKey !== 'context'}
-            className="erp-task-action-drawer__step-panel"
-          >
-            <WorkflowTaskEventTrail
-              className="workflow-task-info-card workflow-task-info-card--records"
-              approvalTask={approvalTask}
-              errorMessage={taskEventsError}
-              events={taskEvents}
-              state={taskEventsState}
-              task={task}
-              truncated={taskEventsTruncated}
-              showResponsibility={false}
-              collapsible
-            />
-          </section>
-
-          <section
-            id="erp-task-action-step-action"
-            role="tabpanel"
-            aria-labelledby="erp-task-action-step-action-tab"
-            hidden={activeStepKey !== 'action'}
-            className="erp-task-action-drawer__step-panel"
-          >
-            {hasSourceAction ? (
-              !hasActionReceipt && activeStepKey === 'action' ? (
-                renderSourceAction(({ content, footer }) => (
-                  <div className="erp-material-task-action">
-                    {content}
-                    {sourceFooter ? createPortal(footer, sourceFooter) : null}
-                  </div>
-                ))
-              ) : null
-            ) : (
-              <div className="erp-task-action-drawer__action-workspace">
-                <section className="erp-task-action-drawer__action-choices">
-                  <div className="erp-task-action-drawer__action-prompt">
-                    <strong>
-                      {canChooseActions ? '选择处理方式' : '当前只能查看任务'}
-                    </strong>
-
-                  </div>
-                  {canChooseActions ? (
-                    <div
-                      className="erp-task-action-drawer__action-options"
-                      role="radiogroup"
-                      aria-label="处理方式"
-                    >
-                      {visibleActionModes.map((mode, index) => {
+            {visibleActionModes.map((mode, index) => {
                         const meta = getWorkflowTaskActionMeta(task, mode)
                         const selected = actionMode === mode
                         return (
@@ -930,64 +659,64 @@ export default function WorkflowTaskActionDrawer({
                           </button>
                         )
                       })}
-                    </div>
+          </div>
                   ) : null}
-                </section>
-                {actionMeta ? (
-                  <section className="erp-task-action-drawer__action-panel">
-                    <div className="erp-task-action-drawer__action-head">
-                      <div>
-                        <BusinessHelpLabel label={actionMeta.title} description={`${TASK_ACTION_DESCRIPTIONS[actionMode]} ${getTaskActionDescription(actionMode)}`} />
-                      </div>
-                      <Tag
-                        color={actionMeta.requireReason ? 'orange' : 'green'}
-                      >
-                        {actionMeta.requireReason
-                          ? approvalTask && actionMode === 'complete'
-                            ? '必须填写审批意见'
-                            : '必须填写原因'
-                          : '确认即可'}
-                      </Tag>
-                    </div>
-                    {actionMode === 'assign' ? (
-                      <div className="erp-task-action-drawer__assignment">
-                        <label htmlFor="erp-task-assignment-target">
-                          转交去向
-                        </label>
-                        <Select
-                          id="erp-task-assignment-target"
-                          value={assignmentTarget}
-                          options={assignmentOptions}
-                          showSearch
-                          optionFilterProp="label"
-                          disabled={
+      </section>
+      {!isTerminal && actionMeta ? (
+        <section className={actionMode === 'block' ? 'workflow-task-block-panel' : 'erp-task-action-drawer__action-panel'}>
+          {actionMode !== 'block' ? (
+            <div className="erp-task-action-drawer__action-head">
+              <div>
+                <BusinessHelpLabel label={actionMeta.title} description={`${TASK_ACTION_DESCRIPTIONS[actionMode]} ${getTaskActionDescription(actionMode)}`} />
+              </div>
+              <Tag color={actionMeta.requireReason ? 'orange' : 'green'}>
+                {actionMeta.requireReason
+                  ? approvalTask && actionMode === 'complete'
+                    ? '必须填写审批意见'
+                    : '必须填写原因'
+                  : '确认即可'}
+              </Tag>
+            </div>
+          ) : null}
+          {actionMode === 'assign' ? (
+            <div className="erp-task-action-drawer__assignment">
+              <label htmlFor="erp-task-assignment-target">
+                转交去向
+              </label>
+              <Select
+                id="erp-task-assignment-target"
+                value={assignmentTarget}
+                options={assignmentOptions}
+                showSearch
+                optionFilterProp="label"
+                disabled={
                             actionSaving ||
                             !canSubmitAction ||
                             assignmentAccess.loading
                           }
-                          placeholder={
+                placeholder={
                             assignmentAccess.loading
                               ? '正在加载可选接收人'
                               : '选择接收人，或由岗位人员处理'
                           }
-                          notFoundContent={
+                notFoundContent={
                             assignmentAccess.stale
                               ? '任务信息已更新，请刷新任务列表'
                               : assignmentAccess.failed
                                 ? '转交信息加载失败，请关闭后重试'
                                 : '当前没有符合条件的接收人'
                           }
-                          onChange={(value) =>
+                onChange={(value) =>
                             onAssignmentTargetChange?.(value)
                           }
-                        />
-                        {assignmentAccess.stale ? (
-                          <Alert
-                            type="warning"
-                            showIcon
-                            message="任务信息已更新"
-                            description="请刷新任务列表后重新打开当前任务，系统不会使用旧版本的转交候选人。"
-                          />
+              />
+              {assignmentAccess.stale ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="任务信息已更新"
+                  description="请刷新任务列表后重新打开当前任务，系统不会使用旧版本的转交候选人。"
+                />
                         ) : assignmentAccess.failed ? (
                           <Alert
                             type="warning"
@@ -996,20 +725,20 @@ export default function WorkflowTaskActionDrawer({
                             description="其他任务操作不受影响；关闭抽屉后可重新加载转交候选人。"
                           />
                         ) : null}
-                      </div>
+            </div>
                     ) : null}
-                    {!canSubmitAction ? (
-                      <Alert
-                        type="warning"
-                        showIcon
-                        message="当前账号不能提交这项操作"
-                        description={
+          {!canSubmitAction ? (
+            <Alert
+              type="warning"
+              showIcon
+              message="当前账号不能提交这项操作"
+              description={
                           readonlyReason ||
                           '请确认任务状态、负责岗位和可用操作。'
                         }
-                      />
+            />
                     ) : null}
-                    {processDecisionRequired &&
+          {processDecisionRequired &&
                     processContextState === 'loading' ? (
                       <Text type="secondary" role="status">
                         正在核对当前流程的审批表单，核对完成前不能提交。
@@ -1022,14 +751,20 @@ export default function WorkflowTaskActionDrawer({
                         description="请关闭后刷新任务再试；系统不会按任务名称或页面入口猜测审批字段。"
                       />
                     ) : null}
-                    {actionMeta.requireReason ? (
-                      <TextArea
-                        value={actionReason}
-                        autoSize={{ minRows: 4, maxRows: 6 }}
-                        maxLength={180}
-                        showCount
-                        disabled={actionSaving || !canSubmitAction}
-                        placeholder={
+          {actionMode === 'block' ? (
+            <WorkflowTaskBlockReason
+              value={actionReason}
+              onChange={onActionReasonChange}
+              disabled={actionSaving || !canSubmitAction}
+            />
+          ) : actionMeta.requireReason ? (
+            <TextArea
+              value={actionReason}
+              autoSize={{ minRows: 4, maxRows: 6 }}
+              maxLength={180}
+              showCount
+              disabled={actionSaving || !canSubmitAction}
+              placeholder={
                           task?.task_group === 'business_followup' && actionMode === 'complete'
                             ? '填写处理结果和需要发起人了解的情况'
                             : approvalTask && actionMode === 'complete'
@@ -1038,172 +773,80 @@ export default function WorkflowTaskActionDrawer({
                               ? '填写请假、人员调整等转交原因'
                               : '填写原因、影响范围、需要谁协助'
                         }
-                        onChange={(event) =>
+              onChange={(event) =>
                           onActionReasonChange?.(event.target.value)
                         }
-                      />
+            />
                     ) : (
                       <div className="erp-task-action-drawer__confirm-copy">
                         <CheckCircleOutlined aria-hidden="true" />
                         <span>
-                          提交后任务会进入已完成；相关业务是否办结，请到对应业务页面确认。
+                          提交后关闭当前任务，业务结果以实际办理记录为准。
                         </span>
                       </div>
                     )}
-                    {approvedQuantityAllowed ? (
-                      <div className="erp-task-action-drawer__assignment">
-                        <label htmlFor="erp-task-approved-quantity">
-                          批准数量（可选）
-                        </label>
-                        <Input
-                          id="erp-task-approved-quantity"
-                          inputMode="decimal"
-                          value={approvedQuantity}
-                          status={approvedQuantityError ? 'error' : undefined}
-                          disabled={actionSaving || !canSubmitAction}
-                          placeholder="留空表示按申请数量批准"
-                          onChange={(event) =>
+          {approvedQuantityAllowed ? (
+            <div className="erp-task-action-drawer__assignment">
+              <label htmlFor="erp-task-approved-quantity">
+                批准数量（可选）
+              </label>
+              <Input
+                id="erp-task-approved-quantity"
+                inputMode="decimal"
+                value={approvedQuantity}
+                status={approvedQuantityError ? 'error' : undefined}
+                disabled={actionSaving || !canSubmitAction}
+                placeholder="留空表示按申请数量批准"
+                onChange={(event) =>
                             setApprovedQuantity(event.target.value)
                           }
-                        />
-                        {approvedQuantityError ? (
-                          <Alert
-                            type="error"
-                            showIcon
-                            message={approvedQuantityError}
-                          />
+              />
+              {approvedQuantityError ? (
+                <Alert
+                  type="error"
+                  showIcon
+                  message={approvedQuantityError}
+                />
                         ) : null}
-                      </div>
+            </div>
                     ) : null}
-                  </section>
+        </section>
                 ) : null}
-              </div>
-            )}
-          </section>
-
-          <section
-            id="erp-task-action-step-confirm"
-            role="tabpanel"
-            aria-labelledby="erp-task-action-step-confirm-tab"
-            hidden={activeStepKey !== 'confirm'}
-            className="erp-task-action-drawer__step-panel"
-          >
-            {hasActionReceipt ? (
-              <div
-                className="erp-task-action-drawer__confirm-panel"
-                data-testid="workflow-task-action-receipt"
-              >
-                <div
-                  className="erp-task-action-drawer__confirm-copy"
-                  role="status"
-                >
-                  <CheckCircleOutlined aria-hidden="true" />
-                  <span>
-                    <strong>办理结果已确认</strong>
-                    <br />
-                    {actionReceipt.successMessage ||
-                      '本次办理结果已由系统确认。'}
-                  </span>
-                </div>
-                <dl className="erp-task-action-drawer__confirm-list">
-                  <div>
-                    <dt>当前任务</dt>
-                    <dd>{taskDisplayName}</dd>
-                  </div>
-                  <div>
-                    <dt>已确认方式</dt>
-                    <dd>
-                      {actionReceipt.actionTitle ||
-                        actionMeta?.title ||
-                        '任务办理'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>确认状态</dt>
-                    <dd>
-                      {actionReceipt.statusLabel ||
-                        statusMeta?.label ||
-                        '已确认'}
-                    </dd>
-                  </div>
-                  {String(actionReceipt.reason || '').trim() ? (
-                    <div>
-                      <dt>处理说明</dt>
-                      <dd>{String(actionReceipt.reason).trim()}</dd>
-                    </div>
+    </div>
+  )
+  const reviewPanel = task && actionMeta ? (
+    <div className="erp-task-action-drawer__confirm-panel">
+      <div className="erp-task-action-drawer__confirm-head">
+        <span>即将提交</span>
+        <strong>{actionMeta.title}</strong>
+      </div>
+      <dl className="erp-task-action-drawer__confirm-list">
+        <div>
+          <dt>当前任务</dt>
+          <dd>{taskDisplayName}</dd>
+        </div>
+        <div>
+          <dt>处理方式</dt>
+          <dd>{actionMeta.title}</dd>
+        </div>
+        {actionMeta.requireReason ? (
+          <div>
+            <dt>处理原因</dt>
+            <dd>{actionReason.trim()}</dd>
+          </div>
                   ) : null}
-                </dl>
-                <div
-                  className="erp-task-action-drawer__outcome-note"
-                  data-tone="info"
-                >
-                  <strong>流程交接结果</strong>
-                  {actionReceipt.handoffMessage ? (
-                    <span>{actionReceipt.handoffMessage}</span>
-                  ) : task.process_instance_id ? (
-                    processContextState === 'loading' ? (
-                      <Text type="secondary" role="status">
-                        正在读取流程交接结果
-                      </Text>
-                    ) : processContextState === 'error' ? (
-                      <>
-                        <Text type="danger" role="alert">
-                          暂时无法读取流程交接结果
-                        </Text>
-                        <Button
-                          size="small"
-                          onClick={() =>
-                            setProcessContextReloadKey((current) => current + 1)
-                          }
-                        >
-                          重新读取
-                        </Button>
-                      </>
-                    ) : processContext ? (
-                      <WorkflowProcessStageTrack context={processContext} />
-                    ) : null
-                  ) : (
-                    <span>
-                      {isTerminal
-                        ? '本任务已结束，没有关联的后续业务流程。'
-                        : '本次操作不触发流程流转，任务仍由当前负责岗位继续办理。'}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : actionMeta ? (
-              <div className="erp-task-action-drawer__confirm-panel">
-                <div className="erp-task-action-drawer__confirm-head">
-                  <span>即将提交</span>
-                  <strong>{actionMeta.title}</strong>
-                </div>
-                <dl className="erp-task-action-drawer__confirm-list">
-                  <div>
-                    <dt>当前任务</dt>
-                    <dd>{taskDisplayName}</dd>
-                  </div>
-                  <div>
-                    <dt>处理方式</dt>
-                    <dd>{actionMeta.title}</dd>
-                  </div>
-                  {actionMeta.requireReason ? (
-                    <div>
-                      <dt>处理原因</dt>
-                      <dd>{actionReason.trim()}</dd>
-                    </div>
+        {approvedQuantityAllowed && approvedQuantity.trim() ? (
+          <div>
+            <dt>批准数量</dt>
+            <dd>{approvedQuantity.trim()}</dd>
+          </div>
                   ) : null}
-                  {approvedQuantityAllowed && approvedQuantity.trim() ? (
-                    <div>
-                      <dt>批准数量</dt>
-                      <dd>{approvedQuantity.trim()}</dd>
-                    </div>
-                  ) : null}
-                  {actionMode === 'assign' ? (
-                    <>
-                      <div>
-                        <dt>当前处理人</dt>
-                        <dd>
-                          {(assignmentAccess.current_assignee
+        {actionMode === 'assign' ? (
+          <>
+            <div>
+              <dt>当前处理人</dt>
+              <dd>
+                {(assignmentAccess.current_assignee
                             ? formatAdminIdentity(
                                 assignmentAccess.current_assignee
                               )
@@ -1211,28 +854,351 @@ export default function WorkflowTaskActionDrawer({
                             (task.assignee_id
                               ? '已指定处理人'
                               : '由岗位人员处理')}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>转交去向</dt>
-                        <dd>{assignmentTargetLabel}</dd>
-                      </div>
-                    </>
+              </dd>
+            </div>
+            <div>
+              <dt>转交去向</dt>
+              <dd>{assignmentTargetLabel}</dd>
+            </div>
+          </>
                   ) : null}
-                </dl>
-                <div
-                  className="erp-task-action-drawer__outcome-note"
-                  data-tone={actionTone === 'danger' ? 'warning' : 'info'}
-                  role="note"
+      </dl>
+      <div
+        className="erp-task-action-drawer__outcome-note"
+        data-tone={actionTone === 'danger' ? 'warning' : 'info'}
+        role="note"
+      >
+        <strong>提交后会发生什么</strong>
+        <span>{actionOutcomeHint}</span>
+      </div>
+    </div>
+  ) : null
+  const closeCollaboration = () => {
+    if (actionSaving) return
+    if (collaborationPopup) { onClose?.(); return }
+    setCollaborationOpen(false)
+    setReviewing(primaryDraftRef.current?.reviewing || false)
+    onActionModeChange?.(primaryDraftRef.current?.mode || '')
+    onActionReasonChange?.(primaryDraftRef.current?.reason || '')
+  }
+
+  const collaborationModal = (
+    <BusinessModal
+      title={actionMeta?.title || '任务协作'}
+      open={Boolean(task && (collaborationOpen || (collaborationPopup && collaborationPopupOpen)))}
+      className="erp-task-collaboration-modal"
+      destroyOnHidden
+      size="localAction"
+      onCancel={closeCollaboration}
+      afterClose={() => {
+        if (collaborationPopup) onCollaborationClosed?.()
+        else if (activeStepKey === 'action' && collaborationTriggerRef.current?.isConnected) collaborationTriggerRef.current.focus({ preventScroll: true })
+      }}
+      closable={!actionSaving}
+      maskClosable={!actionSaving}
+      keyboard={!actionSaving}
+      footer={(
+        <>
+          <Button disabled={actionSaving} onClick={closeCollaboration}>关闭</Button>
+          {!hasActionReceipt && reviewing && actionMode !== 'block' ? <Button disabled={actionSaving} onClick={() => setReviewing(false)}>返回修改</Button> : null}
+          {!hasActionReceipt ? <Button type="primary" danger={actionMode === 'reject'} loading={actionSaving} disabled={actionSaving || !canSubmitAction || !canConfirm} onClick={actionMode === 'block' || reviewing ? submitAction : () => setReviewing(true)}>{actionMode === 'block' || reviewing ? actionMeta?.buttonLabel || '确认提交' : '核对并确认'}</Button> : null}
+        </>
+      )}
+    >
+      {hasActionReceipt ? (collaborationPopup ? <WorkflowTaskReceipt task={task} events={taskEvents} state={taskEventsState} receipt={actionReceipt} /> : null) : reviewing && actionMode !== 'block' ? reviewPanel : actionWorkspace}
+    </BusinessModal>
+  )
+
+  if (collaborationPopup) return collaborationModal
+
+  // 外壳预先挂载，避免入场动画尚未结束就关闭时 Portal 被移除、跳过焦点恢复。
+  // 任务内容仍随 task 清空，不在关闭状态读取任务或附件。
+  return (
+    <TaskBusinessInformationContext.Provider value={information}>
+      <Drawer
+        title={
+          <div className="erp-task-action-drawer__heading">
+            <strong className="erp-task-action-drawer__title">
+              {TASK_DRAWER_STEPS.find((step) => step.key === activeStepKey)?.title}
+            </strong>
+          </div>
+      }
+        extra={task ? <WorkflowTaskCopySummary task={taskWithSource} assigneeLabel={hasActionReceipt ? '' : currentAssigneeLabel} compact disabled={actionSaving} /> : null}
+        width={hasBusinessPage ? 'calc(100vw - 24px)' : 'min(720px, calc(100vw - 24px))'}
+        open={Boolean(task)}
+        forceRender
+        closeIcon={<LeftOutlined aria-hidden />}
+        closable={actionSaving ? false : { placement: 'start', 'aria-label': onReturnToTracking ? '返回流程' : closeLabel }}
+        maskClosable={!actionSaving}
+        keyboard={!actionSaving}
+        onClose={async () => {
+        if (actionSaving || (businessLeaveGuard.current && !(await businessLeaveGuard.current()))) return
+        (onReturnToTracking || onClose)?.()
+      }}
+        className={`erp-workflow-drawer erp-task-action-drawer${activeStepKey === 'context' ? ' erp-task-action-drawer--context' : ''}`}
+        footer={
+        showFooter ? (
+          <div className="erp-task-action-drawer__footer">
+            {taskAttachments}
+            {activeStepKey === 'action' ? <WorkflowTaskSecondaryActions actions={secondaryActions} disabled={actionSaving} /> : null}
+            <WorkflowTaskActionGroup label="业务办理" className="erp-task-operation-group--primary" hidden={!hasSourceAction || activeStepKey !== 'action'}>
+              <div
+                ref={setSourceFooter}
+                className="erp-material-task-action__footer-host"
+                hidden={!hasSourceAction || activeStepKey !== 'action'}
+              />
+            </WorkflowTaskActionGroup>
+            <div
+              className="erp-task-action-drawer__footer-nav"
+              hidden={
+                hasSourceAction &&
+                activeStepKey === 'action'
+              }
+            >
+              {taskResources}
+              {hasActionReceipt ? <Button onClick={() => selectStep(showTaskContext ? 'confirm' : 'context')}>{showTaskContext ? '查看结果回执' : '回看任务'}</Button> : null}
+              {!hasActionReceipt && activeStepKey !== 'context' ? (
+                <Button
+                  disabled={actionSaving}
+                  onClick={() =>
+                    selectStep(
+                      activeStepKey === 'confirm' || reviewing ? 'action' : 'context'
+                    )
+                  }
                 >
-                  <strong>提交后会发生什么</strong>
-                  <span>{actionOutcomeHint}</span>
-                </div>
-              </div>
-            ) : null}
-          </section>
-        </div>
+                  上一步
+                </Button>
+              ) : null}
+              {showTaskContext && canOpenRelatedEntry && !hasBusinessPage ? (
+                <Button
+                  icon={<ExportOutlined aria-hidden="true" />}
+                  disabled={actionSaving}
+                  onClick={() => onOpenEntry(task)}
+                >
+                  {isTerminalWorkflowTask(task) ? '查看单据' : '进入单据办理'}
+                </Button>
+              ) : null}
+
+            </div>
+            <WorkflowTaskActionGroup label={activeStepKey === 'action' && !isTerminal ? approvalTask ? '审批办理' : task?.task_group === 'order_review' ? '评审办理' : '任务办理' : null} className="erp-task-action-drawer__footer-primary">
+              {activeStepKey === 'action' && isTerminal ? <Button type="primary" onClick={() => selectStep('confirm')}>结果回执</Button> : null}
+              {activeStepKey === 'confirm' ? (
+                <Button type="primary" onClick={() => onClose?.()}>
+                  返回列表
+                </Button>
+              ) : activeStepKey === 'context' && canChooseActions ? (
+                <Button
+                  ref={contextActionRef}
+                  type="primary"
+                  disabled={actionSaving}
+                  onClick={() => selectStep('action')}
+                >
+                  {isTerminal ? '查看办理资料' : '任务办理'}
+                </Button>
+              ) : null}
+              {!isTerminal && !hasSourceAction && !reviewing && !collaborationOpen &&
+              activeStepKey === 'action' && visibleActionModes.length > 0 ? (
+                <Button
+                  type="primary"
+                  disabled={actionSaving || !canConfirm}
+                  title={
+                    canConfirm
+                      ? undefined
+                      : processDecisionRequired && !processDecisionReady
+                        ? '审批表单尚未与当前流程节点核对完成'
+                        : approvedQuantityError ||
+                          (actionMeta?.requireReason
+                            ? '先选择处理方式并填写原因'
+                            : '先选择处理方式')
+                  }
+                  onClick={() => setReviewing(true)}
+                >
+                  核对并确认
+                </Button>
+              ) : null}
+              {!isTerminal && reviewing && !collaborationOpen && activeStepKey === 'action' ? (
+                <Button
+                  type="primary"
+                  danger={actionMode === 'block' || actionMode === 'reject'}
+                  icon={<SendOutlined />}
+                  loading={actionSaving}
+                  disabled={actionSaving || !canSubmitAction || !canConfirm}
+                  onClick={submitAction}
+                >
+                  {actionMeta?.buttonLabel || '确认提交'}
+                </Button>
+              ) : null}
+            </WorkflowTaskActionGroup>
+          </div>
+        ) : null
+      }
+      >
+        {task ? (
+          <div
+            ref={navigationRef}
+            className="erp-task-action-drawer__navigation"
+          >
+            <section
+              className="erp-task-action-drawer__guide"
+              aria-label="任务处理导引"
+            >
+              <SlidingTabList
+                className="erp-task-action-drawer__guide-steps"
+                role="tablist"
+                aria-label="任务处理步骤"
+              >
+                {TASK_DRAWER_STEPS.map((baseStep, index) => {
+                const step = baseStep
+                const active = step.key === activeStepKey
+                const available = stepAvailability[step.key]
+                const interactive =
+                  available && !actionSaving
+                return (
+                  <button
+                    type="button"
+                    key={step.key}
+                    ref={(node) => {
+                      if (node) stepButtonRefs.current.set(step.key, node)
+                      else stepButtonRefs.current.delete(step.key)
+                    }}
+                    id={`erp-task-action-step-${step.key}-tab`}
+                    role="tab"
+                    aria-selected={active}
+                    aria-controls={`erp-task-action-step-${step.key}`}
+                    aria-disabled={!interactive}
+                    disabled={!interactive}
+                    tabIndex={active ? 0 : -1}
+                    title={
+                      actionSaving
+                        ? '正在提交，请稍候'
+                        : available
+                          ? `进入${step.title}`
+                          : step.key === 'confirm'
+                            ? '办理后开放'
+                            : '当前账号没有可用的处理方式'
+                    }
+                    className={[
+                      'erp-task-action-drawer__step',
+                      active ? 'erp-task-action-drawer__step--active' : '',
+                      !interactive
+                        ? 'erp-task-action-drawer__step--disabled'
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    onClick={() => interactive && selectStep(step.key)}
+                    onKeyDown={(event) => handleStepKeyDown(event, step.key)}
+                  >
+                    <span>{index + 1}</span>
+                    <strong>{step.title}</strong>
+                  </button>
+                )
+              })}
+              </SlidingTabList>
+            </section>
+          </div>
       ) : null}
-    </Drawer>
+        {task ? (
+          <div className="erp-task-action-drawer__body" aria-busy={actionSaving}>
+            {task?.source_type === 'inventory_operation' ? <div hidden={!showTaskContext}><InventoryOperationTaskReview task={task} onReady={setReviewedInventoryID} /></div> : null}
+            <div hidden={!showTaskContext}>
+              <WorkflowTaskInfoCard
+                task={taskWithSource}
+                title={taskDisplayName}
+                titleClassName="erp-task-action-drawer__task-title"
+                status={<Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag>}
+                source={<div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} onOpen={!hasBusinessPage && canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div>}
+                assigneeLabel={currentAssigneeLabel}
+                events={taskEventsState === 'ready' ? taskEvents : []}
+                businessInfo={hasWorkflowFollowupDetails(task) ? <WorkflowFollowupDetails task={task} /> : null}
+                summary={<WorkflowTaskCurrentSummary appearance="facts" task={task} roleLabel={ownerRoleLabel} assigneeLabel={currentAssigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={taskReason} contact={exceptionContact} guidance={actionAvailabilityLoading ? '正在确认可用的处理方式' : !canChooseActions ? readonlyReason || '当前账号不能直接处理该任务。' : ''} />}
+              />
+            </div>
+            {activeStepKey === 'action' && !hasBusinessPage ? (
+              <section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">
+                <div className="erp-task-copy-heading"><Title level={2} className="erp-task-action-drawer__task-title">{taskDisplayName}</Title><Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag></div>
+                {!hasActionReceipt ? <div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} copyable={false} onOpen={!hasBusinessPage && canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div> : null}
+                {hasActionReceipt ? <div className="erp-task-action-drawer__receipt-context"><WorkflowTaskSource task={taskWithSource} copyable={false} /><span>本次责任岗位：{ownerRoleLabel || '待确认'}</span><WorkflowTaskTiming task={task} detail compact events={taskEventsState === 'ready' ? taskEvents : []} /></div> : null}
+              </section>
+          ) : null}
+
+            <div hidden={!showTaskContext}><div ref={information.setHost} data-testid="workflow-task-business-information">{information.retained}</div></div>
+
+            <section className="workflow-task-info-card" hidden={!showTaskContext}>
+              <WorkflowTaskHandlingChain
+                onOpenTracking={onReturnToTracking}
+                onOpenTask={onOpenRelatedTask}
+                task={task}
+                profile={profile}
+                focused
+                processContext={processContext}
+                processContextState={processContextState}
+                onRetryProcess={() => setProcessContextReloadKey((current) => current + 1)}
+              />
+            </section>
+
+            <section
+              id="erp-task-action-step-context"
+              role="tabpanel"
+              aria-labelledby="erp-task-action-step-context-tab"
+              hidden={activeStepKey !== 'context'}
+              className="erp-task-action-drawer__step-panel"
+            >
+              <WorkflowTaskEventTrail
+                className="workflow-task-info-card workflow-task-info-card--records"
+                approvalTask={approvalTask}
+                errorMessage={taskEventsError}
+                events={taskEvents}
+                state={taskEventsState}
+                task={task}
+                truncated={taskEventsTruncated}
+                showResponsibility={false}
+                compact
+              />
+            </section>
+
+            <section
+              id="erp-task-action-step-action"
+              role="tabpanel"
+              aria-labelledby="erp-task-action-step-action-tab"
+              hidden={activeStepKey !== 'action' || (reviewing && !collaborationOpen)}
+              className="erp-task-action-drawer__step-panel"
+            >
+              {hasSourceAction ? (
+                (hasBusinessPage && !materialTask) || activeStepKey === 'action' || businessTaskVisited === taskIdentity ? (
+                renderSourceAction(({ content, footer }) => (
+                  <div className="erp-material-task-action workflow-task-business-workspace">
+                    {content}
+                    {sourceFooter ? createPortal(footer, sourceFooter) : null}
+                  </div>
+                ))
+              ) : null
+            ) : (
+              collaborationOpen ? null : actionWorkspace
+            )}
+            </section>
+
+            <section
+              id="erp-task-action-step-confirm"
+              role="tabpanel"
+              aria-labelledby="erp-task-action-step-confirm-tab"
+              hidden={activeStepKey !== 'confirm' && !(activeStepKey === 'action' && reviewing && !collaborationOpen)}
+              className="erp-task-action-drawer__step-panel"
+            >
+              {activeStepKey === 'confirm' ? (
+                <>
+                  <WorkflowTaskReceipt task={task} events={taskEvents} state={taskEventsState} receipt={actionReceipt} sourceReadback={sourceReadback} />
+                  {task.process_instance_id ? <WorkflowTaskHandlingChain task={task} profile={profile} focused processContext={processContext} processContextState={processContextState} onOpenTask={onOpenRelatedTask} onRetryProcess={() => setProcessContextReloadKey((current) => current + 1)} /> : null}
+                  <WorkflowTaskEventTrail className="workflow-task-info-card" task={task} events={taskEvents} state={taskEventsState} errorMessage={taskEventsError} truncated={taskEventsTruncated} approvalTask={approvalTask} showResponsibility={false} compact />
+                </>
+            ) : actionMeta ? (
+              reviewPanel
+            ) : null}
+            </section>
+          </div>
+      ) : null}
+      </Drawer>
+      {collaborationModal}
+    </TaskBusinessInformationContext.Provider>
   )
 }

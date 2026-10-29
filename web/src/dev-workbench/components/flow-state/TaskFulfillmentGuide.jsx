@@ -4,7 +4,10 @@ import { CloseOutlined, LeftOutlined } from '@ant-design/icons'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import SlidingSegmented from '../../../common/components/navigation/SlidingSegmented.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
-import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
+import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters, patchDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
+import { buildFulfillmentRelations, buildChainActionRelations, relationMatches, relationFiltersActive } from '../../config/devFulfillmentRelations.mjs'
+import BusinessRelationFilters from './BusinessRelationFilters.jsx'
+import BusinessActionRelations from './BusinessActionRelations.jsx'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
 import {
   fulfillmentRoleOptions,
@@ -32,33 +35,40 @@ const detailKeys = [
   ...exceptionKeys,
   queryKeys.roleStage,
   queryKeys.roleSubstep,
+  queryKeys.relationAction,
 ]
 
 export default function TaskFulfillmentGuide({
-  onExploreStage,
-  onExploreNode,
+  businessCatalog,
   steps = catalog.fulfillment_flow,
   scoped = false,
-  renderTopics,
+  showViewSwitch = false,
+  onOpenView,
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const role = normalizeFulfillmentRole(searchParams.get(queryKeys.role))
+  const openActionRules = onOpenView ? (action) => onOpenView('states', {
+    [queryKeys.flow]: action.machineKeys.length === 1 ? action.machineKeys[0] : null,
+    [queryKeys.relationAction]: action.key,
+  }) : undefined
   const roleLabel = fulfillmentRoleOptions.find(
     (option) => option.value === role
   ).label
   const roleSelectID = React.useId()
+  const filters = readDevFlowRelationFilters(searchParams)
+  const filtered = relationFiltersActive(filters)
+  const relations = React.useMemo(() => businessCatalog ? buildFulfillmentRelations(businessCatalog) : [], [businessCatalog])
+  const relationByStage = new Map(relations.map((item) => [item.stage.stage, item]))
+  const allActions = React.useMemo(() => businessCatalog ? businessCatalog.businessChains.flatMap((chain) => buildChainActionRelations(businessCatalog, chain)) : [], [businessCatalog])
   const detailID = React.useId()
   const overviewRef = React.useRef(null)
   const detailRef = React.useRef(null)
   const openerRef = React.useRef(null)
   const revealRef = React.useRef(false)
-  const view =
-    !scoped &&
-    ['topics', 'exceptions'].includes(searchParams.get(queryKeys.roleTab)) &&
-    (renderTopics || searchParams.get(queryKeys.roleTab) === 'exceptions')
-      ? searchParams.get(queryKeys.roleTab)
-      : 'main'
+  const view = !scoped && searchParams.get(queryKeys.roleTab) === 'exceptions'
+    ? searchParams.get(queryKeys.roleTab)
+    : 'main'
   const guideKey = searchParams.get(queryKeys.exception)
   const selection = guideKey
     ? selectFulfillmentException({
@@ -84,29 +94,14 @@ export default function TaskFulfillmentGuide({
     ? steps.find((step) => step.stage === selection.origin?.stage) ||
       selection.origin
     : current
-  const showDetail = view !== 'topics' && Boolean(current || selection)
-  const links = [
-    ...new Map(
-      [
-        ...(detailStep ? fulfillmentTaskLinks(detailStep) : []),
-        ...(selection?.guide ? fulfillmentTaskLinks(selection.guide) : []),
-      ].map((link) => [link.key, link])
-    ).values(),
-  ]
+  const showDetail = Boolean(current || selection)
+
   const exceptionDirectory = buildFulfillmentExceptionDirectory(
     catalog.exception_guides,
-    role
-  )
-
-  React.useEffect(() => {
-    if (revealRef.current && showDetail) {
-      revealRef.current = false
-      detailRef.current?.scrollIntoView({
-        block: 'nearest',
-        behavior: 'smooth',
-      })
-    }
-  }, [searchParams, showDetail])
+    businessCatalog ? 'all' : role
+  ).filter(({ guide }) => !businessCatalog || !filtered || allActions.some((action) => action.chainKey === guide.business_chain && relationMatches(action, filters)))
+  const filterActions = view === 'main' ? relations.filter((item) => steps.some((step) => step.stage === item.stage.stage)).flatMap((item) => item.actions) : allActions
+  const matchingStages = new Set(relations.filter((item) => item.actions.some((action) => relationMatches(action, filters))).map((item) => item.stage.stage))
 
   const update = (change, reveal = false) => {
     if (reveal) {
@@ -168,7 +163,7 @@ export default function TaskFulfillmentGuide({
   return (
     <section className="erp-dev-fulfillment-guide" id="task-fulfillment-guide">
       <div className="erp-dev-fulfillment-guide__heading">
-        {scoped || !renderTopics ? (
+        {scoped || !showViewSwitch ? (
           <h2>{scoped ? '办理环节' : '订单全流程'}</h2>
         ) : (
           <SlidingSegmented
@@ -177,306 +172,279 @@ export default function TaskFulfillmentGuide({
             value={view}
             options={[
               { value: 'main', label: '订单全流程' },
-              { value: 'topics', label: '业务专题' },
               { value: 'exceptions', label: '异常处理' },
             ]}
             onChange={setView}
           />
         )}
-        <div className="erp-dev-fulfillment-guide__role">
-          <label htmlFor={roleSelectID}>关注岗位</label>
-          <FilterSelect
-            emptyValue="all"
-            placeholder="选择关注岗位"
-            id={roleSelectID}
-            aria-label="关注岗位"
-            value={role}
-            options={fulfillmentRoleOptions}
-            onChange={(value) =>
+        {businessCatalog ? (
+          <BusinessRelationFilters
+            catalog={businessCatalog}
+            actions={filterActions}
+            filters={filters}
+            onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
+          />
+        ) : (
+          <div className="erp-dev-fulfillment-guide__role">
+            <label htmlFor={roleSelectID}>关注岗位</label>
+            <FilterSelect
+              emptyValue="all"
+              placeholder="选择关注岗位"
+              id={roleSelectID}
+              aria-label="关注岗位"
+              value={role}
+              options={fulfillmentRoleOptions}
+              onChange={(value) =>
               update((next) => {
                 if (value === 'all') next.delete(queryKeys.role)
                 else next.set(queryKeys.role, value)
                 next.delete(queryKeys.roleTopicNode)
+                next.delete(queryKeys.roleTopicStep)
               })
             }
-            virtual={false}
-          />
-        </div>
+              virtual={false}
+            />
+          </div>
+        )}
       </div>
-      {view === 'topics' ? (
-        renderTopics({
-          selectedTopicKey: searchParams.get(queryKeys.roleTopic),
-          onSelectTopic: (key) =>
-            update((next) => {
-              next.set(queryKeys.roleTopic, key ?? '')
-              ;[
-                queryKeys.roleTopicNode,
-                queryKeys.roleMap,
-                queryKeys.roleMapNode,
-              ].forEach((name) => next.delete(name))
-            }),
-        })
-      ) : (
+      {view === 'main' ? (
         <>
-          {view === 'main' ? (
-            <>
-              <p className="erp-dev-fulfillment-guide__scope-bar" role="status">
-                {role === 'all'
-                  ? `${steps.length} 个环节 · 点选查看办理流程`
-                  : `${roleLabel}参与 ${steps.filter((step) => fulfillmentStepMatchesRole(step, role)).length} / ${steps.length} 个环节`}
-              </p>
-              {scoped ? (
-                <div
-                  className="erp-dev-fulfillment-guide__stage-picker"
-                  ref={overviewRef}
-                >
-                  {steps.map((step) => (
-                    <Button
-                      key={step.stage}
-                      aria-pressed={detailStep?.stage === step.stage}
-                      data-fulfillment-stage={step.stage}
-                      data-role-match={
-                        role === 'all'
-                          ? undefined
-                          : fulfillmentStepMatchesRole(step, role)
-                      }
-                      onClick={() => selectStage(step.stage)}
-                    >
-                      {getFulfillmentStageCopy(step).label}
-                    </Button>
-                  ))}
-                </div>
-              ) : (
-                <FulfillmentChainCanvas
-                  role={role}
-                  selectedStage={detailStep?.stage}
-                  selectedGuide={selection?.guide?.key}
-                  detailID={detailID}
-                  overviewRef={overviewRef}
-                  onSelectStage={selectStage}
-                  onOpenException={openException}
-                />
-              )}
-            </>
-          ) : (
-            <section
-              className="erp-dev-exception-directory"
-              aria-label="异常处理目录"
+          <p className="erp-dev-fulfillment-guide__scope-bar" role="status">
+            {businessCatalog && filtered ? `匹配 ${steps.filter((step) => matchingStages.has(step.stage)).length} / ${steps.length} 个环节 · 保留上下游位置`
+              : role === 'all'
+              ? `${steps.length} 个环节 · 点选查看办理流程`
+              : `${roleLabel}参与 ${steps.filter((step) => fulfillmentStepMatchesRole(step, role)).length} / ${steps.length} 个环节`}
+          </p>
+          {scoped ? (
+            <div
+              className="erp-dev-fulfillment-guide__stage-picker"
+              ref={overviewRef}
             >
-              {!selection ? (
-                <FilterSelect
-                  label="异常类型"
-                  aria-label="异常类型"
-                  placeholder="选择异常类型"
-                  value={guideKey}
-                  options={exceptionDirectory.map(({ guide }) => ({
-                    value: guide.key,
-                    label: guide.label,
-                  }))}
-                  onChange={(key) =>
-                    key &&
-                    openException(
+              {steps.map((step) => (
+                <Button
+                  key={step.stage}
+                  aria-pressed={detailStep?.stage === step.stage}
+                  data-fulfillment-stage={step.stage}
+                  data-role-match={
+                    businessCatalog && filtered
+                      ? matchingStages.has(step.stage)
+                      : role === 'all'
+                      ? undefined
+                      : fulfillmentStepMatchesRole(step, role)
+                  }
+                  onClick={() => selectStage(step.stage)}
+                >
+                  {getFulfillmentStageCopy(step).label}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <FulfillmentChainCanvas
+              role={role}
+              matchingStages={businessCatalog && filtered ? matchingStages : null}
+              selectedStage={detailStep?.stage}
+              selectedGuide={selection?.guide?.key}
+              detailID={detailID}
+              overviewRef={overviewRef}
+              onSelectStage={selectStage}
+              onOpenException={openException}
+            />
+          )}
+        </>
+      ) : (
+        <section
+          className="erp-dev-exception-directory"
+          aria-label="异常处理目录"
+        >
+          {!selection ? (
+            <FilterSelect
+              label="异常类型"
+              aria-label="异常类型"
+              placeholder="选择异常类型"
+              value={guideKey}
+              options={exceptionDirectory.map(({ guide }) => ({
+                value: guide.key,
+                label: guide.label,
+              }))}
+              onChange={(key) =>
+                key &&
+                openException(
+                  catalog.exception_guides.find(
+                    (guide) => guide.key === key
+                  )
+                )
+              }
+              virtual={false}
+            />
+          ) : null}
+          {!selection ? (
+            <p className="erp-dev-fulfillment-guide__empty">
+              选择异常类型，查看处理分支及回接位置。
+            </p>
+          ) : null}
+        </section>
+      )}
+      {showDetail ? (
+        <section
+          className="erp-dev-fulfillment-guide__panel"
+          aria-label="流程详情"
+          ref={detailRef}
+          id={detailID}
+        >
+          <div className="erp-dev-fulfillment-guide__detail-heading">
+            <div className="erp-dev-fulfillment-guide__detail-title">
+              {canReturn ? (
+                <Button
+                  icon={<LeftOutlined />}
+                  aria-label={`返回 ${currentLabel}`}
+                  onClick={closeDetail}
+                >
+                  返回 {currentLabel}
+                </Button>
+              ) : null}
+              <h3>
+                {selection?.invalid
+                  ? '异常链接不可用'
+                  : selection?.guide
+                    ? selection.guide.label
+                    : currentLabel}
+              </h3>
+            </div>
+            {!scoped && !canReturn ? (
+              <Button
+                type="text"
+                icon={<CloseOutlined />}
+                aria-label="收起详情"
+                onClick={closeDetail}
+              />
+            ) : null}
+          </div>
+          {selection?.invalid ? (
+            <div role="alert">
+              <p>{selection.invalid}，请重新选择异常类型。</p>
+              <Button
+                onClick={() =>
+                  update((next) =>
+                    exceptionKeys.forEach((key) => next.delete(key))
+                  )
+                }
+              >
+                清除并重新选择
+              </Button>
+            </div>
+          ) : selection?.guide ? (
+            <FulfillmentExceptionDetails
+              key={selection.guide.key}
+              selection={selection}
+              guides={catalog.exception_guides}
+              onSelectGuide={(key) =>
+                key
+                  ? openException(
                       catalog.exception_guides.find(
                         (guide) => guide.key === key
                       )
                     )
-                  }
-                  virtual={false}
-                />
-              ) : null}
-              {!selection ? (
-                <p className="erp-dev-fulfillment-guide__empty">
-                  选择异常类型，查看处理分支及回接位置。
-                </p>
-              ) : null}
-            </section>
-          )}
-          {showDetail ? (
-            <section
-              className="erp-dev-fulfillment-guide__panel"
-              aria-label="流程详情"
-              ref={detailRef}
-              id={detailID}
+                  : closeDetail()
+              }
+              role={role}
+              onSelectOrigin={(stage) =>
+                update((next) =>
+                  stage
+                    ? next.set(queryKeys.exceptionOrigin, stage)
+                    : next.delete(queryKeys.exceptionOrigin)
+                )
+              }
+              onSelectStage={selectStage}
+              onSelectPlan={(key) =>
+                update((next) => {
+                  if (key) next.set(queryKeys.exceptionDecision, key)
+                  else next.delete(queryKeys.exceptionDecision)
+                  next.delete(queryKeys.exceptionStep)
+                })
+              }
+              onSelectStep={(key) =>
+                update((next) => next.set(queryKeys.exceptionStep, key))
+              }
+            />
+          ) : current ? (
+            <div
+              className="erp-dev-fulfillment-guide__detail-content"
+              data-stage-normal={current.stage}
             >
-              <div className="erp-dev-fulfillment-guide__detail-heading">
-                <div className="erp-dev-fulfillment-guide__detail-title">
-                  {canReturn ? (
-                    <Button
-                      icon={<LeftOutlined />}
-                      aria-label={`返回 ${currentLabel}`}
-                      onClick={closeDetail}
-                    >
-                      返回 {currentLabel}
-                    </Button>
-                  ) : null}
-                  <h3>
-                    {selection?.invalid
-                      ? '异常链接不可用'
-                      : selection?.guide
-                        ? selection.guide.label
-                        : currentLabel}
-                  </h3>
-                </div>
-                {!scoped && !canReturn ? (
-                  <Button
-                    type="text"
-                    icon={<CloseOutlined />}
-                    aria-label="收起详情"
-                    onClick={closeDetail}
-                  />
-                ) : null}
-              </div>
-              {selection?.invalid ? (
-                <div role="alert">
-                  <p>{selection.invalid}，请重新选择异常类型。</p>
-                  <Button
-                    onClick={() =>
-                      update((next) =>
-                        exceptionKeys.forEach((key) => next.delete(key))
-                      )
-                    }
-                  >
-                    清除并重新选择
-                  </Button>
-                </div>
-              ) : selection?.guide ? (
-                <FulfillmentExceptionDetails
-                  key={selection.guide.key}
-                  selection={selection}
-                  guides={catalog.exception_guides}
-                  onSelectGuide={(key) =>
-                    key
-                      ? openException(
-                          catalog.exception_guides.find(
-                            (guide) => guide.key === key
-                          )
-                        )
-                      : closeDetail()
-                  }
+              {current.subflow ? (
+                <FulfillmentSubflow
+                  step={current}
+                  relation={relationByStage.get(current.stage)}
+                  filters={filters}
+                  onOpenRules={openActionRules}
                   role={role}
-                  onSelectOrigin={(stage) =>
-                    update((next) =>
-                      stage
-                        ? next.set(queryKeys.exceptionOrigin, stage)
-                        : next.delete(queryKeys.exceptionOrigin)
+                  searchParams={searchParams}
+                  setSearchParams={setSearchParams}
+                  onOpenException={(_, key) =>
+                    openException(
+                      catalog.exception_guides.find(
+                        (guide) => guide.key === key
+                      ),
+                      current.stage
                     )
                   }
-                  onSelectStage={selectStage}
-                  onSelectPlan={(key) =>
-                    update((next) => {
-                      if (key) next.set(queryKeys.exceptionDecision, key)
-                      else next.delete(queryKeys.exceptionDecision)
-                      next.delete(queryKeys.exceptionStep)
-                    })
-                  }
-                  onSelectStep={(key) =>
-                    update((next) => next.set(queryKeys.exceptionStep, key))
-                  }
                 />
-              ) : current ? (
-                <div
-                  className="erp-dev-fulfillment-guide__detail-content"
-                  data-stage-normal={current.stage}
-                >
-                  {current.subflow ? (
-                    <FulfillmentSubflow
-                      step={current}
-                      role={role}
-                      searchParams={searchParams}
-                      setSearchParams={setSearchParams}
-                      onOpenException={(_, key) =>
-                        openException(
-                          catalog.exception_guides.find(
-                            (guide) => guide.key === key
-                          ),
-                          current.stage
-                        )
-                      }
-                    />
-                  ) : (
-                    <p>{current.result}</p>
-                  )}
-                  <details
-                    className="erp-dev-disclosure erp-dev-fulfillment-guide__instructions"
-                    key={current.stage}
-                  >
-                    <summary>办理规则与受阻处理</summary>
-                    <p>{current.result}</p>
-                    {current.handoffs?.map((text) => (
-                      <p key={text}>{text}</p>
-                    ))}
-                    {current.approvals?.map((approval) => (
-                      <p key={approval.label}>
-                        {approval.label}：{approval.condition} 通过：
-                        {approval.passed} 未通过：{approval.rejected}
-                      </p>
-                    ))}
-                    {current.handling ? (
-                      <div data-stage-handling={current.stage}>
-                        <p>{current.handling.issues}</p>
-                        <p>{current.handling.action}</p>
-                        <p>{current.handling.resume}</p>
-                        <div className="erp-dev-fulfillment-guide__links">
-                          {fulfillmentTaskLinks({
-                            stages: current.handling.task_stages.filter(
-                              (stage) => !current.stages.includes(stage)
-                            ),
-                          }).map((link) => (
-                            <a key={link.key} href={link.href}>
-                              {link.pathLabel}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </details>
-                </div>
-              ) : null}
-              {!selection?.invalid ? (
-                <div className="erp-dev-fulfillment-guide__detail-actions">
-                  {links.length ? (
-                    <div
-                      className="erp-dev-fulfillment-guide__links"
-                      aria-label="相关任务"
-                    >
-                      <span>任务</span>
-                      {links.map((link) => (
-                        <a key={link.key} href={link.href}>
-                          {links.filter((item) => item.label === link.label)
-                            .length > 1
-                            ? link.pathLabel
-                            : link.label}
-                        </a>
+              ) : (
+                <>
+                  <p>{current.result}</p>
+                  {relationByStage.has(current.stage) ? <BusinessActionRelations
+                    onOpenRules={openActionRules}
+                    actions={relationByStage.get(current.stage).actions.filter((action) => relationMatches(action, filters))}
+                    selectedKey={searchParams.get(queryKeys.relationAction)}
+                    onSelect={(key) => update((next) => next.set(queryKeys.relationAction, key))}
+                  /> : null}
+                </>
+              )}
+              <details
+                className="erp-dev-disclosure erp-dev-fulfillment-guide__instructions"
+                key={current.stage}
+              >
+                <summary>办理规则与受阻处理</summary>
+                <p>{current.result}</p>
+                {current.handoffs?.map((text) => (
+                  <p key={text}>{text}</p>
+                ))}
+                {current.approvals?.map((approval) => (
+                  <p key={approval.label}>
+                    {approval.label}：{approval.condition} 通过：
+                    {approval.passed} 未通过：{approval.rejected}
+                  </p>
+                ))}
+                {current.handling ? (
+                  <div data-stage-handling={current.stage}>
+                    <p>{current.handling.issues}</p>
+                    <p>{current.handling.action}</p>
+                    <p>{current.handling.resume}</p>
+                    <div className="erp-dev-fulfillment-guide__links">
+                      {fulfillmentTaskLinks({
+                        stages: current.handling.task_stages.filter(
+                          (stage) => !current.stages.includes(stage)
+                        ),
+                      }).map((link) => (
+                        <span key={link.key}>
+                          {link.pathLabel}
+                        </span>
                       ))}
                     </div>
-                  ) : null}
-                  {onExploreStage && (current || selection?.guide) ? (
-                    <Button
-                      type="link"
-                      onClick={() =>
-                        onExploreStage(
-                          selection?.guide?.business_chain ||
-                            current?.business_chain
-                        )
-                      }
-                    >
-                      查看关联单据
-                    </Button>
-                  ) : null}
-                  {onExploreNode && detailStep?.nodeKey ? (
-                    <Button
-                      type="link"
-                      onClick={() => onExploreNode(detailStep.nodeKey)}
-                    >
-                      查看关联单据
-                    </Button>
-                  ) : null}
-                </div>
-              ) : null}
-            </section>
+                  </div>
+                ) : null}
+              </details>
+            </div>
           ) : null}
-        </>
-      )}
+          {selection?.guide && !selection.invalid && businessCatalog ? <BusinessActionRelations
+            onOpenRules={openActionRules}
+            actions={allActions.filter((action) => action.chainKey === selection.guide.business_chain && relationMatches(action, filters))}
+            selectedKey={searchParams.get(queryKeys.relationAction)}
+            onSelect={(key) => update((next) => next.set(queryKeys.relationAction, key))}
+          /> : null}
+
+        </section>
+      ) : null}
       <p className="erp-dev-fulfillment-guide__boundary">
         流程示意，非实际进度；任务完成不代替正式业务结果。
       </p>

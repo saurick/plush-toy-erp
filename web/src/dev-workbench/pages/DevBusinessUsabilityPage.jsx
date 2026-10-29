@@ -1,10 +1,7 @@
 import React, { useEffect, useMemo } from 'react'
-import {
-  ArrowRightOutlined,
-  CheckCircleOutlined,
-} from '@ant-design/icons'
-import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { CheckCircleOutlined } from '@ant-design/icons'
+import { Card, Empty, Space, Tag, Typography } from 'antd'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import {
@@ -13,14 +10,11 @@ import {
   BUSINESS_USABILITY_STATUS,
   BUSINESS_USABILITY_STATUS_PRESENTATION,
 } from '../../erp/config/businessUsabilityCatalog.mjs'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTestingEnvironment from '../components/DevTestingEnvironment.jsx'
 import { DEV_PAGINATION } from '../config/devPagination.mjs'
-import {
-  DEV_BUSINESS_USABILITY_ROUTE,
-  DEV_PAGE_TITLE_BY_ROUTE,
-  DEV_TESTING_ROUTE,
-} from '../config/devRoutes.mjs'
+import { DEV_BUSINESS_USABILITY_ROUTE, DEV_PAGE_TITLE_BY_ROUTE } from '../config/devRoutes.mjs'
 import {
   DEV_BUSINESS_USABILITY_PAGE_SIZE,
   DEV_BUSINESS_USABILITY_ROLE_OPTIONS,
@@ -44,8 +38,6 @@ const STATUS_COLOR = Object.freeze({
 
 export default function DevBusinessUsabilityPage() {
   const location = useLocation()
-  const testingReturnParams = new URLSearchParams(typeof location.state?.testingReturnSearch === 'string' ? location.state.testingReturnSearch : '')
-  testingReturnParams.set('view', 'guide')
   const [searchParams, setSearchParams] = useSearchParams()
   const parsedSearch = useMemo(
     () => parseDevBusinessUsabilitySearch(searchParams),
@@ -70,7 +62,7 @@ export default function DevBusinessUsabilityPage() {
       replace: true,
       state: location.state,
     })
-  }, [location.state, parsedSearch, setSearchParams])
+  }, [parsedSearch, setSearchParams, location.state])
 
   const updateQuery = (patch) => {
     const nextSearch = buildDevBusinessUsabilitySearch({
@@ -156,77 +148,26 @@ export default function DevBusinessUsabilityPage() {
           )
         },
       },
-      {
-        align: 'left',
-        title: '继续核对',
-        key: 'actions',
-        width: 170,
-        fixed: 'right',
-        render: (_, entry) => (
-          <Space direction="vertical" size={0}>
-            <Button type="link" href={entry.path}>
-              打开业务页
-              <ArrowRightOutlined />
-            </Button>
-            <Button
-              type="link"
-              href={
-                entry.roleHelpKeys[0]
-                  ? `/erp/help-center?role=${encodeURIComponent(entry.roleHelpKeys[0])}`
-                  : '/erp/help-center'
-              }
-            >
-              查看岗位帮助
-            </Button>
-          </Space>
-        ),
-      },
+
     ],
     []
   )
 
   return (
     <div className="erp-dev-business-usability-page erp-dev-workspace-page erp-dev-tool-page">
-      <DevPageNav sourcePath="web/src/erp/config/businessUsabilityCatalog.mjs" />
+      <DevPageNav />
 
-      <header className="erp-dev-business-usability-header">
-        <div className="erp-dev-business-usability-heading">
-          <Title level={1}>
-            {DEV_PAGE_TITLE_BY_ROUTE[DEV_BUSINESS_USABILITY_ROUTE]}
-          </Title>
-          <Link to={`${DEV_TESTING_ROUTE}?${testingReturnParams}`}>返回测试指引</Link>
-        </div>
-      </header>
-
-      <main className="erp-dev-business-usability-shell">
-        <DevTestingEnvironment view="usability" />
-        <details className="erp-dev-disclosure erp-dev-business-usability-boundary">
-          <summary>检查说明与边界</summary>
-          <Paragraph>推荐岗位不是权限，覆盖状态也不是客户验收。</Paragraph>
-          <Paragraph>
-            岗位标签只表示该页面被哪些岗位帮助列为常用入口；实际能否进入和操作仍以正式权限为准。业务上下游继续到
-            <Link to="/__dev/status-flows">业务链路</Link>
-            核对。界面值的含义和布局取舍到<Link to="/__dev/ui-design?view=specification&topic=task-cards">工作中心设计说明</Link>对照。
-          </Paragraph>
-        </details>
-
-        <section
-          className="erp-dev-business-usability-summary"
-          aria-label="页面说明覆盖摘要"
-        >
-          {[
-            ['业务页面', summary.total],
-            ['已完整覆盖', summary.covered],
-            ['待补齐', summary.total - summary.covered],
-          ].map(([label, value]) => (
-            <div key={label} className="erp-dev-business-usability-summary__item">
-              <Text type="secondary">{label}</Text>
-              <strong>{value}</strong>
-            </div>
-          ))}
-        </section>
-
-        <Card className="erp-dev-business-usability-filters" size="small">
+      <DevPageHeader
+        className="erp-dev-business-usability-header"
+        title={
+          <div className="erp-dev-business-usability-heading">
+            <Title level={1}>
+              {DEV_PAGE_TITLE_BY_ROUTE[DEV_BUSINESS_USABILITY_ROUTE]}
+            </Title>
+          </div>
+        }
+      >
+        <div className="erp-dev-business-usability-filters">
           <SearchInput
             allowClear
             value={keyword}
@@ -255,7 +196,34 @@ export default function DevBusinessUsabilityPage() {
             onChange={(value) => updateQuery({ role: value })}
           />
           <Text type="secondary">当前显示 {filteredEntries.length} 个页面</Text>
-        </Card>
+        </div>
+      </DevPageHeader>
+
+      <main className="erp-dev-business-usability-shell">
+        <DevTestingEnvironment view="usability" />
+        <details className="erp-dev-disclosure erp-dev-business-usability-boundary">
+          <summary>检查说明与边界</summary>
+          <Paragraph>推荐岗位不是权限，覆盖状态也不是客户验收。</Paragraph>
+          <Paragraph>
+            岗位标签只表示该页面被哪些岗位帮助列为常用入口；实际能否进入和操作仍以正式权限为准。
+          </Paragraph>
+        </details>
+
+        <section
+          className="erp-dev-business-usability-summary"
+          aria-label="页面说明覆盖摘要"
+        >
+          {[
+            ['业务页面', summary.total],
+            ['已完整覆盖', summary.covered],
+            ['待补齐', summary.total - summary.covered],
+          ].map(([label, value]) => (
+            <div key={label} className="erp-dev-business-usability-summary__item">
+              <Text type="secondary">{label}</Text>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </section>
 
         <Card className="erp-dev-business-usability-table-card">
           <div className="erp-dev-business-usability-table-head">

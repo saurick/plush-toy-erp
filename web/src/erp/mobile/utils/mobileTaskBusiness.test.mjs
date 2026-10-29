@@ -27,13 +27,15 @@ source_task_intent_hash: 'a'.repeat(64),
 const allowed = { applicable: true, resolved: true, allowed: true }
 const profile = { id: 12, menus: ['/erp/warehouse/inbound'] }
 
-test('a mobile business workspace requires both the authoritative source and menu access', () => {
+test('a task-contained business form requires authoritative source access; menu visibility does not grant or remove task access', () => {
   assert.equal(canOpenMobileTaskBusiness(task, profile, allowed), true)
   for (const access of [{}, { ...allowed, resolved: false }, { ...allowed, allowed: false }, { ...allowed, applicable: false }]) {
     assert.equal(canOpenMobileTaskBusiness(task, profile, access), false)
     assert.equal(canOpenMobileTaskBusiness(task, { is_super_admin: true }, access), false)
   }
   assert.equal(canOpenMobileTaskBusiness(task, { menus: ['/erp/task-board'] }, allowed), false)
+  assert.equal(canOpenMobileTaskBusiness(task, { id: 12, menus: ['/erp/task-board'] }, allowed), true)
+  assert.equal(canOpenMobileTaskBusiness(task, { id: 12, disabled: true }, allowed), false)
 })
 
 test('tampered source anchors and keyword-only tasks cannot select a business form', () => {
@@ -63,13 +65,17 @@ test('a source follow-up opens its exact record without broad keyword matching',
   assert.equal(resolveMobileTaskBusinessEntry({ ...followup, source_id: 0 }), '')
 })
 
-test('related forms require their own menu and mutation capability and cannot substitute a task or source', () => {
-  const user = { menus: ['/erp/warehouse/inventory'], permissions: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE], effective_session: { actions: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE] } }
+test('related forms require their own menu and capability and cannot substitute a task or source', () => {
+  const user = { menus: ['/erp/warehouse/inventory'], permissions: [PermissionCode.WAREHOUSE_INVENTORY_READ], effective_session: { actions: [PermissionCode.WAREHOUSE_INVENTORY_READ] } }
   assert.equal(mobileTaskRelatedCommands(task, user, allowed).length, 1)
+  assert.equal(mobileTaskRelatedCommands({ ...task, task_status_key: 'done' }, user, allowed, { readOnly: true })[0].kind, 'inventory')
   assert.deepEqual(mobileTaskRelatedCommands(task, { menus: user.menus, permissions: [] }, allowed), [])
   assert.deepEqual(mobileTaskRelatedCommands(task, { menus: [], permissions: user.permissions }, allowed), [])
   assert.deepEqual(mobileTaskRelatedCommands(task, user, { ...allowed, allowed: false }), [])
   assert.deepEqual(mobileTaskRelatedCommands(task, { ...user, effective_session: { actions: [] } }, allowed), [])
+  const salesUser = { menus: ['/erp/production/orders', '/erp/warehouse/shipments'], permissions: [PermissionCode.PMC_PLAN_CREATE, PermissionCode.SHIPMENT_CREATE], effective_session: { actions: [PermissionCode.PMC_PLAN_CREATE, PermissionCode.SHIPMENT_CREATE] } }
+  assert.equal(mobileTaskRelatedCommands({ source_type: 'sales_order' }, salesUser, allowed).length, 2)
+  assert.deepEqual(mobileTaskRelatedCommands({ source_type: 'sales_order' }, salesUser, allowed, { readOnly: true }), [])
 })
 
 test('related source identity comes from exact record keys and child facts retain their own identity', () => {

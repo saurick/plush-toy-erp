@@ -9,7 +9,6 @@ export function OverviewPanel({
   dryRunState,
   applyState,
   onNavigate,
-  deploymentHref,
 }) {
   const checked = overview.packageConsoleSummary.primaryStatus !== 'BLOCKED'
   const sampleStatus = {
@@ -89,7 +88,6 @@ export function OverviewPanel({
             <li>
               <strong>发布与部署版本</strong>
               <span>由版本发布中心和 GitLab 流水线完成</span>
-              <a href={deploymentHref}>查看服务器部署 →</a>
             </li>
           </ol>
         </DevStaticGuidance>

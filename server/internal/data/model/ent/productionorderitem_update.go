@@ -190,12 +190,6 @@ func (_u *ProductionOrderItemUpdate) SetNillableRouteCode(v *string) *Production
 	return _u
 }
 
-// ClearRouteCode clears the value of the "route_code" field.
-func (_u *ProductionOrderItemUpdate) ClearRouteCode() *ProductionOrderItemUpdate {
-	_u.mutation.ClearRouteCode()
-	return _u
-}
-
 // SetCustomerInspectionRequired sets the "customer_inspection_required" field.
 func (_u *ProductionOrderItemUpdate) SetCustomerInspectionRequired(v bool) *ProductionOrderItemUpdate {
 	_u.mutation.SetCustomerInspectionRequired(v)
@@ -683,9 +677,6 @@ func (_u *ProductionOrderItemUpdate) sqlSave(ctx context.Context) (_node int, er
 	}
 	if value, ok := _u.mutation.RouteCode(); ok {
 		_spec.SetField(productionorderitem.FieldRouteCode, field.TypeString, value)
-	}
-	if _u.mutation.RouteCodeCleared() {
-		_spec.ClearField(productionorderitem.FieldRouteCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.CustomerInspectionRequired(); ok {
 		_spec.SetField(productionorderitem.FieldCustomerInspectionRequired, field.TypeBool, value)
@@ -1238,12 +1229,6 @@ func (_u *ProductionOrderItemUpdateOne) SetNillableRouteCode(v *string) *Product
 	return _u
 }
 
-// ClearRouteCode clears the value of the "route_code" field.
-func (_u *ProductionOrderItemUpdateOne) ClearRouteCode() *ProductionOrderItemUpdateOne {
-	_u.mutation.ClearRouteCode()
-	return _u
-}
-
 // SetCustomerInspectionRequired sets the "customer_inspection_required" field.
 func (_u *ProductionOrderItemUpdateOne) SetCustomerInspectionRequired(v bool) *ProductionOrderItemUpdateOne {
 	_u.mutation.SetCustomerInspectionRequired(v)
@@ -1761,9 +1746,6 @@ func (_u *ProductionOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Pro
 	}
 	if value, ok := _u.mutation.RouteCode(); ok {
 		_spec.SetField(productionorderitem.FieldRouteCode, field.TypeString, value)
-	}
-	if _u.mutation.RouteCodeCleared() {
-		_spec.ClearField(productionorderitem.FieldRouteCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.CustomerInspectionRequired(); ok {
 		_spec.SetField(productionorderitem.FieldCustomerInspectionRequired, field.TypeBool, value)

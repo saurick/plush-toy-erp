@@ -83,6 +83,9 @@ func TestInventoryLotPostgresFreezeBeforePosting(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			if path == "cycle-loss" {
+				op = approveInventoryCountForTest(t, ctx, r, op)
+			}
 			if path == "reversal" {
 				in.TxnType, in.ReversalOfTxnID, in.Quantity = biz.InventoryTxnReversal, &seed.Txn.ID, seed.Txn.Quantity
 			}
@@ -102,7 +105,9 @@ func TestInventoryLotPostgresFreezeBeforePosting(t *testing.T) {
 			go func() {
 				var err error
 				switch path {
-				case "transfer", "cycle-loss":
+				case "cycle-loss":
+					_, err = r.postInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: op.ID, ExpectedVersion: op.Version, ActorID: 1}, nil, nil)
+				case "transfer":
 					_, err = uc.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: op.ID, ExpectedVersion: op.Version, ActorID: 1})
 				default:
 					_, err = uc.ApplyInventoryTxnAndUpdateBalance(ctx, in)
@@ -358,7 +363,7 @@ func TestInventoryPostgresOperationFirstBalanceAndRollback(t *testing.T) {
 			if !errors.Is(err, biz.ErrInventoryBalanceNotFound) {
 				t.Fatalf("rollback left an empty balance: %v", err)
 			}
-			if count := client.InventoryTxn.Query().Where(inventorytxn.SubjectID(f.materialID)).CountX(ctx); count != 6 {
+			if count := client.InventoryTxn.Query().Where(inventorytxn.SubjectType(biz.InventorySubjectMaterial), inventorytxn.SubjectID(f.materialID)).CountX(ctx); count != 6 {
 				t.Fatalf("rollback left partial ledger: %d", count)
 			}
 			current, err := uc.GetInventoryOperation(ctx, failed.ID)

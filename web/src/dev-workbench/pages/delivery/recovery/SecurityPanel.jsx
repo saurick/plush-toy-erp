@@ -1,7 +1,5 @@
 import { Card, Tag, Typography } from 'antd'
-import { Link } from 'react-router-dom'
 import DevTimestamp from '../../../components/DevTimestamp.jsx'
-import { DEV_DOCS_ROUTE } from '../../../config/devRoutes.mjs'
 
 const { Paragraph } = Typography
 
@@ -59,12 +57,6 @@ export function SecurityPanel({ activeView, overview }) {
                           <small>回执：{check.evidenceId}</small>
                         </>
                       ) : null}
-                      <Link
-                        to={`${DEV_DOCS_ROUTE}?path=${encodeURIComponent(check.guidePath)}${check.guideAnchor ? `#${check.guideAnchor}` : ''}`}
-                        aria-label={`阅读${check.title}核验要求`}
-                      >
-                        核验要求
-                      </Link>
                     </details>
                   </td>
                 </tr>

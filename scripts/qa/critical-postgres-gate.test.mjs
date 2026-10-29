@@ -358,6 +358,15 @@ test("critical PostgreSQL registry covers every database helper-backed test", ()
     "critical PostgreSQL shared pattern must be declared",
   );
   const criticalPattern = new RegExp(patternSource, "u");
+  const requiredPrefixSource = criticalTestConfig.match(
+    /CRITICAL_POSTGRES_REQUIRED_PREFIXES=\(([\s\S]*?)\)/u,
+  )?.[1];
+  assert.ok(
+    requiredPrefixSource,
+    "critical PostgreSQL required result families must be declared",
+  );
+  const requiredPrefixes = requiredPrefixSource.trim().split(/\s+/u);
+  assert.equal(new Set(requiredPrefixes).size, requiredPrefixes.length);
   const helperBackedTests = helperBackedPostgresTests();
   const newlyCoveredTests = [
     "TestBusinessDocumentSearchPostgres",
@@ -382,6 +391,13 @@ test("critical PostgreSQL registry covers every database helper-backed test", ()
     helperBackedTests.filter((testName) => !criticalPattern.test(testName)),
     [],
     "every helper-backed PostgreSQL test must be owned by the critical gate",
+  );
+  assert.deepEqual(
+    helperBackedTests.filter(
+      (testName) => !requiredPrefixes.some((prefix) => testName.startsWith(prefix)),
+    ),
+    [],
+    "every helper-backed PostgreSQL test must belong to a required evidence family",
   );
 });
 

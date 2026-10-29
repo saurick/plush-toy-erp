@@ -3,9 +3,9 @@ import { Alert, Button, Space, Tag } from 'antd'
 import { DownloadOutlined, SettingOutlined } from '@ant-design/icons'
 import {
   useNavigate,
-  useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -64,7 +64,7 @@ export default function SalesOrderSummaryPanel({
   refreshRevision = 0,
   summaryTypeControl = null,
 }) {
-  const { adminProfile } = useOutletContext() || {}
+  const { adminProfile } = useBusinessPageContext() || {}
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const filters = useMemo(() => readSalesSummaryFilters(params), [params])

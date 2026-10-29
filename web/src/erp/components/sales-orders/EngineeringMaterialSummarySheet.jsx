@@ -491,8 +491,8 @@ export default function EngineeringMaterialSummarySheet({
           </li>
         </ol>
         <p>
-          提交审批时会冻结本次订单、BOM
-          和用量依据；已提交申请继续显示冻结内容，后续资料变更不会自动改写。需要调整时，先退回工程，再按当前资料重新整理。
+          自动送审时会冻结本次订单、BOM
+          和用量依据；已提交申请继续显示冻结内容，后续资料变更不会自动改写。需要调整时，先退回工程；工程修订后点击“完成工程资料”，校验通过后自动重新送审。
         </p>
         <p>
           {inventory?.status === 'AVAILABLE'

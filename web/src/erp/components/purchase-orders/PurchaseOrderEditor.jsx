@@ -9,6 +9,7 @@ export default function PurchaseOrderEditor({
   open,
   form,
   editingOrder,
+  baselineKey,
   saving,
   itemsLoading,
   referenceDataReady,
@@ -26,6 +27,7 @@ export default function PurchaseOrderEditor({
   return (
     <BusinessFormPage
       form={form}
+      baselineKey={baselineKey}
       open={open}
       title={editingOrder ? '编辑采购订单' : '新建采购订单'}
       okText={

@@ -354,8 +354,28 @@
     grid-column: 2;
   }
 
+  .business-attachment-panel__toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
   .business-attachment-panel__toolbar > .erp-sliding-segmented {
-    flex: 1;
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .business-attachment-panel__toolbar > .erp-business-help-label {
+    justify-self: end;
+  }
+
+  .business-attachment-panel__toolbar .erp-business-inline-help-trigger {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .business-attachment-panel__refresh {
+    grid-column: 2;
+    margin-inline-start: 0;
   }
 
   .business-attachment-panel__toolbar .ant-segmented-group {

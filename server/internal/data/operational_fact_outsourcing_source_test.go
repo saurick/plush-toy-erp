@@ -325,7 +325,7 @@ func TestOutsourcingFactFromOrderEnforcesPostedQuantityAndAllowsClosedSourceReve
 		t.Fatalf("post over-quantity issue error = %v, want quantity exceeded", err)
 	}
 
-	if _, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusClosed); !errors.Is(err, biz.ErrOutsourcingOrderFactDependency) {
+	if _, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, source.order.ID, biz.OutsourcingOrderStatusClosed); !errors.Is(err, biz.ErrOutsourcingOrderFactDependency) {
 		t.Fatalf("failed over-quantity draft must block parent close, err=%v", err)
 	}
 
@@ -345,7 +345,7 @@ func TestOutsourcingFactFromOrderEnforcesPostedQuantityAndAllowsClosedSourceReve
 	if err != nil {
 		t.Fatalf("post close source issue: %v", err)
 	}
-	closed, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, closeSource.order.ID, biz.OutsourcingOrderStatusClosed)
+	closed, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, closeSource.order.ID, biz.OutsourcingOrderStatusClosed)
 	if err != nil || closed.LifecycleStatus != biz.OutsourcingOrderStatusClosed {
 		t.Fatalf("close order after only posted issue = %#v, err=%v", closed, err)
 	}
@@ -381,20 +381,20 @@ func TestOutsourcingOrderCancelRejectsPostedFactDependency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create return receipt: %v", err)
 	}
-	if _, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusCanceled); !errors.Is(err, biz.ErrOutsourcingOrderFactDependency) {
+	if _, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, source.order.ID, biz.OutsourcingOrderStatusCanceled); !errors.Is(err, biz.ErrOutsourcingOrderFactDependency) {
 		t.Fatalf("cancel order with draft fact error = %v, want dependency", err)
 	}
 	postedFact, err := uc.PostOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("post return receipt: %v", err)
 	}
-	if _, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusCanceled); !errors.Is(err, biz.ErrOutsourcingOrderFactDependency) {
+	if _, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, source.order.ID, biz.OutsourcingOrderStatusCanceled); !errors.Is(err, biz.ErrOutsourcingOrderFactDependency) {
 		t.Fatalf("cancel order with posted fact error = %v, want dependency", err)
 	}
 	if _, err := uc.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(postedFact.ID, postedFact.Version, actor.ID, "撤销委外回货后取消订单")); err != nil {
 		t.Fatalf("cancel posted return receipt: %v", err)
 	}
-	cancelled, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusCanceled)
+	cancelled, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, source.order.ID, biz.OutsourcingOrderStatusCanceled)
 	if err != nil || cancelled.LifecycleStatus != biz.OutsourcingOrderStatusCanceled {
 		t.Fatalf("cancel order after reversing fact = %#v, err=%v", cancelled, err)
 	}

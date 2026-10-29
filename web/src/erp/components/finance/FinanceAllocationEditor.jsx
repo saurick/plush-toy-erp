@@ -29,6 +29,8 @@ export function FinanceAllocationEditor({
 }) {
   return (
     <BusinessFormModal
+      taskInline
+      form={allocationForm}
       className="erp-business-action-modal--operational-fact"
       title="选择核销记录"
       description={

@@ -3,6 +3,7 @@ import { getWorkflowTaskBoard } from '../api/workflowApi.mjs'
 import { canMountCustomerRuntime } from '../utils/adminProfileSync.mjs'
 import { workflowTaskAdminAccessRequestIdentity } from '../utils/workflowTaskActionAccess.mjs'
 import { WORKFLOW_TASKS_CHANGED } from '../utils/workflowTaskChanges.mjs'
+import useLatestRequestCoordinator from './useLatestRequestCoordinator.js'
 import {
   isAuthFailureCode,
   isAdminSessionUnavailableCode,
@@ -14,15 +15,16 @@ export default function useDesktopTaskCount({ adminProfile, enabled: available, 
   const scope = `${workflowTaskAdminAccessRequestIdentity(adminProfile)}|${enabled}`
   const currentScope = useRef(scope)
   currentScope.current = scope
-  const pending = useRef(null)
+  const beginRequest = useLatestRequestCoordinator()
   const [state, setState] = useState(null)
 
   const refresh = useCallback(async () => {
-    pending.current?.abort()
-    if (!enabled) return false
-    const controller = new AbortController()
-    pending.current = controller
-    const isCurrent = () => !controller.signal.aborted && currentScope.current === scope
+    const request = beginRequest('count')
+    if (!enabled) {
+      request.finish()
+      return false
+    }
+    const isCurrent = () => request.isCurrent() && currentScope.current === scope
     setState((previous) => ({
       scope,
       count: previous?.scope === scope ? previous.count : null,
@@ -32,7 +34,7 @@ export default function useDesktopTaskCount({ adminProfile, enabled: available, 
     try {
       const response = await getWorkflowTaskBoard(
         { todo_only: true, limit: 1 },
-        { signal: controller.signal }
+        { signal: request.signal }
       )
       if (!isCurrent()) return false
       setState({ scope, count: response.total, error: false, loading: false })
@@ -49,13 +51,15 @@ export default function useDesktopTaskCount({ adminProfile, enabled: available, 
         loading: false,
       }))
       return false
+    } finally {
+      request.finish()
     }
-  }, [enabled, scope])
+  }, [enabled, scope, beginRequest])
 
   useEffect(() => {
     refresh()
-    return () => pending.current?.abort()
-  }, [refresh, pathname])
+    return () => beginRequest('count').finish()
+  }, [refresh, pathname, beginRequest])
 
   useEffect(() => {
     const onVisible = () => {

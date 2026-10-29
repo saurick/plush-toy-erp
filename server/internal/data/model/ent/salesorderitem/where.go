@@ -101,44 +101,14 @@ func ProcessRequirement(v string) predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(sql.FieldEQ(FieldProcessRequirement, v))
 }
 
-// SampleBomID applies equality check predicate on the "sample_bom_id" field. It's identical to SampleBomIDEQ.
-func SampleBomID(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleBomID, v))
+// BomID applies equality check predicate on the "bom_id" field. It's identical to BomIDEQ.
+func BomID(v int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldEQ(FieldBomID, v))
 }
 
-// SampleBomFingerprint applies equality check predicate on the "sample_bom_fingerprint" field. It's identical to SampleBomFingerprintEQ.
-func SampleBomFingerprint(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleBomFingerprint, v))
-}
-
-// SampleReusedFromItemID applies equality check predicate on the "sample_reused_from_item_id" field. It's identical to SampleReusedFromItemIDEQ.
-func SampleReusedFromItemID(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleReusedFromItemID, v))
-}
-
-// SampleImageAttachmentID applies equality check predicate on the "sample_image_attachment_id" field. It's identical to SampleImageAttachmentIDEQ.
-func SampleImageAttachmentID(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleImageAttachmentID, v))
-}
-
-// EngineeringStatus applies equality check predicate on the "engineering_status" field. It's identical to EngineeringStatusEQ.
-func EngineeringStatus(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldEngineeringStatus, v))
-}
-
-// SampleNote applies equality check predicate on the "sample_note" field. It's identical to SampleNoteEQ.
-func SampleNote(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleNote, v))
-}
-
-// SampleConfirmedAt applies equality check predicate on the "sample_confirmed_at" field. It's identical to SampleConfirmedAtEQ.
-func SampleConfirmedAt(v time.Time) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleConfirmedAt, v))
-}
-
-// SampleConfirmedBy applies equality check predicate on the "sample_confirmed_by" field. It's identical to SampleConfirmedByEQ.
-func SampleConfirmedBy(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleConfirmedBy, v))
+// BomFingerprint applies equality check predicate on the "bom_fingerprint" field. It's identical to BomFingerprintEQ.
+func BomFingerprint(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldEQ(FieldBomFingerprint, v))
 }
 
 // ProductSkuID applies equality check predicate on the "product_sku_id" field. It's identical to ProductSkuIDEQ.
@@ -686,429 +656,109 @@ func ImportSourceNotNil() predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(sql.FieldNotNull(FieldImportSource))
 }
 
-// SampleBomIDEQ applies the EQ predicate on the "sample_bom_id" field.
-func SampleBomIDEQ(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleBomID, v))
+// BomIDEQ applies the EQ predicate on the "bom_id" field.
+func BomIDEQ(v int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldEQ(FieldBomID, v))
 }
 
-// SampleBomIDNEQ applies the NEQ predicate on the "sample_bom_id" field.
-func SampleBomIDNEQ(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNEQ(FieldSampleBomID, v))
+// BomIDNEQ applies the NEQ predicate on the "bom_id" field.
+func BomIDNEQ(v int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldNEQ(FieldBomID, v))
 }
 
-// SampleBomIDIn applies the In predicate on the "sample_bom_id" field.
-func SampleBomIDIn(vs ...int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIn(FieldSampleBomID, vs...))
+// BomIDIn applies the In predicate on the "bom_id" field.
+func BomIDIn(vs ...int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldIn(FieldBomID, vs...))
 }
 
-// SampleBomIDNotIn applies the NotIn predicate on the "sample_bom_id" field.
-func SampleBomIDNotIn(vs ...int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotIn(FieldSampleBomID, vs...))
+// BomIDNotIn applies the NotIn predicate on the "bom_id" field.
+func BomIDNotIn(vs ...int) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldNotIn(FieldBomID, vs...))
 }
 
-// SampleBomIDIsNil applies the IsNil predicate on the "sample_bom_id" field.
-func SampleBomIDIsNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIsNull(FieldSampleBomID))
+// BomIDIsNil applies the IsNil predicate on the "bom_id" field.
+func BomIDIsNil() predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldIsNull(FieldBomID))
 }
 
-// SampleBomIDNotNil applies the NotNil predicate on the "sample_bom_id" field.
-func SampleBomIDNotNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotNull(FieldSampleBomID))
+// BomIDNotNil applies the NotNil predicate on the "bom_id" field.
+func BomIDNotNil() predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldNotNull(FieldBomID))
 }
 
-// SampleBomFingerprintEQ applies the EQ predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintEQ(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleBomFingerprint, v))
+// BomFingerprintEQ applies the EQ predicate on the "bom_fingerprint" field.
+func BomFingerprintEQ(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldEQ(FieldBomFingerprint, v))
 }
 
-// SampleBomFingerprintNEQ applies the NEQ predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintNEQ(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNEQ(FieldSampleBomFingerprint, v))
+// BomFingerprintNEQ applies the NEQ predicate on the "bom_fingerprint" field.
+func BomFingerprintNEQ(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldNEQ(FieldBomFingerprint, v))
 }
 
-// SampleBomFingerprintIn applies the In predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintIn(vs ...string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIn(FieldSampleBomFingerprint, vs...))
+// BomFingerprintIn applies the In predicate on the "bom_fingerprint" field.
+func BomFingerprintIn(vs ...string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldIn(FieldBomFingerprint, vs...))
 }
 
-// SampleBomFingerprintNotIn applies the NotIn predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintNotIn(vs ...string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotIn(FieldSampleBomFingerprint, vs...))
+// BomFingerprintNotIn applies the NotIn predicate on the "bom_fingerprint" field.
+func BomFingerprintNotIn(vs ...string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldNotIn(FieldBomFingerprint, vs...))
 }
 
-// SampleBomFingerprintGT applies the GT predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintGT(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGT(FieldSampleBomFingerprint, v))
+// BomFingerprintGT applies the GT predicate on the "bom_fingerprint" field.
+func BomFingerprintGT(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldGT(FieldBomFingerprint, v))
 }
 
-// SampleBomFingerprintGTE applies the GTE predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintGTE(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGTE(FieldSampleBomFingerprint, v))
+// BomFingerprintGTE applies the GTE predicate on the "bom_fingerprint" field.
+func BomFingerprintGTE(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldGTE(FieldBomFingerprint, v))
 }
 
-// SampleBomFingerprintLT applies the LT predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintLT(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLT(FieldSampleBomFingerprint, v))
+// BomFingerprintLT applies the LT predicate on the "bom_fingerprint" field.
+func BomFingerprintLT(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldLT(FieldBomFingerprint, v))
 }
 
-// SampleBomFingerprintLTE applies the LTE predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintLTE(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLTE(FieldSampleBomFingerprint, v))
+// BomFingerprintLTE applies the LTE predicate on the "bom_fingerprint" field.
+func BomFingerprintLTE(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldLTE(FieldBomFingerprint, v))
 }
 
-// SampleBomFingerprintContains applies the Contains predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintContains(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldContains(FieldSampleBomFingerprint, v))
+// BomFingerprintContains applies the Contains predicate on the "bom_fingerprint" field.
+func BomFingerprintContains(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldContains(FieldBomFingerprint, v))
 }
 
-// SampleBomFingerprintHasPrefix applies the HasPrefix predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintHasPrefix(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldHasPrefix(FieldSampleBomFingerprint, v))
+// BomFingerprintHasPrefix applies the HasPrefix predicate on the "bom_fingerprint" field.
+func BomFingerprintHasPrefix(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldHasPrefix(FieldBomFingerprint, v))
 }
 
-// SampleBomFingerprintHasSuffix applies the HasSuffix predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintHasSuffix(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldHasSuffix(FieldSampleBomFingerprint, v))
+// BomFingerprintHasSuffix applies the HasSuffix predicate on the "bom_fingerprint" field.
+func BomFingerprintHasSuffix(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldHasSuffix(FieldBomFingerprint, v))
 }
 
-// SampleBomFingerprintIsNil applies the IsNil predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintIsNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIsNull(FieldSampleBomFingerprint))
+// BomFingerprintIsNil applies the IsNil predicate on the "bom_fingerprint" field.
+func BomFingerprintIsNil() predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldIsNull(FieldBomFingerprint))
 }
 
-// SampleBomFingerprintNotNil applies the NotNil predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintNotNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotNull(FieldSampleBomFingerprint))
+// BomFingerprintNotNil applies the NotNil predicate on the "bom_fingerprint" field.
+func BomFingerprintNotNil() predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldNotNull(FieldBomFingerprint))
 }
 
-// SampleBomFingerprintEqualFold applies the EqualFold predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintEqualFold(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEqualFold(FieldSampleBomFingerprint, v))
+// BomFingerprintEqualFold applies the EqualFold predicate on the "bom_fingerprint" field.
+func BomFingerprintEqualFold(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldEqualFold(FieldBomFingerprint, v))
 }
 
-// SampleBomFingerprintContainsFold applies the ContainsFold predicate on the "sample_bom_fingerprint" field.
-func SampleBomFingerprintContainsFold(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldContainsFold(FieldSampleBomFingerprint, v))
-}
-
-// SampleReusedFromItemIDEQ applies the EQ predicate on the "sample_reused_from_item_id" field.
-func SampleReusedFromItemIDEQ(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleReusedFromItemID, v))
-}
-
-// SampleReusedFromItemIDNEQ applies the NEQ predicate on the "sample_reused_from_item_id" field.
-func SampleReusedFromItemIDNEQ(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNEQ(FieldSampleReusedFromItemID, v))
-}
-
-// SampleReusedFromItemIDIn applies the In predicate on the "sample_reused_from_item_id" field.
-func SampleReusedFromItemIDIn(vs ...int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIn(FieldSampleReusedFromItemID, vs...))
-}
-
-// SampleReusedFromItemIDNotIn applies the NotIn predicate on the "sample_reused_from_item_id" field.
-func SampleReusedFromItemIDNotIn(vs ...int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotIn(FieldSampleReusedFromItemID, vs...))
-}
-
-// SampleReusedFromItemIDIsNil applies the IsNil predicate on the "sample_reused_from_item_id" field.
-func SampleReusedFromItemIDIsNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIsNull(FieldSampleReusedFromItemID))
-}
-
-// SampleReusedFromItemIDNotNil applies the NotNil predicate on the "sample_reused_from_item_id" field.
-func SampleReusedFromItemIDNotNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotNull(FieldSampleReusedFromItemID))
-}
-
-// SampleImageAttachmentIDEQ applies the EQ predicate on the "sample_image_attachment_id" field.
-func SampleImageAttachmentIDEQ(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleImageAttachmentID, v))
-}
-
-// SampleImageAttachmentIDNEQ applies the NEQ predicate on the "sample_image_attachment_id" field.
-func SampleImageAttachmentIDNEQ(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNEQ(FieldSampleImageAttachmentID, v))
-}
-
-// SampleImageAttachmentIDIn applies the In predicate on the "sample_image_attachment_id" field.
-func SampleImageAttachmentIDIn(vs ...int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIn(FieldSampleImageAttachmentID, vs...))
-}
-
-// SampleImageAttachmentIDNotIn applies the NotIn predicate on the "sample_image_attachment_id" field.
-func SampleImageAttachmentIDNotIn(vs ...int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotIn(FieldSampleImageAttachmentID, vs...))
-}
-
-// SampleImageAttachmentIDGT applies the GT predicate on the "sample_image_attachment_id" field.
-func SampleImageAttachmentIDGT(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGT(FieldSampleImageAttachmentID, v))
-}
-
-// SampleImageAttachmentIDGTE applies the GTE predicate on the "sample_image_attachment_id" field.
-func SampleImageAttachmentIDGTE(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGTE(FieldSampleImageAttachmentID, v))
-}
-
-// SampleImageAttachmentIDLT applies the LT predicate on the "sample_image_attachment_id" field.
-func SampleImageAttachmentIDLT(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLT(FieldSampleImageAttachmentID, v))
-}
-
-// SampleImageAttachmentIDLTE applies the LTE predicate on the "sample_image_attachment_id" field.
-func SampleImageAttachmentIDLTE(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLTE(FieldSampleImageAttachmentID, v))
-}
-
-// SampleImageAttachmentIDIsNil applies the IsNil predicate on the "sample_image_attachment_id" field.
-func SampleImageAttachmentIDIsNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIsNull(FieldSampleImageAttachmentID))
-}
-
-// SampleImageAttachmentIDNotNil applies the NotNil predicate on the "sample_image_attachment_id" field.
-func SampleImageAttachmentIDNotNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotNull(FieldSampleImageAttachmentID))
-}
-
-// EngineeringStatusEQ applies the EQ predicate on the "engineering_status" field.
-func EngineeringStatusEQ(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldEngineeringStatus, v))
-}
-
-// EngineeringStatusNEQ applies the NEQ predicate on the "engineering_status" field.
-func EngineeringStatusNEQ(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNEQ(FieldEngineeringStatus, v))
-}
-
-// EngineeringStatusIn applies the In predicate on the "engineering_status" field.
-func EngineeringStatusIn(vs ...string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIn(FieldEngineeringStatus, vs...))
-}
-
-// EngineeringStatusNotIn applies the NotIn predicate on the "engineering_status" field.
-func EngineeringStatusNotIn(vs ...string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotIn(FieldEngineeringStatus, vs...))
-}
-
-// EngineeringStatusGT applies the GT predicate on the "engineering_status" field.
-func EngineeringStatusGT(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGT(FieldEngineeringStatus, v))
-}
-
-// EngineeringStatusGTE applies the GTE predicate on the "engineering_status" field.
-func EngineeringStatusGTE(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGTE(FieldEngineeringStatus, v))
-}
-
-// EngineeringStatusLT applies the LT predicate on the "engineering_status" field.
-func EngineeringStatusLT(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLT(FieldEngineeringStatus, v))
-}
-
-// EngineeringStatusLTE applies the LTE predicate on the "engineering_status" field.
-func EngineeringStatusLTE(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLTE(FieldEngineeringStatus, v))
-}
-
-// EngineeringStatusContains applies the Contains predicate on the "engineering_status" field.
-func EngineeringStatusContains(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldContains(FieldEngineeringStatus, v))
-}
-
-// EngineeringStatusHasPrefix applies the HasPrefix predicate on the "engineering_status" field.
-func EngineeringStatusHasPrefix(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldHasPrefix(FieldEngineeringStatus, v))
-}
-
-// EngineeringStatusHasSuffix applies the HasSuffix predicate on the "engineering_status" field.
-func EngineeringStatusHasSuffix(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldHasSuffix(FieldEngineeringStatus, v))
-}
-
-// EngineeringStatusEqualFold applies the EqualFold predicate on the "engineering_status" field.
-func EngineeringStatusEqualFold(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEqualFold(FieldEngineeringStatus, v))
-}
-
-// EngineeringStatusContainsFold applies the ContainsFold predicate on the "engineering_status" field.
-func EngineeringStatusContainsFold(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldContainsFold(FieldEngineeringStatus, v))
-}
-
-// SampleNoteEQ applies the EQ predicate on the "sample_note" field.
-func SampleNoteEQ(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleNote, v))
-}
-
-// SampleNoteNEQ applies the NEQ predicate on the "sample_note" field.
-func SampleNoteNEQ(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNEQ(FieldSampleNote, v))
-}
-
-// SampleNoteIn applies the In predicate on the "sample_note" field.
-func SampleNoteIn(vs ...string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIn(FieldSampleNote, vs...))
-}
-
-// SampleNoteNotIn applies the NotIn predicate on the "sample_note" field.
-func SampleNoteNotIn(vs ...string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotIn(FieldSampleNote, vs...))
-}
-
-// SampleNoteGT applies the GT predicate on the "sample_note" field.
-func SampleNoteGT(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGT(FieldSampleNote, v))
-}
-
-// SampleNoteGTE applies the GTE predicate on the "sample_note" field.
-func SampleNoteGTE(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGTE(FieldSampleNote, v))
-}
-
-// SampleNoteLT applies the LT predicate on the "sample_note" field.
-func SampleNoteLT(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLT(FieldSampleNote, v))
-}
-
-// SampleNoteLTE applies the LTE predicate on the "sample_note" field.
-func SampleNoteLTE(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLTE(FieldSampleNote, v))
-}
-
-// SampleNoteContains applies the Contains predicate on the "sample_note" field.
-func SampleNoteContains(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldContains(FieldSampleNote, v))
-}
-
-// SampleNoteHasPrefix applies the HasPrefix predicate on the "sample_note" field.
-func SampleNoteHasPrefix(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldHasPrefix(FieldSampleNote, v))
-}
-
-// SampleNoteHasSuffix applies the HasSuffix predicate on the "sample_note" field.
-func SampleNoteHasSuffix(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldHasSuffix(FieldSampleNote, v))
-}
-
-// SampleNoteIsNil applies the IsNil predicate on the "sample_note" field.
-func SampleNoteIsNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIsNull(FieldSampleNote))
-}
-
-// SampleNoteNotNil applies the NotNil predicate on the "sample_note" field.
-func SampleNoteNotNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotNull(FieldSampleNote))
-}
-
-// SampleNoteEqualFold applies the EqualFold predicate on the "sample_note" field.
-func SampleNoteEqualFold(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEqualFold(FieldSampleNote, v))
-}
-
-// SampleNoteContainsFold applies the ContainsFold predicate on the "sample_note" field.
-func SampleNoteContainsFold(v string) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldContainsFold(FieldSampleNote, v))
-}
-
-// SampleConfirmedAtEQ applies the EQ predicate on the "sample_confirmed_at" field.
-func SampleConfirmedAtEQ(v time.Time) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleConfirmedAt, v))
-}
-
-// SampleConfirmedAtNEQ applies the NEQ predicate on the "sample_confirmed_at" field.
-func SampleConfirmedAtNEQ(v time.Time) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNEQ(FieldSampleConfirmedAt, v))
-}
-
-// SampleConfirmedAtIn applies the In predicate on the "sample_confirmed_at" field.
-func SampleConfirmedAtIn(vs ...time.Time) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIn(FieldSampleConfirmedAt, vs...))
-}
-
-// SampleConfirmedAtNotIn applies the NotIn predicate on the "sample_confirmed_at" field.
-func SampleConfirmedAtNotIn(vs ...time.Time) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotIn(FieldSampleConfirmedAt, vs...))
-}
-
-// SampleConfirmedAtGT applies the GT predicate on the "sample_confirmed_at" field.
-func SampleConfirmedAtGT(v time.Time) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGT(FieldSampleConfirmedAt, v))
-}
-
-// SampleConfirmedAtGTE applies the GTE predicate on the "sample_confirmed_at" field.
-func SampleConfirmedAtGTE(v time.Time) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGTE(FieldSampleConfirmedAt, v))
-}
-
-// SampleConfirmedAtLT applies the LT predicate on the "sample_confirmed_at" field.
-func SampleConfirmedAtLT(v time.Time) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLT(FieldSampleConfirmedAt, v))
-}
-
-// SampleConfirmedAtLTE applies the LTE predicate on the "sample_confirmed_at" field.
-func SampleConfirmedAtLTE(v time.Time) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLTE(FieldSampleConfirmedAt, v))
-}
-
-// SampleConfirmedAtIsNil applies the IsNil predicate on the "sample_confirmed_at" field.
-func SampleConfirmedAtIsNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIsNull(FieldSampleConfirmedAt))
-}
-
-// SampleConfirmedAtNotNil applies the NotNil predicate on the "sample_confirmed_at" field.
-func SampleConfirmedAtNotNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotNull(FieldSampleConfirmedAt))
-}
-
-// SampleConfirmedByEQ applies the EQ predicate on the "sample_confirmed_by" field.
-func SampleConfirmedByEQ(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldEQ(FieldSampleConfirmedBy, v))
-}
-
-// SampleConfirmedByNEQ applies the NEQ predicate on the "sample_confirmed_by" field.
-func SampleConfirmedByNEQ(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNEQ(FieldSampleConfirmedBy, v))
-}
-
-// SampleConfirmedByIn applies the In predicate on the "sample_confirmed_by" field.
-func SampleConfirmedByIn(vs ...int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIn(FieldSampleConfirmedBy, vs...))
-}
-
-// SampleConfirmedByNotIn applies the NotIn predicate on the "sample_confirmed_by" field.
-func SampleConfirmedByNotIn(vs ...int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotIn(FieldSampleConfirmedBy, vs...))
-}
-
-// SampleConfirmedByGT applies the GT predicate on the "sample_confirmed_by" field.
-func SampleConfirmedByGT(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGT(FieldSampleConfirmedBy, v))
-}
-
-// SampleConfirmedByGTE applies the GTE predicate on the "sample_confirmed_by" field.
-func SampleConfirmedByGTE(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldGTE(FieldSampleConfirmedBy, v))
-}
-
-// SampleConfirmedByLT applies the LT predicate on the "sample_confirmed_by" field.
-func SampleConfirmedByLT(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLT(FieldSampleConfirmedBy, v))
-}
-
-// SampleConfirmedByLTE applies the LTE predicate on the "sample_confirmed_by" field.
-func SampleConfirmedByLTE(v int) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldLTE(FieldSampleConfirmedBy, v))
-}
-
-// SampleConfirmedByIsNil applies the IsNil predicate on the "sample_confirmed_by" field.
-func SampleConfirmedByIsNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldIsNull(FieldSampleConfirmedBy))
-}
-
-// SampleConfirmedByNotNil applies the NotNil predicate on the "sample_confirmed_by" field.
-func SampleConfirmedByNotNil() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(sql.FieldNotNull(FieldSampleConfirmedBy))
+// BomFingerprintContainsFold applies the ContainsFold predicate on the "bom_fingerprint" field.
+func BomFingerprintContainsFold(v string) predicate.SalesOrderItem {
+	return predicate.SalesOrderItem(sql.FieldContainsFold(FieldBomFingerprint, v))
 }
 
 // ProductSkuIDEQ applies the EQ predicate on the "product_sku_id" field.
@@ -1796,29 +1446,6 @@ func UpdatedAtLTE(v time.Time) predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(sql.FieldLTE(FieldUpdatedAt, v))
 }
 
-// HasSampleReusedFromItem applies the HasEdge predicate on the "sample_reused_from_item" edge.
-func HasSampleReusedFromItem() predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2O, false, SampleReusedFromItemTable, SampleReusedFromItemColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasSampleReusedFromItemWith applies the HasEdge predicate on the "sample_reused_from_item" edge with a given conditions (other predicates).
-func HasSampleReusedFromItemWith(preds ...predicate.SalesOrderItem) predicate.SalesOrderItem {
-	return predicate.SalesOrderItem(func(s *sql.Selector) {
-		step := newSampleReusedFromItemStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
 // HasSalesOrder applies the HasEdge predicate on the "sales_order" edge.
 func HasSalesOrder() predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(func(s *sql.Selector) {
@@ -1865,21 +1492,21 @@ func HasProductWith(preds ...predicate.Product) predicate.SalesOrderItem {
 	})
 }
 
-// HasSampleBom applies the HasEdge predicate on the "sample_bom" edge.
-func HasSampleBom() predicate.SalesOrderItem {
+// HasBom applies the HasEdge predicate on the "bom" edge.
+func HasBom() predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, SampleBomTable, SampleBomColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, BomTable, BomColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasSampleBomWith applies the HasEdge predicate on the "sample_bom" edge with a given conditions (other predicates).
-func HasSampleBomWith(preds ...predicate.BOMHeader) predicate.SalesOrderItem {
+// HasBomWith applies the HasEdge predicate on the "bom" edge with a given conditions (other predicates).
+func HasBomWith(preds ...predicate.BOMHeader) predicate.SalesOrderItem {
 	return predicate.SalesOrderItem(func(s *sql.Selector) {
-		step := newSampleBomStep()
+		step := newBomStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

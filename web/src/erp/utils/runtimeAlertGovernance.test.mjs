@@ -65,7 +65,7 @@ test('routine task and help guidance use compact content instead of alerts', () 
   assert.match(drawer, /<WorkflowTaskHandlingChain/u)
   assert.match(handlingChain, /role="alert"/u)
   assert.match(handlingChain, /暂时无法读取任务处理链，请重新读取。/u)
-  assert.match(drawer, /canChooseActions \? '选择处理方式' : '当前只能查看任务'/u)
+  assert.match(drawer, /canChooseActions \? '选择处理方式' : '办理资料'/u)
   assert.match(drawer, /readonlyReason \|\| '当前账号不能直接处理该任务。'/u)
 })
 

@@ -140,7 +140,7 @@
 .erp-dev-delivery-decision {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: 12px 24px;
   padding: 16px;
@@ -158,10 +158,6 @@
 .erp-dev-database-migration-flow .erp-dev-delivery-path {
   padding: 0;
   border: 0;
-}
-.erp-dev-database-migration-page > header > .ant-space,
-.erp-dev-recovery-page > header > .ant-space {
-  margin-inline-start: auto;
 }
 .erp-dev-version-tab--versions > .erp-dev-delivery-path {
   margin-bottom: 12px;

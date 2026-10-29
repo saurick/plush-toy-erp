@@ -8,6 +8,22 @@ import {
 } from '@ant-design/icons'
 import '../styles/dev-workbench-pattern.css'
 
+// The catalogue stays mounted while its reader changes, so peers remain directly reachable.
+export function WorkbenchReading({ items = [], catalog, value, onChange, label, detailLabel, detailVisible = true, children, className = '' }) {
+  return (
+    <div className={`erp-workbench-reading${catalog ? ' erp-workbench-reading--custom-catalog' : ''}${detailVisible ? '' : ' erp-workbench-reading--catalog-only'} ${className}`}>
+      <nav className="erp-workbench-reading__catalog" aria-label={label}>
+        {catalog || items.map((item) => (
+          <button key={item.value} type="button" className="erp-dev-directory-item" aria-pressed={value === item.value} onClick={() => onChange(item.value)}>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+      {detailVisible ? <section className="erp-workbench-reading__body" aria-label={detailLabel}>{children}</section> : null}
+    </div>
+  )
+}
+
 // Page families compose these parts; data identity, permissions and operations stay with the caller.
 export function WorkbenchSection({
   title,
@@ -62,14 +78,20 @@ export function WorkbenchSection({
 export function WorkbenchToolbar({
   children,
   actions,
+  tools,
   className = '',
   ...props
 }) {
   return (
     <div {...props} className={`erp-workbench-toolbar ${className}`}>
-      <div className="erp-workbench-toolbar__controls">{children}</div>
-      {actions ? (
-        <div className="erp-workbench-toolbar__actions">{actions}</div>
+      <div className="erp-workbench-toolbar__controls">
+        {children}
+        {actions ? (
+          <div className="erp-workbench-toolbar__actions">{actions}</div>
+        ) : null}
+      </div>
+      {tools ? (
+        <div className="erp-workbench-toolbar__tools">{tools}</div>
       ) : null}
     </div>
   )

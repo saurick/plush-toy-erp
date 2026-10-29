@@ -6,6 +6,7 @@ import {
 import { Alert, Button, Space, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevTestingEnvironment from '../components/DevTestingEnvironment.jsx'
@@ -27,7 +28,6 @@ import {
   selectDisplayedQualityGateOperation,
 } from '../config/devQualityGates.mjs'
 import {
-  SOURCE_PATH,
   PROFILE_LABELS,
   mergeOperationIntoSummary,
   qualityGateViewStatus,
@@ -376,37 +376,58 @@ export default function DevQualityGatesPage() {
     activeView,
     summaryError
   )
+  const contextStrip = (
+    <ContextStrip
+      summary={summary}
+      status={displayedStatus}
+      view={activeView}
+      summaryError={summaryError}
+      onReturnLocal={() => selectView('run')}
+      standalone={standalone}
+      flat={activeView === 'run' && !standalone}
+    />
+  )
 
   return (
     <div className="erp-dev-quality-gates-page erp-dev-workspace-page erp-dev-tool-page">
-      <DevPageNav sourcePath={SOURCE_PATH} />
-      <header className="erp-dev-quality-header">
-        <div>
-          <Space align="center" size={10}>
-            <SafetyCertificateOutlined className="erp-dev-quality-header__icon" />
-            <Title ref={titleRef} tabIndex={-1} level={1}>
-              质量门禁
-            </Title>
-          </Space>
-        </div>
-        <DevTaskNav
-          idPrefix="quality-gates-group"
-          ariaLabel="质量门禁环境与规则"
-          items={getQualityGateViewGroups(standalone)}
-          value={activeGroup}
-          onChange={(group) => selectView(group === 'workspace' ? lastWorkspaceView.current : group)}
-          disabled={!parsed.valid}
-          compact
-          className="erp-dev-quality-tabs"
-        />
-        <Button
-          icon={<ReloadOutlined />}
-          loading={refreshing || activeViewState.loading}
-          onClick={refresh}
-        >
-          刷新状态
-        </Button>
-      </header>
+      <DevPageNav />
+      <DevPageHeader
+        className="erp-dev-quality-header"
+        title={
+          <div>
+            <Space align="center" size={10}>
+              <SafetyCertificateOutlined className="erp-dev-quality-header__icon" />
+              <Title ref={titleRef} tabIndex={-1} level={1}>
+                质量门禁
+              </Title>
+            </Space>
+          </div>
+        }
+        navigation={
+          <DevTaskNav
+            idPrefix="quality-gates-group"
+            ariaLabel="质量门禁环境与规则"
+            items={getQualityGateViewGroups(standalone)}
+            value={activeGroup}
+            onChange={(group) =>
+              selectView(group === 'workspace' ? lastWorkspaceView.current : group)
+            }
+            disabled={!parsed.valid}
+            compact
+            className="erp-dev-quality-tabs"
+          />
+        }
+        tools={
+          <Button
+            className="erp-dev-workbench-tools"
+            icon={<ReloadOutlined />}
+            loading={refreshing || activeViewState.loading}
+            onClick={refresh}
+          >
+            刷新状态
+          </Button>
+        }
+      />
 
       <main className="erp-dev-quality-shell">
         {!parsed.valid ? (
@@ -435,8 +456,8 @@ export default function DevQualityGatesPage() {
           role="tabpanel"
           aria-labelledby={`quality-gates-group-tab-${activeGroup}`}
         >
-          <div className="erp-dev-testing-scope">
-            <DevTestingEnvironment context={getQualityGateEnvironment(activeView, standalone)} />
+          <div className={`erp-dev-testing-scope${activeGroup === 'workspace' ? ' erp-dev-quality-local-scope' : ''}`}>
+            <DevTestingEnvironment compact={activeGroup === 'workspace'} context={getQualityGateEnvironment(activeView, standalone)} />
             <div hidden={activeGroup !== 'workspace'}>
               <DevTaskNav
                 idPrefix="quality-gates"
@@ -450,14 +471,7 @@ export default function DevQualityGatesPage() {
               />
             </div>
           </div>
-          <ContextStrip
-            summary={summary}
-            status={displayedStatus}
-            view={activeView}
-            summaryError={summaryError}
-            onReturnLocal={() => selectView('run')}
-            standalone={standalone}
-          />
+          {activeView !== 'run' || standalone ? contextStrip : null}
 
           <section className="erp-dev-quality-content">
             <div
@@ -474,6 +488,7 @@ export default function DevQualityGatesPage() {
               {parsed.valid && activeView === 'run' ? (
                 <>
                   {!import.meta.env.PLUSH_STANDALONE_WORKBENCH ? <LocalDiagnosticsActions
+                    context={contextStrip}
                     summary={summary}
                     initialLoading={initialLoading}
                     canRun={canRun}

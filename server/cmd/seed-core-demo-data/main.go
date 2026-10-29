@@ -24,8 +24,7 @@ import (
 
 var manualAcceptanceReferenceDatabasePattern = regexp.MustCompile(`^plush_erp_acceptance_([a-z0-9][a-z0-9_]{2,39})_dev$`)
 var scenarioDemoReferenceDatabases = map[string]struct{}{
-	"plush_erp":           {},
-	"plush_erp_simon_dev": {},
+	"plush_erp": {},
 }
 
 func main() {

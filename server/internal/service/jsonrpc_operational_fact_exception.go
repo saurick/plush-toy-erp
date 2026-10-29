@@ -17,6 +17,7 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 			biz.PermissionPMCRiskRead,
 			biz.PermissionProductionFactRead,
 			biz.PermissionProductionExceptionSubmit,
+			biz.PermissionProductionOverIssueSubmit,
 			biz.PermissionProductionExceptionApprove,
 		); res != nil {
 			return id, res, nil
@@ -24,6 +25,25 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 	} else {
 		permission := biz.PermissionProductionExceptionSubmit
 		switch method {
+		case "submit_production_exception":
+			var valid bool
+			permission, valid = biz.ProductionExceptionSubmissionPermission(getString(pm, "decision_type"))
+			if !valid {
+				return id, invalidParamResult(), nil
+			}
+		case "cancel_production_exception":
+			if res := d.RequireAdminAnyPermission(ctx, biz.PermissionProductionExceptionSubmit, biz.PermissionProductionOverIssueSubmit); res != nil {
+				return id, res, nil
+			}
+			item, err := d.operationalFactUC.GetProductionException(ctx, getInt(pm, "id", 0))
+			if err != nil {
+				return id, d.mapOperationalFactError(ctx, err), nil
+			}
+			var valid bool
+			permission, valid = biz.ProductionExceptionSubmissionPermission(item.DecisionType)
+			if !valid {
+				return id, invalidParamResult(), nil
+			}
 		case "reverse_production_exception":
 			permission = biz.PermissionProductionExceptionExecute
 		}

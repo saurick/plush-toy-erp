@@ -207,6 +207,10 @@ test('mobileTaskQueries: 回执详情快照必须匹配当前权限范围和选�
     }),
     task
   )
+  const recorded = { ...receipt, action: '', status: 'recorded' }
+  assert.equal(resolveMobileRoleTaskReceiptDetailTask({ receipt: recorded, scopeKey: receipt.scope_key, selectedTaskID: 88 }), task)
+  assert.equal(resolveMobileRoleTaskReceiptDetailTask({ receipt: recorded, scopeKey: 'another-account', selectedTaskID: 88 }), null)
+  assert.equal(resolveMobileRoleTaskReceiptDetailTask({ receipt: { ...recorded, task: { ...task, task_status_key: 'ready' } }, scopeKey: receipt.scope_key, selectedTaskID: 88 }), null)
   for (const [scopeKey, selectedTaskID] of [
     ['boss|access:revision-1|ready', 88],
     [receipt.scope_key, 89],

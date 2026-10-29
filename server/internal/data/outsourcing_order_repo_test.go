@@ -347,6 +347,8 @@ func TestOutsourcingOrderLifecycleActionUsesExistingInventoryTransaction(t *test
 		SetUnitID(unit.ID).
 		SetProcessingItem("面料裁片").
 		SetOutsourcingQuantity(decimal.NewFromInt(10)).
+		SetUnitPrice(decimal.NewFromInt(2)).
+		SetAmount(decimal.NewFromInt(20)).
 		SaveX(ctx)
 
 	action := &biz.SourceOrderLifecycleAction{

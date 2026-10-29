@@ -99,3 +99,8 @@ export function getWorkflowTaskStatusActionModes(taskOrStatus = '') {
 export function canWorkflowTaskStatusRunAction(taskOrStatus, actionMode = '') {
   return getWorkflowTaskStatusActionModes(taskOrStatus).includes(actionMode)
 }
+
+export function workflowTaskActionRequiresReason(task, action) {
+  if (['complete', 'done'].includes(action)) return isWorkflowApprovalTask(task) || task?.task_group === 'business_followup'
+  return ['block', 'blocked', 'reject', 'rejected', 'resume', 'urge', 'assign'].includes(action)
+}

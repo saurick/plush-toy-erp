@@ -34,6 +34,72 @@ const web = (file, name) =>
 
 export const BUSINESS_RULES = Object.freeze([
   rule(
+    "purchase-source-permissions", "采购来源读取与岗位权限", "boundary", "fact-purchase",
+    "按岗位授予来源只读和本岗办理权限；不附带上游编辑、审批权。仓库与品质无采购价格权限仍可带入数量和来源关联；缺少来源权限时提示，撤权后清理窗口，后端再次校验且禁止越权写入。",
+    [
+      source("biz/rbac_test.go", "TestBuiltinPurchaseChainSourcePermissionsKeepJobBoundaries", "server"),
+      source("service/jsonrpc_sensitive_fields_test.go", "TestPurchaseSourceReadPolicyKeepsRoleQuantitiesWithoutLeakingPrices", "server"),
+      source("service/jsonrpc_purchase_test.go", "TestJsonrpcDispatcher_PurchaseReceiptSourceMethodsRequirePurchaseOrderRead", "server"),
+      source("service/jsonrpc_source_action_permission_test.go", "TestSourceActionReadPermissionGuardsDenyEveryMissingSourceCapabilityBeforeWrite", "server"),
+      web("sourceActionAccess.test.mjs", "采购带入权限同时检查本岗、来源和敏感字段，读取不授予写入"),
+      web("sourceActionAccess.test.mjs", "采购来源撤权按当前有效会话收紧，超级管理员也不能绕过客户动作限制"),
+      web("sourceActionAccess.test.mjs", "采购退货调整与两类不合格处置分别检查来源，准备资料不能扩大办理权限"),
+    ],
+  ),
+  rule(
+    "purchase-approval", "采购审批任务与拒绝终点", "boundary", "workflow",
+    "审批节点由流程运行时创建；批准与拒绝按各自分支结束，审批任务完成不等于入库或应付过账。",
+    [
+      source("biz/process_runtime_test.go", "TestProcessRuntimeUsecaseStartProcessInstanceActivatesFirstWaitingApprovalNode", "server"),
+      source("biz/process_runtime_test.go", "TestProcessRuntimeUsecaseStandardApprovalRejectionCompletesTerminalBranch", "server"),
+      source("data/process_runtime_source_order_postgres_test.go", "TestProcessRuntimePostgresPurchaseApprovalRejectionTerminatesSourceAndProcess"),
+    ],
+  ),
+  rule(
+    "purchase-source-order", "采购批准与订单快照", "boundary", "source-documents",
+    "订单按来源和生命周期办理；收货引用已批准订单，币种与付款条件保持订单快照。",
+    [
+      source("biz/purchase_order_test.go", "TestPurchaseOrderUsecaseLifecycleGuards", "server"),
+      source("biz/purchase_order_test.go", "TestPurchaseOrderCurrencyAndPaymentTermSnapshotContract", "server"),
+    ],
+  ),
+  rule(
+    "purchase-arrival", "分批收货与到货回滚", "transaction", "fact-purchase",
+    "按采购订单行登记实收；数量进度由服务端汇总，到货失败不得遗留收货或检验事实。",
+    [
+      source("data/purchase_order_receipt_progress_repo_test.go", "TestPurchaseOrderReceiptProgressProjectsExactServerOwnedQuantities", "server"),
+      source("data/receiving_quality_atomic_retry_postgres_test.go", "TestPurchaseReceiptPostgresArrivalFailureRollsBackAndRetries"),
+    ],
+  ),
+  rule(
+    "purchase-quality-handoff", "逐行检验与待入库交接", "boundary", "fact-quality",
+    "到货生成逐行待检记录；通过与不合格分别保留，品质结论不代替仓库入库。",
+    [
+      source("biz/incoming_acceptance_test.go", "TestIncomingAcceptanceExplicitQuantitiesAndIntent", "server"),
+      source("data/incoming_acceptance_test.go", "TestPurchaseReceiptPostgresIncomingAcceptance"),
+      source("data/purchase_receipt_handoff_guards_postgres_test.go", "TestPurchaseReceiptPostgresMixedQualityPreservesAggregateOutcome"),
+    ],
+  ),
+  rule(
+    "purchase-inbound", "合格行入库与异常收尾", "transaction", "fact-purchase",
+    "本次仅入库已通过的未过账行；多行失败一并回滚，可重试。不合格行处置后才完成收货收尾。",
+    [
+      source("data/purchase_receipt_partial_inbound_test.go", "TestPurchaseReceiptMixedQualityPostsOnlyPassedLinesAndSettlesIndependently", "server"),
+      source("data/purchase_receipt_partial_inbound_test.go", "TestPurchaseReceiptReadyLinesRollbackTogetherAndRetry", "server"),
+      source("data/purchase_receipt_partial_inbound_test.go", "TestPurchaseReceiptPendingLineCanPassAndPostAfterPartialInbound", "server"),
+      source("data/purchase_receipt_handoff_guards_postgres_test.go", "TestPurchaseReceiptPostgresInboundCommandCompletesWithDisposedRejection"),
+    ],
+  ),
+  rule(
+    "purchase-payable-source", "采购应付来源、计价与过账", "boundary", "fact-finance",
+    "应付草稿读取已入库来源及冻结结算快照；缺值或来源冲突拒绝，重复请求返回同一草稿；财务确认后独立过账。",
+    [
+      source("data/operational_fact_finance_business_source_test.go", "TestPurchaseReceiptPayableRejectsMissingOrMixedOrderSnapshot", "server"),
+      source("data/operational_fact_finance_business_source_test.go", "TestFinanceBusinessSourcesSQLite", "server"),
+      source("data/operational_fact_finance_business_source_test.go", "TestFinanceBusinessSourcesPostgres"),
+    ],
+  ),
+  rule(
     "consistency-money",
     "单价、金额精度与缺值",
     "consistency",
@@ -99,8 +165,10 @@ export const BUSINESS_RULES = Object.freeze([
     "业务日期与时间边界",
     "consistency",
     "rbac-api",
-    "仅日期筛选覆盖上海时区整天；显式时间戳保持原瞬间，付款到期日沿用正式 UTC 月结规则。",
+    "仅日期筛选覆盖上海时区整天；显式时间戳保持原瞬间，付款到期日按中国自然月月末加约定天数。",
     [
+      source("biz/operational_fact_finance_source_test.go", "TestFinanceFactDueAtFromDaysUsesCanonicalMonthEnd", "server"),
+      source("data/finance_china_month_end_migration_postgres_test.go", "TestFinanceChinaMonthEndMigrationPostgres"),
       source(
         "service/jsonrpc_date_filter_test.go",
         "TestBusinessDateFilterBoundaries",
@@ -469,6 +537,27 @@ export const BUSINESS_RULES = Object.freeze([
     ],
   ),
   rule(
+    "finance-read-trace",
+    "财务读取权限与逐笔关联",
+    "boundary",
+    "fact-finance",
+    "账款按所属类型授权；收付关联另需收付款读取权限。关联分页保留已冲回核销，不混入其他账款，不把读取失败当作无记录。",
+    [
+      source("service/jsonrpc_finance_trace_test.go", "TestFinanceTraceReadPermissionsAndFilters", "server"),
+      source("service/jsonrpc_finance_trace_test.go", "TestFinanceTraceRejectsInvalidOrMissingRecord", "server"),
+      source("data/finance_trace_repo_test.go", "TestFinanceTraceRelationshipSQLite", "server"),
+      source("data/finance_trace_repo_test.go", "TestOperationalFactRepoFinanceTracePostgres"),
+    ],
+  ),
+  rule(
+    "finance-period-statement",
+    "期间对账与资金口径",
+    "consistency",
+    "fact-finance",
+    "期间对账按中国日期和入账、冲回时间取数，期初与期末可核对；预收预付不遗漏，核销不重复计入资金。",
+    [source("data/finance_statement_repo_test.go", "TestFinanceStatementPostgres")],
+  ),
+  rule(
     "workflow-boundary",
     "协同终态、幂等与事实边界",
     "boundary",
@@ -496,11 +585,20 @@ export const BUSINESS_RULES = Object.freeze([
   ),
   rule(
     "permission-boundary",
-    "仓库权限与角色聚合写入",
+    "业务链路岗位权限与仓库范围",
     "boundary",
     "rbac-api",
-    "越权仓库写入在 repository 前拒绝；并发角色设置保留一组完整权限。",
+    "业务链路按职责区分质量方案、超领、仓库领料与合同办理；仓库范围同时约束查询、计数、写入及重放，来源只读不授予办理权；迁移保留自定义岗位、停用状态和历史，角色设置并发保持完整。",
     [
+      source("biz/role_flow_permissions_test.go", "TestRoleFlowEveryFulfillmentOwnerCanReadAndPerformSourceAction", "server"),
+      source("service/jsonrpc_role_flow_permissions_test.go", "TestRoleFlowExceptionSubmissionAndWithdrawalByDecisionType", "server"),
+      source("service/jsonrpc_role_flow_permissions_test.go", "TestRoleFlowMaterialIssuePostCancelRequiresWarehouseOutbound", "server"),
+      source("service/jsonrpc_role_flow_permissions_test.go", "TestRoleFlowQuantityCommandsDoNotRequireCommercialRead", "server"),
+      source("service/jsonrpc_role_flow_permissions_test.go", "TestRoleFlowQualityDetailRequiresItsActualSourceRead", "server"),
+      source("data/role_flow_data_scope_test.go", "TestRoleFlowWIPQualityDoesNotInventWarehouseOwnership", "server"),
+      source("data/role_flow_data_scope_test.go", "TestOperationalFactPostgresRoleFlowWarehouseScope"),
+      source("data/role_flow_permissions_migration_postgres_test.go", "TestAdminManagePostgresRoleFlowPermissionMigration"),
+      source("data/role_flow_http_postgres_test.go", "TestSourceDocumentPostgresIntegrationEveryRolePermissionBoundary"),
       source(
         "biz/inventory_usecase_behavior_test.go",
         "TestInventoryUsecaseWarehouseScopeRejectsWritesBeforeRepository",

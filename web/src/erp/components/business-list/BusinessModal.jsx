@@ -2,6 +2,8 @@ import React from 'react'
 import { theme } from 'antd'
 import Modal from '@/common/components/modal/AppModal'
 import { resolveBusinessModalWidth } from '../../utils/modalSizes.mjs'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import BusinessFormPage from './BusinessFormPage.jsx'
 
 export default function BusinessModal({
   size = 'localAction',
@@ -18,14 +20,19 @@ export default function BusinessModal({
   onOk,
   form,
   style,
+  taskInline = false,
+  hasChanges = false,
   ...props
 }) {
   const { token } = theme.useToken()
+  const context = useBusinessPageContext()
+  const inline = taskInline && Boolean(context?.taskBusiness)
+  const readOnly = context?.taskBusiness?.readOnly === true
   const submittingRef = React.useRef(false)
   const [submitting, setSubmitting] = React.useState(false)
   const busy = confirmLoading || submitting
   const confirm = async (event) => {
-    if (submittingRef.current || busy || okButtonProps?.disabled) return
+    if (submittingRef.current || busy || okButtonProps?.disabled || (inline && readOnly)) return
     submittingRef.current = true
     setSubmitting(true)
     try {
@@ -45,6 +52,26 @@ export default function BusinessModal({
       setSubmitting(false)
     }
   }
+  if (inline) { return (
+    <BusinessFormPage
+      open={props.open}
+      form={form}
+      title={typeof props.title === 'string' ? props.title : props.title?.props?.title || props.title?.props?.label || '业务办理'}
+      className={className}
+      readOnly={readOnly}
+      hasChanges={hasChanges}
+      loading={props.loading}
+      confirmLoading={busy}
+      okText={props.okText}
+      okButtonProps={okButtonProps}
+      onOk={onOk ? confirm : undefined}
+      onCancel={onCancel}
+      afterOpenChange={props.afterOpenChange}
+      footer={props.footer}
+    >
+      {props.children}
+    </BusinessFormPage>
+  ) }
   return (
     <Modal
       {...props}

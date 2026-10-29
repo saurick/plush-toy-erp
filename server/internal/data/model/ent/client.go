@@ -13282,22 +13282,6 @@ func (c *SalesOrderItemClient) GetX(ctx context.Context, id int) *SalesOrderItem
 	return obj
 }
 
-// QuerySampleReusedFromItem queries the sample_reused_from_item edge of a SalesOrderItem.
-func (c *SalesOrderItemClient) QuerySampleReusedFromItem(_m *SalesOrderItem) *SalesOrderItemQuery {
-	query := (&SalesOrderItemClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(salesorderitem.Table, salesorderitem.FieldID, id),
-			sqlgraph.To(salesorderitem.Table, salesorderitem.FieldID),
-			sqlgraph.Edge(sqlgraph.O2O, false, salesorderitem.SampleReusedFromItemTable, salesorderitem.SampleReusedFromItemColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
 // QuerySalesOrder queries the sales_order edge of a SalesOrderItem.
 func (c *SalesOrderItemClient) QuerySalesOrder(_m *SalesOrderItem) *SalesOrderQuery {
 	query := (&SalesOrderClient{config: c.config}).Query()
@@ -13330,15 +13314,15 @@ func (c *SalesOrderItemClient) QueryProduct(_m *SalesOrderItem) *ProductQuery {
 	return query
 }
 
-// QuerySampleBom queries the sample_bom edge of a SalesOrderItem.
-func (c *SalesOrderItemClient) QuerySampleBom(_m *SalesOrderItem) *BOMHeaderQuery {
+// QueryBom queries the bom edge of a SalesOrderItem.
+func (c *SalesOrderItemClient) QueryBom(_m *SalesOrderItem) *BOMHeaderQuery {
 	query := (&BOMHeaderClient{config: c.config}).Query()
 	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
 		id := _m.ID
 		step := sqlgraph.NewStep(
 			sqlgraph.From(salesorderitem.Table, salesorderitem.FieldID, id),
 			sqlgraph.To(bomheader.Table, bomheader.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, salesorderitem.SampleBomTable, salesorderitem.SampleBomColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, salesorderitem.BomTable, salesorderitem.BomColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil

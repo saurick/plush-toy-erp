@@ -139,6 +139,7 @@ export function isOutsourcingSourceActionEligible(
   const normalizedAction = normalizedActionType(actionType)
   return Boolean(
     normalizedAction &&
+      !(normalizedAction === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT && (positiveID(order.source_wip_batch_id) || positiveID(item.production_wip_batch_id))) &&
       String(order?.lifecycle_status || '').toLowerCase() === OutsourcingOrderStatus.CONFIRMED &&
       String(item?.line_status || '').toLowerCase() === OutsourcingOrderItemStatus.OPEN &&
       positiveID(order?.id) > 0 &&
@@ -181,7 +182,10 @@ function outsourcingSourceActionProcessedUnits(
     ) {
       return total
     }
-    return addNumeric20Scale6Units(total, quantityUnits(fact?.quantity))
+    const effective = normalizedAction === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
+      ? subtractNumeric20Scale6Units(quantityUnits(fact?.quantity), quantityUnits(fact?.returned_to_vendor_quantity))
+      : quantityUnits(fact?.quantity)
+    return addNumeric20Scale6Units(total, effective)
   }, '0')
 }
 

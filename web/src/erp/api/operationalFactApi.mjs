@@ -11,6 +11,8 @@ import {
 } from '../utils/financeCancellation.mjs'
 import {
   normalizeOutsourcingReturnPayableRequest,
+  normalizeOutsourcingOrderPayableRequest,
+  validateOutsourcingOrderPayableResult,
   normalizePurchaseReceiptPayableRequest,
   normalizeSingleFactReconciliationRequest,
   validateOutsourcingReturnPayableResult,
@@ -525,6 +527,15 @@ export async function listFinanceFacts(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function getFinanceFact(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.GET_FINANCE_FACT,
+    params,
+    options
+  )
+  return dataOf(result)?.finance_fact || null
+}
+
 export async function listAllFinanceFacts(params = {}, options = {}) {
   return listAllPaginatedRecords(
     listFinanceFacts,
@@ -572,6 +583,18 @@ export async function createPayableFromOutsourcingReturn(params = {}) {
     request
   )
   return validateOutsourcingReturnPayableResult(
+    dataOf(result)?.finance_fact,
+    request
+  )
+}
+
+export async function createPayableFromOutsourcingOrder(params = {}) {
+  const request = normalizeOutsourcingOrderPayableRequest(params)
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.CREATE_PAYABLE_FROM_OUTSOURCING_ORDER,
+    request
+  )
+  return validateOutsourcingOrderPayableResult(
     dataOf(result)?.finance_fact,
     request
   )
@@ -763,4 +786,19 @@ async function runOperationalFactLifecycle({
     request,
     targetStatus
   )
+}
+
+export async function getFinanceStatement(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(RpcMethod.operational_fact.GET_FINANCE_STATEMENT, params, options)
+  return dataOf(result)?.statement || null
+}
+
+export async function listFinanceSourceAdjustments(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(RpcMethod.operational_fact.LIST_FINANCE_SOURCE_ADJUSTMENTS, params, options)
+  return dataOf(result)
+}
+
+export async function createFinanceSourceAdjustment(params = {}) {
+  const result = await operationalFactRpc.call(RpcMethod.operational_fact.CREATE_FINANCE_SOURCE_ADJUSTMENT, params)
+  return dataOf(result)?.credit_note || null
 }

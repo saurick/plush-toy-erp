@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
-import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+import { useLocation, useNavigate, } from 'react-router-dom'
+import useBusinessPageContext from './useBusinessPageContext.js'
 import { mobileBusinessPath, mobileBusinessRole } from '../utils/businessTaskRoute.mjs'
 import { workflowTaskNavigationState } from '../utils/workflowTaskNavigation.mjs'
 
@@ -8,10 +9,10 @@ import { workflowTaskNavigationState } from '../utils/workflowTaskNavigation.mjs
 export default function useBusinessNavigate() {
   const navigate = useNavigate()
   const location = useLocation()
-  const outlet = useOutletContext()
+  const outlet = useBusinessPageContext()
   const roleKey = mobileBusinessRole(location.pathname)
   return useCallback((to, options = {}) => {
-    if (outlet?.mobileTaskBusiness?.navigate) return outlet.mobileTaskBusiness.navigate(to, options)
+    if (outlet?.taskBusiness?.navigate) return outlet.taskBusiness.navigate(to, options)
     if (typeof to === 'number') return navigate(to)
     const path = roleKey ? mobileBusinessPath(to, roleKey) : to
     const targetPath = typeof path === 'string' ? path : `${path.pathname || location.pathname}${path.search || ''}${path.hash || ''}`

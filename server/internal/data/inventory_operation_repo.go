@@ -45,6 +45,33 @@ func (r *inventoryRepo) CreateInventoryOperation(ctx context.Context, in *biz.In
 		}
 		return nil, err
 	}
+	if in.OperationType == biz.InventoryOperationCycleCount {
+		keys := make([]biz.InventoryBalanceKey, 0, len(in.Items))
+		for _, item := range in.Items {
+			keys = append(keys, biz.InventoryBalanceKey{SubjectType: item.SubjectType, SubjectID: item.SubjectID, ProductSkuID: item.ProductSkuID, WarehouseID: item.FromWarehouseID, LotID: item.FromLotID, UnitID: item.UnitID})
+		}
+		if err := lockInventoryOperationResources(ctx, tx, keys); err != nil {
+			return nil, err
+		}
+		for index, item := range in.Items {
+			balance, err := getInventoryBalance(ctx, tx.client.InventoryBalance.Query(), keys[index])
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrBadParam
+			}
+			if err != nil {
+				return nil, err
+			}
+			if item.ExpectedQuantity == nil || item.CountedQuantity == nil {
+				return nil, biz.ErrBadParam
+			}
+			if !balance.Quantity.Equal(*item.ExpectedQuantity) {
+				return nil, biz.ErrInventoryOperationStaleCount
+			}
+			if err := validateUnitQuantities(ctx, tx.client, item.UnitID, *item.CountedQuantity, item.AdjustmentQuantity); err != nil {
+				return nil, err
+			}
+		}
+	}
 	for _, item := range in.Items {
 		_, err = tx.client.InventoryOperationItem.Create().SetOperationID(row.ID).SetLineNo(item.LineNo).SetSubjectType(item.SubjectType).SetSubjectID(item.SubjectID).SetNillableProductSkuID(item.ProductSkuID).SetFromWarehouseID(item.FromWarehouseID).SetNillableFromLotID(item.FromLotID).SetNillableToWarehouseID(item.ToWarehouseID).SetNillableToLotID(item.ToLotID).SetUnitID(item.UnitID).SetNillableExpectedQuantity(item.ExpectedQuantity).SetNillableCountedQuantity(item.CountedQuantity).SetAdjustmentQuantity(item.AdjustmentQuantity).SetNillableNote(item.Note).Save(ctx)
 		if err != nil {
@@ -77,7 +104,7 @@ func (r *inventoryRepo) SaveInventoryOperationDraft(ctx context.Context, in *biz
 	if row.CreatedBy != in.ActorID {
 		return nil, biz.ErrInventoryOperationSaveOwner
 	}
-	if row.OperationType == biz.InventoryOperationManualAdjustment {
+	if biz.InventoryOperationRequiresApproval(row.OperationType) {
 		hasProcess, err := tx.client.ProcessInstance.Query().Where(
 			processinstance.ProcessKey(biz.ProcessKeyInventoryAdjustmentApproval),
 			processinstance.BusinessRefType("inventory_operation"),
@@ -150,9 +177,6 @@ func (r *inventoryRepo) inventoryOperationDraftItemValues(
 			return nil, nil, decimal.Zero, nil, nil, err
 		}
 		adjustment := requested.CountedQuantity.Sub(expected)
-		if adjustment.IsZero() {
-			return nil, nil, decimal.Zero, nil, nil, biz.ErrBadParam
-		}
 		return &expected, requested.CountedQuantity, adjustment, nil, nil, nil
 	case biz.InventoryOperationTransfer:
 		if requested.CountedQuantity != nil || !requested.AdjustmentQuantity.IsPositive() || requested.ToWarehouseID == nil || *requested.ToWarehouseID == item.FromWarehouseID {
@@ -306,7 +330,7 @@ func (r *inventoryRepo) submitInventoryOperation(
 		}
 		return commitInventoryOperation(ctx, tx, row.ID)
 	}
-	if row.OperationType != biz.InventoryOperationManualAdjustment || row.Status != biz.InventoryOperationStatusDraft || row.Version != in.ExpectedVersion {
+	if !biz.InventoryOperationRequiresApproval(row.OperationType) || row.Status != biz.InventoryOperationStatusDraft || row.Version != in.ExpectedVersion {
 		return nil, biz.ErrInventoryOperationVersionConflict
 	}
 	if row.CreatedBy != in.ActorID {
@@ -371,7 +395,7 @@ func (r *inventoryRepo) approveInventoryOperation(
 		}
 		return commitInventoryOperation(ctx, tx, row.ID)
 	}
-	if row.OperationType != biz.InventoryOperationManualAdjustment || row.Status != biz.InventoryOperationStatusSubmitted || row.Version != in.ExpectedVersion {
+	if !biz.InventoryOperationRequiresApproval(row.OperationType) || row.Status != biz.InventoryOperationStatusSubmitted || row.Version != in.ExpectedVersion {
 		return nil, biz.ErrInventoryOperationVersionConflict
 	}
 	if row.CreatedBy == in.ActorID {
@@ -436,7 +460,7 @@ func (r *inventoryRepo) rejectInventoryOperation(
 		}
 		return commitInventoryOperation(ctx, tx, row.ID)
 	}
-	if row.OperationType != biz.InventoryOperationManualAdjustment || row.Status != biz.InventoryOperationStatusSubmitted || row.Version != in.ExpectedVersion {
+	if !biz.InventoryOperationRequiresApproval(row.OperationType) || row.Status != biz.InventoryOperationStatusSubmitted || row.Version != in.ExpectedVersion {
 		return nil, biz.ErrInventoryOperationVersionConflict
 	}
 	if row.CreatedBy == in.ActorID {
@@ -473,7 +497,7 @@ func (r *inventoryRepo) PostInventoryOperation(ctx context.Context, in *biz.Inve
 	if err != nil {
 		return nil, err
 	}
-	if item.OperationType == biz.InventoryOperationManualAdjustment {
+	if biz.InventoryOperationRequiresApproval(item.OperationType) {
 		return nil, biz.ErrProcessRuntimeRequired
 	}
 	return r.postInventoryOperation(ctx, in, nil, nil)
@@ -512,7 +536,7 @@ func (r *inventoryRepo) postInventoryOperation(
 		return commitInventoryOperation(ctx, tx, row.ID)
 	}
 	expectedStatus := biz.InventoryOperationStatusDraft
-	if row.OperationType == biz.InventoryOperationManualAdjustment {
+	if biz.InventoryOperationRequiresApproval(row.OperationType) {
 		expectedStatus = biz.InventoryOperationStatusApproved
 	}
 	if row.Status != expectedStatus || row.Version != in.ExpectedVersion {
@@ -565,8 +589,11 @@ func (r *inventoryRepo) postInventoryOperationItem(ctx context.Context, tx *inve
 			return biz.ErrInventoryOperationStaleCount
 		}
 		quantity = item.CountedQuantity.Sub(current)
-		if !quantity.Equal(item.AdjustmentQuantity) || quantity.IsZero() {
+		if !quantity.Equal(item.AdjustmentQuantity) {
 			return biz.ErrIdempotencyConflict
+		}
+		if quantity.IsZero() {
+			return nil // A completed count is retained without a fictitious stock movement.
 		}
 	}
 	if op.OperationType == biz.InventoryOperationTransfer {
@@ -606,7 +633,7 @@ func (r *inventoryRepo) CancelInventoryOperation(ctx context.Context, in *biz.In
 	if row.CreatedBy != in.ActorID && (row.Status != biz.InventoryOperationStatusPosted || row.PostedBy == nil || *row.PostedBy != in.ActorID) {
 		return nil, biz.ErrInventoryOperationCancelOwner
 	}
-	if row.OperationType == biz.InventoryOperationManualAdjustment &&
+	if biz.InventoryOperationRequiresApproval(row.OperationType) &&
 		row.Status != biz.InventoryOperationStatusPosted {
 		processQuery := tx.client.ProcessInstance.Query().Where(
 			processinstance.ProcessKey(biz.ProcessKeyInventoryAdjustmentApproval),
@@ -663,7 +690,7 @@ func (r *inventoryRepo) CancelInventoryOperation(ctx context.Context, in *biz.In
 	if affected != 1 {
 		return nil, biz.ErrInventoryOperationVersionConflict
 	}
-	if row.OperationType == biz.InventoryOperationManualAdjustment {
+	if biz.InventoryOperationRequiresApproval(row.OperationType) {
 		compensatedCommands := []string{}
 		switch row.Status {
 		case biz.InventoryOperationStatusSubmitted:
@@ -780,7 +807,11 @@ func inventoryOperationByID(ctx context.Context, client *ent.Client, id int) (*b
 	if err != nil {
 		return nil, err
 	}
-	return inventoryOperationToBiz(row, categories), nil
+	out := inventoryOperationToBiz(row, categories)
+	if err := hydrateInventoryOperationLabels(ctx, client, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func inventoryOperationToBiz(row *ent.InventoryOperation, categories map[int]string) *biz.InventoryOperation {

@@ -40,7 +40,7 @@ import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import {
   buildHistoryListParams,
   resolveHistoryStatusCounts,
-  getAvailableHistorySources,
+  getHistoryCenterSources,
   normalizeHistoryRecords,
 } from '../utils/historyRecordCatalog.mjs'
 import { buildHistorySourceSelectOptions } from '../utils/historySourceSelectOptions.mjs'
@@ -100,8 +100,9 @@ export default function HistoryRecordsPage() {
   )
   const availableSources = useMemo(
     () =>
-      getAvailableHistorySources({
+      getHistoryCenterSources({
         visibleMenuPaths,
+        isSuperAdmin: adminProfile.is_super_admin === true,
         canReadPermission: (permission) =>
           hasActionPermission(adminProfile, permission),
       }),

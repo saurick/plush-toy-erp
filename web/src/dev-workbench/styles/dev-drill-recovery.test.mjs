@@ -27,8 +27,8 @@ test('drill recovery page leads with the operational conclusion and evidence bou
   assert.match(page, /完成证据/u)
   assert.match(page, /erp-dev-recovery-row__purpose/u)
   assert.doesNotMatch(page, /recentOperations|最近交付记录/u)
-  assert.match(page, /查看交付记录/u)
-  assert.match(page, /DEV_VERSION_CENTER_VIEW_HISTORY/u)
+  assert.doesNotMatch(page, /查看交付记录|查看版本中心的手动操作指引/u)
+  assert.match(page, /核验目标/u)
   assert.match(page, /<details className="erp-dev-disclosure erp-dev-recovery-emergency">/u)
 })
 

@@ -13,6 +13,7 @@ import (
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderevent"
+	"server/internal/data/model/ent/productionwipbatch"
 
 	"github.com/shopspring/decimal"
 )
@@ -26,7 +27,6 @@ func (f productionOrderPGFixture) createReleasedOrder(t *testing.T, ctx context.
 	if err != nil {
 		t.Fatalf("create production order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, created.Order.ID)
 	released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
 		ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID,
 		IdempotencyKey: "mo-pf-release-" + label + "-" + f.suffix,
@@ -35,6 +35,9 @@ func (f productionOrderPGFixture) createReleasedOrder(t *testing.T, ctx context.
 		t.Fatalf("release production order: %v", err)
 	}
 	completeProductionSchedulingTaskForTest(t, ctx, f.data, f.client, released.Order.ID, f.actorID)
+	for _, item := range released.Items {
+		prepareProductionHandworkBatchForFactTest(t, ctx, f.client, item.ID, f.actorID)
+	}
 	return released
 }
 
@@ -45,12 +48,14 @@ func (f productionOrderPGFixture) linkedFactInput(order *biz.ProductionOrderAggr
 func (f productionOrderPGFixture) linkedFactInputForLine(order *biz.ProductionOrderAggregate, lineIndex int, label string, quantity int64) biz.OperationalFactMutation {
 	sourceType, sourceID, sourceLineID := biz.ProductionOrderSourceType, order.Order.ID, order.Items[lineIndex].ID
 	skuID := f.skuID
+	batchID := f.client.ProductionWIPBatch.Query().Where(productionwipbatch.ProductionOrderItemID(order.Items[lineIndex].ID), productionwipbatch.Status(biz.ProductionWIPStatusAccepted)).OnlyX(context.Background()).ID
 	return biz.OperationalFactMutation{
 		FactNo: "PF-" + label + "-" + f.suffix, FactType: biz.ProductionFactFinishedGoodsReceipt,
 		SubjectType: biz.InventorySubjectProduct, SubjectID: f.productID, ProductSkuID: &skuID,
 		WarehouseID: f.warehouseID, UnitID: f.unitID, Quantity: decimal.NewFromInt(quantity),
 		SourceType: &sourceType, SourceID: &sourceID, SourceLineID: &sourceLineID,
-		OccurredAt: time.Now().UTC(), OccurredAtSpecified: true,
+		ProductionWIPBatchID: &batchID,
+		OccurredAt:           time.Now().UTC(), OccurredAtSpecified: true,
 		IdempotencyKey: "pf-" + label + "-" + f.suffix,
 	}
 }
@@ -156,61 +161,52 @@ func TestProductionOrderPostgresConcurrentFactReplayAndQuantityWinner(t *testing
 	}
 
 	secondInput := f.linkedFactInput(order, "second", 6)
-	second, err := f.factUC.CreateProductionFactDraft(ctx, &secondInput)
-	if err != nil {
-		t.Fatalf("create second fact: %v", err)
+	if _, err := f.factUC.CreateProductionFactDraft(ctx, &secondInput); !errors.Is(err, biz.ErrProductionWIPQuantityExceeded) {
+		t.Fatalf("routed completion drafts must reserve WIP capacity: %v", err)
 	}
-	postFacts := []*biz.ProductionFact{created[0], second}
-	postIDs := []int{postFacts[0].ID, postFacts[1].ID}
-	postRequests := map[int]*biz.OperationalFactStatusMutation{
-		postFacts[0].ID: operationalFactStatusMutation(postFacts[0].ID, postFacts[0].Version, f.actorID, ""),
-		postFacts[1].ID: operationalFactStatusMutation(postFacts[1].ID, postFacts[1].Version, f.actorID, ""),
-	}
-	postErrs := make([]error, 2)
+
+	raceOrder := f.createReleasedOrder(t, ctx, "draft-capacity")
+	inputs := []biz.OperationalFactMutation{f.linkedFactInput(raceOrder, "capacity-a", 6), f.linkedFactInput(raceOrder, "capacity-b", 6)}
 	start = make(chan struct{})
-	for i := range postFacts {
-		postRequest := postRequests[postFacts[i].ID]
+	for i := range inputs {
 		wg.Add(1)
-		go func(index int, in *biz.OperationalFactStatusMutation) {
+		go func(index int) {
 			defer wg.Done()
 			<-start
-			_, postErrs[index] = f.factUC.PostProductionFact(ctx, in)
-		}(i, postRequest)
+			created[index], errs[index] = f.factUC.CreateProductionFactDraft(ctx, &inputs[index])
+		}(i)
 	}
 	close(start)
 	wg.Wait()
-	successes, exceeded := 0, 0
-	for _, err := range postErrs {
-		switch {
-		case err == nil:
-			successes++
-		case errors.Is(err, biz.ErrProductionOrderQuantityExceeded):
-			exceeded++
-		default:
-			t.Fatalf("unexpected concurrent post error: %v", err)
+	var winner *biz.ProductionFact
+	for i, err := range errs {
+		if err == nil && winner == nil {
+			winner = created[i]
+		} else if !errors.Is(err, biz.ErrProductionWIPQuantityExceeded) {
+			t.Fatalf("unexpected capacity race outcome: %v", errs)
 		}
 	}
-	if successes != 1 || exceeded != 1 {
-		t.Fatalf("post winners=%d exceeded=%d errors=%#v", successes, exceeded, postErrs)
+	if winner == nil {
+		t.Fatalf("no legal capacity winner: %v", errs)
 	}
-	rows := f.client.ProductionFact.Query().Where(productionfact.IDIn(postIDs...)).AllX(ctx)
-	posted, drafts := 0, 0
-	for _, row := range rows {
-		switch row.Status {
-		case biz.OperationalFactStatusPosted:
-			posted++
-			if replay, err := f.factUC.PostProductionFact(ctx, postRequests[row.ID]); err != nil || replay.Status != biz.OperationalFactStatusPosted {
-				t.Fatalf("posted fact replay failed: fact=%#v err=%v", replay, err)
-			}
-		case biz.OperationalFactStatusDraft:
-			drafts++
-		default:
-			t.Fatalf("unexpected fact status %s", row.Status)
-		}
+	if count := f.client.ProductionFact.Query().Where(productionfact.SourceType(biz.ProductionOrderSourceType), productionfact.SourceID(raceOrder.Order.ID)).CountX(ctx); count != 1 {
+		t.Fatalf("quantity loser persisted a draft: %d", count)
 	}
-	if posted != 1 || drafts != 1 {
-		t.Fatalf("failed post must roll back: posted=%d drafts=%d", posted, drafts)
+	request := operationalFactStatusMutation(winner.ID, winner.Version, f.actorID, "")
+	start = make(chan struct{})
+	for i := range errs {
+		wg.Add(1)
+		go func(index int) { defer wg.Done(); <-start; _, errs[index] = f.factUC.PostProductionFact(ctx, request) }(i)
 	}
+	close(start)
+	wg.Wait()
+	if errs[0] != nil || errs[1] != nil {
+		t.Fatalf("post replay: %v", errs)
+	}
+	if count := f.client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ProductionFactSourceType), inventorytxn.SourceID(winner.ID)).CountX(ctx); count != 1 {
+		t.Fatalf("post replay wrote %d stock transactions", count)
+	}
+
 }
 
 func TestProductionOrderPostgresCancellationAndFactPostingOneWinner(t *testing.T) {
@@ -272,7 +268,8 @@ func TestProductionOrderPostgresCreateAndSettleNeverLeavesActiveDraftOnSettledOr
 			input := &biz.ProductionCompletionFromOrderCreate{
 				FactNo: "PF-" + label + "-" + f.suffix, ProductionOrderID: order.Order.ID,
 				ProductionOrderItemID: order.Items[0].ID, WarehouseID: f.warehouseID,
-				NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pf-" + label + "-" + f.suffix,
+				ProductionWIPBatchID: *f.linkedFactInput(order, label, 1).ProductionWIPBatchID,
+				NewLotNo:             &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pf-" + label + "-" + f.suffix,
 			}
 			reason := "并发结算验证"
 			start := make(chan struct{})
@@ -445,12 +442,14 @@ func TestProductionOrderPostgresCloseChecksEveryLineIndependently(t *testing.T) 
 	if err != nil {
 		t.Fatalf("create multi-line order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, created.Order.ID)
 	order, err := f.uc.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "close-multi-release-" + f.suffix})
 	if err != nil {
 		t.Fatalf("release multi-line order: %v", err)
 	}
 	completeProductionSchedulingTaskForTest(t, ctx, f.data, f.client, order.Order.ID, f.actorID)
+	for _, item := range order.Items {
+		prepareProductionHandworkBatchForFactTest(t, ctx, f.client, item.ID, f.actorID)
+	}
 	f.createAndPostLinkedFact(t, ctx, order, 0, "close-multi-line-1", 3)
 	f.createAndPostLinkedFact(t, ctx, order, 1, "close-multi-line-2-part", 3)
 	if _, err := f.uc.Close(ctx, &biz.ProductionOrderAction{ID: order.Order.ID, ExpectedVersion: 2, ActorID: f.actorID, IdempotencyKey: "close-multi-incomplete-" + f.suffix}); !errors.Is(err, biz.ErrProductionOrderCloseReasonRequired) {

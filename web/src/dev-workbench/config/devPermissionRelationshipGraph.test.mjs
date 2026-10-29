@@ -322,7 +322,7 @@ test('detail rows can include the product permissions and pages not granted to t
     )
   )
   assert.doesNotMatch(
-    JSON.stringify(completeRows),
+    JSON.stringify(completeRows.map(({ source, relation, target, result, status }) => ({ source, relation, target, result, status }))),
     /warehouse\.inventory\.read/u
   )
 })
@@ -466,7 +466,7 @@ test('target and module helpers keep stable human-readable choices', () => {
     buildPermissionRelationshipModuleOptions(permissions).map(
       (option) => option.label
     ),
-    ['全部功能模块', '仓储', '销售管理']
+    ['权限总览', '仓储', '销售管理']
   )
   assert.deepEqual(
     buildPermissionRelationshipTargetOptions({
@@ -605,4 +605,28 @@ accessByRoleKey,
   assert.equal(model.summary.effectivePermissions, null)
   assert.equal(model.summary.pages, null)
   assert.equal(model.summary.approvals, null)
+})
+
+test('capability lookup merges role grants and searches ungranted functions without displaying the full catalog by default', async () => {
+  const { buildPermissionCapabilityGroups } = await import('./devPermissionRelationshipGraph.mjs')
+  const rows = [
+    { kind: 'permission', permissionKey: 'read', target: '查看库存', moduleKey: 'warehouse', moduleLabel: '仓储', source: '仓库', roleKey: 'warehouse', status: '受限', result: '仓库范围不允许' },
+    { kind: 'permission', permissionKey: 'read', target: '查看库存', moduleKey: 'warehouse', moduleLabel: '仓储', source: '业务', roleKey: 'sales', status: '已生效', result: '最终可用' },
+    { kind: 'permission', permissionKey: 'inbound', target: '确认入库', moduleKey: 'warehouse', moduleLabel: '仓储', source: '仓库', roleKey: 'warehouse', status: '受限', result: '当前客户未启用' },
+    { kind: 'permission', permissionKey: 'quality', target: '更新质检结论', moduleKey: 'quality', moduleLabel: '品质', source: '仓库', roleKey: 'warehouse', status: '未授予', result: '岗位未授予该功能' },
+    { kind: 'page', target: '库存台账', status: '已生效' },
+  ]
+  const groups = buildPermissionCapabilityGroups(rows)
+  assert.equal(groups.length, 1)
+  assert.equal(groups[0].items.length, 2)
+  assert.equal(groups[0].available, 1)
+  assert.equal(groups[0].restricted, 1)
+  assert.equal(groups[0].items[0].grants.length, 2)
+  assert.equal(groups[0].items[0].status, '可用')
+  assert.equal(groups[0].items[1].result, '当前客户未启用')
+  assert.deepEqual(buildPermissionCapabilityGroups(rows, { restrictedOnly: true })[0].items.map((item) => item.key), ['inbound'])
+  const ungranted = buildPermissionCapabilityGroups(rows, { keyword: '质检', restrictedOnly: true })
+  assert.equal(ungranted[0].items[0].status, '未授予')
+  assert.equal(ungranted[0].items[0].result, '岗位未授予该功能')
+  assert.deepEqual(buildPermissionCapabilityGroups(rows, { keyword: '不存在' }), [])
 })

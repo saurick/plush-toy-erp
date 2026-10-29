@@ -1334,7 +1334,7 @@ export function setupJsonRpcMockServer() {
           }),
           error: '',
         }
-      } else if (method === 'rbac_options' || method === 'menu_options') {
+      } else if (method === 'rbac_options') {
         responseBody = {
           jsonrpc: '2.0',
           id,
@@ -1342,9 +1342,6 @@ export function setupJsonRpcMockServer() {
             roles: mockRoles,
             permissions: mockPermissions,
             menus: mockMenus,
-            role_options: mockRoles,
-            permission_options: mockPermissions,
-            menu_options: mockMenus,
           }),
           error: '',
         }

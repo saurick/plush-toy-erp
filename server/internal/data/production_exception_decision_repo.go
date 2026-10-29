@@ -14,6 +14,7 @@ import (
 	"server/internal/data/model/ent/productionexceptiondecision"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionwipbatch"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 
 	"github.com/shopspring/decimal"
 )
@@ -414,7 +415,11 @@ func (r *operationalFactRepo) ReverseProductionException(ctx context.Context, in
 		if err := ensureProductionExceptionConcessionReverseCapacity(ctx, tx, row); err != nil {
 			return nil, err
 		}
-		if err := reverseProductionExceptionWIPStatus(ctx, tx, row, biz.ProductionWIPStatusAccepted, biz.ProductionWIPStatusRejected, in.ActorID, in.Reason); err != nil {
+		fromStatus, err := prepareProductionWIPConcessionReversal(ctx, tx, row, in.Reason)
+		if err != nil {
+			return nil, err
+		}
+		if err := reverseProductionExceptionWIPStatus(ctx, tx, row, fromStatus, biz.ProductionWIPStatusRejected, in.ActorID, in.Reason); err != nil {
 			return nil, err
 		}
 	default:
@@ -451,23 +456,11 @@ func ensureProductionExceptionOverIssueUnused(ctx context.Context, client *ent.C
 	if err != nil || requirement.ProductionOrderID != row.ProductionOrderID || requirement.ProductionOrderItemID != row.ProductionOrderItemID {
 		return biz.ErrProductionExceptionSourceInvalid
 	}
-	facts, err := client.ProductionFact.Query().Where(
-		productionfact.SourceType(biz.ProductionOrderSourceType),
-		productionfact.SourceID(requirement.ProductionOrderID),
-		productionfact.SourceLineID(requirement.ID),
-		productionfact.FactType(biz.ProductionFactMaterialIssue),
-		productionfact.Status(biz.OperationalFactStatusPosted),
-	).All(ctx)
+	quantities, err := productionMaterialIssuedQuantities(ctx, client, []*ent.ProductionOrderMaterialRequirement{requirement})
 	if err != nil {
 		return err
 	}
-	issued := decimal.Zero
-	for _, fact := range facts {
-		if fact.SubjectType != biz.InventorySubjectMaterial || fact.SubjectID != requirement.MaterialID || fact.ProductSkuID != nil || fact.UnitID != requirement.UnitID {
-			return biz.ErrProductionExceptionSourceInvalid
-		}
-		issued = issued.Add(fact.Quantity)
-	}
+	issued := quantities[requirement.ID]
 	allowancePredicates := append(
 		activeProductionOverIssuePredicates(),
 		productionexceptiondecision.IDNEQ(row.ID),
@@ -604,12 +597,16 @@ func (r *operationalFactRepo) applyProductionExceptionApproval(ctx context.Conte
 		if err := ensureProductionExceptionWIPNoActiveChild(ctx, tx.client, batch.ID); err != nil {
 			return err
 		}
-		target := biz.ProductionWIPStatusAccepted
-		if row.DecisionType != biz.ProductionExceptionWIPConcession {
+		target := biz.ProductionWIPStatusCancelled
+		if row.DecisionType == biz.ProductionExceptionWIPConcession {
+			target, err = advanceProductionWIPConcededGate(ctx, tx.client, batch, inspection)
+			if err != nil {
+				return err
+			}
+		} else {
 			if err := r.applyProductionExceptionStock(ctx, tx, row, actorID, executionReason, false); err != nil {
 				return err
 			}
-			target = biz.ProductionWIPStatusCancelled
 		}
 		if biz.ProductionExceptionCreatesBatch(row.DecisionType) {
 			if err := createProductionExceptionExecutionBatch(ctx, tx.client, row, batch, actorID); err != nil {
@@ -639,6 +636,19 @@ func ensureProductionExceptionWIPNoActiveChild(ctx context.Context, client *ent.
 	}
 	if hasActiveChild {
 		return biz.ErrProductionExceptionWIPDependency
+	}
+	allocations, err := client.ProductionWIPOutsourcingAllocation.Query().Where(productionwipoutsourcingallocation.ProductionWipBatchID(batchID)).WithOutsourcingOrderItem().All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, allocation := range allocations {
+		active, err := hasActiveFinanceFactForSource(ctx, client, biz.FinanceFactPayable, biz.OutsourcingOrderSourceType, allocation.Edges.OutsourcingOrderItem.OutsourcingOrderID)
+		if err != nil {
+			return err
+		}
+		if active {
+			return biz.ErrProductionExceptionWIPDependency
+		}
 	}
 	return nil
 }

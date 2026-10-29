@@ -89,7 +89,7 @@ test("dev flow state observatory: route and all catalogs stay DEV-only and read-
   assert.equal(catalog.factRuntimeQuery.availability, "unavailable");
   assert.equal(catalog.businessChainOverview.key, "all");
   assert.equal(catalog.businessChainOverview.readOnly, true);
-  assert.equal(catalog.businessChainOverview.relations.length, 17);
+  assert.equal(catalog.businessChainOverview.relations.length, catalog.businessChainCoverage.overviewRelationCount);
   assert.equal(catalog.businessChains.length, 11);
   assert.equal(
     catalog.businessChains.some((chain) => chain.key === "all"),
@@ -110,19 +110,22 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(page, /moduleValue\?\.DEV_FLOW_STATE_CATALOG/u);
   assert.deepEqual(
     [...shared.matchAll(/value:\s*'([^']+)'[\s\S]{0,100}?label:/gu)].map((match) => match[1]),
-    ["chain", "tracking", "workflow", "runtime", "facts", "states"],
+    ["chain", "tracking", "workflow", "runtime", "processes", "facts", "states", "finance_records", "finance_rules"],
   );
-  assert.match(page, /value: 'rules', label: '查看规则'/u);
-  assert.match(shared, /label: '状态与流转规则'/u);
-  assert.match(page, /items=\{TECHNICAL_VIEWS\}/u);
-  assert.match(page, /查看规则/u);
+  assert.doesNotMatch(read('web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx'), /value: 'rules', label:/u);
+  assert.match(read('web/src/dev-workbench/config/devRoutes.mjs'), /route: DEV_BUSINESS_RULES_ROUTE,\s+label: '业务规则'/u);
+  assert.match(shared, /label: '状态流转'/u);
+  assert.match(page, /items=\{primaryViewKey\(view\) === 'tracking' \? TRACKING_VIEWS : TECHNICAL_VIEWS\}/u);
+  assert.match(page, /resolveDevFlowViewRoute/u);
   assert.match(page, /items=\{PRIMARY_VIEWS\}/u);
   assert.equal(DEV_FLOW_STATE_DEFAULT_VIEW, "chain");
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainOverview.label, "订单全流程（销售到出货）");
-  assert.match(page, /renderTopics=\{\(\{ onSelectTopic, selectedTopicKey \}\) => \(\s*<BusinessChainTopics/u);
+  assert.match(page, /<BusinessTopicsView/u);
+  assert.match(read("web/src/dev-workbench/components/flow-state/BusinessTopicsView.jsx"), /<BusinessChainTopics/u);
+  assert.doesNotMatch(guide, /renderTopics|value: 'topics'/u);
   assert.doesNotMatch(page, /<details[^>]*data-business-chain-topics/u);
   assert.match(guide, /aria-label="流程视图"/u);
-  assert.match(guide, /业务专题/u);
+  assert.doesNotMatch(guide, />查看相关专题</u);
   assert.doesNotMatch(guide, /按业务查阅|返回完整流程|topic-nodes/u);
   assert.doesNotMatch(guide, /aria-label="履约流程视图"/u);
   assert.match(guide, /aria-label="流程详情"/u);
@@ -186,8 +189,8 @@ test("dev flow state observatory: English anchors stay paired with the concept l
     ["业务结构", "Business Chain"],
     ["协同记录", "Workflow / Task"],
     ["流程轨迹", "ProcessRuntime"],
-    ["事实定义", "Fact / Ledger"],
-    ["状态与流转规则", "State Machine"],
+    ["事实规则", "Fact / Ledger"],
+    ["状态流转", "State Machine"],
   ]) {
     assert(
       page.includes(`label: '${label}',\n    englishLabel: '${englishLabel}',`),
@@ -262,7 +265,7 @@ test("dev flow state observatory: pasted business text search is local, grouped,
     page,
     /const openGlobalDefinitionView = \(nextView, patch = \{\}\) =>[\s\S]{0,180}?\[QUERY_KEYS\.chain\]: null,[\s\S]{0,80}?\[QUERY_KEYS\.node\]: null/u,
   );
-  assert.match(page, /openGlobalDefinitionView\('runtime'/u);
+  assert.match(page, /openGlobalDefinitionView\('processes'/u);
   assert.match(page, /openGlobalDefinitionView\('facts'/u);
   assert.match(page, /openGlobalDefinitionView\('states'/u);
 });
@@ -276,17 +279,28 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
     "node",
     "flow",
     "state",
+    "rule_action",
     "process",
     "fact",
+    "finance_fact_id",
+    "finance_rule",
+    "finance_topic",
+    "finance_step",
+    "finance_stage",
+    "finance_change",
     "task_id",
     "task_filter",
     "task_stage",
     "flow_role",
+    "flow_object",
+    "flow_permission",
+    "flow_action",
     "flow_stage",
     "flow_substep",
     "flow_tab",
     "flow_topic",
     "flow_topic_node",
+    "flow_topic_step",
     "flow_map",
     "flow_map_node",
     "flow_exception",
@@ -325,7 +339,7 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
     page,
     /const readingContext = useMemo/u,
   );
-  assert.match(page, /nodeKey: readingContext\.nodeKey/u);
+  assert.match(page, /projectChainRelations\(catalog, readingContext\.chainKey, readingContext\.nodeKey/u);
   assert.match(page, /data-chain-projection-context/u);
   assert.match(page, /查看全部定义/u);
   assert.match(page, /未登记组合不生成数据/u);
@@ -337,7 +351,7 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
   assert.match(page, /data-business-chain-overview/u);
   assert.match(page, /data-topic-diagram/u);
   assert.match(page, /data-business-chain-system/u);
-  assert.match(page, /buildDevBusinessChainTopics\(catalog, role\)/u);
+  assert.match(page, /buildDevBusinessChainTopics\(catalog\)/u);
   assert.match(page, /系统衔接图/u);
 });
 
@@ -479,7 +493,8 @@ test("dev flow state observatory: Runtime completion never promotes Workflow or 
   assert.match(page, /尚未证明业务事实已落账/u);
   assert.match(page, /流程走完不代表业务事实已经生效/u);
   assert.match(read("docs/architecture/业务链与运行轨迹边界.md"), /Workflow task done 不等于 Fact posted/u);
-  assert.match(page, /不支持按凭证查询实际结果/u);
+  assert.match(page, /data-selected-fact/u);
+  assert.match(page, /label: '结果凭证'/u);
   assert.doesNotMatch(
     page,
     /(?:get|list|search)(?:Fact|Ledger)(?:Proof|Voucher|Receipt)/u,
@@ -492,8 +507,7 @@ test("dev flow state observatory: state rules explain exceptional paths without 
     "web/src/dev-workbench/pages/devFlowStateRulePresentation.mjs",
   );
   for (const copy of [
-    "什么时候可以", "转换后到哪里", "内部影响边界",
-    "完整转换清单", "状态与规则依据", "聚焦状态",
+    "什么时候可以", "聚焦状态",
   ]) {
     assert(page.includes(copy), `missing state-rule detail: ${copy}`);
   }
@@ -502,7 +516,10 @@ test("dev flow state observatory: state rules explain exceptional paths without 
   assert.match(page, /<BusinessFlowDiagram/u);
   assert.match(page, /getDevFlowStateTransitionDiagramLabel/u);
   assert.match(page, /--erp-dev-state-path-color/u);
-  assert.match(page, /buildDevFlowStateRelatedViews/u);
+  assert.match(presentation, /buildDevFlowStateRelatedViews/u);
+  const focusedRules = read("web/src/dev-workbench/components/flow-state/FlowRuleTables.jsx");
+  for (const label of ["办理规则", "办理条件", "受阻时", "结果与纠正", "纠正与恢复"]) assert(focusedRules.includes(label));
+  assert.doesNotMatch(page, /data-all-transitions/u);
   assert.match(page, /filterDevFlowStateTransitions/u);
   assert.match(page, /aria-label="状态转换筛选"/u);
   assert.doesNotMatch(page, /生命周期转换/u);

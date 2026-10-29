@@ -6,6 +6,7 @@ const bomPage = readFileSync(
   new URL('../pages/BOMVersionsPage.jsx', import.meta.url),
   'utf8'
 )
+const bomEditor = readFileSync(new URL('../components/bom/BOMEditor.jsx', import.meta.url), 'utf8')
 const bomForm = readFileSync(
   new URL('../components/bom/BOMVersionForms.jsx', import.meta.url),
   'utf8'
@@ -28,30 +29,18 @@ function sourceSlice(source, start, end) {
 }
 
 test('BOM edit fails closed until complete line details are loaded', () => {
-  const openEdit = sourceSlice(
-    bomPage,
-    'const openEdit = async',
-    'const openCopy ='
-  )
-
-  assert.match(openEdit, /const detail = prepared \? record : await loadDetail\(record\.id\)/u)
-  assert.match(openEdit, /!Array\.isArray\(detail\.items\)[\s\S]*?return/u)
-  assert.doesNotMatch(openEdit, /\|\| record/u)
-  assert.ok(
-    openEdit.indexOf('setHeaderModalOpen(true)') >
-      openEdit.indexOf('!Array.isArray(detail.items)'),
-    'the editable modal must only open after the complete detail guard'
-  )
+  assert.match(bomPage, /<BOMEditor/u)
+  assert.ok(/recordID && \(!next \|\| !Array\.isArray\(next\.items\)\)\) throw/u.test(bomEditor), 'an incomplete aggregate cannot initialize editable values')
+  assert.ok(bomEditor.indexOf('!Array.isArray(next.items)') < bomEditor.indexOf('const values ='), 'validate complete detail before mapping form fields')
+  assert.match(bomEditor, /disabled:[^\n]*!referencesReady/u)
 })
 
 test('BOM create edit and view share visible fields while immutable identity stays locked', () => {
-  assert.match(bomPage, /<BOMHeaderFormFields[\s\S]*?includeProduct/u)
-  assert.match(bomPage, /productDisabled=\{headerMode === 'edit'\}/u)
+  assert.match(bomEditor, /<BOMHeaderFormFields/u)
+  assert.match(bomForm, /includeProduct = true/u)
+  assert.match(bomEditor, /productDisabled=\{editorMode === 'edit'/u)
   assert.match(bomForm, /disabled=\{disabled \|\| productDisabled\}/u)
-  assert.match(
-    bomPage,
-    /canWithdraw=\{[\s\S]*?headerMode !== 'view'[\s\S]*?modalActionCanEdit/u
-  )
+  assert.match(bomEditor, /canWithdraw=\{writable && canUpdate\}/u)
 })
 
 test('master-data edit fails closed when dependent contacts cannot be read', () => {

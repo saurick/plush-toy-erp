@@ -6,7 +6,10 @@ import {
   PrinterOutlined,
 } from '@ant-design/icons'
 import { Button, Space } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
+import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
+
 import { OutsourcingOrderStatus } from '../../common/consts/statuses.generated.mjs'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -109,8 +112,6 @@ import {
   getOutsourcingOrderDisplayNo,
 } from '../components/outsourcing-orders/outsourcingOrderPageConfig.mjs'
 
-import { FINANCE_BUSINESS_SOURCE_ACTIONS } from '../utils/financeBusinessSourceAction.mjs'
-
 import {
   canOpenRelatedDocumentPath,
   clearLinkedDocumentParams,
@@ -123,7 +124,7 @@ import {
 } from '../utils/lifecycleScope.mjs'
 
 export default function OutsourcingOrdersPage() {
-  const outletContext = useOutletContext()
+  const outletContext = useBusinessPageContext()
   const navigate = useBusinessNavigate()
 
   const adminProfile = useMemo(
@@ -191,9 +192,11 @@ export default function OutsourcingOrdersPage() {
   )
 
   const [saving, setSaving] = useState(false)
+  useWorkflowTaskBusinessBusy(saving)
   const {
     form,
     itemsLoading,
+    editorRevision,
     modalOpen,
     editingRow,
     detailOrder,
@@ -238,6 +241,8 @@ export default function OutsourcingOrdersPage() {
     loadWorkflowTasks,
     loadOrders,
   })
+
+  useTaskBusinessEditor({ record: selectedRow, enabled: canUpdate && canEditOutsourcingOrder(selectedRow) && outletContext?.taskBusiness?.contract?.actionKeys.includes('outsourcing-edit'), open: openEdit })
 
   const [printingAction, setPrintingAction] = useState('')
   const summaryRef = useRef(null)
@@ -294,6 +299,8 @@ export default function OutsourcingOrdersPage() {
     adminProfile,
     PermissionCode.FINANCE_PAYABLE_CONFIRM
   )
+  const canReadWIP = hasActionPermission(adminProfile, PermissionCode.PRODUCTION_WIP_READ) && canOpenRelatedPath(BUSINESS_ROUTE_PATHS.productionOrders)
+  const canCreateStagePayable = canCreatePayable && canRead
   const canViewPayable =
     (canCreatePayable ||
       hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYABLE_READ)) &&
@@ -321,6 +328,7 @@ export default function OutsourcingOrdersPage() {
     qualitySourceFact,
     qualitySourceLoading,
     dispositionSourceFact,
+    financeSourceAction,
     financeSourceFact,
     financeSourceLoading,
     financeSourceInitialValues,
@@ -344,6 +352,9 @@ export default function OutsourcingOrdersPage() {
     loadOutsourcingOrderDetailsItems,
     submitOutsourcingSourceFact,
   } = useOutsourcingSourceFacts({
+    canCreateStagePayable,
+    canReadWIP,
+    taskBusiness: outletContext?.taskBusiness,
     canReadOutsourcingFacts,
     canReadQualityInspection,
     activeCustomerKey,
@@ -359,6 +370,14 @@ export default function OutsourcingOrdersPage() {
     canCreateReturnReceipt,
     unitOptions,
   })
+  const openedTaskRecords = useRef(null)
+  const businessTask = outletContext?.taskBusiness?.task
+  useEffect(() => {
+    if (!businessTask || openedTaskRecords.current === businessTask.id || !selectedRow?.id ||
+        selectedRow.id !== routeOutsourcingOrderID || !['handoff_outsourcing_quality_request', 'handoff_outsourcing_inbound'].includes(businessTask.task_group)) return
+    openedTaskRecords.current = businessTask.id
+    openRelatedReturnRecords(selectedRow)
+  }, [businessTask, selectedRow, routeOutsourcingOrderID, openRelatedReturnRecords])
 
   const refreshPageData = useCallback(async () => {
     if (summaryVisible) {
@@ -381,6 +400,7 @@ export default function OutsourcingOrdersPage() {
     loadWorkflowTasks,
     loadOrderItems,
     openEdit,
+    onChanged: closeModal,
   })
 
   const openProcessingContractPrint = async () => {
@@ -637,6 +657,18 @@ export default function OutsourcingOrdersPage() {
     disabled: true,
     disabledReason: '请先选择一条加工合同',
   }
+  const renderPrimaryLifecycleAction = ({ disabled = false, disabledReason = '' } = {}) => showLifecyclePrimary ? (
+    <BusinessLifecyclePrimaryAction
+      action={primaryLifecycleAction}
+      disabled={disabled || primaryLifecycleState.disabled}
+      disabledReason={disabled ? disabledReason : primaryLifecycleState.disabledReason}
+      loading={saving && Boolean(primaryLifecycleAction)}
+      onAction={runLifecycleAction}
+    />
+  ) : null
+  const canHandleOutsourcingRecords = canPostOutsourcingFact ||
+    canCancelOutsourcingFact || canCreateMaterialIssue || canCreateReturnReceipt ||
+    canCreateQualityInspection || canCreatePayable
   const relatedOutsourcingFactsAvailability =
     resolveContextualBusinessActionAvailability({
       authorized: canReadOutsourcingFacts,
@@ -906,7 +938,7 @@ export default function OutsourcingOrdersPage() {
                 >
                   <Button
                     data-business-action-key="related-outsourcing-facts"
-                    data-business-action-role="related"
+                    data-business-action-role={canHandleOutsourcingRecords ? 'action' : 'related'}
                     size="small"
                     disabled={relatedOutsourcingFactsAvailability.disabled}
                     loading={returnRecordsLoading}
@@ -916,15 +948,7 @@ export default function OutsourcingOrdersPage() {
                   </Button>
                 </BusinessActionTooltip>
               ) : null}
-              {showLifecyclePrimary ? (
-                <BusinessLifecyclePrimaryAction
-                  action={primaryLifecycleAction}
-                  disabled={primaryLifecycleState.disabled}
-                  disabledReason={primaryLifecycleState.disabledReason}
-                  loading={saving && Boolean(primaryLifecycleAction)}
-                  onAction={runLifecycleAction}
-                />
-              ) : null}
+              {renderPrimaryLifecycleAction()}
               <BusinessActionTooltip
                 disabled={!selectedRow || printingAction !== ''}
                 disabledReason={
@@ -1010,7 +1034,7 @@ export default function OutsourcingOrdersPage() {
         </>
       )}
 
-      {outletContext?.mobileTaskBusiness ? (
+      {outletContext?.taskBusiness ? (
         <MobileOutsourcingTaskActions record={selectedRow} load={loadOutsourcingOrderDetailsItems} getItemFields={getOutsourcingOrderItemFields} refreshKey={outletContext.workflowTaskNavigation?.businessReceipt} />
       ) : null}
       <BusinessDetailsModal
@@ -1108,7 +1132,7 @@ export default function OutsourcingOrdersPage() {
       />
 
       <FinanceBusinessSourceModal
-        action={FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_RETURN_PAYABLE}
+        action={financeSourceAction}
         open={Boolean(financeSourceFact)}
         source={financeSourceFact}
         initialValues={financeSourceInitialValues}
@@ -1143,12 +1167,20 @@ export default function OutsourcingOrdersPage() {
 
       <BusinessFormPage
         form={form}
+        baselineKey={editorRevision}
         title={editingRow ? '编辑加工合同' : '新建加工合同'}
         okText={!editingRow || editingRow.lifecycle_status === OutsourcingOrderStatus.DRAFT ? '保存草稿' : '保存'}
         open={modalOpen}
         onCancel={closeModal}
         onOk={submitForm}
         confirmLoading={saving}
+        savedRecordActions={
+          outletContext?.taskBusiness && !outletContext.taskBusiness.readOnly &&
+          selectedRow?.id === editingRow?.id && primaryLifecycleAction &&
+          outletContext.taskBusiness.contract?.actionKeys.includes(`lifecycle-${primaryLifecycleAction.key}`)
+            ? renderPrimaryLifecycleAction
+            : undefined
+        }
       >
         <OutsourcingOrderForm
           form={form}

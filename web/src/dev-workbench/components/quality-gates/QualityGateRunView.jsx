@@ -1,6 +1,6 @@
-import React from 'react'
-import { StopOutlined } from '@ant-design/icons'
-import { Button, Progress, Space, Tag, Typography } from 'antd'
+import React, { useRef, useState } from 'react'
+import { CheckCircleOutlined, QuestionCircleOutlined, StopOutlined } from '@ant-design/icons'
+import { Button, Drawer, Progress, Space, Tag, Typography } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import DevTimestamp from '../DevTimestamp.jsx'
@@ -20,18 +20,21 @@ import {
   previewStages,
   currentStageLabel,
   operationUpdateAction,
+  terminalEvidence,
 } from '../../config/qualityGatePresentation.mjs'
 import { OperationStatusTag } from './QualityGateContextStrip.jsx'
 import {
   TechnicalDetails,
   ManagedDatabaseLifecycleGuide,
   GateExecutionFlow,
+  StageDurationComposition,
 } from './QualityGateExecutionFlow.jsx'
 import { QualityGateHistoryTrend } from './QualityGateEvidenceCharts.jsx'
 
-const { Paragraph, Text, Title } = Typography
+const { Text, Title } = Typography
 
 export function LocalDiagnosticsActions({
+  context,
   summary,
   initialLoading,
   canRun,
@@ -40,21 +43,27 @@ export function LocalDiagnosticsActions({
   onProfileChange,
   onStart,
 }) {
+  const [helpOpen, setHelpOpen] = useState(false)
+  const helpRef = useRef(null)
+  const lastDuration = profileDuration(summary, profile)
   return (
     <WorkbenchSection className="erp-dev-quality-actions" aria-label="本机质量诊断操作">
-      <WorkbenchToolbar className="erp-dev-quality-actions__buttons">
+      <WorkbenchToolbar
+        className="erp-dev-quality-actions__buttons"
+        tools={(
+          <Button ref={helpRef} type="text" icon={<QuestionCircleOutlined aria-hidden="true" />} onClick={() => setHelpOpen(true)}>
+            运行说明
+          </Button>
+        )}
+      >
         <label htmlFor="quality-diagnostic-profile">诊断范围</label>
         <Select
-          allowClear={
-            false /* 不可清空：诊断执行必须明确严格或完整范围，不能用空值隐式选择执行任务。 */
-          }
+          allowClear={false /* 不可清空：诊断执行必须明确严格或完整范围。 */}
           placeholder="诊断范围"
           id="quality-diagnostic-profile"
           aria-label="诊断范围"
           value={profile}
-          disabled={
-            initialLoading || Boolean(actionProfile) || summary?.busy?.active
-          }
+          disabled={initialLoading || Boolean(actionProfile) || summary?.busy?.active}
           onChange={onProfileChange}
           options={[
             { value: 'strict', label: '严格诊断' },
@@ -63,47 +72,51 @@ export function LocalDiagnosticsActions({
         />
         <Button
           type="primary"
+          aria-label={profile === 'strict' ? '运行本机严格诊断' : '运行本机完整诊断'}
           disabled={!canRun}
           loading={Boolean(actionProfile)}
           onClick={() => onStart(profile)}
         >
-          {profile === 'strict' ? '运行本机严格诊断' : '运行本机完整诊断'}
+          运行诊断
         </Button>
-        <Text type="secondary">
-          最近耗时{' '}
-          {formatQualityGateDuration(profileDuration(summary, profile))}
-        </Text>
-        {!initialLoading && summary?.environment ? (
-          <Tag
-            color={
-              summary.environment.disposableDatabaseReady
-                ? 'success'
-                : 'warning'
-            }
-          >
-            {summary.environment.disposableDatabaseReady
-              ? '运行环境已就绪'
-              : '运行环境未就绪'}
-          </Tag>
+        {!initialLoading && summary?.environment?.disposableDatabaseReady ? (
+          <Text className="erp-dev-quality-actions__ready"><CheckCircleOutlined aria-hidden="true" /> 环境就绪</Text>
+        ) : null}
+        {Number.isFinite(lastDuration) ? (
+          <Text type="secondary">上次耗时 {formatQualityGateDuration(lastDuration)}</Text>
         ) : null}
       </WorkbenchToolbar>
-      <div className="erp-dev-quality-actions__environment">
-        <Text type="secondary">
-          {profile === 'strict'
-            ? '严格诊断额外检查工具链、Shell 和 YAML。'
-            : ''}
-          结果仅证明当前工作区；固定提交门禁由 GitLab CI 执行。
-        </Text>
-        {!initialLoading && summary?.environment ? (
-          <Text type="secondary">
-            {summary.environment.disposableDatabaseReady
-              ? summary.environment.message
-              : '请按上方建议完成本机运行环境准备。'}
-          </Text>
-        ) : null}
-      </div>
-      <ManagedDatabaseLifecycleGuide />
+      {context}
+      <Drawer
+        title="诊断运行说明"
+        width={800}
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        afterOpenChange={(open) => { if (!open) helpRef.current?.focus({ preventScroll: true }) }}
+        destroyOnHidden
+      >
+        <ManagedDatabaseLifecycleGuide description={(
+          <div className="erp-dev-quality-actions__environment">
+            <Text>
+              {profile === 'strict'
+                ? '严格诊断在完整检查前增加工具链、Shell 和 YAML 检查。'
+                : '完整诊断运行共用检查主路径。'}
+            </Text>
+            {summary?.environment ? <Text type="secondary">{summary.environment.message}</Text> : null}
+          </div>
+        )}
+        />
+      </Drawer>
     </WorkbenchSection>
+  )
+}
+
+function renderHistoryEvidence(row) {
+  return (
+    <>
+      <Text type="secondary">记录版本 {shortCommit(row.repository.commit)} · {row.repository.dirty ? '未提交改动' : '干净版本'}</Text>
+      <TechnicalDetails operation={row} />
+    </>
   )
 }
 
@@ -116,27 +129,31 @@ export function RunView({
   cancelButtonRef,
   standalone = false,
 }) {
-  const executionLabel = standalone ? '服务端' : '本机'
+  const [technicalOpen, setTechnicalOpen] = useState(false)
+  const technicalRef = useRef(null)
   const profile = operation?.profile || previewProfile
-  const stages = operation
-    ? deriveStages(summary, operation)
-    : previewStages(summary, profile)
-  const cancellable =
-    operation && ['queued', 'running'].includes(operation.status)
+  const stages = operation ? deriveStages(summary, operation) : previewStages(summary, profile)
+  const cancellable = operation && ['queued', 'running'].includes(operation.status)
+  const active = Boolean(operation && DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status))
+  const evidence = terminalEvidence(operation)
   const progress = operation ? stageProgress(stages) : 0
   const history = (summary?.operations || []).slice(0, 20)
   const historyColumns = [
     {
       align: 'left',
-      title: '门禁',
+      title: '诊断 / 时间',
       dataIndex: 'profile',
       key: 'profile',
-      render: (profile) => getQualityGateProfileLabel(profile, standalone),
+      render: (rowProfile, row) => (
+        <div className="erp-dev-quality-history__identity">
+          <Text>{rowProfile === 'strict' ? '严格诊断' : '完整诊断'}</Text>
+          <DevTimestamp value={row.finishedAt || row.updatedAt} missing="时间未证明" />
+        </div>
+      ),
     },
     {
       align: 'left',
       title: '结果',
-      dataIndex: 'status',
       key: 'status',
       render: (_, row) => <OperationStatusTag operation={row} />,
     },
@@ -145,163 +162,99 @@ export function RunView({
       key: 'duration',
       render: (_, row) => formatQualityGateDuration(operationDuration(row)),
     },
-    {
-      title: '时间',
-      key: 'time',
-      width: 220,
-      render: (_, row) => (
-        <Space direction="vertical" size={2}>
-          <DevTimestamp
-            value={row.createdAt}
-            action="开始于"
-            missing="开始时间未证明"
-          />
-          <DevTimestamp
-            value={row.finishedAt || row.updatedAt}
-            action={operationUpdateAction(row)}
-            missing="更新时间未证明"
-          />
-        </Space>
-      ),
-    },
-    {
-      align: 'left',
-      title: '版本',
-      key: 'version',
-      render: (_, row) => (
-        <Space size={6}>
-          <Text code>{shortCommit(row.repository.commit)}</Text>
-          {row.repository.dirty ? <Tag color="warning">dirty</Tag> : null}
-        </Space>
-      ),
-    },
   ]
 
   return (
     <div className="erp-dev-quality-run-view">
       <WorkbenchSection className="erp-dev-quality-operation" aria-live="polite" aria-label="诊断结果与执行轨道">
+        <div className="erp-dev-quality-operation__heading">
+          <Space size={8} wrap>
+            <Title level={2}>{operation ? getQualityGateProfileLabel(operation.profile, standalone) : '诊断结果'}</Title>
+            {operation ? <OperationStatusTag operation={operation} /> : <Text type="secondary">{summary ? '尚未运行' : '正在读取'}</Text>}
+            {operation?.displayContext === 'current-proof' ? <Tag className="erp-dev-accent-tag">当前正式回执</Tag> : null}
+            {operation?.displayContext === 'history' ? <Text type="secondary">历史版本，不代表当前工作区</Text> : null}
+          </Space>
+          <Space size={8}>
+            {cancellable ? (
+              <Button ref={cancelButtonRef} icon={<StopOutlined aria-hidden="true" />} danger onClick={() => onCancel(operation)}>
+                取消运行
+              </Button>
+            ) : null}
+            {operation ? (
+              <Button ref={technicalRef} type="text" onClick={() => setTechnicalOpen(true)}>技术详情</Button>
+            ) : null}
+          </Space>
+        </div>
         {operation ? (
           <>
-            <div className="erp-dev-quality-operation__heading">
-              <div>
-                <Space size={8} wrap>
-                  <Title level={2}>{getQualityGateProfileLabel(operation.profile, standalone)}</Title>
-                  <OperationStatusTag operation={operation} />
-                  {operation.displayContext === 'current-proof' ? (
-                    <Tag className="erp-dev-accent-tag">当前正式回执</Tag>
-                  ) : null}
-                  {operation.displayContext === 'history' ? (
-                    <Tag color="warning">{executionLabel}历史</Tag>
-                  ) : null}
-                </Space>
-                <Paragraph>{operation.message}</Paragraph>
-                <Space wrap size={[12, 4]}>
-                  <DevTimestamp
-                    value={operation.createdAt}
-                    action="开始于"
-                    missing="开始时间未证明"
-                  />
-                  <DevTimestamp
-                    value={operation.finishedAt || operation.updatedAt}
-                    action={operationUpdateAction(operation)}
-                    missing="更新时间未证明"
-                  />
-                </Space>
-              </div>
-              {cancellable ? (
-                <Button
-                  ref={cancelButtonRef}
-                  icon={<StopOutlined />}
-                  danger
-                  onClick={() => onCancel(operation)}
-                >
-                  取消运行
-                </Button>
-              ) : null}
-            </div>
             <WorkbenchFacts
               className="erp-dev-quality-operation__facts"
               items={[
-              { label: '已运行 / 总耗时', value: formatQualityGateDuration(operationDuration(operation)) },
-              { label: '当前阶段', value: currentStageLabel(stages, operation) },
-              { label: DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status) ? '预计剩余' : '运行状态', value: estimatedRemaining(summary, operation) },
-            ]}
+                { label: active ? '已运行' : '总耗时', value: formatQualityGateDuration(operationDuration(operation)) },
+                { label: active ? '开始时间' : operationUpdateAction(operation), value: <DevTimestamp value={active ? operation.createdAt : operation.finishedAt || operation.updatedAt} missing="时间未证明" /> },
+                { label: '记录版本', value: `${shortCommit(operation.repository.commit)}${operation.repository.dirty ? ' · 未提交' : ''}` },
+              ]}
             />
-            <Progress
-              percent={progress}
-              status={
-                operation.status === 'failed'
-                  ? 'exception'
-                  : operation.status === 'passed'
-                    ? 'success'
-                    : 'active'
-              }
-              aria-label={`${getQualityGateProfileLabel(operation.profile, standalone)}进度 ${progress}%`}
-            />
-            {operation.firstFailure ? (
-              <WorkbenchNotice
-                tone="error"
-                title={`第一失败：${operation.firstFailure}`}
-                description="请先修复第一失败阶段，再重新运行；页面不会自动重试。"
+            {active ? (
+              <>
+                <WorkbenchFacts items={[
+                  { label: '当前阶段', value: currentStageLabel(stages, operation) },
+                  { label: '预计剩余', value: estimatedRemaining(summary, operation) },
+                ]}
+                />
+                <Progress percent={progress} status="active" aria-label={`${getQualityGateProfileLabel(operation.profile, standalone)}进度 ${progress}%`} />
+              </>
+            ) : (
+              <WorkbenchFacts
+                className="erp-dev-quality-operation__evidence"
+                items={[
+                  { label: '正式回执', value: evidence.receipt.label },
+                  { label: '资源清理', value: <Text type={evidence.cleanup.status === 'failed' ? 'danger' : undefined}>{evidence.cleanup.label}</Text> },
+                ]}
               />
+            )}
+            {operation.firstFailure ? (
+              <WorkbenchNotice tone="error" title={`第一失败：${operation.firstFailure}`} />
+            ) : !['passed', 'running', 'queued'].includes(operation.status) ? (
+              <Text>{operation.message}</Text>
             ) : null}
           </>
-        ) : (
-          <div className="erp-dev-quality-operation__heading">
-            <div>
-              <Space size={8} wrap>
-                <Title level={2}>{getQualityGateProfileLabel(profile, standalone)}流程预览</Title>
-                <Tag>尚未运行</Tag>
-              </Space>
-              <Paragraph>
-                运行后会在同一条轨道上原位显示当前阶段、第一失败、耗时、正式回执和清理读回。
-              </Paragraph>
-            </div>
-          </div>
-        )}
-        <GateExecutionFlow
-          summary={summary}
-          operation={operation}
-          profile={profile}
-          standalone={standalone}
-        />
-        {operation ? <TechnicalDetails operation={operation} /> : null}
+        ) : null}
+        <GateExecutionFlow key={operation?.id || profile} summary={summary} operation={operation} profile={profile} standalone={standalone} />
       </WorkbenchSection>
 
-      <WorkbenchSection
-        className="erp-dev-quality-history"
-        aria-labelledby="quality-history-title"
-      >
-        <div className="erp-dev-quality-section-heading">
-          <Title id="quality-history-title" level={2}>
-            {standalone ? '服务端最近诊断' : '本机最近诊断'}
-          </Title>
-          <Text type="secondary">
-            每种{executionLabel}诊断最多保留最近 20 次脱敏记录；不混入 GitLab 流水线
-          </Text>
-        </div>
-        <QualityGateHistoryTrend
-          operations={summary?.operations || []}
-          operation={operation}
-        />
+      <WorkbenchSection className="erp-dev-quality-history" title={standalone ? '服务端最近诊断' : '本机最近诊断'} tools={<Text type="secondary">{history.length} 条</Text>}>
         <Table
           rowKey="id"
           size="small"
-          pagination={false}
+          pagination={{ pageSize: 5, showSizeChanger: false, hideOnSinglePage: true }}
           dataSource={history}
           columns={historyColumns}
           locale={{ emptyText: '尚无运行记录' }}
-          scroll={{ x: 900 }}
+          expandable={{
+            columnWidth: 28,
+            expandedRowRender: renderHistoryEvidence,
+          }}
         />
+        {history.length ? (
+          <details className="erp-dev-disclosure erp-dev-quality-history-analysis">
+            <summary>耗时分析</summary>
+            <StageDurationComposition stages={stages} />
+            <QualityGateHistoryTrend operations={summary?.operations || []} operation={operation} />
+          </details>
+        ) : null}
       </WorkbenchSection>
-
-      <Text type="secondary" className="erp-dev-quality-action-status">
-        {actionProfile
-          ? `正在启动${getQualityGateProfileLabel(actionProfile, standalone)}`
-          : standalone
-            ? '此处展示本服务的诊断记录；固定提交的 CI 结果请到“服务器 CI”核对。'
-            : '本机诊断完成后不会自动提交、推送、发布或部署，也不替代 GitLab CI Gate。'}
-      </Text>
+      {actionProfile ? <Text className="erp-dev-quality-action-status">正在启动{getQualityGateProfileLabel(actionProfile, standalone)}</Text> : null}
+      <Drawer
+        title="诊断技术详情"
+        width={680}
+        open={technicalOpen && Boolean(operation)}
+        onClose={() => setTechnicalOpen(false)}
+        afterOpenChange={(open) => { if (!open) technicalRef.current?.focus({ preventScroll: true }) }}
+        destroyOnHidden
+      >
+        <TechnicalDetails operation={operation} />
+      </Drawer>
     </div>
   )
 }

@@ -8,6 +8,15 @@ import {
   presentWorkflowTaskEvent,
 } from './workflowTaskEventPresentation.mjs'
 
+test('task event adapter derives approval wording from the shared task classification', () => {
+  const events = [{ event_type: 'status_changed', from_status_key: 'ready', to_status_key: 'done' }]
+  for (const task of [{ owner_role_key: 'boss' }, { payload: { notification_type: 'approval_required' } }]) {
+    assert.equal(buildWorkflowTaskEventTrailModel({ events, task }).items[0].label, '审批已通过')
+  }
+  assert.equal(buildWorkflowTaskEventTrailModel({ events, task: { owner_role_key: 'warehouse' } }).items[0].label, '任务已完成')
+  assert.equal(buildWorkflowTaskEventTrailModel({ events, task: { owner_role_key: 'boss' }, approvalTask: false }).items[0].label, '任务已完成')
+})
+
 test('workflow task event presentation uses approval language only for approval tasks', () => {
   const event = {
     id: 11,

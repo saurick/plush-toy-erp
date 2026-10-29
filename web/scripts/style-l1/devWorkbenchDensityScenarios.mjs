@@ -1,10 +1,12 @@
 import fs from 'node:fs/promises'
 import {
+  DEV_PAGE_TITLE_BY_ROUTE,
   DEV_SECONDARY_NAV_ITEMS,
   DEV_WORKSPACE_NAV_ITEMS,
 } from '../../src/dev-workbench/config/devRoutes.mjs'
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
 import { installDatabaseMigrationFixture } from './devDeliveryWorkspaceScenarios.mjs'
+import { createDataPreparationBrowserFixture, installDataPreparationBrowserRoutes } from './devDataPreparationScenarios.mjs'
 import { assertFulfillmentChainGeometry } from './fulfillmentChainAssertions.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { createDevDisclosureScenarios } from './devDisclosureScenarios.mjs'
@@ -55,6 +57,129 @@ export function createDevWorkbenchDensityScenarios({
   path,
 }) {
   return [
+    {
+      name: 'dev-workbench-action-placement-desktop-light',
+      path: '/__dev/customer-config?customer=yoyoosun',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await installPermissionRelationshipMock(page)
+        await installDatabaseMigrationFixture(page)
+        await installDataPreparationBrowserRoutes(page, createDataPreparationBrowserFixture())
+        await page.route('**/__dev/api/qa/coverage{,/snapshot}', (route) => route.fulfill({ json: {
+          status: 'missing', message: '布局验证不包含覆盖报告',
+        } }))
+      },
+      verify: async (page) => {
+        const routes = Object.keys(DEV_PAGE_TITLE_BY_ROUTE)
+        const withNavigation = new Set([
+          '/__dev', '/__dev/development-resources', '/__dev/delivery',
+          '/__dev/customer-config', '/__dev/testing', '/__dev/business-chain-audit',
+          '/__dev/quality-gates', '/__dev/data-preparation', '/__dev/drill-recovery',
+          '/__dev/integration', '/__dev/ui-design', '/__dev/status-flows',
+          '/__dev/version-center', '/__dev/database-migration',
+        ])
+        const measurements = []
+        for (const route of routes) {
+          await page.goto(new URL(route, page.url()).href)
+          const root = page.locator('.erp-dev-workspace-page, .erp-dev-version-guide-page').first()
+          await root.locator(':scope > header h1').waitFor()
+          if (route === '/__dev/data-preparation') {
+            await page.getByRole('tablist', { name: '测试数据视图', exact: true }).waitFor()
+          }
+          for (const width of [1024, 1280, 1920]) {
+            await page.setViewportSize({ width, height: 1080 })
+            const geometry = await root.evaluate((element) => {
+              const visible = (node) => node.getBoundingClientRect().height > 0
+              const header = element.querySelector(':scope > header')
+              const headerBox = header.getBoundingClientRect()
+              const titleBox = header.querySelector('.erp-dev-page-header__title').getBoundingClientRect()
+              const navigation = [...header.querySelectorAll('.erp-dev-page-header__navigation [role="tablist"]')].filter(visible)
+              const tools = [...header.querySelectorAll(':scope > .erp-dev-workbench-tools')].filter(visible)
+              return {
+                sharedHeaders: element.querySelectorAll(':scope > .erp-dev-page-header').length,
+                separateNavigation: [...element.querySelectorAll(':scope > .erp-dev-workbench-toolbar [role="tablist"]')].filter(visible).length,
+                headerHeight: headerBox.height,
+                headerRightGap: element.getBoundingClientRect().right - headerBox.right,
+                pagePaddingRight: parseFloat(getComputedStyle(element).paddingRight),
+                titleFontSize: getComputedStyle(header.querySelector('h1')).fontSize,
+                navigation: navigation.map((nav) => {
+                  const box = nav.getBoundingClientRect()
+                  const sameRow = Math.abs(box.top + box.height / 2 - titleBox.top - titleBox.height / 2) <= 1
+                  return { label: nav.getAttribute('aria-label'), sameRow, left: box.left - headerBox.left, gap: box.left - titleBox.right, top: box.top - headerBox.top, bottom: headerBox.bottom - box.bottom }
+                }),
+                tools: tools.map((node) => ({ label: node.textContent.trim(), right: headerBox.right - node.getBoundingClientRect().right })),
+                start: (() => {
+                  const button = element.querySelector('.erp-dev-customer-start > button')
+                  const title = element.querySelector('.erp-dev-customer-start h2')
+                  if (!button || !title) return null
+                  const actionBox = button.getBoundingClientRect()
+                  const titleBox = title.getBoundingClientRect()
+                  return { left: actionBox.left - titleBox.left, below: actionBox.top >= titleBox.bottom }
+                })(),
+              }
+            })
+            assert.equal(geometry.sharedHeaders, 1, `${route}使用一个共享页头`)
+            assert(Math.abs(geometry.headerRightGap - geometry.pagePaddingRight) <= 1, `${route}页头铺满内容区，不继承旧宽度上限`)
+            assert.equal(geometry.titleFontSize, '18px', `${route}沿用共享标题字号`)
+            assert.equal(geometry.separateNavigation, 0, `${route}一级页签合并到页头`)
+            assert.equal(geometry.navigation.length, withNavigation.has(route) ? 1 : 0, `${route}保留原有一级导航`)
+            if (width === 1920) {
+              const maximumHeight = ['/__dev/version-center', '/__dev/docs'].includes(route) ? 96 : 52
+              assert(geometry.headerHeight <= maximumHeight, `${route}宽屏页头保持紧凑：${geometry.headerHeight}px`)
+            }
+            if (['/__dev/quality-gates', '/__dev/data-preparation', '/__dev/drill-recovery', '/__dev/version-center', '/__dev/database-migration', '/__dev/project-skills', '/__dev/permission-relationships'].includes(route)) {
+              assert.equal(geometry.tools.length, 1, `${route}保留可见的辅助工具区`)
+            }
+            for (const nav of geometry.navigation) {
+              assert(nav.top >= 4 && nav.bottom >= 4, `${route}导航完整位于页头内：${JSON.stringify(nav)}`)
+              if (nav.sameRow) assert(nav.gap >= 8 && nav.gap <= 20, `${route}导航紧接标题：${JSON.stringify(nav)}`)
+              else assert(nav.left >= 12 && nav.left <= 14, `${route}换行后从页头左侧开始：${JSON.stringify(nav)}`)
+            }
+            for (const tools of geometry.tools) {
+              assert(tools.right >= 12 && tools.right <= 14, `${route}辅助工具保留在右侧：${JSON.stringify(tools)}`)
+            }
+            if (geometry.start) {
+              assert(Math.abs(geometry.start.left) <= 1 && geometry.start.below, '开始检查配置在说明下方左对齐')
+            }
+            measurements.push({ route, width, ...geometry })
+            await assertNoHorizontalOverflow(page, `${route} ${width}px 操作布局`)
+          }
+          if (withNavigation.has(route)) {
+            const nav = root.locator('.erp-dev-page-header__navigation [role="tablist"]')
+            const current = await nav.getByRole('tab', { selected: true }).innerText()
+            const other = nav.locator('[role="tab"]:not([aria-selected="true"]):not([disabled])').first()
+            const strip = await nav.elementHandle()
+            const before = await nav.boundingBox()
+            await other.click()
+            assert(await strip.evaluate((node) => node.isConnected), `${route}切换保留原页签条`)
+            await nav.getByRole('tab', { name: current, exact: true }).click()
+            await nav.getByRole('tab', { name: current, exact: true, selected: true }).waitFor()
+            const after = await nav.boundingBox()
+            for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(before[key] - after[key]) <= 1, `${route}往返恢复导航${key}`)
+            await assertNoHorizontalOverflow(page, `${route}页签往返`)
+          }
+          if (route === '/__dev/customer-config') {
+            const nav = page.getByRole('tablist', { name: '客户配置工作任务', exact: true })
+            const strip = await nav.elementHandle()
+            const before = await nav.boundingBox()
+            await page.screenshot({ path: path.join(outputDir, 'workbench-customer-config-4k.png') })
+            await page.getByRole('button', { name: '开始检查配置', exact: true }).click()
+            await nav.getByRole('tab', { name: /检查配置/u, selected: true }).waitFor()
+            await nav.getByRole('tab', { name: '配置总览', exact: true }).click()
+            await nav.getByRole('tab', { name: '配置总览', exact: true, selected: true }).waitFor()
+            assert(await strip.evaluate((node) => node.isConnected), '往返切换保留同一页签条')
+            const after = await nav.boundingBox()
+            for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(before[key] - after[key]) <= 1, `往返切换保持页签${key}`)
+          }
+        }
+        await fs.writeFile(path.join(outputDir, 'workbench-action-placement.json'), JSON.stringify(measurements, null, 2))
+        await page.goto(new URL('/__dev/customer-config?customer=unknown', page.url()).href)
+        await page.getByRole('heading', { name: '客户配置', exact: true }).waitFor()
+        assert.equal(await page.locator('.erp-dev-customer-page > header [role="tablist"]').count(), 0, '无效客户不留下空的任务导航栏')
+        await assertNoHorizontalOverflow(page, '无效客户配置')
+      },
+    },
     ...createDevWorkbenchDirectoryScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevDisclosureScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     {
@@ -71,13 +196,9 @@ export function createDevWorkbenchDensityScenarios({
         assert.equal(initial.label, '产品与业务')
         assert.equal(await nav.getByRole('group', { name: /工作入口$/u }).count(), 4, '四个工作区的子入口始终展开')
         assert.equal(await nav.getByRole('group', { name: '产品与业务工作入口' }).count(), 1)
-        const tools = nav.getByRole('button', { name: '页面工具', exact: true })
-        await tools.click()
-        const utilities = page.getByRole('group', { name: '页面工具', exact: true })
-        await utilities.getByRole('button', { name: '复制当前页面链接', exact: true }).waitFor()
-        await utilities.getByRole('button', { name: '复制当前页面链接', exact: true }).press('Escape')
-        await utilities.waitFor({ state: 'hidden' })
-        assert.equal(await tools.evaluate((button) => button === document.activeElement), true, '收起页面工具后恢复入口焦点')
+        assert.equal(await nav.getByRole('button', { name: '页面工具', exact: true }).count(), 0)
+        assert.equal(await page.getByRole('group', { name: '页面工具', exact: true }).count(), 0)
+        await nav.getByRole('button', { name: '外观与密度', exact: true }).waitFor()
         const originalBox = await secondary.boundingBox()
         await secondary.click()
         await page.getByRole('heading', { name: '产品能力', exact: true }).waitFor()
@@ -176,26 +297,10 @@ export function createDevWorkbenchDensityScenarios({
               currentRouteBackground: currentStyle?.backgroundColor,
               gap: content.getBoundingClientRect().top - headerBox.bottom,
               toolbar: (() => {
-                const toolbar =
-                  element.querySelector('.erp-dev-workbench-toolbar') ||
-                  header.querySelector(
-                    '.erp-dev-workbench-header-context:has([role="tablist"])'
-                  )
-                if (!toolbar) return null
-                const nav = toolbar.querySelector('[role="tablist"]')
-                const context = toolbar.querySelector(
-                  '.erp-dev-customer-scope, .erp-dev-delivery-facts'
-                )
-                const navBox = nav.getBoundingClientRect()
-                const contextBox = context.getBoundingClientRect()
-                return {
-                  height: toolbar.getBoundingClientRect().height,
-                  centerDelta: Math.abs(
-                    navBox.top +
-                      navBox.height / 2 -
-                      (contextBox.top + contextBox.height / 2)
-                  ),
-                }
+                const toolbar = header.querySelector('.erp-dev-page-header__navigation')
+                const nav = toolbar?.querySelector('[role="tablist"]')
+                if (!nav) return null
+                return { height: nav.getBoundingClientRect().height }
               })(),
               headerContext: Boolean(
                 header.querySelector('.erp-dev-workbench-header-context')
@@ -227,26 +332,23 @@ export function createDevWorkbenchDensityScenarios({
             1,
             `${label}页头应保留细边框`
           )
-          assert(geometry.themedHeader, `${label}页头应有主题浅底层次`)
+          assert(geometry.themedHeader, `${label}页头沿用主题内容面`)
           if (geometry.hasExactRoute) {
             assert(geometry.currentRouteDistinct, `${label}当前导航应有主题浅底和文字强调`)
             await assertSidebarSelection(page, assert)
           }
           const headerControls = {
-            '/__dev': '.erp-dev-overview-library__toolbar',
             '/__dev/project-skills': '.erp-dev-skills__health',
-            '/__dev/customer-config': '.erp-dev-customer-stagebar',
-            '/__dev/drill-recovery': '[aria-label="安全与恢复任务"]',
           }[route]
           if (headerControls) {
             assert.equal(
               await root.locator(`:scope > header ${headerControls}`).count(),
               1,
-              `${label}的筛选、状态或主导航应直接并入页头`
+              `${label}的检查状态应与标题同组`
             )
           }
           if (route === '/__dev/product-core') {
-            assert.equal(await root.locator('main > .erp-dev-product-core-toolbar').count(), 1, '能力筛选集中在目录上方')
+            assert.equal(await root.locator('header > .erp-dev-product-core-toolbar').count(), 1, '能力筛选与标题共用页头')
           }
           if (route === '/__dev/project-skills') {
             await assertPlainDirectory(page, '.erp-dev-skills__item', assert)
@@ -272,29 +374,30 @@ export function createDevWorkbenchDensityScenarios({
               route
             )
           ) {
-            assert(geometry.toolbar, `${label}的范围和页签应共用操作栏`)
+            assert(geometry.toolbar, `${label}的页签应并入共享页头`)
             assert(
               geometry.toolbar.height <= 52,
               `${label}合并后的操作栏应保持一行`
             )
-            assert(
-              geometry.toolbar.centerDelta <= 1,
-              `${label}范围与页签应垂直对齐`
-            )
+            if (route === '/__dev/database-migration') {
+              assert.equal(await root.locator('header [aria-label="数据库迁移视图"]').count(), 1, '迁移页签在页头，版本事实继续在内容区可见')
+            } else {
+              assert(geometry.headerContext, '安全与恢复的客户范围与标题同组')
+            }
             await verifySlidingMotion(
               page,
               assert,
               route === '/__dev/drill-recovery'
-                ? 'header .erp-dev-workbench-header-context [role="tablist"]'
-                : '.erp-dev-workbench-toolbar [role="tablist"]',
+                ? '.erp-dev-page-header [aria-label="安全与恢复任务"]'
+                : '.erp-dev-page-header__navigation [role="tablist"]',
               1
             )
             await verifySlidingMotion(
               page,
               assert,
               route === '/__dev/drill-recovery'
-                ? 'header .erp-dev-workbench-header-context [role="tablist"]'
-                : '.erp-dev-workbench-toolbar [role="tablist"]',
+                ? '.erp-dev-page-header [aria-label="安全与恢复任务"]'
+                : '.erp-dev-page-header__navigation [role="tablist"]',
               0,
               true
             )
@@ -397,8 +500,8 @@ export function createDevWorkbenchDensityScenarios({
         await fs.writeFile(path.join(outputDir, 'dev-density-chain-geometry.json'), `${JSON.stringify(chain, null, 2)}\n`)
         assert(chain.height <= 760, '桌面总链应在一屏内保留主要结构')
         assert(
-          chain.cards.every((height) => height >= 60 && height <= 88),
-          '正常入口保留标题与完整点击区域'
+          chain.cards.every((height) => height >= 52 && height <= 88),
+          '正常入口遵循 52px 最小高度，保留标题与完整点击区域'
         )
         assert(chain.details.every((item) => item.exceptionGap === null || item.exceptionGap >= 8), '异常入口在主按钮外保留间距')
         await assertNoHorizontalOverflow(page, '压缩后的业务链')

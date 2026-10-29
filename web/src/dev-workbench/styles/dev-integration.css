@@ -114,7 +114,6 @@
   overflow: clip;
   border-radius: 10px;
   min-width: 0;
-  min-height: 580px;
 }
 
 .erp-dev-integration__source-entry {
@@ -123,23 +122,35 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-integration__inventory-surface--open {
-  min-height: max(580px, var(--integration-available-height, 580px));
+.erp-dev-integration__reading > .erp-workbench-reading__body {
+  position: sticky;
+  top: 12px;
 }
 
-.erp-dev-integration__inventory-surface > .erp-dev-integration__table {
-  min-height: inherit;
-}
-
-
-.erp-dev-integration__inventory-surface .ant-drawer-content-wrapper {
-  border-radius: 0 10px 10px 0;
+.erp-dev-integration__reader {
+  display: flex;
+  flex-direction: column;
+  height: var(--integration-detail-height, 600px);
+  min-height: 240px;
+  min-width: 0;
+  gap: 12px;
   overflow: hidden;
+  padding: 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
 }
 
-.erp-dev-integration__inventory-surface .ant-drawer-mask {
-  border-radius: 10px;
-  background: rgb(18 28 23 / 20%);
+.erp-dev-integration__reader-heading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-dev-integration__reader-heading > .ant-btn {
+  flex: none;
 }
 
 .erp-dev-integration__identity {
@@ -259,30 +270,20 @@
   font-size: var(--erp-font-small);
 }
 
-.erp-dev-integration-drawer .ant-drawer-header {
-  align-items: flex-start;
-  padding: 20px 24px 16px;
-}
-
-.erp-dev-integration-drawer .ant-drawer-body {
-  overflow: hidden;
-  padding: 16px 20px;
-}
-
-.erp-dev-integration__drawer-identity {
+.erp-dev-integration__detail-identity {
   display: grid;
   gap: 6px;
   min-width: 0;
 }
 
-.erp-dev-integration__drawer-identity h2 {
+.erp-dev-integration__detail-identity h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 18px;
   line-height: 1.4;
 }
 
-.erp-dev-integration__drawer-identity code,
-.erp-dev-integration__drawer-identity p {
+.erp-dev-integration__detail-identity code,
+.erp-dev-integration__detail-identity p {
   margin: 0;
   color: var(--erp-text-muted);
   font-size: 14px;
@@ -293,7 +294,7 @@
 .erp-dev-integration__detail {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   gap: 12px;

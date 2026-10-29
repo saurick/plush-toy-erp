@@ -7,9 +7,10 @@ import {
   FileTextOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { Alert, Space, Tag, Typography } from 'antd'
+import { Space, Tag, Typography } from 'antd'
 import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
 import DevTaskNav from '../../components/DevTaskNav.jsx'
+import { WorkbenchNotice } from '../../components/WorkbenchPattern.jsx'
 import {
   guardItemLabel,
   StatusTag,
@@ -39,9 +40,9 @@ export function PreflightPanel({
   activeSection,
   onSectionChange,
 }) {
-  const boundaryIssueCount = customerPackageSummary.boundaries.filter(
+  const boundaryIssues = customerPackageSummary.boundaries.filter(
     (item) => !item.ok
-  ).length
+  )
   return (
     <div
       className="erp-dev-customer-panel-grid"
@@ -85,12 +86,24 @@ export function PreflightPanel({
               </tbody>
             </table>
           </div>
-          {boundaryIssueCount > 0 ? (
-            <Alert
-              type="error"
-              showIcon
-              message={`配置包存在 ${boundaryIssueCount} 项边界问题`}
-              description="展开“配置范围与依据”查看具体项，处理后再继续试跑或发布检查。"
+          {boundaryIssues.length > 0 ? (
+            <WorkbenchNotice
+              tone="error"
+              title={`配置包存在 ${boundaryIssues.length} 项边界问题`}
+              description={
+                <>
+                  <ul className="erp-dev-customer-boundary-issues">
+                    {boundaryIssues.map((item) => (
+                      <li key={item.key}>
+                        <strong>{guardItemLabel(item, '客户配置包边界')}</strong>
+                        {'：'}{item.valueLabel}
+                        {item.expectedLabel ? `；要求：${item.expectedLabel}` : ''}
+                      </li>
+                  ))}
+                  </ul>
+                  <Text>处理后再继续试跑或发布检查。</Text>
+                </>
+              }
             />
           ) : null}
           <DevStaticGuidance title="配置范围与依据">
@@ -124,12 +137,7 @@ export function PreflightPanel({
               ))}
             </div>
             <Text strong>客户包对象</Text>
-            <Alert
-              type="info"
-              showIcon
-              message="只读取已登记配置对象，不提供原始包上传，不接收任意代码、SQL 或业务事实"
-              description="本页预检已登记配置与声明；流程、策略和命令草案只供预览。当前没有运行时扩展能力，新增扩展须先完成专项评审。"
-            />
+            <Text type="secondary">流程与扩展项仅预览。</Text>
             <div className="erp-dev-customer-db-targets">
               {consoleSummary.packageAssetScope.map((item) => (
                 <ImportAssetScopeItem item={item} key={item.key} />

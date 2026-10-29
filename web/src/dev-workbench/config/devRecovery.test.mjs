@@ -452,7 +452,7 @@ test('devRecovery: 页面只读消费版本摘要，不创建第二套写动作'
   assert.match(source, /DevCustomerScopeSelector/u)
   assert.match(source, /useDevCustomerScope/u)
   assert.match(source, /buildDevCustomerSnapshotKey/u)
-  assert.match(source, /buildDevCustomerScopedRoute/u)
+  assert.doesNotMatch(source, /navigateWithinCustomerScope|onNavigate|action\.route/u)
   assert.match(source, /disabled=\{!customerReady\}/u)
   assert.doesNotMatch(
     source,

@@ -7,7 +7,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Form, Space } from 'antd'
-import { useOutletContext, useLocation } from 'react-router-dom'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
 import { canReadReference, loadReferenceIDs } from '../utils/remoteReferences.mjs'
@@ -15,7 +15,8 @@ import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { InventoryLotStatus, ShipmentStatus, StockReservationStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
-import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
+import { useProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
@@ -75,7 +76,6 @@ import {
 } from '../components/sales-orders/SalesOrderForm.jsx'
 import WorkflowTaskProductImage from '../components/workflow/WorkflowTaskProductImage.jsx'
 import SalesOrderEngineeringModal from '../components/sales-orders/SalesOrderEngineeringModal.jsx'
-import { readEngineeringBOMReturn } from '../utils/bomPreparationNavigation.mjs'
 import EngineeringMaterialRequestModal from '../components/sales-orders/EngineeringMaterialRequestModal.jsx'
 import { getEngineeringMaterialPermissions } from '../utils/engineeringMaterialTask.mjs'
 import {
@@ -100,7 +100,6 @@ import {
 import { useSalesOrderPaymentReview } from '../components/sales-orders/useSalesOrderPaymentReview.mjs'
 import {
   BUSINESS_ROUTE_PATHS,
-  buildSequentialDraftCode,
   canRunSalesOrderLifecycleAction,
   formatUnixDate,
   hasActionPermission,
@@ -239,8 +238,9 @@ async function loadReservationStockForItem(item = {}) {
 }
 
 export default function SalesOrdersPage() {
-  const outletContext = useOutletContext()
-  const location = useLocation()
+  const outletContext = useBusinessPageContext()
+  const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
@@ -312,31 +312,7 @@ export default function SalesOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const [engineeringOrderID, setEngineeringOrderID] = useState(null)
-  const [returnedEngineeringBOM, setReturnedEngineeringBOM] = useState(null)
-  const consumedEngineeringReturn = useRef(null)
-  useEffect(() => {
-    if (consumedEngineeringReturn.current === location.key) return
-    const returned = readEngineeringBOMReturn(location.state, adminProfile?.id)
-    if (
-      !returned ||
-      !hasActionPermission(
-        adminProfile,
-        PermissionCode.SALES_ORDER_ENGINEERING_UPDATE
-      )
-    )
-      { return }
-    consumedEngineeringReturn.current = location.key
-    setReturnedEngineeringBOM(returned)
-    setEngineeringOrderID(returned.orderID)
-    const history = window.history.state || {}
-    const { engineeringBOMReturn: _consumed, ...usr } = history.usr || {}
-    window.history.replaceState({ ...history, usr }, '')
-  }, [location.key, location.state, adminProfile])
   const [materialRequestOrderID, setMaterialRequestOrderID] = useState(null)
-  const canSubmitMaterialRequest = hasActionPermission(
-    adminProfile,
-    PermissionCode.ENGINEERING_MATERIAL_SUBMIT
-  )
   const canReviewMaterialRequest =
     hasActionPermission(adminProfile, PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE) ||
     hasActionPermission(adminProfile, PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE)
@@ -363,6 +339,10 @@ export default function SalesOrdersPage() {
     searchParams,
     'material_request_id'
   )
+  const engineeringEntry = outletContext?.taskBusiness?.task?.task_group === 'engineering_data'
+  useEffect(() => {
+    if (engineeringEntry && routeSalesOrderID) setEngineeringOrderID(routeSalesOrderID)
+  }, [engineeringEntry, routeSalesOrderID])
   const linkedKeyword = linkedDocumentContext(searchParams).keyword
   const resolvedRouteKeyword =
     routeSalesOrderID &&
@@ -387,6 +367,8 @@ export default function SalesOrdersPage() {
   const reservationContextRequestRef = useRef(0)
   const reservationBalanceRequestRef = useRef(0)
   const reservationInFlightRef = useRef(false)
+  const orderSaveInFlightRef = useRef(false)
+  const orderCreateResultUnknownRef = useRef(false)
   const lifecycleInFlightRef = useRef(false)
   const lifecycleAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const reservationAttemptsRef = useRef(
@@ -511,13 +493,12 @@ export default function SalesOrdersPage() {
       { label: '单价', value: item?.unit_price, rowStart: true },
       { label: '金额', value: item?.amount },
       {
-        label: '工程 / 打样',
+        label: '工程资料',
         value: salesOrderEngineeringLabel(item),
         wide: true,
       },
       { label: '设计师', value: item?.designer, wide: true },
       { label: '工艺要求', value: item?.process_requirement, fullWidth: true },
-      { label: '打样说明', value: item?.sample_note, fullWidth: true },
       { label: '备注', value: item?.note, fullWidth: true },
     ],
     [unitOptions]
@@ -688,14 +669,9 @@ export default function SalesOrdersPage() {
   ])
 
   const deliverySummaryParams = useMemo(() => {
-    const customerName = customerFilter
-      ? customers.find(
-          (customer) => String(customer?.id) === String(customerFilter)
-        )?.name
-      : ''
     return {
       keyword: resolvedRouteKeyword || orderListParams.keyword || undefined,
-      customer: customerName || undefined,
+      customer_id: customerFilter || undefined,
       lifecycle_status: statusFilter || undefined,
       date_field: dateFilterField,
       date_from: dateFilterStart || undefined,
@@ -703,7 +679,6 @@ export default function SalesOrdersPage() {
     }
   }, [
     customerFilter,
-    customers,
     dateFilterEnd,
     dateFilterField,
     dateFilterStart,
@@ -1033,13 +1008,11 @@ export default function SalesOrdersPage() {
     sourceDocumentOpenEditController.invalidate()
     orderAttachmentRef.current?.clearPendingAttachments()
     setEditingOrder(null)
+    orderCreateResultUnknownRef.current = false
     setCustomerContacts([])
     orderForm.resetFields()
     orderForm.setFieldsValue({
-      order_no: buildSequentialDraftCode(orders, {
-        prefix: 'SO',
-        field: 'order_no',
-      }),
+      order_no: undefined,
       currency: 'CNY',
       tax_mode: undefined,
       tax_rate: undefined,
@@ -1167,6 +1140,12 @@ export default function SalesOrdersPage() {
   )
 
   const saveOrder = async () => {
+    if (!editingOrder?.id && orderCreateResultUnknownRef.current) {
+      message.warning(
+        '上次保存结果尚未确认，请先返回列表刷新核对，避免重复创建订单。'
+      )
+      return
+    }
     let values
     try {
       values = await orderForm.validateFields()
@@ -1198,6 +1177,13 @@ export default function SalesOrdersPage() {
       message.error(getActionErrorMessage(error, '准备销售订单保存'))
       return
     }
+    if (
+      orderSaveInFlightRef.current ||
+      (isCreatingOrder && orderCreateResultUnknownRef.current)
+    ) {
+      return
+    }
+    orderSaveInFlightRef.current = true
     setSaving(true)
     try {
       const saveResult = await commitSourceDocumentSaveResult({
@@ -1215,6 +1201,7 @@ export default function SalesOrdersPage() {
           return result.sales_order
         },
         bindSaved: (savedOrder) => {
+          orderForm.setFieldsValue({ order_no: savedOrder.order_no })
           setEditingOrder(savedOrder)
           setSelectedOrder(savedOrder)
         },
@@ -1226,6 +1213,7 @@ export default function SalesOrdersPage() {
             '该单据已被其他人更新，本次内容没有覆盖最新数据。请核对最新单据后再保存。'
           )
         } else if (isMutationResultUnknown(saveError)) {
+          if (isCreatingOrder) orderCreateResultUnknownRef.current = true
           message.warning(
             '保存结果尚未确认，请先核对该单据的最新状态，不要连续重复提交。'
           )
@@ -1268,6 +1256,7 @@ export default function SalesOrdersPage() {
         }
       }
     } finally {
+      orderSaveInFlightRef.current = false
       setSaving(false)
     }
   }
@@ -1306,12 +1295,13 @@ export default function SalesOrdersPage() {
         )
       }
       if (action.key === 'submit') {
-        showProcessSubmissionReceipt({
-          result: updated,
-          title: orderSubmissionSuccessMessage('sales_order', updated),
-        })
+        const title = orderSubmissionSuccessMessage('sales_order', updated)
+        reportBusinessResult(title, order)
+        showProcessSubmissionReceipt({ result: updated, title })
       } else {
-        message.success(action.successMessage || `销售订单已${action.label}`)
+        const title = action.successMessage || `销售订单已${action.label}`
+        reportBusinessResult(title, updated || order)
+        message.success(title)
       }
       const nextSelectedOrder =
         action.returnsRecord === false ? order : updated || order
@@ -1757,7 +1747,7 @@ export default function SalesOrdersPage() {
                 }
                 onClick={() => setEngineeringOrderID(selectedOrder.id)}
               >
-                工程与打样
+                工程资料
               </Button>
             </BusinessActionTooltip>
           ) : null}
@@ -1769,15 +1759,13 @@ export default function SalesOrdersPage() {
               data-business-action-key="engineering-material"
               data-business-action-role="action"
               data-business-action-group={
-                canSubmitMaterialRequest || canReviewMaterialRequest ? 'business' : 'query'
+                canReviewMaterialRequest ? 'business' : 'query'
               }
               size="small"
               disabled={!selectedOrder || saving}
               onClick={() => setMaterialRequestOrderID(selectedOrder.id)}
             >
-              {canSubmitMaterialRequest
-                ? '提交用料汇总'
-                : canReviewMaterialRequest
+              {canReviewMaterialRequest
                   ? '审核用料汇总'
                   : '查看用料汇总'}
             </Button>
@@ -2001,16 +1989,13 @@ export default function SalesOrdersPage() {
       {columnOrderModal}
 
       <SalesOrderEngineeringModal
-        key={`${engineeringOrderID}:${returnedEngineeringBOM?.bomID || ''}`}
+        key={engineeringOrderID}
         orderID={engineeringOrderID}
-        returnedBOM={returnedEngineeringBOM}
         onCancel={() => {
           setEngineeringOrderID(null)
-          setReturnedEngineeringBOM(null)
         }}
         onSaved={() => {
           setEngineeringOrderID(null)
-          setReturnedEngineeringBOM(null)
           loadOrders()
         }}
       />
@@ -2021,12 +2006,7 @@ export default function SalesOrdersPage() {
           (routeMaterialRequestID ? routeSalesOrderID : null)
         }
         requestID={materialRequestOrderID ? undefined : routeMaterialRequestID}
-        permissions={{
-          ...getEngineeringMaterialPermissions(adminProfile),
-          submit:
-            !routeMaterialRequestID &&
-            getEngineeringMaterialPermissions(adminProfile).submit,
-        }}
+        permissions={getEngineeringMaterialPermissions(adminProfile)}
         onCancel={() => {
           setMaterialRequestOrderID(null)
           if (routeMaterialRequestID) {

@@ -27,8 +27,7 @@ export function useVersionCenterState() {
     selectView,
     updateOperationHistoryFilter,
     clearOperationHistoryFilters,
-    openPipelineDetails,
-  } = useVersionCenterRoute({ setHistoryPage, workspaceRef })
+  } = useVersionCenterRoute({ setHistoryPage })
   const client = useMemo(() => createDevDeliveryClient(), [])
   const qualityGateClient = useMemo(() => createDevQualityGateClient(), [])
   const initialSnapshot = useMemo(
@@ -393,7 +392,6 @@ export function useVersionCenterState() {
     historyTableRef,
     initialLoading,
     loadError,
-    openPipelineDetails,
     operationDetail,
     operationDetailLoading,
     operationDetailRequestRef,

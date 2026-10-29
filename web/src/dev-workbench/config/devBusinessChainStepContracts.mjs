@@ -39,6 +39,8 @@ const step = (options = {}) =>
     responsibilityMode: options.responsibilityMode || 'system',
     ownerPoolKeys: Object.freeze(options.ownerPoolKeys || []),
     capabilityKeys: Object.freeze(options.capabilityKeys || []),
+    verificationRuleIds: Object.freeze(options.verificationRuleIds || []),
+    sourceActionKeys: Object.freeze(options.sourceActionKeys || []),
     stateTransitionRefs: Object.freeze(options.stateTransitionRefs || []),
     stateRefs: Object.freeze(options.stateRefs || []),
     processNodeRefs: Object.freeze(options.processNodeRefs || []),
@@ -120,8 +122,10 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         ],
       }),
       'sales_acceptance:requires:effective_bom': step({
-        responsibilityMode: 'system',
-        stateRefs: [state('master.bom', 'ACTIVE', 'precondition')],
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['engineering'],
+        capabilityKeys: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE, PermissionCode.BOM_ACTIVATE],
+        stateRefs: [state('master.bom', 'ACTIVE', 'result')],
       }),
       'sales_order:posts_fact:stock_reservation': step({
         responsibilityMode: 'human',
@@ -147,7 +151,6 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         ],
         stateRefs: [
           state('source.sales_order', 'active', 'precondition'),
-          state('source.sales_order_engineering', 'CONFIRMED', 'precondition'),
           state('master.bom', 'ACTIVE', 'precondition'),
         ],
       }),
@@ -168,7 +171,6 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
             'APPROVED',
             'precondition'
           ),
-          state('source.sales_order_engineering', 'CONFIRMED', 'precondition'),
         ],
       }),
       'effective_bom:creates_source:production_order': step({
@@ -233,6 +235,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
   purchase_to_inventory: Object.freeze({
     steps: Object.freeze({
       'purchase_order:starts_process:purchase_approval': step({
+        verificationRuleIds: ['purchase-source-order'],
         responsibilityMode: 'human',
         ownerPoolKeys: ['purchase'],
         stateTransitionRefs: [
@@ -243,6 +246,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         ],
       }),
       'purchase_approval:creates_task:purchase_task': step({
+        verificationRuleIds: ['purchase-approval'],
         responsibilityMode: 'human',
         stateRefs: [state('workflow.task', 'ready', 'result')],
         processNodeRefs: [
@@ -250,6 +254,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         ],
       }),
       'purchase_task:calls_domain_command:purchase_approval': step({
+        verificationRuleIds: ['purchase-source-order', 'purchase-approval'],
         responsibilityMode: 'human',
         stateTransitionRefs: [
           transition('workflow.task', 'ready->done'),
@@ -260,8 +265,11 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           processNode(PURCHASE_APPROVAL, 'approve_purchase_order'),
         ],
       }),
-      'purchase_order:creates_fact_draft:purchase_receipt': step({ responsibilityMode: 'human', ownerPoolKeys: ['warehouse'], capabilityKeys: [PermissionCode.PURCHASE_RECEIPT_CREATE], stateRefs: [state('source.purchase_order', 'approved', 'precondition'), state('fact.purchase_receipt', 'DRAFT', 'result')] }),
+      'purchase_order:creates_fact_draft:purchase_receipt': step({
+        sourceActionKeys: ['receipt'], verificationRuleIds: ['purchase-arrival', 'purchase-replay', 'purchase-source-permissions'], responsibilityMode: 'human', ownerPoolKeys: ['warehouse'], capabilityKeys: [PermissionCode.PURCHASE_RECEIPT_CREATE], stateRefs: [state('source.purchase_order', 'approved', 'precondition'), state('fact.purchase_receipt', 'DRAFT', 'result')] }),
       'purchase_approval:creates_fact_draft:purchase_receipt': step({
+        verificationRuleIds: ['purchase-arrival', 'purchase-replay', 'purchase-source-permissions'],
+        sourceActionKeys: ['receipt'],
         responsibilityMode: 'human',
         ownerPoolKeys: ['warehouse'],
         capabilityKeys: [PermissionCode.PURCHASE_RECEIPT_CREATE],
@@ -271,6 +279,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         ],
       }),
       'purchase_receipt:creates_fact_draft:purchase_quality': step({
+        verificationRuleIds: ['purchase-quality-handoff'],
         responsibilityMode: 'system',
         stateRefs: [
           state('fact.purchase_receipt', 'DRAFT', 'precondition'),
@@ -281,9 +290,25 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         responsibilityMode: 'human',
         ownerPoolKeys: ['quality'],
         capabilityKeys: [PermissionCode.QUALITY_INSPECTION_UPDATE],
+        verificationRuleIds: ['purchase-quality-handoff', 'quality-correction', 'purchase-source-permissions'],
+        stateTransitionRefs: [transition('fact.quality_inspection', 'SUBMITTED->PASSED')],
+      }),
+      'purchase_quality:creates_fact_draft:purchase_quality_correction': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['quality'],
+        capabilityKeys: [PermissionCode.QUALITY_EXCEPTION_HANDLE],
+        verificationRuleIds: ['quality-correction'],
+        stateRefs: [state('fact.quality_inspection', 'SUBMITTED', 'result')],
+      }),
+      'purchase_quality_correction:posts_fact:purchase_accepted': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['quality'],
+        capabilityKeys: [PermissionCode.QUALITY_INSPECTION_UPDATE],
+        verificationRuleIds: ['quality-correction', 'purchase-quality-handoff'],
         stateTransitionRefs: [transition('fact.quality_inspection', 'SUBMITTED->PASSED')],
       }),
       'purchase_accepted:posts_fact:purchase_lot': step({
+        verificationRuleIds: ['purchase-inbound', 'purchase-replay', 'permission-boundary'],
         responsibilityMode: 'human',
         ownerPoolKeys: ['warehouse'],
         capabilityKeys: [
@@ -298,6 +323,8 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         ],
       }),
       'purchase_lot:creates_fact_draft:purchase_payable_draft': step({
+        verificationRuleIds: ['purchase-payable-source', 'consistency-snapshots', 'purchase-source-permissions'],
+        sourceActionKeys: ['payable'],
         responsibilityMode: 'human',
         ownerPoolKeys: ['finance'],
         capabilityKeys: [PermissionCode.FINANCE_PAYABLE_CONFIRM],
@@ -307,12 +334,14 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         ],
       }),
       'purchase_payable_draft:posts_fact:purchase_payable': step({
+        verificationRuleIds: ['purchase-payable-source', 'finance-atomicity'],
         responsibilityMode: 'human',
         ownerPoolKeys: ['finance'],
         capabilityKeys: [PermissionCode.FINANCE_PAYABLE_CONFIRM],
         stateTransitionRefs: [transition('fact.finance', 'DRAFT->POSTED')],
       }),
       'purchase_task:returns:purchase_rejected': step({
+        verificationRuleIds: ['purchase-source-order', 'purchase-approval'],
         responsibilityMode: 'human',
         ownerPoolKeys: ['boss'],
         stateTransitionRefs: [
@@ -344,7 +373,8 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       ],
       interruptionKinds: ['blocked', 'rejected', 'resume'],
       correctionStepKeys: [
-        'purchase_receipt:creates_fact_draft:purchase_quality',
+        'purchase_quality:creates_fact_draft:purchase_quality_correction',
+        'purchase_quality_correction:posts_fact:purchase_accepted',
       ],
       protectedStepKey: 'purchase_accepted:posts_fact:purchase_lot',
       wrongStateStepKey: 'purchase_accepted:posts_fact:purchase_lot',
@@ -491,6 +521,17 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           state('fact.finance', 'DRAFT', 'result'),
         ],
       }),
+      'outsourcing_order:posts_fact:outsourcing_stage': step({
+        responsibilityMode: 'human',
+ownerPoolKeys: ['warehouse', 'quality'],
+        stateRefs: [state('source.outsourcing_order', 'confirmed', 'precondition'), state('fact.production_wip_batch', 'ACCEPTED', 'result')],
+      }),
+      'outsourcing_stage:creates_fact_draft:outsourcing_payable_draft': step({
+        responsibilityMode: 'human',
+ownerPoolKeys: ['finance'],
+capabilityKeys: [PermissionCode.FINANCE_PAYABLE_CONFIRM],
+        stateRefs: [state('fact.production_wip_batch', 'ACCEPTED', 'precondition'), state('fact.finance', 'DRAFT', 'result')],
+      }),
       'outsourcing_payable_draft:posts_fact:outsourcing_payable': step({
         responsibilityMode: 'human',
         ownerPoolKeys: ['finance'],
@@ -500,6 +541,8 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     }),
     profile: profile({
       happyStepKeys: [
+        'outsourcing_order:posts_fact:outsourcing_stage',
+        'outsourcing_stage:creates_fact_draft:outsourcing_payable_draft',
         'outsourcing_order:posts_fact:outsourcing_issue',
         'outsourcing_issue:returns:outsourcing_return',
         'outsourcing_return:creates_fact_draft:outsourcing_quality',
@@ -1101,6 +1144,8 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     steps: Object.freeze({
       'rejected_purchase_quality:creates_fact_draft:purchase_disposition': step(
         {
+          sourceActionKeys: ['rejectionDisposition'],
+          verificationRuleIds: ['purchase-source-permissions'],
           responsibilityMode: 'human',
           ownerPoolKeys: ['purchase'],
           capabilityKeys: [PermissionCode.PURCHASE_RETURN_CREATE],
@@ -1242,21 +1287,21 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
   purchase_posting_corrections: Object.freeze({
     steps: Object.freeze({
       'posted_purchase_receipt:returns:purchase_return_correction': step({
+        sourceActionKeys: ['receiptReturn', 'qualityReturn'],
+        verificationRuleIds: ['purchase-source-permissions'],
+        capabilityKeys: [PermissionCode.PURCHASE_RETURN_CREATE],
         responsibilityMode: 'human',
         ownerPoolKeys: ['purchase', 'warehouse'],
-        stateRefs: [state('fact.purchase_receipt', 'POSTED', 'precondition')],
-        stateTransitionRefs: [
-          transition('fact.purchase_return', 'DRAFT->POSTED'),
-        ],
+        stateRefs: [state('fact.purchase_receipt', 'POSTED', 'precondition'), state('fact.purchase_return', 'DRAFT', 'result')],
       }),
       'posted_purchase_receipt:creates_fact_draft:purchase_adjustment_correction':
         step({
+          sourceActionKeys: ['receiptAdjustment'],
+          verificationRuleIds: ['purchase-source-permissions'],
+          capabilityKeys: [PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_CREATE],
           responsibilityMode: 'human',
           ownerPoolKeys: ['purchase', 'warehouse'],
-          stateRefs: [state('fact.purchase_receipt', 'POSTED', 'precondition')],
-          stateTransitionRefs: [
-            transition('fact.purchase_receipt_adjustment', 'DRAFT->POSTED'),
-          ],
+          stateRefs: [state('fact.purchase_receipt', 'POSTED', 'precondition'), state('fact.purchase_receipt_adjustment', 'DRAFT', 'result')],
         }),
       'purchase_return_correction:posts_fact:corrected_purchase_inventory':
         step({
@@ -1276,9 +1321,25 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           ],
           stateRefs: [state('fact.inventory_lot', 'ACTIVE', 'result')],
         }),
-      'corrected_purchase_inventory:derives:corrected_purchase_finance': step({
+      'corrected_purchase_inventory:creates_fact_draft:corrected_purchase_finance': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
+        sourceActionKeys: ['payable'],
+        capabilityKeys: [PermissionCode.FINANCE_PAYABLE_CONFIRM],
+        verificationRuleIds: ['purchase-payable-source'],
+        stateRefs: [state('fact.finance', 'DRAFT', 'result')],
+      }),
+      'corrected_purchase_inventory:posts_fact:purchase_finance_adjustment': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
+        capabilityKeys: [PermissionCode.FINANCE_CREDIT_NOTE_CREATE],
+        verificationRuleIds: ['purchase-payable-source', 'finance-atomicity'],
+        stateRefs: [state('fact.finance_credit_note', 'POSTED', 'result')],
+      }),
+      'purchase_finance_adjustment:derives:corrected_purchase_finance': step({
         responsibilityMode: 'derived',
-        stateTransitionRefs: [transition('fact.finance', 'DRAFT->POSTED')],
+        verificationRuleIds: ['purchase-payable-source', 'finance-atomicity'],
+        stateRefs: [state('fact.finance_credit_note', 'POSTED', 'precondition')],
       }),
       'purchase_return_correction:reverses:posted_purchase_receipt': step({
         responsibilityMode: 'human',
@@ -1301,7 +1362,9 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'posted_purchase_receipt:creates_fact_draft:purchase_adjustment_correction',
         'purchase_return_correction:posts_fact:corrected_purchase_inventory',
         'purchase_adjustment_correction:posts_fact:corrected_purchase_inventory',
-        'corrected_purchase_inventory:derives:corrected_purchase_finance',
+        'corrected_purchase_inventory:creates_fact_draft:corrected_purchase_finance',
+        'corrected_purchase_inventory:posts_fact:purchase_finance_adjustment',
+        'purchase_finance_adjustment:derives:corrected_purchase_finance',
       ],
       interruptionStepKeys: [
         'posted_purchase_receipt:returns:purchase_return_correction',

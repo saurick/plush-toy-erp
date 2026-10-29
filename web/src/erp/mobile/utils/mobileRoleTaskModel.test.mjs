@@ -226,20 +226,24 @@ test('mobileRoleTaskModel: 最近动态动作展示不透出技术 action key', 
   assert.equal(resolveDetailActionLabel('done'), '完成反馈（必填）')
   assert.equal(requiresMobileActionFeedback('done'), true)
   assert.equal(requiresMobileActionFeedback('blocked'), false)
-  assert.equal(resolveMobileActionLabel('blocked'), '标记阻塞')
-  assert.equal(resolveMobileActionLabel('block'), '标记阻塞')
-  assert.equal(resolveMobileActionLabel('done'), '完成本岗')
-  assert.equal(resolveMobileActionLabel('complete'), '完成本岗')
-  assert.equal(resolveMobileActionLabel('rejected'), '退回')
-  assert.equal(resolveMobileActionLabel('reject'), '退回')
-  assert.equal(resolveMobileActionLabel('urge'), '催办')
+  assert.equal(resolveMobileActionLabel('blocked'), '标记任务受阻')
+  assert.equal(resolveMobileActionLabel('block'), '标记任务受阻')
+  assert.equal(resolveMobileActionLabel('done'), '完成任务')
+  assert.equal(resolveMobileActionLabel('complete'), '完成任务')
+  assert.equal(resolveMobileActionLabel('rejected'), '退回协同任务')
+  assert.equal(resolveMobileActionLabel('reject'), '退回协同任务')
+  assert.equal(resolveMobileActionLabel('urge'), '催办任务')
   assert.equal(resolveMobileActionLabel('unknown_action'), '移动处理')
+  assert.equal(resolveMobileActionLabel('done', { task_group: 'order_review' }), '完成订单评审')
+  assert.equal(resolveMobileActionLabel('rejected', { task_group: 'order_review' }), '评审退回')
+  assert.equal(resolveMobileActionLabel('done', { task_group: 'business_followup' }), '完成跟进任务')
+  assert.equal(resolveMobileActionLabel('done', { task_group: 'order_review', required_capability_key: 'workflow.task.approve' }), '审批通过')
   assert.equal(
     resolveMobileActionDisplayLabel({
       action_key: 'done',
       action_label: 'unknown_action_key',
     }),
-    '完成本岗'
+    '完成任务'
   )
   assert.equal(
     resolveMobileActionDisplayLabel({

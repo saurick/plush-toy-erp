@@ -71,6 +71,7 @@ var (
 	ErrOutsourcingOrderFactInvalidState     = errors.New("outsourcing order does not allow fact mutation")
 	ErrOutsourcingOrderFactQuantityExceeded = errors.New("outsourcing fact quantity exceeds order item")
 	ErrOutsourcingOrderFactDependency       = errors.New("outsourcing order has posted outsourcing facts")
+	ErrOutsourcingStageReturnRequired       = errors.New("outsourcing stage return must use its WIP batch")
 	ErrOutsourcingReturnQualityDependency   = errors.New("outsourcing return has active quality inspection")
 	ErrShipmentNotFound                     = errors.New("shipment not found")
 	ErrShipmentItemNotFound                 = errors.New("shipment item not found")
@@ -159,29 +160,30 @@ type OutsourcingFact struct {
 	ProductSkuID *int
 	// SKUCodeSnapshot is a read projection from the immutable source order line.
 	// It is not persisted on outsourcing_facts and must not be inferred from an ID.
-	SKUCodeSnapshot *string
-	WarehouseID     int
-	UnitID          int
-	LotID           *int
-	Quantity        decimal.Decimal
-	SupplierID      *int
-	SupplierName    *string
-	SourceType      *string
-	SourceID        *int
-	SourceNo        *string
-	SourceLineID    *int
-	IdempotencyKey  string
-	OccurredAt      time.Time
-	PostedAt        *time.Time
-	PostedBy        *int
-	PostedByName    *string
-	CancelledAt     *time.Time
-	CancelledBy     *int
-	CancelledByName *string
-	CancelReason    *string
-	Note            *string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	SKUCodeSnapshot          *string
+	WarehouseID              int
+	UnitID                   int
+	LotID                    *int
+	Quantity                 decimal.Decimal
+	SupplierID               *int
+	SupplierName             *string
+	SourceType               *string
+	SourceID                 *int
+	SourceNo                 *string
+	SourceLineID             *int
+	IdempotencyKey           string
+	OccurredAt               time.Time
+	PostedAt                 *time.Time
+	PostedBy                 *int
+	PostedByName             *string
+	CancelledAt              *time.Time
+	CancelledBy              *int
+	CancelledByName          *string
+	CancelReason             *string
+	Note                     *string
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
+	ReturnedToVendorQuantity decimal.Decimal
 }
 
 type Shipment struct {
@@ -1454,16 +1456,18 @@ func FinanceFactDueAtFromDays(occurredAt time.Time, days *int) (*time.Time, erro
 	if *days == 0 {
 		return &canonicalOccurredAt, nil
 	}
+	// Month boundaries follow the finance business calendar; storage remains UTC.
+	localOccurredAt := canonicalOccurredAt.In(financeBusinessLocation)
 	dueAt := time.Date(
-		canonicalOccurredAt.Year(),
-		canonicalOccurredAt.Month()+1,
+		localOccurredAt.Year(),
+		localOccurredAt.Month()+1,
 		0,
-		canonicalOccurredAt.Hour(),
-		canonicalOccurredAt.Minute(),
-		canonicalOccurredAt.Second(),
-		canonicalOccurredAt.Nanosecond(),
-		time.UTC,
-	).AddDate(0, 0, *days)
+		localOccurredAt.Hour(),
+		localOccurredAt.Minute(),
+		localOccurredAt.Second(),
+		localOccurredAt.Nanosecond(),
+		financeBusinessLocation,
+	).AddDate(0, 0, *days).UTC()
 	return &dueAt, nil
 }
 

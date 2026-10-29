@@ -76,6 +76,16 @@ func (s stubDebugJSONRPCRepo) ClearBusinessData(_ context.Context, in biz.DebugB
 	}, nil
 }
 
+func TestJsonrpcDispatcher_DebugAliasesAreRemoved(t *testing.T) {
+	j := newDebugJSONRPCTestData(biz.DebugSafetyConfig{Environment: "local", SeedEnabled: true, CleanupEnabled: true})
+	for _, method := range []string{"config", "seed_business_chain_scenario", "cleanup_business_chain_scenario"} {
+		_, result, err := j.handleDebug(debugJSONRPCAdminContext(), method, "retired", nil)
+		if err != nil || result == nil || result.Code != errcode.UnknownMethod.Code {
+			t.Fatalf("retired debug method %s = %#v, %v", method, result, err)
+		}
+	}
+}
+
 func TestJsonrpcDispatcher_DebugSeedAndCleanupDisabledByConfig(t *testing.T) {
 	j := newDebugJSONRPCTestData(biz.DebugSafetyConfig{
 		Environment:    "local",

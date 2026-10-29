@@ -909,7 +909,7 @@ func TestAdminManageUsecase_SetRolesComposesFinanceAndPurchaseResponsibilities(t
 	}
 }
 
-func TestAdminManageUsecase_SetRolesAllowsConfiguredCustomRole(t *testing.T) {
+func TestAdminManageUsecase_SetRolesRejectsUnregisteredCustomRole(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
 	repo.adminsByName["root"] = repo.adminsByID[1]
@@ -929,15 +929,12 @@ func TestAdminManageUsecase_SetRolesAllowsConfiguredCustomRole(t *testing.T) {
 		Role:     RoleAdmin,
 	})
 
-	updated, err := uc.SetRoles(ctx, 2, []string{" sample_room_manager "})
-	if err != nil {
-		t.Fatalf("SetRoles() error = %v", err)
+	_, err := uc.SetRoles(ctx, 2, []string{" sample_room_manager "})
+	if !errors.Is(err, ErrRolePermissionPolicy) {
+		t.Fatalf("SetRoles() error = %v, want ErrRolePermissionPolicy", err)
 	}
-	if !AdminHasRole(updated, "sample_room_manager") {
-		t.Fatalf("expected configured custom role, got %#v", updated.Roles)
-	}
-	if !AdminHasPermission(updated, PermissionWorkflowTaskRead) {
-		t.Fatalf("expected custom role permission to be granted")
+	if len(repo.adminsByID[2].Roles) != 0 || len(repo.auditEvents) != 0 {
+		t.Fatal("unregistered role assignment mutated the account or wrote a successful audit")
 	}
 }
 
@@ -987,7 +984,7 @@ func TestAdminManageUsecase_SetRoleSettingsRecordsOneAggregateAudit(t *testing.T
 	updated, err := uc.SetRoleSettings(
 		ctx,
 		WarehouseRoleKey,
-		[]string{PermissionWarehouseInventoryRead},
+		RolePermissionPolicyFor(role).Required,
 		[]RoleDataScope{{
 			ResourceType: DataScopeResourceWarehouse,
 			Mode:         DataScopeModeNone,
@@ -1060,18 +1057,12 @@ func TestAdminManageUsecase_GetRoleForAccessPreviewIsValidatedAndReadOnly(t *tes
 	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
 	before := append([]string(nil), repo.roleByKey(FinanceRoleKey).Permissions...)
 
-	preview, err := uc.GetRoleForAccessPreview(ctx, FinanceRoleKey, []string{
-		PermissionFinanceReceivableConfirm,
-		PermissionFinanceReceivableRead,
-		PermissionFinanceReceivableRead,
-	})
+	wanted := append(RolePermissionPolicyFor(repo.roleByKey(FinanceRoleKey)).Required, PermissionERPPrintTemplateRead)
+	preview, err := uc.GetRoleForAccessPreview(ctx, FinanceRoleKey, append(append([]string{}, wanted...), wanted[0]))
 	if err != nil {
 		t.Fatalf("GetRoleForAccessPreview() error = %v", err)
 	}
-	if !slices.Equal(preview.Permissions, []string{
-		PermissionFinanceReceivableRead,
-		PermissionFinanceReceivableConfirm,
-	}) {
+	if !slices.Equal(preview.Permissions, NormalizePermissionKeys(wanted)) {
 		t.Fatalf("preview permissions = %#v", preview.Permissions)
 	}
 	if got := repo.roleByKey(FinanceRoleKey).Permissions; !slices.Equal(got, before) {
@@ -1324,7 +1315,7 @@ func TestAdminManageUsecase_SetRoleSettingsPersistsBothMenuOrders(t *testing.T) 
 	updated, err := uc.SetRoleSettings(
 		ctx,
 		FinanceRoleKey,
-		[]string{PermissionFinanceReconciliationRead},
+		RolePermissionPolicyFor(financeRole).Required,
 		[]RoleDataScope{{
 			ResourceType: DataScopeResourceWarehouse,
 			Mode:         DataScopeModeAll,
@@ -1393,7 +1384,7 @@ func TestAdminManageUsecase_ListRolesWithAccessUsesCurrentAdminAndEnvironment(t 
 	if !operatorAccess[SalesRoleKey].Assignable || operatorAccess[SalesRoleKey].PermissionsEditable {
 		t.Fatalf("operator own business-role access = %#v", operatorAccess[SalesRoleKey])
 	}
-	if operatorAccess["legacy_polluted_role"].Assignable || !operatorAccess["legacy_polluted_role"].PermissionsEditable {
+	if operatorAccess["legacy_polluted_role"].Assignable || operatorAccess["legacy_polluted_role"].PermissionsEditable {
 		t.Fatalf("legacy polluted role access = %#v", operatorAccess["legacy_polluted_role"])
 	}
 

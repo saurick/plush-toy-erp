@@ -279,3 +279,17 @@ func TestProductionWIPJSONRPCDistinguishesAllocationAndMaterialIssueErrors(t *te
 		t.Fatalf("allocation=%#v issue=%#v", allocation, issue)
 	}
 }
+
+func TestProductionMaterialUsageErrorIsConsistentAcrossCommands(t *testing.T) {
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard))}
+	err := biz.ErrProductionOrderMaterialIssueQuantityExceeded
+	want := d.mapOperationalFactError(context.Background(), err)
+	if want.Code != errcode.BusinessRuleViolation.Code || want.Message != "普通领料与委外发料合计超过可领数量，请核对已发数量或先办理超领审批" {
+		t.Fatalf("material usage must be an actionable business rejection: %#v", want)
+	}
+	order := d.mapProductionOrderError(context.Background(), err)
+	wip := d.mapProductionWIPError(context.Background(), err)
+	if order.Code != want.Code || order.Message != want.Message || wip.Code != want.Code || wip.Message != want.Message {
+		t.Fatalf("inconsistent cross-chain error: order=%#v wip=%#v", order, wip)
+	}
+}

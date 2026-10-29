@@ -177,7 +177,7 @@ test('shipment freight currency is derived from the selected sales order', () =>
 
 test('new shipment drafts clear prior source selection and cached candidate state', () => {
   const resetState = source.match(
-    /const resetShipmentSourceSelectionState = \(\) => \{([\s\S]*?)\n {2}\}/u
+    /const resetShipmentSourceSelectionState = useCallback\(\(\) => \{([\s\S]*?)\n {2}\}/u
   )?.[1]
   assert.ok(resetState, '应集中清空出货来源选择状态')
   for (const statement of [
@@ -227,7 +227,7 @@ test('sales delivery drafts use fail-closed load-before-edit and optimistic save
     source,
     /hasActionPermission\(\s*adminProfile,\s*'shipment\.update'\s*\)/u
   )
-  assert.match(source, /const openEdit = async \(shipment\) =>/u)
+  assert.match(source, /const openEdit = useCallback\(async \(shipment\) =>/u)
   assert.match(
     source,
     /const detail = await getShipment\(\{ id: shipment\.id \}\)/u

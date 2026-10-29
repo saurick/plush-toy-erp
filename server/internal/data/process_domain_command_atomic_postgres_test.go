@@ -515,6 +515,7 @@ func TestInventoryPostgresQualityProcessCommandRollsBackDecisionOnResultConflict
 		"shipment_id": shipmentRow.ID, "quality_inspection_id": inspection.ID,
 		"finished_goods_lot_id": lot.ID, "result": biz.QualityInspectionResultPass,
 		"defect_rate_operator": defectRateOperator, "defect_rate_percent": defectRatePercent.String(),
+		"check_items": incomingEvidenceForTest(biz.QualityInspectionResultPass),
 	}
 	command := claimedPostgresProcessCommandForBusinessRef(
 		t, ctx, processRepo, biz.ProcessDomainCommandFinishedGoodsQualityDecide,
@@ -524,6 +525,7 @@ func TestInventoryPostgresQualityProcessCommandRollsBackDecisionOnResultConflict
 	inspectorID := 7
 	decision := &biz.QualityInspectionDecision{
 		InspectionID: inspection.ID, Result: biz.QualityInspectionResultPass,
+		CheckItems:  incomingEvidenceForTest(biz.QualityInspectionResultPass),
 		InspectedAt: time.Now().UTC().Truncate(time.Microsecond), InspectorID: &inspectorID,
 		DefectRateOperator: &defectRateOperator, DefectRatePercent: &defectRatePercent,
 		DecisionNote: stringPtr("atomic result conflict"),
@@ -598,6 +600,7 @@ func TestInventoryPostgresConcurrentQualityProcessCommandDefaultedTimesConverge(
 		"shipment_id": shipmentRow.ID, "quality_inspection_id": inspection.ID,
 		"finished_goods_lot_id": lot.ID, "result": biz.QualityInspectionResultPass,
 		"defect_rate_operator": defectRateOperator, "defect_rate_percent": defectRatePercent.String(),
+		"check_items": incomingEvidenceForTest(biz.QualityInspectionResultPass),
 	}
 	command := claimedPostgresProcessCommandForBusinessRef(
 		t, ctx, processRepo, biz.ProcessDomainCommandFinishedGoodsQualityDecide,
@@ -613,11 +616,13 @@ func TestInventoryPostgresConcurrentQualityProcessCommandDefaultedTimesConverge(
 	decisions := []*biz.QualityInspectionDecision{
 		{
 			InspectionID: inspection.ID, Result: biz.QualityInspectionResultPass,
+			CheckItems:  incomingEvidenceForTest(biz.QualityInspectionResultPass),
 			InspectedAt: firstTime, InspectedAtDefaulted: true, InspectorID: &inspectorID,
 			DefectRateOperator: &defectRateOperator, DefectRatePercent: &defectRatePercent,
 		},
 		{
 			InspectionID: inspection.ID, Result: biz.QualityInspectionResultPass,
+			CheckItems:  incomingEvidenceForTest(biz.QualityInspectionResultPass),
 			InspectedAt: firstTime.Add(time.Second), InspectedAtDefaulted: true, InspectorID: &inspectorID,
 			DefectRateOperator: &defectRateOperator, DefectRatePercent: &defectRatePercent,
 		},
@@ -664,6 +669,7 @@ func TestInventoryPostgresConcurrentQualityProcessCommandDefaultedTimesConverge(
 	)
 	explicitMismatch := &biz.QualityInspectionDecision{
 		InspectionID: inspection.ID, Result: biz.QualityInspectionResultPass,
+		CheckItems:  incomingEvidenceForTest(biz.QualityInspectionResultPass),
 		InspectedAt: firstTime.Add(2 * time.Second), InspectorID: &inspectorID,
 		DefectRateOperator: &defectRateOperator, DefectRatePercent: &defectRatePercent,
 	}

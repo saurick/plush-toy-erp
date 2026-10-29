@@ -1,11 +1,8 @@
-import { DEV_DOCS_ROUTE, DEV_PRODUCT_CORE_ROUTE } from './devRoutes.mjs'
+import { DEV_PRODUCT_CORE_ROUTE } from './devRoutes.mjs'
 
 export { DEV_PRODUCT_CORE_ROUTE }
 
 export const DEV_PRODUCT_CORE_SOURCE_PATH = 'docs/product/产品能力进度台账.md'
-export const DEV_PRODUCT_CORE_DOCS_HREF = `${DEV_DOCS_ROUTE}?path=${encodeURIComponent(
-  DEV_PRODUCT_CORE_SOURCE_PATH
-)}`
 export const DEV_PRODUCT_CORE_MEMBERSHIP_ALL = 'all'
 export const DEV_PRODUCT_CORE_MEMBERSHIP_ORDER = Object.freeze([
   'entered',

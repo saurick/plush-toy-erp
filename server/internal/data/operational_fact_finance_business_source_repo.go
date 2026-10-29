@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
@@ -158,6 +159,13 @@ func (r *operationalFactRepo) CreatePayableFromOutsourcingReturn(
 		fact.SubjectType != biz.InventorySubjectProduct || fact.SubjectID != *item.ProductID ||
 		!sameOptionalInt(fact.ProductSkuID, item.ProductSkuID) || fact.UnitID != item.UnitID {
 		return nil, biz.ErrOutsourcingOrderFactSourceInvalid
+	}
+	linked, err := tx.client.ProductionWIPOutsourcingAllocation.Query().Where(productionwipoutsourcingallocation.OutsourcingOrderItemID(item.ID)).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if linked || order.SourceWipBatchID != nil {
+		return nil, biz.ErrOutsourcingStageReturnRequired
 	}
 	if err := requireAcceptedOutsourcingReturnQuality(ctx, tx.client, fact.ID); err != nil {
 		return nil, err

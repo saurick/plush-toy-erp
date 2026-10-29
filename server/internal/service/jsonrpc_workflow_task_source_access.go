@@ -146,7 +146,7 @@ func (d *jsonrpcDispatcher) workflowTaskInventoryOperationSourceAccess(
 	}
 	item, err := d.inventoryUC.GetInventoryOperation(ctx, task.SourceID)
 	if err != nil || item == nil ||
-		item.OperationType != biz.InventoryOperationManualAdjustment ||
+		!biz.InventoryOperationRequiresApproval(item.OperationType) ||
 		validateInventoryOperationScope(item, biz.NormalizeWarehouseDataScope(scope)) != nil {
 		return workflowTaskSourceAccessCheckFailed()
 	}

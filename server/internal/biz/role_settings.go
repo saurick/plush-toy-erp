@@ -50,6 +50,9 @@ func (uc *AdminManageUsecase) SetRoleSettings(
 	if err := ValidateAssignablePermissionKeys(normalizedPermissionKeys); err != nil {
 		return nil, err
 	}
+	if err := ValidateRolePermissionPolicy(*role, normalizedPermissionKeys); err != nil {
+		return nil, err
+	}
 	normalizedScopes, err := NormalizeRoleDataScopes(scopes)
 	if err != nil {
 		return nil, err

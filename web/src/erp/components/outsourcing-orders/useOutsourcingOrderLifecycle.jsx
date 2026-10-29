@@ -24,6 +24,7 @@ export function useOutsourcingOrderLifecycle({
   loadWorkflowTasks,
   loadOrderItems,
   openEdit,
+  onChanged,
 }) {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const lifecycleInFlightRef = useRef(false)
@@ -51,6 +52,7 @@ export function useOutsourcingOrderLifecycle({
           null
         )
         setSelectedRow(updated)
+        onChanged?.(updated)
         reportBusinessResult(`${action.label}成功`, updated)
         message.success(`${action.label}成功`)
         await Promise.all([loadOrders(), loadWorkflowTasks()])

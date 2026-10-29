@@ -13,6 +13,11 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 	pm map[string]any,
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
+	scope, result := d.currentWarehouseDataScope(ctx)
+	if result != nil {
+		return id, result, nil
+	}
+	ctx = biz.WithWarehouseDataScope(ctx, scope)
 	switch method {
 	case "submit_production_exception", "cancel_production_exception", "reverse_production_exception", "get_production_exception", "list_production_exceptions", "get_production_exception_context":
 		return d.handleProductionException(ctx, method, id, pm, actorID)
@@ -126,7 +131,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionProductionFactPost, biz.PermissionWarehouseInboundConfirm); res != nil {
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionProductionFactPost, biz.PermissionWarehouseInboundConfirm, biz.PermissionWarehouseOutboundConfirm); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
@@ -140,6 +145,8 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		permission := biz.PermissionProductionFactPost
 		if policy.FactType == biz.ProductionFactFinishedGoodsReceipt {
 			permission = biz.PermissionWarehouseInboundConfirm
+		} else if policy.FactType == biz.ProductionFactMaterialIssue {
+			permission = biz.PermissionWarehouseOutboundConfirm
 		}
 		if res := d.RequireAdminPermission(ctx, permission); res != nil {
 			return id, res, nil
@@ -161,7 +168,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionProductionFactCancel, biz.PermissionWarehouseInboundConfirm); res != nil {
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionProductionFactCancel, biz.PermissionWarehouseInboundConfirm, biz.PermissionWarehouseOutboundConfirm); res != nil {
 			return id, res, nil
 		}
 		factID := mutation.ID
@@ -173,6 +180,8 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if policy.FactType == biz.ProductionFactFinishedGoodsReceipt &&
 			(policy.Status == biz.OperationalFactStatusPosted || policy.WasPosted) {
 			permission = biz.PermissionWarehouseInboundConfirm
+		} else if policy.FactType == biz.ProductionFactMaterialIssue {
+			permission = biz.PermissionWarehouseOutboundConfirm
 		}
 		if res := d.RequireAdminPermission(ctx, permission); res != nil {
 			return id, res, nil

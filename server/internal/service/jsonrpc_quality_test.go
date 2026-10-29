@@ -23,14 +23,17 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "jsonrpc_quality_inspection")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
-	j := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+	inspector := client.AdminUser.Create().SetUsername("quality-inspector").SetDisplayName("质检员陈").SetPasswordHash("test").SaveX(ctx)
+	admin := workflowJSONRPCAdmin(
 		[]string{biz.QualityRoleKey},
 		biz.PermissionQualityInspectionRead,
 		biz.PermissionQualityInspectionCreate,
 		biz.PermissionQualityInspectionUpdate,
 		biz.PermissionPurchaseReceiptRead,
-	))
-	adminCtx := workflowJSONRPCAdminContext()
+	)
+	admin.ID = inspector.ID
+	j := newQualityJSONRPCTestData(t, data, admin)
+	adminCtx := biz.NewContextWithClaims(ctx, &biz.AuthClaims{UserID: inspector.ID, Username: inspector.Username, Role: biz.RoleAdmin})
 
 	receipt, item, lotID := createPostedQualityReceipt(t, ctx, j.inventoryUC, fixtures, "QI-JSONRPC-IN-PASS", "QI-JSONRPC-LOT-PASS")
 	txnCount := client.InventoryTxn.Query().CountX(ctx)
@@ -76,6 +79,27 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 	}
 	assertLotStatus(t, ctx, client, lotID, biz.InventoryLotHold)
 
+	for _, method := range []string{"pass_quality_inspection", "reject_quality_inspection"} {
+		for _, badID := range []any{float64(inspectionID) + .5, "1", true, nil} {
+			_, invalid, err := j.handleQuality(adminCtx, method, "invalid-id", mustJSONRPCStruct(t, map[string]any{
+				"id": badID, "check_items": qualityCheckItemsToAny(rpcIncomingEvidence("PASS")),
+				"defect_rate_operator": "APPROX", "defect_rate_percent": "0",
+			}))
+			if err != nil || invalid == nil || invalid.Code != errcode.InvalidParam.Code {
+				t.Fatalf("invalid decision ID must be rejected before source access: %+v %v", invalid, err)
+			}
+		}
+		_, forged, err := j.handleQuality(adminCtx, method, "forged-actor", mustJSONRPCStruct(t, map[string]any{
+			"id": float64(inspectionID), "inspector_id": float64(99),
+			"check_items":          qualityCheckItemsToAny(rpcIncomingEvidence("PASS")),
+			"defect_rate_operator": "APPROX", "defect_rate_percent": "0",
+		}))
+		if err != nil || forged.Code != errcode.InvalidParam.Code {
+			t.Fatalf("caller-selected inspector accepted: %+v %v", forged, err)
+		}
+	}
+	assertLotStatus(t, ctx, client, lotID, biz.InventoryLotHold)
+
 	_, passRes, err := j.handleQuality(adminCtx, "pass_quality_inspection", "3", mustJSONRPCStruct(t, map[string]any{
 		"id":                   float64(inspectionID),
 		"result":               biz.QualityInspectionResultConcession,
@@ -89,6 +113,9 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	passed := jsonRPCNestedMap(t, passRes, "quality_inspection")
+	if jsonRPCInt(t, passed, "inspector_id") != inspector.ID || passed["inspector_name"] != "质检员陈" {
+		t.Fatalf("decision must use authenticated actor: %#v", passed)
+	}
 	if status := passed["status"]; status != biz.QualityInspectionStatusPassed {
 		t.Fatalf("expected passed status, got %#v", status)
 	}
@@ -182,6 +209,7 @@ func TestJsonrpcDispatcher_CorrectQualityInspectionResultContract(t *testing.T) 
 	j := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin(
 		[]string{biz.QualityRoleKey},
 		biz.PermissionQualityInspectionRead,
+		biz.PermissionPurchaseReceiptRead,
 		biz.PermissionQualityExceptionHandle,
 	))
 	receipt, err := j.inventoryUC.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{ReceiptNo: "QI-RPC-CORR-R1", SupplierName: "纠错供应商"})
@@ -203,6 +231,7 @@ func TestJsonrpcDispatcher_CorrectQualityInspectionResultContract(t *testing.T) 
 	rejected, err := j.inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{
 		InspectionID: inspections[0].ID, Result: biz.QualityInspectionResultReject,
 		CheckItems:         rpcIncomingEvidence("FAIL"),
+		DecisionNote:       stringPtr("仪器读数异常"),
 		DefectRateOperator: stringPtr(biz.QualityInspectionDefectRateOperatorGT), DefectRatePercent: &defectRate,
 	})
 	if err != nil {
@@ -354,6 +383,7 @@ func TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven(t *t
 		"defect_rate_operator": biz.QualityInspectionDefectRateOperatorApprox,
 		"defect_rate_percent":  "20",
 		"decision_note":        "尺寸不符",
+		"check_items":          qualityCheckItemsToAny(rpcIncomingEvidence("FAIL")),
 	}))
 	if err != nil || rejectRes == nil || rejectRes.Code != errcode.OK.Code {
 		t.Fatalf("reject outsourcing quality result=%#v err=%v", rejectRes, err)
@@ -441,6 +471,7 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact(t 
 	j := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin(
 		[]string{biz.QualityRoleKey},
 		biz.PermissionQualityInspectionRead,
+		biz.PermissionPurchaseReceiptRead,
 		biz.PermissionQualityInspectionCreate,
 		biz.PermissionQualityInspectionUpdate,
 		biz.PermissionShipmentRead,
@@ -743,6 +774,7 @@ func newQualityJSONRPCTestData(t *testing.T, data *datarepo.Data, admin *biz.Adm
 	customerConfigUC := biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo())
 	dispatcher := &jsonrpcDispatcher{
 		log:              log.NewHelper(log.With(logger, "module", "service.jsonrpc.quality.test")),
+		adminManageUC:    newAllWarehouseScopeAdminUsecase(),
 		adminReader:      stubAdminAccountReader{admin: admin},
 		inventoryUC:      biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),
 		customerConfigUC: customerConfigUC,
@@ -881,4 +913,20 @@ func mustDecimal(t *testing.T, value string) decimal.Decimal {
 
 func rpcIncomingEvidence(result string) []qualitycheck.Item {
 	return []qualitycheck.Item{{Name: "外观", Requirement: "符合样品", Observation: "已核对模拟样品", Result: result, Scope: "FULL"}}
+}
+
+func TestQualityInspectionFilterHistoryScopeRequiresBoolean(t *testing.T) {
+	for _, parse := range []func(map[string]any) (biz.QualityInspectionFilter, bool){qualityInspectionFilterFromParams, finishedGoodsQualityInspectionFilterFromParams, outsourcingReturnQualityInspectionFilterFromParams, productionStageQualityInspectionFilterFromParams} {
+		for _, value := range []any{false, true} {
+			filter, ok := parse(map[string]any{"include_superseded": value})
+			if !ok || filter.IncludeSuperseded != value.(bool) {
+				t.Fatalf("history scope lost: %+v %v", filter, ok)
+			}
+		}
+		for _, value := range []any{"true", 1} {
+			if _, ok := parse(map[string]any{"include_superseded": value}); ok {
+				t.Fatalf("invalid history scope accepted: %v", value)
+			}
+		}
+	}
 }

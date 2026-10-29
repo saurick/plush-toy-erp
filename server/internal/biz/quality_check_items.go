@@ -57,3 +57,16 @@ func NormalizeQualityCheckItems(items []qualitycheck.Item, result string) ([]qua
 	}
 	return out, nil
 }
+
+// ValidateQualityInspectionDecisionEvidence applies to new decisions of every
+// source type. Stored decisions are compared for replay before this guard.
+func ValidateQualityInspectionDecisionEvidence(in *QualityInspectionDecision) error {
+	if in == nil || len(in.CheckItems) == 0 {
+		return ErrBadParam
+	}
+	if (in.Result == QualityInspectionResultReject || in.Result == QualityInspectionResultConcession) &&
+		(in.DecisionNote == nil || strings.TrimSpace(*in.DecisionNote) == "") {
+		return ErrBadParam
+	}
+	return nil
+}

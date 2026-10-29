@@ -33,7 +33,7 @@ const stageModel = {
   ],
 }
 
-test('current task and parallel active work stay ahead of default-expanded completed steps', async (t) => {
+test('current task and parallel active work stay ahead of always-visible completed steps', async (t) => {
   const { container, render } = await mount(t, 'WorkflowProcessStageTrack', { model: stageModel, focusCurrent: true })
   const track = container.firstElementChild
   const visible = track.querySelector(':scope > ol')
@@ -41,14 +41,14 @@ test('current task and parallel active work stay ahead of default-expanded compl
   assert.match(visible.textContent, /工程资料.*财务核对用料/u)
   assert.doesNotMatch(visible.textContent, /订单审批/u)
   assert.equal(visible.querySelectorAll('[aria-current="step"]').length, 2)
-  const history = track.querySelector('details')
-  assert.equal(history.open, true)
-  assert.match(history.querySelector('summary').textContent, /前序 2 步已完成/u)
+  const history = track.querySelector('.workflow-process-stage__history')
+  assert.equal(history.tagName, 'DIV')
+  assert.equal(history.querySelectorAll('summary').length, 0)
+  assert.match(history.querySelector('.workflow-process-stage__history-heading').textContent, /前序 2 步已完成/u)
   assert.equal(history.querySelectorAll('li').length, 2)
-  history.open = false
   await render({ model: { ...stageModel, handoffLabel: '等待工程补齐规格。' }, focusCurrent: true })
-  assert.equal(container.querySelector('details'), history)
-  assert.equal(history.open, false, 'same task refresh preserves the reader’s manual collapse')
+  assert.equal(container.querySelector('.workflow-process-stage__history') === history, true)
+  assert.equal(history.querySelectorAll('li').length, 2, '刷新后前序步骤仍直接可见')
   await render({ model: stageModel, focusCurrent: false })
   assert.equal(container.querySelector('details'), null)
   assert.equal(container.querySelectorAll('li').length, 4, 'full tracking retains the chronological execution trace')
@@ -64,27 +64,31 @@ test('ended selected tasks retain their result and do not hide active or unconfi
   const visible = container.querySelector(':scope > div > ol')
   assert.match(visible.textContent, /工程资料.*已完成.*财务核对用料.*责任尚在确认/u)
   assert.equal(visible.querySelector('[data-linked-task="true"]').hasAttribute('aria-current'), false)
-  assert.doesNotMatch(container.querySelector('details').textContent, /责任尚在确认/u)
+  assert.doesNotMatch(container.querySelector('.workflow-process-stage__history').textContent, /责任尚在确认/u)
 })
 
-test('processing records expand after a successful read, retain manual collapse and reset for another task', async (t) => {
+test('processing records stay visible across refresh, task changes, loading and failure', async (t) => {
   const task = { id: 1, owner_role_key: 'engineering', task_status_key: 'ready' }
-  const props = { task, state: 'ready', events: [{ id: 9, event_type: 'created', created_at: 1800000000 }], showResponsibility: false, collapsible: true, truncated: true }
+  const props = { task, state: 'ready', events: [{ id: 9, event_type: 'created', created_at: 1800000000 }], showResponsibility: false, compact: true, truncated: true }
   const { container, render } = await mount(t, 'WorkflowTaskEventTrail', props)
-  const history = container.querySelector('details')
-  assert.equal(history.open, true)
-  history.open = false
-  await render({ ...props, events: [...props.events] })
-  assert.equal(container.querySelector('details').open, false)
-  assert.match(history.textContent, /更早记录未加载/u)
-  await render({ ...props, task: { ...task, id: 2 } })
-  assert.equal(container.querySelector('details').open, true)
-  await render({ ...props, state: 'error', errorMessage: '记录暂时无法读取，请刷新。' })
-  assert.equal(container.querySelector('details'), null)
-  assert.match(container.querySelector('[role="alert"]').textContent, /暂时无法读取/u)
-  await render({ ...props, state: 'loading' })
-  assert.equal(container.querySelector('details'), null)
-  assert.match(container.querySelector('[role="status"]').textContent, /正在加载/u)
+  for (const variant of ['desktop', 'mobile']) {
+    await render({ ...props, variant })
+    const history = container.querySelector('.workflow-task-event-trail__body')
+    assert.equal(container.querySelectorAll('details, summary').length, 0)
+    assert.match(history.textContent, /任务已创建.*更早记录未加载/u)
+    await render({ ...props, variant, events: [...props.events] })
+    assert.equal(container.querySelector('.workflow-task-event-trail__body') === history, true)
+    assert.equal(history.querySelectorAll('li').length, 1)
+    await render({ ...props, variant, task: { ...task, id: 2 } })
+    assert.equal(container.querySelectorAll('li').length, 1)
+    assert.equal(container.querySelectorAll('details, summary').length, 0)
+    await render({ ...props, variant, state: 'error', errorMessage: '记录暂时无法读取，请刷新。' })
+    assert.match(container.querySelector('[role="alert"]').textContent, /暂时无法读取/u)
+    await render({ ...props, variant, state: 'loading' })
+    assert.match(container.querySelector('[role="status"]').textContent, /正在加载/u)
+    await render({ ...props, variant })
+    assert.match(container.querySelector('ol').textContent, /任务已创建/u)
+  }
 })
 
 test('processing record details retain exact audit evidence on desktop and mobile', async (t) => {
@@ -177,8 +181,8 @@ key: `${index + 1}:1`,
   const props = { model, focusCurrent: true, compact: true, hideLinkedCurrent: true }
   const { container, render } = await mount(t, 'WorkflowProcessStageTrack', props)
   const history = container.querySelector('.workflow-process-stage__history')
-  assert.match(history.querySelector('summary').textContent, /前序 2 步已完成/u)
-  assert.doesNotMatch(history.querySelector('summary').textContent, /从早到晚|最近在前/u)
+  assert.match(history.querySelector('.workflow-process-stage__history-heading').textContent, /前序 2 步已完成/u)
+  assert.doesNotMatch(history.querySelector('.workflow-process-stage__history-heading').textContent, /从早到晚|最近在前/u)
   assert.deepEqual([...history.querySelectorAll('.workflow-process-stage__marker')].map((node) => node.textContent), ['2', '1'])
   const details = [...history.querySelectorAll('.workflow-process-stage__step')]
   assert.ok(details.every((node) => !node.open))
@@ -187,7 +191,7 @@ key: `${index + 1}:1`,
   assert.equal(details[1].open, true)
   assert.match(details[1].querySelector('dl').textContent, /处理结果已完成开始时间2026\/09\/28 02:12:44结束时间2026\/09\/28 02:12:45/u)
   await render({ ...props, model: { ...model, items: model.items.map((item) => ({ ...item, key: `${item.id}:2` })) } })
-  assert.equal(container.querySelectorAll('.workflow-process-stage__step')[1], details[1])
+  assert.equal(container.querySelectorAll('.workflow-process-stage__step')[1] === details[1], true)
   assert.equal(details[1].open, true)
   await act(async () => details[0].querySelector('summary').click())
   assert.equal(details[1].open, false)
@@ -195,7 +199,7 @@ key: `${index + 1}:1`,
   assert.match(details[0].querySelector('dl').textContent, /处理时间时间未记录/u)
   await render(props, 'another-task')
   assert.ok([...container.querySelectorAll('.workflow-process-stage__step')].every((node) => !node.open))
-  assert.equal(container.querySelector('.workflow-process-stage__history').open, true)
+  assert.equal(container.querySelector('.workflow-process-stage__history').tagName, 'DIV')
 })
 
 test('previous steps use recorded end times, retain step numbers and leave the full execution trace unchanged', async (t) => {
@@ -216,7 +220,7 @@ test('previous steps use recorded end times, retain step numbers and leave the f
   assert.deepEqual([...history.querySelectorAll('.workflow-process-stage__label')].map((node) => node.textContent), ['同刻退回', '同刻撤回', '先创建后结束', '后创建先结束', '结束时间未记录'])
   assert.deepEqual([...history.querySelectorAll('.workflow-process-stage__marker')].map((node) => node.textContent), ['4', '2', '1', '3', '5'])
   assert.deepEqual(model.items.map((item) => item.key), originalKeys)
-  assert.equal(history.querySelectorAll('.workflow-process-stage__history-toggle').length, 1)
+  assert.equal(history.querySelectorAll(':scope > summary, .workflow-process-stage__history-toggle').length, 0)
   await render({ model })
   assert.deepEqual([...container.querySelectorAll('.workflow-process-stage__label')].map((node) => node.textContent), model.items.map((item) => item.label))
 })
@@ -226,15 +230,15 @@ test('records keep the newest event first with only a count in the heading', asy
     task: { id: 8 },
 state: 'ready',
 showResponsibility: false,
-collapsible: true,
+compact: true,
     events: [
       { id: 52, event_type: 'updated', created_at: 1800000100, reason: '保留原任务办理记录' },
       { id: 51, event_type: 'created', created_at: 1800000000 },
     ],
   }
   const { container, render } = await mount(t, 'WorkflowTaskEventTrail', props)
-  assert.match(container.querySelector('summary').textContent, /本任务处理记录2 条/u)
-  assert.doesNotMatch(container.querySelector('summary').textContent, /最近在前|从早到晚/u)
+  assert.match(container.querySelector('.workflow-task-event-trail__head').textContent, /本任务处理记录2 条/u)
+  assert.doesNotMatch(container.querySelector('.workflow-task-event-trail__head').textContent, /最近在前|从早到晚/u)
   assert.equal(container.querySelectorAll('select, [role="combobox"]').length, 0)
   const rows = [...container.querySelectorAll('.workflow-task-event-trail__item')]
   assert.match(rows[0].textContent, /任务记录已更新.*保留原任务办理记录/u)
@@ -242,7 +246,7 @@ collapsible: true,
   assert.match(rows[1].textContent, /任务已创建/u)
   assert.equal(rows[1].querySelector('.workflow-task-event-trail__latest'), null)
   await render({ ...props, events: [] })
-  assert.match(container.querySelector('summary').textContent, /暂无记录/u)
+  assert.match(container.querySelector('.workflow-task-event-trail__head').textContent, /暂无记录/u)
   assert.equal(container.querySelector('.workflow-task-event-trail__latest'), null)
   await render({ ...props, state: 'error' })
   assert.match(container.querySelector('.workflow-task-event-trail__head').textContent, /读取失败/u)

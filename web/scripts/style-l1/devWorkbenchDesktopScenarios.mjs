@@ -1,9 +1,9 @@
 import { installIntegrationWorkspaceMock, verifyIntegrationWorkspace, verifyProjectGraphDirectory } from './devProjectGraphAssertions.mjs'
 import { DEV_HUB_ITEMS } from '../../src/dev-workbench/config/devHub.mjs'
 import { DEV_TESTING_FIXED_ACTIONS } from '../../src/dev-workbench/config/devTestingOperation.mjs'
+import { DEV_TESTING_WORKSPACE_VIEWS } from '../../src/dev-workbench/config/devTesting.mjs'
 import { TASK_HANDLING_ROWS } from '../../src/dev-workbench/config/devTaskHandling.mjs'
 import { ROLE_DISPLAY_NAMES } from '../../src/erp/utils/roleKeys.mjs'
-import { DEV_TESTING_WORKSPACE_VIEWS } from '../../src/dev-workbench/config/devTesting.mjs'
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
 import { assertMermaidFits, fitMermaidDiagram, switchMermaidLayout, verifyMermaidViewer, verifyMermaidDarkTheme, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
 import {
@@ -30,6 +30,7 @@ import {
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { assertDevDocsDirectorySpace, createDevDocsReadingFixture, verifyDevDocsReadingNavigation } from './devDocsLayoutAssertions.mjs'
 import { verifyTestingOverview } from './devTestingOverviewAssertions.mjs'
+import { openTestingDetails, closeTestingDetails } from './devTestingDetailsActions.mjs'
 import { verifyProductCoreLayout } from './devProductCoreAssertions.mjs'
 
 const SPECIALIZED_ROUTES = new Set([
@@ -109,6 +110,11 @@ export function createDevWorkbenchDesktopScenarios({
         `${item.route} 桌面 smoke 必须落到登记页面`
       )
       if (item.route === DEV_TASK_HANDLING_ROUTE) {
+        const common = page.locator('[aria-label="通用任务协作条件"]')
+        assert.deepEqual(await common.locator('dt').allTextContents(), ['标记任务受阻', '解除任务阻塞', '转交任务', '催办任务'])
+        assert.equal(await common.getByRole('button').count(), 0, 'the workbench describes conditions without granting task actions')
+        const approvalRow = page.locator('[data-row-key="process/sales_order_acceptance/order_approval"]')
+        assert.match(await approvalRow.innerText(), /审批通过 \/ 审批退回/u)
         const header = page.locator('.erp-dev-task-handling__header')
         const before = await header.boundingBox()
         const filterControl = (name) => page.locator('.erp-dev-task-matrix .ant-select')
@@ -263,17 +269,7 @@ export function createDevWorkbenchDesktopScenarios({
           .getByRole('button', { name: '清除筛选', exact: true })
           .first()
           .click()
-        await page
-          .getByRole('button', { name: '查看质量门禁来源与边界', exact: true })
-          .click()
-        await page
-          .locator('.ant-popover-inner')
-          .getByText('质量门禁 · 来源与边界', { exact: true })
-          .waitFor()
-        await page
-          .getByRole('button', { name: '查看质量门禁来源与边界', exact: true })
-          .press('Escape')
-        await page.locator('.ant-popover-inner').waitFor({ state: 'hidden' })
+        assert.equal(await page.getByRole('button', { name: '查看质量门禁来源与边界', exact: true }).count(), 0)
         await page
           .locator('.erp-dev-overview-library__toolbar .ant-select-selector')
           .click()
@@ -321,6 +317,21 @@ export function createDevWorkbenchDesktopScenarios({
         )
       }
       if (item.route === '/__dev/business-chain-audit') {
+        const nav = page.locator('.erp-dev-workspace-nav')
+        const reportTabs = page.getByRole('tablist', { name: '测试验证工作区主视图' })
+        const assertSelectedMenu = async (label) => {
+          assert.deepEqual(
+            await nav.locator('a[aria-current="page"]').allTextContents(),
+            [label],
+            '当前页面应且仅应选中一个所属菜单'
+          )
+          if (label === '测试执行' && new URL(page.url()).pathname === '/__dev/business-chain-audit') {
+            await reportTabs.getByRole('tab', { name: '链路实测', exact: true, selected: true }).waitFor()
+            assert.equal(await page.locator('h1').count(), 1)
+            assert.equal(await page.getByLabel('执行与报告来源').count(), 1)
+          }
+        }
+        await assertSelectedMenu('测试执行')
         const batch = 'ui-controls-fixture'
         let batches = []
         const chains = ['采购', '出货'].map((label, index) => ({
@@ -389,6 +400,7 @@ export function createDevWorkbenchDesktopScenarios({
         }))
         await page.reload()
         await page.getByText('尚未采集链路实测报告。', { exact: true }).waitFor()
+        await assertSelectedMenu('测试执行')
         assert.equal(await page.locator('.erp-dev-workspace-nav').getByRole('link', { name: '链路实测报告', exact: true }).count(), 0)
         assert.equal(await page.getByRole('combobox', { name: '实跑批次' }).count(), 0)
         assert.equal(await page.getByRole('tab', { name: '链路结果', exact: true }).count(), 0)
@@ -397,38 +409,50 @@ export function createDevWorkbenchDesktopScenarios({
           contentType: 'application/json',
           body: JSON.stringify({ status: 'missing', message: '尚未采集覆盖报告' }),
         }))
-        await page.locator('.erp-dev-chain-audit__header a[href="/__dev/testing?view=coverage"]').click()
+        await reportTabs.getByRole('tab', { name: '覆盖报告', exact: true }).click()
         await page.waitForURL('**/__dev/testing?view=coverage')
         const coverage = page.locator('.erp-dev-testing-coverage-view')
-        await coverage.getByRole('link', { name: '链路实测报告', exact: true }).waitFor()
+        assert.equal(await coverage.getByRole('link', { name: '链路实测报告', exact: true }).count(), 0)
         await coverage.getByRole('tab', { name: /^业务场景/u }).click()
-        await coverage.getByRole('link', { name: '链路实测报告', exact: true }).click()
+        await reportTabs.getByRole('tab', { name: '链路实测', exact: true }).click()
         await page.getByText('尚未采集链路实测报告。', { exact: true }).waitFor()
+        await assertSelectedMenu('测试执行')
         await page.goBack()
         await coverage.getByRole('tab', { name: /^业务场景/u, selected: true }).waitFor()
-        await assertNoHorizontalOverflow(page, '测试报告中的链路实测入口')
-        await coverage.getByRole('link', { name: '链路实测报告', exact: true }).click()
+        await assertSelectedMenu('测试执行')
+        await assertNoHorizontalOverflow(page, '测试报告与链路实测页签')
+        await reportTabs.getByRole('tab', { name: '链路实测', exact: true }).click()
         await page.reload()
-        await page.locator('.erp-dev-chain-audit__header a[href="/__dev/testing?view=coverage&coverage=business"]').click()
+        await reportTabs.getByRole('tab', { name: '覆盖报告', exact: true }).click()
         await coverage.getByRole('tab', { name: /^业务场景/u, selected: true }).waitFor()
-        await coverage.getByRole('link', { name: '链路实测报告', exact: true }).click()
-        await page.getByRole('link', { name: '前往本轮验证', exact: true }).click()
+        await reportTabs.getByRole('tab', { name: '链路实测', exact: true }).click()
+        assert.equal(await page.getByRole('link', { name: '前往本轮验证', exact: true }).count(), 0)
+        await reportTabs.getByRole('tab', { name: '本轮验证', exact: true }).click()
         await page.getByRole('region', { name: '本轮验证固定动作' }).waitFor()
         await page.goBack()
         await page.getByText('尚未采集链路实测报告。', { exact: true }).waitFor()
         batches = [{ id: batch, status: 'ready' }]
         await page.getByRole('button', { name: '重新读取', exact: true }).click()
-        await page.getByRole('heading', { name: '本批次链路与结果', exact: true }).waitFor()
+        const reportRoot = page.locator('[data-dev-chain-audit]')
+        await page.getByRole('button', { name: '采购测试链', exact: true }).waitFor()
+        assert.deepEqual(await reportRoot.getByRole('columnheader').allTextContents(), ['链路', '结果', '首个未通过环节'])
+        assert.equal(await reportRoot.getByRole('table').count(), 1, '默认只比较链路结果')
+        assert.equal(await reportRoot.getByRole('tablist').count(), 0, '技术详情不占默认导航')
+        assert.equal(await reportRoot.getByRole('textbox').count(), 0, '步骤筛选只在查看步骤时显示')
         assert.equal(await page.getByRole('combobox', { name: '实跑批次' }).count(), 0, '只有一个批次时无需选择')
-        assert.equal(await page.getByRole('combobox', { name: '筛选链路' }).count(), 0)
+        await reportRoot.getByText('历史报告 · 定义待核对', { exact: true }).waitFor()
         await page.getByRole('button', { name: '采购测试链', exact: true }).click()
-        await page.getByRole('cell', { name: '采购步骤', exact: true }).waitFor()
+        await page.getByText('1. 采购步骤', { exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.get('chain'), 'purchase_to_inventory')
         const stepTable = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: '实际操作与读回', exact: true }) })
-        await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor({ state: 'hidden' })
+        assert.deepEqual(await stepTable.getByRole('columnheader').allTextContents(), ['', '环节', '结果', '实际操作与读回'])
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 1)
+        await stepTable.getByRole('button', { name: '展开行', exact: true }).click()
+        await stepTable.getByText('测试岗位', { exact: true }).waitFor()
+        await stepTable.getByText('页面夹具', { exact: true }).waitFor()
         await page.reload()
-        await page.getByRole('button', { name: '全部链路', exact: true }).click()
+        await page.getByRole('button', { name: '收起步骤', exact: true }).click()
+        await page.getByRole('button', { name: '查看全部步骤', exact: true }).click()
         await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2)
         const stepSearch = page.getByRole('textbox', { name: '搜索环节、岗位或实际读回', exact: true })
@@ -442,24 +466,86 @@ export function createDevWorkbenchDesktopScenarios({
         await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2)
 
+        await page.getByRole('button', { name: '报告详情', exact: true }).click()
+        const details = page.getByRole('dialog', { name: '报告详情', exact: true })
+        await details.getByRole('tab', { name: '报告概况', exact: true, selected: true }).waitFor()
+        await details.getByText('模拟失败用于验证筛选', { exact: true }).waitFor()
+        await details.getByText('a'.repeat(40), { exact: true }).waitFor()
+        assert.equal(await details.getByRole('heading', { name: '与当前业务链定义核对', exact: true }).count(), 0)
+        await details.getByText('执行路径与定义核对', { exact: true }).click()
+        await details.getByRole('heading', { name: '与当前业务链定义核对', exact: true }).waitFor()
         await page.getByRole('tab', { name: '问题与复验', exact: true }).click()
         await page.getByText('本批次没有登记问题；覆盖边界以执行记录为准。', { exact: true }).waitFor()
+        await assertSelectedMenu('测试执行')
         await page.getByRole('tab', { name: '执行与证据', exact: true }).click()
         assert.match(await page.getByRole('link', { name: '下载 report.json', exact: true }).getAttribute('href'), /artifact\?batch=ui-controls-fixture&file=report.json$/u)
         await page.reload()
-        await page.getByRole('tab', { name: '执行与证据', exact: true, selected: true }).waitFor()
-        await page.getByRole('tab', { name: '链路结果', exact: true }).click()
+        await details.getByRole('tab', { name: '执行与证据', exact: true, selected: true }).waitFor()
+        await details.getByRole('tab', { name: '执行与证据', exact: true }).press('Escape')
+        await details.waitFor({ state: 'hidden' })
+        await assertSelectedMenu('测试执行')
+        const reportURL = page.url()
+        const tabSelector = '.erp-dev-testing-primary-nav > .erp-sliding-tab-list'
+        const coverageIndex = DEV_TESTING_WORKSPACE_VIEWS.findIndex(({ value }) => value === 'coverage')
+        const chainsIndex = DEV_TESTING_WORKSPACE_VIEWS.findIndex(({ value }) => value === 'chains')
+        await verifySlidingMotion(page, assert, tabSelector, coverageIndex)
+        await coverage.waitFor()
+        await verifySlidingMotion(page, assert, tabSelector, chainsIndex, true)
+        await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
+        assert.equal(page.url(), reportURL, '主视图往返保留报告批次和步骤范围')
+        await page.goBack()
+        await coverage.waitFor()
+        await page.reload()
+        await reportTabs.getByRole('tab', { name: '链路实测', exact: true }).click()
+        await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
+        assert.equal(page.url(), reportURL, '其他页签刷新后仍能恢复报告选择')
+        await page.getByRole('button', { name: '收起步骤', exact: true }).click()
         await page.getByRole('button', { name: '采购测试链', exact: true }).click()
-        await page.locator('.erp-dev-chain-audit__header').getByRole('link', { name: '业务链路', exact: true }).click()
-        await page.waitForURL('**/__dev/status-flows?view=chain&chain=purchase_to_inventory')
+        assert.equal(await page.locator('.erp-dev-chain-audit__header').getByRole('link', { name: '业务链路', exact: true }).count(), 0, '报告正文不重复导航入口')
+        await nav.getByRole('link', { name: '业务链路', exact: true }).click()
         await page.locator('[data-dev-flow-state-observatory][data-catalog-status="ready"]').waitFor()
-        const chainReportLink = page.getByRole('link', { name: '查看链路实测报告', exact: true })
-        assert.equal(await chainReportLink.getAttribute('href'), '/__dev/business-chain-audit?chain=purchase_to_inventory')
-        await chainReportLink.click()
-        await page.getByRole('cell', { name: '采购步骤', exact: true }).waitFor()
-        assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 1, '从业务链路返回时保留所选链路')
+        await assertSelectedMenu('业务链路')
+        assert.equal(await page.locator('.erp-dev-flow-header').getByRole('link', { name: '查看链路实测报告', exact: true }).count(), 0)
+        await page.goBack()
+        await page.getByText('1. 采购步骤', { exact: true }).waitFor()
+        assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 1, '从导航返回后保留所选链路')
+        await assertSelectedMenu('测试执行')
+        await nav.getByRole('link', { name: '业务专题', exact: true }).click()
+        await page.locator('[data-dev-flow-state-observatory][data-catalog-status="ready"]').waitFor()
+        await assertSelectedMenu('业务专题')
+        assert.equal(await page.getByRole('link', { name: '查看本专题实测报告', exact: true }).count(), 0)
+        await page.goBack()
+        await page.getByText('1. 采购步骤', { exact: true }).waitFor()
+        await assertSelectedMenu('测试执行')
+        await nav.getByRole('link', { name: '测试执行', exact: true }).click()
+        await page.waitForURL((url) => url.pathname === DEV_TESTING_ROUTE)
+        await expectHeading(page, '测试执行')
+        await assertSelectedMenu('测试执行')
+        await page.goBack()
+        await page.getByText('1. 采购步骤', { exact: true }).waitFor()
+        await assertSelectedMenu('测试执行')
         await page.setViewportSize({ width: 1100, height: 800 })
         await assertNoHorizontalOverflow(page, '链路唯一选择入口与窄窗口')
+        batches = [{ id: batch, status: 'ready' }, { id: 'broken-fixture', status: 'invalid' }]
+        await page.getByRole('button', { name: '重新读取', exact: true }).click()
+        const batchSelect = page.locator('.erp-dev-chain-audit__batch-select .ant-select-selector')
+        await batchSelect.click()
+        await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').getByText('broken-fixture · 报告不完整', { exact: true }).click()
+        await page.getByText('报告格式不完整', { exact: true }).waitFor()
+        assert.equal(await reportRoot.getByRole('table').count(), 0, '损坏批次不能残留上次结果')
+        assert.equal(await page.getByText('尚未采集链路实测报告。', { exact: true }).count(), 0, '错误不能伪装成未采集')
+        await batchSelect.click()
+        await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').getByText(batch, { exact: true }).click()
+        await page.getByRole('button', { name: '采购测试链', exact: true }).waitFor()
+        await page.goto(new URL(`/__dev/business-chain-audit?batch=${batch}&chain=purchase_to_inventory&step=missing`, page.url()).href)
+        await page.getByText('所选批次没有这一步的执行记录；旧的合并步骤不能证明当前拆分后的交接。', { exact: true }).waitFor()
+        assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 0)
+        await page.getByRole('button', { name: '取消交接定位', exact: true }).click()
+        await stepTable.getByText('1. 采购步骤', { exact: true }).waitFor()
+        await page.getByRole('button', { name: '收起步骤', exact: true }).click()
+        await page.getByRole('button', { name: '查看全部步骤', exact: true }).waitFor()
+        assert.deepEqual(await reportRoot.getByRole('columnheader').allTextContents(), ['链路', '结果', '首个未通过环节'])
+        await assertNoHorizontalOverflow(page, '极简链路结果与批次恢复')
       }
       if (item.route === DEV_TESTING_ROUTE) {
         await verifyTestingOverview(page, assert, assertNoHorizontalOverflow)
@@ -481,6 +567,31 @@ export function createDevWorkbenchDesktopScenarios({
         assert(detailCell.width > actionTable.width * 0.95, '检查详情应使用整行宽度，避免挤在名称列')
         await fieldTrigger.click()
         assert.equal(await page.locator('.erp-dev-testing-disclosure').count(), 0, '默认执行页不堆放教程折叠区')
+        let planReads = 0
+        await page.route('**/__dev/api/qa/testing/plan', (route) => {
+          planReads += 1
+          assert.equal(route.request().method(), 'GET')
+          return route.fulfill({ json: {
+            kind: 'plush.dev-qa-testing-plan',
+            generatedAt: '2026-10-26T08:00:00.000Z',
+            repository: { commit: 'a'.repeat(40), dirty: true, fingerprint: 'b'.repeat(64) },
+            changedCount: 2,
+            affectedScopes: ['T0', 'T3'],
+            maxAffectedScope: 'T3',
+            localGate: 'focused',
+            commands: [{ id: 'web', scope: 'T3', label: 'Web test', cwd: '.', command: 'node --test web/src/example.test.mjs' }],
+            followUps: [{ scope: 'T5', text: '运行真实浏览器回归' }],
+            prePushGate: 'bash scripts/qa/prepare-push.sh',
+          } })
+        })
+        await validation.getByRole('button', { name: '生成本轮验证计划', exact: true }).click()
+        await validation.getByText('2 个改动文件 · 建议 2 类检查', { exact: true }).waitFor()
+        const planDetails = await openTestingDetails(page, validation.getByRole('button', { name: '计划详情', exact: true }), '本轮验证计划')
+        await planDetails.getByText('node --test web/src/example.test.mjs', { exact: true }).waitFor()
+        await planDetails.getByText('运行真实浏览器回归', { exact: false }).waitFor()
+        await closeTestingDetails(page)
+        assert.equal(planReads, 1, '查看计划只读取一次，不运行检查或重新生成')
+
         const primaryTabs = page.getByRole('tablist', { name: '测试验证工作区主视图' })
         assert.deepEqual(await primaryTabs.getByRole('tab').allTextContents(), DEV_TESTING_WORKSPACE_VIEWS.map(({ label }) => label))
         const groups = page.getByRole('tablist', { name: '测试环境与指引' })
@@ -491,14 +602,21 @@ export function createDevWorkbenchDesktopScenarios({
         await verifySlidingMotion(page, assert, '.erp-dev-testing-group-nav > .erp-sliding-tab-list', 0, true)
         await groups.getByRole('tab', { name: '测试指引', exact: true }).click()
         await page.getByRole('heading', { name: '测试执行', exact: true }).waitFor()
-        const guideNav = page.getByRole('tablist', { name: '测试指引主题' })
-        await guideNav.getByRole('tab', { name: '真机回归', exact: true }).click()
+        const guideNav = page.getByRole('navigation', { name: '测试指引目录', exact: true })
+        await guideNav.getByRole('button', { name: '真机回归', exact: true }).click()
+        assert.equal(await guideNav.getByRole('button').count(), 5, '查看主题时五项目录仍可直接切换')
+        const deviceEntry = page.getByRole('button', { name: '登录与会话恢复', exact: true })
+        await deviceEntry.click()
+        await page.getByRole('region', { name: '登录与会话恢复详情', exact: true }).waitFor()
+        assert.equal(await page.getByRole('dialog').count(), 0, '短说明原位展开，不打开抽屉')
+        await deviceEntry.press('Escape')
+        await page.getByRole('region', { name: '登录与会话恢复详情', exact: true }).waitFor({ state: 'hidden' })
         await page.getByRole('table', { name: '真机回归场景范围', exact: true }).waitFor()
         assert.equal(await page.getByRole('table', { name: '自动化测试方式', exact: true }).count(), 0)
         await page.reload()
         await groups.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
-        await guideNav.getByRole('tab', { name: '真机回归', exact: true, selected: true }).waitFor()
-        await guideNav.getByRole('tab', { name: '常用命令', exact: true }).click()
+        await page.getByRole('heading', { name: '真机回归', exact: true }).waitFor()
+        await guideNav.getByRole('button', { name: '常用命令', exact: true }).click()
         await page.locator('.erp-dev-testing-presets article').first().waitFor()
         const totalPresets = await page.locator('.erp-dev-testing-presets article').count()
         const presetSearch = page.getByPlaceholder('搜索常用检查')
@@ -511,9 +629,10 @@ export function createDevWorkbenchDesktopScenarios({
         const presets = page.locator('.erp-dev-testing-presets')
         assert((await presets.locator('article').count()) > 0)
         assert((await presets.locator('article').count()) < totalPresets)
-        await presets.locator('summary').first().click()
-        await presets.locator('pre').first().waitFor({ state: 'visible' })
+        const presetDetails = await openTestingDetails(page, presets.locator('article summary').first())
+        await presetDetails.locator('pre').waitFor({ state: 'visible' })
         await assertNoHorizontalOverflow(page, '测试使用指引与命令详情')
+        await closeTestingDetails(page)
         await presetSearch.fill('')
         await presetSearch.press('Enter')
         await groups.getByRole('tab', { name: '本地测试', exact: true }).click()
@@ -634,7 +753,7 @@ export function createDevWorkbenchDesktopScenarios({
         await groups.getByRole('tab', { name: '本地测试', exact: true }).click()
         await verifySlidingMotion(page, assert, '.erp-dev-testing-primary-nav > .erp-sliding-tab-list', primaryIndex('coverage'))
         await verifySlidingMotion(page, assert, '.erp-dev-testing-primary-nav > .erp-sliding-tab-list', primaryIndex('tiers'), true)
-        await page.getByRole('tab', { name: '测试报告', exact: true }).click()
+        await page.getByRole('tab', { name: '覆盖报告', exact: true }).click()
         const coverage = page.locator('.erp-dev-testing-coverage-view')
         await coverage
           .getByText('当前工作区尚未验证', { exact: true })
@@ -697,12 +816,11 @@ export function createDevWorkbenchDesktopScenarios({
           1,
           true
         )
-        const reportDetails = coverage.locator('.erp-dev-testing-coverage-report-details')
-        await reportDetails.locator('summary').click()
+        const reportDetails = await openTestingDetails(page, coverage.getByRole('button', { name: '报告信息', exact: true }), '覆盖报告信息')
         await reportDetails.locator('.erp-dev-testing-coverage-identity').waitFor({ state: 'visible' })
         assert.match(await reportDetails.innerText(), /历史隔离验证/u)
         await reportDetails.getByText(snapshot.repository.fingerprint, { exact: true }).waitFor()
-        await reportDetails.locator('summary').click()
+        await closeTestingDetails(page)
         const readsBeforeTabs = { workspaceReads, snapshotReads }
         await switchEvidence('业务场景')
         assert.equal(
@@ -751,7 +869,9 @@ export function createDevWorkbenchDesktopScenarios({
           .waitFor()
         await switchEvidence('运行与验收')
         assert.equal(await page.getByRole('region', { name: '服务器测试与交付证据', exact: true }).count(), 0, '服务器证据只在独立入口读取')
-        assert((await coverage.innerText()).includes('RPC 夹具只证明页面协作'))
+        const browserEvidence = await openTestingDetails(page, coverage.locator('.erp-dev-testing-coverage-card').filter({ hasText: '浏览器回归' }).getByRole('button', { name: '结果详情', exact: true }))
+        await browserEvidence.getByText('RPC 夹具只证明页面协作', { exact: false }).waitFor()
+        await closeTestingDetails(page)
         await page.goBack()
         await coverage
           .getByRole('region', { name: '门禁结果', exact: true })
@@ -776,16 +896,11 @@ export function createDevWorkbenchDesktopScenarios({
         assert.equal(new URL(page.url()).searchParams.has('returnView'), false)
         await page.reload()
         await groups.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
-        await page.getByRole('link', { name: '页面说明检查', exact: true }).click()
-        await page.getByRole('heading', { name: '页面说明检查', exact: true }).waitFor()
-        await page.getByLabel('执行与报告来源').getByText('通用资料 · 页面说明目录', { exact: true }).waitFor()
-        await page.getByRole('textbox', { name: '搜索页面说明', exact: true }).fill('可用量')
-        await page.getByRole('textbox', { name: '搜索页面说明', exact: true }).press('Enter')
-        await page.getByText('当前显示 1 个页面', { exact: true }).waitFor()
-        await page.reload()
-        await page.getByRole('link', { name: '返回测试指引', exact: true }).click()
+        await page.getByRole('heading', { name: '常用命令', exact: true }).waitFor()
+        await page.getByRole('navigation', { name: '测试指引目录', exact: true }).waitFor()
+        assert.equal(await page.getByRole('link', { name: '页面说明检查', exact: true }).count(), 0, '测试指引不堆叠其他工具入口')
         await groups.getByRole('tab', { name: '本地测试', exact: true }).click()
-        await primaryTabs.getByRole('tab', { name: '测试报告', exact: true }).click()
+        await primaryTabs.getByRole('tab', { name: '覆盖报告', exact: true }).click()
         await business.waitFor()
         assert.equal(new URL(page.url()).searchParams.get('coverage'), 'business')
         assert.equal(new URL(page.url()).searchParams.get('coverageDomain'), 'source-documents')
@@ -793,7 +908,7 @@ export function createDevWorkbenchDesktopScenarios({
         assert.equal(new URL(page.url()).searchParams.has('returnView'), false)
         await coverage.getByText('正在查看历史隔离验证', { exact: true }).waitFor()
         await coverage
-          .getByRole('button', { name: '返回业务域总览', exact: true })
+          .getByRole('button', { name: '查看 业务来源 场景与证据', exact: true })
           .click()
         await domainTable.waitFor()
         await page.reload()
@@ -885,7 +1000,7 @@ export function createDevWorkbenchDesktopScenarios({
           .locator('.erp-dev-testing-validation')
           .waitFor({ state: 'visible' })
         postponeSnapshot = false
-        await mainViews.getByText('测试报告', { exact: true }).click()
+        await mainViews.getByText('覆盖报告', { exact: true }).click()
         await coverage.getByText('正在查看历史隔离验证', { exact: true }).waitFor()
         await source.getByText('当前工作区', { exact: true }).click()
         await coverage.getByText('当前工作区尚未验证', { exact: true }).waitFor()
@@ -913,7 +1028,7 @@ export function createDevWorkbenchDesktopScenarios({
           .getByText('正在查看历史隔离验证', { exact: true })
           .waitFor({ state: 'visible' })
         await groups.getByRole('tab', { name: '测试指引', exact: true }).click()
-        await page.getByRole('tab', { name: '常用命令', exact: true }).click()
+        await page.getByRole('navigation', { name: '测试指引目录', exact: true }).getByRole('button', { name: '常用命令', exact: true }).click()
         await page
           .getByRole('button', { name: '查专项命令', exact: true })
           .click()
@@ -962,11 +1077,11 @@ export function createDevWorkbenchDesktopScenarios({
         await commandSearch.press('Enter')
         await commands.first().waitFor()
         await assertNoHorizontalOverflow(page, '专项检查命令分页与空结果恢复')
-        await page.getByRole('button', { name: '返回测试指引', exact: true }).click()
+        await page.getByRole('navigation', { name: '测试指引目录', exact: true }).getByRole('button', { name: '常用命令', exact: true }).click()
         await groups.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
         await groups.getByRole('tab', { name: '本地测试', exact: true }).click()
-        await primaryTabs.getByRole('tab', { name: '测试报告', exact: true }).click()
-        await page.getByRole('tab', { name: '测试报告', exact: true, selected: true }).waitFor()
+        await primaryTabs.getByRole('tab', { name: '覆盖报告', exact: true }).click()
+        await page.getByRole('tab', { name: '覆盖报告', exact: true, selected: true }).waitFor()
         await coverage.getByText('正在查看历史隔离验证', { exact: true }).waitFor()
       }
       if (item.route === DEV_DOCS_ROUTE) {
@@ -1074,12 +1189,17 @@ export function createDevWorkbenchDesktopScenarios({
         const name = await capability.innerText()
         await capability.click()
         assert.equal(new URL(page.url()).searchParams.get('capability'), name)
-        await page.getByRole('dialog', { name, exact: true }).waitFor()
+        await page.getByRole('region', { name: '当前能力详情', exact: true }).getByRole('heading', { name, exact: true }).waitFor()
         await page.reload()
-        const detail = page.getByRole('dialog', { name, exact: true })
+        const detail = page.getByRole('region', { name: '当前能力详情', exact: true })
         await detail.waitFor()
         await detail.getByRole('heading', { name: '当前边界', exact: true }).waitFor()
-        await detail.getByRole('button', { name: '返回能力目录', exact: true }).click()
+        const nextCapability = page.locator('.erp-dev-product-core-group button').nth(3)
+        const nextName = await nextCapability.innerText()
+        await nextCapability.click()
+        await detail.getByRole('heading', { name: nextName, exact: true }).waitFor()
+        assert.equal(await page.getByRole('dialog').count(), 0, '能力目录与详情直接联动，不阻断下一项')
+        await detail.getByRole('button', { name: '收起能力详情', exact: true }).click()
         await detail.waitFor({ state: 'hidden' })
         assert.equal(new URL(page.url()).searchParams.get('status'), 'entered')
         assert.equal(new URL(page.url()).searchParams.has('capability'), false)
@@ -1251,15 +1371,14 @@ function createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow 
         await assertNoHorizontalOverflow(page, `报告布局 ${viewport.width}`)
       }
       assert.equal(await go.getByText(report.codeCoverage.go.note, { exact: true }).isVisible(), false, '正常口径按需阅读')
-      await go.locator('summary').click()
-      await go.getByText(report.codeCoverage.go.note, { exact: true }).waitFor()
-      await go.getByText(report.codeCoverage.go.evidence[0], { exact: true }).waitFor()
-      await assertNoHorizontalOverflow(page, '长证据路径原处展开')
-      await go.locator('summary').click()
-      const details = coverage.locator('.erp-dev-testing-coverage-report-details')
-      await details.locator('summary').click()
-      await details.getByText(report.repository.fingerprint, { exact: true }).waitFor()
-      await details.locator('summary').click()
+      const goDetails = await openTestingDetails(page, go.getByRole('button', { name: '结果详情', exact: true }))
+      await goDetails.getByText(report.codeCoverage.go.note, { exact: true }).waitFor()
+      await goDetails.getByText(report.codeCoverage.go.evidence[0], { exact: true }).waitFor()
+      await assertNoHorizontalOverflow(page, '长证据路径按需查看')
+      await closeTestingDetails(page)
+      const reportInfo = await openTestingDetails(page, coverage.getByRole('button', { name: '报告信息', exact: true }), '覆盖报告信息')
+      await reportInfo.getByText(report.repository.fingerprint, { exact: true }).waitFor()
+      await closeTestingDetails(page)
       for (const [index, label] of ['业务场景', '关键规则', '门禁结果', '运行与验收', '代码覆盖'].entries()) {
         const optionIndex = index === 4 ? 0 : index + 1
         await verifySlidingMotion(page, assert, '.erp-dev-testing-coverage-tabs', optionIndex, index % 2 === 0)
@@ -1295,7 +1414,9 @@ function createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow 
       report.codeCoverage.go = { ...report.codeCoverage.go, status: 'collected', passed: 100, failed: 0, skipped: 0, note: 'Go 包含生成代码，未执行 PostgreSQL 测试。' }
       await reload()
       await coverage.getByText('报告与当前仓库指纹匹配', { exact: true }).waitFor()
-      await go.getByText('已执行 100', { exact: true }).waitFor()
+      const currentGoDetails = await openTestingDetails(page, go.getByRole('button', { name: '结果详情', exact: true }))
+      await currentGoDetails.getByText('已执行 100', { exact: true }).waitFor()
+      await closeTestingDetails(page)
       assert.deepEqual(writes, [], '布局核验不启动采集或其他写入')
     },
   }

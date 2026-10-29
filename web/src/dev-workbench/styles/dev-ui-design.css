@@ -17,10 +17,6 @@
   gap: 16px;
   margin-bottom: 12px;
 }
-.erp-dev-ui-design-header h1.ant-typography {
-  margin: 0;
-  font-size: 16px;
-}
 
 .erp-dev-ui-design-reader {
   display: flex;
@@ -1104,6 +1100,9 @@
 @media (max-width: 980px) {
   .erp-dev-ui-design-page {
     grid-template-rows: auto auto minmax(0, 1fr);
+  }
+  .erp-dev-ui-design-page--workbench {
+    grid-template-rows: auto auto auto minmax(0, 1fr);
   }
 }
 

@@ -159,7 +159,7 @@ export default function ProductionCompletionModal({
     <Editor
       {...(editing
         ? { form }
-        : { size: 'localAction', cancelText: '取消', destroyOnHidden: true })}
+        : { taskInline: true, form, size: 'localAction', cancelText: '取消', destroyOnHidden: true })}
       title={
         editing
           ? '核对成品收仓草稿'

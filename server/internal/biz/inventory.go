@@ -143,26 +143,29 @@ type InventoryLot struct {
 }
 
 type InventoryTxn struct {
-	StockCategory   string
-	ID              int
-	SubjectType     string
-	SubjectID       int
-	ProductSkuID    *int
-	WarehouseID     int
-	LotID           *int
-	TxnType         string
-	Direction       int
-	Quantity        decimal.Decimal
-	UnitID          int
-	SourceType      string
-	SourceID        *int
-	SourceLineID    *int
-	IdempotencyKey  string
-	ReversalOfTxnID *int
-	OccurredAt      time.Time
-	CreatedAt       time.Time
-	CreatedBy       *int
-	Note            *string
+	SourceNo           string
+	SourceDocumentType string
+	SourceDocumentID   int
+	StockCategory      string
+	ID                 int
+	SubjectType        string
+	SubjectID          int
+	ProductSkuID       *int
+	WarehouseID        int
+	LotID              *int
+	TxnType            string
+	Direction          int
+	Quantity           decimal.Decimal
+	UnitID             int
+	SourceType         string
+	SourceID           *int
+	SourceLineID       *int
+	IdempotencyKey     string
+	ReversalOfTxnID    *int
+	OccurredAt         time.Time
+	CreatedAt          time.Time
+	CreatedBy          *int
+	Note               *string
 }
 
 type InventoryBalance struct {
@@ -177,6 +180,9 @@ type InventoryBalance struct {
 	Quantity                  decimal.Decimal
 	ActiveReservedQuantity    decimal.Decimal
 	AvailableQuantity         decimal.Decimal
+	IssuableQuantity          decimal.Decimal
+	RestrictedQuantity        decimal.Decimal
+	LotStatus                 string
 	PendingInspectionQuantity decimal.Decimal
 	PendingPackagingQuantity  decimal.Decimal
 	ReadyToShipQuantity       decimal.Decimal

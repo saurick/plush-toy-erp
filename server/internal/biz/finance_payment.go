@@ -25,6 +25,8 @@ const (
 	FinancePaymentStatusReversed        = "REVERSED"
 	FinancePaymentStatusCancelled       = "CANCELLED"
 	// 核销与红冲记录共用过账、冲销标记，区别于收付款源单的生命周期。
+	FinanceAdjustmentDecrease       = "DECREASE"
+	FinanceAdjustmentIncrease       = "INCREASE"
 	FinanceAllocationStatusPosted   = "POSTED"
 	FinanceAllocationStatusReversed = "REVERSED"
 )
@@ -90,6 +92,9 @@ type FinanceAllocation struct {
 	CreatedAt                    time.Time
 }
 type FinanceCreditNote struct {
+	BalanceDirection             string
+	SourceType                   *string
+	SourceID                     *int
 	ID                           int
 	CreditNoteNo                 string
 	FinanceFactID                int
@@ -146,6 +151,12 @@ type FinancePaymentReverse struct {
 	Reason          string
 }
 type FinancePaymentFilter struct {
+	FinanceFactID     int
+	Currency          string
+	DateFrom          string
+	DateTo            string
+	AccountRef        string
+	EvidenceRef       string
 	SourceType        string
 	SourceID          int
 	Kind              string
@@ -328,6 +339,27 @@ func (uc *OperationalFactUsecase) ListFinancePayments(ctx context.Context, filte
 }
 
 func normalizeFinancePaymentListFilter(filter FinancePaymentFilter) (FinancePaymentFilter, error) {
+	filter.Currency = strings.ToUpper(strings.TrimSpace(filter.Currency))
+	if filter.Currency != "" {
+		if _, ok := NormalizeFinanceCurrency(filter.Currency); !ok {
+			return FinancePaymentFilter{}, ErrBadParam
+		}
+	}
+	if filter.DateFrom != "" {
+		if _, _, err := FinanceDateRange(filter.DateFrom, filter.DateFrom); err != nil {
+			return FinancePaymentFilter{}, err
+		}
+	}
+	if filter.DateTo != "" {
+		if _, _, err := FinanceDateRange(filter.DateTo, filter.DateTo); err != nil {
+			return FinancePaymentFilter{}, err
+		}
+	}
+	if filter.DateFrom != "" && filter.DateTo != "" && filter.DateFrom > filter.DateTo {
+		return FinancePaymentFilter{}, ErrBadParam
+	}
+	filter.AccountRef, filter.EvidenceRef = strings.TrimSpace(filter.AccountRef), strings.TrimSpace(filter.EvidenceRef)
+
 	filter.Kind = strings.ToUpper(strings.TrimSpace(filter.Kind))
 	filter.SourceType = strings.TrimSpace(filter.SourceType)
 	if (filter.Kind != "" && filter.Kind != FinancePaymentKindSettlement && filter.Kind != FinancePaymentKindAdvance && filter.Kind != FinancePaymentKindRefund) ||
@@ -354,7 +386,7 @@ func normalizeFinancePaymentListFilter(filter FinancePaymentFilter) (FinancePaym
 	if filter.CounterpartyType != "" && filter.CounterpartyType != FinanceCounterpartyCustomer && filter.CounterpartyType != FinanceCounterpartySupplier {
 		return FinancePaymentFilter{}, ErrBadParam
 	}
-	if filter.CounterpartyID < 0 || filter.Offset < 0 {
+	if filter.CounterpartyID < 0 || filter.FinanceFactID < 0 || filter.Offset < 0 {
 		return FinancePaymentFilter{}, ErrBadParam
 	}
 	filter.Limit = NormalizeBusinessListLimit(filter.Limit)

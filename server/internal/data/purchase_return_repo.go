@@ -277,12 +277,8 @@ func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (_
 		return out, nil
 	}
 	if purchaseReturn.PurchaseReceiptID != nil {
-		hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, *purchaseReturn.PurchaseReceiptID)
-		if err != nil {
+		if err := guardPurchaseFinanceSourcePosting(ctx, tx.client, *purchaseReturn.PurchaseReceiptID); err != nil {
 			return nil, err
-		}
-		if hasActivePayable {
-			return nil, biz.ErrPurchaseReceiptFinanceDependency
 		}
 	}
 
@@ -410,12 +406,8 @@ func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID
 			tx = nil
 			return out, nil
 		}
-		hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, *purchaseReturn.PurchaseReceiptID)
-		if err != nil {
+		if err := guardPurchaseFinanceSourceCancellation(ctx, tx.client, *purchaseReturn.PurchaseReceiptID, biz.PurchaseReturnSourceType, purchaseReturn.ID, purchaseReturn.PostedAt); err != nil {
 			return nil, err
-		}
-		if hasActivePayable {
-			return nil, biz.ErrPurchaseReceiptFinanceDependency
 		}
 	}
 	if wasDraft {

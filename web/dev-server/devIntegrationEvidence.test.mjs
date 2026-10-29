@@ -35,6 +35,7 @@ async function report(
     after = identity,
     digest = '',
     status = 'passed',
+    workflow = 'critical-postgres',
     content,
   } = {}
 ) {
@@ -49,7 +50,7 @@ async function report(
     .join('\n')}\n`
   const lifecycle = {
     schemaVersion: DISPOSABLE_DATABASE_RUN_SCHEMA,
-    workflow: 'critical-postgres',
+    workflow,
     status,
     generatedAt: '2026-10-18T01:00:00Z',
     finishedAt: '2026-10-18T01:00:01Z',
@@ -170,4 +171,15 @@ test('latest incomplete run stays visible instead of borrowing an older green re
   assert.equal(value.current, false)
   assert.equal(value.run.status, 'failed')
   assert.equal(value.scenarios[0].status, 'missing')
+})
+
+
+test('purchase chain evidence labels the selected scope and leaves other tests missing', async (t) => {
+  const root = await fixture(t)
+  const target = businessRuleTests('postgres')[0]
+  await report(root, { workflow: 'purchase-chain-postgres', content: ['run', 'pass'].map(Action => JSON.stringify({ Action, Package: target.package, Test: target.name })).join('\n') })
+  const value = await read(root)
+  assert.equal(value.run.scopeLabel, '采购链定向')
+  assert.equal(value.ruleTests.find(row => row.id === businessTestKey(target)).status, 'passed')
+  assert.ok(value.ruleTests.filter(row => row.id !== businessTestKey(target)).every(row => row.status === 'missing'))
 })

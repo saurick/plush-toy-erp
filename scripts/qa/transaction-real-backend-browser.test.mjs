@@ -9,6 +9,7 @@ import test from "node:test";
 import {
   createTransactionClient,
   validateTransactionTarget,
+  postTransactionInventoryCount,
 } from "./transaction-real-backend-fixture.mjs";
 import {
   assertTransactionBrowserReport,
@@ -29,12 +30,45 @@ import {
 } from "./transaction-browser-isolated.mjs";
 
 const runID = "transaction_guard";
+test('盘点手机检查发生在正式执行待办完成之前，检查失败不能继续推进', async () => {
+  for (const fail of [false, true]) {
+    let phase = 0;
+    const events = [];
+    const nodes = () => [
+      { id: 10, node_key: 'submit_inventory_adjustment', status: phase === 0 ? 'active' : 'completed' },
+      { id: 11, node_key: 'inventory_adjustment_approval', status: phase === 1 ? 'active' : phase > 1 ? 'completed' : 'pending' },
+      { id: 12, node_key: 'inventory_adjustment_execution', status: phase === 2 ? 'active' : phase > 2 ? 'completed' : 'pending' },
+    ].map(node => ({ ...node, process_instance_id: 1, version: 1 }));
+    const read = () => ({ process_context: { process_instance: { id: 1 }, nodes: nodes() }, source_readback: { status: phase === 0 ? 'DRAFT' : phase === 1 ? 'APPROVAL_PENDING' : 'APPROVED' } });
+    const client = { rpc: async (actor, domain, method, params) => {
+      if (method === 'get_inventory_adjustment_approval_process') return read();
+      if (method === 'execute_inventory_adjustment_submit') { assert.equal(phase, 0); phase = 1; events.push('submit'); return read(); }
+      if (method === 'list_tasks') return { tasks: [{ id: actor === 'boss' ? 21 : 22, version: 1, owner_role_key: actor, task_status_key: 'ready', process_instance_id: 1, process_node_instance_id: actor === 'boss' ? 11 : 12 }] };
+      assert.equal(method, 'complete_task_action');
+      assert.equal(params.expected_version, 1);
+      assert.equal(phase, actor === 'boss' ? 1 : 2);
+      events.push(actor);
+      phase += 1;
+      return { task: { task_status_key: 'done' } };
+    } };
+    const execute = () => postTransactionInventoryCount(client, { id: 91 }, 'SIM', { post: false, beforeExecution: async (task) => {
+      assert.equal(phase, 2);
+      assert.equal(task.task_status_key, 'ready');
+      assert.equal(task.owner_role_key, 'warehouse');
+      events.push('inspect-ready');
+      if (fail) throw new Error('phone boundary failed');
+    } });
+    if (fail) await assert.rejects(execute(), /phone boundary failed/);
+    else assert.equal((await execute()).status, 'APPROVED');
+    assert.deepEqual(events, ['submit', 'boss', 'inspect-ready', ...(fail ? [] : ['warehouse'])]);
+  }
+});
 test('完整任务链和窄范围使用各自有界预算，非法范围在创建资源前拒绝', () => {
   assert.deepEqual(transactionBrowserBudget(), { browserTimeoutMS: 720000, runTimeoutMS: 1500000 });
-  for (const scope of [{ sourceOrdersOnly: true }, { receivingOnly: true }, { desktopVariantsOnly: true }]) {
+  for (const scope of [{ sourceOrdersOnly: true }, { receivingOnly: true }, { desktopVariantsOnly: true }, { purchaseChainOnly: true }, { productionRecoveryOnly: true }]) {
     assert.deepEqual(transactionBrowserBudget(scope), { browserTimeoutMS: 480000, runTimeoutMS: 900000 });
   }
-  for (const scope of [{ sourceOrdersOnly: true, receivingOnly: true }, { sourceOrdersOnly: 'true' }, { receivingOnly: 1 }, { desktopVariantsOnly: 1 }, { sourceOrdersOnly: true, desktopVariantsOnly: true }, { receivingOnly: true, desktopVariantsOnly: true }]) assert.throws(() => transactionBrowserBudget(scope));
+  for (const scope of [{ sourceOrdersOnly: true, receivingOnly: true }, { sourceOrdersOnly: 'true' }, { receivingOnly: 1 }, { desktopVariantsOnly: 1 }, { sourceOrdersOnly: true, desktopVariantsOnly: true }, { receivingOnly: true, desktopVariantsOnly: true }, { purchaseChainOnly: 1 }, { purchaseChainOnly: true, receivingOnly: true }, { productionRecoveryOnly: 1 }, { productionRecoveryOnly: true, sourceOrdersOnly: true }]) assert.throws(() => transactionBrowserBudget(scope));
 });
 test('隔离入口复用平台端口表，仍只接受本轮实际监听PID', async () => {
   const child = { pid: 123 };
@@ -340,7 +374,8 @@ function completeReport() {
   const productionFields = {
     productionOrderID: 101,
     receiptID: 201,
-    taskSourceMismatchBlocked: true,
+    planningSurface: 'desktop',
+    mobilePlanWriteUnavailable: true,
     stock: { quantity: 2, net: 2, txns: 1 },
     fulfillment: [
       { stage: "handwork_completed", stock: { quantity: 0, net: 0, txns: 0 } },
@@ -447,6 +482,8 @@ function completeReport() {
       key,
       passed: true,
       transportFault: { injected: true, backendCode: 0 },
+      ...(/^(?:mobile_)?(?:finance_|refund_)/u.test(key) ? { registrationSurface: 'desktop browser', postSurface: 'desktop browser', approvalSurface: key.startsWith('mobile_') ? 'mobile task' : 'desktop browser', reversalSurface: 'desktop browser', ...(key.startsWith('mobile_') ? { completedTaskReadOnly: true } : {}) } : {}),
+      ...(key.endsWith('inventory') ? { draftSurface: 'desktop browser', postSurface: 'desktop browser', ...(key === 'mobile_inventory' ? { completedInboundReadOnly: true, mobileAdjustmentUnavailable: true } : {}) } : {}),
       ...(key.endsWith("quality") ? { correctionSurface: "real browser", correctionCreatedInBrowser: true, correctionReasonRequired: true, correctionReplayAfterDecisionExact: true, transportFaults: [{ method: "correct_quality_inspection_result", injected: true, backendCode: 0, requestID: `correction-${key}` }] } : {}),
       ...(key.endsWith("production") ? structuredClone(productionFields) : {}),
       ...(key.endsWith("shipment")
@@ -455,17 +492,22 @@ function completeReport() {
             shipmentID: 301,
             approvalTaskID: 401,
             approvalSurface: key.startsWith("mobile_") ? "mobile" : "desktop",
+            registrationSurface: 'desktop',
+            submissionSurface: 'desktop',
+            mobileDraftUnavailable: key.startsWith('mobile_'),
+            reversalSurface: 'desktop',
+            ...(key.startsWith('mobile_') ? { completedTaskReadOnly: true } : {}),
             restored: { quantity: 2, net: 2, txns: 3 },
           }
         : {}),
     })),
     browserRPC: [{ method: "create_finance_payment", code: 0, http: 200 }],
     pageErrors: [],
-    mobileTasks: Array.from({ length: 16 }, (_, index) => ({
-      confirmed: true,
-      taskID: index + 1,
-      paymentID: Math.floor(index / 2) + 1,
-      role: index % 2 === 0 ? "boss" : "finance",
+    mobileTasks: Array.from({ length: 8 }, (_, index) => ({
+      confirmed: true, taskID: index + 1, paymentID: index + 1, role: "boss",
+    })),
+    mobileDesktopTasks: Array.from({ length: 8 }, (_, index) => ({
+      unchanged: true, taskID: index + 11, paymentID: index + 1, role: "finance",
     })),
   };
 }
@@ -574,6 +616,24 @@ test("partial flows, zero execution, browser errors and failed real writes canno
     (report) => { report.flows.find(({ key }) => key === "mobile_quality").correctionReasonRequired = false; },
     (report) => { report.flows.find(({ key }) => key === "quality").transportFaults = []; },
     (report) => { report.flows.find(({ key }) => key === "mobile_quality").correctionReplayAfterDecisionExact = false; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_inventory').postSurface = 'api'; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_inventory').mobileAdjustmentUnavailable = false; },
+    (report) => { report.mobileDesktopTasks.pop(); },
+    (report) => { report.mobileDesktopTasks[0].unchanged = false; },
+    (report) => { report.mobileDesktopTasks[0].paymentID = -1; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_inventory').completedInboundReadOnly = false; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_shipment').reversalSurface = 'api'; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_shipment').completedTaskReadOnly = false; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_finance_disbursement').postSurface = 'api'; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_finance_disbursement').registrationSurface = 'mobile task'; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_finance_disbursement').approvalSurface = 'desktop browser'; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_shipment').registrationSurface = 'mobile'; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_shipment').mobileDraftUnavailable = false; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_finance_receivable').completedTaskReadOnly = false; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_refund_customer').registrationSurface = 'mobile task'; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_refund_supplier').reversalSurface = 'mobile task'; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_production').planningSurface = 'mobile'; },
+    (report) => { report.flows.find(({ key }) => key === 'mobile_production').mobilePlanWriteUnavailable = false; },
     (report) => {
       report.flows.find(({ key }) => key === "production").actions.pop();
     },

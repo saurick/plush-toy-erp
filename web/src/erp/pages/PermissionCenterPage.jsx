@@ -84,6 +84,7 @@ export default function PermissionCenterPage() {
     canManageRolePermissions,
     roleTemplateTab,
   } = usePermissionRoleSettings({
+    initialRoleKey: searchParams.get('role') || '',
     permissions,
     permissionMenuOptions,
     roles,

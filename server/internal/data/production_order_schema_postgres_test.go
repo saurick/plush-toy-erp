@@ -80,22 +80,25 @@ VALUES ($1, 'DRAFT', 1, $3, $2, $4, $2, $2)`, "PO-PG-BAD-DATES-"+suffix, now, no
 
 	if _, err := data.sqldb.ExecContext(ctx, `
 INSERT INTO production_order_items
-  (production_order_id, line_no, product_id, unit_id, planned_quantity, created_at, updated_at)
-VALUES ($1, 1, $2, $3, 10, $4, $4)`, orderID, productID, unitID, now); err != nil {
+  (production_order_id, line_no, product_id, unit_id, planned_quantity, route_code, created_at, updated_at)
+VALUES ($1, 1, $2, $3, 10, 'PLUSH_SEW_HAND_V1', $4, $4)`, orderID, productID, unitID, now); err != nil {
 		t.Fatalf("insert valid production order item: %v", err)
 	}
 	assertPGCode("duplicate line number", "23505", `
 INSERT INTO production_order_items
-  (production_order_id, line_no, product_id, unit_id, planned_quantity, created_at, updated_at)
-VALUES ($1, 1, $2, $3, 5, $4, $4)`, orderID, productID, unitID, now)
+  (production_order_id, line_no, product_id, unit_id, planned_quantity, route_code, created_at, updated_at)
+VALUES ($1, 1, $2, $3, 5, 'PLUSH_SEW_HAND_V1', $4, $4)`, orderID, productID, unitID, now)
 	assertPGCode("non-positive planned quantity", "23514", `
 INSERT INTO production_order_items
-  (production_order_id, line_no, product_id, unit_id, planned_quantity, created_at, updated_at)
-VALUES ($1, 2, $2, $3, 0, $4, $4)`, orderID, productID, unitID, now)
+  (production_order_id, line_no, product_id, unit_id, planned_quantity, route_code, created_at, updated_at)
+VALUES ($1, 2, $2, $3, 0, 'PLUSH_SEW_HAND_V1', $4, $4)`, orderID, productID, unitID, now)
 	assertPGCode("unknown product foreign key", "23503", `
 INSERT INTO production_order_items
-  (production_order_id, line_no, product_id, unit_id, planned_quantity, created_at, updated_at)
-VALUES ($1, 2, 9223372036854770000, $2, 1, $3, $3)`, orderID, unitID, now)
+  (production_order_id, line_no, product_id, unit_id, planned_quantity, route_code, created_at, updated_at)
+VALUES ($1, 2, 9223372036854770000, $2, 1, 'PLUSH_SEW_HAND_V1', $3, $3)`, orderID, unitID, now)
+
+	assertPGCode("missing production route", "23502", `UPDATE production_order_items SET route_code = NULL WHERE production_order_id = $1`, orderID)
+	assertPGCode("unknown production route", "23514", `UPDATE production_order_items SET route_code = 'UNKNOWN' WHERE production_order_id = $1`, orderID)
 
 	insertEvent := func(targetOrderID int, commandKey string, fromStatus *string, toStatus string, version int, key string, hash string, reason *string) error {
 		_, err := data.sqldb.ExecContext(ctx, `

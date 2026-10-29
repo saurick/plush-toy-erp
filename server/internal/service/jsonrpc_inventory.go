@@ -215,9 +215,9 @@ func (d *jsonrpcDispatcher) inventoryErrorResult(ctx context.Context, err error)
 	case errors.Is(err, biz.ErrInventoryOperationSaveOwner):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有创建人可以编辑库存作业草稿"}
 	case errors.Is(err, biz.ErrInventoryOperationSubmitOwner):
-		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有创建人可以提交人工库存调整"}
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有创建人可以提交库存盘点与调整"}
 	case errors.Is(err, biz.ErrInventoryOperationSelfApproval):
-		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "人工库存调整必须由另一位有权人员审批"}
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "库存盘点与调整必须由另一位有权人员审批"}
 	case errors.Is(err, biz.ErrInventoryOperationCancelOwner):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有创建人或过账人可以取消库存作业"}
 	case errors.Is(err, biz.ErrInventoryInsufficientStock):
@@ -254,6 +254,9 @@ func inventoryBalanceToAny(item *biz.InventoryBalance) map[string]any {
 		"quantity":                    item.Quantity.String(),
 		"active_reserved_quantity":    item.ActiveReservedQuantity.String(),
 		"available_quantity":          item.AvailableQuantity.String(),
+		"issuable_quantity":           item.IssuableQuantity.String(),
+		"restricted_quantity":         item.RestrictedQuantity.String(),
+		"lot_status":                  item.LotStatus,
 		"pending_inspection_quantity": item.PendingInspectionQuantity.String(),
 		"pending_packaging_quantity":  item.PendingPackagingQuantity.String(),
 		"ready_to_ship_quantity":      item.ReadyToShipQuantity.String(),
@@ -309,25 +312,28 @@ func inventoryTxnToAny(item *biz.InventoryTxn) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                 item.ID,
-		"subject_type":       item.SubjectType,
-		"stock_category":     item.StockCategory,
-		"subject_id":         item.SubjectID,
-		"product_sku_id":     optionalIntToAny(item.ProductSkuID),
-		"warehouse_id":       item.WarehouseID,
-		"lot_id":             optionalIntToAny(item.LotID),
-		"txn_type":           item.TxnType,
-		"direction":          item.Direction,
-		"quantity":           item.Quantity.String(),
-		"unit_id":            item.UnitID,
-		"source_type":        item.SourceType,
-		"source_id":          optionalIntToAny(item.SourceID),
-		"source_line_id":     optionalIntToAny(item.SourceLineID),
-		"idempotency_key":    item.IdempotencyKey,
-		"reversal_of_txn_id": optionalIntToAny(item.ReversalOfTxnID),
-		"occurred_at":        item.OccurredAt.Unix(),
-		"created_at":         item.CreatedAt.Unix(),
-		"created_by":         optionalIntToAny(item.CreatedBy),
-		"note":               optionalStringToAny(item.Note),
+		"id":                   item.ID,
+		"subject_type":         item.SubjectType,
+		"stock_category":       item.StockCategory,
+		"subject_id":           item.SubjectID,
+		"product_sku_id":       optionalIntToAny(item.ProductSkuID),
+		"warehouse_id":         item.WarehouseID,
+		"lot_id":               optionalIntToAny(item.LotID),
+		"txn_type":             item.TxnType,
+		"direction":            item.Direction,
+		"quantity":             item.Quantity.String(),
+		"unit_id":              item.UnitID,
+		"source_type":          item.SourceType,
+		"source_no":            item.SourceNo,
+		"source_document_type": item.SourceDocumentType,
+		"source_document_id":   item.SourceDocumentID,
+		"source_id":            optionalIntToAny(item.SourceID),
+		"source_line_id":       optionalIntToAny(item.SourceLineID),
+		"idempotency_key":      item.IdempotencyKey,
+		"reversal_of_txn_id":   optionalIntToAny(item.ReversalOfTxnID),
+		"occurred_at":          item.OccurredAt.Unix(),
+		"created_at":           item.CreatedAt.Unix(),
+		"created_by":           optionalIntToAny(item.CreatedBy),
+		"note":                 optionalStringToAny(item.Note),
 	}
 }

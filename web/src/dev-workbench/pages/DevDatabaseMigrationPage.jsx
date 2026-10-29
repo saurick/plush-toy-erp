@@ -16,12 +16,12 @@ import {
   StatusTag,
   issueText,
 } from './delivery/migration/shared.jsx'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import DevVerificationEvidence from '../components/DevVerificationEvidence.jsx'
 import {
-  DEV_DATABASE_MIGRATION_SOURCE_PATH,
   createDatabaseMigrationIdempotencyKey,
   databaseMigrationRecoveryComplete,
 } from '../config/devDatabaseMigration.mjs'
@@ -32,10 +32,11 @@ export default function DevDatabaseMigrationPage() {
   if (import.meta.env.PLUSH_STANDALONE_WORKBENCH) {
     return (
       <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page">
-        <DevPageNav sourcePath={DEV_DATABASE_MIGRATION_SOURCE_PATH} />
-        <header className="erp-dev-hub-header">
-          <Title level={1}>数据库迁移</Title>
-        </header>
+        <DevPageNav />
+        <DevPageHeader
+          className="erp-dev-hub-header"
+          title={<Title level={1}>数据库迁移</Title>}
+        />
         <p>133 各环境的迁移随固定版本发布执行，下面保留实际版本、恢复核验与完整回执。本机开发库的迁移准备请在本机工作台办理。</p>
         <DevVerificationEvidence />
       </div>
@@ -86,71 +87,86 @@ function LocalDatabaseMigrationPage() {
 
   return (
     <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page erp-dev-database-migration-page erp-dev-delivery-workspace">
-      <DevPageNav sourcePath={DEV_DATABASE_MIGRATION_SOURCE_PATH} />
-      <header className="erp-dev-hub-header">
-        <div className="erp-dev-hub-header__copy">
-          <span className="erp-dev-hub-header__icon">
-            <DatabaseOutlined aria-hidden="true" />
-          </span>
-          <Title level={1} className="erp-dev-hub-title">
-            数据库迁移
-          </Title>
-        </div>
-
-        <Space direction="vertical" size={4}>
-          <Space wrap>
-            <Button
-              icon={<ReloadOutlined aria-hidden="true" />}
-              loading={refreshBusy}
-              onClick={refresh}
-            >
-              刷新状态
-            </Button>
-            {activeView === 'migration' && !(summaryFresh && isLatest) ? (
-              <Tooltip
-                title={
-                  canPrepare
-                    ? ''
-                    : !summaryFresh
-                      ? '正在核对最新状态；上次结果只供查看'
-                      : isLatest
-                        ? '没有待执行迁移；如需重新核对，请使用“刷新状态”'
-                        : readOnly
-                          ? '局域网入口只读，请在运行开发服务的本机准备迁移'
-                          : tools?.status !== 'ready'
-                            ? '迁移准备环境未就绪，请按下方检查项处理后刷新'
-                            : hasRunningOperation
-                              ? '已有操作正在执行'
-                              : '当前目标或 migration 状态未通过检查'
-                }
+      <DevPageNav />
+      <DevPageHeader
+        className="erp-dev-hub-header"
+        title={
+          <div className="erp-dev-hub-header__copy">
+            <span className="erp-dev-hub-header__icon">
+              <DatabaseOutlined aria-hidden="true" />
+            </span>
+            <Title level={1} className="erp-dev-hub-title">
+              数据库迁移
+            </Title>
+          </div>
+        }
+        navigation={
+          <DevTaskNav
+            compact
+            idPrefix="dev-migration"
+            ariaLabel="数据库迁移视图"
+            className="erp-dev-delivery-taskbar"
+            items={MIGRATION_VIEW_ITEMS}
+            value={activeView}
+            onChange={selectView}
+          />
+        }
+        tools={
+          <Space className="erp-dev-workbench-tools" direction="vertical" size={4}>
+            <Space wrap>
+              <Button
+                icon={<ReloadOutlined aria-hidden="true" />}
+                loading={refreshBusy}
+                onClick={refresh}
               >
-                <Button
-                  type="primary"
-                  icon={<SafetyCertificateOutlined aria-hidden="true" />}
-                  disabled={!canPrepare}
-                  loading={actionKey === 'prepare'}
-                  onClick={() =>
-                    performAction('prepare', {
-                      action: 'prepare',
-                      idempotencyKey:
-                        createDatabaseMigrationIdempotencyKey('prepare'),
-                    })
-                  }
-                >
-                  {summaryFresh && isLatest
-                    ? '无需迁移'
-                    : readyOperation
-                      ? '重新检查并准备'
-                      : '检查并准备'}
-                </Button>
-              </Tooltip>
-            ) : null}
+                刷新状态
+              </Button>
+            </Space>
+            <Text type="secondary" role="status" aria-live="polite">
+              {refreshStatusText}
+            </Text>
           </Space>
-          <Text type="secondary" role="status" aria-live="polite">
-            {refreshStatusText}
-          </Text>
-        </Space>
-      </header>
+        }
+      >
+        {activeView === 'migration' && !(summaryFresh && isLatest) ? (
+          <Tooltip
+            title={
+              canPrepare
+                ? ''
+                : !summaryFresh
+                  ? '正在核对最新状态；上次结果只供查看'
+                  : isLatest
+                    ? '没有待执行迁移；如需重新核对，请使用“刷新状态”'
+                    : readOnly
+                      ? '局域网入口只读，请在运行开发服务的本机准备迁移'
+                      : tools?.status !== 'ready'
+                        ? '迁移准备环境未就绪，请按下方检查项处理后刷新'
+                        : hasRunningOperation
+                          ? '已有操作正在执行'
+                          : '当前目标或 migration 状态未通过检查'
+            }
+          >
+            <Button
+              type="primary"
+              icon={<SafetyCertificateOutlined aria-hidden="true" />}
+              disabled={!canPrepare}
+              loading={actionKey === 'prepare'}
+              onClick={() =>
+                performAction('prepare', {
+                  action: 'prepare',
+                  idempotencyKey: createDatabaseMigrationIdempotencyKey('prepare'),
+                })
+              }
+            >
+              {summaryFresh && isLatest
+                ? '无需迁移'
+                : readyOperation
+                  ? '重新检查并准备'
+                  : '检查并准备'}
+            </Button>
+          </Tooltip>
+        ) : null}
+      </DevPageHeader>
 
       <main className="erp-dev-hub-shell erp-dev-database-migration-shell">
         {recoveryActive ? (
@@ -159,15 +175,7 @@ function LocalDatabaseMigrationPage() {
               type="success"
               showIcon
               message="数据库与本地后端已经恢复"
-              description="业务页面与工作台操作已恢复，可返回工作台总览继续。"
-              action={
-                <Button
-                  type="primary"
-                  onClick={() => window.location.assign('/__dev')}
-                >
-                  返回工作台总览
-                </Button>
-              }
+              description="业务页面与工作台操作已恢复。"
             />
           ) : (
             <Alert
@@ -230,15 +238,7 @@ function LocalDatabaseMigrationPage() {
           className="erp-dev-workbench-toolbar"
           aria-label="数据库迁移范围"
         >
-          <DevTaskNav
-            compact
-            idPrefix="dev-migration"
-            ariaLabel="数据库迁移视图"
-            className="erp-dev-delivery-taskbar"
-            items={MIGRATION_VIEW_ITEMS}
-            value={activeView}
-            onChange={selectView}
-          />
+
           <dl className="erp-dev-delivery-facts erp-dev-workbench-toolbar__facts">
             <div>
               <dt>目标</dt>
@@ -296,6 +296,7 @@ function LocalDatabaseMigrationPage() {
           activeView={activeView}
           isLatest={isLatest}
           migrationFlow={migrationFlow}
+          onViewRuntime={() => selectView('runtime')}
           pathOperation={pathOperation}
           readOnly={readOnly}
           readyOperation={readyOperation}

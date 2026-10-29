@@ -385,6 +385,9 @@ func (d *jsonrpcDispatcher) mapProductionWIPError(ctx context.Context, err error
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
+	if result := productionMaterialUsageErrorResult(err); result != nil {
+		return result
+	}
 	logger := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrIdempotencyConflict):

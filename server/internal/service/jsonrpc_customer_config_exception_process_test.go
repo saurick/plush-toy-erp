@@ -592,7 +592,7 @@ func (r *exceptionProcessServiceInventoryRepo) SubmitInventoryOperationForProces
 	actorID int,
 ) (*biz.InventoryOperation, error) {
 	if r.operation == nil || r.operation.ID != id ||
-		r.operation.OperationType != biz.InventoryOperationManualAdjustment ||
+		!biz.InventoryOperationRequiresApproval(r.operation.OperationType) ||
 		r.operation.Status != biz.InventoryOperationStatusDraft ||
 		r.operation.CreatedBy != actorID {
 		return nil, biz.ErrBadParam
@@ -804,12 +804,18 @@ func TestCustomerConfigExceptionProcessesStartReadAndReplay(t *testing.T) {
 }
 
 func TestCustomerConfigInventoryAdjustmentStartExecutesSubmitOnceAndReplays(t *testing.T) {
+	for _, operationType := range []string{biz.InventoryOperationManualAdjustment, biz.InventoryOperationCycleCount} {
+		t.Run(operationType, func(t *testing.T) { testInventoryAdjustmentStartExecutesSubmitOnceAndReplays(t, operationType) })
+	}
+}
+
+func testInventoryAdjustmentStartExecutesSubmitOnceAndReplays(t *testing.T, operationType string) {
 	now := time.Now()
 	inventoryRepo := &exceptionProcessServiceInventoryRepo{
 		serviceMaterialSupplyInventoryRepo: &serviceMaterialSupplyInventoryRepo{},
 		operation: &biz.InventoryOperation{
 			ID: 104, OperationNo: "ADJ-104",
-			OperationType: biz.InventoryOperationManualAdjustment,
+			OperationType: operationType,
 			Status:        biz.InventoryOperationStatusDraft,
 			Reason:        "盘盈调整",
 			Version:       1,

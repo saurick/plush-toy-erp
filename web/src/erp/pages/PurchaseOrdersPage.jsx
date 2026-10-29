@@ -1,13 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Form } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
+import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
+
 import { canReadReference, loadReferenceIDs } from '../utils/remoteReferences.mjs'
 import { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
 import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
-import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
+import { useProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
@@ -63,7 +67,8 @@ import {
   BusinessViewSurface,
   BusinessViewSwitch,
 } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
-import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
+import usePurchaseFollowups from '../hooks/usePurchaseFollowups.js'
+import { purchaseFollowupParams } from '../utils/purchaseFollowup.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   BUSINESS_ROUTE_PATHS,
@@ -140,9 +145,14 @@ import {
   normalizeLifecycleStatus,
   withLifecycleScopeSearchParam,
 } from '../utils/lifecycleScope.mjs'
+import { PurchaseSourceActions } from '../../common/consts/purchaseSourceActions.mjs'
+import { sourceActionAccess } from '../utils/sourceActionAccess.mjs'
+import SourceActionAccessNotice from '../components/SourceActionAccessNotice.jsx'
 
 export default function PurchaseOrdersPage() {
-  const outletContext = useOutletContext()
+  const outletContext = useBusinessPageContext()
+  const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
@@ -156,13 +166,16 @@ export default function PurchaseOrdersPage() {
   const [form] = Form.useForm()
   const [inboundDraftForm] = Form.useForm()
   const [termsOrder, setTermsOrder] = useState(null)
+  const [deliveryOrder, setDeliveryOrder] = useState(null)
   const canRead = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_READ)
   const canCreate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_CREATE)
   const canUpdate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_UPDATE)
-  const canCreatePurchaseReceipt = hasActionPermission(
-    adminProfile,
-    PermissionCode.PURCHASE_RECEIPT_CREATE
+  const canReadFollowups = canRead && (
+    hasActionPermission(adminProfile, PermissionCode.PURCHASE_RECEIPT_READ) ||
+    hasActionPermission(adminProfile, PermissionCode.WAREHOUSE_INBOUND_READ)
   )
+  const receiptSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.receipt)
+  const canCreatePurchaseReceipt = receiptSourceAccess.allowed
   const canReadWorkflowTasks = hasActionPermission(
     adminProfile,
     PermissionCode.WORKFLOW_TASK_READ
@@ -179,6 +192,7 @@ export default function PurchaseOrdersPage() {
   const [loading, setLoading] = useState(false)
   const [itemsLoading, setItemsLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  useWorkflowTaskBusinessBusy(saving)
   const [workflowTasks, setWorkflowTasks] = useState([])
   const [workflowTaskLoadState, setWorkflowTaskLoadState] = useState('idle')
   const workflowTaskSourceIDRef = useRef(0)
@@ -186,6 +200,7 @@ export default function PurchaseOrdersPage() {
   const [total, setTotal] = useState(0)
   const [statusCounts, setStatusCounts] = useState(null)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [editorRevision, setEditorRevision] = useState(0)
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
   const lifecycleInFlightRef = useRef(false)
@@ -422,26 +437,17 @@ export default function PurchaseOrdersPage() {
     supplierFilter,
   ])
 
-  const loadArrivalOrders = useCallback(
-    async ({ signal }) => {
-      if (routePurchaseOrderID) {
-        const order = await getPurchaseOrder({ id: routePurchaseOrderID }, { signal })
-        return order ? [order] : []
-      }
-      const result = await listAllPurchaseOrders(orderListParams, { signal })
-      return Array.isArray(result?.purchase_orders)
-        ? result.purchase_orders
-        : []
-    },
-    [orderListParams, routePurchaseOrderID]
-  )
-
-  const arrivalData = useBusinessVisualizationData({
-    enabled: contentView === 'arrival',
-    load: loadArrivalOrders,
-    actionLabel: '加载采购到货日历',
+  const [exceptionViewState, setExceptionViewState] = useBusinessPageState('exceptionViewState', { filter: 'all', page: 1 })
+  const followupViewState = contentView === 'exceptions' ? exceptionViewState : arrivalViewState
+  const followupParams = purchaseFollowupParams(contentView === 'exceptions' ? 'exceptions' : 'arrival', followupViewState, { keyword: linkedKeyword || keyword, supplierID: supplierFilter, orderID: routePurchaseOrderID })
+  const arrivalData = usePurchaseFollowups({
+    enabled: canReadFollowups && contentView !== 'list',
+    params: followupParams,
   })
   const reloadArrivalData = arrivalData.reload
+  useEffect(() => {
+    if (!canReadFollowups && contentView !== 'list') setContentView('list')
+  }, [canReadFollowups, contentView, setContentView])
 
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
@@ -577,7 +583,7 @@ export default function PurchaseOrdersPage() {
   }, [loadOrders])
 
   const refreshPageData = useCallback(async () => {
-    if (contentView === 'arrival') reloadArrivalData()
+    if (contentView !== 'list') reloadArrivalData()
     const [ordersOK, referencesOK, inboundReferencesOK, workflowResult] =
       await Promise.all([
         loadOrders(),
@@ -811,6 +817,8 @@ export default function PurchaseOrdersPage() {
     const sourceValues =
       buildPurchaseOrderItemSourceValuesFromMaterial(material)
     form.setFields([
+      { name: ['items', fieldName, 'unit_price'], value: '' },
+      { name: ['items', fieldName, 'amount'], value: '' },
       { name: ['items', fieldName, 'unit_id'], value: sourceValues.unit_id },
       {
         name: ['items', fieldName, 'material_code_snapshot'],
@@ -901,21 +909,26 @@ export default function PurchaseOrdersPage() {
           getActionErrorMessage(attachmentEffect.error, '上传采购订单附件')
         )
       }
-      orderAttachmentRef.current?.clearPendingAttachments()
-      setModalOpen(false)
+      if (attachmentSaved || !outletContext?.taskBusiness) orderAttachmentRef.current?.clearPendingAttachments()
+      if (!outletContext?.taskBusiness) setModalOpen(false)
       message.success(
         attachmentSaved
           ? '采购订单已保存'
-          : '采购订单已保存，未上传的附件请重新选择'
+          : outletContext?.taskBusiness ? '采购订单已保存，部分附件尚未上传，请保留当前内容重试' : '采购订单已保存，未上传的附件请重新选择'
       )
       const detailEffect = await settleSourceDocumentPostSaveEffect(() =>
         loadOrderItems(saved)
       )
+      if (outletContext?.taskBusiness && detailEffect.status === 'fulfilled') {
+        form.setFieldValue('items', selectOpenSourceDocumentItems(detailEffect.value || []).map(normalizePurchaseLineFormValue))
+        setEditorRevision((value) => value + 1)
+      }
       if (detailEffect.status === 'rejected') {
         message.warning(
           getActionErrorMessage(detailEffect.error, '刷新采购订单明细')
         )
       }
+      await reportBusinessResult(attachmentSaved ? '采购订单已保存' : '采购订单已保存，部分附件尚未上传', saved)
       if (isCreatingOrder) {
         reloadArrivalData()
         setPagination((current) => ({ ...current, current: 1 }))
@@ -961,9 +974,13 @@ export default function PurchaseOrdersPage() {
         )
       }
       if (action.key === 'submit') {
-        showProcessSubmissionReceipt({ result: updated, title: orderSubmissionSuccessMessage('purchase_order', updated) })
+        const title = orderSubmissionSuccessMessage('purchase_order', updated)
+        reportBusinessResult(title, record)
+        showProcessSubmissionReceipt({ result: updated, title })
       } else {
-        message.success(action.successMessage || `采购订单已${action.label}`)
+        const title = action.successMessage || `采购订单已${action.label}`
+        reportBusinessResult(title, updated || record)
+        message.success(title)
       }
       if (updated && action.returnsRecord !== false) {
         setSelectedOrder(updated)
@@ -1102,16 +1119,6 @@ export default function PurchaseOrdersPage() {
     recordLabel: '采购订单',
   })
 
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-    linkedKeyword ||
-    routePurchaseOrderID ||
-    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
-    status ||
-    supplierFilter ||
-    dateFilterStart ||
-    dateFilterEnd
-  )
   const clearRouteContext = useCallback(
     (resetScope = false) => {
       const nextParams = clearLinkedDocumentParams(searchParams)
@@ -1137,22 +1144,12 @@ export default function PurchaseOrdersPage() {
     setPagination((current) => ({ ...current, current: 1 }))
     setSearchParams((current) => withLifecycleScopeSearchParam(current, LIFECYCLE_SCOPE.CURRENT), { replace: true })
   }, [setLifecycleScope, setStatus, setSupplierFilter, setDateFilterField, setDateFilterStart, setDateFilterEnd, setSortValue, setPagination, setSearchParams])
-  const clearQuery = () => {
-    clearFilters()
-    setKeyword('')
-    setStatus('')
-    clearRouteContext(true)
-  }
-
   const selectedOrders = useMemo(
-    () => (contentView === 'arrival'
-      ? arrivalData.loading || arrivalData.error ? [] : arrivalData.rows
-      : orders)
-      .filter((record) => selectedRowKeys.includes(record.id)),
-    [arrivalData.error, arrivalData.loading, arrivalData.rows, contentView, orders, selectedRowKeys]
+    () => orders.filter((record) => selectedRowKeys.includes(record.id)),
+    [orders, selectedRowKeys]
   )
   const singleSelectedOrder = getSingleSelectedPurchaseOrder({
-    selectedOrder: contentView === 'arrival' ? null : selectedOrder,
+    selectedOrder: contentView === 'list' ? selectedOrder : null,
     selectedOrders,
     selectedRowKeys,
   })
@@ -1200,7 +1197,6 @@ export default function PurchaseOrdersPage() {
   } = usePurchaseOrderInboundDraft({
     form: inboundDraftForm,
     loadOrderItems,
-    materials,
     warehouseOptions,
     navigate,
     selectedOrder: singleSelectedOrder,
@@ -1275,10 +1271,20 @@ export default function PurchaseOrdersPage() {
     canUpdate,
     order: singleSelectedOrder,
   })
+  useTaskBusinessEditor({ record: singleSelectedOrder, enabled: selectedOrderCanEdit && referenceDataState === 'ready' && outletContext?.taskBusiness?.contract?.actionKeys.includes('purchase-edit'), open: openEditModal })
   const canGenerateInboundDraft = canCreateInboundDraftFromPurchaseOrder({
     canCreatePurchaseReceipt,
     order: singleSelectedOrder,
   })
+  const taskArrivalOpened = useRef(null)
+  const arrivalTask = outletContext?.taskBusiness?.task
+  useEffect(() => {
+    if (arrivalTask?.task_group !== 'handoff_purchase_arrival' || outletContext?.taskBusiness?.readOnly ||
+        arrivalTask.source_id !== singleSelectedOrder?.id || taskArrivalOpened.current === arrivalTask.id ||
+        !canGenerateInboundDraft || !inboundReferenceDataReady || !hasInboundWarehouse) return
+    taskArrivalOpened.current = arrivalTask.id
+    openInboundDraftModal(singleSelectedOrder)
+  }, [arrivalTask, outletContext?.taskBusiness?.readOnly, singleSelectedOrder, canGenerateInboundDraft, inboundReferenceDataReady, hasInboundWarehouse, openInboundDraftModal])
   const relatedMenuItems = useMemo(
     () =>
       [
@@ -1359,7 +1365,10 @@ export default function PurchaseOrdersPage() {
       value={contentView}
       options={[
         { value: 'list', label: '订单列表' },
-        { value: 'arrival', label: '到货计划' },
+        ...(canReadFollowups ? [
+          { value: 'arrival', label: '到货计划' },
+          { value: 'exceptions', label: '异常汇总' },
+        ] : []),
       ]}
       onChange={(view) => {
         if (recordActionBusy) return
@@ -1383,7 +1392,8 @@ export default function PurchaseOrdersPage() {
         compact
       />
 
-      <PurchaseOrderOperationPanel
+      <SourceActionAccessNotice access={receiptSourceAccess} />
+      {contentView === 'list' && <PurchaseOrderOperationPanel
         showListTools={contentView === 'list'}
         adminProfile={adminProfile}
         statusCounts={statusCounts}
@@ -1395,6 +1405,7 @@ export default function PurchaseOrdersPage() {
         canUpdate={canUpdate}
         canCompleteTerms={canUpdate && hasActionPermission(adminProfile, PermissionCode.FIELD_PROCUREMENT_COMMERCIAL_READ)}
         openTermsModal={setTermsOrder}
+        openDeliveryModal={setDeliveryOrder}
         referenceDataReady={referenceDataState === 'ready'}
         canGenerateInboundDraft={canGenerateInboundDraft}
         hasInboundWarehouse={hasInboundWarehouse}
@@ -1469,43 +1480,35 @@ export default function PurchaseOrdersPage() {
         status={status}
         supplierFilter={supplierFilter}
         supplierOptions={supplierOptions}
-      />
+      />}
 
       <BusinessViewSurface
         activeView={contentView}
         loading={contentView === 'list' ? loading : arrivalData.loading}
       >
-        {contentView === 'arrival' ? (
+        {contentView !== 'list' ? (
           <PurchaseArrivalCalendar
-            viewState={arrivalViewState}
-            onViewStateChange={(state) => {
-              if (recordActionBusy) return
-              applySelectedRowKeys([])
-              setSelectedOrder(null)
-              setArrivalViewState(state)
-            }}
-            orders={arrivalData.rows}
+            queryParams={followupParams}
+            view={contentView === 'exceptions' ? 'exceptions' : 'arrival'}
+            viewState={followupViewState}
+            onViewStateChange={contentView === 'exceptions' ? setExceptionViewState : setArrivalViewState}
+            board={arrivalData.board}
             loading={arrivalData.loading}
             error={arrivalData.error}
             onRetry={arrivalData.reload}
-            selectedRowKeys={selectedRowKeys}
-            selectionDisabled={recordActionBusy}
-            hasQueryFilters={hasActiveFilters}
-            onClearQuery={clearQuery}
-            onSelect={(row) => {
-              if (recordActionBusy || !row) return
-              const order = arrivalData.rows.find((item) => Number(item.id) === Number(row.id))
-              if (!order) return
-              applySelectedRowKeys([order.id])
-              setSelectedOrder(order)
+            keyword={linkedKeyword || keyword}
+            onKeywordChange={(value) => { clearRouteContext(); setKeyword(value) }}
+            supplierFilter={supplierFilter}
+            supplierOptions={supplierOptions}
+            onSupplierChange={setSupplierFilter}
+            onOpen={(row) => {
+              if (row.source_type === 'purchase_order') {
+                setContentView('list')
+                setSearchParams({ purchase_order_id: String(row.source_id) })
+              } else {
+                navigate(`/erp/warehouse/inbound?receipt_id=${row.source_id}`)
+              }
             }}
-            onOpen={(row) =>
-              openPurchaseOrderDetails(
-                arrivalData.rows.find(
-                  (order) => Number(order?.id || 0) === Number(row?.id || 0)
-                )
-              )
-            }
           />
         ) : (
           <BusinessDataTable
@@ -1605,8 +1608,10 @@ export default function PurchaseOrdersPage() {
 
       {columnOrderModal}
 
-      <PurchaseOrderTermsModal order={termsOrder} customerKey={activeCustomerKey} unitOptions={unitOptions} onClose={() => setTermsOrder(null)} onChanged={refreshPageData} />
+      <PurchaseOrderTermsModal key="delivery" deliveryOnly order={deliveryOrder} customerKey={activeCustomerKey} unitOptions={unitOptions} onClose={() => setDeliveryOrder(null)} onChanged={refreshPageData} />
+      <PurchaseOrderTermsModal key="terms" order={termsOrder} customerKey={activeCustomerKey} unitOptions={unitOptions} onClose={() => setTermsOrder(null)} onChanged={refreshPageData} />
       <PurchaseOrderEditor
+        baselineKey={editorRevision}
         open={modalOpen}
         form={form}
         editingOrder={editingOrder}

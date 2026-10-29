@@ -350,6 +350,10 @@
   width: 160px;
 }
 
+.erp-arrival-calendar__filters .ant-select-selection-placeholder {
+  color: var(--erp-text-muted);
+}
+
 .erp-arrival-calendar__calendar {
   overflow-x: auto;
 }

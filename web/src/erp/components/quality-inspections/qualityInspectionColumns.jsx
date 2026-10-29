@@ -29,7 +29,6 @@ export const QUALITY_RESULT_FILTER_OPTIONS = [
 ]
 
 export const QUALITY_INSPECTION_TYPE_FILTER_OPTIONS = [
-  { label: '全部检验类型', value: '' },
   { label: '采购来料', value: 'INCOMING' },
   { label: '委外回货', value: 'OUTSOURCING_RETURN' },
   { label: '成品检验', value: 'FINISHED_GOODS' },
@@ -108,6 +107,7 @@ function qualityResultTag(result) {
 }
 
 export function qualityInspectionListStatusText(record, { emptyText = '-' } = {}) {
+  if (record?.superseded_at) return `已替代 · ${QUALITY_RESULT_LABELS[record?.result] || QUALITY_STATUS_LABELS[record?.status] || '原记录'}`
   if (record?.status === QualityInspectionStatus.PASSED) {
     return QUALITY_RESULT_LABELS[record?.result] || '判定待核对'
   }
@@ -115,7 +115,7 @@ export function qualityInspectionListStatusText(record, { emptyText = '-' } = {}
 }
 
 function qualityInspectionListStatusTag(_value, record) {
-  const color = record?.status === QualityInspectionStatus.PASSED
+  const color = record?.superseded_at ? 'default' : record?.status === QualityInspectionStatus.PASSED
     ? QUALITY_RESULT_COLORS[record?.result]
     : QUALITY_STATUS_COLORS[record?.status]
   return <Tag color={color || 'default'}>{qualityInspectionListStatusText(record)}</Tag>
@@ -137,8 +137,8 @@ function renderStackCell(primary, secondaryItems = []) {
   )
 }
 
-function inspectorLabel(inspectorID, { emptyText = '-' } = {}) {
-  return inspectorID ? '管理员已关联' : emptyText
+function inspectorLabel(record, { emptyText = '-' } = {}) {
+  return record?.inspector_name || (record?.inspector_id ? '姓名待核对' : emptyText)
 }
 
 function inspectionTypeLabel(record) {
@@ -196,7 +196,7 @@ function qualityDefectRateText(record, options) {
 }
 
 function qualityInspectorText(record, options) {
-  return inspectorLabel(record?.inspector_id, options)
+  return inspectorLabel(record, options)
 }
 
 function qualityRemarkText(record, options) {
@@ -398,14 +398,24 @@ export function buildQualityInspectionExportColumns({
       exportValue: (record) => formatUnixDate(record?.inspected_at, { emptyText: '' }),
     },
     {
-      title: '检验员',
-      exportTitle: '检验员',
+      title: '检验人',
+      exportTitle: '检验人',
       dataIndex: 'inspector_id',
       width: 100,
       sortType: 'number',
       render: (_value, record) => qualityInspectorText(record),
       exportValue: (record) => qualityInspectorText(record, { emptyText: '' }),
     },
+    {
+      title: '记录效力',
+      exportTitle: '记录效力',
+      dataIndex: 'superseded_at',
+      exportValue: (record) => record?.superseded_at ? '已替代' : '当前记录',
+      render: (_value, record) => record?.superseded_at ? '已替代' : '当前记录',
+    },
+    { title: '更正原单', exportTitle: '更正原单', dataIndex: 'correction_of_inspection_no' },
+    { title: '替代本单', exportTitle: '替代本单', dataIndex: 'corrected_inspection_no' },
+    { title: '更正原因', exportTitle: '更正原因', dataIndex: 'superseded_reason' },
     {
       align: 'left',
       title: '判定备注',

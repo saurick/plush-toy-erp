@@ -50,6 +50,12 @@ export function createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalO
       await selectPattern('执行与诊断')
       assert(await tabs.evaluate((node) => node.isConnected), '切换页面类型不能重建页签条')
       const execution = samples.getByRole('region', { name: '执行与诊断样板', exact: true })
+      const executionPlacement = await execution.locator('.erp-workbench-toolbar').evaluate((toolbar) => {
+        const controls = toolbar.querySelector('.ant-select').getBoundingClientRect()
+        const actions = toolbar.querySelector('.erp-workbench-toolbar__actions').getBoundingClientRect()
+        return { gap: actions.left - controls.right, sameRow: Math.abs(actions.top - controls.top) <= 1 }
+      })
+      assert(executionPlacement.sameRow && executionPlacement.gap >= 0 && executionPlacement.gap <= 12, '诊断主动作紧邻左侧范围选择')
       await execution.getByRole('button', { name: '运行演示诊断', exact: true }).click()
       await execution.getByText('正在检查页面与浏览器', { exact: true }).waitFor()
       assert.equal(await execution.getByRole('button', { name: '运行演示诊断', exact: true }).isEnabled(), false)
@@ -67,6 +73,8 @@ export function createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalO
 
       await selectPattern('结果与核验')
       const evidence = samples.getByRole('region', { name: '结果与核验样板', exact: true })
+      const evidenceTools = await evidence.locator('.erp-workbench-section__tools').evaluate((tools) => tools.parentElement.getBoundingClientRect().right - tools.getBoundingClientRect().right)
+      assert(Math.abs(evidenceTools) <= 1, '核验样板的刷新保留在所属内容面右侧')
       assert.equal(await evidence.getByText('通过', { exact: true }).count(), 1)
       await evidence.getByText('未核实', { exact: true }).waitFor()
       await evidence.getByText('未采集', { exact: true }).waitFor()
@@ -90,6 +98,7 @@ export function createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalO
       await graph.locator('[data-graph-node]').last().click()
       assert.equal(await graph.locator('[data-graph-node]').last().getAttribute('aria-pressed'), 'true')
       assert.equal(new URL(page.url()).searchParams.get('pattern'), 'reading', '样板节点只选择，不跳转业务页')
+      assert.equal(await reading.locator('[data-source-reference]').count(), 0, '阅读样板不堆放来源引用')
       await setState('无数据')
       await reading.getByText('此主题暂无资料', { exact: true }).waitFor()
       await page.reload()
@@ -104,6 +113,20 @@ export function createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalO
       const switcher = await page.locator('.erp-dev-ui-design-workbench-toolbar').elementHandle()
       await page.getByText('整体交互预览', { exact: true }).click()
       await page.frameLocator('iframe[title="ERP 最新可交互设计"]').getByRole('table', { name: '开发工具对照', exact: true }).waitFor()
+      const previewNavigation = await page.frameLocator('iframe[title="ERP 最新可交互设计"]').locator('.dev-design').evaluate((root) => {
+        const header = root.querySelector('.dev-design-heading')
+        const nav = root.querySelector('.dev-design-tabs')
+        const box = header.getBoundingClientRect()
+        const tabsBox = nav.getBoundingClientRect()
+        return {
+          headerTabs: header.querySelectorAll('[role="tablist"]').length,
+          sameLabelCount: [...root.querySelectorAll('[role="tablist"]')].filter((item) => item.getAttribute('aria-label') === nav.getAttribute('aria-label')).length,
+          contained: header.contains(nav) && tabsBox.top >= box.top - 1 && tabsBox.bottom <= box.bottom + 1 && tabsBox.left >= box.left - 1 && tabsBox.right <= box.right + 1,
+        }
+      })
+      assert.equal(previewNavigation.headerTabs, 1, '整体预览的主任务导航归入共享页头')
+      assert.equal(previewNavigation.sameLabelCount, 1, '主任务导航保持唯一')
+      assert(previewNavigation.contained, '导航完整位于所属页头，宽度不足时允许在页头内换行')
       assert(await switcher.evaluate((node) => node.isConnected), '样板与整体预览切换保留切换栏')
       await page.getByText('统一页面样板', { exact: true }).click()
       await samples.waitFor()

@@ -4,11 +4,15 @@ import { LeftOutlined } from '@ant-design/icons'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { normalizeFulfillmentRole } from '@/erp/utils/workflowFulfillment.mjs'
 import { buildDevBusinessChainTopics } from '../../config/devBusinessChainProjection.mjs'
-import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
+import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
+import { buildChainActionRelations, relationMatches, relationFiltersActive } from '../../config/devFulfillmentRelations.mjs'
 import AppSelect from '@/common/components/select/AppSelect'
-import { EvidenceDisclosure } from './FlowStateShared.jsx'
+
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 import BusinessTopicDetails, { BusinessTopicVerification } from './BusinessTopicDetails.jsx'
+import BusinessChainStepVerification from './BusinessChainStepVerification.jsx'
+import FinanceRelationshipsView from './FinanceRelationshipsView.jsx'
+import { FINANCE_RELATIONS_TOPIC_KEY } from '../../config/devFinanceWorkbench.mjs'
 import './businessChainTopics.css'
 
 export default function BusinessChainTopics({
@@ -16,12 +20,15 @@ export default function BusinessChainTopics({
   currentChainKey,
   onSelectChain,
   selectedTopicKey,
+  filterControls,
   onExploreChain,
+  onOpenView,
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const mapKey = searchParams.get(queryKeys.roleMap)
   const mapOpen = Boolean(mapKey)
+  const financeSelected = selectedTopicKey === FINANCE_RELATIONS_TOPIC_KEY && !mapOpen
   const picked = searchParams.get(
     mapOpen ? queryKeys.roleMapNode : queryKeys.roleTopicNode
   )
@@ -43,10 +50,11 @@ export default function BusinessChainTopics({
   const mapOpener = useRef(null)
   const restoreMapFocus = useRef(false)
   const role = normalizeFulfillmentRole(searchParams.get(queryKeys.role))
-  const lanes = useMemo(
-    () => buildDevBusinessChainTopics(catalog, role),
-    [catalog, role]
-  )
+  const filters = readDevFlowRelationFilters(searchParams)
+  const filtered = relationFiltersActive(filters)
+  const lanes = buildDevBusinessChainTopics(catalog).map((lane) => ({ ...lane,
+    topics: lane.topics.filter(({ chain }) => !filtered || buildChainActionRelations(catalog, chain).some((action) => relationMatches(action, filters))),
+  })).filter((lane) => lane.topics.length)
   const chainByKey = useMemo(
     () => new Map(catalog.businessChains.map((chain) => [chain.key, chain])),
     [catalog.businessChains]
@@ -59,7 +67,7 @@ export default function BusinessChainTopics({
         available[0]?.chain
   const focus = chainByKey.get(mapKey) || topic || catalog.businessChains[0]
   useEffect(() => {
-    if (selectedTopicKey && selectedTopicKey !== topic?.key) {
+    if (selectedTopicKey && selectedTopicKey !== FINANCE_RELATIONS_TOPIC_KEY && selectedTopicKey !== topic?.key) {
       updateReading({
         [queryKeys.roleTopic]: topic?.key || '',
         [queryKeys.roleTopicNode]: null,
@@ -110,8 +118,11 @@ export default function BusinessChainTopics({
     })),
   }), [topic])
   const graph = mapOpen ? map : topicDiagram
+  const matchingActions = topic ? buildChainActionRelations(catalog, topic).filter((action) => relationMatches(action, filters)) : []
+  const matchingNodes = filtered && !mapOpen ? new Set(matchingActions.flatMap((action) => action.nodeKeys)) : null
   const node =
-    graph?.nodes.find((item) => item.key === picked) ||
+    graph?.nodes.find((item) => item.key === picked && (!matchingNodes || matchingNodes.has(item.key))) ||
+    (matchingNodes ? graph?.nodes.find((item) => matchingNodes.has(item.key)) : null) ||
     graph?.nodes.find(
       (item) => item.key === (mapOpen ? focus.key : topic?.entryNodeKeys?.[0])
     ) ||
@@ -120,18 +131,24 @@ export default function BusinessChainTopics({
     restoreMapFocus.current = true
     updateReading({ [queryKeys.roleMap]: null, [queryKeys.roleMapNode]: null })
   }
+  const selectedStep = !mapOpen && topic?.steps.find((step) =>
+    step.key === searchParams.get(queryKeys.roleTopicStep) &&
+    step.verificationRuleIds.length > 0 &&
+    (step.fromNodeKey === node?.key || step.toNodeKey === node?.key)
+  )
   const selectNode = (key) => updateReading(
     mapOpen
       ? { [queryKeys.roleMapNode]: key }
       : {
           [queryKeys.roleTopic]: topic.key,
           [queryKeys.roleTopicNode]: key,
+          [queryKeys.roleTopicStep]: null,
         }
   )
   return (
     <div className="erp-dev-chain-topics" data-business-chain-topics>
       <h3 className="erp-dev-chain-topics__print-title">
-        {mapOpen ? '系统衔接图' : topic?.label}
+        {mapOpen ? '系统衔接图' : financeSelected ? '财务关联概览' : topic?.label}
       </h3>
       {mapOpen ? (
         <div className="erp-dev-fulfillment-guide__detail-title">
@@ -149,7 +166,7 @@ export default function BusinessChainTopics({
           optionFilterProp="label"
           virtual={false}
           allowClear={!mapOpen}
-          value={mapOpen ? focus.key : topic?.key}
+          value={mapOpen ? focus.key : financeSelected ? FINANCE_RELATIONS_TOPIC_KEY : topic?.key}
           onChange={(key) => {
             if (mapOpen) {
               updateReading({
@@ -164,16 +181,17 @@ export default function BusinessChainTopics({
                   value: chain.key,
                   label: chain.label,
                 }))
-              : lanes.map((lane) => ({
+              : [{ label: '跨模块关联', options: [{ value: FINANCE_RELATIONS_TOPIC_KEY, label: '财务关联概览' }] }, ...lanes.map((lane) => ({
                   label: lane.label,
                   options: lane.topics.map(({ chain }) => ({
                     value: chain.key,
                     label: chain.label,
                   })),
-                }))
+                }))]
           }
         />
-        {!mapOpen ? (
+        {filterControls}
+        {!mapOpen && !financeSelected ? (
           <Button
             ref={mapOpener}
             type="link"
@@ -189,7 +207,7 @@ export default function BusinessChainTopics({
           </Button>
         ) : null}
       </div>
-      {graph ? (
+      {financeSelected ? <FinanceRelationshipsView catalog={catalog} onOpenView={onOpenView} role={role} filters={filters} /> : graph ? (
         <section
           className="erp-dev-chain-topics__diagram"
           data-topic-diagram={mapOpen ? 'system' : topic.key}
@@ -210,6 +228,7 @@ export default function BusinessChainTopics({
               selectedKey={node?.key}
               onSelect={selectNode}
               role={role}
+              matchingKeys={matchingNodes}
               relationships
               runtimeKey={mapOpen ? currentChainKey : undefined}
             />
@@ -224,14 +243,16 @@ export default function BusinessChainTopics({
                       .join('；') ||
                     '本分支结果'}
                 </p>
-                <Button
-                  type="link"
-                  onClick={() => {
-                    onSelectChain(node.key)
-                  }}
-                >
-                  查看此专题
-                </Button>
+                {node.key !== topic?.key ? (
+                  <Button
+                    type="link"
+                    onClick={() => {
+                      onSelectChain(node.key)
+                    }}
+                  >
+                    查看此专题
+                  </Button>
+                ) : null}
               </div>
             ) : (
               <BusinessTopicDetails
@@ -239,20 +260,26 @@ export default function BusinessChainTopics({
                 node={node}
                 onSelect={selectNode}
                 onExploreChain={onExploreChain}
+                selectedStepKey={selectedStep?.key}
+                visibleStepKeys={filtered ? new Set(matchingActions.map((action) => action.step.key)) : null}
+                onInspectStep={(key) => updateReading({ [queryKeys.roleTopicStep]: key })}
+                stepDetails={selectedStep ? <BusinessChainStepVerification
+                  key={selectedStep.key}
+                  catalog={catalog}
+                  topic={topic}
+                  step={selectedStep}
+                /> : null}
               />
             )}
           </div>
           {!mapOpen ? <BusinessTopicVerification topic={topic} /> : null}
-          <EvidenceDisclosure
-            value={mapOpen ? catalog.businessChainOverview : topic}
-            label="查看图示来源"
-          />
+
         </section>
       ) : (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
-            available.length ? '请选择业务专题' : '该岗位暂无关联专题'
+            available.length ? '请选择业务专题' : filtered ? '没有同时满足条件的专题，移除筛选可恢复查看' : '该岗位暂无关联专题'
           }
         />
       )}

@@ -40,7 +40,6 @@ import { BusinessListToolbarActions, useBusinessColumnOrder } from '../component
 import BusinessFormSection from '../components/business-list/BusinessFormSection.jsx'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
-import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import {
   ContactFormList,
@@ -50,7 +49,7 @@ import {
   mergeTextSuggestionOptions,
   normalizeContactRows,
 } from '../components/master-data/MasterDataForm.jsx'
-import ProductImageSlots from '../components/master-data/ProductImageSlots.jsx'
+import ProductRecordEditor from '../components/master-data/ProductRecordEditor.jsx'
 import {
   listContactsByOwner,
   listAllProcesses,
@@ -71,8 +70,6 @@ import {
   buildContactParams,
   buildMasterDataParams,
   buildProcessParams,
-  buildProductParams,
-  buildProductSKUParams,
 } from '../utils/masterDataParams.mjs'
 import {
   buildPaymentConditionOptions,
@@ -209,8 +206,6 @@ export default function MasterDataPage({ type }) {
   const [detailRecord, setDetailRecord] = useState(null)
   const [saving, setSaving] = useState(false)
   const [recordForm] = Form.useForm()
-  const productImageSlotsRef = useRef(null)
-  const skuAttachmentRef = useRef(null)
   const requestControllersRef = useRef({})
   const requestSequenceRef = useRef({})
   const moduleKey = config.recordKey
@@ -696,7 +691,6 @@ export default function MasterDataPage({ type }) {
   )
 
   const openCreateRecord = () => {
-    skuAttachmentRef.current?.clearPendingAttachments()
     setEditingRecord(null)
     setContacts([])
     recordForm.resetFields()
@@ -769,7 +763,6 @@ export default function MasterDataPage({ type }) {
 
   const openEditRecord = async (record) => {
     if (!record?.id) return
-    skuAttachmentRef.current?.clearPendingAttachments()
     setSelectedRecord(record)
     recordForm.resetFields()
     const recordContacts = showContactForm ? await loadContacts(record) : []
@@ -804,14 +797,9 @@ export default function MasterDataPage({ type }) {
     setSaving(true)
     try {
       const extra = editingRecord?.id ? { id: editingRecord.id } : {}
-      const params =
-        effectiveType === 'product_skus'
-          ? buildProductSKUParams(values, extra)
-          : effectiveType === 'products'
-            ? buildProductParams(values, extra)
-            : effectiveType === 'processes'
-              ? buildProcessParams(values, extra)
-              : buildMasterDataParams(values, extra)
+      const params = effectiveType === 'processes'
+        ? buildProcessParams(values, extra)
+        : buildMasterDataParams(values, extra)
       const savedData =
         showContactForm && config.saveWithContacts
           ? await config.saveWithContacts({
@@ -826,53 +814,7 @@ export default function MasterDataPage({ type }) {
         : editingRecord?.id
           ? await config.update(params)
           : await config.create(params)
-      const attachmentSaved =
-        effectiveType === 'product_skus'
-          ? (await skuAttachmentRef.current?.flushPendingAttachments(
-              saved?.id
-            )) !== false
-          : true
-      const productImageResult =
-        effectiveType === 'products'
-          ? await productImageSlotsRef.current?.flushChanges(saved?.id)
-          : { mutationsApplied: true, reloaded: true }
-      const productImagesApplied = productImageResult?.mutationsApplied === true
-      const productImagesReloaded = productImageResult?.reloaded === true
-      if (!productImagesApplied) {
-        setSelectedRecord(saved || selectedRecord)
-        setEditingRecord(saved || editingRecord)
-        if (Array.isArray(savedData?.contacts)) {
-          setContacts(savedData.contacts)
-        }
-        if (shouldShowCreatedRecordOnFirstPage) {
-          resetBusinessPaginationCurrent(setPagination)
-        } else {
-          await loadRecords()
-        }
-        const currentImagesReloaded = productImagesReloaded
-          ? true
-          : (await productImageSlotsRef.current?.beginSession(saved?.id)) ===
-            true
-        message.warning(
-          currentImagesReloaded
-            ? '产品已保存，产品图未全部更新；已刷新当前图片，请重新选择未完成的产品图后再保存'
-            : '产品已保存，产品图未全部更新且暂时无法刷新；请稍后重新打开产品并核对图片'
-        )
-        return
-      }
-      if (!productImagesReloaded) {
-        message.warning(
-          '产品和产品图已保存，但当前图片状态暂未刷新；请稍后重新打开产品核对'
-        )
-      } else if (!attachmentSaved) {
-        message.warning(`${entityLabel}已保存，未上传的附件请重新选择`)
-      } else {
-        message.success(
-          editingRecord?.id ? `${entityLabel}已更新` : `${entityLabel}已创建`
-        )
-      }
-      productImageSlotsRef.current?.cancelSession()
-      skuAttachmentRef.current?.clearPendingAttachments()
+      message.success(editingRecord?.id ? `${entityLabel}已更新` : `${entityLabel}已创建`)
       setRecordModalOpen(false)
       setSelectedRecord(saved || selectedRecord)
       if (Array.isArray(savedData?.contacts)) {
@@ -1196,95 +1138,83 @@ export default function MasterDataPage({ type }) {
         onOpenRecord={openMasterDataRecord}
       />
 
-      <BusinessFormPage
-        form={recordForm}
-        title={
-          editingRecord?.id
-            ? `编辑${entityLabel}`
-            : `新建${config.createTitleLabel || config.title}`
-        }
-        open={recordModalOpen}
-        onOk={saveRecord}
-        onCancel={() => {
-          if (saving || contactLoading) return
-          productImageSlotsRef.current?.cancelSession()
-          skuAttachmentRef.current?.clearPendingAttachments()
-          setRecordModalOpen(false)
-        }}
-        confirmLoading={saving}
-        loading={
-          contactLoading || (needsUnitDictionary(effectiveType) && unitLoading)
-        }
-      >
-        <Form
+      {['products', 'product_skus'].includes(effectiveType) ? (
+        <ProductRecordEditor
+          type={effectiveType}
           form={recordForm}
-          layout="vertical"
-          className="erp-business-action-form"
-          onValuesChange={handleRecordValuesChange}
+          open={recordModalOpen}
+          record={editingRecord}
+          products={productReferences}
+          records={records}
+          onClose={() => setRecordModalOpen(false)}
+          onSaved={async (saved) => {
+            setSelectedRecord(saved)
+            if (!editingRecord?.id) resetBusinessPaginationCurrent(setPagination)
+            else await loadRecords()
+          }}
+        />
+      ) : (
+        <BusinessFormPage
+          form={recordForm}
+          title={
+            editingRecord?.id
+              ? `编辑${entityLabel}`
+              : `新建${config.createTitleLabel || config.title}`
+          }
+          open={recordModalOpen}
+          onOk={saveRecord}
+          onCancel={() => {
+            if (saving || contactLoading) return
+                  setRecordModalOpen(false)
+          }}
+          confirmLoading={saving}
+          loading={
+            contactLoading || (needsUnitDictionary(effectiveType) && unitLoading)
+          }
         >
-          <MasterDataFormFields
+          <Form
             form={recordForm}
-            type={effectiveType}
-            isEditing={Boolean(editingRecord?.id)}
-            products={productReferences}
-            productOptions={productOptions}
-            unitOptions={unitOptions}
-            unitLoading={unitLoading}
-            materialCategoryOptions={materialCategoryOptions}
-            materialColorOptions={materialColorOptions}
-            processNameOptions={processNameOptions}
-            processCategoryOptions={processCategoryOptions}
-            supplierProcessOptions={supplierProcessOptions}
-            canEditSupplierProcesses={canReadProcesses}
-            supplierTypeOptions={SUPPLIER_TYPE_OPTIONS}
-            customerPaymentConditionOptions={customerPaymentConditionOptions}
-            onCustomerPaymentMethodChange={applyCustomerPaymentMethod}
-            contactSection={
-              showContactForm ? (
-                <BusinessFormSection
-                  title="联系人"
-                  showHeading={false}
-                  layout="content"
-                >
-                  <ContactFormList
-                    form={recordForm}
-                    entityLabel={entityLabel}
-                  />
-                </BusinessFormSection>
-              ) : null
-            }
-          />
-          {effectiveType === 'products' ? (
-            <BusinessFormSection
-              title="产品图片"
-              showHeading={false}
-              layout="content"
-            >
-              <ProductImageSlots
-                ref={productImageSlotsRef}
-                productId={editingRecord?.id}
-                open={recordModalOpen}
-                canEdit={editingRecord?.id ? canUpdate : canCreate}
-              />
-            </BusinessFormSection>
-          ) : null}
-          {effectiveType === 'product_skus' ? (
-            <BusinessFormSection title="附件">
-              <BusinessAttachmentPanel
-                compact
-                ref={skuAttachmentRef}
-                ownerType="product_sku"
-                ownerId={editingRecord?.id}
-                title="产品规格附件"
-                description="上传产品图、样品图、包装图或客户款式确认资料；附件不会改变产品规格的启用状态。"
-                canUpload={canCreate || canUpdate}
-                canWithdraw={canUpdate}
-                variant="inline"
-              />
-            </BusinessFormSection>
-          ) : null}
-        </Form>
-      </BusinessFormPage>
+            layout="vertical"
+            className="erp-business-action-form"
+            onValuesChange={handleRecordValuesChange}
+          >
+            <MasterDataFormFields
+              form={recordForm}
+              type={effectiveType}
+              isEditing={Boolean(editingRecord?.id)}
+              products={productReferences}
+              productOptions={productOptions}
+              unitOptions={unitOptions}
+              unitLoading={unitLoading}
+              materialCategoryOptions={materialCategoryOptions}
+              materialColorOptions={materialColorOptions}
+              processNameOptions={processNameOptions}
+              processCategoryOptions={processCategoryOptions}
+              supplierProcessOptions={supplierProcessOptions}
+              canEditSupplierProcesses={canReadProcesses}
+              supplierTypeOptions={SUPPLIER_TYPE_OPTIONS}
+              customerPaymentConditionOptions={customerPaymentConditionOptions}
+              onCustomerPaymentMethodChange={applyCustomerPaymentMethod}
+              contactSection={
+                showContactForm ? (
+                  <BusinessFormSection
+                    title="联系人"
+                    showHeading={false}
+                    layout="content"
+                  >
+                    <ContactFormList
+                      form={recordForm}
+                      entityLabel={entityLabel}
+                    />
+                  </BusinessFormSection>
+                ) : null
+              }
+            />
+
+          </Form>
+        </BusinessFormPage>
+
+      )}
 
       <BusinessDetailsModal
         columns={recordColumns}

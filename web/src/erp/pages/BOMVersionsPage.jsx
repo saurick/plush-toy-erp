@@ -12,7 +12,9 @@ import {
   UploadOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Space } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import { canReadReference, loadReferenceIDs } from '../utils/remoteReferences.mjs'
@@ -125,8 +127,10 @@ import {
 } from '../data/engineeringPrintTemplates.mjs'
 
 export default function BOMVersionsPage() {
-  const outletContext = useOutletContext()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const outletContext = useBusinessPageContext()
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const taskReadOnly = outletContext?.taskBusiness?.readOnly === true
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -223,9 +227,9 @@ export default function BOMVersionsPage() {
     adminProfile,
     PermissionCode.WORKFLOW_TASK_READ
   )
-  const canCreate = hasActionPermission(adminProfile, PermissionCode.BOM_CREATE)
-  const canUpdate = hasActionPermission(adminProfile, PermissionCode.BOM_UPDATE)
-  const canActivate = hasActionPermission(
+  const canCreate = !taskReadOnly && hasActionPermission(adminProfile, PermissionCode.BOM_CREATE)
+  const canUpdate = !taskReadOnly && hasActionPermission(adminProfile, PermissionCode.BOM_UPDATE)
+  const canActivate = !taskReadOnly && hasActionPermission(
     adminProfile,
     PermissionCode.BOM_ACTIVATE
   )
@@ -612,6 +616,7 @@ export default function BOMVersionsPage() {
     setSaving(true)
     try {
       const next = await activateBOMVersion({ id: record.id })
+      reportBusinessResult('BOM 版本已启用', next)
       message.success('BOM 新版本已启用，原版本及已有订单引用已保留')
       setSelectedVersion(next || record)
       setSavedRevision(null)
@@ -1191,6 +1196,7 @@ export default function BOMVersionsPage() {
         onSaved={async (saved) => {
           setSelectedVersion(saved)
           applySelectedRowKeys([saved.id])
+          reportBusinessResult('BOM 草稿已保存', saved)
           if (headerMode === 'edit' && revisionEditing) setSavedRevision(saved)
           await loadVersions()
         }}

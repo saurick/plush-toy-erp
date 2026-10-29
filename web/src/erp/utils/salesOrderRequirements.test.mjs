@@ -61,10 +61,10 @@ test('customer demand remains visible after engineering associates a product', (
     product_id: 5,
     requested_product_name: '客户约定名称',
     product_name_snapshot: '工程产品名称',
-    engineering_status: 'SAMPLING',
+    bom_id: 73,
   }
   assert.equal(salesOrderRequirementName(item), '客户约定名称')
-  assert.equal(salesOrderEngineeringLabel(item), '打样中')
+  assert.equal(salesOrderEngineeringLabel(item), '已关联工程 BOM')
   assert.equal(
     salesOrderEngineeringLabel({ ...item, product_id: null }),
     '待工程建档'

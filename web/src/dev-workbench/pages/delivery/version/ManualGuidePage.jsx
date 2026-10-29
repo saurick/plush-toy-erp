@@ -1,13 +1,9 @@
-import { ArrowLeftOutlined, ToolOutlined } from '@ant-design/icons'
-import { Anchor, Button, Typography } from 'antd'
+import { ToolOutlined } from '@ant-design/icons'
+import { Anchor, Typography } from 'antd'
 import { useCallback, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import {
-  buildDevCustomerScopedRoute,
-  resolveDevCustomerScope,
-} from '../../../config/devCustomerScope.mjs'
+import DevPageHeader from '../../../components/DevPageHeader.jsx'
 import { CI_WORKFLOW_SECTIONS } from '../../../config/devCiWorkflow.mjs'
-import { DEV_VERSION_CENTER_ROUTE } from '../../../config/devRoutes.mjs'
 import {
   MANUAL_GUIDE_CI_SECTION_PREFIX,
   ManualTakeoverGuide,
@@ -59,15 +55,6 @@ const guideChapters = [
 export default function ManualGuidePage() {
   const { pathname, search, hash } = useLocation()
   const navigate = useNavigate()
-  const customerScope = resolveDevCustomerScope(search)
-  const versionCenterHref =
-    customerScope.status === 'ready'
-      ? buildDevCustomerScopedRoute(
-          DEV_VERSION_CENTER_ROUTE,
-          customerScope.customerKey
-        )
-      : DEV_VERSION_CENTER_ROUTE
-
   useEffect(() => {
     if (!hash) return
     document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
@@ -95,19 +82,19 @@ export default function ManualGuidePage() {
           />
         </nav>
       </aside>
-      <header className="erp-dev-hub-header">
-        <div className="erp-dev-hub-header__copy">
-          <span className="erp-dev-hub-header__icon">
-            <ToolOutlined aria-hidden="true" />
-          </span>
-          <Typography.Title level={1} className="erp-dev-hub-title">
-            手动与应急发布指引
-          </Typography.Title>
-        </div>
-        <Button href={versionCenterHref} icon={<ArrowLeftOutlined />}>
-          返回版本发布
-        </Button>
-      </header>
+      <DevPageHeader
+        className="erp-dev-hub-header"
+        title={
+          <div className="erp-dev-hub-header__copy">
+            <span className="erp-dev-hub-header__icon">
+              <ToolOutlined aria-hidden="true" />
+            </span>
+            <Typography.Title level={1} className="erp-dev-hub-title">
+              手动与应急发布指引
+            </Typography.Title>
+          </div>
+        }
+      />
       <main className="erp-dev-version-guide-content">
         <ManualTakeoverGuide />
       </main>

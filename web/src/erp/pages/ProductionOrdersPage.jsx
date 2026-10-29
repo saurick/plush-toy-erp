@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Tag, Typography } from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
-import { useOutletContext, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
+import { applyBusinessFormReadback } from '../utils/businessFormReadback.mjs'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
+import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { InventoryLotStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
@@ -264,8 +268,8 @@ function draftParams(values) {
 }
 
 export default function ProductionOrdersPage() {
-  const outletContext = useOutletContext()
-  const taskSource = outletContext?.mobileTaskCommand?.kind === 'production_plan' ? outletContext.mobileTaskCommand : null
+  const outletContext = useBusinessPageContext()
+  const taskSource = outletContext?.taskCommand?.kind === 'production_plan' ? outletContext.taskCommand : null
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const adminProfile = outletContext?.adminProfile || {}
   const allowedMenuPaths = outletContext?.allowedMenuPaths || []
@@ -288,6 +292,7 @@ export default function ProductionOrdersPage() {
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [mutationLoading, setMutationLoading] = useState(false)
+  useWorkflowTaskBusinessBusy(mutationLoading)
   const [selected, setSelected] = useState(null)
   const [aggregate, setAggregate] = useState(null)
   const resolvedRouteKeyword =
@@ -396,7 +401,7 @@ export default function ProductionOrdersPage() {
   )
   const canSubmitProductionException = hasActionPermission(
     adminProfile,
-    PermissionCode.PRODUCTION_EXCEPTION_SUBMIT
+    PermissionCode.PRODUCTION_OVER_ISSUE_SUBMIT
   )
   const canWarehousePackaging = hasActionPermission(adminProfile, PermissionCode.WAREHOUSE_PACKAGING_EXECUTE)
   const canIssueCutting = hasActionPermission(adminProfile, PermissionCode.OUTSOURCING_MATERIAL_ISSUE_CREATE)
@@ -591,8 +596,7 @@ export default function ProductionOrdersPage() {
 
   useEffect(() => {
     if (!formMode || !formValues) return
-    form.resetFields()
-    form.setFieldsValue(formValues)
+    applyBusinessFormReadback(form, formValues)
   }, [form, formMode, formValues])
 
   useEffect(() => {
@@ -674,6 +678,8 @@ export default function ProductionOrdersPage() {
       setDetailLoading(false)
     }
   }
+
+  useTaskBusinessEditor({ record: selected, enabled: canUpdate && selected?.status === PRODUCTION_ORDER_STATUS.DRAFT && outletContext?.taskBusiness?.contract?.actionKeys.includes('edit'), open: (record) => loadDetail(record, 'edit') })
 
   const selectRecord = async (record) => {
     const request = beginLatestRequest('production-order-selection')
@@ -1445,7 +1451,7 @@ export default function ProductionOrdersPage() {
       setAggregate(result)
       setSelected(result.order)
       reportBusinessResult(successText, result.order)
-      return true
+      return result
     } catch (error) {
       if (!isProductionOrderResultUnknown(error)) {
         attemptsRef.current.finish(scope, attempt)
@@ -1485,6 +1491,12 @@ export default function ProductionOrdersPage() {
       isCreate ? '生产订单草稿创建成功' : '生产订单草稿保存成功'
     )
     if (!ok) return
+    if (outletContext?.taskBusiness) {
+      setFormValues(aggregateToForm(ok))
+      setFormMode('edit')
+      await refreshAfterSuccess()
+      return
+    }
     setFormMode(null)
     setFormValues(null)
     if (isCreate) {
@@ -1522,6 +1534,43 @@ export default function ProductionOrdersPage() {
     setFormValues(null)
     await refreshAfterSuccess()
   }
+
+  const renderReleaseAction = ({ disabled = false, disabledReason = '' } = {}) => canUpdate ? (
+    <BusinessActionTooltip
+      visible={!selected || selected.status === PRODUCTION_ORDER_STATUS.DRAFT}
+      disabled={disabled || !selected || selected.status !== PRODUCTION_ORDER_STATUS.DRAFT || !aggregate || mutationLoading}
+      disabledReason={
+        disabled
+          ? disabledReason
+          : !selected
+            ? '请先选择一张生产订单'
+            : selected.status !== PRODUCTION_ORDER_STATUS.DRAFT
+              ? '只有生产订单草稿可以发布'
+              : !aggregate
+                ? '生产订单资料加载完成后可发布'
+                : mutationLoading
+                  ? '当前操作完成后可发布'
+                  : ''
+      }
+    >
+      <Button
+        data-business-action-key="release"
+        data-business-action-role="primary"
+        type="primary"
+        className="erp-business-module-status-action"
+        disabled={disabled || !selected || selected.status !== PRODUCTION_ORDER_STATUS.DRAFT || !aggregate || mutationLoading}
+        onClick={() => modal.confirm({
+          maskClosable: true,
+          title: '确认发布生产订单？',
+          content: '发布后计划明细将不能直接修改。',
+          okText: '确认发布',
+          onOk: () => runLifecycle('release'),
+        })}
+      >
+        发布
+      </Button>
+    </BusinessActionTooltip>
+  ) : null
 
   const columns = useMemo(
     () => [
@@ -1913,54 +1962,7 @@ export default function ProductionOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canUpdate ? (
-            <BusinessActionTooltip
-              visible={
-                !selected || selected.status === PRODUCTION_ORDER_STATUS.DRAFT
-              }
-              disabled={
-                !selected ||
-                selected.status !== PRODUCTION_ORDER_STATUS.DRAFT ||
-                !aggregate ||
-                mutationLoading
-              }
-              disabledReason={
-                !selected
-                  ? '请先选择一张生产订单'
-                  : selected.status !== PRODUCTION_ORDER_STATUS.DRAFT
-                    ? '只有生产订单草稿可以发布'
-                    : !aggregate
-                      ? '生产订单资料加载完成后可发布'
-                      : mutationLoading
-                        ? '当前操作完成后可发布'
-                        : ''
-              }
-            >
-              <Button
-                data-business-action-key="release"
-                data-business-action-role="primary"
-                type="primary"
-                className="erp-business-module-status-action"
-                disabled={
-                  !selected ||
-                  selected.status !== PRODUCTION_ORDER_STATUS.DRAFT ||
-                  !aggregate ||
-                  mutationLoading
-                }
-                onClick={() =>
-                  modal.confirm({
-                    maskClosable: true,
-                    title: '确认发布生产订单？',
-                    content: '发布后计划明细将不能直接修改。',
-                    okText: '确认发布',
-                    onOk: () => runLifecycle('release'),
-                  })
-                }
-              >
-                发布
-              </Button>
-            </BusinessActionTooltip>
-          ) : null}
+          {renderReleaseAction()}
           {canUpdate ? (
             <BusinessActionTooltip
               visible={
@@ -2131,6 +2133,13 @@ export default function ProductionOrdersPage() {
           setFormValues(null)
         }}
         onSubmit={submitDraft}
+        savedRecordActions={
+          outletContext?.taskBusiness && !outletContext.taskBusiness.readOnly &&
+          outletContext.taskBusiness.contract?.actionKeys.includes('release') &&
+          selected?.status === PRODUCTION_ORDER_STATUS.DRAFT
+            ? renderReleaseAction
+            : undefined
+        }
       />
 
       <ProductionCompletionModal

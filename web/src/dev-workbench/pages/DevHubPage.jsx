@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Button, Typography } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevToolTable from '../components/DevToolTable.jsx'
@@ -96,21 +97,29 @@ export default function DevHubPage() {
   return (
     <div className="erp-dev-hub-page erp-dev-hub-page--index erp-dev-overview-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav />
-      <header className="erp-dev-hub-header">
-        <Title level={1} className="erp-dev-hub-title">
-          总览
-        </Title>
-        <div className="erp-dev-overview-library__navigation">
-          <DevTaskNav
-            className="erp-dev-overview-view-tabs"
-            ariaLabel="总览视图"
-            idPrefix="dev-overview"
-            compact
-            items={VIEW_ITEMS}
-            value={activeView}
-            onChange={(value) => selectParam('view', value)}
-          />
-        </div>
+      <DevPageHeader
+        className="erp-dev-hub-header"
+        title={
+          <Title level={1} className="erp-dev-hub-title">
+            总览
+          </Title>
+        }
+        navigation={
+          <div className="erp-dev-overview-library__navigation">
+            <DevTaskNav
+              className="erp-dev-overview-view-tabs"
+              ariaLabel="总览视图"
+              idPrefix="dev-overview"
+              compact
+              items={VIEW_ITEMS}
+              value={activeView}
+              onChange={(value) => selectParam('view', value)}
+            />
+          </div>
+        }
+      />
+      <section className="erp-dev-workbench-toolbar" hidden={activeView === 'path'}>
+
         <div className="erp-dev-overview-library__toolbar" hidden={activeView === 'path'}>
           <SearchInput
             allowClear
@@ -137,7 +146,7 @@ export default function DevHubPage() {
             {items.length} 个工具
           </Text>
         </div>
-      </header>
+      </section>
       <main className="erp-dev-hub-shell">
         <section className="erp-dev-overview-library">
           <section

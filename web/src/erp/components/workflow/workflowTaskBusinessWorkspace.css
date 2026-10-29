@@ -1,0 +1,16 @@
+.workflow-task-business-workspace { min-width: 0; }
+.workflow-task-business-workspace .erp-business-page-layout[data-business-form-editing='true'] { height: auto; }
+.workflow-task-business-workspace .erp-business-form-page:not([hidden]),
+.workflow-task-business-workspace .erp-business-form-page__body { display: block; overflow: visible; }
+.workflow-task-business-workspace .erp-business-form-page__main { overflow: visible; }
+.erp-task-action-drawer .erp-material-task-action__footer-host { display: flex; flex: 1 1 0; align-items: center; gap: 8px; min-width: 0; }
+.erp-task-action-drawer .erp-material-task-action__footer-host[hidden] { display: none; }
+.erp-task-action-drawer .mobile-task-business-action-host { display: flex; flex: 1 1 0; min-width: 0; }
+.erp-task-action-drawer .mobile-task-business-form-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; width: 100%; }
+.erp-task-action-drawer .mobile-task-business-form-footer .erp-business-form-page__status { flex: 0 0 auto; }
+.erp-task-action-drawer .mobile-task-business-form-footer .erp-business-form-page__actions { justify-content: flex-end; }
+
+.workflow-task-business-workspace[data-business-form-editing='true'] .mobile-task-business-context-actions,
+.workflow-task-business-workspace[data-business-form-editing='true'] .mobile-task-business-primary { display: none; }
+
+.erp-task-action-drawer .ant-drawer-body { scroll-padding-block-start: 72px; }

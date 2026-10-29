@@ -66,6 +66,9 @@ export async function shellDispositionsThroughBrowser({ browser, options, client
   }
   await pageAction(page, '判定不合格');
   const reject = await modal(page, '判定不合格');
+  await selectOption(page, reject.getByLabel('检查结果', { exact: true }), '异常');
+  await selectOption(page, reject.getByLabel('检查范围', { exact: true }), '全检');
+  await reject.getByLabel('实际情况', { exact: true }).fill('模拟皮套颜色和尺寸不符');
   await expect(reject.getByLabel('判定结果', { exact: true })).toHaveCount(0);
   await reject.getByLabel('检验日期', { exact: true }).click();
   await page.locator(`.ant-picker-dropdown:visible td[title="${new Date().toISOString().slice(0, 10)}"]`).click();

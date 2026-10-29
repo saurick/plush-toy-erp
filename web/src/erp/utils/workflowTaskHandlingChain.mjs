@@ -85,7 +85,7 @@ export function buildEngineeringMaterialStageModel(task, request) {
         .filter(Boolean)
         .join(' · '),
     })
-  append('submit', '工程提交用料', '已提交', 'completed', request.submitted_at)
+  append('submit', '自动生成用料汇总', '已提交', 'completed', request.submitted_at)
   if (bossApproved) {
     append(
       'boss_review',
@@ -155,14 +155,14 @@ export function buildEngineeringMaterialStageModel(task, request) {
       ? '订单已结束，未完成的审批已停止。'
       : task.task_group === 'engineering_material_revision' &&
           task.task_status_key === WorkflowTaskStatus.DONE
-        ? '本轮已退回；工程已重新提交，后续审批记录在新的用料提交中。'
+        ? '本轮已退回；资料保存后已自动重新送审，后续审批记录在新的用料汇总中。'
         : rejected
           ? '本轮已退回工程修改。'
           : request.status === MaterialRequestStatus.APPROVED
             ? '本次用料已批准采购。'
             : request.status === MaterialRequestStatus.BOSS_APPROVED
               ? '老板已通过，当前由财务审核。'
-              : '工程已提交，当前由老板审核。',
+              : '用料已自动送审，当前由老板审核。',
     items,
   }
 }

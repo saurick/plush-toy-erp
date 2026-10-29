@@ -42,6 +42,7 @@ func newOperationalFactJSONRPCTestDataWithRepo(t *testing.T, admin *biz.AdminUse
 	customerConfigUC := biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo())
 	dispatcher := &jsonrpcDispatcher{
 		log:               log.NewHelper(log.With(logger, "module", "service.jsonrpc.operational_fact.test")),
+		adminManageUC:     newAllWarehouseScopeAdminUsecase(),
 		adminReader:       stubAdminAccountReader{admin: admin},
 		operationalFactUC: biz.NewOperationalFactUsecase(repo),
 		customerConfigUC:  customerConfigUC,
@@ -1151,17 +1152,17 @@ func TestJsonrpcDispatcher_ProductionCompletionSeparatesReportingFromWarehouseIn
 		biz.PermissionProductionFactCancel,
 	), productionMaterialRepo)
 	activateEnabledProduction(productionMaterialDispatcher, "2026.08.11.production-completion-production-material")
-	_, materialPosted, err := productionMaterialDispatcher.handleOperationalFact(ctx, "post_production_fact", "production-posts-material-issue", mustJSONRPCStruct(t, map[string]any{
+	_, materialPosted, err := productionMaterialDispatcher.handleOperationalFact(ctx, "post_production_fact", "production-cannot-post-material-issue", mustJSONRPCStruct(t, map[string]any{
 		"id": 603, "expected_version": 1,
 	}))
-	if err != nil || materialPosted == nil || materialPosted.Code != errcode.OK.Code {
-		t.Fatalf("production material issue post failed: result=%#v err=%v", materialPosted, err)
+	if err != nil || materialPosted == nil || materialPosted.Code != errcode.PermissionDenied.Code || productionMaterialRepo.postProductionFactCalls != 0 {
+		t.Fatalf("production bypassed warehouse material issue permission: result=%#v err=%v", materialPosted, err)
 	}
-	_, materialCancelled, err := productionMaterialDispatcher.handleOperationalFact(ctx, "cancel_production_fact", "production-cancels-material-issue", mustJSONRPCStruct(t, map[string]any{
+	_, materialCancelled, err := productionMaterialDispatcher.handleOperationalFact(ctx, "cancel_production_fact", "production-cannot-cancel-material-issue", mustJSONRPCStruct(t, map[string]any{
 		"id": 603, "expected_version": 2, "reason": "领料登记有误",
 	}))
-	if err != nil || materialCancelled == nil || materialCancelled.Code != errcode.OK.Code {
-		t.Fatalf("production material issue cancellation failed: result=%#v err=%v", materialCancelled, err)
+	if err != nil || materialCancelled == nil || materialCancelled.Code != errcode.PermissionDenied.Code || productionMaterialRepo.cancelProductionFactCalls != 0 {
+		t.Fatalf("production bypassed warehouse material issue cancellation permission: result=%#v err=%v", materialCancelled, err)
 	}
 }
 
@@ -1359,7 +1360,7 @@ func TestJsonrpcDispatcher_ProductionMaterialIssueUsesExactPermissionAndStrictSo
 	ctx := workflowJSONRPCAdminContext()
 	repo := &productionModuleGateOperationalFactRepo{}
 	admin := workflowJSONRPCAdmin(
-		[]string{biz.ProductionRoleKey},
+		[]string{biz.WarehouseRoleKey},
 		biz.PermissionProductionMaterialIssueCreate,
 		biz.PermissionProductionFactRead,
 		biz.PermissionPMCPlanRead,
@@ -1425,7 +1426,7 @@ func TestJsonrpcDispatcher_ProductionMaterialIssueUsesExactPermissionAndStrictSo
 	}
 
 	legacyAdmin := workflowJSONRPCAdmin(
-		[]string{biz.ProductionRoleKey},
+		[]string{biz.WarehouseRoleKey},
 		biz.PermissionPMCPlanUpdate,
 		biz.PermissionWarehouseAdjustmentCreate,
 		biz.PermissionProductionCompletionCreate,

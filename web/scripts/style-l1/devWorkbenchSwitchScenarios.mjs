@@ -322,6 +322,7 @@ async function inspectGroups(page, evidence, seen = new Set()) {
       evidence.push({
         group: group.label,
         target: group.labels[index],
+        content: (await page.locator('.erp-dev-workspace-page').innerText()).slice(0, 3000),
         ...result,
       })
       await inspectGroups(page, evidence, seen)

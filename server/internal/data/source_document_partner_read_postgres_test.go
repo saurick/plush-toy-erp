@@ -29,7 +29,7 @@ func TestSourceDocumentPostgresIntegrationPartnerReadIsolation(t *testing.T) {
 		purchases[i] = f.client.PurchaseOrder.GetX(t.Context(), lines[i].PurchaseOrderID)
 		customers[i] = f.client.Customer.Create().SetCode("SIM-PARTNER-C-" + uuid.NewString()).SetName(fmt.Sprintf("模拟合作客户%c", 'A'+i)).SaveX(t.Context())
 		sales[i] = f.client.SalesOrder.Create().SetOrderNo("SIM-PARTNER-SO-" + uuid.NewString()).SetCustomerID(customers[i].ID).SetOrderDate(time.Now()).SetLifecycleStatus(biz.SalesOrderStatusActive).SetNote("内部备注不公开").SaveX(t.Context())
-		f.client.SalesOrderItem.Create().SetSalesOrderID(sales[i].ID).SetLineNo(1).SetUnitID(lines[i].UnitID).SetOrderedQuantity(decimal.NewFromInt(3)).SetRequestedProductName("模拟毛绒兔").SetUnitPrice(decimal.RequireFromString("1.25")).SetAmount(decimal.RequireFromString("3.75")).SetSampleNote("内部工程意见").SaveX(t.Context())
+		f.client.SalesOrderItem.Create().SetSalesOrderID(sales[i].ID).SetLineNo(1).SetUnitID(lines[i].UnitID).SetOrderedQuantity(decimal.NewFromInt(3)).SetRequestedProductName("模拟毛绒兔").SetUnitPrice(decimal.RequireFromString("1.25")).SetAmount(decimal.RequireFromString("3.75")).SaveX(t.Context())
 	}
 	draft := f.client.SalesOrder.Create().SetOrderNo("SIM-PARTNER-DRAFT-" + uuid.NewString()).SetCustomerID(customers[0].ID).SetOrderDate(time.Now()).SetLifecycleStatus(biz.SalesOrderStatusDraft).SaveX(t.Context())
 	type actor struct {
@@ -96,7 +96,7 @@ func TestSourceDocumentPostgresIntegrationPartnerReadIsolation(t *testing.T) {
 				t.Fatal("authorized detail is missing its line")
 			}
 			encoded, _ := json.Marshal(detail)
-			for _, forbidden := range []string{"note", "sample_bom_id", "engineering_status", "import_source", "settled_by", "product_order_no_snapshot", "内部备注", "内部工程意见"} {
+			for _, forbidden := range []string{"note", "bom_id", "engineering_status", "import_source", "settled_by", "product_order_no_snapshot", "内部备注", "内部工程意见"} {
 				if strings.Contains(string(encoded), forbidden) {
 					t.Fatalf("private field leaked: %s", forbidden)
 				}

@@ -7,9 +7,10 @@ import {
   DeploymentUnitOutlined,
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
-import { Button, Typography } from 'antd'
+import { Typography } from 'antd'
 import { DeliveryWorkspace } from './delivery/DeliveryWorkspace.jsx'
 import DevEnvironmentEvidencePanel from '../components/DevEnvironmentEvidencePanel.jsx'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
@@ -24,7 +25,6 @@ import {
   DEV_DEVELOPMENT_RESOURCES_ROUTE,
   DEV_PRODUCT_ENGINEERING_ROUTE,
   DEV_QUALITY_ROUTE,
-  DEV_TESTING_ROUTE,
   DEV_WORKBENCH_AREA_KEYS,
   getDevSecondaryNavItems,
 } from '../config/devRoutes.mjs'
@@ -62,7 +62,6 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
   const items = getDevSecondaryNavItems(areaKey).map(
     (entry) => DEV_HUB_ITEMS.find((item) => item.key === entry.key)
   )
-  const isQuality = areaKey === DEV_WORKBENCH_AREA_KEYS.quality
   const isDevelopmentResources = areaKey === DEV_WORKBENCH_AREA_KEYS.developmentResources
   const isDelivery = areaKey === DEV_WORKBENCH_AREA_KEYS.delivery
   const customerScope = useDevCustomerScope({
@@ -84,53 +83,58 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
       className={`erp-dev-hub-page erp-dev-hub-page--area erp-dev-workspace-page erp-dev-tool-page erp-dev-area-page${isDelivery ? ' erp-dev-delivery-workspace' : ''}`}
     >
       <DevPageNav />
-      <header className="erp-dev-hub-header">
-        <div className="erp-dev-hub-header__copy">
-          <span className="erp-dev-hub-header__icon" aria-hidden="true">
-            {presentation.icon}
-          </span>
-          <Title level={1} className="erp-dev-hub-title">
-            {presentation.title}
-          </Title>
-        </div>
-        {isQuality ? (
-          <Button type="primary" href={DEV_TESTING_ROUTE}>
-            开始验证
-          </Button>
-        ) : null}
-        {isDelivery ? (
-          <DevTaskNav
-            compact
-            level="primary"
-            className="erp-dev-delivery-taskbar"
-            idPrefix="dev-delivery"
-            ariaLabel="交付运维视图"
-            items={DELIVERY_VIEWS}
-            value={activeView}
-            onChange={(value) => {
-              const next = new URLSearchParams(searchParams)
-              next.set('view', value)
-              setSearchParams(next)
-            }}
-          />
-        ) : null}
-        {isDevelopmentResources ? (
-          <DevTaskNav
-            compact
-            level="primary"
-            className="erp-dev-product-view-tabs"
-            idPrefix="dev-development-resources"
-            ariaLabel="开发资源查看方式"
-            items={DEV_DEVELOPMENT_RESOURCES_VIEWS}
-            value={resourceView}
-            onChange={(value) => {
-              if (value === resourceView) return
-              const next = new URLSearchParams(searchParams)
-              next.set('view', value)
-              setSearchParams(next)
-            }}
-          />
-        ) : null}
+      <DevPageHeader
+        className="erp-dev-hub-header"
+        title={
+          <div className="erp-dev-hub-header__copy">
+            <span className="erp-dev-hub-header__icon" aria-hidden="true">
+              {presentation.icon}
+            </span>
+            <Title level={1} className="erp-dev-hub-title">
+              {presentation.title}
+            </Title>
+          </div>
+        }
+        navigation={
+          isDelivery || isDevelopmentResources ? (
+            <>
+              {isDelivery ? (
+                <DevTaskNav
+                  compact
+                  level="primary"
+                  className="erp-dev-delivery-taskbar"
+                  idPrefix="dev-delivery"
+                  ariaLabel="交付运维视图"
+                  items={DELIVERY_VIEWS}
+                  value={activeView}
+                  onChange={(value) => {
+                    const next = new URLSearchParams(searchParams)
+                    next.set('view', value)
+                    setSearchParams(next)
+                  }}
+                />
+              ) : null}
+              {isDevelopmentResources ? (
+                <DevTaskNav
+                  compact
+                  level="primary"
+                  className="erp-dev-product-view-tabs"
+                  idPrefix="dev-development-resources"
+                  ariaLabel="开发资源查看方式"
+                  items={DEV_DEVELOPMENT_RESOURCES_VIEWS}
+                  value={resourceView}
+                  onChange={(value) => {
+                    if (value === resourceView) return
+                    const next = new URLSearchParams(searchParams)
+                    next.set('view', value)
+                    setSearchParams(next)
+                  }}
+                />
+              ) : null}
+            </>
+          ) : null
+        }
+      >
         {isDelivery ? (
           <section
             className="erp-dev-workbench-header-context"
@@ -146,7 +150,8 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             />
           </section>
         ) : null}
-      </header>
+      </DevPageHeader>
+
       <main className="erp-dev-hub-shell">
         <div
           hidden={(isDelivery && activeView !== 'prepare') || (isDevelopmentResources && resourceView !== 'tools')}

@@ -62,7 +62,7 @@ export default function HelpScenarioIllustration({
               </div>
               <p>示例公仔 · BOM V1 · 示例布料厂</p>
               <span className="erp-help-muted">
-                订单已生效 · 样品已确认 · BOM 已启用
+                订单已生效 · 工程资料已完成
               </span>
             </>
           )}
@@ -87,7 +87,7 @@ export default function HelpScenarioIllustration({
               <span className="erp-help-muted">按本岗位核对并办理</span>
               <span className="erp-help-example__action">
                 {{
-                  engineering: '提交老板审核',
+                  engineering: '保存资料后自动送审',
                   boss: '确认通过，交财务',
                   finance: '批准并生成采购订单',
                   purchase: '查看生成的采购订单',

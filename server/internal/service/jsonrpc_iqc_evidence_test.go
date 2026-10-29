@@ -76,7 +76,7 @@ func TestJsonrpcReplacementRequiresWarehouseCountAndStartsFreshInspection(t *tes
 		t.Fatal(err)
 	}
 	rate := decimal.NewFromInt(40)
-	qi, err := j.inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: receipt.QualityInspections[0].ID, Result: biz.QualityInspectionResultReject, CheckItems: rpcIncomingEvidence("FAIL"), DefectRateOperator: stringPtr(biz.QualityInspectionDefectRateOperatorGT), DefectRatePercent: &rate})
+	qi, err := j.inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: receipt.QualityInspections[0].ID, Result: biz.QualityInspectionResultReject, CheckItems: rpcIncomingEvidence("FAIL"), DecisionNote: stringPtr("外观不符合确认样，需供应商补换"), DefectRateOperator: stringPtr(biz.QualityInspectionDefectRateOperatorGT), DefectRatePercent: &rate})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,3 +1,41 @@
+.mobile-task-step-panels {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100dvh;
+}
+
+.mobile-task-step-panels .mobile-task-flow-topbar {
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+
+.mobile-task-step-panels .mobile-task-flow-trailing {
+  gap: 4px;
+}
+
+.mobile-task-step-panels .mobile-task-flow-trailing .erp-task-more {
+  width: 44px;
+  height: 44px;
+}
+
+@media (max-width: 767px) {
+  .erp-task-collaboration-modal .ant-modal-footer .ant-btn {
+    min-height: 44px;
+    white-space: nowrap;
+  }
+}
+
+.mobile-task-step-panels .mobile-task-screen {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
+}
+
+@media (min-width: 768px) {
+  .mobile-task-step-panels { height: calc(100dvh - 32px); }
+}
+
 .mobile-task-screen .mobile-detail-content {
   gap: 10px;
   padding: 12px;

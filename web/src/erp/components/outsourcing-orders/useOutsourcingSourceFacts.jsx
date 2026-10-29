@@ -1,7 +1,8 @@
 import { ExportOutlined, ImportOutlined } from '@ant-design/icons'
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { Button, Input, Space } from 'antd'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
+import { outsourcingTaskFactMatches, outsourcingTaskScope } from '../../utils/outsourcingTaskScope.mjs'
 import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { useOutsourcingReturnPayable } from './useOutsourcingReturnPayable.mjs'
@@ -96,6 +97,9 @@ export function useOutsourcingSourceFacts({
   canCreateQualityInspection,
   canOpenQualityInspection,
   navigate,
+  canCreateStagePayable,
+  canReadWIP,
+  taskBusiness,
   canCreatePayable,
   canViewPayable,
   setWarehouses,
@@ -104,6 +108,7 @@ export function useOutsourcingSourceFacts({
   unitOptions,
 }) {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const taskScope = useMemo(() => outsourcingTaskScope(taskBusiness), [taskBusiness])
   const [sourceFactOpen, setSourceFactOpen] = useState(false)
 
   const [sourceFactLoading, setSourceFactLoading] = useState(false)
@@ -141,16 +146,19 @@ export function useOutsourcingSourceFacts({
   const returnRecordActionInFlightRef = useRef(false)
 
   const {
+    financeSourceAction,
     financeSourceFact,
     financeSourceLoading,
     financeSourceInFlightRef,
     financeSourceInitialValues,
+    openOutsourcingOrderPayable,
     openOutsourcingReturnPayable,
     closeOutsourcingReturnPayable,
     submitOutsourcingReturnPayable,
     viewOutsourcingReturnPayable,
   } = useOutsourcingReturnPayable({
     canCreatePayable,
+    canCreateStagePayable,
     qualityInspectionByFactID,
     setReturnRecordsOpen,
     setReturnRecordsOrder,
@@ -246,11 +254,11 @@ export function useOutsourcingSourceFacts({
       const factID = Number(fact?.id || 0)
       const currentStatus = String(fact?.status || '').toUpperCase()
       const isPost = action === 'post'
-      const allowed = isPost
+      const allowed = (!taskScope || (taskScope.writable && taskScope.post && isPost && outsourcingTaskFactMatches(taskScope, fact))) && (isPost
         ? canPostOutsourcingFact && currentStatus === OperationalFactStatus.DRAFT
         : action === 'cancel' &&
           canCancelOutsourcingFact &&
-          [OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(currentStatus)
+          [OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(currentStatus))
       if (
         returnRecordActionInFlightRef.current ||
         !allowed ||
@@ -359,6 +367,7 @@ export function useOutsourcingSourceFacts({
       loadRelatedOutsourcingQualityInspections,
       returnRecordsOrder,
       reportBusinessResult,
+      taskScope,
     ]
   )
 
@@ -421,7 +430,7 @@ export function useOutsourcingSourceFacts({
         (inspection) =>
           String(inspection?.status || '').toUpperCase() !== OperationalFactStatus.CANCELLED
       )
-      if (!canCreateQualityInspection || !isPostedOutsourcingReturn(fact)) {
+      if ((taskScope && (!taskScope.writable || !taskScope.quality || !outsourcingTaskFactMatches(taskScope, fact))) || !canCreateQualityInspection || !isPostedOutsourcingReturn(fact)) {
         message.warning('请先选择已过账的委外回货记录')
         return
       }
@@ -432,7 +441,7 @@ export function useOutsourcingSourceFacts({
       setReturnRecordsOpen(false)
       setQualitySourceFact(fact)
     },
-    [canCreateQualityInspection, qualityInspectionByFactID]
+    [canCreateQualityInspection, qualityInspectionByFactID, taskScope]
   )
 
   const closeOutsourcingReturnQualityInspection = useCallback(() => {
@@ -579,7 +588,7 @@ export function useOutsourcingSourceFacts({
 
   const openOutsourcingSourceFact = useCallback(
     async (actionType, order, item) => {
-      if (!isOutsourcingSourceActionEligible(actionType, order, item)) {
+      if ((taskScope && (!taskScope.writable || !taskScope.create || taskScope.factType !== actionType)) || !isOutsourcingSourceActionEligible(actionType, order, item)) {
         message.warning('当前委外明细状态已变化，请刷新后重试')
         return
       }
@@ -638,7 +647,7 @@ export function useOutsourcingSourceFacts({
         }
       }
     },
-    [loadRelatedOutsourcingFacts, setWarehouses]
+    [loadRelatedOutsourcingFacts, setWarehouses, taskScope]
   )
 
   const openOutsourcingFactDraftEditor = useCallback(
@@ -656,7 +665,7 @@ export function useOutsourcingSourceFacts({
           : actionType === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
             ? canCreateReturnReceipt
             : false
-      if (!allowed || fact?.status !== OperationalFactStatus.DRAFT || !returnRecordsOrder?.id) {
+      if ((taskScope && (!taskScope.writable || !taskScope.create || !outsourcingTaskFactMatches(taskScope, fact))) || !allowed || fact?.status !== OperationalFactStatus.DRAFT || !returnRecordsOrder?.id) {
         message.warning('当前委外草稿状态或权限已变化，请刷新后重试')
         return
       }
@@ -724,6 +733,7 @@ export function useOutsourcingSourceFacts({
           facts,
         })
         setWarehouses(warehouseData?.warehouses || [])
+        setReturnRecordsOpen(false)
         setSourceFactOpen(true)
       } catch (error) {
         if (sourceFactRequestRef.current === requestID) {
@@ -741,6 +751,7 @@ export function useOutsourcingSourceFacts({
       loadRelatedOutsourcingFacts,
       returnRecordsOrder,
       setWarehouses,
+      taskScope,
     ]
   )
 
@@ -751,55 +762,37 @@ export function useOutsourcingSourceFacts({
     setSourceFactContext(EMPTY_SOURCE_FACT_CONTEXT)
   }, [])
 
-  const renderOutsourcingSourceFactAction = useCallback(
-    (order, item) => {
-      const action =
-        item?.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
-          ? {
-              type: OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE,
-              label: '委外发料',
-              allowed: canCreateMaterialIssue,
-            }
-          : {
-              type: OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT,
-              label: '登记回货',
-              allowed: canCreateReturnReceipt,
-            }
-      if (
-        !action.allowed ||
-        !isOutsourcingSourceActionEligible(action.type, order, item)
-      ) {
-        return null
-      }
-      return (
-        <Button
-          icon={
-            action.type === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE ? (
-              <ExportOutlined aria-hidden="true" />
-            ) : (
-              <ImportOutlined aria-hidden="true" />
-            )
-          }
-          className="erp-action-button"
-          size="small"
-          loading={sourceFactLoading}
-          onClick={(event) => {
-            event.stopPropagation()
-            openOutsourcingSourceFact(action.type, order, item)
-          }}
-          onDoubleClick={(event) => event.stopPropagation()}
-        >
-          {action.label}
-        </Button>
-      )
-    },
-    [
-      canCreateMaterialIssue,
-      canCreateReturnReceipt,
-      openOutsourcingSourceFact,
-      sourceFactLoading,
-    ]
-  )
+  const renderOutsourcingSourceFactAction = useCallback((order, item) => {
+    const action = item?.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+      ? { type: OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE, label: '委外发料', allowed: canCreateMaterialIssue }
+      : { type: OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT, label: '登记回货', allowed: canCreateReturnReceipt }
+    const stage = Number(item?.production_wip_batch_id) > 0 && Number(item?.production_order_id) > 0
+    const canCreateFact = (!taskScope || (taskScope.writable && taskScope.create && taskScope.factType === action.type)) && action.allowed && isOutsourcingSourceActionEligible(action.type, order, item)
+    const canBill = !taskScope && stage && canCreateStagePayable && item.production_wip_status === 'ACCEPTED' && ['confirmed', 'closed'].includes(order.lifecycle_status)
+    if (!canCreateFact && (taskScope || (!(stage && canReadWIP) && !canBill && !(stage && canViewPayable)))) return null
+    return (
+      <Space wrap onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
+        {canCreateFact && (
+          <Button
+            icon={action.type === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE ? <ExportOutlined aria-hidden="true" /> : <ImportOutlined aria-hidden="true" />}
+            className="erp-action-button"
+            size="small"
+            loading={sourceFactLoading}
+            onClick={() => openOutsourcingSourceFact(action.type, order, item)}
+          >
+            {action.label}
+          </Button>
+        )}
+        {!taskScope && stage && canReadWIP && (
+          <Button size="small" onClick={() => navigate(`${BUSINESS_ROUTE_PATHS.productionOrders}?production_order_id=${item.production_order_id}&wip_batch_id=${item.production_wip_batch_id}`)}>
+            {taskBusiness ? '查看工序任务' : item.production_wip_status === 'OUTSOURCED' ? '办理工序回货' : '查看工序'}
+          </Button>
+        )}
+        {canBill && <Button size="small" onClick={() => openOutsourcingOrderPayable(order)}>生成合同应付</Button>}
+        {!taskScope && stage && canViewPayable && <Button size="small" onClick={() => navigate(relatedDocumentRoute(BUSINESS_ROUTE_PATHS.payables, { source_type: 'OUTSOURCING_ORDER', source_id: order.id }, { source: 'outsourcing-order', keyword: order.outsourcing_order_no, fields: ['source_no'] }))}>查看合同应付</Button>}
+      </Space>
+    )
+  }, [canCreateMaterialIssue, canCreateReturnReceipt, canCreateStagePayable, canReadWIP, canViewPayable, taskBusiness, taskScope, navigate, openOutsourcingOrderPayable, openOutsourcingSourceFact, sourceFactLoading])
 
   const getOutsourcingOrderItemFields = useCallback(
     (item, { record }) => {
@@ -1102,6 +1095,7 @@ export function useOutsourcingSourceFacts({
     qualitySourceFact,
     qualitySourceLoading,
     dispositionSourceFact,
+    financeSourceAction,
     financeSourceFact,
     financeSourceLoading,
     financeSourceInitialValues,
@@ -1115,6 +1109,7 @@ export function useOutsourcingSourceFacts({
     viewOutsourcingReturnQualityInspection,
     openOutsourcingReturnDisposition,
     closeOutsourcingReturnDisposition,
+    openOutsourcingOrderPayable,
     openOutsourcingReturnPayable,
     closeOutsourcingReturnPayable,
     submitOutsourcingReturnPayable,

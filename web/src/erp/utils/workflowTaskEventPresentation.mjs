@@ -1,6 +1,7 @@
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from './roleKeys.mjs'
 import { BUSINESS_STATUS_OPTIONS } from '../config/workflowStatus.mjs'
+import { isApprovalWorkflowTask } from './workflowDashboardStats.mjs'
 
 const BUSINESS_STATUS_LABELS = new Map(BUSINESS_STATUS_OPTIONS.map(({ key, label }) => [key, label]))
 
@@ -303,9 +304,9 @@ export function buildWorkflowTaskResponsibilityItems(task = {}) {
 }
 
 export function buildWorkflowTaskEventTrailModel({
-  approvalTask = false,
   events = [],
   task = {},
+  approvalTask = isApprovalWorkflowTask(task),
 } = {}) {
   const normalizedEvents = Array.isArray(events) ? events.filter(Boolean) : []
   return {

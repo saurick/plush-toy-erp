@@ -1,6 +1,7 @@
 import React from 'react'
 import { Empty } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
 import SalesOrderSummaryPanel from './SalesOrderSummaryPanel.jsx'
@@ -28,7 +29,7 @@ function SummaryTypeControl({ options, selected, onChange }) {
 
 export default function WorkbenchSummaries({ options, refreshRevision = 0 }) {
   const [params, setParams] = useSearchParams()
-  const { adminProfile } = useOutletContext() || {}
+  const { adminProfile } = useBusinessPageContext() || {}
   const selected = params.get('summary') === '' ? undefined :
     options.find(({ value }) => value === params.get('summary'))?.value ||
     options[0]?.value

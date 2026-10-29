@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Button, Empty, Space, Spin, Tag } from 'antd'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { getDevTaskReadingSelection } from '../../pages/devFlowViewContext.mjs'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
 import Select from '@/common/components/select/AppSelect'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -12,15 +11,16 @@ import {
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { buildWorkflowBusinessChain } from '@/erp/utils/workflowBusinessChain.mjs'
 import { getWorkflowTaskDisplayName } from '@/erp/utils/processRuntimePresentation.mjs'
-import { resolveWorkflowTaskEntryPath } from '@/erp/utils/dashboardTaskDisplay.mjs'
+
 import { formatQueryTime } from './FlowStateShared.jsx'
+import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
 
 // Tasks describe responsibility; source records remain the authority for business results.
 export default function BusinessChainInstanceView({
   taskId,
   onSelectTask,
   onTaskLoaded,
-  onOpenView,
+
 }) {
   const [state, setState] = useState(null)
   const [retry, setRetry] = useState(0)
@@ -28,6 +28,7 @@ export default function BusinessChainInstanceView({
   const location = useLocation()
   const filter = searchParams.get(queryKeys.taskFilter) || 'all'
   const groupKey = searchParams.get(queryKeys.taskGroup) || null
+  const referenceStage = taskCatalog.fulfillment_flow.find((stage) => stage.stage === searchParams.get(queryKeys.roleStage))
   const changeFilter = (kind, group) =>
     setSearchParams(
       (previous) => {
@@ -77,7 +78,7 @@ export default function BusinessChainInstanceView({
     return (
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="输入单号或任务，查看实际进度与异常"
+        description={referenceStage ? `当前参考：${referenceStage.label}。输入单号或任务，查询实际记录。` : '输入单号或任务，查看实际进度与异常'}
       />
     )
   }
@@ -110,13 +111,12 @@ export default function BusinessChainInstanceView({
       />
     )
   }
-  const sourcePath = resolveWorkflowTaskEntryPath(current.task)
   const groups = [...current.model.main, ...current.model.exceptions]
   const activeGroupKey = groups.some((group) => group.key === groupKey)
     ? groupKey
     : null
   const unknownGroup = Boolean(groupKey && !activeGroupKey)
-  const readingTarget = getDevTaskReadingSelection(current.task)
+
   const pending = (task) => ['ready', 'blocked'].includes(task.task_status_key)
   const filterGroups = (items) =>
     items
@@ -196,11 +196,6 @@ export default function BusinessChainInstanceView({
             {formatQueryTime(current.at)}
           </span>
         </div>
-        <Space wrap>
-          {sourcePath ? <Link to={sourcePath}>打开业务页面</Link> : null}
-          <Button onClick={() => onOpenView('workflow')}>协同记录</Button>
-          <Button onClick={() => onOpenView('runtime')}>流程轨迹</Button>
-        </Space>
       </header>
       <p className="erp-dev-flow-instance-note">
         当前账号可见的已生成任务；任务结束不代替入库、质检或发货结果。
@@ -208,6 +203,13 @@ export default function BusinessChainInstanceView({
           ? '关联任务较多，当前最多展示 100 项；未展示部分请到业务页面核对。'
           : ''}
       </p>
+      {referenceStage ? (
+        <div className="erp-dev-flow-instance-reading" aria-label="实例参考环节">
+          <span>参考环节：{referenceStage.label}</span>
+          <Button type="link" onClick={() => changeFilter('all', referenceStage.stage)}>仅看此环节任务</Button>
+          <small>按已读取任务筛选，未出现不代表该环节已完成。</small>
+        </div>
+      ) : null}
       <div className="erp-dev-flow-instance-filters">
         <Space role="group" aria-label="关联任务筛选">
           {[
@@ -274,18 +276,7 @@ export default function BusinessChainInstanceView({
           }
         />
       ) : null}
-      {readingTarget ? (
-        <div className="erp-dev-flow-instance-reading">
-          <Button
-            type="link"
-            onClick={() => onOpenView('chain', readingTarget)}
-          >
-            {readingTarget[queryKeys.roleTab] === 'exceptions'
-              ? '查看异常处理路径'
-              : '查看对应办理流程'}
-          </Button>
-        </div>
-      ) : null}
+
       {exceptions.length ? (
         <section
           className="erp-dev-flow-instance-exceptions"

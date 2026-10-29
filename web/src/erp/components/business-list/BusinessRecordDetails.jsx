@@ -30,7 +30,7 @@ function detailValue(column, record) {
   return rawValue
 }
 
-export default function BusinessRecordDetails({ columns = [], record, column = { xs: 1, sm: 2, lg: 3 }, presentation = 'desktop' }) {
+export default function BusinessRecordDetails({ columns = [], record, column = { xs: 1, sm: 2, lg: 3 }, presentation = 'desktop', title = '本次业务资料' }) {
   const detailColumns = columns.filter(
     (column) =>
       column &&
@@ -73,7 +73,7 @@ export default function BusinessRecordDetails({ columns = [], record, column = {
     const populated = items.filter((item) => !item.empty)
     const empty = items.filter((item) => item.empty)
     const fields = (rows) => <dl className="mobile-task-facts__grid">{rows.map((item) => <div key={item.key} className={item.wide ? 'mobile-task-facts__field mobile-task-facts__field--wide' : 'mobile-task-facts__field'}><dt>{item.label}</dt><dd>{item.children}</dd></div>)}</dl>
-    return <section className="mobile-task-facts" aria-label="本次业务资料"><h3>本次业务资料</h3>{fields(populated)}{empty.length ? <details className="mobile-task-facts__empty"><summary>未填写信息（{empty.length} 项）<DownOutlined aria-hidden="true" /></summary>{fields(empty)}</details> : null}</section>
+    return <section className="mobile-task-facts" aria-label={title}><h3>{title}</h3>{fields(populated)}{empty.length ? <details className="mobile-task-facts__empty"><summary>未填写信息（{empty.length} 项）<DownOutlined aria-hidden="true" /></summary>{fields(empty)}</details> : null}</section>
   }
 
   return <Descriptions bordered column={column} size="small" items={items.map(({ key, label, children }) => ({ key, label, children }))} />

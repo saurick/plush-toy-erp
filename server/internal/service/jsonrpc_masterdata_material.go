@@ -46,6 +46,13 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 		if !valid {
 			return id, invalidParamResult(), nil
 		}
+		if _, present := pm["purchase_supplier_id"]; present {
+			supplierID, ok := getRequiredJSONRPCPositiveInt(pm, "purchase_supplier_id")
+			if !ok {
+				return id, invalidParamResult(), nil
+			}
+			filter.PurchaseSupplierID = supplierID
+		}
 		items, total, err := d.masterDataUC.ListMaterials(ctx, filter)
 		if err != nil {
 			return id, d.mapMasterDataError(ctx, err), nil

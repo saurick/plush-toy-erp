@@ -96,10 +96,28 @@ func TestFinanceFactDueAtFromDaysUsesCanonicalMonthEnd(t *testing.T) {
 			want:       time.Date(2026, time.August, 11, 15, 45, 0, 123456000, time.UTC),
 		},
 		{
-			name:       "positive days start from canonical UTC month end",
+			name:       "positive days start from China month end",
 			occurredAt: time.Date(2026, time.August, 11, 23, 45, 0, 123456789, time.FixedZone("CST", 8*60*60)),
 			days:       30,
 			want:       time.Date(2026, time.September, 30, 15, 45, 0, 123456000, time.UTC),
+		},
+		{
+			name:       "China month starts before UTC month",
+			occurredAt: time.Date(2026, time.August, 31, 16, 15, 0, 123456789, time.UTC),
+			days:       30,
+			want:       time.Date(2026, time.October, 29, 16, 15, 0, 123456000, time.UTC),
+		},
+		{
+			name:       "China early morning keeps local day and time",
+			occurredAt: time.Date(2026, time.August, 10, 17, 0, 0, 0, time.UTC),
+			days:       30,
+			want:       time.Date(2026, time.September, 29, 17, 0, 0, 0, time.UTC),
+		},
+		{
+			name:       "China new year precedes UTC new year",
+			occurredAt: time.Date(2026, time.December, 31, 16, 0, 0, 0, time.UTC),
+			days:       1,
+			want:       time.Date(2027, time.January, 31, 16, 0, 0, 0, time.UTC),
 		},
 		{
 			name:       "leap year month end",

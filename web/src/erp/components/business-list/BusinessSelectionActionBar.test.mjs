@@ -2,6 +2,7 @@ import { act, createElement, Fragment, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import assert from 'node:assert/strict'
 import test, { after } from 'node:test'
+import { MessageChannel as NativeMessageChannel } from 'node:worker_threads'
 import {
   registerJSXTestLoader,
   installTestDOM,
@@ -28,7 +29,6 @@ function installActionSpace(t, initialWidth = 420) {
     dom.runtimeWindow.dispatchEvent(new dom.runtimeWindow.Event('resize'))
   }
 }
-const NativeMessageChannel = globalThis.MessageChannel
 const testChannels = []
 globalThis.MessageChannel = class TestMessageChannel extends (
   NativeMessageChannel
@@ -49,7 +49,7 @@ after(() => {
   globalThis.MessageChannel = NativeMessageChannel
 })
 
-test('手机任务保留办理动作和来源摘要，完整单据详情仅在电脑提供', async (t) => {
+test('手机任务直接提供现场操作，来源编辑与查询留在电脑业务页', async (t) => {
   const [{ MemoryRouter, Routes, Route, Outlet }, { SelectionActionBar, BusinessActionTooltip, BusinessDataTable }, { Button }] = await Promise.all([
     import('react-router-dom'), import('./BusinessListLayout.jsx'), import('antd'),
   ])
@@ -57,13 +57,19 @@ test('手机任务保留办理动作和来源摘要，完整单据详情仅在�
   document.body.appendChild(container)
   const root = createRoot(container)
   let mobile = true
+  let pending = true
+  let editable = true
+  let formEditing = false
+  let editing = 0
+  let collaboration = true
   let posted = 0
   let details = 0
+  let secondaryClicks = 0
   const actionHost = document.createElement('div')
   document.body.appendChild(actionHost)
-  function Frame() { return createElement(Outlet, { context: mobile ? { mobileTaskBusiness: { taskID: 31, actionHost } } : {} }) }
+  function Frame() { return createElement(Outlet, { context: mobile ? { taskBusiness: { taskID: 31, actionHost, formEditing, device: 'mobile', collaborationExternal: true } } : {} }) }
   function Page() {
-    return createElement(Fragment, null, createElement(SelectionActionBar, { selectedCount: 1 }, createElement(BusinessActionTooltip, { disabled: false }, createElement(Button, { 'data-business-action-key': 'view-details', onClick: () => { details += 1 } }, '查看详情')), createElement(Button, { 'data-business-action-key': 'post', onClick: () => { posted += 1 } }, '确认入库')), createElement(BusinessDataTable, { rowKey: 'id', columns: [{ key: 'no', title: '单号', dataIndex: 'no' }], dataSource: [{ id: 91, no: 'PR-SIM-91' }], rowSelection: { type: 'radio', selectedRowKeys: [91] }, onOpenRecord: () => { details += 1 }, pagination: false }))
+    return createElement(Fragment, null, createElement(SelectionActionBar, { selectedCount: 1 }, createElement(BusinessActionTooltip, { disabled: false }, createElement(Button, { 'data-business-action-key': 'view-details', onClick: () => { details += 1 } }, '查看详情')), pending && createElement(Button, { 'data-business-action-key': 'post', 'data-business-action-role': 'primary', onClick: () => { posted += 1 } }, '确认入库'), editable && createElement(Button, { 'data-business-action-role': 'edit', onClick: () => { editing += 1 } }, '编辑草稿'), collaboration && createElement(Button, { 'data-business-action-role': 'collaboration' }, '任务协作'), createElement(BusinessActionTooltip, { disabled: false }, createElement(Button, { 'data-business-action-role': 'related' }, '相关单据')), createElement(Button, { 'data-business-action-role': 'related' }, '查看返工进度'), createElement(Button, { 'data-business-action-group': 'query' }, '附件'), createElement(Button, { 'data-business-action-role': 'output' }, '打印'), createElement(Button, { 'data-business-action-role': 'secondary', onClick: () => { secondaryClicks += 1 } }, '查看关联批次')), createElement(BusinessDataTable, { rowKey: 'id', columns: [{ key: 'no', title: '单号', dataIndex: 'no' }], dataSource: [{ id: 91, no: 'PR-SIM-91' }], rowSelection: { type: 'radio', selectedRowKeys: [91] }, onOpenRecord: () => { details += 1 }, pagination: false }))
   }
   const render = () => act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Routes, null, createElement(Route, { element: createElement(Frame) }, createElement(Route, { path: '*', element: createElement(Page) }))))))
   t.after(async () => { await act(async () => root.unmount()); container.remove(); actionHost.remove() })
@@ -75,6 +81,24 @@ test('手机任务保留办理动作和来源摘要，完整单据详情仅在�
   assert.equal(post.disabled, false)
   await act(async () => post.click())
   assert.equal(posted, 1)
+  assert.equal(container.querySelector('.mobile-task-business-other-actions'), null, 'task actions do not create a second hidden operation page')
+  assert.equal(editing, 0)
+  assert.doesNotMatch(actionHost.textContent, /编辑草稿/u)
+  assert.equal(actionHost.querySelector('.erp-business-selection-action-bar__compact-more'), null)
+  assert.doesNotMatch(container.textContent + actionHost.textContent, /相关单据|查看返工进度|附\s*件|打\s*印|查看关联批次/u)
+  formEditing = true
+  await render()
+  assert.equal(actionHost.querySelector('button'), null, 'the form footer replaces business actions while editing')
+  assert.equal(container.querySelector('.mobile-task-business-other-actions'), null)
+  formEditing = false
+  pending = false
+  editable = false
+  await render()
+  assert.equal(actionHost.textContent, '', 'the task host owns its authorized auxiliary actions')
+  assert.doesNotMatch(actionHost.textContent, /确认入库|相关单据|查看返工进度|附\s*件/u)
+  collaboration = false
+  await render()
+  assert.equal(actionHost.querySelector('.erp-business-selection-action-bar__compact-visible button'), null, '只剩辅助查询时不把它提升为手机主操作')
   assert.equal(details, 0)
   mobile = false
   await render()
@@ -82,6 +106,13 @@ test('手机任务保留办理动作和来源摘要，完整单据详情仅在�
   assert.ok(detail)
   await act(async () => detail.click())
   assert.equal(details, 1)
+  const secondary = [...container.querySelectorAll('button')].find((button) => button.textContent === '查看关联批次')
+  assert.ok(secondary)
+  await act(async () => secondary.click())
+  assert.equal(secondaryClicks, 1)
+  assert.match(container.textContent, /相关单据/u)
+  assert.match(container.textContent, /查看返工进度/u)
+  assert.match(container.textContent, /附\s*件/u)
 })
 
 test('未选和清空时保留禁用操作，选中后按权限启用办理动作', async (t) => {
@@ -395,15 +426,17 @@ test('内部受权限控制的组件没有入口时，不生成空的更多操�
 })
 
 test('选中记录时新建降低强调，清空后恢复且保留原入口', async (t) => {
-  const [{ BusinessOperationPanel, SelectionActionBar, ToolbarButton, BusinessActionTooltip }, { Button }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
+  const [{ BusinessOperationPanel, SelectionActionBar, ToolbarButton, BusinessActionTooltip }, { Button, Dropdown, Space }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   t.after(async () => { await act(async () => root.unmount()); container.remove() })
   let selected = false
   let created = 0
+  const createAction = createElement(BusinessActionTooltip, null, createElement(ToolbarButton, { type: 'primary', onClick: () => { created += 1 } }, '新建订单'))
+  const importAction = createElement(Dropdown, { menu: { items: [{ key: 'import', label: '从 Excel 新建' }] }, trigger: ['click'] }, createElement(ToolbarButton, { type: 'primary', 'aria-label': '更多新建方式' }, '⌄'))
   const render = () => act(async () => root.render(createElement(BusinessOperationPanel, {
-    primaryAction: createElement(BusinessActionTooltip, null, createElement(ToolbarButton, { type: 'primary', onClick: () => { created += 1 } }, '新建订单')),
+    primaryAction: createElement(Space.Compact, null, createAction, importAction),
   }, createElement(SelectionActionBar, { selectedCount: Number(selected) }, createElement(Button, { type: 'primary', 'data-business-action-role': 'primary' }, '提交订单')))))
   await render()
   const create = () => [...container.querySelectorAll('button')].find((button) => button.textContent === '新建订单')
@@ -415,9 +448,15 @@ test('选中记录时新建降低强调，清空后恢复且保留原入口', as
   assert.equal(create().classList.contains('ant-btn-primary'), false)
   await act(async () => create().click())
   assert.equal(created, 1)
+  const more = container.querySelector('[aria-label="更多新建方式"]')
+  assert.equal(more.classList.contains('ant-btn-primary'), false)
+  await act(async () => more.click())
+  assert(document.querySelector('.ant-dropdown-menu').textContent.includes('从 Excel 新建'))
+  await act(async () => more.click())
   selected = false
   await render()
   assert(create().classList.contains('ant-btn-primary'))
+  assert(container.querySelector('[aria-label="更多新建方式"]').classList.contains('ant-btn-primary'))
 })
 
 test('清空后保留内部尚未确认的办理状态，并允许非记录内容独立显示', async (t) => {
@@ -916,36 +955,88 @@ test('结束动作降低强调，提交类动作保留主按钮', async (t) => {
   }
 })
 
-test('选中记录时新建降低强调，清空后恢复且保留原入口', async (t) => {
-  const [{ BusinessOperationPanel, SelectionActionBar, ToolbarButton, BusinessActionTooltip }, { Button, Dropdown, Space }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
+test('任务只读时保留协作入口，隐藏业务写入和整单查询', async (t) => {
+  const [{ BusinessPageContext }, { BusinessOperationPanel, SelectionActionBar }, { Button }] = await Promise.all([
+    import('../../hooks/useBusinessPageContext.js'), import('./BusinessListLayout.jsx'), import('antd'),
+  ])
   const container = document.createElement('div')
-  document.body.appendChild(container)
+  const actionHost = document.createElement('div')
+  document.body.append(container, actionHost)
   const root = createRoot(container)
-  t.after(async () => { await act(async () => root.unmount()); container.remove() })
-  let selected = false
-  let created = 0
-  const createAction = createElement(BusinessActionTooltip, null, createElement(ToolbarButton, { type: 'primary', onClick: () => { created += 1 } }, '新建订单'))
-  const importAction = createElement(Dropdown, { menu: { items: [{ key: 'import', label: '从 Excel 新建' }] }, trigger: ['click'] }, createElement(ToolbarButton, { type: 'primary', 'aria-label': '更多新建方式' }, '⌄'))
-  const render = () => act(async () => root.render(createElement(BusinessOperationPanel, {
-    primaryAction: createElement(Space.Compact, null, createAction, importAction),
-  }, createElement(SelectionActionBar, { selectedCount: Number(selected) }, createElement(Button, { type: 'primary', 'data-business-action-role': 'primary' }, '提交订单')))))
-  await render()
-  const create = () => [...container.querySelectorAll('button')].find((button) => button.textContent === '新建订单')
-  assert(create().classList.contains('ant-btn-primary'))
-  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, false)
-  assert.equal(Boolean(container.querySelector('[data-business-selection-placeholder]')), false)
-  selected = true
-  await render()
-  assert.equal(create().classList.contains('ant-btn-primary'), false)
-  await act(async () => create().click())
-  assert.equal(created, 1)
-  const more = container.querySelector('[aria-label="更多新建方式"]')
-  assert.equal(more.classList.contains('ant-btn-primary'), false)
-  await act(async () => more.click())
-  assert(document.querySelector('.ant-dropdown-menu').textContent.includes('从 Excel 新建'))
-  await act(async () => more.click())
-  selected = false
-  await render()
-  assert(create().classList.contains('ant-btn-primary'))
-  assert(container.querySelector('[aria-label="更多新建方式"]').classList.contains('ant-btn-primary'))
+  t.after(async () => { await act(async () => root.unmount()); container.remove(); actionHost.remove() })
+  let collaborations = 0
+  await act(async () => root.render(createElement(BusinessPageContext.Provider, {
+    value: { taskBusiness: { readOnly: true, actionHost, onCollaboration: () => { collaborations += 1 } } },
+  }, createElement(BusinessOperationPanel, { primaryAction: createElement(Button, null, '新建') }, createElement(SelectionActionBar, { selectedCount: 1 }, createElement(Button, { 'data-business-action-role': 'primary' }, '确认出货'), createElement(Button, { 'data-business-action-role': 'collaboration' }, '任务协作'), createElement(Button, { 'data-business-action-role': 'related' }, '相关单据'))))))
+  const buttons = [...actionHost.querySelectorAll('button')]
+  assert.deepEqual(buttons.map((button) => button.textContent), ['任务协作'])
+  assert.doesNotMatch(container.textContent + actionHost.textContent, /确认出货|新建|相关单据/)
+  await act(async () => buttons[0].click())
+  assert.equal(collaborations, 1)
+})
+
+test('任务宿主独立提供辅助动作，来源页不重复协作或流程查询', async (t) => {
+  const [{ MemoryRouter }, { BusinessPageContext }, { SelectionActionBar }, { default: Progress }, { Button }] = await Promise.all([
+    import('react-router-dom'), import('../../hooks/useBusinessPageContext.js'), import('./BusinessListLayout.jsx'), import('../workflow/WorkflowSourceProgressButton.jsx'), import('antd'),
+  ])
+  const container = document.createElement('div')
+  const actionHost = document.createElement('div')
+  document.body.append(container, actionHost)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove(); actionHost.remove() })
+  let collaborations = 0
+  const render = (taskBusiness, duplicate = false, hostAction = true) => act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(BusinessPageContext.Provider, {
+    value: { taskBusiness: { actionHost, collaborationExternal: true, ...taskBusiness } },
+  }, createElement(Fragment, null, hostAction && createElement(Button, { onClick: () => { collaborations += 1 } }, '转交任务'), createElement(SelectionActionBar, { selectedCount: 1 }, createElement(Progress, { sourceType: 'finance_payment', sourceID: 1, profile: { is_super_admin: true } }), createElement(Button, { 'data-business-action-role': 'primary' }, '确认实际收付'), duplicate && createElement(Button, { 'data-business-action-role': 'collaboration' }, '旧协作入口')))))))
+  const hostButtons = () => [...container.querySelectorAll('button')].filter((button) => button.textContent === '转交任务')
+  await render({})
+  assert.equal(actionHost.textContent, '确认实际收付')
+  assert.equal(hostButtons().length, 1)
+  assert.equal(container.querySelector('.mobile-task-business-other-actions'), null)
+  await act(async () => hostButtons()[0].click())
+  assert.equal(collaborations, 1)
+  await render({ readOnly: true }, true)
+  assert.equal(hostButtons().length, 1)
+  assert.equal(actionHost.textContent, '')
+  assert.doesNotMatch(container.textContent + actionHost.textContent, /确认实际收付|旧协作入口/u)
+  await render({ formEditing: true })
+  assert.equal(hostButtons().length, 1, 'opening the native editor does not remove the host action')
+  assert.equal(actionHost.textContent, '')
+  await render({}, false, false)
+  assert.equal(hostButtons().length, 0, 'no authorized host action creates no substitute collaboration entry')
+})
+
+test('手机只提供适合触屏的当前操作，电脑覆盖相同权限下的编辑和生命周期', async (t) => {
+  const [{ MemoryRouter }, { BusinessPageContext }, { SelectionActionBar, BusinessActionTooltip, BusinessLifecyclePrimaryAction, BusinessLifecycleSecondaryAction }, { Button }] = await Promise.all([
+    import('react-router-dom'), import('../../hooks/useBusinessPageContext.js'), import('./BusinessListLayout.jsx'), import('antd'),
+  ])
+  const container = document.createElement('div')
+  const actionHost = document.createElement('div')
+  document.body.append(container, actionHost)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove(); actionHost.remove() })
+  let handled = 0
+  const actions = [
+    createElement(BusinessActionTooltip, { key: 'edit' }, createElement(Button, { 'data-business-action-role': 'edit' }, '编辑合同')),
+    createElement(Button, { key: 'create', 'data-business-action-role': 'create' }, '新建合同'),
+    createElement(BusinessLifecyclePrimaryAction, { key: 'submit', action: { key: 'submit', label: '提交合同' }, onAction: () => { handled += 1 } }),
+    createElement(BusinessLifecycleSecondaryAction, { key: 'cancel', action: { key: 'cancel', label: '取消合同' } }),
+  ]
+  const render = (device, current) => act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(BusinessPageContext.Provider, {
+    value: { taskBusiness: { actionHost, device } },
+  }, createElement(SelectionActionBar, { selectedCount: 1 }, current, createElement(Button, { 'data-business-action-role': 'related' }, '委外记录'))))))
+  const text = () => container.textContent + actionHost.textContent
+  for (const current of actions) {
+    await render('mobile', current)
+    assert.doesNotMatch(text(), /编辑合同|新建合同|提交合同|取消合同|委外记录/u)
+  }
+  await render('mobile', createElement(Button, { 'data-business-action-role': 'action' }, '登记回货'))
+  assert.match(text(), /登记回货/u)
+  assert.doesNotMatch(text(), /委外记录/u)
+  for (const [index, current] of actions.entries()) {
+    await render('desktop', current)
+    assert.ok(text().includes(['编辑合同', '新建合同', '提交合同', '取消合同'][index]))
+    if (index === 2) await act(async () => [...actionHost.querySelectorAll('button')].find((button) => button.textContent === '提交合同').click())
+  }
+  assert.equal(handled, 1)
 })

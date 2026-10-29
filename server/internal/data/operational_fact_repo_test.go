@@ -326,7 +326,7 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	if err != nil {
 		t.Fatalf("create production order failed: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, order.Order.ID)
+	prepareProductionOrderFactMaterialsForTest(t, ctx, client, order.Order.ID)
 	order, err = orderUC.Release(ctx, &biz.ProductionOrderAction{
 		ID: order.Order.ID, ExpectedVersion: order.Order.Version, ActorID: actor.ID, IdempotencyKey: "MO-INACTIVE-HISTORY:RELEASE",
 	})
@@ -334,9 +334,11 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 		t.Fatalf("release production order failed: %v", err)
 	}
 	lotNo := "PF-INACTIVE-HISTORY-LOT"
+	batchID := prepareProductionHandworkBatchForFactTest(t, ctx, client, order.Items[0].ID, actor.ID)
 	fact, err := uc.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 		FactNo: "PF-INACTIVE-HISTORY", ProductionOrderID: order.Order.ID, ProductionOrderItemID: order.Items[0].ID,
-		WarehouseID: fixtures.productWarehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "PF-INACTIVE-HISTORY",
+		ProductionWIPBatchID: batchID,
+		WarehouseID:          fixtures.productWarehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "PF-INACTIVE-HISTORY",
 	})
 	if err != nil {
 		t.Fatalf("create production completion failed: %v", err)

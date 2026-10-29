@@ -50,7 +50,8 @@ import {
   DataScopeOverview,
   SensitiveFieldOverview,
 } from './PermissionAccessOverview.jsx'
-import { PermissionChecklist } from './PermissionChecklist.jsx'
+import { RolePermissionPolicyPanel } from './RolePermissionPolicyPanel.jsx'
+import { readRolePermissionPolicy, constrainRolePermissionSelection } from '../../utils/rolePermissionPolicy.mjs'
 import { usePermissionFullscreen } from './usePermissionFullscreen.jsx'
 import { RpcErrorCode } from '@/common/consts/errorCodes'
 import { message, modal } from '@/common/utils/antdApp'
@@ -69,6 +70,7 @@ const { Paragraph, Text, Title } = Typography
 
 export function usePermissionRoleSettings({
   permissions,
+  initialRoleKey = '',
   permissionMenuOptions,
   roles,
   currentAdmin,
@@ -131,7 +133,7 @@ export function usePermissionRoleSettings({
   const [permissionDraftAccessError, setPermissionDraftAccessError] =
     useState('')
 
-  const [selectedRoleKey, setSelectedRoleKey] = useState('')
+  const [selectedRoleKey, setSelectedRoleKey] = useState(initialRoleKey)
 
   const [roleDraft, setRoleDraft] = useState(null)
 
@@ -207,6 +209,8 @@ export function usePermissionRoleSettings({
 
   const selectedRolePermissionKeys =
     currentRoleDraft?.permissionKeys ?? selectedRoleSavedPermissionKeys
+  const draftPolicy = readRolePermissionPolicy({ ...selectedRole, permissions: selectedRolePermissionKeys })
+  const rolePolicyInvalid = draftPolicy.registered && (draftPolicy.missing.length > 0 || draftPolicy.outside.length > 0)
   const selectedWarehouseScopeMode =
     currentRoleDraft?.warehouseScopeMode ??
     selectedRoleSavedWarehouseScope.mode
@@ -380,7 +384,9 @@ export function usePermissionRoleSettings({
   const selectedRoleReadOnlyReason = getRolePermissionReadOnlyReason(
     selectedRole || {},
     { isProduction: IS_PRODUCTION_BUILD, currentAdmin }
-  )
+  ) || (selectedRole && !draftPolicy.registered
+    ? '岗位职责模板尚未核对，暂不支持调整。请刷新后重试。'
+    : '')
 
   const selectedRoleReadOnly = Boolean(selectedRoleReadOnlyReason)
 
@@ -437,7 +443,7 @@ export function usePermissionRoleSettings({
         permissions: assignablePermissions,
         menuOptions: normalizedPermissionMenus,
       })
-      changeRoleDraft({ permissionKeys: result.permissionKeys })
+      changeRoleDraft({ permissionKeys: constrainRolePermissionSelection(selectedRole, result.permissionKeys) })
 
       const menuByKey = new Map(
         normalizedPermissionMenus.map((menu) => [menu.key, menu])
@@ -478,6 +484,7 @@ export function usePermissionRoleSettings({
       changeRoleDraft,
       normalizedPermissionMenus,
       permissionDetailMap,
+      selectedRole,
       selectedRolePermissionKeys,
     ]
   )
@@ -522,10 +529,7 @@ export function usePermissionRoleSettings({
   }
 
   useEffect(() => {
-    if (roles.length === 0) {
-      setSelectedRoleKey('')
-      return
-    }
+    if (roles.length === 0) return
     if (roles.some((role) => getRoleKey(role) === selectedRoleKey)) {
       return
     }
@@ -850,6 +854,14 @@ export function usePermissionRoleSettings({
                     >
                       退出全屏
                     </Button>
+                  ) : !navigationMode ? (
+                    <Button
+                      ref={enterRef}
+                      icon={<FullscreenOutlined aria-hidden="true" />}
+                      onClick={enterFullscreen}
+                    >
+                      {selectedRoleReadOnly || !canManageRolePermissions ? '全屏查看' : '全屏编辑'}
+                    </Button>
                   ) : null}
                   <Button
                     icon={<SaveOutlined aria-hidden="true" />}
@@ -861,6 +873,7 @@ export function usePermissionRoleSettings({
                       !selectedRoleKey ||
                       !roleConfigurationDirty ||
                       roleDataScopeInvalid ||
+                      rolePolicyInvalid ||
                       selectedRoleReadOnly
                     }
                     onClick={saveRolePermissions}
@@ -923,21 +936,9 @@ export function usePermissionRoleSettings({
                         description={`${permissionDraftAccessError}。页面先按当前岗位权限显示，保存前请重试。`}
                       />
                     ) : null}
-                    <PermissionChecklist
-                      fullscreenAction={
-                        !fullscreen ? (
-                          <Button
-                            ref={enterRef}
-                            size="small"
-                            icon={<FullscreenOutlined aria-hidden="true" />}
-                            onClick={enterFullscreen}
-                          >
-                            {selectedRoleReadOnly || !canManageRolePermissions
-                              ? '全屏查看'
-                              : '全屏编辑'}
-                          </Button>
-                        ) : null
-                      }
+                    <RolePermissionPolicyPanel
+                      key={selectedRoleKey}
+                      role={selectedRole}
                       changeSummaryPopoverProps={popoverProps('changes')}
                       searchKeyword={searchKeyword}
                       onSearchChange={onSearchChange}

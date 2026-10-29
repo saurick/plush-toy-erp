@@ -27,8 +27,12 @@ func (d *jsonrpcDispatcher) handlePurchaseOrder(
 	}
 
 	switch method {
+	case "list_purchase_followups":
+		return d.handlePurchaseFollowups(ctx, id, pm)
 	case "complete_purchase_order_terms":
 		return d.handlePurchaseOrderTerms(ctx, id, pm, claims.UserID)
+	case "update_purchase_order_delivery":
+		return d.handlePurchaseOrderDelivery(ctx, id, pm, claims.UserID)
 	case "save_purchase_order_with_items",
 		"get_purchase_order",
 		"get_purchase_order_receipt_progress",

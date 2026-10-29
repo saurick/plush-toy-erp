@@ -31,9 +31,27 @@ const (
 	SourceReadConditionFinanceInvoice           = "finance_invoice"
 	SourceReadConditionProductionExceptionWIP   = "production_exception_wip"
 	SourceReadConditionProductionExceptionIssue = "production_exception_over_issue"
+	SourceReadConditionQualityPurchase          = "quality_purchase"
+	SourceReadConditionQualityOutsourcing       = "quality_outsourcing"
+	SourceReadConditionQualityShipment          = "quality_shipment"
+	SourceReadConditionQualityWIP               = "quality_wip"
 )
 
 var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionContract{
+	{Domain: "quality", Method: "list_quality_inspections", Rules: sourceReadRules(PermissionPurchaseReceiptRead)},
+	{Domain: "quality", Method: "get_quality_inspection", Rules: []SourceActionReadPermissionRule{
+		{PermissionKey: PermissionPurchaseReceiptRead, Condition: SourceReadConditionQualityPurchase},
+		{PermissionKey: PermissionOutsourcingFactRead, Condition: SourceReadConditionQualityOutsourcing},
+		{PermissionKey: PermissionShipmentRead, Condition: SourceReadConditionQualityShipment},
+		{PermissionKey: PermissionProductionWIPRead, Condition: SourceReadConditionQualityWIP},
+	}},
+	{Domain: "operational_fact", Method: "get_finance_statement", Rules: []SourceActionReadPermissionRule{
+		{PermissionKey: PermissionFinancePayableRead, Condition: SourceReadConditionFinancePayable},
+		{PermissionKey: PermissionFinanceReceivableRead, Condition: SourceReadConditionFinanceReceivable},
+	}},
+	{Domain: "operational_fact", Method: "list_finance_source_adjustments", Rules: sourceReadRules(PermissionFinancePayableRead, PermissionPurchaseReceiptRead, PermissionPurchaseReturnRead, PermissionPurchaseReceiptAdjustmentRead)},
+	{Domain: "operational_fact", Method: "create_finance_source_adjustment", Rules: sourceReadRules(PermissionFinancePayableRead, PermissionPurchaseReceiptRead, PermissionPurchaseReturnRead, PermissionPurchaseReceiptAdjustmentRead)},
+
 	{Domain: "operational_fact", Method: "get_production_exception_context", Rules: sourceReadRules(PermissionQualityInspectionRead, PermissionProductionWIPRead)},
 	{Domain: "sales_order", Method: "list_engineering_material_requests", Rules: sourceReadRules(PermissionEngineeringMaterialRead, PermissionSalesOrderRead)},
 	{Domain: "sales_order", Method: "get_engineering_material_request", Rules: sourceReadRules(PermissionEngineeringMaterialRead, PermissionSalesOrderRead)},
@@ -79,6 +97,7 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "operational_fact", Method: "create_receivable_from_shipment", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "operational_fact", Method: "create_invoice_from_shipment", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "operational_fact", Method: "create_payable_from_purchase_receipt", Rules: sourceReadRules(PermissionPurchaseReceiptRead, PermissionPurchaseReturnRead, PermissionPurchaseReceiptAdjustmentRead)},
+	{Domain: "operational_fact", Method: "create_payable_from_outsourcing_order", Rules: sourceReadRules(PermissionOutsourcingOrderRead)},
 	{Domain: "operational_fact", Method: "create_payable_from_outsourcing_return", Rules: sourceReadRules(PermissionOutsourcingFactRead, PermissionOutsourcingOrderRead, PermissionQualityInspectionRead)},
 	{
 		Domain: "operational_fact", Method: "create_reconciliation_from_finance_fact",
@@ -157,13 +176,7 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "customer_config", Method: "execute_sales_order_acceptance_submit", Rules: sourceReadRules(PermissionSalesOrderRead)},
 	{Domain: "customer_config", Method: "start_material_supply_purchase_order_process", Rules: sourceReadRules(PermissionPurchaseOrderRead)},
 	{Domain: "customer_config", Method: "execute_material_supply_purchase_order_submit", Rules: sourceReadRules(PermissionPurchaseOrderRead)},
-	{Domain: "customer_config", Method: "execute_material_supply_purchase_receipt_create", Rules: sourceReadRules(PermissionPurchaseOrderRead)},
-	{Domain: "customer_config", Method: "execute_material_supply_quality_gate", Rules: sourceReadRules(PermissionPurchaseReceiptRead, PermissionQualityInspectionRead)},
-	{Domain: "customer_config", Method: "execute_material_supply_post_inbound", Rules: sourceReadRules(PermissionPurchaseReceiptRead)},
 	{Domain: "customer_config", Method: "start_finished_goods_delivery_process", Rules: sourceReadRules(PermissionShipmentRead)},
-	{Domain: "customer_config", Method: "execute_finished_goods_delivery_quality_decide", Rules: sourceReadRules(PermissionShipmentRead, PermissionQualityInspectionRead)},
-	{Domain: "customer_config", Method: "execute_finished_goods_delivery_shipment_ship", Rules: sourceReadRules(PermissionShipmentRead)},
-	{Domain: "customer_config", Method: "execute_finished_goods_delivery_receivable_lead", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "customer_config", Method: "start_finance_payment_approval_process", Rules: sourceReadRules(PermissionFinancePaymentRead)},
 	{Domain: "customer_config", Method: "get_finance_payment_approval_process", Rules: sourceReadRules(PermissionFinancePaymentRead)},
 	{

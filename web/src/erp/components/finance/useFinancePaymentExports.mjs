@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { financePaymentFilterParams } from '../../utils/financePaymentFilters.mjs'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -17,6 +18,7 @@ import { currentBusinessDate } from '../../utils/businessDate.mjs'
 
 export default function useFinancePaymentExports({
   paymentKeyword,
+  paymentFilters,
   creditKeyword,
   paymentStatusFilter,
   paymentDirectionFilter,
@@ -37,6 +39,7 @@ export default function useFinancePaymentExports({
     try {
       const result = await listAllFinancePayments(
         compactParams({
+          ...financePaymentFilterParams(paymentFilters),
           status: paymentStatusFilter,
           keyword: paymentKeyword.trim(),
           direction: paymentDirectionFilter,
@@ -66,6 +69,7 @@ export default function useFinancePaymentExports({
   }, [
     beginLatestRequest,
     paymentDirectionFilter,
+    paymentFilters,
     paymentExportColumns,
     paymentStatusFilter,
     paymentKeyword,
@@ -89,18 +93,18 @@ export default function useFinancePaymentExports({
         ? result.credit_notes
         : []
       if (rows.length === 0) {
-        message.info('当前筛选没有可导出的红冲记录')
+        message.info('当前筛选没有可导出的账款调整记录')
         return
       }
       downloadBusinessListCSV({
-        filename: `红冲记录-${currentBusinessDate()}.csv`,
+        filename: `账款调整记录-${currentBusinessDate()}.csv`,
         columns: creditExportColumns,
         rows,
       })
-      message.success(`已导出 ${rows.length} 条红冲记录`)
+      message.success(`已导出 ${rows.length} 条账款调整记录`)
     } catch (error) {
       if (!request.isCurrent() || isRpcAbortError(error)) return
-      message.error(getActionErrorMessage(error, '导出红冲记录'))
+      message.error(getActionErrorMessage(error, '导出账款调整记录'))
     } finally {
       if (request.isCurrent()) setExportingTab('')
       exportInFlightRef.current = false

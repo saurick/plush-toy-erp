@@ -35,10 +35,8 @@ test('专题详情逐条保留关联条件和岗位，点选关联对象不执�
   await harness.act(() => material.click())
   assert.deepEqual(selected, ['material_request'])
   assert.deepEqual(explored, [])
-  const rules = [...harness.container.querySelectorAll('button')]
-    .find((button) => button.textContent === '查看规则')
-  await harness.act(() => rules.click())
-  assert.deepEqual(explored, [['sales_to_production', 'effective_bom']])
+  assert(!harness.container.textContent.includes('查看规则'))
+  assert.deepEqual(explored, [])
 })
 
 test('拒绝与报废终点仅展示真实关联，不拼接正常出货或生产结果', async (t) => {
@@ -59,7 +57,7 @@ test('拒绝与报废终点仅展示真实关联，不拼接正常出货或生�
   }
 })
 
-test('数据与验证入口使用本专题登记场景，实测报告绑定同一稳定链标识', async (t) => {
+test('数据与验证保留本专题登记场景和证据边界，不重复提供跨页入口', async (t) => {
   const harness = await createReactTestHarness(t)
   const { BusinessTopicVerification } = await import('./BusinessTopicDetails.jsx')
   const topic = catalog.businessChains.find((item) => item.key === 'finance_payment_and_reversal')
@@ -72,31 +70,25 @@ test('数据与验证入口使用本专题登记场景，实测报告绑定同�
   })
   assert.match(harness.container.textContent, /规则测试/u)
   assert.match(harness.container.textContent, /浏览器验证/u)
-  const links = [...harness.container.querySelectorAll('a')].map((link) => link.getAttribute('href'))
-  assert.deepEqual(links, [
-    '/__dev/data-preparation', '/__dev/testing',
-    '/__dev/business-chain-audit?chain=finance_payment_and_reversal',
-  ])
+  assert.equal(harness.container.querySelectorAll('a').length, 0)
   assert.match(harness.container.textContent, /登记范围.*实际执行结果/u)
 })
 
-test('图中与相邻详情选取对象共用 URL，查看规则保留专题和具体对象', async (t) => {
+test('图中与相邻详情选取对象共用 URL，当前专题和对象不会被额外跳转替换', async (t) => {
   const harness = await createReactTestHarness(t)
-  const { default: Guide } = await import('./TaskFulfillmentGuide.jsx')
-  const { default: Topics } = await import('./BusinessChainTopics.jsx')
+  const { default: Topics } = await import('./BusinessTopicsView.jsx')
   let location
   const explored = []
   function Page() {
     location = useLocation()
-    return h(Guide, { renderTopics: ({ selectedTopicKey, onSelectTopic }) => h(Topics, {
+    return h(Topics, {
       catalog,
-      selectedTopicKey,
-      onSelectChain: onSelectTopic,
-      onExploreChain: (...args) => explored.push(args),
-    }) })
+      actions: [],
+      onOpenView: (_, patch) => explored.push([patch.chain, patch.node]),
+    })
   }
   await harness.render(h(MemoryRouter, {
-    initialEntries: ['/__dev/status-flows?view=chain&chain=all&flow_tab=topics'],
+    initialEntries: ['/__dev/business-topics'],
     future: { v7_startTransition: true, v7_relativeSplatPath: true },
   }, h(Page)))
   const root = harness.container
@@ -109,24 +101,50 @@ test('图中与相邻详情选取对象共用 URL，查看规则保留专题和�
   await harness.act(() => material.click())
   await harness.flush()
   const params = new URLSearchParams(location.search)
-  assert.equal(params.get('chain'), 'all')
-  assert.equal(params.get('flow_tab'), 'topics')
+  assert.equal(location.pathname, '/__dev/business-topics')
+  assert.equal(params.has('flow_tab'), false)
   assert.equal(params.get('flow_topic'), 'sales_to_production')
   assert.equal(params.get('flow_topic_node'), 'material_request')
   assert(root.querySelector('[data-graph-node="material_request"][aria-pressed="true"]'))
-  const rules = [...root.querySelectorAll('aside button')]
-    .find((button) => button.textContent === '查看规则')
-  await harness.act(() => rules.click())
-  assert.deepEqual(explored, [['sales_to_production', 'material_request']])
+  assert(!root.querySelector('aside').textContent.includes('查看规则'))
+  assert.deepEqual(explored, [])
   const map = [...root.querySelectorAll('button')]
     .find((button) => button.textContent === '系统衔接图')
   await harness.act(() => map.click())
   await harness.flush()
   assert(root.querySelector('[data-business-chain-system]'))
+  assert.equal([...root.querySelectorAll('button')].filter((button) => button.textContent === '查看此专题').length, 0)
+  await harness.act(() => root.querySelector('[data-business-chain-system] [data-graph-node][aria-pressed="false"]').click())
+  await harness.flush()
+  assert.equal([...root.querySelectorAll('button')].filter((button) => button.textContent === '查看此专题').length, 1)
   const back = [...root.querySelectorAll('button')]
     .find((button) => button.textContent.startsWith('返回'))
   await harness.act(() => back.click())
   await harness.flush()
   assert.equal(new URLSearchParams(location.search).get('flow_topic_node'), 'material_request')
   assert.equal(document.activeElement.textContent, '系统衔接图')
+})
+
+test('规则正文在所属交接下展开，收起和选择其他对象都不替换关联目录', async (t) => {
+  const harness = await createReactTestHarness(t)
+  const { default: Details } = await import('./BusinessTopicDetails.jsx')
+  const topic = catalog.businessChains.find((item) => item.key === 'purchase_to_inventory')
+  const node = topic.nodes.find((item) => item.key === 'purchase_order')
+  const step = topic.steps.find((item) => item.fromNodeKey === node.key && item.verificationRuleIds.length)
+  const requested = []
+  const selected = []
+  const props = { topic, node, onSelect: (key) => selected.push(key), onInspectStep: (key) => requested.push(key) }
+  await harness.render(h(Details, props))
+  const trigger = harness.container.querySelector(`[data-topic-relation="${step.key}"] [aria-expanded]`)
+  await harness.act(() => trigger.click())
+  assert.deepEqual(requested, [step.key])
+  await harness.render(h(Details, { ...props, selectedStepKey: step.key, stepDetails: h('p', { 'data-rule-body': true }, '完整规则与验证结果') }))
+  const expanded = harness.container.querySelector(`[data-topic-relation="${step.key}"]`)
+  assert.equal(Boolean(expanded.querySelector('[data-rule-body]')), true)
+  assert.equal(harness.container.querySelector('[aria-expanded="true"]') === trigger, true)
+  await harness.act(() => trigger.click())
+  assert.deepEqual(requested, [step.key, null])
+  const peer = expanded.querySelector('.erp-dev-chain-topics__relation-heading button')
+  await harness.act(() => peer.click())
+  assert.equal(selected.length, 1)
 })

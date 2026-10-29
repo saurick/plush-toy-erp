@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -120,5 +121,44 @@ func TestSalesOrderSummaryRowsFiltersAndSourceDisplay(t *testing.T) {
 	base.DateFrom, base.DateTo = &lineDate, &headerDate
 	if _, _, err := uc.ListSalesOrderSummary(ctx, base); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("reversed dates: %v", err)
+	}
+}
+
+func TestSalesOrderSummaryFiltersCustomerIdentityAcrossNamesAndSnapshots(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openSalesOrderRepoTest(t, "sales-summary-customer-identity")
+	defer mustCloseEntClient(t, client)
+	selected := createSalesOrderTestCustomer(t, ctx, client, "C-SELECTED", true)
+	other := createSalesOrderTestCustomer(t, ctx, client, "C-OTHER", true)
+	client.Customer.UpdateOneID(selected.ID).SetName("模拟更名客户").SaveX(ctx)
+	client.Customer.UpdateOneID(other.ID).SetName("模拟更名客户").SaveX(ctx)
+	unit := createSalesOrderTestUnit(t, ctx, client, "PCS-IDENTITY", true)
+	for index, seed := range []struct {
+		customerID int
+		snapshot   map[string]any
+	}{
+		{selected.ID, map[string]any{"name": "模拟旧名称"}},
+		{selected.ID, map[string]any{}},
+		{other.ID, map[string]any{"name": "模拟更名客户"}},
+		{other.ID, map[string]any{"name": "模拟更名客户分公司"}},
+	} {
+		order := client.SalesOrder.Create().SetOrderNo(fmt.Sprintf("SO-IDENTITY-%d", index)).
+			SetCustomerID(seed.customerID).SetCustomerSnapshot(seed.snapshot).SetOrderDate(time.Now().UTC()).SaveX(ctx)
+		client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetUnitID(unit.ID).SetOrderedQuantity(decimal.NewFromInt(1)).SaveX(ctx)
+	}
+	filter := biz.SalesOrderSummaryFilter{SalesOrderFilter: biz.SalesOrderFilter{CustomerID: selected.ID, Limit: 20, LifecycleScope: "all"}}
+	rows, total, err := uc.ListSalesOrderSummary(ctx, filter)
+	if err != nil || total != 2 || len(rows) != 2 {
+		t.Fatalf("selected customer: total=%d rows=%+v err=%v", total, rows, err)
+	}
+	for _, row := range rows {
+		if row.Order.CustomerID != selected.ID {
+			t.Fatalf("same or partial name selected another customer: %+v", row.Order)
+		}
+	}
+	filter.CustomerID = 0
+	rows, total, err = uc.ListSalesOrderSummary(ctx, filter)
+	if err != nil || total != 4 || len(rows) != 4 {
+		t.Fatalf("cleared customer: total=%d rows=%+v err=%v", total, rows, err)
 	}
 }

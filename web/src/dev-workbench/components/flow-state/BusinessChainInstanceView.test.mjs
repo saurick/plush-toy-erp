@@ -110,10 +110,8 @@ test('instance filtering retains URL context, true statuses and registered flow 
       ['get_task', 'get_task_handling_chain'].includes(rpc.method)
     )
   )
-  await view.click('查看对应办理流程')
-  assert.equal(view.opened.at(-1)[1].flow_stage, 'shell_quality')
-  await view.click('协同记录')
-  assert.equal(view.opened.at(-1)[0], 'workflow')
+  assert(!view.container.textContent.includes('查看对应办理流程'))
+  assert.deepEqual(view.opened, [])
   assert.equal(
     new URLSearchParams(view.navigation.location.search).get('task_filter'),
     'pending'
@@ -124,6 +122,17 @@ test('instance filtering retains URL context, true statuses and registered flow 
     new URLSearchParams(view.navigation.location.search).has('task_filter'),
     false
   )
+})
+
+test('reference stage filters only loaded tasks and does not claim missing records are completed', async (t) => {
+  const view = await mount(t, { query: '&flow_stage=incoming_quality', respond: success })
+  assert.equal(view.container.querySelectorAll('[data-task-record]').length, 3)
+  await view.click('仅看此环节任务')
+  assert.equal(view.container.querySelectorAll('[data-task-record]').length, 0)
+  assert(view.container.textContent.includes('未出现不代表该环节已完成'))
+  assert.equal(new URLSearchParams(view.navigation.location.search).get('task_stage'), 'incoming_quality')
+  await view.click('全部任务3')
+  assert.equal(view.container.querySelectorAll('[data-task-record]').length, 3)
 })
 
 test('unknown instance group stays empty and offers a deliberate clear', async (t) => {

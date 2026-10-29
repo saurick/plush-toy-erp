@@ -30,7 +30,8 @@ func TestProductionExceptionReadsMatchPageAnyPermissionContract(t *testing.T) {
 	}{
 		{roleKey: biz.PMCRoleKey, permission: biz.PermissionPMCRiskRead},
 		{roleKey: biz.ProductionRoleKey, permission: biz.PermissionProductionFactRead},
-		{roleKey: biz.QualityRoleKey, permission: biz.PermissionProductionExceptionSubmit},
+		{roleKey: biz.SalesRoleKey, permission: biz.PermissionProductionExceptionSubmit},
+		{roleKey: biz.ProductionRoleKey, permission: biz.PermissionProductionOverIssueSubmit},
 	} {
 		t.Run(testCase.permission, func(t *testing.T) {
 			dispatcher := newOperationalFactJSONRPCTestDataWithRepo(

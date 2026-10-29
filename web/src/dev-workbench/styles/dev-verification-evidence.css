@@ -110,3 +110,22 @@
     border-inline-start: 1px solid var(--erp-border);
   }
 }
+.erp-dev-verification-evidence__source {
+  margin: 0;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-verification-evidence__checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+
+.erp-dev-verification-evidence__checks > div {
+  display: flex;
+  gap: 8px;
+}
+
+.erp-dev-verification-evidence__checks dd {
+  margin: 0;
+}

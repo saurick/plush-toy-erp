@@ -3,7 +3,7 @@ import { Alert, Button, Form, Input, Spin } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import { ProductionExceptionStatus } from '../../../common/consts/statuses.generated.mjs'
 import MaterialSupplierSelect from '../master-data/MaterialSupplierSelect.jsx'
-import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
+import { useProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
 import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -30,6 +30,7 @@ export default function ProductionExceptionRequestModal({
   onChanged,
 }) {
   const [form] = Form.useForm()
+  const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
   const [loading, setLoading] = useState(false)
   const [context, setContext] = useState(null)
   const [contextError, setContextError] = useState('')
@@ -117,7 +118,7 @@ export default function ProductionExceptionRequestModal({
         attempt,
         null
       )
-      showProcessSubmissionReceipt({ result: processData, title: '生产异常申请已提交' })
+      showProcessSubmissionReceipt({ result: processData, record: next, title: '生产异常申请已提交' })
       onChanged?.(next)
       onClose?.()
     } catch (error) {
@@ -137,6 +138,8 @@ export default function ProductionExceptionRequestModal({
   }
   return (
     <BusinessModal
+      taskInline
+      form={form}
       size="localAction"
       title="决定质量异常处理方案"
       open={open}

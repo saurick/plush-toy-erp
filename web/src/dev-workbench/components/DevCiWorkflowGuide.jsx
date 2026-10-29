@@ -1,12 +1,11 @@
 import React from 'react'
 import { Collapse, Typography } from 'antd'
-import { Link } from 'react-router-dom'
 import { MermaidDiagram } from '@/common/components/markdown'
+
 import {
   CI_WORKFLOW_SECTIONS,
   formatCiWorkflowSection,
 } from '../config/devCiWorkflow.mjs'
-import { DEV_DOCS_ROUTE } from '../config/devDocs.mjs'
 import './dev-ci-workflow.css'
 
 function CiWorkflowSectionContent({ section }) {
@@ -77,15 +76,7 @@ function CiWorkflowSectionContent({ section }) {
           ))}
         </div>
       ) : null}
-      <Typography.Paragraph
-        type="secondary"
-        className="erp-dev-ci-guide__sources"
-      >
-        定义来源：
-        {(section.sources || ['.gitlab-ci.yml', 'scripts/qa/README.md']).join(
-          '、'
-        )}
-      </Typography.Paragraph>
+
       <Typography.Paragraph
         copyable={{ text: formatCiWorkflowSection(section) }}
       >
@@ -110,15 +101,6 @@ export default function DevCiWorkflowGuide({
       </Typography.Title>
       <Typography.Paragraph type="secondary">
         流程说明与配置规则，实际执行结果请查看本次流水线和目标回执。
-      </Typography.Paragraph>
-      <Typography.Paragraph>
-        <Link
-          to={`${DEV_DOCS_ROUTE}?path=${encodeURIComponent('scripts/qa/README.md')}`}
-        >
-          打开 QA 命令与证据合同
-        </Link>
-        {' · '}
-        <Link to="/__dev/quality-gates?view=gaps">查看当前改动缺口</Link>
       </Typography.Paragraph>
       {documentMode ? (
         <div className="erp-dev-ci-guide__chapters">

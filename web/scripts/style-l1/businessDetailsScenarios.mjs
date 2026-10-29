@@ -322,7 +322,6 @@ export function createBusinessDetailsScenarios(deps) {
             product_code_snapshot: `PROD-${index + 1}`,
             product_no_snapshot: `PROD-${index + 1}`,
             process_requirement: '缝线颜色按确认样品执行。'.repeat(6),
-            sample_note: '打样说明第一行。\n第二行请核对尺寸。',
             material_id: 1,
             warehouse_id: 1,
             unit_id: 1,

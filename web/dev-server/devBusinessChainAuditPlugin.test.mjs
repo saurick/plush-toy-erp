@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, rm, symlink, realpath } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import {
   createDevBusinessChainAuditMiddleware,
   createDevBusinessChainAuditService,
+  createDevBusinessChainAuditPlugin,
 } from './devBusinessChainAuditPlugin.mjs'
 import { createDevOperatorAuthMiddleware } from './devOperatorAuthPlugin.mjs'
 import { buildManualAcceptanceBusinessChainContract } from '../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
@@ -188,6 +189,39 @@ test('audit reads frozen failures and evidence while keeping current source dist
     'unverified'
   )
   assert.equal(chainAuditFreshness(result.report, null), 'unknown')
+})
+
+test('development reports reload current definitions through Vite and fail closed on read errors', async (t) => {
+  const { root, write } = await fixture(t)
+  const catalog = structuredClone(DEV_FLOW_STATE_CATALOG)
+  let snapshot = buildManualAcceptanceBusinessChainContract({ catalog }).definitionSnapshot
+  const report = reportFixture()
+  report.definitionSnapshot = snapshot
+  report.chains[0].key = snapshot.chains[0].key
+  report.chains[0].steps[0].key = snapshot.chains[0].steps[0].key
+  report.chains[0].scenarios[0].key = snapshot.chains[0].scenarios[0].key
+  await write('report.json', JSON.stringify(report))
+  let middleware
+  let fail = false
+  const reads = []
+  createDevBusinessChainAuditPlugin({ projectRoot: root }).configureServer({
+    middlewares: { use(value) { middleware = value } },
+    async ssrLoadModule(file) {
+      reads.push(file)
+      if (fail) throw new Error('current definition unavailable')
+      return { buildManualAcceptanceBusinessChainContract: () => ({ definitionSnapshot: snapshot }) }
+    },
+  })
+  const read = () => request(middleware, { suffix: `/report?batch=${batch}` })
+  assert.equal(JSON.parse((await read()).body).definitionComparison.status, 'unchanged')
+  catalog.businessChains[0].steps[0].condition = '新的来源前置条件'
+  snapshot = buildManualAcceptanceBusinessChainContract({ catalog }).definitionSnapshot
+  const changed = JSON.parse((await read()).body)
+  assert.equal(changed.definitionComparison.status, 'changed')
+  assert.equal(changed.report.chains[0].status, 'failed')
+  assert.deepEqual(reads, Array(2).fill(path.join(await realpath(root), 'scripts/qa/manual-acceptance-business-chain-contract.mjs')))
+  fail = true
+  assert.equal((await read()).status, 422)
 })
 
 test('audit API compares frozen definitions without changing failed observations or hiding coverage gaps', async (t) => {

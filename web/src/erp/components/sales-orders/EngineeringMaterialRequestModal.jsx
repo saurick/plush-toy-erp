@@ -2,14 +2,25 @@ import React from 'react'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import EngineeringMaterialRequestForm from './EngineeringMaterialRequestForm.jsx'
 import { ENGINEERING_MATERIAL_STATUS as STATUS } from '../../utils/engineeringMaterialTask.mjs'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 
 export default function EngineeringMaterialRequestModal(props) {
-  const { mobile = false, readOnly = false, orderID, onCancel } = props
+  const { mobile = false, readOnly: sourceReadOnly = false, orderID, onCancel, onChanged, permissions: sourcePermissions, onBusyChange: sourceBusyChange } = props
+  const taskBusiness = useBusinessPageContext()?.taskBusiness
+  const readOnly = sourceReadOnly || taskBusiness?.readOnly === true
+  const reportResult = useWorkflowTaskBusinessResult()
   return (
     <EngineeringMaterialRequestForm
       {...props}
-      render={({ content, footer, title, request, saving, discardThen }) => (
+      readOnly={readOnly}
+      permissions={taskBusiness ? { ...sourcePermissions, boss: false, finance: false } : sourcePermissions}
+      onBusyChange={taskBusiness?.onBusyChange || sourceBusyChange}
+      onChanged={(record, result) => { reportResult(result.successMessage, record); onChanged?.(record, result) }}
+      render={({ content, footer, title, request, saving, discardThen, form }) => (
         <BusinessFormModal
+          taskInline
+          form={form}
           className={
             mobile
               ? 'erp-material-summary-modal erp-material-summary-modal--mobile'
@@ -23,7 +34,7 @@ export default function EngineeringMaterialRequestModal(props) {
           description={
             mobile || readOnly
               ? undefined
-              : '工程提交用料，老板审核，财务审核通过后按厂商生成采购订单。展开材料可核对产品与部位用量。'
+              : '工程资料齐全后自动送老板审核，财务审核通过后按厂商生成采购订单。展开材料可核对产品与部位用量。'
           }
           size="lineItems"
           width={mobile ? '100%' : undefined}

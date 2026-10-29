@@ -173,7 +173,7 @@ test('associated views start with the selected object and retain adjacent object
     nodeKey: 'material_request',
   })
   assert.equal(material.flows[0].key, 'source.engineering_material_request')
-  assert(material.flows.some((flow) => flow.key === 'source.sales_order_engineering'))
+  assert(!material.flows.some((flow) => flow.key === 'source.sales_order_engineering'))
 
   for (const chain of DEV_FLOW_STATE_CATALOG.businessChains) {
     for (const node of chain.nodes) {

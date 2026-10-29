@@ -60,6 +60,9 @@ export const SOURCE_TYPE_OPTIONS = [
   { label: '出货单', value: 'SHIPMENT' },
   { label: '生产记录', value: 'PRODUCTION_FACT' },
   { label: '委外记录', value: 'OUTSOURCING_FACT' },
+  { label: '库存作业', value: 'INVENTORY_OPERATION' },
+  { label: '生产异常处置', value: 'PRODUCTION_EXCEPTION' },
+  { label: '委外回货处置', value: 'OUTSOURCING_DISPOSITION' },
 ]
 
 export const LOT_DATE_FILTER_OPTIONS = [
@@ -197,14 +200,7 @@ export function linkedBusinessRef(label, value) {
 }
 
 function formatSourceDocumentRef(record = {}, { emptyText } = {}) {
-  const sourceNo = String(
-    record.source_no ||
-      record.document_no ||
-      record.order_no ||
-      record.receipt_no ||
-      record.shipment_no ||
-      ''
-  ).trim()
+  const sourceNo = String(record.source_no || '').trim()
   if (sourceNo) return sourceNo
   return emptyText ?? (sourceTypeText(record.source_type) ? '未提供业务单号' : '-')
 }
@@ -239,7 +235,7 @@ export function selectedLabelFor(view, row) {
 }
 
 export function canOpenSourceDocument(record = {}) {
-  return Boolean(businessSourceRouteFor(record.source_type, record.source_id))
+  return Boolean(businessSourceRouteFor(record.source_document_type, record.source_document_id))
 }
 
 export function createInventoryLedgerColumns({
@@ -501,10 +497,7 @@ export function createInventoryLedgerColumns({
         copyable: {
           label: '来源单据',
           resolveValue: (_value, record) =>
-            record?.source_no ||
-            record?.source_document_no ||
-            record?.document_no ||
-            '',
+            record?.source_no || '',
         },
         detailCopyable: true,
         width: 120,
@@ -636,8 +629,8 @@ export function createInventoryLedgerColumns({
     {
       align: 'right',
       defaultPriority: 50,
-      title: '当前数量',
-      exportTitle: '当前数量',
+      title: '账面数量',
+      exportTitle: '账面数量',
       dataIndex: 'quantity',
       width: 130,
       render: formatQuantity,
@@ -659,15 +652,35 @@ export function createInventoryLedgerColumns({
       title: (
         <BusinessHelpLabel
           itemKey="available-quantity"
-          label="可用量"
+          label="未预留数量"
           pageKey="inventory"
         />
       ),
-      exportTitle: '可用量',
+      exportTitle: '未预留数量',
       dataIndex: 'available_quantity',
       width: 130,
       render: formatQuantity,
       exportValue: (record) => (record?.available_quantity ?? ''),
+    },
+    {
+      title: '材料可领用',
+exportTitle: '材料可领用',
+dataIndex: 'issuable_quantity',
+width: 130,
+align: 'right',
+defaultPriority: 40,
+      render: (value, record) => record.subject_type === 'MATERIAL' ? formatQuantity(value) : '—',
+      exportValue: (record) => record.subject_type === 'MATERIAL' ? record.issuable_quantity ?? '' : '',
+    },
+    {
+      title: <BusinessHelpLabel label="受限库存" description="暂扣、不合格或停用批次的账面库存，仍计入结存；不能普通领用或出货。" />,
+      exportTitle: '受限库存',
+dataIndex: 'restricted_quantity',
+width: 130,
+align: 'right',
+defaultPriority: 45,
+      render: formatQuantity,
+exportValue: (record) => record.restricted_quantity ?? '',
     },
     ...[
       ['pending_inspection_quantity', '待成品检验'],

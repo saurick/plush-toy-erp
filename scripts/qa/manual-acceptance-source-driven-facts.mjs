@@ -324,6 +324,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "customer_key",
     "id",
     "result",
+    "check_items",
     "defect_rate_operator",
     "defect_rate_percent",
     "decision_note",
@@ -1736,6 +1737,7 @@ export async function applyFinishedGoodsDeliveryProcess({
         customerParams({
           id: inspection.id,
           result: "PASS",
+          check_items: simulatedQualityChecks(),
           defect_rate_operator: "APPROX",
           defect_rate_percent: "5",
           decision_note: SIMULATED_NOTE,
@@ -2301,6 +2303,7 @@ async function passCurrentProductionWIPQualityGate(rpc, batchID) {
       customerParams({
         id: inspection.id,
         result: "PASS",
+        check_items: simulatedQualityChecks(),
         defect_rate_operator: "APPROX",
         defect_rate_percent: "0",
         decision_note: SIMULATED_NOTE,
@@ -2820,6 +2823,7 @@ async function ensureOutsourcingQuality(plan, rpc, returnFactID) {
         customerParams({
           id: inspection.id,
           result: "PASS",
+          check_items: simulatedQualityChecks(),
           defect_rate_operator: "APPROX",
           defect_rate_percent: "5",
           decision_note: SIMULATED_NOTE,
@@ -3354,4 +3358,8 @@ if (
       process.exitCode =
         error instanceof SourceDrivenFactError ? error.exitCode : 1;
     });
+}
+
+function simulatedQualityChecks() {
+  return [{ name: "外观与约定要求", requirement: "符合来源订单及确认样", observation: "模拟逐项检查符合约定", result: "PASS", scope: "FULL" }];
 }

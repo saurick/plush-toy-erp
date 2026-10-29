@@ -1,4 +1,6 @@
 import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
+import { closeBusinessFormPage } from './businessFormPageAssertions.mjs'
+import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 
 export function createSalesOrderDemandEntryVerifier(deps) {
   const {
@@ -484,9 +486,230 @@ export function createSalesOrderDemandEntryVerifier(deps) {
 }
 
 export function createSalesOrderDemandEntryScenarios(deps) {
-  const { outputDir, path, customerRuntimeEffectiveSession } = deps
+  const { assert, outputDir, path, customerRuntimeEffectiveSession } = deps
   const verifySalesOrderDemandEntry = createSalesOrderDemandEntryVerifier(deps)
+  let regressionState
   return [
+    {
+      name: 'sales-order-number-and-customer-filter',
+      path: '/erp/sales/project-orders/sales-orders',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 3840, height: 2160 },
+      beforeNavigate: async (page) => {
+        regressionState = {
+          saves: [],
+          summaries: [],
+          lists: [],
+          orders: [],
+          unknown: false,
+        }
+        await page.route('**/rpc/sales_order', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          const respond = (data, code = 0) =>
+            route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  code,
+                  message: code ? '暂时无法确认保存结果' : 'OK',
+                  data,
+                },
+              }),
+            })
+          if (method === 'list_sales_order_summary') {
+            regressionState.summaries.push(params)
+            return respond(stylePaginatedRpcData([], 'items', params))
+          }
+          if (method === 'list_sales_orders') {
+            regressionState.lists.push(params)
+            return respond(
+              stylePaginatedRpcData(
+                regressionState.orders,
+                'sales_orders',
+                params
+              )
+            )
+          }
+          if (method === 'save_sales_order_with_items') {
+            regressionState.saves.push(params)
+            if (regressionState.unknown) return respond({}, 50000)
+            const order = {
+              ...params,
+              id: 8100 + regressionState.saves.length,
+              order_no: params.order_no || 'SO-20261026-042',
+              version: 1,
+              lifecycle_status: 'draft',
+              order_date: Date.parse(`${params.order_date}T00:00:00Z`) / 1000,
+              item_count: 0,
+            }
+            regressionState.orders.push(order)
+            return respond({ sales_order: order, sales_order_items: [] })
+          }
+          if (method === 'get_sales_order')
+            return respond({
+              sales_order: regressionState.orders.find(
+                (order) => order.id === params.id
+              ),
+            })
+          if (method === 'list_sales_order_items')
+            return respond(
+              stylePaginatedRpcData([], 'sales_order_items', params)
+            )
+          return route.fallback()
+        })
+      },
+      verify: async (page) => {
+        await page
+          .getByRole('heading', { name: '销售订单', exact: true })
+          .waitFor()
+        await page.getByRole('button', { name: '筛选', exact: true }).click()
+        const customerFilter = page.getByRole('combobox', {
+          name: '客户',
+          exact: true,
+        })
+        await customerFilter.click()
+        await Promise.all([
+          page.waitForResponse(
+            (response) =>
+              response.request().postDataJSON()?.method ===
+                'list_sales_orders' &&
+              response.request().postDataJSON()?.params?.customer_id === 1
+          ),
+          page
+            .locator('.ant-select-dropdown:visible .ant-select-item-option')
+            .filter({ hasText: 'CUS-STYLE-L1' })
+            .click(),
+        ])
+        await page.getByRole('button', { name: '完成', exact: true }).click()
+        await page.getByText('交付进度', { exact: true }).click()
+        await page
+          .getByRole('region', { name: '销售交付进度' })
+          .getByText('当前筛选暂无数据', { exact: true })
+          .waitFor()
+        assert.equal(regressionState.summaries.at(-1)?.customer_id, 1)
+        assert.equal(
+          Object.hasOwn(regressionState.summaries.at(-1), 'customer'),
+          false
+        )
+        await page.getByRole('button', { name: /^筛选，已应用/u }).click()
+        const customerSelect = page
+          .locator('.ant-select')
+          .filter({ has: customerFilter })
+        await customerSelect.hover()
+        await Promise.all([
+          page.waitForResponse(
+            (response) =>
+              response.request().postDataJSON()?.method ===
+                'list_sales_order_summary' &&
+              !response.request().postDataJSON()?.params?.customer_id
+          ),
+          customerSelect.locator('.ant-select-clear').click(),
+        ])
+        assert.equal(
+          Object.hasOwn(regressionState.summaries.at(-1), 'customer_id'),
+          false
+        )
+        await page.getByRole('button', { name: '完成', exact: true }).click()
+        await page.getByText('订单列表', { exact: true }).click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        const openDraft = async () => {
+          await page.getByRole('button', { name: '新建订单' }).click()
+          assert.equal(
+            await editor
+              .getByLabel('订单号（自动）', { exact: true })
+              .inputValue(),
+            ''
+          )
+          await editor.getByLabel('客户', { exact: true }).click()
+          await page
+            .locator('.ant-select-dropdown:visible .ant-select-item-option')
+            .filter({ hasText: 'CUS-STYLE-L1' })
+            .click()
+          for (const [label, value] of [
+            ['计税方式', '不计税'],
+            ['报价是否含运费', '报价含运费'],
+          ]) {
+            await editor.getByLabel(label, { exact: true }).click()
+            await page
+              .locator('.ant-select-dropdown:visible')
+              .getByText(value, { exact: true })
+              .click()
+          }
+        }
+        await openDraft()
+        await editor
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .click()
+        await editor.waitFor({ state: 'hidden' })
+        assert.equal(Object.hasOwn(regressionState.saves[0], 'order_no'), false)
+        await page
+          .getByText('SO-20261026-042', { exact: true })
+          .first()
+          .dblclick()
+        assert.equal(
+          await editor
+            .getByLabel('订单号（自动）', { exact: true })
+            .inputValue(),
+          'SO-20261026-042'
+        )
+        await editor.getByLabel('订单号（自动）', { exact: true }).fill('')
+        await editor
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .click()
+        await editor.getByText('请保留或填写订单号', { exact: true }).waitFor()
+        assert.equal(
+          regressionState.saves.length,
+          1,
+          '编辑清空编号不得重新分配或提交保存'
+        )
+        await editor
+          .getByLabel('订单号（自动）', { exact: true })
+          .fill('SO-20261026-042')
+        await closeBusinessFormPage(page, editor)
+        await openDraft()
+        await editor
+          .getByLabel('订单号（自动）', { exact: true })
+          .fill('SO-MANUAL-REGRESSION')
+        await editor
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .click()
+        await editor.waitFor({ state: 'hidden' })
+        assert.equal(regressionState.saves[1].order_no, 'SO-MANUAL-REGRESSION')
+        await openDraft()
+        regressionState.unknown = true
+        await editor
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .click()
+        await page
+          .getByText(
+            '保存结果尚未确认，请先核对该单据的最新状态，不要连续重复提交。',
+            { exact: true }
+          )
+          .waitFor()
+        await editor
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .click()
+        await page
+          .getByText(
+            '上次保存结果尚未确认，请先返回列表刷新核对，避免重复创建订单。',
+            { exact: true }
+          )
+          .waitFor()
+        assert.equal(
+          regressionState.saves.length,
+          3,
+          '结果未知后再次点击不得重复创建'
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'sales-order-save-unknown.png'),
+        })
+        await closeBusinessFormPage(page, editor)
+      },
+    },
     {
       name: 'sales-order-demand-entry',
       path: '/erp/sales/project-orders/sales-orders',

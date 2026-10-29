@@ -1,8 +1,12 @@
 .erp-dev-chain-audit {
+  display: grid;
+  gap: 16px;
   min-width: 0;
+  padding: var(--dev-workbench-panel-padding);
 }
 
 .erp-dev-chain-audit__header,
+.erp-dev-chain-audit__heading,
 .erp-dev-chain-audit__toolbar {
   display: flex;
   align-items: center;
@@ -14,13 +18,13 @@
   justify-content: space-between;
 }
 
-.erp-dev-chain-audit__header h1 {
+.erp-dev-chain-audit__header h2 {
   margin: 0;
   font-size: 16px;
 }
 
 .erp-dev-chain-audit__batch-select {
-  width: 320px;
+  width: 240px;
   max-width: 100%;
 }
 
@@ -33,24 +37,24 @@
   max-width: 100%;
 }
 
-.erp-dev-chain-audit__summary {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.erp-dev-chain-audit__summary > div {
+.erp-dev-chain-audit__context {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 12px 16px;
-  border: 1px solid var(--erp-control-border);
-  border-radius: 8px;
-  background: var(--erp-control-surface);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 0;
+  color: var(--erp-text-muted);
 }
 
-.erp-dev-chain-audit__summary strong {
-  font-size: 24px;
+.erp-dev-chain-audit__context .ant-btn {
+  height: auto;
+  padding: 0;
+}
+
+.erp-dev-chain-audit__all-steps {
+  justify-self: start;
+  height: auto;
+  padding: 0;
 }
 
 .erp-dev-chain-audit__stack {
@@ -64,13 +68,12 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--erp-control-border);
-  border-radius: 8px;
-  background: var(--erp-control-surface);
+  padding-block: 16px;
 }
 
-.erp-dev-chain-audit__section h2 {
+.erp-dev-chain-audit__section h2,
+.erp-dev-chain-audit__section h3,
+.erp-dev-chain-audit__limits h3 {
   margin: 0;
   font-size: var(--erp-font-body);
 }
@@ -108,10 +111,7 @@
   padding-left: 20px;
 }
 
-.erp-dev-chain-audit code,
-.erp-dev-chain-audit td,
-.erp-dev-chain-audit dd,
-.erp-dev-chain-audit a {
+:is(.erp-dev-chain-audit, .erp-dev-chain-audit-drawer) :is(code, td, dd, a) {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -129,4 +129,12 @@
 
 .erp-dev-chain-audit__verdict {
   margin: 0;
+}
+
+.erp-dev-chain-audit-drawer .erp-dev-task-nav {
+  justify-self: start;
+}
+
+.erp-dev-chain-audit-drawer .erp-workbench-facts dd {
+  overflow-wrap: anywhere;
 }

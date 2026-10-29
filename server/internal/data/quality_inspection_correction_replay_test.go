@@ -72,7 +72,10 @@ func testQualityInspectionCorrectionCompletedReplay(t *testing.T, data *Data, cl
 			t.Fatal(err)
 		}
 	}
-	before := entQualityInspectionToBiz(client.QualityInspection.GetX(ctx, corrected.ID))
+	before, err := qualityInspectionWithHistory(ctx, client, client.QualityInspection.GetX(ctx, corrected.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
 	originalBefore, err := uc.GetQualityInspection(ctx, inspection.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -111,7 +114,10 @@ func testQualityInspectionCorrectionCompletedReplay(t *testing.T, data *Data, cl
 			t.Fatalf("changed %s must conflict: %v", change, err)
 		}
 	}
-	after := entQualityInspectionToBiz(client.QualityInspection.GetX(ctx, corrected.ID))
+	after, err := qualityInspectionWithHistory(ctx, client, client.QualityInspection.GetX(ctx, corrected.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(after, before) {
 		t.Fatalf("replay changed child inspection: %+v", after)
 	}

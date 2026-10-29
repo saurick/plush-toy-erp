@@ -1,5 +1,5 @@
 import {
-  getAuthenticatedNavigationSections,
+  getUtilityNavigationSections,
   getNavigationSections,
 } from '../../erp/config/seedData.mjs'
 import {
@@ -21,6 +21,7 @@ import {
   getPermissionRelationshipContext,
 } from './devPermissionRelationshipGraph.mjs'
 import { formatAdminIdentity } from '../../erp/utils/adminIdentity.mjs'
+import { getHistoryCenterSources } from '../../erp/utils/historyRecordCatalog.mjs'
 import {
   groupSidebarNavigationSections,
   projectBusinessModuleSections,
@@ -58,7 +59,7 @@ function getCurrentNavigationSections(navigationSections, customerMenuConfig) {
   }
   return [
     ...getNavigationSections(customerMenuConfig),
-    ...getAuthenticatedNavigationSections(),
+    ...getUtilityNavigationSections(),
   ]
 }
 
@@ -76,14 +77,17 @@ function getEffectivePathSet(accesses = []) {
 
 function filterNavigationSections(
   navigationSections = [],
-  effectivePaths = new Set()
+  effectivePaths = new Set(),
+  historyAvailable = false
 ) {
   return normalizeList(navigationSections)
     .map((section) => ({
       ...section,
       items: normalizeList(section?.items).filter(
         (item) =>
-          item?.access === 'authenticated' || effectivePaths.has(item?.path)
+          item?.access === 'history'
+            ? historyAvailable
+            : item?.access === 'authenticated' || effectivePaths.has(item?.path)
       ),
     }))
     .filter((section) => section.items.length > 0)
@@ -121,9 +125,20 @@ function buildMenuSections({
   effectivePaths,
   roles,
   presentation,
+  accesses,
 }) {
+  const permissions = new Set(accesses.flatMap((access) =>
+    normalizeList(access?.permissions)
+      .filter((permission) => permission.effective === true)
+      .map((permission) => permission.permission_key)
+  ))
+  const historyAvailable = getHistoryCenterSources({
+    visibleMenuPaths: normalizeList(navigationSections).flatMap((section) => normalizeList(section.items))
+      .filter((item) => effectivePaths.has(item.path)).map((item) => item.path),
+    canReadPermission: (permission) => permissions.has(permission),
+  }).length > 0
   const visibleSections = getSidebarNavigationSections(
-    filterNavigationSections(navigationSections, effectivePaths)
+    filterNavigationSections(navigationSections, effectivePaths, historyAvailable)
   )
   if (presentation !== 'role_guided') {
     return groupSidebarNavigationSections(
@@ -228,6 +243,7 @@ function buildRoleNavigationModel({
     effectivePaths,
     roles: [role],
     presentation,
+    accesses: [access],
   })
   return readyModel({
     placement,
@@ -300,6 +316,7 @@ function buildAccountNavigationModel({
     effectivePaths,
     roles: selectedRoles,
     presentation,
+    accesses,
   })
   const singleRoleSettings =
     selectedRoles.length === 1

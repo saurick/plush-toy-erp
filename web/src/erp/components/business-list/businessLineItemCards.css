@@ -1,0 +1,16 @@
+.erp-task-line-cards { display: grid; gap: 12px; min-width: 0; }
+.erp-task-line-card { border: 1px solid var(--erp-border); border-radius: 10px; background: var(--erp-surface-bg); min-width: 0; }
+.erp-task-line-card > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 48px; padding: 12px; cursor: pointer; }
+.erp-task-line-card__fields { display: grid; gap: 14px; padding: 0 12px 12px; }
+.erp-task-line-card__field { min-width: 0; }
+.erp-task-line-card__label { margin-bottom: 6px; color: var(--erp-text-muted); font-size: 13px; }
+.erp-task-line-card__label > span { color: var(--erp-danger); }
+.erp-task-line-card .ant-form-item { margin-bottom: 0; }
+.erp-task-line-card .ant-select, .erp-task-line-card .ant-input-number { width: 100%; max-width: 100%; }
+.erp-task-line-card__actions { display: flex; justify-content: flex-end; }
+
+.erp-task-line-card .ant-form-item-label { display: none; }
+
+.erp-task-line-card .ant-input,
+.erp-task-line-card .ant-input-number-input,
+.erp-task-line-card .ant-select-single .ant-select-selector { min-height: 44px; font-size: 16px; }

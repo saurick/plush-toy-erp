@@ -5,6 +5,7 @@ import {
   FolderOpenOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Space } from 'antd'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import RemoteReferencePicker from '../RemoteReferencePicker.jsx'
 import Select from '@/common/components/select/AppSelect'
@@ -47,6 +48,7 @@ import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
 import { optionalMoneyRule } from '../../utils/sourceOrderValidation.mjs'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx'
+import { purchaseMaterialMatchesSupplier, purchaseMaterialOption } from '../../utils/purchaseMaterialSupplier.mjs'
 
 const PURCHASE_ORDER_COLUMNS = [
   { label: '材料名称', width: 240, flexible: true, required: true },
@@ -169,7 +171,10 @@ export function PurchaseOrderFormFields({
   onSupplierChange,
   onMaterialChange,
 }) {
+  const taskReadOnly = useBusinessPageContext()?.taskBusiness?.readOnly === true
   const [materialImportOpen, setMaterialImportOpen] = useState(false)
+  const supplierID = Form.useWatch('supplier_id', form)
+  const materialParams = useMemo(() => supplierID ? { purchase_supplier_id: supplierID } : {}, [supplierID])
   useEffect(() => {
     if (!referenceDataReady) setMaterialImportOpen(false)
   }, [referenceDataReady])
@@ -203,12 +208,8 @@ export function PurchaseOrderFormFields({
   )
   const materialOptions = useMemo(
     () =>
-      materials.map((item) => ({
-        value: item.id,
-        label: materialLabel(item),
-        item,
-      })),
-    [materials]
+      materials.map((item) => purchaseMaterialOption(item, supplierID)),
+    [materials, supplierID]
   )
   const materialImportColumns = useMemo(
     () => [
@@ -228,6 +229,7 @@ export function PurchaseOrderFormFields({
       { title: '分类', dataIndex: 'category', width: 120 },
       { align: 'left', title: '规格', dataIndex: 'spec', width: 170 },
       { title: '颜色', dataIndex: 'color', width: 110 },
+      { title: '厂商料号', dataIndex: 'supplier_item_no', width: 150 },
       {
         title: '默认单位',
         key: 'default_unit',
@@ -243,8 +245,7 @@ export function PurchaseOrderFormFields({
     <Form
       form={form}
       layout="vertical"
-      disabled={!referenceDataReady}
-      preserve={false}
+      disabled={taskReadOnly || !referenceDataReady}
       className="erp-business-action-form"
     >
       <Form.Item name="supplier_snapshot" hidden>
@@ -344,8 +345,8 @@ export function PurchaseOrderFormFields({
             <Button
               icon={<FolderOpenOutlined aria-hidden="true" />}
               className="erp-line-items-form__import-button erp-action-button"
-              disabled={!referenceDataReady}
-              title={!referenceDataReady ? '采购基础资料加载完成后可选择材料' : undefined}
+              disabled={taskReadOnly || !referenceDataReady || !supplierID}
+              title={!supplierID ? '请先选择供应商' : !referenceDataReady ? '采购基础资料加载完成后可选择材料' : undefined}
               onClick={() => setMaterialImportOpen(true)}
             >
               从材料库添加
@@ -354,6 +355,7 @@ export function PurchaseOrderFormFields({
           renderBeforeHeader={({ add }) => (
             <RemoteReferencePicker
               referenceType="materials"
+              params={materialParams}
               open={materialImportOpen}
               title={<BusinessHelpLabel label="从材料库添加" description="这里只选择材料档案；数量、单价和预计到货日期在编辑页的采购明细里维护。" />}
               rows={materials}
@@ -442,7 +444,7 @@ export function PurchaseOrderFormFields({
                     danger
                     type="text"
                     icon={<DeleteOutlined />}
-                    disabled={fields.length <= 1}
+                    disabled={taskReadOnly || fields.length <= 1}
                     onClick={() => remove(field.name)}
                   >
                     移除行
@@ -464,10 +466,18 @@ export function PurchaseOrderFormFields({
                   className="erp-line-item-field erp-line-item-field--source"
                   name={[field.name, 'material_id']}
                   label="材料名称"
-                  rules={[{ required: true, message: '请选择材料' }]}
+                  dependencies={['supplier_id']}
+                  rules={[
+                    { required: true, message: '请选择材料' },
+                    { validator: (_, id) => purchaseMaterialMatchesSupplier(materials.find((material) => Number(material.id) === Number(id)), form.getFieldValue('supplier_id'))
+                      ? Promise.resolve() : Promise.reject(new Error('材料属于其他厂商，请重新选择')) },
+                  ]}
                 >
                   <RemoteReferenceSelect
                     referenceType="materials"
+                    params={materialParams}
+                    disabled={taskReadOnly || !supplierID}
+                    mapOption={(material) => purchaseMaterialOption(material, supplierID)}
                     placeholder="请选择材料名称"
                     allowClear
                     showSearch
@@ -746,7 +756,7 @@ export function PurchaseOrderFormFields({
         >
           <Select
             allowClear
-            disabled={invoiceRequired !== true}
+            disabled={taskReadOnly || invoiceRequired !== true}
             options={PURCHASE_INVOICE_CATEGORY_OPTIONS}
             placeholder="请先选择需要发票"
           />

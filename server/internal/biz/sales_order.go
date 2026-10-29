@@ -100,11 +100,7 @@ type SalesOrderItem struct {
 	UnshippedQuantity         *decimal.Decimal
 	ProcessRequirement        *string
 	ImportSource              map[string]any
-	SampleBOMID               *int
-	EngineeringStatus         string
-	SampleNote                *string
-	SampleConfirmedAt         *time.Time
-	SampleConfirmedBy         *int
+	BOMID                     *int
 	Designer                  *string
 	ProductImageAttachmentID  *int
 	ProductSkuID              *int
@@ -182,7 +178,7 @@ type SalesOrderWithItems struct {
 type SalesOrderFilter struct {
 	Keyword         string
 	CustomerID      int
-	SampleBOMID     int
+	BOMID           int
 	LifecycleStatus string
 	LifecycleScope  string
 	DateField       string
@@ -640,7 +636,7 @@ func normalizeSalesOrderMutation(in SalesOrderMutation, create bool) (SalesOrder
 	if err != nil {
 		return SalesOrderMutation{}, err
 	}
-	if in.OrderNo == "" || in.CustomerID <= 0 || in.OrderDate.IsZero() || (in.PaymentTermDays != nil && *in.PaymentTermDays < 0) {
+	if (!create && in.OrderNo == "") || in.CustomerID <= 0 || in.OrderDate.IsZero() || (in.PaymentTermDays != nil && *in.PaymentTermDays < 0) {
 		return SalesOrderMutation{}, ErrBadParam
 	}
 	if err := validateOptionalDateNotBefore(in.OrderDate, in.PlannedDeliveryDate); err != nil {
@@ -751,7 +747,7 @@ func normalizeSalesOrderFilter(in SalesOrderFilter) (SalesOrderFilter, error) {
 	) {
 		return SalesOrderFilter{}, ErrBadParam
 	}
-	if in.CustomerID < 0 || in.SampleBOMID < 0 {
+	if in.CustomerID < 0 || in.BOMID < 0 {
 		return SalesOrderFilter{}, ErrBadParam
 	}
 	switch in.DateField {

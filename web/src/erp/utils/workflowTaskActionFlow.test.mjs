@@ -5,9 +5,28 @@ import {
   isWorkflowTaskActionReady,
   moveWorkflowTaskActionStep,
   orderWorkflowTaskActions,
+  workflowTaskCollaborationModes,
+  workflowTaskHandlingModes,
+  workflowTaskPrimaryModes,
   resolveWorkflowTaskActionInitialStep,
   resolveWorkflowTaskActionStep,
 } from './workflowTaskActionFlow.mjs'
+
+test('secondary collaboration keeps only authorized ancillary commands without completing business work', () => {
+  assert.deepEqual(workflowTaskCollaborationModes(['complete', 'urge', 'assign', 'urge', 'unknown']), ['assign'])
+  assert.deepEqual(workflowTaskCollaborationModes([]), [])
+  assert.deepEqual(workflowTaskCollaborationModes(['block', 'resume', 'reject']), ['block', 'resume'])
+  assert.deepEqual(workflowTaskCollaborationModes(['complete', 'block', 'reject', 'urge', 'assign']), ['block', 'assign'])
+  assert.deepEqual(workflowTaskCollaborationModes(['urge', 'assign']), ['urge', 'assign'])
+})
+
+test('handling keeps approval rejection and recovery while urging is limited to follow-up access', () => {
+  assert.deepEqual(workflowTaskHandlingModes(['complete', 'reject', 'urge']), ['complete', 'reject'])
+  assert.deepEqual(workflowTaskHandlingModes(['done', 'blocked', 'rejected', 'urge']), ['done', 'blocked', 'rejected'])
+  assert.deepEqual(workflowTaskHandlingModes(['resume', 'urge']), ['resume'])
+  assert.deepEqual(workflowTaskHandlingModes(['urge', 'assign', 'urge']), ['urge', 'assign'])
+  assert.deepEqual(workflowTaskHandlingModes(), [])
+})
 
 test('action ordering keeps ordinary and approval choices stable without hiding allowed actions', () => {
   const actions = ['complete', 'block', 'reject', 'urge', 'assign']
@@ -82,61 +101,20 @@ test('confirmation requires an allowed action and any required reason', () => {
   )
 })
 
-test('step navigation exposes context and action immediately but gates confirmation', () => {
-  const beforeSelection = getWorkflowTaskActionStepAvailability({
-    canChooseActions: true,
-    canConfirm: false,
-  })
-  assert.deepEqual(beforeSelection, {
-    context: true,
-    action: true,
-    confirm: false,
-  })
-  assert.equal(
-    resolveWorkflowTaskActionStep({
-      requestedStep: 'action',
-      availability: beforeSelection,
-    }),
-    'action'
-  )
-  assert.equal(
-    resolveWorkflowTaskActionStep({
-      requestedStep: 'confirm',
-      availability: beforeSelection,
-    }),
-    'context'
-  )
-
-  const afterSelection = getWorkflowTaskActionStepAvailability({
-    canChooseActions: true,
-    canConfirm: true,
-  })
-  assert.equal(
-    moveWorkflowTaskActionStep({
-      currentStep: 'action',
-      direction: 1,
-      availability: afterSelection,
-    }),
-    'confirm'
-  )
-  assert.equal(
-    moveWorkflowTaskActionStep({
-      currentStep: 'context',
-      direction: -1,
-      availability: beforeSelection,
-    }),
-    'action'
-  )
+test('receipt stays locked until an outcome exists, and finished tasks retain all steps', () => {
+  assert.deepEqual(getWorkflowTaskActionStepAvailability(), { context: true, action: true, confirm: false })
+  assert.equal(getWorkflowTaskActionStepAvailability({ hasReceipt: true }).confirm, true)
+  const availability = getWorkflowTaskActionStepAvailability({ isTerminal: true })
+  assert.deepEqual(availability, { context: true, action: true, confirm: true })
+  for (const requestedStep of ['context', 'action', 'confirm']) {
+    assert.equal(resolveWorkflowTaskActionStep({ requestedStep, availability }), requestedStep)
+  }
+  assert.equal(moveWorkflowTaskActionStep({ currentStep: 'confirm', direction: -1, availability }), 'action')
+  assert.equal(moveWorkflowTaskActionStep({ currentStep: 'context', direction: -1, availability }), 'confirm')
 })
 
-test('a confirmed receipt remains on its only available step when editing closes', () => {
-  for (const requestedStep of ['context', 'action', 'confirm']) {
-    assert.equal(
-      resolveWorkflowTaskActionStep({
-        requestedStep,
-        availability: { context: false, action: false, confirm: true },
-      }),
-      'confirm'
-    )
-  }
+test('primary choices never absorb generic task coordination on either device', () => {
+  assert.deepEqual(workflowTaskPrimaryModes(['complete', 'block', 'reject', 'resume', 'urge', 'assign']), ['complete', 'reject'])
+  assert.deepEqual(workflowTaskPrimaryModes(['done', 'blocked', 'rejected', 'resume', 'urge']), ['done', 'rejected'])
+  assert.deepEqual(workflowTaskPrimaryModes(['urge', 'assign']), [])
 })

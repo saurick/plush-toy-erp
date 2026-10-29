@@ -198,12 +198,12 @@ test("sales order form fields are saved through the shared mapper", () => {
   );
   assertIncludes(
     salesOrderPage,
-    "order_no: buildSequentialDraftCode(orders,",
+    "order_no: undefined",
     "SalesOrdersPage order no draft",
   );
   assertIncludes(
     salesOrderPage,
-    "field: 'order_no'",
+    "orderForm.setFieldsValue({ order_no: savedOrder.order_no })",
     "SalesOrdersPage order no draft",
   );
   assertIncludes(

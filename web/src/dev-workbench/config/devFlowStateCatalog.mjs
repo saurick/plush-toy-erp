@@ -45,11 +45,6 @@ const schemaStatusRef = (path, field = 'status') =>
   Object.freeze({ path, field })
 
 export const DEV_FLOW_STATUS_CONTRACT_REFS = Object.freeze({
-  'source.sales_order_engineering': entCheckContract(
-    'server/internal/data/model/schema/sales_order_item.go',
-    'sales_order_items_engineering_status_allowed',
-    'engineering_status'
-  ),
   'source.engineering_material_request': entCheckContract(
     'server/internal/data/model/schema/engineering_material_request.go',
     'engineering_material_requests_status_allowed'
@@ -213,13 +208,16 @@ export const DEV_FLOW_STATUS_CONTRACT_REFS = Object.freeze({
   ),
 })
 
-const pathMetadata = (pathKinds, pathKindWhen = '') =>
+const pathMetadata = (pathKinds, pathKindWhen = '', { includesStandardPath = false } = {}) =>
   Object.freeze({
     pathKinds: Object.freeze(pathKinds),
     pathKindWhen,
+    includesStandardPath,
   })
 
 export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
+  'source.engineering_material_request:SUBMITTED->REJECTED': pathMetadata(['rejected']),
+  'source.engineering_material_request:BOSS_APPROVED->REJECTED': pathMetadata(['rejected']),
   'source.sales_order:draft->canceled': pathMetadata(['cancelled']),
   'source.sales_order:submitted->canceled': pathMetadata(['cancelled']),
   'source.sales_order:active->canceled': pathMetadata(['cancelled']),
@@ -238,7 +236,6 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
   'workflow.task:blocked->withdrawn': pathMetadata(['cancelled']),
   'process.instance:active->blocked': pathMetadata(['blocked']),
   'process.instance:blocked->active': pathMetadata(['resumed']),
-  'process.instance:blocked->completed': pathMetadata(['cancelled']),
   'process.node:active->blocked': pathMetadata(['blocked']),
   'process.node:blocked->active': pathMetadata(['resumed']),
   'process.node:waiting->withdrawn': pathMetadata(['cancelled']),
@@ -274,12 +271,14 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
   'fact.shipment:SHIPPED->CANCELLED': pathMetadata(['cancelled', 'reversed']),
   'fact.production:DRAFT->POSTED': pathMetadata(
     ['rework'],
-    '仅当 production_fact.fact_type=REWORK；其它事实类型不是返工路径。'
+    '仅当 production_fact.fact_type=REWORK；其它事实类型不是返工路径。',
+    { includesStandardPath: true }
   ),
   'fact.production:POSTED->CANCELLED': pathMetadata(['cancelled', 'reversed']),
   'fact.outsourcing:POSTED->CANCELLED': pathMetadata(['cancelled', 'reversed']),
   'fact.finance:POSTED->CANCELLED': pathMetadata(['cancelled', 'reversed']),
   'fact.finance:SETTLED->POSTED': pathMetadata(['reopened']),
+  'fact.finance:SETTLED->CANCELLED': pathMetadata(['cancelled']),
   'fact.production_wip_batch:PLANNED->CANCELLED': pathMetadata(['cancelled']),
   'fact.production_wip_batch:WAITING_QUALITY->REJECTED': pathMetadata([
     'rejected',
@@ -319,7 +318,7 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
   'fact.finance_payment:POSTED->REVERSED': pathMetadata(['reversed']),
   'fact.inventory_operation:DRAFT->SUBMITTED': pathMetadata(
     ['adjusted'],
-    '仅人工调整 operation_type=MANUAL_ADJUSTMENT 进入审批链。'
+    '盘点 CYCLE_COUNT 与人工调整 MANUAL_ADJUSTMENT 均进入复核链。'
   ),
   'fact.inventory_operation:SUBMITTED->REJECTED': pathMetadata(['rejected']),
   'fact.inventory_operation:DRAFT->CANCELLED': pathMetadata(['cancelled']),
@@ -331,7 +330,7 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
   ]),
   'fact.inventory_operation:APPROVED->POSTED': pathMetadata(
     ['adjusted'],
-    '仅人工调整 operation_type=MANUAL_ADJUSTMENT 的批准后过账。'
+    '盘点与人工调整批准后过账；盘点零差异只保留完成记录。'
   ),
 })
 
@@ -351,6 +350,9 @@ const transition = (
   {
     guard,
     action,
+    label = '',
+    outcomeDimensionKey = '',
+    outcomeKeys = [],
     permission = [],
     systemOnly = false,
     responsibilityMode,
@@ -365,6 +367,9 @@ const transition = (
   to,
   guard,
   action,
+  label,
+  outcomeDimensionKey,
+  outcomeKeys,
   permission,
   systemOnly,
   responsibilityMode,
@@ -591,6 +596,12 @@ function normalizeFlow(definition) {
         throw new Error(`${definition.key} has an invalid transition`)
       }
       const key = `${item.from}->${item.to}`
+      if (item.outcomeDimensionKey) {
+        const dimension = (RULE_DIMENSIONS[definition.key] || []).find((dimension) => dimension.key === item.outcomeDimensionKey)
+        if (!dimension || !item.outcomeKeys?.length || item.outcomeKeys.some((key) => !dimension.states.some((state) => state.key === key))) {
+          throw new Error(`${definition.key}:${key} references an unknown result dimension or outcome`)
+        }
+      }
       const registeredPathMetadata =
         DEV_FLOW_PATH_KIND_REGISTRY[`${definition.key}:${key}`] || null
       const pathKinds = unique(
@@ -639,12 +650,16 @@ function normalizeFlow(definition) {
         to: item.to,
         guard: item.guard,
         action: item.action,
+        label: item.label || '',
+        outcomeDimensionKey: item.outcomeDimensionKey || '',
+        outcomeKeys: freezeStrings(unique(item.outcomeKeys || [])),
         systemOnly: definition.kind === 'runtime' || item.systemOnly,
         responsibilityMode,
         permission: freezeStrings(unique(item.permission || [])),
         factBoundary: item.factBoundary,
         pathKinds: freezeStrings(pathKinds),
         pathKindWhen,
+        includesStandardPath: registeredPathMetadata?.includesStandardPath === true,
         sourceRefs: freezeStrings(
           item.sourceRefs?.length ? item.sourceRefs : sourceRefs
         ),
@@ -831,65 +846,6 @@ function immutableRedEntryDefinition({ key, label, sourceRefs, summary }) {
 
 const FLOW_DEFINITIONS = [
   {
-    key: 'source.sales_order_engineering',
-    terminalPolicy: 'none_reactivatable',
-    scopeKey: 'source_document',
-    kind: 'state_machine',
-    label: '工程与打样',
-    summary: '客户先接单，工程补产品和材料，样品确认与订单生效分开管理。',
-    states: [
-      state('PREPARING', '资料准备'),
-      state('SAMPLING', '打样中'),
-      state('CONFIRMED', '样品已确认'),
-    ],
-    initialStates: ['PREPARING'],
-    terminalStates: [],
-    transitions: [
-      transition('PREPARING', 'SAMPLING', {
-        guard: '产品主图与 BOM 齐备。',
-        action: 'save_sales_order_engineering',
-        permission: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE],
-        factBoundary: 'source_document_only',
-      }),
-      transition('SAMPLING', 'CONFIRMED', {
-        guard: '当前资料与打样资料一致，记录确认结果。',
-        action: 'save_sales_order_engineering',
-        permission: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE],
-        factBoundary: 'source_document_only',
-      }),
-      transition('PREPARING', 'CONFIRMED', {
-        guard: '同客户返单复用已确认且内容一致的样品。',
-        action: 'save_sales_order_engineering',
-        permission: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE],
-        factBoundary: 'source_document_only',
-      }),
-      transition('SAMPLING', 'PREPARING', {
-        guard: '填写重做原因，且没有用料审批及下游单据。',
-        action: 'save_sales_order_engineering',
-        permission: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE],
-        factBoundary: 'source_document_only',
-      }),
-      transition('CONFIRMED', 'PREPARING', {
-        guard: '填写重做原因，且没有用料审批及下游单据。',
-        action: 'save_sales_order_engineering',
-        permission: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE],
-        factBoundary: 'source_document_only',
-      }),
-    ],
-    factBoundary: 'source_document_only',
-    sourceRefs: [
-      'server/internal/biz/sales_order_engineering.go',
-      'server/internal/data/sales_order_engineering_repo.go',
-    ],
-    evidence: [
-      evidence(
-        'code',
-        'server/internal/data/sales_order_engineering_repo.go',
-        '订单行保存打样资料依据和返单复用来源。'
-      ),
-    ],
-  },
-  {
     key: 'source.engineering_material_request',
     scopeKey: 'source_document',
     kind: 'state_machine',
@@ -906,18 +862,21 @@ const FLOW_DEFINITIONS = [
     terminalStates: ['APPROVED', 'REJECTED'],
     transitions: [
       transition('SUBMITTED', 'BOSS_APPROVED', {
+        label: '老板批准用料',
         guard: '当前样品和材料与提交资料一致。',
         action: 'boss_review_engineering_material_request',
         permission: [PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE],
         factBoundary: 'source_document_only',
       }),
       transition('SUBMITTED', 'REJECTED', {
+        label: '老板退回用料',
         guard: '老板填写退回原因。',
         action: 'boss_review_engineering_material_request',
         permission: [PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE],
         factBoundary: 'source_document_only',
       }),
       transition('BOSS_APPROVED', 'APPROVED', {
+        label: '财务批准采购',
         guard:
           '另一位财务审批人核对冻结的订单、BOM、材料、厂商与应需数量；不可改量，批准后按厂商生成采购单。',
         action: 'finance_review_engineering_material_request',
@@ -925,6 +884,7 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'source_document_only',
       }),
       transition('BOSS_APPROVED', 'REJECTED', {
+        label: '财务退回用料',
         guard: '财务填写退回原因。',
         action: 'finance_review_engineering_material_request',
         permission: [PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE],
@@ -1454,13 +1414,16 @@ const FLOW_DEFINITIONS = [
     summary: '流程受阻可恢复；结束时另记成功、驳回、取消或补偿结果。',
     states: [
       state('active', '运行中'),
-      state('completed', '已完成'),
+      state('completed', '已结束'),
       state('blocked', '已阻塞'),
     ],
     initialStates: ['active'],
     terminalStates: ['completed'],
     transitions: [
       transition('active', 'completed', {
+        label: '结束流程',
+        outcomeDimensionKey: 'resolution_kind',
+        outcomeKeys: ['succeeded', 'rejected', 'cancelled', 'compensated'],
         guard: '选定路径按冻结流程合同结算后结束；来源取消或补偿恢复也可终止。必须同时读取 resolution_kind、原因与时间，completed 不表示一定成功。',
         action: 'ProcessRuntimeUsecase.CompleteProcessInstance',
         permission: [],
@@ -1479,6 +1442,9 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'orchestration_only',
       }),
       transition('blocked', 'completed', {
+        label: '取消或补偿后结束',
+        outcomeDimensionKey: 'resolution_kind',
+        outcomeKeys: ['cancelled', 'compensated'],
         guard: '仅正式来源取消或已确认补偿的恢复决策可终止；保留结束结果、原因、时间及下游撤回证据，不把阻塞改成成功。',
         action: 'ProcessRuntime source cancellation / compensation recovery',
         permission: [],
@@ -1961,9 +1927,9 @@ const FLOW_DEFINITIONS = [
       }),
       transition('SETTLED', 'POSTED', {
         guard:
-          '仅 RECEIVABLE / PAYABLE 在收付款冲正或反向红冲后重新出现未结余额时，由同一领域事务清空 settled_at / settled_by；不开放通用重开按钮。',
-        action: 'reverse_finance_payment / reverse_finance_credit_note',
-        permission: [PermissionCode.FINANCE_PAYMENT_REVERSE, PermissionCode.FINANCE_CREDIT_NOTE_REVERSE],
+          '仅 RECEIVABLE / PAYABLE 在撤销核销、收付款冲正、反向红冲或采购来源调增后重新出现未结余额时，由同一领域事务更新结清状态；不开放通用重开按钮。',
+        action: 'reverse_finance_payment / reverse_finance_credit_note / reverse_finance_allocation / create_finance_source_adjustment',
+        permission: [PermissionCode.FINANCE_PAYMENT_REVERSE, PermissionCode.FINANCE_CREDIT_NOTE_REVERSE, PermissionCode.FINANCE_CREDIT_NOTE_CREATE],
         factBoundary: 'fact_ledger',
       }),
       transition('POSTED', 'CANCELLED', {
@@ -1976,6 +1942,13 @@ const FLOW_DEFINITIONS = [
           PermissionCode.FINANCE_RECONCILIATION_CONFIRM,
         ],
         factBoundary: 'fact_ledger',
+      }),
+      transition('SETTLED', 'CANCELLED', {
+        guard: '仅已完成的 RECONCILIATION；校验权限、版本与原因，保留原 posted_at、settled_at 和完成人审计。',
+        action: 'cancel_finance_fact',
+        permission: [PermissionCode.FINANCE_RECONCILIATION_CONFIRM],
+        factBoundary: 'fact_ledger',
+        sourceRefs: ['server/internal/data/finance_fact_cancel_audit_postgres_test.go'],
       }),
     ],
     guard:
@@ -2237,9 +2210,9 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'source_document_decision_only',
       }),
       transition('SUBMITTED', 'CANCELLED', {
-        guard: '取消必须提供正式原因并匹配当前 version。',
+        guard: '取消必须提供正式原因并匹配当前 version；生产只能撤回超领，销售只能撤回质量异常方案。',
         action: 'cancel_production_exception',
-        permission: [PermissionCode.PRODUCTION_EXCEPTION_SUBMIT],
+        permission: [PermissionCode.PRODUCTION_EXCEPTION_SUBMIT, PermissionCode.PRODUCTION_OVER_ISSUE_SUBMIT],
         factBoundary: 'source_document_decision_only',
       }),
     ],
@@ -2478,7 +2451,7 @@ const FLOW_DEFINITIONS = [
     scopeKey: 'fact_ledger',
     kind: 'state_machine',
     label: '库存操作单',
-    summary: '普通库存操作可直接过账；人工调整必须先提交、审批，再过账。',
+    summary: '调拨核对后直接过账；盘点与人工调整必须先提交、由他人复核，再过账。',
     states: [
       state('DRAFT', '草稿'),
       state('SUBMITTED', '已提交'),
@@ -2492,34 +2465,34 @@ const FLOW_DEFINITIONS = [
     transitions: [
       transition('DRAFT', 'SUBMITTED', {
         guard:
-          '仅 MANUAL_ADJUSTMENT 可提交，且创建人、version 与流程节点必须匹配。',
+          '仅 CYCLE_COUNT 或 MANUAL_ADJUSTMENT 可提交，且创建人、version 与流程节点必须匹配。',
         action: 'submit_inventory_adjustment',
         permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
         factBoundary: 'source_document_only',
       }),
       transition('SUBMITTED', 'APPROVED', {
         guard:
-          '仅 MANUAL_ADJUSTMENT 可批准，审批人不得为创建人并必须匹配 version。',
+          '仅 CYCLE_COUNT 或 MANUAL_ADJUSTMENT 可批准，审批人不得为创建人并必须匹配 version。',
         action: 'approve_inventory_adjustment',
         permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE, PermissionCode.WORKFLOW_TASK_APPROVE],
         factBoundary: 'source_document_only',
       }),
       transition('SUBMITTED', 'REJECTED', {
         guard:
-          '仅 MANUAL_ADJUSTMENT 可退回，必须提供原因且审批人不得为创建人。',
+          '仅 CYCLE_COUNT 或 MANUAL_ADJUSTMENT 可退回，必须提供原因且审批人不得为创建人。',
         action: 'reject_inventory_adjustment',
         permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE, PermissionCode.WORKFLOW_TASK_REJECT],
         factBoundary: 'source_document_only',
       }),
       transition('DRAFT', 'POSTED', {
         guard:
-          '仅非 MANUAL_ADJUSTMENT 从草稿直接过账，并原子写库存交易与余额。',
+          '仅 TRANSFER 从草稿直接过账，并原子写调出、调入流水与余额。',
         action: 'post_inventory_operation',
         permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
         factBoundary: 'inventory_fact',
       }),
       transition('APPROVED', 'POSTED', {
-        guard: '仅已批准 MANUAL_ADJUSTMENT 可过账，并原子写库存交易与余额。',
+        guard: '仅已批准 CYCLE_COUNT 或 MANUAL_ADJUSTMENT 可过账；盘点账面数必须仍匹配，零差异不生成流水。',
         action: 'post_inventory_adjustment',
         permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
         factBoundary: 'inventory_fact',
@@ -2533,7 +2506,7 @@ const FLOW_DEFINITIONS = [
         })
       ),
       transition('POSTED', 'CANCELLED', {
-        guard: '已过账单只允许原过账人提供原因后取消，并原子写反向库存交易。',
+        guard: '已过账单只允许原过账人提供原因后取消，为原有非零差异流水追加反向记录；零差异不生成流水。',
         action: 'cancel_inventory_operation',
         permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
         factBoundary: 'inventory_fact',
@@ -3838,6 +3811,7 @@ function flowSearchText(flow) {
     ...flow.states.flatMap((item) => [item.key, item.label, item.summary]),
     ...flow.transitions.flatMap((item) => [
       item.key,
+      item.label,
       item.guard,
       item.action,
       ...item.permission,

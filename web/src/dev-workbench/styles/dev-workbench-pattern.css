@@ -1,3 +1,75 @@
+.erp-workbench-reading {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-workbench-reading__catalog {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-inline-end: 12px;
+  border-inline-end: 1px solid var(--erp-border);
+}
+
+.erp-workbench-reading__catalog > button {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.erp-workbench-reading__body {
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .erp-workbench-reading {
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+.erp-workbench-reading--custom-catalog {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, min(40%, 520px));
+}
+
+.erp-workbench-reading--custom-catalog > .erp-workbench-reading__catalog {
+  display: block;
+}
+
+.erp-workbench-reading--catalog-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.erp-workbench-reading--catalog-only > .erp-workbench-reading__catalog {
+  padding-inline-end: 0;
+  border-inline-end: 0;
+}
+
+@media (max-width: 760px) {
+  .erp-workbench-reading,
+  .erp-workbench-reading--custom-catalog {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .erp-workbench-reading__catalog {
+    display: flex;
+    flex-wrap: wrap;
+    padding-inline-end: 0;
+    padding-block-end: 8px;
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--erp-border);
+  }
+
+  .erp-workbench-reading__catalog > button {
+    width: auto;
+  }
+}
+
 .erp-workbench-section {
   display: grid;
   align-content: start;
@@ -26,7 +98,9 @@
 .erp-workbench-toolbar,
 .erp-workbench-toolbar__controls,
 .erp-workbench-toolbar__actions,
-.erp-workbench-section__actions {
+.erp-workbench-toolbar__tools,
+.erp-workbench-section__actions,
+.erp-workbench-section__tools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -36,11 +110,16 @@
 
 .erp-workbench-section__heading,
 .erp-workbench-toolbar {
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .erp-workbench-toolbar__controls {
   flex: 1 1 auto;
+}
+
+.erp-workbench-toolbar__tools,
+.erp-workbench-section__tools {
+  margin-inline-start: auto;
 }
 
 .erp-workbench-section__title {

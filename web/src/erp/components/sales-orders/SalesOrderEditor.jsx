@@ -86,6 +86,7 @@ export default function SalesOrderEditor({
     >
       <Form form={form} layout="vertical" className="erp-business-action-form">
         <SalesOrderFormFields
+          orderID={editingOrder?.id}
           itemsSection={
             <BusinessFormSection
               title="订货明细"

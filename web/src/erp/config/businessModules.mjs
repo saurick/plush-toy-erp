@@ -5,7 +5,7 @@ const businessSectionMeta = Object.freeze([
   { key: 'purchase', title: '采购管理' },
   { key: 'outsourcing', title: '委外管理' },
   { key: 'production', title: '生产管理' },
-  { key: 'warehouse', title: '库存管理' },
+  { key: 'warehouse', title: '仓储管理' },
   { key: 'quality', title: '质检管理' },
   { key: 'shipment', title: '出货管理' },
   { key: 'finance', title: '财务管理' },
@@ -170,16 +170,50 @@ export const businessModuleDefinitions = Object.freeze([
     ],
   },
   {
+    key: 'inventory',
+    sectionKey: 'warehouse',
+    label: '库存查询',
+    title: '库存查询',
+    path: '/erp/warehouse/inventory',
+    shortLabel: '库存',
+    pageKind: 'formal',
+    description:
+      '库存台账统一查看库存余额、已预留、可用量、批次和变动记录；库存数量以已确认的入库、出库和调整记录为准。',
+    primaryEntity:
+      'inventory_operations / inventory_balances / inventory_txns / inventory_lots',
+    factSource:
+      'inventory_operations, inventory_operation_items, inventory_txns, inventory_balances, inventory_lots, stock_reservations',
+    boundary:
+      '入库、生产、委外、出货和预留必须通过对应来源单据或业务记录办理；本页只额外提供盘点、仓间调拨和有权限的人工调整，过账后才改变库存。',
+    sourceRefs: [
+      'inventory_txns',
+      'inventory_balances',
+      'inventory_lots',
+      'inventory_operations',
+      'inventory_operation_items',
+      'stock_reservations',
+    ],
+    currentScope: [
+      '库存余额',
+      '已预留 / 可用量只读',
+      '库存批次',
+      '库存变动记录',
+      '按来源单据和业务记录追溯',
+      '盘点差异、仓间调拨和受控人工调整',
+      '调整草稿过账、取消和并发版本校验',
+    ],
+  },
+  {
     key: 'inbound',
     sectionKey: 'warehouse',
-    label: '采购入库',
-    title: '采购入库',
+    label: '入库办理',
+    title: '入库办理',
     path: '/erp/warehouse/inbound',
     shortLabel: '入库',
     pageKind: 'formal',
     description:
-      '采购入库只接收从已审核采购订单生成的入库草稿，并继续办理收货、待检、退货、调整和入库确认；确认过账后系统更新库存。',
-    primaryEntity: 'purchase_receipts / purchase_receipt_items',
+      '集中办理采购收货、成品入库与委外回货，复用原来源单据、质检关口和入库确认，正式过账后更新库存。',
+    primaryEntity: 'purchase_receipts / production_facts / outsourcing_facts',
     factSource: 'purchase_receipts, purchase_receipt_items, inventory_txns',
     boundary: '任务完成不等于采购入库；合格行可分次确认，部分入库须逐行核对库存流水；每行入库或拒收处置完成后才能生成应付。',
     sourceRefs: [
@@ -230,40 +264,7 @@ export const businessModuleDefinitions = Object.freeze([
       '批次冻结 / 可用 / 不合格状态',
     ],
   },
-  {
-    key: 'inventory',
-    sectionKey: 'warehouse',
-    label: '库存台账',
-    title: '库存台账',
-    path: '/erp/warehouse/inventory',
-    shortLabel: '库存',
-    pageKind: 'formal',
-    description:
-      '库存台账统一查看库存余额、已预留、可用量、批次和变动记录；库存数量以已确认的入库、出库和调整记录为准。',
-    primaryEntity:
-      'inventory_operations / inventory_balances / inventory_txns / inventory_lots',
-    factSource:
-      'inventory_operations, inventory_operation_items, inventory_txns, inventory_balances, inventory_lots, stock_reservations',
-    boundary:
-      '入库、生产、委外、出货和预留必须通过对应来源单据或业务记录办理；本页只额外提供盘点、仓间调拨和有权限的人工调整，过账后才改变库存。',
-    sourceRefs: [
-      'inventory_txns',
-      'inventory_balances',
-      'inventory_lots',
-      'inventory_operations',
-      'inventory_operation_items',
-      'stock_reservations',
-    ],
-    currentScope: [
-      '库存余额',
-      '已预留 / 可用量只读',
-      '库存批次',
-      '库存变动记录',
-      '按来源单据和业务记录追溯',
-      '盘点差异、仓间调拨和受控人工调整',
-      '调整草稿过账、取消和并发版本校验',
-    ],
-  },
+
   {
     key: 'processing-contracts',
     sectionKey: 'outsourcing',
@@ -273,12 +274,12 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '委外',
     pageKind: 'formal',
     description:
-      '委外订单维护加工合同、工序明细、加工厂承诺和打印内容；已确认合同可在本页按明细生成委外发料或回货草稿。',
+      '委外订单维护加工合同、工序明细、加工厂承诺和打印内容；按明细办理材料发出、普通回货或关联生产工序。',
     primaryEntity: 'outsourcing_orders / outsourcing_order_items',
     factSource:
       'outsourcing_orders, outsourcing_order_items, outsourcing_facts, quality_inspections, finance_facts',
     boundary:
-      '确认加工合同只表示双方约定已确认；发料和回货仍需在本页办理并过账，回货质检和应付请到对应页面继续处理。',
+      '确认合同只表示加工约定成立；普通发料和回货须过账，工序回货从关联批次办理，全部验收后生成合同应付草稿，再到应付管理确认。',
     sourceRefs: [
       'outsourcing_orders',
       'outsourcing_order_items',
@@ -466,29 +467,32 @@ export const businessModuleDefinitions = Object.freeze([
   },
   {
     key: 'outbound',
-    sectionKey: 'shipment',
-    label: '库存预留',
-    title: '库存预留',
+    sectionKey: 'warehouse',
+    label: '出库办理',
+    title: '出库办理',
     path: '/erp/warehouse/outbound',
-    shortLabel: '预留',
+    shortLabel: '出库',
     pageKind: 'formal',
     description:
-      '库存预留用于核对销售订单占用的库存，并按权限释放预留；实际出货在出货单中确认。',
-    primaryEntity: 'stock_reservations',
-    factSource: 'stock_reservations',
+      '集中办理销售出货、生产领料、委外发料与库存预留，复用各来源业务的状态、权限与库存校验。',
+    primaryEntity: 'shipments / production_facts / outsourcing_facts / stock_reservations',
+    factSource: 'shipments, production_facts, outsourcing_facts, stock_reservations, inventory_txns',
     boundary:
-      '库存预留和释放不会增减库存总量；只有出货单确认出货才消耗预留并写入库存出库记录。',
+      '审批放行、库存预留和释放不增减账面库存；销售出货确认后、生产领料和委外发料过账后才产生库存出库记录。',
     sourceRefs: [
       'sales_orders',
       'sales_order_items',
       'shipments',
       'shipment_items',
       'stock_reservations',
+      'production_facts',
+      'outsourcing_facts',
       'inventory_txns',
     ],
     currentScope: [
-      '按销售订单、仓库和批次核对库存预留',
-      '查看预留数量、单位和状态',
+      '销售出货按放行、检验、包装与库存条件确认实际发货',
+      '生产领料、委外发料按原业务来源确认过账',
+      '按销售订单、仓库和批次核对库存预留数量、单位与状态',
       '按权限释放尚未消耗的库存预留',
     ],
   },

@@ -307,6 +307,40 @@ export function getAvailableHistorySources({
   })
 }
 
+// 集中查询服务于资料维护、单据管理、财务核对和监督；来源读取权仍独立校验。
+const HISTORY_CENTER_PURPOSE_PERMISSIONS = Object.freeze([
+  PermissionCode.CUSTOMER_UPDATE,
+  PermissionCode.SUPPLIER_UPDATE,
+  PermissionCode.MATERIAL_UPDATE,
+  PermissionCode.PRODUCT_UPDATE,
+  PermissionCode.PRODUCT_SKU_UPDATE,
+  PermissionCode.PROCESS_UPDATE,
+  PermissionCode.BOM_UPDATE,
+  PermissionCode.SALES_ORDER_UPDATE,
+  PermissionCode.PURCHASE_ORDER_UPDATE,
+  PermissionCode.OUTSOURCING_ORDER_UPDATE,
+  PermissionCode.PMC_PLAN_UPDATE,
+  PermissionCode.PRODUCTION_WIP_ASSIGN,
+  PermissionCode.WORKFLOW_TASK_SUPERVISE,
+  PermissionCode.FINANCE_RECEIVABLE_READ,
+  PermissionCode.FINANCE_PAYABLE_READ,
+  PermissionCode.FINANCE_INVOICE_READ,
+  PermissionCode.FINANCE_RECONCILIATION_READ,
+  PermissionCode.FINANCE_PAYMENT_READ,
+  PermissionCode.FINANCE_REPORT_READ,
+])
+
+export function getHistoryCenterSources({
+  visibleMenuPaths = [],
+  canReadPermission = () => false,
+  isSuperAdmin = false,
+} = {}) {
+  if (!isSuperAdmin && !HISTORY_CENTER_PURPOSE_PERMISSIONS.some(canReadPermission)) {
+    return []
+  }
+  return getAvailableHistorySources({ visibleMenuPaths, canReadPermission })
+}
+
 export function buildHistoryListParams(
   source,
   { keyword = '', status = '' } = {}

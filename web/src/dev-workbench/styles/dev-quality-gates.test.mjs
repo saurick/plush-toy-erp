@@ -100,17 +100,12 @@ test('quality gates styles: use project theme tokens instead of missing Ant CSS 
   }
 })
 
-test('quality gates styles: execution track keeps state semantics', () => {
-  assert.match(css, /\.erp-dev-quality-flow__track/u)
-  assert.match(
-    css,
-    /grid-template-columns:\s*repeat\([\s\S]*?auto-fit[\s\S]*?minmax\(min\(170px, 100%\), 1fr\)/u
-  )
-  assert.match(css, /\[data-status='running'\]/u)
+test('quality gates styles: execution table keeps state semantics', () => {
+  assert.match(css, /\.erp-dev-quality-flow__table/u)
+  assert.match(css, /border-collapse:\s*collapse/u)
   assert.match(css, /\[data-status='failed'\]/u)
   assert.match(css, /\[data-emphasis='current'\]/u)
-  assert.match(css, /\[data-emphasis='failed'\]/u)
-  assert.match(css, /\[data-emphasis='longest'\]/u)
+  assert.doesNotMatch(css, /\.erp-dev-quality-flow__track\s*\{/u)
 })
 
 test('quality gates styles: visual evidence stays semantic and scoped', () => {

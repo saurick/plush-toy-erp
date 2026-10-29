@@ -75,6 +75,10 @@ export function assertReceivingEvidence(report) {
     } else if (flow.key.endsWith("purchase_return")) {
       assert.equal(flow.reversalRestored, true);
       assert.equal(flow.cancelReplayExact, true);
+      assert.equal(flow.registrationSurface, "desktop");
+      assert.equal(flow.postSurface, "desktop");
+      assert.equal(flow.reversalSurface, "desktop");
+      if (flow.key.startsWith("mobile_")) assert.equal(flow.completedTaskReadOnly, true);
     } else {
       assert.equal(flow.correctionPreservesEvidence, true);
       assert.equal(flow.dependentCancelBlocked, true);
@@ -340,11 +344,9 @@ async function run(options) {
       const dialog = await modal(page, reject ? "判定不合格" : "判定合格");
       const results = dialog.getByLabel("检查结果", { exact: true });
       const count = await results.count();
-      // Structured line checks belong to incoming inspections. Return quality
-      // decisions require their source, explicit defect rate and decision note.
       assert.equal(
         count,
-        kind === "INCOMING" ? 3 : 0,
+        kind === "INCOMING" ? 3 : 1,
         `${kind} must use its formal decision form`,
       );
       for (let i = 0; i < count; i++) {
@@ -611,7 +613,7 @@ async function run(options) {
         "purchase",
         "post_purchase_receipt",
         { id: receiptID },
-        CODE.INVALID_PARAM,
+        CODE.BUSINESS_RULE_VIOLATION,
       );
       assert.deepEqual(unchanged(), committed);
       for (const inspection of committed.inspections)
@@ -651,12 +653,19 @@ async function run(options) {
         items = snapshot("purchase_receipt_items", `receipt_id=${receiptID}`),
         source = items[0];
       flow.sourceID = receiptID;
+      if (mobile) {
+        const completed = await open("warehouse", true, "warehouse/inbound", receiptID);
+        for (const label of ["生成采购退货", "确认材料入库", "取消入库"])
+          await expect(completed.getByRole("button", { name: label, exact: true })).toHaveCount(0);
+        flow.completedTaskReadOnly = true;
+      }
       const page = await open(
         "warehouse",
-        mobile,
+        false,
         "warehouse/inbound",
         receiptID,
       );
+      Object.assign(flow, { registrationSurface: "desktop", postSurface: "desktop", reversalSurface: "desktop" });
       await pageAction(page, "生成采购退货");
       const dialog = await modal(page, "从入库单生成采购退货");
       const submit = dialog.getByRole("button", {
@@ -1041,7 +1050,7 @@ async function run(options) {
         "quality",
         "create_quality_inspection_from_outsourcing_return",
         { fact_id: fact.id, inspection_no: `${prefix}-EARLY` },
-        CODE.INVALID_PARAM,
+        CODE.BUSINESS_RULE_VIOLATION,
       );
       flow.backendInvalidUnchanged = true;
       await pageAction(page, "委外记录");
@@ -1188,7 +1197,7 @@ async function run(options) {
         "quality",
         "create_quality_inspection_from_outsourcing_return",
         { ...params, inspection_no: `${prefix}-OTHER` },
-        CODE.IDEMPOTENCY_CONFLICT,
+        CODE.RESOURCE_CONFLICT,
       );
       assert.deepEqual(state(), draft);
       flow.changedIntentRejected =
@@ -1227,7 +1236,7 @@ async function run(options) {
           expected_version: draft.facts[0].version,
           reason: "模拟拒收后不能直接撤销",
         },
-        CODE.INVALID_PARAM,
+        CODE.BUSINESS_RULE_VIOLATION,
       );
       assert.deepEqual(state(), rejectedState);
       flow.dependentCancelBlocked = true;

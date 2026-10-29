@@ -26,8 +26,8 @@ func populateSalesOrderItemDisplay(ctx context.Context, client *ent.Client, item
 		if item.ProductID > 0 {
 			productIDs = append(productIDs, item.ProductID)
 		}
-		if item.SampleBOMID != nil {
-			bomIDs = append(bomIDs, *item.SampleBOMID)
+		if item.BOMID != nil {
+			bomIDs = append(bomIDs, *item.BOMID)
 		}
 	}
 	quantities, err := loadShipmentSourceLineQuantities(ctx, client, sourceOrders)
@@ -65,8 +65,8 @@ func populateSalesOrderItemDisplay(ctx context.Context, client *ent.Client, item
 			remaining := decimal.Max(decimal.Zero, item.OrderedQuantity.Sub(shipped))
 			item.ShippedQuantity, item.UnshippedQuantity = &shipped, &remaining
 		}
-		if item.SampleBOMID != nil {
-			item.Designer = designers[*item.SampleBOMID]
+		if item.BOMID != nil {
+			item.Designer = designers[*item.BOMID]
 		}
 		if id := images[item.ProductID]; id > 0 {
 			item.ProductImageAttachmentID = &id
@@ -105,12 +105,12 @@ func validateSalesOrderCommercialEngineeringChange(ctx context.Context, client *
 	if in.ImportSource != nil && !reflect.DeepEqual(current.ImportSource, in.ImportSource) {
 		return biz.ErrBadParam
 	}
-	if current.SampleBomID != nil || current.EngineeringStatus != biz.SalesOrderEngineeringPreparing {
+	if current.BomID != nil {
 		if current.ProductID != in.ProductID || !sameOptionalInt(current.ProductSkuID, in.ProductSkuID) {
 			return biz.ErrSalesOrderEngineeringTransition
 		}
 	}
-	if current.EngineeringStatus != biz.SalesOrderEngineeringPreparing && (!sameOptionalString(current.ProcessRequirement, in.ProcessRequirement) || !sameOptionalString(current.RequestedProductName, in.RequestedProductName)) {
+	if current.BomFingerprint != nil && (!sameOptionalString(current.ProcessRequirement, in.ProcessRequirement) || !sameOptionalString(current.RequestedProductName, in.RequestedProductName)) {
 		return biz.ErrSalesOrderEngineeringTransition
 	}
 	return nil

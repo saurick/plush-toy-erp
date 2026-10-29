@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { createPayableFromOutsourcingReturn } from '../../api/operationalFactApi.mjs'
+import { createPayableFromOutsourcingReturn, createPayableFromOutsourcingOrder } from '../../api/operationalFactApi.mjs'
 import { BUSINESS_ROUTE_PATHS } from '../../utils/masterDataOrderView.mjs'
 import { createSourceBusinessActionAttemptStore } from '../../utils/sourceBusinessAction.mjs'
 import {
-  buildOutsourcingReturnPayablePayload,
+  buildFinanceBusinessSourcePayload,
+  FINANCE_BUSINESS_SOURCE_ACTIONS,
   financeBusinessSourceFormValuesFromRequest,
 } from '../../utils/financeBusinessSourceAction.mjs'
 import {
@@ -17,6 +18,7 @@ import { relatedDocumentRoute } from '../../utils/relatedDocumentNavigation.mjs'
 
 export function useOutsourcingReturnPayable({
   canCreatePayable,
+  canCreateStagePayable,
   qualityInspectionByFactID,
   setReturnRecordsOpen,
   setReturnRecordsOrder,
@@ -26,6 +28,9 @@ export function useOutsourcingReturnPayable({
   navigate,
 }) {
   const [financeSourceFact, setFinanceSourceFact] = useState(null)
+  const [financeSourceAction, setFinanceSourceAction] = useState(FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_RETURN_PAYABLE)
+  const stagePayable = financeSourceAction === FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE
+  const canCreateCurrentPayable = stagePayable ? canCreateStagePayable : canCreatePayable
 
   const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
 
@@ -36,7 +41,7 @@ export function useOutsourcingReturnPayable({
   const financeSourceInFlightRef = useRef(false)
 
   const financeSourceScope = financeSourceFact?.id
-    ? `outsourcing-return-payable:${financeSourceFact.id}`
+    ? `${financeSourceAction}:${financeSourceFact.id}`
     : ''
 
   const financeSourceInitialValues = useMemo(() => {
@@ -69,6 +74,7 @@ export function useOutsourcingReturnPayable({
       setReturnRecordsOpen(false)
       setReturnRecordsOrder(null)
       setRelatedReturnFacts([])
+      setFinanceSourceAction(FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_RETURN_PAYABLE)
       setFinanceSourceFact(fact)
     },
     [
@@ -80,6 +86,12 @@ export function useOutsourcingReturnPayable({
     ]
   )
 
+  const openOutsourcingOrderPayable = useCallback((order) => {
+    if (!canCreateStagePayable) return
+    setFinanceSourceAction(FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE)
+    setFinanceSourceFact(order)
+  }, [canCreateStagePayable])
+
   const closeOutsourcingReturnPayable = useCallback(() => {
     if (financeSourceInFlightRef.current) return
     setFinanceSourceFact(null)
@@ -88,14 +100,14 @@ export function useOutsourcingReturnPayable({
   const submitOutsourcingReturnPayable = useCallback(
     async (values) => {
       const fact = financeSourceFact
-      if (financeSourceInFlightRef.current || !canCreatePayable || !fact?.id) {
+      if (financeSourceInFlightRef.current || !canCreateCurrentPayable || !fact?.id) {
         return
       }
-      const scope = `outsourcing-return-payable:${fact.id}`
+      const scope = `${financeSourceAction}:${fact.id}`
       let attempt
       try {
         const payload = {
-          ...buildOutsourcingReturnPayablePayload(values, fact),
+          ...buildFinanceBusinessSourcePayload(financeSourceAction, values, fact),
           customer_key: activeCustomerKey || undefined,
         }
         attempt = financeSourceAttemptsRef.current.prepare(scope, payload)
@@ -107,7 +119,7 @@ export function useOutsourcingReturnPayable({
       financeSourceInFlightRef.current = true
       setFinanceSourceLoading(true)
       try {
-        await createPayableFromOutsourcingReturn(attempt.params)
+        await (stagePayable ? createPayableFromOutsourcingOrder : createPayableFromOutsourcingReturn)(attempt.params)
         financeSourceAttemptsRef.current.settle(scope, attempt, null)
         setFinanceSourceFact(null)
         message.success('应付草稿已生成，请到应付管理核对并确认')
@@ -129,7 +141,7 @@ export function useOutsourcingReturnPayable({
         setFinanceSourceLoading(false)
       }
     },
-    [activeCustomerKey, canCreatePayable, financeSourceFact]
+    [activeCustomerKey, canCreateCurrentPayable, financeSourceFact, financeSourceAction, stagePayable]
   )
 
   const viewOutsourcingReturnPayable = useCallback(
@@ -150,6 +162,8 @@ export function useOutsourcingReturnPayable({
     [canViewPayable, navigate]
   )
   return {
+    financeSourceAction,
+    openOutsourcingOrderPayable,
     financeSourceFact,
     financeSourceLoading,
     financeSourceInFlightRef,

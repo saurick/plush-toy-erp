@@ -1,31 +1,25 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   AppstoreOutlined,
   BuildOutlined,
   CodeOutlined,
-  CopyOutlined,
   DeploymentUnitOutlined,
-  FileTextOutlined,
-  MoreOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { Button, Popover, theme } from 'antd'
+import { Button, theme } from 'antd'
 import { Link, useLocation } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
-import { message } from '@/common/utils/antdApp'
-import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import {
-  DEV_DOCS_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_WORKBENCH_AREA_KEYS,
   DEV_WORKSPACE_NAV_ITEMS,
   getDevSecondaryNavItems,
+  resolveDevNavigationRoute,
   resolveDevWorkbenchAreaKey,
 } from '../config/devRoutes.mjs'
 import { preloadDevRoute } from '../config/devRouteModules.mjs'
 
-const COPY_MESSAGE_KEY = 'dev-page-nav-copy-deep-link'
 const navIcons = {
   [DEV_WORKBENCH_AREA_KEYS.overview]: <AppstoreOutlined />,
   [DEV_WORKBENCH_AREA_KEYS.productEngineering]: <BuildOutlined />,
@@ -53,11 +47,9 @@ function isPlainRouteClick(event) {
   )
 }
 
-export default function DevPageNav({ sourcePath = '', navRef = null }) {
+export default function DevPageNav({ navRef = null }) {
   const location = useLocation()
   const { token } = theme.useToken()
-  const [toolsOpen, setToolsOpen] = useState(false)
-  const toolsTriggerRef = useRef(null)
   const routedPathname = normalizePathname(location.pathname)
   const [navigationIntent, setNavigationIntent] = useState(
     EMPTY_NAVIGATION_INTENT
@@ -70,41 +62,10 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
     ? navigationIntent.targetPathname
     : routedPathname
   const currentAreaKey = resolveDevWorkbenchAreaKey(currentPathname)
+  const currentNavigationRoute = resolveDevNavigationRoute(currentPathname)
   const pendingRouteLabel =
     DEV_PAGE_TITLE_BY_ROUTE[currentPathname] || '目标页面'
   const currentRouteRef = useRef(null)
-  const currentDeepLink = useMemo(() => {
-    const relativeLink = routePending
-      ? currentPathname
-      : `${location.pathname}${location.search}${location.hash}`
-    if (typeof window === 'undefined') return relativeLink
-    return `${window.location.origin}${relativeLink}`
-  }, [
-    currentPathname,
-    location.hash,
-    location.pathname,
-    location.search,
-    routePending,
-  ])
-  const sourceHref = sourcePath
-    ? `${DEV_DOCS_ROUTE}?path=${encodeURIComponent(sourcePath)}`
-    : ''
-
-  useEffect(() => {
-    setToolsOpen(false)
-  }, [location.key])
-
-  useEffect(() => {
-    if (!toolsOpen) return undefined
-    const closeOnEscape = (event) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      setToolsOpen(false)
-      toolsTriggerRef.current?.focus()
-    }
-    document.addEventListener('keydown', closeOnEscape)
-    return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [toolsOpen])
 
   useEffect(() => {
     setNavigationIntent((currentIntent) => {
@@ -139,23 +100,6 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
       inline: 'nearest',
     })
   }, [currentPathname])
-
-  const handleCopyDeepLink = () => {
-    setToolsOpen(false)
-    copyTextToClipboard(currentDeepLink)
-      .then(() =>
-        message.success({
-          key: COPY_MESSAGE_KEY,
-          content: '页面链接已复制',
-        })
-      )
-      .catch(() =>
-        message.error({
-          key: COPY_MESSAGE_KEY,
-          content: '复制失败，请手动复制地址栏链接',
-        })
-      )
-  }
 
   const handleRouteIntent = (event, targetPathname) => {
     if (!isPlainRouteClick(event)) return
@@ -207,7 +151,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
             <div key={area.key} className="erp-dev-workspace-nav__group">
               <Link
                 ref={
-                  currentPathname === area.route ? currentRouteRef : undefined
+                  currentNavigationRoute === area.route ? currentRouteRef : undefined
                 }
                 to={area.route}
                 onPointerEnter={() => handleRoutePreload(area.route)}
@@ -215,7 +159,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
                 onClick={(event) => handleRouteIntent(event, area.route)}
                 className={[
                   'erp-dev-workspace-nav__route',
-                  currentPathname === area.route
+                  currentNavigationRoute === area.route
                     ? 'erp-dev-workspace-nav__route--active'
                     : currentAreaKey === area.key
                       ? 'erp-dev-workspace-nav__route--context'
@@ -224,7 +168,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
                   .filter(Boolean)
                   .join(' ')}
                 aria-current={
-                  currentPathname === area.route ? 'page' : undefined
+                  currentNavigationRoute === area.route ? 'page' : undefined
                 }
               >
                 <span
@@ -242,7 +186,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
                   aria-label={`${area.label}工作入口`}
                 >
                   {getDevSecondaryNavItems(area.key).map((item) => {
-                    const isActive = currentPathname === item.route
+                    const isActive = currentNavigationRoute === item.route
                     return (
                       <Link
                         ref={isActive ? currentRouteRef : undefined}
@@ -274,34 +218,11 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
             className="erp-dev-workspace-nav__theme-toggle"
             showLabel
           />
-          <Popover
-            trigger="click"
-            placement="rightBottom"
-            open={toolsOpen}
-            onOpenChange={setToolsOpen}
-            content={
-              <div className="erp-dev-workspace-nav__tools" role="group" aria-label="页面工具">
-                <Button type="text" icon={<CopyOutlined />} aria-label="复制当前页面链接" onClick={handleCopyDeepLink}>
-                  复制链接
-                </Button>
-                {sourceHref ? (
-                  <Button type="text" href={sourceHref} icon={<FileTextOutlined />} aria-label={`在项目文档中打开来源 ${sourcePath}`}>
-                    来源文档
-                  </Button>
-                ) : null}
-                {import.meta.env.MODE === 'workbench' ? (
-                  <form method="post" action="/__dev/auth/logout">
-                    <Button block type="text" htmlType="submit">退出登录</Button>
-                  </form>
-                ) : null}
-                <p>开发工具仅供维护使用。运行结果、发布版本与目标环境，以各工具的实际记录为准。</p>
-              </div>
-            }
-          >
-            <Button ref={toolsTriggerRef} block icon={<MoreOutlined aria-hidden="true" />} aria-label="页面工具" aria-expanded={toolsOpen}>
-              页面工具
-            </Button>
-          </Popover>
+          {import.meta.env.MODE === 'workbench' ? (
+            <form method="post" action="/__dev/auth/logout">
+              <Button block htmlType="submit">退出登录</Button>
+            </form>
+          ) : null}
         </div>
       </nav>
       {routePending ? (

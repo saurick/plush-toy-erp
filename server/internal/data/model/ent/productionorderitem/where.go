@@ -431,16 +431,6 @@ func RouteCodeHasSuffix(v string) predicate.ProductionOrderItem {
 	return predicate.ProductionOrderItem(sql.FieldHasSuffix(FieldRouteCode, v))
 }
 
-// RouteCodeIsNil applies the IsNil predicate on the "route_code" field.
-func RouteCodeIsNil() predicate.ProductionOrderItem {
-	return predicate.ProductionOrderItem(sql.FieldIsNull(FieldRouteCode))
-}
-
-// RouteCodeNotNil applies the NotNil predicate on the "route_code" field.
-func RouteCodeNotNil() predicate.ProductionOrderItem {
-	return predicate.ProductionOrderItem(sql.FieldNotNull(FieldRouteCode))
-}
-
 // RouteCodeEqualFold applies the EqualFold predicate on the "route_code" field.
 func RouteCodeEqualFold(v string) predicate.ProductionOrderItem {
 	return predicate.ProductionOrderItem(sql.FieldEqualFold(FieldRouteCode, v))

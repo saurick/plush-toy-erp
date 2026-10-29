@@ -142,9 +142,8 @@ export async function prepareEngineeringPressureData({
     allOrders.push({ id: item.id, orderNo, orderDate, kind, ...(historical ? { status: PRESSURE_HISTORY_STATES[ordinal % PRESSURE_HISTORY_STATES.length] } : {}) });
     if ((index + 1) % 20 === 0) onProgress({ step: "orders", completed: index + 1, total: totalOrders });
   }
-  let confirmed = 0;
-  // Reuse the preparation helper in chunks; each product image and BOM remains
-  // unique and existing sources are read back on subsequent chunks.
+  let completed = 0;
+  // Complete engineering in chunks; the domain action creates material review once.
   for (let offset = 0; offset < allOrders.length; offset += 20) {
     signal?.throwIfAborted();
     const chunk = allOrders.slice(offset, offset + 20);
@@ -152,7 +151,7 @@ export async function prepareEngineeringPressureData({
       plan: { prefix, productionCandidates: chunk.map((order) => ({ salesOrder: { id: order.id, orderNo: order.orderNo } })) },
       sourceReport: { referenceRecords: refs }, rpc, materialMode: "preview",
     });
-    confirmed += chunk.length; onProgress({ step: "samples", completed: confirmed, total: totalOrders });
+    completed += chunk.length; onProgress({ step: "engineering", completed, total: totalOrders });
   }
   const historyOrders = allOrders.slice(0, scale.historyOrders), orders = allOrders.slice(scale.historyOrders);
   // Use the same adapter and independent checker as the timed scenario. Data
@@ -166,7 +165,7 @@ export async function prepareEngineeringPressureData({
   }
   const historyLedger = await readEngineeringPressureLedger(databaseURL, historyOrders);
   const expectedApproved = historyOrders.filter((order) => order.status === "APPROVED").length;
-  if (historyLedger.orders !== historyOrders.length || historyLedger.requests !== historyOrders.filter((order) => order.status !== "PREVIEW").length ||
+  if (historyLedger.orders !== historyOrders.length || historyLedger.requests !== historyOrders.length ||
       historyLedger.approvedRequests !== expectedApproved || historyLedger.purchaseOrders !== expectedApproved * 2 ||
       historyLedger.purchaseItems !== expectedApproved * 3 || historyLedger.partialSupplierResults || historyLedger.invalidPurchaseLines || historyLedger.duplicateSupplierResults)
     throw new Error("engineering background data readback failed");

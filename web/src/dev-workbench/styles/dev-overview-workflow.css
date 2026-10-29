@@ -13,9 +13,6 @@
   border-radius: 10px;
   background: var(--erp-surface-bg);
 }
-.erp-dev-overview-library__navigation {
-  padding: 10px 12px 0;
-}
 .erp-dev-overview-library__toolbar {
   display: grid;
   grid-template-columns: minmax(180px, 340px) 136px max-content 7em;

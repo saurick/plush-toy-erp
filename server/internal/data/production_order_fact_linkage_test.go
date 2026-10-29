@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"server/internal/biz"
-	"server/internal/data/model/ent/inventorytxn"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -36,7 +35,7 @@ func TestProductionCompletionFromOrderDerivesSourceAndReplays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create production order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, created.Order.ID)
+	prepareProductionOrderFactMaterialsForTest(t, ctx, client, created.Order.ID)
 	released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{
 		ID: created.Order.ID, ExpectedVersion: 1, ActorID: actor.ID, IdempotencyKey: "mo-completion-release",
 	})
@@ -45,11 +44,13 @@ func TestProductionCompletionFromOrderDerivesSourceAndReplays(t *testing.T) {
 	}
 	completeProductionSchedulingTaskForTest(t, ctx, data, client, released.Order.ID, actor.ID)
 	line := released.Items[0]
+	batchID := prepareProductionHandworkBatchForFactTest(t, ctx, client, line.ID, actor.ID)
 	lotNo := "PCO-COMPLETION-LOT"
 	input := &biz.ProductionCompletionFromOrderCreate{
 		FactNo:                "PF-COMPLETION-001",
 		ProductionOrderID:     released.Order.ID,
 		ProductionOrderItemID: line.ID,
+		ProductionWIPBatchID:  batchID,
 		WarehouseID:           warehouseRow.ID,
 		NewLotNo:              &lotNo,
 		Quantity:              decimal.NewFromInt(4),
@@ -114,13 +115,14 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	if err != nil {
 		t.Fatalf("create production order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, created.Order.ID)
+	prepareProductionOrderFactMaterialsForTest(t, ctx, client, created.Order.ID)
 	released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 1, ActorID: actor.ID, IdempotencyKey: "mo-fact-release"})
 	if err != nil {
 		t.Fatalf("release production order: %v", err)
 	}
 	completeProductionSchedulingTaskForTest(t, ctx, data, client, released.Order.ID, actor.ID)
 	line := released.Items[0]
+	batchID := prepareProductionHandworkBatchForFactTest(t, ctx, client, line.ID, actor.ID)
 
 	newFact := func(no, key string, quantity int64) *biz.OperationalFactMutation {
 		sourceType, sourceID, sourceLineID := biz.ProductionOrderSourceType, released.Order.ID, line.ID
@@ -129,7 +131,8 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 			SubjectType: biz.InventorySubjectProduct, SubjectID: productRow.ID, ProductSkuID: &skuRow.ID,
 			WarehouseID: warehouseRow.ID, UnitID: unitRow.ID, Quantity: decimal.NewFromInt(quantity),
 			SourceType: &sourceType, SourceID: &sourceID, SourceLineID: &sourceLineID,
-			IdempotencyKey: key, OccurredAt: time.Now().UTC(), OccurredAtSpecified: true,
+			ProductionWIPBatchID: &batchID,
+			IdempotencyKey:       key, OccurredAt: time.Now().UTC(), OccurredAtSpecified: true,
 		}
 	}
 
@@ -157,19 +160,14 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	}
 
 	overInput := newFact("PF-MO-OVER", "pf-mo-over", 5)
-	over, err := factUC.CreateProductionFactDraft(ctx, overInput)
-	if err != nil {
-		t.Fatalf("create over-limit draft: %v", err)
+	if _, err := factUC.CreateProductionFactDraft(ctx, overInput); !errors.Is(err, biz.ErrProductionWIPQuantityExceeded) {
+		t.Fatalf("over-limit draft must not reserve unavailable WIP capacity: %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(over.ID, over.Version, actor.ID, "")); !errors.Is(err, biz.ErrProductionOrderQuantityExceeded) {
-		t.Fatalf("over-limit post error = %v", err)
+	if count := client.ProductionFact.Query().CountX(ctx); count != 1 {
+		t.Fatalf("rejected over-limit draft must not persist, count=%d", count)
 	}
-	overReadback := client.ProductionFact.GetX(ctx, over.ID)
-	if overReadback.Status != biz.OperationalFactStatusDraft {
-		t.Fatalf("failed over-limit post must remain DRAFT: %#v", overReadback)
-	}
-	if count := client.InventoryTxn.Query().Where(inventorytxn.IdempotencyKey(biz.OperationalFactInventoryIdempotencyKey(biz.ProductionFactSourceType, over.ID, over.ID, "POST"))).CountX(ctx); count != 0 {
-		t.Fatalf("failed over-limit post must write zero inventory txn, count=%d", count)
+	if count := client.InventoryTxn.Query().CountX(ctx); count != 1 {
+		t.Fatalf("rejected over-limit draft must not add inventory txns, count=%d", count)
 	}
 
 	fact2, err := factUC.CreateProductionFactDraft(ctx, newFact("PF-MO-002", "pf-mo-002", 4))
@@ -183,7 +181,11 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedFact1.ID, postedFact1.Version, actor.ID, "撤销首笔完工")); err != nil {
 		t.Fatalf("cancel first linked fact: %v", err)
 	}
-	postedOver, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(overReadback.ID, overReadback.Version, actor.ID, ""))
+	over, err := factUC.CreateProductionFactDraft(ctx, overInput)
+	if err != nil {
+		t.Fatalf("reversal must release WIP capacity for a new draft: %v", err)
+	}
+	postedOver, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(over.ID, over.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("reversal must release effective quantity for later post: %v", err)
 	}
@@ -255,7 +257,7 @@ func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T)
 					SetOccurredAtSpecified(true).
 					SaveX(ctx)
 			case biz.OperationalFactStatusPosted, biz.OperationalFactStatusCancelled:
-				markProductionOrderHistoricalUnroutedForTest(t, ctx, client, created.Order.ID)
+				prepareProductionOrderFactMaterialsForTest(t, ctx, client, created.Order.ID)
 				released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{
 					ID: created.Order.ID, ExpectedVersion: created.Order.Version, ActorID: actor.ID,
 					IdempotencyKey: "release-draft-order-" + status,
@@ -266,10 +268,12 @@ func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T)
 				completeProductionSchedulingTaskForTest(t, ctx, data, client, released.Order.ID, actor.ID)
 				factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 				lotNo := "PDC-LOT-" + status
+				batchID := prepareProductionHandworkBatchForFactTest(t, ctx, client, released.Items[0].ID, actor.ID)
 				draftFact, err := factUC.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 					FactNo: "PF-DRAFT-CANCEL-" + status, ProductionOrderID: released.Order.ID,
 					ProductionOrderItemID: released.Items[0].ID, WarehouseID: warehouseRow.ID,
-					NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pf-draft-cancel-" + status,
+					ProductionWIPBatchID: batchID,
+					NewLotNo:             &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pf-draft-cancel-" + status,
 				})
 				if err != nil {
 					t.Fatalf("create terminal fixture fact: %v", err)
@@ -329,7 +333,7 @@ func TestProductionOrderFactLinkageRejectsWrongSourceShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create source order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, created.Order.ID)
+	prepareProductionOrderFactMaterialsForTest(t, ctx, client, created.Order.ID)
 	released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 1, ActorID: actor.ID, IdempotencyKey: "mo-wrong-release"})
 	if err != nil {
 		t.Fatalf("release source order: %v", err)

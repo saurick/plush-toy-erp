@@ -3,6 +3,7 @@ import { currentBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 import { moveBusinessDate } from '../../src/erp/utils/businessVisualizationModels.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { expectHeading } from './pageAssertions.mjs'
+import { purchaseFollowupFixture } from './purchaseFollowupFixtures.mjs'
 import {
   assertBusinessViewMotion,
   captureBusinessView,
@@ -460,8 +461,8 @@ export function createUnifiedInteractionScenarios({
       beforeNavigate: async (page) => {
         await page.route('**/rpc/purchase_order', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
-          if (method !== 'list_purchase_orders') return route.fallback()
-          if (purchaseArrivalFail && !params.include_status_counts) {
+          if (!['list_purchase_orders', 'list_purchase_followups', 'get_purchase_order'].includes(method)) return route.fallback()
+          if (purchaseArrivalFail && method === 'list_purchase_followups') {
             return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id, error: { code: -32603, message: '计划读取失败' } }) })
           }
           const orders = rows.map((row, index) => ({
@@ -478,6 +479,15 @@ export function createUnifiedInteractionScenarios({
             supplier_confirmed_arrival_date:
               index % 2 ? unix(moveBusinessDate(today, 3)) : null,
           }))
+          if (method === 'get_purchase_order') return respond(route, id, { purchase_order: orders.find((order) => order.id === params.id) })
+          if (method === 'list_purchase_followups') {
+            const followups = orders.map((order) => {
+              const due = order.supplier_confirmed_arrival_date || order.expected_arrival_date
+              const date = due ? new Date(due * 1000).toISOString().slice(0, 10) : ''
+              return { key: `arrival:${order.id}`, source_type: 'purchase_order', source_id: order.id, source_no: order.purchase_order_no, order_id: order.id, order_no: order.purchase_order_no, line_id: order.id, line_no: '1', supplier_id: 1, supplier_name: order.supplier_snapshot.name, material_code: `MAT-${order.id}`, material_name: '到货模拟材料', unit_name: '米', quantity: '20', due_date: date, date_source: order.supplier_confirmed_arrival_date ? 'confirmed' : 'expected', kind: !date ? 'unscheduled' : date < today ? 'overdue' : 'due_soon' }
+            })
+            return respond(route, id, purchaseFollowupFixture(followups, params, today))
+          }
           return respond(
             route,
             id,
@@ -512,10 +522,10 @@ export function createUnifiedInteractionScenarios({
         assert.equal(await page.getByRole('button', { name: '表格工具', exact: true }).count(), 0)
         assert.equal(await panel.getByRole('button', { name: /^全部\s*500/ }).getAttribute('aria-pressed'), 'true')
         await page.screenshot({ path: `${outputDir}/purchase-arrival-default-4k.png`, fullPage: false })
-        await panel.getByText('全部确认状态', { exact: true }).click()
-        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '供应商已确认' }).click()
+        await panel.getByRole('combobox', { name: '交期来源', exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '供应商确认交期' }).click()
         await panel.getByRole('button', { name: /^全部\s*250/ }).waitFor()
-        assert.ok((await panel.locator('.erp-arrival-calendar__detail-head').innerText()).includes('250 张订单'))
+        assert.ok((await panel.locator('.erp-arrival-calendar__detail-head').innerText()).includes('250 项'))
         const [download] = await Promise.all([
           page.waitForEvent('download', { timeout: 12000 }),
           panel.getByRole('button', { name: '导出当前结果', exact: true }).click({ timeout: 8000 }),
@@ -523,27 +533,15 @@ export function createUnifiedInteractionScenarios({
         const { readFile } = await import('node:fs/promises')
         const csv = await readFile(await download.path(), 'utf8')
         assert.equal(csv.trim().split('\n').length, 251, '导出应覆盖全部筛选结果，不受当前 25 行限制')
-        assert.ok(csv.includes('供应商已确认'))
-        assert.ok(!csv.includes('待供应商确认'))
+        assert.ok(csv.includes('待到货面料') || csv.includes('到货模拟材料'))
         await panel.getByRole('button', { name: '重置到货筛选', exact: true }).click()
         await panel.locator('.ant-pagination-next button').click()
-        const selectedRow = panel.locator('.ant-table-tbody > tr[data-row-key]').first()
-        const selectedID = await selectedRow.getAttribute('data-row-key')
-        await selectedRow.click()
-        assert.equal(await page.locator('[data-business-action-key="print-contract"]').isEnabled(), true, '日历页第二页选单仍能打印')
-        await page.locator('[data-business-action-key="purchase-details"]').click()
-        const detail = page.getByRole('dialog').filter({ hasText: '采购订单详情' })
-        await detail.waitFor()
-        assert.ok((await detail.innerText()).includes(`PO-UI-${selectedID}`))
-        await detail.locator('.ant-modal-close').click()
-        await detail.waitFor({ state: 'hidden' })
-        await panel.locator('.ant-table-row-selected').waitFor()
+        assert.equal(await panel.getByRole('button', { name: '打开采购单', exact: true }).count(), 25)
         await panel.getByRole('button', { name: '今天', exact: true }).click()
-        await panel.getByText('所选日期暂无到货安排', { exact: true }).waitFor()
-        assert.equal(await page.locator('[data-business-action-key="purchase-details"]').isEnabled(), false, '改变到货范围后不能继续操作旧选单')
+        await panel.getByText('当前范围没有需要跟进的事项', { exact: true }).waitFor()
         assert.equal(await panel.getByRole('button', { name: '导出当前结果', exact: true }).isEnabled(), false)
         assert.equal(await panel.locator('.ant-pagination').count(), 0)
-        await panel.getByRole('button', { name: '查看全部到货安排', exact: true }).click()
+        await panel.getByRole('button', { name: '重置到货筛选', exact: true }).click()
         await panel.getByRole('button', { name: /^全部\s*\d/ }).click()
         assert.equal(
           await panel.locator('.ant-table-tbody > tr[data-row-key]').count(),
@@ -562,7 +560,8 @@ export function createUnifiedInteractionScenarios({
         await panel
           .getByRole('button', { name: '前 14 天', exact: true })
           .click()
-        await panel.getByRole('button', { name: /^未填日期/ }).click()
+        await panel.getByRole('button', { name: /^未排交期/ }).click()
+        await panel.locator('.ant-table-tbody > tr[data-row-key]').first().waitFor()
         assert.equal(
           await panel.locator('.ant-table-tbody > tr[data-row-key]').count(),
           25
@@ -572,17 +571,15 @@ export function createUnifiedInteractionScenarios({
         await panel.locator('.erp-arrival-calendar__day').first().waitFor()
         assert.equal(
           await panel
-            .getByRole('button', { name: /^未填日期/ })
+            .getByRole('button', { name: /^未排交期/ })
             .getAttribute('aria-pressed'),
           'true'
         )
-        await panel.locator('.ant-table-tbody > tr[data-row-key]').first().click()
-        assert.equal(await page.locator('[data-business-action-key="purchase-details"]').isEnabled(), true)
         purchaseArrivalFail = true
         await page.getByRole('button', { name: '刷新当前页', exact: true }).click()
         await panel.getByRole('button', { name: '重新加载', exact: true }).waitFor()
         assert.equal(await panel.locator('.ant-table-tbody > tr[data-row-key]').count(), 0, '加载失败不能展示旧清单')
-        assert.equal(await page.locator('[data-business-action-key="purchase-details"]').isEnabled(), false, '加载失败后不能操作旧记录')
+        assert.equal(await panel.getByRole('button', { name: '打开采购单', exact: true }).count(), 0)
         purchaseArrivalFail = false
         await panel.getByRole('button', { name: '重新加载', exact: true }).click()
         await panel.locator('.ant-table-tbody > tr[data-row-key]').first().waitFor()

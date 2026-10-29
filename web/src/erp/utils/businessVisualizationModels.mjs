@@ -2,7 +2,6 @@ import {
   OperationalFactStatus,
   ProductionOrderStatus,
   ProductionWIPStatus,
-  PurchaseOrderStatus,
   QualityInspectionStatus,
   SalesOrderItemStatus,
   SalesOrderStatus,
@@ -156,37 +155,6 @@ export function buildSalesDeliveryModel(items = [], options = {}) {
   }
 }
 
-function purchaseArrivalStatus(order, today) {
-  if (order.lifecycleStatus === PurchaseOrderStatus.CANCELED) {
-    return { key: 'cancelled', label: '已取消', rank: 6 }
-  }
-  if (order.lifecycleStatus === PurchaseOrderStatus.CLOSED) {
-    return { key: 'closed', label: '订单已关闭', rank: 5 }
-  }
-  if (!order.arrivalDate) {
-    return { key: 'unscheduled', label: '未填到货日', rank: 0 }
-  }
-  const days = dayDistance(today, order.arrivalDate)
-  if (days !== null && days < 0) {
-    return {
-      key: 'overdue',
-      label: `逾期 ${Math.abs(days)} 天`,
-      rank: 0,
-    }
-  }
-  if (days !== null && days <= 7) {
-    return {
-      key: 'dueSoon',
-      label: days === 0 ? '今天到货' : `${days} 天后到货`,
-      rank: 1,
-    }
-  }
-  if (order.confirmedDate) {
-    return { key: 'confirmed', label: '供应商已确认日期', rank: 2 }
-  }
-  return { key: 'planned', label: '预计到货', rank: 3 }
-}
-
 export function moveBusinessDate(dateKey, delta) {
   const timestamp = dateKeyToUTC(dateKey)
   if (timestamp === null || !Number.isInteger(delta)) return ''
@@ -210,76 +178,6 @@ export function paginateVisualizationRows(
     pageSize: size,
     total: rows.length,
   }
-}
-
-export function buildPurchaseArrivalModel(orders = [], options = {}) {
-  const today = options.today || currentBusinessDate()
-  const startDate =
-    dateKeyToUTC(options.startDate) !== null ? options.startDate : today
-  const rows = (Array.isArray(orders) ? orders : []).map((item) => {
-    const confirmedDate = unixDateKey(item?.supplier_confirmed_arrival_date)
-    const expectedDate = unixDateKey(item?.expected_arrival_date)
-    const row = {
-      id: Number(item?.id || 0),
-      orderNo: normalizedText(item?.purchase_order_no),
-      supplierName: normalizedText(
-        item?.supplier_snapshot?.name || item?.supplier_name
-      ),
-      lifecycleStatus: normalizedText(item?.lifecycle_status).toLowerCase(),
-      confirmedDate,
-      expectedDate,
-      arrivalDate: confirmedDate || expectedDate,
-      dateSource: confirmedDate ? 'confirmed' : expectedDate ? 'expected' : '',
-    }
-    return { ...row, status: purchaseArrivalStatus(row, today) }
-  }).filter((row) => options.confirmation === 'confirmed'
-    ? Boolean(row.confirmedDate)
-    : options.confirmation === 'unconfirmed' ? !row.confirmedDate : true)
-  rows.sort((left, right) => {
-    const rank = left.status.rank - right.status.rank
-    if (rank !== 0) return rank
-    return (left.arrivalDate || '9999-12-31').localeCompare(
-      right.arrivalDate || '9999-12-31'
-    ) || left.orderNo.localeCompare(right.orderNo, 'zh-CN') || left.id - right.id
-  })
-
-  const days = Array.from({ length: 14 }, (_, index) => {
-    const dateKey = moveBusinessDate(startDate, index)
-    return { dateKey, day: Number(dateKey.slice(-2)), items: [] }
-  })
-  const dayMap = new Map(days.map((day) => [day.dateKey, day]))
-  rows.filter((row) => !['closed', 'cancelled'].includes(row.status.key))
-    .forEach((row) => dayMap.get(row.arrivalDate)?.items.push(row))
-
-  return {
-    rows,
-    days,
-    startDate,
-    endDate: days.at(-1).dateKey,
-    unscheduled: rows.filter((row) => row.status.key === 'unscheduled'),
-    counts: {
-      total: rows.length,
-      period: days.reduce((count, day) => count + day.items.length, 0),
-      overdue: rows.filter((row) => row.status.key === 'overdue').length,
-      dueSoon: rows.filter((row) => row.status.key === 'dueSoon').length,
-      confirmed: rows.filter(
-        (row) =>
-          row.confirmedDate && !['closed', 'cancelled'].includes(row.status.key)
-      ).length,
-      unscheduled: rows.filter((row) => row.status.key === 'unscheduled')
-        .length,
-    },
-  }
-}
-
-export function filterPurchaseArrivalRows(model, { filter = 'all', selectedDate = '' } = {}) {
-  return model.rows.filter((row) => {
-    if (filter === 'all') return true
-    if (['closed', 'cancelled'].includes(row.status.key)) return false
-    if (filter === 'date') return row.arrivalDate === selectedDate
-    if (filter === 'period') return row.arrivalDate >= model.startDate && row.arrivalDate <= model.endDate
-    return row.status.key === filter
-  })
 }
 
 function financeDueStatus(row, today) {

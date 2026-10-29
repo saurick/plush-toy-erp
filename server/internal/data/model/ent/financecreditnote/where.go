@@ -56,6 +56,21 @@ func IDLTE(id int) predicate.FinanceCreditNote {
 	return predicate.FinanceCreditNote(sql.FieldLTE(FieldID, id))
 }
 
+// BalanceDirection applies equality check predicate on the "balance_direction" field. It's identical to BalanceDirectionEQ.
+func BalanceDirection(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldEQ(FieldBalanceDirection, v))
+}
+
+// SourceType applies equality check predicate on the "source_type" field. It's identical to SourceTypeEQ.
+func SourceType(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldEQ(FieldSourceType, v))
+}
+
+// SourceID applies equality check predicate on the "source_id" field. It's identical to SourceIDEQ.
+func SourceID(v int) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldEQ(FieldSourceID, v))
+}
+
 // CreditNoteNo applies equality check predicate on the "credit_note_no" field. It's identical to CreditNoteNoEQ.
 func CreditNoteNo(v string) predicate.FinanceCreditNote {
 	return predicate.FinanceCreditNote(sql.FieldEQ(FieldCreditNoteNo, v))
@@ -109,6 +124,196 @@ func CreatedBy(v int) predicate.FinanceCreditNote {
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.FinanceCreditNote {
 	return predicate.FinanceCreditNote(sql.FieldEQ(FieldCreatedAt, v))
+}
+
+// BalanceDirectionEQ applies the EQ predicate on the "balance_direction" field.
+func BalanceDirectionEQ(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldEQ(FieldBalanceDirection, v))
+}
+
+// BalanceDirectionNEQ applies the NEQ predicate on the "balance_direction" field.
+func BalanceDirectionNEQ(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldNEQ(FieldBalanceDirection, v))
+}
+
+// BalanceDirectionIn applies the In predicate on the "balance_direction" field.
+func BalanceDirectionIn(vs ...string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldIn(FieldBalanceDirection, vs...))
+}
+
+// BalanceDirectionNotIn applies the NotIn predicate on the "balance_direction" field.
+func BalanceDirectionNotIn(vs ...string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldNotIn(FieldBalanceDirection, vs...))
+}
+
+// BalanceDirectionGT applies the GT predicate on the "balance_direction" field.
+func BalanceDirectionGT(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldGT(FieldBalanceDirection, v))
+}
+
+// BalanceDirectionGTE applies the GTE predicate on the "balance_direction" field.
+func BalanceDirectionGTE(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldGTE(FieldBalanceDirection, v))
+}
+
+// BalanceDirectionLT applies the LT predicate on the "balance_direction" field.
+func BalanceDirectionLT(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldLT(FieldBalanceDirection, v))
+}
+
+// BalanceDirectionLTE applies the LTE predicate on the "balance_direction" field.
+func BalanceDirectionLTE(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldLTE(FieldBalanceDirection, v))
+}
+
+// BalanceDirectionContains applies the Contains predicate on the "balance_direction" field.
+func BalanceDirectionContains(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldContains(FieldBalanceDirection, v))
+}
+
+// BalanceDirectionHasPrefix applies the HasPrefix predicate on the "balance_direction" field.
+func BalanceDirectionHasPrefix(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldHasPrefix(FieldBalanceDirection, v))
+}
+
+// BalanceDirectionHasSuffix applies the HasSuffix predicate on the "balance_direction" field.
+func BalanceDirectionHasSuffix(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldHasSuffix(FieldBalanceDirection, v))
+}
+
+// BalanceDirectionEqualFold applies the EqualFold predicate on the "balance_direction" field.
+func BalanceDirectionEqualFold(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldEqualFold(FieldBalanceDirection, v))
+}
+
+// BalanceDirectionContainsFold applies the ContainsFold predicate on the "balance_direction" field.
+func BalanceDirectionContainsFold(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldContainsFold(FieldBalanceDirection, v))
+}
+
+// SourceTypeEQ applies the EQ predicate on the "source_type" field.
+func SourceTypeEQ(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldEQ(FieldSourceType, v))
+}
+
+// SourceTypeNEQ applies the NEQ predicate on the "source_type" field.
+func SourceTypeNEQ(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldNEQ(FieldSourceType, v))
+}
+
+// SourceTypeIn applies the In predicate on the "source_type" field.
+func SourceTypeIn(vs ...string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldIn(FieldSourceType, vs...))
+}
+
+// SourceTypeNotIn applies the NotIn predicate on the "source_type" field.
+func SourceTypeNotIn(vs ...string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldNotIn(FieldSourceType, vs...))
+}
+
+// SourceTypeGT applies the GT predicate on the "source_type" field.
+func SourceTypeGT(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldGT(FieldSourceType, v))
+}
+
+// SourceTypeGTE applies the GTE predicate on the "source_type" field.
+func SourceTypeGTE(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldGTE(FieldSourceType, v))
+}
+
+// SourceTypeLT applies the LT predicate on the "source_type" field.
+func SourceTypeLT(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldLT(FieldSourceType, v))
+}
+
+// SourceTypeLTE applies the LTE predicate on the "source_type" field.
+func SourceTypeLTE(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldLTE(FieldSourceType, v))
+}
+
+// SourceTypeContains applies the Contains predicate on the "source_type" field.
+func SourceTypeContains(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldContains(FieldSourceType, v))
+}
+
+// SourceTypeHasPrefix applies the HasPrefix predicate on the "source_type" field.
+func SourceTypeHasPrefix(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldHasPrefix(FieldSourceType, v))
+}
+
+// SourceTypeHasSuffix applies the HasSuffix predicate on the "source_type" field.
+func SourceTypeHasSuffix(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldHasSuffix(FieldSourceType, v))
+}
+
+// SourceTypeIsNil applies the IsNil predicate on the "source_type" field.
+func SourceTypeIsNil() predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldIsNull(FieldSourceType))
+}
+
+// SourceTypeNotNil applies the NotNil predicate on the "source_type" field.
+func SourceTypeNotNil() predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldNotNull(FieldSourceType))
+}
+
+// SourceTypeEqualFold applies the EqualFold predicate on the "source_type" field.
+func SourceTypeEqualFold(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldEqualFold(FieldSourceType, v))
+}
+
+// SourceTypeContainsFold applies the ContainsFold predicate on the "source_type" field.
+func SourceTypeContainsFold(v string) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldContainsFold(FieldSourceType, v))
+}
+
+// SourceIDEQ applies the EQ predicate on the "source_id" field.
+func SourceIDEQ(v int) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldEQ(FieldSourceID, v))
+}
+
+// SourceIDNEQ applies the NEQ predicate on the "source_id" field.
+func SourceIDNEQ(v int) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldNEQ(FieldSourceID, v))
+}
+
+// SourceIDIn applies the In predicate on the "source_id" field.
+func SourceIDIn(vs ...int) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldIn(FieldSourceID, vs...))
+}
+
+// SourceIDNotIn applies the NotIn predicate on the "source_id" field.
+func SourceIDNotIn(vs ...int) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldNotIn(FieldSourceID, vs...))
+}
+
+// SourceIDGT applies the GT predicate on the "source_id" field.
+func SourceIDGT(v int) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldGT(FieldSourceID, v))
+}
+
+// SourceIDGTE applies the GTE predicate on the "source_id" field.
+func SourceIDGTE(v int) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldGTE(FieldSourceID, v))
+}
+
+// SourceIDLT applies the LT predicate on the "source_id" field.
+func SourceIDLT(v int) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldLT(FieldSourceID, v))
+}
+
+// SourceIDLTE applies the LTE predicate on the "source_id" field.
+func SourceIDLTE(v int) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldLTE(FieldSourceID, v))
+}
+
+// SourceIDIsNil applies the IsNil predicate on the "source_id" field.
+func SourceIDIsNil() predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldIsNull(FieldSourceID))
+}
+
+// SourceIDNotNil applies the NotNil predicate on the "source_id" field.
+func SourceIDNotNil() predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(sql.FieldNotNull(FieldSourceID))
 }
 
 // CreditNoteNoEQ applies the EQ predicate on the "credit_note_no" field.

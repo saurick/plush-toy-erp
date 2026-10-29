@@ -371,9 +371,8 @@ func ProductionWIPRequiredQualityGates(operationCode string, customerInspectionR
 	}
 }
 
-// ValidateProductionWIPInitialization selects explicitly routed items without
-// inferring a route for records that have no frozen route. The repository must
-// call this in the release transaction before creating route snapshots.
+// ValidateProductionWIPInitialization validates every line before freezing its
+// route in the release transaction.
 func ValidateProductionWIPInitialization(order *ProductionOrder, items []*ProductionOrderItem) ([]*ProductionOrderItem, error) {
 	if order == nil || order.ID <= 0 {
 		return nil, ErrBadParam
@@ -387,10 +386,7 @@ func ValidateProductionWIPInitialization(order *ProductionOrder, items []*Produc
 			return nil, ErrProductionWIPInvalidRoute
 		}
 		if item.RouteCode == nil {
-			if item.CustomerInspectionRequired {
-				return nil, ErrProductionWIPInvalidRoute
-			}
-			continue
+			return nil, ErrProductionWIPInvalidRoute
 		}
 		routeCode := strings.TrimSpace(*item.RouteCode)
 		if routeCode != ProductionWIPRoutePlushSewHandV1 {

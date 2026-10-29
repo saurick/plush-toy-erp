@@ -10,33 +10,37 @@
 .mobile-task-business > .mobile-role-tasks-page__detail-main {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-}
-
-.mobile-task-business > .mobile-role-tasks-page__detail-main > .mobile-detail-section {
-  flex-shrink: 0;
+  overflow-y: auto;
+  scroll-padding-block-start: 72px;
 }
 
 .mobile-task-business > .mobile-role-tasks-page__detail-main > .erp-material-task-action {
   display: flex;
-  flex: 1;
+  flex: 0 0 auto;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .mobile-task-business__content {
   position: relative;
-  flex: 1;
   min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow: visible;
   padding: 0;
 }
 
-.mobile-task-business__content[data-business-form-editing='true'] {
-  overflow: hidden;
+.mobile-task-business .erp-business-page-layout[data-business-form-editing='true'] {
+  height: auto;
+}
+
+.mobile-task-business .erp-business-form-page:not([hidden]),
+.mobile-task-business .erp-business-form-page__body {
+  display: block;
+  overflow: visible;
+}
+
+.mobile-task-business .erp-business-form-page__main {
+  overflow: visible;
 }
 
 .mobile-task-business-actions {
@@ -49,6 +53,19 @@
 .mobile-task-business-actions > .ant-btn,
 .mobile-outsourcing-task-actions .erp-action-button {
   min-height: 44px;
+}
+
+.mobile-task-business-context-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-end: 12px;
+}
+
+.mobile-task-business-context-actions .ant-btn {
+  min-height: 44px;
+  height: auto;
+  white-space: normal;
 }
 
 .mobile-task-business__content > label,
@@ -125,9 +142,42 @@
   cursor: pointer;
 }
 
-.mobile-task-business-action-host {
+.mobile-task-business-action-host,
+.mobile-task-business-result-footer {
   flex: 1 1 0;
   min-width: 0;
+}
+
+.mobile-task-business-result-footer > .ant-btn {
+  width: 100%;
+  min-height: 44px;
+  height: auto;
+  white-space: normal;
+}
+
+.mobile-task-business[data-business-form-editing='true'] .mobile-task-business-result-footer {
+  display: none;
+}
+
+.mobile-task-business .erp-inventory-operation-receipt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.mobile-task-business .erp-inventory-operation-receipt .ant-alert-icon {
+  margin-inline-end: 0;
+}
+
+.mobile-task-business .erp-inventory-operation-receipt .ant-alert-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mobile-task-business .erp-inventory-operation-receipt .ant-alert-action {
+  grid-column: 1 / -1;
+  margin-inline-start: 0;
 }
 
 .mobile-task-business-action-host:empty {
@@ -147,6 +197,10 @@
   white-space: normal;
 }
 
+.mobile-task-business .erp-inventory-operation-receipt .ant-btn {
+  min-height: 44px;
+}
+
 .mobile-task-business-primary .erp-business-selection-action-bar__compact-visible {
   flex: 1 1 0;
   min-width: 0;
@@ -156,14 +210,6 @@
 .mobile-task-business-primary .erp-business-action-tooltip-anchor {
   min-width: 0;
 }
-
-.mobile-task-business-primary .erp-business-selection-action-bar__compact-more {
-  flex: 0 0 auto;
-  min-width: 44px;
-  width: 44px;
-  padding: 8px;
-}
-
 
 .mobile-task-business-primary .erp-business-selection-action-bar__compact-visible > div,
 .mobile-task-business-primary .erp-business-selection-action-bar__compact-visible .erp-business-action-tooltip-anchor,
@@ -197,7 +243,8 @@
   white-space: normal;
 }
 
-.mobile-task-business[data-business-form-editing='true'] .mobile-task-business-primary {
+.mobile-task-business[data-business-form-editing='true'] .mobile-task-business-primary,
+.mobile-task-business[data-business-form-editing='true'] .mobile-task-business-context-actions {
   display: none;
 }
 
@@ -207,8 +254,15 @@
   color: #fff;
 }
 
+.mobile-task-device-scope {
+  flex-basis: 100%;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
 .mobile-task-business[data-business-form-editing='true'] > .mobile-role-action-bar {
-  align-items: flex-end;
+  align-items: stretch;
+  flex-wrap: wrap;
 }
 
 .mobile-task-business .mobile-task-business-form-footer .erp-business-form-page__actions > .ant-btn:first-child {

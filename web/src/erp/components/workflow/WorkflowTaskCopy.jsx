@@ -70,7 +70,7 @@ export function WorkflowTaskSource({ task, label, copyable = true, onOpen, showU
   )
 }
 
-function WorkflowTaskCopyMenu({ task, assigneeLabel, includeTask, includeLink }) {
+function WorkflowTaskCopyMenu({ task, assigneeLabel, includeTask, includeLink, disabled }) {
   const triggerRef = React.useRef(null)
   const [open, setOpen] = React.useState(false)
   const handleKeyDown = (event) => {
@@ -96,7 +96,9 @@ function WorkflowTaskCopyMenu({ task, assigneeLabel, includeTask, includeLink })
       autoFocus
       menu={{
         onKeyDown: handleKeyDown,
-        items: entries.map((entry) => ({ key: entry.key, label: `复制${entry.label}`, icon: entry.key === 'link' ? <LinkOutlined aria-hidden="true" /> : <CopyOutlined aria-hidden="true" /> })),
+        items: [
+          ...entries.map((entry) => ({ key: entry.key, label: `复制${entry.label}`, icon: entry.key === 'link' ? <LinkOutlined aria-hidden="true" /> : <CopyOutlined aria-hidden="true" /> })),
+        ],
         onClick: async ({ key, domEvent }) => {
           const trigger = triggerRef.current
           const entry = entries.find((item) => item.key === key)
@@ -108,14 +110,14 @@ function WorkflowTaskCopyMenu({ task, assigneeLabel, includeTask, includeLink })
         },
       }}
     >
-      <Button ref={triggerRef} className="erp-task-more" type="text" size="small" icon={<EllipsisOutlined aria-hidden="true" />} aria-label="更多操作" aria-haspopup="menu" aria-expanded={open} onKeyDown={handleKeyDown} onClick={(event) => event.stopPropagation()} />
+      <Button ref={triggerRef} disabled={disabled} className="erp-task-more" type="text" size="small" icon={<EllipsisOutlined aria-hidden="true" />} aria-label="更多操作" aria-haspopup="menu" aria-expanded={open} onKeyDown={handleKeyDown} onClick={(event) => event.stopPropagation()} />
     </Dropdown>
   )
 }
 
-export function WorkflowTaskCopySummary({ task, assigneeLabel, compact = false, taskOnly = false, includeTask = true, includeLink = true }) {
+export function WorkflowTaskCopySummary({ task, assigneeLabel, compact = false, taskOnly = false, includeTask = true, includeLink = true, disabled = false }) {
   const path = workflowTaskLinkPath(task?.id)
-  if (compact) return <WorkflowTaskCopyMenu key={`${task?.id}:${task?.source_type}:${task?.source_id}:${task?.display_context?.available}`} task={task} assigneeLabel={assigneeLabel} includeTask={includeTask} includeLink={includeLink} />
+  if (compact) return <WorkflowTaskCopyMenu key={`${task?.id}:${task?.source_type}:${task?.source_id}:${task?.display_context?.available}`} task={task} assigneeLabel={assigneeLabel} includeTask={includeTask} includeLink={includeLink} disabled={disabled} />
   return (
     <>
       <TaskCopyButton

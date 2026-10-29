@@ -43,9 +43,12 @@ func (s *outsourcingOrderRepoStub) ListOutsourcingOrders(context.Context, Outsou
 	return nil, 0, nil
 }
 
-func (s *outsourcingOrderRepoStub) UpdateOutsourcingOrderLifecycle(_ context.Context, id int, lifecycleStatus string) (*OutsourcingOrder, error) {
+func (s *outsourcingOrderRepoStub) ApplyOutsourcingOrderLifecycleAction(_ context.Context, in *SourceOrderLifecycleAction, lifecycleStatus string) (*OutsourcingOrder, error) {
+	if !IsOutsourcingOrderLifecycleTransitionAllowed(s.orders[in.ID].LifecycleStatus, lifecycleStatus) {
+		return nil, ErrSourceOrderStateInvalid
+	}
 	s.nextStatus = lifecycleStatus
-	return &OutsourcingOrder{ID: id, LifecycleStatus: lifecycleStatus}, nil
+	return &OutsourcingOrder{ID: in.ID, LifecycleStatus: lifecycleStatus}, nil
 }
 
 func (s *outsourcingOrderRepoStub) SaveOutsourcingOrderWithItems(_ context.Context, id int, order *OutsourcingOrderMutation, items []*OutsourcingOrderItemSaveMutation) (*OutsourcingOrderWithItems, error) {
@@ -350,34 +353,34 @@ func TestOutsourcingOrderUsecaseLifecycleGuards(t *testing.T) {
 			5: {ID: 5, LifecycleStatus: OutsourcingOrderStatusDraft},
 		},
 		itemsByOrder: map[int][]*OutsourcingOrderItem{
-			1: {{ID: 1, OutsourcingOrderID: 1, ProcessingItem: &processingItem, LineStatus: OutsourcingOrderItemStatusOpen}},
-			2: {{ID: 2, OutsourcingOrderID: 2, ProcessingItem: &processingItem, LineStatus: OutsourcingOrderItemStatusOpen}},
+			1: {{ID: 1, OutsourcingOrderID: 1, OutsourcingQuantity: decimal.NewFromInt(1), UnitPrice: decimalTestPointer("2"), Amount: decimalTestPointer("2"), ProcessingItem: &processingItem, LineStatus: OutsourcingOrderItemStatusOpen}},
+			2: {{ID: 2, OutsourcingOrderID: 2, OutsourcingQuantity: decimal.NewFromInt(1), UnitPrice: decimalTestPointer("2"), Amount: decimalTestPointer("2"), ProcessingItem: &processingItem, LineStatus: OutsourcingOrderItemStatusOpen}},
 		},
 	}
 	uc := NewOutsourcingOrderUsecase(repo)
 
-	if _, err := uc.SubmitOutsourcingOrder(ctx, 1); err != nil || repo.nextStatus != OutsourcingOrderStatusSubmitted {
+	if _, err := uc.SubmitOutsourcingOrderWithAction(ctx, outsourcingBizLifecycleForTest(1, SourceOrderActionSubmit)); err != nil || repo.nextStatus != OutsourcingOrderStatusSubmitted {
 		t.Fatalf("expected draft -> submitted allowed, status=%s err=%v", repo.nextStatus, err)
 	}
-	if _, err := uc.ConfirmOutsourcingOrder(ctx, 2); err != nil || repo.nextStatus != OutsourcingOrderStatusConfirmed {
+	if _, err := uc.ConfirmOutsourcingOrderWithAction(ctx, outsourcingBizLifecycleForTest(2, SourceOrderActionConfirm)); err != nil || repo.nextStatus != OutsourcingOrderStatusConfirmed {
 		t.Fatalf("expected submitted -> confirmed allowed, status=%s err=%v", repo.nextStatus, err)
 	}
-	if _, err := uc.CloseOutsourcingOrder(ctx, 3); err != nil || repo.nextStatus != OutsourcingOrderStatusClosed {
+	if _, err := uc.CloseOutsourcingOrderWithAction(ctx, outsourcingBizLifecycleForTest(3, SourceOrderActionClose)); err != nil || repo.nextStatus != OutsourcingOrderStatusClosed {
 		t.Fatalf("expected confirmed -> closed allowed, status=%s err=%v", repo.nextStatus, err)
 	}
-	if _, err := uc.ConfirmOutsourcingOrder(ctx, 1); !errors.Is(err, ErrSourceOrderStateInvalid) {
+	if _, err := uc.ConfirmOutsourcingOrderWithAction(ctx, outsourcingBizLifecycleForTest(1, SourceOrderActionConfirm)); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected draft -> confirmed rejected, got %v", err)
 	}
-	if _, err := uc.CancelOutsourcingOrder(ctx, 1); err != nil || repo.nextStatus != OutsourcingOrderStatusCanceled {
+	if _, err := uc.CancelOutsourcingOrderWithAction(ctx, outsourcingBizLifecycleForTest(1, SourceOrderActionCancel)); err != nil || repo.nextStatus != OutsourcingOrderStatusCanceled {
 		t.Fatalf("expected draft -> canceled allowed, status=%s err=%v", repo.nextStatus, err)
 	}
 	if IsValidOutsourcingOrderStatus("posted") || IsOutsourcingOrderLifecycleTransitionAllowed(OutsourcingOrderStatusConfirmed, "posted") {
 		t.Fatalf("posted must not be an outsourcing order lifecycle status")
 	}
-	if _, err := uc.CancelOutsourcingOrder(ctx, 4); !errors.Is(err, ErrSourceOrderStateInvalid) {
+	if _, err := uc.CancelOutsourcingOrderWithAction(ctx, outsourcingBizLifecycleForTest(4, SourceOrderActionCancel)); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected settled order transition rejected, got %v", err)
 	}
-	if _, err := uc.SubmitOutsourcingOrder(ctx, 5); !errors.Is(err, ErrOutsourcingOrderIncomplete) {
+	if _, err := uc.SubmitOutsourcingOrderWithAction(ctx, outsourcingBizLifecycleForTest(5, SourceOrderActionSubmit)); !errors.Is(err, ErrOutsourcingOrderIncomplete) {
 		t.Fatalf("expected incomplete contract submission rejected, got %v", err)
 	}
 	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 1, &OutsourcingOrderMutation{}, nil); !errors.Is(err, ErrBadParam) {
@@ -385,5 +388,49 @@ func TestOutsourcingOrderUsecaseLifecycleGuards(t *testing.T) {
 	}
 	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 2, &OutsourcingOrderMutation{ExpectedVersion: 1}, nil); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected submitted outsourcing contract to be frozen, got %v", err)
+	}
+}
+
+func outsourcingBizLifecycleForTest(id int, action string) *SourceOrderLifecycleAction {
+	in := &SourceOrderLifecycleAction{ID: id, ExpectedVersion: 1, ActorID: 1, IdempotencyKey: action}
+	if action == SourceOrderActionClose {
+		in.CloseMode = SourceOrderCloseModeNormal
+	}
+	if action == SourceOrderActionCancel {
+		in.Reason = "取消"
+	}
+	return in
+}
+
+func decimalTestPointer(value string) *decimal.Decimal {
+	v := decimal.RequireFromString(value)
+	return &v
+}
+
+func TestOutsourcingContractPrices(t *testing.T) {
+	for _, tc := range []struct {
+		name, quantity, price, amount string
+		ok                            bool
+	}{
+		{"unpriced", "2", "", "", false}, {"zero", "2", "0", "0", true}, {"priced", "2", "3.5", "7", true},
+		{"missing amount", "2", "3.5", "", false}, {"mismatch", "2", "3.5", "8", false}, {"negative", "2", "-1", "-2", false},
+		{"overflow", "99999999999999", "2", "199999999999998", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			item := &OutsourcingOrderItem{OutsourcingQuantity: decimal.RequireFromString(tc.quantity)}
+			if tc.price != "" {
+				item.UnitPrice = decimalTestPointer(tc.price)
+			}
+			if tc.amount != "" {
+				item.Amount = decimalTestPointer(tc.amount)
+			}
+			if err := ValidateOutsourcingContractPrices([]*OutsourcingOrderItem{item}); (err == nil) != tc.ok {
+				t.Fatalf("price readiness: %v", err)
+			}
+		})
+	}
+	item := &OutsourcingOrderItem{OutsourcingQuantity: decimal.NewFromInt(1), UnitPrice: decimalTestPointer("60000000000000"), Amount: decimalTestPointer("60000000000000")}
+	if err := ValidateOutsourcingContractPrices([]*OutsourcingOrderItem{item, item}); !errors.Is(err, ErrOutsourcingOrderIncomplete) {
+		t.Fatalf("total overflow: %v", err)
 	}
 }

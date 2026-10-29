@@ -5,8 +5,6 @@ import {
   buildInventoryDistributionModel,
   buildProductionOrderOverviewModel,
   buildProductionProcessModel,
-  buildPurchaseArrivalModel,
-  filterPurchaseArrivalRows,
   buildSalesDeliveryModel,
   moveBusinessDate,
   paginateVisualizationRows,
@@ -72,66 +70,8 @@ test('sales delivery keeps unknown shipment facts explicit and sorts risks first
   assert.equal(model.counts.delivered, 1)
 })
 
-test('purchase arrival uses supplier confirmation before expected date and builds an exact fourteen-day window', () => {
-  const model = buildPurchaseArrivalModel(
-    [
-      {
-        id: 1,
-        purchase_order_no: 'PO-1',
-        lifecycle_status: 'approved',
-        supplier_confirmed_arrival_date: unix('2026-09-24'),
-        expected_arrival_date: unix('2026-09-30'),
-        supplier_snapshot: { name: '示例供应商' },
-      },
-      {
-        id: 2,
-        purchase_order_no: 'PO-2',
-        lifecycle_status: 'approved',
-      },
-    ],
-    { today: '2026-09-22', startDate: '2026-09-22' }
-  )
 
-  const confirmed = model.rows.find((row) => row.id === 1)
-  assert.equal(confirmed.arrivalDate, '2026-09-24')
-  assert.equal(confirmed.dateSource, 'confirmed')
-  assert.equal(model.days.length, 14)
-  assert.equal(model.days[0].dateKey, '2026-09-22')
-  assert.equal(model.days.at(-1).dateKey, '2026-10-05')
-  assert.equal(
-    model.days.find((day) => day.dateKey === '2026-09-24').items.length,
-    1
-  )
-  assert.equal(model.unscheduled.length, 1)
-  assert.equal(moveBusinessDate('2026-12-25', 14), '2027-01-08')
-  assert.equal(moveBusinessDate('2026-02-30', 1), '')
-})
 
-test('purchase arrival export projections keep source blanks and literal hyphens', () => {
-  const { rows } = buildPurchaseArrivalModel([
-    { id: 1 },
-    { id: 2, purchase_order_no: '-', supplier_snapshot: { name: '—' } },
-  ], { today: '2026-10-23' })
-  const empty = rows.find((row) => row.id === 1)
-  assert.equal(empty.orderNo, '')
-  assert.equal(empty.supplierName, '')
-  assert.equal(empty.arrivalDate, '')
-  const literal = rows.find((row) => row.id === 2)
-  assert.equal(literal.orderNo, '-')
-  assert.equal(literal.supplierName, '—')
-})
-
-test('purchase arrival treats unset timestamps as unscheduled instead of the Unix epoch', () => {
-  for (const value of [undefined, null, '', 0, '0']) {
-    const model = buildPurchaseArrivalModel([
-      { id: 1, supplier_confirmed_arrival_date: value, expected_arrival_date: value },
-      { id: 2, supplier_confirmed_arrival_date: value, expected_arrival_date: unix('2026-10-24') },
-    ], { today: '2026-10-23' })
-    assert.equal(model.rows.find((row) => row.id === 1).arrivalDate, '')
-    assert.equal(model.rows.find((row) => row.id === 2).arrivalDate, '2026-10-24')
-    assert.equal(model.unscheduled.length, 1)
-  }
-})
 
 test('finance due uses outstanding facts without combining currencies', () => {
   const model = buildFinanceDueModel(
@@ -409,64 +349,10 @@ test('finance missing amounts or currency never become zero, settled or overdue'
   assert.equal(model.rows[0].outstanding, null)
 })
 
-test('closed and cancelled purchasing orders never enter outstanding arrival reminders', () => {
-  const model = buildPurchaseArrivalModel(
-    [
-      { id: 1, lifecycle_status: 'closed' },
-      {
-        id: 2,
-        lifecycle_status: 'canceled',
-        expected_arrival_date: unix('2026-09-01'),
-      },
-      { id: 3, lifecycle_status: 'approved' },
-    ],
-    { today: '2026-09-26', startDate: '2026-12-30' }
-  )
-  assert.equal(model.counts.unscheduled, 1)
-  assert.equal(model.counts.overdue, 0)
-  assert.equal(model.startDate, '2026-12-30')
-  assert.equal(model.endDate, '2027-01-12')
-  assert.equal(model.rows.length, 3)
-})
 
-test('purchase confirmation filters use the same scope for counts, calendar, list and exports', () => {
-  const orders = [
-    { id: 1, lifecycle_status: 'approved', expected_arrival_date: unix('2026-10-01'), supplier_confirmed_arrival_date: unix('2026-10-24') },
-    { id: 2, lifecycle_status: 'approved', expected_arrival_date: unix('2026-10-24') },
-    { id: 3, lifecycle_status: 'approved' },
-    { id: 4, lifecycle_status: 'closed', supplier_confirmed_arrival_date: unix('2026-10-24') },
-    { id: 5, lifecycle_status: 'canceled', expected_arrival_date: unix('2026-10-24') },
-  ]
-  const options = { today: '2026-10-22', startDate: '2026-10-22' }
-  const confirmed = buildPurchaseArrivalModel(orders, { ...options, confirmation: 'confirmed' })
-  assert.equal(confirmed.counts.total, 2)
-  assert.equal(confirmed.counts.period, 1)
-  assert.equal(confirmed.counts.dueSoon, 1)
-  assert.equal(confirmed.counts.overdue, 0)
-  assert.equal(confirmed.days[2].items.length, 1)
-  assert.deepEqual(filterPurchaseArrivalRows(confirmed, { filter: 'date', selectedDate: '2026-10-24' }).map((row) => row.id), [1])
-  assert.equal(filterPurchaseArrivalRows(confirmed, { filter: 'all' }).length, 2)
-  const unconfirmed = buildPurchaseArrivalModel(orders, { ...options, confirmation: 'unconfirmed' })
-  assert.equal(unconfirmed.counts.total, 3)
-  assert.equal(unconfirmed.counts.unscheduled, 1)
-  assert.equal(unconfirmed.counts.period, 1)
-  assert.deepEqual(filterPurchaseArrivalRows(unconfirmed, { filter: 'unscheduled' }).map((row) => row.id), [3])
-  const cleared = buildPurchaseArrivalModel(orders, options)
-  assert.equal(cleared.counts.total, 5)
-  assert.equal(cleared.counts.period, 2)
-  assert.equal(filterPurchaseArrivalRows(cleared).length, 5)
-})
 
-test('purchase date filtering includes the exact period endpoints and clears confirmation without stale dates', () => {
-  const options = { today: '2026-10-22', startDate: '2026-10-22' }
-  const order = { id: 1, lifecycle_status: 'approved', expected_arrival_date: unix('2026-10-21'), supplier_confirmed_arrival_date: unix('2026-10-22') }
-  const scheduled = buildPurchaseArrivalModel([order, { id: 2, expected_arrival_date: unix('2026-11-04') }, { id: 3, expected_arrival_date: unix('2026-11-05') }], options)
-  assert.deepEqual(filterPurchaseArrivalRows(scheduled, { filter: 'period' }).map((row) => row.id), [1, 2])
-  const reverted = buildPurchaseArrivalModel([{ ...order, supplier_confirmed_arrival_date: null }], options)
-  assert.equal(reverted.rows[0].arrivalDate, '2026-10-21')
-  assert.equal(reverted.counts.overdue, 1)
-  assert.equal(filterPurchaseArrivalRows(reverted, { filter: 'date', selectedDate: '2026-10-22' }).length, 0)
-  const cleared = buildPurchaseArrivalModel([{ ...order, supplier_confirmed_arrival_date: null, expected_arrival_date: null }], options)
-  assert.equal(cleared.counts.unscheduled, 1)
-  assert.equal(cleared.counts.overdue, 0)
+
+test('business calendar date movement crosses months and years without local timezone drift', () => {
+  assert.equal(moveBusinessDate('2026-12-25', 14), '2027-01-08')
+  assert.equal(moveBusinessDate('2026-10-22', 13), '2026-11-04')
 })

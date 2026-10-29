@@ -21,7 +21,7 @@ func (BusinessAttachment) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"business_attachments_owner_type_allowed":     "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task')",
+				"business_attachments_owner_type_allowed":     "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'finance_payment', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task')",
 				"business_attachments_file_size_positive":     "file_size > 0",
 				"business_attachments_file_size_max":          fmt.Sprintf("file_size <= %d", biz.BusinessAttachmentMaxBytes),
 				"business_attachments_object_key_shape":       "length(object_key) IN (44, 76) AND substr(object_key, 1, 12) = 'attachments/' AND object_key = lower(object_key)",

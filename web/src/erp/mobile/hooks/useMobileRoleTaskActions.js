@@ -30,7 +30,9 @@ import {
 import {
   isWorkflowProcessDecisionTask,
   workflowTaskAllowsApprovedQuantity,
+  workflowTaskActionRequiresReason,
 } from '../../utils/workflowTaskActionContract.mjs'
+import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import { retainWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
 
 function resolveWorkflowTaskActionMode(action = '') {
@@ -49,7 +51,7 @@ function buildMobileWorkflowActionPayload({ feedback, processDecision }) {
   }
 }
 
-const MOBILE_TASK_RECEIPT_STATUSES = new Set(['confirmed', 'failed', 'unknown'])
+const MOBILE_TASK_RECEIPT_STATUSES = new Set(['confirmed', 'failed', 'unknown', 'recorded'])
 const MOBILE_TASK_RECEIPT_ACTIONS = new Set([
   'done',
   'blocked',
@@ -68,7 +70,7 @@ function normalizeMobileTaskReceipt(value) {
       : null
   if (
     !MOBILE_TASK_RECEIPT_STATUSES.has(status) ||
-    !MOBILE_TASK_RECEIPT_ACTIONS.has(action) ||
+    (status !== 'recorded' && !MOBILE_TASK_RECEIPT_ACTIONS.has(action)) ||
     !String(task?.id || '').trim()
   ) {
     return null
@@ -86,6 +88,12 @@ function normalizeMobileTaskReceipt(value) {
       : {}),
     task,
   }
+}
+
+function recordedTaskReceipt(task, scopeKey) {
+  if (!task?.id || !isTerminalWorkflowTask(task)) return null
+  // Pending task history stays in task information until a handling result exists.
+  return normalizeMobileTaskReceipt({ status: 'recorded', task, scope_key: scopeKey })
 }
 
 function mobileTaskReceiptKey(scopeKey, task) {
@@ -320,7 +328,7 @@ export default function useMobileRoleTaskActions({
       const reasonRequired = ['blocked', 'rejected', 'resume'].includes(
         taskStatusKey
       )
-      if (completionFeedbackRequired && !actionInput) {
+      if (completionFeedbackRequired && workflowTaskActionRequiresReason(task, taskStatusKey) && !actionInput) {
         message.warning('请先填写完成反馈')
         return false
       }
@@ -832,7 +840,7 @@ export default function useMobileRoleTaskActions({
   const showTaskReceipt = useCallback(
     (task) => {
       const key = mobileTaskReceiptKey(normalizedReceiptScopeKey, task)
-      const receipt = key ? taskReceiptsByKey[key] || null : null
+      const receipt = key ? taskReceiptsByKey[key] || recordedTaskReceipt(task, normalizedReceiptScopeKey) : null
       if (!receipt) return null
       setActionReceipt(receipt)
       return receipt
@@ -843,7 +851,7 @@ export default function useMobileRoleTaskActions({
   const selectedTaskReceipt = selectedTask
     ? taskReceiptsByKey[
         mobileTaskReceiptKey(normalizedReceiptScopeKey, selectedTask)
-      ] || null
+      ] || recordedTaskReceipt(selectedTask, normalizedReceiptScopeKey)
     : null
   const scopedActionReceipt =
     actionReceipt?.scope_key === normalizedReceiptScopeKey

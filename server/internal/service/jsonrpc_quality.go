@@ -30,6 +30,11 @@ func (d *jsonrpcDispatcher) handleQuality(
 	if d.inventoryUC == nil {
 		return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
 	}
+	warehouseScope, scopeResult := d.currentWarehouseDataScope(ctx)
+	if scopeResult != nil {
+		return id, scopeResult, nil
+	}
+	ctx = biz.WithWarehouseDataScope(ctx, warehouseScope)
 
 	switch method {
 	case "create_quality_inspection_draft":
@@ -84,6 +89,9 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireQualityInspectionMutationRead(ctx, getInt(pm, "id", 0)); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "quality_inspections"); res != nil {
 			return id, res, nil
 		}
@@ -97,9 +105,13 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		if res := d.requireQualityInspectionMutationRead(ctx, in.InspectionID); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "quality_inspections"); res != nil {
 			return id, res, nil
 		}
+		in.InspectorID = &claims.UserID
 		item, err := d.inventoryUC.PassQualityInspection(ctx, in)
 		return id, qualityInspectionResult(ctx, d, item, err), nil
 	case "reject_quality_inspection":
@@ -110,13 +122,20 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		if res := d.requireQualityInspectionMutationRead(ctx, in.InspectionID); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "quality_inspections"); res != nil {
 			return id, res, nil
 		}
+		in.InspectorID = &claims.UserID
 		item, err := d.inventoryUC.RejectQualityInspection(ctx, in)
 		return id, qualityInspectionResult(ctx, d, item, err), nil
 	case "cancel_quality_inspection":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireQualityInspectionMutationRead(ctx, getInt(pm, "id", 0)); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "quality_inspections"); res != nil {
@@ -126,6 +145,9 @@ func (d *jsonrpcDispatcher) handleQuality(
 		return id, qualityInspectionResult(ctx, d, item, err), nil
 	case "correct_quality_inspection_result":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityExceptionHandle); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireQualityInspectionMutationRead(ctx, getInt(pm, "id", 0)); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireSourceActionReadPermissions(ctx, "quality", method); res != nil {
@@ -148,9 +170,17 @@ func (d *jsonrpcDispatcher) handleQuality(
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.GetQualityInspection(ctx, getInt(pm, "id", 0))
+		if err == nil {
+			if res := d.requireQualityInspectionSourceRead(ctx, item); res != nil {
+				return id, res, nil
+			}
+		}
 		return id, qualityInspectionResult(ctx, d, item, err), nil
 	case "list_quality_inspections":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "quality", method); res != nil {
 			return id, res, nil
 		}
 		filter, ok := qualityInspectionFilterFromParams(pm)
@@ -323,7 +353,6 @@ func qualityInspectionDecisionFromParams(pm map[string]any) (*biz.QualityInspect
 		"id",
 		"result",
 		"inspected_at",
-		"inspector_id",
 		"defect_rate_operator",
 		"defect_rate_percent",
 		"decision_note",
@@ -352,7 +381,6 @@ func qualityInspectionDecisionFromParams(pm map[string]any) (*biz.QualityInspect
 		InspectionID:       inspectionID,
 		Result:             getString(pm, "result"),
 		InspectedAt:        optionalTimeValue(inspectedAt),
-		InspectorID:        getOptionalInt(pm, "inspector_id"),
 		DefectRateOperator: defectRateOperator,
 		DefectRatePercent:  defectRatePercent,
 		DecisionNote:       getWorkflowStringPtr(pm, "decision_note"),
@@ -399,6 +427,10 @@ func qualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspection
 	if !ok {
 		return biz.QualityInspectionFilter{}, false
 	}
+	includeSuperseded, ok := getOptionalJSONRPCBool(pm, "include_superseded")
+	if !ok {
+		return biz.QualityInspectionFilter{}, false
+	}
 	return biz.QualityInspectionFilter{
 		Status:                   getString(pm, "status"),
 		Result:                   getString(pm, "result"),
@@ -417,6 +449,7 @@ func qualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspection
 		SubjectType:              getString(pm, "subject_type"),
 		SubjectID:                getInt(pm, "subject_id", 0),
 		CorrectionOfInspectionID: getInt(pm, "correction_of_inspection_id", 0),
+		IncludeSuperseded:        includeSuperseded != nil && *includeSuperseded,
 		Limit:                    getInt(pm, "limit", 50),
 		Offset:                   getInt(pm, "offset", 0),
 	}, true
@@ -444,7 +477,7 @@ func outsourcingReturnQualityInspectionFilterFromParams(pm map[string]any) (biz.
 	if !valid {
 		return biz.QualityInspectionFilter{}, false
 	}
-	if !jsonRPCParamsAllowed(pm, "include_status_counts", "customer_key", "fact_id", "fact_ids", "status", "result", "keyword", "inventory_lot_id", "warehouse_id", "product_id", "date_from", "date_to", "limit", "offset") {
+	if !jsonRPCParamsAllowed(pm, "include_status_counts", "include_superseded", "customer_key", "fact_id", "fact_ids", "status", "result", "keyword", "inventory_lot_id", "warehouse_id", "product_id", "date_from", "date_to", "limit", "offset") {
 		return biz.QualityInspectionFilter{}, false
 	}
 	dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
@@ -455,8 +488,13 @@ func outsourcingReturnQualityInspectionFilterFromParams(pm map[string]any) (biz.
 	if !ok {
 		return biz.QualityInspectionFilter{}, false
 	}
+	includeSuperseded, ok := getOptionalJSONRPCBool(pm, "include_superseded")
+	if !ok {
+		return biz.QualityInspectionFilter{}, false
+	}
 	return biz.QualityInspectionFilter{
-		SourceIDs: ids, Status: getString(pm, "status"),
+		IncludeSuperseded: includeSuperseded != nil && *includeSuperseded,
+		SourceIDs:         ids, Status: getString(pm, "status"),
 		Result:         getString(pm, "result"),
 		Keyword:        getString(pm, "keyword"),
 		DateFrom:       dateFrom,
@@ -472,7 +510,7 @@ func outsourcingReturnQualityInspectionFilterFromParams(pm map[string]any) (biz.
 
 func productionStageQualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspectionFilter, bool) {
 	if !jsonRPCParamsAllowed(
-		pm, "include_status_counts",
+		pm, "include_status_counts", "include_superseded",
 		"customer_key",
 		"status",
 		"result",
@@ -494,7 +532,12 @@ func productionStageQualityInspectionFilterFromParams(pm map[string]any) (biz.Qu
 	if !ok {
 		return biz.QualityInspectionFilter{}, false
 	}
+	includeSuperseded, ok := getOptionalJSONRPCBool(pm, "include_superseded")
+	if !ok {
+		return biz.QualityInspectionFilter{}, false
+	}
 	return biz.QualityInspectionFilter{
+		IncludeSuperseded:    includeSuperseded != nil && *includeSuperseded,
 		Status:               getString(pm, "status"),
 		Result:               getString(pm, "result"),
 		Keyword:              getString(pm, "keyword"),
@@ -531,6 +574,8 @@ func (d *jsonrpcDispatcher) qualityErrorResult(ctx context.Context, err error) *
 	}
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrDataScopeForbidden):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "无权访问该仓库的质检记录"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrQualityInspectionSourceConflict):
@@ -607,11 +652,15 @@ func qualityInspectionToAny(item *biz.QualityInspection) map[string]any {
 		"original_lot_status":         item.OriginalLotStatus,
 		"inspected_at":                optionalUnix(item.InspectedAt),
 		"inspector_id":                optionalIntToAny(item.InspectorID),
+		"inspector_name":              optionalStringToAny(item.InspectorName),
 		"defect_rate_operator":        optionalStringToAny(item.DefectRateOperator),
 		"defect_rate_percent":         optionalDecimalString(item.DefectRatePercent),
 		"check_items":                 qualityCheckItemsToAny(item.CheckItems),
 		"decision_note":               optionalStringToAny(item.DecisionNote),
 		"correction_of_inspection_id": optionalIntToAny(item.CorrectionOfInspectionID),
+		"correction_of_inspection_no": optionalStringToAny(item.CorrectionOfInspectionNo),
+		"corrected_inspection_id":     optionalIntToAny(item.CorrectedInspectionID),
+		"corrected_inspection_no":     optionalStringToAny(item.CorrectedInspectionNo),
 		"superseded_at":               optionalUnix(item.SupersededAt),
 		"superseded_by":               optionalIntToAny(item.SupersededBy),
 		"superseded_reason":           optionalStringToAny(item.SupersededReason),

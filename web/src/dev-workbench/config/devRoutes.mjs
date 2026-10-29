@@ -13,7 +13,9 @@ export const DEV_DELIVERY_ROUTE = '/__dev/delivery'
 export const DEV_DOCS_ROUTE = '/__dev/docs'
 export const DEV_PROJECT_SKILLS_ROUTE = '/__dev/project-skills'
 export const DEV_STATUS_FLOWS_ROUTE = '/__dev/status-flows'
+export const DEV_BUSINESS_RULES_ROUTE = '/__dev/business-rules'
 export const DEV_TASK_HANDLING_ROUTE = '/__dev/task-handling'
+export const DEV_BUSINESS_TOPICS_ROUTE = '/__dev/business-topics'
 export const DEV_BUSINESS_USABILITY_ROUTE = '/__dev/business-usability'
 export const DEV_UI_DESIGN_ROUTE = '/__dev/ui-design'
 export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
@@ -47,7 +49,7 @@ export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
     key: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_PRODUCT_ENGINEERING_ROUTE,
     label: '产品与业务',
-    description: '产品能力、业务链路、权限与交互设计',
+    description: '产品能力、业务链路与规则、专题、权限与交互设计',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.developmentResources,
@@ -81,6 +83,18 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_STATUS_FLOWS_ROUTE,
     label: '业务链路',
+  }),
+  Object.freeze({
+    key: 'business-rules',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_BUSINESS_RULES_ROUTE,
+    label: '业务规则',
+  }),
+  Object.freeze({
+    key: 'business-topics',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_BUSINESS_TOPICS_ROUTE,
+    label: '业务专题',
   }),
   Object.freeze({
     key: 'task-handling',
@@ -137,6 +151,7 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     route: DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
     label: '链路实测报告',
     showInNavigation: false,
+    navigationParentRoute: DEV_TESTING_ROUTE,
   }),
   Object.freeze({
     key: 'quality-gates',
@@ -212,6 +227,14 @@ export function getDevSecondaryNavItems(areaKey = '') {
   return DEV_SECONDARY_NAV_ITEMS.filter(
     (item) => item.areaKey === areaKey && item.showInNavigation !== false
   )
+}
+
+export function resolveDevNavigationRoute(pathname = '') {
+  const normalizedPath = normalizeDevPathname(pathname)
+  const item = DEV_SECONDARY_NAV_ITEMS.find(
+    (entry) => entry.route === normalizedPath
+  )
+  return item?.navigationParentRoute ?? normalizedPath
 }
 
 export function resolveDevPageTitle(pathname, appTitle) {

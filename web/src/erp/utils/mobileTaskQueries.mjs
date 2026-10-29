@@ -2,6 +2,7 @@ import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { normalizeTaskListFilters, taskListFilterRequest, WORKFLOW_TASK_DUE_OPTIONS } from './workflowTaskListFilters.mjs'
 import { resolveBusinessStatusCounts } from './businessStatusCounts.mjs'
 import { normalizeRoleKey } from './roleKeys.mjs'
+import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 import { WORKFLOW_HISTORY_STATUS_OPTIONS, WORKFLOW_HISTORY_PERIOD_OPTIONS } from './workflowRoleTaskHistory.mjs'
 
 export const MOBILE_ROLE_TASK_PAGE_LIMIT = 50
@@ -68,6 +69,7 @@ const MOBILE_TASK_RECEIPT_STATUS_SET = new Set([
   'confirmed',
   'failed',
   'unknown',
+  'recorded',
 ])
 const MOBILE_TASK_RECEIPT_ACTION_SET = new Set([
   'done',
@@ -208,7 +210,9 @@ export function resolveMobileRoleTaskReceiptDetailTask({
     !normalizedScopeKey ||
     receipt?.scope_key !== normalizedScopeKey ||
     !MOBILE_TASK_RECEIPT_STATUS_SET.has(receipt?.status) ||
-    !MOBILE_TASK_RECEIPT_ACTION_SET.has(receipt?.action) ||
+    (receipt?.status === 'recorded'
+      ? !isTerminalWorkflowTask(task || {})
+      : !MOBILE_TASK_RECEIPT_ACTION_SET.has(receipt?.action)) ||
     !selectedID ||
     String(task?.id || '').trim() !== selectedID
   ) {

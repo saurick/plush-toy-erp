@@ -15,7 +15,7 @@ export function usePermissionFullscreen({ enabled, dismissPopup }) {
 
   const enterFullscreen = () => {
     const workspace = workspaceRef.current
-    const table = workspace?.querySelector('.erp-permission-checklist')
+    const table = workspace?.querySelector('.erp-role-policy, .erp-permission-checklist')
     if (!table) return
     const positions = [[table, table.scrollTop, table.scrollLeft]]
     for (let node = workspace; node; node = node.parentElement) {
@@ -37,7 +37,7 @@ export function usePermissionFullscreen({ enabled, dismissPopup }) {
     if (!fullscreen) return undefined
     const workspace = workspaceRef.current
     if (!workspace) return undefined
-    const table = workspace.querySelector('.erp-permission-checklist')
+    const table = workspace.querySelector('.erp-role-policy, .erp-permission-checklist')
     const scrollPositions = scrollPositionsRef.current
     const background = []
     const scrollLocks = []

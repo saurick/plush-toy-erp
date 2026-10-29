@@ -15,8 +15,9 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+
 import { BranchesOutlined, ReloadOutlined } from '@ant-design/icons'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
@@ -249,9 +250,12 @@ export default function ProductionRouteExecutionModal({
   onChanged,
   onCreateCompletion,
 }) {
-  const outlet = useOutletContext()
+  const outlet = useBusinessPageContext()
   const taskNavigation = outlet?.workflowTaskNavigation
-  const handling = taskNavigation?.productionHandling
+  const sourceTask = outlet?.taskBusiness?.task
+  const handling = useMemo(() => taskNavigation?.productionHandling ||
+    (sourceTask && ['production_wip_batch', 'production_packaging_confirmation'].includes(sourceTask.source_type)
+      ? { taskID: sourceTask.id, group: sourceTask.task_group, sourceID: sourceTask.source_id, sourceType: sourceTask.source_type } : null), [taskNavigation?.productionHandling, sourceTask])
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const navigate = useBusinessNavigate()
   const { modal } = App.useApp()
@@ -297,7 +301,7 @@ export default function ProductionRouteExecutionModal({
     .trim()
     .toUpperCase()
   const batchScopeEnabled = originReworkFactID !== null
-  const readOnly =
+  const readOnly = outlet?.taskBusiness?.readOnly === true || (
     !assignmentOnly &&
     !canAssign &&
     !canExecute &&
@@ -305,7 +309,7 @@ export default function ProductionRouteExecutionModal({
     !canCreateCompletion &&
     !canWarehousePackaging &&
     !canIssueCutting &&
-    !canConfirmPackaging
+    !canConfirmPackaging)
   const scopedReworkFactID = Number(originReworkFactID || 0)
 
   const loadOutsourcingSources = useCallback(
@@ -492,7 +496,7 @@ export default function ProductionRouteExecutionModal({
     [aggregate, selectedBatch]
   )
   const canReceiveFinishedGoods = Boolean(
-    !assignmentOnly &&
+    !readOnly && !assignmentOnly &&
       (!handling || (handling.group === 'handoff_production_completion' && !taskNavigation.businessReceipt)) &&
       canCreateCompletion &&
       onCreateCompletion &&
@@ -510,6 +514,7 @@ export default function ProductionRouteExecutionModal({
   }, [aggregate, selectedBatch])
   const canRunAction = useCallback(
     (action) => {
+      if (readOnly) return false
       if (assignmentOnly && action !== PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION) {
         return false
       }
@@ -543,6 +548,7 @@ export default function ProductionRouteExecutionModal({
     },
     [
       assignmentOnly,
+      readOnly,
       currentOperation,
       canWarehousePackaging,
       canIssueCutting,
@@ -772,7 +778,10 @@ onCancel: () => resolve(false),
       setActiveAction('')
       setDirty(false)
       actionForm.resetFields()
-      reportBusinessResult(ACTION_SUCCESS_TEXT[activeAction], selectedBatch)
+      const confirmedRecord = activeAction === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL
+        ? nextAggregate.packagingConfirmations.find((item) => item.id === selectedPackagingConfirmation?.id)
+        : nextAggregate.batches.find((item) => item.id === selectedBatch.id)
+      reportBusinessResult(ACTION_SUCCESS_TEXT[activeAction], confirmedRecord ? { ...confirmedRecord, order_no: nextAggregate.productionOrder.order_no } : nextAggregate.productionOrder)
       setEntrySaved(true)
       message.success(ACTION_SUCCESS_TEXT[activeAction])
       onChanged?.(nextAggregate)
@@ -1341,30 +1350,37 @@ onCancel: () => resolve(false),
           </>
         ) : null}
 
-        <Space wrap>
-          <Button type="primary" loading={saving} onClick={submitAction}>
-            确认办理
-          </Button>
-          <Button
-            disabled={saving}
-            onClick={async () => {
+        {!outlet?.taskBusiness ? (
+          <Space wrap>
+            <Button type="primary" aria-label="确认办理" loading={saving} onClick={submitAction}>
+              确认办理
+            </Button>
+            <Button
+              disabled={saving}
+              onClick={async () => {
               if (!(await confirmLeave())) return
               actionAttemptRef.current = null
               actionForm.resetFields()
               setDirty(false)
               setActiveAction('')
             }}
-          >
-            返回工序
-          </Button>
-        </Space>
+            >
+              返回工序
+            </Button>
+          </Space>
+        ) : null}
       </Form>
     </Card>
   ) : null
 
   return (
     <BusinessFormModal
+      taskInline
+      form={actionForm}
+      dirty={dirty}
       open={open}
+      loading={loading}
+      confirmLoading={saving}
       size={focusedEntry || assignmentOnly ? 'localAction' : 'lineItems'}
       title={
         focusedEntry ? ACTION_TITLE[activeAction] || '生产事项办理' : assignmentOnly
@@ -1390,8 +1406,9 @@ onCancel: () => resolve(false),
       icon={<BranchesOutlined />}
       footer={
         <Space>
-          <Button disabled={saving} onClick={close}>关闭</Button>
-          {taskNavigation?.businessReceipt ? <Button type="primary" onClick={returnToTask}>办完返回原任务</Button> : null}
+          <Button disabled={saving} onClick={close}>{outlet?.taskBusiness ? '返回办理' : '关闭'}</Button>
+          {outlet?.taskBusiness && activeAction && !readOnly ? <Button type="primary" aria-label="确认办理" loading={saving} onClick={submitAction}>确认办理</Button> : null}
+          {taskNavigation?.businessReceipt ? <Button type="primary" onClick={outlet?.taskBusiness?.viewResult || returnToTask}>{outlet?.taskBusiness ? '查看办理结果' : '办完返回原任务'}</Button> : null}
           {!handling && onReturnToExecution ? <Button type={entrySaved ? 'primary' : 'default'} disabled={saving} onClick={async () => { if (await confirmLeave()) onReturnToExecution() }}>{entrySaved ? '办完返回生产执行' : '返回生产执行'}</Button> : null}
         </Space>
       }
@@ -1400,7 +1417,7 @@ onCancel: () => resolve(false),
       onCancel={saving ? undefined : close}
       destroyOnHidden
     >
-      {taskNavigation?.businessReceipt ? <Alert type="success" showIcon message={taskNavigation.businessReceipt.message} /> : null}
+      {taskNavigation?.businessReceipt && !outlet?.taskBusiness ? <Alert type="success" showIcon message={taskNavigation.businessReceipt.message} /> : null}
       {focusedEntry ? null : assignmentOnly ? (
         <div className="erp-business-inline-note" role="note">
           保存后只更新加工安排，不会自动完成当前任务，也不会登记完工、回仓、质检或库存。

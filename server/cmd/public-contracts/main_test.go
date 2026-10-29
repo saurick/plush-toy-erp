@@ -40,12 +40,13 @@ func TestPublicPermissionCatalogMatchesRegisteredPermissions(t *testing.T) {
 		t.Fatal("BOM source constraints or loss provenance differ from domain declarations")
 	}
 	for name, want := range map[string]map[string]string{
-		"FinancePaymentStatus":    {"DRAFT": biz.FinancePaymentStatusDraft, "APPROVED": biz.FinancePaymentStatusApproved, "REJECTED": biz.FinancePaymentStatusRejected, "POSTED": biz.FinancePaymentStatusPosted, "REVERSED": biz.FinancePaymentStatusReversed, "CANCELLED": biz.FinancePaymentStatusCancelled},
-		"FinanceAllocationStatus": {"POSTED": biz.FinanceAllocationStatusPosted, "REVERSED": biz.FinanceAllocationStatusReversed},
-		"FinancePaymentDirection": {"RECEIPT": biz.FinancePaymentDirectionReceipt, "DISBURSEMENT": biz.FinancePaymentDirectionDisbursement},
-		"ProcessStatus":           {"ACTIVE": biz.ProcessStatusActive, "BLOCKED": biz.ProcessStatusBlocked, "COMPLETED": biz.ProcessStatusCompleted},
-		"ProcessNodeStatus":       {"WAITING": biz.ProcessNodeStatusWaiting, "ACTIVE": biz.ProcessNodeStatusActive, "COMPLETED": biz.ProcessNodeStatusCompleted, "BLOCKED": biz.ProcessNodeStatusBlocked, "WITHDRAWN": biz.ProcessNodeStatusWithdrawn},
-		"ProcessNodeType":         {"HUMAN_TASK": biz.ProcessNodeTypeHumanTask, "APPROVAL": biz.ProcessNodeTypeApproval, "DOMAIN_COMMAND": biz.ProcessNodeTypeDomainCommand, "WAIT_EVENT": biz.ProcessNodeTypeWaitEvent, "END": biz.ProcessNodeTypeEnd},
+		"FinancePaymentStatus":       {"DRAFT": biz.FinancePaymentStatusDraft, "APPROVED": biz.FinancePaymentStatusApproved, "REJECTED": biz.FinancePaymentStatusRejected, "POSTED": biz.FinancePaymentStatusPosted, "REVERSED": biz.FinancePaymentStatusReversed, "CANCELLED": biz.FinancePaymentStatusCancelled},
+		"FinanceAllocationStatus":    {"POSTED": biz.FinanceAllocationStatusPosted, "REVERSED": biz.FinanceAllocationStatusReversed},
+		"FinancePaymentDirection":    {"RECEIPT": biz.FinancePaymentDirectionReceipt, "DISBURSEMENT": biz.FinancePaymentDirectionDisbursement},
+		"FinanceAdjustmentDirection": {"DECREASE": biz.FinanceAdjustmentDecrease, "INCREASE": biz.FinanceAdjustmentIncrease},
+		"ProcessStatus":              {"ACTIVE": biz.ProcessStatusActive, "BLOCKED": biz.ProcessStatusBlocked, "COMPLETED": biz.ProcessStatusCompleted},
+		"ProcessNodeStatus":          {"WAITING": biz.ProcessNodeStatusWaiting, "ACTIVE": biz.ProcessNodeStatusActive, "COMPLETED": biz.ProcessNodeStatusCompleted, "BLOCKED": biz.ProcessNodeStatusBlocked, "WITHDRAWN": biz.ProcessNodeStatusWithdrawn},
+		"ProcessNodeType":            {"HUMAN_TASK": biz.ProcessNodeTypeHumanTask, "APPROVAL": biz.ProcessNodeTypeApproval, "DOMAIN_COMMAND": biz.ProcessNodeTypeDomainCommand, "WAIT_EVENT": biz.ProcessNodeTypeWaitEvent, "END": biz.ProcessNodeTypeEnd},
 	} {
 		if !reflect.DeepEqual(got.States[name], want) {
 			t.Fatalf("%s differs from domain declarations", name)

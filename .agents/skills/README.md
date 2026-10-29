@@ -74,3 +74,4 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --check -- .agents/
 | “只改一个按钮文案。” | Page | 沿用现有布局与容量边界，完成相关核对；不额外引入规模分析、造数或压测。 |
 | “提交本次修复；同文件有另一会话改动，必要依赖暂未提交。” | Git Conflict Coordination | 定向核对归属、依赖与授权，在候选上验证后串行提交；明确暂缓的依赖不纳入，只阻断相应目标。 |
 | “在没有跨会话工具的宿主中提交存在混合归属的修复。” | Git Conflict Coordination | 先报告缺失工具，保留待核清的文件 / hunk 和 index；已有交接可证明独立的目标仍按原授权推进，不模拟联系或轮询。 |
+| “审查 DEV 工作台局部布局修改。” | Code Review / Test | 按正式测试策略核对浅色桌面 smoke、受影响交互与溢出；截图按失败诊断或人工视觉评审需要选择，不追加全站主题、移动端或通用键盘矩阵。 |

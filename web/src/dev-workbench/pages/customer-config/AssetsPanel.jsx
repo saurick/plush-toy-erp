@@ -72,6 +72,7 @@ export function AssetsPanel({
             <details
               className="erp-dev-disclosure erp-dev-customer-menu-group"
               key={section.title}
+              open
             >
               <summary className="erp-dev-customer-menu-group__title">
                 <span>
@@ -98,7 +99,6 @@ export function AssetsPanel({
       </section>
       <details
         className="erp-dev-disclosure erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
-        name="customer-assets"
       >
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <SafetyCertificateOutlined aria-hidden="true" />
@@ -124,7 +124,7 @@ export function AssetsPanel({
       </details>
       <details
         className="erp-dev-disclosure erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
-        name="customer-assets"
+        open
       >
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <SettingOutlined aria-hidden="true" />
@@ -159,7 +159,7 @@ export function AssetsPanel({
       </details>
       <details
         className="erp-dev-disclosure erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
-        name="customer-assets"
+        open
       >
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <CodeOutlined aria-hidden="true" />
@@ -188,7 +188,7 @@ export function AssetsPanel({
       </details>
       <details
         className="erp-dev-disclosure erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-templates erp-dev-customer-disclosure"
-        name="customer-assets"
+        open
       >
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <FileTextOutlined aria-hidden="true" />

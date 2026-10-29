@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Button, Progress, Tag } from 'antd'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import Tabs from '@/common/components/navigation/SlidingTabs'
+import DevPageHeader from './DevPageHeader.jsx'
 import Select from '@/common/components/select/AppSelect'
 import SearchInput from '@/common/components/SearchInput'
 import Table from '@/common/components/table/AppTable'
@@ -9,11 +10,13 @@ import {
   WorkbenchEmpty,
   WorkbenchFacts,
   WorkbenchNotice,
+  WorkbenchReading,
   WorkbenchSection,
   WorkbenchToolbar,
 } from './WorkbenchPattern.jsx'
 import '../styles/dev-workbench-standards.css'
 import BusinessFlowDiagram from './flow-state/BusinessFlowDiagram.jsx'
+
 import { WorkflowTaskDiscoveryCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { buildFulfillmentSubflow } from '../config/devFulfillmentSubflow.mjs'
 
@@ -23,8 +26,6 @@ const PATTERNS = [
     label: '目录与检索',
     task: '找到需要的条目，并查看判断依据。',
     composition: '范围与筛选 → 结果表 → 行内详情',
-    example: '/__dev/quality-gates?view=governance',
-    exampleLabel: '门禁目录',
     acceptance:
       '输入关键词、清除筛选、展开一项；工具栏不跳动，关闭详情后仍在原结果中。',
   },
@@ -33,8 +34,6 @@ const PATTERNS = [
     label: '执行与诊断',
     task: '明确执行范围，处理阻断，再核对运行结果。',
     composition: '范围与主动作 → 当前结果 / 第一失败 → 阶段与历史',
-    example: '/__dev/quality-gates?view=run',
-    exampleLabel: '本机诊断',
     acceptance:
       '范围与执行按钮同组；运行中不能重复启动，失败原因常显，修复后可主动重试。',
   },
@@ -43,20 +42,16 @@ const PATTERNS = [
     label: '结果与核验',
     task: '比较各项结果，找出缺口，追溯对应证据。',
     composition: '来源与时间 → 分项结果 → 对应依据与后续动作',
-    example: '/__dev/testing?view=server',
-    exampleLabel: '服务器验证',
     acceptance:
       '区分通过、未采集、历史和读取失败；刷新时不把上次结果当成本次通过，缺口有处理入口。',
   },
   {
     key: 'reading',
     label: '阅读与关系',
-    task: '理解责任边界，沿关系定位到正式依据。',
-    composition: '主题选择 → 当前解释 → 关联关系与来源',
-    example: '/__dev/docs',
-    exampleLabel: '项目文档',
+    task: '理解当前主题与关联关系。',
+    composition: '主题选择 → 当前解释 → 关联关系',
     acceptance:
-      '选择主题、查看关系、返回正文；当前主题保留，技术来源按需查看，正文无需跨页拼接。',
+      '目录持续可选，正文与短说明在相邻位置查看；当前主题保留，正文无需跨页拼接。',
   },
 ]
 const STATES = [
@@ -91,31 +86,34 @@ const GATES = [
 ]
 
 function ReadState({ state, onRecover }) {
-  if (state === 'loading')
-    { return (
+  if (state === 'loading') {
+    return (
       <WorkbenchNotice
         tone="loading"
         title="正在读取当前范围"
         description="范围和操作位置保持不变，取得结果后原位显示。"
       />
-    ) }
-  if (state === 'error')
-    { return (
+    )
+  }
+  if (state === 'error') {
+    return (
       <WorkbenchNotice
         tone="error"
         title="读取失败，当前结果尚未核实"
         description="检查连接后重新读取；失败不会自动触发执行。"
         action={<Button onClick={onRecover}>重新读取</Button>}
       />
-    ) }
-  if (state === 'stale')
-    { return (
+    )
+  }
+  if (state === 'stale') {
+    return (
       <WorkbenchNotice
         tone="warning"
         title="这是上次记录，不能证明当前状态"
         action={<Button onClick={onRecover}>重新核对</Button>}
       />
-    ) }
+    )
+  }
   return null
 }
 
@@ -179,14 +177,31 @@ function ExecutionExample({ state, onRecover }) {
   const [scope, setScope] = useState('strict')
   const [run, setRun] = useState('idle')
   const [failure, setFailure] = useState(true)
-  useEffect(() => { setRun('idle') }, [state])
+  useEffect(() => {
+    setRun('idle')
+  }, [state])
   const running = run === 'running'
   return (
     <WorkbenchSection
       title="本机诊断"
       footer="本地诊断、固定提交的 CI、部署读回和客户验收各自留证。"
     >
-      <WorkbenchToolbar>
+      <WorkbenchToolbar
+        actions={
+          <>
+            <Button
+              type="primary"
+              disabled={running || ['loading', 'error'].includes(state)}
+              onClick={() => setRun('running')}
+            >
+              运行演示诊断
+            </Button>
+            {running ? (
+              <Button onClick={() => setRun('cancelled')}>取消运行</Button>
+            ) : null}
+          </>
+        }
+      >
         <Select
           aria-label="样板诊断范围"
           label="诊断范围"
@@ -199,16 +214,6 @@ function ExecutionExample({ state, onRecover }) {
             { value: 'full', label: '完整诊断' },
           ]}
         />
-        <Button
-          type="primary"
-          disabled={running || ['loading', 'error'].includes(state)}
-          onClick={() => setRun('running')}
-        >
-          运行演示诊断
-        </Button>
-        {running ? (
-          <Button onClick={() => setRun('cancelled')}>取消运行</Button>
-        ) : null}
       </WorkbenchToolbar>
       <ReadState state={state} onRecover={onRecover} />
       {['loading', 'error'].includes(state) ? null : running ? (
@@ -291,7 +296,7 @@ function EvidenceExample({ state, onRecover }) {
   return (
     <WorkbenchSection
       title="服务器证据核验"
-      actions={
+      tools={
         <Button disabled={state === 'loading'} onClick={onRecover}>
           重新核对
         </Button>
@@ -383,25 +388,18 @@ function ReadingExample({ state, onRecover }) {
   const current = topics[topic]
   return (
     <WorkbenchSection title="证据边界说明">
-      <WorkbenchToolbar>
-        <Select
-          aria-label="阅读主题"
-          label="主题"
-          value={topic}
-          allowClear={false /* 不可清空：阅读区必须对应一个主题。 */}
-          onChange={setTopic}
-          options={Object.entries(topics).map(([value, item]) => ({
-            value,
-            label: item.title,
-          }))}
-        />
-      </WorkbenchToolbar>
-      <ReadState state={state} onRecover={onRecover} />
-      {state === 'empty' ? (
-        <WorkbenchEmpty
-          title="此主题暂无资料"
-          action={<Button onClick={onRecover}>返回已有主题</Button>}
-        />
+      <WorkbenchReading
+        label="阅读主题"
+        value={topic}
+        onChange={setTopic}
+        items={Object.entries(topics).map(([value, item]) => ({ value, label: item.title }))}
+      >
+        <ReadState state={state} onRecover={onRecover} />
+        {state === 'empty' ? (
+          <WorkbenchEmpty
+            title="此主题暂无资料"
+            action={<Button onClick={onRecover}>返回已有主题</Button>}
+          />
       ) : ['loading', 'error'].includes(state) ? null : (
         <WorkbenchSection
           flat
@@ -430,16 +428,11 @@ function ReadingExample({ state, onRecover }) {
               {businessFlow.nodes.find((node) => node.key === graphNode)?.label}
               ：节点点击只选中；跨环节查看使用明确入口。
             </p>
-            <Link to="/__dev/status-flows?view=chain&chain=all&flow_stage=shell_quality">
-              查看实际业务链路
-            </Link>
           </details>
-          <details className="erp-dev-disclosure">
-            <summary>查看来源与适用范围</summary>
-            样板内容引用工作台设计的证据分层；这里不读取真实服务器状态。
-          </details>
+
         </WorkbenchSection>
       )}
+      </WorkbenchReading>
     </WorkbenchSection>
   )
 }
@@ -471,16 +464,19 @@ export default function DevWorkbenchStandards() {
       className="erp-workbench-standards"
       aria-label="效能工作台统一设计"
     >
-      <div className="erp-workbench-standards__intro">
-        <strong>先确定页面任务，再组合共享组件</strong>
-        <span>复用 ERP 主题与控件；以下操作仅改变演示状态。</span>
-      </div>
-      <Tabs
-        aria-label="工作台页面类型"
-        activeKey={pattern.key}
-        onChange={(value) => update('pattern', value)}
-        items={PATTERNS.map(({ key, label }) => ({ key, label }))}
-      />
+      <DevPageHeader
+        title={<h2>页面样板</h2>}
+        navigation={
+          <Tabs
+            aria-label="工作台页面类型"
+            activeKey={pattern.key}
+            onChange={(value) => update('pattern', value)}
+            items={PATTERNS.map(({ key, label }) => ({ key, label }))}
+          />
+        }
+      >
+        <span className="erp-workbench-standards__note">仅改变演示状态</span>
+      </DevPageHeader>
       <WorkbenchToolbar
         actions={
           <Select
@@ -522,25 +518,13 @@ export default function DevWorkbenchStandards() {
             headingLevel={3}
             description={pattern.acceptance}
           />
-          <WorkbenchSection flat title="真实页面" headingLevel={3}>
-            <Link to={pattern.example}>打开{pattern.exampleLabel}</Link>
-            {pattern.key === 'evidence' ? (
-              <>
-                <Link to="/__dev/testing?view=coverage">打开测试报告</Link>
-                <Link to="/__dev/quality-gates?view=gaps">打开改动缺口</Link>
-              </>
-            ) : null}
-          </WorkbenchSection>
           <details className="erp-dev-disclosure">
             <summary>共享实现与设计约定</summary>
             <p>
               WorkbenchSection 组织标题、动作与结果；WorkbenchToolbar
-              组织范围与筛选；WorkbenchFacts 表达身份；WorkbenchNotice
+              将范围与任务动作靠左成组，刷新与收起等工具放右侧；WorkbenchFacts 表达身份；WorkbenchNotice
               表达结果、阻断与恢复；WorkbenchEmpty 区分空结果。
             </p>
-            <Link to="/__dev/docs?path=docs%2Fproduct%2Fui-design%2F交互设计说明.md#workbench-patterns">
-              阅读统一设计约定
-            </Link>
           </details>
         </aside>
       </div>

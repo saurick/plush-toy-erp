@@ -96,7 +96,7 @@ func TestManualAcceptanceReferenceTargetIsBoundToTheExactFreshDatabase(t *testin
 
 func TestScenarioDemoReferenceTargetIsBoundToRegisteredLongLivedDevelopmentDatabase(t *testing.T) {
 	contract := manualacceptance.Current()
-	for _, database := range []string{"plush_erp", "plush_erp_simon_dev"} {
+	for _, database := range []string{"plush_erp"} {
 		confirmation := "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:" + database + ":" + contract.DataVersion + ":" + contract.RunID
 		dsn := "postgres://acceptance:secret@192.168.0.133:5432/" + database + "?sslmode=disable"
 		if err := validateScenarioDemoReferenceTarget(dsn, database, confirmation); err != nil {

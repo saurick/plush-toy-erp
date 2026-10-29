@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+
 import { DownOutlined, DownloadOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons'
 import { Dropdown, Tooltip } from 'antd'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { message } from '@/common/utils/antdApp'
 import { AUTH_SCOPE, getToken } from '@/common/auth/auth'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -53,7 +54,7 @@ export function useBusinessColumnOrder({
   moduleTitle,
   columns,
 }) {
-  const outletContext = useOutletContext()
+  const outletContext = useBusinessPageContext()
   const scopeKey = `${adminProfile?.id || adminProfile?.user_id || ''}:${moduleKey}`
   const [savedSettings, setSavedSettings] = useState(null)
   const [panelScope, setPanelScope] = useState(null)

@@ -32,12 +32,12 @@ function BusinessChainProjectionContext({
   return (
     <section
       className="erp-dev-flow-chain-projection-context"
-      data-chain-projection-context={projection.chain.key}
+      data-chain-projection-context={projection.chain?.key || 'all'}
     >
       <div>
         <Text type="secondary">关联业务</Text>
         <strong>
-          {projection.chain.label}
+          {projection.contextLabel || projection.chain.label}
           {nodeLabel}
         </strong>
       </div>

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test, { after } from 'node:test'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
+import { getRequestScopeCancellation } from '../../common/utils/requestScopeCancellation.mjs'
 import {
   registerJSXTestLoader,
   installTestDOM,
@@ -108,12 +109,13 @@ test('late or aborted reads cannot overwrite a new scope or newer response', asy
   assert.equal(next.count, null)
   assert.equal(next.loading, true)
   assert.equal((await h.settle(() => h.calls[2].resolve({ total: 2 }))).count, 2)
+  await h.refresh()
   await h.unmount()
-  assert.equal(h.calls[2].options.signal.aborted, true)
+  assert.equal(h.calls[3].options.signal.aborted, true)
   window.dispatchEvent(new Event(WORKFLOW_TASKS_CHANGED))
   window.dispatchEvent(new Event('online'))
   document.dispatchEvent(new Event('visibilitychange'))
-  assert.equal(h.calls.length, 3)
+  assert.equal(h.calls.length, 4)
 })
 
 test('read failure preserves known counts, first failure is unknown, retry can confirm zero', async (t) => {
@@ -169,4 +171,21 @@ test('confirmed changes, visibility, online and route return trigger fresh reads
   assert.equal(h.calls.length, 4)
   await h.render({ adminProfile: profile, enabled: true, pathname: '/erp/workbench' })
   assert.equal(h.calls.length, 5)
+})
+
+test('permission refresh and unmount identify the exact cancelled count request', async (t) => {
+  const h = harness(t)
+  await h.render()
+  const oldSignal = h.calls[0].options.signal
+  await h.render({ adminProfile: { ...profile, permissions: ['changed'] }, enabled: true, pathname: '/erp/task-board' })
+  assert.equal(oldSignal.aborted, true)
+  const replaced = getRequestScopeCancellation(oldSignal.reason)
+  assert.equal(replaced.owner, 'latest-request')
+  assert.equal(replaced.cause, 'superseded')
+  assert.equal(replaced.nextGeneration, replaced.generation + 1)
+  const currentSignal = h.calls.at(-1).options.signal
+  await h.unmount()
+  const disposed = getRequestScopeCancellation(currentSignal.reason)
+  assert.equal(disposed.owner, 'latest-request')
+  assert.equal(disposed.cause, 'disposed')
 })

@@ -6,7 +6,7 @@ import { formatQualityGateDuration } from '../../config/devQualityGates.mjs'
 import { ServerJobGuideDrawer } from './ServerCiJobGuideDrawer.jsx'
 
 const { Link, Text } = Typography
-const STATUS = { passed: '完整 CI 通过', docs_passed: '文档检查通过', running: 'CI 运行中', failed: 'CI 未通过', missing: '当前提交尚无 CI', unavailable: 'CI 读取失败' }
+export const SERVER_CI_STATUS = { passed: '完整 CI 通过', docs_passed: '文档检查通过', running: 'CI 运行中', failed: 'CI 未通过', missing: '当前提交尚无 CI', unavailable: 'CI 读取失败' }
 
 export function ServerCiEvidencePanel({ summary, showEmptyState = true }) {
   const evidence = summary?.serverEvidence
@@ -25,7 +25,7 @@ export function ServerCiEvidencePanel({ summary, showEmptyState = true }) {
         <>
           <Space wrap>
             <Text>CI 对应版本 <Text code>{shortCommit(evidence.gitSha)}</Text></Text>
-            <Tag color={evidence.status === 'passed' ? 'success' : evidence.status === 'failed' ? 'error' : 'default'}>{STATUS[evidence.status] || 'CI 尚未证明'}</Tag>
+            <Tag color={evidence.status === 'passed' ? 'success' : evidence.status === 'failed' ? 'error' : 'default'}>{SERVER_CI_STATUS[evidence.status] || 'CI 尚未证明'}</Tag>
             <Text>耗时 {formatQualityGateDuration(evidence.pipeline.durationMs)}</Text>
             {evidence.pipeline.finishedAt || evidence.pipeline.status === 'completed' ? (
               <DevTimestamp value={evidence.pipeline.finishedAt} missing="结束时间未记录" />
@@ -56,7 +56,7 @@ export function ServerCiEvidencePanel({ summary, showEmptyState = true }) {
         </>
       ) : showEmptyState ? (
         <div role="status">
-          <Text strong>{STATUS[evidence.status] || 'CI 尚未证明'}</Text>
+          <Text strong>{SERVER_CI_STATUS[evidence.status] || 'CI 尚未证明'}</Text>
           <div><Text type="secondary">{evidence.status === 'missing' ? '当前提交尚未产生执行结果，可查看历史流水线。' : '请刷新后重新核对；读取失败不代表没有流水线。'}</Text></div>
         </div>
       ) : null}

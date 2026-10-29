@@ -264,7 +264,7 @@ func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
 		PermissionProductionWIPRead,
 		PermissionProductionWIPAssign,
 		PermissionProductionWIPExecute,
-		PermissionProductionMaterialIssueCreate,
+		PermissionProductionOverIssueSubmit,
 		PermissionProductionFactPost,
 		PermissionProductionFactCancel,
 	)
@@ -283,7 +283,10 @@ func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
 
 	warehouse := builtinRolePermissionSet(t, WarehouseRoleKey)
 	assertPermissionSetContains(t, warehouse, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionProductionFactRead, PermissionProductionWIPRead, PermissionWarehouseInboundConfirm)
-	assertPermissionSetOmits(t, warehouse, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
+	assertPermissionSetContains(t, warehouse, PermissionProductionMaterialIssueCreate, PermissionPMCPlanRead)
+	assertPermissionSetOmits(t, warehouse, PermissionProductionFactPost, PermissionProductionFactCancel)
+	assertPermissionSetOmits(t, production, PermissionProductionMaterialIssueCreate, PermissionProductionExceptionSubmit)
+	assertPermissionSetOmits(t, builtinRolePermissionSet(t, QualityRoleKey), PermissionProductionExceptionSubmit, PermissionProductionOverIssueSubmit)
 
 	quality := builtinRolePermissionSet(t, QualityRoleKey)
 	assertPermissionSetContains(t, quality, PermissionCustomerRead, PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionShipmentRead, PermissionProductionWIPRead, PermissionQualityInspectionRead, PermissionQualityInspectionCreate)
@@ -294,6 +297,28 @@ func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
 	assertPermissionSetOmits(t, finance, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionQualityInspectionCreate)
 
 	assertPermissionSetContains(t, production, PermissionProductSKURead, PermissionWarehouseInventoryRead, PermissionOutsourcingFactRead)
+}
+
+func TestBuiltinPurchaseChainSourcePermissionsKeepJobBoundaries(t *testing.T) {
+	for _, row := range []struct{ role, domain, method, action string }{
+		{WarehouseRoleKey, "purchase", "create_purchase_receipt_from_purchase_order", PermissionPurchaseReceiptCreate},
+		{QualityRoleKey, "quality", "create_quality_inspection_draft", PermissionQualityInspectionCreate},
+		{FinanceRoleKey, "operational_fact", "create_payable_from_purchase_receipt", PermissionFinancePayableConfirm},
+	} {
+		permissions := builtinRolePermissionSet(t, row.role)
+		source, ok := SourceActionReadPermissions(row.domain, row.method)
+		if !ok || len(source) == 0 {
+			t.Fatalf("missing source contract for %s", row.role)
+		}
+		assertPermissionSetContains(t, permissions, append(source, row.action)...)
+		assertPermissionSetOmits(t, permissions, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseOrderSubmit, PermissionPurchaseOrderClose, PermissionPurchaseOrderCancel)
+	}
+	for _, role := range []string{WarehouseRoleKey, QualityRoleKey} {
+		assertPermissionSetOmits(t, builtinRolePermissionSet(t, role), PermissionFieldProcurementCommercialRead, PermissionFinancePayableConfirm)
+	}
+	assertPermissionSetContains(t, builtinRolePermissionSet(t, WarehouseRoleKey), PermissionPurchaseReceiptRead, PermissionWarehouseInboundRead, PermissionWarehouseInventoryRead, PermissionMaterialRead, PermissionWarehouseInboundConfirm)
+	assertPermissionSetOmits(t, builtinRolePermissionSet(t, QualityRoleKey), PermissionPurchaseReceiptCreate, PermissionWarehouseInboundConfirm)
+	assertPermissionSetContains(t, builtinRolePermissionSet(t, FinanceRoleKey), PermissionFieldProcurementCommercialRead)
 }
 
 func TestFinanceCanReadAndPrintPurchaseOrdersWithoutPurchasingMutations(t *testing.T) {

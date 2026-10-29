@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 import { installRpcCallHarness } from '../../../../scripts/test/rpcApiTestHarness.mjs'
+import { RpcErrorCode } from '../../../common/consts/errorCodes.generated.js'
 
 async function actionsHarness(t, handler, overrides = {}) {
   const view = await createReactTestHarness(t)
@@ -35,12 +36,14 @@ async function actionsHarness(t, handler, overrides = {}) {
         source_type: 'manual',
         source_id: 999,
       }),
+      resetFields: () => {},
     },
     decisionForm: {
       validateFields: async () => ({
         result: 'PASS',
         inspected_at: '2026-10-17',
         defect_rate_selection: 'APPROX:0',
+        check_items: [{ name: '外观', requirement: '符合确认样', observation: '未见异常', result: 'PASS', scope: 'FULL' }],
       }),
     },
     inspectionAttachmentRef: {
@@ -61,6 +64,7 @@ async function actionsHarness(t, handler, overrides = {}) {
   function Consumer() {
     current = useQualityInspectionActions({
       editor,
+      sourceAccess: overrides.sourceAccess || { allowed: true },
       activeCustomerKey: 'actions-fixture',
       loadRows: async () => {
         refreshed++
@@ -97,6 +101,22 @@ async function actionsHarness(t, handler, overrides = {}) {
     render: () => view.render(createElement(Consumer)),
   }
 }
+
+test('missing receipt read blocks inspection creation before requesting a write', async (t) => {
+  const view = await actionsHarness(t, () => { throw new Error('must not write') }, { sourceAccess: { allowed: false, reason: '缺少收货读取权限' } })
+  await view.act(() => view.current.handleCreateInspection())
+  assert.equal(view.calls.length, 0)
+})
+
+test('inspection creation permission denial closes and clears the source editor', async (t) => {
+  const view = await actionsHarness(t, () => ({ code: RpcErrorCode.PERMISSION_DENIED, message: '权限不足' }))
+  let cleared = 0
+  view.editor.inspectionForm.resetFields = () => { cleared++ }
+  await view.act(() => view.current.handleCreateInspection())
+  assert.equal(view.closed, 1)
+  assert.equal(cleared, 1)
+  assert.deepEqual(view.attachments, [])
+})
 
 test('a pending decision admits one mutation and retains the committed result after attachment failure', async (t) => {
   let complete
@@ -190,4 +210,26 @@ test('cancel uses the cancellation command and carries no decision-only evidence
     params: { id: 7, decision_note: 'source cancelled' },
   })
   assert.equal(view.closed, 1)
+})
+
+for (const inspection_type of ['INCOMING', 'OUTSOURCING_RETURN', 'FINISHED_GOODS', 'PRODUCTION_STAGE']) {
+  test(`${inspection_type} cannot submit a decision without actual inspection evidence`, async (t) => {
+    const view = await actionsHarness(t, () => { throw new Error('must not write') }, {
+      inspectionModal: { mode: 'pass', inspection: { id: 7, inspection_type } },
+      decisionForm: { validateFields: async () => ({ result: 'PASS', defect_rate_selection: 'APPROX:0' }) },
+    })
+    await view.act(() => view.current.handleDecision())
+    assert.equal(view.calls.length, 0)
+    assert.equal(view.closed, 0)
+  })
+}
+
+test('rejection without a reason stays open even with a failed check', async (t) => {
+  const view = await actionsHarness(t, () => { throw new Error('must not write') }, {
+    inspectionModal: { mode: 'reject', inspection: { id: 7, inspection_type: 'PRODUCTION_STAGE' } },
+    decisionForm: { validateFields: async () => ({ defect_rate_selection: 'APPROX:5', check_items: [{ name: '针检', requirement: '无异物', observation: '检出异物', scope: 'FULL', result: 'FAIL' }] }) },
+  })
+  await view.act(() => view.current.handleDecision())
+  assert.equal(view.calls.length, 0)
+  assert.equal(view.closed, 0)
 })

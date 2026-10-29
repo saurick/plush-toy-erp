@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Form, Input } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+
 import BusinessModal from '../business-list/BusinessModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { correctQualityInspectionResult } from '../../api/qualityApi.mjs'
@@ -12,7 +13,7 @@ export default function QualityInspectionCorrectionModal({ inspection, customerK
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [pending, setPending] = useState(null)
-  const outlet = useOutletContext()
+  const outlet = useBusinessPageContext()
   const stateRef = useRef({ dirty: false, saved: false, loading: false })
   stateRef.current.loading = loading
   const pendingRef = useRef(null)

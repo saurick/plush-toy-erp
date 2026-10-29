@@ -5,7 +5,7 @@ import { warehouseOptionFromRecord } from '../../web/src/erp/utils/referenceSele
 import { materialWarehouseOptions } from '../../web/src/erp/utils/warehouseClassification.mjs';
 import { assignTransactionWarehouseScopes } from './transaction-real-backend-fixture.mjs';
 import { RpcErrorCode as CODE } from '../../web/src/common/consts/errorCodes.generated.js';
-import { clickRPC, modal, pageAction, selectOption, openMobileSourceTask } from './transaction-browser-ui.mjs';
+import { clickRPC, modal, pageAction, selectOption } from './transaction-browser-ui.mjs';
 
 export const PARTIAL_RECEIVING_KEYS = Object.freeze(['desktop_partial_receiving', 'mobile_partial_receiving']);
 
@@ -15,6 +15,9 @@ export function assertPartialReceivingEvidence(flows) {
     for (const field of ['sourceID', 'receiptID', 'payableID']) assert.ok(Number.isSafeInteger(flow[field]) && flow[field] > 0, `${flow.key}.${field}`);
     for (const field of ['passed', 'unpricedBlocked', 'partialPosted', 'rejectedUnposted', 'dispositionSettled', 'frozenSnapshotPreserved', 'priceReplayExact', 'forbiddenUnchanged', 'changedIntentRejected', 'payableVerified']) assert.equal(flow[field], true, `${flow.key}.${field}`);
     assert.equal(flow.payableAmount, 10);
+    assert.equal(flow.dispositionSurface, 'desktop');
+    assert.equal(flow.pricingSurface, 'desktop');
+    assert.equal(flow.payableSurface, 'api');
     assert.equal(flow.priceEvents, 1);
     assert.equal(flow.transportFaults.length, 1);
     assert.equal(flow.transportFaults[0].injected, true);
@@ -26,11 +29,11 @@ export function assertPartialReceivingEvidence(flows) {
 
 // Engineering approval is fixture preparation. Counting, quality decisions,
 // partial inbound, rejection disposition and late pricing use real product UI.
-export async function runPartialReceiving({ client, fixture, options, report, open, pageFor, snapshot, stock, rejected, lost, decide, popup, screenshot, expect, auditForm }) {
+export async function runPartialReceiving({ client, fixture, options, report, open, snapshot, stock, rejected, lost, decide, popup, screenshot, expect, auditForm }) {
   report.partialReceiving = [];
   for (const mobile of [false, true]) {
     const prefix = `${fixture.prefix}-${mobile ? 'MPART' : 'DPART'}`;
-    const flow = { key: `${mobile ? 'mobile' : 'desktop'}_partial_receiving`, transportFaults: [] };
+    const flow = { key: `${mobile ? 'mobile' : 'desktop'}_partial_receiving`, transportFaults: [], dispositionSurface: 'desktop', pricingSurface: 'desktop', payableSurface: 'api' };
     report.partialReceiving.push(flow);
     const { material } = await client.rpc('admin', 'masterdata', 'create_material', { code: `${prefix}-MAT`, name: '模拟分包质检材料', stock_category: 'MAIN', default_unit_id: fixture.material.default_unit_id, supplier_id: fixture.supplier.id });
     assert.equal(material.stock_category, 'MAIN');
@@ -77,13 +80,9 @@ export async function runPartialReceiving({ client, fixture, options, report, op
     assert.deepEqual(stock(frozen[1].lot_id), { balance: 0, net: 0, txns: 0, lot: 'REJECTED' });
     flow.partialPosted = flow.rejectedUnposted = true;
     const payableParams = { purchase_receipt_id: receipt.id, fact_no: `${prefix}-AP`, idempotency_key: `${prefix}:ap` };
-    await rejected('finance', 'operational_fact', 'create_payable_from_purchase_receipt', payableParams, CODE.INVALID_PARAM);
+    await rejected('finance', 'operational_fact', 'create_payable_from_purchase_receipt', payableParams, CODE.BUSINESS_RULE_VIOLATION);
     const rejectedInspection = inspectionFor(frozen[1]);
-    if (mobile) {
-      page = await pageFor('purchase', true);
-      await openMobileSourceTask(page, { ...options, mobile }, client, 'purchase', 'purchase_receipt', receipt.id, ['handoff_receipt_exception']);
-      await selectOption(page, page.getByRole('combobox', { name: '选择本次收货的质检单', exact: true }), rejectedInspection.inspection_no);
-    } else page = await open('purchase', false, 'production/quality-inspections', rejectedInspection.id);
+    page = await open('purchase', false, 'production/quality-inspections', rejectedInspection.id);
     await pageAction(page, '不合格处置');
     const disposition = await modal(page, '首次来料不合格退厂处置');
     await disposition.getByLabel('处置单号', { exact: true }).fill(`${prefix}-REJECT`);
@@ -96,16 +95,10 @@ export async function runPartialReceiving({ client, fixture, options, report, op
     assert.equal(snapshot('purchase_rejection_dispositions', `id=${draft.id}`)[0].status, 'POSTED');
     assert.deepEqual(stock(frozen[1].lot_id), { balance: 0, net: 0, txns: 0, lot: 'REJECTED' });
     flow.dispositionSettled = true;
-    await rejected('finance', 'operational_fact', 'create_payable_from_purchase_receipt', payableParams, CODE.INVALID_PARAM);
+    await rejected('finance', 'operational_fact', 'create_payable_from_purchase_receipt', payableParams, CODE.BUSINESS_RULE_VIOLATION);
     assert.deepEqual(snapshot('finance_facts', `source_type='purchase_receipt' AND source_id=${receipt.id}`), []);
     flow.unpricedBlocked = true;
-    if (mobile) {
-      page = await pageFor('purchase', true);
-      // This is an explicit source follow-up, validated by the existing source
-      // usecase and candidate permissions; it contains no fabricated fact.
-      await client.rpc('admin', 'workflow', 'create_followup_task', { source_type: 'purchase_order', source_id: orderID, owner_role_key: 'purchase', task_name: '模拟核对采购价格', description: '模拟到货后补齐价格，保留到货快照', due_at: Math.floor(Date.now() / 1000) + 3600, priority: 0, idempotency_key: `${prefix}:terms-task` });
-      await openMobileSourceTask(page, { ...options, mobile }, client, 'purchase', 'purchase_order', orderID, ['business_followup']);
-    } else page = await open('purchase', false, 'purchase/orders', orderID, true);
+    page = await open('purchase', false, 'purchase/orders', orderID, true);
     await pageAction(page, '补齐价格与交期');
     const terms = await modal(page, /补齐价格与交期/u);
     await terms.getByLabel('第1行单价', { exact: true }).fill('2.5');

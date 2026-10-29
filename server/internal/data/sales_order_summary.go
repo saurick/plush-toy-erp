@@ -28,6 +28,9 @@ func (r *salesOrderRepo) ListSalesOrderSummary(ctx context.Context, filter biz.S
 		))
 	}
 	orderPredicates := []predicate.SalesOrder{}
+	if filter.CustomerID > 0 {
+		orderPredicates = append(orderPredicates, salesorder.CustomerID(filter.CustomerID))
+	}
 	if filter.Customer != "" {
 		orderPredicates = append(orderPredicates, func(s *sql.Selector) {
 			s.Where(sqljson.StringContains(salesorder.FieldCustomerSnapshot, filter.Customer, sqljson.Path("name")))

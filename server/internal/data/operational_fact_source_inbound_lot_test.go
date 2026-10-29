@@ -41,7 +41,7 @@ func TestSourceDrivenInboundFactsCreateAndReplayDerivedLots(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create production order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, created.Order.ID)
+	prepareProductionOrderFactMaterialsForTest(t, ctx, client, created.Order.ID)
 	released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{
 		ID: created.Order.ID, ExpectedVersion: created.Order.Version,
 		ActorID: actor.ID, IdempotencyKey: "mo-source-lot-release",
@@ -50,10 +50,12 @@ func TestSourceDrivenInboundFactsCreateAndReplayDerivedLots(t *testing.T) {
 		t.Fatalf("release production order: %v", err)
 	}
 	productionLotNo := "PROD-SOURCE-LOT-001"
+	batchID := prepareProductionHandworkBatchForFactTest(t, ctx, client, released.Items[0].ID, actor.ID)
 	completionIn := &biz.ProductionCompletionFromOrderCreate{
 		FactNo: "PF-SOURCE-LOT-001", ProductionOrderID: released.Order.ID,
 		ProductionOrderItemID: released.Items[0].ID, WarehouseID: fixtures.productWarehouseID,
-		NewLotNo: &productionLotNo, Quantity: decimal.NewFromInt(2),
+		ProductionWIPBatchID: batchID,
+		NewLotNo:             &productionLotNo, Quantity: decimal.NewFromInt(2),
 		IdempotencyKey: "pf-source-lot-001",
 	}
 	completion, err := factUC.CreateProductionCompletionFromOrder(ctx, completionIn)

@@ -462,7 +462,6 @@ func TestOperationalFactPostgresConcurrentSourceInboundLotCreateReusesOneBatch(t
 	if err != nil {
 		t.Fatalf("create postgres inbound lot order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, created.Order.ID)
 	released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
 		ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "pg-inbound-lot-release-" + f.suffix,
 	})
@@ -471,16 +470,19 @@ func TestOperationalFactPostgresConcurrentSourceInboundLotCreateReusesOneBatch(t
 	}
 
 	lotNo := "PG-INBOUND-LOT-" + f.suffix
+	batchID := prepareProductionHandworkBatchForFactTest(t, ctx, f.client, released.Items[0].ID, f.actorID)
 	inputs := []*biz.ProductionCompletionFromOrderCreate{
 		{
 			FactNo: "PF-PG-INBOUND-LOT-A-" + f.suffix, ProductionOrderID: released.Order.ID,
 			ProductionOrderItemID: released.Items[0].ID, WarehouseID: f.warehouseID,
-			NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pg-inbound-lot-a-" + f.suffix,
+			ProductionWIPBatchID: batchID,
+			NewLotNo:             &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pg-inbound-lot-a-" + f.suffix,
 		},
 		{
 			FactNo: "PF-PG-INBOUND-LOT-B-" + f.suffix, ProductionOrderID: released.Order.ID,
 			ProductionOrderItemID: released.Items[0].ID, WarehouseID: f.warehouseID,
-			NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pg-inbound-lot-b-" + f.suffix,
+			ProductionWIPBatchID: batchID,
+			NewLotNo:             &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pg-inbound-lot-b-" + f.suffix,
 		},
 	}
 	start := make(chan struct{})

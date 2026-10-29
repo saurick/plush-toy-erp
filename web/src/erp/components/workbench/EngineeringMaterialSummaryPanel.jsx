@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Tag } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { MaterialRequestStatus, SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -56,7 +57,7 @@ export default function EngineeringMaterialSummaryPanel({
   refreshRevision = 0,
   summaryTypeControl = null,
 }) {
-  const { adminProfile } = useOutletContext() || {}
+  const { adminProfile } = useBusinessPageContext() || {}
   const [params, setParams] = useSearchParams()
   const keyword = (params.get('materials.q') || '').slice(0, 100)
   const status = STATUS_OPTIONS.some(

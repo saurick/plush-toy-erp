@@ -88,7 +88,7 @@ WITH normalized AS (
   UNION ALL
   SELECT 'engineering_material_requests.frozen_unit_change' AS field, r.id FROM engineering_material_requests r JOIN engineering_material_request_items x ON x.request_id=r.id JOIN unit_map m ON m.old_id=x.unit_id JOIN units u ON u.id=m.old_id WHERE (r.status IN ('SUBMITTED','BOSS_APPROVED') AND (m.old_id<>m.target_id OR u.name<>m.name)) OR (r.status='APPROVED' AND m.old_id<>m.target_id)
   UNION ALL
-  SELECT 'sales_order_items.confirmed_bom_unit_change' AS field, x.id FROM sales_order_items x JOIN sales_orders o ON o.id=x.sales_order_id JOIN bom_items b ON b.bom_header_id=x.sample_bom_id JOIN materials a ON a.id=b.material_id JOIN unit_map m ON m.old_id IN (b.unit_id,a.default_unit_id) WHERE x.engineering_status='CONFIRMED' AND o.lifecycle_status IN ('draft','submitted','active') AND m.old_id<>m.target_id
+  SELECT 'sales_order_items.confirmed_bom_unit_change' AS field, x.id FROM sales_order_items x JOIN sales_orders o ON o.id=x.sales_order_id JOIN bom_items b ON b.bom_header_id=COALESCE((to_jsonb(x)->>'bom_id')::bigint,(to_jsonb(x)->>'sample_bom_id')::bigint) JOIN materials a ON a.id=b.material_id JOIN unit_map m ON m.old_id IN (b.unit_id,a.default_unit_id) WHERE COALESCE(to_jsonb(x)->>'bom_fingerprint', CASE WHEN to_jsonb(x)->>'engineering_status'='CONFIRMED' THEN to_jsonb(x)->>'sample_bom_fingerprint' END) IS NOT NULL AND o.lifecycle_status IN ('draft','submitted','active') AND m.old_id<>m.target_id
   UNION ALL
   SELECT 'inventory_balances.merge_overflow' AS field, min(x.id) FROM inventory_balances x JOIN unit_map m ON m.old_id=x.unit_id GROUP BY x.subject_type,x.subject_id,x.product_sku_id,x.warehouse_id,x.lot_id,m.target_id HAVING sum(x.quantity)>99999999999999.999999
 )

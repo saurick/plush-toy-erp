@@ -1,159 +1,85 @@
-import React from 'react'
-import Table from '@/common/components/table/AppTable'
-import { WorkbenchSection } from '../WorkbenchPattern.jsx'
-import { EvidenceDisclosure, KeyValue } from './FlowStateShared.jsx'
+import React, { useState } from 'react'
+import Select from '@/common/components/select/AppSelect'
+import { WorkbenchFacts, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 
-function RuleConditions({ rule }) {
-  return (
-    <>
-      <p>{rule.condition}</p>
-      <p>
-        <strong>阻断原因：</strong>
-        {rule.blocked}
-      </p>
-    </>
-  )
-}
-
-function RuleEffects({ rule }) {
-  return (
-    <>
-      <p>{rule.effect}</p>
-      <p>
-        <strong>纠正与恢复：</strong>
-        {rule.recovery}
-      </p>
-    </>
-  )
-}
-
-export function FlowActionRules({ flow }) {
-  if (!flow.actionRules.length) return null
-  const states = new Map(flow.states.map((state) => [state.key, state.label]))
+function RuleReader({ rules, title, selectLabel, states, lifecycle = false, selectedKey, onSelect }) {
+  const [localKey, setLocalKey] = useState(null)
+  const key = onSelect ? selectedKey : localKey
+  const rule = key === '' ? null : rules.find((item) => item.key === key) || (onSelect && key != null ? null : rules[0])
+  if (!rules.length) return null
   return (
     <WorkbenchSection
       flat
       headingLevel={3}
-      title="办理条件与影响"
+      title={title}
       className="erp-dev-flow-rule-table"
-      data-action-rules
+      data-action-rules={!lifecycle || undefined}
+      data-master-lifecycle-rules={lifecycle || undefined}
     >
-      <p>
-        以下为办理规则；实际能否办理由后端按当时的权限、版本和关联事实判定。
-      </p>
-      <Table
-        aria-label={`${flow.label}办理规则`}
-        rowKey="key"
-        pagination={false}
-        tableLayout="fixed"
-        scroll={{ x: 720 }}
-        dataSource={flow.actionRules}
-        columns={[
-          {
-            title: '动作与责任',
-            key: 'action',
-            width: '26%',
-            render: (_, rule) => (
-              <>
-                <strong>{rule.label}</strong>
-                <p>
-                  适用状态：
-                  {rule.states.map((key) => states.get(key)).join('、')}
-                </p>
-                <p>{rule.authority}</p>
-                <EvidenceDisclosure value={rule} label="规则依据">
-                  {rule.permission.length > 0 ? (
-                    <p>
-                      权限：
-                      <KeyValue value={rule.permission.join('、')} />
-                    </p>
-                  ) : null}
-                </EvidenceDisclosure>
-              </>
-            ),
-          },
-          {
-            title: '办理条件与阻断',
-            key: 'conditions',
-            width: '37%',
-            render: (_, rule) => <RuleConditions rule={rule} />,
-          },
-          {
-            title: '结果与纠正',
-            key: 'effects',
-            width: '37%',
-            render: (_, rule) => <RuleEffects rule={rule} />,
-          },
+      <WorkbenchToolbar>
+        <Select
+          aria-label={selectLabel}
+          allowClear
+          placeholder={`选择${selectLabel}`}
+          virtual={false}
+          value={rule?.key}
+          options={rules.map((item) => ({ value: item.key, label: item.label }))}
+          onChange={(key) => (onSelect || setLocalKey)(key ?? '')}
+        />
+      </WorkbenchToolbar>
+      {rule ? (
+        <>
+          <WorkbenchFacts
+            items={[
+          ...(rule.states ? [{ label: '适用状态', value: rule.states.map((key) => states.get(key)).join('、') }] : []),
+          ...(rule.authority ? [{ label: '办理责任', value: rule.authority }] : []),
+          ...(lifecycle ? [{ label: '办理入口', value: rule.key === 'warehouse' ? '编辑仓库后保存启停值' : '对象专属启用／停用动作' }] : []),
         ]}
-      />
+          />
+          <div className="erp-dev-flow-rule-detail">
+            <section>
+              <h4>办理条件</h4>
+              <p>{rule.condition}</p>
+              <p><strong>受阻时：</strong>{rule.blocked}</p>
+            </section>
+            <section>
+              <h4>结果与纠正</h4>
+              <p>{rule.effect}</p>
+              <p><strong>纠正与恢复：</strong>{rule.recovery}</p>
+            </section>
+          </div>
+        </>
+      ) : null}
     </WorkbenchSection>
   )
 }
 
-export function MasterLifecycleRules({ flow }) {
-  if (!flow.lifecycleRules.length) return null
+export function FlowActionRules({ flow, stateKey = '', selectedKey, onSelect }) {
+  const rules = stateKey
+    ? flow.actionRules.filter((rule) => rule.states.includes(stateKey))
+    : flow.actionRules
   return (
-    <WorkbenchSection
-      flat
-      headingLevel={3}
-      title="逐对象启停规则"
-      className="erp-dev-flow-rule-table"
-      data-master-lifecycle-rules
-    >
-      <p>
-        五类对象均使用“启用／停用”；归档不属于这五类对象的通用动作。停用不会自动作废历史单据。
-      </p>
-      <Table
-        aria-label="主数据启停规则表"
-        rowKey="key"
-        pagination={false}
-        tableLayout="fixed"
-        scroll={{ x: 720 }}
-        dataSource={flow.lifecycleRules}
-        columns={[
-          {
-            title: '对象与入口',
-            key: 'object',
-            width: '20%',
-            render: (_, rule) => (
-              <>
-                <strong>{rule.label}</strong>
-                <p>
-                  {rule.key === 'warehouse'
-                    ? '编辑仓库 → 保存启停值'
-                    : '对象专属启用／停用动作'}
-                </p>
-                <EvidenceDisclosure value={rule} label="规则依据">
-                  <p>
-                    字段：
-                    <KeyValue value={rule.field} />
-                  </p>
-                  <p>
-                    动作：
-                    <KeyValue value={rule.action} />
-                  </p>
-                  <p>
-                    权限：
-                    <KeyValue value={rule.permission.join('、')} />
-                  </p>
-                </EvidenceDisclosure>
-              </>
-            ),
-          },
-          {
-            title: '办理条件与限制',
-            key: 'conditions',
-            width: '40%',
-            render: (_, rule) => <RuleConditions rule={rule} />,
-          },
-          {
-            title: '引用、历史与恢复',
-            key: 'effects',
-            width: '40%',
-            render: (_, rule) => <RuleEffects rule={rule} />,
-          },
-        ]}
-      />
-    </WorkbenchSection>
+    <RuleReader
+      rules={rules}
+      title="办理规则"
+      selectLabel="办理动作"
+      selectedKey={selectedKey}
+      onSelect={onSelect}
+      states={new Map(flow.states.map((state) => [state.key, state.label]))}
+    />
+  )
+}
+
+export function MasterLifecycleRules({ flow, selectedKey, onSelect }) {
+  return (
+    <RuleReader
+      rules={flow.lifecycleRules}
+      title="启停规则"
+      selectLabel="主数据对象"
+      selectedKey={selectedKey}
+      onSelect={onSelect}
+      states={new Map(flow.states.map((state) => [state.key, state.label]))}
+      lifecycle
+    />
   )
 }

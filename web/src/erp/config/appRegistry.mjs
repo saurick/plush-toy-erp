@@ -73,7 +73,7 @@ export const mobileRoleDefinitions = Object.freeze([
     title: '工程手机待办',
     shortTitle: '工程手机待办',
     label: '工程',
-    description: '跟进产品资料、加工环节、BOM 和待补工程资料。',
+    description: '跟进产品、材料、BOM 和待补工程资料。',
   },
 ])
 

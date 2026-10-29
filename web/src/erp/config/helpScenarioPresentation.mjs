@@ -7,7 +7,7 @@ export const HELP_OVERVIEW_LAYOUTS = {
       from: 's3',
       back: 's1',
       label: '资料不足或审批退回',
-      title: '工程修订并重新提交',
+      title: '工程修订后自动送审',
       owner: '工程',
     },
   },
@@ -257,12 +257,12 @@ export const HELP_OVERVIEW_LAYOUTS = {
 export const HELP_VISUAL_EXAMPLES = {
   'engineering-material-request': {
     title: '工程用料审批与采购生成',
-    description: '核对用料，提交老板审核；财务批准后按厂商生成采购订单。',
+    description: '工程资料保存且齐全后自动送老板审核；财务批准后按厂商生成采购订单。',
     entry: '销售订单 · 材料汇总',
     points: [
       [
         '核对订单与用料来源',
-        '先确认订单已生效、样品已确认、BOM 已启用，核对本轮产品和厂商。',
+        '先确认订单已生效、工程资料已完成，核对本轮产品和厂商。',
       ],
       [
         '分清总用数量与库存参考',
@@ -270,15 +270,15 @@ export const HELP_VISUAL_EXAMPLES = {
       ],
       [
         '按岗位办理并核对结果',
-        '工程提交、老板交财务、另一位财务批准生成采购单；采购继续补充价格和到货安排。',
+        '自动送审、老板交财务、另一位财务批准生成采购单；采购继续补充价格和到货安排。',
       ],
     ],
     boundary:
       '教学示例：总用数量 214.2 米、库存参考 30 米，生成采购数量仍为 214.2 米。',
     before: '用料预览',
-    after: '已提交老板审核',
+    after: '用料已自动送审',
     delta: '冻结本轮依据',
-    resultTitle: '工程提交结果 · 示例',
+    resultTitle: '自动送审结果 · 示例',
     resultRows: [
       ['来源订单', 'SO-DEMO-001'],
       ['总用数量', '214.2 米'],
@@ -286,15 +286,15 @@ export const HELP_VISUAL_EXAMPLES = {
     ],
     exceptionTitle: 'BOM 用量需要修订',
     exceptionTo: '工程',
-    exceptionBack: '本单用料预览',
+    exceptionBack: '原工程资料',
     exceptionRows: [
       ['退回原因', '请核对短毛绒单位用量'],
-      ['工程处理', '修订资料，读取当前预览，再提交'],
+      ['工程处理', '修订后点击“完成工程资料”，校验通过后自动重新送审'],
     ],
     exceptionNote:
-      '退回必须写明原因；新资料重新提交后开始新审批轮次，保留原审批和退回历史。',
+      '退回必须写明原因；原资料修订并保存后自动开始新审批轮次，保留原审批和退回历史。',
     exceptionResume:
-      '提交结果不确定时，先重新读取同一申请并核对状态、轮次与采购单，避免连续提交。',
+      '保存结果不确定时，重新读取原资料和审批状态；使用原内容重试，避免重复生成审批轮次。',
   },
   'finished-goods': {
     title: '成品入库',

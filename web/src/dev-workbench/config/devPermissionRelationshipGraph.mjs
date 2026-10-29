@@ -8,6 +8,7 @@ import {
   getMatchingRoleAccess,
   normalizePermissionUsage,
 } from '../../erp/utils/permissionCenterAccess.mjs'
+import { readRolePermissionPolicy } from '../../erp/utils/rolePermissionPolicy.mjs'
 import { getPermissionModuleTitle } from '../../erp/utils/permissionModuleLabels.mjs'
 import { formatAdminIdentity } from '../../erp/utils/adminIdentity.mjs'
 import { getApprovalSettingsBlockerLabel } from '../../erp/utils/approvalSettingsActivation.mjs'
@@ -139,7 +140,7 @@ export function buildPermissionRelationshipModuleOptions(permissions = []) {
     }
   })
   return [
-    { value: PERMISSION_RELATIONSHIP_ALL_MODULES, label: '全部功能模块' },
+    { value: PERMISSION_RELATIONSHIP_ALL_MODULES, label: '权限总览' },
     ...[...modules.entries()]
       .map(([value, label]) => ({ value, label }))
       .sort((left, right) => left.label.localeCompare(right.label, 'zh-CN')),
@@ -476,6 +477,7 @@ export function buildPermissionRelationshipDetailRows({
     const blockedReason = context.blocked ? context.blockedReason : '岗位已停用'
     const permissionDecisions = accessPermissionMap(access)
     const pageDecisions = accessPageMap(access)
+    const policy = readRolePermissionPolicy(role)
     const permissionKeys = includeUngranted
       ? [...detailByKey.keys()]
       : [...permissionDecisions.keys()]
@@ -498,8 +500,12 @@ export function buildPermissionRelationshipDetailRows({
         const ungranted = !decision || decision.rbac_granted === false
         addRow({
           kind: 'permission',
+          permissionKey: key,
+          roleKey,
+          moduleKey: detail.moduleKey,
+          moduleLabel: detail.moduleName,
           source: roleName,
-          relation: '获得功能',
+          relation: policy.required.includes(key) ? '核心职责' : policy.optional.includes(key) ? '可选辅助' : policy.registered ? '模板外功能' : '获得功能',
           target: detail.name,
           result: ungranted
             ? '岗位未授予该功能'
@@ -559,6 +565,73 @@ export function buildPermissionRelationshipDetailRows({
   })
 
   return rows
+}
+
+// Merge the same capability across roles without treating a role projection as
+// the employee's complete session authorization. The caller retains that notice.
+export function buildPermissionCapabilityGroups(
+  rows = [],
+  { keyword = '', restrictedOnly = false } = {}
+) {
+  const capabilities = new Map()
+  rows
+    .filter((row) => row.kind === 'permission')
+    .forEach((row) => {
+      const item = capabilities.get(row.permissionKey) || {
+        key: row.permissionKey,
+        label: row.target,
+        moduleKey: row.moduleKey,
+        moduleLabel: row.moduleLabel,
+        grants: [],
+      }
+      item.grants.push(row)
+      capabilities.set(item.key, item)
+    })
+  const query = keyword.trim().toLocaleLowerCase()
+  const groups = new Map()
+  capabilities.forEach((item) => {
+    const effective = item.grants.some((grant) => grant.status === '已生效')
+    const granted = item.grants.some((grant) => grant.status !== '未授予')
+    const status = effective ? '可用' : granted ? '受限' : '未授予'
+    const reasons = [
+      ...new Set(
+        item.grants
+          .filter((grant) => !effective || grant.status === '已生效')
+          .map((grant) => grant.result)
+      ),
+    ]
+    if (!query && !granted) return
+    if (restrictedOnly && effective) return
+    if (
+      query &&
+      !`${item.label} ${item.moduleLabel} ${reasons.join(' ')}`
+        .toLocaleLowerCase()
+        .includes(query)
+    )
+      { return }
+    const group = groups.get(item.moduleKey) || {
+      key: item.moduleKey,
+      label: item.moduleLabel,
+      items: [],
+    }
+    group.items.push({
+      ...item,
+      status,
+      result: effective ? '可用' : reasons.join('；'),
+    })
+    groups.set(group.key, group)
+  })
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      available: group.items.filter((item) => item.status === '可用').length,
+      restricted: group.items.filter((item) => item.status !== '可用').length,
+    }))
+    .sort(
+      (left, right) =>
+        right.items.length - left.items.length ||
+        left.label.localeCompare(right.label, 'zh-CN')
+    )
 }
 
 function approvalRoleKeys(item = {}) {

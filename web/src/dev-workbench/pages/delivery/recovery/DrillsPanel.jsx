@@ -1,12 +1,10 @@
 import { Card } from 'antd'
 import { DrillRow } from './shared.jsx'
-import BackupRetentionPanel from './BackupRetentionPanel.jsx'
 
 export function DrillsPanel({
   activeView,
   drillTriggerRef,
   overview,
-  retention,
   setSelectedDrillKey,
 }) {
   return (
@@ -54,7 +52,6 @@ export function DrillsPanel({
           </table>
         </div>
       </Card>
-      <BackupRetentionPanel retention={retention} />
     </section>
   )
 }

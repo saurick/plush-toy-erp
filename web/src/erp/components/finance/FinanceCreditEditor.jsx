@@ -32,9 +32,9 @@ export function FinanceCreditEditor({
         : {
             size: 'localAction',
             cancelText: '取消',
-            description: '冲销会恢复该红冲对未核销金额的影响。',
+            description: '冲回会撤销本次调增或调减的余额影响；已有核销或后续调整时须先处理依赖。',
           })}
-      title={creditOpen === 'reverse' ? '冲销红冲记录' : '登记红冲'}
+      title={creditOpen === 'reverse' ? '冲回账款调整' : '登记红冲'}
       open={Boolean(creditOpen)}
       okText={creditOpen === 'reverse' ? '确认冲销' : '确认红冲'}
       confirmLoading={loading}

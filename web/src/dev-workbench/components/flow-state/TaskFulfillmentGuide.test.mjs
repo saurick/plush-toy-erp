@@ -9,7 +9,7 @@ async function mount(t, url = '/__dev/status-flows?view=chain&chain=all', props 
   const harness = await createReactTestHarness(t)
   const { default: Guide } = await import('./TaskFulfillmentGuide.jsx')
   const navigation = {}
-  function Probe() { Object.assign(navigation, { location: useLocation(), navigate: useNavigate() }); return h(Guide, { renderTopics: () => h('div', null, '业务专题'), ...props }) }
+  function Probe() { Object.assign(navigation, { location: useLocation(), navigate: useNavigate() }); return h(Guide, { showViewSwitch: true, ...props }) }
   await harness.render(h(MemoryRouter, { initialEntries: [url], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, h(Probe)))
   const root = harness.container
   const click = async (selector) => { const el = typeof selector === 'string' ? root.querySelector(selector) : selector; assert(el, selector); await harness.act(() => { el.focus(); el.click() }); await harness.flush() }
@@ -61,8 +61,8 @@ test('两个独立异常均可返回原首付流程及子步骤，关联任务�
     assert.equal(params().get('flow_substep'), 'actual')
     assert.equal(params().has('flow_exception_origin'), false, '返回位置不是独立异常的业务来源')
     assert.equal(root.querySelector('[aria-label="相关任务"] a[href$="stage_key=payment"]'), null)
-    await click([...root.querySelectorAll('.erp-dev-fulfillment-guide__detail-actions button')].find((button) => button.textContent === '查看关联单据'))
-    assert.equal(explored.at(-1), catalog.exception_guides.find((guide) => guide.key === key).business_chain)
+    assert.equal(root.querySelector('.erp-dev-fulfillment-guide__detail-actions'), null)
+    assert.deepEqual(explored, [])
     await click('[aria-label="返回 4 · 采购 / 委外首付"]')
     assert(root.querySelector('[data-stage-normal="supplier_advance"] [data-business-flow]'))
     assert.equal(root.querySelector('[data-selected-substep]').dataset.selectedSubstep, 'actual')
@@ -98,15 +98,15 @@ test('未选主环节的独立异常关闭详情，不补造返回位置', async
   assert.equal(root.querySelector('[aria-label="流程详情"]'), null)
 })
 
-test('专题内异常保留正确的单据入口，并能返回该专题原环节', async (t) => {
+test('专题内异常保留原环节与返回，同页不附加跨页操作', async (t) => {
   const explored = []
   const { root, click } = await mount(t, '/__dev/status-flows?flow_stage=cutting_quality&flow_exception=production_quality&flow_exception_origin=cutting_quality', {
     scoped: true,
     steps: [{ ...catalog.fulfillment_flow.find((step) => step.stage === 'cutting_quality'), nodeKey: 'quality_source' }],
     onExploreNode: (key) => explored.push(key),
   })
-  await click([...root.querySelectorAll('.erp-dev-fulfillment-guide__detail-actions button')].find((button) => button.textContent === '查看关联单据'))
-  assert.deepEqual(explored, ['quality_source'])
+  assert.equal(root.querySelector('.erp-dev-fulfillment-guide__detail-actions'), null)
+  assert.deepEqual(explored, [])
   await click('[aria-label="返回 1 · 裁片颜色 / 尺寸检验"]')
   assert(root.querySelector('[data-stage-normal="cutting_quality"]'))
 })
@@ -114,7 +114,7 @@ test('专题内异常保留正确的单据入口，并能返回该专题原环�
 test('固定导航保持挂载，异常目录只保留正式类型且不猜测发生环节', async (t) => {
   const { root, click, choose, params } = await mount(t)
   const tabs = root.querySelector('[aria-label="流程视图"]')
-  await click(tabs.querySelectorAll('input')[2])
+  await click(tabs.querySelectorAll('input')[1])
   assert.equal(root.querySelector('[aria-label="流程视图"]'), tabs)
   assert(root.querySelector('[aria-label="异常类型"]'))
   assert.equal(root.querySelectorAll('[data-handling-entry]').length, 0)

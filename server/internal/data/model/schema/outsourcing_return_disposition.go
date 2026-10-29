@@ -21,7 +21,7 @@ func (OutsourcingReturnDisposition) Annotations() []schema.Annotation {
 		"outsourcing_return_dispositions_quantity_positive": "quantity > 0",
 		"outsourcing_return_dispositions_intent_bundle":     "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
 		"outsourcing_return_dispositions_version_positive":  "version > 0",
-		"outsourcing_return_dispositions_wip_source":        "production_wip_batch_id IS NOT NULL",
+		"outsourcing_return_dispositions_wip_source":        "disposition_type = 'RETURN_TO_VENDOR' OR production_wip_batch_id IS NOT NULL",
 	}}}
 }
 func (OutsourcingReturnDisposition) Fields() []ent.Field {
@@ -46,7 +46,7 @@ func (OutsourcingReturnDisposition) Fields() []ent.Field {
 func (OutsourcingReturnDisposition) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("disposition_no").Unique(), index.Fields("created_by", "idempotency_key").Unique(),
-		index.Fields("quality_inspection_id").Unique().Annotations(entsql.IndexWhere("status <> 'CANCELLED'")),
+		index.Fields("quality_inspection_id"),
 		index.Fields("outsourcing_return_fact_id", "status"),
 		index.Fields("production_wip_batch_id", "status"),
 	}

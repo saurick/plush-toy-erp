@@ -1,5 +1,4 @@
 import { Card, Space, Tag, Typography } from 'antd'
-import { Link as RouterLink } from 'react-router-dom'
 import DevTimestamp from '../../../components/DevTimestamp.jsx'
 import DevStaticGuidance from '../../../components/DevStaticGuidance.jsx'
 import {
@@ -7,7 +6,6 @@ import {
   shortGitSha,
 } from '../../../config/devDelivery.mjs'
 import { formatQualityGateDuration } from '../../../config/devQualityGates.mjs'
-import { DEV_QUALITY_GATES_ROUTE } from '../../../config/devRoutes.mjs'
 
 const { Link, Paragraph, Text, Title } = Typography
 
@@ -216,9 +214,7 @@ export function VersionOverview({
               className="erp-dev-quality-gate-finished-at"
             />
           </details>
-          <RouterLink to={`${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`}>
-            查看质量门禁详情
-          </RouterLink>
+
         </section>
       </aside>
     </Card>

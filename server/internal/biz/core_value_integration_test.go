@@ -361,11 +361,11 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 	if normalizedFinance.PaymentTermDays == nil || *normalizedFinance.PaymentTermDays != 45 {
 		t.Fatalf("expected payment term days retained at 45, got %#v", normalizedFinance.PaymentTermDays)
 	}
-	canonicalOccurredAt := finance.OccurredAt.UTC().Truncate(time.Microsecond)
+	canonicalOccurredAt := finance.OccurredAt.In(financeBusinessLocation).Truncate(time.Microsecond)
 	wantDueAt := time.Date(
 		canonicalOccurredAt.Year(), canonicalOccurredAt.Month()+1, 0,
 		canonicalOccurredAt.Hour(), canonicalOccurredAt.Minute(), canonicalOccurredAt.Second(),
-		canonicalOccurredAt.Nanosecond(), time.UTC,
+		canonicalOccurredAt.Nanosecond(), financeBusinessLocation,
 	).AddDate(0, 0, 45)
 	if normalizedFinance.DueAt == nil || !normalizedFinance.DueAt.Equal(wantDueAt) {
 		t.Fatalf("expected due_at derived from occurrence and terms, got %#v", normalizedFinance.DueAt)

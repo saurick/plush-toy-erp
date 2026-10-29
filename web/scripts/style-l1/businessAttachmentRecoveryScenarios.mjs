@@ -360,7 +360,7 @@ export function createBusinessAttachmentRecoveryScenarios(deps) {
             state: 'hidden',
             timeout: 10_000,
           })
-          await expectText(page, '产品规格已创建')
+          await expectText(page, '产品规格已保存')
         },
       }
     })(),

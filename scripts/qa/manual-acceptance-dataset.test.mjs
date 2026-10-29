@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { buildManualAcceptanceBusinessChainContract } from "./manual-acceptance-business-chain-contract.mjs";
 
 import {
   DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION,
@@ -1238,9 +1239,16 @@ test("semantic digest is stable across targets and clocks and legacy versions fa
 
 test("semantic plan locks the nine narrow stage contracts", () => {
   const plan = buildManualAcceptanceSemanticPlan();
-  assert.equal(plan.businessChain.chainCount, 11);
-  assert.equal(plan.businessChain.stepCount, 84);
-  assert.equal(plan.businessChain.scenarioCount, 66);
+  const registered = buildManualAcceptanceBusinessChainContract();
+  assert.equal(plan.businessChain.chainCount, registered.chainCount);
+  assert.equal(plan.businessChain.stepCount, registered.stepCount);
+  assert.equal(plan.businessChain.scenarioCount, registered.scenarioCount);
+  assert.deepEqual(plan.businessChain.dataPlan, registered.dataPlan);
+  assert.deepEqual(
+    plan.businessChain.stageScenarioKeys,
+    registered.stageScenarioKeys,
+  );
+  assert.equal(plan.businessChain.chainDataDigest, registered.chainDataDigest);
   const steps = plan.businessChain.dataPlan.chains.flatMap((chain) => chain.steps);
   const receiptDraft = steps.find(
     (step) => step.key === "purchase_order:creates_fact_draft:purchase_receipt",

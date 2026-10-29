@@ -102,7 +102,7 @@ export function createBOMTaskActionsScenarios({
         })
         await page.route('**/rpc/sales_order', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
-          if (method !== 'list_sales_orders' || !params.sample_bom_id)
+          if (method !== 'list_sales_orders' || !params.bom_id)
             { return route.fallback() }
           requests.push(params)
           if (failOnce) {
@@ -121,7 +121,7 @@ export function createBOMTaskActionsScenarios({
             '历史订单的已有任务也应可追溯'
           )
           const orders =
-            params.sample_bom_id === 1
+            params.bom_id === 1
               ? [
                   relatedOrder,
                   {
@@ -339,7 +339,7 @@ export function createBOMTaskActionsScenarios({
           '切换 BOM 后不能残留原订单任务'
         )
         assert.deepEqual(
-          requests.map((item) => item.sample_bom_id),
+          requests.map((item) => item.bom_id),
           [1, 1, 1, 2]
         )
         if (mobile) {
@@ -383,7 +383,7 @@ export function createBOMTaskActionsScenarios({
       beforeNavigate: async (page) => {
         await page.route('**/rpc/sales_order', async (route) => {
           assert.equal(
-            route.request().postDataJSON().params?.sample_bom_id,
+            route.request().postDataJSON().params?.bom_id,
             undefined,
             '缺少销售权限时不能读取 BOM 关联订单'
           )
@@ -421,7 +421,7 @@ export function createBOMTaskActionsScenarios({
       await base.beforeNavigate(page)
       await page.route('**/rpc/sales_order', async (route) => {
         const { id, method, params = {} } = route.request().postDataJSON()
-        if (method !== 'list_sales_orders' || !params.sample_bom_id) return route.fallback()
+        if (method !== 'list_sales_orders' || !params.bom_id) return route.fallback()
         assert.equal(params.lifecycle_scope, 'all')
         return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ sales_orders: [relatedOrder], total: 1 }) } })
       })

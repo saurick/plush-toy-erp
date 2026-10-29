@@ -31,7 +31,7 @@ function moduleSource(source, exports) {
 }
 
 export function renderCatalog(catalog) {
-  for (const key of ['permissions', 'permissionLabels', 'states', 'attachments', 'numeric', 'policies', 'rpc', 'rpcTransport', 'rpcInspection', 'taskDiscovery']) {
+  for (const key of ['permissions', 'permissionLabels', 'sourceActionPermissions', 'states', 'attachments', 'numeric', 'policies', 'rpc', 'rpcTransport', 'rpcInspection', 'taskDiscovery']) {
     if (!catalog[key] || Object.keys(catalog[key]).length === 0) throw new Error(`缺少契约：${key}`)
   }
   const precision = catalog.numeric.Precision
@@ -49,6 +49,7 @@ export function renderCatalog(catalog) {
   return {
     'workflowTaskDiscovery.generated.mjs': moduleSource('server/internal/biz/workflow_task_catalog.json', { WorkflowTaskDiscoveryCatalog: catalog.taskDiscovery }),
     'permissions.generated.mjs': moduleSource('server/internal/biz/rbac.go', { PermissionCode: catalog.permissions, PermissionLabel: catalog.permissionLabels }),
+    'sourceActionPermissions.generated.mjs': moduleSource('server/internal/biz/source_action_permission.go；前端用于说明与预检，最终授权由后端执行', { SourceActionReadPermissions: catalog.sourceActionPermissions }),
     'statuses.generated.mjs': moduleSource('server/internal/core/status 及 server/cmd/public-contracts 登记的 biz 领域声明', catalog.states),
     'attachments.generated.mjs': moduleSource('server/internal/biz/business_attachment.go', { AttachmentPolicy: catalog.attachments }),
     'numeric.generated.mjs': moduleSource('server/internal/core/value/numeric.go', { NumericContract: numeric }),

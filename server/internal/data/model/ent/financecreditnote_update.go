@@ -115,6 +115,12 @@ func (_u *FinanceCreditNoteUpdate) sqlSave(ctx context.Context) (_node int, err 
 			}
 		}
 	}
+	if _u.mutation.SourceTypeCleared() {
+		_spec.ClearField(financecreditnote.FieldSourceType, field.TypeString)
+	}
+	if _u.mutation.SourceIDCleared() {
+		_spec.ClearField(financecreditnote.FieldSourceID, field.TypeInt)
+	}
 	if _u.mutation.ReversalsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -297,6 +303,12 @@ func (_u *FinanceCreditNoteUpdateOne) sqlSave(ctx context.Context) (_node *Finan
 				ps[i](selector)
 			}
 		}
+	}
+	if _u.mutation.SourceTypeCleared() {
+		_spec.ClearField(financecreditnote.FieldSourceType, field.TypeString)
+	}
+	if _u.mutation.SourceIDCleared() {
+		_spec.ClearField(financecreditnote.FieldSourceID, field.TypeInt)
 	}
 	if _u.mutation.ReversalsCleared() {
 		edge := &sqlgraph.EdgeSpec{

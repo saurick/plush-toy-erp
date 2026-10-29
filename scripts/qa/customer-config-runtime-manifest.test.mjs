@@ -104,6 +104,35 @@ test("customer-config-runtime-manifest: runtime page allowlist follows desktop n
   assert(!RUNTIME_PAGE_KEYS.includes("operations-facts"));
 });
 
+test("engineering keeps reference reads without process management entitlements or pages", () => {
+  const manifest = buildRuntimeManifest();
+  const actions = manifest.access_entitlements.filter((entry) => entry.role_key === "engineering").map((entry) => entry.capability_key);
+  for (const key of ["process.read", "customer.read", "supplier.read", "bom.update", "sales_order.engineering.update"]) {
+    assert.ok(actions.includes(key), `engineering keeps ${key}`);
+  }
+  for (const key of ["process.create", "process.update", "process.disable"]) {
+    assert.ok(!actions.includes(key), `engineering must not receive ${key}`);
+  }
+  const projection = manifest.compiled_snapshot.rolePageProjections.engineering;
+  assert.ok(projection);
+  for (const key of ["processes", "customers", "suppliers", "processing-contracts", "production-orders", "accessories-purchase"]) {
+    assert.ok(!projection.includes(key), `engineering must not see ${key}`);
+  }
+});
+
+test("PMC owns process maintenance while actual production assignment stays separate", () => {
+  for (const manifest of [buildRuntimeManifest(), buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage)]) {
+    assert.ok(manifest.compiled_snapshot.rolePageProjections.pmc.includes("processes"));
+    for (const capability of ["process.create", "process.update", "process.disable"]) {
+      const roles = manifest.access_entitlements
+        .filter((entry) => entry.enabled && entry.capability_key === capability)
+        .map((entry) => entry.role_key);
+      assert.deepEqual(roles, ["pmc"], `${capability} belongs to PMC`);
+    }
+    assert.ok(!manifest.access_entitlements.some((entry) => entry.enabled && entry.role_key === "pmc" && entry.capability_key === "production.wip.assign"));
+  }
+});
+
 test("customer-config-runtime-manifest: boss and PMC progress visibility includes WIP reading without execution grants", () => {
   const manifest = buildRuntimeManifest();
   for (const roleKey of ["boss", "pmc"]) {
@@ -561,6 +590,8 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   assert(pages.warehouse.includes("inbound"));
   assert(pages.warehouse.includes("production-progress"));
   const warehouse = entitlementsFor("warehouse");
+  assert(warehouse.has("production.material_issue.create"));
+  assert(warehouse.has("pmc.plan.read"));
   for (const key of [
     "purchase.receipt.create",
     "outsourcing.material_issue.create",
@@ -607,7 +638,7 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
     "production.wip.assign",
     "production.wip.execute",
     "production.exception.execute",
-    "production.material_issue.create",
+    "production.over_issue.submit",
     "production.rework.create",
     "production.fact.post",
     "production.fact.cancel",
@@ -616,6 +647,8 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
     assert(production.has(key), `production must receive ${key}`);
   }
   for (const key of [
+    "production.material_issue.create",
+    "production.exception.submit",
     "outsourcing.material_issue.create",
     "outsourcing.return_receipt.create",
     "outsourcing.fact.post",

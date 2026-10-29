@@ -1,14 +1,15 @@
 import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Tag } from 'antd'
-import { useSearchParams } from 'react-router-dom'
+import useBusinessSearchParams from '../../hooks/useBusinessSearchParams.js'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import BusinessStatusFilter from '../business-list/BusinessStatusFilter.jsx'
 import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
 import { ProcessStatus, ProductionExceptionExecutionStatus, ProductionExceptionStatus } from '../../../common/consts/statuses.generated.mjs'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import WorkflowSourceProgressButton from '../workflow/WorkflowSourceProgressButton.jsx'
-import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
+import { useProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
@@ -135,8 +136,10 @@ export default function ProductionExceptionDecisionPanel({
   onRefreshReady,
 }) {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const taskBusiness = useBusinessPageContext()?.taskBusiness
+  const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
   const navigate = useBusinessNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -153,16 +156,12 @@ export default function ProductionExceptionDecisionPanel({
   const [statusFilter, setStatusFilter] = useBusinessPageState('exceptionStatus', '')
   const [executionStatusFilter, setExecutionStatusFilter] = useBusinessPageState('exceptionExecutionStatus', '')
   const canRead = canReadProductionExceptionDecisions(adminProfile)
-  const canDecide = hasActionPermission(
+  const canDecide = !taskBusiness && hasActionPermission(
     adminProfile,
     PermissionCode.PRODUCTION_EXCEPTION_APPROVE
   )
-  const canCancel = hasActionPermission(
-    adminProfile,
-    PermissionCode.PRODUCTION_EXCEPTION_SUBMIT
-  )
-  const canExecute = hasActionPermission(adminProfile, PermissionCode.PRODUCTION_EXCEPTION_EXECUTE)
-  const canRecoverProcess = hasActionPermission(
+  const canExecute = taskBusiness?.readOnly !== true && hasActionPermission(adminProfile, PermissionCode.PRODUCTION_EXCEPTION_EXECUTE)
+  const canRecoverProcess = !taskBusiness && hasActionPermission(
     adminProfile,
     PermissionCode.PROCESS_RUNTIME_RECOVER
   )
@@ -397,7 +396,7 @@ export default function ProductionExceptionDecisionPanel({
         })
       }
       await load()
-      showProcessSubmissionReceipt({ result: processData, title: alreadyStarted ? '生产异常审批流已存在' : '生产异常审批流已恢复发起' })
+      showProcessSubmissionReceipt({ result: processData, record: processData.source_readback, title: alreadyStarted ? '生产异常审批流已存在' : '生产异常审批流已恢复发起' })
     } catch (error) {
       message.error(getActionErrorMessage(error, '核对生产异常审批流'))
     } finally {
@@ -534,6 +533,12 @@ export default function ProductionExceptionDecisionPanel({
   if (!canRead) return null
 
   const selectedRecord = rows.find((item) => item.id === selectedID) || null
+  const canCancel = hasActionPermission(
+    adminProfile,
+    selectedRecord?.decision_type === 'OVER_ISSUE'
+      ? PermissionCode.PRODUCTION_OVER_ISSUE_SUBMIT
+      : PermissionCode.PRODUCTION_EXCEPTION_SUBMIT
+  )
   const detailRecord = rows.find((item) => item.id === detailID) || null
   const selectedRequesterOwned = Boolean(
     selectedRecord && Number(selectedRecord.requested_by) === adminID
@@ -892,6 +897,7 @@ export default function ProductionExceptionDecisionPanel({
         ) : null}
       />
       <BusinessModal
+        taskInline
         size="confirm"
         title="确认生产异常处置"
         open={Boolean(action)}

@@ -65,9 +65,7 @@ const PurchaseOrdersPage = lazyRoute(
 const OutsourcingOrdersPage = lazyRoute(
   () => import('./pages/OutsourcingOrdersPage.jsx')
 )
-const PurchaseReceiptsPage = lazyRoute(
-  () => import('./pages/PurchaseReceiptsPage.jsx')
-)
+const WarehouseHandlingPage = lazyRoute(() => import('./pages/WarehouseHandlingPage.jsx'))
 const QualityInspectionsPage = lazyRoute(
   () => import('./pages/QualityInspectionsPage.jsx')
 )
@@ -327,7 +325,7 @@ function businessTaskRoutes() {
       />
       <Route
         path="warehouse/inbound"
-        element={<PurchaseReceiptsPage />}
+        element={<WarehouseHandlingPage direction="inbound" />}
       />
       <Route
         path="production/quality-inspections"
@@ -373,7 +371,7 @@ function businessTaskRoutes() {
       />
       <Route
         path="warehouse/outbound"
-        element={<OperationalFactPage moduleKey="outbound" />}
+        element={<WarehouseHandlingPage direction="outbound" />}
       />
       <Route
         path="finance/reconciliation"

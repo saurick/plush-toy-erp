@@ -63,6 +63,9 @@ type OutsourcingOrder struct {
 }
 
 type OutsourcingOrderItem struct {
+	ProductionOrderID       *int
+	ProductionWIPBatchID    *int
+	ProductionWIPStatus     *string
 	ID                      int
 	OutsourcingOrderID      int
 	LineNo                  int
@@ -166,7 +169,6 @@ type OutsourcingOrderItemFilter struct {
 type OutsourcingOrderRepo interface {
 	GetOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error)
 	ListOutsourcingOrders(ctx context.Context, filter OutsourcingOrderFilter) ([]*OutsourcingOrder, int, error)
-	UpdateOutsourcingOrderLifecycle(ctx context.Context, id int, lifecycleStatus string) (*OutsourcingOrder, error)
 	SaveOutsourcingOrderWithItems(ctx context.Context, id int, order *OutsourcingOrderMutation, items []*OutsourcingOrderItemSaveMutation) (*OutsourcingOrderWithItems, error)
 	ListOutsourcingOrderItems(ctx context.Context, filter OutsourcingOrderItemFilter) ([]*OutsourcingOrderItem, int, error)
 	GetOutsourcingOrderItem(ctx context.Context, id int) (*OutsourcingOrderItem, error)
@@ -295,32 +297,16 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 	return uc.repo.SaveOutsourcingOrderWithItems(ctx, id, &normalizedOrder, normalizedItems)
 }
 
-func (uc *OutsourcingOrderUsecase) SubmitOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
-	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusSubmitted)
-}
-
 func (uc *OutsourcingOrderUsecase) SubmitOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
 	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionSubmit, OutsourcingOrderStatusSubmitted)
-}
-
-func (uc *OutsourcingOrderUsecase) ConfirmOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
-	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusConfirmed)
 }
 
 func (uc *OutsourcingOrderUsecase) ConfirmOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
 	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionConfirm, OutsourcingOrderStatusConfirmed)
 }
 
-func (uc *OutsourcingOrderUsecase) CloseOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
-	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusClosed)
-}
-
 func (uc *OutsourcingOrderUsecase) CloseOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
 	return uc.applyOutsourcingOrderLifecycleAction(ctx, in, SourceOrderActionClose, OutsourcingOrderStatusClosed)
-}
-
-func (uc *OutsourcingOrderUsecase) CancelOutsourcingOrder(ctx context.Context, id int) (*OutsourcingOrder, error) {
-	return uc.changeOutsourcingOrderLifecycle(ctx, id, OutsourcingOrderStatusCanceled)
 }
 
 func (uc *OutsourcingOrderUsecase) CancelOutsourcingOrderWithAction(ctx context.Context, in *SourceOrderLifecycleAction) (*OutsourcingOrder, error) {
@@ -362,28 +348,6 @@ func (uc *OutsourcingOrderUsecase) ListOutsourcingOrderItems(ctx context.Context
 	return uc.repo.ListOutsourcingOrderItems(ctx, normalized)
 }
 
-func (uc *OutsourcingOrderUsecase) changeOutsourcingOrderLifecycle(ctx context.Context, id int, next string) (*OutsourcingOrder, error) {
-	if uc == nil || uc.repo == nil || id <= 0 || !IsValidOutsourcingOrderStatus(next) {
-		return nil, ErrBadParam
-	}
-	current, err := uc.repo.GetOutsourcingOrder(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if !IsOutsourcingOrderLifecycleTransitionAllowed(current.LifecycleStatus, next) {
-		return nil, ErrSourceOrderStateInvalid
-	}
-	if current.LifecycleStatus == next {
-		return current, nil
-	}
-	if next == OutsourcingOrderStatusSubmitted || next == OutsourcingOrderStatusConfirmed {
-		if err := uc.validateContractReadyForConfirmation(ctx, current); err != nil {
-			return nil, err
-		}
-	}
-	return uc.repo.UpdateOutsourcingOrderLifecycle(ctx, id, next)
-}
-
 func (uc *OutsourcingOrderUsecase) validateContractReadyForConfirmation(ctx context.Context, order *OutsourcingOrder) error {
 	if order == nil || order.ExpectedReturnDate == nil {
 		return ErrOutsourcingOrderIncomplete
@@ -403,7 +367,7 @@ func (uc *OutsourcingOrderUsecase) validateContractReadyForConfirmation(ctx cont
 		return ErrOutsourcingOrderIncomplete
 	}
 
-	activeItemCount := 0
+	activeItems := []*OutsourcingOrderItem{}
 	for offset := 0; ; offset += 200 {
 		items, total, err := uc.repo.ListOutsourcingOrderItems(ctx, OutsourcingOrderItemFilter{
 			OutsourcingOrderID: order.ID,
@@ -417,7 +381,7 @@ func (uc *OutsourcingOrderUsecase) validateContractReadyForConfirmation(ctx cont
 			if item == nil || item.LineStatus == OutsourcingOrderItemStatusCanceled {
 				continue
 			}
-			activeItemCount++
+			activeItems = append(activeItems, item)
 			if item.ProcessingItem == nil || strings.TrimSpace(*item.ProcessingItem) == "" {
 				return ErrOutsourcingOrderIncomplete
 			}
@@ -426,7 +390,32 @@ func (uc *OutsourcingOrderUsecase) validateContractReadyForConfirmation(ctx cont
 			break
 		}
 	}
-	if activeItemCount == 0 {
+	return ValidateOutsourcingContractPrices(activeItems)
+}
+
+// A priced zero-value contract is valid. Missing prices, mismatched frozen
+// amounts and an overflowing contract total are not confirmable.
+func ValidateOutsourcingContractPrices(items []*OutsourcingOrderItem) error {
+	count := 0
+	total := decimal.Zero
+	for _, item := range items {
+		if item == nil || item.LineStatus == OutsourcingOrderItemStatusCanceled {
+			continue
+		}
+		count++
+		if !item.OutsourcingQuantity.IsPositive() || item.UnitPrice == nil || item.Amount == nil || item.UnitPrice.IsNegative() {
+			return ErrOutsourcingOrderIncomplete
+		}
+		amount, err := normalizeCalculatedLineAmount(item.OutsourcingQuantity, item.UnitPrice, item.Amount)
+		if err != nil || amount == nil {
+			return ErrOutsourcingOrderIncomplete
+		}
+		total = total.Add(*amount)
+		if total.GreaterThan(maxPositiveNumeric20Scale6) {
+			return ErrOutsourcingOrderIncomplete
+		}
+	}
+	if count == 0 {
 		return ErrOutsourcingOrderIncomplete
 	}
 	return nil

@@ -73,8 +73,8 @@ export const FINANCE_INVOICE_CATEGORY_LABELS = Object.freeze(
 
 export const ACTION_PERMISSIONS = Object.freeze({
   productionRead: [PermissionCode.PRODUCTION_FACT_READ],
-  productionPost: [PermissionCode.PRODUCTION_FACT_POST, PermissionCode.WAREHOUSE_INBOUND_CONFIRM],
-  productionCancel: [PermissionCode.PRODUCTION_FACT_CANCEL, PermissionCode.WAREHOUSE_INBOUND_CONFIRM],
+  productionPost: [PermissionCode.PRODUCTION_FACT_POST, PermissionCode.WAREHOUSE_INBOUND_CONFIRM, PermissionCode.WAREHOUSE_OUTBOUND_CONFIRM],
+  productionCancel: [PermissionCode.PRODUCTION_FACT_CANCEL, PermissionCode.WAREHOUSE_INBOUND_CONFIRM, PermissionCode.WAREHOUSE_OUTBOUND_CONFIRM],
   outsourcingRead: [PermissionCode.OUTSOURCING_FACT_READ],
   outsourcingPost: [PermissionCode.OUTSOURCING_FACT_POST],
   outsourcingCancel: [PermissionCode.OUTSOURCING_FACT_CANCEL],
@@ -100,6 +100,7 @@ export function isFinishedGoodsReceipt(record = {}) {
 
 export function productionFactPostPermissions(record) {
   if (!record) return ACTION_PERMISSIONS.productionPost
+  if (record.fact_type === 'MATERIAL_ISSUE') return [PermissionCode.WAREHOUSE_OUTBOUND_CONFIRM]
   return isFinishedGoodsReceipt(record)
     ? [PermissionCode.WAREHOUSE_INBOUND_CONFIRM]
     : [PermissionCode.PRODUCTION_FACT_POST]
@@ -107,6 +108,7 @@ export function productionFactPostPermissions(record) {
 
 export function productionFactCancelPermissions(record) {
   if (!record) return ACTION_PERMISSIONS.productionCancel
+  if (record.fact_type === 'MATERIAL_ISSUE') return [PermissionCode.WAREHOUSE_OUTBOUND_CONFIRM]
   const status = String(record?.status || '')
     .trim()
     .toUpperCase()

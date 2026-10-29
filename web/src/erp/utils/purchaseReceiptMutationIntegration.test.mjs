@@ -21,41 +21,6 @@ function functionSlice(source, start, end) {
   return source.slice(startIndex, endIndex)
 }
 
-test('purchase order inbound draft keeps unknown results in the current modal', () => {
-  const mutation = functionSlice(
-    inboundDraftHook,
-    'const createInboundDraftFromOrder',
-    'const hasInboundDraftRemaining'
-  )
-  assert.match(inboundDraftHook, /createPurchaseReceiptMutationAttemptStore/u)
-  assert.match(
-    mutation,
-    /mutationAttemptsRef\.current\.prepare\(scope, payload\)/u
-  )
-  assert.match(
-    mutation,
-    /createPurchaseReceiptFromPurchaseOrder\(\s*attempt\.params\s*\)/u
-  )
-  assert.match(mutation, /settle\(scope, attempt, error\)/u)
-  assert.match(
-    mutation,
-    /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
-  )
-  const catchBody = mutation.match(
-    /catch \(error\) \{([\s\S]*?)\n {4}\} finally/u
-  )?.[1]
-  assert(catchBody)
-  assert.doesNotMatch(catchBody, /closeInboundDraftModal|navigate/u)
-  assert(
-    mutation.indexOf('settle(scope, attempt)') <
-      mutation.indexOf('closeInboundDraftModal()')
-  )
-  assert(
-    mutation.indexOf('closeInboundDraftModal()') < mutation.indexOf('navigate(')
-  )
-  assert.doesNotMatch(inboundDraftHook, /idempotency_key/u)
-})
-
 test('purchase order inbound draft reads the authoritative receipt progress once', () => {
   const load = functionSlice(
     inboundDraftHook,

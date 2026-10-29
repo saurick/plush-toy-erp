@@ -22,10 +22,10 @@ import {
   theme,
   Typography,
 } from 'antd'
-import { Link } from 'react-router-dom'
 import Modal from '@/common/components/modal/AppModal'
 import { MermaidDiagram } from '@/common/components/markdown'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevTestingEnvironment from '../components/DevTestingEnvironment.jsx'
@@ -35,14 +35,13 @@ import {
   DEV_DATA_PREPARATION_MODULE_FLOW,
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
-  DEV_DATA_PREPARATION_SOURCE_PATH,
   DEV_DATA_PREPARATION_TARGET_KEYS,
   dataPreparationStatusPresentation,
   getDataPreparationEnvironment,
   resolveDataPreparationAvailability,
 } from '../config/devDataPreparation.mjs'
 import { DATA_VIEW_ITEMS, profileTargetKey, useDataPreparation } from './data-preparation/useDataPreparation.jsx'
-import { WorkbenchEmpty, WorkbenchFacts, WorkbenchNotice, WorkbenchSection } from '../components/WorkbenchPattern.jsx'
+import { WorkbenchEmpty, WorkbenchFacts, WorkbenchNotice, WorkbenchReading, WorkbenchSection } from '../components/WorkbenchPattern.jsx'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -91,7 +90,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
   const [reuseRulesOpen, setReuseRulesOpen] = useState(false)
   const selectedChain = plan.chains.find(
     (chain) => chain.key === selectedChainKey
-  )
+  ) || plan.chains[0]
   const scenarioLabelByKey = new Map(
     plan.scenarioKinds.map((scenario) => [scenario.key, scenario.label])
   )
@@ -175,46 +174,30 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
             选择只影响计划下钻；完整回归始终执行全部已登记场景合同。
           </Text>
         </div>
-        {selectedChain ? (
-          <Button type="link" onClick={() => onSelectChain('')}>
-            返回全部业务链
-          </Button>
-        ) : null}
       </div>
-      {selectedChain ? (
-        <section className="erp-dev-data-selected-chain">
-          <div>
-            <Title level={3}>{selectedChain.label}</Title>
-            <Paragraph>{selectedChain.summary}</Paragraph>
-            <Space wrap size={[4, 4]}>
-              {selectedChain.scenarioKinds.map((kind) => (
-                <Tag className="erp-dev-accent-tag" key={kind}>
-                  {scenarioLabelByKey.get(kind) || kind}
-                </Tag>
+      <WorkbenchReading
+        label="业务链范围目录"
+        items={plan.chains.map((chain) => ({ value: chain.key, label: chain.label }))}
+        value={selectedChain?.key}
+        onChange={onSelectChain}
+      >
+        {selectedChain ? (
+          <section className="erp-dev-data-selected-chain">
+            <div>
+              <Title level={3}>{selectedChain.label}</Title>
+              <Paragraph>{selectedChain.summary}</Paragraph>
+              <Space wrap size={[4, 4]}>
+                {selectedChain.scenarioKinds.map((kind) => (
+                  <Tag className="erp-dev-accent-tag" key={kind}>
+                    {scenarioLabelByKey.get(kind) || kind}
+                  </Tag>
               ))}
-            </Space>
-          </div>
-          <Collapse accordion items={stepItems} />
-        </section>
-      ) : (
-        <List
-          className="erp-dev-data-chain-list"
-          size="small"
-          dataSource={plan.chains}
-          renderItem={(chain) => (
-            <List.Item>
-              <List.Item.Meta
-                title={
-                  <Button type="link" onClick={() => onSelectChain(chain.key)}>
-                    {chain.label}
-                  </Button>
-                }
-                description={`${chain.summary}（${chain.stepCount} 步 / ${chain.scenarioCount} 类场景）`}
-              />
-            </List.Item>
-          )}
-        />
-      )}
+              </Space>
+            </div>
+            <Collapse accordion items={stepItems} />
+          </section>
+      ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚无业务链范围" />}
+      </WorkbenchReading>
       <details className="erp-dev-disclosure erp-dev-data-reuse-rules" onToggle={(event) => setReuseRulesOpen(event.currentTarget.open)}>
         <summary>代码变化后，旧数据怎么处理</summary>
         <div className="erp-dev-data-table-wrap">
@@ -938,46 +921,60 @@ export default function DevDataPreparationPage() {
         '--dev-data-warning-bg': token.colorWarningBg,
       }}
     >
-      <DevPageNav sourcePath={DEV_DATA_PREPARATION_SOURCE_PATH} />
-      <header className="erp-dev-hub-header">
-        <div className="erp-dev-hub-header__copy">
-          <span className="erp-dev-hub-header__icon">
-            <DatabaseOutlined aria-hidden="true" />
-          </span>
-          <div>
-            <Title level={1} className="erp-dev-hub-title">
-              测试数据
-            </Title>
+      <DevPageNav />
+      <DevPageHeader
+        className="erp-dev-hub-header"
+        title={
+          <div className="erp-dev-hub-header__copy">
+            <span className="erp-dev-hub-header__icon">
+              <DatabaseOutlined aria-hidden="true" />
+            </span>
+            <div>
+              <Title level={1} className="erp-dev-hub-title">
+                测试数据
+              </Title>
+            </div>
           </div>
-        </div>
-        {summary && (
-          <DevTaskNav
-            compact
-            idPrefix="dev-data"
-            ariaLabel="测试数据视图"
-            items={DATA_VIEW_ITEMS.filter(
-              (item) => item.value !== 'confirm' || (currentOperation && !currentOperation.terminal)
-            )}
-            value={dataView}
-            onChange={selectDataView}
-          />
-        )}
-        <Space direction="vertical" align="end" size={4}>
-          <Button
-            icon={<ReloadOutlined aria-hidden="true" />}
-            loading={loading}
-            disabled={preparing || executing}
-            onClick={() => refresh({ force: true })}
+        }
+        navigation={
+          summary ? (
+            <DevTaskNav
+              compact
+              idPrefix="dev-data"
+              ariaLabel="测试数据视图"
+              items={DATA_VIEW_ITEMS.filter(
+                (item) =>
+                  item.value !== 'confirm' ||
+                  (currentOperation && !currentOperation.terminal)
+              )}
+              value={dataView}
+              onChange={selectDataView}
+            />
+          ) : null
+        }
+        tools={
+          <Space
+            className="erp-dev-workbench-tools"
+            direction="vertical"
+            align="end"
+            size={4}
           >
-            重新检查
-          </Button>
-          <DevTimestamp
-            value={summary?.generatedAt}
-            action="预检读取于"
-            missing="预检时间未证明"
-          />
-        </Space>
-      </header>
+            <Button
+              icon={<ReloadOutlined aria-hidden="true" />}
+              loading={loading}
+              disabled={preparing || executing}
+              onClick={() => refresh({ force: true })}
+            >
+              重新检查
+            </Button>
+            <DevTimestamp
+              value={summary?.generatedAt}
+              action="预检读取于"
+              missing="预检时间未证明"
+            />
+          </Space>
+        }
+      />
 
       <main className="erp-dev-hub-shell erp-dev-data-shell">
         <DevTestingEnvironment
@@ -1007,9 +1004,6 @@ export default function DevDataPreparationPage() {
                 <Text>{loadError}</Text>
                 <Space>
                   <Text>请使用页头“重新检查”重试。</Text>
-                  <Link to="/__dev/database-migration">
-                    查看数据库与运行状态
-                  </Link>
                 </Space>
               </Space>
             }
@@ -1185,11 +1179,6 @@ export default function DevDataPreparationPage() {
                           {blocker.nextAction ? (
                             <Text type="secondary">{blocker.nextAction}</Text>
                           ) : null}
-                          {blocker.migration ? (
-                            <Link to="/__dev/database-migration">
-                              查看数据库与运行状态
-                            </Link>
-                          ) : null}
                         </div>
                       ))}
                     </section>
@@ -1233,7 +1222,7 @@ export default function DevDataPreparationPage() {
                     </ol>
                   </details>
                 </div>
-                <details className="erp-dev-disclosure erp-dev-data-disclosure">
+                <details className="erp-dev-disclosure erp-dev-data-disclosure" open={Boolean(selectedChainKey)}>
                   <summary>
                     业务链与场景范围 · {summary.acceptancePlan.chainCount}{' '}
                     条业务链 / {summary.acceptancePlan.scenarioCount} 项场景
@@ -1371,9 +1360,6 @@ export default function DevDataPreparationPage() {
                               <p>合同：{operation.contract.dataVersion || '未记录'}；批次：{operation.contract.datasetRunId || '未记录'}。</p>
                               <p>按操作编号核对原执行日志、目标运行状态及实际数据结果；未确认前不要重跑或改写原回执。</p>
                               <Space wrap>
-                                {operation.targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment ? <Link to="/__dev/database-migration">核对本地数据库状态</Link> : null}
-                                {operation.targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133 ? <Link to="/__dev/version-center?target=demo-133&view=history">查看 demo 环境记录</Link> : null}
-                                <Link to="/__dev/docs?path=docs%2Fengineering%2F研发效能工作台与CI-CD设计.md#data-preparation-recovery">查看核对与恢复说明</Link>
                                 {operation.targetKey ? (
                                   <Button
                                     onClick={() => {

@@ -97,3 +97,17 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+.erp-dev-testing-overview > .ant-btn-link {
+  justify-self: start;
+  height: auto;
+  padding: 2px 12px;
+}
+
+.erp-dev-testing-overview .erp-dev-testing-simple-table th:first-child {
+  width: 60%;
+}
+
+.erp-dev-testing-overview .erp-dev-testing-simple-table th:nth-child(2) {
+  width: auto;
+}

@@ -690,6 +690,9 @@ var (
 	// FinanceCreditNotesColumns holds the columns for the "finance_credit_notes" table.
 	FinanceCreditNotesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "balance_direction", Type: field.TypeString, Size: 16, Default: "DECREASE"},
+		{Name: "source_type", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "source_id", Type: field.TypeInt, Nullable: true},
 		{Name: "credit_note_no", Type: field.TypeString, Size: 64},
 		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "currency", Type: field.TypeString, Size: 16},
@@ -710,13 +713,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "finance_credit_notes_finance_credit_notes_reversals",
-				Columns:    []*schema.Column{FinanceCreditNotesColumns[10]},
+				Columns:    []*schema.Column{FinanceCreditNotesColumns[13]},
 				RefColumns: []*schema.Column{FinanceCreditNotesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "finance_credit_notes_finance_facts_credit_notes",
-				Columns:    []*schema.Column{FinanceCreditNotesColumns[11]},
+				Columns:    []*schema.Column{FinanceCreditNotesColumns[14]},
 				RefColumns: []*schema.Column{FinanceFactsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -725,22 +728,27 @@ var (
 			{
 				Name:    "financecreditnote_credit_note_no",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceCreditNotesColumns[1]},
+				Columns: []*schema.Column{FinanceCreditNotesColumns[4]},
 			},
 			{
 				Name:    "financecreditnote_created_by_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceCreditNotesColumns[8], FinanceCreditNotesColumns[6]},
+				Columns: []*schema.Column{FinanceCreditNotesColumns[11], FinanceCreditNotesColumns[9]},
 			},
 			{
 				Name:    "financecreditnote_finance_fact_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{FinanceCreditNotesColumns[11], FinanceCreditNotesColumns[4]},
+				Columns: []*schema.Column{FinanceCreditNotesColumns[14], FinanceCreditNotesColumns[7]},
+			},
+			{
+				Name:    "financecreditnote_source_type_source_id",
+				Unique:  false,
+				Columns: []*schema.Column{FinanceCreditNotesColumns[2], FinanceCreditNotesColumns[3]},
 			},
 			{
 				Name:    "financecreditnote_reversal_of_credit_note_id",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceCreditNotesColumns[10]},
+				Columns: []*schema.Column{FinanceCreditNotesColumns[13]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "reversal_of_credit_note_id IS NOT NULL",
 				},
@@ -1828,11 +1836,8 @@ var (
 			},
 			{
 				Name:    "outsourcingreturndisposition_quality_inspection_id",
-				Unique:  true,
+				Unique:  false,
 				Columns: []*schema.Column{OutsourcingReturnDispositionsColumns[2]},
-				Annotation: &entsql.IndexAnnotation{
-					Where: "status <> 'CANCELLED'",
-				},
 			},
 			{
 				Name:    "outsourcingreturndisposition_outsourcing_return_fact_id_status",
@@ -2584,7 +2589,7 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "line_no", Type: field.TypeInt},
 		{Name: "planned_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
-		{Name: "route_code", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "route_code", Type: field.TypeString, Size: 64},
 		{Name: "customer_inspection_required", Type: field.TypeBool, Default: false},
 		{Name: "product_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "product_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
@@ -4304,12 +4309,7 @@ var (
 		{Name: "pre_shipment_sample_quantity", Type: field.TypeOther, Default: "0", SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "process_requirement", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "import_source", Type: field.TypeJSON, Nullable: true},
-		{Name: "sample_bom_fingerprint", Type: field.TypeString, Nullable: true, Size: 64},
-		{Name: "sample_image_attachment_id", Type: field.TypeInt, Nullable: true},
-		{Name: "engineering_status", Type: field.TypeString, Size: 16, Default: "PREPARING"},
-		{Name: "sample_note", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "sample_confirmed_at", Type: field.TypeTime, Nullable: true},
-		{Name: "sample_confirmed_by", Type: field.TypeInt, Nullable: true},
+		{Name: "bom_fingerprint", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "product_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "product_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "color_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
@@ -4323,9 +4323,8 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
 		{Name: "sales_order_id", Type: field.TypeInt},
-		{Name: "sample_reused_from_item_id", Type: field.TypeInt, Unique: true, Nullable: true},
 		{Name: "product_id", Type: field.TypeInt, Nullable: true},
-		{Name: "sample_bom_id", Type: field.TypeInt, Nullable: true},
+		{Name: "bom_id", Type: field.TypeInt, Nullable: true},
 		{Name: "unit_id", Type: field.TypeInt},
 	}
 	// SalesOrderItemsTable holds the schema information for the "sales_order_items" table.
@@ -4336,37 +4335,31 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sales_order_items_product_skus_sales_order_items",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[26]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[21]},
 				RefColumns: []*schema.Column{ProductSkusColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "sales_order_items_sales_orders_items",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[27]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[22]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
-				Symbol:     "sales_order_items_sales_order_items_sample_reused_from_item",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[28]},
-				RefColumns: []*schema.Column{SalesOrderItemsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
 				Symbol:     "sales_order_items_products_product",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[29]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[23]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
-				Symbol:     "sales_order_items_bom_headers_sample_bom",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[30]},
+				Symbol:     "sales_order_items_bom_headers_bom",
+				Columns:    []*schema.Column{SalesOrderItemsColumns[24]},
 				RefColumns: []*schema.Column{BomHeadersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "sales_order_items_units_unit",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[31]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[25]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -4375,32 +4368,32 @@ var (
 			{
 				Name:    "salesorderitem_sales_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{SalesOrderItemsColumns[27], SalesOrderItemsColumns[1]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[22], SalesOrderItemsColumns[1]},
 			},
 			{
 				Name:    "salesorderitem_product_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[29]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[23]},
 			},
 			{
 				Name:    "salesorderitem_product_sku_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[26]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[21]},
 			},
 			{
 				Name:    "salesorderitem_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[31]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[25]},
 			},
 			{
 				Name:    "salesorderitem_line_status",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[22]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[17]},
 			},
 			{
 				Name:    "salesorderitem_planned_delivery_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[21]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[16]},
 			},
 		},
 	}
@@ -5251,7 +5244,7 @@ func init() {
 		"business_attachments_file_size_max":          "file_size <= 209715200",
 		"business_attachments_file_size_positive":     "file_size > 0",
 		"business_attachments_object_key_shape":       "length(object_key) IN (44, 76) AND substr(object_key, 1, 12) = 'attachments/' AND object_key = lower(object_key)",
-		"business_attachments_owner_type_allowed":     "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task')",
+		"business_attachments_owner_type_allowed":     "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'finance_payment', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task')",
 		"business_attachments_product_image_contract": "((owner_type = 'product' AND attachment_type = 'product_image' AND slot_key IS NOT NULL AND slot_key IN ('primary', 'secondary') AND mime_type IN ('image/png', 'image/jpeg', 'image/webp')) OR (owner_type <> 'product' AND attachment_type <> 'product_image'))",
 		"business_attachments_product_image_size_max": "attachment_type <> 'product_image' OR file_size <= 5242880",
 		"business_attachments_sha256_lower_hex":       "length(sha256) = 64 AND sha256 = lower(sha256)",
@@ -5299,9 +5292,11 @@ func init() {
 	FinanceCreditNotesTable.Annotation.Checks = map[string]string{
 		"finance_credit_notes_amount_positive":   "amount > 0",
 		"finance_credit_notes_currency_allowed":  "currency IN ('USD', 'CNY', 'HKD')",
+		"finance_credit_notes_direction_allowed": "balance_direction IN ('DECREASE', 'INCREASE')",
 		"finance_credit_notes_intent_bundle":     "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
 		"finance_credit_notes_reversal_bundle":   "((status = 'POSTED' AND reversal_of_credit_note_id IS NULL) OR (status = 'REVERSED' AND reversal_of_credit_note_id IS NOT NULL))",
 		"finance_credit_notes_reversal_not_self": "reversal_of_credit_note_id IS NULL OR reversal_of_credit_note_id <> id",
+		"finance_credit_notes_source_bundle":     "((source_type IS NULL AND source_id IS NULL AND balance_direction = 'DECREASE') OR (source_type IS NOT NULL AND source_type IN ('PURCHASE_RETURN', 'PURCHASE_RECEIPT_ADJUSTMENT') AND source_id IS NOT NULL AND source_id > 0))",
 		"finance_credit_notes_status_allowed":    "status IN ('POSTED', 'REVERSED')",
 	}
 	FinanceFactsTable.ForeignKeys[0].RefTable = AdminUsersTable
@@ -5320,7 +5315,7 @@ func init() {
 		"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('DUE_ON_OCCURRENCE', 'EOM_DAYS')",
 		"finance_facts_payment_term_days_check":  "payment_term_days IS NULL OR payment_term_days >= 0",
 		"finance_facts_status_allowed":           "status IN ('DRAFT', 'POSTED', 'SETTLED', 'CANCELLED')",
-		"finance_facts_status_audit_bundle":      "\n(\n  (status = 'DRAFT'\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND settled_at IS NULL AND settled_by IS NULL)\n  OR\n  (status = 'POSTED'\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND settled_at IS NULL AND settled_by IS NULL)\n  OR\n  (status = 'SETTLED'\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND settled_at IS NOT NULL AND settled_by IS NOT NULL)\n  OR\n  (status = 'CANCELLED'\n    AND settled_at IS NULL AND settled_by IS NULL\n    AND ((posted_at IS NULL AND posted_by IS NULL)\n      OR (posted_at IS NOT NULL AND posted_by IS NOT NULL)))\n)",
+		"finance_facts_status_audit_bundle":      "\n(\n  (status = 'DRAFT'\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND settled_at IS NULL AND settled_by IS NULL)\n  OR\n  (status = 'POSTED'\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND settled_at IS NULL AND settled_by IS NULL)\n  OR\n  (status = 'SETTLED'\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND settled_at IS NOT NULL AND settled_by IS NOT NULL)\n  OR\n  (status = 'CANCELLED'\n    AND ((settled_at IS NULL AND settled_by IS NULL)\n      OR (fact_type = 'RECONCILIATION' AND settled_at IS NOT NULL AND settled_by IS NOT NULL))\n    AND ((posted_at IS NULL AND posted_by IS NULL)\n      OR (posted_at IS NOT NULL AND posted_by IS NOT NULL)))\n)",
 		"finance_facts_type_allowed":             "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'RECONCILIATION')",
 		"finance_facts_version_positive":         "version > 0",
 	}
@@ -5366,7 +5361,7 @@ func init() {
 	}
 	InventoryOperationsTable.Annotation = &entsql.Annotation{}
 	InventoryOperationsTable.Annotation.Checks = map[string]string{
-		"inventory_operations_approval_bundle":  "((operation_type <> 'MANUAL_ADJUSTMENT' AND submitted_at IS NULL AND submitted_by IS NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (operation_type = 'MANUAL_ADJUSTMENT' AND ((status = 'DRAFT' AND submitted_at IS NULL AND submitted_by IS NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (status = 'SUBMITTED' AND submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (status IN ('APPROVED', 'POSTED') AND submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NOT NULL AND approved_by IS NOT NULL AND approved_by <> created_by AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (status = 'REJECTED' AND submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NOT NULL AND rejected_by IS NOT NULL AND rejected_by <> created_by AND reject_reason IS NOT NULL AND length(trim(reject_reason)) > 0) OR (status = 'CANCELLED' AND ((submitted_at IS NULL AND submitted_by IS NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NOT NULL AND approved_by IS NOT NULL AND approved_by <> created_by AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL))))))",
+		"inventory_operations_approval_bundle":  "(((operation_type = 'TRANSFER' AND submitted_at IS NULL AND submitted_by IS NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (operation_type IN ('MANUAL_ADJUSTMENT', 'CYCLE_COUNT') AND ((status = 'DRAFT' AND submitted_at IS NULL AND submitted_by IS NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (status = 'SUBMITTED' AND submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (status IN ('APPROVED', 'POSTED') AND submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NOT NULL AND approved_by IS NOT NULL AND approved_by <> created_by AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (status = 'REJECTED' AND submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NOT NULL AND rejected_by IS NOT NULL AND rejected_by <> created_by AND reject_reason IS NOT NULL AND length(trim(reject_reason)) > 0) OR (status = 'CANCELLED' AND ((submitted_at IS NULL AND submitted_by IS NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NOT NULL AND approved_by IS NOT NULL AND approved_by <> created_by AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL)))))) OR (operation_type = 'CYCLE_COUNT' AND status IN ('POSTED', 'CANCELLED') AND submitted_at IS NULL AND submitted_by IS NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL))",
 		"inventory_operations_cancel_bundle":    "((status = 'CANCELLED' AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) > 0) OR (status <> 'CANCELLED' AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL))",
 		"inventory_operations_intent_bundle":    "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64 AND idempotency_item_count > 0",
 		"inventory_operations_post_bundle":      "((status = 'POSTED' AND posted_at IS NOT NULL AND posted_by IS NOT NULL) OR (status <> 'POSTED' AND posted_at IS NULL AND posted_by IS NULL) OR (status = 'CANCELLED' AND posted_at IS NOT NULL AND posted_by IS NOT NULL))",
@@ -5378,7 +5373,7 @@ func init() {
 	InventoryOperationItemsTable.Annotation = &entsql.Annotation{}
 	InventoryOperationItemsTable.Annotation.Checks = map[string]string{
 		"inventory_operation_items_counted_shape":      "counted_quantity IS NULL OR counted_quantity >= 0",
-		"inventory_operation_items_nonzero_adjustment": "adjustment_quantity <> 0",
+		"inventory_operation_items_nonzero_adjustment": "adjustment_quantity <> 0 OR (expected_quantity IS NOT NULL AND counted_quantity IS NOT NULL AND expected_quantity = counted_quantity)",
 		"inventory_operation_items_quantity_shape":     "expected_quantity IS NULL OR expected_quantity >= 0",
 		"inventory_operation_items_sku_allowed":        "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
 		"inventory_operation_items_subject_allowed":    "subject_type IN ('MATERIAL', 'PRODUCT')",
@@ -5459,7 +5454,7 @@ func init() {
 		"outsourcing_return_dispositions_status_allowed":    "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
 		"outsourcing_return_dispositions_type_allowed":      "disposition_type IN ('RETURN_TO_VENDOR', 'REWORK')",
 		"outsourcing_return_dispositions_version_positive":  "version > 0",
-		"outsourcing_return_dispositions_wip_source":        "production_wip_batch_id IS NOT NULL",
+		"outsourcing_return_dispositions_wip_source":        "disposition_type = 'RETURN_TO_VENDOR' OR production_wip_batch_id IS NOT NULL",
 	}
 	ProcessesTable.Annotation = &entsql.Annotation{}
 	ProcessesTable.Annotation.Checks = map[string]string{
@@ -5566,11 +5561,10 @@ func init() {
 	ProductionOrderItemsTable.Annotation = &entsql.Annotation{}
 	ProductionOrderItemsTable.Annotation.Checks = map[string]string{
 		"production_order_items_bom_header_positive": "bom_header_id IS NULL OR bom_header_id > 0",
-		"production_order_items_customer_gate_route": "NOT customer_inspection_required OR route_code IS NOT NULL",
 		"production_order_items_line_no_positive":    "line_no > 0",
 		"production_order_items_product_id_positive": "product_id > 0",
 		"production_order_items_quantity_positive":   "planned_quantity > 0",
-		"production_order_items_route_allowed":       "route_code IS NULL OR route_code = 'PLUSH_SEW_HAND_V1'",
+		"production_order_items_route_allowed":       "route_code = 'PLUSH_SEW_HAND_V1'",
 		"production_order_items_sales_line_positive": "sales_order_item_id IS NULL OR sales_order_item_id > 0",
 		"production_order_items_sku_id_positive":     "product_sku_id IS NULL OR product_sku_id > 0",
 	}
@@ -5793,21 +5787,18 @@ func init() {
 	}
 	SalesOrderItemsTable.ForeignKeys[0].RefTable = ProductSkusTable
 	SalesOrderItemsTable.ForeignKeys[1].RefTable = SalesOrdersTable
-	SalesOrderItemsTable.ForeignKeys[2].RefTable = SalesOrderItemsTable
-	SalesOrderItemsTable.ForeignKeys[3].RefTable = ProductsTable
-	SalesOrderItemsTable.ForeignKeys[4].RefTable = BomHeadersTable
-	SalesOrderItemsTable.ForeignKeys[5].RefTable = UnitsTable
+	SalesOrderItemsTable.ForeignKeys[2].RefTable = ProductsTable
+	SalesOrderItemsTable.ForeignKeys[3].RefTable = BomHeadersTable
+	SalesOrderItemsTable.ForeignKeys[4].RefTable = UnitsTable
 	SalesOrderItemsTable.Annotation = &entsql.Annotation{}
 	SalesOrderItemsTable.Annotation.Checks = map[string]string{
 		"sales_order_items_amount_non_negative":         "amount IS NULL OR amount >= 0",
 		"sales_order_items_category_allowed":            "order_category IN ('NEW', 'REPEAT')",
 		"sales_order_items_display_order_positive":      "display_order IS NULL OR display_order > 0",
-		"sales_order_items_engineering_status_allowed":  "engineering_status IN ('PREPARING', 'SAMPLING', 'CONFIRMED')",
 		"sales_order_items_line_no_positive":            "line_no > 0",
 		"sales_order_items_line_status_allowed":         "line_status IN ('open', 'closed', 'canceled')",
 		"sales_order_items_ordered_qty_positive":        "ordered_quantity > 0",
 		"sales_order_items_sample_quantity_nonnegative": "pre_shipment_sample_quantity >= 0",
-		"sales_order_items_sampling_requires_sources":   "engineering_status = 'PREPARING' OR (product_id IS NOT NULL AND sample_bom_id IS NOT NULL)",
 		"sales_order_items_sku_requires_product":        "product_sku_id IS NULL OR product_id IS NOT NULL",
 		"sales_order_items_unit_price_non_negative":     "unit_price IS NULL OR unit_price >= 0",
 	}

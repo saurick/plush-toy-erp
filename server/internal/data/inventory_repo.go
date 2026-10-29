@@ -539,6 +539,16 @@ func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.In
 		}
 		item.ActiveReservedQuantity = activeReserved
 		item.AvailableQuantity = calc.InventoryAvailableQuantity(item.Quantity, activeReserved)
+		item.LotStatus = corestatus.InventoryLotActive
+		if row.Edges.InventoryLot != nil {
+			item.LotStatus = row.Edges.InventoryLot.Status
+		}
+		if item.LotStatus != corestatus.InventoryLotActive {
+			item.RestrictedQuantity = item.Quantity
+		}
+		if row.SubjectType == biz.InventorySubjectMaterial && item.LotStatus == corestatus.InventoryLotActive {
+			item.IssuableQuantity = item.AvailableQuantity
+		}
 		item.PendingInspectionQuantity = readiness.PendingInspection
 		item.PendingPackagingQuantity = readiness.PendingPackaging
 		item.ReadyToShipQuantity = decimal.Max(decimal.Zero, item.AvailableQuantity.Sub(readiness.blocked()))
@@ -769,6 +779,9 @@ func (r *inventoryRepo) listInventoryTxns(ctx context.Context, filter biz.Invent
 			item.StockCategory = categories[row.SubjectID]
 		}
 		out = append(out, item)
+	}
+	if err := hydrateInventoryTxnSources(ctx, r.data.postgres, out); err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }
@@ -1626,9 +1639,24 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (_ *biz.
 		return nil, err
 	}
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	result, err := activateBOMVersion(ctx, tx.Client(), id, r.data.sqlDialect)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		if ent.IsConstraintError(err) {
+			return nil, biz.ErrBOMActiveConflict
+		}
+		return nil, err
+	}
+	tx = nil
+	return result, nil
+}
 
-	targetQuery := tx.BOMHeader.Query().Where(bomheader.ID(id))
-	if r.data.sqlDialect != dialect.SQLite {
+// Both standalone activation and order completion use the same validation and write.
+func activateBOMVersion(ctx context.Context, client *ent.Client, id int, sqlDialect string) (*biz.BOMVersionDetail, error) {
+	targetQuery := client.BOMHeader.Query().Where(bomheader.ID(id))
+	if sqlDialect == dialect.Postgres {
 		targetQuery.Where(func(s *entsql.Selector) { s.ForUpdate() })
 	}
 	target, err := targetQuery.Only(ctx)
@@ -1641,7 +1669,7 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (_ *biz.
 	if target.Status != biz.BOMStatusActive && !biz.CanTransitionBOMStatus(target.Status, biz.BOMStatusActive) {
 		return nil, biz.ErrBadParam
 	}
-	items, err := tx.BOMItem.Query().
+	items, err := client.BOMItem.Query().
 		Where(bomitem.BomHeaderID(id)).
 		Order(ent.Asc(bomitem.FieldID)).
 		All(ctx)
@@ -1652,10 +1680,10 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (_ *biz.
 		return nil, biz.ErrBadParam
 	}
 	if target.Status != biz.BOMStatusActive {
-		if err := validateBOMActivationReferences(ctx, tx.Client(), target, items, r.data.sqlDialect != dialect.SQLite); err != nil {
+		if err := validateBOMActivationReferences(ctx, client, target, items, sqlDialect == dialect.Postgres); err != nil {
 			return nil, err
 		}
-		if _, err := tx.BOMHeader.Update().
+		if _, err := client.BOMHeader.Update().
 			Where(
 				bomheader.ProductID(target.ProductID),
 				bomheader.Status(biz.BOMStatusActive),
@@ -1665,7 +1693,7 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (_ *biz.
 			Save(ctx); err != nil {
 			return nil, err
 		}
-		target, err = tx.BOMHeader.UpdateOneID(id).
+		target, err = client.BOMHeader.UpdateOneID(id).
 			SetStatus(biz.BOMStatusActive).
 			Save(ctx)
 		if err != nil {
@@ -1675,13 +1703,6 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (_ *biz.
 			return nil, err
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		if ent.IsConstraintError(err) {
-			return nil, biz.ErrBOMActiveConflict
-		}
-		return nil, err
-	}
-	tx = nil
 	outItems := make([]*biz.BOMItem, 0, len(items))
 	for _, item := range items {
 		outItems = append(outItems, entBOMItemToBiz(item))

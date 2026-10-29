@@ -27,12 +27,6 @@
   font-size: 19px;
 }
 
-.erp-dev-customer-title.ant-typography {
-  margin: 0;
-  font-size: 20px;
-  line-height: 1.2;
-}
-
 .erp-dev-customer-summary {
   max-width: 760px;
   margin: 4px 0 0;
@@ -755,7 +749,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  max-width: 1120px;
   margin: 0 auto 10px;
   border: 1px solid var(--erp-border);
   border-radius: 10px;
@@ -777,12 +770,6 @@
 .erp-dev-hub-header__icon {
   color: var(--erp-primary);
   font-size: 19px;
-}
-
-.erp-dev-hub-title.ant-typography {
-  margin: 0;
-  font-size: 20px;
-  line-height: 1.2;
 }
 
 .erp-dev-hub-summary {

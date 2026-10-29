@@ -8,14 +8,14 @@ import (
 )
 
 func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id string, pm map[string]any, actorID int) (string, *v1.JsonrpcResult, error) {
-	permission := map[string]string{"list_finance_payment_allocation_candidates": biz.PermissionFinancePaymentRead, "allocate_finance_payment": biz.PermissionFinancePaymentPost, "reverse_finance_allocation": biz.PermissionFinancePaymentReverse, "create_finance_payment": biz.PermissionFinancePaymentCreate, "cancel_finance_payment": biz.PermissionFinancePaymentCreate, "reverse_finance_payment": biz.PermissionFinancePaymentReverse, "get_finance_payment": biz.PermissionFinancePaymentRead, "list_finance_payments": biz.PermissionFinancePaymentRead, "get_finance_credit_note": biz.PermissionFinancePaymentRead, "list_finance_credit_notes": biz.PermissionFinancePaymentRead, "create_finance_credit_note": biz.PermissionFinanceCreditNoteCreate, "reverse_finance_credit_note": biz.PermissionFinanceCreditNoteReverse}[method]
+	permission := map[string]string{"get_finance_statement": biz.PermissionFinancePaymentRead, "list_finance_source_adjustments": biz.PermissionFinancePaymentRead, "create_finance_source_adjustment": biz.PermissionFinanceCreditNoteCreate, "list_finance_payment_allocation_candidates": biz.PermissionFinancePaymentRead, "allocate_finance_payment": biz.PermissionFinancePaymentPost, "reverse_finance_allocation": biz.PermissionFinancePaymentReverse, "create_finance_payment": biz.PermissionFinancePaymentCreate, "cancel_finance_payment": biz.PermissionFinancePaymentCreate, "reverse_finance_payment": biz.PermissionFinancePaymentReverse, "get_finance_payment": biz.PermissionFinancePaymentRead, "list_finance_payments": biz.PermissionFinancePaymentRead, "get_finance_credit_note": biz.PermissionFinancePaymentRead, "list_finance_credit_notes": biz.PermissionFinancePaymentRead, "create_finance_credit_note": biz.PermissionFinanceCreditNoteCreate, "reverse_finance_credit_note": biz.PermissionFinanceCreditNoteReverse}[method]
 	if permission == "" {
 		return id, unknownOperationalFactResult(method), nil
 	}
 	if res := d.RequireAdminPermission(ctx, permission); res != nil {
 		return id, res, nil
 	}
-	if method != "list_finance_payment_allocation_candidates" && method != "get_finance_payment" && method != "list_finance_payments" && method != "get_finance_credit_note" && method != "list_finance_credit_notes" {
+	if method != "get_finance_statement" && method != "list_finance_source_adjustments" && method != "list_finance_payment_allocation_candidates" && method != "get_finance_payment" && method != "list_finance_payments" && method != "get_finance_credit_note" && method != "list_finance_credit_notes" {
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance", "finance_payments"); res != nil {
 			return id, res, nil
 		}
@@ -26,6 +26,8 @@ func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id
 		return id, invalidParamResult(), nil
 	}
 	switch method {
+	case "get_finance_statement", "list_finance_source_adjustments", "create_finance_source_adjustment":
+		return d.handleFinanceReporting(ctx, method, id, pm, actorID)
 	case "create_finance_payment":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "payment_no", "direction", "counterparty_type", "counterparty_id", "amount", "currency", "account_ref", "evidence_ref", "idempotency_key", "occurred_at", "kind", "source_type", "source_id", "refund_of_payment_id", "purpose_note") {
 			return id, invalidParamResult(), nil
@@ -139,10 +141,26 @@ func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id
 		out, err := d.operationalFactUC.GetFinancePayment(ctx, getInt(pm, "id", 0))
 		return id, financePaymentResult(d, ctx, out, err), nil
 	case "list_finance_payments":
-		if !jsonRPCParamsAllowed(pm, "include_status_counts", "customer_key", "keyword", "status", "direction", "counterparty_type", "counterparty_id", "limit", "offset", "kind", "source_type", "source_id", "refund_of_payment_id") {
+		if !jsonRPCParamsAllowed(pm, "finance_fact_id", "include_status_counts", "include_totals", "currency", "date_from", "date_to", "account_ref", "evidence_ref", "customer_key", "keyword", "status", "direction", "counterparty_type", "counterparty_id", "limit", "offset", "kind", "source_type", "source_id", "refund_of_payment_id") {
 			return id, invalidParamResult(), nil
 		}
-		filter := biz.FinancePaymentFilter{Kind: getString(pm, "kind"), SourceType: getString(pm, "source_type"), SourceID: getInt(pm, "source_id", 0), RefundOfPaymentID: getInt(pm, "refund_of_payment_id", 0), Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), Direction: getString(pm, "direction"), CounterpartyType: getString(pm, "counterparty_type"), CounterpartyID: getInt(pm, "counterparty_id", 0), Limit: normalizedBusinessListLimit(pm), Offset: getInt(pm, "offset", 0)}
+		factID := 0
+		if _, supplied := pm["finance_fact_id"]; supplied {
+			var valid bool
+			factID, valid = getRequiredJSONRPCPositiveInt(pm, "finance_fact_id")
+			if !valid {
+				return id, invalidParamResult(), nil
+			}
+			scope, res := d.financeFactReadAccessScope(ctx)
+			if res != nil {
+				return id, res, nil
+			}
+			if res := d.requireFinanceFactAccess(ctx, factID, scope); res != nil {
+				return id, res, nil
+			}
+		}
+		filter := biz.FinancePaymentFilter{Currency: getString(pm, "currency"), DateFrom: getString(pm, "date_from"), DateTo: getString(pm, "date_to"), AccountRef: getString(pm, "account_ref"), EvidenceRef: getString(pm, "evidence_ref"), Kind: getString(pm, "kind"), SourceType: getString(pm, "source_type"), SourceID: getInt(pm, "source_id", 0), RefundOfPaymentID: getInt(pm, "refund_of_payment_id", 0), Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), Direction: getString(pm, "direction"), CounterpartyType: getString(pm, "counterparty_type"), CounterpartyID: getInt(pm, "counterparty_id", 0), Limit: normalizedBusinessListLimit(pm), Offset: getInt(pm, "offset", 0)}
+		filter.FinanceFactID = factID
 		items, total, err := d.operationalFactUC.ListFinancePayments(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
@@ -157,7 +175,19 @@ func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id
 		for _, item := range items {
 			out = append(out, financePaymentToMap(item))
 		}
-		return id, okData(withBusinessStatusCounts(map[string]any{"payments": out, "total": total, "limit": normalizedBusinessListLimit(pm), "offset": getInt(pm, "offset", 0)}, statusCounts)), nil
+		data := withBusinessStatusCounts(map[string]any{"payments": out, "total": total, "limit": normalizedBusinessListLimit(pm), "offset": getInt(pm, "offset", 0)}, statusCounts)
+		if include, ok := pm["include_totals"].(bool); ok && include {
+			totals, err := d.operationalFactUC.FinancePaymentTotals(ctx, filter)
+			if err != nil {
+				return id, d.mapOperationalFactError(ctx, err), nil
+			}
+			values := make([]any, 0, len(totals))
+			for _, item := range totals {
+				values = append(values, map[string]any{"currency": item.Currency, "direction": item.Direction, "status": item.Status, "amount": item.Amount.String(), "count": item.Count})
+			}
+			data["totals"] = values
+		}
+		return id, okData(data), nil
 	case "get_finance_credit_note":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id") {
 			return id, invalidParamResult(), nil
@@ -258,6 +288,10 @@ func financePaymentIntegerParamsValid(method string, pm map[string]any) bool {
 		required = []string{"id", "expected_version", "allocation_id"}
 	case "get_finance_payment", "get_finance_credit_note", "list_finance_payment_allocation_candidates":
 		required = []string{"id"}
+	case "create_finance_source_adjustment":
+		required = []string{"source_id"}
+	case "get_finance_statement":
+		required = []string{"counterparty_id"}
 	case "create_finance_credit_note":
 		required = []string{"finance_fact_id"}
 	case "reverse_finance_credit_note":
@@ -346,5 +380,5 @@ func financeCreditNoteToMap(item *biz.FinanceCreditNote) map[string]any {
 	if item == nil {
 		return nil
 	}
-	return map[string]any{"id": item.ID, "credit_note_no": item.CreditNoteNo, "finance_fact_id": item.FinanceFactID, "finance_fact_no": item.FinanceFactNo, "finance_fact_type": item.FinanceFactType, "finance_fact_original_amount": item.FinanceFactOriginalAmount.String(), "finance_fact_outstanding_amount": item.FinanceFactOutstandingAmount.String(), "reversal_of_credit_note_id": optionalIntValue(item.ReversalOfCreditNoteID), "amount": item.Amount.String(), "currency": item.Currency, "status": item.Status, "reason": item.Reason}
+	return map[string]any{"balance_direction": item.BalanceDirection, "source_type": optionalStringValue(item.SourceType), "source_id": optionalIntValue(item.SourceID), "id": item.ID, "credit_note_no": item.CreditNoteNo, "finance_fact_id": item.FinanceFactID, "finance_fact_no": item.FinanceFactNo, "finance_fact_type": item.FinanceFactType, "finance_fact_original_amount": item.FinanceFactOriginalAmount.String(), "finance_fact_outstanding_amount": item.FinanceFactOutstandingAmount.String(), "reversal_of_credit_note_id": optionalIntValue(item.ReversalOfCreditNoteID), "amount": item.Amount.String(), "currency": item.Currency, "status": item.Status, "reason": item.Reason}
 }

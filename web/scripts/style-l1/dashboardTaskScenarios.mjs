@@ -553,7 +553,7 @@ export function createDashboardTaskScenarios({
         await expectText(page, '办理中')
         const taskEventTrail = page.getByTestId('workflow-task-event-trail')
         await taskEventTrail.waitFor({ state: 'visible', timeout: 10_000 })
-        assert.equal(await taskEventTrail.locator('details').evaluate((element) => element.open), true, '本任务处理记录默认展开')
+        assert.equal(await taskEventTrail.locator('details, summary').count(), 0, '本任务处理记录直接展示')
         await expectText(taskEventTrail, '审批已发起')
         await expectText(taskEventTrail, '任务信息已更新')
         await assertTaskEventTrailMarkers(
@@ -599,7 +599,7 @@ export function createDashboardTaskScenarios({
           page.getByTestId('workflow-task-handling-chain'),
           '出货财务放行'
         )
-        assert.equal(await executionTrail.locator('.workflow-process-stage__history').evaluate((element) => element.open), true, '前序步骤默认展开')
+        assert.equal(await executionTrail.locator('.workflow-process-stage__history').evaluate((element) => element.tagName), 'DIV', '前序步骤直接展示')
         await assertTextAbsent(executionTrail, '执行轨迹')
         await expectText(executionTrail, '成品质检')
         await assertTextAbsent(executionTrail, '出货财务审批')

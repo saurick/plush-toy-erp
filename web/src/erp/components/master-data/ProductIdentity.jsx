@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { ReloadOutlined } from '@ant-design/icons'
-import { useOutletContext } from 'react-router-dom'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { RpcErrorCode } from '@/common/consts/errorCodes'
 import { listProductImageReferences } from '../../api/attachmentApi.mjs'
@@ -94,7 +95,7 @@ function ProductPicture({ productID, name, code, read, preview }) {
 }
 
 export function ProductThumbnail({ productId, name, code, preview = true }) {
-  const { adminProfile } = useOutletContext() || {}
+  const { adminProfile } = useBusinessPageContext() || {}
   const productID = Number(productId || 0)
   const allowed =
     Number.isSafeInteger(productID) &&

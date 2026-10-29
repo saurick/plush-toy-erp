@@ -33,7 +33,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
   const verifySelectionRecovery = async (page) => {
       for (const [view, id, key, detail, placeholder] of [
         ['states', 'dev-flow-state-select', 'flow', '[data-selected-flow]', '选择状态对象'],
-        ['runtime', 'dev-flow-process-select', 'process', '.erp-dev-flow-process-definition', '选择流程定义'],
+        ['processes', 'dev-flow-process-select', 'process', '.erp-dev-flow-process-definition', '选择流程定义'],
         ['facts', 'dev-flow-fact-select', 'fact', '[data-selected-fact]', '选择事实定义'],
       ]) {
         await page.goto(new URL(`/__dev/status-flows?view=${view}`, page.url()).href)
@@ -50,7 +50,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
         await control.locator('.ant-select-selection-item').waitFor()
         assert.notEqual(new URL(page.url()).searchParams.get(key), '')
       }
-      await page.goto(new URL('/__dev/status-flows?view=chain&chain=all&flow_tab=topics', page.url()).href)
+      await page.goto(new URL('/__dev/business-topics', page.url()).href)
       const topics = page.locator('[data-business-chain-topics]')
       await topics.locator('[data-topic-diagram]').waitFor()
       assert.equal(new URL(page.url()).searchParams.has('flow_topic'), false)
@@ -62,7 +62,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await topics.getByText('请选择业务专题', { exact: true }).waitFor()
       assert.equal(new URL(page.url()).searchParams.get('flow_topic'), '')
       await topics.getByRole('combobox', { name: '选择业务专题' }).click()
-      await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
+      await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: '销售受理到生产准备', exact: true }).click()
       await topics.locator('[data-topic-diagram]').waitFor()
       await assertNoHorizontalOverflow(page)
   }
@@ -89,7 +89,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
         await page.goto(new URL(observatoryPath, page.url()).href)
       await expectText(page, '业务链路')
       const root = page.locator('[data-dev-flow-state-observatory]')
-      const guide = page.locator('#task-fulfillment-guide')
+      let guide = page.locator('#task-fulfillment-guide')
       const views = guide.getByRole('radiogroup', { name: '流程视图' })
       const panel = guide.locator('[aria-label="流程详情"]')
       await expect(root).toBeVisible()
@@ -107,12 +107,13 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await verifyDiagram(page, panel.locator('[data-business-flow]'))
       await assertFulfillmentChainGeometry(guide.locator('[data-fulfillment-chain]'))
       await assertFulfillmentDetailGeometry(panel)
-      await views.getByText('业务专题', { exact: true }).click()
+      await guide.getByRole('button', { name: '业务专题', exact: true }).click()
+      guide = page.getByRole('region', { name: '业务专题阅读', exact: true })
       await guide.locator('.ant-select')
         .filter({ has: page.getByRole('combobox', { name: '选择业务专题', exact: true }) })
         .locator('.ant-select-selector').click()
       const topicOptions = page.locator('.ant-select-dropdown:visible')
-      await expect(topicOptions.getByRole('option')).toHaveCount(11)
+      await expect(topicOptions.getByRole('option', { name: '销售受理到生产准备', exact: true })).toBeVisible()
       await topicOptions.getByRole('option', { name: '成品出货到应收建立', exact: true }).click()
       await topicOptions.waitFor({ state: 'hidden' })
       await guide.locator('[data-topic-diagram="delivery_to_settlement"] [data-graph-status="rendered"]').waitFor()
@@ -128,7 +129,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await expect(system).toHaveCount(0)
       await guide.getByRole('button', { name: '查看规则', exact: true }).click()
       await page.getByRole('tablist', { name: '关联信息类型' }).waitFor()
-      await page.getByRole('button', { name: '返回 业务结构', exact: true }).click()
+      await page.getByRole('button', { name: '返回 业务专题', exact: true }).click()
       await guide.locator('[data-topic-diagram="delivery_to_settlement"]').waitFor()
       await page.reload()
       await guide.locator('[data-topic-diagram="delivery_to_settlement"] [data-graph-status="rendered"]').waitFor()
@@ -144,9 +145,11 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await page.reload()
       await expect(page.locator('[data-selected-flow]'))
         .toHaveAttribute('data-selected-flow', 'source.engineering_material_request')
-      await page.getByRole('button', { name: '返回 业务结构', exact: true }).click()
+      await page.getByRole('button', { name: '返回 业务专题', exact: true }).click()
       await expect(guide.locator('[data-graph-node="material_request"]'))
         .toHaveAttribute('aria-pressed', 'true')
+      await page.getByRole('button', { name: '返回 业务结构', exact: true }).click()
+      guide = page.locator('#task-fulfillment-guide')
       await openFulfillmentExceptionDirectory(guide)
       await guide.getByRole('combobox', { name: '异常类型', exact: true }).click()
       await expect(page.locator('.ant-select-dropdown:visible .ant-select-item-option')).toHaveCount(6)
@@ -197,11 +200,11 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await expect(taskSearch).toHaveCount(0)
       await panel.locator('[data-exception-plan="remake"] [data-graph-status="rendered"]').waitFor()
       await primary.getByRole('tab', { name: '查看规则', exact: true }).click()
-      for (const [name, view] of [['协同记录', 'workflow'], ['流程轨迹', 'runtime'], ['事实定义', 'facts'], ['状态与流转规则', 'states']]) {
+      for (const [name, view] of [['流程定义', 'processes'], ['事实定义', 'facts'], ['状态与流转规则', 'states']]) {
         await page.getByRole('tablist', { name: '关联信息类型' }).getByRole('tab', { name: new RegExp(`^${name}`) }).click()
         await expect(page).toHaveURL((url) => url.searchParams.get('view') === view)
         await expect(taskSearch).toHaveCount(0)
-        if (view === 'runtime') await verifyDiagram(page, page.locator('.erp-dev-flow-process-definition [data-business-flow]'))
+        if (view === 'processes') await verifyDiagram(page, page.locator('.erp-dev-flow-process-definition [data-business-flow]'))
         if (view === 'states') await verifyDiagram(page, page.locator('[data-selected-flow] [data-business-flow]'))
       }
       await primary.getByRole('tab', { name: '业务结构' }).click()
@@ -286,9 +289,9 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       assert.equal(new URL(page.url()).searchParams.get('task_filter'), 'pending')
       assert.equal(new URL(page.url()).searchParams.get('task_id'), '21')
       await expect(page.getByRole('button', { name: /^返回 / })).toHaveCount(0)
-      await instance.getByRole('button', { name: '协同记录', exact: true }).click()
+      await page.getByRole('tab', { name: '协同记录', exact: true }).click()
       await page.getByRole('tablist', { name: '关联信息类型' }).waitFor()
-      await page.getByRole('button', { name: '返回 实例跟踪', exact: true }).click()
+      await page.getByRole('tab', { name: '关联任务', exact: true }).click()
       await expect(instance.locator('[data-task-record]')).toHaveCount(3)
       assert.equal(new URL(page.url()).searchParams.get('task_filter'), 'pending')
       await instance.getByRole('button', { name: '查看对应办理流程', exact: true }).click()

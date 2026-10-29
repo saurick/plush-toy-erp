@@ -86,10 +86,10 @@ func TestFinanceFactCancelAuditPostgresAllowsDraftAndRejectsInvalidStatesWithout
 	if err != nil {
 		t.Fatalf("settle finance fact: %v", err)
 	}
-	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(settled.ID, settled.Version, actor.ID, "已结清不可取消")); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("settled cancellation error=%v", err)
+	cancelledCheck, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(settled.ID, settled.Version, actor.ID, "核对依据有误"))
+	if err != nil || cancelledCheck.Status != biz.OperationalFactStatusCancelled || cancelledCheck.SettledAt == nil || !cancelledCheck.SettledAt.Equal(*settled.SettledAt) || cancelledCheck.SettledBy == nil || *cancelledCheck.SettledBy != actor.ID {
+		t.Fatalf("completed reconciliation cancellation must preserve settlement audit: %+v err=%v", cancelledCheck, err)
 	}
-	assertFinanceFactHasNoCancelAudit(t, ctx, client, settled.ID, biz.OperationalFactStatusSettled)
 
 	posted := createPostedFinanceFactForCancelAudit(t, ctx, data, client, repo, suffix+"-missing-actor", actor.ID)
 	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(posted.ID, posted.Version, actor.ID+999999, "不存在的操作者")); err == nil {

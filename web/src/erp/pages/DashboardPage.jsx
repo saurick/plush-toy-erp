@@ -35,7 +35,6 @@ import useWorkflowTaskCalendarView from '../hooks/useWorkflowTaskCalendarView.js
 import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
 import WorkflowExceptionPanel from '../components/workflow/WorkflowExceptionPanel.jsx'
 import { TRACKING_VIEW_OPTIONS } from '../utils/workflowTrackingFilters.mjs'
-import { retainReturnedWorkflowTask } from '../utils/productionTaskHandling.mjs'
 import useReturnedWorkflowTask from '../hooks/useReturnedWorkflowTask.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 
@@ -45,10 +44,8 @@ import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import WorkflowTaskActionDrawer, {
-  TASK_ACTION_META,
-  getWorkflowTaskActionMeta,
-} from '../components/workflow/WorkflowTaskActionDrawer.jsx'
+import WorkflowTaskActionDrawer from '../components/workflow/WorkflowTaskActionDrawer.jsx'
+import { TASK_ACTION_META, getWorkflowTaskActionMeta } from '../utils/workflowTaskActionPresentation.mjs'
 import WorkflowTaskIdentity from '../components/workflow/WorkflowTaskIdentity.jsx'
 import { WorkflowTaskSource } from '../components/workflow/WorkflowTaskCopy.jsx'
 import WorkflowTaskTiming from '../components/workflow/WorkflowTaskTiming.jsx'
@@ -935,15 +932,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     pendingReturnPosition.current = context?.returnPosition
     openTaskDrawer(task)
   })
-  const retainedBusinessTask = returnedBusinessTask?.path === `${location.pathname}${location.search}`
-    ? returnedBusinessTask : null
   useLayoutEffect(() => {
     const position = pendingReturnPosition.current
     if (!position || loading || !taskBoardReady) return
     const container = document.querySelector('.erp-admin-content')
     const row = container?.querySelector(`[data-task-id="${returnedBusinessTask?.task.id}"]`)
-    if (!container || !row) return
-    container.scrollTop = position.rowOffset === null
+    if (!container) return
+    container.scrollTop = !row || position.rowOffset === null
       ? position.scrollTop
       : container.scrollTop + row.getBoundingClientRect().top - container.getBoundingClientRect().top - position.rowOffset
     pendingReturnPosition.current = null
@@ -1665,32 +1660,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         <TaskLane
                           key={lane.key}
                           keyword={filters.keyword}
-                          lane={retainedBusinessTask ? {
-                            ...lane,
-                            tasks: retainReturnedWorkflowTask(lane.tasks, retainedBusinessTask.task, retainedBusinessTask.context?.returnPosition),
-                          } : lane}
+                          lane={lane}
                           loading={taskBoardUpdating}
                           onOpenTask={openTaskDrawer}
                         />
                       ))}
                     </div>
-                    {retainedBusinessTask ? <Alert
-                      type="success"
-                      showIcon
-                      closable
-                      message={retainedBusinessTask.context?.businessReceipt?.message || '已返回原任务，任务状态已重新读取'}
-                      description="已恢复原筛选、页码和位置；刚办理的事项暂留原位，列表数量仍按当前筛选统计。"
-                      onClose={() => setReturnedBusinessTask(null)}
-                    /> : null}
                   </div>
                 )}
                 {!calendarView ? (
                   <WorkflowTaskPagination
                     total={taskBoardVisibleCount}
                     current={
-                      retainedBusinessTask ? filters.page : taskBoardReady ? taskBoardModel.page : filters.page
+                      taskBoardReady ? taskBoardModel.page : filters.page
                     }
-                    retainedPage={retainedBusinessTask ? filters.page : null}
                     pageSize={filters.pageSize}
                     loading={taskBoardUpdating}
                     error={Boolean(taskBoardLoadError)}
@@ -1723,6 +1706,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         }
         onOpenRelatedTask={openTaskDrawer}
         task={selectedTask}
+        onTaskRead={(fresh) => { setSelectedTask(fresh); reloadTaskData() }}
         profile={adminProfile}
         sourceSummary={
           <EngineeringMaterialTaskSummaryEntry
@@ -1748,9 +1732,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       actionTitle:
                         result.action === 'REJECT'
                           ? '退回工程'
-                          : result.action === 'SUBMIT'
-                            ? '提交老板审核'
-                            : '审批通过',
+                          : '审批通过',
                       reason: result.reason,
                       statusLabel: ENGINEERING_MATERIAL_STATUS[value.status],
                       handoffMessage: result.successMessage,

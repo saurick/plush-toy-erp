@@ -24,7 +24,10 @@ func TestInventoryOperationJSONRPCRejectsInvalidIDsWithoutWrites(t *testing.T) {
 	params := customerConfigPublishParamsForRevision(t, "strict-operation-ids")
 	params = customerConfigPublishParamsWithRevisionAndModuleState(t, params, "strict-operation-ids", "inventory", "enabled")
 	publishAndActivateCustomerConfigUsecaseForTest(t, d, params, 7)
-	expected, counted := decimal.Zero, decimal.NewFromInt(1)
+	expected, counted := decimal.NewFromInt(2), decimal.NewFromInt(1)
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{SubjectType: biz.InventorySubjectMaterial, SubjectID: fixtures.materialID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: expected, SourceType: "TEST", IdempotencyKey: "strict-count-seed"}); err != nil {
+		t.Fatal(err)
+	}
 	op, err := uc.CreateInventoryOperation(ctx, &biz.InventoryOperationCreate{
 		OperationNo: "STRICT-IDS", OperationType: biz.InventoryOperationCycleCount, Reason: "参数验证", IdempotencyKey: "strict-ids", CreatedBy: 7,
 		Items: []biz.InventoryOperationItemCreate{{LineNo: "1", SubjectType: biz.InventorySubjectMaterial, SubjectID: fixtures.materialID,
@@ -71,7 +74,7 @@ func TestInventoryOperationJSONRPCRejectsInvalidIDsWithoutWrites(t *testing.T) {
 			}
 			t.Run(fmt.Sprintf("create/%s/%v", key, value), func(t *testing.T) {
 				item := map[string]any{"line_no": "1", "subject_type": biz.InventorySubjectMaterial, "subject_id": float64(fixtures.materialID),
-					"from_warehouse_id": float64(fixtures.warehouseID), "unit_id": float64(fixtures.unitID), "counted_quantity": "1", "expected_quantity": "0"}
+					"from_warehouse_id": float64(fixtures.warehouseID), "unit_id": float64(fixtures.unitID), "counted_quantity": "1", "expected_quantity": "2"}
 				item[key] = value
 				call(t, "create_inventory_operation", map[string]any{"operation_type": biz.InventoryOperationCycleCount,
 					"operation_no": "INVALID", "reason": "参数验证", "idempotency_key": "invalid-create", "items": []any{item}})
@@ -85,11 +88,15 @@ func TestInventoryOperationJSONRPCRejectsInvalidIDsWithoutWrites(t *testing.T) {
 	if count := client.InventoryOperation.Query().CountX(ctx); count != 1 {
 		t.Fatalf("invalid requests created %d operations", count)
 	}
-	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
+	if count := client.InventoryTxn.Query().CountX(ctx); count != 1 {
 		t.Fatalf("invalid requests created %d transactions", count)
 	}
-	if count := client.InventoryBalance.Query().CountX(ctx); count != 0 {
+	if count := client.InventoryBalance.Query().CountX(ctx); count != 1 {
 		t.Fatalf("invalid requests changed %d balances", count)
+	}
+	balance := client.InventoryBalance.Query().OnlyX(ctx)
+	if !balance.Quantity.Equal(expected) {
+		t.Fatalf("invalid requests changed quantity: %v", balance.Quantity)
 	}
 }
 

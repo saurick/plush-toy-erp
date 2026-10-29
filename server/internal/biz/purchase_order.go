@@ -26,6 +26,7 @@ const (
 
 var (
 	ErrPurchaseOrderNotFound                    = errors.New("purchase order not found")
+	ErrPurchaseOrderMaterialSupplierMismatch    = errors.New("purchase material belongs to another supplier")
 	ErrPurchaseOrderItemNotFound                = errors.New("purchase order item not found")
 	ErrPurchaseOrderConflict                    = errors.New("purchase order version conflict")
 	ErrPurchaseOrderCloseDraftReceiptDependency = errors.New("purchase order close blocked by draft receipt")

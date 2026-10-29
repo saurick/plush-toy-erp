@@ -71,6 +71,8 @@ export default function ProductionReworkModal({
       {...(editing
         ? { form }
         : {
+            taskInline: true,
+            form,
             size: 'localAction',
             cancelText: '取消',
             destroyOnHidden: true,

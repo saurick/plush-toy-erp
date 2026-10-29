@@ -1,26 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Empty, Space, Spin, Tag, Typography } from 'antd'
 import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_PROJECT_SKILLS_ROUTE } from '../config/devRoutes.mjs'
 import SearchInput from '@/common/components/SearchInput'
-import { MermaidDiagram } from '@/common/components/markdown'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
-import DevTimestamp from '../components/DevTimestamp.jsx'
 import { WorkbenchNotice } from '../components/WorkbenchPattern.jsx'
 import { requestWorkbenchJson } from '../config/devWorkbenchRequest.mjs'
-import { buildDevDocsLocation } from './devDocsNavigation.mjs'
+
 import {
   DEV_PROJECT_SKILLS_API,
-  buildProjectSkillDiagram,
   filterProjectSkills,
 } from '../config/devProjectSkills.mjs'
 import '../styles/dev-project-skills.css'
 
 const { Title, Text } = Typography
-const SOURCE_PATH = '.agents/skills/README.md'
 
 export default function DevProjectSkillsPage() {
   const [params, setParams] = useSearchParams()
@@ -28,7 +25,7 @@ export default function DevProjectSkillsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [reload, setReload] = useState(0)
-  const [graphOpen, setGraphOpen] = useState(false)
+
   const keyword = params.get('q') || ''
   const selectedName = params.get('skill') || ''
 
@@ -68,10 +65,7 @@ export default function DevProjectSkillsPage() {
   const selected = selectedName
     ? filtered.find((skill) => skill.name === selectedName)
     : filtered[0]
-  const chart = useMemo(
-    () => buildProjectSkillDiagram(selected, snapshot?.skills || []),
-    [selected, snapshot]
-  )
+
   const updateQuery = (values) => {
     setParams(
       (current) => {
@@ -90,33 +84,52 @@ export default function DevProjectSkillsPage() {
       await copyTextToClipboard(`$${selected.name}`)
       message.success('Skill 调用名称已复制')
     } catch {
-      message.error('复制失败，请展开“关联与引用”后手动复制调用名称')
+      message.error('复制失败，请手动复制页面中的调用名称')
     }
   }
 
   return (
     <div className="erp-dev-workspace-page erp-dev-tool-page erp-dev-skills">
-      <DevPageNav sourcePath={SOURCE_PATH} />
-      <header className="erp-dev-skills__header">
-        <Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_PROJECT_SKILLS_ROUTE]}</Title>
+      <DevPageNav />
+      <DevPageHeader
+        className="erp-dev-skills__header"
+        title={
+          <Title level={1}>
+            {DEV_PAGE_TITLE_BY_ROUTE[DEV_PROJECT_SKILLS_ROUTE]}
+          </Title>
+        }
+        tools={
+          <Button
+            className="erp-dev-workbench-tools"
+            aria-label="刷新与检查"
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={() => setReload((value) => value + 1)}
+          >
+            刷新与检查
+          </Button>
+        }
+      >
         {snapshot ? (
           <div className="erp-dev-skills__health" role="status">
-            <Tag color={loading || error ? 'default' : snapshot.health.status === 'ok' ? 'success' : 'error'}>
-              {loading || error ? '上次检查 · 待核实' : snapshot.health.status === 'ok'
-                ? '结构检查通过'
-                : '结构检查需处理'}
+            <Tag
+              color={
+                loading || error
+                  ? 'default'
+                  : snapshot.health.status === 'ok'
+                    ? 'success'
+                    : 'error'
+              }
+            >
+              {loading || error
+                ? '上次检查 · 待核实'
+                : snapshot.health.status === 'ok'
+                  ? '结构检查通过'
+                  : '结构检查需处理'}
             </Tag>
           </div>
         ) : null}
-        <Button
-          aria-label="刷新与检查"
-          icon={<ReloadOutlined />}
-          loading={loading}
-          onClick={() => setReload((value) => value + 1)}
-        >
-          刷新与检查
-        </Button>
-      </header>
+      </DevPageHeader>
       {loading && snapshot ? <WorkbenchNotice tone="loading" title="正在刷新；以下为上次读取的项目 Skill。" /> : null}
       {loading && !snapshot ? (
         <div className="erp-dev-skills__state">
@@ -211,12 +224,6 @@ export default function DevProjectSkillsPage() {
                   <div className="erp-dev-skills__detail-head">
                     <Title level={2}>{selected.title}</Title>
                     <Space wrap>
-                      <Link
-                        className="ant-btn ant-btn-default"
-                        to={buildDevDocsLocation({ path: selected.sourcePath })}
-                      >
-                        查看原文
-                      </Link>
                       <Button
                         aria-label="复制调用名称"
                         icon={<CopyOutlined />}
@@ -227,56 +234,19 @@ export default function DevProjectSkillsPage() {
                     </Space>
                   </div>
                   <p>{selected.scope || '适用范围尚未登记，请查看原文。'}</p>
-                  <details
-                    className="erp-dev-disclosure erp-dev-skills__disclosure"
-                    open={graphOpen}
-                    onToggle={(event) => setGraphOpen(event.currentTarget.open)}
-                  >
-                    <summary>关联与引用</summary>
-                    <div className="erp-dev-skills__sources">
-                      <code className="erp-dev-skills__name">${selected.name}</code>
-                      {selected.relatedSkills.length ? (
-                        <section>
-                          <Title level={3}>相关 Skill</Title>
-                          <Text type="secondary">按原文中的条件选用，不代表固定执行顺序。</Text>
-                          <div className="erp-dev-skills__related">
-                            {selected.relatedSkills.map((name) => (
-                              <Button key={name} size="small" onClick={() => updateQuery({ skill: name, q: '' })}>
-                                {skills.find((skill) => skill.name === name)?.title || name}
-                              </Button>
-                            ))}
-                          </div>
-                        </section>
-                      ) : null}
-                      {selected.references.length ? (
-                        <section>
-                          <Title level={3}>引用文档</Title>
-                          <ul className="erp-dev-skills__references">
-                            {selected.references.map((reference) => (
-                              <li key={`${reference.path}#${reference.headingId}`}>
-                                <Link to={buildDevDocsLocation({ path: reference.path, headingId: reference.headingId })}>
-                                  {reference.path}{reference.headingId ? ` #${reference.headingId}` : ''}
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
-                        </section>
-                      ) : null}
-                      {graphOpen ? (
-                        <MermaidDiagram
-                          chart={chart}
-                          label={`${selected.title}职责与引用关系图`}
-                          initialZoom="fit"
-                          flowchartHtmlLabels={false}
-                          showSourceOnError={false}
-                        />
-                      ) : null}
-                      <Text type="secondary" className="erp-dev-skills__boundary">
-                        来源：{selected.sourcePath}。结构检查只核对文件、metadata、索引与引用；执行和验收以任务证据为准。
-                        <DevTimestamp value={snapshot.checkedAt} action="检查于" />
-                      </Text>
-                    </div>
-                  </details>
+                  <code className="erp-dev-skills__name">${selected.name}</code>
+                  {selected.relatedSkills.length ? (
+                    <section>
+                      <Title level={3}>相关 Skill</Title>
+                      <div className="erp-dev-skills__related">
+                        {selected.relatedSkills.map((name) => (
+                          <Button key={name} size="small" onClick={() => updateQuery({ skill: name, q: '' })}>
+                            {skills.find((skill) => skill.name === name)?.title || name}
+                          </Button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
                 </>
               ) : filtered.length ? (
                 <Empty

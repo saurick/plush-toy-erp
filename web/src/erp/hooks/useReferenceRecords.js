@@ -5,6 +5,7 @@ import {
   mergeReferenceRecords,
 } from '../utils/remoteReferences.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
+import useLatestRequestCoordinator from './useLatestRequestCoordinator.js'
 
 export function useReferenceRecords(profile) {
   const scopeKey = JSON.stringify(profile || null)
@@ -36,6 +37,7 @@ export function useReferenceRecords(profile) {
 // Callers provide only the IDs displayed by the current page/detail. This cache
 // lives with that page and never bypasses the endpoint's current authorization.
 export function useReferenceHydration(requests, profile, refreshKey) {
+  const beginLatestRequest = useLatestRequestCoordinator()
   const latest = useRef(requests)
   latest.current = requests
   const refreshed = useRef(
@@ -56,7 +58,8 @@ export function useReferenceHydration(requests, profile, refreshKey) {
     ])
   )
   useEffect(() => {
-    const abort = new AbortController()
+    const hydration = beginLatestRequest('reference-hydration')
+    const pending = []
     for (const [type, enabled, ids] of JSON.parse(key)) {
       if (!enabled) continue
       const request = latest.current[type]
@@ -66,19 +69,20 @@ export function useReferenceHydration(requests, profile, refreshKey) {
           ? ids
           : ids.filter((id) => !known.has(id))
       if (!missing.length) continue
-      loadReferenceIDs(type, missing, { signal: abort.signal })
+      pending.push(loadReferenceIDs(type, missing, { signal: hydration.signal })
         .then((data) => {
-          if (!abort.signal.aborted) {
+          if (hydration.isCurrent()) {
             refreshed.current.set(type, refreshKey)
             latest.current[type].onRecords(data[type])
           }
         })
         .catch((error) => {
-          if (!abort.signal.aborted && !isRpcAbortError(error)) {
+          if (hydration.isCurrent() && !isRpcAbortError(error)) {
             showPageLoadError(error, '加载关联资料')
           }
-        })
+        }))
     }
-    return () => abort.abort()
-  }, [key, scopeKey, refreshKey])
+    Promise.all(pending).finally(hydration.finish)
+    return () => beginLatestRequest('reference-hydration').finish()
+  }, [beginLatestRequest, key, scopeKey, refreshKey])
 }

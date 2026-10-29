@@ -302,6 +302,9 @@ export default function PurchaseOrderInboundDraftModal({
 
   return (
     <BusinessFormModal
+      taskInline
+      form={form}
+      dirty={dirty}
       title="登记采购到货"
       open={open}
       size="lineItems"

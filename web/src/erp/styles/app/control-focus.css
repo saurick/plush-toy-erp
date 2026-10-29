@@ -23,7 +23,10 @@ body
   > .ant-select-selector,
 body
   .erp-item-field-with-unit
-  .ant-input-affix-wrapper.ant-input-outlined.ant-input-status-error:focus-within {
+  .ant-input-affix-wrapper.ant-input-outlined.ant-input-status-error:focus-within,
+body
+  .erp-business-action-modal
+  .ant-input.ant-input-outlined.ant-input-status-error:focus {
   border-color: var(--erp-control-focus-border);
   box-shadow: var(
     --erp-control-focus-shadow,

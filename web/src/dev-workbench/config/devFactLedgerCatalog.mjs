@@ -1,8 +1,8 @@
 export const DEV_FACT_LEDGER_RUNTIME_QUERY = Object.freeze({
   availability: 'unavailable',
-  label: '未提供运行凭证查询',
+  label: '未提供通用跨领域凭证查询',
   reason:
-    '当前后端没有跨领域、按事实凭证 ID 读取 Fact/Ledger 的统一只读接口；观察台只展示定义和代码证据。',
+    '当前没有通用跨领域凭证查询；此页展示定义与代码依据。财务记录可在实例跟踪中按账款查询已有领域关联，不代表完整跨域历史。',
 })
 
 export const DEV_FACT_LEDGER_DISPLAY_GROUPS = Object.freeze(
@@ -260,17 +260,18 @@ const FACT_DEFINITIONS = [
       'server/internal/data/finance_payment_balance_repo.go',
     ],
   }),
-  fact('fact.finance_credit_note', '财务红冲单', {
+  fact('fact.finance_credit_note', '账款调整记录', {
     displayGroupKey: 'shipping_finance',
-    occurrenceCondition: '对已生效财务事实执行有理由、有权限的正式红冲。',
-    sourceDocument: '原财务事实或已过账收付款单',
-    authority: 'finance_credit_notes 与反向财务记录',
-    businessImpact: '以反向记录抵消原事实，不抹除原账。',
-    voucher: '财务红冲单及其原事实关联。',
-    idempotencyRule: '原事实、红冲原因和幂等键不得重复生成反向影响。',
-    correction: '红冲本身保持不可变；后续错误通过新的正式记录处理。',
+    occurrenceCondition: '对已生效账款执行有权限的手工调减，或由财务确认采购来源的增减差额。',
+    sourceDocument: '原账款，以及采购退货或数量调整来源',
+    authority: 'finance_credit_notes',
+    businessImpact: '保留原账金额，按调整方向更新未结余额；不会自动发生实际收付或退款。',
+    voucher: '账款调整及原账、来源、冲回关联。',
+    idempotencyRule: '来源差额与幂等键不得重复影响余额。',
+    correction: '显式冲回并保留反向记录；有后续核销依赖时先解除。',
     sourceRefs: [
       'server/internal/biz/finance_payment.go',
+      'server/internal/data/finance_source_adjustment_repo.go',
       'server/internal/data/model/schema/finance_credit_note.go',
     ],
   }),

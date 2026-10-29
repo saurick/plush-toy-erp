@@ -277,14 +277,6 @@
 .erp-dev-version-guide-page.erp-dev-hub-page > .erp-dev-hub-header {
   grid-column: 1 / -1;
   grid-row: 1;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 16px 20px;
-  box-shadow: none;
 }
 
 .erp-dev-version-guide-page > main {
@@ -499,13 +491,6 @@
 .erp-dev-version-workspace,
 .erp-dev-version-tab {
   min-width: 0;
-}
-
-.erp-dev-version-workspace > .ant-tabs > .ant-tabs-nav {
-  padding: 10px 12px;
-  border: 1px solid var(--erp-border);
-  border-radius: var(--erp-business-card-radius);
-  background: var(--erp-surface-bg);
 }
 
 .erp-dev-version-workspace,
@@ -824,7 +809,7 @@
     padding: 12px;
   }
 
-  .erp-dev-version-workspace .ant-tabs-tab {
+  .erp-dev-version-page > .erp-dev-page-header .erp-dev-task-nav__item {
     min-height: 44px;
     padding-inline: 2px;
   }

@@ -374,14 +374,26 @@ func adminRoleToMap(item biz.AdminRole, includePermissions bool) map[string]any 
 		"primary_menu_paths":   toAnySliceString(navigation.PrimaryMenuPaths),
 		"secondary_menu_paths": toAnySliceString(navigation.SecondaryMenuPaths),
 		"data_scopes":          roleDataScopesToAny(item.DataScopes),
-		"permissions_editable": !item.Disabled && !isSystemRole,
+		"permissions_editable": !item.Disabled && !isSystemRole && biz.RolePermissionPolicyFor(item).Registered,
 		"assignable":           !item.Disabled && (!isSystemRole || isDebugRole),
 		"non_production_only":  isDebugRole,
 	}
 	if includePermissions {
 		out["permissions"] = toAnySliceString(item.Permissions)
+		out["permission_policy"] = rolePermissionPolicyToMap(biz.RolePermissionPolicyFor(item))
 	}
 	return out
+}
+
+func rolePermissionPolicyToMap(policy biz.RolePermissionPolicy) map[string]any {
+	return map[string]any{
+		"template_key":                 policy.TemplateKey,
+		"registered":                   policy.Registered,
+		"required_permissions":         toAnySliceString(policy.Required),
+		"optional_permissions":         toAnySliceString(policy.Optional),
+		"missing_required_permissions": toAnySliceString(policy.MissingRequired),
+		"outside_template_permissions": toAnySliceString(policy.OutsideTemplate),
+	}
 }
 
 func roleDataScopesToAny(items []biz.RoleDataScope) []any {

@@ -18,7 +18,7 @@ const SOURCES = Object.freeze({
 })
 const noRefresh = async () => {}
 
-export default function MobileTaskPaymentAction({ task, profile, onClose }) {
+export default function MobileTaskPaymentAction({ task, profile }) {
   const [sourceState, setSourceState] = useState({ context: null, error: '' })
   const [loading, setLoading] = useState(false)
   const [payment, setPayment] = useState(null)
@@ -101,7 +101,6 @@ sourceContext: context,
           <Button type="primary" disabled={loading} onClick={creation.openPayment}>填写收付款</Button>
         </>
       )}
-      <Button disabled={loading} onClick={onClose}>返回业务办理</Button>
       <FinancePaymentEditor
         {...creation}
         adminProfile={profile}

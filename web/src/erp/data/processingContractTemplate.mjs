@@ -67,8 +67,6 @@ const PROCESSING_FACT_TYPE_LABELS = {
   REWORK: '返工',
 }
 
-const LEGACY_PROCESSING_ATTACHMENT_KEYS = ['attachment-1', 'attachment-2']
-
 const defaultLines = [
   {
     contractNo: 'SIM-OS-001',
@@ -323,16 +321,12 @@ export function normalizeProcessingLine(line = {}) {
   }
 }
 
-function resolveProcessingAppendixImages(draft = {}) {
-  if (Object.prototype.hasOwnProperty.call(draft, 'appendixImages')) {
-    return normalizePrintAppendixImages(draft.appendixImages)
-  }
-  const legacyAttachments =
-    draft?.attachments && typeof draft.attachments === 'object'
-      ? draft.attachments
-      : {}
-  return normalizePrintAppendixImages(
-    LEGACY_PROCESSING_ATTACHMENT_KEYS.map((key) => legacyAttachments[key])
+function processingContractDraftFields(draft, defaults) {
+  return Object.fromEntries(
+    Object.entries(defaults).map(([key, value]) => [
+      key,
+      Object.hasOwn(draft || {}, key) ? draft[key] : value,
+    ])
   )
 }
 
@@ -476,46 +470,34 @@ export function createBlankProcessingContractDraft(draft = {}) {
 }
 
 export function normalizeProcessingContractDraft(draft = {}) {
-  const {
-    attachments: _legacyAttachments,
-    appendixImages: _appendixImages,
-    lines,
-    clauses,
-    merges,
-    ...rest
-  } = draft || {}
+  const { lines, clauses, merges, appendixImages } = draft || {}
   return {
-    ...createProcessingContractDraft(),
-    ...rest,
+    ...processingContractDraftFields(draft, createProcessingContractDraft()),
     currency: normalizeText(draft.currency).toUpperCase(),
     draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
     lines: Array.isArray(lines)
       ? lines.map((line) => normalizeProcessingLine(line))
       : createProcessingContractDraft().lines,
     clauses: normalizeProcessingContractClauses(clauses),
-    appendixImages: resolveProcessingAppendixImages(draft),
+    appendixImages: normalizePrintAppendixImages(appendixImages),
     merges: Array.isArray(merges) ? merges : [],
   }
 }
 
 export function createProcessingContractBusinessDraft(draft = {}) {
-  const {
-    attachments: _legacyAttachments,
-    appendixImages: _appendixImages,
-    lines,
-    clauses,
-    merges,
-    ...rest
-  } = draft || {}
+  const { lines, clauses, merges, appendixImages } = draft || {}
   return {
-    ...createBlankProcessingContractDraft({ clauses }),
-    ...rest,
+    ...processingContractDraftFields(
+      draft,
+      createBlankProcessingContractDraft({ clauses })
+    ),
     currency: normalizeText(draft.currency).toUpperCase(),
     draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
     lines: Array.isArray(lines)
       ? lines.map((line) => normalizeProcessingLine(line))
       : [normalizeProcessingLine(createEmptyProcessingLine())],
-    appendixImages: resolveProcessingAppendixImages(draft),
+    clauses: normalizeProcessingContractClauses(clauses),
+    appendixImages: normalizePrintAppendixImages(appendixImages),
     merges: Array.isArray(merges) ? merges : [],
   }
 }

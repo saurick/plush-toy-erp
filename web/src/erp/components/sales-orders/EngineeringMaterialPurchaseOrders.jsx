@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { Button, Space, Typography } from 'antd'
-import { Link, useLocation, useOutletContext } from 'react-router-dom'
+import { Link, useLocation, } from 'react-router-dom'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { MaterialRequestStatus } from '../../../common/consts/statuses.generated.mjs'
 import { usePurchaseOrderContractPrint } from '../purchase-orders/usePurchaseOrderContractPrint.mjs'
 import { getEffectivePrintTemplateDefaults } from '../../utils/adminProfileSync.mjs'
@@ -16,7 +17,7 @@ export default function EngineeringMaterialPurchaseOrders({
   task,
   adminID,
 }) {
-  const { adminProfile } = useOutletContext() || {}
+  const { adminProfile } = useBusinessPageContext() || {}
   const location = useLocation()
   const navigate = useBusinessNavigate()
   const roleKey = mobileBusinessRole(location.pathname)

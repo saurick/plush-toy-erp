@@ -271,12 +271,8 @@ func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjus
 		tx = nil
 		return out, nil
 	}
-	hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, receipt.ID)
-	if err != nil {
+	if err := guardPurchaseFinanceSourcePosting(ctx, tx.client, receipt.ID); err != nil {
 		return nil, err
-	}
-	if hasActivePayable {
-		return nil, biz.ErrPurchaseReceiptFinanceDependency
 	}
 
 	items, err := tx.client.PurchaseReceiptAdjustmentItem.Query().
@@ -409,12 +405,8 @@ func (r *inventoryRepo) CancelPostedPurchaseReceiptAdjustment(ctx context.Contex
 		tx = nil
 		return out, nil
 	}
-	hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, adjustment.PurchaseReceiptID)
-	if err != nil {
+	if err := guardPurchaseFinanceSourceCancellation(ctx, tx.client, adjustment.PurchaseReceiptID, biz.PurchaseReceiptAdjustmentSourceType, adjustment.ID, adjustment.PostedAt); err != nil {
 		return nil, err
-	}
-	if hasActivePayable {
-		return nil, biz.ErrPurchaseReceiptFinanceDependency
 	}
 
 	items, err := tx.client.PurchaseReceiptAdjustmentItem.Query().

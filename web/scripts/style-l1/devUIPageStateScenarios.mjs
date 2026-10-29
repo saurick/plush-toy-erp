@@ -195,7 +195,9 @@ export function createDevUIPageStateScenarios({ assert, assertNoHorizontalOverfl
         await choosePageState(page, '正常')
         await desktop.getByText('销售订单已就绪', { exact: true }).waitFor()
         assert.deepEqual(requests, [], '共享组件样例不得请求业务接口')
-        await page.getByRole('link', { name: '查看图解说明', exact: true }).click()
+        assert.equal(await page.getByRole('link', { name: '查看图解说明', exact: true }).count(), 0)
+        await page.getByRole('tab', { name: '设计说明', exact: true }).click()
+        await page.getByRole('button', { name: '状态与异常恢复', exact: true }).click()
         await page.getByText('规范原文', { exact: true }).click()
         await page.getByRole('heading', { name: /状态与恢复/ }).waitFor()
         await page.getByText('同一查询刷新', { exact: true }).waitFor()
@@ -246,7 +248,10 @@ export function createDevUIPageStateScenarios({ assert, assertNoHorizontalOverfl
         await frame.getByRole('button', { name: '重新读取', exact: true }).click()
         assert.equal(await card.evaluate((node) => node.isConnected), true)
         assert.deepEqual(requests, [])
-        await page.getByRole('link', { name: '页面状态样例', exact: true }).click()
+        assert.equal(await page.getByRole('link', { name: '页面状态样例', exact: true }).count(), 0)
+        await page.locator('.erp-dev-ui-design-page-select').click()
+        await page.locator('.ant-select-dropdown:visible').getByText('控件设计', { exact: true }).click()
+        await page.locator('.erp-control-library-directory').getByRole('button', { name: /^页面状态/u }).click()
         await page.getByRole('heading', { name: '页面状态', exact: true }).waitFor()
       },
     },

@@ -72,17 +72,6 @@ func (s *stubOutsourcingOrderJSONRPCRepo) ListOutsourcingOrders(_ context.Contex
 	return out, len(out), nil
 }
 
-func (s *stubOutsourcingOrderJSONRPCRepo) UpdateOutsourcingOrderLifecycle(_ context.Context, id int, lifecycleStatus string) (*biz.OutsourcingOrder, error) {
-	s.lifecycleCalls++
-	order, ok := s.orders[id]
-	if !ok {
-		return nil, biz.ErrOutsourcingOrderNotFound
-	}
-	order.LifecycleStatus = lifecycleStatus
-	order.UpdatedAt = time.Unix(2, 0)
-	return order, nil
-}
-
 func (s *stubOutsourcingOrderJSONRPCRepo) ApplyOutsourcingOrderLifecycleAction(
 	_ context.Context,
 	in *biz.SourceOrderLifecycleAction,
@@ -715,6 +704,7 @@ func outsourcingOrderJSONRPCSaveParams(t *testing.T, orderNo string) *structpb.S
 				"process_id":            float64(1),
 				"unit_id":               float64(1),
 				"outsourcing_quantity":  "12.5",
+				"unit_price":            "2",
 				"product_no_snapshot":   "PROD-MODULE-GATE",
 				"product_name_snapshot": "半成品",
 				"processing_item":       "脸*1",

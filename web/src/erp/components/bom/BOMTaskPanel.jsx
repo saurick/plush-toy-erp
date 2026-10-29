@@ -44,7 +44,7 @@ export default function BOMTaskPanel({ context, onContextChange, adminProfile })
     setResult(null)
     Promise.all([
       getBOMVersion({ id: bomID }, { signal: controller.signal }),
-      listSalesOrders({ sample_bom_id: bomID, lifecycle_scope: 'all', limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }, { signal: controller.signal }),
+      listSalesOrders({ bom_id: bomID, lifecycle_scope: 'all', limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }, { signal: controller.signal }),
     ]).then(([bom, data]) => {
       if (controller.signal.aborted) return
       if (bom?.id !== bomID || !Array.isArray(data?.sales_orders) || !Number.isSafeInteger(data.total) || data.total < 0) {
@@ -67,7 +67,7 @@ export default function BOMTaskPanel({ context, onContextChange, adminProfile })
       ? '暂未读取关联订单'
       : total > 0
         ? '请选择关联销售订单，查看该订单的任务'
-        : '此 BOM 尚未在销售订单的工程与打样中关联。'
+        : '此 BOM 尚未在销售订单的工程资料中关联。'
 
   return (
     <BusinessTaskActions

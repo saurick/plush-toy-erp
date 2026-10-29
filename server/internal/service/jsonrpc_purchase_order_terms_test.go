@@ -81,3 +81,20 @@ func TestPurchaseReceiptRPCProjectsLineInboundAndLatePriceProvenance(t *testing.
 		t.Fatalf("line projection=%+v", items)
 	}
 }
+
+func TestPurchaseOrderDeliveryRPCDoesNotRequireOrAcceptPrices(t *testing.T) {
+	repo := &purchaseTermsRPCRepo{stubPurchaseOrderJSONRPCRepo: newStubPurchaseOrderJSONRPCRepo()}
+	d := newPurchaseOrderJSONRPCTestData(t, repo.stubPurchaseOrderJSONRPCRepo, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionPurchaseOrderRead, biz.PermissionPurchaseOrderUpdate))
+	d.purchaseOrderUC = biz.NewPurchaseOrderUsecase(repo)
+	params := purchaseTermsRPCParams()
+	delete(params["items"].([]any)[0].(map[string]any), "unit_price")
+	_, result, err := d.Handle(workflowJSONRPCAdminContext(), "purchase_order", "2.0", "update_purchase_order_delivery", "delivery", mustJSONRPCStruct(t, params))
+	if err != nil || result.Code != errcode.OK.Code || repo.calls != 1 || !repo.received.DeliveryOnly || repo.received.Items[0].UnitPrice != nil {
+		t.Fatalf("date-only result=%+v err=%v calls=%d", result, err, repo.calls)
+	}
+	params["items"].([]any)[0].(map[string]any)["unit_price"] = nil
+	_, result, err = d.Handle(workflowJSONRPCAdminContext(), "purchase_order", "2.0", "update_purchase_order_delivery", "delivery", mustJSONRPCStruct(t, params))
+	if err != nil || result.Code != errcode.InvalidParam.Code || repo.calls != 1 {
+		t.Fatalf("price field injection result=%+v err=%v", result, err)
+	}
+}

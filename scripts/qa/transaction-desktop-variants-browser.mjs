@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { financeFlow, qualityFlow, inventoryFlow } from './transaction-real-backend-browser.mjs';
+import { financeReportingEvidenceFlow } from './transaction-finance-reporting-browser.mjs';
 import { shellDispositionsThroughBrowser } from './transaction-shell-dispositions-browser.mjs';
 import { productionShipmentFlow } from './transaction-production-shipment-browser.mjs';
 import { createTransactionClient, prepareTransactionFixture, prepareTransactionProductionSource } from './transaction-real-backend-fixture.mjs';
@@ -18,7 +19,7 @@ export async function runDesktopVariantsBrowser(input) {
   assert.ok(['all', 'advance', 'outsourcing', 'shell'].includes(selectedCase));
   const runCase = value => selectedCase === 'all' || selectedCase === value;
   const client = createTransactionClient(options);
-  const report = { status: 'running', simulatedOnly: true, mobileDeferred: true, flows: [], browserRPC: [], pageErrors: [] };
+  const report = { status: 'running', simulatedOnly: true, mobileOutsourcingIncluded: runCase('outsourcing'), flows: [], browserRPC: [], pageErrors: [] };
   let browser;
   try {
     report.identity = await client.verify();
@@ -36,23 +37,39 @@ export async function runDesktopVariantsBrowser(input) {
       assert.deepEqual(persisted, { sourceType: scenario.sourceType, sourceID: scenario.source.id, direction: 'DISBURSEMENT', kind: 'ADVANCE', amount: scenario.amount, status: 'REVERSED' });
       Object.assign(report.flows.at(-1), { sourceType: scenario.sourceType, sourceID: scenario.source.id, exactAmount: scenario.amount, sourcePersisted: true });
     }
+    await financeReportingEvidenceFlow(browser, options, client, fixture, report);
     }
     if (runCase('outsourcing') || runCase('shell')) {
     await qualityFlow(browser, options, client, fixture, report);
-    await inventoryFlow(browser, options, client, fixture, report);
-    if (runCase('outsourcing')) await productionShipmentFlow(browser, options, client, fixture, report, { key: 'desktop_wip_outsourcing', outsourcingOperations: ['SEWING', 'HANDWORK'], dropReturnResponse: true, skipShipment: true });
+    if (selectedCase === 'outsourcing') {
+      // This scoped scenario needs received material, not the independent inventory-count journey.
+      const { purchase_receipt: received } = await client.rpc('warehouse', 'purchase', 'post_purchase_receipt', { id: fixture.receipt.id });
+      assert.equal(received.status, 'POSTED');
+      report.materialFixture = { receiptID: received.id, posted: true };
+    } else await inventoryFlow(browser, options, client, fixture, report);
+    if (runCase('outsourcing')) {
+      const desktop = await productionShipmentFlow(browser, options, client, fixture, report, { key: 'desktop_wip_outsourcing', outsourcingOperations: ['SEWING', 'HANDWORK'], dropReturnResponse: true, skipShipment: true });
+      await productionShipmentFlow(browser, { ...options, mobile: true, fourK: false }, client, fixture, report, { key: 'wip_outsourcing', conflictingSalesOrderNo: desktop.source.salesOrder.order_no, outsourcingOperations: ['SEWING', 'HANDWORK'], dropReturnResponse: true, skipShipment: true });
+    }
     if (runCase('shell')) await productionShipmentFlow(browser, options, client, fixture, report, { key: 'desktop_shell', outsourcingOperations: ['SEWING'], onShellRejected: shellDispositionsThroughBrowser });
     }
     const expected = [
-      ...(runCase('advance') ? ['desktop_purchase_advance', 'desktop_outsourcing_advance'] : []),
-      ...(runCase('outsourcing') || runCase('shell') ? ['quality', 'inventory'] : []),
-      ...(runCase('outsourcing') ? ['desktop_wip_outsourcing'] : []),
+      ...(runCase('advance') ? ['desktop_purchase_advance', 'desktop_outsourcing_advance', 'desktop_finance_reporting_evidence'] : []),
+      ...(runCase('outsourcing') || runCase('shell') ? ['quality', ...(selectedCase === 'outsourcing' ? [] : ['inventory'])] : []),
+      ...(runCase('outsourcing') ? ['desktop_wip_outsourcing', 'mobile_wip_outsourcing'] : []),
       ...(runCase('shell') ? ['desktop_shell_dispositions'] : []),
     ];
     assert.deepEqual(report.flows.map(r => r.key), expected);
     assert.ok(report.flows.every(r => r.passed));
     if (runCase('advance')) assert.ok(report.flows.filter(r => r.key.endsWith('_advance')).every(r => r.sourcePersisted));
-    if (runCase('outsourcing')) assert.deepEqual(report.flows.find(r => r.key === 'desktop_wip_outsourcing').outsourcingOperations, ['SEWING', 'HANDWORK']);
+    if (runCase('outsourcing')) for (const surface of ['desktop', 'mobile']) {
+      const flow = report.flows.find(r => r.key === `${surface}_wip_outsourcing`);
+      assert.deepEqual(flow.outsourcingOperations, ['SEWING', 'HANDWORK']);
+      assert.equal(flow.planningSurface, 'desktop');
+      if (surface === 'mobile') assert.equal(flow.mobilePlanWriteUnavailable, true);
+      assert.deepEqual(flow.outsourcingEntryChecks.map(({ operation, surface: actual, passed }) => ({ operation, surface: actual, passed })),
+        ['SEWING', 'HANDWORK'].map(operation => ({ operation, surface, passed: true })));
+    }
     if (runCase('shell')) assert.deepEqual(report.flows.find(r => r.key === 'desktop_shell_dispositions').decisions.map(r => r.type), ['WIP_CONCESSION', 'SCRAP', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE']);
     if (runCase('shell')) {
       assert.equal(report.expectedNegativeReads.length, 1);

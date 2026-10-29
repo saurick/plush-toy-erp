@@ -67,10 +67,10 @@ func TestSalesOrderExportRedaction(t *testing.T) {
 
 func TestSalesOrderExportFiltersAndPermissions(t *testing.T) {
 	d, repo := salesOrderExportRPCFixture(t, biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead, biz.PermissionFieldSalesCommercialRead, biz.PermissionFieldPartyPrivateRead)
-	params := map[string]any{"keyword": "SO", "customer_id": 17, "sample_bom_id": 27, "lifecycle_scope": "all", "lifecycle_status": "closed", "date_field": "planned_delivery_date", "date_from": 1700000000, "date_to": 1800000000, "sort_by": "updated_at", "sort_direction": "asc"}
+	params := map[string]any{"keyword": "SO", "customer_id": 17, "bom_id": 27, "lifecycle_scope": "all", "lifecycle_status": "closed", "date_field": "planned_delivery_date", "date_from": 1700000000, "date_to": 1800000000, "sort_by": "updated_at", "sort_direction": "asc"}
 	result := salesOrderExportRPCCall(t, d, workflowJSONRPCAdminContext(), "sales_order.export_sales_orders", params)
 	filter := repo.query.Filter
-	if result.Code != 0 || filter.CustomerID != 17 || filter.SampleBOMID != 27 || filter.Keyword != "SO" || filter.LifecycleScope != "all" || filter.LifecycleStatus != "closed" || filter.DateField != "planned_delivery_date" || filter.DateFrom.Unix() != 1700000000 || filter.DateTo.Unix() != 1800000000 || filter.SortBy != "updated_at" || filter.SortDirection != "asc" {
+	if result.Code != 0 || filter.CustomerID != 17 || filter.BOMID != 27 || filter.Keyword != "SO" || filter.LifecycleScope != "all" || filter.LifecycleStatus != "closed" || filter.DateField != "planned_delivery_date" || filter.DateFrom.Unix() != 1700000000 || filter.DateTo.Unix() != 1800000000 || filter.SortBy != "updated_at" || filter.SortDirection != "asc" {
 		t.Fatalf("result=%v filter=%+v", result, filter)
 	}
 	row := result.Data.AsMap()["sales_orders"].([]any)[0].(map[string]any)
@@ -102,7 +102,7 @@ func TestSalesOrderExportFiltersAndPermissions(t *testing.T) {
 }
 
 func TestSalesOrderExportRejectsPartialAndInvalidRequests(t *testing.T) {
-	for _, params := range []map[string]any{{"limit": 200}, {"offset": 0}, {"id": 0}, {"id": 1, "keyword": "SO"}, {"customer_id": "17"}, {"sample_bom_id": nil}, {"sort_by": "unknown"}} {
+	for _, params := range []map[string]any{{"limit": 200}, {"offset": 0}, {"id": 0}, {"id": 1, "keyword": "SO"}, {"customer_id": "17"}, {"bom_id": nil}, {"sort_by": "unknown"}} {
 		d, repo := salesOrderExportRPCFixture(t, biz.PermissionSalesOrderRead)
 		result := salesOrderExportRPCCall(t, d, workflowJSONRPCAdminContext(), "sales_order.export_sales_orders", params)
 		if result.Code != errcode.InvalidParam.Code || repo.calls != 0 || result.Data != nil {

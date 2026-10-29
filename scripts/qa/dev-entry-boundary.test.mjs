@@ -221,15 +221,14 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   );
   assertIncludes(
     devPermissionRelationshipsPageSource,
-    "修改权限请进入权限配置",
-    "permission relationship page must not provide permission writes",
+    "readPermissionRelationshipSnapshot",
+    "permission relationship page uses the read-only snapshot",
   );
-  assertIncludes(
+  assert.match(
     devPermissionRelationshipsPageSource,
-    'href="/erp/system/permissions"',
-    "permission relationship formal configuration handoff",
-  );
-  assert.doesNotMatch(
+    /navigate\(\s*`\/erp\/system\/permissions\?tab=roles&role=/u,
+    "permission relationship configuration handoff retains the selected role",
+  );  assert.doesNotMatch(
     dashboardPageSource,
     /PermissionRelationship|权限关系图/u,
     "the formal ERP dashboard must not retain the dev-only permission graph",
@@ -422,24 +421,19 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "workflow-fact-boundary",
     "dev testing QA README source",
   );
-  assertIncludes(
+  assert.match(
     devTestingPageSource,
-    "block.sourceLabel || block.title || '测试命令来源'",
-    "dev testing page command source label",
+    /block\.sourceLabel\s*\|\|\s*block\.title/u,
+    "dev testing page keeps a readable command source label",
   );
   assert(
     !/>\s*\{block\.sourcePath\}\s*</u.test(devTestingPageSource),
     "dev testing command blocks must not render raw sourcePath as primary visible copy",
   );
-  assertIncludes(
+  assert.doesNotMatch(
     devTestingPageSource,
-    "aria-label={`打开来源文档 ${block.sourcePath}`}",
-    "dev testing source action accessible label",
-  );
-  assertIncludes(
-    devTestingPageSource,
-    "onClick={() => onOpenSource(block.sourcePath)}",
-    "dev testing source action navigation",
+    /onOpenSource|openSourceDoc/u,
+    "dev testing command details do not navigate away from the current task",
   );
   const presetKeys = DEV_TESTING_COPY_PRESETS.map((item) => item.key);
   const presetSource = DEV_TESTING_COPY_PRESETS.map(
@@ -1179,7 +1173,7 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   assert.match(pageSource, /<PreflightPanel\b/u);
   assertIncludes(
     consoleSource,
-    "不提供原始包上传",
+    "流程与扩展项仅预览",
     "customer config console package-source boundary",
   );
   assert(

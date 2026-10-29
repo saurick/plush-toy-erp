@@ -7,21 +7,18 @@ import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCata
 
 test('专题默认选择、主动清空和刷新恢复使用同一 URL 真源', async (t) => {
   const harness = await createReactTestHarness(t)
-  const { default: Guide } = await import('./TaskFulfillmentGuide.jsx')
-  const { default: Topics } = await import('./BusinessChainTopics.jsx')
+  const { default: Topics } = await import('./BusinessTopicsView.jsx')
   let location
   function Page() {
     location = useLocation()
-    return h(Guide, { renderTopics: ({ selectedTopicKey, onSelectTopic }) => h(Topics, {
-      catalog, selectedTopicKey, onSelectChain: onSelectTopic,
-    }) })
+    return h(Topics, { catalog, actions: [] })
   }
   const render = (entry, key) => harness.render(h(MemoryRouter, {
     key,
     initialEntries: [entry],
     future: { v7_startTransition: true, v7_relativeSplatPath: true },
   }, h(Page)))
-  await render('/__dev/status-flows?view=chain&chain=all&flow_tab=topics', 'initial')
+  await render('/__dev/business-topics', 'initial')
   const root = harness.container
   assert(root.querySelector('[data-topic-diagram]'))
   assert.equal(new URLSearchParams(location.search).has('flow_topic'), false)

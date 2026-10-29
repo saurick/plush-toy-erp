@@ -17,10 +17,10 @@ export const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY =
 
 export const PAYMENT_STATUS_META = Object.freeze({
   [FinancePaymentStatus.DRAFT]: ['待审批', 'blue'],
-  [FinancePaymentStatus.APPROVED]: ['已批准待核销', 'gold'],
+  [FinancePaymentStatus.APPROVED]: ['已批准待入账', 'gold'],
   [FinancePaymentStatus.REJECTED]: ['已退回', 'red'],
   [FinancePaymentStatus.CANCELLED]: ['已取消', 'default'],
-  [FinancePaymentStatus.POSTED]: ['已核销', 'green'],
+  [FinancePaymentStatus.POSTED]: ['已入账', 'green'],
   [FinancePaymentStatus.REVERSED]: ['已冲销', 'magenta'],
 })
 
@@ -40,13 +40,15 @@ export const PAYMENT_DIRECTION_OPTIONS = [
 
 export const CREDIT_STATUS_OPTIONS = [
   { value: '', label: '全部状态' },
-  { value: FinanceAllocationStatus.POSTED, label: '已红冲' },
+  { value: FinanceAllocationStatus.POSTED, label: '已调整' },
   { value: FinanceAllocationStatus.REVERSED, label: '冲销记录' },
 ]
 
 export const FINANCE_VIEW_ITEMS = [
   { key: 'payments', label: '收付款记录' },
-  { key: 'credits', label: '红冲记录' },
+  { key: 'credits', label: '账款调整' },
+  { key: 'statement', label: '期间对账' },
+  { key: 'source-adjustments', label: '采购待调整' },
 ]
 
 export function paymentStatus(value) {
@@ -59,7 +61,7 @@ export function paymentStatusLabel(value) {
 }
 
 export function creditStatusLabel(value) {
-  return value === FinanceAllocationStatus.REVERSED ? '冲销记录' : '已红冲'
+  return value === FinanceAllocationStatus.REVERSED ? '冲销记录' : '已调整'
 }
 
 export function financeFactTypeLabel(value) {

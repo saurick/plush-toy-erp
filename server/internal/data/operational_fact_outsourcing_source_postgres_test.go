@@ -124,7 +124,7 @@ func TestOutsourcingFactFromOrderPostgresOrderCancelRaceKeepsValidState(t *testi
 	}()
 	go func() {
 		<-start
-		_, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, order.ID, biz.OutsourcingOrderStatusCanceled)
+		_, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, order.ID, biz.OutsourcingOrderStatusCanceled)
 		cancelErr <- err
 	}()
 	close(start)
@@ -178,7 +178,7 @@ func TestOutsourcingFactFromOrderPostgresCreateAndSettleNeverLeavesActiveDraftOn
 			go func() {
 				defer wg.Done()
 				<-start
-				_, settleErr = orderRepo.UpdateOutsourcingOrderLifecycle(ctx, order.ID, target)
+				_, settleErr = applyOutsourcingLifecycleForTest(ctx, orderRepo, order.ID, target)
 			}()
 			close(start)
 			wg.Wait()

@@ -290,12 +290,12 @@ func TestProductionOrderSalesPlanningOptionsKeepFullLinesVisibleAndEditingContex
 	if _, _, err := f.uc.ListReferenceOptions(ctx, biz.ProductionOrderReferenceFilter{ReferenceType: biz.ProductionOrderReferenceSalesOrderItem, ProductionOrderID: 99999, Limit: 20}); !errors.Is(err, biz.ErrProductionOrderNotFound) {
 		t.Fatalf("unknown editing context: %v", err)
 	}
-	// Closed production has already used its planning capacity; it is not a cancellation.
+	// A short-closed order without posted output releases its unused demand.
 	now := time.Now().UTC()
 	f.client.ProductionOrder.UpdateOneID(b.Order.ID).SetStatus(biz.ProductionOrderStatusClosed).
 		SetReleasedBy(f.actorID).SetReleasedAt(now).SetClosedBy(f.actorID).SetClosedAt(now).SaveX(ctx)
-	if *query(0).PlannedProductionQuantity != "20" {
-		t.Fatal("closed order incorrectly released planning capacity")
+	if option := query(0); *option.PlannedProductionQuantity != "12" || *option.RemainingPlannableQuantity != "8" || !option.Selectable {
+		t.Fatal("short-closed order did not release unused planning capacity")
 	}
 	if _, _, err := f.uc.ListReferenceOptions(ctx, biz.ProductionOrderReferenceFilter{ReferenceType: biz.ProductionOrderReferenceSalesOrderItem, ProductionOrderID: b.Order.ID, Limit: 20}); !errors.Is(err, biz.ErrProductionOrderInvalidState) {
 		t.Fatalf("non-draft editing context: %v", err)

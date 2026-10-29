@@ -8,14 +8,12 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { Link as RouterLink } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import { WorkbenchEmpty, WorkbenchNotice, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import { formatQualityGateDuration } from '../../config/devQualityGates.mjs'
 import {
-  SECURITY_GUIDE_HREF,
   GOVERNANCE_FILTER_OPTIONS,
   GAP_RANGE_OPTIONS,
   GAP_RISK_OPTIONS,
@@ -31,53 +29,14 @@ function renderGovernanceEvidence(row) {
       column={1}
       bordered
       items={[
-        {
-          key: 'key',
-          label: 'Stable key',
-          children: <Text code>{row.key}</Text>,
-        },
-        { key: 'risk', label: '风险等级', children: row.riskLevel },
-        {
-          key: 'profiles',
-          label: '适用 profile',
-          children: row.profiles.join(' / '),
-        },
-        {
-          key: 'sources',
-          label: '正式执行入口引用',
-          children: row.sources.join('；'),
-        },
-        { key: 'evidence', label: '唯一验证记录', children: row.evidence },
-        { key: 'blocks', label: '失败阻断', children: row.blocks },
-        {
-          key: 'median',
-          label: '中位数',
-          children: formatQualityGateDuration(row.statistics?.medianDurationMs),
-        },
-        {
-          key: 'slower',
-          label: '较慢运行参考',
-          children: row.statistics?.enoughSamples
-            ? formatQualityGateDuration(row.statistics.slowerDurationMs)
-            : '暂无足够样本',
-        },
-        {
-          key: 'relationship',
-          label: '与其他门禁关系',
-          children: row.relationship,
-        },
-        {
-          key: 'exit-condition',
-          label: '替代或退出条件',
-          children: row.exitCondition,
-        },
-      ]}
+      { key: 'profiles', label: '适用范围', children: row.profiles.join(' / ') },
+      { key: 'blocks', label: '失败影响', children: row.blocks },
+      ...(row.statistics?.enoughSamples ? [{ key: 'slower', label: '较慢运行参考', children: formatQualityGateDuration(row.statistics.slowerDurationMs) }] : []),
+      { key: 'relationship', label: '与其他门禁关系', children: row.relationship },
+      { key: 'exit-condition', label: '调整条件', children: row.exitCondition },
+    ]}
     />
   )
-}
-
-function SecurityGuideLink() {
-  return <RouterLink to={SECURITY_GUIDE_HREF}>应用安全与验证边界</RouterLink>
 }
 
 export function GovernanceView({
@@ -236,7 +195,6 @@ export function GovernanceView({
         {!loading && !error && data && !data.complexity?.length ? (
           <Text type="secondary">当前没有客观复杂度候选</Text>
         ) : null}
-        <SecurityGuideLink />
       </div>
     </WorkbenchSection>
   )
@@ -286,15 +244,11 @@ export function GapsView({ data, loading, error, values, onRange, onRisk, onRetr
               ? '此范围暂无需要比对的文件；服务器 CI 与当前执行端的诊断记录可分别查看。'
               : values.risk === 'high'
                 ? '可切回全部风险查看其他匹配项；未匹配不代表已验证安全。'
-                : '未知改动不能据此视为安全；请回到测试执行核对验证范围，必要时运行完整门禁。'
+                : '未知改动需要人工核对验证范围，必要时运行完整门禁。'
           }
           action={
             values.risk === 'high' ? (
               <Button onClick={() => onRisk('all')}>查看全部风险</Button>
-            ) : !noChanges ? (
-              <RouterLink to="/__dev/testing?view=tiers">
-                核对验证范围
-              </RouterLink>
             ) : null
           }
         />
@@ -355,9 +309,6 @@ export function GapsView({ data, loading, error, values, onRange, onRisk, onRetr
           证据边界：{data.boundaries.join('；')}
         </Text>
       ) : null}
-      <div className="erp-dev-quality-view-footnote">
-        <SecurityGuideLink />
-      </div>
     </WorkbenchSection>
   )
 }

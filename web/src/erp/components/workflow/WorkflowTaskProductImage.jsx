@@ -4,7 +4,8 @@ import {
   PictureOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { useOutletContext } from 'react-router-dom'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { RpcErrorCode } from '@/common/consts/errorCodes'
 import { downloadBusinessAttachment } from '../../api/attachmentApi.mjs'
@@ -186,7 +187,7 @@ export default function WorkflowTaskProductImage({
   preview = true,
   state = 'empty',
 }) {
-  const { adminProfile } = useOutletContext() || {}
+  const { adminProfile } = useBusinessPageContext() || {}
   const denied = item.kind !== 'material' && item.productID > 0 && !hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
   if (
     item.kind === 'material' ||

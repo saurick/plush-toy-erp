@@ -8,13 +8,12 @@ import {
   DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
   DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS,
   DEV_VERSION_CENTER_VIEW_HISTORY,
-  DEV_VERSION_CENTER_VIEW_PIPELINE,
   DEV_VERSION_CENTER_VIEW_QUERY_KEY,
   resolveDevOperationHistoryFilters,
   resolveDevVersionCenterView,
 } from '../../../config/devDelivery.mjs'
 
-export function useVersionCenterRoute({ setHistoryPage, workspaceRef }) {
+export function useVersionCenterRoute({ setHistoryPage }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const customerScope = useDevCustomerScope({
     searchParams,
@@ -201,13 +200,6 @@ export function useVersionCenterRoute({ setHistoryPage, workspaceRef }) {
     setSearchParams(nextParams)
   }, [searchParams, setSearchParams, setHistoryPage])
 
-  const openPipelineDetails = useCallback(() => {
-    selectView(DEV_VERSION_CENTER_VIEW_PIPELINE)
-    window.requestAnimationFrame(() => {
-      workspaceRef.current?.scrollIntoView({ block: 'start' })
-    })
-  }, [selectView, workspaceRef])
-
   return {
     customerScope,
     customerReady,
@@ -219,6 +211,5 @@ export function useVersionCenterRoute({ setHistoryPage, workspaceRef }) {
     selectView,
     updateOperationHistoryFilter,
     clearOperationHistoryFilters,
-    openPipelineDetails,
   }
 }

@@ -51,7 +51,7 @@ test('HelpCenterPage: 通用帮助由登录壳追加且不依赖业务权限项'
     'web/src/erp/config/menuPermissions.mjs'
   )
 
-  assert.match(layoutSource, /getAuthenticatedNavigationSections/u)
+  assert.match(layoutSource, /getUtilityNavigationSections/u)
   assert.match(layoutSource, /item\.access === 'authenticated'/u)
   assert.match(layoutSource, /permissionGovernedVisibleSections/u)
   assert.match(layoutSource, /getCustomerNavigationPresentation/u)

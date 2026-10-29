@@ -8,9 +8,13 @@ import React, {
 } from 'react'
 import { Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { canOpenMobileTaskBusiness, resolveMobileTaskBusinessEntry } from '../utils/mobileTaskBusiness.mjs'
-import { isFulfillmentTask } from '../../utils/fulfillmentTask.mjs'
+import { workflowTaskBusinessContract } from '../../utils/workflowTaskBusinessContract.mjs'
 import { normalizeTaskListFilters } from '../../utils/workflowTaskListFilters.mjs'
 import WorkflowTaskLinkDrawer from '../../components/workflow/WorkflowTaskLinkDrawer.jsx'
+import BusinessTaskActions from '../../components/workflow/BusinessTaskActions.jsx'
+import { getWorkflowTaskActionMeta } from '../../utils/workflowTaskActionPresentation.mjs'
+import { workflowTaskCollaborationModes, workflowTaskHandlingModes } from '../../utils/workflowTaskActionFlow.mjs'
+import useWorkflowTaskAssignmentAccess from '../../hooks/useWorkflowTaskAssignmentAccess.js'
 import { normalizeTaskDiscoveryFilters } from '../../utils/workflowTaskDiscovery.mjs'
 import { readWorkflowTaskReturn } from '../../utils/workflowTaskNavigation.mjs'
 import { readMobileTrackingSource } from '../utils/mobileWorkflowTracking.mjs'
@@ -44,11 +48,14 @@ import { canMountCustomerRuntime } from '../../utils/adminProfileSync.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { canViewWorkflowApprovalInbox } from '../../utils/workflowApprovalInbox.mjs'
 import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
+import MobileTaskStepPanels from '../components/MobileTaskStepPanels.jsx'
+import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import MobileTaskDetailScreen from '../components/MobileTaskDetailScreen.jsx'
 import EngineeringMaterialTaskAction from '../../components/sales-orders/EngineeringMaterialTaskAction.jsx'
 import {
   canProcessEngineeringMaterialTask,
   ENGINEERING_MATERIAL_STATUS,
+  isEngineeringMaterialTask,
 } from '../../utils/engineeringMaterialTask.mjs'
 import MobileTaskActionScreen from '../components/MobileTaskActionScreen.jsx'
 import { mobileProgressAccess } from '../utils/mobileProgress.mjs'
@@ -416,13 +423,13 @@ export default function MobileRoleTasksPage() {
         !TERMINAL_TASK_STATUS_KEYS.has(selectedTask.task_status_key)))
   const selectedTaskActionAccess = useWorkflowTaskActionAccess({
     adminProfile,
-    task: selectedTaskActionsEnabled && !taskFormMode ? selectedTask : null,
-    enabled: selectedTaskActionsEnabled && !taskFormMode,
+    task: selectedTaskActionsEnabled ? selectedTask : null,
+    enabled: selectedTaskActionsEnabled,
   })
   const taskFormReadAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: selectedTask,
-    enabled: Boolean(!taskFormMode && canMountCustomerTasks && selectedTask && !selectedTaskActionsEnabled && resolveMobileTaskBusinessEntry(selectedTask)),
+    enabled: Boolean(canMountCustomerTasks && selectedTask && !selectedTaskActionsEnabled && resolveMobileTaskBusinessEntry(selectedTask)),
   })
   const taskFormAccess = selectedTaskActionsEnabled ? selectedTaskActionAccess : taskFormReadAccess
   const canOpenTaskForm = canOpenMobileTaskBusiness(selectedTask, adminProfile, taskFormAccess.sourceAccess)
@@ -909,6 +916,10 @@ export default function MobileRoleTasksPage() {
     setSelectedTaskID,
   })
 
+  const [collaborationOpen, setCollaborationOpen] = useState('')
+  const collaborationTriggerRef = useRef(null)
+  useEffect(() => setCollaborationOpen(''), [taskAccessScopeKey, selectedTaskID, actionReceipt])
+
   useEffect(() => {
     if (initialHistoryRestoreHandledRef.current || !canMountCustomerTasks) {
       return
@@ -991,6 +1002,7 @@ export default function MobileRoleTasksPage() {
     restoreActionDraft,
     restoreActionReceipt,
     taskScopeKey,
+    selectedTaskID,
   ])
 
   const { flush: flushMobileTaskDraftHistory, backup: backupMobileTaskDraft } =
@@ -1100,7 +1112,7 @@ export default function MobileRoleTasksPage() {
   const receiptHistoryKeyRef = useRef('')
 
   const pushMobileTaskScreen = useCallback(
-    ({ action = '', receipt = null, screen, taskID = null, linked = selectedLinkedTaskID === taskID, factForm = false }) => {
+    ({ action = '', receipt = null, screen, taskID = null, linked = selectedLinkedTaskID === taskID, factForm = false, replace = false }) => {
       if (typeof window === 'undefined') return
       const currentState = window.history.state || {}
       const loadedCounts = readMobileRoleTaskLoadedCounts(
@@ -1116,11 +1128,12 @@ export default function MobileRoleTasksPage() {
         currentState[MOBILE_TASK_HISTORY_SCREEN_KEY] === screen &&
         String(currentState[MOBILE_TASK_HISTORY_TASK_KEY] || '') ===
           String(taskID || '')
+      const replaceScreen = sameScreen || replace
       const nextState = {
         ...currentState,
         [MOBILE_TASK_HISTORY_FACT_FORM_KEY]: factForm,
         [MOBILE_TASK_HISTORY_SCREEN_KEY]: screen,
-        [MOBILE_TASK_HISTORY_DEPTH_KEY]: sameScreen
+        [MOBILE_TASK_HISTORY_DEPTH_KEY]: replaceScreen
           ? Number(currentState[MOBILE_TASK_HISTORY_DEPTH_KEY] || 0)
           : Number(currentState[MOBILE_TASK_HISTORY_DEPTH_KEY] || 0) + 1,
         [MOBILE_TASK_HISTORY_TASK_KEY]: taskID,
@@ -1142,7 +1155,7 @@ export default function MobileRoleTasksPage() {
         [MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY]: loadedCounts,
         [MOBILE_TASK_HISTORY_SCOPE_KEY]: taskScopeKey,
       }
-      if (sameScreen) {
+      if (replaceScreen) {
         window.history.replaceState(nextState, '')
         currentTaskScreenRef.current = screen
         return
@@ -1218,22 +1231,26 @@ export default function MobileRoleTasksPage() {
       // 浏览器不允许更新历史记录时，仍保留当前页面内的草稿。
     }
   }, [])
+  const usesMaterialReviewForm = isEngineeringMaterialTask(selectedTask) && selectedTask.task_group !== 'engineering_material_revision'
   const canProcessMaterial =
+    usesMaterialReviewForm &&
     !materialTaskSettled &&
     canProcessEngineeringMaterialTask(adminProfile, selectedTask)
   const setMaterialBusy = useCallback((value) => {
     materialBusyRef.current = value
   }, [])
 
+  const sourceAssignmentAccess = useWorkflowTaskAssignmentAccess({ adminProfile, task: selectedTask, enabled: Boolean(selectedTask && hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_ASSIGN)) })
+
   const availableActions = useMemo(
     () =>
-      [
+      workflowTaskHandlingModes([
         selectedCanComplete ? 'done' : '',
         selectedCanBlock ? 'blocked' : '',
         selectedCanResume ? 'resume' : '',
         selectedCanReject ? 'rejected' : '',
         selectedCanUrge ? 'urge' : '',
-      ].filter(Boolean),
+      ].filter(Boolean)),
     [
       selectedCanBlock,
       selectedCanComplete,
@@ -1267,7 +1284,7 @@ export default function MobileRoleTasksPage() {
   const handleOpenAction = useCallback(
     (preferredAction = '') => {
       if (!selectedTask) return
-      if (canOpenTaskForm && isFulfillmentTask(selectedTask) && !preferredAction) {
+      if (canOpenTaskForm && !usesMaterialReviewForm && !preferredAction) {
         retainLinkedTask(selectedTask)
         setSelectedLinkedTaskID(selectedTask.id)
         window.history.replaceState({ ...window.history.state, [MOBILE_TASK_HISTORY_LINKED_KEY]: selectedTask.id }, '')
@@ -1303,6 +1320,7 @@ export default function MobileRoleTasksPage() {
     [
       availableActions,
       canProcessMaterial,
+      usesMaterialReviewForm,
       canOpenTaskForm,
       handleTaskAction,
       pushMobileTaskScreen,
@@ -1326,19 +1344,30 @@ export default function MobileRoleTasksPage() {
     ]
   )
 
+  const handleOpenRecordedAction = useCallback((target = detailTask) => {
+    if (!target || !isTerminalWorkflowTask(target) || materialBusyRef.current) return
+    retainLinkedTask(target)
+    setSelectedLinkedTaskID(target.id)
+    setSelectedTaskID(target.id)
+    clearActionReceipt()
+    setTaskFormMode(false)
+    setDetailAction('done')
+    pushMobileTaskScreen({ action: 'done', screen: 'action', taskID: target.id, linked: true })
+  }, [clearActionReceipt, detailTask, pushMobileTaskScreen, retainLinkedTask])
+
   const openTaskForm = () => {
     const current = selectedTask || taskFormReceipt?.task || actionReceipt?.task
-    if (!current || !resolveMobileTaskBusinessEntry(current)) return
+    if (!current || !resolveMobileTaskBusinessEntry(current) || !workflowTaskBusinessContract(current).containedBusiness) return
     flushMobileTaskDraftHistory()
     clearActionReceipt()
     retainLinkedTask(current)
     setSelectedLinkedTaskID(current.id)
     window.history.replaceState({ ...window.history.state, [MOBILE_TASK_HISTORY_LINKED_KEY]: current.id }, '')
     setSelectedTaskID(current.id)
-    setTaskFormReceipt(null)
+    setTaskFormReceipt((receipt) => receipt?.scopeKey === taskScopeKey && receipt.task.id === current.id ? receipt : null)
     setTaskFormMode(true)
     setDetailAction('done')
-    pushMobileTaskScreen({ action: 'done', screen: 'action', taskID: current.id, linked: true, factForm: true })
+    pushMobileTaskScreen({ action: 'done', screen: 'action', taskID: current.id, linked: true, factForm: true, replace: currentTaskScreenRef.current === 'receipt' })
   }
 
   const handleScreenBack = useCallback((screen, fallback) => {
@@ -1353,7 +1382,9 @@ export default function MobileRoleTasksPage() {
     fallback()
   }, [])
 
-  const handleDetailBack = useCallback(() => {
+  const handleDetailBack = useCallback(async () => {
+    const willPop = window.history.state?.[MOBILE_TASK_HISTORY_SCREEN_KEY] === 'detail' && Number(window.history.state?.[MOBILE_TASK_HISTORY_DEPTH_KEY] || 0) > 0
+    if (!willPop && taskFormLeaveGuard.current && !(await taskFormLeaveGuard.current())) return
     clearMobileTaskDraftBackup(taskScopeKey, selectedTaskID)
     receiptDetailSnapshotRef.current = null
     setReceiptDetailSnapshot(null)
@@ -1373,15 +1404,13 @@ export default function MobileRoleTasksPage() {
   }, [sharedHandlingID, selectedTask?.id, selectedTaskActionAccess, handleOpenSelectedTaskAction, handleDetailBack])
   const handleActionBack = useCallback(async () => {
     if (materialBusyRef.current) return
-    const willPop = typeof window !== 'undefined' && window.history.state?.[MOBILE_TASK_HISTORY_SCREEN_KEY] === 'action' && Number(window.history.state?.[MOBILE_TASK_HISTORY_DEPTH_KEY] || 0) > 0
-    if (!willPop && taskFormMode && taskFormLeaveGuard.current && !(await taskFormLeaveGuard.current())) return
     flushMobileTaskDraftHistory()
     handleScreenBack('action', () => {
       setTaskFormMode(false)
       setDetailAction(null)
       currentTaskScreenRef.current = 'detail'
     })
-  }, [flushMobileTaskDraftHistory, handleScreenBack, taskFormMode])
+  }, [flushMobileTaskDraftHistory, handleScreenBack])
   const handleReceiptBackToList = useCallback(() => {
     restoreListStateRef.current = true
     receiptDetailSnapshotRef.current = null
@@ -1454,12 +1483,29 @@ export default function MobileRoleTasksPage() {
     selectedTask,
   ])
 
+  const selectedTaskBusinessReceipt = taskFormReceipt?.scopeKey === taskScopeKey && taskFormReceipt.task.id === selectedTaskID ? taskFormReceipt : null
+  const showTaskBusinessReceipt = useCallback((receipt) => {
+    setTaskFormReceipt({ ...receipt, scopeKey: taskScopeKey })
+    setTaskFormMode(false)
+    const state = window.history.state || {}
+    window.history.replaceState({ ...state, [MOBILE_TASK_HISTORY_SCREEN_KEY]: 'receipt', [MOBILE_TASK_HISTORY_RECEIPT_KEY]: null, [MOBILE_TASK_HISTORY_FACT_FORM_KEY]: false }, '')
+    currentTaskScreenRef.current = 'receipt'
+  }, [taskScopeKey])
+
+  const handleViewSelectedTaskReceipt = useCallback(async () => {
+    if (selectedTaskBusinessReceipt) {
+      showTaskBusinessReceipt(selectedTaskBusinessReceipt)
+      return
+    }
+    showTaskReceipt(selectedTask)
+  }, [selectedTask, showTaskReceipt, selectedTaskBusinessReceipt, showTaskBusinessReceipt])
+
   useEffect(() => {
     if (!actionReceipt) {
       receiptHistoryKeyRef.current = ''
       return
     }
-    clearMobileTaskDraftBackup(taskScopeKey, actionReceipt.task?.id)
+    if (actionReceipt.status === 'confirmed') clearMobileTaskDraftBackup(taskScopeKey, actionReceipt.task?.id)
     const receiptKey = `${actionReceipt.status || ''}:${actionReceipt.action || ''}:${actionReceipt.task?.id || ''}:${actionReceipt.task?.version || ''}:${actionReceipt.message || ''}`
     if (receiptHistoryKeyRef.current === receiptKey) return
     receiptHistoryKeyRef.current = receiptKey
@@ -1498,12 +1544,13 @@ export default function MobileRoleTasksPage() {
       const historyState = event.state || {}
       const targetScreen = historyState[MOBILE_TASK_HISTORY_SCREEN_KEY]
       const targetTaskID = historyState[MOBILE_TASK_HISTORY_TASK_KEY]
-      if (currentTaskScreenRef.current === 'action' && taskFormLeaveGuard.current && (targetScreen !== 'action' || historyState[MOBILE_TASK_HISTORY_FACT_FORM_KEY] !== true)) {
+      const sameTaskStep = isMobileRoleTaskHistoryScope(historyState, taskScopeKey) && targetTaskID === selectedTaskID && ['detail', 'action', 'receipt'].includes(targetScreen)
+      if (!sameTaskStep && taskFormLeaveGuard.current) {
         const allowed = await taskFormLeaveGuard.current()
         if (!active) return
         if (!allowed) { window.history.forward(); return }
       }
-      setTaskFormReceipt(null)
+      if (!sameTaskStep) setTaskFormReceipt(null)
       setTaskFormMode(isMobileRoleTaskHistoryScope(historyState, taskScopeKey) && historyState[MOBILE_TASK_HISTORY_FACT_FORM_KEY] === true)
       setSelectedLinkedTaskID(isMobileRoleTaskHistoryScope(historyState, taskScopeKey) ? historyState[MOBILE_TASK_HISTORY_LINKED_KEY] || null : null)
       const previousScreen = currentTaskScreenRef.current
@@ -1641,6 +1688,7 @@ export default function MobileRoleTasksPage() {
     restoreActionDraft,
     restoreActionReceipt,
     taskScopeKey,
+    selectedTaskID,
   ])
 
   const receiptResetKey = `${activeMainTabKey}|${taskScopeKey}`
@@ -1776,98 +1824,36 @@ export default function MobileRoleTasksPage() {
     )
   }
 
-  if (taskFormReceipt?.scopeKey === taskScopeKey && taskFormReceipt.task.id === selectedTaskID) {
-    const current = taskFormReceipt
-    return <MobileTaskReceiptScreen
-      businessResult
-      outcome="confirmed"
-      message={current.message}
-      feedback={current.recordNo ? `业务单号：${current.recordNo}` : ''}
-      task={current.task}
-      statusLabel={resolveMobileTaskStatusLabel(current.task)}
-      onOpenTaskForm={openTaskForm}
-      onBackToList={handleReceiptBackToList}
-      onViewTask={() => {
-      retainLinkedTask(current.task)
-      setSelectedLinkedTaskID(current.task.id)
-      setTaskFormReceipt(null)
-      setDetailAction(null)
-      receiptBackIntentRef.current = 'detail'
-      handleScreenBack('receipt', () => { setTaskFormMode(false); currentTaskScreenRef.current = 'detail' })
-    }}
-    />
-  }
+  const sourceCollaborationActions = workflowTaskCollaborationModes([
+    ...(selectedCanComplete ? ['complete'] : []),
+    ...(selectedCanBlock ? ['block'] : []),
+    ...(selectedCanReject ? ['reject'] : []),
+    ...(selectedCanResume ? ['resume'] : []),
+    ...(selectedCanUrge ? ['urge'] : []),
+    ...(sourceAssignmentAccess.can_reassign ? ['assign'] : []),
+  ]).map((mode) => ({ key: mode, label: getWorkflowTaskActionMeta(selectedTask, mode).title, onClick: (trigger) => { collaborationTriggerRef.current = trigger; setCollaborationOpen(mode) } }))
 
-  if (actionReceipt) {
-    const receiptTaskRecoveryPending = Boolean(
-      actionReceiptRetryable && selectedTaskID && !selectedTask
-    )
-    return (
-      <MobileTaskReceiptScreen
-        action={actionReceipt.action}
-        backLabel={
-          isLinkedTaskTab(activeMainTabKey)
-            ? taskDetailBackLabel
-            : null
-        }
-        busy={actionBusy}
-        evidenceRefs={actionReceipt.evidence_refs}
-        feedback={actionReceipt.feedback}
-        message={actionReceipt.message}
-        statusLabel={actionReceipt.statusLabel}
-        onBackToList={handleReceiptBackToList}
-        onOpenTaskForm={actionReceipt.status === 'confirmed' && resolveMobileTaskBusinessEntry(actionReceipt.task) ? openTaskForm : null}
-        onOpenProcess={
-          actionReceiptRetryable &&
-          selectedTask &&
-          availableActions.includes(actionReceipt.action)
-            ? handleReturnToActionFromReceipt
-            : null
-        }
-        onRetryConfirm={
-          !actionReceiptRetryable || !selectedTask || !detailAction
-            ? null
-            : submitDetailAction
-        }
-        onRetryTaskLoad={
-          receiptTaskRecoveryPending && activeTaskSlot.error
-            ? () => refreshTasksAfterMutation().catch(() => {})
-            : null
-        }
-        onViewTask={actionReceipt.task ? handleViewTaskFromReceipt : null}
-        outcome={actionReceipt.status}
-        reason={actionReceipt.reason}
-        task={actionReceipt.task}
-        taskRecoveryBusy={receiptTaskRecoveryPending && activeTaskSlot.loading}
-        taskRecoveryError={
-          receiptTaskRecoveryPending ? activeTaskSlot.error : ''
-        }
-        taskRecoveryPending={receiptTaskRecoveryPending}
-      />
-    )
-  }
-
-  if (selectedTask && detailAction) {
-    return (
-      <MobileTaskActionScreen
-        canManageAttachments={selectedCanOperate && hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_UPDATE)}
-        renderSourceAction={
-          taskFormMode ? (render) => <Outlet
-            key={`${taskAccessScopeKey}:${selectedTask.id}`}
-            context={{ ...shellContext,
+  const renderTaskAction = (preloadSource = false) => (
+    <MobileTaskActionScreen
+      collaborationActions={sourceCollaborationActions}
+      taskBusinessForm={taskFormMode || preloadSource}
+      canManageAttachments={selectedCanOperate && hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_UPDATE)}
+      renderSourceAction={
+        (taskFormMode || preloadSource) ? (render) => <Outlet
+          key={`${taskAccessScopeKey}:${selectedTask.id}`}
+          context={{ ...shellContext,
 taskFactHandling: {
             task: selectedTask,
 profile: adminProfile,
 roleKey: activeRoleKey,
 render,
             registerLeaveGuard: (guard) => { taskFormLeaveGuard.current = guard },
+            onBusyChange: setMaterialBusy,
+            collaborationExternal: true,
             onTaskRead: retainLinkedTask,
             onBack: handleActionBack,
             onReceipt: (receipt) => {
-              setTaskFormReceipt({ ...receipt, scopeKey: taskScopeKey })
-              const state = window.history.state || {}
-              window.history.replaceState({ ...state, [MOBILE_TASK_HISTORY_SCREEN_KEY]: 'receipt', [MOBILE_TASK_HISTORY_RECEIPT_KEY]: null, [MOBILE_TASK_HISTORY_FACT_FORM_KEY]: false }, '')
-              currentTaskScreenRef.current = 'receipt'
+              showTaskBusinessReceipt(receipt)
               refreshTasksAfterMutation().catch(() => {})
             },
             onOpenTask: (task) => {
@@ -1882,7 +1868,7 @@ render,
               pushMobileTaskScreen({ action: 'done', screen: 'action', taskID: task.id, linked: true, factForm: true })
             },
           } }}
-          /> : canProcessMaterial && detailAction !== 'urge'
+        /> : canProcessMaterial && detailAction !== 'urge'
             ? (render) => (
               <EngineeringMaterialTaskAction
                 task={selectedTask}
@@ -1908,31 +1894,30 @@ render,
               )
             : null
         }
-        accessMessage={selectedTaskActionAccess.readonlyReason}
-        accessState={actionAccessState}
-        approvedQuantity={detailApprovedQuantityValue}
-        availableActions={availableActions}
-        busy={actionBusy}
-        canViewReceipt={Boolean(selectedTaskReceipt)}
-        hasActionCapability={selectedHasActionCapability}
-        onActionChange={(action) => handleTaskAction(selectedTask, action)}
-        onApprovedQuantityChange={updateDetailApprovedQuantity}
-        onBack={handleActionBack}
-        onOpenTaskForm={!taskFormMode && canOpenTaskForm ? openTaskForm : null}
-        onReasonChange={updateDetailReason}
-        onRetryAccess={selectedTaskActionAccess.retry}
-        onSubmit={submitDetailAction}
-        onViewReceipt={
-          selectedTaskReceipt ? () => showTaskReceipt(selectedTask) : null
+      accessMessage={selectedTaskActionAccess.readonlyReason}
+      accessState={actionAccessState}
+      approvedQuantity={detailApprovedQuantityValue}
+      availableActions={availableActions}
+      busy={actionBusy}
+      canViewReceipt={Boolean(selectedTaskReceipt || selectedTaskBusinessReceipt)}
+      hasActionCapability={selectedHasActionCapability}
+      onActionChange={(action) => handleTaskAction(selectedTask, action)}
+      onApprovedQuantityChange={updateDetailApprovedQuantity}
+      onBack={handleActionBack}
+      onOpenTaskForm={!taskFormMode && canOpenTaskForm ? openTaskForm : null}
+      onReasonChange={updateDetailReason}
+      onRetryAccess={selectedTaskActionAccess.retry}
+      onSubmit={submitDetailAction}
+      onViewReceipt={
+          selectedTaskReceipt || selectedTaskBusinessReceipt ? handleViewSelectedTaskReceipt : null
         }
-        reason={detailReasonValue}
-        selectedAction={detailAction}
-        task={selectedTask}
-      />
-    )
-  }
-
-  if (detailTask) {
+      reason={detailReasonValue}
+      recordedReceipt={selectedTaskReceipt}
+      selectedAction={detailAction}
+      task={selectedTask}
+    />
+  )
+  const renderTaskDetail = () => {
     const receiptSnapshotOnly = Boolean(receiptDetailTask && !selectedTask)
     return (
       <MobileTaskDetailScreen
@@ -1951,7 +1936,8 @@ render,
         onBack={handleDetailBack}
         processingComplete={receiptSnapshotOnly || materialTaskSettled}
         onOpenAction={receiptSnapshotOnly ? null : handleOpenSelectedTaskAction}
-        onOpenTaskForm={!receiptSnapshotOnly && canOpenTaskForm && (isFulfillmentTask(selectedTask) || !selectedCanOperate) ? openTaskForm : null}
+        onOpenRecordedAction={isTerminalWorkflowTask(detailTask) && !canOpenTaskForm ? () => handleOpenRecordedAction(detailTask) : null}
+        onOpenTaskForm={!receiptSnapshotOnly && canOpenTaskForm && !usesMaterialReviewForm ? openTaskForm : null}
         onViewReceipt={
           receiptSnapshotOnly && receiptDetailSnapshot
             ? () => restoreActionReceipt(receiptDetailSnapshot)
@@ -1981,6 +1967,92 @@ render,
         selectedTask={detailTask}
       />
     )
+  }
+
+  const stepTask = detailTask || actionReceipt?.task || selectedTaskBusinessReceipt?.task
+  const renderTaskStep = (step, content) => <MobileTaskStepPanels scopeKey={`${taskAccessScopeKey}:${stepTask?.id}`} version={stepTask?.version} activeStep={step} panels={canOpenTaskForm && selectedTask && !usesMaterialReviewForm ? { detail: renderTaskDetail(), action: renderTaskAction(true) } : undefined} overlay={collaborationOpen && selectedTask ? <BusinessTaskActions collaborationTask={selectedTask} collaborationAction={collaborationOpen} adminProfile={adminProfile} allowCreate={false} onCollaborationClose={() => { setCollaborationOpen(''); if (collaborationTriggerRef.current?.isConnected) collaborationTriggerRef.current.focus({ preventScroll: true }) }} onCreated={(updated) => { retainLinkedTask(updated); setSelectedLinkedTaskID(updated.id); refreshTasksAfterMutation().catch(() => {}) }} /> : null}>{content}</MobileTaskStepPanels>
+
+  if (selectedTaskBusinessReceipt && !taskFormMode && detailAction) {
+    const current = selectedTaskBusinessReceipt
+    return renderTaskStep('receipt', <MobileTaskReceiptScreen
+      profile={adminProfile}
+      businessResult
+      businessReceipt={current}
+      outcome="confirmed"
+      message={current.message}
+      recordNo={current.recordNo}
+      task={current.task}
+      statusLabel={resolveMobileTaskStatusLabel(current.task)}
+      onOpenTaskForm={openTaskForm}
+      onBackToList={handleReceiptBackToList}
+      onViewTask={() => {
+      retainLinkedTask(current.task)
+      setSelectedLinkedTaskID(current.task.id)
+      setDetailAction(null)
+      receiptBackIntentRef.current = 'detail'
+      handleScreenBack('receipt', () => { setTaskFormMode(false); currentTaskScreenRef.current = 'detail' })
+    }}
+    />)
+  }
+
+  if (actionReceipt) {
+    const receiptTaskRecoveryPending = Boolean(
+      actionReceiptRetryable && selectedTaskID && !selectedTask
+    )
+    return renderTaskStep('receipt', (
+      <MobileTaskReceiptScreen
+        profile={adminProfile}
+        action={actionReceipt.action}
+        backLabel={
+          isLinkedTaskTab(activeMainTabKey)
+            ? taskDetailBackLabel
+            : null
+        }
+        busy={actionBusy}
+        evidenceRefs={actionReceipt.evidence_refs}
+        feedback={actionReceipt.feedback}
+        message={actionReceipt.message}
+        statusLabel={actionReceipt.statusLabel}
+        onBackToList={handleReceiptBackToList}
+        onOpenTaskForm={['confirmed', 'recorded'].includes(actionReceipt.status) && resolveMobileTaskBusinessEntry(actionReceipt.task) && workflowTaskBusinessContract(actionReceipt.task).containedBusiness ? openTaskForm : null}
+        onOpenProcess={
+          isTerminalWorkflowTask(actionReceipt.task)
+            ? () => handleOpenRecordedAction(actionReceipt.task)
+            : actionReceiptRetryable &&
+          selectedTask &&
+          availableActions.includes(actionReceipt.action)
+            ? handleReturnToActionFromReceipt
+            : null
+        }
+        onRetryConfirm={
+          !actionReceiptRetryable || !selectedTask || !detailAction
+            ? null
+            : submitDetailAction
+        }
+        onRetryTaskLoad={
+          receiptTaskRecoveryPending && activeTaskSlot.error
+            ? () => refreshTasksAfterMutation().catch(() => {})
+            : null
+        }
+        onViewTask={actionReceipt.task ? handleViewTaskFromReceipt : null}
+        outcome={actionReceipt.status}
+        reason={actionReceipt.reason}
+        task={actionReceipt.task}
+        taskRecoveryBusy={receiptTaskRecoveryPending && activeTaskSlot.loading}
+        taskRecoveryError={
+          receiptTaskRecoveryPending ? activeTaskSlot.error : ''
+        }
+        taskRecoveryPending={receiptTaskRecoveryPending}
+      />
+    ))
+  }
+
+  if (selectedTask && detailAction) {
+    return renderTaskStep('action', renderTaskAction())
+  }
+
+  if (detailTask) {
+    return renderTaskStep('detail', renderTaskDetail())
   }
 
   return (

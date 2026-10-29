@@ -1,4 +1,6 @@
-export { DEV_TESTING_ROUTE } from './devRoutes.mjs'
+import { DEV_BUSINESS_CHAIN_AUDIT_ROUTE, DEV_TESTING_ROUTE } from './devRoutes.mjs'
+
+export { DEV_TESTING_ROUTE }
 export const DEV_TESTING_STRATEGY_SOURCE_PATH = 'docs/product/自动化测试策略.md'
 export const DEV_TESTING_COVERAGE_API_PATH = '/__dev/api/qa/coverage'
 export const DEV_TESTING_COVERAGE_SNAPSHOT_API_PATH = `${DEV_TESTING_COVERAGE_API_PATH}/snapshot`
@@ -13,7 +15,8 @@ export const DEV_TESTING_PRIMARY_VIEWS = Object.freeze([
   { value: 'server', label: '服务器验证' },
   Object.freeze({ value: 'overview', label: '测试总览' }),
   Object.freeze({ value: 'tiers', label: '本轮验证' }),
-  Object.freeze({ value: 'coverage', label: '测试报告' }),
+  Object.freeze({ value: 'coverage', label: '覆盖报告' }),
+  Object.freeze({ value: 'chains', label: '链路实测' }),
   Object.freeze({ value: 'pressure', label: '压力测试' }),
   Object.freeze({ value: 'guide', label: '测试指引' }),
 ])
@@ -23,7 +26,7 @@ export const DEV_TESTING_WORKSPACE_VIEWS = Object.freeze(
 )
 
 export function getDevTestingViewGroup(view) {
-  return ['server', 'guide'].includes(view) ? view : 'workspace'
+  return view === 'commands' ? 'guide' : ['server', 'guide'].includes(view) ? view : 'workspace'
 }
 
 export function getDevTestingViewGroups(standalone = false) {
@@ -98,6 +101,25 @@ export function buildDevTestingViewSearch(search, nextView) {
   params.set('view', next)
   params.delete('doc')
   return params
+}
+
+// 链路报告有自己的 view、q 和批次筛选，跨页签时分别保存两侧查询。
+export function buildDevTestingViewNavigation(location, nextView) {
+  const { pathname, search = '', state } = location
+  const isChainReport = pathname.replace(/\/+$/u, '') === DEV_BUSINESS_CHAIN_AUDIT_ROUTE
+  if (nextView === 'chains') {
+    return {
+      to: { pathname: DEV_BUSINESS_CHAIN_AUDIT_ROUTE, search: isChainReport ? search : state?.chainAuditSearch || '' },
+      state: { ...state, testingReturnSearch: isChainReport ? state?.testingReturnSearch : search },
+    }
+  }
+  return {
+    to: {
+      pathname: DEV_TESTING_ROUTE,
+      search: `?${buildDevTestingViewSearch(isChainReport ? state?.testingReturnSearch : search, nextView)}`,
+    },
+    state: { ...state, ...(isChainReport ? { chainAuditSearch: search } : {}) },
+  }
 }
 
 export const DEV_TESTING_COVERAGE_SECTIONS = Object.freeze([

@@ -14,7 +14,7 @@ function query(filters = {}, context = {}) {
       dateFilterEnd: '',
       dateFilterField: 'inspected_at',
       dateFilterStart: '',
-      inspectionTypeFilter: '',
+      inspectionTypeFilter: 'INCOMING',
       keyword: '',
       lotFilter: '',
       materialFilter: '',
@@ -82,6 +82,7 @@ test('incoming exact-source lists retain structured filters without adding a con
   assert.equal(calls[0].method, 'list_quality_inspections')
   assert.deepEqual(calls[0].params, {
     include_status_counts: true,
+    include_superseded: false,
     status: 'SUBMITTED',
     result: 'PASS',
     date_from: '2026-10-01',
@@ -187,13 +188,8 @@ test('an exact inspection export reads that record without broadening the list',
   )
 })
 
-test('production-stage exact exports stay on the production read model', async (t) => {
-  const calls = await rpcHarness(t, (_method, params) => ({
-    quality_inspections: [{ id: 77 }, { id: 78 }],
-    total: 2,
-    limit: params.limit,
-    offset: params.offset,
-  }))
+test('production-stage exact exports use the source-authorized detail read', async (t) => {
+  const calls = await rpcHarness(t, () => ({ quality_inspection: { id: 77 } }))
   const rows = await loadQualityInspectionExport(
     query(
       { inspectionTypeFilter: 'PRODUCTION_STAGE' },
@@ -201,7 +197,16 @@ test('production-stage exact exports stay on the production read model', async (
     )
   )
   assert.deepEqual(rows, [{ id: 77 }])
-  assert.equal(calls[0].method, 'list_production_stage_quality_inspections')
+  assert.equal(calls[0].method, 'get_quality_inspection')
+})
+
+test('an exact task reads its inspection once without unrelated incoming-list permissions', async (t) => {
+  const calls = await rpcHarness(t, () => ({ quality_inspection: { id: 77, inspection_type: 'PRODUCTION_STAGE' } }))
+  const controller = new AbortController()
+  const data = await loadQualityInspectionList({ ...query({}, { routeQualityInspectionID: 77 }), signal: controller.signal })
+  assert.deepEqual(data, { quality_inspections: [{ id: 77, inspection_type: 'PRODUCTION_STAGE' }], total: 1 })
+  assert.deepEqual(calls.map(({ method, params }) => ({ method, params })), [{ method: 'get_quality_inspection', params: { id: 77 } }])
+  assert.equal(calls[0].signal, controller.signal)
 })
 
 test('failed reads remain errors instead of successful empty lists', async (t) => {
@@ -209,4 +214,26 @@ test('failed reads remain errors instead of successful empty lists', async (t) =
     throw new Error('connection closed')
   })
   await assert.rejects(loadQualityInspectionList(query()))
+  await assert.rejects(loadQualityInspectionList(query({}, { routeQualityInspectionID: 77 })))
+})
+
+test('list, summary and export share the explicitly selected historical scope for every type', async (t) => {
+  const calls = await rpcHarness(t)
+  for (const [inspectionTypeFilter, method] of [
+    ['INCOMING', 'list_quality_inspections'],
+    ['OUTSOURCING_RETURN', 'list_outsourcing_return_quality_inspections'],
+    ['FINISHED_GOODS', 'list_finished_goods_quality_inspections'],
+    ['PRODUCTION_STAGE', 'list_production_stage_quality_inspections'],
+  ]) {
+    for (const includeSuperseded of [false, true]) {
+      const input = query({ inspectionTypeFilter, includeSuperseded })
+      await loadQualityInspectionList(input)
+      assert.equal(calls.at(-1).method, method)
+      assert.equal(calls.at(-1).params.include_superseded, includeSuperseded)
+      assert.equal(calls.at(-1).params.include_status_counts, true)
+      await loadQualityInspectionExport(input)
+      assert.equal(calls.at(-1).method, method)
+      assert.equal(calls.at(-1).params.include_superseded, includeSuperseded)
+    }
+  }
 })

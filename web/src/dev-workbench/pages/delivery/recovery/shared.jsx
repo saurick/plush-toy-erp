@@ -1,4 +1,4 @@
-import { ReloadOutlined, RightOutlined } from '@ant-design/icons'
+import { ReloadOutlined } from '@ant-design/icons'
 import { Button, Space, Tag, Typography } from 'antd'
 import DevTimestamp from '../../../components/DevTimestamp.jsx'
 
@@ -7,6 +7,7 @@ const { Paragraph, Text } = Typography
 export const RECOVERY_VIEWS = [
   { value: 'security', label: '安全核验' },
   { value: 'drills', label: '恢复演练' },
+  { value: 'backups', label: '备份记录' },
   { value: 'emergency', label: '应急指引' },
 ]
 
@@ -15,7 +16,6 @@ export function DrillAction({
   refreshing,
   disabled = false,
   onRefresh,
-  onNavigate,
 }) {
   if (action.type === 'refresh') {
     return (
@@ -24,17 +24,6 @@ export function DrillAction({
         loading={refreshing}
         disabled={disabled}
         onClick={onRefresh}
-      >
-        {action.label}
-      </Button>
-    )
-  }
-  if (action.type === 'route') {
-    return (
-      <Button
-        icon={<RightOutlined aria-hidden="true" />}
-        disabled={disabled}
-        onClick={() => onNavigate(action.route)}
       >
         {action.label}
       </Button>
@@ -77,7 +66,6 @@ export function DrillDetail({
   refreshing,
   disabled,
   onRefresh,
-  onNavigate,
 }) {
   return (
     <div className="erp-dev-recovery-row__detail">
@@ -124,7 +112,6 @@ export function DrillDetail({
         refreshing={refreshing}
         disabled={disabled}
         onRefresh={onRefresh}
-        onNavigate={onNavigate}
       />
     </div>
   )

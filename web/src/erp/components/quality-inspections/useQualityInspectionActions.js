@@ -14,9 +14,11 @@ import { compactParams } from '../../utils/sourceDocumentValues.mjs'
 import { resetBusinessPaginationCurrent } from '../../utils/businessPagination.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isSourceActionPermissionDenied, SOURCE_ACCESS_REVOKED_MESSAGE } from '../../utils/sourceActionAccess.mjs'
 
 export default function useQualityInspectionActions({
   editor,
+  sourceAccess,
   activeCustomerKey,
   loadRows,
   reportBusinessResult,
@@ -33,12 +35,19 @@ export default function useQualityInspectionActions({
     setSaving,
   } = editor
   const mutationInFlight = useRef(false)
+  const sourceAccessRef = useRef(sourceAccess)
+  sourceAccessRef.current = sourceAccess
   const handleCreateInspection = useCallback(async () => {
+    if (!sourceAccessRef.current?.allowed) {
+      message.warning(sourceAccessRef.current?.reason || SOURCE_ACCESS_REVOKED_MESSAGE)
+      return
+    }
     if (referenceDataState !== 'ready') {
       message.warning('质检来源资料尚未就绪，本次未生成，请刷新后重试')
       return
     }
     const values = await inspectionForm.validateFields()
+    if (!sourceAccessRef.current?.allowed) return
     if (mutationInFlight.current) return
     mutationInFlight.current = true
     setSaving(true)
@@ -62,7 +71,13 @@ export default function useQualityInspectionActions({
       closeModal()
       resetBusinessPaginationCurrent(setPagination)
     } catch (error) {
-      message.error(getActionErrorMessage(error, '创建来料质检草稿'))
+      if (isSourceActionPermissionDenied(error)) {
+        inspectionForm.resetFields()
+        closeModal()
+        message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+      } else {
+        message.error(getActionErrorMessage(error, '创建来料质检草稿'))
+      }
     } finally {
       mutationInFlight.current = false
       setSaving(false)
@@ -105,7 +120,6 @@ export default function useQualityInspectionActions({
     if (!inspection?.id) return
     const values = await decisionForm.validateFields()
     if (
-      inspection.purchase_receipt_item_id &&
       inspectionModal.mode !== 'cancel'
     ) {
       const result =
@@ -116,10 +130,10 @@ export default function useQualityInspectionActions({
         return
       }
       if (
-        result === 'CONCESSION' &&
+        ['CONCESSION', 'REJECT'].includes(result) &&
         !String(values.decision_note || '').trim()
       ) {
-        message.warning('让步接收请填写接收理由')
+        message.warning('请填写异常或让步理由')
         return
       }
     }

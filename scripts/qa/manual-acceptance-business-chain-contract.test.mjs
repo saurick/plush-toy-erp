@@ -19,6 +19,16 @@ function cloneCatalog() {
   return structuredClone(DEV_FLOW_STATE_CATALOG);
 }
 
+function assertRegisteredChainCounts(actual) {
+  const chains = DEV_FLOW_STATE_CATALOG.businessChains;
+  assert.equal(actual.chainCount, chains.length);
+  assert.equal(actual.stepCount, chains.flatMap((chain) => chain.steps).length);
+  assert.equal(
+    actual.scenarioCount,
+    chains.flatMap((chain) => chain.acceptanceScenarios).length,
+  );
+}
+
 function observedSnapshot(snapshot) {
   return {
     definitionSnapshot: structuredClone(snapshot),
@@ -195,10 +205,20 @@ test("review plan preserves alternative and sequential outcomes with the shared 
 test("manual acceptance projects all registered chain steps and legal scenarios", () => {
   const contract = buildManualAcceptanceBusinessChainContract();
 
-  assert.equal(contract.chainCount, 11);
-  assert.equal(contract.stepCount, 82);
-  assert.equal(contract.scenarioCount, 66);
-  assert.equal(contract.chains.length, 11);
+  assertRegisteredChainCounts(contract);
+  assert.deepEqual(
+    contract.chains.map((chain) => ({
+      key: chain.chainKey,
+      steps: chain.steps.map((step) => step.key),
+      scenarios: chain.scenarios.map((scenario) => scenario.key),
+    })),
+    DEV_FLOW_STATE_CATALOG.businessChains.map((chain) => ({
+      key: chain.key,
+      steps: chain.steps.map((step) => step.key),
+      scenarios: chain.acceptanceScenarios.map((scenario) => scenario.key),
+    })),
+    "acceptance must preserve every registered chain, step and scenario in order",
+  );
   for (const chain of contract.chains) {
     assert.deepEqual(
       chain.scenarios.map((scenario) => scenario.kind),
@@ -280,10 +300,22 @@ test("manual acceptance review plan is a readable projection of registered steps
     datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
   });
 
-  assert.equal(review.chainCount, 11);
-  assert.equal(review.stepCount, 82);
-  assert.equal(review.scenarioCount, 66);
-  assert.equal(review.dataStageCount, 9);
+  assertRegisteredChainCounts(review);
+  assert.deepEqual(
+    review.chains.map((chain) => ({
+      key: chain.key,
+      steps: chain.steps.map((step) => step.key),
+    })),
+    DEV_FLOW_STATE_CATALOG.businessChains.map((chain) => ({
+      key: chain.key,
+      steps: chain.steps.map((step) => step.key),
+    })),
+    "review must preserve the exact registered steps rather than only their count",
+  );
+  assert.equal(
+    review.dataStageCount,
+    MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length,
+  );
   assert.deepEqual(
     review.dataStages.map((stage) => stage.key),
     MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
@@ -305,7 +337,11 @@ test("manual acceptance review plan is a readable projection of registered steps
     ],
   );
   for (const chain of review.chains) {
-    assert.equal(chain.scenarioCount, 6, chain.key);
+    assert.equal(
+      chain.scenarioCount,
+      DEV_BUSINESS_CHAIN_SCENARIO_KINDS.length,
+      chain.key,
+    );
     assert.deepEqual(chain.scenarioKinds, DEV_BUSINESS_CHAIN_SCENARIO_KINDS);
     for (const step of chain.steps) {
       assert(step.label, step.key);

@@ -24,6 +24,7 @@ import {
   captureFlowFieldPage,
 } from "./transaction-flow-fields-browser.mjs";
 import { printTemplateCatalog } from "../../web/src/erp/config/printTemplates.mjs";
+import { RpcMethod } from '../../web/src/common/consts/rpcMethods.generated.mjs';
 import { OutsourcingOrderStatus } from "../../web/src/common/consts/statuses.generated.mjs";
 
 const require = createRequire(
@@ -35,16 +36,47 @@ const templateKeys = printTemplateCatalog
   .filter((template) => template.runtime?.workspace)
   .map((template) => template.key);
 
+export const SHARED_FILTER_CASES = Object.freeze([
+  {
+    key: 'quality-type', page: 'quality', label: '检验类型', choice: '委外回货',
+    field: 'inspection_type', value: 'OUTSOURCING_RETURN', restoredValue: 'INCOMING',
+    collection: 'quality_inspections', table: 'quality_inspections',
+    selectedRequest: { method: RpcMethod.quality.LIST_OUTSOURCING_RETURN_QUALITY_INSPECTIONS, params: { inspection_type: '' } },
+    restoredRequest: { method: RpcMethod.quality.LIST_QUALITY_INSPECTIONS, params: { inspection_type: 'INCOMING' } },
+  },
+  {
+    key: 'customer-receipts', page: 'payments', label: '收付款方向', choice: '收款',
+    field: 'direction', value: 'RECEIPT', restoredValue: '', collection: 'payments', table: 'finance_payments',
+    selectedRequest: { method: RpcMethod.operational_fact.LIST_FINANCE_PAYMENTS, params: { direction: 'RECEIPT' } },
+    restoredRequest: { method: RpcMethod.operational_fact.LIST_FINANCE_PAYMENTS, params: { direction: '' } },
+  },
+  {
+    key: 'supplier-payments', page: 'payments', label: '收付款方向', choice: '付款',
+    field: 'direction', value: 'DISBURSEMENT', restoredValue: '', collection: 'payments', table: 'finance_payments',
+    selectedRequest: { method: RpcMethod.operational_fact.LIST_FINANCE_PAYMENTS, params: { direction: 'DISBURSEMENT' } },
+    restoredRequest: { method: RpcMethod.operational_fact.LIST_FINANCE_PAYMENTS, params: { direction: '' } },
+  },
+]);
+
+export function matchesSharedFilterRequest(call, request) {
+  return call?.method === request.method && Object.entries(request.params).every(([key, value]) => String(call.params?.[key] || '') === value);
+}
+
 export function assertSharedSurfaceReport(report) {
   assert.deepEqual(report.pageErrors, []);
   assert.deepEqual(
     report.filters.map((entry) => entry.key),
-    ["incoming-quality", "customer-receipts", "supplier-payments"],
+    ["quality-type", "customer-receipts", "supplier-payments"],
   );
-  for (const entry of report.filters) {
+  for (const [index, entry] of report.filters.entries()) {
     assert.ok(entry.rows > 0);
     assert.equal(entry.databaseMatches, true);
     assert.equal(entry.restored, true);
+    assert.equal(entry.restoredDatabaseMatches, true);
+    assert.equal(entry.selectedMethod, SHARED_FILTER_CASES[index].selectedRequest.method);
+    assert.equal(entry.restoredMethod, SHARED_FILTER_CASES[index].restoredRequest.method);
+    assert.equal(entry.selectedValue, entry.key === 'quality-type' ? 'OUTSOURCING_RETURN' : entry.key === 'customer-receipts' ? 'RECEIPT' : 'DISBURSEMENT');
+    assert.equal(entry.restoredValue, entry.key === 'quality-type' ? 'INCOMING' : '');
     assert.equal(entry.documentOverflow, false);
   }
   assert.deepEqual(
@@ -175,9 +207,7 @@ async function verifyMaterialInstructionBlocked(
   try {
     await pageAction(page, "作业指导书打印");
     await expect(
-      page.locator(".ant-message-notice-content").filter({
-        hasText: "当前加工合同没有可带入作业指导书的产品 / 半成品明细",
-      }),
+      page.getByText("当前加工合同没有可带入作业指导书的产品 / 半成品明细", { exact: true }),
     ).toBeVisible();
     assert.deepEqual(context.pages(), pages);
     assert.deepEqual(pdfRequests, []);
@@ -200,25 +230,20 @@ async function filterAndRestore(page, options, client, report, config) {
   await expect(page.locator(".ant-table-row:visible").first()).toBeVisible();
   await page
     .locator(".erp-business-operation-panel")
-    .getByRole("button", { name: /^(filter )?筛选( · 已应用)?$/u })
+    .getByRole("button", { name: /^筛选(?:，已应用 \d+ 项)?$/u })
     .click();
   const dialog = page.getByRole("dialog", { name: "筛选条件", exact: true });
   await expect(dialog).toBeVisible();
   const group = dialog.getByRole("group", { name: config.label, exact: true });
   await expect(group).toBeVisible();
   assert.equal(await group.locator("input").count(), 0);
-  const responseFor = (value) =>
-    page.waitForResponse((response) => {
-      if (!response.url().includes("/rpc/")) return false;
-      const body = response.request().postDataJSON();
-      return (
-        body?.method === config.method &&
-        String(body.params?.[config.field] || "") === value
-      );
-    });
-  const selectedResponse = responseFor(config.value);
-  await group.getByRole("button", { name: config.choice, exact: true }).click();
-  const response = await selectedResponse;
+  const responseFor = (request) => page.waitForResponse(response =>
+    response.url().includes('/rpc/') && matchesSharedFilterRequest(response.request().postDataJSON(), request),
+  );
+  const [response] = await Promise.all([
+    responseFor(config.selectedRequest),
+    group.getByRole("button", { name: config.choice, exact: true }).click(),
+  ]);
   assert.equal(response.status(), 200);
   const { result } = await response.json();
   assert.equal(result.code, 0);
@@ -254,13 +279,21 @@ async function filterAndRestore(page, options, client, report, config) {
   );
   await page
     .locator(".erp-business-operation-panel")
-    .getByRole("button", { name: /^(filter )?筛选( · 已应用)?$/u })
+    .getByRole("button", { name: /^筛选(?:，已应用 \d+ 项)?$/u })
     .click();
-  const restoredResponse = responseFor("");
-  await group.getByRole("button", { name: config.clear, exact: true }).click();
-  const restored = await (await restoredResponse).json();
+  const restoredValue = config.restoredValue || '';
+  const [restoredResponse] = await Promise.all([
+    responseFor(config.restoredRequest),
+    group.getByRole("button", { name: '不限', exact: true }).click(),
+  ]);
+  const restored = await restoredResponse.json();
   assert.equal(restored.result.code, 0);
-  assert.ok(restored.result.data.total >= result.data.total);
+  const restoredRows = restored.result.data[config.collection];
+  if (!restoredValue) assert.ok(restored.result.data.total >= result.data.total);
+  else assert.ok(restoredRows.every(row => row[config.field] === restoredValue));
+  const restoredIDs = restoredRows.map(({ id }) => id);
+  assert.ok(restoredIDs.length > 0 && restoredIDs.every(Number.isSafeInteger));
+  assert.deepEqual(client.query(`SELECT json_agg(id ORDER BY id) FROM ${config.table} WHERE id IN (${restoredIDs.join(',')})${restoredValue ? ` AND ${config.field}='${restoredValue}'` : ''}`), [...restoredIDs].sort((a, b) => a - b));
   await dialog.getByRole("button", { name: "完成", exact: true }).click();
   await expect
     .poll(async () =>
@@ -276,6 +309,11 @@ async function filterAndRestore(page, options, client, report, config) {
     rows: rows.length,
     databaseMatches: true,
     restored: true,
+    restoredDatabaseMatches: true,
+    selectedMethod: config.selectedRequest.method,
+    restoredMethod: config.restoredRequest.method,
+    selectedValue: config.value,
+    restoredValue,
     documentOverflow:
       captured.metrics.documentWidth > captured.metrics.viewport.width,
   });
@@ -435,45 +473,7 @@ export async function runSharedSurfacesBrowser(input) {
     );
     await observePDFDownloads(context);
     try {
-      for (const config of [
-        {
-          key: "incoming-quality",
-          page: "quality",
-          label: "检验类型",
-          choice: "采购来料",
-          clear: "全部检验类型",
-          method: "list_quality_inspections",
-          field: "inspection_type",
-          value: "INCOMING",
-          collection: "quality_inspections",
-          table: "quality_inspections",
-        },
-        {
-          key: "customer-receipts",
-          page: "payments",
-          label: "收付款方向",
-          choice: "收款",
-          clear: "全部方向",
-          method: "list_finance_payments",
-          field: "direction",
-          value: "RECEIPT",
-          collection: "payments",
-          table: "finance_payments",
-        },
-        {
-          key: "supplier-payments",
-          page: "payments",
-          label: "收付款方向",
-          choice: "付款",
-          clear: "全部方向",
-          method: "list_finance_payments",
-          field: "direction",
-          value: "DISBURSEMENT",
-          collection: "payments",
-          table: "finance_payments",
-        },
-      ])
-        await filterAndRestore(page, options, client, report, config);
+      for (const config of SHARED_FILTER_CASES) await filterAndRestore(page, options, client, report, config);
       const purchase = client.query(`SELECT row_to_json(p) FROM
         (SELECT id,purchase_order_no FROM purchase_orders ORDER BY id LIMIT 1) p`);
       const outsourcing = printSources.material;

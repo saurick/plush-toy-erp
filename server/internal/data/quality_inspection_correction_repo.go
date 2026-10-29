@@ -38,7 +38,7 @@ func (r *inventoryRepo) CreateQualityInspectionCorrection(ctx context.Context, i
 		if existing.InspectionNo != in.CorrectionInspectionNo {
 			return nil, biz.ErrIdempotencyConflict
 		}
-		return entQualityInspectionToBiz(existing), nil
+		return qualityInspectionWithHistory(ctx, tx.client, existing)
 	}
 	if (original.Status != biz.QualityInspectionStatusPassed && original.Status != biz.QualityInspectionStatusRejected) || original.ProductionWipBatchID != nil {
 		return nil, biz.ErrBadParam
@@ -93,11 +93,15 @@ func (r *inventoryRepo) CreateQualityInspectionCorrection(ctx context.Context, i
 	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
 		return nil, err
 	}
+	item, err := qualityInspectionWithHistory(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx.sqlTx = nil
-	return entQualityInspectionToBiz(row), nil
+	return item, nil
 }
 
 func validateQualityCorrectionDependencies(ctx context.Context, tx *inventoryDBTx, row *ent.QualityInspection) error {

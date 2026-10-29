@@ -29,12 +29,14 @@ const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const STORAGE_IMAGE = "chrislusf/seaweedfs:4.46";
 
-export function transactionBrowserBudget({ sourceOrdersOnly = false, receivingOnly = false, desktopVariantsOnly = false } = {}) {
+export function transactionBrowserBudget({ sourceOrdersOnly = false, receivingOnly = false, desktopVariantsOnly = false, purchaseChainOnly = false, productionRecoveryOnly = false } = {}) {
   assert.equal(typeof sourceOrdersOnly, 'boolean');
   assert.equal(typeof receivingOnly, 'boolean');
+  assert.equal(typeof purchaseChainOnly, "boolean");
+  assert.equal(typeof productionRecoveryOnly, "boolean");
   assert.equal(typeof desktopVariantsOnly, 'boolean');
-  assert.ok([sourceOrdersOnly, receivingOnly, desktopVariantsOnly].filter(Boolean).length <= 1, 'select only one browser scope');
-  const narrow = sourceOrdersOnly || receivingOnly || desktopVariantsOnly;
+  assert.ok([sourceOrdersOnly, receivingOnly, desktopVariantsOnly, purchaseChainOnly, productionRecoveryOnly].filter(Boolean).length <= 1, 'select only one browser scope');
+  const narrow = sourceOrdersOnly || receivingOnly || desktopVariantsOnly || purchaseChainOnly || productionRecoveryOnly;
   return { browserTimeoutMS: (narrow ? 8 : 12) * 60 * 1000, runTimeoutMS: (narrow ? 15 : 25) * 60 * 1000 };
 }
 
@@ -171,15 +173,19 @@ export async function runIsolatedTransactionBrowser({
   sourceOrdersOnly = false,
   receivingOnly = false,
   desktopVariantsOnly = false,
+  purchaseChainOnly = false,
+  productionRecoveryOnly = false,
   desktopCase = "all",
 } = {}) {
   assert.equal(typeof sourceOrdersOnly, "boolean");
   assert.equal(typeof receivingOnly, "boolean");
+  assert.equal(typeof purchaseChainOnly, "boolean");
+  assert.equal(typeof productionRecoveryOnly, "boolean");
   assert.equal(typeof desktopVariantsOnly, "boolean");
-  assert.ok([sourceOrdersOnly, receivingOnly, desktopVariantsOnly].filter(Boolean).length <= 1, "select only one browser scope");
+  assert.ok([sourceOrdersOnly, receivingOnly, desktopVariantsOnly, purchaseChainOnly, productionRecoveryOnly].filter(Boolean).length <= 1, "select only one browser scope");
   assert.ok(["all", "advance", "outsourcing", "shell"].includes(desktopCase), "unknown desktop case");
   assert.ok(desktopVariantsOnly || desktopCase === "all", "desktop case requires desktop variants scope");
-  const budget = transactionBrowserBudget({ sourceOrdersOnly, receivingOnly, desktopVariantsOnly });
+  const budget = transactionBrowserBudget({ sourceOrdersOnly, receivingOnly, desktopVariantsOnly, purchaseChainOnly, productionRecoveryOnly });
   const out = path.resolve(
     outputDir ||
       path.join(root, "output/qa/transaction-browser", Date.now().toString()),
@@ -189,9 +195,9 @@ export async function runIsolatedTransactionBrowser({
     "evidence must stay under output/qa",
   );
   await fs.mkdir(out, { recursive: true, mode: 0o700 });
-  const directory = await fs.mkdtemp(
+  const directory = await fs.realpath(await fs.mkdtemp(
     path.join(os.tmpdir(), "plush-transaction-e2e-"),
-  );
+  ));
   const source = path.join(directory, "source");
   const report = {
     status: "running",
@@ -199,7 +205,7 @@ export async function runIsolatedTransactionBrowser({
     outputDir: out,
     simulatedOnly: true,
     desktopCase: desktopVariantsOnly ? desktopCase : undefined,
-    scope: desktopVariantsOnly ? "desktop-variants" : receivingOnly ? "receiving" : sourceOrdersOnly ? "source-orders" : "transactions-and-source-orders-and-receiving",
+    scope: productionRecoveryOnly ? "production-recovery" : purchaseChainOnly ? "purchase-chain" : desktopVariantsOnly ? "desktop-variants" : receivingOnly ? "receiving" : sourceOrdersOnly ? "source-orders" : "transactions-and-source-orders-and-receiving",
     budget,
   };
   const runID = randomBytes(6).toString("hex"),
@@ -241,11 +247,11 @@ export async function runIsolatedTransactionBrowser({
       });
       return stdout.trim();
     } catch (error) {
-      if (error.stdout) {
+      if (error.stdout || error.stderr) {
         report.commandFailures ??= [];
         const evidence = `command-failure-${report.commandFailures.length + 1}.log`;
         report.commandFailures.push({ program: path.basename(file), evidence });
-        const diagnostic = redact(error.stdout);
+        const diagnostic = redact(`${error.stdout || ""}\n${error.stderr || ""}`);
         await fs.writeFile(path.join(out, evidence), diagnostic, { mode: 0o600 });
         await fs.writeFile(path.join(out, "command-failure.log"), diagnostic, { mode: 0o600 });
       }
@@ -312,7 +318,7 @@ export async function runIsolatedTransactionBrowser({
         requiredNode,
         "use the repository's pinned Node version",
       );
-      if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly) {
+      if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly && !purchaseChainOnly && !productionRecoveryOnly) {
         await Promise.all(["pdfinfo", "pdffonts", "pdftotext"].map((tool) =>
           command(tool, ["-v"], { cwd: root, timeout: 10000 }),
         ));
@@ -619,14 +625,14 @@ export async function runIsolatedTransactionBrowser({
       await command(
         process.execPath,
         [
-          path.join(source, desktopVariantsOnly ? "scripts/qa/transaction-desktop-variants-browser.mjs" : receivingOnly ? "scripts/qa/transaction-arrival-return-quality-browser.mjs" : sourceOrdersOnly ? "scripts/qa/transaction-source-orders-browser.mjs" : "scripts/qa/transaction-real-backend-browser.mjs"),
+          path.join(source, productionRecoveryOnly ? "scripts/qa/transaction-production-recovery-browser.mjs" : purchaseChainOnly ? "scripts/qa/purchase-chain-browser.mjs" : desktopVariantsOnly ? "scripts/qa/transaction-desktop-variants-browser.mjs" : receivingOnly ? "scripts/qa/transaction-arrival-return-quality-browser.mjs" : sourceOrdersOnly ? "scripts/qa/transaction-source-orders-browser.mjs" : "scripts/qa/transaction-real-backend-browser.mjs"),
           "--environment",
           environmentPath,
         ],
         { timeout: budget.browserTimeoutMS },
       );
       const browser = JSON.parse(
-        await fs.readFile(path.join(out, desktopVariantsOnly ? "browser/desktop-variants/report.json" : receivingOnly ? "browser/receiving/report.json" : sourceOrdersOnly ? "browser/source-orders/report.json" : "browser/report.json"), "utf8"),
+        await fs.readFile(path.join(out, productionRecoveryOnly ? "browser/production-recovery/report.json" : purchaseChainOnly ? "browser/purchase-chain/report.json" : desktopVariantsOnly ? "browser/desktop-variants/report.json" : receivingOnly ? "browser/receiving/report.json" : sourceOrdersOnly ? "browser/source-orders/report.json" : "browser/report.json"), "utf8"),
       );
       assert.equal(browser.status, "passed");
       report.flows = browser.flows.map(({ key, passed }) => ({ key, passed }));
@@ -638,18 +644,19 @@ export async function runIsolatedTransactionBrowser({
       );
     });
     } catch (error) {
-      if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly) throw error;
+      if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly && !purchaseChainOnly) throw error;
       sourceOrderBrowserFailure = error;
+      report.browserError = redact(error.stack);
       report.steps.push({ key: "browser-real-backend-postgres", passed: false });
     }
-    if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly) await stage("source-order-procurement-browser", async () => {
+    if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly && !purchaseChainOnly && !productionRecoveryOnly) await stage("source-order-procurement-browser", async () => {
       await command(process.execPath, [path.join(source, "scripts/qa/transaction-source-orders-browser.mjs"), "--environment", path.join(directory, "browser-environment.json")], { timeout: 300000 });
       const orders = JSON.parse(await fs.readFile(path.join(out, "browser/source-orders/report.json"), "utf8"));
       assert.equal(orders.status, "passed");
       report.sourceOrders = orders.flows.map(({ key, passed }) => ({ key, passed }));
       report.sourceOrderRequestLogs = verifyTransactionRequestLogs(orders, await fs.readFile(path.join(directory, "backend.log"), "utf8"), Object.values(secrets));
     });
-    if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly) await stage("arrival-return-quality-browser", async () => {
+    if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly && !purchaseChainOnly && !productionRecoveryOnly) await stage("arrival-return-quality-browser", async () => {
       await command(process.execPath, [path.join(source, "scripts/qa/transaction-arrival-return-quality-browser.mjs"), "--environment", path.join(directory, "browser-environment.json")], { timeout: 480000 });
       const receiving = JSON.parse(await fs.readFile(path.join(out, "browser/receiving/report.json"), "utf8"));
       assert.equal(receiving.status, "passed");
@@ -693,12 +700,41 @@ export async function runIsolatedTransactionBrowser({
         JSON.stringify(report.observability),
       );
     });
-    await stage("critical-postgres", async () => {
+    await stage(purchaseChainOnly ? "purchase-chain-postgres" : "critical-postgres", async () => {
       const criticalURL = baseDSN.replace(
         "/postgres?",
         `/${databaseNameForRun("ci", runID)}?`,
       );
-      const stdout = await command(
+      let stdout;
+      if (purchaseChainOnly) {
+        try {
+          await command(process.execPath, [
+            path.join(source, "scripts/qa/disposable-database-runner.mjs"),
+            "--profile", "ci", "--workflow", "purchase-chain-postgres", "--run-id", runID,
+            "--out", path.join(out, "postgres-lifecycle.json"),
+          ], { env: { ...env, GOFLAGS: "-p=4", DISPOSABLE_DATABASE_BASE_URL: baseDSN }, timeout: 360000 });
+        } finally {
+          const evidencePath = path.join(source, "output/dev-workbench/database", `ci-${runID}.json`);
+          const evidence = await fs.readFile(evidencePath, "utf8").catch(error => {
+            if (error.code === "ENOENT") return null;
+            throw error;
+          });
+          if (evidence) {
+            const receipt = JSON.parse(evidence);
+            assert.equal(receipt.workflow, "purchase-chain-postgres");
+            assertRepositoryIdentityEqual(report.source, receipt.repository);
+            assertRepositoryIdentityEqual(report.source, receipt.repositoryAfter);
+            const eventPath = path.join(source, receipt.testReport.path);
+            stdout = await fs.readFile(eventPath, "utf8");
+            assert.equal(createHash("sha256").update(stdout).digest("hex"), receipt.testReport.digest);
+            const canonical = path.join(root, "output/dev-workbench/database");
+            await fs.mkdir(canonical, { recursive: true });
+            await fs.copyFile(eventPath, path.join(canonical, path.basename(eventPath)));
+            await fs.copyFile(evidencePath, path.join(canonical, path.basename(evidencePath)));
+            report.postgresLifecycle = receipt;
+          }
+        }
+      } else stdout = await command(
         "bash",
         [
           path.join(source, "scripts/purchase-receipt-pg.sh"),
@@ -711,17 +747,18 @@ export async function runIsolatedTransactionBrowser({
             GOFLAGS: "-p=4",
             PURCHASE_RECEIPT_PG_DB_URL: criticalURL,
           },
-          timeout: 360000,
+          timeout: 600000,
         },
       );
       const events = stdout
         .split("\n")
         .filter((line) => line.startsWith('{"'))
         .join("\n");
-      report.postgres = verifyGoTestJson(events, [
+      report.postgres = verifyGoTestJson(events, purchaseChainOnly ? [] : [
         "TestInventoryPostgres",
         "TestQualityInspectionPostgres",
         "TestOperationalFactRepoFinance",
+        ...(productionRecoveryOnly ? ["TestProductionMaterialIssuePostgresConcurrentCrossChainIssue", "TestProductionOrderPostgresShortCloseConcurrentSupplement"] : []),
         ...(desktopVariantsOnly ? [
           "TestProductionOrderPostgresOutsourcedStageReturnRollbackAndReplay",
           "TestProductionOrderPostgresShellDispositionRollbackReplayAndReversal",
@@ -746,7 +783,7 @@ export async function runIsolatedTransactionBrowser({
       );
     });
     if (sourceOrderBrowserFailure) throw sourceOrderBrowserFailure;
-    if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly) await stage("shared-list-filter-print", async () => {
+    if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly && !purchaseChainOnly && !productionRecoveryOnly) await stage("shared-list-filter-print", async () => {
       await command(
         process.execPath,
         [
@@ -917,6 +954,16 @@ export async function runIsolatedTransactionBrowser({
       path.join(out, "lifecycle.json"),
       JSON.stringify(report, null, 2) + "\n",
     );
+    if (purchaseChainOnly && report.status === "passed") {
+      try {
+        const { publishPurchaseChainExecutionEvidence } = await import("./purchase-chain-evidence.mjs");
+        report.workbench = await publishPurchaseChainExecutionEvidence({ root, directory: out });
+      } catch (error) {
+        report.status = "failed";
+        report.evidenceError = redact(error.stack);
+      }
+      await fs.writeFile(path.join(out, "lifecycle.json"), JSON.stringify(report, null, 2) + "\n");
+    }
     process.stdout.write(
       `[transaction-e2e] ${report.status}; cleanup=${report.cleanup.passed}; ${out}\n`,
     );
@@ -931,7 +978,7 @@ if (
   const args = process.argv.slice(2);
   if (!args.length || args[0] === "--help") {
     process.stdout.write(
-      "Usage: node scripts/qa/transaction-browser-isolated.mjs --run [--source-orders | --receiving | --desktop-variants] [--desktop-case all|advance|outsourcing|shell] [--out output/qa/transaction-browser/<run>]\nCreates and removes an isolated source copy, PostgreSQL, storage, backend and browser. --source-orders selects sales, purchase and outsourcing browser flows with the same real PostgreSQL and logging gates; it does not attest the other browser or print flows. --receiving selects arrival counts, purchase returns and outsourcing return quality with the same PostgreSQL and logging gates; it excludes other browser and print flows. --desktop-variants selects desktop supplier advance payments and production exception variants, with the same PostgreSQL and logging gates. Requires pinned Node, Go, Atlas, psql, installed web dependencies, Chromium, postgres:18.6 and chrislusf/seaweedfs:4.46. The default print scope also requires pdfinfo, pdffonts and pdftotext.\n",
+      "Usage: node scripts/qa/transaction-browser-isolated.mjs --run [--source-orders | --receiving | --desktop-variants | --purchase-chain | --production-recovery] [--desktop-case all|advance|outsourcing|shell] [--out output/qa/transaction-browser/<run>]\nCreates and removes an isolated source copy, PostgreSQL, storage, backend and browser. --source-orders selects sales, purchase and outsourcing browser flows with the same real PostgreSQL and logging gates; it does not attest the other browser or print flows. --receiving selects arrival counts, purchase returns and outsourcing return quality with the same PostgreSQL and logging gates; it excludes other browser and print flows. --desktop-variants selects desktop supplier advance payments and production exception variants, including mobile outsourcing task entry, with the same PostgreSQL and logging gates. --production-recovery checks shared material allowance and short-close supplemental planning with warehouse and PMC browser actions. --purchase-chain follows one purchase order through desktop role approval, arrival, IQC, inbound and payable posting, and publishes the existing PostgreSQL evidence. Requires pinned Node, Go, Atlas, psql, installed web dependencies, Chromium, postgres:18.6 and chrislusf/seaweedfs:4.46. The default print scope also requires pdfinfo, pdffonts and pdftotext.\n",
     );
   } else {
     const caseIndex = args.indexOf("--desktop-case");
@@ -940,9 +987,9 @@ if (
     assert.ok(["all", "advance", "outsourcing", "shell"].includes(desktopCase), "unknown desktop case");
     assert.ok(caseIndex < 0 || args.includes("--desktop-variants"), "desktop case requires desktop variants scope");
     const scopeArgs = args.filter((arg, index) => index !== caseIndex && index !== caseIndex + 1 || caseIndex < 0);
-    const selected = scopeArgs.filter(arg => !["--source-orders", "--receiving", "--desktop-variants"].includes(arg));
+    const selected = scopeArgs.filter(arg => !["--source-orders", "--receiving", "--desktop-variants", "--purchase-chain", "--production-recovery"].includes(arg));
     assert.ok(
-      args.filter(arg => ["--source-orders", "--receiving", "--desktop-variants"].includes(arg)).length <= 1 && selected[0] === "--run" &&
+      args.filter(arg => ["--source-orders", "--receiving", "--desktop-variants", "--purchase-chain", "--production-recovery"].includes(arg)).length <= 1 && selected[0] === "--run" &&
         (selected.length === 1 || (selected.length === 3 && selected[1] === "--out")),
       "unknown arguments",
     );
@@ -950,7 +997,7 @@ if (
     const timer = setTimeout(
       () =>
         controller.abort(new Error("isolated transaction test hard timeout")),
-      transactionBrowserBudget({ sourceOrdersOnly: args.includes('--source-orders'), receivingOnly: args.includes('--receiving'), desktopVariantsOnly: args.includes('--desktop-variants') }).runTimeoutMS,
+      transactionBrowserBudget({ sourceOrdersOnly: args.includes('--source-orders'), receivingOnly: args.includes('--receiving'), desktopVariantsOnly: args.includes('--desktop-variants'), purchaseChainOnly: args.includes('--purchase-chain'), productionRecoveryOnly: args.includes('--production-recovery') }).runTimeoutMS,
     );
     process.once("SIGINT", () => controller.abort());
     process.once("SIGTERM", () => controller.abort());
@@ -960,6 +1007,8 @@ if (
         sourceOrdersOnly: args.includes("--source-orders"),
         receivingOnly: args.includes("--receiving"),
         desktopVariantsOnly: args.includes("--desktop-variants"),
+        purchaseChainOnly: args.includes("--purchase-chain"),
+        productionRecoveryOnly: args.includes("--production-recovery"),
         desktopCase,
         signal: controller.signal,
       });

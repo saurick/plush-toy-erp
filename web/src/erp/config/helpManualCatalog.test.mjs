@@ -111,7 +111,7 @@ test('搜索标题、自然问题、别称、公式与来源；相同名词保�
     )
   )
   assert(
-    searchHelpDocuments(catalog, '提交老板审核').some(
+    searchHelpDocuments(catalog, '用料已自动送审').some(
       (doc) => doc.kind === 'guide' && doc.id === 'engineering-material-request'
     )
   )
@@ -137,7 +137,7 @@ test('已开放页面补入阅读目录，岗位常用推荐与未开放说明�
     allowedMenuPaths: BUSINESS_USABILITY_CATALOG.map((entry) => entry.path),
   }
   const expected = {
-    warehouse: ['materials', 'inbound', 'inventory', 'production-orders', 'production-progress', 'shipments', 'outbound'],
+    warehouse: ['materials', 'inventory', 'inbound', 'production-orders', 'production-progress', 'shipments', 'outbound'],
     engineering: ['products', 'materials', 'material-bom', 'processes', 'engineering-material-request'],
     finance: ['shipments', 'receivables', 'payables', 'finance-payments', 'reconciliation', 'invoices', 'engineering-material-request'],
     admin: [],

@@ -267,7 +267,7 @@ func (r *processRuntimeRepo) lockProcessSourceInTx(
 			}
 			return "", "", err
 		}
-		if row.OperationType != biz.InventoryOperationManualAdjustment {
+		if !biz.InventoryOperationRequiresApproval(row.OperationType) {
 			return "", "", biz.ErrBadParam
 		}
 		return requiredProcessSourceNo(row.OperationNo, row.Status)

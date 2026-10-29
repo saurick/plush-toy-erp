@@ -1,5 +1,5 @@
 import {
-  getAuthenticatedNavigationSections,
+  getUtilityNavigationSections,
   getNavigationSections,
 } from '../config/seedData.mjs'
 import { businessModuleDefinitions } from '../config/businessModules.mjs'
@@ -8,10 +8,11 @@ import {
   projectBusinessModuleSections,
 } from './businessModuleGroups.mjs'
 import { getSidebarNavigationSections } from '../config/customerMenuConfig.mjs'
+import { getHistoryCenterSources } from './historyRecordCatalog.mjs'
 
 const navigationItems = [
   ...getNavigationSections(),
-  ...getAuthenticatedNavigationSections(),
+  ...getUtilityNavigationSections(),
 ].flatMap((section) => section.items)
 const pageEntries = [...businessModuleDefinitions, ...navigationItems]
 const entryByPath = new Map(pageEntries.map((item) => [item.path, item]))
@@ -74,7 +75,7 @@ export function buildPermissionNavigationPlacement({
   access = null,
   navigationSections = [
     ...getNavigationSections(),
-    ...getAuthenticatedNavigationSections(),
+    ...getUtilityNavigationSections(),
   ],
 } = {}) {
   if (access?.is_final !== true) {
@@ -85,12 +86,22 @@ export function buildPermissionNavigationPlacement({
       .filter((page) => page?.effective === true)
       .map((page) => page.path)
   )
+  const permissions = new Set((Array.isArray(access.permissions) ? access.permissions : [])
+    .filter((permission) => permission.effective === true)
+    .map((permission) => permission.permission_key))
+  const historyAvailable = getHistoryCenterSources({
+    visibleMenuPaths: navigationSections.flatMap((section) => section.items)
+      .filter((item) => effectivePaths.has(item.path)).map((item) => item.path),
+    canReadPermission: (permission) => permissions.has(permission),
+  }).length > 0
   const visibleSections = getSidebarNavigationSections(
     navigationSections.map((section) => ({
       ...section,
       items: section.items.filter(
         (item) =>
-          item.access === 'authenticated' || effectivePaths.has(item.path)
+          item.access === 'history'
+            ? historyAvailable
+            : item.access === 'authenticated' || effectivePaths.has(item.path)
       ),
     }))
   )

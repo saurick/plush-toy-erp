@@ -23,7 +23,7 @@ function fixture(kind = "ordinary") {
     })),
     sources: Array.from({ length: recipe.lines }, (_, line) => recipe.parts.map((part, index) => ({
       sales_order_item_id: 100 + line, line_no: line + 1, bom_item_id: 200 + index, bom_id: 3, product_id: 2,
-      material_id: references.materials[part.material].id, unit_id: 6, product_sku_id: 4, sample_image_attachment_id: 5,
+      material_id: references.materials[part.material].id, unit_id: 6, product_sku_id: 4,
       ordered_quantity: recipe.ordered, pre_shipment_sample_quantity: recipe.samples,
       unit_usage: part.quantity, loss_rate: part.loss_rate, position: "模拟部位" + (index + 1),
       production_quantity: kind === "ordinary" ? "1012" : "130", total_usage: kind === "ordinary" ? ["212.52", "33.396", "82.5792", "15.18"][index] : "1.725214",
@@ -171,7 +171,7 @@ test("missing, duplicate, wrong-unit, wrong-quantity and changed-BOM demand fail
     (f) => f.request.sources[0].material_id++, (f) => f.request.sources[0].unit_id++,
     (f) => f.request.sources[0].line_no++, (f) => f.request.sources[0].unit_usage = "1",
     (f) => f.request.sources[0].loss_rate = "0", (f) => f.request.sources[0].pre_shipment_sample_quantity = "0",
-    (f) => f.request.sources[0].product_sku_id++, (f) => f.request.sources[0].sample_image_attachment_id = null,
+    (f) => f.request.sources[0].product_sku_id++,
     (f) => f.request.sources[0].position = "模拟部位0",
   ];
   for (const mutate of mutations) {
@@ -213,11 +213,11 @@ test("competition distinguishes version conflicts, wrong stages and permission d
   const rejected = (code) => ({ ok: false, code });
   const run = (overrides = {}) => {
     const f = fixture(), submitted = { ...f.request, id: 1, version: 1, status: "SUBMITTED", purchase_orders: [] };
-    let reads = 0, submits = 0;
+    let submits = 0;
     const client = {
       async requireCall(operation, _params, options = {}) {
         assert.equal(operation, "preview");
-        const data = { ...submitted, status: reads++ === 0 ? "PREVIEW" : "SUBMITTED" };
+        const data = { ...submitted };
         if (options.validate) assert.equal(options.validate(data), true);
         return structuredClone(data);
       },

@@ -603,6 +603,9 @@ func (d *jsonrpcDispatcher) mapProductionOrderError(ctx context.Context, err err
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
+	if result := productionMaterialUsageErrorResult(err); result != nil {
+		return result
+	}
 	logger := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrSalesOrderEngineeringNotReady):

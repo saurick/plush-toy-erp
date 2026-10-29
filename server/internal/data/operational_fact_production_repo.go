@@ -56,6 +56,9 @@ func findProductionFactReplay(ctx context.Context, client *ent.Client, in *biz.O
 		}
 		return nil, false, err
 	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{row.WarehouseID}); err != nil {
+		return nil, true, err
+	}
 	comparison := *in
 	if in.NewLotNo != nil {
 		if row.LotID == nil {
@@ -125,6 +128,9 @@ func (r *operationalFactRepo) SaveProductionFactDraft(ctx context.Context, in *b
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrProductionFactNotFound
 		}
+		return nil, err
+	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{preview.WarehouseID}); err != nil {
 		return nil, err
 	}
 	if preview.FactType != in.FactType || preview.SourceType == nil || *preview.SourceType != in.SourceType {
@@ -343,6 +349,9 @@ func validateProductionReworkDraftSave(ctx context.Context, tx *inventoryDBTx, r
 func updateProductionFactDraft(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, in *biz.ProductionFactDraftSave) error {
 	if tx == nil || tx.sqlTx == nil || row == nil || in == nil {
 		return biz.ErrBadParam
+	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{row.WarehouseID, in.WarehouseID}); err != nil {
+		return err
 	}
 	if err := validateUnitQuantities(ctx, tx.client, row.UnitID, in.Quantity); err != nil {
 		return err
@@ -613,6 +622,9 @@ func findProductionReworkIntent(ctx context.Context, client *ent.Client, in *biz
 			return nil, false, nil
 		}
 		return nil, false, err
+	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{row.WarehouseID}); err != nil {
+		return nil, true, err
 	}
 	if row.FactNo != in.FactNo || row.FactType != biz.ProductionFactRework ||
 		row.SourceType == nil || *row.SourceType != biz.ProductionFactSourceType ||
@@ -1106,6 +1118,9 @@ func (r *operationalFactRepo) ListProductionOrderMaterialRequirements(ctx contex
 }
 
 func createProductionFactDraftWithClient(ctx context.Context, client *ent.Client, in *biz.OperationalFactMutation) (*biz.ProductionFact, error) {
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{in.WarehouseID}); err != nil {
+		return nil, err
+	}
 	row, err := client.ProductionFact.Create().
 		SetFactNo(in.FactNo).
 		SetFactType(in.FactType).
@@ -1206,11 +1221,7 @@ func validateProductionOrderFactSource(
 		return nil, err
 	}
 	if requireActive {
-		if item.RouteCode == nil {
-			if orderRow.Status != biz.ProductionOrderStatusReleased {
-				return nil, biz.ErrProductionOrderInvalidState
-			}
-		} else if orderRow.Status != biz.ProductionOrderStatusReleased &&
+		if orderRow.Status != biz.ProductionOrderStatusReleased &&
 			(orderRow.Status != biz.ProductionOrderStatusClosed || batch == nil || batch.OriginReworkFactID == nil) {
 			return nil, biz.ErrProductionOrderInvalidState
 		}
@@ -1262,13 +1273,7 @@ func resolveProductionCompletionWIPBatch(
 	if client == nil || item == nil {
 		return nil, biz.ErrProductionOrderFactSourceInvalid
 	}
-	if item.RouteCode == nil {
-		if batchID != nil {
-			return nil, biz.ErrProductionOrderFactSourceInvalid
-		}
-		return nil, nil
-	}
-	if strings.TrimSpace(*item.RouteCode) != biz.ProductionWIPRoutePlushSewHandV1 {
+	if item.RouteCode == nil || strings.TrimSpace(*item.RouteCode) != biz.ProductionWIPRoutePlushSewHandV1 {
 		return nil, biz.ErrProductionWIPInvalidRoute
 	}
 	if batchID == nil || *batchID <= 0 {
@@ -1335,8 +1340,7 @@ func validateProductionReworkOriginForBatch(ctx context.Context, client *ent.Cli
 	return nil
 }
 
-// validateProductionWIPFinishedGoodsAvailability keeps route-less completions
-// independent from WIP. Explicit routes reserve capacity on one
+// validateProductionWIPFinishedGoodsAvailability reserves capacity on one
 // completed handwork batch; DRAFT and POSTED facts both consume that batch.
 func validateProductionWIPFinishedGoodsAvailability(
 	ctx context.Context,
@@ -1348,12 +1352,6 @@ func validateProductionWIPFinishedGoodsAvailability(
 ) error {
 	if client == nil || item == nil {
 		return biz.ErrProductionOrderFactSourceInvalid
-	}
-	if item.RouteCode == nil {
-		if batch != nil {
-			return biz.ErrProductionOrderFactSourceInvalid
-		}
-		return nil
 	}
 	if batch == nil || additional.IsNegative() {
 		return biz.ErrProductionOrderFactSourceInvalid
@@ -1478,23 +1476,11 @@ func validateProductionOrderMaterialIssueQuantity(
 	if requirement == nil || !additional.GreaterThan(decimal.Zero) {
 		return biz.ErrProductionOrderMaterialRequirementInvalid
 	}
-	rows, err := client.ProductionFact.Query().Where(
-		productionfact.SourceType(biz.ProductionOrderSourceType),
-		productionfact.SourceID(requirement.ProductionOrderID),
-		productionfact.SourceLineID(requirement.ID),
-		productionfact.FactType(biz.ProductionFactMaterialIssue),
-		productionfact.Status(biz.OperationalFactStatusPosted),
-	).All(ctx)
+	quantities, err := productionMaterialIssuedQuantities(ctx, client, []*ent.ProductionOrderMaterialRequirement{requirement})
 	if err != nil {
 		return err
 	}
-	issued := decimal.Zero
-	for _, row := range rows {
-		if row.SubjectType != biz.InventorySubjectMaterial || row.SubjectID != requirement.MaterialID || row.ProductSkuID != nil || row.UnitID != requirement.UnitID {
-			return biz.ErrProductionOrderMaterialRequirementInvalid
-		}
-		issued = issued.Add(row.Quantity)
-	}
+	issued := quantities[requirement.ID]
 	allowancePredicates := append(
 		activeProductionOverIssuePredicates(),
 		productionexceptiondecision.ProductionMaterialRequirementID(requirement.ID),
@@ -1697,6 +1683,9 @@ func (r *operationalFactRepo) GetProductionFactTransitionPolicy(ctx context.Cont
 		}
 		return nil, err
 	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{row.WarehouseID}); err != nil {
+		return nil, err
+	}
 	return &biz.ProductionFactTransitionPolicy{
 		FactType:           row.FactType,
 		Status:             row.Status,
@@ -1705,8 +1694,15 @@ func (r *operationalFactRepo) GetProductionFactTransitionPolicy(ctx context.Cont
 	}, nil
 }
 
-func (r *operationalFactRepo) productionFactListQuery(filter biz.OperationalFactFilter) *ent.ProductionFactQuery {
+func (r *operationalFactRepo) productionFactListQuery(ctx context.Context, filter biz.OperationalFactFilter) *ent.ProductionFactQuery {
 	q := r.data.postgres.ProductionFact.Query()
+	if scope, scoped := biz.WarehouseDataScopeFromContext(ctx); scoped && !scope.IsAll() {
+		ids := []int{}
+		if scope.Mode == biz.DataScopeModeAssigned {
+			ids = scope.WarehouseIDs
+		}
+		q = q.Where(productionfact.WarehouseIDIn(ids...))
+	}
 	if filter.Status != "" {
 		q = q.Where(productionfact.Status(filter.Status))
 	}
@@ -1762,7 +1758,7 @@ func (r *operationalFactRepo) productionFactListQuery(filter biz.OperationalFact
 }
 
 func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.ProductionFact, int, error) {
-	q := r.productionFactListQuery(filter)
+	q := r.productionFactListQuery(ctx, filter)
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -1816,6 +1812,9 @@ func (r *operationalFactRepo) postProductionFact(ctx context.Context, in *biz.Op
 		}
 		return nil, err
 	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{preview.WarehouseID}); err != nil {
+		return nil, err
+	}
 	if isProductionReworkLinkedFactRow(preview) {
 		return r.postProductionReworkFact(ctx, in, cancel)
 	}
@@ -1838,6 +1837,9 @@ func (r *operationalFactRepo) postProductionFact(ctx context.Context, in *biz.Op
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrProductionFactNotFound
 		}
+		return nil, err
+	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{row.WarehouseID}); err != nil {
 		return nil, err
 	}
 	if cancel {
@@ -1911,6 +1913,9 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, in *
 		}
 		return nil, err
 	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{preview.WarehouseID}); err != nil {
+		return nil, err
+	}
 	if !isProductionReworkLinkedFactRow(preview) {
 		return nil, biz.ErrProductionReworkSourceInvalid
 	}
@@ -1945,6 +1950,9 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, in *
 	}
 	row, err := tx.client.ProductionFact.Get(ctx, in.ID)
 	if err != nil {
+		return nil, err
+	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{row.WarehouseID}); err != nil {
 		return nil, err
 	}
 	source, err := resolveProductionReworkRowSource(ctx, tx.client, row, !cancel)
@@ -2140,6 +2148,9 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 		}
 		return nil, err
 	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{preview.WarehouseID}); err != nil {
+		return nil, err
+	}
 	orderID, err := productionOrderSourceIDFromRow(preview)
 	if err != nil {
 		return nil, err
@@ -2166,6 +2177,9 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrProductionFactNotFound
 		}
+		return nil, err
+	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{row.WarehouseID}); err != nil {
 		return nil, err
 	}
 	if cancel {
@@ -2361,5 +2375,5 @@ func entProductionFactToBiz(row *ent.ProductionFact) *biz.ProductionFact {
 
 func (r *operationalFactRepo) CountProductionFactsByStatus(ctx context.Context, filter biz.OperationalFactFilter) (map[string]int, error) {
 	filter.Status = ""
-	return scanBusinessStatusCounts(ctx, r.productionFactListQuery(filter).GroupBy(productionfact.FieldStatus).Aggregate(ent.Count()).Scan)
+	return scanBusinessStatusCounts(ctx, r.productionFactListQuery(ctx, filter).GroupBy(productionfact.FieldStatus).Aggregate(ent.Count()).Scan)
 }

@@ -130,8 +130,9 @@ func TestEngineeringMaterialCalculationRejectsGroupedOverflow(t *testing.T) {
 	_, client := openSalesOrderRepoTest(t, "material_calculation_overflow")
 	defer mustCloseEntClient(t, client)
 	f := prepareMaterialRequestFixtureWithDemand(t, ctx, &Data{postgres: client}, "CALC-OVERFLOW", materialRequestDemand{
-		ordered: "99999999999999", samples: "0", usage: "1", loss: "0", precision: 0,
+		ordered: "1", samples: "0", usage: "1", loss: "0", precision: 0,
 	})
+	client.SalesOrderItem.UpdateOneID(f.line.ID).SetOrderedQuantity(decimal.RequireFromString("99999999999999")).SaveX(ctx)
 	if _, err := f.uc.GetEngineeringMaterialRequest(ctx, f.order.ID, true); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("accepted grouped demand above storage limit: %v", err)
 	}

@@ -6,7 +6,7 @@ import {
   MenuUnfoldOutlined,
 } from '@ant-design/icons'
 import { Button, Empty } from 'antd'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import { Markdown } from '@/common/components/markdown'
@@ -109,12 +109,6 @@ export default function DevUIDesignDocument({ source, specification, view }) {
     })
   const reference = (id) =>
     updateLocation({ read: 'reference', chapter: id, q: '' })
-  const previewParams = new URLSearchParams(location.search)
-  ;['view', 'read', 'chapter', 'topic', 'q', 'point'].forEach((key) =>
-    previewParams.delete(key)
-  )
-  const previewHref = `${location.pathname}${previewParams.size ? `?${previewParams}` : ''}`
-
   useLayoutEffect(() => {
     const panel = contentRef.current
     if (!panel) return
@@ -176,9 +170,6 @@ export default function DevUIDesignDocument({ source, specification, view }) {
           >
             {directoryOpen ? '收起目录' : '展开目录'}
           </Button>
-          <Link to={previewHref}>
-            打开可交互设计 <ArrowRightOutlined aria-hidden="true" />
-          </Link>
         </div>
       </div>
       <div

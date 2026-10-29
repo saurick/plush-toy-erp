@@ -95,7 +95,7 @@ test('shipment details precede supplementary logistics and freight keeps the sal
   assert.doesNotMatch(source, /name="freight_currency"/u)
 
   assert.match(source, /<DeliveryAddressFields[\s\S]*?disabled=\{disabled\}/u)
-  const fieldsIndex = source.indexOf('title="单据与客户"')
+  const fieldsIndex = source.indexOf("title={taskBusiness ? '本次出货' : '单据与客户'}")
   const itemsIndex = source.indexOf('{itemsSection}')
   const deliveryIndex = source.indexOf('title="收货信息"')
   const attachmentsIndex = source.indexOf('{attachmentPanel}')

@@ -298,6 +298,7 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 func TestClosedProductionOrderReworkRequiresAcceptedReplacementPackaging(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "production_closed_rework_replacement")
+	defer func() { assertProductionSalesPlanningQuantity(t, f.client, f.salesItemID, 10) }()
 	logger := log.NewStdLogger(io.Discard)
 	createProductionWIPRouteProcesses(t, ctx, f.client)
 	warehouse := createTestProductWarehouse(t, ctx, f.client, "CLOSED-REWORK-WH")
@@ -352,6 +353,7 @@ func TestClosedProductionOrderReworkRequiresAcceptedReplacementPackaging(t *test
 	if err != nil {
 		t.Fatalf("post rework: %v", err)
 	}
+	assertProductionSalesPlanningQuantity(t, f.client, f.salesItemID, 10)
 	rootRow := f.client.ProductionWIPBatch.Query().Where(
 		productionwipbatch.OriginReworkFactID(postedRework.ID),
 		productionwipbatch.SourceBatchIDIsNil(),

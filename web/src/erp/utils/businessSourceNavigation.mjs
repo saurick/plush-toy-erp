@@ -2,6 +2,8 @@ import { BUSINESS_ROUTE_PATHS } from './masterDataOrderView.mjs'
 import { relatedDocumentRoute } from './relatedDocumentNavigation.mjs'
 
 const DIRECT_SOURCE_ROUTES = Object.freeze({
+  INVENTORY_OPERATION: Object.freeze({ path: BUSINESS_ROUTE_PATHS.inventory, queryKey: 'inventory_operation_id', params: { workspace: 'operations' } }),
+  PRODUCTION_EXCEPTION: Object.freeze({ path: '/erp/production/exceptions', queryKey: 'production_exception_id' }),
   SALES_ORDER: Object.freeze({
     path: BUSINESS_ROUTE_PATHS.salesOrders,
     queryKey: 'sales_order_id',
@@ -65,7 +67,7 @@ export function businessSourceRouteFor(
   if (!target || !normalizedID) return ''
   return relatedDocumentRoute(
     target.path,
-    { [target.queryKey]: normalizedID },
+    { ...target.params, [target.queryKey]: normalizedID },
     {
       keyword,
       source,

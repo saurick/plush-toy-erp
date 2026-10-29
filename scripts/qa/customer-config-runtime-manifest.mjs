@@ -230,8 +230,6 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "erp.print_template.read",
     "material.read",
     "process.read",
-    "process.create",
-    "process.update",
     "product.read",
     "product.create",
     "product.update",
@@ -357,6 +355,7 @@ const APPROVAL_SETTING_POOLS = Object.freeze({
     description: "fixed approval setting for shipment finance release",
   }),
 });
+
 
 
 const MATERIAL_SUPPLY_EVIDENCE_OWNER_POOLS = Object.freeze([

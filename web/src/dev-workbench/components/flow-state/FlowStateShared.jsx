@@ -38,16 +38,31 @@ const VIEW_ITEMS = Object.freeze([
     description: '流程走到哪里、走过什么路径',
   },
   {
+    value: 'processes',
+    label: '流程定义',
+    description: '查看流程节点、分支与责任定义',
+  },
+  {
     value: 'facts',
-    label: '事实定义',
+    label: '事实规则',
     englishLabel: 'Fact / Ledger',
     description: '查来源、发生条件、入账与纠正规则',
   },
   {
     value: 'states',
-    label: '状态与流转规则',
+    label: '状态流转',
     englishLabel: 'State Machine',
     description: '对象有哪些状态、允许怎样转换',
+  },
+  {
+    value: 'finance_records',
+    label: '财务记录',
+    description: '按账款查询真实收付、核销、调整与退款关联',
+  },
+  {
+    value: 'finance_rules',
+    label: '财务口径',
+    description: '来源金额、采购差额、月结到期日和纠错边界',
   },
 ])
 
@@ -105,18 +120,11 @@ function useDefinitionSelectSearch() {
 }
 
 function renderDefinitionSelectOption(option) {
-  const businessLabel = option?.data?.businessLabel || option?.label
-  const machineKey = option?.data?.machineKey || ''
   return (
     <span className="erp-dev-flow-definition-option">
       <span className="erp-dev-flow-definition-option__label">
-        {businessLabel}
+        {option?.data?.businessLabel || option?.label}
       </span>
-      {machineKey ? (
-        <code className="erp-dev-flow-definition-option__key">
-          {machineKey}
-        </code>
-      ) : null}
     </span>
   )
 }
@@ -125,34 +133,12 @@ function asArray(value) {
   return Array.isArray(value) ? value : []
 }
 
-function evidenceRefs(value) {
-  const refs = [
-    ...asArray(value?.sourceRefs),
-    ...asArray(value?.evidence).map((item) => item?.ref),
-  ]
-    .map(cleanText)
-    .filter(Boolean)
-  return [...new Set(refs)]
-}
-
-function EvidenceDisclosure({ value, label = '查看代码与文档证据', children }) {
-  const refs = evidenceRefs(value)
-  if (refs.length === 0 && !children) return null
+function EvidenceDisclosure({ label = '核对详情', children }) {
+  if (!children) return null
   return (
     <details className="erp-dev-disclosure erp-dev-flow-evidence" data-evidence-disclosure>
-      <summary>
-        {label}{refs.length > 0 ? `（${refs.length}）` : ''}
-      </summary>
+      <summary>{label}</summary>
       {children}
-      {refs.length > 0 ? (
-        <ul>
-          {refs.map((ref) => (
-            <li key={ref}>
-              <code>{ref}</code>
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </details>
   )
 }

@@ -1,3 +1,5 @@
+import { BUSINESS_RULES } from '../../../../scripts/qa/lib/business-rule-catalog.mjs'
+import { PurchaseSourceActions } from '../../common/consts/purchaseSourceActions.mjs'
 import {
   DEV_BUSINESS_CHAIN_DATA_STAGE_KEYS,
   DEV_BUSINESS_CHAIN_EVIDENCE_MODES,
@@ -138,13 +140,12 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'sales_to_production',
     '销售受理到生产准备',
     'primary',
-    '订单审批与工程、BOM、打样可并行准备；条件满足后用料经老板和财务两级审核，按厂商生成采购单。生产订单另行建立并发布；现有成品库存按需显式预留。',
+    '订单审批与工程 BOM 可并行准备；条件满足后用料经老板和财务两级审核，按厂商生成采购单。生产订单另行建立并发布；现有成品库存按需显式预留。',
     [
       chainNode('sales_order', '销售订单与订单行', 'source_document', {
         machineKeys: [
           'source.sales_order',
           'source.order_item',
-          'source.sales_order_engineering',
         ],
         sourceRefs: ['server/internal/biz/sales_order.go'],
       }),
@@ -229,12 +230,13 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'sales_acceptance',
         'effective_bom',
-        '生产准备要求有效版本',
+        '完成工程资料并启用 BOM',
         'requires',
         {
-          action: 'validate active BOM snapshot',
+          action: 'SalesOrderUsecase.SaveSalesOrderEngineering (complete=true)',
+          condition: '校验本单全部有效明细，启用关联 BOM 并保存制造内容指纹；不生成库存或生产事实。',
           factBoundary: 'masterdata_reference_only',
-          sourceRefs: ['server/internal/biz/production_order.go'],
+          sourceRefs: ['server/internal/data/sales_order_engineering_repo.go'],
         }
       ),
       chainEdge(
@@ -253,13 +255,13 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'effective_bom',
         'material_request',
-        '工程提交用料并完成两级审核',
+        '自动汇总用料并完成两级审核',
         'calls_domain_command',
         {
           action:
-            'SalesOrderUsecase.SubmitEngineeringMaterialRequest / ReviewEngineeringMaterialRequest',
+            'SalesOrderUsecase.SaveSalesOrderEngineering / ReviewEngineeringMaterialRequest',
           condition:
-            '订单已生效、样品已确认、BOM 已启用；老板通过后由另一位财务复核。',
+            '完成工程资料时统一校验并启用 BOM，订单生效且用料来源有效即自动送审；老板通过后由另一位财务复核。',
           factBoundary: 'engineering_material_source_only',
           sourceRefs: ['server/internal/biz/engineering_material_request.go'],
         }
@@ -286,7 +288,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'requires',
         {
           action: 'ProductionOrderUsecase.Release',
-          condition: '样品及 BOM 指纹仍一致，工程用料已批准。',
+          condition: '工程 BOM 与制造内容指纹仍一致，工程用料已批准。',
           factBoundary: 'source_document_precondition_only',
           sourceRefs: ['server/internal/data/production_order_repo.go'],
         }
@@ -322,7 +324,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'purchase_to_inventory',
     '采购下单到入库应付',
     'primary',
-    '用料生成的采购单已经批准，独立人工单另行审批；采购补齐价格与交期，可与实际到货并行。仓库点数、IQC 检验、仓库入库各自办理，生成应付前核对价格依据。',
+    '用料生成的采购单已经批准，独立人工单另行审批；采购独立维护交期、补齐缺价，到货提醒与异常汇总读取原单事实。仓库点数、IQC 检验、仓库入库各自办理，生成应付前核对价格依据。',
     [
       chainNode('purchase_order', '采购订单与订单行', 'source_document', {
         machineKeys: ['source.purchase_order', 'source.order_item'],
@@ -343,6 +345,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainNode('purchase_quality', 'IQC 逐项验收', 'fact_ledger', {
         machineKeys: ['fact.quality_inspection'],
         sourceRefs: ['server/internal/biz/quality_inspection.go'],
+      }),
+      chainNode('purchase_quality_correction', '纠正后新待检记录', 'fact_ledger', {
+        summary: '保留原检验判定并记为被替代；另建引用原检验的新记录，按实际检查结果重新判定。',
+        machineKeys: ['fact.quality_inspection'],
+        sourceRefs: ['server/internal/data/quality_inspection_correction_repo.go'],
       }),
       chainNode('purchase_accepted', '合格行待入库', 'fact_ledger', {
         summary: '逐行检验通过后等待仓库确认；此时尚未增加库存。',
@@ -443,6 +450,18 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         factBoundary: 'inventory_txn_and_lot',
         sourceRefs: ['server/internal/biz/purchase_receipt.go', 'server/internal/data/purchase_receipt_repo.go'],
       }),
+      chainEdge('purchase_quality', 'purchase_quality_correction', '保留原判定，另建纠正待检', 'creates_fact_draft', {
+        action: 'QualityInspectionUsecase.CorrectQualityInspectionResult',
+        condition: '原检验已通过或拒绝、尚未被替代，采购行尚未实际入库且没有有效拒收处置；有质检异常处置及来源读取权限，填写原因和新检验单号。此入口不适用于在制批次检验。',
+        factBoundary: 'quality_correction_creates_new_inspection_original_decision_retained',
+        sourceRefs: ['server/internal/data/quality_inspection_correction_repo.go', 'server/internal/service/jsonrpc_quality.go'],
+      }),
+      chainEdge('purchase_quality_correction', 'purchase_accepted', '新检验独立判定通过后待入库', 'posts_fact', {
+        action: 'QualityInspectionUsecase.PassQualityInspection',
+        condition: '对新检验记录完成实际检查并正式判定通过；原判定不变，新检验仍可不通过，不自动增加库存。',
+        factBoundary: 'quality_inspection_fact',
+        sourceRefs: ['server/internal/biz/quality_inspection.go', 'server/internal/data/quality_inspection_correction_repo.go'],
+      }),
       chainEdge(
         'purchase_lot',
         'purchase_payable_draft',
@@ -450,6 +469,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'creates_fact_draft',
         {
           action: 'OperationalFactUsecase.CreatePayableFromPurchaseReceipt',
+          condition: '收货明细已完成入库或不合格处置，采购价格和结算快照完整；仅按已入库行计入应付',
           factBoundary: 'finance_fact_draft_from_posted_source',
           sourceRefs: [
             'server/internal/biz/operational_fact_finance_source.go',
@@ -567,7 +587,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'outsourcing_to_inventory',
     '委外发料到回货应付',
     'supporting',
-    '委外订单确认后记录发料与回货事实，回货经质检通过后进入可用库存，再按已过账来源生成应付并确认。',
+    '普通委外按回货与质检生成应付；工序委外按已验收批次和合同生成应付，材料发料与工序回货分别留存真实事实。',
     [
       chainNode('outsourcing_order', '委外订单', 'source_document', {
         machineKeys: ['source.outsourcing_order'],
@@ -588,6 +608,10 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainNode('outsourcing_lot', '合格库存批次', 'fact_ledger', {
         machineKeys: ['fact.inventory_lot'],
         sourceRefs: ['server/internal/biz/inventory.go'],
+      }),
+      chainNode('outsourcing_stage', '已验收委外工序', 'fact_ledger', {
+        machineKeys: ['fact.production_wip_batch'],
+        sourceRefs: ['server/internal/data/outsourcing_order_settlement.go'],
       }),
       chainNode('outsourcing_payable_draft', '委外应付草稿', 'fact_ledger', {
         machineKeys: ['fact.finance'],
@@ -665,6 +689,16 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           ],
         }
       ),
+      chainEdge('outsourcing_order', 'outsourcing_stage', '工序回货与验收', 'posts_fact', {
+        action: 'ProductionOrderUsecase.ReceiveProductionWIPOutsourcingReturn / InventoryUsecase.PassQualityInspection',
+        factBoundary: 'production_wip',
+        sourceRefs: ['server/internal/data/production_wip_repo.go', 'server/internal/data/outsourcing_order_settlement.go'],
+      }),
+      chainEdge('outsourcing_stage', 'outsourcing_payable_draft', '按已验收合同生成应付', 'creates_fact_draft', {
+        action: 'OperationalFactUsecase.CreatePayableFromOutsourcingOrder',
+        factBoundary: 'finance_fact_draft_from_posted_source',
+        sourceRefs: ['server/internal/data/operational_fact_finance_outsourcing_order_repo.go'],
+      }),
       chainEdge(
         'outsourcing_payable_draft',
         'outsourcing_payable',
@@ -1004,7 +1038,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'inventory_adjustment',
     '盘点、调拨与库存调整',
     'supporting',
-    '仓库登记盘点实数或调拨来源与目标仓后显式过账；人工调整另走审批。只有正式过账才改变库存，已过账纠错追加反向流水。',
+    '仓库登记所选库存范围与实盘数，盘点和人工调整经他人复核后过账；调拨核对来源与目标仓后过账。零差异只留完成记录，有差异才生成流水，纠错保留原证据。',
     [
       chainNode(
         'inventory_operation',
@@ -1018,7 +1052,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       ),
       chainNode(
         'inventory_adjustment_process',
-        '库存调整审批流程',
+        '盘点与调整复核流程',
         'process_runtime',
         {
           processDefinitionKeys: [
@@ -1029,7 +1063,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       ),
       chainNode(
         'inventory_adjustment_task',
-        '库存调整审批任务',
+        '盘点与调整复核任务',
         'workflow_task',
         {
           sourceRefs: ['server/internal/biz/workflow_source_tasks.go'],
@@ -1044,11 +1078,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'inventory_operation',
         'inventory_adjustment_process',
-        '人工调整提交后启动审批',
+        '盘点或人工调整提交复核',
         'starts_process',
         {
           action: 'InventoryUsecase.SubmitInventoryOperation',
-          condition: '仅人工调整；盘点和调拨不经过本审批分支。',
+          condition: '盘点与人工调整必须复核，创建人不能自审；调拨不经过此分支。',
           factBoundary: 'inventory_operation_source_only',
           sourceRefs: ['server/internal/biz/inventory_operation.go'],
         }
@@ -1083,10 +1117,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'inventory_adjustment_process',
         'adjusted_inventory_lot',
-        '人工调整批准后确认过账',
+        '盘点与调整批准后确认过账',
         'posts_fact',
         {
           action: 'InventoryUsecase.PostInventoryOperationForProcessCommand',
+          condition: '盘点账面数须仍匹配；零差异只完成作业，非零差异才写流水。',
           factBoundary: 'inventory_txn_and_lot',
           sourceRefs: [
             'server/internal/biz/inventory_adjustment_process_command.go',
@@ -1097,12 +1132,12 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'inventory_operation',
         'adjusted_inventory_lot',
-        '盘点或调拨确认过账',
+        '调拨确认过账',
         'posts_fact',
         {
           action: 'InventoryUsecase.PostInventoryOperation',
           condition:
-            '仅盘点或调拨草稿；盘点差异按实时库存复核，调拨校验来源、目标仓及可用量。',
+            '仅调拨草稿，核对来源、目标仓及可用库存。',
           factBoundary: 'inventory_txn_and_lot',
           sourceRefs: ['server/internal/data/inventory_operation_repo.go'],
         }
@@ -1464,7 +1499,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'outsourcing_quality_disposition',
     '委外不合格回货处置',
     'exception',
-    '委外回货质检拒绝后登记退回处置，过账后修正委外事实及库存影响。',
+    '普通回货质检拒绝后可分批返厂，过账出库并释放原合同行补回额度；补回已占用额度时先撤销补回，再撤销返厂。',
     [
       chainNode(
         'rejected_outsourcing_quality',
@@ -1561,8 +1596,8 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       ),
       chainNode(
         'corrected_purchase_finance',
-        '修正后应付事实',
-        'derived_result',
+        '采购应付与当前余额',
+        'fact_ledger',
         {
           machineKeys: ['fact.finance'],
           sourceRefs: [
@@ -1570,6 +1605,10 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           ],
         }
       ),
+      chainNode('purchase_finance_adjustment', '采购来源账款调整', 'fact_ledger', {
+        machineKeys: ['fact.finance_credit_note'],
+        sourceRefs: ['server/internal/data/finance_source_adjustment_repo.go'],
+      }),
     ],
     [
       chainEdge(
@@ -1579,8 +1618,8 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'returns',
         {
           action:
-            'InventoryUsecase.CreatePurchaseReturnFromReceipt / PostPurchaseReturn',
-          factBoundary: 'purchase_return_and_inventory',
+            'InventoryUsecase.CreatePurchaseReturnFromReceipt / CreatePurchaseReturnFromQualityInspection',
+          factBoundary: 'purchase_return_draft',
           sourceRefs: ['server/internal/biz/purchase_return.go'],
         }
       ),
@@ -1591,8 +1630,8 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'creates_fact_draft',
         {
           action:
-            'InventoryUsecase.CreatePurchaseReceiptAdjustmentFromReceipt / PostPurchaseReceiptAdjustment',
-          factBoundary: 'purchase_receipt_adjustment_and_inventory',
+            'InventoryUsecase.CreatePurchaseReceiptAdjustmentFromReceipt',
+          factBoundary: 'purchase_receipt_adjustment_draft',
           sourceRefs: ['server/internal/biz/purchase_receipt_adjustment.go'],
         }
       ),
@@ -1627,16 +1666,29 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'corrected_purchase_inventory',
         'corrected_purchase_finance',
-        '重新计算采购来源应付',
-        'derives',
+        '按净来源生成应付草稿',
+        'creates_fact_draft',
         {
           action: 'OperationalFactUsecase.CreatePayableFromPurchaseReceipt',
-          factBoundary: 'finance_fact_projection',
+          condition: '尚无有效应付时生成草稿；已有草稿须先取消，财务另行确认过账。',
+          factBoundary: 'finance_fact_draft',
           sourceRefs: [
             'server/internal/biz/operational_fact_finance_source.go',
           ],
         }
       ),
+      chainEdge('corrected_purchase_inventory', 'purchase_finance_adjustment', '财务确认来源差额', 'posts_fact', {
+        action: 'OperationalFactUsecase.CreateFinanceSourceAdjustment',
+        condition: '应付已过账或结清；退货调减、数量增加调增，超出未核销余额先撤销足额核销。',
+        factBoundary: 'finance_credit_note',
+        sourceRefs: ['server/internal/data/finance_source_adjustment_repo.go'],
+      }),
+      chainEdge('purchase_finance_adjustment', 'corrected_purchase_finance', '保留原账并更新未结余额', 'derives', {
+        action: 'derive finance balance from posted adjustments and allocations',
+        condition: '库存变化不自动改账；移库或批次修正不产生账款差额，真实退款单独办理。',
+        factBoundary: 'finance_fact_projection',
+        sourceRefs: ['server/internal/data/finance_payment_balance_repo.go'],
+      }),
       chainEdge(
         'purchase_return_correction',
         'posted_purchase_receipt',
@@ -1769,6 +1821,12 @@ const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
       fromChainKey: 'purchase_to_inventory',
       toChainKey: 'purchase_posting_corrections',
       label: '过账后退货或调整',
+      kind: 'corrects',
+    },
+    {
+      fromChainKey: 'purchase_posting_corrections',
+      toChainKey: 'finance_payment_and_reversal',
+      label: '已记账差额由财务确认，核销与退款分别处理',
       kind: 'corrects',
     },
     {
@@ -2066,6 +2124,16 @@ function normalizeStepContract({
   if (!rawStep || !RESPONSIBILITY_MODE_SET.has(rawStep.responsibilityMode)) {
     throw new Error(`${chainDefinition.key}/${edge.key} has no step contract`)
   }
+  const sourceActionKeys = uniqueStrings(rawStep.sourceActionKeys || [])
+  for (const key of sourceActionKeys) {
+    if (!PurchaseSourceActions[key]) throw new Error(`未知采购来源权限合同：${key}`)
+  }
+  const verificationRuleIds = uniqueStrings(rawStep.verificationRuleIds || [])
+  for (const id of verificationRuleIds) {
+    if (!BUSINESS_RULES.some((rule) => rule.id === id)) {
+      throw new Error(`${chainDefinition.key}/${edge.key} references unknown verification rule: ${id}`)
+    }
+  }
   const stateTransitionRefs = uniqueBy(
     (rawStep.stateTransitionRefs || []).map((ref) =>
       resolveTransitionRef(ref, flowByKey)
@@ -2180,6 +2248,8 @@ function normalizeStepContract({
       ownerPoolKeys,
       capabilityKeys,
     }),
+    verificationRuleIds,
+    sourceActionKeys,
     preconditionStateRefs,
     stateTransitionRefs,
     processNodeRefs,

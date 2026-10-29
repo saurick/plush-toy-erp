@@ -17,6 +17,12 @@ const ROUTE_SOURCE_TYPE_BY_INSPECTION_TYPE = Object.freeze({
   OUTSOURCING_RETURN: 'OUTSOURCING_FACT',
 })
 
+export function qualityInspectionTypeForRouteSource(sourceType) {
+  const normalizedSourceType = normalizedUpperText(sourceType)
+  return Object.entries(ROUTE_SOURCE_TYPE_BY_INSPECTION_TYPE)
+    .find(([, source]) => source === normalizedSourceType)?.[0] || ''
+}
+
 export function isQualityInspectionRouteSourceCompatible(
   inspectionType,
   sourceType

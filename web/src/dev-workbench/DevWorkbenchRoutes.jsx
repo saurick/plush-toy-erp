@@ -4,6 +4,8 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
 import {
   DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
+  DEV_BUSINESS_TOPICS_ROUTE,
+  DEV_BUSINESS_RULES_ROUTE,
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
   DEV_DATABASE_MIGRATION_ROUTE,
@@ -93,6 +95,14 @@ const DevFlowStateObservatoryPage = createDevLazyRoute(
   () => import('./pages/DevFlowStateObservatoryPage.jsx')
 )
 const DevTaskHandlingPage = createDevLazyRoute(DEV_TASK_HANDLING_ROUTE, () => import('./pages/DevTaskHandlingPage.jsx'))
+const DevBusinessRulesPage = createDevLazyRoute(
+  DEV_BUSINESS_RULES_ROUTE,
+  () => import('./pages/DevFlowStateObservatoryPage.jsx')
+)
+const DevBusinessTopicsPage = createDevLazyRoute(
+  DEV_BUSINESS_TOPICS_ROUTE,
+  () => import('./pages/DevFlowStateObservatoryPage.jsx')
+)
 const DevBusinessUsabilityPage = createDevLazyRoute(
   DEV_BUSINESS_USABILITY_ROUTE,
   () => import('./pages/DevBusinessUsabilityPage.jsx')
@@ -209,6 +219,8 @@ export default function DevWorkbenchRoutes() {
             element={<DevFlowStateObservatoryPage />}
           />
           <Route path="task-handling" element={<DevTaskHandlingPage />} />
+          <Route path="business-topics" element={<DevBusinessTopicsPage />} />
+          <Route path="business-rules" element={<DevBusinessRulesPage />} />
           <Route path="integration" element={<DevIntegrationPage />} />
           <Route
             path="business-usability"
@@ -216,8 +228,10 @@ export default function DevWorkbenchRoutes() {
           />
           <Route path="docs" element={<DevDocsPage />} />
           <Route path="project-skills" element={<DevProjectSkillsPage />} />
-          <Route path="testing" element={<DevTestingPage />} />
-          <Route path="business-chain-audit" element={<DevBusinessChainAuditPage />} />
+          <Route element={<DevTestingPage />}>
+            <Route path="testing" />
+            <Route path="business-chain-audit" element={<DevBusinessChainAuditPage />} />
+          </Route>
           <Route path="quality-gates" element={<DevQualityGatesPage />} />
           <Route path="data-preparation" element={<DevDataPreparationPage />} />
           <Route path="ui-design" element={<DevUIDesignPage />} />

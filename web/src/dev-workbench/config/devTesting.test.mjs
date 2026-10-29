@@ -20,6 +20,7 @@ import {
   getDevTestingViewGroups,
   getDevTestingEnvironment,
   buildDevTestingViewSearch,
+  buildDevTestingViewNavigation,
   resolveDevTestingReturnView,
   buildDevTestingCopyText,
   buildDevTestingDocs,
@@ -1367,8 +1368,41 @@ test('devTesting: 主视图与专项命令往返保留查询上下文并拒绝�
   assert.equal(buildDevTestingViewSearch('view=guide&returnView=pressure', 'invalid').get('view'), 'overview')
 })
 
+test('devTesting: 跨报告页签保留各自查询，链路子视图不覆盖测试主视图', () => {
+  const testing = {
+    pathname: DEV_TESTING_ROUTE,
+    search: '?view=coverage&coverage=business&customer=yoyoosun&q=go+test',
+    state: { source: 'overview' },
+  }
+  const entry = buildDevTestingViewNavigation(testing, 'chains')
+  assert.equal(entry.to.pathname, '/__dev/business-chain-audit')
+  assert.equal(entry.to.search, '')
+  assert.equal(entry.state.testingReturnSearch, testing.search)
+  const reportSearch = '?batch=sample&view=evidence&chain=purchase_to_inventory&step=receive&status=failed&q=采购'
+  const report = { ...entry.to, search: reportSearch, state: entry.state }
+  const coverage = buildDevTestingViewNavigation(report, 'coverage')
+  assert.equal(coverage.to.pathname, testing.pathname)
+  assert.equal(coverage.to.search, testing.search)
+  assert.equal(coverage.state.chainAuditSearch, reportSearch)
+  assert.equal(coverage.state.source, 'overview')
+  const pressure = buildDevTestingViewNavigation({ ...coverage.to, state: coverage.state }, 'pressure')
+  assert.equal(new URLSearchParams(pressure.to.search).get('view'), 'pressure')
+  const restored = buildDevTestingViewNavigation({ ...pressure.to, state: pressure.state }, 'chains')
+  assert.equal(restored.to.search, reportSearch)
+  assert.equal(restored.state.testingReturnSearch, pressure.to.search)
+  assert.equal(report.search, reportSearch)
+})
+
+test('devTesting: 直接访问链路报告不把批次和结果筛选带入其他测试视图', () => {
+  const report = { pathname: '/__dev/business-chain-audit/', search: '?view=findings&batch=sample&q=采购&chain=all' }
+  const overview = buildDevTestingViewNavigation(report, 'overview')
+  assert.deepEqual(overview.to, { pathname: DEV_TESTING_ROUTE, search: '?view=overview' })
+  assert.equal(buildDevTestingViewNavigation({ ...overview.to, state: overview.state }, 'chains').to.search, report.search)
+  assert.equal(buildDevTestingViewNavigation(report, 'unknown').to.search, '?view=overview')
+})
+
 test('devTesting: 所有执行和报告视图归入真实执行端，服务器证据与通用资料独立', () => {
-  assert.deepEqual(DEV_TESTING_WORKSPACE_VIEWS.map(({ value }) => value), ['overview', 'tiers', 'coverage', 'pressure'])
+  assert.deepEqual(DEV_TESTING_WORKSPACE_VIEWS.map(({ value }) => value), ['overview', 'tiers', 'coverage', 'chains', 'pressure'])
   for (const { value } of DEV_TESTING_WORKSPACE_VIEWS) {
     assert.equal(getDevTestingViewGroup(value), 'workspace')
     assert.equal(getDevTestingEnvironment(value).kind, 'local')
@@ -1376,6 +1410,7 @@ test('devTesting: 所有执行和报告视图归入真实执行端，服务器�
   }
   assert.equal(getDevTestingViewGroup('server'), 'server')
   assert.equal(getDevTestingViewGroup('guide'), 'guide')
+  assert.equal(getDevTestingViewGroup('commands'), 'guide')
   for (const standalone of [false, true]) {
     assert.equal(getDevTestingEnvironment('server', standalone).kind, 'server')
     for (const view of ['guide', 'commands', 'usability']) assert.equal(getDevTestingEnvironment(view, standalone).kind, 'reference')
@@ -1392,13 +1427,13 @@ test('devTesting: 页面提供独立的固定动作与覆盖基线边界', () =>
   assert.match(testingPageSource, /const VIEW_CLOSEOUT = 'closeout'/)
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
   assert.match(testingPageSource, /DEV_PAGE_TITLE_BY_ROUTE\[DEV_TESTING_ROUTE\]/)
-  assert.deepEqual(DEV_TESTING_PRIMARY_VIEWS.map(({ label }) => label), ['服务器验证', '测试总览', '本轮验证', '测试报告', '压力测试', '测试指引'])
+  assert.deepEqual(DEV_TESTING_PRIMARY_VIEWS.map(({ label }) => label), ['服务器验证', '测试总览', '本轮验证', '覆盖报告', '链路实测', '压力测试', '测试指引'])
   assert.doesNotMatch(
     testingPageSource,
     /\{ label: '(?:专项检查库|Git 收口)', value: VIEW_(?:COMMANDS|CLOSEOUT) \}/
   )
   assert.match(testingPageSource, /查专项命令/)
-  assert.match(testingPageSource, /页面说明检查/)
+  assert.doesNotMatch(testingPageSource, /to=\{DEV_BUSINESS_USABILITY_ROUTE\}|onOpenSource|openSourceDoc/u)
   assert.match(
     testingPageSource,
     /const VIEW_OPTIONS = DEV_TESTING_PRIMARY_VIEWS/
@@ -1411,7 +1446,6 @@ test('devTesting: 页面提供独立的固定动作与覆盖基线边界', () =>
     testingPageSource,
     /erp-dev-testing-guide-tiers[\s\S]*?tiers\.map/
   )
-  assert.match(testingPageSource, /T0–T8 是内部选测键，不是完成进度/)
   assert.match(testingPageSource, /DEV_TESTING_COVERAGE_API_PATH/)
   assert.match(testingPageSource, /DEV_TESTING_COVERAGE_COLLECT_COMMAND/)
   assert.match(testingPageSource, /createDevCoverageOperationClient/)
@@ -1425,11 +1459,11 @@ test('devTesting: 页面提供独立的固定动作与覆盖基线边界', () =>
   assert.match(testingPageSource, /查看建议命令、待补证据与计划身份/)
   assert.match(testingPageSource, /复制不会执行检查/)
   assert.match(testingPageSource, /erp-dev-testing-command-matrix__head/)
-  assert.match(testingPageSource, /查看固定命令/)
+  assert.match(testingPageSource, /data-command-lines=\{block.commands.length\}/u)
   assert.match(testingPageSource, /selectView\(returnView\)/)
   assert.match(testingPageSource, /DEV_TESTING_GIT_CLOSEOUT_STAGES\.map/)
   assert.match(testingPageSource, /getGitStageWiring/)
-  assert.match(testingPageSource, /查看边界与来源/)
+  assert.match(testingPageSource, /stage\.boundary/)
   assert.match(testingPageSource, /erp-dev-testing-hook-list__head/)
   assert.match(testingPageSource, /Hook 接线完整/)
   assert.match(

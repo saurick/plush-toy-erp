@@ -13,6 +13,7 @@ import (
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
+	"server/internal/data/model/ent/outsourcingreturndisposition"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/productsku"
@@ -30,6 +31,9 @@ func findOutsourcingFactReplay(ctx context.Context, client *ent.Client, in *biz.
 		if ent.IsNotFound(err) {
 			return nil, false, nil
 		}
+		return nil, false, err
+	}
+	if err := validateOutsourcingFactAccess(ctx, row); err != nil {
 		return nil, false, err
 	}
 	if !operationalFactMutationMatchesOutsourcing(row, in) {
@@ -72,6 +76,9 @@ func findOutsourcingFactFromOrderIntent(ctx context.Context, client *ent.Client,
 		return nil, false, err
 	}
 	if in.NewLotNo != nil {
+		if err := validateOutsourcingFactAccess(ctx, row); err != nil {
+			return nil, false, err
+		}
 		if row.LotID == nil {
 			return nil, true, biz.ErrIdempotencyConflict
 		}
@@ -119,10 +126,17 @@ func (r *operationalFactRepo) createOutsourcingFactFromOrder(ctx context.Context
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	materialAllocation, err := lockOutsourcingProductionMaterial(ctx, tx, in.OutsourcingOrderItemID)
+	if err != nil {
+		return nil, err
+	}
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_orders", in.OutsourcingOrderID, biz.ErrOutsourcingOrderNotFound); err != nil {
 		return nil, err
 	}
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_order_items", in.OutsourcingOrderItemID, biz.ErrOutsourcingOrderItemNotFound); err != nil {
+		return nil, err
+	}
+	if err := verifyOutsourcingProductionMaterialLock(ctx, tx.client, in.OutsourcingOrderItemID, materialAllocation); err != nil {
 		return nil, err
 	}
 	resolved, item, err := resolveOutsourcingOrderFactMutation(ctx, tx.client, factType, in, !found)
@@ -194,6 +208,12 @@ func (r *operationalFactRepo) createOutsourcingFactFromOrder(ctx context.Context
 }
 
 func resolveOutsourcingOrderFactMutation(ctx context.Context, client *ent.Client, factType string, in *biz.OutsourcingFactFromOrderCreate, requireActive bool) (*biz.OperationalFactMutation, *ent.OutsourcingOrderItem, error) {
+	if in != nil {
+		if err := biz.ValidateContextWarehouseAccess(ctx, []int{in.WarehouseID}); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	if client == nil || in == nil {
 		return nil, nil, biz.ErrBadParam
 	}
@@ -226,6 +246,15 @@ func resolveOutsourcingOrderFactMutation(ctx context.Context, client *ent.Client
 		}
 		subjectID = *item.MaterialID
 	case biz.OutsourcingFactReturnReceipt:
+		if requireActive {
+			linked, err := client.ProductionWIPOutsourcingAllocation.Query().Where(productionwipoutsourcingallocation.OutsourcingOrderItemID(item.ID)).Exist(ctx)
+			if err != nil {
+				return nil, nil, err
+			}
+			if linked || order.SourceWipBatchID != nil {
+				return nil, nil, biz.ErrOutsourcingStageReturnRequired
+			}
+		}
 		if item.SubjectType != biz.OutsourcingOrderSubjectProduct || item.ProductID == nil || item.MaterialID != nil {
 			return nil, nil, biz.ErrOutsourcingOrderFactSourceInvalid
 		}
@@ -350,17 +379,30 @@ func validateOutsourcingOrderFactQuantity(ctx context.Context, client *ent.Clien
 	if err != nil {
 		return err
 	}
+	quantities, err := outsourcingFactEffectiveQuantities(ctx, client, rows)
+	if err != nil {
+		return err
+	}
 	effective := decimal.Zero
-	for _, row := range rows {
-		effective = effective.Add(row.Quantity)
+	for _, quantity := range quantities {
+		effective = effective.Add(quantity)
 	}
 	if effective.Add(additional).GreaterThan(item.OutsourcingQuantity) {
 		return biz.ErrOutsourcingOrderFactQuantityExceeded
+	}
+	if factType == biz.OutsourcingFactMaterialIssue {
+		return validateOutsourcingProductionMaterialQuantity(ctx, client, item.ID, additional)
 	}
 	return nil
 }
 
 func createOutsourcingFactDraftWithClient(ctx context.Context, client *ent.Client, in *biz.OperationalFactMutation) (*ent.OutsourcingFact, error) {
+	if in != nil {
+		if err := biz.ValidateContextWarehouseAccess(ctx, []int{in.WarehouseID}); err != nil {
+			return nil, err
+		}
+	}
+
 	return client.OutsourcingFact.Create().
 		SetFactNo(in.FactNo).
 		SetFactType(in.FactType).
@@ -391,7 +433,7 @@ func (r *operationalFactRepo) CreateOutsourcingFactDraft(ctx context.Context, in
 	if replay, found, err := findOutsourcingFactReplay(ctx, r.data.postgres, in); err != nil {
 		return nil, err
 	} else if found {
-		if err := hydrateOutsourcingFactSourceSKUProjections(ctx, r.data.postgres, []*biz.OutsourcingFact{replay}); err != nil {
+		if err := hydrateOutsourcingFactProjections(ctx, r.data.postgres, []*biz.OutsourcingFact{replay}); err != nil {
 			return nil, err
 		}
 		return replay, nil
@@ -402,7 +444,7 @@ func (r *operationalFactRepo) CreateOutsourcingFactDraft(ctx context.Context, in
 			if replay, found, replayErr := findOutsourcingFactReplay(ctx, r.data.postgres, in); replayErr != nil {
 				return nil, replayErr
 			} else if found {
-				if hydrateErr := hydrateOutsourcingFactSourceSKUProjections(ctx, r.data.postgres, []*biz.OutsourcingFact{replay}); hydrateErr != nil {
+				if hydrateErr := hydrateOutsourcingFactProjections(ctx, r.data.postgres, []*biz.OutsourcingFact{replay}); hydrateErr != nil {
 					return nil, hydrateErr
 				}
 				return replay, nil
@@ -424,6 +466,9 @@ func (r *operationalFactRepo) SaveOutsourcingFactDraft(ctx context.Context, in *
 		}
 		return nil, err
 	}
+	if err := validateOutsourcingFactAccess(ctx, preview); err != nil {
+		return nil, err
+	}
 	orderID, itemID, err := outsourcingOrderSourceIDsFromFact(preview)
 	if err != nil {
 		return nil, err
@@ -436,10 +481,17 @@ func (r *operationalFactRepo) SaveOutsourcingFactDraft(ctx context.Context, in *
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	materialAllocation, err := lockOutsourcingProductionMaterial(ctx, tx, itemID)
+	if err != nil {
+		return nil, err
+	}
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_orders", orderID, biz.ErrOutsourcingOrderNotFound); err != nil {
 		return nil, err
 	}
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_order_items", itemID, biz.ErrOutsourcingOrderItemNotFound); err != nil {
+		return nil, err
+	}
+	if err := verifyOutsourcingProductionMaterialLock(ctx, tx.client, itemID, materialAllocation); err != nil {
 		return nil, err
 	}
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", in.ID, biz.ErrOutsourcingFactNotFound); err != nil {
@@ -507,6 +559,9 @@ func updateOutsourcingFactDraft(ctx context.Context, tx *inventoryDBTx, row *ent
 	if tx == nil || tx.sqlTx == nil || row == nil || in == nil {
 		return biz.ErrBadParam
 	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, []int{row.WarehouseID, in.WarehouseID}); err != nil {
+		return err
+	}
 	if err := validateUnitQuantities(ctx, tx.client, row.UnitID, in.Quantity); err != nil {
 		return err
 	}
@@ -554,7 +609,7 @@ func (r *operationalFactRepo) CancelPostedOutsourcingFact(ctx context.Context, i
 }
 
 func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.OutsourcingFact, int, error) {
-	q := r.data.postgres.OutsourcingFact.Query()
+	q := r.data.postgres.OutsourcingFact.Query().Where(outsourcingWarehousePredicate(ctx)...)
 	if filter.Status != "" {
 		q = q.Where(outsourcingfact.Status(filter.Status))
 	}
@@ -623,7 +678,7 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	for _, row := range rows {
 		out = append(out, entOutsourcingFactToBiz(row))
 	}
-	if err := hydrateOutsourcingFactSourceSKUProjections(ctx, r.data.postgres, out); err != nil {
+	if err := hydrateOutsourcingFactProjections(ctx, r.data.postgres, out); err != nil {
 		return nil, 0, err
 	}
 	references := make([]businessSourceReference, 0, len(rows))
@@ -651,7 +706,7 @@ type outsourcingFactSourceSKUProjection struct {
 	skuCodeSnapshot *string
 }
 
-func hydrateOutsourcingFactSourceSKUProjections(
+func hydrateOutsourcingFactProjections(
 	ctx context.Context,
 	client *ent.Client,
 	items []*biz.OutsourcingFact,
@@ -659,6 +714,28 @@ func hydrateOutsourcingFactSourceSKUProjections(
 	projections, err := resolveOutsourcingFactSourceSKUSnapshots(ctx, client, items)
 	if err != nil {
 		return err
+	}
+	ids := []int{}
+	for _, item := range items {
+		if item != nil {
+			ids = append(ids, item.ID)
+			item.ReturnedToVendorQuantity = decimal.Zero
+		}
+	}
+	if len(ids) > 0 {
+		returns, err := client.OutsourcingReturnDisposition.Query().Where(outsourcingreturndisposition.OutsourcingReturnFactIDIn(ids...), outsourcingreturndisposition.DispositionType(biz.OutsourcingDispositionReturnToVendor), outsourcingreturndisposition.Status(biz.OutsourcingDispositionPosted)).All(ctx)
+		if err != nil {
+			return err
+		}
+		totals := map[int]decimal.Decimal{}
+		for _, row := range returns {
+			totals[row.OutsourcingReturnFactID] = totals[row.OutsourcingReturnFactID].Add(row.Quantity)
+		}
+		for _, item := range items {
+			if item != nil {
+				item.ReturnedToVendorQuantity = totals[item.ID]
+			}
+		}
 	}
 	for _, item := range items {
 		if item == nil {
@@ -749,6 +826,9 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, in *biz.O
 		}
 		return nil, err
 	}
+	if err := validateOutsourcingFactAccess(ctx, preview); err != nil {
+		return nil, err
+	}
 	if preview.SourceType == nil || *preview.SourceType != biz.OutsourcingOrderSourceType {
 		if !cancel {
 			return nil, biz.ErrOutsourcingOrderFactSourceInvalid
@@ -759,33 +839,26 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, in *biz.O
 	if err != nil {
 		return nil, err
 	}
-	var dependencyBatchID int
-	if cancel && preview.FactType == biz.OutsourcingFactMaterialIssue {
-		allocation, allocationErr := r.data.postgres.ProductionWIPOutsourcingAllocation.Query().Where(
-			productionwipoutsourcingallocation.OutsourcingOrderItemID(itemID),
-			productionwipoutsourcingallocation.SubjectType(biz.OutsourcingOrderSubjectMaterial),
-		).Only(ctx)
-		if allocationErr != nil && !ent.IsNotFound(allocationErr) {
-			return nil, allocationErr
-		}
-		if allocationErr == nil {
-			dependencyBatchID = allocation.ProductionWipBatchID
-		}
-	}
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if dependencyBatchID > 0 {
-		if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", dependencyBatchID, biz.ErrProductionWIPOutsourcingSourceDependency); err != nil {
-			return nil, err
-		}
+	materialAllocation, err := lockOutsourcingProductionMaterial(ctx, tx, itemID)
+	if err != nil {
+		return nil, err
+	}
+	dependencyBatchID := 0
+	if materialAllocation != nil {
+		dependencyBatchID = materialAllocation.ProductionWipBatchID
 	}
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_orders", orderID, biz.ErrOutsourcingOrderNotFound); err != nil {
 		return nil, err
 	}
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_order_items", itemID, biz.ErrOutsourcingOrderItemNotFound); err != nil {
+		return nil, err
+	}
+	if err := verifyOutsourcingProductionMaterialLock(ctx, tx.client, itemID, materialAllocation); err != nil {
 		return nil, err
 	}
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", in.ID, biz.ErrOutsourcingFactNotFound); err != nil {
@@ -796,6 +869,9 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, in *biz.O
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrOutsourcingFactNotFound
 		}
+		return nil, err
+	}
+	if err := validateOutsourcingFactAccess(ctx, row); err != nil {
 		return nil, err
 	}
 	if row.SourceID == nil || *row.SourceID != orderID || row.SourceLineID == nil || *row.SourceLineID != itemID {
@@ -953,6 +1029,9 @@ func (r *operationalFactRepo) cancelSourceLessOutsourcingFact(ctx context.Contex
 		}
 		return nil, err
 	}
+	if err := validateOutsourcingFactAccess(ctx, row); err != nil {
+		return nil, err
+	}
 	replay, err := versionedOperationalFactCancellationReplay(
 		row.Status,
 		row.Version,
@@ -1063,7 +1142,7 @@ func outsourcingFactWithSourceSKUProjection(ctx context.Context, client *ent.Cli
 	if item == nil {
 		return nil, nil
 	}
-	if err := hydrateOutsourcingFactSourceSKUProjections(ctx, client, []*biz.OutsourcingFact{item}); err != nil {
+	if err := hydrateOutsourcingFactProjections(ctx, client, []*biz.OutsourcingFact{item}); err != nil {
 		return nil, err
 	}
 	return item, nil

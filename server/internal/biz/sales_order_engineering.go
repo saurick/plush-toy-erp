@@ -3,36 +3,27 @@ package biz
 import (
 	"context"
 	"errors"
-	"strings"
-)
-
-const (
-	SalesOrderEngineeringPreparing = "PREPARING"
-	SalesOrderEngineeringSampling  = "SAMPLING"
-	SalesOrderEngineeringConfirmed = "CONFIRMED"
 )
 
 var (
-	ErrSalesOrderEngineeringNotReady   = errors.New("sales order engineering requires product image and BOM")
-	ErrSalesOrderEngineeringTransition = errors.New("sales order sampling transition invalid")
+	ErrSalesOrderEngineeringNotReady   = errors.New("sales order engineering BOM is not ready")
+	ErrSalesOrderEngineeringTransition = errors.New("sales order engineering source change invalid")
 	ErrSalesOrderEngineeringDependency = errors.New("sales order engineering has downstream dependencies")
 )
 
 type SalesOrderEngineeringItemMutation struct {
-	ID                   int
-	ProductID            int
-	ProductSkuID         *int
-	SampleBOMID          *int
-	ExpectedBOMVersion   int64
-	ReuseConfirmedSample bool
-	EngineeringStatus    string
-	SampleNote           *string
+	ID                 int
+	ProductID          int
+	ProductSkuID       *int
+	BOMID              *int
+	ExpectedBOMVersion int64
 }
 
 type SalesOrderEngineeringMutation struct {
 	SalesOrderID    int
 	ExpectedVersion int
 	ActorID         int
+	Complete        bool
 	Items           []SalesOrderEngineeringItemMutation
 }
 
@@ -51,25 +42,23 @@ func (uc *SalesOrderUsecase) SaveSalesOrderEngineering(ctx context.Context, in *
 	normalized := *in
 	normalized.Items = append([]SalesOrderEngineeringItemMutation(nil), in.Items...)
 	seen := map[int]bool{}
+	productBOMs := map[int]int{}
 	for i := range normalized.Items {
 		item := &normalized.Items[i]
-		item.EngineeringStatus = strings.ToUpper(strings.TrimSpace(item.EngineeringStatus))
-		item.SampleNote = normalizeOptionalString(item.SampleNote)
 		if item.ID <= 0 || seen[item.ID] || item.ProductID < 0 ||
 			(item.ProductSkuID != nil && (*item.ProductSkuID <= 0 || item.ProductID == 0)) ||
-			(item.SampleBOMID != nil && (*item.SampleBOMID <= 0 || item.ProductID == 0 || item.ExpectedBOMVersion <= 0)) ||
-			(item.SampleNote != nil && len([]rune(*item.SampleNote)) > 255) {
+			(item.BOMID != nil && (*item.BOMID <= 0 || item.ProductID == 0 || item.ExpectedBOMVersion <= 0)) {
 			return nil, ErrBadParam
 		}
 		seen[item.ID] = true
-		switch item.EngineeringStatus {
-		case SalesOrderEngineeringPreparing:
-		case SalesOrderEngineeringSampling, SalesOrderEngineeringConfirmed:
-			if item.ProductID == 0 || item.SampleBOMID == nil {
-				return nil, ErrSalesOrderEngineeringNotReady
+		if in.Complete && item.BOMID != nil {
+			if prior, exists := productBOMs[item.ProductID]; exists && prior != *item.BOMID {
+				return nil, ErrBOMActiveConflict
 			}
-		default:
-			return nil, ErrBadParam
+			productBOMs[item.ProductID] = *item.BOMID
+		}
+		if in.Complete && (item.ProductID == 0 || item.BOMID == nil) {
+			return nil, ErrSalesOrderEngineeringNotReady
 		}
 	}
 	return repo.SaveSalesOrderEngineering(ctx, &normalized)

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { Tag } from 'antd'
 
-import { FinanceAllocationStatus } from '../../../common/consts/statuses.generated.mjs'
+import { FinanceAllocationStatus, FinanceAdjustmentDirection } from '../../../common/consts/statuses.generated.mjs'
 
 import { formatUnixDateTime } from '../../utils/masterDataOrderView.mjs'
 
@@ -202,11 +202,12 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
       {
         align: 'right',
         defaultPriority: 50,
-        title: '红冲金额',
+        title: '调整金额',
         dataIndex: 'amount',
         width: 140,
       },
       { defaultPriority: 60, title: '币种', dataIndex: 'currency', width: 90 },
+      { title: '调整方向', dataIndex: 'balance_direction', width: 110, render: (value) => value === FinanceAdjustmentDirection.INCREASE ? '增加账款' : '减少账款', exportValue: (row) => row.balance_direction === FinanceAdjustmentDirection.INCREASE ? '增加账款' : '减少账款' },
       {
         align: 'right',
         defaultPriority: 80,
@@ -217,7 +218,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
       {
         align: 'right',
         defaultPriority: 70,
-        title: '红冲后未核销',
+        title: '当前未核销',
         dataIndex: 'finance_fact_outstanding_amount',
         width: 150,
       },

@@ -1,11 +1,9 @@
 import React, { useEffect } from 'react'
 import { SettingOutlined } from '@ant-design/icons'
 import { Alert, Button, Space, Tag, Typography } from 'antd'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
-import { DEV_CUSTOMER_CONFIG_SOURCE_PATH } from '../config/devCustomerConfig.mjs'
-import { buildDevCustomerScopedRoute } from '../config/devCustomerScope.mjs'
-import { DEV_VERSION_CENTER_ROUTE } from '../config/devRoutes.mjs'
 import { AssetsPanel } from './customer-config/AssetsPanel.jsx'
 import { DiffPanel } from './customer-config/DiffPanel.jsx'
 import { OverviewPanel } from './customer-config/OverviewPanel.jsx'
@@ -45,12 +43,6 @@ export default function DevCustomerConfigPage() {
   })
   const { isMutationRunning, releaseBatch, releaseBatchesState } = operations
   const isMissingCustomer = overview.status !== 'ready'
-  const deploymentHref = isMissingCustomer
-    ? DEV_VERSION_CENTER_ROUTE
-    : buildDevCustomerScopedRoute(
-        DEV_VERSION_CENTER_ROUTE,
-        overview.customerKey
-      )
   const selectStep = (step) => {
     if (!isMutationRunning) route.navigate(step)
   }
@@ -72,7 +64,6 @@ export default function DevCustomerConfigPage() {
         dryRunState={operations.dryRunState}
         applyState={operations.applyState}
         onNavigate={selectStep}
-        deploymentHref={deploymentHref}
       />
     ),
     preflight: (
@@ -121,7 +112,6 @@ export default function DevCustomerConfigPage() {
         }}
         onCheckReleaseReadiness={operations.handleCheckReleaseReadiness}
         onRetryRead={operations.retryRead}
-        deploymentHref={deploymentHref}
         disabled={isMutationRunning}
       />
     ),
@@ -129,18 +119,35 @@ export default function DevCustomerConfigPage() {
 
   return (
     <main className="erp-dev-customer-page erp-dev-workspace-page erp-dev-tool-page erp-dev-delivery-workspace">
-      <DevPageNav
-        sourcePath={overview.sourcePath || DEV_CUSTOMER_CONFIG_SOURCE_PATH}
-      />
-      <header className="erp-dev-customer-header">
-        <div className="erp-dev-customer-header__copy">
-          <Space align="center" size={10}>
-            <SettingOutlined className="erp-dev-customer-header__icon" />
-            <Title className="erp-dev-customer-title" level={1}>
-              客户配置
-            </Title>
-          </Space>
-        </div>
+      <DevPageNav />
+      <DevPageHeader
+        className="erp-dev-customer-header"
+        title={
+          <div className="erp-dev-customer-header__copy">
+            <Space align="center" size={10}>
+              <SettingOutlined className="erp-dev-customer-header__icon" />
+              <Title className="erp-dev-customer-title" level={1}>
+                客户配置
+              </Title>
+            </Space>
+          </div>
+        }
+        navigation={
+          !isMissingCustomer ? (
+            <DevTaskNav
+              compact
+              level="primary"
+              idPrefix="dev-customer"
+              className="erp-dev-customer-journey erp-dev-customer-stagebar"
+              ariaLabel="客户配置工作任务"
+              items={steps}
+              value={activeStep}
+              onChange={selectStep}
+              disabled={isMutationRunning}
+            />
+          ) : null
+        }
+      >
         <section
           className="erp-dev-workbench-header-context erp-dev-customer-context"
           aria-label="客户配置范围"
@@ -154,20 +161,8 @@ export default function DevCustomerConfigPage() {
           />
           {!isMissingCustomer ? <Tag>工作区配置源</Tag> : null}
         </section>
-        {!isMissingCustomer ? (
-          <DevTaskNav
-            compact
-            level="primary"
-            idPrefix="dev-customer"
-            className="erp-dev-customer-journey erp-dev-customer-stagebar"
-            ariaLabel="客户配置工作任务"
-            items={steps}
-            value={activeStep}
-            onChange={selectStep}
-            disabled={isMutationRunning}
-          />
-        ) : null}
-      </header>
+      </DevPageHeader>
+
       {operations.historyState.status === 'error' ? (
         <Alert
           type="warning"

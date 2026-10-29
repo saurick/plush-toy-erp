@@ -222,7 +222,9 @@
 
 .mobile-app-layout--review,
 .mobile-app-layout--sync-issue,
-.mobile-app-layout:has(> .legal-notice-status-banner) {
+.mobile-app-layout:has(> .mobile-task-step-panels),
+.mobile-app-layout:has(> .legal-notice-status-banner),
+.mobile-app-layout:has(> nav[aria-label='切换岗位任务端']) {
   display: flex;
   min-height: 0;
   height: 100vh;
@@ -237,9 +239,19 @@
 
 .mobile-app-layout--review .mobile-role-tasks-page,
 .mobile-app-layout--sync-issue .mobile-role-tasks-page,
-.mobile-app-layout:has(> .legal-notice-status-banner) .mobile-role-tasks-page {
+.mobile-app-layout:has(> .legal-notice-status-banner) .mobile-role-tasks-page,
+.mobile-app-layout:has(> nav[aria-label='切换岗位任务端']) .mobile-role-tasks-page {
   height: auto;
   flex: 1 1 auto;
+}
+
+.mobile-app-layout > .mobile-task-step-panels {
+  height: auto;
+  flex: 1 1 0;
+}
+
+.mobile-app-layout > nav[aria-label='切换岗位任务端'] {
+  flex: 0 0 auto;
 }
 
 .mobile-role-runtime-boundary {
@@ -1075,8 +1087,24 @@
   grid-template-columns: auto minmax(0, 1fr);
 }
 
-.mobile-task-action-footer {
-  grid-template-columns: minmax(0, 1fr);
+.mobile-role-tasks-page--detail .mobile-task-action-footer {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.mobile-task-action-footer .erp-task-secondary-actions {
+  flex: 0 0 auto;
+  padding-inline: 8px;
+  font-size: var(--erp-font-small);
+  white-space: nowrap;
+}
+
+.mobile-task-action-footer .erp-task-operation-group--primary {
+  flex-basis: 100%;
+}
+
+.mobile-task-action-footer .erp-task-operation-group--primary > .erp-task-operation-group__controls {
+  flex: 1 1 0;
 }
 
 .mobile-task-action-footer .erp-material-task-action__footer {
@@ -1269,7 +1297,9 @@
   .mobile-role-tasks-page--detail,
   .mobile-app-layout--review,
   .mobile-app-layout--sync-issue,
-  .mobile-app-layout:has(> .legal-notice-status-banner) {
+  .mobile-app-layout:has(> .mobile-task-step-panels),
+  .mobile-app-layout:has(> .legal-notice-status-banner),
+  .mobile-app-layout:has(> nav[aria-label='切换岗位任务端']) {
     height: calc(100vh - 32px);
     height: calc(100dvh - 32px);
   }
@@ -1737,7 +1767,7 @@
   padding: 14px;
 }
 
-.mobile-role-tasks-page--detail .workflow-task-event-trail--collapsible {
+.mobile-role-tasks-page--detail .workflow-task-event-trail--compact {
   border-top: 1px solid var(--erp-border);
 }
 

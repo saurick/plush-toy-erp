@@ -277,8 +277,15 @@ test("manual acceptance catalog treats production and outbound pages as source-g
   const byTitle = new Map(
     catalog.acceptanceGuide.desktopPages.map((item) => [item.title, item]),
   );
-  const production = byTitle.get("生产记录");
-  const outbound = byTitle.get("库存预留");
+  const guideForPage = (key) => {
+    const page = catalog.technicalManifest.desktopPages.find(
+      (item) => item.key === key,
+    );
+    assert(page, `missing registered page ${key}`);
+    return byTitle.get(page.title);
+  };
+  const production = guideForPage("production-progress");
+  const outbound = guideForPage("outbound");
 
   assert(production);
   assert(outbound);
@@ -287,6 +294,7 @@ test("manual acceptance catalog treats production and outbound pages as source-g
     /正式生产任务.*已准备的试用记录/u,
   );
   assert.match(outbound.whatToDo.join("\n"), /出货单处理.*已准备的试用记录/u);
+  assert.match(outbound.whatToDo.join("\n"), /选择“库存预留”页签/u);
   assert.match(production.whatToSee.join("\n"), /不提供无来源的新建入口/u);
   assert.match(outbound.whatToSee.join("\n"), /不提供无来源的新建入口/u);
   assert.doesNotMatch(

@@ -177,6 +177,7 @@ function flowCandidates(flow) {
     candidate(flow.label, '', {}, 3),
     candidate(flow.summary, '', {}, 2),
     candidate(flow.key, '定义 key', {}, 3),
+    ...asArray(flow.transitions).map((transition) => candidate(transition.label, `状态动作：${transition.label}`, {}, 2)),
     ...[...asArray(flow.actionRules), ...asArray(flow.lifecycleRules)].flatMap((rule) => [
       candidate(rule.label, `办理规则：${rule.label}`, {}, 2),
       candidate(rule.action, `办理规则：${rule.label}`),

@@ -90,7 +90,7 @@ export default function ProductionMaterialIssueModal({
     <Editor
       {...(editing
         ? { form }
-        : { size: 'localAction', cancelText: '取消', destroyOnHidden: true })}
+        : { taskInline: true, form, size: 'localAction', cancelText: '取消', destroyOnHidden: true })}
       className="erp-production-material-issue-modal"
       title={editing ? '编辑生产领料草稿' : '生产领料'}
       open={open}

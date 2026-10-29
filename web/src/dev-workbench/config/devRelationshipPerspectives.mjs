@@ -7,6 +7,7 @@ import {
   DEV_PROJECT_SKILLS_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
   DEV_STATUS_FLOWS_ROUTE,
+  DEV_BUSINESS_RULES_ROUTE,
   DEV_VERSION_CENTER_ROUTE,
 } from './devRoutes.mjs'
 import { RpcTransport } from '../../common/consts/rpcMethods.generated.mjs'
@@ -178,7 +179,7 @@ export const DEV_PROJECT_GRAPH_EXAMPLES = Object.freeze({
     directed: true,
     direction: 'LR',
     caption: '状态机制示意；不同业务对象有各自正式状态，不新增统一业务状态。',
-    destinations: [{ label: '状态规则', route: `${DEV_STATUS_FLOWS_ROUTE}?view=states` }, { label: '实例跟踪', route: `${DEV_STATUS_FLOWS_ROUTE}?view=tracking` }],
+    destinations: [{ label: '状态流转', route: `${DEV_BUSINESS_RULES_ROUTE}?view=states` }, { label: '实例跟踪', route: `${DEV_STATUS_FLOWS_ROUTE}?view=tracking` }],
     nodes: [
       { id: 'todo', label: '待办理', description: '进入当前责任环节，等待具备资格的办理人处理。' },
       { id: 'work', label: '办理中', description: '补齐条件后可以再次办理，因此可能被回路重新到达。' },

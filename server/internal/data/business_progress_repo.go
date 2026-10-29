@@ -184,7 +184,7 @@ func (r *businessProgressRepo) GetBusinessProgress(ctx context.Context, q biz.Bu
 func progressDetailQueries(q biz.BusinessProgressQuery, id, sqlDialect string) map[string]string {
 	queries := map[string]string{}
 	if q.View == "orders" {
-		queries["lines"] = `SELECT l.id,'sales_line',CAST(l.line_no AS TEXT),l.product_label,l.engineering_status,
+		queries["lines"] = `SELECT l.id,'sales_line',CAST(l.line_no AS TEXT),l.product_label,CASE WHEN l.bom_id IS NOT NULL AND l.bom_fingerprint IS NOT NULL THEN '工程资料已完成' ELSE '待完善工程资料' END,
  CAST(l.ordered_quantity AS TEXT),l.unit_name,` + progressDateSQL("l.due_at", sqlDialect) + `,'','',
  CASE WHEN EXISTS(SELECT 1 FROM shipment_mismatch m WHERE m.order_id=l.sales_order_id) THEN '出货关联待核对'
  ELSE '已出货 ' || CAST(l.shipped_quantity AS TEXT) END,COALESCE(l.product_id,0),l.sales_order_id FROM sales_lines l

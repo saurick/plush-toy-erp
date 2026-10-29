@@ -199,40 +199,16 @@ test('product page integrates dedicated slots without changing SKU attachment se
     'utf8'
   )
 
-  assert.match(
-    pageSource,
-    /effectiveType === 'products'[\s\S]*?<ProductImageSlots/u
-  )
-  assert.match(
-    pageSource,
-    /effectiveType === 'product_skus'[\s\S]*?<BusinessAttachmentPanel/u
-  )
-  assert.match(pageSource, /flushChanges\(saved\?\.id\)/u)
-  assert.match(pageSource, /产品已保存，产品图未全部更新/u)
-  assert.match(
-    pageSource,
-    /productImageResult\?\.mutationsApplied === true[\s\S]*?productImageResult\?\.reloaded === true/u,
-    'the product save flow must distinguish image writes from the follow-up readback'
-  )
-  assert.match(
-    pageSource,
-    /产品和产品图已保存，但当前图片状态暂未刷新/u,
-    'a readback failure after successful writes must not be reported as a partial image write'
-  )
-  assert.match(
-    pageSource,
-    /if \(!productImagesApplied\)[\s\S]*?setEditingRecord\(saved \|\| editingRecord\)[\s\S]*?await loadRecords\(\)[\s\S]*?beginSession\(saved\?\.id\)[\s\S]*?return/u,
-    'a partial image write must keep the saved product in update mode for an in-place retry'
-  )
-  assert.match(
-    pageSource,
-    /onCancel=\{\(\) => \{\s*if \(saving \|\| contactLoading\) return[\s\S]*?confirmLoading=\{saving\}[\s\S]*?loading=\{\s*contactLoading \|\|/u,
-    'the editor must protect product and image writes in flight'
-  )
-  assert.match(
-    pageSource,
-    /<ProductImageSlots[\s\S]*?canEdit=\{editingRecord\?\.id \? canUpdate : canCreate\}/u
-  )
+  const editorSource = readFileSync(new URL('../components/master-data/ProductRecordEditor.jsx', import.meta.url), 'utf8')
+  assert.match(pageSource, /<ProductRecordEditor/u)
+  assert.match(editorSource, /type === 'products'[^\n]*<ProductImageSlots/u)
+  assert.match(editorSource, /ownerType="product_sku"/u)
+  assert.match(editorSource, /flushChanges\(saved\.id\)/u)
+  assert.match(editorSource, /mutationsApplied[\s\S]*?reloaded/u)
+  assert.match(editorSource, /产品和产品图片已保存，图片状态尚未确认/u)
+  assert.match(editorSource, /persisted\.current = saved/u)
+  assert.match(editorSource, /confirmLoading=\{saving\}/u)
+  assert.match(editorSource, /canEdit=\{canUploadImages\}/u)
   assert.deepEqual(
     PRODUCT_IMAGE_SLOT_DEFINITIONS.map(({ label }) => label),
     ['产品图 1（主图）', '产品图 2（辅图）']

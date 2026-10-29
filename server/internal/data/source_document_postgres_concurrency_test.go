@@ -283,6 +283,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 				ProcessID:           process.ID,
 				UnitID:              unit.ID,
 				OutsourcingQuantity: originalQuantity,
+				UnitPrice:           new(decimal.NewFromInt(2)),
 				ProcessingItem:      &processingItem,
 			},
 		}})
@@ -317,7 +318,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 			saveErr <- err
 		}()
 		waitForPausedSourceDocumentSave(t, entered)
-		if _, err := realUC.SubmitOutsourcingOrder(ctx, created.Order.ID); err != nil {
+		if _, err := applyOutsourcingLifecycleUsecaseForTest(ctx, realUC, created.Order.ID, biz.SourceOrderActionSubmit); err != nil {
 			close(release)
 			t.Fatalf("submit outsourcing order while stale save is paused: %v", err)
 		}
@@ -337,10 +338,10 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 		if order.LifecycleStatus != biz.OutsourcingOrderStatusSubmitted || order.OutsourcingOrderNo != created.Order.OutsourcingOrderNo || len(items) != 1 || !items[0].OutsourcingQuantity.Equal(originalQuantity) {
 			t.Fatalf("submitted outsourcing order must retain original header/items, order=%#v items=%#v", order, items)
 		}
-		if _, err := realUC.ConfirmOutsourcingOrder(ctx, order.ID); err != nil {
+		if _, err := applyOutsourcingLifecycleUsecaseForTest(ctx, realUC, order.ID, biz.SourceOrderActionConfirm); err != nil {
 			t.Fatalf("confirm submitted outsourcing order: %v", err)
 		}
-		if _, err := realRepo.UpdateOutsourcingOrderLifecycle(ctx, order.ID, biz.OutsourcingOrderStatusSubmitted); !errors.Is(err, biz.ErrSourceOrderStateInvalid) {
+		if _, err := applyOutsourcingLifecycleForTest(ctx, realRepo, order.ID, biz.OutsourcingOrderStatusSubmitted); !errors.Is(err, biz.ErrSourceOrderStateInvalid) {
 			t.Fatalf("stale lifecycle write must not regress confirmed outsourcing order, got %v", err)
 		}
 	})

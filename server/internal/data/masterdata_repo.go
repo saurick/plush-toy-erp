@@ -407,6 +407,9 @@ func (r *masterDataRepo) GetMaterial(ctx context.Context, id int) (*biz.Material
 
 func (r *masterDataRepo) ListMaterials(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Material, int, error) {
 	query := r.data.postgres.Material.Query()
+	if filter.PurchaseSupplierID > 0 {
+		query.Where(material.Or(material.SupplierID(filter.PurchaseSupplierID), material.SupplierIDIsNil()))
+	}
 	if filter.IDs != nil {
 		query.Where(material.IDIn(filter.IDs...))
 	}

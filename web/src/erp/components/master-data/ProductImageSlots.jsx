@@ -296,6 +296,7 @@ const ProductImageSlots = forwardRef(
     const mountedRef = useRef(true)
     const [session, setSession] = useState(() => sessionRef.current)
     const [loading, setLoading] = useState(false)
+    const needsReadback = useRef(false)
     const [loadFailed, setLoadFailed] = useState(false)
     const [saving, setSaving] = useState(false)
     const [preparingSlotKey, setPreparingSlotKey] = useState('')
@@ -404,6 +405,7 @@ const ProductImageSlots = forwardRef(
         const requestSequence = requestSequenceRef.current + 1
         requestSequenceRef.current = requestSequence
         activeProductIDRef.current = targetProductID
+        needsReadback.current = false
         for (const { key } of PRODUCT_IMAGE_SLOT_DEFINITIONS) {
           fileReadSequenceRef.current[key] += 1
         }
@@ -482,7 +484,7 @@ const ProductImageSlots = forwardRef(
           filePreparationPromisesRef.current
         )
         let plan = buildProductImageMutationPlan(sessionRef.current)
-        if (plan.length <= 0 && pendingPreparations.length <= 0) {
+        if (plan.length <= 0 && pendingPreparations.length <= 0 && !needsReadback.current) {
           return { mutationsApplied: true, reloaded: true }
         }
         if (!canEdit || targetProductID <= 0) {
@@ -501,7 +503,7 @@ const ProductImageSlots = forwardRef(
             plan = buildProductImageMutationPlan(sessionRef.current)
             for (const change of plan) {
               if (change.type === 'upload') {
-                await uploadProductImage({
+                const uploaded = await uploadProductImage({
                   product_id: targetProductID,
                   slot_key: change.slotKey,
                   file_name: change.image.file_name,
@@ -509,6 +511,10 @@ const ProductImageSlots = forwardRef(
                   file_size: change.image.file_size,
                   content_base64: change.image.content_base64,
                 })
+                const { current } = sessionRef
+                const slot = current.slots[change.slotKey]
+                setCurrentSession({ ...current, slots: { ...current.slots, [change.slotKey]: { ...slot, pending: null, cleared: false, saved: { ...uploaded, preview_url: slot.pending?.preview_url } } } })
+                needsReadback.current = true
                 continue
               }
               const cleared = await clearProductImage({
@@ -516,23 +522,20 @@ const ProductImageSlots = forwardRef(
                 slot_key: change.slotKey,
               })
               if (!cleared) throw new Error('clear product image failed')
+              const { current } = sessionRef
+              setCurrentSession({ ...current, slots: { ...current.slots, [change.slotKey]: { ...current.slots[change.slotKey], saved: null, pending: null, cleared: false } } })
+              needsReadback.current = true
             }
           } catch (error) {
             message.error(getActionErrorMessage(error, '更新产品图片'))
-            try {
-              applySavedAttachments(await loadSavedAttachments(targetProductID))
-              return { mutationsApplied: false, reloaded: true }
-            } catch {
-              cancelSession()
-              return { mutationsApplied: false, reloaded: false }
-            }
+            return { mutationsApplied: false, reloaded: false }
           }
 
           try {
             applySavedAttachments(await loadSavedAttachments(targetProductID))
+            needsReadback.current = false
             return { mutationsApplied: true, reloaded: true }
           } catch {
-            cancelSession()
             return { mutationsApplied: true, reloaded: false }
           }
         } finally {
@@ -541,8 +544,8 @@ const ProductImageSlots = forwardRef(
       },
       [
         applySavedAttachments,
-        cancelSession,
         canEdit,
+        setCurrentSession,
         loadSavedAttachments,
         productId,
       ]
@@ -716,17 +719,7 @@ const ProductImageSlots = forwardRef(
 
     return (
       <section className="product-image-slots" aria-label="产品图片">
-        <div className="product-image-slots__header">
-          <div>
-            <Typography.Text strong>产品图片</Typography.Text>
-            <Typography.Paragraph type="secondary">
-              用于物料明细和作业指导书右上角。可设置 0–2
-              张，只有一张时请放在产品图 1。支持
-              PNG、JPEG、WEBP。源图片不限制文件大小；大尺寸图片会在浏览器内自动优化为适合保存和打印的清晰版本。
-            </Typography.Paragraph>
-          </div>
-          <Tag color="blue">保存产品后生效</Tag>
-        </div>
+        {canEdit ? <div className="product-image-slots__header"><Typography.Text type="secondary">支持 PNG、JPEG、WEBP</Typography.Text></div> : null}
 
         <div className="product-image-slots__grid">
           {PRODUCT_IMAGE_SLOT_DEFINITIONS.map(({ key, label }) => {

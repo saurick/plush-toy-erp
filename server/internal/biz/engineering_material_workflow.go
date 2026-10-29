@@ -30,7 +30,7 @@ func materialTaskResponsibility(group string) (string, string, string) {
 	case WorkflowMaterialFinanceReviewGroup:
 		return FinanceRoleKey, PermissionEngineeringMaterialFinanceApprove, "审核并批准采购用料"
 	case WorkflowMaterialRevisionGroup:
-		return EngineeringRoleKey, PermissionEngineeringMaterialSubmit, "修改用料并重新提交"
+		return EngineeringRoleKey, PermissionEngineeringMaterialSubmit, "修改工程资料"
 	default:
 		return "", "", ""
 	}
@@ -87,6 +87,9 @@ func BuildEngineeringMaterialTask(request *EngineeringMaterialRequest) (*Workflo
 	}
 	if group == WorkflowMaterialRevisionGroup && request.ReviewNote != nil {
 		payload["business_status_reason"] = *request.ReviewNote
+	}
+	if group == WorkflowMaterialRevisionGroup {
+		payload["complete_condition"] = "修改原工程资料并点击“完成工程资料”；校验通过后自动重新送审。"
 	}
 	return &WorkflowTaskCreate{
 		TaskCode: WorkflowSourceTaskCode(group, request.ID), TaskGroup: group,

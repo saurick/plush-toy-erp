@@ -2,6 +2,7 @@ import React from 'react'
 import { App } from 'antd'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 import BusinessModal from './BusinessModal.jsx'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 
 function joinClassNames(...parts) {
   return parts.filter(Boolean).join(' ')
@@ -129,11 +130,14 @@ export default function BusinessFormModal({
   children,
   open,
   dirty = false,
+  taskInline = false,
   onCancel,
   okText = '保存',
   ...modalProps
 }) {
   const { modal } = App.useApp()
+  const context = useBusinessPageContext()
+  const inline = taskInline && Boolean(context?.taskBusiness)
   const discardRef = React.useRef(null)
   React.useEffect(() => () => discardRef.current?.destroy(), [])
   const close = (event) => {
@@ -169,7 +173,7 @@ export default function BusinessFormModal({
   const handleAfterOpenChange = React.useCallback(
     (open) => {
       userAfterOpenChange?.(open)
-      if (typeof document === 'undefined') return
+      if (inline || typeof document === 'undefined') return
       if (!open) {
         scheduleBusinessFormModalTriggerFocus(triggerElementRef, previousOpenRef)
         return
@@ -177,7 +181,7 @@ export default function BusinessFormModal({
 
       focusBusinessFormModalAfterTransition(160)
     },
-    [userAfterOpenChange]
+    [userAfterOpenChange, inline]
   )
   React.useLayoutEffect(() => {
     if (
@@ -191,15 +195,17 @@ export default function BusinessFormModal({
     previousOpenRef.current = open
   }, [open])
   React.useEffect(() => {
-    if (!open || typeof window === 'undefined') return undefined
+    if (!open || inline || typeof window === 'undefined') return undefined
     return scheduleBusinessFormModalFocus(120)
-  }, [open])
+  }, [open, inline])
 
   return (
     <BusinessModal
       {...modalProps}
+      taskInline={taskInline}
+      hasChanges={dirty}
       open={open}
-      onCancel={close}
+      onCancel={inline ? onCancel : close}
       okText={okText}
       afterOpenChange={handleAfterOpenChange}
       className={joinClassNames(

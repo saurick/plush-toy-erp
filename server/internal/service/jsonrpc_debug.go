@@ -31,11 +31,11 @@ func (d *jsonrpcDispatcher) handleDebug(
 	}
 
 	switch method {
-	case "capabilities", "config":
+	case "capabilities":
 		return d.handleDebugCapabilities(ctx, id)
-	case "rebuild_business_chain_scenario", "seed_business_chain_scenario":
+	case "rebuild_business_chain_scenario":
 		return d.handleDebugSeed(ctx, id, pm, claims.UserID)
-	case "clear_business_chain_scenario", "cleanup_business_chain_scenario":
+	case "clear_business_chain_scenario":
 		return d.handleDebugCleanup(ctx, id, pm, claims.UserID)
 	case "clear_business_data":
 		return d.handleDebugClearBusinessData(ctx, id, pm, claims.UserID)

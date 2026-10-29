@@ -320,6 +320,39 @@
   }
 
 }
+.erp-workflow-source-tracking {
+  display: grid;
+  gap: 16px;
+  margin: 12px;
+  padding: 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
+  overflow-wrap: anywhere;
+}
+
+.erp-workflow-source-tracking__source {
+  display: grid;
+  gap: 6px;
+}
+
+.erp-workflow-source-tracking__label {
+  color: var(--erp-text-muted);
+}
+
+.erp-workflow-source-tracking__link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  color: var(--erp-text);
+  background: var(--erp-surface-bg);
+  text-align: center;
+}
+
 .erp-workflow-source-tracking ul {
   display: grid;
   gap: 8px;

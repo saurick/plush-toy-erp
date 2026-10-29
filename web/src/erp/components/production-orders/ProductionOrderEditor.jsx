@@ -466,6 +466,7 @@ export default function ProductionOrderEditor({
   onRequestOverIssue,
   onCancel,
   onSubmit,
+  savedRecordActions,
 }) {
   const readOnly = mode === 'view'
   const quantityUnitOptions = useQuantityUnits(open && !readOnly)
@@ -501,6 +502,7 @@ export default function ProductionOrderEditor({
   return (
     <BusinessFormPage
       form={form}
+      baselineKey={`${order?.id || ''}:${order?.version || ''}`}
       readOnly={readOnly}
       open={open}
       title={title}
@@ -508,6 +510,7 @@ export default function ProductionOrderEditor({
       okText={mode === 'create' ? '创建草稿' : '保存草稿'}
       onCancel={onCancel}
       onOk={readOnly ? undefined : () => form.submit()}
+      savedRecordActions={savedRecordActions}
     >
       <Form
         form={form}

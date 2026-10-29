@@ -29,6 +29,8 @@ export function assertSourceOrderEvidence(report) {
   assert.deepEqual(Object.keys(report.factsBefore).sort(), [...factTables].sort());
   assert.deepEqual(report.factsAfter, report.factsBefore);
   for (const flow of report.flows) {
+    assert.equal(flow.authoringSurface, 'desktop');
+    if (flow.key.startsWith('mobile_')) assert.equal(flow.mobileAuthoringUnavailable, true);
     for (const field of ["passed", "draftCAS", "conflictMessageShownOnce", "forbiddenUnchanged", "invalidQuantityUnchanged", "saveRecovered", "saveKeptBusinessValues", "submitRecovered", "replayExact", "changedIntentRejected", "factsUnchanged", "frozenAfterSubmit", "terminalGuard"]) assert.equal(flow[field], true, `${flow.key}.${field}`);
     assert.ok(Number.isSafeInteger(flow.sourceID) && flow.sourceID > 0);
     for (const fault of [flow.saveFault, flow.submitFault]) {
@@ -53,6 +55,7 @@ export function assertSourceOrderEvidence(report) {
     assert.equal(report.browserRPC.filter(call => call.role === entry.actor && call.method === entry.method && call.code === entry.code).length, expected.filter(other => other.actor === entry.actor && other.method === entry.method && other.code === entry.code).length);
   }
   assert.deepEqual(report.engineering.map(entry => entry.surface), ["desktop", "mobile"]);
+  assert.ok(report.engineering.every(entry => entry.preparationSurface === "desktop"));
   for (const entry of report.engineering) {
     for (const key of ["passed", "staleSourceRejected", "permissionDenied", "rejectReasonRequired", "rejectedResubmitted", "approvalOrdered", "financeRecovered", "replayExact", "changedReviewRejected", "purchaseSourceVerified", "factsUnchanged"]) assert.equal(entry[key], true, `engineering.${entry.surface}.${key}`);
     assert.equal(entry.purchaseOrders, 1);
@@ -132,16 +135,10 @@ async function run(options) {
         sourceFollowups.set(key, task.id);
       }
     };
-    const openSource = async (config, order, mobile) => {
-      const page = await getPage(config.role, mobile);
-      if (mobile) {
-        await prepareFollowup(config.domain, order.id, config.role);
-        await openMobileSourceTask(page, { ...options, mobile }, client, config.role, config.domain, order.id, ["business_followup"]);
-        await expect(page.getByTestId("mobile-task-business-source")).toHaveAttribute("data-record-id", String(order.id));
-        return page;
-      }
+    const openSource = async (config, order) => {
+      const page = await getPage(config.role, false);
       const route = BUSINESS_ROUTE_PATHS[config.domain === "sales_order" ? "salesOrders" : config.domain === "purchase_order" ? "purchaseOrders" : "processingContracts"].replace(/^\/erp\//u, "");
-      await navigate(page, businessURL({ ...options, mobile }, config.role, route));
+      await navigate(page, businessURL({ ...options, mobile: false }, config.role, route));
       const search = page.locator('.erp-business-operation-panel input[placeholder]').first();
       await search.fill(order[config.no]);
       await search.press("Enter");
@@ -153,7 +150,7 @@ async function run(options) {
       } else await selectRow(page, order.id);
       return page;
     };
-    const formAction = (page, form, mobile, name) => (mobile ? page.locator(".mobile-task-business-form-footer:visible") : form).getByRole("button", { name, exact: true });
+    const formAction = (form, name) => form.getByRole("button", { name, exact: true });
     const closeReceipt = async page => {
       const receipt = page.locator('.ant-modal:visible');
       if (await receipt.count()) await receipt.getByRole("button", { name: /知道了|关闭|确定|完成/u }).last().click();
@@ -216,7 +213,7 @@ async function run(options) {
         await search.press("Enter");
         await openDesktopTaskRow(page, task, orderNo);
         const panel = page.locator(".erp-task-action-drawer:visible");
-        await panel.getByRole("button", { name: "选择处理方式", exact: true }).click();
+        await panel.getByRole("button", { name: "任务办理", exact: true }).click();
         await panel.getByRole("radio").filter({ hasText: { complete: "审批通过", reject: "审批退回", block: "标记阻塞", resume: "解除阻塞" }[action] }).click();
         if (required) {
           await expect(panel.getByRole("button", { name: "核对并确认", exact: true })).toBeDisabled();
@@ -233,7 +230,9 @@ async function run(options) {
           await page.waitForLoadState("networkidle");
           (report.submissionMessages ??= []).push({ taskID: task.id, action, messages: await page.locator('.ant-message-notice-content').allTextContents() });
         });
-        await expect(panel.getByText("办理结果已确认", { exact: true })).toBeVisible();
+        const receipt = panel.getByRole('region', { name: '办理结果', exact: true });
+        await expect(receipt).toBeVisible();
+        await expect(receipt).toContainText(`模拟${action}，核对来源与后续责任`);
         await page.screenshot({ path: path.join(options.outputDir, `desktop-${orderNo}-${action}.png`), fullPage: false });
       }
       const updated = (await client.rpc(task.owner_role_key, "workflow", "get_task", { task_id: task.id })).task;
@@ -242,7 +241,7 @@ async function run(options) {
       return updated;
     };
     for (const kind of ["sales", "purchase", "outsourcing"]) for (const mobile of [false, true]) {
-      const flow = { key: `${mobile ? "mobile" : "desktop"}_${kind}` };
+      const flow = { key: `${mobile ? "mobile" : "desktop"}_${kind}`, authoringSurface: "desktop" };
       const fixture = await prepare(kind, `${mobile ? "M" : "D"}-${kind.toUpperCase()}`);
       const { config, params } = fixture;
       let order = fixture.order;
@@ -255,7 +254,14 @@ async function run(options) {
       await expectFailure(config.role, config.domain, `save_${config.domain}_with_items`, { ...params, note: "非法明细不得落库", items: params.items.map(item => ({ ...item, [config.quantity]: "-1" })) }, CODE.INVALID_PARAM);
       assert.deepEqual(snapshot(config, order.id), initial);
       flow.invalidQuantityUnchanged = true;
-      let page = await openSource(config, order, mobile);
+      if (mobile) {
+        const phone = await getPage(config.role, true);
+        await prepareFollowup(config.domain, order.id, config.role);
+        await openMobileSourceTask(phone, { ...options, mobile: true }, client, config.role, config.domain, order.id, ['business_followup']);
+        await expect(phone.getByRole('button', { name: /^(编辑|保存草稿|提交订单|提交合同)$/u })).toHaveCount(0);
+        flow.mobileAuthoringUnavailable = true;
+      }
+      let page = await openSource(config, order);
       await pageAction(page, "编辑");
       let form = page.getByRole("region", { name: config.title, exact: true });
       await expect(form).toBeVisible();
@@ -266,7 +272,7 @@ async function run(options) {
       await page.screenshot({ path: path.join(options.outputDir, `${flow.key}-edit.png`), fullPage: false });
       const remote = await client.rpc(config.role, config.domain, `save_${config.domain}_with_items`, { ...params, note: "模拟另一次正式更新" });
       const winner = snapshot(config, order.id);
-      await clickRPC(page, `save_${config.domain}_with_items`, () => formAction(page, form, mobile, "保存草稿").click(), CODE.RESOURCE_VERSION_CONFLICT);
+      await clickRPC(page, `save_${config.domain}_with_items`, () => formAction(form, "保存草稿").click(), CODE.RESOURCE_VERSION_CONFLICT);
       report.expectedFailures.push({ actor: config.role, domain: config.domain, method: `save_${config.domain}_with_items`, code: CODE.RESOURCE_VERSION_CONFLICT, browser: true });
       const conflictAlert = page.locator(".erp-feedback-message [role=alert]");
       await expect(conflictAlert).toHaveCount(1);
@@ -278,20 +284,20 @@ async function run(options) {
       await expect(form).toBeVisible();
       await expect(note).toHaveValue("模拟本地未保存内容");
       assert.deepEqual(snapshot(config, order.id), winner);
-      await formAction(page, form, mobile, mobile ? "返回办理" : "返回列表").click();
+      await formAction(form, "返回列表").click();
       const discard = page.locator('.ant-modal-confirm:visible');
       await discard.getByRole("button", { name: /放弃|离开/u }).click();
       await expect(form).toBeHidden();
       flow.draftCAS = true;
       flow.draftVersions = { initial: initial.header.version, conflict: winner.header.version };
       order = remote[config.domain];
-      page = await openSource(config, order, mobile);
+      page = await openSource(config, order);
       await pageAction(page, "编辑");
       form = page.getByRole("region", { name: config.title, exact: true });
       await expect(form.getByRole("textbox", { name: "备注", exact: true })).toHaveValue("模拟另一次正式更新");
       await form.getByRole("textbox", { name: "备注", exact: true }).fill("模拟丢失响应后已确认保存");
       const saveFault = await dropRealResponse(page, options, config.domain, `save_${config.domain}_with_items`);
-      await formAction(page, form, mobile, "保存草稿").click();
+      await formAction(form, "保存草稿").click();
       await expect.poll(() => Boolean(saveFault.state.captured)).toBe(true);
       await saveFault.remove();
       flow.saveFault = faultEvidence(saveFault.state);
@@ -308,15 +314,15 @@ async function run(options) {
       flow.draftVersions.recovered = snapshot(config, order.id).header.version;
       await expect(form).toHaveAttribute("aria-busy", "false");
       await expect(form.getByRole("textbox", { name: "备注", exact: true })).toHaveValue("模拟丢失响应后已确认保存");
-      await formAction(page, form, mobile, mobile ? "返回办理" : "返回列表").click();
+      await formAction(form, "返回列表").click();
       await page.locator('.ant-modal-confirm:visible').getByRole("button", { name: "放弃修改", exact: true }).click();
       await expect(form).toBeHidden();
       order = await read(config, order.id);
-      page = await openSource(config, order, mobile);
+      page = await openSource(config, order);
       await pageAction(page, "编辑");
       form = page.getByRole("region", { name: config.title, exact: true });
       await expect(form.getByRole("textbox", { name: "备注", exact: true })).toHaveValue("模拟丢失响应后已确认保存");
-      await formAction(page, form, mobile, mobile ? "返回办理" : "返回列表").click();
+      await formAction(form, "返回列表").click();
       await expect(form).toBeHidden();
       flow.saveRecovered = true;
       const submitFault = await dropRealResponse(page, options, kind === "outsourcing" ? config.domain : "customer_config", config.execute);
@@ -368,7 +374,7 @@ async function run(options) {
         await taskAction(resumed, order[config.no], mobile, "complete", true);
         assert.equal((await read(config, order.id)).lifecycle_status, config.approved);
         flow.blockResume = flow.reasonRequired = true;
-        const rejectPage = await openSource(config, alternative.order, mobile);
+        const rejectPage = await openSource(config, alternative.order);
         await clickRPC(rejectPage, config.execute, () => pageAction(rejectPage, config.submit));
         await closeReceipt(rejectPage);
         const rejectTask = (await client.rpc("admin", "workflow", "list_tasks", { source_type: config.domain, source_id: alternative.order.id, limit: 100 })).tasks.find(task => task.task_status_key === "ready");
@@ -383,7 +389,7 @@ async function run(options) {
         assert.deepEqual(snapshot(config, alternative.order.id), rejected);
         flow.rejectionSettled = flow.terminalGuard = true;
       } else {
-        page = await openSource(config, order, mobile);
+        page = await openSource(config, order);
         await clickRPC(page, "confirm_outsourcing_order", () => contractAction(page, "confirm"));
         assert.equal((await read(config, order.id)).lifecycle_status, "confirmed");
         flow.confirmed = true;
@@ -410,7 +416,7 @@ async function run(options) {
     }
     for (const mobile of [false, true]) {
       const surface = mobile ? "mobile" : "desktop";
-      const entry = { surface };
+      const entry = { surface, preparationSurface: "desktop" };
       report.engineering.push(entry);
       const label = `${prefix}-${mobile ? "M" : "D"}-ENGINEERING`;
       const { material: engineeringMaterial } = await client.rpc("admin", "masterdata", "create_material", { code: `${label}-MAT`, name: "模拟用料审批材料", default_unit_id: material.default_unit_id, supplier_id: supplier.id });
@@ -422,14 +428,14 @@ async function run(options) {
       await prepareManualAcceptanceEngineering({ plan: { prefix: "SIM-E2E", productionCandidates: [{ salesOrder: { id: source.id, orderNo: source.order_no } }] }, sourceReport: { referenceRecords: { products: [engineeringProduct], bomVersions: [{ id: bom.id, version: bom.version, productId: engineeringProduct.id, status: "ACTIVE" }] } }, materialMode: "preview", rpc: ({ actor, domain, method, params }) => client.rpc(actor, domain, method, params) });
       const getRequest = () => client.rpc("engineering", "sales_order", "get_engineering_material_request", { sales_order_id: source.id });
       const preview = await getRequest();
-      assert.equal(preview.status, "PREVIEW");
+      assert.equal(preview.status, "SUBMITTED");
       const countRequests = () => client.query(`SELECT to_json(count(*)) FROM engineering_material_requests WHERE sales_order_id=${source.id}`);
-      assert.equal(countRequests(), 0);
+      assert.equal(countRequests(), 1);
       await expectFailure("engineering", "sales_order", "submit_engineering_material_request", { sales_order_id: source.id, expected_version: preview.source_order_version, expected_source_hash: "0".repeat(64) }, CODE.RESOURCE_VERSION_CONFLICT);
-      assert.equal(countRequests(), 0);
+      assert.equal(countRequests(), 1);
       entry.staleSourceRejected = true;
       const openMaterial = async actor => {
-        const page = await getPage(actor, mobile);
+        const page = await getPage(actor, mobile && actor !== "engineering");
         if (mobile && actor !== "engineering") {
           const current = await getRequest();
           const group = actor === "boss" ? "engineering_material_boss_review" : "engineering_material_finance_review";
@@ -464,17 +470,11 @@ async function run(options) {
           await expect(dialog.locator('.erp-material-task-action__footer')).toBeVisible();
           return { page, dialog, taskForm: true };
         }
-        if (mobile) {
-          await prepareFollowup("sales_order", source.id, actor);
-          await openMobileSourceTask(page, { ...options, mobile }, client, actor, "sales_order", source.id, ["business_followup"]);
-          await expect(page.getByTestId("mobile-task-business-source")).toHaveAttribute("data-record-id", String(source.id));
-        } else {
-          await navigate(page, businessURL({ ...options, mobile }, actor, BUSINESS_ROUTE_PATHS.salesOrders.replace(/^\/erp\//u, "")));
-          const search = page.locator('.erp-business-operation-panel input[placeholder]').first();
-          await search.fill(source.order_no);
-          await search.press("Enter");
-          await selectRow(page, source.id);
-        }
+        await navigate(page, businessURL({ ...options, mobile: false }, actor, BUSINESS_ROUTE_PATHS.salesOrders.replace(/^\/erp\//u, "")));
+        const search = page.locator('.erp-business-operation-panel input[placeholder]').first();
+        await search.fill(source.order_no);
+        await search.press("Enter");
+        await selectRow(page, source.id);
         await pageAction(page, actor === "engineering" ? "提交用料汇总" : "审核用料汇总");
         const dialog = page.locator('.erp-material-summary-modal:visible');
         await expect(dialog).toBeVisible();
@@ -501,9 +501,7 @@ async function run(options) {
         if (ui.taskForm) await ui.dialog.getByRole("radio", { name: decision === "reject" ? "退回工程" : "审批通过", exact: true }).check();
         return ui.dialog.getByRole("button", { name: decision === "reject" ? ui.taskForm ? "确认退回工程" : "退回工程" : ui.taskForm ? "确认通过，交财务" : "审核通过，交财务", exact: true });
       };
-      let ui = await openMaterial("engineering");
-      await clickRPC(ui.page, "submit_engineering_material_request", () => ui.dialog.getByRole("button", { name: "提交老板审核", exact: true }).click());
-      await ui.dialog.getByRole("button", { name: "关闭", exact: true }).click();
+      let ui;
       let request = await getRequest();
       assert.equal(request.status, "SUBMITTED");
       const submitted = structuredClone(request);
@@ -523,10 +521,7 @@ async function run(options) {
       await closeMaterial(ui);
       assert.equal((await getRequest()).status, "REJECTED");
       entry.rejectReasonRequired = true;
-      ui = await openMaterial("engineering");
-      await ui.dialog.getByRole("button", { name: "按当前资料重新整理", exact: true }).click();
-      await clickRPC(ui.page, "submit_engineering_material_request", () => ui.dialog.getByRole("button", { name: "提交老板审核", exact: true }).click());
-      await ui.dialog.getByRole("button", { name: "关闭", exact: true }).click();
+      await prepareManualAcceptanceEngineering({ plan: { prefix: "SIM-E2E", productionCandidates: [{ salesOrder: { id: source.id, orderNo: source.order_no } }] }, sourceReport: { referenceRecords: { products: [engineeringProduct], bomVersions: [{ id: bom.id, version: bom.version, productId: engineeringProduct.id, status: "ACTIVE" }] } }, materialMode: "preview", rpc: ({ actor, domain, method, params }) => client.rpc(actor, domain, method, params) });
       request = await getRequest();
       assert.equal(request.status, "SUBMITTED");
       assert.notEqual(request.id, submitted.id);

@@ -86,7 +86,7 @@ test('finance payments: exports complete active-tab filters with readable values
   }
   for (const text of [
     '当前筛选没有可导出的收付款记录',
-    '当前筛选没有可导出的红冲记录',
+    '当前筛选没有可导出的账款调整记录',
   ]) {
     assert.equal(exportSource.includes(text), true, text)
   }

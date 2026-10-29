@@ -124,6 +124,8 @@ function installTestDOM() {
     DocumentFragment: runtimeWindow.DocumentFragment,
     MutationObserver: runtimeWindow.MutationObserver,
     ResizeObserver: runtimeWindow.ResizeObserver,
+    // Browser components must use the DOM's capabilities, not Node's ref-counted ports.
+    MessageChannel: runtimeWindow.MessageChannel,
     localStorage: runtimeWindow.localStorage,
     sessionStorage: runtimeWindow.sessionStorage,
     navigator: runtimeWindow.navigator,

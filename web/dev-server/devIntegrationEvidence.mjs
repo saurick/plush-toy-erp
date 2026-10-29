@@ -98,7 +98,7 @@ export async function readIntegrationRunEvidence(
         'utf8'
       )
     )
-    if (report.workflow !== 'critical-postgres') continue
+    if (!['critical-postgres', 'purchase-chain-postgres'].includes(report.workflow)) continue
     if (
       report.schemaVersion !== DISPOSABLE_DATABASE_RUN_SCHEMA ||
       !Number.isFinite(Date.parse(report.generatedAt))
@@ -116,6 +116,7 @@ export async function readIntegrationRunEvidence(
   if (!latest) return empty
   const { name, report } = latest
   const run = {
+    scopeLabel: report.workflow === 'purchase-chain-postgres' ? '采购链定向' : '关键数据库全量',
     status: report.status,
     startedAt: report.generatedAt,
     finishedAt: report.finishedAt || null,

@@ -15,6 +15,12 @@ const (
 	Label = "finance_credit_note"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldBalanceDirection holds the string denoting the balance_direction field in the database.
+	FieldBalanceDirection = "balance_direction"
+	// FieldSourceType holds the string denoting the source_type field in the database.
+	FieldSourceType = "source_type"
+	// FieldSourceID holds the string denoting the source_id field in the database.
+	FieldSourceID = "source_id"
 	// FieldCreditNoteNo holds the string denoting the credit_note_no field in the database.
 	FieldCreditNoteNo = "credit_note_no"
 	// FieldFinanceFactID holds the string denoting the finance_fact_id field in the database.
@@ -65,6 +71,9 @@ const (
 // Columns holds all SQL columns for financecreditnote fields.
 var Columns = []string{
 	FieldID,
+	FieldBalanceDirection,
+	FieldSourceType,
+	FieldSourceID,
 	FieldCreditNoteNo,
 	FieldFinanceFactID,
 	FieldReversalOfCreditNoteID,
@@ -95,6 +104,14 @@ func ValidColumn(column string) bool {
 //	import _ "server/internal/data/model/ent/runtime"
 var (
 	Hooks [1]ent.Hook
+	// DefaultBalanceDirection holds the default value on creation for the "balance_direction" field.
+	DefaultBalanceDirection string
+	// BalanceDirectionValidator is a validator for the "balance_direction" field. It is called by the builders before save.
+	BalanceDirectionValidator func(string) error
+	// SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
+	SourceTypeValidator func(string) error
+	// SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
+	SourceIDValidator func(int) error
 	// CreditNoteNoValidator is a validator for the "credit_note_no" field. It is called by the builders before save.
 	CreditNoteNoValidator func(string) error
 	// FinanceFactIDValidator is a validator for the "finance_fact_id" field. It is called by the builders before save.
@@ -125,6 +142,21 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByBalanceDirection orders the results by the balance_direction field.
+func ByBalanceDirection(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBalanceDirection, opts...).ToFunc()
+}
+
+// BySourceType orders the results by the source_type field.
+func BySourceType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceType, opts...).ToFunc()
+}
+
+// BySourceID orders the results by the source_id field.
+func BySourceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceID, opts...).ToFunc()
 }
 
 // ByCreditNoteNo orders the results by the credit_note_no field.

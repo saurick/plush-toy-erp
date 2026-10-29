@@ -19,6 +19,12 @@ type FinanceCreditNote struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// BalanceDirection holds the value of the "balance_direction" field.
+	BalanceDirection string `json:"balance_direction,omitempty"`
+	// SourceType holds the value of the "source_type" field.
+	SourceType *string `json:"source_type,omitempty"`
+	// SourceID holds the value of the "source_id" field.
+	SourceID *int `json:"source_id,omitempty"`
 	// CreditNoteNo holds the value of the "credit_note_no" field.
 	CreditNoteNo string `json:"credit_note_no,omitempty"`
 	// FinanceFactID holds the value of the "finance_fact_id" field.
@@ -98,9 +104,9 @@ func (*FinanceCreditNote) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case financecreditnote.FieldAmount:
 			values[i] = new(decimal.Decimal)
-		case financecreditnote.FieldID, financecreditnote.FieldFinanceFactID, financecreditnote.FieldReversalOfCreditNoteID, financecreditnote.FieldCreatedBy:
+		case financecreditnote.FieldID, financecreditnote.FieldSourceID, financecreditnote.FieldFinanceFactID, financecreditnote.FieldReversalOfCreditNoteID, financecreditnote.FieldCreatedBy:
 			values[i] = new(sql.NullInt64)
-		case financecreditnote.FieldCreditNoteNo, financecreditnote.FieldCurrency, financecreditnote.FieldStatus, financecreditnote.FieldReason, financecreditnote.FieldIdempotencyKey, financecreditnote.FieldIdempotencyPayloadHash:
+		case financecreditnote.FieldBalanceDirection, financecreditnote.FieldSourceType, financecreditnote.FieldCreditNoteNo, financecreditnote.FieldCurrency, financecreditnote.FieldStatus, financecreditnote.FieldReason, financecreditnote.FieldIdempotencyKey, financecreditnote.FieldIdempotencyPayloadHash:
 			values[i] = new(sql.NullString)
 		case financecreditnote.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -125,6 +131,26 @@ func (_m *FinanceCreditNote) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int(value.Int64)
+		case financecreditnote.FieldBalanceDirection:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field balance_direction", values[i])
+			} else if value.Valid {
+				_m.BalanceDirection = value.String
+			}
+		case financecreditnote.FieldSourceType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field source_type", values[i])
+			} else if value.Valid {
+				_m.SourceType = new(string)
+				*_m.SourceType = value.String
+			}
+		case financecreditnote.FieldSourceID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field source_id", values[i])
+			} else if value.Valid {
+				_m.SourceID = new(int)
+				*_m.SourceID = int(value.Int64)
+			}
 		case financecreditnote.FieldCreditNoteNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field credit_note_no", values[i])
@@ -243,6 +269,19 @@ func (_m *FinanceCreditNote) String() string {
 	var builder strings.Builder
 	builder.WriteString("FinanceCreditNote(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	builder.WriteString("balance_direction=")
+	builder.WriteString(_m.BalanceDirection)
+	builder.WriteString(", ")
+	if v := _m.SourceType; v != nil {
+		builder.WriteString("source_type=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SourceID; v != nil {
+		builder.WriteString("source_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("credit_note_no=")
 	builder.WriteString(_m.CreditNoteNo)
 	builder.WriteString(", ")

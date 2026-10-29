@@ -91,7 +91,7 @@ const navItemRegistry = {
     path: '/erp/history',
     shortLabel: '历史',
     description: '只读查询有权查看的已关闭、已取消、已归档和已停用记录。',
-    access: 'authenticated',
+    access: 'history',
   },
   'help-center': {
     key: 'help-center',
@@ -154,7 +154,7 @@ export function getProductCoreNavigationSections() {
   ]
 }
 
-export function getAuthenticatedNavigationSections() {
+export function getUtilityNavigationSections() {
   return [
     {
       key: 'history',

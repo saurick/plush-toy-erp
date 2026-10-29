@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Space, Tag } from 'antd'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import Select from '@/common/components/select/AppSelect'
 import Pagination from '@/common/components/pagination/AppPagination'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
-import { DEV_INTEGRATION_ROUTE } from '../config/devRoutes.mjs'
+
+import DevSourceReferences from './DevSourceReferences.jsx'
 import {
   getRPCExecutionPresentation,
   parseRPCReviewSearch,
@@ -307,7 +308,6 @@ export default function DevRPCContractReview() {
               <section className="erp-dev-rpc-review__detail" aria-label={`${selected.label}变更详情`}>
                 <div className="erp-dev-rpc-review__detail-heading">
                   <strong>{selected.label}</strong><code>{selected.key}</code>
-                  {selected.kind !== 'removed' ? <Link to={`${DEV_INTEGRATION_ROUTE}?view=inventory&rpc=${encodeURIComponent(selected.key)}`}>查看正式合同</Link> : null}
                 </div>
                 <div className="erp-dev-rpc-review__diff">
                   {selected.fields.length ? (
@@ -353,24 +353,14 @@ export default function DevRPCContractReview() {
                   <div className="erp-dev-rpc-review__consumers">
                     <strong>静态识别的调用方</strong>
                     {selected.consumers.length ? (
-                          selected.consumers.map((consumer) => (
-                            <code key={`${consumer.path}:${consumer.line}`}>
-                              {consumer.path}:{consumer.line}
-                            </code>
-                          ))
+                      <DevSourceReferences references={selected.consumers.map((consumer) => `${consumer.path}:${consumer.line}`)} />
                         ) : (
                           <span>
                             未发现可静态识别的直接引用；动态调用仍需人工核对。
                           </span>
                         )}
                   </div>
-                  <details className="erp-dev-disclosure">
-                    <summary>来源与比较范围</summary>
-                    <code>{selected.source || '见正式接口分发'}</code>
-                    <span>
-                      忽略源码行号，比较字段类型、必填、可空、条件与解析器默认值；业务语义仍由领域测试核对。
-                    </span>
-                  </details>
+
                 </div>
               </section>
             </div>

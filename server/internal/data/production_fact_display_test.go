@@ -18,7 +18,7 @@ func TestProductionFactDisplay_SourceSnapshotAndStockIdentity(t *testing.T) {
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	actor := client.AdminUser.Create().SetUsername("display-actor").SetPasswordHash("test").SaveX(ctx)
 	order := client.ProductionOrder.Create().SetOrderNo("SIM-DISPLAY-ORDER").SetCreatedBy(actor.ID).SaveX(ctx)
-	item := client.ProductionOrderItem.Create().SetProductionOrderID(order.ID).SetLineNo(1).
+	item := client.ProductionOrderItem.Create().SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SetProductionOrderID(order.ID).SetLineNo(1).
 		SetProductID(fixtures.productID).SetUnitID(fixtures.unitID).SetPlannedQuantity(decimal.NewFromInt(2)).
 		SetProductNameSnapshot("下单时产品名称").SetProductCodeSnapshot("SOURCE-PRODUCT").SetUnitNameSnapshot("下单时单位").SaveX(ctx)
 	row := client.ProductionFact.Create().SetFactNo("SIM-DISPLAY-RECEIPT").SetFactType(biz.ProductionFactFinishedGoodsReceipt).

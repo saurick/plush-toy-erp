@@ -1,5 +1,5 @@
 import { Alert, Button, Typography } from 'antd'
-import { CopyOutlined, ArrowRightOutlined } from '@ant-design/icons'
+import { CopyOutlined } from '@ant-design/icons'
 import Select from '@/common/components/select/AppSelect'
 import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
 import { ReleaseApplySummary } from './ReleaseApplySummary.jsx'
@@ -15,7 +15,6 @@ export function ReleasePanel({
   onReleaseBatchChange,
   onCheckReleaseReadiness,
   onRetryRead,
-  deploymentHref,
   disabled,
 }) {
   const passed = releaseState.status === 'success'
@@ -101,14 +100,7 @@ export function ReleasePanel({
           </div>
           <div>
             <strong>服务器版本部署</strong>
-            <p>进入版本发布中心，选择固定版本，检查后部署到测试服或正式服。</p>
-            <Button
-              href={deploymentHref}
-              disabled={disabled}
-              icon={<ArrowRightOutlined aria-hidden="true" />}
-            >
-              进入版本发布
-            </Button>
+            <p>固定版本通过检查后，再部署到测试服或正式服。</p>
           </div>
         </div>
       </section>

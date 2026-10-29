@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation, useOutletContext } from 'react-router-dom'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useLocation, } from 'react-router-dom'
+import useBusinessPageContext from './useBusinessPageContext.js'
+
+const BusinessPageStateScope = createContext('')
+export const BusinessPageStateScopeProvider = BusinessPageStateScope.Provider
 
 // UI preferences live only for the current verified desktop session. API rows,
 // permissions, drafts and business facts always reload from their own sources.
 export default function useBusinessPageState(name, initialValue) {
   const { pathname } = useLocation()
-  const context = useOutletContext()
+  const scope = useContext(BusinessPageStateScope)
+  const context = useBusinessPageContext()
   const fallback = useRef(new Map())
   const cache = context?.pageUIState?.values || fallback.current
-  const key = `${pathname}:${name}`
+  const key = `${pathname}:${scope ? `${scope}:` : ''}${name}`
   const [value, setValue] = useState(() =>
     cache.has(key)
       ? cache.get(key)

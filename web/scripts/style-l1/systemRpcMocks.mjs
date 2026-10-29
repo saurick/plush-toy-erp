@@ -58,6 +58,24 @@ export async function installSystemRpcMocks(page, context) {
     pmcRole,
     adminRole,
   ].filter(Boolean)
+  // The fixture declares a bounded template once, before drafts mutate grants.
+  // Complete product role templates are exercised by the backend policy tests.
+  for (const role of availableRoles.filter((item) => item.role_type !== 'system')) {
+    const optional = ['erp.print_template.read', 'erp.business_dashboard.read']
+    if (role.role_key === 'finance') {
+      role.permissions = [...new Set([
+        ...role.permissions,
+        ...mockPermissions.filter((item) => /^(finance|field)\./u.test(item.permission_key))
+          .map((item) => item.permission_key),
+      ])]
+    }
+    role.permission_policy = {
+      template_key: role.role_key, registered: true,
+      required_permissions: role.permissions.filter((key) => !optional.includes(key)),
+      optional_permissions: optional,
+    }
+    role.permissions = [...new Set([...role.permissions, 'erp.business_dashboard.read'])]
+  }
   adminProfile.erp_preferences = {
     column_orders: {},
     hidden_columns: {},

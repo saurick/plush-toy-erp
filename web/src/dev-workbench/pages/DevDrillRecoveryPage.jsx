@@ -5,19 +5,17 @@ import { useDrillRecovery } from './delivery/recovery/useDrillRecovery.jsx'
 import { DrillDrawer } from './delivery/recovery/DrillDrawer.jsx'
 import { EmergencyPanel } from './delivery/recovery/EmergencyPanel.jsx'
 import { DrillsPanel } from './delivery/recovery/DrillsPanel.jsx'
+import BackupRetentionPanel from './delivery/recovery/BackupRetentionPanel.jsx'
 import { SecurityPanel } from './delivery/recovery/SecurityPanel.jsx'
 import { RECOVERY_VIEWS } from './delivery/recovery/shared.jsx'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevVerificationEvidence from '../components/DevVerificationEvidence.jsx'
 import {
-  DEV_VERSION_CENTER_ROUTE,
-  DEV_VERSION_CENTER_VIEW_HISTORY,
-  DEV_VERSION_CENTER_VIEW_QUERY_KEY,
   shortGitSha,
 } from '../config/devDelivery.mjs'
-import { DEV_DRILL_RECOVERY_SOURCE_PATH } from '../config/devRecovery.mjs'
 
 const { Text, Title } = Typography
 
@@ -29,7 +27,6 @@ export default function DevDrillRecoveryPage() {
     drillTriggerRef,
     loadError,
     loading,
-    navigateWithinCustomerScope,
     overview,
     publicHealthy,
     recoveryReady,
@@ -44,18 +41,20 @@ export default function DevDrillRecoveryPage() {
   } = useDrillRecovery()
   return (
     <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page erp-dev-recovery-page erp-dev-delivery-workspace">
-      <DevPageNav sourcePath={DEV_DRILL_RECOVERY_SOURCE_PATH} />
-      <header className="erp-dev-hub-header">
-        <div className="erp-dev-hub-header__copy">
-          <span className="erp-dev-hub-header__icon">
-            <SafetyCertificateOutlined aria-hidden="true" />
-          </span>
-          <Title level={1} className="erp-dev-hub-title">
-            安全与恢复
-          </Title>
-        </div>
-
-        <section className="erp-dev-workbench-header-context" aria-label="安全与恢复范围">
+      <DevPageNav />
+      <DevPageHeader
+        className="erp-dev-hub-header"
+        title={
+          <div className="erp-dev-hub-header__copy">
+            <span className="erp-dev-hub-header__icon">
+              <SafetyCertificateOutlined aria-hidden="true" />
+            </span>
+            <Title level={1} className="erp-dev-hub-title">
+              安全与恢复
+            </Title>
+          </div>
+        }
+        navigation={
           <DevTaskNav
             compact
             level="primary"
@@ -66,48 +65,48 @@ export default function DevDrillRecoveryPage() {
             value={activeView}
             onChange={selectView}
           />
+        }
+        tools={
+          <Space
+            className="erp-dev-workbench-tools"
+            direction="vertical"
+            size={4}
+            align="end"
+          >
+            <Space wrap>
+              <Tag>只读核验</Tag>
+              <Button
+                icon={<ReloadOutlined aria-hidden="true" />}
+                loading={loading || refreshing}
+                disabled={!customerReady}
+                onClick={refresh}
+              >
+                核验目标
+              </Button>
+            </Space>
+            <Text type="secondary" role="status" aria-live="polite">
+              {statusText}
+            </Text>
+          </Space>
+        }
+      >
+        <section
+          className="erp-dev-workbench-header-context"
+          aria-label="安全与恢复范围"
+        >
           <DevCustomerScopeSelector
             compact
             label="客户"
             note=""
             scope={customerScope}
             onChange={customerScope.selectCustomer}
-            invalidDescription="当前甲方没有登记交付目标；演练状态读取与版本中心跳转均已停止。"
+            invalidDescription="当前甲方没有登记交付目标，暂时无法读取演练状态。"
           />
         </section>
-
-        <Space direction="vertical" size={4} align="end">
-          <Space wrap>
-            <Tag>只读核验</Tag>
-            <Button
-              type="link"
-              disabled={!customerReady}
-              onClick={() =>
-                navigateWithinCustomerScope(
-                  `${DEV_VERSION_CENTER_ROUTE}?${DEV_VERSION_CENTER_VIEW_QUERY_KEY}=${DEV_VERSION_CENTER_VIEW_HISTORY}`
-                )
-              }
-            >
-              查看交付记录
-            </Button>
-
-            <Button
-              icon={<ReloadOutlined aria-hidden="true" />}
-              loading={loading || refreshing}
-              disabled={!customerReady}
-              onClick={refresh}
-            >
-              核验目标
-            </Button>
-          </Space>
-          <Text type="secondary" role="status" aria-live="polite">
-            {statusText}
-          </Text>
-        </Space>
-      </header>
+      </DevPageHeader>
 
       <main className="erp-dev-hub-shell erp-dev-recovery-shell">
-        <DevVerificationEvidence />
+        <DevVerificationEvidence compact />
         {loadError ? (
           <Alert
             type={summary ? 'warning' : 'error'}
@@ -173,20 +172,24 @@ export default function DevDrillRecoveryPage() {
           activeView={activeView}
           drillTriggerRef={drillTriggerRef}
           overview={overview}
-          retention={summary?.retention}
           setSelectedDrillKey={setSelectedDrillKey}
         />
+        <section
+          hidden={activeView !== 'backups'}
+          id="dev-recovery-panel-backups"
+          role="tabpanel"
+          aria-labelledby="dev-recovery-tab-backups"
+        >
+          <BackupRetentionPanel retention={summary?.retention} />
+        </section>
         <EmergencyPanel
           activeView={activeView}
-          customerReady={customerReady}
-          navigateWithinCustomerScope={navigateWithinCustomerScope}
         />
       </main>
       <DrillDrawer
         customerReady={customerReady}
         drillTriggerRef={drillTriggerRef}
         loading={loading}
-        navigateWithinCustomerScope={navigateWithinCustomerScope}
         overview={overview}
         refresh={refresh}
         refreshing={refreshing}

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Button, Tag } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
-import { Link } from 'react-router-dom'
+
+import DevTestingDetails from './DevTestingDetails.jsx'
 import { WorkbenchFacts, WorkbenchNotice, WorkbenchSection } from './WorkbenchPattern.jsx'
 import DevTimestamp from './DevTimestamp.jsx'
 import { readDevVerificationEvidence } from '../config/devVerificationEvidence.mjs'
@@ -10,7 +11,7 @@ import {
   deliveryStatusPresentation,
 } from '../config/devDelivery.mjs'
 import '../styles/dev-verification-evidence.css'
-import { ServerCiEvidencePanel } from './quality-gates/ServerCiEvidencePanel.jsx'
+import { ServerCiEvidencePanel, SERVER_CI_STATUS } from './quality-gates/ServerCiEvidencePanel.jsx'
 
 const CHECK_LABELS = {
   tests: '运行冒烟',
@@ -103,13 +104,12 @@ function ReceiptDetails({ target }) {
           没有取得与运行版本对应的完整执行回执，不能以健康检查或 CI 结果代替。
         </p>
       )}
-      <Link
-        to={`/__dev/version-center?target=${target.key}&view=history&history_q=${target.selectedOperationId}`}
-      >
-        查看本环境交付历史
-      </Link>
     </div>
   )
+}
+
+function TargetStatus({ target, loading, failed }) {
+  return <Tag color={loading ? undefined : failed ? 'error' : target.passed ? 'success' : 'warning'}>{loading ? '核对中' : failed ? '读取失败' : target.passed ? '通过' : '未证明'}</Tag>
 }
 
 function TargetRow({ target, loading, failed }) {
@@ -135,25 +135,7 @@ function TargetRow({ target, loading, failed }) {
                     : '运行版本待核实'}
           </div>
         </td>
-        {Object.keys(CHECK_LABELS).map((key) => (
-          <td key={key}>
-            <Tag
-              color={
-                loading
-                  ? undefined
-                  : !failed && target.verification?.[key]
-                    ? 'success'
-                    : 'warning'
-              }
-            >
-              {loading
-                ? '核对中'
-                : !failed && target.verification?.[key]
-                  ? '通过'
-                  : '未证明'}
-            </Tag>
-          </td>
-        ))}
+        <td><TargetStatus target={target} loading={loading} failed={failed} /></td>
         <td>
           {initial ? (
             '—'
@@ -176,7 +158,8 @@ function TargetRow({ target, loading, failed }) {
       </tr>
       {expanded && !initial ? (
         <tr className="erp-dev-verification-evidence__receipt-row">
-          <td colSpan={7}>
+          <td colSpan={4}>
+            <dl className="erp-dev-verification-evidence__checks">{Object.entries(CHECK_LABELS).map(([key, label]) => <div key={key}><dt>{label}</dt><dd><Tag color={!failed && target.verification?.[key] ? 'success' : 'warning'}>{!failed && target.verification?.[key] ? '通过' : '未证明'}</Tag></dd></div>)}</dl>
             <ReceiptDetails target={target} />
           </td>
         </tr>
@@ -185,7 +168,7 @@ function TargetRow({ target, loading, failed }) {
   )
 }
 
-export default function DevVerificationEvidence() {
+export default function DevVerificationEvidence({ compact = false }) {
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -218,28 +201,71 @@ export default function DevVerificationEvidence() {
   }, [reload])
   const ciLoading = loading && (!state || state.pending?.ci)
   const stale = Boolean(state?.ci.evidence && (ciLoading || failed || state?.failed?.ci))
+  const ciResult = <Tag color={ciLoading || stale ? undefined : state?.ci.passed ? 'success' : state?.ci.evidence?.status === 'failed' ? 'error' : 'warning'}>{ciLoading ? '核对中' : stale ? '上次读取' : state?.ci.evidence ? state.ci.passed ? SERVER_CI_STATUS.passed : state.ci.evidence.status === 'passed' ? '历史 CI 通过' : SERVER_CI_STATUS[state.ci.evidence.status] || '未证明' : '未取得证据'}</Tag>
+  const targets = (state?.targets || DEV_DELIVERY_TARGETS).map((target) => ({
+    target,
+    loading: loading && (!state || state.pending?.targets.includes(target.key)),
+    failed: failed || state?.failed?.targets.includes(target.key),
+  }))
+  const unalignedTargets = targets
+    .filter(({ target }) => target.runtimeSha && !target.current)
+    .map(({ target }) => target.shortLabel)
+  const details = (
+    <>
+      <div className="erp-dev-tool-table-wrap">
+        <table className="erp-dev-tool-table erp-dev-verification-evidence__table" data-table-lines="appearance" aria-label="目标服务器验证结果">
+          <thead><tr><th scope="col">来源</th><th scope="col">版本</th><th scope="col">结果</th><th scope="col">详情</th></tr></thead>
+          <tbody>
+            <tr>
+              <th scope="row">GitLab CI</th>
+              <td><code>{state?.ci.evidence?.gitSha?.slice(0, 12) || '未读取'}</code></td>
+              <td>{ciResult}</td>
+              <td>
+                <DevTestingDetails id="server-ci" label="查看 CI" title="GitLab CI 证据">
+                  {stale ? <p role="status">上次读取记录，仅供追溯；本次状态尚未确认。</p> : !state?.ci.passed ? <p>本条是对应提交的 CI 记录，未证明当前工作区通过。</p> : null}
+                  {state?.ci.evidence ? <ServerCiEvidencePanel summary={{ repository: state.ciRepository || state.repository, serverEvidence: state.ci.evidence }} /> : <p>尚未取得 GitLab CI 证据。</p>}
+                </DevTestingDetails>
+              </td>
+            </tr>
+            {targets.map((props) => <TargetRow key={props.target.key} {...props} />)}
+          </tbody>
+        </table>
+      </div>
+      <DevTestingDetails id="server-context" label="来源信息" title="服务器证据来源">
+        <p>工作台源码：<code>{state?.repository?.commit || '未读取'}</code></p>
+        <p>工作区：{state?.repository ? state.repository.dirty ? '有未提交改动（不在 CI 范围内）' : '干净' : '未读取'}</p>
+        <DevTimestamp value={state?.readAt} action="读取于" missing="尚未取得读取时间" />
+        <p>运行冒烟、迁移、新备份隔离恢复与部署分别留证；本执行端专项报告、客户验收与生产容量另行核验。</p>
+      </DevTestingDetails>
+    </>
+  )
   return (
     <WorkbenchSection
       className="erp-dev-verification-evidence"
       title="服务器测试与交付证据"
       aria-label="服务器测试与交付证据"
       aria-busy={loading}
-      actions={<Button icon={<ReloadOutlined aria-hidden="true" />} loading={loading} onClick={() => setReload((value) => value + 1)}>重新核对服务器</Button>}
+      tools={<Button icon={<ReloadOutlined aria-hidden="true" />} loading={loading} onClick={() => setReload((value) => value + 1)}>重新核对服务器</Button>}
     >
-      <WorkbenchFacts
-        className="erp-dev-verification-evidence__context"
-        items={[
-        { label: '工作台源码', value: <code>{state?.repository?.commit?.slice(0, 12) || '未读取'}</code> },
-        ...(state?.repository ? [{ label: '工作区', value: state.repository.dirty ? '有未提交改动（不在 CI 范围内）' : '干净' }] : []),
-        { label: '读取于', value: <DevTimestamp value={state?.readAt} missing="尚未取得读取时间" /> },
-      ]}
-      />
-      {loading ? (
-        <WorkbenchNotice
-          className="erp-dev-verification-evidence__notice"
-          tone="loading"
-          title="正在读取 GitLab CI、目标运行版本与执行回执…"
-        />
+      <p className="erp-dev-verification-evidence__source">源码 <code>{state?.repository?.commit?.slice(0, 12) || '未读取'}</code>{state?.repository?.dirty ? ' · 有未提交改动' : ''} · <DevTimestamp value={state?.readAt} action="读取于" missing="尚未取得读取时间" /></p>
+      {compact ? (
+        <>
+          <WorkbenchFacts
+            aria-label="服务器证据摘要"
+            items={[
+              { label: 'GitLab CI', value: ciResult },
+              ...targets.map((props) => ({
+                label: props.target.shortLabel,
+                value: <TargetStatus {...props} />,
+              })),
+            ]}
+          />
+          {unalignedTargets.length > 0 ? (
+            <p className="erp-dev-verification-evidence__source">
+              {unalignedTargets.join('、')}的运行版本未证明与工作台源码一致
+            </p>
+          ) : null}
+        </>
       ) : null}
       {failed ? (
         <WorkbenchNotice
@@ -263,90 +289,12 @@ export default function DevVerificationEvidence() {
           }
         />
       ) : null}
-      <div className="erp-dev-verification-evidence__body">
-        <WorkbenchSection
-          flat
-          headingLevel={3}
-          className="erp-dev-verification-evidence__ci"
-          title="GitLab CI"
-          aria-label="GitLab CI 记录"
-          actions={stale ? <Tag>上次读取</Tag> : null}
-        >
-          {state?.ci.evidence ? (
-            <ServerCiEvidencePanel
-              summary={{
-                repository: state.ciRepository || state.repository,
-                serverEvidence: state.ci.evidence,
-              }}
-            />
-          ) : (
-            <div className="erp-dev-verification-evidence__placeholder">
-              <p>
-                {ciLoading
-                  ? '正在核对流水线、测试报告与覆盖率。'
-                  : '尚未取得 GitLab CI 证据。'}
-              </p>
-              <p>CI 对应已提交版本；工作区改动与目标部署分别核对。</p>
-              {!ciLoading ? (
-                <Link to="/__dev/quality-gates?view=server">前往质量门禁</Link>
-              ) : null}
-            </div>
-          )}
-        </WorkbenchSection>
-        <WorkbenchSection
-          flat
-          headingLevel={3}
-          className="erp-dev-verification-evidence__targets"
-          title="目标环境"
-          aria-label="目标环境核验"
-          description="按运行版本与执行回执判定"
-        >
-          <div className="erp-dev-tool-table-wrap">
-            <table
-              className="erp-dev-tool-table erp-dev-verification-evidence__table"
-              data-table-lines="appearance"
-              aria-label="目标服务器验证结果"
-            >
-              <colgroup>
-                <col className="erp-dev-verification-evidence__target-column" />
-                <col />
-                {Object.keys(CHECK_LABELS).map((key) => (
-                  <col
-                    key={key}
-                    className="erp-dev-verification-evidence__check-column"
-                  />
-                ))}
-                <col className="erp-dev-verification-evidence__record-column" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th scope="col">环境</th>
-                  <th scope="col">运行版本</th>
-                  {Object.values(CHECK_LABELS).map((label) => (
-                    <th scope="col" key={label}>
-                      {label}
-                    </th>
-                  ))}
-                  <th scope="col">记录</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(state?.targets || DEV_DELIVERY_TARGETS).map((target) => (
-                  <TargetRow
-                    key={target.key}
-                    target={target}
-                    loading={loading && (!state || state.pending?.targets.includes(target.key))}
-                    failed={failed || state?.failed?.targets.includes(target.key)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </WorkbenchSection>
-      </div>
-      <p className="erp-dev-verification-evidence__boundary">
-        运行冒烟、迁移、新备份隔离恢复与部署分别留证；本执行端专项报告、客户验收与生产容量另行核验。
-      </p>
+      {compact ? (
+        <details className="erp-dev-disclosure">
+          <summary>核验详情</summary>
+          {details}
+        </details>
+      ) : details}
     </WorkbenchSection>
   )
 }

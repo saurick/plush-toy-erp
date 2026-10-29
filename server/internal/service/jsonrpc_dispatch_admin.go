@@ -112,7 +112,7 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			}),
 		}, nil
 
-	case "rbac_options", "menu_options":
+	case "rbac_options":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRoleRead); res != nil {
 			return id, res, nil
 		}
@@ -145,9 +145,6 @@ func (d *jsonrpcDispatcher) handleAdmin(
 				"roles":                   roleOptionsToAny(roles, roleAccess),
 				"permissions":             permissionOptionsToAny(permissions),
 				"menus":                   menuOptionsToAny(biz.BuiltinAdminMenus()),
-				"role_options":            roleOptionsToAny(roles, roleAccess),
-				"permission_options":      permissionOptionsToAny(permissions),
-				"menu_options":            menuOptionsToAny(biz.BuiltinAdminMenus()),
 				"warehouse_scope_options": warehouseScopeOptions,
 			}),
 		}, nil
@@ -703,6 +700,9 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 	case errors.Is(err, biz.ErrPermissionNotDelegable):
 		l.Warnf("[admin] permission not delegable err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "该权限不能分配给业务角色"}
+	case errors.Is(err, biz.ErrRolePermissionPolicy):
+		l.Warnf("[admin] role responsibility template rejected err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "岗位功能须符合已登记模板：保留核心能力，只能选用模板内的辅助功能"}
 	case errors.Is(err, biz.ErrDebugRoleProductionForbidden):
 		l.Warnf("[admin] debug role rejected by environment err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "当前环境不能分配调试角色"}

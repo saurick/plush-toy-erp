@@ -383,14 +383,22 @@ export async function prepareTransactionPurchase(client, options, configHash) {
   const { warehouses } = await rpc("admin", "masterdata", "list_warehouses", {
     limit: 100,
   });
-  const material = materials.find(
+  const materialTemplate = materials.find(
     (item) => item.is_active && item.default_unit_id,
   );
   const warehouse = warehouses.find((item) => item.is_active);
   assert.ok(
-    material && warehouse,
+    materialTemplate && warehouse,
     "canonical core seed must provide material and warehouse",
   );
+  const { material } = await rpc("admin", "masterdata", "create_material", {
+    code: `${prefix}-MAT`,
+    name: `${prefix} 采购材料`,
+    default_unit_id: materialTemplate.default_unit_id,
+    stock_category: materialTemplate.stock_category,
+    default_warehouse_id: warehouse.id,
+    supplier_id: supplier.id,
+  });
   await assignTransactionWarehouseScopes(client, warehouse.id);
   const { purchase_order: order } = await rpc(
     "purchase",
@@ -416,6 +424,10 @@ export async function prepareTransactionPurchase(client, options, configHash) {
       ],
     },
   );
+  if (options.purchaseDraftOnly) {
+    assert.equal(order.lifecycle_status, "draft");
+    return { prefix, customer, supplier, material, warehouse, order, configHash };
+  }
   await approvePurchaseOrderThroughProcess({
     purchaseOrder: order,
     customerKey: "yoyoosun",
@@ -487,13 +499,13 @@ export async function prepareTransactionReceivable(client, fixture) {
   assert.equal(items.length, 1);
   const item = items[0];
   const prefix = `${fixture.prefix}-AR`;
-  // Establish simulated opening stock through the normal counted-stock usecase.
+  // Establish simulated opening stock through an independently reviewed adjustment.
   // Production routing is outside this receivable settlement fixture.
   let operation = (
     await rpc("warehouse", "inventory", "create_inventory_operation", {
       operation_no: `${prefix}-STOCK`,
-      operation_type: "CYCLE_COUNT",
-      reason: "应收结算期初实盘",
+      operation_type: "MANUAL_ADJUSTMENT",
+      reason: "应收结算模拟期初库存",
       idempotency_key: `${prefix}:stock`,
       items: [
         {
@@ -503,18 +515,12 @@ export async function prepareTransactionReceivable(client, fixture) {
           product_sku_id: item.product_sku_id,
           unit_id: item.unit_id,
           from_warehouse_id: warehouse.id,
-          expected_quantity: "0",
-          counted_quantity: "10",
+          adjustment_quantity: "10",
         },
       ],
     })
   ).inventory_operation;
-  operation = (
-    await rpc("warehouse", "inventory", "post_inventory_operation", {
-      id: operation.id,
-      expected_version: operation.version,
-    })
-  ).inventory_operation;
+  operation = await postTransactionInventoryCount(client, operation, prefix);
   assert.equal(operation.status, "POSTED");
   let shipment = (
     await rpc("sales", "operational_fact", "create_shipment_with_items", {
@@ -632,6 +638,67 @@ export async function prepareTransactionReceivable(client, fixture) {
   return { fact, shipment, stockOperation: operation };
 }
 
+export async function postTransactionInventoryCount(client, operation, prefix, { post = true, beforeExecution } = {}) {
+  const { rpc } = client;
+  const operationID = operation.id;
+  const source = { customer_key: "yoyoosun", inventory_operation_id: operationID };
+  const read = () => rpc("warehouse", "customer_config", "get_inventory_adjustment_approval_process", source);
+  let data = await read();
+  if (!data.process_context) {
+    await rpc("warehouse", "customer_config", "start_inventory_adjustment_approval_process", {
+      ...source, idempotency_key: `inventory-adjustment-approval/${operationID}`,
+    });
+    data = await read();
+  }
+  const node = (key) => {
+    const found = data.process_context.nodes.find((item) => item.node_key === key);
+    assert.ok(found?.id, `missing inventory process node ${key}`);
+    assert.equal(found.process_instance_id, data.process_context.process_instance.id);
+    return found;
+  };
+  const execute = async (key, method) => {
+    const current = node(key);
+    assert.equal(current.status, "active");
+    data = await rpc("warehouse", "customer_config", method, {
+      ...source, process_instance_id: current.process_instance_id,
+      process_node_instance_id: current.id, expected_version: current.version,
+      idempotency_key: `${prefix}:inventory-verification:${operationID}:${current.id}:${method}`,
+    });
+  };
+  if (data.source_readback.status === "DRAFT") {
+    await execute("submit_inventory_adjustment", "execute_inventory_adjustment_submit");
+  }
+  for (const [actor, key] of [["boss", "inventory_adjustment_approval"], ["warehouse", "inventory_adjustment_execution"]]) {
+    const current = node(key);
+    if (current.status === "completed") continue;
+    assert.equal(current.status, "active");
+    const { tasks } = await rpc(actor, "workflow", "list_tasks", {
+      source_type: "inventory_operation", source_id: operationID, limit: 200,
+    });
+    const matches = tasks.filter((item) => item.process_instance_id === current.process_instance_id && item.process_node_instance_id === current.id);
+    assert.equal(matches.length, 1, `${key} must have one bound task`);
+    const task = matches[0];
+    assert.equal(task.owner_role_key, actor);
+    if (actor === 'warehouse' && beforeExecution) await beforeExecution(task);
+    const { task: completed } = await rpc(actor, "workflow", "complete_task_action", {
+      task_id: task.id, expected_version: task.version,
+      idempotency_key: `${prefix}:inventory-verification:${operationID}:${task.id}:complete`,
+      action_key: "complete", reason: "模拟核对库存盘点与调整",
+      payload: { surface_key: "workflow_business_module", feedback: "模拟核对库存盘点与调整",
+        ...(actor === "boss" ? { process_decision: { reason: "模拟独立复核" } } : {}),
+      },
+    });
+    assert.equal(completed.task_status_key, "done");
+    data = await read();
+  }
+  assert.equal(data.source_readback.status, "APPROVED");
+  if (post) {
+    await execute("post_inventory_adjustment", "execute_inventory_adjustment_post");
+    assert.equal(data.source_readback.status, "POSTED");
+  }
+  return data.source_readback;
+}
+
 export async function prepareTransactionProductionSource(
   client,
   options,
@@ -740,7 +807,6 @@ export async function prepareTransactionProductionSource(
     rpc: ({ actor, domain, method, params }) =>
       client.rpc(actor, domain, method, params),
   });
-  assert.equal(engineering.sampleImageCount, 1);
   assert.equal(engineering.materialRequests.length, 1);
   assert.equal(engineering.materialRequests[0].status, "APPROVED");
   const { processes } = await client.rpc(

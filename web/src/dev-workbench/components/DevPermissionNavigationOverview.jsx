@@ -43,10 +43,10 @@ export default function DevPermissionNavigationOverview({
           </Title>
           <Text type="secondary">
             {blocked
-              ? '账号或岗位当前不可使用；已保存的分配关系可在关系图和明细中核对。'
+              ? '账号或岗位当前不可使用；已保存的分配关系可在权限依据中核对。'
               : model?.projectionOnly
                 ? '按各岗位生成菜单合并参考，实际菜单以账号登录结果为准。'
-                : '完整展示当前选择登录后如何找到页面；不会随“功能范围”筛选缩小。'}
+                : '显示当前对象的完整侧栏入口。'}
           </Text>
         </div>
         <Space wrap size={[6, 6]}>

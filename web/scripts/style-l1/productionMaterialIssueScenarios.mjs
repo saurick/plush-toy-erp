@@ -114,11 +114,11 @@ export function createProductionMaterialIssueScenarios(deps) {
           )
           const materialRequirementCells = detailModal
             .locator('.ant-table-cell:visible')
-            .filter({ hasText: 'MAT-STYLE-L1 / 样式短毛绒布' })
+            .filter({ hasText: 'MAT-STYLE-L1 样式短毛绒布' })
           await materialRequirementCells.first().waitFor()
           assert(
             (await materialRequirementCells.allInnerTexts()).every(
-              (text) => text.trim() === 'MAT-STYLE-L1 / 样式短毛绒布'
+              (text) => text.trim() === 'MAT-STYLE-L1 样式短毛绒布'
             ),
             '生产订单详情中的物料需求单元格应保持代码与名称完整'
           )

@@ -52,7 +52,6 @@ export function createOrderEngineeringScenarios(deps) {
           unit_price: '10',
           amount: '10000',
           line_status: 'open',
-          engineering_status: 'PREPARING',
         }
         request = {
           id: 5,
@@ -61,7 +60,7 @@ export function createOrderEngineeringScenarios(deps) {
           source_order_version: 4,
           version: 1,
           source_hash: 'a'.repeat(64),
-          status: 'PREVIEW',
+          status: 'SUBMITTED',
           issues: [],
           sources: [
             {
@@ -131,10 +130,6 @@ export function createOrderEngineeringScenarios(deps) {
               })
             case 'get_engineering_material_request':
               return fulfill(route, id, request)
-            case 'submit_engineering_material_request':
-              request = { ...request, status: 'SUBMITTED', version: 1 }
-              calls.push({ method, params })
-              return fulfill(route, id, request)
             case 'boss_review_engineering_material_request':
               request = { ...request, status: 'BOSS_APPROVED', version: 2 }
               calls.push({ method, params })
@@ -185,19 +180,12 @@ export function createOrderEngineeringScenarios(deps) {
         )
         await page.getByText(order.order_no, { exact: true }).first().click()
         await page
-          .getByRole('button', { name: '工程与打样', exact: true })
+          .getByRole('button', { name: '工程资料', exact: true })
           .click()
-        const engineering = page
-          .getByRole('dialog')
-          .filter({ hasText: '工程与打样 ·' })
-          .last()
+        const engineering = page.locator('[data-business-editor-workspace]')
         await engineering
           .locator('.erp-compact-field-table')
           .waitFor({ state: 'visible' })
-        await engineering.locator('.erp-optional-field > summary').click()
-        await engineering
-          .locator('textarea[id$="sample_note"]')
-          .fill('待工程建档，先记录客户的设计要求')
         await engineering.evaluate(async (node) => {
           await Promise.all(
             node
@@ -237,28 +225,22 @@ export function createOrderEngineeringScenarios(deps) {
             (await engineering.evaluate((node) => node.clientWidth)) * 0.85,
           JSON.stringify(engineeringLayout)
         )
-        await engineering
-          .locator('.ant-modal-footer .ant-btn-primary')
-          .last()
-          .click()
+        await engineering.getByRole('button', { name: '保存工程资料', exact: true }).click()
         await engineering.waitFor({ state: 'hidden', timeout: 10000 })
         const engineeringSave = calls.find(
           (call) => call.method === 'save_sales_order_engineering'
         )
         deps.assert.ok(engineeringSave)
-        deps.assert.equal(engineeringSave.params.items[0].sample_note, '待工程建档，先记录客户的设计要求')
+        deps.assert.equal(Object.hasOwn(engineeringSave.params.items[0], 'sample_note'), false)
         deps.assert.equal(engineeringSave.params.items[0].id, 1)
         deps.assert.ok(!engineeringSave.params.items[0].product_id)
-        deps.assert.equal(
-          engineeringSave.params.items[0].engineering_status,
-          'PREPARING'
-        )
+        deps.assert.equal(Object.hasOwn(engineeringSave.params.items[0], 'engineering_status'), false)
         const materialRequestAction = page.locator(
           'button[data-business-action-key="engineering-material"]'
         )
         deps.assert.equal(
           (await materialRequestAction.innerText()).trim(),
-          '提交用料汇总'
+          '审核用料汇总'
         )
         await materialRequestAction.click()
         const modal = page
@@ -272,9 +254,7 @@ export function createOrderEngineeringScenarios(deps) {
         await modal
           .getByText('身体', { exact: true })
           .waitFor({ state: 'visible' })
-        await modal
-          .getByRole('button', { name: '提交老板审核', exact: true })
-          .click()
+        deps.assert.equal(await modal.getByRole('button', { name: '提交老板审核', exact: true }).count(), 0)
         await modal
           .getByRole('button', { name: '审核通过，交财务', exact: true })
           .click()

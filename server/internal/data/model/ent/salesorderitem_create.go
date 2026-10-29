@@ -144,114 +144,30 @@ func (_c *SalesOrderItemCreate) SetImportSource(v map[string]interface{}) *Sales
 	return _c
 }
 
-// SetSampleBomID sets the "sample_bom_id" field.
-func (_c *SalesOrderItemCreate) SetSampleBomID(v int) *SalesOrderItemCreate {
-	_c.mutation.SetSampleBomID(v)
+// SetBomID sets the "bom_id" field.
+func (_c *SalesOrderItemCreate) SetBomID(v int) *SalesOrderItemCreate {
+	_c.mutation.SetBomID(v)
 	return _c
 }
 
-// SetNillableSampleBomID sets the "sample_bom_id" field if the given value is not nil.
-func (_c *SalesOrderItemCreate) SetNillableSampleBomID(v *int) *SalesOrderItemCreate {
+// SetNillableBomID sets the "bom_id" field if the given value is not nil.
+func (_c *SalesOrderItemCreate) SetNillableBomID(v *int) *SalesOrderItemCreate {
 	if v != nil {
-		_c.SetSampleBomID(*v)
+		_c.SetBomID(*v)
 	}
 	return _c
 }
 
-// SetSampleBomFingerprint sets the "sample_bom_fingerprint" field.
-func (_c *SalesOrderItemCreate) SetSampleBomFingerprint(v string) *SalesOrderItemCreate {
-	_c.mutation.SetSampleBomFingerprint(v)
+// SetBomFingerprint sets the "bom_fingerprint" field.
+func (_c *SalesOrderItemCreate) SetBomFingerprint(v string) *SalesOrderItemCreate {
+	_c.mutation.SetBomFingerprint(v)
 	return _c
 }
 
-// SetNillableSampleBomFingerprint sets the "sample_bom_fingerprint" field if the given value is not nil.
-func (_c *SalesOrderItemCreate) SetNillableSampleBomFingerprint(v *string) *SalesOrderItemCreate {
+// SetNillableBomFingerprint sets the "bom_fingerprint" field if the given value is not nil.
+func (_c *SalesOrderItemCreate) SetNillableBomFingerprint(v *string) *SalesOrderItemCreate {
 	if v != nil {
-		_c.SetSampleBomFingerprint(*v)
-	}
-	return _c
-}
-
-// SetSampleReusedFromItemID sets the "sample_reused_from_item_id" field.
-func (_c *SalesOrderItemCreate) SetSampleReusedFromItemID(v int) *SalesOrderItemCreate {
-	_c.mutation.SetSampleReusedFromItemID(v)
-	return _c
-}
-
-// SetNillableSampleReusedFromItemID sets the "sample_reused_from_item_id" field if the given value is not nil.
-func (_c *SalesOrderItemCreate) SetNillableSampleReusedFromItemID(v *int) *SalesOrderItemCreate {
-	if v != nil {
-		_c.SetSampleReusedFromItemID(*v)
-	}
-	return _c
-}
-
-// SetSampleImageAttachmentID sets the "sample_image_attachment_id" field.
-func (_c *SalesOrderItemCreate) SetSampleImageAttachmentID(v int) *SalesOrderItemCreate {
-	_c.mutation.SetSampleImageAttachmentID(v)
-	return _c
-}
-
-// SetNillableSampleImageAttachmentID sets the "sample_image_attachment_id" field if the given value is not nil.
-func (_c *SalesOrderItemCreate) SetNillableSampleImageAttachmentID(v *int) *SalesOrderItemCreate {
-	if v != nil {
-		_c.SetSampleImageAttachmentID(*v)
-	}
-	return _c
-}
-
-// SetEngineeringStatus sets the "engineering_status" field.
-func (_c *SalesOrderItemCreate) SetEngineeringStatus(v string) *SalesOrderItemCreate {
-	_c.mutation.SetEngineeringStatus(v)
-	return _c
-}
-
-// SetNillableEngineeringStatus sets the "engineering_status" field if the given value is not nil.
-func (_c *SalesOrderItemCreate) SetNillableEngineeringStatus(v *string) *SalesOrderItemCreate {
-	if v != nil {
-		_c.SetEngineeringStatus(*v)
-	}
-	return _c
-}
-
-// SetSampleNote sets the "sample_note" field.
-func (_c *SalesOrderItemCreate) SetSampleNote(v string) *SalesOrderItemCreate {
-	_c.mutation.SetSampleNote(v)
-	return _c
-}
-
-// SetNillableSampleNote sets the "sample_note" field if the given value is not nil.
-func (_c *SalesOrderItemCreate) SetNillableSampleNote(v *string) *SalesOrderItemCreate {
-	if v != nil {
-		_c.SetSampleNote(*v)
-	}
-	return _c
-}
-
-// SetSampleConfirmedAt sets the "sample_confirmed_at" field.
-func (_c *SalesOrderItemCreate) SetSampleConfirmedAt(v time.Time) *SalesOrderItemCreate {
-	_c.mutation.SetSampleConfirmedAt(v)
-	return _c
-}
-
-// SetNillableSampleConfirmedAt sets the "sample_confirmed_at" field if the given value is not nil.
-func (_c *SalesOrderItemCreate) SetNillableSampleConfirmedAt(v *time.Time) *SalesOrderItemCreate {
-	if v != nil {
-		_c.SetSampleConfirmedAt(*v)
-	}
-	return _c
-}
-
-// SetSampleConfirmedBy sets the "sample_confirmed_by" field.
-func (_c *SalesOrderItemCreate) SetSampleConfirmedBy(v int) *SalesOrderItemCreate {
-	_c.mutation.SetSampleConfirmedBy(v)
-	return _c
-}
-
-// SetNillableSampleConfirmedBy sets the "sample_confirmed_by" field if the given value is not nil.
-func (_c *SalesOrderItemCreate) SetNillableSampleConfirmedBy(v *int) *SalesOrderItemCreate {
-	if v != nil {
-		_c.SetSampleConfirmedBy(*v)
+		_c.SetBomFingerprint(*v)
 	}
 	return _c
 }
@@ -422,11 +338,6 @@ func (_c *SalesOrderItemCreate) SetNillableUpdatedAt(v *time.Time) *SalesOrderIt
 	return _c
 }
 
-// SetSampleReusedFromItem sets the "sample_reused_from_item" edge to the SalesOrderItem entity.
-func (_c *SalesOrderItemCreate) SetSampleReusedFromItem(v *SalesOrderItem) *SalesOrderItemCreate {
-	return _c.SetSampleReusedFromItemID(v.ID)
-}
-
 // SetSalesOrder sets the "sales_order" edge to the SalesOrder entity.
 func (_c *SalesOrderItemCreate) SetSalesOrder(v *SalesOrder) *SalesOrderItemCreate {
 	return _c.SetSalesOrderID(v.ID)
@@ -437,9 +348,9 @@ func (_c *SalesOrderItemCreate) SetProduct(v *Product) *SalesOrderItemCreate {
 	return _c.SetProductID(v.ID)
 }
 
-// SetSampleBom sets the "sample_bom" edge to the BOMHeader entity.
-func (_c *SalesOrderItemCreate) SetSampleBom(v *BOMHeader) *SalesOrderItemCreate {
-	return _c.SetSampleBomID(v.ID)
+// SetBom sets the "bom" edge to the BOMHeader entity.
+func (_c *SalesOrderItemCreate) SetBom(v *BOMHeader) *SalesOrderItemCreate {
+	return _c.SetBomID(v.ID)
 }
 
 // SetProductSku sets the "product_sku" edge to the ProductSKU entity.
@@ -525,10 +436,6 @@ func (_c *SalesOrderItemCreate) defaults() {
 		v := salesorderitem.DefaultPreShipmentSampleQuantity
 		_c.mutation.SetPreShipmentSampleQuantity(v)
 	}
-	if _, ok := _c.mutation.EngineeringStatus(); !ok {
-		v := salesorderitem.DefaultEngineeringStatus
-		_c.mutation.SetEngineeringStatus(v)
-	}
 	if _, ok := _c.mutation.LineStatus(); !ok {
 		v := salesorderitem.DefaultLineStatus
 		_c.mutation.SetLineStatus(v)
@@ -597,42 +504,14 @@ func (_c *SalesOrderItemCreate) check() error {
 			return &ValidationError{Name: "process_requirement", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.process_requirement": %w`, err)}
 		}
 	}
-	if v, ok := _c.mutation.SampleBomID(); ok {
-		if err := salesorderitem.SampleBomIDValidator(v); err != nil {
-			return &ValidationError{Name: "sample_bom_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_bom_id": %w`, err)}
+	if v, ok := _c.mutation.BomID(); ok {
+		if err := salesorderitem.BomIDValidator(v); err != nil {
+			return &ValidationError{Name: "bom_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.bom_id": %w`, err)}
 		}
 	}
-	if v, ok := _c.mutation.SampleBomFingerprint(); ok {
-		if err := salesorderitem.SampleBomFingerprintValidator(v); err != nil {
-			return &ValidationError{Name: "sample_bom_fingerprint", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_bom_fingerprint": %w`, err)}
-		}
-	}
-	if v, ok := _c.mutation.SampleReusedFromItemID(); ok {
-		if err := salesorderitem.SampleReusedFromItemIDValidator(v); err != nil {
-			return &ValidationError{Name: "sample_reused_from_item_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_reused_from_item_id": %w`, err)}
-		}
-	}
-	if v, ok := _c.mutation.SampleImageAttachmentID(); ok {
-		if err := salesorderitem.SampleImageAttachmentIDValidator(v); err != nil {
-			return &ValidationError{Name: "sample_image_attachment_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_image_attachment_id": %w`, err)}
-		}
-	}
-	if _, ok := _c.mutation.EngineeringStatus(); !ok {
-		return &ValidationError{Name: "engineering_status", err: errors.New(`ent: missing required field "SalesOrderItem.engineering_status"`)}
-	}
-	if v, ok := _c.mutation.EngineeringStatus(); ok {
-		if err := salesorderitem.EngineeringStatusValidator(v); err != nil {
-			return &ValidationError{Name: "engineering_status", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.engineering_status": %w`, err)}
-		}
-	}
-	if v, ok := _c.mutation.SampleNote(); ok {
-		if err := salesorderitem.SampleNoteValidator(v); err != nil {
-			return &ValidationError{Name: "sample_note", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_note": %w`, err)}
-		}
-	}
-	if v, ok := _c.mutation.SampleConfirmedBy(); ok {
-		if err := salesorderitem.SampleConfirmedByValidator(v); err != nil {
-			return &ValidationError{Name: "sample_confirmed_by", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.sample_confirmed_by": %w`, err)}
+	if v, ok := _c.mutation.BomFingerprint(); ok {
+		if err := salesorderitem.BomFingerprintValidator(v); err != nil {
+			return &ValidationError{Name: "bom_fingerprint", err: fmt.Errorf(`ent: validator failed for field "SalesOrderItem.bom_fingerprint": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.ProductSkuID(); ok {
@@ -749,29 +628,9 @@ func (_c *SalesOrderItemCreate) createSpec() (*SalesOrderItem, *sqlgraph.CreateS
 		_spec.SetField(salesorderitem.FieldImportSource, field.TypeJSON, value)
 		_node.ImportSource = value
 	}
-	if value, ok := _c.mutation.SampleBomFingerprint(); ok {
-		_spec.SetField(salesorderitem.FieldSampleBomFingerprint, field.TypeString, value)
-		_node.SampleBomFingerprint = &value
-	}
-	if value, ok := _c.mutation.SampleImageAttachmentID(); ok {
-		_spec.SetField(salesorderitem.FieldSampleImageAttachmentID, field.TypeInt, value)
-		_node.SampleImageAttachmentID = &value
-	}
-	if value, ok := _c.mutation.EngineeringStatus(); ok {
-		_spec.SetField(salesorderitem.FieldEngineeringStatus, field.TypeString, value)
-		_node.EngineeringStatus = value
-	}
-	if value, ok := _c.mutation.SampleNote(); ok {
-		_spec.SetField(salesorderitem.FieldSampleNote, field.TypeString, value)
-		_node.SampleNote = &value
-	}
-	if value, ok := _c.mutation.SampleConfirmedAt(); ok {
-		_spec.SetField(salesorderitem.FieldSampleConfirmedAt, field.TypeTime, value)
-		_node.SampleConfirmedAt = &value
-	}
-	if value, ok := _c.mutation.SampleConfirmedBy(); ok {
-		_spec.SetField(salesorderitem.FieldSampleConfirmedBy, field.TypeInt, value)
-		_node.SampleConfirmedBy = &value
+	if value, ok := _c.mutation.BomFingerprint(); ok {
+		_spec.SetField(salesorderitem.FieldBomFingerprint, field.TypeString, value)
+		_node.BomFingerprint = &value
 	}
 	if value, ok := _c.mutation.ProductCodeSnapshot(); ok {
 		_spec.SetField(salesorderitem.FieldProductCodeSnapshot, field.TypeString, value)
@@ -817,23 +676,6 @@ func (_c *SalesOrderItemCreate) createSpec() (*SalesOrderItem, *sqlgraph.CreateS
 		_spec.SetField(salesorderitem.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
 	}
-	if nodes := _c.mutation.SampleReusedFromItemIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2O,
-			Inverse: false,
-			Table:   salesorderitem.SampleReusedFromItemTable,
-			Columns: []string{salesorderitem.SampleReusedFromItemColumn},
-			Bidi:    true,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(salesorderitem.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_node.SampleReusedFromItemID = &nodes[0]
-		_spec.Edges = append(_spec.Edges, edge)
-	}
 	if nodes := _c.mutation.SalesOrderIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -868,12 +710,12 @@ func (_c *SalesOrderItemCreate) createSpec() (*SalesOrderItem, *sqlgraph.CreateS
 		_node.ProductID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	if nodes := _c.mutation.SampleBomIDs(); len(nodes) > 0 {
+	if nodes := _c.mutation.BomIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   salesorderitem.SampleBomTable,
-			Columns: []string{salesorderitem.SampleBomColumn},
+			Table:   salesorderitem.BomTable,
+			Columns: []string{salesorderitem.BomColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomheader.FieldID, field.TypeInt),
@@ -882,7 +724,7 @@ func (_c *SalesOrderItemCreate) createSpec() (*SalesOrderItem, *sqlgraph.CreateS
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.SampleBomID = &nodes[0]
+		_node.BomID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ProductSkuIDs(); len(nodes) > 0 {

@@ -1,9 +1,28 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { canCreateFollowupFromRecord, requireFollowupCreateParams, requireFollowupOptions, requireFollowupReceipt, requireFollowupTaskPage } from './workflowFollowup.mjs'
+import { canCreateFollowupFromRecord, relatedBusinessTaskSource, requireFollowupCreateParams, requireFollowupOptions, requireFollowupReceipt, requireFollowupTaskPage } from './workflowFollowup.mjs'
 
 const input = { source_type: 'sales_order', source_id: 42, task_name: '核实交期', description: '请提供预计完成日期', owner_role_key: 'sales', assignee_id: null, due_at: 1_900_000_000, priority: 0, idempotency_key: 'followup:one' }
 const task = { id: 99, version: 1, task_group: 'business_followup', ...input, task_status_key: 'ready', payload: { description: input.description } }
+
+test('任务内协作沿用任务真源身份，且仅绑定同一办理单据', () => {
+  const rework = {
+    id: 3414,
+    task_code: 'source-production-exception-42',
+    task_group: 'production_exception',
+    source_type: 'production-progress',
+    source_id: 42,
+    owner_role_key: 'production',
+    payload: { source_task_contract: 'workflow.source-task/v1', source_task_producer: 'production_rework.post', source_task_intent_hash: 'a'.repeat(64), production_fact_id: 42 },
+  }
+  assert.deepEqual(relatedBusinessTaskSource('production_fact', { id: 42 }, rework), { source_type: 'production-progress', source_id: 42 })
+  assert.deepEqual(relatedBusinessTaskSource('production_fact', { id: 43 }, rework), { source_type: 'production_fact', source_id: 43 })
+  assert.deepEqual(relatedBusinessTaskSource('shipment', { id: 42 }, rework), { source_type: 'shipment', source_id: 42 })
+  assert.deepEqual(relatedBusinessTaskSource('production_fact', { id: 42 }, { ...rework, payload: {} }), { source_type: 'production_fact', source_id: 42 })
+  assert.deepEqual(relatedBusinessTaskSource('production_fact', { id: 42 }), { source_type: 'production_fact', source_id: 42 })
+  assert.equal(relatedBusinessTaskSource('production_fact', null, rework), null)
+  assert.equal(relatedBusinessTaskSource('unknown', { id: 42 }, rework), null)
+})
 
 test('跟进任务创建只接受有效来源、明确要求和同一重试意图', () => {
   assert.deepEqual(requireFollowupCreateParams(input), input)

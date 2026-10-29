@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { DownloadOutlined, FullscreenOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, Result, Space } from 'antd'
-import { Link } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
 import Select from '@/common/components/select/AppSelect'
 import { TaskFulfillmentGuideButton } from '../components/flow-state/TaskFulfillmentGuide.jsx'
@@ -184,7 +183,6 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
               }}
             />
           ) : null}
-          {stateOptions.length ? <Link to="/__dev/ui-design?page=controls&control=empty">页面状态样例</Link> : null}
           {['task-handling', 'mobile-tasks'].includes(page) ? <TaskFulfillmentGuideButton /> : null}
           <Button icon={<ReloadOutlined />} onClick={() => setPreviewRevision((value) => value + 1)}>
             重置演示

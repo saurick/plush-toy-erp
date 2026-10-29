@@ -39,6 +39,7 @@ const (
 	BusinessAttachmentOwnerQualityInspection = "quality_inspection"
 	BusinessAttachmentOwnerShipment          = "shipment"
 	BusinessAttachmentOwnerFinanceFact       = "finance_fact"
+	BusinessAttachmentOwnerFinancePayment    = "finance_payment"
 	BusinessAttachmentOwnerProductionFact    = "production_fact"
 	BusinessAttachmentOwnerOutsourcingFact   = "outsourcing_fact"
 	BusinessAttachmentOwnerProduct           = "product"
@@ -92,6 +93,7 @@ var allowedBusinessAttachmentOwnerTypes = map[string]struct{}{
 	BusinessAttachmentOwnerQualityInspection: {},
 	BusinessAttachmentOwnerShipment:          {},
 	BusinessAttachmentOwnerFinanceFact:       {},
+	BusinessAttachmentOwnerFinancePayment:    {},
 	BusinessAttachmentOwnerProductionFact:    {},
 	BusinessAttachmentOwnerOutsourcingFact:   {},
 	BusinessAttachmentOwnerProduct:           {},

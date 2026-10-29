@@ -66,8 +66,8 @@
     },
     "test": "TestRPCDocumentedExamples",
     "verification": {
-      "test": "TestRPCDocumentedExamples",
-      "case": "admin.audit_logs"
+      "case": "admin.audit_logs",
+      "test": "TestRPCDocumentedExamples"
     }
   },
   "admin.change_password": {
@@ -135,14 +135,42 @@
         "is_preview": true,
         "pages": [
           {
-            "effective": false,
+            "effective": true,
             "key": "global-dashboard",
             "label": "工作台",
             "missing_all": [],
-            "missing_any": [
-              "erp.workbench.read"
-            ],
+            "missing_any": [],
             "path": "/erp/dashboard",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "erp.workbench.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "task-board",
+            "label": "任务管理",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/task-board",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "workflow.task.read"
+            ]
+          },
+          {
+            "effective": false,
+            "key": "business-dashboard",
+            "label": "进度看板",
+            "missing_all": [],
+            "missing_any": [
+              "erp.business_dashboard.read"
+            ],
+            "path": "/erp/business-dashboard",
             "rbac_granted": false,
             "reasons": [
               {
@@ -152,7 +180,416 @@
             ],
             "required_all": [],
             "required_any": [
-              "erp.workbench.read"
+              "erp.business_dashboard.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "customers",
+            "label": "客户档案",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/master/partners/customers",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "customer.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "suppliers",
+            "label": "供应商与加工厂",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/master/partners/suppliers",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "supplier.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "products",
+            "label": "产品档案",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/master/products",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "product.read",
+              "product_sku.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "materials",
+            "label": "材料档案",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/master/materials",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "material.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "processes",
+            "label": "工序档案",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/engineering/processes",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "process.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "sales-orders",
+            "label": "销售订单",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/sales/project-orders/sales-orders",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "sales_order.read"
+            ]
+          },
+          {
+            "effective": false,
+            "key": "material-bom",
+            "label": "BOM 管理",
+            "missing_all": [],
+            "missing_any": [
+              "bom.read"
+            ],
+            "path": "/erp/purchase/material-bom",
+            "rbac_granted": false,
+            "reasons": [
+              {
+                "code": "missing_rbac_permission",
+                "label": "岗位基础权限不足"
+              }
+            ],
+            "required_all": [],
+            "required_any": [
+              "bom.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "accessories-purchase",
+            "label": "采购订单",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/purchase/accessories",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "purchase.order.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "inbound",
+            "label": "入库办理",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/warehouse/inbound",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "warehouse.inbound.read",
+              "purchase.receipt.read",
+              "production.fact.read",
+              "outsourcing.fact.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "quality-inspections",
+            "label": "质量检验",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/production/quality-inspections",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "quality.inspection.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "inventory",
+            "label": "库存查询",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/warehouse/inventory",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "warehouse.inventory.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "processing-contracts",
+            "label": "委外订单",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/purchase/processing-contracts",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "outsourcing.order.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "production-orders",
+            "label": "生产订单",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/production/orders",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "pmc.plan.read",
+              "production.wip.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "production-scheduling",
+            "label": "排产确认",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/production/scheduling",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [
+              "workflow.task.read"
+            ],
+            "required_any": [
+              "pmc.plan.read"
+            ]
+          },
+          {
+            "effective": false,
+            "key": "production-progress",
+            "label": "生产记录",
+            "missing_all": [],
+            "missing_any": [
+              "production.fact.read"
+            ],
+            "path": "/erp/production/progress",
+            "rbac_granted": false,
+            "reasons": [
+              {
+                "code": "missing_rbac_permission",
+                "label": "岗位基础权限不足"
+              }
+            ],
+            "required_all": [],
+            "required_any": [
+              "production.fact.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "production-exceptions",
+            "label": "异常处理",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/production/exceptions",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "workflow.task.read",
+              "pmc.risk.read",
+              "production.fact.read",
+              "production.exception.submit",
+              "production.over_issue.submit",
+              "production.exception.approve"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "outbound",
+            "label": "出库办理",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/warehouse/outbound",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "warehouse.outbound.read",
+              "shipment.read",
+              "production.fact.read",
+              "outsourcing.fact.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "shipments",
+            "label": "出货单",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/warehouse/shipments",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "shipment.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "reconciliation",
+            "label": "对账管理",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/finance/reconciliation",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "finance.reconciliation.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "receivables",
+            "label": "应收管理",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/finance/receivables",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "finance.receivable.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "payables",
+            "label": "应付管理",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/finance/payables",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "finance.payable.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "finance-payments",
+            "label": "收付款核销",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/finance/payments",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "finance.payment.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "invoices",
+            "label": "发票管理",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/finance/invoices",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "finance.invoice.read"
+            ]
+          },
+          {
+            "effective": true,
+            "key": "print-center",
+            "label": "模板打印中心",
+            "missing_all": [],
+            "missing_any": [],
+            "path": "/erp/print-center",
+            "rbac_granted": true,
+            "reasons": [],
+            "required_all": [],
+            "required_any": [
+              "erp.print_template.read"
+            ]
+          },
+          {
+            "effective": false,
+            "key": "permission-center",
+            "label": "权限管理",
+            "missing_all": [],
+            "missing_any": [
+              "system.role.read",
+              "system.user.read"
+            ],
+            "path": "/erp/system/permissions",
+            "rbac_granted": false,
+            "reasons": [
+              {
+                "code": "missing_rbac_permission",
+                "label": "岗位基础权限不足"
+              }
+            ],
+            "required_all": [],
+            "required_any": [
+              "system.user.read",
+              "system.role.read"
+            ]
+          },
+          {
+            "effective": false,
+            "key": "system-audit-logs",
+            "label": "审计日志",
+            "missing_all": [],
+            "missing_any": [
+              "system.audit.read"
+            ],
+            "path": "/erp/system/audit-logs",
+            "rbac_granted": false,
+            "reasons": [
+              {
+                "code": "missing_rbac_permission",
+                "label": "岗位基础权限不足"
+              }
+            ],
+            "required_all": [],
+            "required_any": [
+              "system.audit.read"
             ]
           }
         ],
@@ -160,7 +597,343 @@
           {
             "class": "business",
             "effective": true,
+            "permission_key": "erp.workbench.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "erp.print_template.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "field.party_private.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "field.sales_commercial.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "field.procurement_commercial.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "field.finance_settlement.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "customer.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "supplier.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "material.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "process.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "product.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "product_sku.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "contact.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "sales_order.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "sales_order_item.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "engineering.material.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "engineering.material.finance_approve",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "workflow.task.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "workflow.task.update",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "workflow.task.approve",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "workflow.task.reject",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "workflow.task.complete",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "purchase.order.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "outsourcing.order.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "outsourcing.fact.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "purchase.receipt.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "purchase.receipt.adjustment.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "purchase.return.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "warehouse.inventory.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "shipment.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "quality.inspection.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.payable.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.payable.confirm",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.invoice.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.invoice.confirm",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
             "permission_key": "finance.receivable.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.receivable.confirm",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.reconciliation.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.reconciliation.confirm",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.report.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.payment.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.payment.create",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.payment.post",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.payment.reverse",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.credit_note.create",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "finance.credit_note.reverse",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "production.wip.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "pmc.plan.read",
+            "rbac_granted": true,
+            "reasons": []
+          },
+          {
+            "class": "business",
+            "effective": true,
+            "permission_key": "mobile.finance.access",
             "rbac_granted": true,
             "reasons": []
           }
@@ -177,8 +950,55 @@
     "message": "OK",
     "params": {
       "permission_keys": [
+        "erp.workbench.read",
+        "field.party_private.read",
+        "field.sales_commercial.read",
+        "field.procurement_commercial.read",
+        "field.finance_settlement.read",
+        "customer.read",
+        "supplier.read",
+        "material.read",
+        "process.read",
+        "product.read",
+        "product_sku.read",
+        "contact.read",
+        "sales_order.read",
+        "sales_order_item.read",
+        "engineering.material.read",
+        "engineering.material.finance_approve",
+        "workflow.task.read",
+        "workflow.task.update",
+        "workflow.task.approve",
+        "workflow.task.reject",
+        "workflow.task.complete",
+        "purchase.order.read",
+        "outsourcing.order.read",
+        "outsourcing.fact.read",
+        "purchase.receipt.read",
+        "purchase.receipt.adjustment.read",
+        "purchase.return.read",
+        "warehouse.inventory.read",
+        "shipment.read",
+        "quality.inspection.read",
+        "finance.payable.read",
+        "finance.payable.confirm",
+        "finance.invoice.read",
+        "finance.invoice.confirm",
+        "finance.receivable.read",
         "finance.receivable.confirm",
-        "finance.receivable.read"
+        "finance.reconciliation.read",
+        "finance.reconciliation.confirm",
+        "finance.report.read",
+        "finance.payment.read",
+        "finance.payment.create",
+        "finance.payment.post",
+        "finance.payment.reverse",
+        "finance.credit_note.create",
+        "finance.credit_note.reverse",
+        "production.wip.read",
+        "pmc.plan.read",
+        "mobile.finance.access",
+        "erp.print_template.read"
       ],
       "role_key": "finance"
     },
@@ -396,22 +1216,9 @@
     "params": {},
     "test": "TestRPCDocumentedExamples",
     "verification": {
-      "test": "TestRPCDocumentedExamples",
-      "case": "admin.me"
+      "case": "admin.me",
+      "test": "TestRPCDocumentedExamples"
     }
-  },
-  "admin.menu_options": {
-    "basis": "backend-wire-shape",
-    "data": {
-      "menu_options": [],
-      "menus": [],
-      "permission_options": [],
-      "permissions": [],
-      "role_options": [],
-      "roles": [],
-      "warehouse_scope_options": []
-    },
-    "params": {}
   },
   "admin.project_manuals": {
     "basis": "handler-fixture",
@@ -425,17 +1232,6 @@
   "admin.rbac_options": {
     "basis": "handler-fixture",
     "data": {
-      "menu_options": [
-        {
-          "key": "global-dashboard",
-          "label": "工作台",
-          "path": "/erp/dashboard",
-          "required_all": [],
-          "required_any": [
-            "erp.workbench.read"
-          ]
-        }
-      ],
       "menus": [
         {
           "key": "global-dashboard",
@@ -445,60 +1241,6 @@
           "required_any": [
             "erp.workbench.read"
           ]
-        }
-      ],
-      "permission_options": [
-        {
-          "action": "edit",
-          "assignable": true,
-          "builtin": true,
-          "class": "business",
-          "description": "",
-          "id": 0,
-          "module": "help",
-          "module_name": "帮助与企业补充",
-          "name": "编辑业务手册企业补充",
-          "non_production_only": false,
-          "permission_key": "help.business.edit",
-          "resource": "business",
-          "usage": {
-            "backend_methods": [
-              {
-                "domain": "admin",
-                "method": "help_chapter"
-              }
-            ],
-            "backend_only": false,
-            "conditions": [
-              "仍须具备所在章节阅读权限；正式手册正文不受编辑影响"
-            ],
-            "pages": [
-              {
-                "backend_methods": [
-                  {
-                    "domain": "admin",
-                    "method": "help_chapter"
-                  }
-                ],
-                "conditions": [
-                  "仍须具备所在章节阅读权限；正式手册正文不受编辑影响"
-                ],
-                "control_key": "help.business.edit",
-                "control_name": "维护企业补充",
-                "control_type": "button",
-                "effect": "按对应手册维护企业补充和处理纠错",
-                "key": "help-center",
-                "name": "帮助中心",
-                "path": "/erp/help-center",
-                "required_all": [],
-                "required_any": [],
-                "section_key": "enterprise-supplement",
-                "section_name": "企业补充"
-              }
-            ],
-            "required_all": [],
-            "required_any": []
-          }
         }
       ],
       "permissions": [
@@ -555,33 +1297,6 @@
           }
         }
       ],
-      "role_options": [
-        {
-          "assignable": true,
-          "assignable_by_current_admin": true,
-          "assignment_blocked_reason": "",
-          "builtin": true,
-          "data_scopes": [],
-          "description": "查看全局业务、审批和报表，不默认包含高危 debug 清空权限。",
-          "disabled": false,
-          "id": 0,
-          "name": "老板 / 管理层",
-          "navigation_mode": "recommended",
-          "non_production_only": false,
-          "permissions": [
-            "erp.workbench.read"
-          ],
-          "permissions_edit_blocked_reason": "",
-          "permissions_editable": true,
-          "permissions_editable_by_current_admin": true,
-          "primary_menu_paths": [],
-          "role_key": "boss",
-          "role_type": "business_default",
-          "secondary_menu_paths": [],
-          "sort_order": 10,
-          "version": 1
-        }
-      ],
       "roles": [
         {
           "assignable": true,
@@ -595,6 +1310,114 @@
           "name": "老板 / 管理层",
           "navigation_mode": "recommended",
           "non_production_only": false,
+          "permission_policy": {
+            "missing_required_permissions": [
+              "field.party_private.read",
+              "field.sales_commercial.read",
+              "field.procurement_commercial.read",
+              "field.finance_settlement.read",
+              "customer.read",
+              "supplier.read",
+              "material.read",
+              "process.read",
+              "product.read",
+              "product_sku.read",
+              "bom.read",
+              "contact.read",
+              "sales_order.read",
+              "sales_order_item.read",
+              "engineering.material.read",
+              "engineering.material.boss_approve",
+              "workflow.task.read",
+              "workflow.task.supervise",
+              "workflow.task.update",
+              "workflow.task.assign",
+              "workflow.task.approve",
+              "workflow.task.reject",
+              "purchase.order.read",
+              "outsourcing.order.read",
+              "outsourcing.fact.read",
+              "purchase.receipt.read",
+              "purchase.receipt.adjustment.read",
+              "purchase.return.read",
+              "warehouse.inventory.read",
+              "warehouse.inbound.read",
+              "warehouse.outbound.read",
+              "warehouse.adjustment.approve",
+              "shipment.read",
+              "quality.inspection.read",
+              "production.exception.approve",
+              "finance.payable.read",
+              "finance.invoice.read",
+              "finance.receivable.read",
+              "finance.reconciliation.read",
+              "finance.report.read",
+              "finance.payment.read",
+              "finance.payment.approve",
+              "production.fact.read",
+              "production.wip.read",
+              "pmc.plan.read",
+              "pmc.risk.read",
+              "mobile.boss.access"
+            ],
+            "optional_permissions": [
+              "erp.business_dashboard.read",
+              "erp.print_template.read"
+            ],
+            "outside_template_permissions": [],
+            "registered": true,
+            "required_permissions": [
+              "erp.workbench.read",
+              "field.party_private.read",
+              "field.sales_commercial.read",
+              "field.procurement_commercial.read",
+              "field.finance_settlement.read",
+              "customer.read",
+              "supplier.read",
+              "material.read",
+              "process.read",
+              "product.read",
+              "product_sku.read",
+              "bom.read",
+              "contact.read",
+              "sales_order.read",
+              "sales_order_item.read",
+              "engineering.material.read",
+              "engineering.material.boss_approve",
+              "workflow.task.read",
+              "workflow.task.supervise",
+              "workflow.task.update",
+              "workflow.task.assign",
+              "workflow.task.approve",
+              "workflow.task.reject",
+              "purchase.order.read",
+              "outsourcing.order.read",
+              "outsourcing.fact.read",
+              "purchase.receipt.read",
+              "purchase.receipt.adjustment.read",
+              "purchase.return.read",
+              "warehouse.inventory.read",
+              "warehouse.inbound.read",
+              "warehouse.outbound.read",
+              "warehouse.adjustment.approve",
+              "shipment.read",
+              "quality.inspection.read",
+              "production.exception.approve",
+              "finance.payable.read",
+              "finance.invoice.read",
+              "finance.receivable.read",
+              "finance.reconciliation.read",
+              "finance.report.read",
+              "finance.payment.read",
+              "finance.payment.approve",
+              "production.fact.read",
+              "production.wip.read",
+              "pmc.plan.read",
+              "pmc.risk.read",
+              "mobile.boss.access"
+            ],
+            "template_key": "boss"
+          },
           "permissions": [
             "erp.workbench.read"
           ],
@@ -796,8 +1619,123 @@
         "name": "仓库",
         "navigation_mode": "recommended",
         "non_production_only": false,
+        "permission_policy": {
+          "missing_required_permissions": [],
+          "optional_permissions": [
+            "erp.business_dashboard.read",
+            "erp.print_template.read"
+          ],
+          "outside_template_permissions": [],
+          "registered": true,
+          "required_permissions": [
+            "erp.workbench.read",
+            "customer.read",
+            "supplier.read",
+            "material.read",
+            "process.read",
+            "product.read",
+            "product_sku.read",
+            "contact.read",
+            "sales_order.read",
+            "sales_order_item.read",
+            "workflow.task.read",
+            "workflow.task.update",
+            "workflow.task.approve",
+            "workflow.task.reject",
+            "workflow.task.complete",
+            "purchase.order.read",
+            "outsourcing.order.read",
+            "outsourcing.fact.read",
+            "outsourcing.material_issue.create",
+            "outsourcing.return_receipt.create",
+            "outsourcing.fact.post",
+            "outsourcing.fact.cancel",
+            "purchase.receipt.read",
+            "purchase.receipt.create",
+            "purchase.receipt.cancel_draft",
+            "purchase.receipt.adjustment.read",
+            "purchase.receipt.adjustment.create",
+            "purchase.receipt.adjustment.post",
+            "purchase.receipt.adjustment.cancel",
+            "purchase.return.read",
+            "purchase.return.create",
+            "purchase.return.post",
+            "purchase.return.cancel",
+            "warehouse.manage",
+            "warehouse.inventory.read",
+            "warehouse.inbound.read",
+            "warehouse.inbound.confirm",
+            "warehouse.packaging.execute",
+            "warehouse.outbound.read",
+            "warehouse.outbound.confirm",
+            "warehouse.adjustment.create",
+            "stock.reservation.create",
+            "stock.reservation.release",
+            "shipment.read",
+            "quality.inspection.read",
+            "production.exception.execute",
+            "production.fact.read",
+            "production.wip.read",
+            "production.completion.create",
+            "production.material_issue.create",
+            "pmc.plan.read",
+            "mobile.warehouse.access"
+          ],
+          "template_key": "warehouse"
+        },
         "permissions": [
-          "warehouse.inventory.read"
+          "erp.workbench.read",
+          "customer.read",
+          "supplier.read",
+          "material.read",
+          "process.read",
+          "product.read",
+          "product_sku.read",
+          "contact.read",
+          "sales_order.read",
+          "sales_order_item.read",
+          "workflow.task.read",
+          "workflow.task.update",
+          "workflow.task.approve",
+          "workflow.task.reject",
+          "workflow.task.complete",
+          "purchase.order.read",
+          "outsourcing.order.read",
+          "outsourcing.fact.read",
+          "outsourcing.material_issue.create",
+          "outsourcing.return_receipt.create",
+          "outsourcing.fact.post",
+          "outsourcing.fact.cancel",
+          "purchase.receipt.read",
+          "purchase.receipt.create",
+          "purchase.receipt.cancel_draft",
+          "purchase.receipt.adjustment.read",
+          "purchase.receipt.adjustment.create",
+          "purchase.receipt.adjustment.post",
+          "purchase.receipt.adjustment.cancel",
+          "purchase.return.read",
+          "purchase.return.create",
+          "purchase.return.post",
+          "purchase.return.cancel",
+          "warehouse.manage",
+          "warehouse.inventory.read",
+          "warehouse.inbound.read",
+          "warehouse.inbound.confirm",
+          "warehouse.packaging.execute",
+          "warehouse.outbound.read",
+          "warehouse.outbound.confirm",
+          "warehouse.adjustment.create",
+          "stock.reservation.create",
+          "stock.reservation.release",
+          "shipment.read",
+          "quality.inspection.read",
+          "production.exception.execute",
+          "production.fact.read",
+          "production.wip.read",
+          "production.completion.create",
+          "production.material_issue.create",
+          "pmc.plan.read",
+          "mobile.warehouse.access"
         ],
         "permissions_editable": true,
         "primary_menu_paths": [],
@@ -820,7 +1758,58 @@
       "expected_version": 1,
       "navigation_mode": "recommended",
       "permission_keys": [
-        "warehouse.inventory.read"
+        "erp.workbench.read",
+        "customer.read",
+        "supplier.read",
+        "material.read",
+        "process.read",
+        "product.read",
+        "product_sku.read",
+        "contact.read",
+        "sales_order.read",
+        "sales_order_item.read",
+        "workflow.task.read",
+        "workflow.task.update",
+        "workflow.task.approve",
+        "workflow.task.reject",
+        "workflow.task.complete",
+        "purchase.order.read",
+        "outsourcing.order.read",
+        "outsourcing.fact.read",
+        "outsourcing.material_issue.create",
+        "outsourcing.return_receipt.create",
+        "outsourcing.fact.post",
+        "outsourcing.fact.cancel",
+        "purchase.receipt.read",
+        "purchase.receipt.create",
+        "purchase.receipt.cancel_draft",
+        "purchase.receipt.adjustment.read",
+        "purchase.receipt.adjustment.create",
+        "purchase.receipt.adjustment.post",
+        "purchase.receipt.adjustment.cancel",
+        "purchase.return.read",
+        "purchase.return.create",
+        "purchase.return.post",
+        "purchase.return.cancel",
+        "warehouse.manage",
+        "warehouse.inventory.read",
+        "warehouse.inbound.read",
+        "warehouse.inbound.confirm",
+        "warehouse.packaging.execute",
+        "warehouse.outbound.read",
+        "warehouse.outbound.confirm",
+        "warehouse.adjustment.create",
+        "stock.reservation.create",
+        "stock.reservation.release",
+        "shipment.read",
+        "quality.inspection.read",
+        "production.exception.execute",
+        "production.fact.read",
+        "production.wip.read",
+        "production.completion.create",
+        "production.material_issue.create",
+        "pmc.plan.read",
+        "mobile.warehouse.access"
       ],
       "primary_menu_paths": [],
       "role_key": "warehouse",
@@ -828,8 +1817,8 @@
     },
     "test": "TestRPCDocumentedExamples",
     "verification": {
-      "test": "TestRPCDocumentedExamples",
-      "case": "admin.set_role_settings"
+      "case": "admin.set_role_settings",
+      "test": "TestRPCDocumentedExamples"
     }
   },
   "admin.set_roles": {
@@ -2254,348 +3243,6 @@
       "reason": "接口调用示例"
     }
   },
-  "customer_config.execute_finished_goods_delivery_quality_decide": {
-    "basis": "handler-fixture",
-    "data": {
-      "completed_node": {
-        "action_set_key": null,
-        "activated_from_node_instance_id": null,
-        "attempt": 1,
-        "block_kind": null,
-        "blocked_at": null,
-        "blocked_by": null,
-        "blocked_reason": null,
-        "blocked_reason_code": null,
-        "completed_at": 1792394183,
-        "created_at": 1792394183,
-        "domain_command_compensated_at": null,
-        "domain_command_compensated_by": null,
-        "domain_command_compensation_hash": null,
-        "domain_command_effect_state": "unknown",
-        "domain_command_recovered_at": null,
-        "domain_command_recovered_by": null,
-        "domain_command_recovery_decision": null,
-        "domain_command_result_hash": "c73aee1985dc2771b2c569bf731d0f7c32fd78acb1b4655223a5a56667b1dfe6",
-        "due_at": null,
-        "form_profile_key": null,
-        "id": 1,
-        "node_key": "execute",
-        "node_type": "domain_command",
-        "outcome": "submitted",
-        "owner_pool_key": null,
-        "policy_snapshot": {
-          "command_key": "finished_goods_quality.decide"
-        },
-        "process_instance_id": 1,
-        "required_capability_key": null,
-        "resume_reason": null,
-        "resumed_at": null,
-        "resumed_by": null,
-        "routing_completed_at": null,
-        "routing_completed_by": null,
-        "started_at": 1792394183,
-        "status": "completed",
-        "updated_at": 1792394183,
-        "updated_by": null,
-        "version": 3
-      },
-      "nodes": [
-        {
-          "action_set_key": null,
-          "activated_from_node_instance_id": null,
-          "attempt": 1,
-          "block_kind": null,
-          "blocked_at": null,
-          "blocked_by": null,
-          "blocked_reason": null,
-          "blocked_reason_code": null,
-          "completed_at": 1792394183,
-          "created_at": 1792394183,
-          "domain_command_compensated_at": null,
-          "domain_command_compensated_by": null,
-          "domain_command_compensation_hash": null,
-          "domain_command_effect_state": "unknown",
-          "domain_command_recovered_at": null,
-          "domain_command_recovered_by": null,
-          "domain_command_recovery_decision": null,
-          "domain_command_result_hash": "c73aee1985dc2771b2c569bf731d0f7c32fd78acb1b4655223a5a56667b1dfe6",
-          "due_at": null,
-          "form_profile_key": null,
-          "id": 1,
-          "node_key": "execute",
-          "node_type": "domain_command",
-          "outcome": "submitted",
-          "owner_pool_key": null,
-          "policy_snapshot": {
-            "command_key": "finished_goods_quality.decide"
-          },
-          "process_instance_id": 1,
-          "required_capability_key": null,
-          "resume_reason": null,
-          "resumed_at": null,
-          "resumed_by": null,
-          "routing_completed_at": 1792394183,
-          "routing_completed_by": 7,
-          "started_at": 1792394183,
-          "status": "completed",
-          "updated_at": 1792394183,
-          "updated_by": null,
-          "version": 3
-        }
-      ],
-      "runtime_boundary": {
-        "command_key": "finished_goods_quality.decide",
-        "config_revision": "r1",
-        "executes_domain_command": true,
-        "process_key": "finished_goods_delivery",
-        "scope": "shipment_finished_goods_quality_decide",
-        "source": "process_instance_config_revision",
-        "workflow_task_done_posts_fact": false,
-        "writes_quality_fact": true,
-        "writes_shipment_or_finance_fact": false
-      }
-    },
-    "message": "OK",
-    "params": {
-      "customer_key": "yoyoosun",
-      "expected_version": 2,
-      "idempotency_key": "execute-r1",
-      "process_instance_id": 1,
-      "process_node_instance_id": 1,
-      "quality_inspection_id": 1,
-      "result": "PASS",
-      "shipment_id": 1001
-    },
-    "test": "TestCustomerConfigExecuteMethodsAuthorizeInstanceRevision"
-  },
-  "customer_config.execute_finished_goods_delivery_receivable_lead": {
-    "basis": "handler-fixture",
-    "data": {
-      "completed_node": {
-        "action_set_key": null,
-        "activated_from_node_instance_id": null,
-        "attempt": 1,
-        "block_kind": null,
-        "blocked_at": null,
-        "blocked_by": null,
-        "blocked_reason": null,
-        "blocked_reason_code": null,
-        "completed_at": 1792394183,
-        "created_at": 1792394183,
-        "domain_command_compensated_at": null,
-        "domain_command_compensated_by": null,
-        "domain_command_compensation_hash": null,
-        "domain_command_effect_state": "unknown",
-        "domain_command_recovered_at": null,
-        "domain_command_recovered_by": null,
-        "domain_command_recovery_decision": null,
-        "domain_command_result_hash": "c73aee1985dc2771b2c569bf731d0f7c32fd78acb1b4655223a5a56667b1dfe6",
-        "due_at": null,
-        "form_profile_key": null,
-        "id": 1,
-        "node_key": "execute",
-        "node_type": "domain_command",
-        "outcome": "submitted",
-        "owner_pool_key": null,
-        "policy_snapshot": {
-          "command_key": "finance.receivable_lead"
-        },
-        "process_instance_id": 1,
-        "required_capability_key": null,
-        "resume_reason": null,
-        "resumed_at": null,
-        "resumed_by": null,
-        "routing_completed_at": null,
-        "routing_completed_by": null,
-        "started_at": 1792394183,
-        "status": "completed",
-        "updated_at": 1792394183,
-        "updated_by": null,
-        "version": 3
-      },
-      "nodes": [
-        {
-          "action_set_key": null,
-          "activated_from_node_instance_id": null,
-          "attempt": 1,
-          "block_kind": null,
-          "blocked_at": null,
-          "blocked_by": null,
-          "blocked_reason": null,
-          "blocked_reason_code": null,
-          "completed_at": 1792394183,
-          "created_at": 1792394183,
-          "domain_command_compensated_at": null,
-          "domain_command_compensated_by": null,
-          "domain_command_compensation_hash": null,
-          "domain_command_effect_state": "unknown",
-          "domain_command_recovered_at": null,
-          "domain_command_recovered_by": null,
-          "domain_command_recovery_decision": null,
-          "domain_command_result_hash": "c73aee1985dc2771b2c569bf731d0f7c32fd78acb1b4655223a5a56667b1dfe6",
-          "due_at": null,
-          "form_profile_key": null,
-          "id": 1,
-          "node_key": "execute",
-          "node_type": "domain_command",
-          "outcome": "submitted",
-          "owner_pool_key": null,
-          "policy_snapshot": {
-            "command_key": "finance.receivable_lead"
-          },
-          "process_instance_id": 1,
-          "required_capability_key": null,
-          "resume_reason": null,
-          "resumed_at": null,
-          "resumed_by": null,
-          "routing_completed_at": 1792394183,
-          "routing_completed_by": 7,
-          "started_at": 1792394183,
-          "status": "completed",
-          "updated_at": 1792394183,
-          "updated_by": null,
-          "version": 3
-        }
-      ],
-      "runtime_boundary": {
-        "command_key": "finance.receivable_lead",
-        "config_revision": "r1",
-        "executes_domain_command": true,
-        "process_key": "finished_goods_delivery",
-        "scope": "receivable_lead_domain_command",
-        "source": "process_instance_config_revision",
-        "workflow_task_done_posts_fact": false,
-        "writes_finance_fact": true,
-        "writes_invoice_fact": false,
-        "writes_receivable_fact": true
-      }
-    },
-    "message": "OK",
-    "params": {
-      "customer_key": "yoyoosun",
-      "expected_amount": "1",
-      "expected_version": 2,
-      "idempotency_key": "execute-r1",
-      "process_instance_id": 1,
-      "process_node_instance_id": 1,
-      "receivable_source_no": "AR-test",
-      "shipment_id": 1001
-    },
-    "test": "TestCustomerConfigExecuteMethodsAuthorizeInstanceRevision"
-  },
-  "customer_config.execute_finished_goods_delivery_shipment_ship": {
-    "basis": "handler-fixture",
-    "data": {
-      "completed_node": {
-        "action_set_key": null,
-        "activated_from_node_instance_id": null,
-        "attempt": 1,
-        "block_kind": null,
-        "blocked_at": null,
-        "blocked_by": null,
-        "blocked_reason": null,
-        "blocked_reason_code": null,
-        "completed_at": 1792394183,
-        "created_at": 1792394183,
-        "domain_command_compensated_at": null,
-        "domain_command_compensated_by": null,
-        "domain_command_compensation_hash": null,
-        "domain_command_effect_state": "unknown",
-        "domain_command_recovered_at": null,
-        "domain_command_recovered_by": null,
-        "domain_command_recovery_decision": null,
-        "domain_command_result_hash": "c73aee1985dc2771b2c569bf731d0f7c32fd78acb1b4655223a5a56667b1dfe6",
-        "due_at": null,
-        "form_profile_key": null,
-        "id": 1,
-        "node_key": "execute",
-        "node_type": "domain_command",
-        "outcome": "submitted",
-        "owner_pool_key": null,
-        "policy_snapshot": {
-          "command_key": "shipment.ship"
-        },
-        "process_instance_id": 1,
-        "required_capability_key": null,
-        "resume_reason": null,
-        "resumed_at": null,
-        "resumed_by": null,
-        "routing_completed_at": null,
-        "routing_completed_by": null,
-        "started_at": 1792394183,
-        "status": "completed",
-        "updated_at": 1792394183,
-        "updated_by": null,
-        "version": 3
-      },
-      "nodes": [
-        {
-          "action_set_key": null,
-          "activated_from_node_instance_id": null,
-          "attempt": 1,
-          "block_kind": null,
-          "blocked_at": null,
-          "blocked_by": null,
-          "blocked_reason": null,
-          "blocked_reason_code": null,
-          "completed_at": 1792394183,
-          "created_at": 1792394183,
-          "domain_command_compensated_at": null,
-          "domain_command_compensated_by": null,
-          "domain_command_compensation_hash": null,
-          "domain_command_effect_state": "unknown",
-          "domain_command_recovered_at": null,
-          "domain_command_recovered_by": null,
-          "domain_command_recovery_decision": null,
-          "domain_command_result_hash": "c73aee1985dc2771b2c569bf731d0f7c32fd78acb1b4655223a5a56667b1dfe6",
-          "due_at": null,
-          "form_profile_key": null,
-          "id": 1,
-          "node_key": "execute",
-          "node_type": "domain_command",
-          "outcome": "submitted",
-          "owner_pool_key": null,
-          "policy_snapshot": {
-            "command_key": "shipment.ship"
-          },
-          "process_instance_id": 1,
-          "required_capability_key": null,
-          "resume_reason": null,
-          "resumed_at": null,
-          "resumed_by": null,
-          "routing_completed_at": 1792394183,
-          "routing_completed_by": 7,
-          "started_at": 1792394183,
-          "status": "completed",
-          "updated_at": 1792394183,
-          "updated_by": null,
-          "version": 3
-        }
-      ],
-      "runtime_boundary": {
-        "command_key": "shipment.ship",
-        "config_revision": "r1",
-        "executes_domain_command": true,
-        "process_key": "finished_goods_delivery",
-        "scope": "shipment_execution_domain_command",
-        "source": "process_instance_config_revision",
-        "workflow_task_done_posts_fact": false,
-        "writes_finance_fact": false,
-        "writes_inventory_fact": true,
-        "writes_shipment_fact": true
-      }
-    },
-    "message": "OK",
-    "params": {
-      "customer_key": "yoyoosun",
-      "expected_version": 2,
-      "idempotency_key": "execute-r1",
-      "process_instance_id": 1,
-      "process_node_instance_id": 1,
-      "shipment_id": 1001
-    },
-    "test": "TestCustomerConfigExecuteMethodsAuthorizeInstanceRevision"
-  },
   "customer_config.execute_inventory_adjustment_post": {
     "basis": "backend-wire-shape",
     "data": {
@@ -3123,118 +3770,6 @@
     },
     "test": "TestCustomerConfigInventoryAdjustmentStartExecutesSubmitOnceAndReplays"
   },
-  "customer_config.execute_material_supply_post_inbound": {
-    "basis": "handler-fixture",
-    "data": {
-      "completed_node": {
-        "action_set_key": null,
-        "activated_from_node_instance_id": null,
-        "attempt": 1,
-        "block_kind": null,
-        "blocked_at": null,
-        "blocked_by": null,
-        "blocked_reason": null,
-        "blocked_reason_code": null,
-        "completed_at": 1792394185,
-        "created_at": 1792394185,
-        "domain_command_compensated_at": null,
-        "domain_command_compensated_by": null,
-        "domain_command_compensation_hash": null,
-        "domain_command_effect_state": "none",
-        "domain_command_recovered_at": null,
-        "domain_command_recovered_by": null,
-        "domain_command_recovery_decision": null,
-        "domain_command_result_hash": "199fb653c8bfbb3fd6ef0003c58e1efca899416c7ab7e3a7480a3126ba4edc1a",
-        "due_at": null,
-        "form_profile_key": null,
-        "id": 1,
-        "node_key": "post",
-        "node_type": "domain_command",
-        "outcome": "checked",
-        "owner_pool_key": null,
-        "policy_snapshot": {
-          "command_key": "inventory.post_inbound"
-        },
-        "process_instance_id": 1,
-        "required_capability_key": null,
-        "resume_reason": null,
-        "resumed_at": null,
-        "resumed_by": null,
-        "routing_completed_at": null,
-        "routing_completed_by": null,
-        "started_at": 1792394185,
-        "status": "completed",
-        "updated_at": 1792394185,
-        "updated_by": null,
-        "version": 3
-      },
-      "nodes": [
-        {
-          "action_set_key": null,
-          "activated_from_node_instance_id": null,
-          "attempt": 1,
-          "block_kind": null,
-          "blocked_at": null,
-          "blocked_by": null,
-          "blocked_reason": null,
-          "blocked_reason_code": null,
-          "completed_at": 1792394185,
-          "created_at": 1792394185,
-          "domain_command_compensated_at": null,
-          "domain_command_compensated_by": null,
-          "domain_command_compensation_hash": null,
-          "domain_command_effect_state": "none",
-          "domain_command_recovered_at": null,
-          "domain_command_recovered_by": null,
-          "domain_command_recovery_decision": null,
-          "domain_command_result_hash": "199fb653c8bfbb3fd6ef0003c58e1efca899416c7ab7e3a7480a3126ba4edc1a",
-          "due_at": null,
-          "form_profile_key": null,
-          "id": 1,
-          "node_key": "post",
-          "node_type": "domain_command",
-          "outcome": "checked",
-          "owner_pool_key": null,
-          "policy_snapshot": {
-            "command_key": "inventory.post_inbound"
-          },
-          "process_instance_id": 1,
-          "required_capability_key": null,
-          "resume_reason": null,
-          "resumed_at": null,
-          "resumed_by": null,
-          "routing_completed_at": 1792394185,
-          "routing_completed_by": 7,
-          "started_at": 1792394185,
-          "status": "completed",
-          "updated_at": 1792394185,
-          "updated_by": null,
-          "version": 3
-        }
-      ],
-      "runtime_boundary": {
-        "command_key": "inventory.post_inbound",
-        "config_revision": "2026.06.28.1",
-        "executes_domain_command": true,
-        "process_key": "material_supply",
-        "source": "process_instance_config_revision",
-        "workflow_task_done_posts_fact": false,
-        "writes_inventory_fact": true,
-        "writes_purchase_receipt_source_doc": false,
-        "writes_quality_decision": false,
-        "writes_shipment_or_finance_fact": false
-      }
-    },
-    "message": "OK",
-    "params": {
-      "expected_version": 2,
-      "idempotency_key": "process-access-post",
-      "process_instance_id": 1,
-      "process_node_instance_id": 1,
-      "purchase_receipt_id": 1
-    },
-    "test": "TestPurchaseReceiptProcessJSONRPCChecksScopeBeforeExecutionAndReplay"
-  },
   "customer_config.execute_material_supply_purchase_order_submit": {
     "basis": "handler-fixture",
     "data": {
@@ -3345,273 +3880,6 @@
       "process_instance_id": 1,
       "process_node_instance_id": 1,
       "purchase_order_id": 1001
-    },
-    "test": "TestCustomerConfigExecuteMethodsAuthorizeInstanceRevision"
-  },
-  "customer_config.execute_material_supply_purchase_receipt_create": {
-    "basis": "handler-fixture",
-    "data": {
-      "completed_node": {
-        "action_set_key": null,
-        "activated_from_node_instance_id": null,
-        "attempt": 1,
-        "block_kind": null,
-        "blocked_at": null,
-        "blocked_by": null,
-        "blocked_reason": null,
-        "blocked_reason_code": null,
-        "completed_at": 1792394183,
-        "created_at": 1792394183,
-        "domain_command_compensated_at": null,
-        "domain_command_compensated_by": null,
-        "domain_command_compensation_hash": null,
-        "domain_command_effect_state": "unknown",
-        "domain_command_recovered_at": null,
-        "domain_command_recovered_by": null,
-        "domain_command_recovery_decision": null,
-        "domain_command_result_hash": "c73aee1985dc2771b2c569bf731d0f7c32fd78acb1b4655223a5a56667b1dfe6",
-        "due_at": null,
-        "form_profile_key": null,
-        "id": 1,
-        "node_key": "execute",
-        "node_type": "domain_command",
-        "outcome": "submitted",
-        "owner_pool_key": null,
-        "policy_snapshot": {
-          "command_key": "purchase_receipt.create"
-        },
-        "process_instance_id": 1,
-        "required_capability_key": null,
-        "resume_reason": null,
-        "resumed_at": null,
-        "resumed_by": null,
-        "routing_completed_at": null,
-        "routing_completed_by": null,
-        "started_at": 1792394183,
-        "status": "completed",
-        "updated_at": 1792394183,
-        "updated_by": null,
-        "version": 3
-      },
-      "nodes": [
-        {
-          "action_set_key": null,
-          "activated_from_node_instance_id": null,
-          "attempt": 1,
-          "block_kind": null,
-          "blocked_at": null,
-          "blocked_by": null,
-          "blocked_reason": null,
-          "blocked_reason_code": null,
-          "completed_at": 1792394183,
-          "created_at": 1792394183,
-          "domain_command_compensated_at": null,
-          "domain_command_compensated_by": null,
-          "domain_command_compensation_hash": null,
-          "domain_command_effect_state": "unknown",
-          "domain_command_recovered_at": null,
-          "domain_command_recovered_by": null,
-          "domain_command_recovery_decision": null,
-          "domain_command_result_hash": "c73aee1985dc2771b2c569bf731d0f7c32fd78acb1b4655223a5a56667b1dfe6",
-          "due_at": null,
-          "form_profile_key": null,
-          "id": 1,
-          "node_key": "execute",
-          "node_type": "domain_command",
-          "outcome": "submitted",
-          "owner_pool_key": null,
-          "policy_snapshot": {
-            "command_key": "purchase_receipt.create"
-          },
-          "process_instance_id": 1,
-          "required_capability_key": null,
-          "resume_reason": null,
-          "resumed_at": null,
-          "resumed_by": null,
-          "routing_completed_at": 1792394183,
-          "routing_completed_by": 7,
-          "started_at": 1792394183,
-          "status": "completed",
-          "updated_at": 1792394183,
-          "updated_by": null,
-          "version": 3
-        }
-      ],
-      "process_instance": {
-        "block_kind": null,
-        "blocked_at": null,
-        "blocked_by": null,
-        "blocked_reason": null,
-        "blocked_reason_code": null,
-        "business_ref_id": 1001,
-        "business_ref_no": null,
-        "business_ref_type": "purchase_order",
-        "completed_at": 1792394183,
-        "config_revision": "r1",
-        "correlation_key": null,
-        "created_at": 1792394183,
-        "created_by": 7,
-        "definition_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "id": 1,
-        "idempotency_key": "start-r1",
-        "module_contract_snapshot": {
-          "config_revision": "r1",
-          "customer_key": "yoyoosun",
-          "source": "active_customer_config"
-        },
-        "process_key": "material_supply",
-        "process_version": "v1",
-        "resolution_kind": null,
-        "resolution_reason": null,
-        "resolved_at": null,
-        "resolved_by": null,
-        "started_at": 1792394183,
-        "status": "completed",
-        "terminal_node_instance_id": null,
-        "updated_at": 1792394183,
-        "updated_by": 7,
-        "variant_key": null
-      },
-      "runtime_boundary": {
-        "command_key": "purchase_receipt.create",
-        "config_revision": "r1",
-        "creates_submitted_quality_inspections": true,
-        "creates_zero_balance_hold_lots": true,
-        "executes_domain_command": true,
-        "linked_business_ref_source": "process_runtime_result",
-        "process_key": "material_supply",
-        "source": "process_instance_config_revision",
-        "workflow_task_done_posts_fact": false,
-        "writes_inventory_quantity_fact": false,
-        "writes_purchase_receipt_source_doc": true,
-        "writes_quality_decision": false,
-        "writes_shipment_or_finance_fact": false
-      }
-    },
-    "message": "OK",
-    "params": {
-      "all_remaining": true,
-      "customer_key": "yoyoosun",
-      "expected_version": 2,
-      "idempotency_key": "execute-r1",
-      "process_instance_id": 1,
-      "process_node_instance_id": 1,
-      "purchase_order_id": 1001,
-      "receipt_no": "RCPT-test",
-      "warehouse_id": 1
-    },
-    "test": "TestCustomerConfigExecuteMethodsAuthorizeInstanceRevision"
-  },
-  "customer_config.execute_material_supply_quality_gate": {
-    "basis": "handler-fixture",
-    "data": {
-      "evaluated_node": {
-        "action_set_key": null,
-        "activated_from_node_instance_id": null,
-        "attempt": 1,
-        "block_kind": null,
-        "blocked_at": null,
-        "blocked_by": null,
-        "blocked_reason": null,
-        "blocked_reason_code": null,
-        "completed_at": 1792394183,
-        "created_at": 1792394183,
-        "domain_command_compensated_at": null,
-        "domain_command_compensated_by": null,
-        "domain_command_compensation_hash": null,
-        "domain_command_effect_state": "unknown",
-        "domain_command_recovered_at": null,
-        "domain_command_recovered_by": null,
-        "domain_command_recovery_decision": null,
-        "domain_command_result_hash": "c73aee1985dc2771b2c569bf731d0f7c32fd78acb1b4655223a5a56667b1dfe6",
-        "due_at": null,
-        "form_profile_key": null,
-        "id": 1,
-        "node_key": "execute",
-        "node_type": "domain_command",
-        "outcome": "submitted",
-        "owner_pool_key": null,
-        "policy_snapshot": {
-          "command_key": "quality_inspection.aggregate_gate"
-        },
-        "process_instance_id": 1,
-        "required_capability_key": null,
-        "resume_reason": null,
-        "resumed_at": null,
-        "resumed_by": null,
-        "routing_completed_at": null,
-        "routing_completed_by": null,
-        "started_at": 1792394183,
-        "status": "completed",
-        "updated_at": 1792394183,
-        "updated_by": null,
-        "version": 3
-      },
-      "nodes": [
-        {
-          "action_set_key": null,
-          "activated_from_node_instance_id": null,
-          "attempt": 1,
-          "block_kind": null,
-          "blocked_at": null,
-          "blocked_by": null,
-          "blocked_reason": null,
-          "blocked_reason_code": null,
-          "completed_at": 1792394183,
-          "created_at": 1792394183,
-          "domain_command_compensated_at": null,
-          "domain_command_compensated_by": null,
-          "domain_command_compensation_hash": null,
-          "domain_command_effect_state": "unknown",
-          "domain_command_recovered_at": null,
-          "domain_command_recovered_by": null,
-          "domain_command_recovery_decision": null,
-          "domain_command_result_hash": "c73aee1985dc2771b2c569bf731d0f7c32fd78acb1b4655223a5a56667b1dfe6",
-          "due_at": null,
-          "form_profile_key": null,
-          "id": 1,
-          "node_key": "execute",
-          "node_type": "domain_command",
-          "outcome": "submitted",
-          "owner_pool_key": null,
-          "policy_snapshot": {
-            "command_key": "quality_inspection.aggregate_gate"
-          },
-          "process_instance_id": 1,
-          "required_capability_key": null,
-          "resume_reason": null,
-          "resumed_at": null,
-          "resumed_by": null,
-          "routing_completed_at": 1792394183,
-          "routing_completed_by": 7,
-          "started_at": 1792394183,
-          "status": "completed",
-          "updated_at": 1792394183,
-          "updated_by": null,
-          "version": 3
-        }
-      ],
-      "runtime_boundary": {
-        "command_key": "quality_inspection.aggregate_gate",
-        "config_revision": "r1",
-        "executes_domain_command": true,
-        "process_key": "material_supply",
-        "source": "process_instance_config_revision",
-        "workflow_task_done_posts_fact": false,
-        "writes_inventory_fact": false,
-        "writes_purchase_receipt_source_doc": false,
-        "writes_quality_decision": false,
-        "writes_shipment_or_finance_fact": false
-      }
-    },
-    "message": "OK",
-    "params": {
-      "customer_key": "yoyoosun",
-      "expected_version": 2,
-      "idempotency_key": "execute-r1",
-      "process_instance_id": 1,
-      "process_node_instance_id": 1,
-      "purchase_receipt_id": 1001
     },
     "test": "TestCustomerConfigExecuteMethodsAuthorizeInstanceRevision"
   },
@@ -12978,26 +13246,6 @@
     "params": {},
     "test": "TestJsonrpcDispatcher_DebugCapabilitiesDescribeBusinessClearSafety"
   },
-  "debug.cleanup_business_chain_scenario": {
-    "basis": "backend-wire-shape",
-    "data": {
-      "archivedRecords": [],
-      "debugRunId": "RUN-API01",
-      "deletedAttachments": 1,
-      "deletedBusinessStates": 1,
-      "deletedTaskEvents": 1,
-      "deletedTasks": [],
-      "dryRun": true,
-      "matchedAttachments": 1,
-      "matchedBusinessStates": [],
-      "matchedRecords": [],
-      "matchedTasks": [],
-      "scenarioKey": "order_approval_engineering",
-      "skippedItems": [],
-      "warnings": []
-    },
-    "params": {}
-  },
   "debug.clear_business_chain_scenario": {
     "basis": "backend-wire-shape",
     "data": {
@@ -13035,32 +13283,6 @@
     "message": "业务数据清空范围已统计",
     "params": {},
     "test": "TestJsonrpcDispatcher_DebugClearBusinessDataReturnsCounts"
-  },
-  "debug.config": {
-    "basis": "backend-wire-shape",
-    "data": {
-      "businessDataClearAllowed": true,
-      "businessDataClearAllowedEnvironments": [],
-      "businessDataClearConfirmation": "CLEAR_ALL_PROJECT_BUSINESS_DATA",
-      "businessDataClearDisabledReason": "",
-      "businessDataClearDryRunDefault": true,
-      "businessDataClearEnabled": true,
-      "cleanupAllowed": false,
-      "cleanupDisabledReason": "后端未开启清理调试数据开关 ERP_DEBUG_CLEANUP_ENABLED",
-      "cleanupEnabled": false,
-      "cleanupOnlyDebugData": true,
-      "cleanupScope": "debug_run",
-      "databaseName": "plush_erp_acceptance_20260715_v3_dev",
-      "destructiveRemoteDenied": true,
-      "environment": "dev",
-      "requiresBackendGuard": true,
-      "requiresDebugRunId": true,
-      "seedAllowed": false,
-      "seedDisabledReason": "后端未开启生成调试数据开关 ERP_DEBUG_SEED_ENABLED",
-      "seedEnabled": false,
-      "supportedScenarios": []
-    },
-    "params": {}
   },
   "debug.rebuild_business_chain_scenario": {
     "basis": "handler-fixture",
@@ -13114,26 +13336,6 @@
     "message": "调试数据已生成",
     "params": {},
     "test": "TestJsonrpcDispatcher_DebugSeedReturnsScenarioRunRecordsAndTasks"
-  },
-  "debug.seed_business_chain_scenario": {
-    "basis": "backend-wire-shape",
-    "data": {
-      "cleanupParams": {
-        "debugRunId": "RUN-API01",
-        "dryRun": true,
-        "scenarioKey": "order_approval_engineering"
-      },
-      "cleanupToken": "RUN-API01:order_approval_engineering",
-      "coverageStatus": "",
-      "createdRecords": [],
-      "createdTasks": [],
-      "debugRunId": "RUN-API01",
-      "nextCheckpoints": [],
-      "partial": false,
-      "scenarioKey": "order_approval_engineering",
-      "warnings": []
-    },
-    "params": {}
   },
   "inventory.cancel_inventory_operation": {
     "basis": "backend-wire-shape",
@@ -13260,12 +13462,15 @@
           "active_reserved_quantity": "4",
           "available_quantity": "8.5",
           "id": 2,
+          "issuable_quantity": "0",
           "lot_id": null,
+          "lot_status": "ACTIVE",
           "pending_inspection_quantity": "0",
           "pending_packaging_quantity": "0",
           "product_sku_id": null,
           "quantity": "12.5",
           "ready_to_ship_quantity": "8.5",
+          "restricted_quantity": "0",
           "stock_category": "",
           "subject_id": 1,
           "subject_type": "PRODUCT",
@@ -13286,8 +13491,8 @@
     },
     "test": "TestRPCDocumentedExamples",
     "verification": {
-      "test": "TestRPCDocumentedExamples",
-      "case": "inventory.list_inventory_balances"
+      "case": "inventory.list_inventory_balances",
+      "test": "TestRPCDocumentedExamples"
     }
   },
   "inventory.list_inventory_lots": {
@@ -13318,24 +13523,24 @@
       ],
       "limit": 50,
       "offset": 0,
-      "total": 1,
       "status_counts": {
         "ACTIVE": 1
-      }
+      },
+      "total": 1
     },
     "message": "OK",
     "params": {
       "date_from": "2026-06-17",
       "date_to": "2026-06-17",
+      "include_status_counts": true,
       "keyword": "INV-LEDGER-LOT",
       "status": "ACTIVE",
-      "warehouse_id": 1,
-      "include_status_counts": true
+      "warehouse_id": 1
     },
     "test": "TestRPCDocumentedExamples",
     "verification": {
-      "test": "TestRPCDocumentedExamples",
-      "case": "inventory.list_inventory_lots"
+      "case": "inventory.list_inventory_lots",
+      "test": "TestRPCDocumentedExamples"
     }
   },
   "inventory.list_inventory_operations": {
@@ -13364,8 +13569,11 @@
           "product_sku_id": null,
           "quantity": "12.5",
           "reversal_of_txn_id": null,
+          "source_document_id": 0,
+          "source_document_type": "",
           "source_id": 77,
           "source_line_id": 88,
+          "source_no": "",
           "source_type": "MANUAL_SEED",
           "stock_category": "MAIN",
           "subject_id": 1,
@@ -13391,8 +13599,8 @@
     },
     "test": "TestRPCDocumentedExamples",
     "verification": {
-      "test": "TestRPCDocumentedExamples",
-      "case": "inventory.list_inventory_txns"
+      "case": "inventory.list_inventory_txns",
+      "test": "TestRPCDocumentedExamples"
     }
   },
   "inventory.post_inventory_operation": {
@@ -14122,8 +14330,8 @@
       "offset": 0,
       "products": [
         {
-          "id": 505,
           "code": "PAGE-505",
+          "id": 505,
           "name": "PAGE-505成品"
         }
       ],
@@ -15120,6 +15328,7 @@
     "data": {
       "credit_note": {
         "amount": "0",
+        "balance_direction": "DECREASE",
         "credit_note_no": "",
         "currency": "",
         "finance_fact_id": 0,
@@ -15130,6 +15339,8 @@
         "id": 1,
         "reason": "",
         "reversal_of_credit_note_id": null,
+        "source_id": null,
+        "source_type": null,
         "status": ""
       }
     },
@@ -15201,6 +15412,37 @@
       "payment_no": "PAY-RPC-1"
     },
     "test": "TestOperationalFactFinancePaymentCreateAndListContract"
+  },
+  "operational_fact.create_finance_source_adjustment": {
+    "basis": "handler-fixture",
+    "data": {
+      "credit_note": {
+        "amount": "0",
+        "balance_direction": "DECREASE",
+        "credit_note_no": "",
+        "currency": "",
+        "finance_fact_id": 0,
+        "finance_fact_no": "",
+        "finance_fact_original_amount": "0",
+        "finance_fact_outstanding_amount": "0",
+        "finance_fact_type": "",
+        "id": 1,
+        "reason": "",
+        "reversal_of_credit_note_id": null,
+        "source_id": 4,
+        "source_type": "PURCHASE_RETURN",
+        "status": ""
+      }
+    },
+    "message": "OK",
+    "params": {
+      "credit_note_no": "ADJ-SIM-4",
+      "idempotency_key": "source-adjustment-sim-4",
+      "reason": "采购退货差额",
+      "source_id": 4,
+      "source_type": "PURCHASE_RETURN"
+    },
+    "test": "TestFinanceSourceAdjustmentPermissionsAndContract"
   },
   "operational_fact.create_invoice_from_shipment": {
     "basis": "handler-fixture",
@@ -15377,6 +15619,56 @@
       "warehouse_id": 1
     },
     "test": "TestOutsourcingWarehouseCommandsThroughDispatcherWithoutPricePermission"
+  },
+  "operational_fact.create_payable_from_outsourcing_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "finance_fact": {
+        "amount": "24",
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "cancelled_by_name": null,
+        "collection_type": null,
+        "counterparty_id": 703,
+        "counterparty_type": "SUPPLIER",
+        "created_at": 1792394184,
+        "currency": "CNY",
+        "due_at": null,
+        "fact_no": "AP-STAGE",
+        "fact_type": "PAYABLE",
+        "fee_amount": "0",
+        "id": 300,
+        "idempotency_key": "AP-STAGE",
+        "invoice_category": null,
+        "note": null,
+        "occurred_at": -62135596800,
+        "outstanding_amount": "0",
+        "payment_term": null,
+        "payment_term_days": null,
+        "posted_at": null,
+        "posted_by": null,
+        "posted_by_name": null,
+        "settled_at": null,
+        "settled_by": null,
+        "settled_by_name": null,
+        "source_id": null,
+        "source_line_id": null,
+        "source_no": null,
+        "source_type": null,
+        "status": "DRAFT",
+        "updated_at": 1792394184,
+        "version": 0
+      }
+    },
+    "message": "OK",
+    "params": {
+      "customer_key": "demo",
+      "fact_no": "AP-STAGE",
+      "idempotency_key": "AP-STAGE",
+      "outsourcing_order_id": 12
+    },
+    "test": "TestFinanceBusinessSourceRPCUsesExactPermissions"
   },
   "operational_fact.create_payable_from_outsourcing_return": {
     "basis": "handler-fixture",
@@ -15838,6 +16130,7 @@
     "data": {
       "credit_note": {
         "amount": "0",
+        "balance_direction": "DECREASE",
         "credit_note_no": "",
         "currency": "",
         "finance_fact_id": 0,
@@ -15848,12 +16141,32 @@
         "id": 1,
         "reason": "",
         "reversal_of_credit_note_id": 1,
+        "source_id": null,
+        "source_type": null,
         "status": ""
       }
     },
     "params": {
       "id": 2
     }
+  },
+  "operational_fact.get_finance_fact": {
+    "basis": "handler-fixture",
+    "data": {
+      "finance_fact": {
+        "amount": "20",
+        "currency": "CNY",
+        "fact_no": "REC-RPC-1",
+        "fact_type": "RECEIVABLE",
+        "id": 9,
+        "status": "POSTED"
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 9
+    },
+    "test": "TestFinanceTraceDocumentedExample"
   },
   "operational_fact.get_finance_payment": {
     "basis": "backend-wire-shape",
@@ -15903,6 +16216,36 @@
     "params": {
       "id": 2
     }
+  },
+  "operational_fact.get_finance_statement": {
+    "basis": "handler-fixture",
+    "data": {
+      "statement": {
+        "closing": "0",
+        "counterparty_id": 2,
+        "counterparty_type": "CUSTOMER",
+        "currency": "CNY",
+        "date_from": "2026-09-01",
+        "date_to": "2026-09-30",
+        "decrease": "0",
+        "entries": [],
+        "increase": "0",
+        "opening": "0",
+        "snapshot_at": "2026-10-01T00:00:00Z",
+        "total": 0
+      }
+    },
+    "message": "OK",
+    "params": {
+      "counterparty_id": 2,
+      "counterparty_type": "CUSTOMER",
+      "currency": "CNY",
+      "date_from": "2026-09-01",
+      "date_to": "2026-09-30",
+      "limit": 20,
+      "offset": 0
+    },
+    "test": "TestFinanceStatementPermissionsAndContract"
   },
   "operational_fact.get_outsourcing_return_disposition": {
     "basis": "backend-wire-shape",
@@ -16017,21 +16360,21 @@
         "note": null,
         "package_count": null,
         "planned_ship_at": null,
+        "quoted_freight_amount_snapshot": null,
+        "receivable_amount_snapshot": null,
         "sales_order_id": null,
         "shipment_no": "SHIP-EXACT-READ",
         "shipped_at": null,
         "shipping_mark": null,
         "status": "DRAFT",
+        "tax_amount_snapshot": null,
+        "tax_mode_snapshot": null,
         "total_net_weight_g": null,
         "tracking_no": null,
         "transport_method": null,
         "updated_at": 1752787200,
         "version": 0,
-        "volume_m3": null,
-        "receivable_amount_snapshot": null,
-        "quoted_freight_amount_snapshot": null,
-        "tax_amount_snapshot": null,
-        "tax_mode_snapshot": null
+        "volume_m3": null
       }
     },
     "message": "OK",
@@ -16046,6 +16389,7 @@
       "credit_notes": [
         {
           "amount": "10",
+          "balance_direction": "DECREASE",
           "credit_note_no": "CN-RPC-1",
           "currency": "CNY",
           "finance_fact_id": 0,
@@ -16056,6 +16400,8 @@
           "id": 1,
           "reason": "",
           "reversal_of_credit_note_id": null,
+          "source_id": null,
+          "source_type": null,
           "status": "POSTED"
         }
       ],
@@ -16098,7 +16444,7 @@
     "test": "TestFinanceAdvanceAllocationRPCExactPermissions"
   },
   "operational_fact.list_finance_payments": {
-    "basis": "handler-fixture",
+    "basis": "backend-wire-shape",
     "data": {
       "limit": 1,
       "offset": 20,
@@ -16107,16 +16453,45 @@
         "DRAFT": 42,
         "POSTED": 3
       },
-      "total": 0
+      "total": 0,
+      "totals": []
     },
     "message": "OK",
     "params": {
       "include_status_counts": true,
+      "include_totals": true,
       "limit": 1,
       "offset": 20,
       "status": "DRAFT"
+    }
+  },
+  "operational_fact.list_finance_source_adjustments": {
+    "basis": "handler-fixture",
+    "data": {
+      "adjustments": [
+        {
+          "amount": "10",
+          "balance_direction": "DECREASE",
+          "counterparty_id": 2,
+          "counterparty_name": "模拟供应商",
+          "currency": "CNY",
+          "finance_fact_id": 9,
+          "finance_fact_no": "AP-SIM-9",
+          "occurred_at": "2026-09-01T00:00:00Z",
+          "outstanding_amount": "50",
+          "source_id": 4,
+          "source_no": "RET-SIM-4",
+          "source_type": "PURCHASE_RETURN"
+        }
+      ],
+      "total": 1
     },
-    "test": "TestBusinessStatusCountsRPCPermissionBoundary"
+    "message": "OK",
+    "params": {
+      "limit": 20,
+      "offset": 0
+    },
+    "test": "TestFinanceSourceAdjustmentPermissionsAndContract"
   },
   "operational_fact.list_outsourcing_facts": {
     "basis": "handler-fixture",
@@ -16144,19 +16519,19 @@
     "basis": "handler-fixture",
     "data": {
       "production_exceptions": [],
-      "total": 0,
-      "status_counts": {}
+      "status_counts": {},
+      "total": 0
     },
     "message": "OK",
     "params": {
+      "handling_status": "APPROVED:PENDING",
       "include_status_counts": true,
-      "limit": 20,
-      "handling_status": "APPROVED:PENDING"
+      "limit": 20
     },
     "test": "TestRPCDocumentedBusinessQuickCounts",
     "verification": {
-      "test": "TestRPCDocumentedBusinessQuickCounts",
-      "case": "operational_fact.list_production_exceptions"
+      "case": "operational_fact.list_production_exceptions",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
     }
   },
   "operational_fact.list_production_facts": {
@@ -16165,8 +16540,8 @@
       "limit": 20,
       "offset": 0,
       "production_facts": [],
-      "total": 0,
-      "status_counts": {}
+      "status_counts": {},
+      "total": 0
     },
     "message": "OK",
     "params": {
@@ -16175,8 +16550,8 @@
     },
     "test": "TestRPCDocumentedBusinessQuickCounts",
     "verification": {
-      "test": "TestRPCDocumentedBusinessQuickCounts",
-      "case": "operational_fact.list_production_facts"
+      "case": "operational_fact.list_production_facts",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
     }
   },
   "operational_fact.list_production_order_material_requirements": {
@@ -16281,9 +16656,9 @@
     "data": {
       "limit": 20,
       "offset": 0,
+      "status_counts": {},
       "stock_reservations": [],
-      "total": 0,
-      "status_counts": {}
+      "total": 0
     },
     "message": "OK",
     "params": {
@@ -16292,8 +16667,8 @@
     },
     "test": "TestRPCDocumentedBusinessQuickCounts",
     "verification": {
-      "test": "TestRPCDocumentedBusinessQuickCounts",
-      "case": "operational_fact.list_stock_reservations"
+      "case": "operational_fact.list_stock_reservations",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
     }
   },
   "operational_fact.post_finance_fact": {
@@ -16556,6 +16931,7 @@
     "data": {
       "credit_note": {
         "amount": "0",
+        "balance_direction": "DECREASE",
         "credit_note_no": "",
         "currency": "",
         "finance_fact_id": 0,
@@ -16566,6 +16942,8 @@
         "id": 1,
         "reason": "",
         "reversal_of_credit_note_id": 1,
+        "source_id": null,
+        "source_type": null,
         "status": ""
       }
     },
@@ -18735,7 +19113,10 @@
           {
             "batch_quantity": null,
             "check_items": [],
+            "corrected_inspection_id": null,
+            "corrected_inspection_no": null,
             "correction_of_inspection_id": null,
+            "correction_of_inspection_no": null,
             "created_at": 1792394185,
             "decision_note": null,
             "defect_rate_operator": null,
@@ -18746,6 +19127,7 @@
             "inspection_no": "IQC-PR-1-ITEM-1",
             "inspection_type": "INCOMING",
             "inspector_id": null,
+            "inspector_name": null,
             "inventory_lot_id": 1,
             "material_id": 1,
             "operation_code": null,
@@ -19103,8 +19485,8 @@
       "limit": 20,
       "offset": 0,
       "purchase_receipts": [],
-      "total": 0,
-      "status_counts": {}
+      "status_counts": {},
+      "total": 0
     },
     "message": "OK",
     "params": {
@@ -19113,8 +19495,8 @@
     },
     "test": "TestRPCDocumentedBusinessQuickCounts",
     "verification": {
-      "test": "TestRPCDocumentedBusinessQuickCounts",
-      "case": "purchase.list_purchase_receipts"
+      "case": "purchase.list_purchase_receipts",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
     }
   },
   "purchase.list_purchase_rejection_dispositions": {
@@ -19530,6 +19912,29 @@
     },
     "test": "TestJsonrpcDispatcher_PurchaseOrderReceiptProgressRequiresIntersectionAndSerializesExactProjection"
   },
+  "purchase_order.list_purchase_followups": {
+    "basis": "handler-fixture",
+    "data": {
+      "access": {
+        "commercial": false,
+        "finance": false,
+        "quality": false
+      },
+      "as_of_date": "2026-10-26",
+      "counts": {},
+      "days": {},
+      "limit": 25,
+      "offset": 0,
+      "rows": [],
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "kind": "all",
+      "view": "exceptions"
+    },
+    "test": "TestPurchaseFollowupsRPCEnforcesSourceAndCategoryPermissions"
+  },
   "purchase_order.list_purchase_order_items": {
     "basis": "handler-fixture",
     "data": {
@@ -19547,18 +19952,18 @@
           "material_code_snapshot": null,
           "material_id": 1,
           "material_name_snapshot": null,
+          "material_spec_snapshot": null,
           "note": null,
           "product_name_snapshot": null,
           "product_no_snapshot": null,
           "product_order_no_snapshot": null,
           "purchase_order_id": 1,
           "purchased_quantity": "12.5",
-          "unit_id": 1,
-          "unit_price": null,
-          "updated_at": 1,
-          "material_spec_snapshot": null,
           "supplier_item_no_snapshot": null,
-          "unit_name_snapshot": null
+          "unit_id": 1,
+          "unit_name_snapshot": null,
+          "unit_price": null,
+          "updated_at": 1
         }
       ],
       "total": 1
@@ -19623,13 +20028,63 @@
     },
     "test": "TestJsonrpcDispatcher_PurchaseOrderAPIRequiresDomainPermissions"
   },
+  "purchase_order.update_purchase_order_delivery": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_order": {
+        "contract_party_snapshot": {},
+        "created_at": -62135596800,
+        "currency": "",
+        "delivery_address": null,
+        "expected_arrival_date": null,
+        "id": 1,
+        "invoice_category": null,
+        "invoice_required": null,
+        "lifecycle_status": "approved",
+        "note": null,
+        "payment_method": null,
+        "payment_term_days": null,
+        "purchase_date": -62135596800,
+        "purchase_order_no": "",
+        "settled_at": null,
+        "settled_by": null,
+        "settlement_action": null,
+        "settlement_mode": null,
+        "settlement_reason": null,
+        "supplier_confirmed_arrival_date": null,
+        "supplier_id": 0,
+        "supplier_purchase_order_no": null,
+        "supplier_snapshot": {},
+        "updated_at": -62135596800,
+        "version": 3
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_arrival_date": null,
+      "expected_version": 2,
+      "id": 1,
+      "idempotency_key": "purchase-delivery-rpc",
+      "items": [
+        {
+          "expected_arrival_date": null,
+          "id": 3
+        }
+      ],
+      "supplier_confirmed_arrival_date": null
+    },
+    "test": "TestPurchaseOrderDeliveryRPCDoesNotRequireOrAcceptPrices"
+  },
   "quality.cancel_quality_inspection": {
     "basis": "handler-fixture",
     "data": {
       "quality_inspection": {
         "batch_quantity": null,
         "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
         "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
         "created_at": 1792394185,
         "decision_note": "来料批次撤检",
         "defect_rate_operator": null,
@@ -19640,6 +20095,7 @@
         "inspection_no": "QI-JSONRPC-CANCEL",
         "inspection_type": "INCOMING",
         "inspector_id": null,
+        "inspector_name": null,
         "inventory_lot_id": 3,
         "material_id": 1,
         "operation_code": null,
@@ -19683,7 +20139,10 @@
       "quality_inspection": {
         "batch_quantity": null,
         "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
         "correction_of_inspection_id": 1,
+        "correction_of_inspection_no": null,
         "created_at": 1792394185,
         "decision_note": "仪器校准复核失败",
         "defect_rate_operator": null,
@@ -19694,6 +20153,7 @@
         "inspection_no": "QI-RPC-CORR-R2",
         "inspection_type": "INCOMING",
         "inspector_id": null,
+        "inspector_name": null,
         "inventory_lot_id": 1,
         "material_id": 1,
         "operation_code": null,
@@ -19738,7 +20198,10 @@
       "quality_inspection": {
         "batch_quantity": null,
         "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
         "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
         "created_at": 1792394185,
         "decision_note": "成品质检待判定",
         "defect_rate_operator": null,
@@ -19749,6 +20212,7 @@
         "inspection_no": "QI-JSONRPC-FG",
         "inspection_type": "FINISHED_GOODS",
         "inspector_id": null,
+        "inspector_name": null,
         "inventory_lot_id": 1,
         "material_id": null,
         "operation_code": null,
@@ -19796,7 +20260,10 @@
       "quality_inspection": {
         "batch_quantity": null,
         "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
         "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
         "created_at": 1792394185,
         "decision_note": null,
         "defect_rate_operator": null,
@@ -19807,6 +20274,7 @@
         "inspection_no": "QI-JSONRPC-REJECT",
         "inspection_type": "INCOMING",
         "inspector_id": null,
+        "inspector_name": null,
         "inventory_lot_id": 2,
         "material_id": 1,
         "operation_code": null,
@@ -19851,7 +20319,10 @@
       "quality_inspection": {
         "batch_quantity": null,
         "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
         "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
         "created_at": 1792394185,
         "decision_note": "委外回货抽检",
         "defect_rate_operator": null,
@@ -19862,6 +20333,7 @@
         "inspection_no": "QI-RPC-OUT-INSPECTION",
         "inspection_type": "OUTSOURCING_RETURN",
         "inspector_id": null,
+        "inspector_name": null,
         "inventory_lot_id": 1,
         "material_id": null,
         "operation_code": null,
@@ -19907,7 +20379,10 @@
       "quality_inspection": {
         "batch_quantity": null,
         "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
         "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
         "created_at": 1792394185,
         "decision_note": null,
         "defect_rate_operator": null,
@@ -19918,6 +20393,7 @@
         "inspection_no": "QI-MODULE-ENABLED",
         "inspection_type": "INCOMING",
         "inspector_id": null,
+        "inspector_name": null,
         "inventory_lot_id": 1,
         "material_id": 1,
         "operation_code": null,
@@ -19963,7 +20439,10 @@
         {
           "batch_quantity": null,
           "check_items": [],
+          "corrected_inspection_id": null,
+          "corrected_inspection_no": null,
           "correction_of_inspection_id": null,
+          "correction_of_inspection_no": null,
           "created_at": 1792394185,
           "decision_note": "成品质检待判定",
           "defect_rate_operator": null,
@@ -19974,6 +20453,7 @@
           "inspection_no": "QI-JSONRPC-FG",
           "inspection_type": "FINISHED_GOODS",
           "inspector_id": null,
+          "inspector_name": null,
           "inventory_lot_id": 1,
           "material_id": null,
           "operation_code": null,
@@ -20008,6 +20488,7 @@
     },
     "message": "OK",
     "params": {
+      "include_superseded": false,
       "product_id": 1,
       "shipment_id": 1,
       "status": "SUBMITTED"
@@ -20023,7 +20504,10 @@
         {
           "batch_quantity": null,
           "check_items": [],
+          "corrected_inspection_id": null,
+          "corrected_inspection_no": null,
           "correction_of_inspection_id": null,
+          "correction_of_inspection_no": null,
           "created_at": 1792394185,
           "decision_note": "尺寸不符",
           "defect_rate_operator": "APPROX",
@@ -20034,6 +20518,7 @@
           "inspection_no": "QI-RPC-OUT-INSPECTION",
           "inspection_type": "OUTSOURCING_RETURN",
           "inspector_id": null,
+          "inspector_name": null,
           "inventory_lot_id": 1,
           "material_id": null,
           "operation_code": null,
@@ -20069,10 +20554,11 @@
     "message": "OK",
     "params": {
       "fact_id": 1,
-      "status": "REJECTED",
       "fact_ids": [
         1
-      ]
+      ],
+      "include_superseded": false,
+      "status": "REJECTED"
     },
     "test": "TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven"
   },
@@ -20085,7 +20571,9 @@
       "status_counts": {},
       "total": 1
     },
-    "params": {}
+    "params": {
+      "include_superseded": false
+    }
   },
   "quality.list_quality_inspections": {
     "basis": "handler-fixture",
@@ -20105,7 +20593,10 @@
               "scope": "FULL"
             }
           ],
+          "corrected_inspection_id": null,
+          "corrected_inspection_no": null,
           "correction_of_inspection_id": null,
+          "correction_of_inspection_no": null,
           "created_at": 1792394185,
           "decision_note": "让步接收",
           "defect_rate_operator": "APPROX",
@@ -20116,6 +20607,7 @@
           "inspection_no": "QI-JSONRPC-PASS",
           "inspection_type": "INCOMING",
           "inspector_id": null,
+          "inspector_name": null,
           "inventory_lot_id": 1,
           "material_id": 1,
           "operation_code": null,
@@ -20152,6 +20644,7 @@
     "params": {
       "date_from": "2026-06-17",
       "date_to": "2026-06-17",
+      "include_superseded": false,
       "inventory_lot_id": 1,
       "material_id": 1,
       "purchase_receipt_id": 1,
@@ -20176,7 +20669,10 @@
             "scope": "FULL"
           }
         ],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
         "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
         "created_at": 1792394185,
         "decision_note": "让步接收",
         "defect_rate_operator": "APPROX",
@@ -20186,7 +20682,8 @@
         "inspected_at": 1781654400,
         "inspection_no": "QI-JSONRPC-PASS",
         "inspection_type": "INCOMING",
-        "inspector_id": null,
+        "inspector_id": 1,
+        "inspector_name": "质检员陈",
         "inventory_lot_id": 1,
         "material_id": 1,
         "operation_code": null,
@@ -20243,8 +20740,20 @@
     "data": {
       "quality_inspection": {
         "batch_quantity": null,
-        "check_items": [],
+        "check_items": [
+          {
+            "name": "外观",
+            "note": "",
+            "observation": "已核对模拟样品",
+            "requirement": "符合样品",
+            "result": "FAIL",
+            "scope": "FULL"
+          }
+        ],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
         "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
         "created_at": 1792394185,
         "decision_note": "尺寸不符",
         "defect_rate_operator": "APPROX",
@@ -20254,7 +20763,8 @@
         "inspected_at": 1792394185,
         "inspection_no": "QI-RPC-OUT-INSPECTION",
         "inspection_type": "OUTSOURCING_RETURN",
-        "inspector_id": null,
+        "inspector_id": 7,
+        "inspector_name": null,
         "inventory_lot_id": 1,
         "material_id": null,
         "operation_code": null,
@@ -20287,6 +20797,16 @@
     },
     "message": "OK",
     "params": {
+      "check_items": [
+        {
+          "name": "外观",
+          "note": "",
+          "observation": "已核对模拟样品",
+          "requirement": "符合样品",
+          "result": "FAIL",
+          "scope": "FULL"
+        }
+      ],
       "decision_note": "尺寸不符",
       "defect_rate_operator": "APPROX",
       "defect_rate_percent": "20",
@@ -20300,7 +20820,10 @@
       "quality_inspection": {
         "batch_quantity": null,
         "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
         "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
         "created_at": 1792394185,
         "decision_note": null,
         "defect_rate_operator": null,
@@ -20311,6 +20834,7 @@
         "inspection_no": "QI-JSONRPC-REJECT",
         "inspection_type": "INCOMING",
         "inspector_id": null,
+        "inspector_name": null,
         "inventory_lot_id": 2,
         "material_id": 1,
         "operation_code": null,
@@ -20474,6 +20998,27 @@
       "reason": "接口调用示例"
     }
   },
+  "sales_order.export_sales_orders": {
+    "basis": "handler-fixture",
+    "data": {
+      "sales_orders": [
+        {
+          "customer_id": 1,
+          "id": 1,
+          "lifecycle_status": "draft",
+          "order_no": "SO-EXPORT-001"
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "case": "sales_order.export_sales_orders",
+      "test": "TestRPCDocumentedExamples"
+    }
+  },
   "sales_order.finance_review_engineering_material_request": {
     "basis": "handler-fixture",
     "data": {
@@ -20617,7 +21162,6 @@
           "created_at": -62135596800,
           "customer_product_no": null,
           "designer": null,
-          "engineering_status": "",
           "id": 1,
           "import_source": {},
           "line_no": 1,
@@ -20636,10 +21180,7 @@
           "production_quantity": "10",
           "requested_product_name": null,
           "sales_order_id": 1,
-          "sample_bom_id": null,
-          "sample_confirmed_at": null,
-          "sample_confirmed_by": null,
-          "sample_note": null,
+          "bom_id": null,
           "shipped_quantity": null,
           "unit_id": 1,
           "unit_price": null,
@@ -20668,7 +21209,6 @@
           "customer_order_no": null,
           "customer_product_no": null,
           "designer": null,
-          "engineering_status": "",
           "id": 2,
           "lifecycle_status": "",
           "line_no": 0,
@@ -20690,10 +21230,7 @@
           "requested_product_name": null,
           "sales_order_id": 1,
           "sales_owner": null,
-          "sample_bom_id": null,
-          "sample_confirmed_at": null,
-          "sample_confirmed_by": null,
-          "sample_note": null,
+          "bom_id": null,
           "shipped_quantity": null,
           "unit_id": 0,
           "unit_name": "只",
@@ -20707,29 +21244,10 @@
       "total": 1
     },
     "message": "OK",
-    "params": {},
-    "test": "TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction"
-  },
-  "sales_order.export_sales_orders": {
-    "basis": "handler-fixture",
-    "data": {
-      "sales_orders": [
-        {
-          "id": 1,
-          "order_no": "SO-EXPORT-001",
-          "customer_id": 1,
-          "lifecycle_status": "draft"
-        }
-      ],
-      "total": 1
+    "params": {
+      "customer_id": 42
     },
-    "message": "OK",
-    "params": {},
-    "test": "TestRPCDocumentedExamples",
-    "verification": {
-      "test": "TestRPCDocumentedExamples",
-      "case": "sales_order.export_sales_orders"
-    }
+    "test": "TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction"
   },
   "sales_order.list_sales_orders": {
     "basis": "handler-fixture",
@@ -20792,7 +21310,6 @@
       "id": 1,
       "items": [
         {
-          "engineering_status": "PREPARING",
           "id": 3,
           "product_id": null
         }
@@ -21459,10 +21976,10 @@
       "lanes": [
         {
           "key": "all",
-          "total": 0,
           "limit": 20,
           "offset": 20,
-          "tasks": []
+          "tasks": [],
+          "total": 0
         }
       ],
       "owner_role_keys": [],
@@ -21472,12 +21989,12 @@
     },
     "message": "OK",
     "params": {
+      "keyword": "包装",
       "lane_key": "all",
-      "todo_only": true,
-      "sort": "newest",
       "limit": 20,
       "offset": 20,
-      "keyword": "包装"
+      "sort": "newest",
+      "todo_only": true
     },
     "test": "TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage"
   },
@@ -21916,9 +22433,9 @@
     "data": {
       "limit": 20,
       "offset": 0,
+      "status_counts": {},
       "tasks": [],
-      "total": 0,
-      "status_counts": {}
+      "total": 0
     },
     "message": "OK",
     "params": {
@@ -21927,8 +22444,8 @@
     },
     "test": "TestRPCDocumentedBusinessQuickCounts",
     "verification": {
-      "test": "TestRPCDocumentedBusinessQuickCounts",
-      "case": "workflow.list_tasks"
+      "case": "workflow.list_tasks",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
     }
   },
   "workflow.list_tracking": {

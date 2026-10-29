@@ -10,6 +10,7 @@ import {
   DEV_FLOW_STATE_PATH_KIND_PRESENTATION,
   DEV_FLOW_STATE_TRANSITION_FILTERS,
   buildDevFlowStateNodeSummary,
+  buildDevFlowRecordRelationship,
   buildDevFlowStateRelatedViews,
   buildDevFlowStateRuleMermaid,
   buildDevFlowStateRuleSummary,
@@ -19,6 +20,20 @@ import {
   getDevFlowStateTransitionPresentation,
   listDevFlowStatePathGroups,
 } from './devFlowStateRulePresentation.mjs'
+
+test('不可变记录只投影反向记录到原记录的引用，不补造状态边', () => {
+  for (const key of ['fact.finance_credit_note', 'fact.finance_allocation']) {
+    const value = flow(key)
+    const relation = buildDevFlowRecordRelationship(value)
+    assert.deepEqual(relation.nodes.map((node) => node.key).sort(), value.states.map((state) => state.key).sort())
+    assert.equal(relation.edges.length, 1)
+    assert.equal(relation.edges[0].from, 'REVERSED')
+    assert.equal(relation.edges[0].to, 'POSTED')
+    assert.equal(relation.edges[0].label, '引用原记录')
+    assert.equal(value.transitions.length, 0)
+  }
+  assert.equal(buildDevFlowRecordRelationship(flow('source.sales_order')), null)
+})
 
 function flow(key) {
   const value = DEV_FLOW_STATE_CATALOG.flows.find((item) => item.key === key)
@@ -164,7 +179,7 @@ test('diagram labels stay short while preserving cancellation, reversal, and con
   const rework = transition(production, 'DRAFT->POSTED')
   assert.equal(
     getDevFlowStateTransitionDiagramLabel(rework),
-    '过账 · 返工 · 新轮次 · 条件适用'
+    '过账（返工按条件）'
   )
   assert.equal(
     getDevFlowStateTransitionPresentation(production, rework).conditional,
@@ -206,8 +221,47 @@ test('state rule Mermaid colors transition lines from the shared path presentati
   )
   assert.match(
     productionDiagram,
-    /stroke:#722ed1,stroke-width:2\.5px,stroke-dasharray:3 4/u
+    /stroke:#2b8a3e,stroke-width:2\.25px/u
   )
+  assert.doesNotMatch(productionDiagram, /stroke:#722ed1/u)
+})
+
+test('用料退回进入异常筛选，同接口下的业务动作仍可区分', () => {
+  const materials = flow('source.engineering_material_request')
+  assert.deepEqual(filterDevFlowStateTransitions(materials, '', 'exceptional').map((item) => item.key), ['SUBMITTED->REJECTED', 'BOSS_APPROVED->REJECTED'])
+  assert.equal(new Set(materials.transitions.map(getDevFlowStateTransitionDiagramLabel)).size, 4)
+})
+
+test('有条件的返工保留正常过账，同一转换可同时属于正常与条件异常范围', () => {
+  const production = flow('fact.production')
+  const post = transition(production, 'DRAFT->POSTED')
+  assert(filterDevFlowStateTransitions(production, '', 'standard').includes(post))
+  assert(filterDevFlowStateTransitions(production, '', 'exceptional').includes(post))
+  assert.equal(getDevFlowStateTransitionPresentation(production, post).groupKey, 'normal')
+  assert.equal(getDevFlowStateTransitionPresentation(production, post).conditional, true)
+  assert(listDevFlowStatePathGroups(production).some((item) => item.key === 'normal'))
+  assert.match(buildDevFlowStateRuleMermaid(production, { filter: 'standard' }), /过账/u)
+  const adjustment = flow('fact.inventory_operation')
+  assert(!filterDevFlowStateTransitions(adjustment, '', 'standard').includes(transition(adjustment, 'DRAFT->SUBMITTED')))
+})
+
+test('流程结束使用中性结果维度，补偿结束不冒充成功或单一取消', () => {
+  const runtime = flow('process.instance')
+  const complete = transition(runtime, 'active->completed')
+  const stopped = transition(runtime, 'blocked->completed')
+  assert.equal(runtime.states.find((item) => item.key === 'completed').label, '已结束')
+  assert.deepEqual(complete.outcomeKeys, ['succeeded', 'rejected', 'cancelled', 'compensated'])
+  assert.deepEqual(stopped.outcomeKeys, ['cancelled', 'compensated'])
+  for (const edge of [complete, stopped]) {
+    const presentation = getDevFlowStateTransitionPresentation(runtime, edge)
+    assert.equal(presentation.groupKey, 'outcome')
+    assert.match(presentation.condition, /补偿结束/u)
+    assert.match(presentation.condition, /结束不代表成功/u)
+    assert(filterDevFlowStateTransitions(runtime, '', 'exceptional').includes(edge))
+  }
+  assert(filterDevFlowStateTransitions(runtime, '', 'standard').includes(complete))
+  assert(!filterDevFlowStateTransitions(runtime, '', 'standard').includes(stopped))
+  assert.equal(getDevFlowStateTransitionPresentation(runtime, transition(runtime, 'blocked->active')).groupKey, 'pause_restore')
 })
 
 test('state rule Mermaid fails closed when catalog transitions reference an unknown state', () => {

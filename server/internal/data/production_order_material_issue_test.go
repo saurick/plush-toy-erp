@@ -18,7 +18,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func TestProductionOrderReleaseFreezesMaterialRequirementsAndKeepsNoBOMExplicit(t *testing.T) {
+func TestProductionOrderReleaseFreezesMaterialRequirementsAndRejectsMissingBOM(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "production_order_material_requirement_snapshot")
 	created, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{
@@ -78,17 +78,16 @@ func TestProductionOrderReleaseFreezesMaterialRequirementsAndKeepsNoBOMExplicit(
 	if err != nil {
 		t.Fatalf("create no-BOM production order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, createdWithoutBOM.Order.ID)
 	releasedWithoutBOM, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
 		ID: createdWithoutBOM.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "mo-material-no-bom-release",
 	})
-	if err != nil || len(releasedWithoutBOM.MaterialRequirements) != 0 || releasedWithoutBOM.MaterialRequirementsState != biz.ProductionOrderMaterialRequirementsNotRequired {
-		t.Fatalf("no-BOM release=%#v err=%v", releasedWithoutBOM, err)
+	if !errors.Is(err, biz.ErrProductionWIPInvalidRoute) || releasedWithoutBOM != nil {
+		t.Fatalf("missing material requirements must reject routed release=%#v err=%v", releasedWithoutBOM, err)
 	}
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard)))
 	if _, err := factUC.CreateProductionMaterialIssueFromOrder(ctx, &biz.ProductionMaterialIssueFromOrderCreate{
-		FactNo: "PF-NO-BOM", ProductionOrderID: releasedWithoutBOM.Order.ID,
-		ProductionOrderItemID: releasedWithoutBOM.Items[0].ID, ProductionOrderMaterialRequirementID: 999999,
+		FactNo: "PF-NO-BOM", ProductionOrderID: createdWithoutBOM.Order.ID,
+		ProductionOrderItemID: createdWithoutBOM.Items[0].ID, ProductionOrderMaterialRequirementID: 999999,
 		WarehouseID: createTestWarehouse(t, ctx, f.client, "PO-NO-BOM-WH").ID,
 		Quantity:    decimal.NewFromInt(1), IdempotencyKey: "pf-no-bom",
 	}); !errors.Is(err, biz.ErrProductionOrderMaterialRequirementNotFound) {

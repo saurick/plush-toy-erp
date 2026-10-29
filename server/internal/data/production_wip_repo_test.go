@@ -482,10 +482,10 @@ func TestProductionWIPExternalReturnCreatesFirstQualityDraftAndReplaysExactly(t 
 	}
 	initialIssueFact := createAndPostIssue("initial")
 	orderRepo := NewOutsourcingOrderRepo(f.data, logger)
-	if _, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, outsourceOrder.ID, biz.OutsourcingOrderStatusCanceled); !errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency) {
+	if _, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, outsourceOrder.ID, biz.OutsourcingOrderStatusCanceled); !errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency) {
 		t.Fatalf("cancel allocated outsourcing order error = %v", err)
 	}
-	if _, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, outsourceOrder.ID, biz.OutsourcingOrderStatusClosed); !errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency) {
+	if _, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, outsourceOrder.ID, biz.OutsourcingOrderStatusClosed); !errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency) {
 		t.Fatalf("close active outsourcing order error = %v", err)
 	}
 	if cancelled, err := factRepo.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(initialIssueFact.ID, initialIssueFact.Version, f.actorID, "撤销未投入 WIP 的委外发料")); err != nil || cancelled.Status != biz.OperationalFactStatusCancelled {
@@ -542,7 +542,7 @@ func TestProductionWIPExternalReturnCreatesFirstQualityDraftAndReplaysExactly(t 
 		t.Fatalf("outsourcing return receipt count = %d", count)
 	}
 	f.client.ProductionWIPBatch.UpdateOneID(root.ID).SetStatus(biz.ProductionWIPStatusRejected).SaveX(ctx)
-	if closed, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, outsourceOrder.ID, biz.OutsourcingOrderStatusClosed); err != nil || closed.LifecycleStatus != biz.OutsourcingOrderStatusClosed {
+	if closed, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, outsourceOrder.ID, biz.OutsourcingOrderStatusClosed); err != nil || closed.LifecycleStatus != biz.OutsourcingOrderStatusClosed {
 		t.Fatalf("close rejected terminal outsourcing order = %#v err=%v", closed, err)
 	}
 }

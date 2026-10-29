@@ -168,10 +168,12 @@ func TestRPCInspectionRetainsOmissionNullAndConditionalRules(t *testing.T) {
 	if due.Required != "可选" || !due.Nullable || due.Type != "integer" {
 		t.Fatalf("Unix-second optional parser: %#v", due)
 	}
-	for _, name := range []string{"defect_rate_operator", "defect_rate_percent"} {
-		field := find("customer_config", "execute_finished_goods_delivery_quality_decide", name)
-		if !field.Nullable || len(field.RequiredWhen) != 1 || field.RequiredWhen[0].Presence != "nonnull" {
-			t.Fatalf("omitted/null pair lost: %#v", field)
+	for _, method := range []string{"pass_quality_inspection", "reject_quality_inspection"} {
+		for _, name := range []string{"defect_rate_operator", "defect_rate_percent"} {
+			field := find("quality", method, name)
+			if !field.Nullable || len(field.RequiredWhen) != 1 || field.RequiredWhen[0].Presence != "nonnull" {
+				t.Fatalf("omitted/null pair lost: %s %#v", method, field)
+			}
 		}
 	}
 	for _, name := range []string{"calendar_month", "calendar_selection"} {

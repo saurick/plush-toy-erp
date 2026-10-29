@@ -1,0 +1,180 @@
+.erp-dev-testing-simple-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.erp-dev-testing-simple-table :is(th, td) {
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-simple-table thead th {
+  color: var(--erp-text-muted);
+  background: var(--erp-surface-bg-soft);
+  font-weight: 600;
+}
+
+.erp-dev-testing-simple-table .ant-btn-link {
+  height: auto;
+  padding: 0;
+  text-align: left;
+  white-space: normal;
+}
+
+.erp-dev-testing-detail-content {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-dev-testing-detail-content :is(h2, h3, p) {
+  margin-block: 0;
+}
+
+.erp-dev-testing-detail-content pre {
+  overflow: auto;
+}
+
+.erp-dev-testing-detail-drawer :is(code, dd, td) {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-guide-reading {
+  display: grid;
+  gap: 16px;
+  padding: 12px;
+}
+
+.erp-dev-testing-strategy-guide .erp-dev-testing-simple-table th:first-child {
+  width: 30%;
+}
+
+.erp-dev-pressure-report--summary > .ant-btn-link,
+.erp-dev-testing-plan-summary > .ant-btn-link {
+  justify-self: start;
+  height: auto;
+  padding: 0;
+}
+
+.erp-dev-testing-page .erp-dev-testing-simple-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--erp-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.erp-dev-testing-simple-row > .ant-btn-link {
+  height: auto;
+  padding: 0;
+  white-space: normal;
+  text-align: left;
+}
+
+.erp-dev-testing-guide-facts {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 12px 16px;
+  margin: 0;
+}
+
+.erp-dev-testing-guide-facts dd {
+  margin: 0;
+}
+
+.erp-dev-testing-page :is(.erp-dev-testing-tier-grid, .erp-dev-testing-presets) {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.erp-dev-testing-page .erp-dev-pressure-report--summary {
+  gap: 16px;
+}
+
+.erp-dev-pressure-summary-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.erp-dev-testing-page .erp-dev-pressure-panel > .ant-btn-link {
+  justify-self: start;
+  height: auto;
+  padding: 0;
+}
+
+.erp-dev-testing-detail-drawer .erp-dev-pressure-report {
+  display: grid;
+  gap: 20px;
+}
+
+.erp-dev-testing-detail-drawer .erp-dev-pressure-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.erp-dev-testing-page .erp-dev-testing-command-block--simple {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 10px 12px;
+}
+
+.erp-dev-testing-page .erp-dev-testing-command-matrix__head--simple {
+  display: flex;
+  justify-content: space-between;
+}
+
+.erp-dev-testing-plan-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.erp-dev-testing-guide-reading > .erp-workbench-reading__body > h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.erp-dev-testing-guide-expanded {
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-dev-testing-inline-details {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.erp-dev-testing-inline-details > summary {
+  width: fit-content;
+  color: var(--erp-primary);
+  cursor: pointer;
+}
+
+.erp-dev-testing-inline-details > .erp-dev-testing-detail-content {
+  padding-block: 12px;
+}
+
+.erp-dev-testing-inline-details pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-page .erp-dev-testing-simple-row:has(.erp-dev-testing-inline-details),
+.erp-dev-testing-page .erp-dev-testing-command-block--simple:has(.erp-dev-testing-inline-details) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}

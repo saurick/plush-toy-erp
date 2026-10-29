@@ -305,8 +305,6 @@ const statusLabels = {
   RELEASED: '已下达',
   CLOSED: '已关闭',
   CANCELLED: '已取消',
-  PREPARING: '资料准备',
-  SAMPLING: '打样中',
   CONFIRMED: '已确认',
   PLANNED: '待开工',
   IN_PROGRESS: '生产中',

@@ -113,7 +113,8 @@ func integrationDownstreamFulfillment(t *testing.T, f *integrationHTTPFixture, s
 		t.Fatal("shipment is missing its actual shipment timestamp")
 	}
 	at := shipped.ShippedAt.UTC()
-	due := time.Date(at.Year(), at.Month()+1, 0, at.Hour(), at.Minute(), at.Second(), at.Nanosecond(), time.UTC).AddDate(0, 0, 30)
+	local := at.In(time.FixedZone("Asia/Shanghai", 8*60*60))
+	due := time.Date(local.Year(), local.Month()+1, 0, local.Hour(), local.Minute(), local.Second(), local.Nanosecond(), local.Location()).AddDate(0, 0, 30)
 	if stored.Status != biz.OperationalFactStatusPosted || stored.Version != int(ar["version"].(float64))+1 || !stored.Amount.Equal(decimal.RequireFromString("12.30")) || !stored.OccurredAt.Equal(at) || stored.DueAt == nil || !stored.DueAt.Equal(due) {
 		t.Fatal("posted receivable did not preserve the shipment amount and payment snapshot")
 	}

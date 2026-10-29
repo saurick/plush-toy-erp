@@ -269,24 +269,6 @@
   width: 100%;
 }
 
-.erp-dev-workspace-nav__tools {
-  display: grid;
-  gap: 4px;
-  width: min(260px, calc(100vw - 48px));
-}
-
-.erp-dev-workspace-nav__tools > .ant-btn {
-  justify-content: flex-start;
-}
-
-.erp-dev-workspace-nav__tools > p {
-  margin: 8px 0 0;
-  padding-top: 8px;
-  border-top: 1px solid var(--erp-border);
-  color: var(--erp-text-muted);
-  line-height: 1.5;
-}
-
 .erp-dev-task-nav {
   --erp-slider-bg: var(--dev-task-active-bg, rgb(22 119 255 / 0.08));
   --erp-slider-radius: 9px;

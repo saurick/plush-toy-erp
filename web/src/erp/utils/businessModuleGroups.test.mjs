@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getNavigationSections, getAuthenticatedNavigationSections } from '../config/seedData.mjs'
+import { getNavigationSections, getUtilityNavigationSections } from '../config/seedData.mjs'
 import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
 import {
   businessNavigationSections,
@@ -36,110 +36,32 @@ test('委外以独立模块直达订单，只有一个页面时不增加页签',
   assert.deepEqual(restricted[0].items.map((entry) => entry.label), ['生产管理'])
 })
 
-test('标准菜单合并出货三页，以出货单为默认入口且财务保持独立', () => {
+test('仓储集中查询和办理，销售出货与财务仍保留独立业务入口', () => {
   const sections = projectBusinessModuleSections(businessNavigationSections)
-  const shipping = sections.find((item) => item.key === 'shipment')
-  const finance = sections.find((item) => item.key === 'finance')
-  assert.equal(shipping.items.length, 1)
-  assert.equal(finance.items.length, 1)
-  assert.deepEqual(
-    [
-      shipping.items[0].label,
-      shipping.items[0].sidebarKey,
-      shipping.items[0].path,
-    ],
-    ['出货管理', 'module:shipment', '/erp/warehouse/shipments']
-  )
-  assert.equal(finance.items[0].sidebarKey, 'module:finance')
-  assert.equal(finance.items[0].label, '财务管理')
-  const workspace = getBusinessModuleTabs(
-    '/erp/warehouse/outbound',
-    businessNavigationSections
-  )
-  assert.equal(workspace.activeKey, 'outbound')
-  assert.deepEqual(
-    workspace.tabs.map((tab) => tab.label),
-    ['出货单', '库存预留']
-  )
+  assert.equal(sections.find((item) => item.key === 'warehouse').items[0].path, '/erp/warehouse/inventory')
+  assert.equal(sections.find((item) => item.key === 'shipment').items[0].path, '/erp/warehouse/shipments')
+  const workspace = getBusinessModuleTabs('/erp/warehouse/inventory', businessNavigationSections, { adminProfile: { is_super_admin: true, effective_session: { actions: ['warehouse.adjustment.create'] } } })
+  assert.deepEqual(workspace.tabs.map((tab) => tab.label), ['库存查询', '入库办理', '出库办理', '库存作业'])
+  assert.equal(getBusinessModuleTabs('/erp/warehouse/shipments', businessNavigationSections), null)
 })
 
-test('出货页签只呈现获准页面，保留仅出货或仅预留岗位入口', () => {
-  for (const key of ['shipments', 'outbound']) {
-    const visible = [section(key)]
-    const item = getBusinessModule(key)
-    const projected = projectBusinessModuleSections(visible)[0].items
-    assert.equal(projected.length, 1)
-    assert.equal(projected[0].path, item.path)
-    assert.equal(projected[0].sidebarKey, 'module:shipment')
-    const workspace = getBusinessModuleTabs(item.path, visible)
-    assert.deepEqual(
-      workspace.tabs.map((tab) => tab.path),
-      [item.path]
-    )
-    assert.equal(workspace.activeKey, key)
-  }
-  assert.deepEqual(
-    getBusinessModuleTabs('/erp/warehouse/shipments', []).tabs,
-    []
-  )
+test('仓储页签只投影获准入口，查询岗位不显示库存作业', () => {
+  const visible = [section('inventory', 'outbound')]
+  const workspace = getBusinessModuleTabs('/erp/warehouse/inventory', visible, { adminProfile: { permissions: ['warehouse.inventory.read'] } })
+  assert.deepEqual(workspace.tabs.map((tab) => tab.key), ['inventory', 'outbound'])
+  const onlyOutbound = projectBusinessModuleSections([section('outbound')])[0].items
+  assert.equal(onlyOutbound[0].path, '/erp/warehouse/outbound')
+  assert.equal(onlyOutbound[0].sidebarKey, 'module:warehouse')
 })
 
-test('岗位优先出货时合并后保留该入口，其他入口不重复出货模块', () => {
-  const navigation = projectRoleGuidedModuleNavigation({
-    dashboardItems: [],
-    primaryItems: section('shipments').items,
-    secondarySections: [
-      section('outbound'),
-      section('receivables'),
-    ],
-  })
-  assert.equal(navigation.primaryItems[0].label, '出货管理')
-  assert.equal(
-    navigation.primaryItems[0].path,
-    '/erp/warehouse/shipments'
-  )
-  assert.deepEqual(
-    navigation.secondaryItems.map((item) => item.label),
-    ['财务管理']
-  )
-})
-
-test('出货来源深链和页签查询可恢复，失去权限后不重开旧页面', () => {
+test('仓储与销售出货的最近入口互不覆盖，库存作业与查询分别恢复', () => {
   const cache = new Map()
-  const item = getBusinessModule('shipments')
-  const reservationPath = getBusinessModule('outbound').path
-  rememberBusinessModuleLocation(cache, {
-    pathname: item.path,
-    search: '?shipment_id=81',
-    hash: '',
-  })
-  rememberBusinessModuleLocation(cache, {
-    pathname: reservationPath,
-    search: '?source_type=SALES_ORDER&source_id=12',
-    hash: '',
-  })
-  assert.equal(
-    restoreBusinessModuleTabPath(item.path, cache),
-    `${item.path}?shipment_id=81`
-  )
-  assert.equal(
-    resolveBusinessModuleMenuTarget(
-      item,
-      { pathname: '/erp/finance/receivables' },
-      cache,
-      [item.path, reservationPath]
-    ),
-    `${reservationPath}?source_type=SALES_ORDER&source_id=12`
-  )
-  assert.equal(
-    resolveBusinessModuleMenuTarget(
-      item,
-      { pathname: '/erp/finance/receivables' },
-      cache,
-      [item.path]
-    ),
-    item.path
-  )
+  rememberBusinessModuleLocation(cache, { pathname: '/erp/warehouse/inventory', search: '?view=txns', hash: '' })
+  rememberBusinessModuleLocation(cache, { pathname: '/erp/warehouse/inventory', search: '?workspace=operations&inventory_operation_id=12', hash: '' })
+  rememberBusinessModuleLocation(cache, { pathname: '/erp/warehouse/shipments', search: '?shipment_id=81', hash: '' })
+  assert.equal(restoreBusinessModuleTabPath({ path: '/erp/warehouse/inventory' }, cache), '/erp/warehouse/inventory?view=txns')
+  assert.equal(restoreBusinessModuleTabPath({ path: '/erp/warehouse/inventory', search: '?workspace=operations' }, cache), '/erp/warehouse/inventory?workspace=operations&inventory_operation_id=12')
+  assert.equal(resolveBusinessModuleMenuTarget(getBusinessModule('shipments'), { pathname: '/erp/finance/receivables' }, cache, ['/erp/warehouse/shipments', '/erp/warehouse/outbound']), '/erp/warehouse/shipments?shipment_id=81')
 })
 
 test('模块入口只归并已有可访问页面，默认路径仍是已授权页面', () => {
@@ -320,7 +242,7 @@ test('direct production execution preserves the active menu URL while records us
 test('完整侧栏只有四个导航区，十个业务模块统一为单入口', () => {
   const visible = [
     ...getNavigationSections(),
-    ...getAuthenticatedNavigationSections(),
+    ...getUtilityNavigationSections(),
   ]
   const sections = groupSidebarNavigationSections(
     projectBusinessModuleSections(visible)
@@ -338,7 +260,7 @@ test('完整侧栏只有四个导航区，十个业务模块统一为单入口',
       '采购管理',
       '委外管理',
       '生产管理',
-      '库存管理',
+      '仓储管理',
       '质检管理',
       '出货管理',
       '财务管理',
@@ -378,7 +300,7 @@ test('客户菜单顺序与产品分类一致，默认入口从获准页面按�
   ])[0].items
   assert.deepEqual(
     reordered.map((entry) => entry.path),
-    ['/erp/warehouse/shipments', '/erp/finance/receivables']
+    ['/erp/warehouse/outbound', '/erp/warehouse/shipments', '/erp/finance/receivables']
   )
   const limited = projectBusinessModuleSections([
     section('materials', 'suppliers'),
@@ -401,7 +323,7 @@ test('岗位指定的材料和库存台账入口继续优先，模块不会在�
     result.primaryItems.map((entry) => [entry.label, entry.path]),
     [
       ['基础资料', '/erp/master/materials'],
-      ['库存管理', '/erp/warehouse/inventory'],
+      ['仓储管理', '/erp/warehouse/inventory'],
     ]
   )
   assert.deepEqual(

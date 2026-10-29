@@ -2,9 +2,12 @@ import React from 'react'
 
 import { FinanceAllocationStatus } from '../../../common/consts/statuses.generated.mjs'
 
+import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
 import BusinessDetailsModal from '../business-list/BusinessDetailsModal.jsx'
 
 export function FinancePaymentDetails({
+  canUploadEvidence = false,
+  canWithdrawEvidence = false,
   paymentDetail,
   setPaymentDetail,
   creditDetail,
@@ -74,11 +77,13 @@ export function FinancePaymentDetails({
         columns={paymentColumns}
         lineItems={paymentDetailLineItems}
         onClose={() => setPaymentDetail(null)}
-      />
+      >
+        {paymentDetail?.id ? <BusinessAttachmentPanel ownerType="finance_payment" ownerId={paymentDetail.id} canUpload={canUploadEvidence} canWithdraw={canWithdrawEvidence} title="收付款凭据" /> : null}
+      </BusinessDetailsModal>
       <BusinessDetailsModal
         open={Boolean(creditDetail)}
-        title="红冲详情"
-        description="红冲保留来源应收或应付、原金额和当前未核销金额。"
+        title="账款调整详情"
+        description="调整保留来源应收或应付、原金额、调整方向和当前未核销金额。"
         record={creditDetail}
         columns={creditColumns}
         onClose={() => setCreditDetail(null)}

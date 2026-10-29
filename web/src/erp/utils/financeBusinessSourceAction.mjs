@@ -6,6 +6,7 @@ const MAX_NOTE_LENGTH = 255
 export const FINANCE_BUSINESS_SOURCE_ACTIONS = Object.freeze({
   PURCHASE_RECEIPT_PAYABLE: 'purchase-receipt-payable',
   OUTSOURCING_RETURN_PAYABLE: 'outsourcing-return-payable',
+  OUTSOURCING_ORDER_PAYABLE: 'outsourcing-order-payable',
   SINGLE_FACT_RECONCILIATION: 'single-fact-reconciliation',
 })
 
@@ -30,6 +31,16 @@ const ACTION_CONFIGS = Object.freeze({
     factNoPrefix: 'AP',
     successMessage: '应付草稿已生成，请到应付管理核对并确认',
   }),
+  [FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE]: Object.freeze({
+    key: FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE,
+    title: '从工序委外合同生成应付',
+    okText: '生成应付草稿',
+    factType: 'PAYABLE',
+    sourceType: 'OUTSOURCING_ORDER',
+    sourceIDKey: 'outsourcing_order_id',
+    factNoPrefix: 'AP',
+    successMessage: '应付草稿已生成，请到应付管理核对并确认',
+  }),
   [FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION]: Object.freeze({
     key: FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION,
     title: '登记单笔核对',
@@ -50,7 +61,7 @@ const RECONCILIATION_SOURCE_TYPES = new Set([
 
 const FINANCE_TRANSITION_SOURCE_TYPES = Object.freeze({
   RECEIVABLE: new Set(['SHIPMENT']),
-  PAYABLE: new Set(['PURCHASE_RECEIPT', 'OUTSOURCING_FACT']),
+  PAYABLE: new Set(['PURCHASE_RECEIPT', 'OUTSOURCING_FACT', 'OUTSOURCING_ORDER']),
   INVOICE: new Set(['SHIPMENT']),
   RECONCILIATION: new Set(['FINANCE_FACT']),
 })
@@ -105,9 +116,11 @@ function optionalNote(value) {
   return note || undefined
 }
 
-function operatorFields(values = {}) {
+function operatorFields(values = {}, includeOccurredAt = false) {
   const factNo = boundedFactNo(values.fact_no)
-  const occurredAt = optionalOccurredAt(values.occurred_at)
+  const occurredAt = includeOccurredAt
+    ? optionalOccurredAt(values.occurred_at)
+    : undefined
   const note = optionalNote(values.note)
   return {
     fact_no: factNo,
@@ -134,6 +147,7 @@ function sourceBusinessNo(action, source = {}) {
   if (action === FINANCE_BUSINESS_SOURCE_ACTIONS.PURCHASE_RECEIPT_PAYABLE) {
     return normalizedText(record.receipt_no)
   }
+  if (action === FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE) return normalizedText(record.outsourcing_order_no)
   return normalizedText(record.fact_no)
 }
 
@@ -204,7 +218,7 @@ export function buildSingleFactReconciliationPayload(values = {}, fact = {}) {
     throw new Error('财务记录信息不完整，请刷新后重试')
   }
   return {
-    ...operatorFields(values),
+    ...operatorFields(values, true),
     finance_fact_id: factID,
   }
 }
@@ -217,6 +231,8 @@ export function buildFinanceBusinessSourcePayload(
   switch (action) {
     case FINANCE_BUSINESS_SOURCE_ACTIONS.PURCHASE_RECEIPT_PAYABLE:
       return buildPurchaseReceiptPayablePayload(values, source)
+    case FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_ORDER_PAYABLE:
+      return buildOutsourcingOrderPayablePayload(values, source)
     case FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_RETURN_PAYABLE:
       return buildOutsourcingReturnPayablePayload(values, source)
     case FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION:
@@ -226,7 +242,7 @@ export function buildFinanceBusinessSourcePayload(
   }
 }
 
-function strictRequest(params, sourceIDKey) {
+function strictRequest(params, sourceIDKey, includeOccurredAt = false) {
   const sourceID = positiveID(params?.[sourceIDKey])
   const idempotencyKey = normalizedText(params?.idempotency_key)
   if (!sourceID || !idempotencyKey || [...idempotencyKey].length > 128) {
@@ -235,7 +251,7 @@ function strictRequest(params, sourceIDKey) {
   const customerKey = normalizedText(params?.customer_key)
   return {
     ...(customerKey ? { customer_key: customerKey } : {}),
-    ...operatorFields(params),
+    ...operatorFields(params, includeOccurredAt),
     [sourceIDKey]: sourceID,
     idempotency_key: idempotencyKey,
   }
@@ -250,7 +266,7 @@ export function normalizeOutsourcingReturnPayableRequest(params = {}) {
 }
 
 export function normalizeSingleFactReconciliationRequest(params = {}) {
-  return strictRequest(params, 'finance_fact_id')
+  return strictRequest(params, 'finance_fact_id', true)
 }
 
 export function validateFinanceBusinessSourceResult(
@@ -308,4 +324,21 @@ export function financeBusinessSourceFormValuesFromRequest(request = {}) {
         : '',
     note: normalizedText(request.note),
   }
+}
+
+export function buildOutsourcingOrderPayablePayload(values = {}, order = {}) {
+  if (!positiveID(order.id) || !normalizedText(order.outsourcing_order_no) || !['confirmed', 'closed'].includes(order.lifecycle_status)) {
+    throw new Error('请选择已确认或已关闭、全部工序已验收的委外合同')
+  }
+  return { ...operatorFields(values), outsourcing_order_id: positiveID(order.id) }
+}
+
+export function normalizeOutsourcingOrderPayableRequest(params = {}) {
+  return strictRequest(params, 'outsourcing_order_id')
+}
+
+export function validateOutsourcingOrderPayableResult(result, request) {
+  return validateFinanceBusinessSourceResult(result, request, {
+    factType: 'PAYABLE', sourceType: 'OUTSOURCING_ORDER', sourceIDKey: 'outsourcing_order_id',
+  })
 }

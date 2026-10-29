@@ -6,7 +6,7 @@ import {
   isCustomerBusinessDataPageKey,
 } from './businessModules.mjs'
 import {
-  getAuthenticatedNavigationSections,
+  getUtilityNavigationSections,
   getNavigationSections,
   getProductCoreNavigationSections,
   getRoleWorkbench,
@@ -44,7 +44,7 @@ test('seedData: 权限菜单不混入前端文档、开发验收或通用帮助�
       '采购管理',
       '委外管理',
       '生产管理',
-      '库存管理',
+      '仓储管理',
       '质检管理',
       '出货管理',
       '财务管理',
@@ -84,8 +84,8 @@ test('seedData: 权限菜单不混入前端文档、开发验收或通用帮助�
   assert(!navPaths.some((path) => path.startsWith('/erp/qa/')))
 })
 
-test('seedData: 已登录账号统一获得历史查询与帮助中心入口', () => {
-  const authenticatedSections = getAuthenticatedNavigationSections()
+test('seedData: 历史查询按用途推导，帮助中心保持登录可用', () => {
+  const authenticatedSections = getUtilityNavigationSections()
   assert.deepEqual(authenticatedSections, [
     {
       key: 'history',
@@ -98,7 +98,7 @@ test('seedData: 已登录账号统一获得历史查询与帮助中心入口', (
           path: '/erp/history',
           shortLabel: '历史',
           description: '只读查询有权查看的已关闭、已取消、已归档和已停用记录。',
-          access: 'authenticated',
+          access: 'history',
         },
       ],
     },
@@ -140,16 +140,16 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
   assert(navLabels.includes('物料清单（BOM）'))
   assert(navLabels.includes('加工环节'))
   assert(navLabels.includes('采购订单'))
-  assert(navLabels.includes('采购入库'))
+  assert(navLabels.includes('入库办理'))
   assert(navLabels.includes('质量检验'))
-  assert(navLabels.includes('库存台账'))
+  assert(navLabels.includes('库存查询'))
   assert(navLabels.includes('委外订单'))
   assert(navLabels.includes('生产订单'))
   assert(navLabels.includes('排产确认'))
   assert(navLabels.includes('生产记录'))
   assert(navLabels.includes('异常处理'))
   assert(!navLabels.includes('出货放行'))
-  assert(navLabels.includes('库存预留'))
+  assert(navLabels.includes('出库办理'))
   assert(navLabels.includes('出货单'))
   assert(navLabels.includes('对账管理'))
   assert(navLabels.includes('应付管理'))

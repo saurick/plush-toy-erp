@@ -8,6 +8,7 @@ import { Loading } from '@/common/components/loading'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import { resolveUIDesignPreviewPage, UI_DESIGN_PREVIEW_PAGES } from '../config/devUIDesign.mjs'
 
@@ -93,15 +94,23 @@ export default function DevUIDesignPage() {
 
   return (
     <div className={`erp-dev-ui-design-page erp-dev-workspace-page erp-dev-tool-page${view === 'preview' && workbenchVisible ? ' erp-dev-ui-design-page--workbench' : ''}`}>
-      <DevPageNav sourcePath="docs/product/ui-design/README.md" />
-      <header className="erp-dev-ui-design-header">
-        <Typography.Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_UI_DESIGN_ROUTE]}</Typography.Title>
-        <Tabs
-          activeKey={view}
-          items={VIEWS}
-          onChange={(key) => updateQuery('view', key === 'preview' ? '' : key)}
-        />
-      </header>
+      <DevPageNav />
+      <DevPageHeader
+        className="erp-dev-ui-design-header"
+        title={
+          <Typography.Title level={1}>
+            {DEV_PAGE_TITLE_BY_ROUTE[DEV_UI_DESIGN_ROUTE]}
+          </Typography.Title>
+        }
+        navigation={
+          <Tabs
+            activeKey={view}
+            items={VIEWS}
+            onChange={(key) => updateQuery('view', key === 'preview' ? '' : key)}
+          />
+        }
+      />
+
       {view === 'preview' && workbenchVisible ? (
         <div className="erp-dev-ui-design-workbench-toolbar">
           {pageSelector}

@@ -839,7 +839,7 @@ func TestJsonrpcDispatcher_AdminSetRoleSettingsIsAtomicAndVersioned(t *testing.T
 	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Username: "operator", Role: biz.RoleAdmin})
 	validParams := map[string]any{
 		"role_key":        biz.WarehouseRoleKey,
-		"permission_keys": []any{biz.PermissionWarehouseInventoryRead},
+		"permission_keys": toAnySliceString(biz.RolePermissionPolicyFor(repo.roleByKey(biz.WarehouseRoleKey)).Required),
 		"data_scopes": []any{
 			map[string]any{
 				"resource_type": biz.DataScopeResourceWarehouse,
@@ -875,7 +875,7 @@ func TestJsonrpcDispatcher_AdminSetRoleSettingsIsAtomicAndVersioned(t *testing.T
 		t.Run(tt.name, func(t *testing.T) {
 			payload := map[string]any{
 				"role_key":             biz.WarehouseRoleKey,
-				"permission_keys":      []any{biz.PermissionWarehouseInventoryRead},
+				"permission_keys":      toAnySliceString(biz.RolePermissionPolicyFor(repo.roleByKey(biz.WarehouseRoleKey)).Required),
 				"data_scopes":          validParams["data_scopes"],
 				"navigation_mode":      string(biz.RoleNavigationModeRecommended),
 				"primary_menu_paths":   []any{},
@@ -1059,6 +1059,7 @@ func TestJsonrpcDispatcher_AdminLegacyRoleMutationMethodsAreRemoved(t *testing.T
 		&biz.AuthClaims{UserID: 1, Username: "operator", Role: biz.RoleAdmin},
 	)
 	for _, method := range []string{
+		"menu_options",
 		"set_role_permissions",
 		"set_role_data_scopes",
 		"set_role_navigation",
@@ -1087,6 +1088,11 @@ func TestJsonrpcDispatcher_AdminRBACOptionsExposeRoleAndPermissionMetadata(t *te
 		t.Fatalf("rbac_options = %#v err=%v", result, err)
 	}
 	data := result.Data.AsMap()
+	for _, key := range []string{"role_options", "permission_options", "menu_options"} {
+		if _, exists := data[key]; exists {
+			t.Fatalf("rbac_options must not return duplicate field %s", key)
+		}
+	}
 	find := func(items []any, keyField string, key string) map[string]any {
 		t.Helper()
 		for _, raw := range items {
@@ -1098,7 +1104,7 @@ func TestJsonrpcDispatcher_AdminRBACOptionsExposeRoleAndPermissionMetadata(t *te
 		t.Fatalf("%s=%q not found", keyField, key)
 		return nil
 	}
-	roles := data["role_options"].([]any)
+	roles := data["roles"].([]any)
 	sales := find(roles, "role_key", biz.SalesRoleKey)
 	if sales["role_type"] != string(biz.RoleTypeBusinessDefault) ||
 		sales["version"] != float64(1) ||
@@ -1117,7 +1123,7 @@ func TestJsonrpcDispatcher_AdminRBACOptionsExposeRoleAndPermissionMetadata(t *te
 		t.Fatalf("debug role metadata = %#v", debugRole)
 	}
 
-	permissions := data["permission_options"].([]any)
+	permissions := data["permissions"].([]any)
 	for _, permissionKey := range []string{biz.PermissionSystemUserRoleAssign, biz.PermissionSystemRolePermissionManage, biz.PermissionProcessRuntimeRecover} {
 		permission := find(permissions, "permission_key", permissionKey)
 		if permission["class"] != string(biz.PermissionClassControlPlane) || permission["assignable"] != false {
@@ -1187,7 +1193,7 @@ func TestJsonrpcDispatcher_AdminEffectiveRoleAccessPreviewsPermissionDraftWithou
 		&biz.AuthClaims{UserID: 1, Username: "root", Role: biz.RoleAdmin},
 	)
 
-	previewReceivables := func(permissionKeys ...string) map[string]any {
+	previewPrint := func(permissionKeys ...string) map[string]any {
 		t.Helper()
 		rawPermissionKeys := make([]any, 0, len(permissionKeys))
 		for _, permissionKey := range permissionKeys {
@@ -1207,24 +1213,22 @@ func TestJsonrpcDispatcher_AdminEffectiveRoleAccessPreviewsPermissionDraftWithou
 		}
 		for _, rawPage := range access["pages"].([]any) {
 			page := rawPage.(map[string]any)
-			if page["key"] == "receivables" {
+			if page["key"] == "print-center" {
 				return page
 			}
 		}
-		t.Fatal("receivables page missing from access explanation")
+		t.Fatal("print-center page missing from access explanation")
 		return nil
 	}
 
-	confirmOnly := previewReceivables(biz.PermissionFinanceReceivableConfirm)
-	if confirmOnly["rbac_granted"] != false {
-		t.Fatalf("confirm-only receivables decision = %#v", confirmOnly)
+	core := biz.RolePermissionPolicyFor(repo.roleByKey(biz.FinanceRoleKey)).Required
+	coreOnly := previewPrint(core...)
+	if coreOnly["rbac_granted"] != false {
+		t.Fatalf("core-only print entry decision = %#v", coreOnly)
 	}
-	withEntry := previewReceivables(
-		biz.PermissionFinanceReceivableConfirm,
-		biz.PermissionFinanceReceivableRead,
-	)
+	withEntry := previewPrint(append(core, biz.PermissionERPPrintTemplateRead)...)
 	if withEntry["rbac_granted"] != true {
-		t.Fatalf("receivables entry decision = %#v", withEntry)
+		t.Fatalf("optional print entry decision = %#v", withEntry)
 	}
 	if repo.lastRoleSettingsChange != nil {
 		t.Fatalf("preview persisted role settings: %#v", repo.lastRoleSettingsChange)

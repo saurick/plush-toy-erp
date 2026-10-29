@@ -14,6 +14,7 @@ import (
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionpackagingconfirmation"
 	"server/internal/data/model/ent/productionwipbatch"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/qualityinspection"
@@ -239,11 +240,27 @@ func syncOutsourcingHandoffs(ctx context.Context, client *ent.Client, orderID, a
 		if err != nil {
 			return err
 		}
+		allocations, err := client.ProductionWIPOutsourcingAllocation.Query().Where(productionwipoutsourcingallocation.HasOutsourcingOrderItemWith(outsourcingorderitem.OutsourcingOrderID(orderID))).All(ctx)
+		if err != nil {
+			return err
+		}
+		stageLines := map[int]bool{}
+		for _, allocation := range allocations {
+			stageLines[allocation.OutsourcingOrderItemID] = true
+		}
+		hasInventoryReturn := false
 		for _, item := range items {
+			if item.SubjectType == biz.OutsourcingOrderSubjectProduct && item.LineStatus != biz.OutsourcingOrderItemStatusCanceled && !stageLines[item.ID] {
+				hasInventoryReturn = true
+			}
 			if item.LineStatus != biz.OutsourcingOrderItemStatusOpen {
 				continue
 			}
 			facts, err := client.OutsourcingFact.Query().Where(outsourcingfact.SourceType(biz.OutsourcingOrderSourceType), outsourcingfact.SourceID(orderID), outsourcingfact.SourceLineID(item.ID), outsourcingfact.Status("POSTED")).All(ctx)
+			if err != nil {
+				return err
+			}
+			effective, err := outsourcingFactEffectiveQuantities(ctx, client, facts)
 			if err != nil {
 				return err
 			}
@@ -253,15 +270,18 @@ func syncOutsourcingHandoffs(ctx context.Context, client *ent.Client, orderID, a
 					issued = issued.Add(fact.Quantity)
 				}
 				if fact.FactType == biz.OutsourcingFactReturnReceipt {
-					returned = returned.Add(fact.Quantity)
+					returned = returned.Add(effective[fact.ID])
 				}
 			}
 			if item.SubjectType == biz.OutsourcingOrderSubjectMaterial && issued.LessThan(item.OutsourcingQuantity) {
 				issue = "ready"
 			}
-			if returned.LessThan(item.OutsourcingQuantity) {
+			if item.SubjectType == biz.OutsourcingOrderSubjectProduct && !stageLines[item.ID] && returned.LessThan(item.OutsourcingQuantity) {
 				receive = "ready"
 			}
+		}
+		if !hasInventoryReturn {
+			receive = ""
 		}
 	case biz.OutsourcingOrderStatusClosed:
 		contract, issue, receive = "done", "done", "done"

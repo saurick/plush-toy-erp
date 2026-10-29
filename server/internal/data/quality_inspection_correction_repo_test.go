@@ -136,6 +136,29 @@ func TestQualityInspectionCorrectionSupersedesResultAndReopensHold(t *testing.T)
 	if len(original.CheckItems) == 0 || !slices.Equal(gotOriginal.CheckItems, original.CheckItems) || len(corrected.CheckItems) != 0 {
 		t.Fatal("correction must preserve original evidence and require a fresh inspection")
 	}
+	if gotOriginal.CorrectedInspectionID == nil || *gotOriginal.CorrectedInspectionID != corrected.ID ||
+		gotOriginal.CorrectedInspectionNo == nil || *gotOriginal.CorrectedInspectionNo != corrected.InspectionNo ||
+		corrected.CorrectionOfInspectionNo == nil || *corrected.CorrectionOfInspectionNo != original.InspectionNo {
+		t.Fatalf("missing bidirectional correction links: original=%+v corrected=%+v", gotOriginal, corrected)
+	}
+	filter := biz.QualityInspectionFilter{PurchaseReceiptID: receipt.ID, Limit: 10}
+	currentRows, currentTotal, err := uc.ListQualityInspections(ctx, filter)
+	if err != nil || currentTotal != 1 || len(currentRows) != 1 || currentRows[0].ID != corrected.ID {
+		t.Fatalf("default list included superseded original: %+v %d %v", currentRows, currentTotal, err)
+	}
+	counts, err := uc.CountQualityInspectionsByStatus(ctx, filter)
+	if err != nil || counts[biz.QualityInspectionStatusRejected] != 0 || counts[biz.QualityInspectionStatusSubmitted] != 1 {
+		t.Fatalf("default counts include old result: %+v %v", counts, err)
+	}
+	filter.IncludeSuperseded = true
+	history, total, err := uc.ListQualityInspections(ctx, filter)
+	if err != nil || total != 2 || len(history) != 2 {
+		t.Fatalf("historical list missing original: %+v %d %v", history, total, err)
+	}
+	counts, err = uc.CountQualityInspectionsByStatus(ctx, filter)
+	if err != nil || counts[biz.QualityInspectionStatusRejected] != 1 || counts[biz.QualityInspectionStatusSubmitted] != 1 {
+		t.Fatalf("historical counts must match historical list: %+v %v", counts, err)
+	}
 	assertLotStatus(t, ctx, uc, *item.LotID, biz.InventoryLotHold)
 
 	replay, err := uc.CorrectQualityInspectionResult(ctx, &biz.QualityInspectionCorrectionCreate{

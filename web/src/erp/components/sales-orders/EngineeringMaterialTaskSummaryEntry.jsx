@@ -4,7 +4,6 @@ import { FileTextOutlined } from '@ant-design/icons'
 import EngineeringMaterialRequestModal from './EngineeringMaterialRequestModal.jsx'
 import {
   canReadEngineeringMaterial,
-  getEngineeringMaterialOrderContext,
   getEngineeringMaterialPermissions,
   getEngineeringMaterialTaskContext,
 } from '../../utils/engineeringMaterialTask.mjs'
@@ -16,14 +15,11 @@ export default function EngineeringMaterialTaskSummaryEntry({
   compact = true,
   buttonText = '查看材料汇总',
 }) {
-  const context =
-    getEngineeringMaterialTaskContext(task) ||
-    getEngineeringMaterialOrderContext(task)
-  const canRead = Boolean(context && canReadEngineeringMaterial(profile))
+  const context = getEngineeringMaterialTaskContext(task)
+  const canRead = Boolean(context && ['engineering_material_boss_review', 'engineering_material_finance_review'].includes(task?.task_group) && canReadEngineeringMaterial(profile))
   const sourceKey = `${profile?.id}:${task?.id}:${task?.version}:${task?.task_group}:${context?.orderID}:${context?.requestID}`
   const entryRef = React.useRef(null)
   const [openedSourceKey, setOpenedSourceKey] = React.useState(null)
-  const [view, setView] = React.useState('summary')
   React.useEffect(() => {
     setOpenedSourceKey(null)
   }, [sourceKey, canRead])
@@ -55,33 +51,17 @@ export default function EngineeringMaterialTaskSummaryEntry({
         aria-label="查看材料汇总"
         onClick={(event) => {
           entryRef.current = event.currentTarget
-          setView('summary')
           setOpenedSourceKey(sourceKey)
         }}
       >
         {buttonText}
       </Button>
-      {task.task_group === 'engineering_material_revision' &&
-      task.task_status_key === 'ready' ? (
-        <Button
-          block={!compact}
-          size={mobile && !compact ? 'large' : 'middle'}
-          onClick={(event) => {
-            entryRef.current = event.currentTarget
-            setView('preview')
-            setOpenedSourceKey(sourceKey)
-          }}
-        >
-          查看待重提用料
-        </Button>
-      ) : null}
       {openedSourceKey === sourceKey ? (
         <EngineeringMaterialRequestModal
-          key={`${sourceKey}:${view}`}
+          key={sourceKey}
           {...context}
           mobile={mobile}
           readOnly
-          preview={view === 'preview'}
           permissions={getEngineeringMaterialPermissions(profile, task)}
           onCancel={closeSummary}
         />

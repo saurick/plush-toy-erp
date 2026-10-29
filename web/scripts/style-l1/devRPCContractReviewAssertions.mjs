@@ -90,7 +90,9 @@ export async function verifyRPCContractReviewWorkspace(page, { assert, assertNoH
     lastOperation = operation('completed')
     return route.fulfill({ json: { kind: 'plush.dev-qa-testing-operation-result', operation: lastOperation } })
   }
-  const routes = [[pattern, reportRoute], [testingPattern, testingRoute], [sessionPattern, sessionRoute], [actionPattern, actionRoute], [operationPattern, operationRoute]]
+  const coveragePattern = '**/__dev/api/qa/coverage**'
+  const coverageRoute = (route) => route.fulfill({ json: { status: 'missing' } })
+  const routes = [[pattern, reportRoute], [testingPattern, testingRoute], [sessionPattern, sessionRoute], [actionPattern, actionRoute], [operationPattern, operationRoute], [coveragePattern, coverageRoute]]
   for (const [url, handler] of routes) await page.route(url, handler)
   try {
     await page.setViewportSize({ width: 1280, height: 900 })
@@ -155,10 +157,12 @@ export async function verifyRPCContractReviewWorkspace(page, { assert, assertNoH
     assert.equal(await page.getByRole('tab', { name: '接口合同', exact: true }).count(), 0)
     await page.getByRole('tab', { name: '本轮验证', exact: true }).click()
     const summaryRow = page.locator('[data-action-key="rpc-examples"]')
-    await summaryRow.getByRole('link', { name: '查看并运行', exact: true }).click()
+    assert.equal(await summaryRow.getByRole('link', { name: '查看并运行', exact: true }).count(), 0)
+    await page.locator('.erp-dev-workspace-nav').getByRole('link', { name: '接口与集成', exact: true }).click()
+    await page.getByRole('tab', { name: '本轮变更', exact: true }).click()
     await workspace.getByText('本轮无接口合同变化', { exact: true }).waitFor()
     assert.equal(new URL(page.url()).pathname, '/__dev/integration')
-    assert.equal(starts, 1, '摘要跳转不启动执行')
+    assert.equal(starts, 1, '从常驻导航进入不自动启动执行')
     await assertNoHorizontalOverflow(page, '从本轮验证返回同一合同工作区')
   } finally {
     for (const [url, handler] of routes) await page.unroute(url, handler)

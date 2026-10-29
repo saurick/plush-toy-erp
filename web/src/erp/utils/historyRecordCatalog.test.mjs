@@ -5,9 +5,65 @@ import {
   HISTORY_RECORD_SOURCES,
   buildHistoryListParams,
   getAvailableHistorySources,
+  getHistoryCenterSources,
   normalizeHistoryRecords,
   resolveHistoryStatusCounts,
 } from './historyRecordCatalog.mjs'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import { businessModuleDefinitions } from '../config/businessModules.mjs'
+import { yoyoosunRoleFlowMatrix } from '../../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
+
+test('历史集中入口按当前岗位有效职责开放，保留执行岗位的来源查询', () => {
+  const retained = new Set(['boss', 'sales', 'purchase', 'finance', 'engineering', 'pmc', 'production'])
+  for (const role of yoyoosunRoleFlowMatrix.roles) {
+    const options = {
+      visibleMenuPaths: businessModuleDefinitions.filter((page) => role.menuSurfaces.includes(page.key)).map((page) => page.path),
+      canReadPermission: (permission) => role.capabilityKeys.includes(permission),
+    }
+    assert.equal(getHistoryCenterSources(options).length > 0, retained.has(role.roleKey), role.roleKey)
+    if (['warehouse', 'quality'].includes(role.roleKey)) {
+      assert.ok(getAvailableHistorySources(options).length > 0, '隐藏集中入口不撤销模块历史来源')
+    }
+  }
+})
+
+test('历史入口不凭岗位名称或执行权限放行，自定义职责与多岗合并使用相同能力判断', () => {
+  const permissions = new Set([PermissionCode.PROCESS_READ, PermissionCode.PRODUCTION_WIP_EXECUTE])
+  const options = {
+    visibleMenuPaths: ['/erp/engineering/processes'],
+    canReadPermission: (permission) => permissions.has(permission),
+  }
+  assert.deepEqual(getHistoryCenterSources(options), [])
+  permissions.add(PermissionCode.PRODUCTION_WIP_ASSIGN)
+  assert.deepEqual(getHistoryCenterSources(options).map((source) => source.key), ['processes'])
+  permissions.delete(PermissionCode.PRODUCTION_WIP_ASSIGN)
+  permissions.add(PermissionCode.FINANCE_PAYABLE_READ)
+  assert.equal(getHistoryCenterSources(options).length, 1, '兼任财务后可集中核对原有可读来源')
+  permissions.delete(PermissionCode.FINANCE_PAYABLE_READ)
+  assert.deepEqual(getHistoryCenterSources(options), [], '撤销管理职责后收回集中入口')
+})
+
+test('工程的引用读取权不开放加工环节、往来方或其他岗位的历史来源', () => {
+  const role = yoyoosunRoleFlowMatrix.roles.find((item) => item.roleKey === 'engineering')
+  for (const permission of ['process.read', 'customer.read', 'supplier.read']) {
+    assert.ok(role.capabilityKeys.includes(permission), `${permission} 引用读取必须保留`)
+  }
+  const sources = getHistoryCenterSources({
+    visibleMenuPaths: businessModuleDefinitions.filter((page) => role.menuSurfaces.includes(page.key)).map((page) => page.path),
+    canReadPermission: (permission) => role.capabilityKeys.includes(permission),
+  })
+  assert.deepEqual(sources.map((source) => source.key), ['materials', 'products', 'product_skus', 'sales_orders', 'bom_versions'])
+})
+
+test('历史入口无来源、客户收窄或权限未就绪时关闭，超级管理员也不绕过来源权限', () => {
+  const paths = ['/erp/engineering/processes']
+  assert.deepEqual(getHistoryCenterSources(), [])
+  assert.deepEqual(getHistoryCenterSources({ canReadPermission: () => true }), [])
+  assert.deepEqual(getHistoryCenterSources({ visibleMenuPaths: paths, canReadPermission: (p) => p === PermissionCode.PROCESS_UPDATE }), [])
+  assert.deepEqual(getHistoryCenterSources({ visibleMenuPaths: paths, isSuperAdmin: true }), [])
+  assert.deepEqual(getHistoryCenterSources({ isSuperAdmin: true, canReadPermission: () => true }), [])
+  assert.equal(getHistoryCenterSources({ visibleMenuPaths: paths, isSuperAdmin: true, canReadPermission: (p) => p === PermissionCode.PROCESS_READ }).length, 1)
+})
 
 test('历史导出在源字段投影时留空，保留页面占位、真实横杠和明确历史状态', () => {
   for (const source of HISTORY_RECORD_SOURCES) {

@@ -3,8 +3,6 @@ package data
 import (
 	"context"
 	"errors"
-	"server/internal/attachmentstore"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +11,7 @@ import (
 	"server/internal/data/model/ent/salesorderitem"
 )
 
-func TestSalesOrderDemandBeforeEngineeringAndSampling(t *testing.T) {
+func TestSalesOrderDemandBeforeEngineeringCompletion(t *testing.T) {
 	ctx := context.Background()
 	uc, client := openSalesOrderRepoTest(t, "sales_order_demand_engineering")
 	defer mustCloseEntClient(t, client)
@@ -53,13 +51,14 @@ func TestSalesOrderDemandBeforeEngineeringAndSampling(t *testing.T) {
 	}
 	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "ENGINEERED-PRODUCT", true)
 	bom := client.BOMHeader.Create().SetProductID(product.ID).SetVersion("V1").SaveX(ctx)
-	mutation := biz.SalesOrderEngineeringItemMutation{ID: item.ID, ProductID: product.ID, SampleBOMID: &bom.ID, ExpectedBOMVersion: bom.UpdatedAt.UnixMicro(), EngineeringStatus: biz.SalesOrderEngineeringPreparing}
+	mutation := biz.SalesOrderEngineeringItemMutation{ID: item.ID, ProductID: product.ID, BOMID: &bom.ID, ExpectedBOMVersion: bom.UpdatedAt.UnixMicro()}
+	complete := false
 	apply := func(wantErr error) {
 		t.Helper()
 		before := client.SalesOrder.GetX(ctx, saved.Order.ID)
-		result, err := uc.SaveSalesOrderEngineering(ctx, &biz.SalesOrderEngineeringMutation{SalesOrderID: before.ID, ExpectedVersion: before.Version, ActorID: 42, Items: []biz.SalesOrderEngineeringItemMutation{mutation}})
+		result, err := uc.SaveSalesOrderEngineering(ctx, &biz.SalesOrderEngineeringMutation{SalesOrderID: before.ID, ExpectedVersion: before.Version, ActorID: 42, Complete: complete, Items: []biz.SalesOrderEngineeringItemMutation{mutation}})
 		if !errors.Is(err, wantErr) {
-			t.Fatalf("engineering status %s: got %v want %v", mutation.EngineeringStatus, err, wantErr)
+			t.Fatalf("engineering save: got %v want %v", err, wantErr)
 		}
 		if wantErr != nil {
 			if client.SalesOrder.GetX(ctx, before.ID).Version != before.Version {
@@ -72,37 +71,34 @@ func TestSalesOrderDemandBeforeEngineeringAndSampling(t *testing.T) {
 		}
 	}
 	apply(nil)
-	mutation.EngineeringStatus = biz.SalesOrderEngineeringSampling
-	apply(biz.ErrSalesOrderEngineeringNotReady)
-	material := client.Material.Create().SetCode("SAMPLE-FABRIC").SetName("绒布").SetDefaultUnitID(unit.ID).SaveX(ctx)
-	client.BOMItem.Create().SetBomHeaderID(bom.ID).SetMaterialID(material.ID).SetUnitID(unit.ID).SetQuantity(decimal.NewFromInt(1)).SetLossRate(decimal.Zero).SaveX(ctx)
-	apply(biz.ErrSalesOrderEngineeringNotReady)
-	client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerProduct).SetOwnerID(product.ID).SetAttachmentType(biz.BusinessAttachmentTypeProductImage).
-		SetSlotKey(biz.BusinessAttachmentProductImageSlotPrimary).SetFileName("fixture.png").SetMimeType("image/png").SetFileSize(1).SetObjectKey(attachmentstore.NewKey()).SetSha256(strings.Repeat("a", 64)).SaveX(ctx)
-	apply(nil)
-	mutation.EngineeringStatus = biz.SalesOrderEngineeringConfirmed
-	apply(biz.ErrSalesOrderEngineeringTransition)
-	note := "样品尺寸与工艺已确认"
-	mutation.SampleNote = &note
-	apply(nil)
-	confirmed := client.SalesOrderItem.GetX(ctx, item.ID)
-	if confirmed.SampleConfirmedAt == nil || confirmed.SampleConfirmedBy == nil || *confirmed.SampleConfirmedBy != 42 {
-		t.Fatal("sample confirmation must retain actor and time")
+	if client.BOMHeader.GetX(ctx, bom.ID).Status != biz.BOMStatusDraft || client.EngineeringMaterialRequest.Query().CountX(ctx) != 0 {
+		t.Fatal("draft save activated BOM or entered approval")
 	}
-	if confirmed.RequestedProductName == nil || *confirmed.RequestedProductName != name || confirmed.Amount.String() != "15000" || confirmed.OrderedQuantity.String() != "1000" {
-		t.Fatal("engineering changed customer demand or commercial commitment")
-	}
-	mutation.ProductID, mutation.SampleBOMID = 0, nil
-	mutation.EngineeringStatus = biz.SalesOrderEngineeringPreparing
-	reason := "重新核对客户尺寸后再建档"
-	mutation.SampleNote = &reason
+	mutation.ProductID, mutation.BOMID = 0, nil
 	apply(nil)
 	cleared := client.SalesOrderItem.GetX(ctx, item.ID)
-	if cleared.ProductID != 0 || cleared.SampleBomID != nil || cleared.ProductNameSnapshot != nil || cleared.SampleConfirmedAt != nil || *cleared.RequestedProductName != name {
+	if cleared.ProductID != 0 || cleared.BomID != nil || cleared.ProductNameSnapshot != nil || cleared.BomFingerprint != nil || *cleared.RequestedProductName != name {
 		t.Fatal("source clear left stale engineering data or erased demand")
 	}
+	mutation.ProductID, mutation.BOMID = product.ID, &bom.ID
+	complete = true
+	apply(biz.ErrSalesOrderEngineeringNotReady)
+	supplier := client.Supplier.Create().SetCode("ENG-SUPPLIER").SetName("工程材料厂").SaveX(ctx)
+	material := client.Material.Create().SetCode("ENG-FABRIC").SetName("绒布").SetDefaultUnitID(unit.ID).SetSupplierID(supplier.ID).SaveX(ctx)
+	client.BOMItem.Create().SetBomHeaderID(bom.ID).SetMaterialID(material.ID).SetUnitID(unit.ID).SetQuantity(decimal.NewFromInt(1)).SetLossRate(decimal.Zero).SaveX(ctx)
+	apply(nil)
+	completed := client.SalesOrderItem.GetX(ctx, item.ID)
+	if completed.BomFingerprint == nil || client.BOMHeader.GetX(ctx, bom.ID).Status != biz.BOMStatusActive || client.EngineeringMaterialRequest.Query().CountX(ctx) != 1 {
+		t.Fatal("completion did not activate and submit engineering materials")
+	}
+	if *completed.RequestedProductName != name || completed.Amount.String() != "15000" || completed.OrderedQuantity.String() != "1000" {
+		t.Fatal("engineering changed commercial commitment")
+	}
+	if client.BusinessAttachment.Query().CountX(ctx) != 0 {
+		t.Fatal("completion requires no image or sampling evidence")
+	}
 	stale := client.SalesOrder.GetX(ctx, saved.Order.ID).Version - 1
-	if _, err := uc.SaveSalesOrderEngineering(ctx, &biz.SalesOrderEngineeringMutation{SalesOrderID: saved.Order.ID, ExpectedVersion: stale, ActorID: 42, Items: []biz.SalesOrderEngineeringItemMutation{mutation}}); !errors.Is(err, biz.ErrSalesOrderConflict) {
+	if _, err := uc.SaveSalesOrderEngineering(ctx, &biz.SalesOrderEngineeringMutation{SalesOrderID: saved.Order.ID, ExpectedVersion: stale, ActorID: 42, Complete: complete, Items: []biz.SalesOrderEngineeringItemMutation{mutation}}); !errors.Is(err, biz.ErrSalesOrderConflict) {
 		t.Fatalf("stale writer: %v", err)
 	}
 }

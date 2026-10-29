@@ -19,18 +19,19 @@ import (
 )
 
 type catalog struct {
-	PermissionLabels map[string]string                         `json:"permissionLabels"`
-	TaskDiscovery    map[string]any                            `json:"taskDiscovery"`
-	Permissions      map[string]string                         `json:"permissions"`
-	States           map[string]map[string]string              `json:"states"`
-	Attachments      map[string]any                            `json:"attachments"`
-	Numeric          map[string]int64                          `json:"numeric"`
-	Policies         map[string]map[string]int64               `json:"policies"`
-	RPC              map[string]map[string]string              `json:"rpc"`
-	RPCTransport     map[string]string                         `json:"rpcTransport"`
-	RPCInspection    map[string]map[string]rpcSourceInspection `json:"rpcInspection"`
-	RPCCalls         map[string]map[string]rpcCallContract     `json:"rpcCalls"`
-	RPCIssues        []rpcExampleIssue                         `json:"rpcIssues,omitempty"`
+	TaskDiscovery           map[string]any                            `json:"taskDiscovery"`
+	Permissions             map[string]string                         `json:"permissions"`
+	PermissionLabels        map[string]string                         `json:"permissionLabels"`
+	SourceActionPermissions map[string][]sourcePermissionRule         `json:"sourceActionPermissions"`
+	States                  map[string]map[string]string              `json:"states"`
+	Attachments             map[string]any                            `json:"attachments"`
+	Numeric                 map[string]int64                          `json:"numeric"`
+	Policies                map[string]map[string]int64               `json:"policies"`
+	RPC                     map[string]map[string]string              `json:"rpc"`
+	RPCTransport            map[string]string                         `json:"rpcTransport"`
+	RPCInspection           map[string]map[string]rpcSourceInspection `json:"rpcInspection"`
+	RPCCalls                map[string]map[string]rpcCallContract     `json:"rpcCalls"`
+	RPCIssues               []rpcExampleIssue                         `json:"rpcIssues,omitempty"`
 }
 
 var wordBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
@@ -506,7 +507,11 @@ func collectCatalog(root string, review bool) (catalog, error) {
 	if err != nil || len(out.Permissions) == 0 {
 		return out, fmt.Errorf("permissions: %v", err)
 	}
-	out.PermissionLabels, err = permissionLabels(rbac)
+	source, err := parse(root, "server/internal/biz/source_action_permission.go")
+	if err != nil {
+		return out, err
+	}
+	out.SourceActionPermissions, out.PermissionLabels, err = sourcePermissions(rbac, source)
 	if err != nil {
 		return out, err
 	}
@@ -536,6 +541,7 @@ func collectCatalog(root string, review bool) (catalog, error) {
 		{"biz/finance_payment.go", "FinancePaymentKind", "FinancePaymentKind"},
 		{"biz/finance_payment.go", "FinancePaymentDirection", "FinancePaymentDirection"},
 		{"biz/finance_payment.go", "FinancePaymentStatus", "FinancePaymentStatus"},
+		{"biz/finance_payment.go", "FinanceAdjustment", "FinanceAdjustmentDirection"},
 		{"biz/finance_payment.go", "FinanceAllocationStatus", "FinanceAllocationStatus"},
 		{"biz/process_runtime.go", "ProcessStatus", "ProcessStatus"},
 		{"biz/process_runtime.go", "ProcessNodeStatus", "ProcessNodeStatus"},

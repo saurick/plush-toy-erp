@@ -161,6 +161,9 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 }
 
 func (d *jsonrpcDispatcher) operationalFactErrorResult(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := productionMaterialUsageErrorResult(err); result != nil {
+		return result
+	}
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
@@ -169,6 +172,8 @@ func (d *jsonrpcDispatcher) operationalFactErrorResult(ctx context.Context, err 
 	}
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrDataScopeForbidden):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "无权办理该仓库的业务记录"}
 	case errors.Is(err, biz.ErrProcessRuntimeRequired):
 		l.Warnf("[operational_fact] process runtime required err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该动作必须通过业务流程任务办理，请刷新流程状态"}
@@ -255,8 +260,6 @@ func (d *jsonrpcDispatcher) operationalFactErrorResult(ctx context.Context, err 
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "生产订单当前状态不允许登记或确认生产记录"}
 	case errors.Is(err, biz.ErrProductionOrderQuantityExceeded):
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次完工将超过生产订单明细剩余可完工数量"}
-	case errors.Is(err, biz.ErrProductionOrderMaterialIssueQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次领料将超过生产订单物料需求剩余可领数量"}
 	case errors.Is(err, biz.ErrProductionReworkSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工来源与原完工记录不一致，请刷新后重试"}
 	case errors.Is(err, biz.ErrProductionReworkSourceState):
@@ -291,6 +294,10 @@ func (d *jsonrpcDispatcher) operationalFactErrorResult(ctx context.Context, err 
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该委外回货已有未取消的质检单，请先完成或取消质检后再撤销回货"}
 	case errors.Is(err, biz.ErrOutsourcingReturnFinanceDependency):
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该委外回货已有未取消的应付记录，请先取消应付后再撤销回货"}
+	case errors.Is(err, biz.ErrOutsourcingStageReturnRequired):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "工序委外请在对应生产批次办理回货，加工费从已验收的合同生成应付"}
+	case errors.Is(err, biz.ErrOutsourcingStageNotAccepted):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该合同的委外工序尚未全部验收，请先完成工序回货与质检"}
 	case errors.Is(err, biz.ErrOutsourcingReturnQualityPending):
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该委外回货尚未完成合格或让步接收判定，不能生成应付"}
 	case errors.Is(err, biz.ErrOutsourcingReturnQualityRejected):
@@ -391,4 +398,11 @@ func optionalUnix(value *time.Time) any {
 		return nil
 	}
 	return value.Unix()
+}
+
+func productionMaterialUsageErrorResult(err error) *v1.JsonrpcResult {
+	if errors.Is(err, biz.ErrProductionOrderMaterialIssueQuantityExceeded) {
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "普通领料与委外发料合计超过可领数量，请核对已发数量或先办理超领审批"}
+	}
+	return nil
 }

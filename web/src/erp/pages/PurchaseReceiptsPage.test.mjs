@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 
 import test from 'node:test'
+import { PurchaseSourceActions } from '../../common/consts/purchaseSourceActions.mjs'
 import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
 const source = readFileSync(
@@ -16,13 +17,14 @@ const exceptionRecordsSource = readFileSync(
 )
 
 test('purchase receipt exception actions follow backend read and manage permission projections', () => {
+  assert.equal(PurchaseSourceActions.receiptReturn.permission, 'purchase.return.create')
+  assert.equal(PurchaseSourceActions.receiptAdjustment.permission, 'purchase.receipt.adjustment.create')
+  for (const key of ['receiptReturn', 'receiptAdjustment']) assert.match(source, new RegExp(`sourceActionAccess\\(adminProfile, PurchaseSourceActions.${key}\\)`, 'u'))
   for (const permission of [
-    'purchase.return.create',
     'purchase.return.post',
     'purchase.return.cancel',
     'purchase.return.read',
     'purchase.receipt.adjustment.read',
-    'purchase.receipt.adjustment.create',
     'purchase.receipt.adjustment.post',
     'purchase.receipt.adjustment.cancel',
   ]) {
@@ -91,7 +93,8 @@ test('purchase receipt exception creation only opens a records view the user may
 })
 
 test('posted purchase receipt payable uses the exact permission and source-bound request', () => {
-  assert.match(source, /finance\.payable\.confirm/u)
+  assert.equal(PurchaseSourceActions.payable.permission, 'finance.payable.confirm')
+  assert.match(source, /sourceActionAccess\(adminProfile, PurchaseSourceActions.payable\)/u)
   assert.match(source, /selectedRow\.status !== 'POSTED'/u)
   assert.match(source, /生成应付/u)
   assert.match(source, /查看应付/u)

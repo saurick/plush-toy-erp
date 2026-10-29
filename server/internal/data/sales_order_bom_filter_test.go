@@ -31,13 +31,13 @@ func TestSalesOrderBOMTaskSourcesUseEngineeringRelation(t *testing.T) {
 			bomID = other.ID
 		}
 		for line := 1; line <= 2; line++ {
-			item := client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(line).SetProductID(product.ID).SetUnitID(unit.ID).SetOrderedQuantity(decimal.NewFromInt(1)).SetSampleBomID(bomID).SaveX(ctx)
+			item := client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(line).SetProductID(product.ID).SetUnitID(unit.ID).SetOrderedQuantity(decimal.NewFromInt(1)).SetBomID(bomID).SaveX(ctx)
 			if index == 0 {
 				linkedItemIDs = append(linkedItemIDs, item.ID)
 			}
 		}
 	}
-	filter := biz.SalesOrderFilter{SampleBOMID: bom.ID, LifecycleScope: biz.LifecycleScopeAll, Limit: 1}
+	filter := biz.SalesOrderFilter{BOMID: bom.ID, LifecycleScope: biz.LifecycleScopeAll, Limit: 1}
 	first, total, err := uc.ListSalesOrders(ctx, filter)
 	if err != nil || total != 2 || len(first) != 1 || first[0].OrderNo == "SO-UNRELATED" {
 		t.Fatalf("exact relation must include history, deduplicate lines and ignore printed source number: total=%d rows=%+v err=%v", total, first, err)
@@ -51,18 +51,18 @@ func TestSalesOrderBOMTaskSourcesUseEngineeringRelation(t *testing.T) {
 	if err != nil || counts[biz.SalesOrderStatusDraft] != 1 || counts[biz.SalesOrderStatusClosed] != 1 {
 		t.Fatalf("status counts must use same relation: %v %v", counts, err)
 	}
-	client.SalesOrderItem.UpdateOneID(linkedItemIDs[0]).SetSampleBomID(other.ID).SaveX(ctx)
-	client.SalesOrderItem.UpdateOneID(linkedItemIDs[1]).ClearSampleBomID().SaveX(ctx)
+	client.SalesOrderItem.UpdateOneID(linkedItemIDs[0]).SetBomID(other.ID).SaveX(ctx)
+	client.SalesOrderItem.UpdateOneID(linkedItemIDs[1]).ClearBomID().SaveX(ctx)
 	filter.Offset = 0
 	rows, total, err := uc.ListSalesOrders(ctx, filter)
 	if err != nil || total != 1 || len(rows) != 1 || rows[0].OrderNo != "SO-BOM-HISTORY" {
 		t.Fatalf("switching/clearing BOM must not leave a stale task source: total=%d rows=%+v err=%v", total, rows, err)
 	}
-	filter.SampleBOMID = other.ID + 100
+	filter.BOMID = other.ID + 100
 	if rows, total, err := uc.ListSalesOrders(ctx, filter); err != nil || total != 0 || len(rows) != 0 {
 		t.Fatalf("unlinked BOM must be empty: %d %v %v", total, rows, err)
 	}
-	filter.SampleBOMID = -1
+	filter.BOMID = -1
 	if _, _, err := uc.ListSalesOrders(ctx, filter); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("negative BOM filter must fail closed: %v", err)
 	}

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Button, Tag } from 'antd'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { ProgressIdentity, ProgressDue, ProgressDelivery, ProgressAttention } from '../../erp/components/business-visualizations/ProgressCompactContent.jsx'
@@ -95,10 +95,6 @@ export default function DevWorkCenterDesign({ topic: entry }) {
   const mobile = topic.devices.length === 1 || params.get('page') === 'mobile-tasks'
   const selected = topic.points.find((item) => item.key === params.get('point')) || topic.points[0]
   const index = topic.points.indexOf(selected)
-  const basisParams = new URLSearchParams(params)
-  basisParams.set('view', 'rationale')
-  basisParams.set('read', 'reference')
-  basisParams.set('chapter', 'work-center-rationale')
   const origin = useRef(null)
   const update = (patch) => {
     const next = new URLSearchParams(window.location.search)
@@ -129,7 +125,7 @@ export default function DevWorkCenterDesign({ topic: entry }) {
     <section ref={root} className="erp-design-work-center" aria-label="工作中心界面说明" data-design-topic={topic.key} data-design-device={mobile ? 'mobile' : 'desktop'}>
       <header className="erp-wc-heading"><div><h2>{topic.title}</h2><p>{topic.description}</p></div>{topic.devices.length > 1 ? <Segmented aria-label="说明设备" value={mobile ? 'mobile' : 'desktop'} options={[{ value: 'desktop', label: '电脑版' }, { value: 'mobile', label: '手机版' }]} onChange={(value) => update({ page: value === 'mobile' ? 'mobile-tasks' : '', point: '' })} /> : null}</header>
       <div className="erp-wc-layout"><figure className={`erp-wc-figure ${mobile ? 'is-mobile' : ''}`} aria-label="界面信息示意"><Scene topic={topic} mobile={mobile} point={point} select={select} /><figcaption>示例数据 · 点击编号看含义与布局原因</figcaption></figure>
-        <aside className="erp-wc-explanation" aria-label="当前界面解释"><nav className="erp-wc-point-nav" aria-label="查看说明位置">{topic.points.map((item, number) => <button key={item.key} type="button" aria-label={`${number + 1} ${item.title}`} aria-pressed={selected.key === item.key} onClick={() => select(item.key, 'explanation')}>{number + 1}</button>)}</nav><div aria-live="polite"><h3>{index + 1} {selected.title}</h3><p>{selected.shows}</p><h4>为什么这样安排</h4><p>{selected.why}</p><h4>什么时候变化</h4><p>{selected.when}</p></div><Link to={`/__dev/ui-design?${basisParams}`}>查看设计依据</Link></aside>
+        <aside className="erp-wc-explanation" aria-label="当前界面解释"><nav className="erp-wc-point-nav" aria-label="查看说明位置">{topic.points.map((item, number) => <button key={item.key} type="button" aria-label={`${number + 1} ${item.title}`} aria-pressed={selected.key === item.key} onClick={() => select(item.key, 'explanation')}>{number + 1}</button>)}</nav><div aria-live="polite"><h3>{index + 1} {selected.title}</h3><p>{selected.shows}</p><h4>为什么这样安排</h4><p>{selected.why}</p><h4>什么时候变化</h4><p>{selected.when}</p></div></aside>
       </div>
     </section>
   )

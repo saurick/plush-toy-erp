@@ -22,6 +22,48 @@ type FinanceCreditNoteCreate struct {
 	hooks    []Hook
 }
 
+// SetBalanceDirection sets the "balance_direction" field.
+func (_c *FinanceCreditNoteCreate) SetBalanceDirection(v string) *FinanceCreditNoteCreate {
+	_c.mutation.SetBalanceDirection(v)
+	return _c
+}
+
+// SetNillableBalanceDirection sets the "balance_direction" field if the given value is not nil.
+func (_c *FinanceCreditNoteCreate) SetNillableBalanceDirection(v *string) *FinanceCreditNoteCreate {
+	if v != nil {
+		_c.SetBalanceDirection(*v)
+	}
+	return _c
+}
+
+// SetSourceType sets the "source_type" field.
+func (_c *FinanceCreditNoteCreate) SetSourceType(v string) *FinanceCreditNoteCreate {
+	_c.mutation.SetSourceType(v)
+	return _c
+}
+
+// SetNillableSourceType sets the "source_type" field if the given value is not nil.
+func (_c *FinanceCreditNoteCreate) SetNillableSourceType(v *string) *FinanceCreditNoteCreate {
+	if v != nil {
+		_c.SetSourceType(*v)
+	}
+	return _c
+}
+
+// SetSourceID sets the "source_id" field.
+func (_c *FinanceCreditNoteCreate) SetSourceID(v int) *FinanceCreditNoteCreate {
+	_c.mutation.SetSourceID(v)
+	return _c
+}
+
+// SetNillableSourceID sets the "source_id" field if the given value is not nil.
+func (_c *FinanceCreditNoteCreate) SetNillableSourceID(v *int) *FinanceCreditNoteCreate {
+	if v != nil {
+		_c.SetSourceID(*v)
+	}
+	return _c
+}
+
 // SetCreditNoteNo sets the "credit_note_no" field.
 func (_c *FinanceCreditNoteCreate) SetCreditNoteNo(v string) *FinanceCreditNoteCreate {
 	_c.mutation.SetCreditNoteNo(v)
@@ -188,6 +230,10 @@ func (_c *FinanceCreditNoteCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *FinanceCreditNoteCreate) defaults() error {
+	if _, ok := _c.mutation.BalanceDirection(); !ok {
+		v := financecreditnote.DefaultBalanceDirection
+		_c.mutation.SetBalanceDirection(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := financecreditnote.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -204,6 +250,24 @@ func (_c *FinanceCreditNoteCreate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *FinanceCreditNoteCreate) check() error {
+	if _, ok := _c.mutation.BalanceDirection(); !ok {
+		return &ValidationError{Name: "balance_direction", err: errors.New(`ent: missing required field "FinanceCreditNote.balance_direction"`)}
+	}
+	if v, ok := _c.mutation.BalanceDirection(); ok {
+		if err := financecreditnote.BalanceDirectionValidator(v); err != nil {
+			return &ValidationError{Name: "balance_direction", err: fmt.Errorf(`ent: validator failed for field "FinanceCreditNote.balance_direction": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SourceType(); ok {
+		if err := financecreditnote.SourceTypeValidator(v); err != nil {
+			return &ValidationError{Name: "source_type", err: fmt.Errorf(`ent: validator failed for field "FinanceCreditNote.source_type": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SourceID(); ok {
+		if err := financecreditnote.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "FinanceCreditNote.source_id": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.CreditNoteNo(); !ok {
 		return &ValidationError{Name: "credit_note_no", err: errors.New(`ent: missing required field "FinanceCreditNote.credit_note_no"`)}
 	}
@@ -308,6 +372,18 @@ func (_c *FinanceCreditNoteCreate) createSpec() (*FinanceCreditNote, *sqlgraph.C
 		_node = &FinanceCreditNote{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(financecreditnote.Table, sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt))
 	)
+	if value, ok := _c.mutation.BalanceDirection(); ok {
+		_spec.SetField(financecreditnote.FieldBalanceDirection, field.TypeString, value)
+		_node.BalanceDirection = value
+	}
+	if value, ok := _c.mutation.SourceType(); ok {
+		_spec.SetField(financecreditnote.FieldSourceType, field.TypeString, value)
+		_node.SourceType = &value
+	}
+	if value, ok := _c.mutation.SourceID(); ok {
+		_spec.SetField(financecreditnote.FieldSourceID, field.TypeInt, value)
+		_node.SourceID = &value
+	}
 	if value, ok := _c.mutation.CreditNoteNo(); ok {
 		_spec.SetField(financecreditnote.FieldCreditNoteNo, field.TypeString, value)
 		_node.CreditNoteNo = value

@@ -30,6 +30,7 @@ export function loadQualityInspectionList({
     dateFilterField,
     dateFilterStart,
     inspectionTypeFilter,
+    includeSuperseded,
     keyword,
     lotFilter,
     materialFilter,
@@ -46,8 +47,15 @@ export function loadQualityInspectionList({
     routeSourceID,
     routeSourceType,
   } = context
+  if (routeQualityInspectionID > 0) {
+    return getQualityInspection({ id: routeQualityInspectionID }, { signal }).then((inspection) => ({
+      quality_inspections: inspection ? [inspection] : [],
+      total: inspection ? 1 : 0,
+    }))
+  }
   const baseParams = compactParams({
     include_status_counts: all ? undefined : true,
+    include_superseded: Boolean(includeSuperseded),
     status: statusFilter,
     result: resultFilter,
     keyword: trimOptional(
@@ -94,10 +102,7 @@ export function loadQualityInspectionList({
       { signal }
     )
   }
-  if (
-    inspectionTypeFilter === 'FINISHED_GOODS' ||
-    routeSourceType === 'SHIPMENT'
-  ) {
+  if (inspectionTypeFilter === 'FINISHED_GOODS') {
     const list = all
       ? listAllFinishedGoodsQualityInspections
       : listFinishedGoodsQualityInspections
@@ -127,16 +132,6 @@ export function loadQualityInspectionList({
 }
 
 export async function loadQualityInspectionExport(query, { signal } = {}) {
-  const { routeQualityInspectionID } = query.context
-  const { inspectionTypeFilter } = query.filters
-  const routeSelectedID = Number(routeQualityInspectionID || 0)
-  if (routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE') {
-    const inspection = await getQualityInspection({ id: routeSelectedID })
-    return inspection ? [inspection] : []
-  }
   const data = await loadQualityInspectionList({ ...query, signal, all: true })
-  const exportRows = data?.quality_inspections
-  return routeSelectedID > 0 && Array.isArray(exportRows)
-    ? exportRows.filter((item) => Number(item?.id || 0) === routeSelectedID)
-    : exportRows
+  return data?.quality_inspections
 }

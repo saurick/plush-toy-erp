@@ -50,7 +50,7 @@ func TestBusinessProgressMaterialTaskUsesRequirementLine(t *testing.T) {
 	createProductionWIPRouteProcesses(t, ctx, f.client)
 	flow := releaseProductionWIPRoute(t, ctx, f, "MO-MATERIAL-TASK", 10, false)
 	other := f.client.ProductionOrder.Create().SetOrderNo("MO-UNRELATED").SetCreatedBy(f.actorID).SaveX(ctx)
-	otherLine := f.client.ProductionOrderItem.Create().SetProductionOrderID(other.ID).SetLineNo(1).SetProductID(f.productID).SetUnitID(f.unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
+	otherLine := f.client.ProductionOrderItem.Create().SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SetProductionOrderID(other.ID).SetLineNo(1).SetProductID(f.productID).SetUnitID(f.unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
 	var requirementID int
 	for _, requirement := range flow.MaterialRequirements {
 		if requirement.ID == otherLine.ID {
@@ -149,9 +149,9 @@ func TestBusinessProgressMixedUnitsAndIndependentProduction(t *testing.T) {
 	f.client.SalesOrderItem.Create().SetSalesOrderID(so.ID).SetLineNo(2).SetRequestedProductName("搜索第二产品").SetUnitID(unit.ID).SetOrderedQuantity(decimal.NewFromInt(2)).SaveX(ctx)
 	now := time.Now().UTC()
 	po := f.client.ProductionOrder.Create().SetOrderNo("MO-INDEPENDENT").SetCreatedBy(f.actorID).SaveX(ctx)
-	f.client.ProductionOrderItem.Create().SetProductionOrderID(po.ID).SetLineNo(1).SetProductID(f.productID).SetUnitID(f.unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
+	f.client.ProductionOrderItem.Create().SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SetProductionOrderID(po.ID).SetLineNo(1).SetProductID(f.productID).SetUnitID(f.unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
 	closed := f.client.ProductionOrder.Create().SetOrderNo("MO-CLOSED").SetStatus("CLOSED").SetCreatedBy(f.actorID).SetReleasedBy(f.actorID).SetReleasedAt(now).SetClosedBy(f.actorID).SetClosedAt(now).SetCloseReason("停止生产").SaveX(ctx)
-	f.client.ProductionOrderItem.Create().SetProductionOrderID(closed.ID).SetLineNo(1).SetProductID(f.productID).SetUnitID(f.unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SetSalesOrderItemID(f.salesItemID).SaveX(ctx)
+	f.client.ProductionOrderItem.Create().SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SetProductionOrderID(closed.ID).SetLineNo(1).SetProductID(f.productID).SetUnitID(f.unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SetSalesOrderItemID(f.salesItemID).SaveX(ctx)
 	uc := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(f.data))
 	q := biz.BusinessProgressQuery{View: "orders", Keyword: "搜索第二产品", Access: biz.BusinessProgressAccess{Sales: true, Production: true}}
 	board, err := uc.List(ctx, q)
@@ -185,7 +185,7 @@ func TestBusinessProgressMixedUnitsAndIndependentProduction(t *testing.T) {
 	otherSales := f.client.SalesOrder.Create().SetOrderNo("SO-ANOTHER-CUSTOMER").SetCustomerID(otherCustomer.ID).SetOrderDate(now).SetLifecycleStatus("active").SetSalesOwner("第二位负责人").SaveX(ctx)
 	f.client.SalesOrder.UpdateOneID(so.ID).SetSalesOwner("首位负责人").SaveX(ctx)
 	otherSalesLine := f.client.SalesOrderItem.Create().SetSalesOrderID(otherSales.ID).SetLineNo(1).SetProductID(f.productID).SetUnitID(f.unitID).SetOrderedQuantity(decimal.NewFromInt(10)).SaveX(ctx)
-	f.client.ProductionOrderItem.Create().SetProductionOrderID(closed.ID).SetLineNo(2).SetProductID(f.productID).SetUnitID(f.unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SetSalesOrderItemID(otherSalesLine.ID).SaveX(ctx)
+	f.client.ProductionOrderItem.Create().SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SetProductionOrderID(closed.ID).SetLineNo(2).SetProductID(f.productID).SetUnitID(f.unitID).SetPlannedQuantity(decimal.NewFromInt(10)).SetSalesOrderItemID(otherSalesLine.ID).SaveX(ctx)
 	q.Access.Sales = true
 	detail, err = uc.Detail(ctx, q)
 	if err != nil || detail.Row.Customer != "多客户 · 查看明细" || len(detail.Sections["lines"]) != 2 || detail.Sections["lines"][0].ProductID != f.productID || !strings.Contains(detail.Sections["lines"][1].Note, otherSales.OrderNo) {

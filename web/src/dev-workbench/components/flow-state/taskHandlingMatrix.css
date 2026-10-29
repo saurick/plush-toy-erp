@@ -59,7 +59,20 @@
   border-radius: 12px;
   background: var(--erp-surface-bg);
 }
-.erp-dev-task-handling__header h1.ant-typography {
+
+.erp-dev-task-matrix__collaboration {
   margin: 0;
-  font-size: 20px;
+  display: grid;
+  gap: 8px;
+}
+.erp-dev-task-matrix__collaboration > div {
+  display: grid;
+  grid-template-columns: minmax(100px, 140px) minmax(0, 1fr);
+  gap: 12px;
+}
+.erp-dev-task-matrix__collaboration dt {
+  font-weight: 600;
+}
+.erp-dev-task-matrix__collaboration dd {
+  margin: 0;
 }

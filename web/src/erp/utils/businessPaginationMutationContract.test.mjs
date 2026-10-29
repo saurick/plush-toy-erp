@@ -139,7 +139,8 @@ for (const pageCase of [
     const mutation = sourceSlice(pageCase.source, pageCase.start, pageCase.end)
     assert.match(mutation, /const isCreatingOrder = !editingOrder\?\.id/u)
 
-    const branches = conditionalBranches(mutation, 'isCreatingOrder')
+    const savedIndex = mutation.indexOf('const { saved } = saveResult')
+    const branches = conditionalBranches(mutation, 'isCreatingOrder', Math.max(savedIndex, 0))
     assert.match(branches.truthy, pageCase.resetPattern)
     assert.doesNotMatch(branches.truthy, /loadOrders\b/u)
     assert.doesNotMatch(branches.truthy, pageCase.refreshPattern)
@@ -155,7 +156,7 @@ test('purchase edit refresh preserves pagination while refreshing the arrival vi
     'registerPageRefresh?.(refreshPageData)'
   )
   assert.match(refresh, /loadOrders\(\)/u)
-  assert.match(refresh, /if \(contentView === 'arrival'\) reloadArrivalData\(\)/u)
+  assert.match(refresh, /if \(contentView !== 'list'\) reloadArrivalData\(\)/u)
   assert.doesNotMatch(refresh, /setPagination|resetBusinessPaginationCurrent/u)
 })
 
@@ -230,7 +231,7 @@ test('BOM create and copy reset page one while editing refreshes the current pag
 test('shipment edits reload the current page while create-only flows return their list to page one', () => {
   const shipmentMutation = sourceSlice(
     shipmentSource,
-    'const submitShipmentModal = async () => {',
+    'const submitShipmentModal = async (',
     'const runShipmentAction'
   )
 

@@ -274,11 +274,11 @@ test('posted outsourcing returns expose source-bound payable through related rec
   assert.match(source, /finance\.payable\.confirm/u)
   assert.match(
     payableAction,
-    /buildOutsourcingReturnPayablePayload\(values, fact\)/u
+    /buildFinanceBusinessSourcePayload\(financeSourceAction, values, fact\)/u
   )
   assert.match(
     payableAction,
-    /createPayableFromOutsourcingReturn\(attempt\.params\)/u
+    /stagePayable \? createPayableFromOutsourcingOrder : createPayableFromOutsourcingReturn/u
   )
   assert.match(payableAction, /financeSourceAttemptsRef\.current\.prepare/u)
   assert.match(payableAction, /financeSourceAttemptsRef\.current\.settle/u)

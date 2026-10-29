@@ -1,7 +1,38 @@
-import { act } from 'react'
+import { act, createElement } from 'react'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { installTestDOM, registerJSXTestLoader } from '../../../../scripts/test/reactRuntime.mjs'
+
+test('手机提交流程使用任务回执，已有结果不重复报告，桌面继续显示流转通知', async (t) => {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [{ createRoot }, router, { useProcessSubmissionReceipt }, { registerAntdAppApis }] = await Promise.all([
+    import('react-dom/client'), import('react-router-dom'), import('./ProcessSubmissionReceipt.jsx'), import('../../../common/utils/antdApp.js'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  const results = []
+  const notices = []
+  registerAntdAppApis({ notification: { success: (notice) => notices.push(notice) } })
+  let showReceipt
+  function Consumer() { showReceipt = useProcessSubmissionReceipt(); return null }
+  const render = async (mobile) => act(async () => root.render(createElement(router.MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(router.Routes, null, createElement(router.Route, { element: createElement(router.Outlet, { context: mobile ? { taskBusiness: { onResult: (...args) => results.push(args) } } : {} }) }, createElement(router.Route, { index: true, element: createElement(Consumer) }))))))
+  t.after(async () => { await act(async () => root.unmount()); container.remove(); registerAntdAppApis(); dom.restore() })
+  const record = { id: 7, payment_no: 'PAY-7' }
+  await render(true)
+  await act(async () => showReceipt({ title: '收付款已提交审批', record, result: { process_instance: { id: 10 } } }))
+  assert.deepEqual(results, [['收付款已提交审批', record]])
+  assert.equal(notices.length, 0)
+  await act(async () => showReceipt({ title: '业务结果已由调用方记录', result: { process_instance: { id: 10 } } }))
+  assert.equal(results.length, 1)
+  assert.equal(notices.length, 0)
+  await render(false)
+  await act(async () => showReceipt({ title: '收付款已提交审批', record, result: { process_instance: { id: 10 } } }))
+  assert.equal(results.length, 1)
+  assert.equal(notices.length, 1)
+  assert.equal(notices[0].message, '收付款已提交审批')
+})
 
 test('confirmed submission retains success when progress read fails and retry never resubmits', async (t) => {
   const dom = installTestDOM()

@@ -68,6 +68,7 @@ func TestResolveWorkflowTaskSourceAccessContract(t *testing.T) {
 				PermissionPMCRiskRead,
 				PermissionProductionFactRead,
 				PermissionProductionExceptionSubmit,
+				PermissionProductionOverIssueSubmit,
 				PermissionProductionExceptionApprove,
 			},
 		},

@@ -67,7 +67,7 @@ func (h *inventoryAdjustmentProcessCommandHandler) ValidateProcessDomainCommand(
 	if err != nil {
 		return err
 	}
-	if item == nil || item.ID != id || item.OperationType != InventoryOperationManualAdjustment {
+	if item == nil || item.ID != id || !InventoryOperationRequiresApproval(item.OperationType) {
 		return ErrBadParam
 	}
 	reason := strings.TrimSpace(processCommandStringFromPayload(in.Payload, processDecisionPayloadReason))

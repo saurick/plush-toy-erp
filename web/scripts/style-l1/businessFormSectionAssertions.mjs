@@ -1,6 +1,49 @@
-import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import assert from 'node:assert/strict'
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+
+export async function assertBusinessFormNavigationSurface(page, editor) {
+  await waitForFiniteAnimations(page)
+  const metrics = await editor.evaluate((node) => {
+    const main = node.querySelector('.erp-business-form-page__main')
+    const nav = main?.querySelector(':scope > nav')
+    const links = nav?.querySelector('.erp-business-form-page__section-links')
+    const picker = nav?.querySelector('.erp-business-form-page__section-picker')
+    const body = main?.querySelector('.erp-business-form-page__body')
+    const box = (element) => element?.getBoundingClientRect().toJSON()
+    const visible = (element) => Boolean(element?.getClientRects().length)
+    return {
+      title: node.getAttribute('aria-label'),
+      sectionCount: [...node.querySelectorAll('[data-form-section]')].filter((section) => visible(section) && section.closest('[data-business-form-page]') === node).length,
+      main: box(main),
+      nav: box(nav),
+      body: box(body),
+      sidebar: visible(links),
+      picker: visible(picker),
+      background: nav ? getComputedStyle(nav).backgroundColor : null,
+      border: nav ? getComputedStyle(nav).borderRightWidth : null,
+      bodyOverflow: body ? body.scrollWidth - body.clientWidth : null,
+    }
+  })
+  const detail = JSON.stringify(metrics)
+  assert.ok(metrics.bodyOverflow <= 1, `editor body keeps horizontal overflow inside its detail table: ${detail}`)
+  if (metrics.sectionCount < 3) {
+    assert.equal(metrics.nav, undefined, `short forms do not add an empty directory: ${detail}`)
+    return metrics
+  }
+  assert.ok(metrics.nav, `complete forms retain their shared directory: ${detail}`)
+  assert.ok(metrics.background && !['transparent', 'rgba(0, 0, 0, 0)'].includes(metrics.background), `directory has an opaque theme surface: ${detail}`)
+  if (metrics.sidebar) {
+    assert.ok(Math.abs(metrics.nav.top - metrics.main.top) <= 1 && Math.abs(metrics.nav.bottom - metrics.main.bottom) <= 1, `directory background and divider cover the full editor column: ${detail}`)
+    assert.ok(Math.abs(metrics.nav.right - metrics.body.left) <= 1, `directory divider meets the body without a gap: ${detail}`)
+    assert.equal(metrics.border, '1px', detail)
+  } else {
+    assert.equal(metrics.picker, true, `narrow editors retain an accessible section picker: ${detail}`)
+    assert.ok(Math.abs(metrics.nav.width - metrics.main.width) <= 1, `section picker background spans the narrow editor: ${detail}`)
+  }
+  return metrics
+}
 
 const expectedSections = {
   customers: ['基本资料', '联系人', '默认收货信息', '结算方式', '备注'],
@@ -77,6 +120,7 @@ export async function assertBusinessFormSections(page, editor, key) {
   const nav = editor.getByRole('navigation', { name: '表单分区' })
   await nav.getByRole('button', { name: titles[0], exact: true }).waitFor()
   assert.deepEqual(await nav.getByRole('button').allTextContents(), titles)
+  await assertBusinessFormNavigationSurface(page, editor)
   const sections = editor.locator('[data-form-section]')
   const body = editor.locator('.erp-business-form-page__body')
   assert.equal(
@@ -140,8 +184,9 @@ export async function assertBusinessFormSections(page, editor, key) {
   )
   for (const width of [1024, 390]) {
     await page.setViewportSize({ width, height: 844 })
-    const picker = nav.getByRole('combobox', { name: "跳转到", exact: true })
+    const picker = nav.getByRole('combobox', { name: '跳转到', exact: true })
     await picker.waitFor({ state: 'visible' })
+    await assertBusinessFormNavigationSurface(page, editor)
     assert.equal(await lastLink.isVisible(), false)
     const target = await sections.nth(1).getAttribute('id')
     await chooseSelectOption(picker, target)

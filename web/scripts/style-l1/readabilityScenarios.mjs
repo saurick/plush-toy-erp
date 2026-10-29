@@ -321,29 +321,7 @@ export function createReadabilityScenarios({
               )
             }
             if (item.key === 'overview') {
-              await page
-                .getByRole('button', {
-                  name: '查看产品能力来源与边界',
-                  exact: true,
-                })
-                .click()
-              await page.locator('.ant-popover:visible').waitFor()
-              const metrics = await measureReadability(page)
-              assert.deepEqual(
-                metrics.smallText,
-                [],
-                '工作台帮助弹出层文字至少 14px'
-              )
-              await assertNoHorizontalOverflow(page, 'dev-readability-help')
-              await page
-                .getByRole('button', {
-                  name: '查看产品能力来源与边界',
-                  exact: true,
-                })
-                .press('Escape')
-              await page
-                .locator('.ant-popover:visible')
-                .waitFor({ state: 'hidden' })
+              assert.equal(await page.getByRole('button', { name: '查看产品能力来源与边界', exact: true }).count(), 0)
             }
           },
         }))

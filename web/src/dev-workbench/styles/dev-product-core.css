@@ -13,12 +13,12 @@
   justify-content: space-between;
 }
 
-.erp-dev-product-core-header__icon {
-  color: var(--erp-primary);
+.erp-dev-product-core-toolbar {
+  flex: 1 1 auto;
 }
 
-.erp-dev-product-core-header h1.ant-typography {
-  margin: 0;
+.erp-dev-product-core-header__icon {
+  color: var(--erp-primary);
 }
 
 .erp-dev-product-core-shell {
@@ -49,6 +49,7 @@
 
 .erp-dev-product-core-inventory {
   min-width: 0;
+  padding: 12px;
   border: 1px solid var(--erp-border);
   border-radius: 8px;
   background: var(--erp-surface-bg);
@@ -76,9 +77,26 @@
 .erp-dev-product-core-detail {
   display: grid;
   min-width: 0;
-  gap: 24px;
+  gap: 16px;
   justify-items: start;
   overflow-wrap: anywhere;
+}
+
+.erp-dev-product-core-inventory > .erp-workbench-reading__body {
+  position: sticky;
+  top: 12px;
+}
+
+.erp-dev-product-core-detail__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.erp-dev-product-core-detail__heading .ant-btn {
+  flex: none;
 }
 
 .erp-dev-product-core-detail h2.ant-typography {

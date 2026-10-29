@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -57,17 +58,18 @@ type InventoryOperation struct {
 }
 
 type InventoryOperationItem struct {
-	StockCategory                     string
-	ID, OperationID                   int
-	LineNo, SubjectType               string
-	SubjectID                         int
-	ProductSkuID                      *int
-	FromWarehouseID                   int
-	FromLotID, ToWarehouseID, ToLotID *int
-	UnitID                            int
-	ExpectedQuantity, CountedQuantity *decimal.Decimal
-	AdjustmentQuantity                decimal.Decimal
-	Note                              *string
+	SubjectName, SKUCode, WarehouseName, ToWarehouseName, LotNo, UnitName string
+	StockCategory                                                         string
+	ID, OperationID                                                       int
+	LineNo, SubjectType                                                   string
+	SubjectID                                                             int
+	ProductSkuID                                                          *int
+	FromWarehouseID                                                       int
+	FromLotID, ToWarehouseID, ToLotID                                     *int
+	UnitID                                                                int
+	ExpectedQuantity, CountedQuantity                                     *decimal.Decimal
+	AdjustmentQuantity                                                    decimal.Decimal
+	Note                                                                  *string
 }
 
 type InventoryOperationCreate struct {
@@ -212,7 +214,7 @@ func (uc *InventoryUsecase) PostInventoryOperation(ctx context.Context, in *Inve
 	if item == nil {
 		return nil, ErrInventoryOperationNotFound
 	}
-	if item.OperationType == InventoryOperationManualAdjustment {
+	if InventoryOperationRequiresApproval(item.OperationType) {
 		return nil, ErrProcessRuntimeRequired
 	}
 	return repo.PostInventoryOperation(ctx, in)
@@ -274,13 +276,14 @@ func normalizeInventoryOperationCreate(in *InventoryOperationCreate) (*Inventory
 	o.OperationType = strings.ToUpper(strings.TrimSpace(o.OperationType))
 	o.Reason = strings.TrimSpace(o.Reason)
 	o.IdempotencyKey = strings.TrimSpace(o.IdempotencyKey)
-	if o.OperationNo == "" || o.Reason == "" || o.IdempotencyKey == "" || len(o.IdempotencyKey) > 128 || o.CreatedBy <= 0 || len(o.Items) == 0 {
+	if o.OperationNo == "" || o.Reason == "" || o.IdempotencyKey == "" || len(o.IdempotencyKey) > 128 || o.CreatedBy <= 0 || len(o.Items) == 0 || len(o.Items) > 200 || len([]rune(o.OperationNo)) > 64 || len([]rune(o.Reason)) > 255 {
 		return nil, "", ErrBadParam
 	}
 	if o.OperationType != InventoryOperationCycleCount && o.OperationType != InventoryOperationTransfer && o.OperationType != InventoryOperationManualAdjustment {
 		return nil, "", ErrBadParam
 	}
 	seen := map[string]struct{}{}
+	grains := map[string]struct{}{}
 	o.Items = append([]InventoryOperationItemCreate(nil), o.Items...)
 	for i := range o.Items {
 		item := &o.Items[i]
@@ -294,15 +297,17 @@ func normalizeInventoryOperationCreate(in *InventoryOperationCreate) (*Inventory
 			return nil, "", ErrBadParam
 		}
 		seen[item.LineNo] = struct{}{}
+		grain := fmt.Sprintf("%s:%d:%d:%d:%d:%d", item.SubjectType, item.SubjectID, inventoryOperationOptionalID(item.ProductSkuID), item.FromWarehouseID, inventoryOperationOptionalID(item.FromLotID), item.UnitID)
+		if _, duplicate := grains[grain]; duplicate && o.OperationType == InventoryOperationCycleCount {
+			return nil, "", ErrBadParam
+		}
+		grains[grain] = struct{}{}
 		switch o.OperationType {
 		case InventoryOperationCycleCount:
 			if item.ExpectedQuantity == nil || item.CountedQuantity == nil || item.ExpectedQuantity.IsNegative() || item.CountedQuantity.IsNegative() || item.ToWarehouseID != nil || item.ToLotID != nil {
 				return nil, "", ErrBadParam
 			}
 			item.AdjustmentQuantity = item.CountedQuantity.Sub(*item.ExpectedQuantity)
-			if item.AdjustmentQuantity.IsZero() {
-				return nil, "", ErrBadParam
-			}
 		case InventoryOperationTransfer:
 			if !item.AdjustmentQuantity.IsPositive() || item.ToWarehouseID == nil || *item.ToWarehouseID <= 0 || *item.ToWarehouseID == item.FromWarehouseID || item.ExpectedQuantity != nil || item.CountedQuantity != nil {
 				return nil, "", ErrBadParam
@@ -361,4 +366,17 @@ func sameBizOptionalInt(a, b *int) bool {
 		return a == nil && b == nil
 	}
 	return *a == *b
+}
+
+// Counts and manual adjustments share independent review; transfers keep their
+// atomic warehouse-to-warehouse posting path.
+func InventoryOperationRequiresApproval(operationType string) bool {
+	return operationType == InventoryOperationCycleCount || operationType == InventoryOperationManualAdjustment
+}
+
+func inventoryOperationOptionalID(id *int) int {
+	if id == nil {
+		return 0
+	}
+	return *id
 }

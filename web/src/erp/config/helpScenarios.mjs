@@ -72,14 +72,15 @@ const businessScenarios = {
     ['交回来源岗位', '来源经办岗位', ['purchase', 'production', 'warehouse']],
   ]),
   '/erp/purchase/processing-contracts': pageScenario('processing-contracts', [
-    ['准备加工合同', '委外经办岗位', ['production']],
-    ['提交并确认合同', '委外经办岗位', ['production']],
+    ['准备加工合同', '采购', ['purchase']],
+    ['提交并确认合同', '采购', ['purchase']],
     ['分别办理发料与回货', '生产 / 仓库', ['production', 'warehouse']],
     [
       '检验后继续办理',
       '品质 / 仓库 / 财务',
       ['quality', 'warehouse', 'finance'],
     ],
+    ['核对履约并关闭合同', '采购', ['purchase']],
   ]),
   '/erp/production/orders': pageScenario('production-orders', [
     ['核对生产来源', '生产', ['production']],

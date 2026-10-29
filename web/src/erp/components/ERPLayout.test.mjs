@@ -22,24 +22,8 @@ let businessProbeRPC
 let businessPageMounts = 0
 let businessPageRPCAttempts = 0
 const sharedDOM = installTestDOM()
-const NativeMessageChannel = globalThis.MessageChannel
-const testChannels = []
-globalThis.MessageChannel = class TestMessageChannel extends (
-  NativeMessageChannel
-) {
-  constructor() {
-    super()
-    testChannels.push(this)
-  }
-}
 after(() => {
   sharedDOM.restore()
-  // rc-overflow 的浏览器调度通道在 Node 中需要显式释放句柄。
-  for (const channel of testChannels) {
-    channel.port1.close()
-    channel.port2.close()
-  }
-  globalThis.MessageChannel = NativeMessageChannel
 })
 
 function loadERPLayoutRuntime() {

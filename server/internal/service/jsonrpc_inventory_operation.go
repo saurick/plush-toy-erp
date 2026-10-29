@@ -66,7 +66,7 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}
-		if current.OperationType == biz.InventoryOperationManualAdjustment {
+		if biz.InventoryOperationRequiresApproval(current.OperationType) {
 			return id, inventoryAdjustmentProcessRequiredResult(), nil
 		}
 		pkglogger.SetRequestObject(ctx, "inventory_operation", operationID)
@@ -132,7 +132,7 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 func inventoryAdjustmentProcessRequiredResult() *v1.JsonrpcResult {
 	return &v1.JsonrpcResult{
 		Code:    errcode.InvalidParam.Code,
-		Message: "人工库存调整必须通过审批任务办理并在流程执行节点过账",
+		Message: "库存盘点与调整必须通过审批任务办理并在流程执行节点过账",
 	}
 }
 
@@ -328,7 +328,7 @@ func inventoryOperationToAny(item *biz.InventoryOperation) map[string]any {
 	}
 	items := make([]any, 0, len(item.Items))
 	for _, line := range item.Items {
-		items = append(items, map[string]any{"id": line.ID, "line_no": line.LineNo, "subject_type": line.SubjectType, "stock_category": line.StockCategory, "subject_id": line.SubjectID, "product_sku_id": optionalIntToAny(line.ProductSkuID), "from_warehouse_id": line.FromWarehouseID, "from_lot_id": optionalIntToAny(line.FromLotID), "to_warehouse_id": optionalIntToAny(line.ToWarehouseID), "to_lot_id": optionalIntToAny(line.ToLotID), "unit_id": line.UnitID, "expected_quantity": optionalDecimalToAny(line.ExpectedQuantity), "counted_quantity": optionalDecimalToAny(line.CountedQuantity), "adjustment_quantity": line.AdjustmentQuantity.String(), "note": optionalStringToAny(line.Note)})
+		items = append(items, map[string]any{"id": line.ID, "line_no": line.LineNo, "subject_type": line.SubjectType, "stock_category": line.StockCategory, "subject_name": line.SubjectName, "sku_code": line.SKUCode, "warehouse_name": line.WarehouseName, "to_warehouse_name": line.ToWarehouseName, "lot_no": line.LotNo, "unit_name": line.UnitName, "subject_id": line.SubjectID, "product_sku_id": optionalIntToAny(line.ProductSkuID), "from_warehouse_id": line.FromWarehouseID, "from_lot_id": optionalIntToAny(line.FromLotID), "to_warehouse_id": optionalIntToAny(line.ToWarehouseID), "to_lot_id": optionalIntToAny(line.ToLotID), "unit_id": line.UnitID, "expected_quantity": optionalDecimalToAny(line.ExpectedQuantity), "counted_quantity": optionalDecimalToAny(line.CountedQuantity), "adjustment_quantity": line.AdjustmentQuantity.String(), "note": optionalStringToAny(line.Note)})
 	}
 	return map[string]any{"id": item.ID, "operation_no": item.OperationNo, "operation_type": item.OperationType, "status": item.Status, "reason": item.Reason, "version": item.Version, "submitted_at": optionalUnix(item.SubmittedAt), "submitted_by": optionalIntToAny(item.SubmittedBy), "approved_at": optionalUnix(item.ApprovedAt), "approved_by": optionalIntToAny(item.ApprovedBy), "rejected_at": optionalUnix(item.RejectedAt), "rejected_by": optionalIntToAny(item.RejectedBy), "reject_reason": optionalStringToAny(item.RejectReason), "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancel_reason": optionalStringToAny(item.CancelReason), "created_by": item.CreatedBy, "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix(), "items": items}
 }

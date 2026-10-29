@@ -16,6 +16,64 @@ function sample() {
   };
 }
 
+test('finance reads still require exact active scope evidence and never excuse a financial write', () => {
+  for (const method of ['list_finance_payments', 'list_finance_source_adjustments']) {
+    const { record, event } = sample();
+    record.domain = 'operational_fact';
+    record.postDataJSON = () => ({ id: 'rpc-1', method });
+    Object.assign(record.scopeRelease, { domain: 'operational_fact', method });
+    assert.equal(classifyRPCCancellation(record, event, 'old').outcome, 'expected_cancel');
+    record.response = { status: 429 };
+    assert.equal(classifyRPCCancellation(record, event, 'old').outcome, 'failure');
+    delete record.response;
+    delete record.scopeRelease;
+    assert.equal(classifyRPCCancellation(record, event, 'old').outcome, 'failure');
+    record.postDataJSON = () => ({ id: 'rpc-1', method: 'create_finance_source_adjustment' });
+    assert.equal(classifyRPCCancellation(record, event, 'new').outcome, 'failure');
+  }
+});
+
+test('purchase source reads require matched active cancellation evidence; related writes never qualify', () => {
+  for (const [domain, method] of [
+    ['inventory', 'list_inventory_lots'],
+    ['masterdata', 'list_materials'],
+    ['masterdata', 'list_products'],
+    ['purchase', 'list_purchase_receipts'],
+    ['purchase', 'get_purchase_receipt'],
+    ['purchase', 'list_purchase_returns'],
+    ['purchase', 'list_purchase_rejection_dispositions'],
+    ['quality', 'list_quality_inspections'],
+  ]) {
+    const make = () => {
+      const value = sample();
+      value.record.domain = domain;
+      value.record.postDataJSON = () => ({ id: 'rpc-1', method });
+      Object.assign(value.record.scopeRelease, { domain, method });
+      return value;
+    };
+    const positive = make();
+    assert.equal(classifyRPCCancellation(positive.record, positive.event, 'old').category, 'scope_superseded');
+    for (const mutate of [
+      value => { delete value.record.scopeRelease; },
+      value => { value.record.scopeRelease.rpcID = 'different'; },
+      value => { value.record.scopeRelease.scope.owner = 'workflow-action-access'; },
+      value => { value.record.scopeRelease.requestState = 'failed'; },
+      value => { value.record.response = { status: 403 }; },
+      value => { value.event.errorText = 'net::ERR_FAILED'; },
+    ]) {
+      const value = make(); mutate(value);
+      assert.equal(classifyRPCCancellation(value.record, value.event, 'old').outcome, 'failure', `${method}: ${mutate}`);
+    }
+  }
+  for (const method of ['create_purchase_return_from_receipt', 'create_purchase_receipt_adjustment_from_receipt', 'create_purchase_return_from_quality_inspection', 'create_purchase_rejection_disposition']) {
+    const { record, event } = sample();
+    record.domain = 'purchase';
+    record.postDataJSON = () => ({ id: 'rpc-1', method });
+    Object.assign(record.scopeRelease, { domain: 'purchase', method });
+    assert.equal(classifyRPCCancellation(record, event, 'old').reason, 'write_or_unaudited_rpc');
+  }
+});
+
 test('only a matched, active, explicitly released read scope or departed document explains ERR_ABORTED', () => {
   const { record, event } = sample();
   assert.deepEqual(classifyRPCCancellation(record, event, 'old'), {

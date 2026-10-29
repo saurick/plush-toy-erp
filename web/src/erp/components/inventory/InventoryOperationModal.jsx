@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
 import { Form, Input } from 'antd'
+import { inventoryOperationRequiresApproval } from '../../utils/inventoryOperationTransition.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
@@ -23,9 +24,9 @@ const TYPE_META = Object.freeze({
   CYCLE_COUNT: {
     createTitle: '登记库存盘点',
     editTitle: '编辑盘点草稿',
-    createSubmit: '生成盘点作业',
+    createSubmit: '提交盘点复核',
     notice:
-      '保存和过账时都会重新核对账面数量；盘点期间库存变化时，系统会按最新账面数量重新计算差异。',
+      '范围为本次选中的库存行。盘点须由另一人复核后过账；零差异也留存记录。库存变化会阻止过账，须重新盘点。',
   },
   TRANSFER: {
     createTitle: '登记库存调拨',
@@ -36,7 +37,7 @@ const TYPE_META = Object.freeze({
   MANUAL_ADJUSTMENT: {
     createTitle: '登记人工库存调整',
     editTitle: '编辑人工调整草稿',
-    createSubmit: '生成调整作业',
+    createSubmit: '提交调整审批',
     notice:
       '人工调整启动审批后内容即冻结；审批不会改变库存，过账后才形成库存变动。',
   },
@@ -51,6 +52,7 @@ function selectedInventoryText(record, labels = {}) {
   const quantity = record?.quantity ?? record?.expected_quantity ?? '-'
   return [
     labels.subject || '存货已关联',
+    ...(record?.subject_type === 'PRODUCT' ? [labels.sku || (record.product_sku_id ? '规格已关联' : '未分规格')] : []),
     labels.warehouse || '仓库已关联',
     labels.lot || '未分批次',
     labels.unit || '单位已关联',
@@ -80,6 +82,7 @@ export default function InventoryOperationModal({
   mode = 'create',
   operation,
   operationType,
+  sourceRecords,
   sourceRecord,
   sourceLabels,
   resolveSourceLabels,
@@ -97,8 +100,8 @@ export default function InventoryOperationModal({
     if (isEdit) {
       return Array.isArray(operation?.items) ? operation.items : []
     }
-    return sourceRecord ? [sourceRecord] : []
-  }, [isEdit, operation?.items, sourceRecord])
+    return sourceRecords || (sourceRecord ? [sourceRecord] : [])
+  }, [isEdit, operation?.items, sourceRecord, sourceRecords])
 
   useEffect(() => {
     if (!open) return
@@ -141,7 +144,7 @@ export default function InventoryOperationModal({
       onOk={submit}
     >
       <div className="erp-business-inline-note" role="note">{meta.notice}</div>
-      {effectiveType === 'MANUAL_ADJUSTMENT' && !isEdit ? (
+      {inventoryOperationRequiresApproval(effectiveType) && !isEdit ? (
         <ProcessSubmissionRoute processKey="inventory_adjustment_approval" customerKey={customerKey} open={open} />
       ) : null}
       <Form
@@ -197,9 +200,7 @@ export default function InventoryOperationModal({
             >
               {fields.map(({ key, name }, index) => {
                 const source = sourceRows[index] || {}
-                const labels = isEdit
-                  ? resolveSourceLabels?.(source, index) || {}
-                  : sourceLabels || {}
+                const labels = resolveSourceLabels?.(source, index) || sourceLabels || {}
                 const fromWarehouseID =
                   source.from_warehouse_id || source.warehouse_id
                 const targetWarehouseOptions = warehouseOptions.filter(

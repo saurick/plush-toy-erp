@@ -34,6 +34,14 @@ func TestFinanceBusinessSourceParamsRejectDerivedFields(t *testing.T) {
 			},
 		},
 		{
+			name: "outsourcing stage payable",
+			base: map[string]any{"customer_key": biz.DefaultCustomerKey, "fact_no": "AP-STAGE", "outsourcing_order_id": float64(12), "idempotency_key": "AP-STAGE"},
+			parse: func(params map[string]any) bool {
+				_, ok := financeFactFromOutsourcingOrderCreateFromParams(params)
+				return ok
+			},
+		},
+		{
 			name: "single reconciliation",
 			base: map[string]any{"customer_key": biz.DefaultCustomerKey, "fact_no": "REC-ONE", "finance_fact_id": float64(12), "idempotency_key": "REC-ONE"},
 			parse: func(params map[string]any) bool {
@@ -125,14 +133,23 @@ func TestFinanceBusinessSourceRPCUsesExactPermissions(t *testing.T) {
 	}{
 		{method: "create_payable_from_purchase_receipt", params: map[string]any{"customer_key": biz.DefaultCustomerKey, "fact_no": "AP-PR", "purchase_receipt_id": float64(10), "idempotency_key": "AP-PR"}},
 		{method: "create_payable_from_outsourcing_return", params: map[string]any{"customer_key": biz.DefaultCustomerKey, "fact_no": "AP-OUT", "outsourcing_fact_id": float64(11), "idempotency_key": "AP-OUT"}},
+		{method: "create_payable_from_outsourcing_order", params: map[string]any{"customer_key": biz.DefaultCustomerKey, "fact_no": "AP-STAGE", "outsourcing_order_id": float64(12), "idempotency_key": "AP-STAGE"}},
 	} {
 		_, res, err := payable.handleOperationalFact(ctx, tc.method, tc.method, mustJSONRPCStruct(t, tc.params))
 		if err != nil || res == nil || res.Code != errcode.OK.Code {
 			t.Fatalf("%s result=%#v err=%v", tc.method, res, err)
 		}
 	}
-	if payableRepo.createFinanceFactCalls != 2 {
-		t.Fatalf("payable source calls=%d want=2", payableRepo.createFinanceFactCalls)
+	if payableRepo.createFinanceFactCalls != 3 {
+		t.Fatalf("payable source calls=%d want=3", payableRepo.createFinanceFactCalls)
+	}
+
+	noSourceRepo := &financeModuleGateOperationalFactRepo{}
+	noSource := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionFinancePayableConfirm), noSourceRepo)
+	activateOperationalFactTestCustomerConfig(t, noSource, config)
+	_, sourceDenied, sourceErr := noSource.handleOperationalFact(ctx, "create_payable_from_outsourcing_order", "no-source-read", mustJSONRPCStruct(t, map[string]any{"customer_key": biz.DefaultCustomerKey, "fact_no": "AP-NO-SOURCE", "outsourcing_order_id": float64(12), "idempotency_key": "AP-NO-SOURCE"}))
+	if sourceErr != nil || sourceDenied == nil || sourceDenied.Code != errcode.PermissionDenied.Code || noSourceRepo.createFinanceFactCalls != 0 {
+		t.Fatalf("contract source read guard: result=%#v err=%v calls=%d", sourceDenied, sourceErr, noSourceRepo.createFinanceFactCalls)
 	}
 
 	_, denied, err := payable.handleOperationalFact(ctx, "create_reconciliation_from_finance_fact", "denied-reconciliation", mustJSONRPCStruct(t, map[string]any{
@@ -214,6 +231,17 @@ func (r *financeModuleGateOperationalFactRepo) CreateReconciliationFromFinanceFa
 	return r.CreateFinanceFactDraft(context.Background(), &biz.FinanceFactCreate{
 		FactNo: in.FactNo, FactType: biz.FinanceFactReconciliation, CounterpartyType: biz.FinanceCounterpartyCustomer,
 		CounterpartyID: &customerID, Amount: decimal.RequireFromString("128.50"), Currency: biz.FinanceCurrencyCNY,
+		SourceType: &sourceType, SourceID: &sourceID, IdempotencyKey: in.IdempotencyKey,
+	})
+}
+
+func (r *financeModuleGateOperationalFactRepo) CreatePayableFromOutsourcingOrder(_ context.Context, in *biz.FinanceFactFromOutsourcingOrderCreate) (*biz.FinanceFact, error) {
+	supplierID := 703
+	sourceType := biz.OutsourcingOrderSourceType
+	sourceID := in.OutsourcingOrderID
+	return r.CreateFinanceFactDraft(context.Background(), &biz.FinanceFactCreate{
+		FactNo: in.FactNo, FactType: biz.FinanceFactPayable, CounterpartyType: biz.FinanceCounterpartySupplier,
+		CounterpartyID: &supplierID, Amount: decimal.NewFromInt(24), Currency: biz.FinanceCurrencyCNY,
 		SourceType: &sourceType, SourceID: &sourceID, IdempotencyKey: in.IdempotencyKey,
 	})
 }

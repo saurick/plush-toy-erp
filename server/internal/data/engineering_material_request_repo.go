@@ -75,10 +75,18 @@ func (r *salesOrderRepo) lockEngineeringOrder(ctx context.Context, client *ent.C
 }
 
 func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, client *ent.Client, order *ent.SalesOrder, lock bool) (*biz.EngineeringMaterialRequest, error) {
-	result := &biz.EngineeringMaterialRequest{SalesOrderID: order.ID, OrderNo: order.OrderNo, OrderStatus: order.LifecycleStatus, SourceOrderVersion: order.Version, Status: "PREVIEW", Items: []*biz.EngineeringMaterialRequestItem{}, Sources: []map[string]any{}, Issues: []string{}, PurchaseOrders: []biz.EngineeringMaterialPurchaseOrder{}}
+	result, err := r.buildEngineeringMaterialSources(ctx, client, order, lock)
+	if err != nil {
+		return nil, err
+	}
 	if order.LifecycleStatus != biz.SalesOrderStatusActive {
 		result.Issues = append(result.Issues, "订单生效后才能提交采购用料审批")
 	}
+	return result, nil
+}
+
+func (r *salesOrderRepo) buildEngineeringMaterialSources(ctx context.Context, client *ent.Client, order *ent.SalesOrder, lock bool) (*biz.EngineeringMaterialRequest, error) {
+	result := &biz.EngineeringMaterialRequest{SalesOrderID: order.ID, OrderNo: order.OrderNo, OrderStatus: order.LifecycleStatus, SourceOrderVersion: order.Version, Status: "PREVIEW", Items: []*biz.EngineeringMaterialRequestItem{}, Sources: []map[string]any{}, Issues: []string{}, PurchaseOrders: []biz.EngineeringMaterialPurchaseOrder{}}
 	lines, err := client.SalesOrderItem.Query().Where(salesorderitem.SalesOrderID(order.ID), salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen)).Order(ent.Asc(salesorderitem.FieldID)).All(ctx)
 	if err != nil {
 		return nil, err
@@ -102,11 +110,11 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 	}
 	byKey := map[[2]int]*biz.EngineeringMaterialRequestItem{}
 	for _, line := range lines {
-		if line.ProductID == 0 || line.SampleBomID == nil {
+		if line.ProductID == 0 || line.BomID == nil {
 			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行尚未关联工程产品和 BOM", line.LineNo))
 			continue
 		}
-		q := client.BOMHeader.Query().Where(bomheader.ID(*line.SampleBomID), bomheader.ProductID(line.ProductID)).WithItems(func(q *ent.BOMItemQuery) {
+		q := client.BOMHeader.Query().Where(bomheader.ID(*line.BomID), bomheader.ProductID(line.ProductID)).WithItems(func(q *ent.BOMItemQuery) {
 			q.Order(ent.Asc(bomitem.FieldID)).WithUnit().WithMaterial(func(q *ent.MaterialQuery) {
 				q.WithSupplier()
 				if lock {
@@ -129,15 +137,8 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 		if err != nil {
 			return nil, err
 		}
-		if line.EngineeringStatus != biz.SalesOrderEngineeringConfirmed || header.Status != biz.BOMStatusActive || line.SampleBomFingerprint == nil || *line.SampleBomFingerprint != fingerprint {
-			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行需确认当前样品并启用量产 BOM", line.LineNo))
-		}
-		imageID, err := currentSalesOrderSampleImage(ctx, client, line.ProductID)
-		if err != nil {
-			return nil, err
-		}
-		if line.SampleImageAttachmentID == nil || imageID != *line.SampleImageAttachmentID {
-			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行产品图片已变更，请重新确认样品", line.LineNo))
+		if header.Status != biz.BOMStatusActive || line.BomFingerprint == nil || *line.BomFingerprint != fingerprint {
+			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行工程 BOM 尚未完成或已修改，请完成工程资料", line.LineNo))
 		}
 		if len(header.Edges.Items) == 0 {
 			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行 BOM 没有材料明细", line.LineNo))
@@ -179,7 +180,7 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 				result.Items = append(result.Items, group)
 			}
 			group.RequiredQuantity = group.RequiredQuantity.Add(usage)
-			result.Sources = append(result.Sources, map[string]any{"sales_order_item_id": line.ID, "line_no": line.LineNo, "product_id": line.ProductID, "product_name": line.ProductNameSnapshot, "product_code": line.ProductCodeSnapshot, "customer_product_no": line.CustomerProductNo, "order_date": order.OrderDate.Format("2006-01-02"), "ordered_quantity": line.OrderedQuantity.String(), "pre_shipment_sample_quantity": line.PreShipmentSampleQuantity.String(), "product_unit_name": productUnit.Name, "process_requirement": line.ProcessRequirement, "product_sku_id": line.ProductSkuID, "bom_id": header.ID, "bom_version": header.Version, "bom_edit_version": header.UpdatedAt.UnixMicro(), "sample_image_attachment_id": imageID, "bom_item_id": part.ID, "material_id": m.ID, "unit_id": u.ID, "position": part.Position, "piece_count": part.PieceCount, "unit_usage": part.Quantity.String(), "unit_usage_format": part.SourceSnapshot["quantity_format"], "total_usage_format": part.SourceSnapshot["total_format"], "loss_rate": part.LossRate.String(), "production_quantity": productionQuantity.String(), "total_usage": usage.String(), "process_base": part.ProcessBase, "process_method": part.ProcessMethod, "material_note": part.Note})
+			result.Sources = append(result.Sources, map[string]any{"sales_order_item_id": line.ID, "line_no": line.LineNo, "product_id": line.ProductID, "product_name": line.ProductNameSnapshot, "product_code": line.ProductCodeSnapshot, "customer_product_no": line.CustomerProductNo, "order_date": order.OrderDate.Format("2006-01-02"), "ordered_quantity": line.OrderedQuantity.String(), "pre_shipment_sample_quantity": line.PreShipmentSampleQuantity.String(), "product_unit_name": productUnit.Name, "process_requirement": line.ProcessRequirement, "product_sku_id": line.ProductSkuID, "bom_id": header.ID, "bom_version": header.Version, "bom_edit_version": header.UpdatedAt.UnixMicro(), "bom_item_id": part.ID, "material_id": m.ID, "unit_id": u.ID, "position": part.Position, "piece_count": part.PieceCount, "unit_usage": part.Quantity.String(), "unit_usage_format": part.SourceSnapshot["quantity_format"], "total_usage_format": part.SourceSnapshot["total_format"], "loss_rate": part.LossRate.String(), "production_quantity": productionQuantity.String(), "total_usage": usage.String(), "process_base": part.ProcessBase, "process_method": part.ProcessMethod, "material_note": part.Note})
 		}
 	}
 	if len(result.Items) > 2000 {
@@ -216,7 +217,7 @@ func engineeringMaterialSourceHash(in *biz.EngineeringMaterialRequest) string {
 		return items[i].UnitID < items[j].UnitID
 	})
 	// Header annotations do not add procurement inputs. Their source changes are
-	// guarded by the order version and the confirmed BOM version/fingerprint.
+	// guarded by the order version and the completed engineering BOM version/fingerprint.
 	// Calculated display totals do not change manufacturing inputs. This also
 	// keeps an existing approval valid when decimal presentation gains precision.
 	sources := make([]map[string]any, len(in.Sources))
@@ -224,7 +225,7 @@ func engineeringMaterialSourceHash(in *biz.EngineeringMaterialRequest) string {
 		entry := make(map[string]any, len(source))
 		for key, value := range source {
 			switch key {
-			case "product_code", "customer_product_no", "order_date", "ordered_quantity", "pre_shipment_sample_quantity", "product_unit_name", "process_requirement", "material_note", "total_usage", "unit_usage_format", "total_usage_format":
+			case "sample_image_attachment_id", "product_code", "customer_product_no", "order_date", "ordered_quantity", "pre_shipment_sample_quantity", "product_unit_name", "process_requirement", "material_note", "total_usage", "unit_usage_format", "total_usage_format":
 				continue
 			}
 			entry[key] = value
@@ -289,27 +290,63 @@ func (r *salesOrderRepo) SubmitEngineeringMaterialRequest(ctx context.Context, i
 	if err := r.settleMaterialRevisionForResubmit(ctx, tx.Client(), order.ID, in.ActorID, in.WorkflowTaskID, in.ExpectedTaskVersion); err != nil {
 		return nil, err
 	}
-	row, err := tx.EngineeringMaterialRequest.Create().SetSalesOrderID(order.ID).SetSourceOrderVersion(order.Version).SetOrderNoSnapshot(order.OrderNo).SetSourceSnapshot(preview.Sources).SetSubmittedBy(in.ActorID).Save(ctx)
+	result, err := createEngineeringMaterialRequest(ctx, tx.Client(), preview, in.ActorID)
 	if err != nil {
-		return nil, err
-	}
-	for _, item := range preview.Items {
-		_, err = tx.EngineeringMaterialRequestItem.Create().SetRequestID(row.ID).SetMaterialID(item.MaterialID).SetUnitID(item.UnitID).SetSupplierID(item.SupplierID).SetMaterialCode(item.MaterialCode).SetMaterialName(item.MaterialName).SetSupplierName(item.SupplierName).SetNillableSupplierItemNo(item.SupplierItemNo).SetNillableColor(item.Color).SetNillableSpec(item.Spec).SetUnitName(item.UnitName).SetRequiredQuantity(item.RequiredQuantity).Save(ctx)
-		if err != nil {
-			return nil, err
-		}
-	}
-	result, err := loadEngineeringMaterialRequest(ctx, tx.Client(), row)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := ensureEngineeringMaterialTask(ctx, tx.Client(), result, in.ActorID); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	tx = nil
+	return result, nil
+}
+
+// Engineering saves own the automatic handoff. Incomplete sources remain
+// editable; freezing the source and creating the review task commit together.
+func (r *salesOrderRepo) submitReadyEngineeringMaterials(ctx context.Context, client *ent.Client, order *ent.SalesOrder, actorID int) error {
+	if order.LifecycleStatus != biz.SalesOrderStatusActive {
+		return nil
+	}
+	exists, err := client.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.SalesOrderID(order.ID), engineeringmaterialrequest.StatusNEQ(biz.MaterialRequestRejected)).Exist(ctx)
+	if err != nil || exists {
+		return err
+	}
+	incomplete, err := client.SalesOrderItem.Query().Where(salesorderitem.SalesOrderID(order.ID), salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen), salesorderitem.BomFingerprintIsNil()).Exist(ctx)
+	if err != nil || incomplete {
+		return err
+	}
+	preview, err := r.buildEngineeringMaterialPreview(ctx, client, order, true)
+	if err != nil {
+		return err
+	}
+	if len(preview.Issues) > 0 || len(preview.Items) == 0 {
+		return nil
+	}
+	if err := r.settleMaterialRevisionForResubmit(ctx, client, order.ID, actorID, 0, 0); err != nil {
+		return err
+	}
+	_, err = createEngineeringMaterialRequest(ctx, client, preview, actorID)
+	return err
+}
+
+func createEngineeringMaterialRequest(ctx context.Context, client *ent.Client, preview *biz.EngineeringMaterialRequest, actorID int) (*biz.EngineeringMaterialRequest, error) {
+	row, err := client.EngineeringMaterialRequest.Create().SetSalesOrderID(preview.SalesOrderID).SetSourceOrderVersion(preview.SourceOrderVersion).SetOrderNoSnapshot(preview.OrderNo).SetSourceSnapshot(preview.Sources).SetSubmittedBy(actorID).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range preview.Items {
+		_, err = client.EngineeringMaterialRequestItem.Create().SetRequestID(row.ID).SetMaterialID(item.MaterialID).SetUnitID(item.UnitID).SetSupplierID(item.SupplierID).SetMaterialCode(item.MaterialCode).SetMaterialName(item.MaterialName).SetSupplierName(item.SupplierName).SetNillableSupplierItemNo(item.SupplierItemNo).SetNillableColor(item.Color).SetNillableSpec(item.Spec).SetUnitName(item.UnitName).SetRequiredQuantity(item.RequiredQuantity).Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	result, err := loadEngineeringMaterialRequest(ctx, client, row)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := ensureEngineeringMaterialTask(ctx, client, result, actorID); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -445,7 +482,7 @@ func (r *salesOrderRepo) generateMaterialPurchaseOrders(ctx context.Context, cli
 			return err
 		}
 		for i, item := range lines {
-			printSnapshot := &biz.PurchaseOrderItemMutation{MaterialID: item.MaterialID, UnitID: item.UnitID}
+			printSnapshot := &biz.PurchaseOrderItemMutation{PurchaseOrderID: po.ID, MaterialID: item.MaterialID, UnitID: item.UnitID}
 			if err := preparePurchaseItemPrintSnapshots(ctx, client, printSnapshot, nil); err != nil {
 				return err
 			}

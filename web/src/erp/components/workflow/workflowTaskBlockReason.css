@@ -1,0 +1,51 @@
+.workflow-task-block-panel,
+.workflow-task-block-reason,
+.workflow-task-block-reason__detail {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.workflow-task-block-reason {
+  gap: 16px;
+}
+
+.workflow-task-block-reason fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.workflow-task-block-reason legend,
+.workflow-task-block-reason__detail > label {
+  color: var(--erp-text);
+  font-weight: 600;
+  font-size: var(--erp-font-small);
+}
+
+.workflow-task-block-reason legend {
+  margin-bottom: 6px;
+}
+
+.workflow-task-block-reason .ant-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.workflow-task-block-reason .ant-radio-wrapper {
+  min-height: 32px;
+  align-items: center;
+  margin-inline-end: 0;
+}
+
+.workflow-task-block-reason__detail > [role='alert'] {
+  color: var(--erp-danger, #d43838);
+}
+
+@media (max-width: 600px) {
+  .workflow-task-block-reason .ant-radio-wrapper {
+    min-height: 44px;
+  }
+}

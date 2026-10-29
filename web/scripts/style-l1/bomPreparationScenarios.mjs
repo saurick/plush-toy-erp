@@ -1,7 +1,8 @@
+import { chooseWorkspaceEditor } from './businessEditorWorkspaceTools.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 export function createBOMPreparationScenarios(deps) {
-  return ['create', 'draft-mobile', 'multiple', 'readonly-mobile', 'stale', 'read-failure'].map((mode) => {
+  return ['create', 'multiple', 'stale', 'read-failure'].map((mode) => {
     const mobile = mode.endsWith('mobile')
     const readonly = mode === 'readonly-mobile'
     const orderNo = `SO-BOM-PREPARE-${mode}`
@@ -34,9 +35,9 @@ export function createBOMPreparationScenarios(deps) {
         rejectSave = mode === 'create'
         rejectRead = mode === 'read-failure'
         order = { id: 1, order_no: orderNo, customer_id: 1, currency: 'CNY', customer_snapshot: { name: '模拟客户' }, order_date: 1791648000, lifecycle_status: 'active', version: 1, item_count: 1 }
-        item = { id: 1, sales_order_id: 1, line_no: 1, product_id: 1, product_sku_id: null, sample_bom_id: ['create', 'multiple'].includes(mode) ? null : 2, requested_product_name: '模拟工程产品', ordered_quantity: '100', pre_shipment_sample_quantity: '2', unit_id: 1, unit_price: '10', amount: '1000', line_status: 'open', engineering_status: 'PREPARING' }
+        item = { id: 1, sales_order_id: 1, line_no: 1, product_id: 1, product_sku_id: null, bom_id: ['create', 'multiple'].includes(mode) ? null : 2, requested_product_name: '模拟工程产品', ordered_quantity: '100', pre_shipment_sample_quantity: '2', unit_id: 1, unit_price: '10', amount: '1000', line_status: 'open' }
         records = mode === 'create' ? [] : [structuredClone(original)]
-        if (mode === 'multiple') records.push({ ...structuredClone(original), id: 3, version: 'V3' })
+        if (mode === 'multiple') records.push({ ...structuredClone(original), id: 3, version: 'V3', items: [{ ...original.items[0], id: 12, bom_header_id: 3 }] })
         if (mobile) {
           await page.addInitScript(() => {
             const history = window.history.state || {}
@@ -99,90 +100,59 @@ export function createBOMPreparationScenarios(deps) {
         page.setDefaultTimeout(10000)
         await page.getByText(orderNo, { exact: true }).first().click()
         if (mobile) await page.getByRole('button', { name: /更多操作/u }).click()
-        await page.getByRole('button', { name: '工程与打样', exact: true }).click()
-        const engineering = page.getByRole('dialog').filter({ hasText: `工程与打样 · ${orderNo}` }).last()
-        const action = engineering.getByRole('button', { name: readonly ? '查看 BOM' : mode === 'create' || mode === 'multiple' ? '编制 BOM' : '继续编制', exact: true })
-        await action.waitFor()
-        const bomGeometry = await engineering.locator('.ant-select:has(input[id$="sample_bom_id"])').evaluate((node) => {
-          const box = node.getBoundingClientRect()
-          const cell = node.closest('td').getBoundingClientRect()
-          return { right: box.right, cellRight: cell.right, width: box.width }
-        })
-        deps.assert.ok(bomGeometry.width > 0 && bomGeometry.right <= bomGeometry.cellRight + 1, 'BOM 选择框不能覆盖相邻字段')
-        if (mode === 'create') {
-          await page.screenshot({ path: deps.path.join(deps.outputDir, 'engineering-bom-entry-desktop-4k.png'), animations: 'disabled' })
-          await engineering.locator('.erp-optional-field > summary').click()
-          await engineering.locator('textarea[id$="sample_note"]').fill('编制前的工程备注')
-        }
-        await action.click()
-        if (mode === 'create') {
-          await page.getByRole('button', { name: '继续填写', exact: true }).click()
-          deps.assert.equal(writes.length, 0)
-          await action.click()
-          await page.getByRole('button', { name: '保存并继续', exact: true }).click()
-          await page.locator('.ant-message-error').waitFor()
-          deps.assert.equal(rejectSave, false)
-          deps.assert.equal(writes.length, 0)
-          deps.assert.ok(page.url().includes('sales-orders'), '保存失败不能离开工程表单')
-          await action.click()
-          await page.getByRole('button', { name: '保存并继续', exact: true }).click()
-        }
+        await page.getByRole('button', { name: '工程资料', exact: true }).click()
+        const engineering = page.locator('[data-business-form-page]').filter({ has: page.locator('.erp-sales-order-engineering-form') })
+        await engineering.waitFor()
+        const editor = page.locator('.erp-bom-editor:visible')
+        deps.assert.equal(new URL(page.url()).pathname, '/erp/sales/project-orders/sales-orders', 'all editing remains in the business workspace')
+        deps.assert.equal(await engineering.getByRole('button', { name: '返回办理', exact: true }).count(), 0)
+        deps.assert.equal(await engineering.getByRole('button', { name: '返回工程资料', exact: true }).count(), 0)
         if (mode === 'multiple') {
-          const chooser = page.getByRole('dialog').filter({ hasText: '选择要编制的 BOM' }).last()
-          deps.assert.equal(await chooser.getByRole('button', { name: '继续编制', exact: true }).isDisabled(), true)
-          deps.assert.equal(await chooser.getByText('新建独立 BOM 草稿').count(), 0)
-          await chooser.getByRole('radio', { name: 'V3 · 草稿', exact: true }).check()
-          await chooser.getByRole('button', { name: '继续编制', exact: true }).click()
+          const choose = engineering.locator('.erp-sales-order-engineering-form').getByLabel('工程 BOM', { exact: true })
+          await choose.click()
+          await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'V3（草稿）' }).click()
         }
+        await chooseWorkspaceEditor(page, 'bom')
+        await editor.getByLabel('BOM 版本', { exact: true }).waitFor()
         if (mode === 'read-failure') {
-          const failure = page.locator('.ant-alert-error')
+          const failure = editor.getByRole('alert')
           await failure.waitFor()
           deps.assert.equal(writes.length, 0)
           await failure.getByRole('button', { name: '重新读取', exact: true }).click()
         }
-        const editor = page.locator('[data-business-form-page]:visible')
-        await editor.waitFor()
-        deps.assert.ok(page.url().includes(mobile ? '/m/engineering/handle/purchase/material-bom' : '/erp/purchase/material-bom'))
-        await editor.getByRole('button', { name: '返回工程与打样', exact: true }).waitFor()
-        if (mobile) deps.assert.equal(await page.evaluate(() => window.history.state.usr.workflowTaskNavigation.taskID), 91)
-        if (readonly || mode === 'stale') {
-          await editor.getByRole('heading', { name: '查看 BOM 版本' }).waitFor()
+        if (mode === 'stale') {
+          await editor.getByRole('heading', { name: /查看 BOM 版本.*只读/u }).waitFor()
           deps.assert.equal(await editor.getByRole('button', { name: '保存草稿', exact: true }).count(), 0)
         } else {
-          await editor.getByRole('heading', { name: mode === 'create' ? '新建 BOM 草稿' : '编辑 BOM 草稿' }).waitFor()
+          await page.waitForFunction(() => document.querySelector('.erp-bom-editor')?.getAttribute('aria-busy') === 'false')
           if (mode === 'create') {
-            deps.assert.equal(await editor.locator('input[id$="source_order_no"]').inputValue(), orderNo)
-            deps.assert.equal(await editor.locator('input[id$="quantity_text"]').inputValue(), '102')
-            await editor.locator('input[id$="version"]').fill('V1')
+            deps.assert.equal(await editor.getByLabel('来源订单号', { exact: true }).inputValue(), orderNo)
+            deps.assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '102')
+            await editor.getByLabel('BOM 版本', { exact: true }).fill('V1')
           } else {
-            deps.assert.equal(await editor.locator('input[id$="version"]').inputValue(), mode === 'multiple' ? 'V3' : 'V2')
-          }
-          if (mobile) {
-            await editor.locator('input[id$="version"]').fill('V2-补充')
-            await editor.getByRole('button', { name: '返回工程与打样', exact: true }).click()
-            const discard = page.getByRole('dialog').filter({ hasText: '放弃未保存的修改？' }).last()
-            await discard.getByRole('button', { name: '继续编辑', exact: true }).click()
-            deps.assert.equal(await editor.locator('input[id$="version"]').inputValue(), 'V2-补充')
-          }
-          if (mode === 'create' || mobile) {
-            await page.waitForFunction(() => !document.querySelector('.ant-message-notice'))
-            await page.screenshot({ path: deps.path.join(deps.outputDir, `engineering-bom-editor-${mode}.png`), animations: 'disabled' })
+            deps.assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), mode === 'multiple' ? 'V3' : 'V2')
           }
           await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
-          await editor.waitFor({ state: 'hidden' })
-          const save = writes.find((call) => call.method === 'save_bom_with_items')
-          deps.assert.ok(save)
-          deps.assert.equal(save.params.product_id, 1)
-          if (mode === 'create') deps.assert.equal(writes[0].params.items[0].sample_note, '编制前的工程备注')
+          await page.waitForFunction(() => document.querySelector('.erp-bom-editor')?.getAttribute('data-unsaved') === 'false')
+          const saved = writes.find((call) => call.method === 'save_bom_with_items')
+          deps.assert.ok(saved)
+          deps.assert.equal(saved.params.product_id, 1)
+          deps.assert.equal(await editor.isVisible(), true, 'saving retains the complete workspace')
+          deps.assert.equal(writes.filter((call) => call.method === 'save_sales_order_engineering').length, 0, 'saving a BOM does not silently save order source changes')
+          if (mode === 'create') {
+            await chooseWorkspaceEditor(page, 'engineering')
+            const selection = engineering.locator('.erp-sales-order-engineering-form').getByLabel('工程 BOM', { exact: true })
+            await engineering.getByRole('button', { name: '保存工程资料', exact: true }).click()
+            await page.locator('.ant-message-error').waitFor()
+            deps.assert.equal(await selection.isVisible(), true, 'failed engineering save preserves the source form')
+            deps.assert.equal(writes.filter((call) => call.method === 'save_sales_order_engineering').length, 0)
+            await engineering.getByRole('button', { name: '保存工程资料', exact: true }).click()
+            await engineering.waitFor({ state: 'hidden' })
+            deps.assert.equal(writes.filter((call) => call.method === 'save_sales_order_engineering').length, 1)
+          }
         }
-        await page.getByRole('button', { name: '返回工程与打样', exact: true }).filter({ visible: true }).click()
-        await engineering.waitFor()
-        const returnedAction = engineering.getByRole('button', { name: readonly || mode === 'stale' ? '查看 BOM' : '继续编制', exact: true })
-        await returnedAction.waitFor()
-        if (mobile) deps.assert.equal(await page.evaluate(() => window.history.state.usr.workflowTaskNavigation.taskID), 91)
-        deps.assert.equal(writes.filter((call) => call.method === 'save_sales_order_engineering').length, mode === 'create' ? 1 : 0, '返回仅带回 BOM 选择，不自动改写工程资料')
         await deps.assertNoHorizontalOverflow(page)
-        if (mobile || mode === 'create') await page.screenshot({ path: deps.path.join(deps.outputDir, `engineering-bom-entry-${mode}.png`), animations: 'disabled' })
+        await page.screenshot({ path: deps.path.join(deps.outputDir, `engineering-bom-entry-${mode}.png`), animations: 'disabled' })
       },
     }
   })

@@ -278,42 +278,18 @@
   background: rgb(127 29 29 / 0.32);
   color: #fca5a5;
 }
-.workflow-task-event-trail__disclosure > summary {
-  min-height: 32px;
-  cursor: pointer;
-}
-
 .workflow-task-event-trail__heading-label > .anticon {
   color: var(--erp-text-muted);
   font-size: 16px;
 }
 
-.workflow-task-event-trail__disclosure > summary > .anticon {
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
-}
-
-.workflow-task-event-trail__disclosure[open] > summary > .anticon {
-  transform: rotate(180deg);
-}
-
-.workflow-task-event-trail__disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-
-@media (pointer: coarse) {
-  .workflow-task-event-trail__disclosure > summary {
-    min-height: 44px;
-  }
-}
-
-.workflow-task-event-trail__disclosure > .workflow-task-event-trail__head {
+.workflow-task-event-trail__body > .workflow-task-event-trail__head {
   margin-bottom: 12px;
 }
 
 
 
-.workflow-task-event-trail--collapsible {
+.workflow-task-event-trail--compact {
   padding: 0;
   border: 0;
   border-top: 1px solid var(--erp-border);
@@ -321,14 +297,13 @@
   background: transparent;
 }
 
-.workflow-task-event-trail--collapsible .workflow-task-event-trail__head {
+.workflow-task-event-trail--compact .workflow-task-event-trail__head {
   display: flex;
-  min-height: 44px;
   align-items: center;
   padding: 10px 0;
 }
 
-.workflow-task-event-trail--collapsible .workflow-task-event-trail__head h3 {
+.workflow-task-event-trail--compact .workflow-task-event-trail__head h3 {
   margin: 0;
   font-size: var(--erp-font-small);
   font-weight: 500;
@@ -353,16 +328,12 @@
   white-space: nowrap;
 }
 
-.workflow-task-event-trail--collapsible .workflow-task-event-trail__item-head strong {
+.workflow-task-event-trail--compact .workflow-task-event-trail__item-head strong {
   font-size: var(--erp-font-small);
 }
 
-.workflow-task-event-trail--collapsible .workflow-task-event-trail__meta {
+.workflow-task-event-trail--compact .workflow-task-event-trail__meta {
   font-size: var(--erp-font-caption);
-}
-
-.workflow-task-event-trail--collapsible:has(details:not([open])) .workflow-task-event-trail__head {
-  margin-bottom: 0;
 }
 
 .workflow-task-event-trail__audit { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; max-width: min(360px, calc(100vw - 64px)); margin: 0; }

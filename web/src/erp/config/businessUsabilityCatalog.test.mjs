@@ -95,7 +95,14 @@ test('businessUsabilityCatalog: 新页完成条件不把审批、预留或业务
     /审批通过不等于已执行/u
   )
   assert.match(entry('shipments').flowSteps.join(' '), /任务管理的待我审批/u)
-  assert.match(entry('outbound').completion, /实际出货另行确认/u)
+  const outbound = entry('outbound')
+  for (const kind of ['销售出货', '生产领料', '委外发料', '库存预留']) {
+    assert(outbound.task.includes(kind), `出库帮助应覆盖${kind}`)
+  }
+  assert.match(outbound.completion, /审批放行不代表已出库/u)
+  assert.match(outbound.completion, /实际发货或发料过账后才减少账面库存/u)
+  assert.match(outbound.boundary, /审批放行、库存预留和释放不增减账面库存/u)
+  assert.match(outbound.flowSteps.join(' '), /释放预留不产生出库/u)
   assert.match(entry('reconciliation').completion, /不表示已收款或付款/u)
   assert.match(entry('invoices').completion, /实际开票结果另行核实/u)
   for (const key of ['receivables', 'payables']) {

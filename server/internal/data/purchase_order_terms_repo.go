@@ -25,7 +25,7 @@ func (r *purchaseOrderRepo) CompletePurchaseOrderTerms(ctx context.Context, in *
 	}
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	action := &biz.SourceOrderLifecycleAction{ID: in.ID, ExpectedVersion: in.ExpectedVersion, ActorID: in.ActorID,
-		ActionKey: biz.PurchaseOrderActionCompleteTerms, IdempotencyKey: in.IdempotencyKey, IntentHash: in.IntentHash}
+		ActionKey: in.ActionKey(), IdempotencyKey: in.IdempotencyKey, IntentHash: in.IntentHash}
 	query := tx.PurchaseOrder.Query().Where(purchaseorder.ID(in.ID))
 	if r.data.sqlDialect == dialect.Postgres {
 		query.Where(func(s *sql.Selector) { s.ForUpdate() })
@@ -51,6 +51,9 @@ func (r *purchaseOrderRepo) CompletePurchaseOrderTerms(ctx context.Context, in *
 	}
 	if order.LifecycleStatus != biz.PurchaseOrderStatusApproved && order.LifecycleStatus != biz.PurchaseOrderStatusClosed {
 		return nil, biz.ErrBadParam
+	}
+	if in.DeliveryOnly && order.LifecycleStatus != biz.PurchaseOrderStatusApproved {
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if order.LifecycleStatus == biz.PurchaseOrderStatusClosed && (!samePurchaseTermsDate(order.ExpectedArrivalDate, in.ExpectedArrivalDate) || !samePurchaseTermsDate(order.SupplierConfirmedArrivalDate, in.SupplierConfirmedArrivalDate)) {
 		return nil, biz.ErrBadParam
@@ -79,7 +82,7 @@ func (r *purchaseOrderRepo) CompletePurchaseOrderTerms(ctx context.Context, in *
 	lines := make([]map[string]any, 0, len(items))
 	for i, item := range items {
 		input := in.Items[i]
-		if input.ID != item.ID || input.UnitPrice == nil {
+		if input.ID != item.ID || (!in.DeliveryOnly && input.UnitPrice == nil) || (in.DeliveryOnly && input.UnitPrice != nil) {
 			return nil, biz.ErrBadParam
 		}
 		if input.ExpectedArrivalDate != nil && input.ExpectedArrivalDate.Before(order.PurchaseDate.UTC().Truncate(24*time.Hour)) {
@@ -88,14 +91,21 @@ func (r *purchaseOrderRepo) CompletePurchaseOrderTerms(ctx context.Context, in *
 		if order.LifecycleStatus == biz.PurchaseOrderStatusClosed && !samePurchaseTermsDate(item.ExpectedArrivalDate, input.ExpectedArrivalDate) {
 			return nil, biz.ErrBadParam
 		}
-		amount := item.PurchasedQuantity.Mul(*input.UnitPrice).Round(6)
-		if err := value.ValidateOptionalNonNegativeMoney(&amount); err != nil {
-			return nil, biz.ErrBadParam
+		update := tx.PurchaseOrderItem.UpdateOneID(item.ID)
+		line := map[string]any{"line_id": item.ID, "material_id": item.MaterialID, "unit_id": item.UnitID,
+			"purchased_quantity": item.PurchasedQuantity.String(), "expected_arrival_date": input.ExpectedArrivalDate,
+			"order_expected_arrival_date": in.ExpectedArrivalDate, "supplier_confirmed_arrival_date": in.SupplierConfirmedArrivalDate}
+		if !in.DeliveryOnly {
+			amount := item.PurchasedQuantity.Mul(*input.UnitPrice).Round(6)
+			if err := value.ValidateOptionalNonNegativeMoney(&amount); err != nil {
+				return nil, biz.ErrBadParam
+			}
+			if (item.UnitPrice != nil && !item.UnitPrice.Equal(*input.UnitPrice)) || (item.Amount != nil && !item.Amount.Equal(amount)) {
+				return nil, biz.ErrPurchaseOrderPriceFrozen
+			}
+			update.SetUnitPrice(*input.UnitPrice).SetAmount(amount)
+			line["unit_price"], line["amount"] = input.UnitPrice.String(), amount.String()
 		}
-		if (item.UnitPrice != nil && !item.UnitPrice.Equal(*input.UnitPrice)) || (item.Amount != nil && !item.Amount.Equal(amount)) {
-			return nil, biz.ErrPurchaseOrderPriceFrozen
-		}
-		update := tx.PurchaseOrderItem.UpdateOneID(item.ID).SetUnitPrice(*input.UnitPrice).SetAmount(amount)
 		if input.ExpectedArrivalDate == nil {
 			update.ClearExpectedArrivalDate()
 		} else {
@@ -104,9 +114,7 @@ func (r *purchaseOrderRepo) CompletePurchaseOrderTerms(ctx context.Context, in *
 		if _, err := update.Save(ctx); err != nil {
 			return nil, err
 		}
-		lines = append(lines, map[string]any{"line_id": item.ID, "material_id": item.MaterialID, "unit_id": item.UnitID,
-			"purchased_quantity": item.PurchasedQuantity.String(), "unit_price": input.UnitPrice.String(), "amount": amount.String(),
-			"expected_arrival_date": input.ExpectedArrivalDate, "order_expected_arrival_date": in.ExpectedArrivalDate, "supplier_confirmed_arrival_date": in.SupplierConfirmedArrivalDate})
+		lines = append(lines, line)
 	}
 	update := tx.PurchaseOrder.Update().Where(purchaseorder.ID(order.ID), purchaseorder.Version(in.ExpectedVersion)).AddVersion(1)
 	if in.ExpectedArrivalDate == nil {

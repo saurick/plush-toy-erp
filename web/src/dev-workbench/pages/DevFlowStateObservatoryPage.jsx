@@ -17,7 +17,7 @@ import {
   Spin,
   Tag,
 } from 'antd'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import Modal from '@/common/components/modal/AppModal'
 import { StateRulesView } from '../components/flow-state/StateRulesView.jsx'
@@ -25,6 +25,10 @@ import { FactsView } from '../components/flow-state/FactsView.jsx'
 import { RuntimeView } from '../components/flow-state/RuntimeView.jsx'
 import { WorkflowView } from '../components/flow-state/WorkflowView.jsx'
 import BusinessChainInstanceView from '../components/flow-state/BusinessChainInstanceView.jsx'
+import FinanceTraceView from '../components/flow-state/FinanceTraceView.jsx'
+import FinanceRulesView from '../components/flow-state/FinanceRulesView.jsx'
+import { FINANCE_RELATIONS_TOPIC_KEY, FINANCE_RULES, FINANCE_TOPIC_KEYS } from '../config/devFinanceWorkbench.mjs'
+import BusinessRelationFilters from '../components/flow-state/BusinessRelationFilters.jsx'
 import { TaskFinder } from '../components/flow-state/FlowTaskContext.jsx'
 import {
   BusinessChainOverviewView,
@@ -47,17 +51,20 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
+import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import {
-  DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
+  DEV_BUSINESS_TOPICS_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
-  DEV_STATUS_FLOWS_ROUTE,
+  DEV_BUSINESS_RULES_ROUTE,
 } from '../config/devRoutes.mjs'
 import {
   FLOW_READING_CONTEXT_KEYS,
   resolveDevFlowViewContext,
+  restoreDevFlowPrimaryContext,
 } from './devFlowViewContext.mjs'
+import { buildFulfillmentRelations, buildChainActionRelations, projectFulfillmentRelations, projectChainRelations, projectAllActionRelations } from '../config/devFulfillmentRelations.mjs'
 import { buildDevBusinessChainProjection } from '../config/devBusinessChainProjection.mjs'
 import { buildDevBusinessChainCustomerReview } from '../config/devBusinessChainCustomerReview.mjs'
 import { DEV_CUSTOMER_QUERY_KEY } from '../config/devCustomerScope.mjs'
@@ -76,10 +83,14 @@ import {
   DEV_FLOW_STATE_SELECTION_QUERY_KEYS as SELECTION_QUERY_KEYS,
   DEV_FLOW_STATE_VIEW_SELECTION_QUERY_KEYS as VIEW_SELECTION_QUERY_KEYS,
   canonicalizeDevFlowStateSearchParams,
+  DEV_BUSINESS_RULE_VIEWS,
+  resolveDevFlowViewRoute,
+  buildDevFlowSurfaceLocation,
+  readDevFlowRelationFilters,
+  patchDevFlowRelationFilters,
 } from './devFlowStateQuery.mjs'
 import '../styles/dev-flow-state-observatory.css'
 
-const SOURCE_PATH = 'docs/architecture/业务链与运行轨迹边界.md'
 const CATALOG_MODULE_PATH = '../config/devFlowStateCatalog.mjs'
 const CATALOG_MODULES = import.meta.glob('../config/devFlowStateCatalog.mjs')
 
@@ -91,12 +102,12 @@ const KNOWN_QUERY_KEYS = new Set([
 const VIEW_KEYS = new Set(VIEW_ITEMS.map((item) => item.value))
 const PRIMARY_VIEWS = [
   ...VIEW_ITEMS.filter((item) => ['chain', 'tracking'].includes(item.value)).map(({ value, label }) => ({ value, label })),
-  { value: 'rules', label: '查看规则' },
 ]
-const primaryViewKey = (view) => ['chain', 'tracking'].includes(view) ? view : 'rules'
-const TECHNICAL_VIEWS = VIEW_ITEMS.filter(
-  (item) => !['chain', 'tracking'].includes(item.value)
-).map(({ value, label }) => ({ value, label }))
+const primaryViewKey = (view) => view === 'chain' ? 'chain' : ['tracking', 'workflow', 'runtime', 'finance_records'].includes(view) ? 'tracking' : 'rules'
+const TECHNICAL_VIEWS = DEV_BUSINESS_RULE_VIEWS.map((key) => VIEW_ITEMS.find((item) => item.value === key))
+  .map(({ value, label }) => ({ value, label }))
+const TRACKING_VIEWS = VIEW_ITEMS.filter((item) => ['tracking', 'workflow', 'runtime', 'finance_records'].includes(item.value))
+  .map(({ value, label }) => ({ value, label: value === 'tracking' ? '关联任务' : label }))
 
 const DEFINITION_SEARCH_GUIDE_GROUPS = Object.freeze([
   {
@@ -283,7 +294,7 @@ function patchParams(searchParams, patch) {
     const normalized = cleanText(value)
     if (
       value === '' &&
-      [QUERY_KEYS.flow, QUERY_KEYS.process, QUERY_KEYS.fact].includes(key)
+      [QUERY_KEYS.flow, QUERY_KEYS.process, QUERY_KEYS.fact, QUERY_KEYS.financeRule, QUERY_KEYS.ruleAction].includes(key)
     ) {
       next.set(key, '')
     } else if (!normalized) next.delete(key)
@@ -451,7 +462,7 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
   )
 }
 
-function invalidQueryMessages(searchParams, catalog) {
+function invalidQueryMessages(searchParams, catalog, defaultView = DEFAULT_VIEW) {
   const messages = []
   for (const key of new Set(searchParams.keys())) {
     if (!KNOWN_QUERY_KEYS.has(key)) messages.push(`未知 query 参数：${key}`)
@@ -459,6 +470,8 @@ function invalidQueryMessages(searchParams, catalog) {
       messages.push(`query 参数重复：${key}`)
     }
   }
+  const readingTab = searchParams.get(QUERY_KEYS.roleTab)
+  if (readingTab && readingTab !== 'exceptions') messages.push('未登记的流程视图，请从侧栏进入业务专题')
   const view = cleanText(searchParams.get(QUERY_KEYS.view))
   const chainKey = cleanText(searchParams.get(QUERY_KEYS.chain))
   const nodeKey = cleanText(searchParams.get(QUERY_KEYS.node))
@@ -473,10 +486,22 @@ function invalidQueryMessages(searchParams, catalog) {
   const mapNodeKey = searchParams.get(QUERY_KEYS.roleMapNode)
   if (
     topicKey &&
+    topicKey !== FINANCE_RELATIONS_TOPIC_KEY &&
     !catalog.businessChains.some((item) => item.key === topicKey)
   ) {
     messages.push('未登记的业务专题')
   }
+  for (const [key, values] of [
+    [QUERY_KEYS.financeRule, ['', ...FINANCE_RULES.map((item) => item.key)]],
+    [QUERY_KEYS.financeTopic, FINANCE_TOPIC_KEYS],
+    [QUERY_KEYS.financeStep, ['0', '1', '2', '3']],
+    [QUERY_KEYS.financeStage, ['none', 'draft', 'posted']],
+    [QUERY_KEYS.financeChange, ['return', 'increase', 'transfer']],
+  ]) {
+    if (searchParams.has(key) && !values.includes(searchParams.get(key))) messages.push('未登记的财务阅读条件')
+  }
+  const financeFactID = searchParams.get(QUERY_KEYS.financeFact)
+  if (financeFactID !== null && (!/^[1-9]\d*$/.test(financeFactID) || !Number.isSafeInteger(Number(financeFactID)))) messages.push('账款编号无效')
   if (mapKey && !catalog.businessChains.some((item) => item.key === mapKey)) {
     messages.push('未登记的系统关联专题')
   }
@@ -515,7 +540,7 @@ function invalidQueryMessages(searchParams, catalog) {
       })
     : null
   const flow = catalog.flows.find((item) => item.key === flowKey)
-  const activeView = view || DEFAULT_VIEW
+  const activeView = view || defaultView
 
   if (view && !VIEW_KEYS.has(view)) messages.push(`未知视图：${view}`)
   if (VIEW_KEYS.has(activeView)) {
@@ -550,6 +575,13 @@ function invalidQueryMessages(searchParams, catalog) {
   if (stateKey && !flowKey) messages.push('状态 key 缺少所属状态对象')
   if (stateKey && flow && !flow.states.some((item) => item.key === stateKey)) {
     messages.push(`状态对象中不存在状态：${stateKey}`)
+  }
+  const actionKey = searchParams.get(QUERY_KEYS.ruleAction)
+  if (actionKey && (!flow || ![
+    ...flow.actionRules.filter((rule) => !stateKey || rule.states.includes(stateKey)),
+    ...flow.lifecycleRules,
+  ].some((rule) => rule.key === actionKey))) {
+    messages.push('办理动作不属于当前对象或选中状态')
   }
   if (
     processKey &&
@@ -596,13 +628,18 @@ export default function DevFlowStateObservatoryPage() {
   const { catalog } = catalogState
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
+  const navigate = useNavigate()
+  const topicsPage = location.pathname.replace(/\/+$/, '') === DEV_BUSINESS_TOPICS_ROUTE
+  const rulesPage = location.pathname.replace(/\/+$/, '') === DEV_BUSINESS_RULES_ROUTE
+  const defaultView = rulesPage ? 'states' : DEFAULT_VIEW
   const queryCanonicalization = useMemo(
-    () => canonicalizeDevFlowStateSearchParams(searchParams),
-    [searchParams]
+    () => canonicalizeDevFlowStateSearchParams(searchParams, { defaultView }),
+    [searchParams, defaultView]
   )
   const activeSearchParams = queryCanonicalization.searchParams
   const requestedView = cleanText(activeSearchParams.get(QUERY_KEYS.view))
-  const view = requestedView || DEFAULT_VIEW
+  const view = requestedView || defaultView
+  const viewRoute = resolveDevFlowViewRoute(view, { topics: topicsPage })
   const [customerExportOpen, setCustomerExportOpen] = useState(false)
   const [definitionSearchOpen, setDefinitionSearchOpen] = useState(false)
   const [printingCurrent, setPrintingCurrent] = useState(false)
@@ -623,7 +660,7 @@ export default function DevFlowStateObservatoryPage() {
   )
   const requestedFactKey = cleanText(activeSearchParams.get(QUERY_KEYS.fact))
   const taskId = cleanText(activeSearchParams.get(QUERY_KEYS.taskId))
-  const [taskDraft, setTaskDraft] = useState(taskId)
+  const [taskDraft, setTaskDraft] = useState(location.state?.flowRestoreFrame?.draft ?? taskId)
   const [selectedTask, setSelectedTask] = useState(null)
   const [customerReviewPrintSnapshot, setCustomerReviewPrintSnapshot] =
     useState(null)
@@ -631,7 +668,7 @@ export default function DevFlowStateObservatoryPage() {
   const sessionTokenRef = useRef(getToken())
   const [sessionRevision, setSessionRevision] = useState(0)
   const primaryViewsRef = useRef({})
-  const readingRestoreRef = useRef(null)
+  const readingRestoreRef = useRef(location.state?.flowRestoreFrame || null)
   const pageRef = useRef(null)
   const chainReturnRef = useRef({
     [QUERY_KEYS.chain]: requestedChainKey || ALL_BUSINESS_CHAINS_KEY,
@@ -653,9 +690,10 @@ export default function DevFlowStateObservatoryPage() {
         (current) => {
           const next = new URLSearchParams(current)
           next.delete(QUERY_KEYS.taskId)
+          next.delete(QUERY_KEYS.financeFact)
           return next
         },
-        { replace: true }
+        { replace: true, state: { flowReturnFrames: [], flowRuleViews: {}, flowRestoreFrame: null, flowTaskContext: false } }
       )
     }
     window.addEventListener(AUTH_SESSION_CHANGED_EVENT, resetSession)
@@ -688,19 +726,19 @@ export default function DevFlowStateObservatoryPage() {
     (patch, options = {}) => {
       setSearchParams(patchParams(activeSearchParams, patch), {
         replace: options.replace === true,
-        state: options.state || location.state,
+        state: { ...location.state, ...options.state, flowRestoreFrame: null },
       })
     },
     [activeSearchParams, setSearchParams, location.state]
   )
 
   const invalidMessages = catalog
-    ? invalidQueryMessages(activeSearchParams, catalog)
+    ? invalidQueryMessages(activeSearchParams, catalog, defaultView)
     : []
   const valid = invalidMessages.length === 0
   const [taskRead, setTaskRead] = useState(null)
   const [taskReadRevision, setTaskReadRevision] = useState(0)
-  const needsTaskDetail = Boolean(valid && taskId && !['chain', 'tracking'].includes(view) && String(selectedTask?.id || '') !== taskId)
+  const needsTaskDetail = Boolean(valid && taskId && !['chain', 'tracking', 'processes', 'finance_records', 'finance_rules'].includes(view) && String(selectedTask?.id || '') !== taskId)
 
   useEffect(() => {
     if (!needsTaskDetail) return undefined
@@ -718,12 +756,17 @@ export default function DevFlowStateObservatoryPage() {
   }, [needsTaskDetail, taskId, taskReadRevision, sessionRevision])
 
   useEffect(() => {
-    if (!queryCanonicalization.changed) return
+    if (!queryCanonicalization.changed || viewRoute !== location.pathname) return
     setSearchParams(queryCanonicalization.searchParams, {
       replace: true,
       state: location.state,
     })
-  }, [queryCanonicalization, setSearchParams, location.state])
+  }, [queryCanonicalization, setSearchParams, location.state, location.pathname, viewRoute])
+
+  useEffect(() => {
+    if (!VIEW_KEYS.has(view) || viewRoute === location.pathname) return
+    navigate({ pathname: viewRoute, search: location.search }, { replace: true, state: location.state })
+  }, [view, viewRoute, location.pathname, location.search, location.state, navigate])
 
   useEffect(() => {
     if (!catalog || !valid || view !== 'chain') return
@@ -749,7 +792,7 @@ export default function DevFlowStateObservatoryPage() {
     ? chain.nodes.find((item) => item.key === requestedNodeKey) ||
       (!requestedNodeKey ? chain.nodes[0] : null)
     : null
-  const taskScoped =
+  const taskScoped = view === 'processes' ? false :
     location.state?.flowTaskContext ??
     (view === 'tracking' || (view !== 'chain' && Boolean(taskId)))
   const readingContext = useMemo(
@@ -760,20 +803,24 @@ export default function DevFlowStateObservatoryPage() {
             searchParams: activeSearchParams,
             task: selectedTask,
             taskScoped,
+            topics: topicsPage,
           })
         : null,
-    [catalog, activeSearchParams, selectedTask, taskScoped]
+    [catalog, activeSearchParams, selectedTask, taskScoped, topicsPage]
   )
+  const fulfillmentRelations = useMemo(() => catalog ? buildFulfillmentRelations(catalog) : [], [catalog])
+  const allRelationActions = useMemo(() => catalog ? [
+    ...catalog.businessChains.flatMap((item) => buildChainActionRelations(catalog, item)),
+    ...fulfillmentRelations.flatMap((item) => item.actions.filter((action) => !action.step)),
+  ] : [], [catalog, fulfillmentRelations])
+  const stageRelation = !topicsPage && !taskScoped && (!requestedChainKey || overviewSelected) && !activeSearchParams.get(QUERY_KEYS.exception) && !activeSearchParams.get(QUERY_KEYS.roleTab)
+    ? fulfillmentRelations.find((item) => item.stage.stage === activeSearchParams.get(QUERY_KEYS.roleStage))
+    : null
   const chainProjection = useMemo(
-    () =>
-      catalog && readingContext
-        ? buildDevBusinessChainProjection({
-            catalog,
-            chainKey: readingContext.chainKey,
-            nodeKey: readingContext.nodeKey,
-          })
-        : null,
-    [catalog, readingContext]
+    () => stageRelation ? projectFulfillmentRelations(catalog, stageRelation, readDevFlowRelationFilters(activeSearchParams), activeSearchParams.get(QUERY_KEYS.relationAction))
+      : catalog && readingContext ? projectChainRelations(catalog, readingContext.chainKey, readingContext.nodeKey, taskScoped ? {} : readDevFlowRelationFilters(activeSearchParams), taskScoped ? null : activeSearchParams.get(QUERY_KEYS.relationAction))
+        : catalog && !taskScoped ? projectAllActionRelations(catalog, allRelationActions, readDevFlowRelationFilters(activeSearchParams)) : null,
+    [catalog, readingContext, stageRelation, activeSearchParams, taskScoped, allRelationActions]
   )
   const availableFlows = chainProjection?.flows || catalog?.flows || []
   const availableProcessDefinitions =
@@ -858,9 +905,9 @@ export default function DevFlowStateObservatoryPage() {
       : null
 
   useEffect(() => {
-    if (!catalog || !valid) return
+    if (!catalog || !valid || viewRoute !== location.pathname) return
     const patch = {}
-    if (!requestedView) patch[QUERY_KEYS.view] = DEFAULT_VIEW
+    if (!requestedView) patch[QUERY_KEYS.view] = defaultView
     if (view === 'chain' && !requestedChainKey) {
       patch[QUERY_KEYS.chain] = catalog.businessChainOverview.key
     }
@@ -872,13 +919,13 @@ export default function DevFlowStateObservatoryPage() {
       patch[QUERY_KEYS.state] = null
     }
     if (
-      view === 'runtime' &&
+      ['runtime', 'processes'].includes(view) &&
       requestedProcessKey !== definition?.key &&
       definition
     ) {
       patch[QUERY_KEYS.process] = definition.key
     }
-    if (view === 'runtime' && requestedProcessKey && !definition) {
+    if (['runtime', 'processes'].includes(view) && requestedProcessKey && !definition) {
       patch[QUERY_KEYS.process] = null
     }
     if (view === 'facts' && requestedFactKey !== fact?.factKey && fact) {
@@ -902,6 +949,9 @@ export default function DevFlowStateObservatoryPage() {
     updateParams,
     valid,
     view,
+    defaultView,
+    viewRoute,
+    location.pathname,
   ])
 
   const selectTask = (nextTaskId, task, targetView) => {
@@ -925,8 +975,8 @@ export default function DevFlowStateObservatoryPage() {
   }
   const returnFrames = location.state?.flowReturnFrames || []
   useLayoutEffect(() => {
-    const frame = readingRestoreRef.current
-    if (!frame) return undefined
+    const frame = readingRestoreRef.current || location.state?.flowRestoreFrame
+    if (!frame || catalogState.status !== 'ready') return undefined
     readingRestoreRef.current = null
     // Async task reads and diagrams can grow after navigation has rendered.
     const observer = new ResizeObserver(restore)
@@ -948,12 +998,13 @@ export default function DevFlowStateObservatoryPage() {
     inputs.forEach((event) => window.addEventListener(event, stop, true))
     restore()
     return stop
-  }, [location.key])
+  }, [location.key, location.state?.flowRestoreFrame, catalogState.status])
   const captureReadingFrame = () => {
     const active = document.activeElement
     return {
+      pathname: location.pathname,
       search: activeSearchParams.toString(),
-      label: VIEW_META[view]?.label || '上一层',
+      label: topicsPage && view === 'chain' ? '业务专题' : VIEW_META[view]?.label || '上一层',
       scroll: window.scrollY,
       focus: (active?.getAttribute('aria-label') || active?.textContent || '').trim(),
       taskScoped,
@@ -964,15 +1015,26 @@ export default function DevFlowStateObservatoryPage() {
     const previous = returnFrames.at(-1)
     if (!previous) return
     readingRestoreRef.current = previous
-    setSearchParams(new URLSearchParams(previous.search), {
+    navigate({ pathname: previous.pathname, search: previous.search ? `?${previous.search}` : '' }, {
       state: {
         ...location.state,
         flowReturnFrames: returnFrames.slice(0, -1),
         flowTaskContext: previous.taskScoped,
+        flowRestoreFrame: previous,
+      },
+    })
+  }
+  const openSurface = (topics, topicKey) => {
+    navigate(buildDevFlowSurfaceLocation(activeSearchParams, { topics, topicKey }), {
+      state: {
+        flowReturnFrames: [...returnFrames, captureReadingFrame()],
+        flowTaskContext: false,
+        flowRestoreFrame: null,
       },
     })
   }
   const openView = (nextView, patch = {}, options = {}) => {
+    if (options.replaceTool && nextView === view) return
     const allowedSelectionKeys = VIEW_SELECTION_QUERY_KEYS[nextView] || []
     const nextPatch = Object.fromEntries(
       SELECTION_QUERY_KEYS.map((key) => [key, null])
@@ -996,7 +1058,7 @@ export default function DevFlowStateObservatoryPage() {
       }
     }
     if (options.global) {
-      FLOW_READING_CONTEXT_KEYS.forEach((key) => {
+      [...FLOW_READING_CONTEXT_KEYS, QUERY_KEYS.role, QUERY_KEYS.relationMachine, QUERY_KEYS.relationPermission].forEach((key) => {
         nextPatch[key] = null
       })
     }
@@ -1004,7 +1066,7 @@ export default function DevFlowStateObservatoryPage() {
     if (primaryViewKey(nextView) !== primaryViewKey(view)) {
       primaryViewsRef.current[primaryViewKey(view)] = {
         ...frame,
-        focus: PRIMARY_VIEWS.find((item) => item.value === primaryViewKey(view)).label,
+        focus: PRIMARY_VIEWS.find((item) => item.value === primaryViewKey(view))?.label || '业务规则',
       }
     }
     const frames = options.main
@@ -1012,19 +1074,40 @@ export default function DevFlowStateObservatoryPage() {
       : options.replaceTool
         ? returnFrames
         : [...returnFrames, frame]
-    updateParams(nextPatch, {
-      state: {
-        ...location.state,
-        flowReturnFrames: frames,
-        flowTaskContext: options.global
-          ? false
-          : options.main && ['chain', 'tracking'].includes(nextView)
-            ? nextView === 'tracking'
-            : nextView === 'chain'
-              ? false
-              : frame.taskScoped,
+    const nextState = {
+      ...location.state,
+      flowRuleViews: {
+        ...location.state?.flowRuleViews,
+        ...(DEV_BUSINESS_RULE_VIEWS.includes(view) ? { [view]: frame } : {}),
       },
-    })
+      flowReturnFrames: frames,
+      flowRestoreFrame: null,
+      flowTaskContext: options.global
+        ? false
+        : options.main && ['chain', 'tracking'].includes(nextView)
+          ? nextView === 'tracking'
+          : nextView === 'chain'
+            ? false
+            : frame.taskScoped,
+    }
+    const previousRule = nextState.flowRuleViews[nextView]
+    if (rulesPage && options.replaceTool && previousRule) {
+      const restored = restoreDevFlowPrimaryContext(previousRule.search, activeSearchParams, { independentKeys: [QUERY_KEYS.financeRule] })
+      readingRestoreRef.current = restored.changed ? null : { ...previousRule, focus: VIEW_META[nextView].label }
+      setSearchParams(restored.searchParams, { state: nextState })
+      return
+    }
+    const leavesTopic = topicsPage && (options.global || (nextView === 'chain' && (
+      patch[QUERY_KEYS.roleStage] || patch[QUERY_KEYS.roleTab] === 'exceptions'
+    )))
+    const nextPathname = resolveDevFlowViewRoute(nextView, { topics: topicsPage && !leavesTopic })
+    if (nextPathname !== location.pathname) {
+      navigate({ pathname: location.pathname, search: location.search }, {
+        replace: true,
+        state: { ...location.state, flowRestoreFrame: frame },
+      })
+      navigate({ pathname: nextPathname, search: `?${patchParams(activeSearchParams, nextPatch)}` }, { state: nextState })
+    } else updateParams(nextPatch, { state: nextState })
   }
   const openPrimaryView = (nextPrimary) => {
     const currentPrimary = primaryViewKey(view)
@@ -1035,26 +1118,32 @@ export default function DevFlowStateObservatoryPage() {
     }
     const previous = primaryViewsRef.current[nextPrimary]
     if (!previous) {
-      openView(nextPrimary === 'rules' ? 'states' : nextPrimary, {}, { main: true })
+      openView(nextPrimary, {}, { main: true })
       return
     }
-    readingRestoreRef.current = previous
+    const restored = restoreDevFlowPrimaryContext(previous.search, activeSearchParams)
+    readingRestoreRef.current = restored.changed ? null : previous
     setTaskDraft(previous.draft)
-    setSearchParams(new URLSearchParams(previous.search), {
-      state: { ...location.state, flowReturnFrames: [], flowTaskContext: previous.taskScoped },
+    setSearchParams(restored.searchParams, {
+      state: { ...location.state, flowReturnFrames: [], flowTaskContext: nextPrimary === 'tracking' },
     })
   }
-  const clearChainContext = () =>
+  const clearChainContext = () => {
+    if (topicsPage) {
+      openView(view, { [QUERY_KEYS.chain]: null, [QUERY_KEYS.node]: null }, { global: true })
+      return
+    }
     updateParams(
       {
         [QUERY_KEYS.chain]: null,
         [QUERY_KEYS.node]: null,
         ...Object.fromEntries(
-          FLOW_READING_CONTEXT_KEYS.map((key) => [key, null])
+          [...FLOW_READING_CONTEXT_KEYS, QUERY_KEYS.role, QUERY_KEYS.relationMachine, QUERY_KEYS.relationPermission].map((key) => [key, null])
         ),
       },
       { state: { ...location.state, flowTaskContext: false } }
     )
+  }
   const openGlobalDefinitionView = (nextView, patch = {}) =>
     openView(
       nextView,
@@ -1170,13 +1259,23 @@ export default function DevFlowStateObservatoryPage() {
   const specialistSelection =
     ['workflow', 'runtime'].includes(view) && taskId
       ? selectedTask?.source_no || selectedTask?.task_code
-      : view === 'runtime'
-      ? definition?.label
-      : view === 'facts'
-        ? fact?.label
-        : view === 'states'
-          ? flow?.label
-          : ''
+      : ''
+  const ruleScopeLabel = chainProjection
+    ? [chainProjection.contextLabel || chainProjection.chain?.label, chainProjection.node?.label].filter(Boolean).join(' · ')
+    : ''
+  const ruleTools = catalog ? (
+    <section className="erp-dev-flow-rule-tools" aria-label="当前规则范围">
+      {!taskScoped ? <BusinessRelationFilters
+        catalog={catalog}
+        actions={stageRelation?.actions || (chainProjection?.chain ? buildChainActionRelations(catalog, chainProjection.chain) : allRelationActions)}
+        filters={readDevFlowRelationFilters(activeSearchParams)}
+        onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
+      /> : null}
+      {ruleScopeLabel ? <span data-chain-projection-context={chainProjection.chain?.key || 'all'}>{ruleScopeLabel}</span> : null}
+      {chainProjection ? <Button type="text" onClick={clearChainContext}>查看全部定义</Button> : null}
+      {activeSearchParams.has(QUERY_KEYS.relationAction) ? <Button type="text" onClick={() => updateParams({ [QUERY_KEYS.relationAction]: null, [QUERY_KEYS.flow]: null, [QUERY_KEYS.state]: null })}>查看本环节全部动作</Button> : null}
+    </section>
+  ) : null
 
   const renderView = () => {
     if (!catalog) {
@@ -1203,10 +1302,12 @@ export default function DevFlowStateObservatoryPage() {
       )
     }
     if (view === 'chain') {
-      if (overviewSelected) {
+      if (topicsPage || overviewSelected) {
         return (
           <BusinessChainOverviewView
             catalog={catalog}
+            topics={topicsPage}
+            actions={allRelationActions}
             taskId={taskId}
             selectedTask={selectedTask}
             onSelectChain={(key) =>
@@ -1219,6 +1320,7 @@ export default function DevFlowStateObservatoryPage() {
               })
             }
             onOpenView={openView}
+            onOpenTopics={(key) => openSurface(true, key)}
           />
         )
       }
@@ -1229,6 +1331,7 @@ export default function DevFlowStateObservatoryPage() {
           catalog={catalog}
           chain={chain}
           node={node}
+          focusNode={Boolean(searchParams.get(QUERY_KEYS.node))}
           taskId={taskId}
           selectedTask={selectedTask}
           onSelectChain={(key) =>
@@ -1245,6 +1348,12 @@ export default function DevFlowStateObservatoryPage() {
         />
       )
     }
+    if (view === 'finance_records') {
+      return <FinanceTraceView key={sessionRevision} factID={Number(activeSearchParams.get(QUERY_KEYS.financeFact)) || null} onSelectFact={(id) => updateParams({ [QUERY_KEYS.financeFact]: id == null ? null : String(id) })} onOpenRules={() => openView('finance_rules')} />
+    }
+    if (view === 'finance_rules') {
+      return <FinanceRulesView ruleKey={activeSearchParams.get(QUERY_KEYS.financeRule)} onSelectRule={(key) => updateParams({ [QUERY_KEYS.financeRule]: key })} onOpenRecords={() => openView('finance_records')} />
+    }
     if (view === 'tracking') {
       return (
         <BusinessChainInstanceView
@@ -1256,6 +1365,7 @@ export default function DevFlowStateObservatoryPage() {
       )
     }
     if (view === 'workflow') {
+      if (!taskId) return <Empty description="先查询并选择一笔任务，再查看协同记录" />
       return (
         <WorkflowView
           projection={chainProjection}
@@ -1267,21 +1377,22 @@ export default function DevFlowStateObservatoryPage() {
         />
       )
     }
-    if (view === 'runtime') {
+    if (view === 'runtime' || view === 'processes') {
+      if (view === 'runtime' && !taskId) return <Empty description="先查询并选择一笔任务，再查看运行轨迹" />
       return (
         <RuntimeView
           catalog={catalog}
           projection={chainProjection}
           definition={definition}
-          taskId={taskId}
-          selectedTask={selectedTask}
+          taskId={view === 'processes' ? '' : taskId}
+          selectedTask={view === 'processes' ? null : selectedTask}
           onSelectDefinition={(key) =>
             updateParams({ [QUERY_KEYS.process]: key ?? '' })
           }
           onBackToChain={undefined}
           onClearChainContext={clearChainContext}
-          onLocateTask={() => openView('tracking', {}, { main: true })}
-          onBrowseDefinitions={() => openGlobalDefinitionView('runtime', { [QUERY_KEYS.taskId]: null })}
+          onBrowseDefinitions={() => openGlobalDefinitionView('processes')}
+          ruleTools={ruleTools}
         />
       )
     }
@@ -1298,8 +1409,7 @@ export default function DevFlowStateObservatoryPage() {
               [QUERY_KEYS.state]: null,
             })
           }
-          onBackToChain={undefined}
-          onClearChainContext={clearChainContext}
+          ruleTools={ruleTools}
         />
       )
     }
@@ -1313,12 +1423,14 @@ export default function DevFlowStateObservatoryPage() {
           updateParams({
             [QUERY_KEYS.flow]: key ?? '',
             [QUERY_KEYS.state]: null,
+            [QUERY_KEYS.ruleAction]: null,
           })
         }
-        onSelectState={(key) => updateParams({ [QUERY_KEYS.state]: key })}
+        onSelectState={(key) => updateParams({ [QUERY_KEYS.state]: key, [QUERY_KEYS.ruleAction]: null })}
+        ruleAction={activeSearchParams.get(QUERY_KEYS.ruleAction)}
+        onSelectRuleAction={(key) => updateParams({ [QUERY_KEYS.ruleAction]: key })}
         onOpenView={openView}
-        onBackToChain={undefined}
-        onClearChainContext={clearChainContext}
+        ruleTools={ruleTools}
       />
     )
   }
@@ -1331,53 +1443,62 @@ export default function DevFlowStateObservatoryPage() {
       data-catalog-status={catalogState.status}
       data-flow-print-current={printingCurrent || undefined}
     >
-      <DevPageNav sourcePath={SOURCE_PATH} />
-      <header className="erp-dev-flow-header">
-        <Space align="center">
-          <PartitionOutlined className="erp-dev-flow-header__icon" />
-          <Title level={1}>
-            {DEV_PAGE_TITLE_BY_ROUTE[DEV_STATUS_FLOWS_ROUTE]}
-          </Title>
-          <Link
-            to={`${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?${new URLSearchParams({ chain: chain?.key || 'all' })}`}
-          >
-            查看链路实测报告
-          </Link>
-        </Space>
-        <section className="erp-dev-flow-nav erp-dev-flow-workspace-nav">
-          <DevTaskNav
-            compact
-            level="primary"
-            ariaLabel="业务链路方式"
-            items={PRIMARY_VIEWS}
-            value={primaryViewKey(view)}
-            disabled={catalogState.status === 'loading'}
-            onChange={openPrimaryView}
-          />
-          <Tag>
-            {view === 'tracking' || (view === 'workflow' && taskId)
-              ? '运行记录'
-              : view === 'runtime' && taskId
-                ? '流程记录'
-                : '设计结构'}
-          </Tag>
-          {!['chain', 'tracking'].includes(view) ? (
-            <span>
-              {VIEW_META[view]?.label}
-              {specialistSelection ? ` · ${specialistSelection}` : ''}
-            </span>
-          ) : null}
-          {chain ? (
-            <span className="erp-dev-flow-context-path">
-              {chain.label}
-              {node && view !== 'chain' ? ` / ${node.label}` : ''}
-            </span>
-          ) : null}
-        </section>
+      <DevPageNav />
+      <DevPageHeader
+        className="erp-dev-flow-header"
+        title={
+          <Space align="center">
+            <PartitionOutlined className="erp-dev-flow-header__icon" />
+            <Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[location.pathname]}</Title>
+          </Space>
+        }
+        navigation={
+          !rulesPage ? (
+            <>
+              {!topicsPage ? (
+                <DevTaskNav
+                  compact
+                  level="primary"
+                  ariaLabel="业务链路方式"
+                  items={PRIMARY_VIEWS}
+                  value={primaryViewKey(view)}
+                  disabled={catalogState.status === 'loading'}
+                  onChange={openPrimaryView}
+                />
+              ) : view !== 'chain' && returnFrames.length === 0 ? (
+                <Button onClick={() => openView('chain')}>专题关系</Button>
+              ) : null}
+              {primaryViewKey(view) !== 'rules' ? (
+                <Tag>
+                  {view === 'tracking' ||
+                  view === 'finance_records' ||
+                  (view === 'workflow' && taskId)
+                    ? '运行记录'
+                    : view === 'runtime' && taskId
+                      ? '流程记录'
+                      : '设计结构'}
+                </Tag>
+              ) : null}
+              {primaryViewKey(view) === 'tracking' && view !== 'tracking' ? (
+                <span>
+                  {VIEW_META[view]?.label}
+                  {specialistSelection ? ` · ${specialistSelection}` : ''}
+                </span>
+              ) : null}
+              {chain &&
+              primaryViewKey(view) !== 'rules' &&
+              view !== 'finance_records' ? (
+                <span className="erp-dev-flow-context-path">
+                  {chain.label}
+                  {node && view !== 'chain' ? ` / ${node.label}` : ''}
+                </span>
+              ) : null}
+            </>
+          ) : null
+        }
+      >
         <Space className="erp-dev-flow-header-actions">
-          <Button onClick={() => setDefinitionSearchOpen(true)}>
-            搜索定义
-          </Button>
+          <Button onClick={() => setDefinitionSearchOpen(true)}>搜索定义</Button>
           <Dropdown
             disabled={!valid || !catalog || printingCustomer}
             menu={{
@@ -1400,23 +1521,23 @@ export default function DevFlowStateObservatoryPage() {
             </Button>
           </Dropdown>
         </Space>
-      </header>
+      </DevPageHeader>
 
       {valid &&
       catalog &&
-      (!['chain', 'tracking'].includes(view) || returnFrames.length > 0) ? (
+      (view !== 'chain' || returnFrames.length > 0) ? (
         <section className="erp-dev-flow-reading-nav">
           {returnFrames.length > 0 ? (
             <Button icon={<LeftOutlined aria-hidden />} onClick={backToReading}>
               返回 {returnFrames.at(-1).label}
             </Button>
           ) : null}
-          {!['chain', 'tracking'].includes(view) ? (
+          {view !== 'chain' ? (
             <DevTaskNav
               compact
               level="secondary"
               ariaLabel="关联信息类型"
-              items={TECHNICAL_VIEWS}
+              items={primaryViewKey(view) === 'tracking' ? TRACKING_VIEWS : TECHNICAL_VIEWS}
               value={view}
               onChange={(key) => openView(key, {}, { replaceTool: true })}
             />
@@ -1424,7 +1545,7 @@ export default function DevFlowStateObservatoryPage() {
         </section>
       ) : null}
 
-      {valid && catalog && view === 'tracking' ? (
+      {valid && catalog && primaryViewKey(view) === 'tracking' && view !== 'finance_records' ? (
         <TaskFinder
           key={`finder-${sessionRevision}`}
           draft={taskDraft}
@@ -1460,7 +1581,7 @@ export default function DevFlowStateObservatoryPage() {
                   ),
                 })
               } else if (item.type === 'runtime') {
-                openGlobalDefinitionView('runtime', {
+                openGlobalDefinitionView('processes', {
                   [QUERY_KEYS.process]: item.key,
                 })
               } else if (item.type === 'facts') {
@@ -1553,7 +1674,7 @@ export default function DevFlowStateObservatoryPage() {
                     )
                   }}
                 >
-                  恢复到业务总图
+                  {topicsPage ? '恢复到业务专题' : '恢复到业务总图'}
                 </Button>
               </Space>
             }

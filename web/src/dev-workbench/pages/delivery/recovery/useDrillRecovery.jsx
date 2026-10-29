@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { deliveryReadErrorMessage } from '../readError.mjs'
 import { RECOVERY_VIEWS } from './shared.jsx'
 import {
-  buildDevCustomerScopedRoute,
   buildDevCustomerSnapshotKey,
 } from '../../../config/devCustomerScope.mjs'
 import {
@@ -19,7 +18,6 @@ import {
 import useDevCustomerScope from '../../../hooks/useDevCustomerScope.mjs'
 
 export function useDrillRecovery() {
-  const navigate = useNavigate()
   const [selectedDrillKey, setSelectedDrillKey] = useState('')
   const drillTriggerRef = useRef(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -161,14 +159,6 @@ export function useDrillRecovery() {
     }
   }, [customerReady, deliverySnapshotKey, refresh])
 
-  const navigateWithinCustomerScope = useCallback(
-    (route) => {
-      if (!customerReady) return
-      navigate(buildDevCustomerScopedRoute(route, customerScope.customerKey))
-    },
-    [customerReady, customerScope.customerKey, navigate]
-  )
-
   const overview = useMemo(
     () => buildDevRecoveryOverview(summary || {}),
     [summary]
@@ -195,7 +185,6 @@ export function useDrillRecovery() {
     drillTriggerRef,
     loadError,
     loading,
-    navigateWithinCustomerScope,
     overview,
     publicHealthy,
     recoveryReady,

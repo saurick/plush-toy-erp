@@ -1,15 +1,12 @@
 import React, { useState } from 'react'
-import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
-import { Descriptions, Empty, Space, Tag, Typography } from 'antd'
+import { Button, Descriptions, Empty, Space, Tag, Typography } from 'antd'
 import { MermaidDiagram } from '@/common/components/markdown'
 import DevTimestamp from '../DevTimestamp.jsx'
 import {
   buildQualityGateStageDurationComposition,
   formatQualityGateDuration,
-  getQualityGateFlowSegments,
 } from '../../config/devQualityGates.mjs'
 import {
-  getQualityGateProfileLabel,
   STAGE_STATUS,
   MANAGED_DATABASE_STEPS,
   MANAGED_DATABASE_FLOW,
@@ -17,7 +14,6 @@ import {
   previewStages,
   flowStageStatus,
   flowGroups,
-  terminalEvidence,
   longestStageId,
   operationUpdateAction,
 } from '../../config/qualityGatePresentation.mjs'
@@ -27,8 +23,7 @@ const { Text } = Typography
 export function TechnicalDetails({ operation }) {
   if (!operation) return null
   return (
-    <details className="erp-dev-disclosure erp-dev-quality-technical">
-      <summary>查看技术详情</summary>
+    <div className="erp-dev-quality-technical">
       <Descriptions
         size="small"
         column={1}
@@ -122,68 +117,7 @@ export function TechnicalDetails({ operation }) {
             : []),
         ]}
       />
-    </details>
-  )
-}
-
-function FlowMarker({ index, status }) {
-  if (status === 'passed') return <CheckCircleOutlined aria-hidden="true" />
-  if (status === 'failed') return <CloseCircleOutlined aria-hidden="true" />
-  return <span aria-hidden="true">{index}</span>
-}
-
-function TerminalEvidence({ operation }) {
-  const evidence = terminalEvidence(operation)
-  const items = [
-    {
-      key: 'receipt',
-      title: '正式回执',
-      timestamp: operation?.receipt?.finishedAt,
-      ...evidence.receipt,
-    },
-    { key: 'cleanup', title: '资源清理', ...evidence.cleanup },
-  ]
-  return (
-    <section
-      className="erp-dev-quality-flow__terminal"
-      aria-label="门禁终态证明"
-    >
-      <div className="erp-dev-quality-flow__segment-heading">
-        <div>
-          <Text strong>终态证明</Text>
-          <Text type="secondary">不计入 runner 运行阶段</Text>
-        </div>
-        <Tag>回执 + 清理读回</Tag>
-      </div>
-      <div className="erp-dev-quality-flow__terminal-items">
-        {items.map((item) => {
-          const status = STAGE_STATUS[item.status] || STAGE_STATUS.not_run
-          return (
-            <div
-              className="erp-dev-quality-flow__terminal-item"
-              data-status={item.status}
-              key={item.key}
-            >
-              <span className="erp-dev-quality-flow__terminal-marker">
-                <FlowMarker index="•" status={item.status} />
-              </span>
-              <div>
-                <Text strong>{item.title}</Text>
-                <Text type="secondary">{item.label}</Text>
-                {item.timestamp ? (
-                  <DevTimestamp
-                    value={item.timestamp}
-                    action="完成于"
-                    missing="完成时间未证明"
-                  />
-                ) : null}
-              </div>
-              <Tag color={status.color}>{status.label}</Tag>
-            </div>
-          )
-        })}
-      </div>
-    </section>
+    </div>
   )
 }
 
@@ -191,12 +125,7 @@ function StageDetails({ stage, operation }) {
   const hasSubsteps = stage.substeps.length > 0
   if (!hasSubsteps && !operation) return null
   return (
-    <details className="erp-dev-disclosure erp-dev-quality-flow__details">
-      <summary>
-        {hasSubsteps
-          ? `固定子步骤 ${stage.substeps.length} 项`
-          : '阶段技术信息'}
-      </summary>
+    <div className="erp-dev-quality-flow__details">
       {hasSubsteps ? (
         <>
           <ol className="erp-dev-quality-flow__substeps">
@@ -230,11 +159,11 @@ function StageDetails({ stage, operation }) {
           </Text>
         </div>
       ) : null}
-    </details>
+    </div>
   )
 }
 
-function StageDurationComposition({ stages }) {
+export function StageDurationComposition({ stages }) {
   const composition = buildQualityGateStageDurationComposition(stages)
   if (composition.items.length === 0) return null
   return (
@@ -291,14 +220,10 @@ function StageDurationComposition({ stages }) {
   )
 }
 
-export function ManagedDatabaseLifecycleGuide() {
-  const [diagramOpen, setDiagramOpen] = useState(false)
+export function ManagedDatabaseLifecycleGuide({ description }) {
   return (
-    <details
-      className="erp-dev-disclosure erp-dev-quality-managed-database"
-      onToggle={(event) => setDiagramOpen(event.currentTarget.open)}
-    >
-      <summary>查看本机托管数据库的静态运行与清理流程</summary>
+    <div className="erp-dev-quality-managed-database">
+      {description}
       <div className="erp-dev-quality-managed-database__body">
         <div className="erp-dev-quality-managed-database__copy">
           <Text strong>静态工作原理，不代表当前运行状态</Text>
@@ -308,125 +233,103 @@ export function ManagedDatabaseLifecycleGuide() {
             ))}
           </ol>
           <Text type="secondary">
-            当前是否就绪、运行到哪里、是否清理完成，仍以上方状态和正式 operation
-            回执为准。
+            本机诊断只验证当前工作区，不自动提交、推送或发布；固定提交以服务器 CI 为准。
           </Text>
         </div>
-        {diagramOpen ? (
-          <MermaidDiagram
-            chart={MANAGED_DATABASE_FLOW}
-            label="本机托管数据库生命周期图"
-            showSourceOnError={false}
-            flowchartHtmlLabels={false}
-          />
-        ) : null}
+        <MermaidDiagram
+          chart={MANAGED_DATABASE_FLOW}
+          label="本机托管数据库生命周期图"
+          showSourceOnError={false}
+          flowchartHtmlLabels={false}
+        />
       </div>
-    </details>
+    </div>
   )
 }
 
 export function GateExecutionFlow({ summary, operation, profile, standalone = false }) {
+  const [expandedStage, setExpandedStage] = useState('')
   const trackLabel = standalone ? '服务端诊断执行轨道' : '本机诊断执行轨道'
-  const stages = operation
-    ? deriveStages(summary, operation)
-    : previewStages(summary, profile)
+  const stages = operation ? deriveStages(summary, operation) : previewStages(summary, profile)
   const groups = flowGroups(summary, profile, stages)
   const longestId = longestStageId(stages)
-  const composition = buildQualityGateStageDurationComposition(stages)
-  const compositionById = new Map(
-    composition.items.map((item) => [item.id, item])
-  )
-  const strictSegments = getQualityGateFlowSegments(summary?.profiles, 'strict')
-  const strictExtraCount =
-    strictSegments.find((segment) => segment.id === 'strict-extra')?.stages
-      .length || 0
 
-  if (stages.length === 0) {
-    return <Empty description="正在读取正式门禁阶段" />
-  }
+  if (stages.length === 0) return <Empty description="正在读取正式门禁阶段" />
 
   return (
     <section className="erp-dev-quality-flow" aria-label={trackLabel}>
       <div className="erp-dev-quality-flow__heading">
-        <div>
-          <Text strong>{trackLabel}</Text>
-          <Text type="secondary">
-            {profile === 'strict'
-              ? `先运行 ${strictExtraCount} 个 strict 附加检查，再进入 full 共用主路径。`
-              : `直接运行 full 共用主路径；strict 会在此之前增加 ${strictExtraCount} 个检查。`}
-          </Text>
-        </div>
-        <Tag className={operation ? 'erp-dev-accent-tag' : undefined}>
-          {getQualityGateProfileLabel(profile, standalone)} · {stages.length} 个阶段
-        </Tag>
+        <Text strong>执行阶段</Text>
+        <Text type="secondary">{stages.length} 个阶段</Text>
       </div>
-      <div className="erp-dev-quality-flow__segments">
-        {groups.map((group) => (
-          <section className="erp-dev-quality-flow__segment" key={group.id}>
-            <div className="erp-dev-quality-flow__segment-heading">
-              <Text strong>{group.label}</Text>
-              <Tag>{group.scopeLabel}</Tag>
-            </div>
-            <ol className="erp-dev-quality-flow__track">
+      <div className="erp-dev-quality-flow__table-wrap">
+        <table className="erp-dev-quality-flow__table" data-table-lines="appearance">
+          <thead>
+            <tr>
+              <th scope="col">阶段</th>
+              <th scope="col">结果</th>
+              <th scope="col">耗时</th>
+              <th scope="col"><span className="erp-dev-quality-flow__details-label">详情</span></th>
+            </tr>
+          </thead>
+          {groups.map((group) => (
+            <tbody key={group.id}>
+              <tr className="erp-dev-quality-flow__group">
+                <th scope="rowgroup" colSpan={4}>{group.label}</th>
+              </tr>
               {group.stages.map((stage) => {
                 const displayStatus = flowStageStatus(stage, operation)
-                const status =
-                  STAGE_STATUS[displayStatus] || STAGE_STATUS.not_run
-                const index =
-                  stages.findIndex((item) => item.id === stage.id) + 1
-                const duration = compositionById.get(stage.id)
-                const emphasis =
-                  displayStatus === 'failed'
-                    ? 'failed'
-                    : displayStatus === 'running'
-                      ? 'current'
-                      : longestId === stage.id && duration
-                        ? 'longest'
-                        : 'supporting'
+                const status = STAGE_STATUS[displayStatus] || STAGE_STATUS.not_run
+                const index = stages.findIndex((item) => item.id === stage.id) + 1
+                const hasDetails = Boolean(operation || stage.substeps.length)
+                const expanded = expandedStage === stage.id
+                const longest = longestId === stage.id && Number.isFinite(stage.durationMs)
                 return (
-                  <li
-                    className="erp-dev-quality-flow__step"
-                    data-status={displayStatus}
-                    data-emphasis={emphasis}
-                    aria-current={
-                      displayStatus === 'running' ? 'step' : undefined
-                    }
-                    key={stage.id}
-                  >
-                    <span className="erp-dev-quality-flow__marker">
-                      <FlowMarker index={index} status={displayStatus} />
-                    </span>
-                    <div className="erp-dev-quality-flow__step-body">
-                      <div className="erp-dev-quality-flow__step-title">
-                        <Text type="secondary">第 {index} 步</Text>
-                        <Text strong>{stage.label}</Text>
-                      </div>
-                      <Space size={6} wrap>
-                        <Tag color={status.color}>{status.label}</Tag>
-                        {longestId === stage.id && duration ? (
-                          <Tag color="gold">最长阶段</Tag>
+                  <React.Fragment key={stage.id}>
+                    <tr
+                      className="erp-dev-quality-flow__step"
+                      data-status={displayStatus}
+                      data-emphasis={displayStatus === 'failed' ? 'failed' : displayStatus === 'running' ? 'current' : longest ? 'longest' : 'supporting'}
+                      aria-current={displayStatus === 'running' ? 'step' : undefined}
+                    >
+                      <th scope="row">
+                        <span className="erp-dev-quality-flow__number">{index}</span>
+                        {stage.label}
+                      </th>
+                      <td><Tag color={status.color}>{status.label}</Tag></td>
+                      <td>
+                        {operation && Number.isFinite(stage.durationMs) ? formatQualityGateDuration(stage.durationMs) : '—'}
+                        {longest ? <Text type="secondary" className="erp-dev-quality-flow__longest">最长</Text> : null}
+                      </td>
+                      <td>
+                        {hasDetails ? (
+                          <Button
+                            type="link"
+                            size="small"
+                            aria-label={`${expanded ? '收起' : '查看'}${stage.label}详情`}
+                            aria-expanded={expanded}
+                            aria-controls={`quality-stage-detail-${stage.id}`}
+                            onClick={() => setExpandedStage(expanded ? '' : stage.id)}
+                          >
+                            {expanded ? '收起' : '详情'}
+                          </Button>
                         ) : null}
-                        {stage.substeps.length ? (
-                          <Tag>{stage.substeps.length} 个固定子步骤</Tag>
-                        ) : null}
-                      </Space>
-                      {operation && duration ? (
-                        <Text type="secondary">
-                          {formatQualityGateDuration(duration.durationMs)} ·
-                          已记录阶段耗时占比 {duration.sharePercent}%
-                        </Text>
-                      ) : null}
-                      <StageDetails stage={stage} operation={operation} />
-                    </div>
-                  </li>
+                      </td>
+                    </tr>
+                    {expanded ? (
+                      <tr className="erp-dev-quality-flow__expanded">
+                        <td colSpan={4} id={`quality-stage-detail-${stage.id}`}>
+                          <StageDetails stage={stage} operation={operation} />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </React.Fragment>
                 )
               })}
-            </ol>
-          </section>
-        ))}
+            </tbody>
+          ))}
+        </table>
       </div>
-      <StageDurationComposition stages={stages} />
-      <TerminalEvidence operation={operation} />
     </section>
   )
 }

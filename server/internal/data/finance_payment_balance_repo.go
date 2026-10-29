@@ -151,11 +151,11 @@ func scopeFinanceFactsToPaymentOrder(query *ent.FinanceFactQuery, payment *ent.F
 			s.Where(entsql.In(s.C(financefact.FieldSourceID), matching))
 		}), nil
 	case "outsourcing_order":
-		return query.Where(financefact.SourceType(biz.OutsourcingFactSourceType), func(s *entsql.Selector) {
+		return query.Where(financefact.Or(financefact.And(financefact.SourceType(biz.OutsourcingOrderSourceType), financefact.SourceID(sourceID)), financefact.And(financefact.SourceType(biz.OutsourcingFactSourceType), func(s *entsql.Selector) {
 			facts := entsql.Table(outsourcingfact.Table)
 			matching := entsql.Select(facts.C(outsourcingfact.FieldID)).From(facts).Where(entsql.And(entsql.EQ(facts.C(outsourcingfact.FieldSourceType), biz.OutsourcingOrderSourceType), entsql.EQ(facts.C(outsourcingfact.FieldSourceID), sourceID)))
 			s.Where(entsql.In(s.C(financefact.FieldSourceID), matching))
-		}), nil
+		}))), nil
 	default:
 		return nil, biz.ErrFinanceFactSourceInvalid
 	}

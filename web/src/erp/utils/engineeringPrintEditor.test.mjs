@@ -1088,7 +1088,7 @@ test('engineeringPrintEditor: 空白模板显式清空业务字段但保留版�
   assert.deepEqual(workInstruction.appendixImages, [])
 })
 
-test('engineeringPrintTemplates: 物料明细旧页底图片仅在新字段缺失时迁入末尾附图', () => {
+test('engineeringPrintTemplates: 物料明细不读取退役的页底图片槽', () => {
   const legacyDraft = createEngineeringPrintDraft(
     MATERIAL_DETAIL_TEMPLATE_KEY,
     {
@@ -1117,11 +1117,50 @@ test('engineeringPrintTemplates: 物料明细旧页底图片仅在新字段缺�
     }
   )
 
-  assert.deepEqual(
-    legacyDraft.appendixImages.map((image) => image.name),
-    ['旧左图.svg', '旧右图.svg']
-  )
+  assert.deepEqual(legacyDraft.appendixImages, [])
   assert.deepEqual(clearedDraft.appendixImages, [])
+})
+
+test('engineeringPrintTemplates: 当前产品图和末尾附图在恢复与清空时保持各自数据', () => {
+  const productImage = {
+    name: '当前产品图.png',
+    dataURL: 'data:image/png;base64,cHJvZHVjdA==',
+    mimeType: 'image/png',
+  }
+  const appendixImage = {
+    id: 'current-appendix',
+    name: '当前末尾附图.png',
+    dataURL: 'data:image/png;base64,YXBwZW5kaXg=',
+    mimeType: 'image/png',
+    width: 640,
+    height: 480,
+    layoutMode: 'full',
+    segments: [],
+  }
+  const current = createEngineeringPrintDraft(MATERIAL_DETAIL_TEMPLATE_KEY, {
+    productNo: 'SIM-PRODUCT-EDIT',
+    images: { header_right: productImage, footer_left: productImage },
+    appendixImages: [appendixImage],
+  })
+  const stored = JSON.parse(JSON.stringify(current))
+  const restored = createEngineeringPrintDraft(
+    MATERIAL_DETAIL_TEMPLATE_KEY,
+    stored
+  )
+
+  assert.deepEqual(restored, current)
+  assert.equal(restored.productNo, 'SIM-PRODUCT-EDIT')
+  assert.equal(restored.images.header_right.dataURL, productImage.dataURL)
+  assert(!Object.hasOwn(restored.images, 'footer_left'))
+  assert.deepEqual(restored.appendixImages, [appendixImage])
+
+  const cleared = createEngineeringPrintDraft(MATERIAL_DETAIL_TEMPLATE_KEY, {
+    ...stored,
+    appendixImages: [],
+  })
+  assert.deepEqual(cleared.appendixImages, [])
+  assert.deepEqual(cleared.images, restored.images)
+  assert.deepEqual(stored.appendixImages, [appendixImage])
 })
 
 test('engineeringPrintTemplates: 作业行图片标注归一化后可随草稿恢复', () => {

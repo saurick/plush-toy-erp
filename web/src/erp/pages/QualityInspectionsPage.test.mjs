@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 
 import test from 'node:test'
+import { PurchaseSourceActions } from '../../common/consts/purchaseSourceActions.mjs'
 import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
 const source = readFileSync(
@@ -12,7 +13,8 @@ const editorSource = readFileSync(new URL('../components/quality-inspections/use
 const actionsSource = readFileSync(new URL('../components/quality-inspections/useQualityInspectionActions.js', import.meta.url), 'utf8')
 
 test('quality page uses exact purchase return permission and dedicated source command', () => {
-  assert.match(source, /'purchase\.return\.create'/u)
+  assert.equal(PurchaseSourceActions.qualityReturn.permission, 'purchase.return.create')
+  assert.match(source, /sourceActionAccess\(adminProfile, PurchaseSourceActions.qualityReturn\)/u)
   assert.match(source, /'purchase\.return\.read'/u)
   assert.match(source, /createPurchaseReturnFromQualityInspection/u)
   assert.match(source, /isRejectedIncomingInspection/u)
@@ -28,12 +30,12 @@ test('quality rejection return retries safely and validates the returned source 
     /listAllPurchaseReturns\(\s*compactParams\(\{[\s\S]*?quality_inspection_id: inspection\.id/u
   )
   assert.doesNotMatch(source, /listPurchaseReturns\([\s\S]{0,180}limit:\s*20/u)
-  assert.match(source, /getPurchaseReceipt\(\{ id: receiptID \}\)/u)
+  assert.match(source, /getPurchaseReceipt\(\{ id: receiptID \}, \{ signal: request\.signal \}\)/u)
   assert.match(source, /selectedRowPurchaseReceiptRequestRef/u)
   assert.match(source, /未能确认来源收货已入库，暂不能生成采购退货/u)
   const openAction = source.slice(
     source.indexOf('const openPurchaseReturn'),
-    source.indexOf('const closePurchaseReturn')
+    source.indexOf('const closePurchaseReturn =')
   )
   assert.match(
     openAction,
@@ -234,7 +236,7 @@ test('production-stage filter uses the WIP read model without inventory lot or w
   )
   assert.match(
     source,
-    /routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE'/u
+    /hasExactContext:\s*routeSelectedID > 0/u
   )
   assert.match(source, /const listedRouteInspection =/u)
   assert.match(source, /setWarehouseFilter\(''\)/u)

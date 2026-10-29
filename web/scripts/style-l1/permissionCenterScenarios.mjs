@@ -7,6 +7,7 @@ import {
 import { createPermissionUnifiedScenarios } from './permissionUnifiedScenarios.mjs'
 import { createPermissionRelationshipScenarios } from './permissionRelationshipScenarios.mjs'
 import { createPermissionAccessLayoutScenarios } from './permissionAccessLayoutScenarios.mjs'
+import { createRoleResponsibilityScenarios } from './roleResponsibilityScenarios.mjs'
 import { createPermissionRoleSwitchScenarios } from './permissionRoleSwitchScenarios.mjs'
 
 export function createPermissionCenterScenarios({
@@ -121,7 +122,7 @@ export function createPermissionCenterScenarios({
     if (mobile) return
 
     await page.getByRole('tab', { name: '岗位设置', exact: true }).click()
-    await page.getByRole('checkbox', { name: '查看销售订单', exact: true }).uncheck()
+    await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).uncheck()
     await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
     await preview.getByText('未保存的功能草稿', { exact: true }).waitFor()
     assert.equal(await save.isEnabled(), true)
@@ -134,16 +135,17 @@ export function createPermissionCenterScenarios({
     assert.deepEqual(writes[0].secondary_menu_paths, [])
     assert.equal(writes[0].data_scopes.length, 1)
     assert.equal(writes[0].data_scopes[0].resource_type, 'warehouse')
-    assert.equal(writes[0].permission_keys.includes(PermissionCode.SALES_ORDER_READ), false)
+    assert.equal(writes[0].permission_keys.includes(PermissionCode.SALES_ORDER_READ), true)
     assert.equal(await save.isDisabled(), true)
     await page.reload()
     await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
     await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
     await preview.waitFor()
-    assert.equal(await preview.getByText(/销售管理/u).count(), 0)
+    assert.equal(await preview.getByText('业务进度', { exact: true }).count(), 0)
     assert.equal(await save.isDisabled(), true)
   }
   return [
+    ...createRoleResponsibilityScenarios(),
     ...createPermissionRoleSwitchScenarios(),
     ...createPermissionAccessLayoutScenarios({
       openControlledAntSelectDropdown,
@@ -807,7 +809,7 @@ export function createPermissionCenterScenarios({
         await expectHeading(page, '权限管理')
         await expectText(page, '岗位设置')
         await expectText(page, '员工账号')
-        await expectText(page, '项功能已授权')
+        await expectText(page, '核心职责')
         await expectText(page, '数据范围')
         await expectText(page, '敏感字段')
         await expectText(page, '岗位导航')
@@ -835,6 +837,7 @@ export function createPermissionCenterScenarios({
           .filter({ hasText: '财务' })
           .click()
         await financeEffectiveAccessRead
+        await page.getByRole('button', { name: '查看功能明细', exact: true }).click()
         await page.evaluate(
           () =>
             new Promise((resolve) =>
@@ -946,31 +949,22 @@ export function createPermissionCenterScenarios({
         await selectedOnlySwitch.click()
         assert.equal(
           await page.locator('.erp-permission-checklist__section').count(),
-          2,
+          3,
           '只看已选保留已选功能所在业务域'
         )
         await selectedOnlySwitch.click()
-        const productionToggle = page.locator(
-          '[data-permission-module="production"] .erp-permission-checklist__toggle'
-        )
-        await productionToggle.focus()
+        const financeToggle = page.locator('[data-permission-module="finance"] .erp-permission-checklist__toggle')
+        await financeToggle.focus()
         await page.keyboard.press('Enter')
-        assert.equal(
-          await productionToggle.getAttribute('aria-expanded'),
-          'false'
-        )
+        assert.equal(await financeToggle.getAttribute('aria-expanded'), 'false')
         await page.keyboard.press('Enter')
-        assert.equal(
-          await productionToggle.getAttribute('aria-expanded'),
-          'true'
-        )
+        assert.equal(await financeToggle.getAttribute('aria-expanded'), 'true')
         const permissionModuleTitles = await page
           .locator('.erp-permission-checklist__toggle .ant-typography')
           .allTextContents()
         for (const expectedTitle of [
           '敏感字段',
-          '物料清单（BOM）',
-          '生产执行',
+          '财务',
         ]) {
           assert(
             permissionModuleTitles.includes(expectedTitle),
@@ -997,92 +991,12 @@ export function createPermissionCenterScenarios({
           '.erp-permission-checklist__section[data-permission-module="finance"]'
         )
         await expectText(financePermissionSection, '确认应收')
-        const receivablesMenuRow = financePermissionSection
-          .locator(
-            '.erp-permission-row__content[data-menu-key="receivables"][data-permission-kind="menu"]'
-          )
-          .filter({ hasText: '查看应收' })
-          .first()
-        const receivablesActionRow = financePermissionSection
-          .locator(
-            '.erp-permission-row__content[data-permission-kind="action"]'
-          )
-          .filter({ hasText: '确认应收' })
-          .first()
-        assert.match(
-          await receivablesMenuRow.getAttribute('title'),
-          /菜单入口/u
-        )
-        assert.match(
-          await receivablesMenuRow.getAttribute('title'),
-          /应收管理不显示/u
-        )
-        assert.match(
-          await receivablesActionRow.getAttribute('title'),
-          /页内操作/u
-        )
-        assert.match(
-          await receivablesActionRow.getAttribute('title'),
-          /需先开启：查看应收/u
-        )
-        await assertTextAbsent(receivablesActionRow, '常用工作')
-        await assertTextAbsent(receivablesActionRow, '更多功能')
-        const receivableConfirmCheckbox = page.getByRole('checkbox', {
-          name: /确认应收/u,
-        })
-        await receivableConfirmCheckbox.click()
-        await receivableConfirmCheckbox.click()
-        await expectText(
-          page,
-          '为避免有操作却进不了页面，已同时开启“应收管理”入口（查看应收）'
-        )
-        assert.match(
-          await receivablesMenuRow.getAttribute('title'),
-          /应收管理待核对/u
-        )
-        assert.doesNotMatch(
-          await receivablesMenuRow.getAttribute('title'),
-          /业务模块 \/ 财务管理/u
-        )
-        await assertTextAbsent(page, '预计显示')
-        await assertTextAbsent(page, '草稿会显示')
-        const pendingStatusBox = await receivablesMenuRow
-          .locator('xpath=ancestor::td[1]')
-          .boundingBox()
-        assert(pendingStatusBox, '菜单状态标签应有可测量尺寸')
-        await financePermissionSection.screenshot({
-          path: 'output/playwright/style-l1/permission-center-finance-inline-results.png',
-        })
-        assert.equal(
-          await receivablesMenuRow
-            .locator('xpath=ancestor::label[1]')
-            .getByRole('checkbox')
-            .isChecked(),
-          true,
-          '选择确认应收后应自动补齐查看应收页面入口'
-        )
-        await page.waitForTimeout(1300)
-        assert.match(
-          await receivablesMenuRow.getAttribute('title'),
-          /应收管理显示/u
-        )
-        assert.match(
-          await receivablesMenuRow.getAttribute('title'),
-          /业务模块 \/ 财务管理/u
-        )
-        await assertTextAbsent(page, '预计显示')
-        const settledStatusBox = await receivablesMenuRow
-          .locator('xpath=ancestor::td[1]')
-          .boundingBox()
-        assert(settledStatusBox, '后端核对后的菜单状态标签应有可测量尺寸')
-        assert(
-          Math.abs(settledStatusBox.width - pendingStatusBox.width) < 0.5,
-          `菜单状态标签宽度不应抖动：${pendingStatusBox.width} -> ${settledStatusBox.width}`
-        )
-        assert(
-          Math.abs(settledStatusBox.height - pendingStatusBox.height) < 0.5,
-          `菜单状态标签高度不应抖动：${pendingStatusBox.height} -> ${settledStatusBox.height}`
-        )
+        const confirmReceivable = page.getByRole('checkbox', { name: '确认应收', exact: true })
+        assert.equal(await confirmReceivable.isChecked(), true)
+        assert.equal(await confirmReceivable.isDisabled(), true)
+        assert.equal(await page.locator('.erp-permission-row input:not(:disabled)').count(), 0)
+        await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).uncheck()
+        await page.getByText('待关闭', { exact: true }).waitFor()
         await selectedOnlySwitch.click()
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'auto' }))
         await page.waitForTimeout(400)
@@ -1147,7 +1061,7 @@ export function createPermissionCenterScenarios({
         await expectText(page, '任务管理')
         await expectText(page, '基础资料')
         await expectText(page, '销售管理')
-        await expectText(page, '库存管理')
+        await expectText(page, '仓储管理')
         await expectText(page, '历史记录中心')
         await expectText(page, '帮助中心')
         await pageAccessTab.click()
@@ -1215,6 +1129,7 @@ export function createPermissionCenterScenarios({
         await expectText(page, '可进入')
         await expectText(page, '不可进入')
         await page.getByRole('tab', { name: /岗位设置/u }).click()
+        await page.getByRole('button', { name: '查看功能明细', exact: true }).click()
         await assertTextAbsent(page, '当前角色权限尚未保存')
         await assertTextAbsent(page, '角色名称可按岗位调整，职责权限保持统一')
         await assertTextAbsent(page, 'system.role.permission.manage')
@@ -1328,12 +1243,7 @@ export function createPermissionCenterScenarios({
           scenarioName: 'permission-center-desktop',
         })
         await expectText(page, '只看已选')
-        await page
-          .locator(
-            '.erp-permission-checklist__actions input[type=checkbox]:not(:disabled):not(:checked)'
-          )
-          .first()
-          .click()
+        await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).uncheck()
         await expectText(page, '有未保存调整')
         const roleCards = page.locator('.erp-role-template-card')
         if ((await roleCards.count()) > 1) {

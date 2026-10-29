@@ -5,6 +5,7 @@ import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessModal from '../business-list/BusinessModal.jsx'
 import {
   completePurchaseOrderTerms,
+  updatePurchaseOrderDelivery,
   getPurchaseOrder,
   listAllPurchaseOrderItems,
 } from '../../api/masterDataOrderApi.mjs'
@@ -20,6 +21,7 @@ const dateParam = (value) =>
 
 export default function PurchaseOrderTermsModal({
   order,
+  deliveryOnly = false,
   customerKey,
   unitOptions = [],
   onClose,
@@ -30,6 +32,7 @@ export default function PurchaseOrderTermsModal({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const attempts = useRef(createSourceBusinessActionAttemptStore())
+  const actionLabel = deliveryOnly ? '维护采购交期' : '补齐采购价格与交期'
   const orderID = Number(order?.id || 0)
 
   useEffect(() => {
@@ -78,7 +81,7 @@ export default function PurchaseOrderTermsModal({
       })
       .catch((error) => {
         if (!controller.signal.aborted && !isRpcAbortError(error)) {
-          message.error(getActionErrorMessage(error, '读取采购补价资料'))
+          message.error(getActionErrorMessage(error, '读取采购条款'))
         }
       })
       .finally(() => {
@@ -100,18 +103,18 @@ export default function PurchaseOrderTermsModal({
       ),
       items: context.items.map((item, index) => ({
         id: item.id,
-        unit_price: String(values.items[index].unit_price),
+        ...(deliveryOnly ? {} : { unit_price: String(values.items[index].unit_price) }),
         expected_arrival_date: dateParam(
           values.items[index].expected_arrival_date
         ),
       })),
     }
-    const scope = `purchase-terms:${orderID}`
+    const scope = `${deliveryOnly ? 'purchase-delivery' : 'purchase-terms'}:${orderID}`
     let attempt
     setSaving(true)
     try {
       attempt = attempts.current.prepare(scope, payload)
-      const updated = await completePurchaseOrderTerms(attempt.params)
+      const updated = await (deliveryOnly ? updatePurchaseOrderDelivery : completePurchaseOrderTerms)(attempt.params)
       if (
         updated?.id !== context.order.id ||
         Number(updated.version) <= Number(context.order.version)
@@ -121,7 +124,7 @@ export default function PurchaseOrderTermsModal({
         })
       }
       attempts.current.settle(scope, attempt, null)
-      message.success('采购价格与交期已保存')
+      message.success(deliveryOnly ? '采购交期已保存' : '采购价格与交期已保存')
       onClose?.()
       try {
         await onChanged?.()
@@ -133,7 +136,7 @@ export default function PurchaseOrderTermsModal({
       message[retained ? 'warning' : 'error'](
         retained
           ? '结果暂时无法确认，请保持内容不变后重试'
-          : getActionErrorMessage(error, '补齐采购价格与交期')
+          : getActionErrorMessage(error, actionLabel)
       )
     } finally {
       setSaving(false)
@@ -144,7 +147,7 @@ export default function PurchaseOrderTermsModal({
   return (
     <BusinessModal
       open={Boolean(orderID)}
-      title={`补齐价格与交期${order?.purchase_order_no ? ` · ${order.purchase_order_no}` : ''}`}
+      title={`${deliveryOnly ? '维护交期' : '补齐价格与交期'}${order?.purchase_order_no ? ` · ${order.purchase_order_no}` : ''}`}
       size="localAction"
       form={form}
       okText="保存"
@@ -156,7 +159,7 @@ export default function PurchaseOrderTermsModal({
       <Spin spinning={loading}>
         <Form form={form} layout="vertical" disabled={saving}>
           <p>
-            采购数量沿用批准结果。已确认价格保持锁定，晚补价用于缺价收货的结算。
+            {deliveryOnly ? '交期可独立维护或清空，无需填写价格。明细交期优先于整单交期，采购数量沿用批准结果。' : '采购数量沿用批准结果。已确认价格保持锁定，晚补价用于缺价收货的结算。'}
           </p>
           <div
             style={{
@@ -196,7 +199,7 @@ export default function PurchaseOrderTermsModal({
                 render: (_, item) =>
                   `${item.purchased_quantity} ${referenceLabel(unitOptions, item.unit_id, '单位')}`,
               },
-              {
+              ...(!deliveryOnly ? [{
                 title: context?.order.currency
                   ? `单价（${context.order.currency}）`
                   : '单价',
@@ -217,7 +220,7 @@ export default function PurchaseOrderTermsModal({
                     />
                   </Form.Item>
                 ),
-              },
+              }] : []),
               {
                 title: '明细预计到货',
                 key: 'arrival',

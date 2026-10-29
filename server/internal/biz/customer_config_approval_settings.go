@@ -134,10 +134,10 @@ var approvalSettingCatalog = []approvalSettingCatalogItem{
 		FactBoundary:   "批准不执行 SCRAP、超领或 WIP 让步",
 	},
 	{
-		Key: "inventory_adjustment", Label: "库存人工调整审批", Domain: "仓库",
+		Key: "inventory_adjustment", Label: "库存盘点与调整审批", Domain: "仓库",
 		Configurable:   false,
 		BlockedReasons: []string{approvalResponsibilityFixedByProcessContract},
-		DomainBoundary: "已登记库存人工调整源单与 ProcessRuntime；老板审批后由仓库责任池显式过账",
+		DomainBoundary: "已登记库存盘点与调整源单与 ProcessRuntime；老板审批后由仓库责任池显式过账",
 		FactBoundary:   "批准不等于过账；只有库存领域命令写库存交易和余额",
 	},
 	{
@@ -158,7 +158,7 @@ var approvalSettingCatalog = []approvalSettingCatalogItem{
 		Key: "engineering_material", Label: "工程用料审批", Domain: "工程 / 采购",
 		Configurable:   false,
 		BlockedReasons: []string{approvalResponsibilityFixedByProcessContract},
-		DomainBoundary: "工程按已确认样品提交用料汇总，老板审核后由另一位财务人员核定采购数量、单价和交期",
+		DomainBoundary: "工程完成资料后自动汇总用料并送审，老板审核后由另一位财务人员核对冻结用料并批准生成采购订单",
 		FactBoundary:   "财务批准后按厂商生成采购订单；到货、质检、入库和付款仍分别办理",
 	},
 }

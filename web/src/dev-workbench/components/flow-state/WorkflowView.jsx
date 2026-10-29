@@ -16,7 +16,6 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { listWorkflowTaskEvents } from '@/erp/api/workflowApi.mjs'
 import { getWorkflowTaskDisplayName } from '@/erp/utils/processRuntimePresentation.mjs'
-import { isApprovalWorkflowTask } from '@/erp/utils/workflowDashboardStats.mjs'
 import { buildWorkflowTaskEventTrailModel } from '@/erp/utils/workflowTaskEventPresentation.mjs'
 import {
   getWorkflowTaskStatusMeta,
@@ -88,7 +87,6 @@ function WorkflowView({
   const events = useWorkflowEvents(taskId, revision)
   const model = buildWorkflowTaskEventTrailModel({
     events: events.items,
-    approvalTask: isApprovalWorkflowTask(selectedTask || {}),
     task: selectedTask || {},
   })
   const status = selectedTask ? getWorkflowTaskStatusMeta(selectedTask) : null

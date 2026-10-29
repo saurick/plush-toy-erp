@@ -7,7 +7,9 @@ import {
   LinkOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Tag } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
+
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
@@ -86,6 +88,9 @@ import {
   isSourceBusinessActionResultUnknown,
   sourceBusinessActionNo,
 } from '../utils/sourceBusinessAction.mjs'
+import { PurchaseSourceActions } from '../../common/consts/purchaseSourceActions.mjs'
+import { sourceActionAccess, isSourceActionPermissionDenied, SOURCE_ACCESS_REVOKED_MESSAGE } from '../utils/sourceActionAccess.mjs'
+import SourceActionAccessNotice from '../components/SourceActionAccessNotice.jsx'
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
   buildPurchaseReceiptPayablePayload,
@@ -181,7 +186,7 @@ function receiptQuantityTotal(receipt = {}) {
 
 export default function PurchaseReceiptsPage() {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
-  const outletContext = useOutletContext()
+  const outletContext = useBusinessPageContext()
   const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
@@ -228,9 +233,14 @@ export default function PurchaseReceiptsPage() {
   })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  useWorkflowTaskBusinessBusy(saving)
   const [selectedRow, setSelectedRow] = useState(null)
   const [detailReceipt, setDetailReceipt] = useState(null)
   const [receiptExceptionMode, setReceiptExceptionMode] = useState(null)
+  const [receiptExceptionSource, setReceiptExceptionSource] = useState(null)
+  const beginExceptionRequest = useLatestRequestCoordinator()
+  const exceptionInFlightRef = useRef(false)
+  const exceptionAccessRef = useRef(null)
   const [receiptExceptionRecordsOpen, setReceiptExceptionRecordsOpen] =
     useState(false)
   const [financeSourceReceipt, setFinanceSourceReceipt] = useState(null)
@@ -288,10 +298,9 @@ export default function PurchaseReceiptsPage() {
     adminProfile,
     PermissionCode.PURCHASE_RECEIPT_CANCEL_DRAFT
   )
-  const canCreateReturn = hasActionPermission(
-    adminProfile,
-    PermissionCode.PURCHASE_RETURN_CREATE
-  )
+  const returnSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.receiptReturn)
+  const adjustmentSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.receiptAdjustment)
+  const canCreateReturn = returnSourceAccess.allowed
   const canPostReturn = hasActionPermission(
     adminProfile,
     PermissionCode.PURCHASE_RETURN_POST
@@ -308,10 +317,8 @@ export default function PurchaseReceiptsPage() {
     adminProfile,
     PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_READ
   )
-  const canCreateAdjustment = hasActionPermission(
-    adminProfile,
-    PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_CREATE
-  )
+  const canCreateAdjustment = adjustmentSourceAccess.allowed
+  exceptionAccessRef.current = { return: returnSourceAccess, adjustment: adjustmentSourceAccess }
   const canPostAdjustment = hasActionPermission(
     adminProfile,
     PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_POST
@@ -320,10 +327,9 @@ export default function PurchaseReceiptsPage() {
     adminProfile,
     PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_CANCEL
   )
-  const canCreatePayable = hasActionPermission(
-    adminProfile,
-    PermissionCode.FINANCE_PAYABLE_CONFIRM
-  )
+  const receiptSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.receipt)
+  const payableSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.payable)
+  const canCreatePayable = payableSourceAccess.allowed
   const canViewPayable =
     (canCreatePayable ||
       hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYABLE_READ)) &&
@@ -714,11 +720,43 @@ export default function PurchaseReceiptsPage() {
     [loadRows, reportBusinessResult]
   )
 
+  const closeReceiptException = useCallback(() => {
+    beginExceptionRequest('exception').finish()
+    setReceiptExceptionMode(null)
+    setReceiptExceptionSource(null)
+    setSaving(false)
+  }, [beginExceptionRequest])
+
+  const openReceiptException = useCallback((mode) => {
+    const access = exceptionAccessRef.current[mode]
+    if (!access?.allowed) {
+      message.warning(access?.reason)
+      return
+    }
+    if (!selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED) return
+    setReceiptExceptionSource(selectedRow)
+    setReceiptExceptionMode(mode)
+  }, [selectedRow])
+
+  useEffect(() => {
+    if (receiptExceptionMode && !exceptionAccessRef.current[receiptExceptionMode].allowed) {
+      closeReceiptException()
+      message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+    }
+  }, [canCreateReturn, canCreateAdjustment, receiptExceptionMode, closeReceiptException])
+
   const submitReceiptException = useCallback(
     async (values) => {
-      const receipt = selectedRow
+      const receipt = receiptExceptionSource
       const mode = receiptExceptionMode
-      if (!receipt?.id || !['return', 'adjustment'].includes(mode)) return
+      if (!receipt?.id || !['return', 'adjustment'].includes(mode) || exceptionInFlightRef.current) return
+      if (!exceptionAccessRef.current[mode].allowed) {
+        closeReceiptException()
+        message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+        return
+      }
+      const request = beginExceptionRequest('exception')
+      exceptionInFlightRef.current = true
       const scope = `${mode}:${receipt.id}`
       let attempt
       setSaving(true)
@@ -761,11 +799,12 @@ export default function PurchaseReceiptsPage() {
           throw error
         }
         exceptionAttemptsRef.current.settle(scope, attempt)
+        if (!request.isCurrent() || !exceptionAccessRef.current[mode].allowed) return
         reportBusinessResult(mode === 'return' ? '采购退货草稿已生成' : '入库调整草稿已生成', createdRecord)
         message.success(
           mode === 'return' ? '采购退货草稿已生成' : '入库调整草稿已生成'
         )
-        setReceiptExceptionMode(null)
+        closeReceiptException()
         if (
           (mode === 'return' && canReadReturn) ||
           (mode === 'adjustment' && canReadAdjustment)
@@ -777,6 +816,12 @@ export default function PurchaseReceiptsPage() {
         const retained = attempt
           ? exceptionAttemptsRef.current.settle(scope, attempt, error)
           : isSourceBusinessActionResultUnknown(error)
+        if (!request.isCurrent()) return
+        if (isSourceActionPermissionDenied(error)) {
+          closeReceiptException()
+          message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+          return
+        }
         if (retained) {
           message.warning(
             '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
@@ -790,7 +835,11 @@ export default function PurchaseReceiptsPage() {
           )
         }
       } finally {
-        setSaving(false)
+        exceptionInFlightRef.current = false
+        if (request.isCurrent()) {
+          setSaving(false)
+          request.finish()
+        }
       }
     },
     [
@@ -799,7 +848,9 @@ export default function PurchaseReceiptsPage() {
       canReadReturn,
       loadRows,
       receiptExceptionMode,
-      selectedRow,
+      receiptExceptionSource,
+      beginExceptionRequest,
+      closeReceiptException,
       reportBusinessResult,
     ]
   )
@@ -807,6 +858,12 @@ export default function PurchaseReceiptsPage() {
   const purchasePayableScope = financeSourceReceipt?.id
     ? `purchase-receipt-payable:${financeSourceReceipt.id}`
     : ''
+  useEffect(() => {
+    if (financeSourceReceipt && !canCreatePayable) {
+      setFinanceSourceReceipt(null)
+      message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+    }
+  }, [canCreatePayable, financeSourceReceipt])
   const financeSourceInitialValues = useMemo(() => {
     if (!purchasePayableScope) return undefined
     const retained = financeSourceAttemptsRef.current.peek(purchasePayableScope)
@@ -817,8 +874,11 @@ export default function PurchaseReceiptsPage() {
 
   const openPurchaseReceiptPayable = useCallback(
     (receipt) => {
+      if (!canCreatePayable) {
+        message.warning(payableSourceAccess.reason)
+        return
+      }
       if (
-        !canCreatePayable ||
         !receipt?.id ||
         (String(receipt.status || '').toUpperCase() !== PurchaseReceiptStatus.POSTED || Number(receipt.pending_inbound_lines) > 0)
       ) {
@@ -827,7 +887,7 @@ export default function PurchaseReceiptsPage() {
       }
       setFinanceSourceReceipt(receipt)
     },
-    [canCreatePayable]
+    [canCreatePayable, payableSourceAccess.reason]
   )
 
   const closePurchaseReceiptPayable = useCallback(() => {
@@ -872,7 +932,10 @@ export default function PurchaseReceiptsPage() {
           attempt,
           error
         )
-        if (retained) {
+        if (isSourceActionPermissionDenied(error)) {
+          setFinanceSourceReceipt(null)
+          message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+        } else if (retained) {
           message.warning(
             '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
           )
@@ -1081,6 +1144,10 @@ export default function PurchaseReceiptsPage() {
   return (
     <BusinessPageLayout className="erp-purchase-receipts-page">
       <PageHeaderCard compact helpKey="inbound" title="采购入库" />
+      <SourceActionAccessNotice access={receiptSourceAccess} />
+      <SourceActionAccessNotice access={payableSourceAccess} />
+      <SourceActionAccessNotice access={returnSourceAccess} />
+      <SourceActionAccessNotice access={adjustmentSourceAccess} />
 
       <BusinessOperationPanel
         compact
@@ -1346,7 +1413,7 @@ export default function PurchaseReceiptsPage() {
                 disabled={
                   !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
                 }
-                onClick={() => setReceiptExceptionMode('return')}
+                onClick={() => openReceiptException('return')}
               >
                 生成采购退货
               </Button>
@@ -1376,7 +1443,7 @@ export default function PurchaseReceiptsPage() {
                 disabled={
                   !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
                 }
-                onClick={() => setReceiptExceptionMode('adjustment')}
+                onClick={() => openReceiptException('adjustment')}
               >
                 登记入库调整
               </Button>
@@ -1591,19 +1658,19 @@ export default function PurchaseReceiptsPage() {
         onClose={() => setDetailReceipt(null)}
       />
 
-      <PurchaseReceiptExceptionModal
+      {receiptExceptionMode && <PurchaseReceiptExceptionModal
         open={Boolean(receiptExceptionMode)}
         mode={receiptExceptionMode}
-        receipt={selectedRow}
+        receipt={receiptExceptionSource}
         materialOptions={materialOptions}
         warehouseOptions={warehouseOptions}
         lotOptions={inventoryLotOptions}
         loading={saving}
         onCancel={() => {
-          if (!saving) setReceiptExceptionMode(null)
+          if (!saving) closeReceiptException()
         }}
         onSubmit={submitReceiptException}
-      />
+      />}
       <FinanceBusinessSourceModal
         action={FINANCE_BUSINESS_SOURCE_ACTIONS.PURCHASE_RECEIPT_PAYABLE}
         open={Boolean(financeSourceReceipt)}

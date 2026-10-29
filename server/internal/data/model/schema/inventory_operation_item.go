@@ -23,7 +23,7 @@ func (InventoryOperationItem) Annotations() []schema.Annotation {
 		"inventory_operation_items_sku_allowed":        "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
 		"inventory_operation_items_quantity_shape":     "expected_quantity IS NULL OR expected_quantity >= 0",
 		"inventory_operation_items_counted_shape":      "counted_quantity IS NULL OR counted_quantity >= 0",
-		"inventory_operation_items_nonzero_adjustment": "adjustment_quantity <> 0",
+		"inventory_operation_items_nonzero_adjustment": "adjustment_quantity <> 0 OR (expected_quantity IS NOT NULL AND counted_quantity IS NOT NULL AND expected_quantity = counted_quantity)",
 	}}}
 }
 

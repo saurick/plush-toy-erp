@@ -46,7 +46,6 @@ export function buildDecisionParams(inspectionID, values = {}, result = '') {
     id: positiveInt(inspectionID),
     result: decisionResult,
     inspected_at: trimOptional(values.inspected_at),
-    inspector_id: positiveInt(values.inspector_id),
     decision_note: trimOptional(values.decision_note),
     ...(decisionResult && values.check_items
       ? { check_items: values.check_items }
@@ -131,10 +130,11 @@ export function QualityInspectionDecisionForm({
   form,
   mode,
   allowConcession = true,
-  incoming = false,
   disabled = false,
 }) {
   const defectRateSelection = Form.useWatch('defect_rate_selection', form)
+  const result = Form.useWatch('result', form)
+  const reasonRequired = mode === 'reject' || (mode === 'pass' && result === 'CONCESSION')
 
   const handleDefectRateSelectionChange = (event) => {
     if (event?.target?.value !== QUALITY_DEFECT_RATE_CUSTOM_SELECTION) {
@@ -149,7 +149,7 @@ export function QualityInspectionDecisionForm({
       disabled={disabled}
       className="erp-business-action-form erp-business-action-form--grid"
     >
-      {incoming && mode !== 'cancel' ? <IncomingCheckItemsForm /> : null}
+      {mode !== 'cancel' ? <IncomingCheckItemsForm /> : null}
       {mode === 'pass' ? (
         <Form.Item
           className="erp-business-action-form__field"
@@ -234,6 +234,8 @@ export function QualityInspectionDecisionForm({
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="判定备注"
         name="decision_note"
+        extra={reasonRequired ? '不合格或让步接收须填写原因。' : undefined}
+        rules={reasonRequired ? [{ required: true, whitespace: true, message: '请填写异常或让步理由' }] : []}
       >
         <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
       </Form.Item>

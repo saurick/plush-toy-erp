@@ -17,6 +17,9 @@ import {
 } from '../../utils/qualityInspectionSourceAction.mjs'
 import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import { outsourcingTaskFactMatches, outsourcingTaskScope } from '../../utils/outsourcingTaskScope.mjs'
+import BusinessRecordDetails from '../business-list/BusinessRecordDetails.jsx'
 
 const STATUS_LABELS = Object.freeze({
   [OperationalFactStatus.DRAFT]: '草稿',
@@ -116,13 +119,23 @@ export default function OutsourcingReturnRecordsModal({
   onGeneratePayable,
   onViewPayable,
 }) {
+  const taskBusiness = useBusinessPageContext()?.taskBusiness
+  const scope = useMemo(() => outsourcingTaskScope(taskBusiness), [taskBusiness])
+  canPostFact = canPostFact && (!scope || (scope.writable && scope.post))
+  canCancelFact = canCancelFact && !scope
+  canEditMaterialIssue = canEditMaterialIssue && (!scope || (scope.writable && scope.create && scope.factType === 'MATERIAL_ISSUE'))
+  canEditReturnReceipt = canEditReturnReceipt && (!scope || (scope.writable && scope.create && scope.factType === 'RETURN_RECEIPT'))
+  canCreateQualityInspection = canCreateQualityInspection && (!scope || (scope.writable && scope.quality))
+  canViewDisposition = canViewDisposition && !scope
+  canCreatePayable = canCreatePayable && !scope
+  canViewPayable = canViewPayable && !scope
   const [selected, setSelected] = useState(null)
   const orderFacts = useMemo(
     () =>
       (Array.isArray(facts) ? facts : []).filter((fact) =>
-        OUTSOURCING_FACT_TYPES.has(normalizedFactType(fact))
+        OUTSOURCING_FACT_TYPES.has(normalizedFactType(fact)) && outsourcingTaskFactMatches(scope, fact)
       ),
-    [facts]
+    [facts, scope]
   )
 
   useEffect(() => {
@@ -133,9 +146,9 @@ export default function OutsourcingReturnRecordsModal({
     setSelected((current) =>
       current?.id
         ? orderFacts.find((fact) => fact.id === current.id) || null
-        : null
+        : taskBusiness && orderFacts.length === 1 ? orderFacts[0] : null
     )
-  }, [open, order?.id, orderFacts])
+  }, [open, order?.id, orderFacts, taskBusiness])
 
   const selectedStatus = normalizedFactStatus(selected)
   const selectedDraft = selectedStatus === OperationalFactStatus.DRAFT
@@ -231,6 +244,8 @@ export default function OutsourcingReturnRecordsModal({
 
   return (
     <BusinessModal
+      taskInline
+      confirmLoading={actionBusy}
       title={`委外记录 · ${order?.outsourcing_order_no || '当前委外订单'}`}
       open={open}
       size="lineItems"
@@ -342,13 +357,18 @@ export default function OutsourcingReturnRecordsModal({
       destroyOnHidden
       onCancel={onCancel}
     >
-      <Alert
+      {!taskBusiness ? <Alert
         type="info"
         showIcon
         message="草稿可编辑、过账或作废，作废草稿不会改变库存；已过账记录取消后恢复至过账前库存。只有已过账的委外回货可发起质检，并在判定合格或让步接收后生成应付。"
         style={{ marginBottom: 12 }}
-      />
-      <Table
+      /> : null}
+      {taskBusiness ? (
+        <section aria-label="本次委外记录">
+          <Space wrap>{orderFacts.map((fact) => <Button key={fact.id} aria-pressed={selected?.id === fact.id} onClick={() => setSelected(fact)}>{fact.fact_no}</Button>)}</Space>
+          {selected ? <BusinessRecordDetails columns={columns} record={selected} presentation="mobile-task" /> : <p>选择本次办理记录</p>}
+        </section>
+      ) : <Table
         rowKey="id"
         size="small"
         columns={columns}
@@ -363,7 +383,7 @@ export default function OutsourcingReturnRecordsModal({
         }}
         onRow={(record) => ({ onClick: () => setSelected(record) })}
         locale={{ emptyText: '暂无委外记录' }}
-      />
+      />}
     </BusinessModal>
   )
 }

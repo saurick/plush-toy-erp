@@ -369,12 +369,12 @@ func (_q *FinanceCreditNoteQuery) WithReversalOf(opts ...func(*FinanceCreditNote
 // Example:
 //
 //	var v []struct {
-//		CreditNoteNo string `json:"credit_note_no,omitempty"`
+//		BalanceDirection string `json:"balance_direction,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.FinanceCreditNote.Query().
-//		GroupBy(financecreditnote.FieldCreditNoteNo).
+//		GroupBy(financecreditnote.FieldBalanceDirection).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *FinanceCreditNoteQuery) GroupBy(field string, fields ...string) *FinanceCreditNoteGroupBy {
@@ -392,11 +392,11 @@ func (_q *FinanceCreditNoteQuery) GroupBy(field string, fields ...string) *Finan
 // Example:
 //
 //	var v []struct {
-//		CreditNoteNo string `json:"credit_note_no,omitempty"`
+//		BalanceDirection string `json:"balance_direction,omitempty"`
 //	}
 //
 //	client.FinanceCreditNote.Query().
-//		Select(financecreditnote.FieldCreditNoteNo).
+//		Select(financecreditnote.FieldBalanceDirection).
 //		Scan(ctx, &v)
 func (_q *FinanceCreditNoteQuery) Select(fields ...string) *FinanceCreditNoteSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)

@@ -1,14 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import {
-  buildAttachmentFixtures,
-  ATTACHMENT_NOTE,
-} from "./manual-acceptance-attachment-data.mjs";
 import { prepareManualAcceptanceEngineering } from "./manual-acceptance-engineering-data.mjs";
 
 function fixture({
-  status = "PREPARING",
+  complete = false,
   requestStatus = "PREVIEW",
   missingBOM = false,
 } = {}) {
@@ -18,9 +13,7 @@ function fixture({
     product_id: 1,
     product_sku_id: 2,
     line_status: "OPEN",
-    engineering_status: status,
-    sample_bom_id: status === "PREPARING" ? null : 3,
-    product_image_attachment_id: 7,
+    bom_id: complete ? 3 : null,
   };
   const order = {
     id: 4,
@@ -46,19 +39,6 @@ function fixture({
     source_order_version: 1,
     source_hash: "a".repeat(64),
   };
-  const image = {
-    id: 7,
-    attachment_type: "product_image",
-    slot_key: "primary",
-    note: ATTACHMENT_NOTE,
-    sha256: createHash("sha256")
-      .update(
-        buildAttachmentFixtures({ includeNearLimit: false }).find(
-          (x) => x.mime_type === "image/png",
-        ).content,
-      )
-      .digest("hex"),
-  };
   const plan = {
     prefix: "YS8",
     productionCandidates: [{ salesOrder: { id: 4, orderNo: order.order_no } }],
@@ -79,7 +59,6 @@ function fixture({
       return structuredClone({ sales_order: order });
     if (method === "list_sales_order_items")
       return structuredClone({ total: 1, sales_order_items: [line] });
-    if (method === "list_attachments") return { attachments: [image] };
     if (method === "get_bom_version") return { bom_version: bom };
     if (method === "list_bom_versions") return { total: 0, bom_versions: [] };
     if (method === "save_bom_with_items") {
@@ -92,7 +71,9 @@ function fixture({
     }
     if (method === "save_sales_order_engineering") {
       assert.equal(params.expected_version, order.version);
+      assert.equal(params.complete, true);
       Object.assign(line, params.items[0]);
+      request.status = "SUBMITTED";
       order.version += 1;
       return {};
     }
@@ -113,21 +94,19 @@ function fixture({
     }
     throw new Error(`unexpected ${method}`);
   };
-  return { plan, sourceReport, rpc, calls, image };
+  return { plan, sourceReport, rpc, calls };
 }
 
-test("engineering preparation binds samples before role-owned material approvals and reuses the result", async () => {
+test("engineering preparation completes engineering before role-owned material approvals and reuses the result", async () => {
   const f = fixture();
   const result = await prepareManualAcceptanceEngineering(f);
-  assert.equal(result.materialRequests[0].confirmedLineCount, 1);
+  assert.equal(result.materialRequests[0].completedLineCount, 1);
   assert.deepEqual(
     f.calls
       .filter((x) => x.method === "save_sales_order_engineering")
-      .map((x) => [x.actor, x.params.items[0].engineering_status]),
+      .map((x) => [x.actor, x.params.complete]),
     [
-      ["engineering", "PREPARING"],
-      ["engineering", "SAMPLING"],
-      ["engineering", "CONFIRMED"],
+      ["engineering", true],
     ],
   );
   assert.deepEqual(
@@ -136,7 +115,7 @@ test("engineering preparation binds samples before role-owned material approvals
         /^(submit|boss_review|finance_review)_engineering/.test(x.method),
       )
       .map((x) => x.actor),
-    ["engineering", "boss", "finance"],
+    ["boss", "finance"],
   );
   f.calls.length = 0;
   await prepareManualAcceptanceEngineering({ ...f, apply: false });
@@ -146,45 +125,27 @@ test("engineering preparation binds samples before role-owned material approvals
   );
 });
 
-test("each uncovered ordered product gets its own sample BOM without modifying another product", async () => {
+test("each uncovered ordered product gets its own engineering BOM without modifying another product", async () => {
   const f = fixture({ missingBOM: true });
   const result = await prepareManualAcceptanceEngineering(f);
   assert.equal(result.supplementalBOMs[0].productId, 1);
   assert.equal(
     f.calls.find((x) => x.method === "save_bom_with_items").params.version,
-    "YS8-CP-001-SAMPLE",
+    "YS8-CP-001-ENG",
   );
 });
 
-test("a changed sample image or an unapproved read-only run cannot manufacture confirmation", async () => {
+test("an unapproved read-only run cannot complete engineering", async () => {
   const f = fixture();
-  f.image.sha256 = "edited";
-  await assert.rejects(
-    prepareManualAcceptanceEngineering(f),
-    /sample image.*edited/,
-  );
-  assert.equal(
-    f.calls.some((x) => x.method.startsWith("save_")),
-    false,
-  );
-  await assert.rejects(
-    prepareManualAcceptanceEngineering({ ...fixture(), apply: false }),
-    /sample is not confirmed/,
-  );
-  await assert.rejects(
-    prepareManualAcceptanceEngineering(
-      fixture({ status: "CONFIRMED", requestStatus: "REJECTED" }),
-    ),
-    /not approved/,
-  );
+  await assert.rejects(prepareManualAcceptanceEngineering({ ...f, apply: false }), /engineering is not complete/);
+  assert.equal(f.calls.some((x) => /save|upload|review|submit|activate/.test(x.method)), false);
 });
 
-
-test("pressure preparation confirms samples and keeps the material request unsubmitted", async () => {
+test("pressure preparation completes engineering and stops before material review", async () => {
   const f = fixture();
   const result = await prepareManualAcceptanceEngineering({ ...f, materialMode: "preview" });
-  assert.equal(result.materialRequests[0].status, "PREVIEW");
-  assert.equal(result.materialRequests[0].confirmedLineCount, 1);
+  assert.equal(result.materialRequests[0].status, "SUBMITTED");
+  assert.equal(result.materialRequests[0].completedLineCount, 1);
   assert.equal(f.calls.filter((call) => /submit_|review_/u.test(call.method)).length, 0);
   await assert.rejects(prepareManualAcceptanceEngineering({ ...f, materialMode: "skip" }), /unsupported/u);
 });

@@ -1,14 +1,20 @@
 import React, { useMemo } from 'react'
-import { Alert, Typography } from 'antd'
-import { Link } from 'react-router-dom'
+import { Alert, Button, Typography } from 'antd'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import {
-  DEV_TESTING_STRATEGY_SOURCE_PATH,
   parseDevTestingStrategyGuide,
 } from '../config/devTesting.mjs'
-import { DEV_DOCS_ROUTE } from '../config/devRoutes.mjs'
 import '../styles/dev-testing-strategy-guide.css'
 
-function StrategyTable({ table, label }) {
+function StrategyTable({ table, label, topic }) {
+  const [params, setParams] = useSearchParams()
+  const { state } = useLocation()
+  const choose = (id) => {
+    const next = new URLSearchParams(params)
+    if (params.get('testingDetail') === id) next.delete('testingDetail')
+    else next.set('testingDetail', id)
+    setParams(next, { replace: true, state })
+  }
   if (!table.rows.length) {
     return (
       <Alert
@@ -16,6 +22,41 @@ function StrategyTable({ table, label }) {
         showIcon
         message={`${label}暂不可读，请查看正式测试策略。`}
       />
+    )
+  }
+  if (topic) {
+    return (
+      <table data-table-lines="appearance" className="erp-dev-tool-table erp-dev-testing-simple-table" aria-label={label}>
+        <thead><tr><th scope="col">{table.headers[0]}</th><th scope="col">{table.headers[1]}</th></tr></thead>
+        <tbody>
+          {table.rows.map(([name, ...cells], index) => {
+            const id = `guide-${topic}-${name}`
+            const open = params.get('testingDetail') === id
+            const regionId = `guide-${topic}-${index}`
+            return (
+              <React.Fragment key={name}>
+                <tr>
+                  <th scope="row"><Button type="link" aria-expanded={open} aria-controls={regionId} onKeyDown={(event) => { if (open && event.key === 'Escape') { event.stopPropagation(); choose(id) } }} onClick={() => choose(id)}>{name}</Button></th>
+                  <td>{cells[0]}</td>
+                </tr>
+                {open ? (
+                  <tr>
+                    <td colSpan={2} className="erp-dev-testing-guide-expanded">
+                      <div id={regionId} role="region" aria-label={`${name}详情`}>
+                        <dl className="erp-dev-testing-guide-facts">
+                          {cells.slice(1).map((cell, cellIndex) => (
+                            <React.Fragment key={table.headers[cellIndex + 2]}><dt>{table.headers[cellIndex + 2]}</dt><dd>{cell}</dd></React.Fragment>
+                          ))}
+                        </dl>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+              </React.Fragment>
+            )
+          })}
+        </tbody>
+      </table>
     )
   }
   return (
@@ -49,7 +90,6 @@ function StrategyTable({ table, label }) {
 
 export default function DevTestingStrategyGuide({ source, evidence = false, topic = 'methods' }) {
   const tables = useMemo(() => parseDevTestingStrategyGuide(source), [source])
-  const sourceLink = `${DEV_DOCS_ROUTE}?path=${encodeURIComponent(DEV_TESTING_STRATEGY_SOURCE_PATH)}`
   const topics = {
     methods: { label: '自动化测试方式', anchor: 'test-methods', note: '按改动选择测试方式；入口说明不代表执行结果。' },
     devices: { label: '真机回归场景范围', anchor: 'real-device-regression', note: '手机视口与 WebKit 检查不能代替真实设备结果。' },
@@ -60,11 +100,7 @@ export default function DevTestingStrategyGuide({ source, evidence = false, topi
     return (
       <section className="erp-dev-testing-strategy-guide erp-dev-testing-strategy-guide--topic">
         <Typography.Paragraph type="secondary">{selected.note}</Typography.Paragraph>
-        <StrategyTable table={tables[topic]} label={selected.label} />
-        <Typography.Paragraph>
-          <Link to={`${sourceLink}#${selected.anchor}`}>查看正式依据</Link>
-          {topic === 'growth' ? <>{' · '}<Link to="?view=coverage&coverage=rules">查看关键规则证据</Link>{' · '}<Link to="?view=pressure">查看规模与压力报告</Link></> : null}
-        </Typography.Paragraph>
+        <StrategyTable table={tables[topic]} label={selected.label} topic={topic} />
       </section>
     )
   }
@@ -76,9 +112,6 @@ export default function DevTestingStrategyGuide({ source, evidence = false, topi
         分类说明不代表执行结果。报告须明确实际环境；未记录的范围保留未证明。
       </Typography.Paragraph>
       <StrategyTable table={tables.evidence} label="测试证据分类" />
-      <Typography.Paragraph>
-        <Link to={`${sourceLink}#evidence-categories`}>查看分类依据与证据边界</Link>
-      </Typography.Paragraph>
     </details>
   )
 }

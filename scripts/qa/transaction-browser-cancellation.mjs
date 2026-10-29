@@ -3,6 +3,16 @@ import { getRequestScopeCancellation, RequestScopeOwner, RequestScopeCancellatio
 
 // Each pair is an audited query, not a method-name convention or a write exemption.
 const readOwners = new Map([
+  [`${RpcDomain.INVENTORY}/${RpcMethod.inventory.LIST_INVENTORY_LOTS}`, RequestScopeOwner.LATEST_REQUEST],
+  [`${RpcDomain.MASTERDATA}/${RpcMethod.masterdata.LIST_MATERIALS}`, RequestScopeOwner.LATEST_REQUEST],
+  [`${RpcDomain.MASTERDATA}/${RpcMethod.masterdata.LIST_PRODUCTS}`, RequestScopeOwner.LATEST_REQUEST],
+  [`${RpcDomain.PURCHASE}/${RpcMethod.purchase.LIST_PURCHASE_RECEIPTS}`, RequestScopeOwner.LATEST_REQUEST],
+  [`${RpcDomain.QUALITY}/${RpcMethod.quality.LIST_QUALITY_INSPECTIONS}`, RequestScopeOwner.LATEST_REQUEST],
+  [`${RpcDomain.PURCHASE}/${RpcMethod.purchase.GET_PURCHASE_RECEIPT}`, RequestScopeOwner.LATEST_REQUEST],
+  [`${RpcDomain.PURCHASE}/${RpcMethod.purchase.LIST_PURCHASE_RETURNS}`, RequestScopeOwner.LATEST_REQUEST],
+  [`${RpcDomain.PURCHASE}/${RpcMethod.purchase.LIST_PURCHASE_REJECTION_DISPOSITIONS}`, RequestScopeOwner.LATEST_REQUEST],
+  [`${RpcDomain.OPERATIONAL_FACT}/${RpcMethod.operational_fact.LIST_FINANCE_PAYMENTS}`, RequestScopeOwner.LATEST_REQUEST],
+  [`${RpcDomain.OPERATIONAL_FACT}/${RpcMethod.operational_fact.LIST_FINANCE_SOURCE_ADJUSTMENTS}`, RequestScopeOwner.LATEST_REQUEST],
   [`${RpcDomain.OPERATIONAL_FACT}/${RpcMethod.operational_fact.GET_PRODUCTION_EXCEPTION}`, RequestScopeOwner.LATEST_REQUEST],
   [`${RpcDomain.WORKFLOW}/${RpcMethod.workflow.GET_WORKBENCH}`, RequestScopeOwner.LATEST_REQUEST],
   [`${RpcDomain.WORKFLOW}/${RpcMethod.workflow.GET_TASK_BOARD}`, RequestScopeOwner.LATEST_REQUEST],

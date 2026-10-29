@@ -1,23 +1,26 @@
 import { useCallback } from 'react'
-import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+import { useLocation, useNavigate, } from 'react-router-dom'
+import useBusinessPageContext from './useBusinessPageContext.js'
 import { workflowTaskBusinessReceipt } from '../utils/workflowTaskNavigation.mjs'
+import { formatAdminIdentity } from '../utils/adminIdentity.mjs'
 
 export default function useWorkflowTaskBusinessResult() {
   const location = useLocation()
   const navigate = useNavigate()
-  const context = useOutletContext()
-  const onTaskResult = context?.mobileTaskBusiness?.onResult
+  const context = useBusinessPageContext()
+  const onTaskResult = context?.taskBusiness?.onResult
   const navigation = context?.workflowTaskNavigation || location.state?.workflowTaskNavigation
+  const actorLabel = formatAdminIdentity(context?.adminProfile)
   return useCallback((message, record = {}) => {
-    if (onTaskResult) { onTaskResult(message, record); return }
+    if (onTaskResult) return onTaskResult(message, record, { actorLabel })
     if (!navigation) return
     navigate(`${location.pathname}${location.search}${location.hash}`, {
       replace: true,
       state: { ...location.state,
 workflowTaskNavigation: {
         ...navigation,
-        businessReceipt: workflowTaskBusinessReceipt(message, record),
+        businessReceipt: workflowTaskBusinessReceipt(message, record, { actorLabel }),
       } },
     })
-  }, [location, navigate, navigation, onTaskResult])
+  }, [location, navigate, navigation, onTaskResult, actorLabel])
 }

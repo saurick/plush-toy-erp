@@ -1255,6 +1255,7 @@ const BusinessAttachmentPanel = forwardRef(
             className="business-attachment-panel__compact-summary"
             aria-expanded={panelExpanded}
             aria-controls={contentId}
+            aria-label={`${title} · ${loading ? '正在读取' : loadError ? '读取失败' : `${attachments.length} 个已上传`}${pendingAttachments.length ? ` · ${pendingAttachments.length} 个待处理` : ''} ${panelExpanded ? '收起附件' : '展开附件'}`}
             onClick={() => setExpanded((value) => !value)}
             disabled={
               pendingAttachments.length > 0 ||
@@ -1265,18 +1266,17 @@ const BusinessAttachmentPanel = forwardRef(
             }
           >
             <span className="business-attachment-panel__compact-copy">
-              <PaperClipOutlined aria-hidden="true" /> {title} ·{' '}
+              <PaperClipOutlined aria-hidden="true" /> {title}{' '}
               {loading
                 ? '正在读取'
                 : loadError
                   ? '读取失败'
-                  : `${attachments.length} 个已上传`}
+                  : `（${attachments.length}）`}
               {pendingAttachments.length > 0
                 ? ` · ${pendingAttachments.length} 个待处理`
                 : ''}
             </span>
             <span className="business-attachment-panel__compact-action">
-              {panelExpanded ? '收起附件' : '展开附件'}
               {panelExpanded ? (
                 <UpOutlined aria-hidden="true" />
               ) : (
@@ -1290,16 +1290,18 @@ const BusinessAttachmentPanel = forwardRef(
           className="business-attachment-panel__content"
           hidden={compact && !panelExpanded}
         >
-          <div className="business-attachment-panel__header">
-            {variant !== 'manager' ? (
-              <BusinessHelpLabel label={title} description={!missingOwner ? panelDescription : undefined} />
-            ) : !missingOwner ? <BusinessHelpLabel label="附件说明" description={panelDescription} /> : null}
-            {missingOwner ? (
-              <Typography.Paragraph type="secondary">
-                {panelDescription}
-              </Typography.Paragraph>
-            ) : null}
-          </div>
+          {!compact || missingOwner ? (
+            <div className="business-attachment-panel__header">
+              {!compact && variant !== 'manager' ? (
+                <BusinessHelpLabel label={title} description={!missingOwner ? panelDescription : undefined} />
+              ) : !compact && !missingOwner ? <BusinessHelpLabel label="附件说明" description={panelDescription} /> : null}
+              {missingOwner ? (
+                <Typography.Paragraph type="secondary">
+                  {panelDescription}
+                </Typography.Paragraph>
+              ) : null}
+            </div>
+          ) : null}
           <div className="business-attachment-panel__toolbar">
             <SlidingSegmented
               aria-label="附件分类"
@@ -1307,6 +1309,7 @@ const BusinessAttachmentPanel = forwardRef(
               value={category}
               onChange={setCategory}
             />
+            {compact && !missingOwner ? <BusinessHelpLabel iconOnly label={title} description={panelDescription} /> : null}
             {!missingOwner ? (
               <Button
                 type="text"

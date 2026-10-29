@@ -49,7 +49,7 @@ export default function useFinanceCreditActions({
       })
     } catch (error) {
       message[error.isCreditAmountWarning ? 'warning' : 'error'](
-        getActionErrorMessage(error, '准备红冲记录')
+        getActionErrorMessage(error, '准备账款调整')
       )
       return
     }
@@ -62,10 +62,10 @@ export default function useFinanceCreditActions({
       if (result.outcome === 'unconfirmed') {
         message[result.retained ? 'warning' : 'error'](
           result.retained
-            ? '红冲结果暂时无法确认，请保持内容不变后重试'
+            ? '调整结果暂时无法确认，请保持内容不变后重试'
             : getActionErrorMessage(
                 result.error,
-                reverse ? '冲销红冲记录' : '登记红冲'
+                reverse ? '冲回账款调整' : '登记红冲'
               )
         )
         return
@@ -78,14 +78,14 @@ export default function useFinanceCreditActions({
       await loadReferences()
       message.success(
         result.recovered
-          ? '已重新读取红冲冲销结果'
+          ? '已重新读取账款调整冲回结果'
           : reverse
-            ? '红冲记录已冲销'
+            ? '账款调整已冲回'
             : '红冲已登记'
       )
     } catch (error) {
       message.error(
-        getActionErrorMessage(error, reverse ? '冲销红冲记录' : '登记红冲')
+        getActionErrorMessage(error, reverse ? '冲回账款调整' : '登记红冲')
       )
     } finally {
       setLoading(false)

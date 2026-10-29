@@ -17,7 +17,10 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import { applyBusinessFormReadback } from '../utils/businessFormReadback.mjs'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
+
 import { loadReferenceIDs } from '../utils/remoteReferences.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
@@ -28,19 +31,20 @@ import { sourceBusinessActionUUID,
 } from '../utils/sourceBusinessAction.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
-import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
+import { useProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import ProcessSubmissionRoute from '../components/workflow/ProcessSubmissionRoute.jsx'
 import { shipmentApprovalPath } from '../utils/shipmentApproval.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import {
   ShipmentStatus,
+  ShipmentFinanceReleaseStatus,
   OperationalFactStatus,
 } from '../../common/consts/statuses.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
-import { message } from '@/common/utils/antdApp'
+import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
@@ -92,6 +96,7 @@ import ShipmentEditor, {
   salesOrderCustomerText,
   sourceLineProductText,
 } from '../components/shipments/ShipmentEditor.jsx'
+import ShipmentTaskItems from '../components/shipments/ShipmentTaskItems.jsx'
 import ShipmentFinanceSourceModal from '../components/shipments/ShipmentFinanceSourceModal.jsx'
 import ShipmentQualityInspectionModal from '../components/quality-inspections/ShipmentQualityInspectionModal.jsx'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
@@ -270,8 +275,13 @@ function shipmentFormValues(shipment = {}) {
 export default function ShipmentsPage() {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const navigate = useBusinessNavigate()
-  const outletContext = useOutletContext()
-  const taskSource = outletContext?.mobileTaskCommand?.kind === 'shipment' ? outletContext.mobileTaskCommand : null
+  const outletContext = useBusinessPageContext()
+  const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
+  const taskBusiness = outletContext?.taskBusiness
+  const mobileTaskExecution = taskBusiness?.device === 'mobile'
+  const taskDraftOpenedRef = useRef(null)
+  const taskDraftSavingRef = useRef(false)
+  const taskSource = outletContext?.taskCommand?.kind === 'shipment' ? outletContext.taskCommand : null
   const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -317,6 +327,7 @@ export default function ShipmentsPage() {
   })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  useWorkflowTaskBusinessBusy(saving)
   const [releaseConfirmOpen, setReleaseConfirmOpen] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [financeSourceAction, setFinanceSourceAction] = useState(null)
@@ -384,11 +395,11 @@ export default function ShipmentsPage() {
     adminProfile,
     PermissionCode.SHIPMENT_READ
   )
-  const canCreate = hasActionPermission(
+  const canCreate = !mobileTaskExecution && hasActionPermission(
     adminProfile,
     PermissionCode.SHIPMENT_CREATE
   )
-  const canUpdate = hasActionPermission(
+  const canUpdate = !mobileTaskExecution && hasActionPermission(
     adminProfile,
     PermissionCode.SHIPMENT_UPDATE
   )
@@ -397,18 +408,18 @@ export default function ShipmentsPage() {
     adminProfile,
     PermissionCode.SHIPMENT_SHIP
   )
-  const canCancel = hasActionPermission(
+  const canCancel = !mobileTaskExecution && hasActionPermission(
     adminProfile,
     PermissionCode.SHIPMENT_CANCEL
   )
-  const canCreateReceivable = canConfirmFinanceFact(adminProfile, 'RECEIVABLE')
-  const canCreateInvoice = canConfirmFinanceFact(adminProfile, 'INVOICE')
+  const canCreateReceivable = !mobileTaskExecution && canConfirmFinanceFact(adminProfile, 'RECEIVABLE')
+  const canCreateInvoice = !mobileTaskExecution && canConfirmFinanceFact(adminProfile, 'INVOICE')
   const canViewQualityInspections = hasActionPermission(
     adminProfile,
     PermissionCode.QUALITY_INSPECTION_READ
   )
   const canCreateFinishedGoodsQualityInspection =
-    canRead &&
+    !mobileTaskExecution && canRead &&
     canViewQualityInspections &&
     hasActionPermission(adminProfile, PermissionCode.QUALITY_INSPECTION_CREATE)
   const canViewSalesOrders = hasActionPermission(
@@ -1064,7 +1075,7 @@ export default function ShipmentsPage() {
     }
   }
 
-  const resetShipmentSourceSelectionState = () => {
+  const resetShipmentSourceSelectionState = useCallback(() => {
     setSalesOrderItems([])
     setSalesOrderSources([])
     setSalesOrderSourceItems([])
@@ -1074,7 +1085,7 @@ export default function ShipmentsPage() {
     setSalesOrderSourceLoadFailed(false)
     setSalesOrderImportOpen(false)
     salesOrderSourceQueryRef.current = { keyword: '', page: 1 }
-  }
+  }, [])
 
   const openCreate = () => {
     shipmentAttachmentRef.current?.clearPendingAttachments()
@@ -1103,7 +1114,7 @@ export default function ShipmentsPage() {
     setShipmentModal({ mode: 'create', shipment: null })
   }
 
-  const openEdit = async (shipment) => {
+  const openEdit = useCallback(async (shipment) => {
     if (!canUpdate) {
       message.warning('当前账号没有编辑出货草稿的权限')
       return
@@ -1152,7 +1163,13 @@ export default function ShipmentsPage() {
     } finally {
       setSaving(false)
     }
-  }
+  }, [canUpdate, loadRows, loadSalesOrderSources, resetShipmentSourceSelectionState, shipmentForm])
+
+  useEffect(() => {
+    if (!taskBusiness || taskBusiness.readOnly || taskSource || !canUpdate || !canEditShipmentDraft(selectedRow) || taskDraftOpenedRef.current === taskBusiness.taskID) return
+    taskDraftOpenedRef.current = taskBusiness.taskID
+    openEdit(selectedRow)
+  }, [taskBusiness, taskSource, canUpdate, selectedRow, openEdit])
 
   const openShipmentDetails = (shipment) => {
     shipmentAttachmentRef.current?.clearPendingAttachments()
@@ -1171,7 +1188,11 @@ export default function ShipmentsPage() {
     shipmentForm.resetFields()
   }
 
-  const submitShipmentModal = async () => {
+  const submitShipmentModal = async ({ submitForApproval = false } = {}) => {
+    if (taskDraftSavingRef.current || taskBusiness?.readOnly) return
+    taskDraftSavingRef.current = true
+    let savedBeforeApproval = false
+    let approvalSubmitted = false
     try {
       const values = await shipmentForm.validateFields()
       const params = buildShipmentWithItemsParams(values, {
@@ -1189,6 +1210,19 @@ export default function ShipmentsPage() {
         message.error('出货草稿版本不完整，请关闭弹窗并刷新后重试')
         return
       }
+      if (submitForApproval) {
+        if (!canSubmitShipmentRelease || taskBusiness?.readOnly) return
+        const confirmed = await new Promise((resolve) => modal.confirm({
+          maskClosable: true,
+          title: '保存并提交出货审批？',
+          content: <ProcessSubmissionRoute processKey="finished_goods_delivery" customerKey={activeCustomerKey} open />,
+          okText: '提交审批',
+          cancelText: '取消',
+          onOk: () => { resolve(true) },
+          onCancel: () => resolve(false),
+        }))
+        if (!confirmed) return
+      }
       setSaving(true)
       let savedShipment
       if (editingShipment?.id) {
@@ -1202,10 +1236,27 @@ export default function ShipmentsPage() {
       } else {
         savedShipment = await createShipmentWithItems(params)
       }
+      if (submitForApproval) {
+        savedBeforeApproval = true
+        setSelectedRow(savedShipment)
+        setShipmentModal({ mode: 'edit', shipment: savedShipment })
+      }
       const attachmentSaved =
         (await shipmentAttachmentRef.current?.flushPendingAttachments(
           savedShipment?.id
         )) !== false
+      if (submitForApproval) {
+        if (!attachmentSaved) {
+          message.warning('草稿已保存，附件尚未上传完成，请重新选择附件后提交审批')
+          return
+        }
+        await submitShipmentFinanceApprovalProcess({ id: savedShipment.id, shipment_no: savedShipment.shipment_no })
+        approvalSubmitted = true
+        closeShipmentModal()
+        reportBusinessResult('出货草稿已保存，审批已提交', savedShipment)
+        await loadRows()
+        return
+      }
       message.success(
         attachmentSaved
           ? editingShipment?.id
@@ -1213,7 +1264,11 @@ export default function ShipmentsPage() {
             : '出货单草稿和明细已保存'
           : '出货单已保存，未上传的附件请重新选择'
       )
-      closeShipmentModal()
+      if (taskBusiness) {
+        const fresh = await getShipment({ id: savedShipment.id })
+        applyBusinessFormReadback(shipmentForm, { ...shipmentFormValues(fresh), items: fresh.items })
+        setShipmentModal({ mode: 'edit', shipment: fresh })
+      } else closeShipmentModal()
       setSelectedRow(savedShipment)
       reportBusinessResult(editingShipment?.id ? '出货草稿和明细已更新' : '出货单草稿和明细已保存', savedShipment)
       if (editingShipment?.id) {
@@ -1225,9 +1280,18 @@ export default function ShipmentsPage() {
       if (error?.errorFields) {
         return
       }
-      message.error(getActionErrorMessage(error, '保存出货单'))
+      if (approvalSubmitted) {
+        message.error('审批已提交，任务列表读取失败，请刷新列表')
+      } else if (savedBeforeApproval) {
+        message.error(isSourceBusinessActionResultUnknown(error)
+          ? '草稿已保存，审批结果暂未确认，请重新打开任务核对'
+          : `草稿已保存，审批未提交。${getActionErrorMessage(error, '提交出货审批')}`)
+      } else {
+        message.error(getActionErrorMessage(error, '保存出货单'))
+      }
     } finally {
       setSaving(false)
+      taskDraftSavingRef.current = false
     }
   }
 
@@ -1271,6 +1335,7 @@ export default function ShipmentsPage() {
         id: selectedRow.id,
         shipment_no: selectedRow.shipment_no,
       })
+      reportBusinessResult('财务审批已提交；成品质检仍由品质检验单独判定', selectedRow)
       showProcessSubmissionReceipt({
         result,
         title: '财务审批已提交；成品质检仍由品质检验单独判定',
@@ -2023,10 +2088,14 @@ export default function ShipmentsPage() {
           onClick: () => setSelectedRow(record),
         })}
         onOpenRecord={openShipmentRecord}
+        taskSourceDetails={mobileTaskExecution && selectedRow ? <ShipmentTaskItems title="出货明细" shipment={selectedRow} productOptions={productOptions} skuOptions={productSKUOptions} warehouseOptions={warehouseOptions} lotOptions={inventoryLotOptions} unitOptions={unitOptions} /> : null}
       />
+      {mobileTaskExecution && selectedRow && !taskBusiness.readOnly && shipmentActionAvailability.ship.visible && selectedRow.finance_release_status === ShipmentFinanceReleaseStatus.APPROVED ? <ShipmentTaskItems shipment={selectedRow} productOptions={productOptions} skuOptions={productSKUOptions} warehouseOptions={warehouseOptions} lotOptions={inventoryLotOptions} unitOptions={unitOptions} /> : null}
       {columnOrderModal}
 
       <ShipmentEditor
+        taskFocused={Boolean(taskBusiness && !taskSource)}
+        onSubmitApproval={taskBusiness && !taskBusiness.readOnly && !taskSource && isEditModal && shipmentActionAvailability.release.visible && !shipmentActionAvailability.release.disabled ? () => submitShipmentModal({ submitForApproval: true }) : null}
         canReadApproval={hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ)}
         canCreate={canCreate}
         canUpdate={canUpdate}

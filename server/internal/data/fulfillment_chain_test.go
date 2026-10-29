@@ -54,7 +54,7 @@ func testFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T, f productio
 	facts := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, logger))
 	contracts := biz.NewOutsourcingOrderUsecase(NewOutsourcingOrderRepo(f.data, logger))
 	warehouse := f.client.Warehouse.Create().SetCode("HANDOFF-MATERIAL").SetName("测试材料仓").SetType("MATERIAL").SaveX(ctx)
-	vendor := f.client.Supplier.Create().SetCode("HANDOFF-VENDOR").SetName("测试加工厂").SetSupplierType("outsourcing").SaveX(ctx)
+	vendor := f.client.Supplier.Create().SetCode("HANDOFF-VENDOR").SetName("测试加工厂").SetSupplierType("outsourcing").SetDefaultPaymentTermDays(30).SaveX(ctx)
 
 	sourceItem := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, f.client, inventoryTestFixtures{materialID: f.materialID, unitID: f.unitID, warehouseID: warehouse.ID}, "CHAIN", wip.MaterialRequirements[0].PlannedQuantity)
 	receipt, err := inv.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{AllRemaining: true, PurchaseOrderID: sourceItem.PurchaseOrderID, ReceiptNo: "PR-HANDOFF-CHAIN", WarehouseID: warehouse.ID, IdempotencyKey: "chain-arrival"})
@@ -71,7 +71,7 @@ func testFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T, f productio
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertFulfillmentTask(t, ctx, f.client, "outsourcing_contract", prepared.OutsourcingOrderID, "ready", biz.FinanceRoleKey)
+	assertFulfillmentTask(t, ctx, f.client, "outsourcing_contract", prepared.OutsourcingOrderID, "ready", biz.PurchaseRoleKey)
 	order := f.client.OutsourcingOrder.GetX(ctx, prepared.OutsourcingOrderID)
 	line := f.client.OutsourcingOrderItem.Query().Where(outsourcingorderitem.OutsourcingOrderID(order.ID)).OnlyX(ctx)
 	price := decimal.NewFromInt(2)
@@ -79,13 +79,13 @@ func testFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T, f productio
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = contracts.SubmitOutsourcingOrder(ctx, order.ID); err != nil {
+	if _, err = applyOutsourcingLifecycleUsecaseForTest(ctx, contracts, order.ID, biz.SourceOrderActionSubmit); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = contracts.ConfirmOutsourcingOrder(ctx, order.ID); err != nil {
+	if _, err = applyOutsourcingLifecycleUsecaseForTest(ctx, contracts, order.ID, biz.SourceOrderActionConfirm); err != nil {
 		t.Fatal(err)
 	}
-	assertFulfillmentTask(t, ctx, f.client, "outsourcing_contract", order.ID, "done", biz.FinanceRoleKey)
+	assertFulfillmentTask(t, ctx, f.client, "outsourcing_contract", order.ID, "done", biz.PurchaseRoleKey)
 	assertFulfillmentTask(t, ctx, f.client, "outsourcing_issue", order.ID, "ready", biz.WarehouseRoleKey)
 	wip, err = f.uc.AssignProductionWIPExecution(ctx, &biz.ProductionWIPAction{ProductionOrderID: wip.ProductionOrderID, BatchID: root.ID, ExpectedVersion: root.Version, ActorID: f.actorID, IdempotencyKey: "chain-assign-fabric", ExecutionMode: biz.ProductionWIPExecutionOutsourced, OutsourcingAllocations: []biz.ProductionWIPOutsourcingAllocationInput{{OutsourcingOrderItemID: line.ID, ProductionOrderMaterialRequirementID: &wip.MaterialRequirements[0].ID}}})
 	if err != nil {
@@ -238,4 +238,17 @@ func testFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T, f productio
 	if _, err = facts.CancelPostedProductionFact(ctx, operationalFactStatusMutation(completion.ID, completion.Version, f.actorID, "已包装不能冲正来源")); !errors.Is(err, biz.ErrProductionReworkDependency) {
 		t.Fatalf("cancel packing source err=%v", err)
 	}
+	// Fabric settlement derives from accepted WIP and its material issue.
+	contractNow, err := contracts.GetOutsourcingOrder(ctx, order.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = contracts.CloseOutsourcingOrderWithAction(ctx, &biz.SourceOrderLifecycleAction{ID: order.ID, ExpectedVersion: contractNow.Version, ActorID: f.actorID, IdempotencyKey: "fabric-normal-close", CloseMode: biz.SourceOrderCloseModeNormal}); err != nil {
+		t.Fatalf("fabric contract normal close: %v", err)
+	}
+	payable, err := facts.CreatePayableFromOutsourcingOrder(ctx, &biz.FinanceFactFromOutsourcingOrderCreate{FactNo: "AP-FABRIC-HANDOFF", OutsourcingOrderID: order.ID, IdempotencyKey: "fabric-payable"})
+	if err != nil || !payable.Amount.Equal(line.OutsourcingQuantity.Mul(price)) {
+		t.Fatalf("fabric payable: %#v %v", payable, err)
+	}
+
 }

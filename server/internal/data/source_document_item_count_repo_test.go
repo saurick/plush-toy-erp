@@ -245,8 +245,8 @@ func TestProductionOrderRepoListProjectsItemCountsWithOneGroupedQuery(t *testing
 		t.Fatalf("create second production order: %v", err)
 	}
 	if _, err := client.ProductionOrderItem.CreateBulk(
-		client.ProductionOrderItem.Create().SetProductionOrderID(first.ID).SetLineNo(1).SetProductID(product.ID).SetUnitID(unit.ID).SetPlannedQuantity(decimal.NewFromInt(1)),
-		client.ProductionOrderItem.Create().SetProductionOrderID(first.ID).SetLineNo(2).SetProductID(product.ID).SetUnitID(unit.ID).SetPlannedQuantity(decimal.NewFromInt(2)),
+		client.ProductionOrderItem.Create().SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SetProductionOrderID(first.ID).SetLineNo(1).SetProductID(product.ID).SetUnitID(unit.ID).SetPlannedQuantity(decimal.NewFromInt(1)),
+		client.ProductionOrderItem.Create().SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SetProductionOrderID(first.ID).SetLineNo(2).SetProductID(product.ID).SetUnitID(unit.ID).SetPlannedQuantity(decimal.NewFromInt(2)),
 	).Save(ctx); err != nil {
 		t.Fatalf("create production order items: %v", err)
 	}

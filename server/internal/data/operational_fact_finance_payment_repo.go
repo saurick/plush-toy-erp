@@ -654,7 +654,20 @@ func (r *operationalFactRepo) ReverseFinanceCreditNote(ctx context.Context, in *
 	if err := lockOperationalFactRow(ctx, tx, "finance_facts", source.FinanceFactID, biz.ErrBadParam); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.FinanceCreditNote.Create().SetCreditNoteNo(in.CreditNoteNo).SetFinanceFactID(source.FinanceFactID).SetReversalOfCreditNoteID(source.ID).SetAmount(source.Amount).SetCurrency(source.Currency).SetStatus(biz.FinanceAllocationStatusReversed).SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID).Save(ctx)
+	fact, err := tx.client.FinanceFact.Get(ctx, source.FinanceFactID)
+	if err != nil {
+		return nil, err
+	}
+	if source.BalanceDirection == biz.FinanceAdjustmentIncrease {
+		available, err := financeFactOutstanding(ctx, tx.client, fact.ID, fact.Amount)
+		if err != nil {
+			return nil, err
+		}
+		if source.Amount.GreaterThan(available) {
+			return nil, biz.ErrFinanceAllocationDependency
+		}
+	}
+	row, err := tx.client.FinanceCreditNote.Create().SetCreditNoteNo(in.CreditNoteNo).SetFinanceFactID(source.FinanceFactID).SetReversalOfCreditNoteID(source.ID).SetBalanceDirection(source.BalanceDirection).SetNillableSourceType(source.SourceType).SetNillableSourceID(source.SourceID).SetAmount(source.Amount).SetCurrency(source.Currency).SetStatus(biz.FinanceAllocationStatusReversed).SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil {
@@ -665,10 +678,6 @@ func (r *operationalFactRepo) ReverseFinanceCreditNote(ctx context.Context, in *
 				return replay, replayErr
 			}
 		}
-		return nil, err
-	}
-	fact, err := tx.client.FinanceFact.Get(ctx, source.FinanceFactID)
-	if err != nil {
 		return nil, err
 	}
 	outstanding, err := financeFactOutstanding(ctx, tx.client, source.FinanceFactID, fact.Amount)
@@ -797,6 +806,29 @@ func (r *operationalFactRepo) ListFinancePayments(ctx context.Context, filter bi
 
 func (r *operationalFactRepo) financePaymentListQuery(filter biz.FinancePaymentFilter) *ent.FinancePaymentQuery {
 	query := r.data.postgres.FinancePayment.Query()
+	if filter.FinanceFactID > 0 {
+		// Keep reversed allocations visible so this remains a relationship query,
+		// rather than silently dropping the evidence used to correct a payment.
+		query = query.Where(financepayment.HasAllocationsWith(financeallocation.FinanceFactID(filter.FinanceFactID)))
+	}
+	if filter.Currency != "" {
+		query = query.Where(financepayment.Currency(filter.Currency))
+	}
+	if filter.DateFrom != "" {
+		from, _, _ := biz.FinanceDateRange(filter.DateFrom, filter.DateFrom)
+		query = query.Where(financepayment.OccurredAtGTE(from))
+	}
+	if filter.DateTo != "" {
+		_, to, _ := biz.FinanceDateRange(filter.DateTo, filter.DateTo)
+		query = query.Where(financepayment.OccurredAtLT(to))
+	}
+	if filter.AccountRef != "" {
+		query = query.Where(financepayment.AccountRef(filter.AccountRef))
+	}
+	if filter.EvidenceRef != "" {
+		query = query.Where(financepayment.EvidenceRef(filter.EvidenceRef))
+	}
+
 	if filter.Kind != "" {
 		query = query.Where(financepayment.Kind(filter.Kind))
 	}
@@ -1085,5 +1117,5 @@ func entFinanceCreditNoteToBiz(row *ent.FinanceCreditNote) *biz.FinanceCreditNot
 	if row == nil {
 		return nil
 	}
-	return &biz.FinanceCreditNote{ID: row.ID, CreditNoteNo: row.CreditNoteNo, FinanceFactID: row.FinanceFactID, ReversalOfCreditNoteID: row.ReversalOfCreditNoteID, Amount: row.Amount, Currency: row.Currency, Status: row.Status, Reason: row.Reason, IdempotencyKey: row.IdempotencyKey, IdempotencyPayloadHash: row.IdempotencyPayloadHash, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt}
+	return &biz.FinanceCreditNote{BalanceDirection: row.BalanceDirection, SourceType: row.SourceType, SourceID: row.SourceID, ID: row.ID, CreditNoteNo: row.CreditNoteNo, FinanceFactID: row.FinanceFactID, ReversalOfCreditNoteID: row.ReversalOfCreditNoteID, Amount: row.Amount, Currency: row.Currency, Status: row.Status, Reason: row.Reason, IdempotencyKey: row.IdempotencyKey, IdempotencyPayloadHash: row.IdempotencyPayloadHash, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt}
 }

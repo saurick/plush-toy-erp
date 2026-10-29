@@ -1,18 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertSharedSurfaceReport } from "./transaction-shared-surfaces-browser.mjs";
+import { assertSharedSurfaceReport, matchesSharedFilterRequest, SHARED_FILTER_CASES } from "./transaction-shared-surfaces-browser.mjs";
 import { assertPDFDownloadResponse } from "./transaction-pdf-download-observer.mjs";
 import { printTemplateCatalog } from "../../web/src/erp/config/printTemplates.mjs";
 
 function completeReport() {
   return {
     pageErrors: [],
-    filters: ["incoming-quality", "customer-receipts", "supplier-payments"].map(
-      (key) => ({
+    filters: ["quality-type", "customer-receipts", "supplier-payments"].map(
+      (key, index) => ({
         key,
         rows: 2,
         databaseMatches: true,
         restored: true,
+        restoredDatabaseMatches: true,
+        selectedMethod: SHARED_FILTER_CASES[index].selectedRequest.method,
+        restoredMethod: SHARED_FILTER_CASES[index].restoredRequest.method,
+        selectedValue: key === 'quality-type' ? 'OUTSOURCING_RETURN' : key === 'customer-receipts' ? 'RECEIPT' : 'DISBURSEMENT',
+        restoredValue: key === 'quality-type' ? 'INCOMING' : '',
         documentOverflow: false,
       }),
     ),
@@ -64,6 +69,10 @@ test("shared surface evidence requires actual rows, restored filters, real PDFs 
     (r) => {
       r.filters[1].restored = false;
     },
+    (r) => { r.filters[0].restoredValue = ''; },
+    (r) => { r.filters[0].selectedMethod = 'list_quality_inspections'; },
+    (r) => { r.filters[0].selectedValue = 'INCOMING'; },
+    (r) => { r.filters[0].restoredDatabaseMatches = false; },
     (r) => {
       r.filters[2].documentOverflow = true;
     },
@@ -166,4 +175,13 @@ test("the download must match its native PDF response, not an overlapping previe
     assert.throws(() =>
       assertPDFDownloadResponse({ ...response, ...override }, actual),
     );
+});
+
+test('质检类型切换匹配真实来源专用接口，恢复默认匹配来料接口和参数', () => {
+  const [quality] = SHARED_FILTER_CASES;
+  assert.equal(matchesSharedFilterRequest({ method: 'list_outsourcing_return_quality_inspections', params: { include_status_counts: true } }, quality.selectedRequest), true);
+  assert.equal(matchesSharedFilterRequest({ method: 'list_quality_inspections', params: { inspection_type: 'OUTSOURCING_RETURN' } }, quality.selectedRequest), false);
+  assert.equal(matchesSharedFilterRequest({ method: 'list_outsourcing_return_quality_inspections', params: { inspection_type: 'OUTSOURCING_RETURN' } }, quality.selectedRequest), false);
+  assert.equal(matchesSharedFilterRequest({ method: 'list_quality_inspections', params: { inspection_type: 'INCOMING' } }, quality.restoredRequest), true);
+  assert.equal(matchesSharedFilterRequest({ method: 'list_quality_inspections', params: {} }, quality.restoredRequest), false);
 });

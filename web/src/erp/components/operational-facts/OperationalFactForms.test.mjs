@@ -7,6 +7,8 @@ import { registerJSXTestLoader } from '../../../../scripts/test/reactRuntime.mjs
 
 registerJSXTestLoader()
 const {
+  productionFactPostPermissions,
+  productionFactCancelPermissions,
   FINANCE_COLLECTION_TYPE_LABELS,
   FINANCE_PAYMENT_TERM_LABELS,
   FINANCE_INVOICE_CATEGORY_LABELS,
@@ -109,7 +111,7 @@ test('OperationalFactForms keeps outsourcing fact permissions exact', () => {
 test('OperationalFactForms separates production reporting from warehouse finished-goods inbound', () => {
   assert.match(
     source,
-    /productionPost:\s*\['production\.fact\.post', 'warehouse\.inbound\.confirm'\]/u
+    /productionPost:\s*\['production\.fact\.post', 'warehouse\.inbound\.confirm', 'warehouse\.outbound\.confirm'\]/u
   )
   assert.match(source, /productionFactPostPermissions/u)
   assert.match(source, /productionFactCancelPermissions/u)
@@ -127,4 +129,16 @@ test('OperationalFactForms formats fact decimals without Number rounding', () =>
     /export function formatQuantity\(value\) \{\s*return formatOperationalFactDecimal\(value\)/u
   )
   assert.doesNotMatch(source, /decimalNumber|toFixed|Number\(value/u)
+})
+
+
+test('领料仅由出库能力确认和取消，成品与返工保持各自权限', () => {
+  for (const status of ['DRAFT', 'POSTED']) {
+    assert.deepEqual(productionFactPostPermissions({fact_type: 'MATERIAL_ISSUE', status}), ['warehouse.outbound.confirm'])
+    assert.deepEqual(productionFactCancelPermissions({fact_type: 'MATERIAL_ISSUE', status}), ['warehouse.outbound.confirm'])
+    assert.deepEqual(productionFactPostPermissions({fact_type: 'REWORK', status}), ['production.fact.post'])
+    assert.deepEqual(productionFactCancelPermissions({fact_type: 'REWORK', status}), ['production.fact.cancel'])
+  }
+  assert.deepEqual(productionFactPostPermissions({fact_type: 'FINISHED_GOODS_RECEIPT', status: 'DRAFT'}), ['warehouse.inbound.confirm'])
+  assert.deepEqual(productionFactCancelPermissions({fact_type: 'FINISHED_GOODS_RECEIPT', status: 'POSTED'}), ['warehouse.inbound.confirm'])
 })

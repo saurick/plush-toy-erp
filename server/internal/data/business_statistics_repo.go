@@ -115,7 +115,7 @@ func (r *businessStatisticsRepo) receivableQuery(q biz.BusinessStatisticsQuery) 
  SELECT finance_fact_id,SUM(CASE WHEN status='POSTED' THEN amount WHEN status='REVERSED' THEN -amount ELSE 0 END) AS amount
  FROM finance_allocations GROUP BY finance_fact_id
 ), credits AS (
- SELECT finance_fact_id,SUM(CASE WHEN status='POSTED' THEN amount WHEN status='REVERSED' THEN -amount ELSE 0 END) AS amount
+ SELECT finance_fact_id,SUM((CASE WHEN status='POSTED' THEN amount WHEN status='REVERSED' THEN -amount ELSE 0 END) * (CASE WHEN balance_direction='INCREASE' THEN -1 ELSE 1 END)) AS amount
  FROM finance_credit_notes GROUP BY finance_fact_id
 ), balances AS (
  SELECT f.*,COALESCE(a.amount,0) AS allocated,COALESCE(n.amount,0) AS credited,

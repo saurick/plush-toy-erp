@@ -70,7 +70,7 @@ func TestOutsourcingFactFromOrderPostgresWIPAllocationAndLifecycleSettlementStay
 		}
 		closeDone := make(chan error, 1)
 		go func() {
-			_, closeErr := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, order.ID, biz.OutsourcingOrderStatusClosed)
+			_, closeErr := applyOutsourcingLifecycleForTest(ctx, orderRepo, order.ID, biz.OutsourcingOrderStatusClosed)
 			closeDone <- closeErr
 		}()
 		waitForPostgresBlockedQueryCount(t, ctx, f.data.sqldb, "production_wip_batches", 1)
@@ -106,7 +106,7 @@ func TestOutsourcingFactFromOrderPostgresWIPAllocationAndLifecycleSettlementStay
 				return err
 			}
 			cancel := func() error {
-				_, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, order.ID, biz.OutsourcingOrderStatusCanceled)
+				_, err := applyOutsourcingLifecycleForTest(ctx, orderRepo, order.ID, biz.OutsourcingOrderStatusCanceled)
 				return err
 			}
 			first, second := assign, cancel

@@ -4,6 +4,7 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import InventoryOperationTaskReview from '../../components/inventory/InventoryOperationTaskReview.jsx'
 import { getWorkflowTaskAssigneeLabel } from '../../utils/workflowTaskEventPresentation.mjs'
 import { BusinessHelpLabel } from '../../components/help/BusinessContextHelp.jsx'
 import {
@@ -15,8 +16,11 @@ import {
   getWorkflowProcessDecisionApprovalProfile,
   isWorkflowApprovalTask,
   isWorkflowProcessDecisionTask,
+  workflowTaskActionRequiresReason,
 } from '../../utils/workflowTaskActionContract.mjs'
-import { getWorkflowTaskProcessContext } from '../../api/workflowApi.mjs'
+import { getWorkflowTaskProcessContext, listWorkflowTaskEvents } from '../../api/workflowApi.mjs'
+import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
+import WorkflowTaskReceipt from '../../components/workflow/WorkflowTaskReceipt.jsx'
 import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
@@ -24,10 +28,12 @@ import {
 import { getWorkflowTaskActionOutcomeHint } from '../../utils/workflowTaskProcessingHint.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
 import MobileTaskContextCard from './MobileTaskContextCard.jsx'
+import { taskDeviceNotice, taskNeedsDesktop } from '../../utils/taskHandlingPolicy.mjs'
 import MobileTaskAttachments from './MobileTaskAttachments.jsx'
 import { WorkflowTaskCopySummary } from '../../components/workflow/WorkflowTaskCopy.jsx'
+import WorkflowTaskSecondaryActions, { WorkflowTaskActionGroup } from '../../components/workflow/WorkflowTaskSecondaryActions.jsx'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
-import { orderWorkflowTaskActions } from '../../utils/workflowTaskActionFlow.mjs'
+import { orderWorkflowTaskActions, workflowTaskPrimaryModes } from '../../utils/workflowTaskActionFlow.mjs'
 
 const ACTION_OPTIONS = Object.freeze([
   {
@@ -50,14 +56,6 @@ const ACTION_OPTIONS = Object.freeze([
     key: 'urge',
     description: '记录催办原因，任务状态保持不变。',
   },
-])
-
-const REASON_REQUIRED_ACTIONS = new Set([
-  'done',
-  'blocked',
-  'rejected',
-  'resume',
-  'urge',
 ])
 
 function hasOpenTaskOverlay() {
@@ -112,12 +110,13 @@ function validationErrorsFor({
   approvedQuantityAllowed = false,
   processDecisionRequired = false,
   reason,
+  requireReason = false,
 }) {
   const normalizedReason = String(reason || '').trim()
   return {
     action: action ? '' : '请选择本次处理方式',
     reason:
-      REASON_REQUIRED_ACTIONS.has(action) && !normalizedReason
+      requireReason && !normalizedReason
         ? `${resolveReasonLabel(action, approvalTask)}为必填项`
         : processDecisionRequired && [...normalizedReason].length > 255
           ? '审批意见不能超过 255 个字符'
@@ -132,6 +131,7 @@ function validationErrorsFor({
 }
 
 function MobileWorkflowTaskActionScreen({
+  collaborationActions = [],
   accessMessage = '',
   accessState = MOBILE_TASK_ACTION_ACCESS_STATES.CHECKING,
   approvedQuantity = '',
@@ -149,9 +149,11 @@ function MobileWorkflowTaskActionScreen({
   onSubmit = () => {},
   onViewReceipt = null,
   reason = '',
+  recordedReceipt = null,
   selectedAction = '',
   task = null,
 }) {
+  const [reviewedInventoryID, setReviewedInventoryID] = useState(0)
   const fieldID = useId()
   const screenRef = useRef(null)
   const actionChoiceRef = useRef(null)
@@ -165,9 +167,24 @@ function MobileWorkflowTaskActionScreen({
   const [processContextState, setProcessContextState] = useState('idle')
   const [processApprovalForm, setProcessApprovalForm] = useState(null)
   const [processContextRetry, setProcessContextRetry] = useState(0)
+  const settled = Boolean(task) && isTerminalWorkflowTask(task)
+  const [recordedHistory, setRecordedHistory] = useState({ state: 'loading', items: [] })
+  const [recordedRetry, setRecordedRetry] = useState(0)
+  const confirmedReceipt = recordedReceipt?.status === 'confirmed' && recordedReceipt.task?.id === task?.id && recordedReceipt.task?.version === task?.version ? recordedReceipt : null
+  useEffect(() => {
+    if (!settled || confirmedReceipt || !task?.id) return undefined
+    const controller = new AbortController()
+    setRecordedHistory({ state: 'loading', items: [] })
+    listWorkflowTaskEvents(task.id, { limit: 100, signal: controller.signal }).then(
+      (result) => { if (!controller.signal.aborted) setRecordedHistory({ state: 'ready', items: result.items }) },
+      () => { if (!controller.signal.aborted) setRecordedHistory({ state: 'error', items: [] }) }
+    )
+    return () => controller.abort()
+  }, [confirmedReceipt, settled, task?.id, task?.version, recordedRetry])
 
+  const handlingActionModes = workflowTaskPrimaryModes(availableActions)
   const normalizedActions = ACTION_OPTIONS.filter((option) =>
-    availableActions.includes(option.key)
+    handlingActionModes.includes(option.key)
   )
   const visibleActions =
     accessState === MOBILE_TASK_ACTION_ACCESS_STATES.URGE_ONLY
@@ -181,9 +198,9 @@ function MobileWorkflowTaskActionScreen({
     : visibleActions.some((option) => option.key === selectedAction)
       ? selectedAction
       : ''
-  const accessAllowsSubmit =
+  const accessAllowsSubmit = !settled && (
     accessState === MOBILE_TASK_ACTION_ACCESS_STATES.ACTIONABLE ||
-    accessState === MOBILE_TASK_ACTION_ACCESS_STATES.URGE_ONLY
+    accessState === MOBILE_TASK_ACTION_ACCESS_STATES.URGE_ONLY)
   const processDecisionRequired =
     effectiveAction === 'done' && isWorkflowProcessDecisionTask(task)
   const expectedApprovalProfile =
@@ -193,14 +210,14 @@ function MobileWorkflowTaskActionScreen({
     (processContextState === 'ready' &&
       processApprovalForm?.profile_key === expectedApprovalProfile &&
       processApprovalForm?.reason_required === true)
-  const canSubmit = accessAllowsSubmit && processDecisionReady
+  const canSubmit = accessAllowsSubmit && processDecisionReady && (effectiveAction !== 'done' || task?.source_type !== 'inventory_operation' || reviewedInventoryID === Number(task.source_id))
   const showFooterRetry =
-    !canSubmit &&
+    !settled && !canSubmit &&
     accessState === MOBILE_TASK_ACTION_ACCESS_STATES.FAILED &&
     Boolean(onRetryAccess)
   const showDisabledSubmit =
-    !canSubmit && !showFooterRetry && hasActionCapability === true
-  const accessCopy = resolveAccessCopy(accessState, accessMessage)
+    !settled && !canSubmit && !showFooterRetry && hasActionCapability === true
+  const accessCopy = settled ? '' : resolveAccessCopy(accessState, accessMessage)
   const taskStatus = task
     ? resolveMobileTaskStatusLabel(task)
     : '任务状态暂不可用'
@@ -214,16 +231,13 @@ function MobileWorkflowTaskActionScreen({
     processApprovalForm?.profile_key === 'production_exception_approval' &&
     processApprovalForm?.approved_quantity?.precision === 20 &&
     processApprovalForm?.approved_quantity?.scale === 6
-  const reasonRequired = REASON_REQUIRED_ACTIONS.has(effectiveAction)
+  const reasonRequired = workflowTaskActionRequiresReason(task, effectiveAction)
   const showReasonHelp = Boolean(
     validationErrors.reason ||
     String(reason || '').length >= (processDecisionRequired ? 205 : 450)
   )
-  const effectiveActionLabel = effectiveAction
-    ? approvalTask && effectiveAction === 'done'
-      ? '审批通过'
-      : resolveMobileActionLabel(effectiveAction)
-    : ''
+  const actionLabel = (key) => resolveMobileActionLabel(key, task)
+  const effectiveActionLabel = effectiveAction ? actionLabel(effectiveAction) : ''
   const submitLabel = effectiveActionLabel
     ? `确认${effectiveActionLabel}`
     : '确认提交'
@@ -340,6 +354,7 @@ function MobileWorkflowTaskActionScreen({
       approvedQuantity,
       approvedQuantityAllowed,
       processDecisionRequired,
+      requireReason: reasonRequired,
       reason,
     })
     setValidationErrors(errors)
@@ -388,10 +403,7 @@ function MobileWorkflowTaskActionScreen({
   const renderActionOption = (key) => {
     const option = visibleActions.find((item) => item.key === key)
     const selected = effectiveAction === option.key
-    const label =
-      approvalTask && option.key === 'done'
-        ? '审批通过'
-        : resolveMobileActionLabel(option.key)
+    const label = actionLabel(option.key)
     return (
       <label
         key={option.key}
@@ -434,13 +446,19 @@ function MobileWorkflowTaskActionScreen({
         onBack={onBack}
         onOpenDetail={onBack}
         onOpenReceipt={onViewReceipt}
-        receiptUnavailableLabel="提交后开放"
         title="任务办理"
-        trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={getWorkflowTaskAssigneeLabel(task)} compact />}
+        trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={getWorkflowTaskAssigneeLabel(task)} compact disabled={busy} />}
       />
 
       <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
         <div data-testid="mobile-task-action-context"><MobileTaskContextCard task={task} status={taskStatus} /></div>
+        {settled ? (
+          <>
+            <WorkflowTaskReceipt task={task} events={recordedHistory.items} state={confirmedReceipt ? 'ready' : recordedHistory.state} receipt={confirmedReceipt ? { actionTitle: confirmedReceipt.message || resolveMobileActionLabel(confirmedReceipt.action, task), statusLabel: confirmedReceipt.statusLabel, reason: confirmedReceipt.feedback || confirmedReceipt.reason } : null} />
+            {!confirmedReceipt && recordedHistory.state === 'error' ? <button type="button" className="mobile-detail-primary" onClick={() => setRecordedRetry((value) => value + 1)}>重新读取办理记录</button> : null}
+          </>
+        ) : null}
+        {task?.source_type === 'inventory_operation' ? <InventoryOperationTaskReview task={task} onReady={setReviewedInventoryID} /> : null}
 
         {accessCopy ? (
           <section
@@ -470,7 +488,7 @@ function MobileWorkflowTaskActionScreen({
           </section>
         ) : null}
 
-        {accessAllowsSubmit ? (
+        {accessAllowsSubmit && visibleActions.length > 0 ? (
           <>
             {processDecisionRequired && processContextState !== 'ready' ? (
               <section
@@ -504,7 +522,7 @@ function MobileWorkflowTaskActionScreen({
             {onOpenTaskForm ? (
               <section className="erp-mobile-card mobile-detail-section">
                 <button type="button" className="mobile-detail-secondary min-h-11 w-full rounded-xl px-4 py-3 text-base font-semibold" disabled={busy} onClick={onOpenTaskForm}>
-                  填写办理表单
+                  任务办理
                 </button>
               </section>
             ) : null}
@@ -666,35 +684,39 @@ function MobileWorkflowTaskActionScreen({
       {task?.id || accessAllowsSubmit || showFooterRetry || showDisabledSubmit ? (
         <div className="mobile-role-action-bar mobile-task-action-footer">
           <MobileTaskAttachments task={task} canManage={canManageAttachments} busy={busy} />
-          {accessAllowsSubmit ? (
-            <button
-              type="submit"
-              className="mobile-detail-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={busy || !canSubmit || visibleActions.length === 0}
-            >
-              {busy ? <LoadingOutlined spin /> : null}
-              <span>{busy ? busySubmitLabel : submitLabel}</span>
-            </button>
-          ) : null}
-          {showFooterRetry ? (
-            <button
-              type="button"
-              className="mobile-detail-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={busy}
-              onClick={onRetryAccess}
-            >
-              <ReloadOutlined />
-              重新确认
-            </button>
-          ) : showDisabledSubmit ? (
-            <button
-              type="button"
-              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
-              disabled
-            >
-              暂不能提交
-            </button>
-          ) : null}
+          {!settled ? <WorkflowTaskSecondaryActions actions={collaborationActions} disabled={busy} /> : null}
+          <WorkflowTaskActionGroup label={approvalTask ? '审批办理' : task?.task_group === 'order_review' ? '评审办理' : '任务办理'} className="erp-task-operation-group--primary">
+            {settled && canViewReceipt ? <button type="button" className="mobile-detail-primary" onClick={onViewReceipt}>查看结果回执</button> : null}
+            {accessAllowsSubmit && visibleActions.length > 0 ? (
+              <button
+                type="submit"
+                className="mobile-detail-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+                disabled={busy || !canSubmit || visibleActions.length === 0}
+              >
+                {busy ? <LoadingOutlined spin /> : null}
+                <span>{busy ? busySubmitLabel : submitLabel}</span>
+              </button>
+            ) : null}
+            {showFooterRetry ? (
+              <button
+                type="button"
+                className="mobile-detail-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+                disabled={busy}
+                onClick={onRetryAccess}
+              >
+                <ReloadOutlined />
+                重新确认
+              </button>
+            ) : showDisabledSubmit ? (
+              <button
+                type="button"
+                className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
+                disabled
+              >
+                暂不能提交
+              </button>
+            ) : null}
+          </WorkflowTaskActionGroup>
         </div>
       ) : null}
     </form>
@@ -702,15 +724,32 @@ function MobileWorkflowTaskActionScreen({
 }
 
 export default function MobileTaskActionScreen(props) {
-  const { renderSourceAction, onBack, task, canManageAttachments } = props
+  const { busy = false, collaborationActions = [], renderSourceAction, taskBusinessForm = false, onBack, task, selectedAction, canManageAttachments, canViewReceipt: canViewTaskReceipt, onViewReceipt: onViewTaskReceipt } = props
+  if (taskNeedsDesktop(task) && selectedAction !== 'urge' && !taskBusinessForm && !renderSourceAction) {
+    return (
+      <div className="mobile-role-tasks-page mobile-role-tasks-page--detail mobile-task-screen" data-testid="mobile-task-desktop-review">
+        <MobileTaskFlowHeader title="任务办理" currentStep="process" onBack={onBack} onOpenDetail={onBack} canOpenReceipt={canViewTaskReceipt} onOpenReceipt={onViewTaskReceipt} backLabel="返回任务详情" trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={getWorkflowTaskAssigneeLabel(task)} compact disabled={busy} />} />
+        <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
+          <MobileTaskContextCard task={task} />
+          <p>{taskDeviceNotice(task) || '本次办理已结束，可回看任务资料和结果。'}</p>
+        </main>
+        <div className="mobile-role-action-bar">
+          <MobileTaskAttachments task={task} canManage={canManageAttachments} />
+          <WorkflowTaskSecondaryActions actions={collaborationActions} disabled={busy} />
+          {canViewTaskReceipt ? <button type="button" className="mobile-detail-primary" onClick={onViewTaskReceipt}>查看结果回执</button> : <button type="button" onClick={onBack}>返回任务信息</button>}
+        </div>
+      </div>
+    )
+  }
   if (!renderSourceAction) {
     return <MobileWorkflowTaskActionScreen {...props} />
   }
-  return renderSourceAction(({ content, footer, saving, canViewReceipt, onViewReceipt, taskForm, actionHostRef }) => (
+  return renderSourceAction(({ content, footer, saving, canViewReceipt, onViewReceipt, taskForm, readOnly: sourceReadOnly, actionHostRef }) => (
     <div
       className={`mobile-role-tasks-page mobile-role-tasks-page--detail mobile-role-tasks-page--task-info mobile-task-screen md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl${taskForm ? ' mobile-task-business' : ''}`}
       aria-busy={saving}
       data-testid="mobile-task-action-screen"
+      data-business-result-ready={taskForm && footer ? 'true' : undefined}
       onKeyDown={(event) => {
         if (saving || event.defaultPrevented || !event.currentTarget.contains(event.target) || hasOpenTaskOverlay()) return
         if (event.key === 'Escape') onBack?.()
@@ -724,25 +763,29 @@ export default function MobileTaskActionScreen(props) {
         backLabel="返回任务详情"
         busy={saving}
         currentStep="process"
-        canOpenReceipt={canViewReceipt}
-        onOpenReceipt={onViewReceipt}
+        canOpenReceipt={canViewReceipt || canViewTaskReceipt}
+        onOpenReceipt={canViewReceipt ? onViewReceipt : onViewTaskReceipt}
         onBack={onBack}
         onOpenDetail={onBack}
-        receiptUnavailableLabel="提交后开放"
         title="任务办理"
-        trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={getWorkflowTaskAssigneeLabel(task)} compact />}
+        trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={getWorkflowTaskAssigneeLabel(task)} compact disabled={saving} />}
       />
       <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
-        <MobileTaskContextCard task={task} />
+        {!taskForm ? <MobileTaskContextCard task={task} /> : null}
+        {taskDeviceNotice(task) && !sourceReadOnly && (!taskForm || !taskNeedsDesktop(task)) ? <p>{taskDeviceNotice(task)}</p> : null}
         <div className="erp-material-task-action erp-material-task-action--mobile">
           {content}
         </div>
-        <MobileBackToTop />
+        <MobileBackToTop enabled={!taskForm || !taskNeedsDesktop(task)} />
       </main>
       <div className="mobile-role-action-bar mobile-task-action-footer">
         <MobileTaskAttachments task={task} canManage={canManageAttachments} busy={saving} />
-        <div className="mobile-task-business-action-host" ref={actionHostRef} />
-        {footer}
+        <WorkflowTaskSecondaryActions actions={collaborationActions} disabled={busy || saving} />
+        <WorkflowTaskActionGroup label="业务办理" className="erp-task-operation-group--primary">
+          <div className="mobile-task-business-action-host" ref={actionHostRef} />
+          {taskForm && footer ? <div className="mobile-task-business-result-footer">{footer}</div> : footer}
+        </WorkflowTaskActionGroup>
+        {taskForm && taskNeedsDesktop(task) && taskDeviceNotice(task) ? <span className="mobile-task-device-scope">电脑编制 · 手机查看</span> : null}
       </div>
     </div>
   ))

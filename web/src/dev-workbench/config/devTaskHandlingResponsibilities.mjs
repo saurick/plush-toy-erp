@@ -44,16 +44,16 @@ export const TASK_HANDLING_DUTIES = Object.freeze(
     ...duties(
       'engineering_data',
       ['engineering'],
-      '编制产品、工序和 BOM，补齐打样及样品资料',
-      '资料齐备后，由工程提交用料',
+      '在原 BOM 编辑器编制、导入材料明细并完成工程资料',
+      '完成工程资料且订单生效后自动汇总并送审',
       { relationRefs: [['sales_order', 'engineering']] }
     ),
     ...duties(
       'engineering',
       ['engineering'],
-      '核对已确认样品和启用 BOM，提交用料；退回后修改重提',
+      '修改原工程资料并点击“完成工程资料”，校验通过后自动送审；退回后继续修订原资料',
       '老板审核 → 另一位财务复核',
-      { label: '工程用料提交与修订' }
+      { label: '工程资料修订与自动送审' }
     ),
     ...duties(
       'sales_order',
@@ -173,7 +173,7 @@ export const TASK_HANDLING_DUTIES = Object.freeze(
     ),
     ...duties(
       'outsourcing_contract',
-      ['finance'],
+      ['purchase'],
       '补齐加工合同价格、数量和交期，确认合同',
       '交仓库办理加工收发'
     ),

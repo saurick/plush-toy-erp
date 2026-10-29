@@ -1211,8 +1211,36 @@ func init() {
 	financecreditnote.Hooks[0] = financecreditnoteHooks[0]
 	financecreditnoteFields := schema.FinanceCreditNote{}.Fields()
 	_ = financecreditnoteFields
+	// financecreditnoteDescBalanceDirection is the schema descriptor for balance_direction field.
+	financecreditnoteDescBalanceDirection := financecreditnoteFields[0].Descriptor()
+	// financecreditnote.DefaultBalanceDirection holds the default value on creation for the balance_direction field.
+	financecreditnote.DefaultBalanceDirection = financecreditnoteDescBalanceDirection.Default.(string)
+	// financecreditnote.BalanceDirectionValidator is a validator for the "balance_direction" field. It is called by the builders before save.
+	financecreditnote.BalanceDirectionValidator = func() func(string) error {
+		validators := financecreditnoteDescBalanceDirection.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(balance_direction string) error {
+			for _, fn := range fns {
+				if err := fn(balance_direction); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// financecreditnoteDescSourceType is the schema descriptor for source_type field.
+	financecreditnoteDescSourceType := financecreditnoteFields[1].Descriptor()
+	// financecreditnote.SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
+	financecreditnote.SourceTypeValidator = financecreditnoteDescSourceType.Validators[0].(func(string) error)
+	// financecreditnoteDescSourceID is the schema descriptor for source_id field.
+	financecreditnoteDescSourceID := financecreditnoteFields[2].Descriptor()
+	// financecreditnote.SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
+	financecreditnote.SourceIDValidator = financecreditnoteDescSourceID.Validators[0].(func(int) error)
 	// financecreditnoteDescCreditNoteNo is the schema descriptor for credit_note_no field.
-	financecreditnoteDescCreditNoteNo := financecreditnoteFields[0].Descriptor()
+	financecreditnoteDescCreditNoteNo := financecreditnoteFields[3].Descriptor()
 	// financecreditnote.CreditNoteNoValidator is a validator for the "credit_note_no" field. It is called by the builders before save.
 	financecreditnote.CreditNoteNoValidator = func() func(string) error {
 		validators := financecreditnoteDescCreditNoteNo.Validators
@@ -1230,15 +1258,15 @@ func init() {
 		}
 	}()
 	// financecreditnoteDescFinanceFactID is the schema descriptor for finance_fact_id field.
-	financecreditnoteDescFinanceFactID := financecreditnoteFields[1].Descriptor()
+	financecreditnoteDescFinanceFactID := financecreditnoteFields[4].Descriptor()
 	// financecreditnote.FinanceFactIDValidator is a validator for the "finance_fact_id" field. It is called by the builders before save.
 	financecreditnote.FinanceFactIDValidator = financecreditnoteDescFinanceFactID.Validators[0].(func(int) error)
 	// financecreditnoteDescReversalOfCreditNoteID is the schema descriptor for reversal_of_credit_note_id field.
-	financecreditnoteDescReversalOfCreditNoteID := financecreditnoteFields[2].Descriptor()
+	financecreditnoteDescReversalOfCreditNoteID := financecreditnoteFields[5].Descriptor()
 	// financecreditnote.ReversalOfCreditNoteIDValidator is a validator for the "reversal_of_credit_note_id" field. It is called by the builders before save.
 	financecreditnote.ReversalOfCreditNoteIDValidator = financecreditnoteDescReversalOfCreditNoteID.Validators[0].(func(int) error)
 	// financecreditnoteDescCurrency is the schema descriptor for currency field.
-	financecreditnoteDescCurrency := financecreditnoteFields[4].Descriptor()
+	financecreditnoteDescCurrency := financecreditnoteFields[7].Descriptor()
 	// financecreditnote.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
 	financecreditnote.CurrencyValidator = func() func(string) error {
 		validators := financecreditnoteDescCurrency.Validators
@@ -1256,7 +1284,7 @@ func init() {
 		}
 	}()
 	// financecreditnoteDescStatus is the schema descriptor for status field.
-	financecreditnoteDescStatus := financecreditnoteFields[5].Descriptor()
+	financecreditnoteDescStatus := financecreditnoteFields[8].Descriptor()
 	// financecreditnote.DefaultStatus holds the default value on creation for the status field.
 	financecreditnote.DefaultStatus = financecreditnoteDescStatus.Default.(string)
 	// financecreditnote.StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -1276,7 +1304,7 @@ func init() {
 		}
 	}()
 	// financecreditnoteDescReason is the schema descriptor for reason field.
-	financecreditnoteDescReason := financecreditnoteFields[6].Descriptor()
+	financecreditnoteDescReason := financecreditnoteFields[9].Descriptor()
 	// financecreditnote.ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
 	financecreditnote.ReasonValidator = func() func(string) error {
 		validators := financecreditnoteDescReason.Validators
@@ -1294,7 +1322,7 @@ func init() {
 		}
 	}()
 	// financecreditnoteDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	financecreditnoteDescIdempotencyKey := financecreditnoteFields[7].Descriptor()
+	financecreditnoteDescIdempotencyKey := financecreditnoteFields[10].Descriptor()
 	// financecreditnote.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	financecreditnote.IdempotencyKeyValidator = func() func(string) error {
 		validators := financecreditnoteDescIdempotencyKey.Validators
@@ -1312,7 +1340,7 @@ func init() {
 		}
 	}()
 	// financecreditnoteDescIdempotencyPayloadHash is the schema descriptor for idempotency_payload_hash field.
-	financecreditnoteDescIdempotencyPayloadHash := financecreditnoteFields[8].Descriptor()
+	financecreditnoteDescIdempotencyPayloadHash := financecreditnoteFields[11].Descriptor()
 	// financecreditnote.IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
 	financecreditnote.IdempotencyPayloadHashValidator = func() func(string) error {
 		validators := financecreditnoteDescIdempotencyPayloadHash.Validators
@@ -1331,11 +1359,11 @@ func init() {
 		}
 	}()
 	// financecreditnoteDescCreatedBy is the schema descriptor for created_by field.
-	financecreditnoteDescCreatedBy := financecreditnoteFields[9].Descriptor()
+	financecreditnoteDescCreatedBy := financecreditnoteFields[12].Descriptor()
 	// financecreditnote.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	financecreditnote.CreatedByValidator = financecreditnoteDescCreatedBy.Validators[0].(func(int) error)
 	// financecreditnoteDescCreatedAt is the schema descriptor for created_at field.
-	financecreditnoteDescCreatedAt := financecreditnoteFields[10].Descriptor()
+	financecreditnoteDescCreatedAt := financecreditnoteFields[13].Descriptor()
 	// financecreditnote.DefaultCreatedAt holds the default value on creation for the created_at field.
 	financecreditnote.DefaultCreatedAt = financecreditnoteDescCreatedAt.Default.(func() time.Time)
 	financefactHooks := schema.FinanceFact{}.Hooks()
@@ -6864,58 +6892,36 @@ func init() {
 	salesorderitemDescProcessRequirement := salesorderitemFields[8].Descriptor()
 	// salesorderitem.ProcessRequirementValidator is a validator for the "process_requirement" field. It is called by the builders before save.
 	salesorderitem.ProcessRequirementValidator = salesorderitemDescProcessRequirement.Validators[0].(func(string) error)
-	// salesorderitemDescSampleBomID is the schema descriptor for sample_bom_id field.
-	salesorderitemDescSampleBomID := salesorderitemFields[10].Descriptor()
-	// salesorderitem.SampleBomIDValidator is a validator for the "sample_bom_id" field. It is called by the builders before save.
-	salesorderitem.SampleBomIDValidator = salesorderitemDescSampleBomID.Validators[0].(func(int) error)
-	// salesorderitemDescSampleBomFingerprint is the schema descriptor for sample_bom_fingerprint field.
-	salesorderitemDescSampleBomFingerprint := salesorderitemFields[11].Descriptor()
-	// salesorderitem.SampleBomFingerprintValidator is a validator for the "sample_bom_fingerprint" field. It is called by the builders before save.
-	salesorderitem.SampleBomFingerprintValidator = salesorderitemDescSampleBomFingerprint.Validators[0].(func(string) error)
-	// salesorderitemDescSampleReusedFromItemID is the schema descriptor for sample_reused_from_item_id field.
-	salesorderitemDescSampleReusedFromItemID := salesorderitemFields[12].Descriptor()
-	// salesorderitem.SampleReusedFromItemIDValidator is a validator for the "sample_reused_from_item_id" field. It is called by the builders before save.
-	salesorderitem.SampleReusedFromItemIDValidator = salesorderitemDescSampleReusedFromItemID.Validators[0].(func(int) error)
-	// salesorderitemDescSampleImageAttachmentID is the schema descriptor for sample_image_attachment_id field.
-	salesorderitemDescSampleImageAttachmentID := salesorderitemFields[13].Descriptor()
-	// salesorderitem.SampleImageAttachmentIDValidator is a validator for the "sample_image_attachment_id" field. It is called by the builders before save.
-	salesorderitem.SampleImageAttachmentIDValidator = salesorderitemDescSampleImageAttachmentID.Validators[0].(func(int) error)
-	// salesorderitemDescEngineeringStatus is the schema descriptor for engineering_status field.
-	salesorderitemDescEngineeringStatus := salesorderitemFields[14].Descriptor()
-	// salesorderitem.DefaultEngineeringStatus holds the default value on creation for the engineering_status field.
-	salesorderitem.DefaultEngineeringStatus = salesorderitemDescEngineeringStatus.Default.(string)
-	// salesorderitem.EngineeringStatusValidator is a validator for the "engineering_status" field. It is called by the builders before save.
-	salesorderitem.EngineeringStatusValidator = salesorderitemDescEngineeringStatus.Validators[0].(func(string) error)
-	// salesorderitemDescSampleNote is the schema descriptor for sample_note field.
-	salesorderitemDescSampleNote := salesorderitemFields[15].Descriptor()
-	// salesorderitem.SampleNoteValidator is a validator for the "sample_note" field. It is called by the builders before save.
-	salesorderitem.SampleNoteValidator = salesorderitemDescSampleNote.Validators[0].(func(string) error)
-	// salesorderitemDescSampleConfirmedBy is the schema descriptor for sample_confirmed_by field.
-	salesorderitemDescSampleConfirmedBy := salesorderitemFields[17].Descriptor()
-	// salesorderitem.SampleConfirmedByValidator is a validator for the "sample_confirmed_by" field. It is called by the builders before save.
-	salesorderitem.SampleConfirmedByValidator = salesorderitemDescSampleConfirmedBy.Validators[0].(func(int) error)
+	// salesorderitemDescBomID is the schema descriptor for bom_id field.
+	salesorderitemDescBomID := salesorderitemFields[10].Descriptor()
+	// salesorderitem.BomIDValidator is a validator for the "bom_id" field. It is called by the builders before save.
+	salesorderitem.BomIDValidator = salesorderitemDescBomID.Validators[0].(func(int) error)
+	// salesorderitemDescBomFingerprint is the schema descriptor for bom_fingerprint field.
+	salesorderitemDescBomFingerprint := salesorderitemFields[11].Descriptor()
+	// salesorderitem.BomFingerprintValidator is a validator for the "bom_fingerprint" field. It is called by the builders before save.
+	salesorderitem.BomFingerprintValidator = salesorderitemDescBomFingerprint.Validators[0].(func(string) error)
 	// salesorderitemDescProductSkuID is the schema descriptor for product_sku_id field.
-	salesorderitemDescProductSkuID := salesorderitemFields[18].Descriptor()
+	salesorderitemDescProductSkuID := salesorderitemFields[12].Descriptor()
 	// salesorderitem.ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
 	salesorderitem.ProductSkuIDValidator = salesorderitemDescProductSkuID.Validators[0].(func(int) error)
 	// salesorderitemDescUnitID is the schema descriptor for unit_id field.
-	salesorderitemDescUnitID := salesorderitemFields[19].Descriptor()
+	salesorderitemDescUnitID := salesorderitemFields[13].Descriptor()
 	// salesorderitem.UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
 	salesorderitem.UnitIDValidator = salesorderitemDescUnitID.Validators[0].(func(int) error)
 	// salesorderitemDescProductCodeSnapshot is the schema descriptor for product_code_snapshot field.
-	salesorderitemDescProductCodeSnapshot := salesorderitemFields[20].Descriptor()
+	salesorderitemDescProductCodeSnapshot := salesorderitemFields[14].Descriptor()
 	// salesorderitem.ProductCodeSnapshotValidator is a validator for the "product_code_snapshot" field. It is called by the builders before save.
 	salesorderitem.ProductCodeSnapshotValidator = salesorderitemDescProductCodeSnapshot.Validators[0].(func(string) error)
 	// salesorderitemDescProductNameSnapshot is the schema descriptor for product_name_snapshot field.
-	salesorderitemDescProductNameSnapshot := salesorderitemFields[21].Descriptor()
+	salesorderitemDescProductNameSnapshot := salesorderitemFields[15].Descriptor()
 	// salesorderitem.ProductNameSnapshotValidator is a validator for the "product_name_snapshot" field. It is called by the builders before save.
 	salesorderitem.ProductNameSnapshotValidator = salesorderitemDescProductNameSnapshot.Validators[0].(func(string) error)
 	// salesorderitemDescColorSnapshot is the schema descriptor for color_snapshot field.
-	salesorderitemDescColorSnapshot := salesorderitemFields[22].Descriptor()
+	salesorderitemDescColorSnapshot := salesorderitemFields[16].Descriptor()
 	// salesorderitem.ColorSnapshotValidator is a validator for the "color_snapshot" field. It is called by the builders before save.
 	salesorderitem.ColorSnapshotValidator = salesorderitemDescColorSnapshot.Validators[0].(func(string) error)
 	// salesorderitemDescLineStatus is the schema descriptor for line_status field.
-	salesorderitemDescLineStatus := salesorderitemFields[27].Descriptor()
+	salesorderitemDescLineStatus := salesorderitemFields[21].Descriptor()
 	// salesorderitem.DefaultLineStatus holds the default value on creation for the line_status field.
 	salesorderitem.DefaultLineStatus = salesorderitemDescLineStatus.Default.(string)
 	// salesorderitem.LineStatusValidator is a validator for the "line_status" field. It is called by the builders before save.
@@ -6935,15 +6941,15 @@ func init() {
 		}
 	}()
 	// salesorderitemDescNote is the schema descriptor for note field.
-	salesorderitemDescNote := salesorderitemFields[28].Descriptor()
+	salesorderitemDescNote := salesorderitemFields[22].Descriptor()
 	// salesorderitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	salesorderitem.NoteValidator = salesorderitemDescNote.Validators[0].(func(string) error)
 	// salesorderitemDescCreatedAt is the schema descriptor for created_at field.
-	salesorderitemDescCreatedAt := salesorderitemFields[29].Descriptor()
+	salesorderitemDescCreatedAt := salesorderitemFields[23].Descriptor()
 	// salesorderitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	salesorderitem.DefaultCreatedAt = salesorderitemDescCreatedAt.Default.(func() time.Time)
 	// salesorderitemDescUpdatedAt is the schema descriptor for updated_at field.
-	salesorderitemDescUpdatedAt := salesorderitemFields[30].Descriptor()
+	salesorderitemDescUpdatedAt := salesorderitemFields[24].Descriptor()
 	// salesorderitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	salesorderitem.DefaultUpdatedAt = salesorderitemDescUpdatedAt.Default.(func() time.Time)
 	// salesorderitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

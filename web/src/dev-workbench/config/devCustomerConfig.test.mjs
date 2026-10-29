@@ -126,7 +126,7 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
       '采购管理',
       '委外管理',
       '生产管理',
-      '库存管理',
+      '仓储管理',
       '质检管理',
       '出货管理',
       '财务管理',
@@ -135,7 +135,7 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
     ]
   )
   assert(summary.sections.some((section) => section.title === '系统管理'))
-  assert(summary.sections.some((section) => section.title === '库存管理'))
+  assert(summary.sections.some((section) => section.title === '仓储管理'))
   assert(
     summary.sections.some(
       (section) =>
@@ -150,8 +150,9 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   )
   assert.deepEqual(
     summary.sections.find((section) => section.title === '出货管理')?.items,
-    ['shipments', 'outbound']
+    ['shipments']
   )
+  assert(summary.sections.find((section) => section.title === '仓储管理')?.items.includes('outbound'))
   assert(
     summary.sections.some(
       (section) =>

@@ -29,8 +29,6 @@ func (SalesOrderItem) Annotations() []schema.Annotation {
 				"sales_order_items_category_allowed":            "order_category IN ('NEW', 'REPEAT')",
 				"sales_order_items_sample_quantity_nonnegative": "pre_shipment_sample_quantity >= 0",
 				"sales_order_items_sku_requires_product":        "product_sku_id IS NULL OR product_id IS NOT NULL",
-				"sales_order_items_engineering_status_allowed":  "engineering_status IN ('PREPARING', 'SAMPLING', 'CONFIRMED')",
-				"sales_order_items_sampling_requires_sources":   "engineering_status = 'PREPARING' OR (product_id IS NOT NULL AND sample_bom_id IS NOT NULL)",
 			},
 		},
 	}
@@ -57,14 +55,8 @@ func (SalesOrderItem) Fields() []ent.Field {
 		field.String("process_requirement").Optional().Nillable().MaxLen(255),
 		// Import evidence remains separate from editable demand and engineering facts.
 		field.JSON("import_source", map[string]any{}).Optional().Immutable(),
-		field.Int("sample_bom_id").Optional().Nillable().Positive(),
-		field.String("sample_bom_fingerprint").Optional().Nillable().MaxLen(64),
-		field.Int("sample_reused_from_item_id").Optional().Nillable().Positive(),
-		field.Int("sample_image_attachment_id").Optional().Nillable().Positive(),
-		field.String("engineering_status").Default("PREPARING").MaxLen(16),
-		field.String("sample_note").Optional().Nillable().MaxLen(255),
-		field.Time("sample_confirmed_at").Optional().Nillable(),
-		field.Int("sample_confirmed_by").Optional().Nillable().Positive(),
+		field.Int("bom_id").Optional().Nillable().Positive(),
+		field.String("bom_fingerprint").Optional().Nillable().MaxLen(64),
 		field.Int("product_sku_id").
 			Optional().
 			Nillable().
@@ -109,7 +101,6 @@ func (SalesOrderItem) Fields() []ent.Field {
 
 func (SalesOrderItem) Edges() []ent.Edge {
 	return []ent.Edge{
-		edge.To("sample_reused_from_item", SalesOrderItem.Type).Field("sample_reused_from_item_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("sales_order", SalesOrder.Type).
 			Ref("items").
 			Field("sales_order_id").
@@ -119,8 +110,8 @@ func (SalesOrderItem) Edges() []ent.Edge {
 			Field("product_id").
 			Annotations(entsql.OnDelete(entsql.NoAction)).
 			Unique(),
-		edge.To("sample_bom", BOMHeader.Type).
-			Field("sample_bom_id").
+		edge.To("bom", BOMHeader.Type).
+			Field("bom_id").
 			Annotations(entsql.OnDelete(entsql.NoAction)).
 			Unique(),
 		edge.From("product_sku", ProductSKU.Type).

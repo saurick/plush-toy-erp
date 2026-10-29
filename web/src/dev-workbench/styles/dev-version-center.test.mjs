@@ -136,7 +136,7 @@ test('version decisions and target evidence remain source-backed', () => {
   )
   assert.match(component, /查看失败 Job/u)
   assert.match(component, /最近发布与部署/u)
-  assert.match(component, /查看耗时详情/u)
+  assert.doesNotMatch(component, /查看耗时详情|onOpenDetails/u)
 })
 
 test('manual takeover guide uses a standalone page without the former modal limits', () => {

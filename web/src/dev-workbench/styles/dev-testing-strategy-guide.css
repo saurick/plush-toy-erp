@@ -22,3 +22,7 @@
 .erp-dev-testing-strategy-guide .erp-dev-tool-table th:first-child {
   width: 16%;
 }
+
+.erp-dev-testing-strategy-guide--topic .erp-dev-testing-simple-table th:first-child {
+  width: 30%;
+}

@@ -874,7 +874,7 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresEnabledModule(t *testing.T) {
 		"inhouse_enabled":     false,
 	})
 	admin := workflowJSONRPCAdmin(
-		[]string{biz.EngineeringRoleKey},
+		[]string{biz.PMCRoleKey},
 		biz.PermissionProcessCreate,
 		biz.PermissionProcessUpdate,
 		biz.PermissionProcessDisable,

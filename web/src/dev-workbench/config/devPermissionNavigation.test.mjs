@@ -6,6 +6,7 @@ import {
   buildPermissionRelationshipNavigationModel,
 } from './devPermissionNavigation.mjs'
 import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
+import { getUtilityNavigationSections } from '../../erp/config/seedData.mjs'
 
 const guidedMenuConfig = { desktopMenu: { presentation: 'role_guided' } }
 const groupItems = (model, key) =>
@@ -49,7 +50,7 @@ const navigationSections = [
   },
   {
     key: 'warehouse',
-    title: '库存管理',
+    title: '仓储管理',
     items: [
       {
         key: 'inventory',
@@ -133,6 +134,29 @@ const accessByRoleKey = {
   },
 }
 
+test('权限地图菜单与实际历史入口保持一致，只消费最终有效能力', () => {
+  const access = {
+    ...accessByRoleKey.sales,
+    permissions: [
+      { permission_key: 'customer.read', effective: true },
+      { permission_key: 'customer.update', rbac_granted: true, effective: false },
+    ],
+  }
+  const model = () => buildPermissionRelationshipNavigationModel({
+    targetKey: 'sales',
+    roles,
+    accessByRoleKey: { ...accessByRoleKey, sales: access },
+    navigationSections: [...navigationSections, ...getUtilityNavigationSections().filter((section) => section.key === 'history')],
+    customerMenuConfig: guidedMenuConfig,
+  })
+  const hasHistory = () => model().sections.some((section) => section.items.some((item) => item.path === '/erp/history'))
+  assert.equal(hasHistory(), false)
+  access.permissions[1].effective = true
+  assert.equal(hasHistory(), true)
+  access.permissions[0].effective = false
+  assert.equal(hasHistory(), false)
+})
+
 test('explicit role-guided presentation shows complete recommended navigation', () => {
   const model = buildPermissionRelationshipNavigationModel({
     viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
@@ -161,7 +185,7 @@ test('explicit role-guided presentation shows complete recommended navigation', 
       section.items.map((item) => item.label),
     ]),
     [
-      ['业务模块', ['库存管理']],
+      ['业务模块', ['仓储管理']],
       ['系统与帮助', ['帮助中心']],
     ]
   )
@@ -193,7 +217,7 @@ test('role menu projection preserves a saved custom layout and appends remaining
   assert.equal(model.modeLabel, '自定义布局')
   assert.deepEqual(
     groupItems(model, 'primary').map((item) => item.label),
-    ['库存管理', '销售管理']
+    ['仓储管理', '销售管理']
   )
   assert.deepEqual(
     otherSections(model).flatMap((section) =>
@@ -232,7 +256,7 @@ test('employee menu projection merges multiple active roles once', () => {
   assert.equal(model.effectivePageCount, 7)
   assert.deepEqual(
     groupItems(model, 'primary').map((item) => item.label),
-    ['基础资料', '财务管理', '销售管理', '出货管理', '库存管理']
+    ['基础资料', '财务管理', '销售管理', '出货管理', '仓储管理']
   )
   assert.equal(
     groupItems(model, 'primary').filter((item) => item.label === '出货管理')
@@ -369,7 +393,7 @@ test('default sectioned presentation ignores saved role layout and uses current 
     ]),
     [
       ['工作中心', ['工作台']],
-      ['业务模块', ['基础资料', '销售管理', '出货管理', '库存管理']],
+      ['业务模块', ['基础资料', '销售管理', '出货管理', '仓储管理']],
       ['系统与帮助', ['帮助中心']],
     ]
   )
@@ -399,7 +423,7 @@ test('sectioned employee projection merges authorized modules without restoring 
   assert.equal(model.mode, 'sectioned')
   assert.deepEqual(
     groupItems(model, 'business').map((item) => item.label),
-    ['基础资料', '销售管理', '出货管理', '库存管理', '财务管理']
+    ['基础资料', '销售管理', '出货管理', '仓储管理', '财务管理']
   )
   assert.equal(
     model.sections.some((section) => section.title === '常用工作'),
@@ -491,6 +515,7 @@ test('current customer configuration projects four sidebar areas and keeps page 
         role_key: 'sales',
         is_final: true,
         pages: paths.map((path) => ({ path, effective: true })),
+        permissions: ['customer.read', 'customer.update'].map((permission_key) => ({ permission_key, effective: true })),
       },
     },
   }
@@ -503,7 +528,7 @@ test('current customer configuration projects four sidebar areas and keeps page 
   )
   assert.deepEqual(
     groupItems(model, 'business').map((item) => item.label),
-    ['基础资料', '销售管理', '生产管理', '库存管理', '质检管理', '出货管理']
+    ['基础资料', '销售管理', '生产管理', '仓储管理', '质检管理', '出货管理']
   )
   assert.equal(model.effectivePageCount, 12)
   assert.equal(model.totalItemCount, 11)

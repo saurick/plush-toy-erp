@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Button, Space } from 'antd'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { notification } from '@/common/utils/antdApp'
 import { AUTH_SESSION_CHANGED_EVENT } from '@/common/auth/auth'
 import { getWorkflowTracking } from '../../api/workflowApi.mjs'
@@ -63,4 +66,17 @@ export function showProcessSubmissionReceipt({ result, loadProcess, title = '已
     description: <ReceiptContent result={result} loadProcess={loadProcess} noticeKey={key} />,
     duration: 12,
   })
+}
+
+export function useProcessSubmissionReceipt() {
+  const { taskBusiness } = useBusinessPageContext() || {}
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  return useCallback(({ record, ...receipt }) => {
+    if (taskBusiness) {
+      // 已由调用方报告业务结果时无需再报告；手机始终使用任务内回执。
+      if (record) reportBusinessResult(receipt.title || '已提交', record)
+      return
+    }
+    showProcessSubmissionReceipt(receipt)
+  }, [taskBusiness, reportBusinessResult])
 }

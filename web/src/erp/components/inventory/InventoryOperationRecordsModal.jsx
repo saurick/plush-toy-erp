@@ -77,6 +77,8 @@ function statusTag(value) {
 
 export default function InventoryOperationRecordsModal({
   open,
+  inline = false,
+  refreshKey = 0,
   currentAdminID = 0,
   canCreate = false,
   onCancel,
@@ -148,7 +150,7 @@ export default function InventoryOperationRecordsModal({
       return
     }
     loadRecords()
-  }, [beginLatestRequest, loadRecords, open])
+  }, [beginLatestRequest, loadRecords, open, refreshKey])
 
   const runRecordAction = useCallback(async (kind, record, action) => {
     if (!record?.id || !action) return
@@ -242,16 +244,8 @@ export default function InventoryOperationRecordsModal({
     [actionKey, canCreate, currentAdminID, onEdit, onSelect, runRecordAction]
   )
 
-  return (
-    <BusinessModal
-      className="erp-inventory-operation-records-modal"
-      title={<BusinessHelpLabel label="库存作业记录" description="库存作业是可恢复的业务记录；草稿可由创建人继续编辑，已提交、已批准或已过账内容保持只读。" />}
-      open={open}
-      size="lineItems"
-      footer={null}
-      destroyOnHidden
-      onCancel={onCancel}
-    >
+  const content = (
+    <>
       <div className="erp-business-inline-note" role="note">仅草稿可继续编辑，已提交内容只读。</div>
       <Space wrap style={{ margin: '16px 0' }}>
         <FilterSelect
@@ -315,6 +309,19 @@ export default function InventoryOperationRecordsModal({
           })
         }
       />
+    </>
+  )
+  if (inline) return content
+  return (
+    <BusinessModal
+      className="erp-inventory-operation-records-modal"
+      title={<BusinessHelpLabel label="库存作业记录" description="盘点、调拨和人工调整记录；核对明细、复核与过账结果。" />}
+      open={open}
+      size="lineItems"
+      footer={null}
+      destroyOnHidden
+      onCancel={onCancel}
+    >{content}
     </BusinessModal>
   )
 }

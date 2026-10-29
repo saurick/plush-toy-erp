@@ -1,7 +1,9 @@
 .erp-dev-chain-topics { display: grid; gap: 16px; min-width: 0; }
 .erp-dev-chain-topics__print-title { display: none; }
-.erp-dev-chain-topics__toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.erp-dev-chain-topics__toolbar { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
 .erp-dev-chain-topics__toolbar > .ant-select { width: min(100%, 420px); }
+.erp-dev-chain-topics__toolbar > .erp-dev-relation-filters { flex: 1 1 200px; }
+.erp-dev-chain-topics__toolbar > .ant-btn { margin-inline-start: auto; }
 .erp-dev-chain-topics__diagram { display: grid; gap: 12px; min-width: 0; }
 .erp-dev-chain-topics__system { display: grid; gap: 16px; }
 .erp-dev-chain-topics__system .erp-dev-flow-overview-relations li { display: grid; gap: 4px; }

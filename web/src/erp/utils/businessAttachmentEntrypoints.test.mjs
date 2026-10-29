@@ -11,8 +11,8 @@ const pageLevelAttachmentEntrypoints = [
 ]
 
 const formModalAttachmentEntrypoints = [
-  '../pages/BOMVersionsPage.jsx',
-  '../pages/MasterDataPage.jsx',
+  '../components/bom/BOMEditor.jsx',
+  '../components/master-data/ProductRecordEditor.jsx',
   '../pages/OutsourcingOrdersPage.jsx',
   '../pages/QualityInspectionsPage.jsx',
   '../components/shipments/ShipmentEditor.jsx',

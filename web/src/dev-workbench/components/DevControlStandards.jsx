@@ -1,12 +1,11 @@
 import React, { Suspense, useLayoutEffect, useRef, useState } from 'react'
 import { Button, ConfigProvider, Empty, Popover, theme } from 'antd'
 import {
-  ArrowRightOutlined,
   DownOutlined,
   FilterOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
@@ -21,7 +20,7 @@ import { getBusinessPagePresentation } from '@/erp/config/businessUsabilityCatal
 import { useERPTheme } from '@/common/theme/erpTheme'
 import { getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
-import DevSharedComponentGuide, { DevUIConsumerLink, SHARED_COMPONENT_SEARCH_TEXT } from './DevSharedComponentGuide.jsx'
+import DevSharedComponentGuide, { DevUIConsumerName, SHARED_COMPONENT_SEARCH_TEXT } from './DevSharedComponentGuide.jsx'
 import DevUIPaginationExample from './DevUIPaginationExample.jsx'
 import DevUIPageStateExamples from './DevUIPageStateExamples.jsx'
 import { BasicInputExample, DateInputExample } from './DevUIInputExamples.jsx'
@@ -43,7 +42,6 @@ const TOPICS = [
     key: 'feedback',
     title: '弹窗与反馈',
     summary: '编辑、提交、消息与恢复',
-    guide: 'dialogs',
     description: '在同一份样例里体验输入校验、保存失败、结果未知和关闭保护。',
     rules: [
       ['系统信息与外观设置', 'AppModal 标准模式', '通用弹窗使用共享入口，保留任务需要的尺寸、内容和页脚。'],
@@ -118,7 +116,6 @@ const TOPICS = [
     key: 'pagination',
     title: '列表与分页',
     summary: '翻页、条数与读取恢复',
-    guide: 'data',
     description: '表格内分页与独立分页使用同一套控件；切换样例数据和读取状态，核对当前记录与分页结果。',
     rules: [
       ['表格内分页', 'AppTable', '表格统一接入公共分页配置，页面只提供当前页、总数和读取动作。'],
@@ -139,7 +136,6 @@ const TOPICS = [
     key: 'inputs',
     title: '基础输入',
     summary: '文本、选择与项目主题',
-    guide: 'forms',
     description: 'Button、Input 继承项目主题；下拉统一使用 AppSelect / FilterSelect，选中后保留用途，清空后恢复提示。',
     rules: [
       ['普通文本与枚举', 'Input / AppSelect', '字段有明确提示和可见用途；可编辑值支持清空，必填仍由表单校验。'],
@@ -154,7 +150,6 @@ const TOPICS = [
     key: 'dates',
     title: '日期与时间',
     summary: '日期、分钟与范围约束',
-    guide: 'forms',
     description: '直接操作正式日期组件；正常、禁用与错误切换作用于上方两个输入，范围示例单独展示日期类型与起止约束。',
     rules: [
       ['单个日期', 'DateInput', '整框打开日历，选值立即回填，清空后保留空值。'],
@@ -169,7 +164,6 @@ const TOPICS = [
     key: 'navigation',
     title: '页签与视图',
     summary: '切换内容，保留当前对象',
-    guide: 'type',
     description:
       '内容导航使用下划线，工作方式、显示模式和筛选选项使用分段按钮。手机任务、进度与流程跟踪同样按内容导航处理。',
     rules: [
@@ -193,7 +187,6 @@ const TOPICS = [
     key: 'filters',
     title: '筛选与搜索',
     summary: '缩小同一份结果',
-    guide: 'navigation',
     description: '点状态、提交关键词或改变范围，观察同一份虚构记录如何变化。',
     rules: [
       [
@@ -226,7 +219,6 @@ const TOPICS = [
     key: 'actions',
     title: '按钮与动作',
     summary: '主次、禁用与执行反馈',
-    guide: 'states',
     description: '同一组突出一个主动作，文字、状态与反馈共同说明点击的结果。',
     rules: [
       ['主要提交', '实心主按钮', '一组只强调一个最重要动作。'],
@@ -250,7 +242,6 @@ const TOPICS = [
     key: 'empty',
     title: '页面状态',
     summary: '加载、空白、失败与恢复',
-    guide: 'states',
     description: '操作手机任务和电脑切页样例，核对等待期间保留什么，以及完成读取或失败后的恢复。',
     rules: [
       ['手机首次读取', '卡片骨架', '复用任务卡片布局，保留页签与筛选；未知数量不显示为零。'],
@@ -273,7 +264,6 @@ const TOPICS = [
     key: 'counts',
     title: '数字提醒',
     summary: '有待办才提示，点开范围一致',
-    guide: 'states',
     description: '菜单数字帮助发现待办；办理后更新，打开页面不会清零。',
     rules: [
       ['任务管理', '低强调数字', '统计本人责任范围内未结束任务；同一任务只计一次。'],
@@ -718,12 +708,6 @@ export default function DevControlStandards() {
         Object.hasOwn(values, 'controlq') && !Object.hasOwn(values, 'control'),
     })
   }
-  const guideLink = (view) => {
-    const next = new URLSearchParams(params)
-    next.set('view', view)
-    next.set('topic', current.guide)
-    return `/__dev/ui-design?${next}`
-  }
   useLayoutEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0
   }, [current.key])
@@ -856,21 +840,9 @@ export default function DevControlStandards() {
                     <li key={check}>{check}</li>
                   ))}
                 </ol>
-                {current.guide ? (
-                  <>
-                    <Link to={guideLink('specification')}>
-                      查看图解说明 <ArrowRightOutlined aria-hidden="true" />
-                    </Link>
-                    <Link to={guideLink('rationale')}>
-                      查看设计依据 <ArrowRightOutlined aria-hidden="true" />
-                    </Link>
-                  </>
-                ) : null}
                 <h3>真实页面核对</h3>
-                <DevUIConsumerLink consumer={current.consumer} />
+                <DevUIConsumerName consumer={current.consumer} />
                 <p>{current.consumer.task}</p>
-                <p>在新标签页打开，沿用业务账号权限。</p>
-                <Link to="/__dev/ui-design?page=controls&control=components">查看组件选用与完整边界</Link>
               </aside>
             </div>
             <section className="erp-control-library-rules">

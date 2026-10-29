@@ -3,9 +3,20 @@ import test from 'node:test'
 
 import {
   normalizeFinanceCancellationRequest,
+  canCancelFinanceFact,
   financeCancelAuditText,
   validateFinanceCancellationResult,
 } from './financeCancellation.mjs'
+
+test('completed single checks can be corrected without reopening settled receivables', () => {
+  assert.equal(canCancelFinanceFact({ fact_type: 'RECONCILIATION', status: 'SETTLED' }), true)
+  for (const fact_type of ['RECEIVABLE', 'PAYABLE', 'INVOICE']) {
+    assert.equal(canCancelFinanceFact({ fact_type, status: 'SETTLED' }), false)
+    assert.equal(canCancelFinanceFact({ fact_type, status: 'POSTED' }), true)
+  }
+  assert.equal(canCancelFinanceFact({ fact_type: 'RECONCILIATION', status: 'CANCELLED' }), false)
+  assert.equal(canCancelFinanceFact(null), false)
+})
 
 test('finance cancellation request requires a positive id and trimmed bounded reason', () => {
   assert.deepEqual(

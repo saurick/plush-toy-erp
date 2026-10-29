@@ -63,15 +63,15 @@ export function createPermissionRoleSwitchScenarios() {
 
         await permissionMenu.click()
         await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
-        assert.equal(await page.getByRole('checkbox', { name: '查看销售订单', exact: true }).isChecked(), true)
-        await page.getByRole('checkbox', { name: '查看销售订单', exact: true }).uncheck()
+        assert.equal(await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).isChecked(), true)
+        await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).uncheck()
         await auditMenu.click()
         const discard = page.getByRole('dialog').filter({ hasText: '离开前要放弃未保存的修改吗？' })
         await discard.waitFor()
         await discard.getByRole('button', { name: '继续编辑', exact: true }).click()
         await discard.waitFor({ state: 'hidden' })
         assert.equal(new URL(page.url()).pathname, '/erp/system/permissions')
-        assert.equal(await page.getByRole('checkbox', { name: '查看销售订单', exact: true }).isChecked(), false)
+        assert.equal(await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).isChecked(), false)
         await auditMenu.click()
         await discard.getByRole('button', { name: '放弃修改', exact: true }).click()
         await discard.waitFor({ state: 'hidden' })
@@ -80,7 +80,7 @@ export function createPermissionRoleSwitchScenarios() {
         await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
         await page.locator('.erp-role-center-save-status').getByText('当前设置已保存', { exact: true }).waitFor()
         assert.equal(await page.getByRole('button', { name: '保存岗位设置', exact: true }).isDisabled(), true)
-        assert.equal(await page.getByRole('checkbox', { name: '查看销售订单', exact: true }).isChecked(), true)
+        assert.equal(await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).isChecked(), true)
         assert.equal(await page.getByRole('dialog').count(), 0)
         assert.equal(await page.locator('.ant-message-error').count(), 0, '离开后的迟到读取不应弹出错误')
         assert.equal(writes, 0, '菜单切换和放弃草稿均不得写入岗位权限')
@@ -107,6 +107,7 @@ export function createPermissionRoleSwitchScenarios() {
           },
         ]
         const permissions = [
+          { permission_key: 'erp.business_dashboard.read', name: '查看进度看板', module: 'erp', module_name: '通用工具', permission_class: 'business', assignable: true },
           {
             permission_key: 'customer.read',
             name: '查看客户',
@@ -137,6 +138,8 @@ export function createPermissionRoleSwitchScenarios() {
           },
         ].map((role) => ({
           ...role,
+          permission_policy: { template_key: role.role_key, registered: true,
+            required_permissions: ['customer.read', 'sales_order.read'], optional_permissions: ['erp.business_dashboard.read'] },
           role_type: 'business_default',
           version: 1,
           navigation_mode: 'custom',
@@ -232,7 +235,7 @@ export function createPermissionRoleSwitchScenarios() {
         await assertClean()
 
         await page
-          .getByRole('checkbox', { name: '查看销售订单', exact: true })
+          .getByRole('checkbox', { name: '查看进度看板', exact: true })
           .click()
         await page
           .locator('.erp-role-center-save-status')
@@ -253,7 +256,7 @@ export function createPermissionRoleSwitchScenarios() {
         )
         assert.equal(
           await page
-            .getByRole('checkbox', { name: '查看销售订单', exact: true })
+            .getByRole('checkbox', { name: '查看进度看板', exact: true })
             .isChecked(),
           false
         )
@@ -267,7 +270,7 @@ export function createPermissionRoleSwitchScenarios() {
         await assertClean()
         assert.equal(
           await page
-            .getByRole('checkbox', { name: '查看销售订单', exact: true })
+            .getByRole('checkbox', { name: '查看进度看板', exact: true })
             .isChecked(),
           true
         )

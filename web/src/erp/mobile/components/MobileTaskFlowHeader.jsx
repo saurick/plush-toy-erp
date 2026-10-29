@@ -1,5 +1,9 @@
 import '../mobileTaskPresentation.css'
+import React, { createContext, useContext, useLayoutEffect } from 'react'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import MobileDetailHeader from './MobileDetailHeader.jsx'
+
+export const MobileTaskHeaderContext = createContext(null)
 
 const MOBILE_TASK_FLOW_STEPS = Object.freeze([
   {
@@ -19,7 +23,7 @@ const MOBILE_TASK_FLOW_STEPS = Object.freeze([
   },
 ])
 
-export default function MobileTaskFlowHeader({
+export function MobileTaskFlowHeaderView({
   backLabel = '返回任务列表',
   busy = false,
   canOpenProcess = false,
@@ -57,7 +61,7 @@ export default function MobileTaskFlowHeader({
       busy={busy}
       trailing={trailing}
     >
-      <nav
+      <SlidingTabList
         className="mobile-task-flow-steps"
         aria-label="任务处理步骤"
         data-testid="mobile-task-flow-steps"
@@ -80,6 +84,8 @@ export default function MobileTaskFlowHeader({
             <button
               key={step.key}
               type="button"
+              role="tab"
+              aria-selected={current}
               className="mobile-task-flow-step"
               aria-current={current ? 'step' : undefined}
               aria-label={accessibilityLabel}
@@ -87,8 +93,8 @@ export default function MobileTaskFlowHeader({
                 current ? 'current' : available ? 'available' : 'locked'
               }
               data-step-key={step.key}
-              disabled={busy || current || !available}
-              onClick={stepActions[step.key] || undefined}
+              disabled={busy || !available}
+              onClick={current ? undefined : stepActions[step.key] || undefined}
             >
               <span className="mobile-task-flow-step__number">
                 {step.number}
@@ -101,7 +107,16 @@ export default function MobileTaskFlowHeader({
             </button>
           )
         })}
-      </nav>
+      </SlidingTabList>
     </MobileDetailHeader>
   )
+}
+
+export default function MobileTaskFlowHeader(props) {
+  const owner = useContext(MobileTaskHeaderContext)
+  const { currentStep = 'detail' } = props
+  useLayoutEffect(() => {
+    if (owner && owner.step === currentStep) owner.register(props)
+  }, [owner, props, currentStep])
+  return owner ? null : <MobileTaskFlowHeaderView {...props} />
 }
