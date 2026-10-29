@@ -1,6 +1,6 @@
-# Codex 项目 Skills / Project Skills
+# 项目 Skills / Project Skills
 
-本目录只保存 plush-toy-erp 的专项 SOP。长期规则在 `AGENTS.md`，项目事实在正式 docs、代码、migration 和测试；通用工作流使用 `~/.codex/skills`，不在项目版重复。
+本目录只保存 plush-toy-erp 的专项 SOP。长期规则在 `AGENTS.md`，项目事实在正式 docs、代码、migration 和测试；通用工作流复用当前宿主已发现的用户 Skill，不在项目版重复。
 
 当前 11 个 Skill 按请求动作、对象与影响选择一个主入口；只有当前判断需要时才读取分支/引用或补充其他 Skill。切换后继续同一目标的已授权工作，不逐个执行或逐层向甲方确认；当前技能目录已能定位时无需重复读取本索引。
 
@@ -10,7 +10,7 @@
 | `$plush-code-review-governance`           | review diff/commit/worktree；按触达面路由到领域、页面、打印和测试检查                                                                  |
 | `$plush-docs-governance`                  | 当前真源、文档清单、中文文件名、读者路径和 `progress.md`                                                                               |
 | `$plush-domain-boundary-governance`       | Workflow / Fact、Product Core、客户差异、schema/migration 设计与生成、usecase/API/RBAC、字段真源和数据增长与容量设计                      |
-| `$plush-git-conflict-coordination`        | 已授权本地提交遇到同文件、混合改动或跨会话依赖时，定向联系相关聊天核清、验证并串行收口；不推送、不后台轮询                           |
+| `$plush-git-conflict-coordination`        | 宿主具备必要跨会话工具时，对已授权本地提交的同文件、混合改动或跨会话依赖定向核清、验证并串行收口；不推送、不后台轮询                   |
 | `$plush-page-design-governance`           | ERP 与效能工作台的任务语义、统一页面样板、共享组件、原型与任务路径验收                                                                  |
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、纸张版式、字段映射、模板编辑与 PDF/打印保真                                                                     |
 | `$plush-seed-import-governance`           | 模块化 seed / fixture / 模拟数据、甲方资料到脱敏场景映射、增量复用、import dry-run、批次与数据 cleanup 边界                           |
@@ -36,13 +36,19 @@
 - 项目 skill 不重复高内聚、低耦合等通用常识，只保留项目真源、判断流程、命令和验收。
 - 修改 Skill 时核对 `agents/openai.yaml` 仍准确；仅在适用范围、入口或元数据变化时修改相关 README / metadata / 引用。验证入口与覆盖见下文；只有命中项目过程记录条件时才更新 `progress.md`。
 
+## 宿主与依赖 / Host Capabilities
+
+执行前按当前会话发现的 Skill 与实际工具核对依赖。磁盘源文件、配置接入或另一宿主曾执行过，都不能证明当前会话具备同样能力；已知 canonical 源可读但未被发现时，说明后按需读取并遵循其流程。缺少工具时保留受影响现场，只暂停依赖动作，继续独立的已授权工作。
+
+用户级 Skill 的接入、重载与跨机器同步遵循全局规则，不进入产品仓配置。跨会话联系与等待的具体前置条件集中在 [Git 冲突协调的宿主能力](plush-git-conflict-coordination/SKILL.md#host-capabilities)；本项目不为缺失能力新建调度器或复制工具协议。
+
 <a id="skill-validation"></a>
 
 ## 维护与验证 / Skill Validation
 
 仓库根目录运行 `node scripts/qa/skill-health.mjs`。这是项目 validator，仅使用现有 Node 与仓库代码，不依赖 Python、PyYAML、客户私有仓库或运行服务。`affected` 对 Markdown 与项目 Skill 变更选择同一入口，也核对被引用文档的章节变化。
 
-检查当前项目支持的平面字符串 YAML：frontmatter 的 `name / description` 与 `openai.yaml` 的 `interface` 字段；同时核对目录名、metadata、README 索引、Skill 指令与 references 的本地文件/章节链接、项目 Skill 名称引用及未完成 TODO 占位。代码块中的示例不作为指令占位；`assets` 中的输出模板不扫描正文，指令指向模板的链接仍须有效。全局 Skill 的可用性仍按当前会话安装目录确认，不在产品仓复制目录。
+检查当前项目支持的平面字符串 YAML：frontmatter 的 `name / description` 与 `openai.yaml` 的 `interface` 字段；同时核对目录名、metadata、README 索引、Skill 指令与 references 的本地文件/章节链接、项目 Skill 名称引用及未完成 TODO 占位。代码块中的示例不作为指令占位；`assets` 中的输出模板不扫描正文，指令指向模板的链接仍须有效。此检查不验证宿主工具或全局 Skill 是否可执行。
 
 ```bash
 node scripts/qa/skill-health.mjs
@@ -67,3 +73,4 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --check -- .agents/
 | “评估历史数据增长后的查询和导出，先别改。” | Domain / Test | 区分总量、处理范围、负载和环境，核对现有主路径并提出有依据的验证方案；不改库、不启动压测、不承诺未实测容量。 |
 | “只改一个按钮文案。” | Page | 沿用现有布局与容量边界，完成相关核对；不额外引入规模分析、造数或压测。 |
 | “提交本次修复；同文件有另一会话改动，必要依赖暂未提交。” | Git Conflict Coordination | 定向核对归属、依赖与授权，在候选上验证后串行提交；明确暂缓的依赖不纳入，只阻断相应目标。 |
+| “在没有跨会话工具的宿主中提交存在混合归属的修复。” | Git Conflict Coordination | 先报告缺失工具，保留待核清的文件 / hunk 和 index；已有交接可证明独立的目标仍按原授权推进，不模拟联系或轮询。 |

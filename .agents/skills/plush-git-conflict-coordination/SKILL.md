@@ -1,11 +1,19 @@
 ---
 name: plush-git-conflict-coordination
-description: 已授权本地提交遇到同文件、混合改动或跨会话依赖时，按需联系相关聊天核清并验证收口。Use for on-demand Git conflict coordination; no background polling or push.
+description: 已授权本地提交遇到同文件、混合改动或跨会话依赖时，在具备必要跨会话工具的宿主中按需联系、核清并验证收口。Use for on-demand Git conflict coordination with host tools; no background polling or push.
 ---
 
 # Plush Git Conflict Coordination
 
 在当前会话完成一次有明确触发原因的协调，再使用项目提交入口串行收口。入口、互斥与错误含义见[本地提交入口](../../../scripts/README.md#git-commit-entry)。普通无冲突提交直接使用该入口，不启动此流程。
+
+<a id="host-capabilities"></a>
+
+## 宿主能力 / Host Capabilities
+
+联系相关会话前，核对当前宿主实际提供 `read_thread`、`send_message_to_thread` 和事件等待 `wait_threads`；相关对象未知时另需 `list_threads`。这些是宿主工具，不由安装本 Skill 或读取聊天 ID 自动获得；其他宿主只有提供等价且已核实的读取、定向联系与有界事件等待能力时才能执行协调。
+
+缺少必要工具时报告具体缺口，保留依赖协调的路径 / hunk、index 和 HOLD，留下被动交接；不假称已联系、不用定时扫描补齐。已有交接和实时差异足以证明无重叠、无依赖的目标，可按原授权继续使用项目提交入口；归属未核清或依赖暂缓批次的部分继续暂停。
 
 ## Trigger and Authority
 

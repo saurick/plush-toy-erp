@@ -1587,6 +1587,7 @@ fast 保留试用账号 RBAC、浏览器 smoke 脚本语法与真实登录共享
 | `node --test scripts/qa/ci-job-guide.test.mjs` | 校验每个正式 push-CI Job 都有一份简短用途说明；说明源不保存依赖、状态、耗时、等待或历史，未知 Job 只标记“说明待登记”并继续投影 | 新增、删除、改名或拆分 GitLab CI Job 时 |
 | `bash scripts/qa/fast.sh` | 跨模块基础检查集合，运行显式 `fast` Node 测试组，并覆盖文档清单、客户配置、菜单、Web 静态检查和 server quick；阶段编号只由 affected 扫描本次变更文件 | 需要跨模块基础验证时；小改优先 affected / 定向测试 |
 | `node scripts/qa/skill-health.mjs` | 项目 validator：检查当前 YAML 子集、目录名、metadata、README 索引、Skill 指令与 references 的文件/章节链接、项目 Skill 名称及 TODO 占位；assets 输出模板不扫描正文，指向模板的入口链接仍须有效；只依赖现有 Node，见 [Skill 维护与验证](../../.agents/skills/README.md#skill-validation) | Markdown 或项目 Skill 变更时由 `affected` 选择，也检查被引用文档的章节漂移 |
+| `bash scripts/qa/agents-size.sh` | 只读检查 Git 已跟踪及未忽略的 `AGENTS.md` 当前工作区字节数；包含新建的目录规则，跳过已删除文件，排除 ignored 历史副本与依赖；24 KiB 预警、32 KiB 阻断，Git 枚举失败时不报通过 | 规则调整后定向运行；回归由 fast 组的 `agents-size.test.mjs` 覆盖 |
 | `node scripts/qa/test-code-governance.mjs` | 盘点测试文件、行数、测试文件直接读取，以及仓库 JS / TS 中的源码改写执行；大文件只报告不按行数阻断，既有源码改写执行使用 shrink-only 清单，新增或清单已失效都会失败 | 新增测试基础设施、源码沙箱或治理测试债务后 |
 | `node scripts/qa/erp-field-linkage.mjs` | 运行字段联动专项，前后绑定同一仓库指纹，并把脱敏结构化证据写入 `output/qa/coverage/field-linkage.latest.json`；只证明该专项，不代表整仓覆盖 | 修改字段来源、映射、回显或打印链路后 |
 | `node scripts/qa/test-coverage-collect.mjs --profile baseline --write` | 在同一仓库身份下运行非数据库 baseline，采集 Go / Web 代码覆盖、显式业务场景、字段联动、导入合同和受影响验证范围（内部键 T0-T8），再原子写入证据并聚合 latest；运行期身份变化即失败 | 刷新开发工作台真实覆盖证据前 |
