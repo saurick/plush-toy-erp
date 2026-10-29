@@ -2,6 +2,33 @@ import assert from 'node:assert/strict'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 
+export async function assertControlCursor(control, expected) {
+  await control.scrollIntoViewIfNeeded()
+  await control.hover()
+  const metrics = await control.evaluate((node) => {
+    const rect = node.getBoundingClientRect()
+    const points = [
+      [rect.left + 2, rect.top + rect.height / 2],
+      [rect.right - 2, rect.top + rect.height / 2],
+      [rect.left + rect.width / 2, rect.top + rect.height / 2],
+      ...Array.from(node.querySelectorAll('span, svg')).map((child) => {
+        const box = child.getBoundingClientRect()
+        return [box.left + box.width / 2, box.top + box.height / 2]
+      }),
+    ].filter(([x, y]) => x > rect.left && x < rect.right && y > rect.top && y < rect.bottom)
+    return {
+      label: node.getAttribute('aria-label') || node.textContent.trim(),
+      cursor: getComputedStyle(node).cursor,
+      hits: points.map(([x, y]) => {
+        const hit = document.elementFromPoint(x, y)
+        return { owned: Boolean(hit && (hit === node || node.contains(hit))), cursor: hit ? getComputedStyle(hit).cursor : null }
+      }),
+    }
+  })
+  assert.equal(metrics.cursor, expected, JSON.stringify(metrics))
+  assert(metrics.hits.length > 0 && metrics.hits.every((hit) => hit.owned && hit.cursor === expected), JSON.stringify(metrics))
+}
+
 export async function assertMobileSearchAffordance(locator, action) {
   await waitForFiniteAnimations(locator.page())
   const metrics = await locator.evaluate((root) => {

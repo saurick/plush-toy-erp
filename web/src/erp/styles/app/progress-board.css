@@ -522,7 +522,7 @@
 }
 .erp-progress-metric:disabled {
   opacity: 0.55;
-  cursor: default;
+  cursor: not-allowed;
 }
 .erp-progress-board button:focus-visible,
 .erp-progress-summary h2:focus-visible {

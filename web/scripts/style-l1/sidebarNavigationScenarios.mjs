@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { findVisibleBusinessPage } from '../businessNavigation.mjs'
+import { assertControlCursor } from './controlAffordanceAssertions.mjs'
 
 export function createSidebarNavigationScenarios({
   customerRoleAdminProfile,
@@ -20,6 +21,43 @@ export function createSidebarNavigationScenarios({
     ),
   }
   return [
+    {
+      name: 'purchase-disabled-cursor-recovery',
+      path: '/erp/purchase/accessories',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        await page.getByRole('button', { name: /新建采购订单$/u }).click()
+        const form = page.locator('.erp-business-form-page:not([hidden])')
+        const add = form.getByRole('button', { name: '从材料库添加', exact: true })
+        await add.waitFor()
+        assert(await add.isDisabled())
+        await assertControlCursor(add, 'not-allowed')
+        const box = await add.boundingBox()
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+        assert.equal(await page.getByRole('dialog').count(), 0, '禁用按钮不打开材料选择')
+        await page.screenshot({ path: `${outputDir}/purchase-disabled-cursor-4k.png` })
+        const supplier = form.getByLabel('供应商', { exact: true })
+        await supplier.click()
+        const options = page.locator('.ant-select-dropdown:visible')
+        await options.locator('.ant-select-item-option').filter({ hasText: '样式供应商' }).click()
+        await options.waitFor({ state: 'hidden' })
+        assert(await add.isEnabled())
+        await assertControlCursor(add, 'pointer')
+        await add.click()
+        const picker = page.getByRole('dialog').filter({ hasText: '从材料库添加' })
+        await picker.waitFor()
+        await picker.getByRole('button', { name: /^取\s*消$/u }).click()
+        await picker.waitFor({ state: 'hidden' })
+        const supplierSelect = supplier.locator('xpath=ancestor-or-self::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+        await supplierSelect.hover()
+        await supplierSelect.locator('.ant-select-clear').click()
+        assert(await add.isDisabled())
+        await assertControlCursor(add, 'not-allowed')
+      },
+    },
     {
       ...sales,
       name: 'interactive-cursor-surfaces',

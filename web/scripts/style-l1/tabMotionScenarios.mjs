@@ -6,6 +6,7 @@ import {
   assertSegmentAffordance,
   assertTabsAffordance,
   assertFilterAffordance,
+  assertControlCursor,
 } from './controlAffordanceAssertions.mjs'
 
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
@@ -498,6 +499,41 @@ export function createTabMotionScenarios({ outputDir }) {
       },
     }))
     .concat([
+      {
+        name: 'shared-disabled-cursor-surfaces',
+        path: `${fixturePath}?cursors`,
+        viewport: { width: 1280, height: 1000 },
+        beforeNavigate: async (page) => {
+          await page.route(`**${fixturePath}?cursors`, (route) =>
+            route.fulfill({ contentType: 'text/html', body: fixtureHTML.replace('SlidingTabsFixture.jsx', 'ControlCursorFixture.jsx') })
+          )
+        },
+        verify: async (page) => {
+          const surface = page.locator('#cursor-controls')
+          await surface.waitFor()
+          for (const width of [1280, 390]) {
+            await page.setViewportSize({ width, height: 1000 })
+            for (const control of await surface.locator('button:disabled, [role="tab"][aria-disabled="true"]').all()) {
+              await assertControlCursor(control, 'not-allowed')
+            }
+            await assertControlCursor(surface.getByRole('button', { name: '可用操作', exact: true }), 'pointer')
+            await assertControlCursor(surface.getByRole('button', { name: /正在保存/u }), 'default')
+            for (const control of await surface.locator('.ant-select-disabled .ant-select-selector, .ant-checkbox-wrapper-disabled, .ant-radio-wrapper-disabled, .ant-picker-disabled').all()) {
+              await assertControlCursor(control, 'not-allowed')
+            }
+          }
+          await surface.getByRole('button', { name: '恢复操作', exact: true }).click()
+          await assertControlCursor(surface.getByRole('button', { name: '暂不可用', exact: true }), 'pointer')
+          await surface.getByRole('button', { name: '暂不可用', exact: true }).click()
+          assert.equal(await surface.getByRole('status').textContent(), '已执行 1 次')
+          await surface.getByRole('button', { name: '禁用操作', exact: true }).click()
+          const blocked = surface.getByRole('button', { name: '暂不可用', exact: true })
+          await assertControlCursor(blocked, 'not-allowed')
+          const box = await blocked.boundingBox()
+          await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+          assert.equal(await surface.getByRole('status').textContent(), '已执行 1 次')
+        },
+      },
       {
         name: 'app-standard-modal-keyboard-contract',
         path: '/__dev/ui-design?page=controls',

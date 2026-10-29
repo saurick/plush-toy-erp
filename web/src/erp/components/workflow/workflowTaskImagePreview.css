@@ -121,7 +121,7 @@
 
 .erp-task-image-preview button:disabled {
   opacity: 0.4;
-  cursor: default;
+  cursor: not-allowed;
 }
 
 .erp-task-image-preview button:hover:not(:disabled) {

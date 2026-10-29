@@ -154,7 +154,7 @@
 }
 .erp-progress-stage-detail:disabled {
   opacity: 0.5;
-  cursor: default;
+  cursor: not-allowed;
 }
 .erp-progress-overview-stage-content {
   display: grid;

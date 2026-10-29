@@ -17,11 +17,11 @@
   --erp-control-disabled-text: var(--erp-text-subtle);
 }
 
-/* Semantic cursor fallback. Component-specific resize, drag, text, and wait
-   cursors keep precedence because these selectors have zero specificity. */
+/* Enabled controls use a low-specificity fallback so text, drag and busy
+   cursors keep their component semantics. */
 :where(
-  button:not(:disabled),
-  a[href],
+  button:not(:disabled, [aria-disabled='true']),
+  a[href]:not([aria-disabled='true']),
   summary,
   select:not(:disabled),
   input[type='checkbox']:not(:disabled),
@@ -37,19 +37,13 @@
   cursor: pointer;
 }
 
-:where(
-  button:disabled,
-  select:disabled,
-  input[type='checkbox']:disabled,
-  input[type='radio']:disabled,
-  label:has(input:is([type='checkbox'], [type='radio']):disabled),
-  [role='button'][aria-disabled='true'],
-  [role='link'][aria-disabled='true'],
-  [role='menuitem'][aria-disabled='true'],
-  [role='option'][aria-disabled='true'],
-  [role='tab'][aria-disabled='true'],
-  [role='treeitem'][aria-disabled='true']
-) {
+/* Disabled state must also override the native button cursor from reset CSS. */
+button:disabled,
+select:disabled,
+input[type='checkbox']:disabled,
+input[type='radio']:disabled,
+label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
+:where(button, a[href], [role='button'], [role='link'], [role='menuitem'], [role='option'], [role='tab'], [role='treeitem'])[aria-disabled='true'] {
   cursor: not-allowed;
 }
 
@@ -208,7 +202,6 @@
   font-weight: 500;
   line-height: 22px;
   white-space: nowrap;
-  cursor: pointer;
 }
 
 .erp-sliding-tab-list.erp-navigation-tabs > [role='tab'][aria-selected='true'] {
@@ -634,6 +627,5 @@
 }
 
 .mobile-filter-panel .erp-filter-chip:disabled {
-  cursor: default;
   opacity: 0.55;
 }

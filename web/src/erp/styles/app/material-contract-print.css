@@ -130,7 +130,7 @@
 
 .erp-material-contract-batch-link:disabled {
   opacity: 0.6;
-  cursor: default;
+  cursor: not-allowed;
 }
 
 .erp-material-contract-batch-link small[data-incomplete='true'] {

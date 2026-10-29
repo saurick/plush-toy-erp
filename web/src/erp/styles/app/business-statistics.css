@@ -93,9 +93,6 @@
 .erp-statistics-metrics small {
   font-size: var(--erp-font-caption);
 }
-.erp-statistics-metrics > .erp-filter-chip:disabled {
-  cursor: default;
-}
 .erp-statistics-total-amount {
   margin-left: auto;
   padding-left: 12px;
