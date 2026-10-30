@@ -118,6 +118,9 @@ importers:
       happy-dom:
         specifier: 20.14.5
         version: 20.14.5
+      mdn-data:
+        specifier: 2.12.2
+        version: 2.12.2
       playwright:
         specifier: ^1.63.0
         version: 1.63.0

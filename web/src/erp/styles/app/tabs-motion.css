@@ -18,9 +18,6 @@
   left: 0;
   width: var(--erp-slider-width, 0px);
   height: var(--erp-slider-height, 0px);
-  border-radius: var(--erp-slider-radius, 6px);
-  background: var(--erp-slider-bg, var(--erp-primary-soft, #eef7ef));
-  box-shadow: var(--erp-slider-shadow, none);
   content: '';
   opacity: 0;
   pointer-events: none;
@@ -71,20 +68,7 @@
 .erp-sliding-segmented.ant-segmented .ant-segmented-item {
   position: relative;
   z-index: 1;
-  background: transparent;
-  box-shadow: none;
   transition: color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
-}
-
-.erp-sliding-segmented.ant-segmented
-  .ant-segmented-item.erp-segmented-item-selected {
-  background: transparent;
-  box-shadow: none;
-}
-
-.erp-sliding-segmented.ant-segmented
-  .ant-segmented-item.ant-segmented-item-disabled {
-  color: var(--erp-text-disabled, #a0a9b4);
 }
 
 .erp-sliding-tab-list > [role='tab'] {

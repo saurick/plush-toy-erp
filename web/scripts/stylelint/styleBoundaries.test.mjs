@@ -133,6 +133,18 @@ test('only shared content tab owners define the 2px underline', async () => {
   }
 })
 
+test('motion files and custom tab strips cannot define shared control appearance', async () => {
+  for (const selector of [
+    '.erp-sliding-segmented.ant-segmented .ant-segmented-item',
+    '.erp-sliding-tab-list > [role="tab"]',
+  ]) {
+    for (const file of ['src/erp/styles/app/tabs-motion.css', 'src/erp/styles/app/example.css']) {
+      assert.match((await warnings(`${selector} { color: red; }`, file))[0], /control-affordance/u)
+      assert.deepEqual(await warnings(`${selector} { transform: translateX(4px); transition: color 200ms; }`, file), [])
+    }
+  }
+})
+
 test('mobile search layout and excluded fields do not claim shared appearance', async () => {
   assert.deepEqual(
     await warnings('.erp-page .erp-mobile-search { max-width: 440px; }'),
@@ -233,4 +245,82 @@ test('Tailwind form styles require opt-in classes and cannot reset AntD native i
     assert.match(css, new RegExp(`\\.form-${name}`))
   }
   assert.doesNotMatch(css, /\[type=['"](?:text|password|email|radio)['"]\]/u)
+})
+
+test('control geometry belongs to one owner even in shared theme and modal files', async () => {
+  for (const file of [
+    'src/erp/styles/app/example.css',
+    'src/erp/styles/app/business-modals.css',
+    'src/erp/styles/app/theme-overrides.css',
+    'src/erp/styles/app/control-foundation.css',
+  ]) {
+    for (const declaration of ['height: 44px', 'min-block-size: 40px', 'line-height: 1.45', 'padding: 6px 10px']) {
+      assert.match((await warnings(`.erp-page .ant-select-selector { ${declaration}; }`, file))[0], /business-control-rhythm/u)
+    }
+  }
+  assert.deepEqual(await warnings(
+    '.erp-page .ant-select-selector { height: var(--erp-control-height); }',
+    'src/erp/styles/app/business-control-rhythm.css'
+  ), [])
+})
+
+test('geometry checks inspect the target compound without confusing parents or exclusions', async () => {
+  for (const selector of [
+    '.erp-page :where(.ant-input, .ant-picker)',
+    '.erp-page :is(.ant-select, .erp-summary)',
+    '.erp-page .ant-input-textarea-affix-wrapper',
+    '.erp-page .ant-input-number-input-wrap',
+    '.erp-page .ant-select-selection-wrap',
+    '.erp-page .ant-select-selection-overflow',
+    '.erp-page .ant-picker-input',
+    '.erp-page .ant-select-single .ant-select-selection-item',
+    '.erp-page .ant-picker-input > input',
+    '.erp-page .ant-picker input',
+    '.erp-page .ant-input-textarea-affix-wrapper > textarea',
+    '.erp-page :where(.ant-input-affix-wrapper > input)',
+    '.erp-page .ant-picker-input :is(input, textarea)',
+  ]) {
+    assert.match((await warnings(`${selector} { height: auto; }`))[0], /business-control-rhythm/u)
+  }
+  for (const css of [
+    '.erp-page .ant-select-selector { width: 100%; min-width: 0; padding-inline: 12px; }',
+    '.erp-page { --erp-control-height: 44px; display: grid; gap: 8px; }',
+    '.erp-page:has(.ant-select) { height: 100%; }',
+    '.erp-page:not(.ant-input) { min-height: 100px; }',
+    '.erp-page .ant-select .erp-help { line-height: 1.5; }',
+    '.erp-page textarea { min-height: 120px; }',
+  ]) {
+    assert.deepEqual(await warnings(css), [], css)
+  }
+})
+
+test('textarea wrappers keep radius ownership without claiming counter or popup layout', async () => {
+  const css = '.erp-page .ant-input-textarea-affix-wrapper { border-radius: 12px; }'
+  assert.match((await warnings(css))[0], /圆角/u)
+  assert.deepEqual(await warnings(css, 'src/erp/styles/app/control-foundation.css'), [])
+  for (const selector of [
+    '.erp-page .ant-input-data-count',
+    '.erp-page .ant-input-clear-icon',
+    '.erp-picker-popup .ant-picker-panel-container',
+    '.erp-picker-popup .ant-select-item-option',
+  ]) {
+    assert.deepEqual(await warnings(`${selector} { height: 24px; padding: 4px; }`), [], selector)
+  }
+})
+
+test('selected value text has one owner while dropdown options remain independent', async () => {
+  const file = 'src/erp/styles/app/control-foundation.css'
+  assert.match((await warnings('.erp-page .ant-select-selection-item { overflow: hidden; }'))[0], /control-foundation/u)
+  assert.deepEqual(await warnings('.ant-select-single .ant-select-selection-item { white-space: nowrap; text-overflow: ellipsis; }', file), [])
+  for (const selector of [
+    '.ant-select-single .ant-select-selection-item',
+    'td .ant-select-selection-item',
+    '.ant-select:not(.ant-select-multiple) .ant-select-selection-item',
+    ':is(.ant-select-single, .ant-select-multiple) .ant-select-selection-item',
+    '.ant-select-multiple .ant-select-selection-item, .ant-select-single .ant-select-selection-item',
+  ]) {
+    assert.match((await warnings(`${selector} { white-space: normal; }`, file))[0], /单行省略/u)
+  }
+  assert.deepEqual(await warnings('.ant-select-multiple .ant-select-selection-item { white-space: normal; }', file), [])
+  assert.deepEqual(await warnings('.erp-picker-popup .ant-select-item-option-content { white-space: normal; line-height: 1.5; }'), [])
 })

@@ -1,6 +1,5 @@
 .erp-dev-data-shell {
   display: grid;
-  gap: 16px;
 }
 
 .erp-dev-data-preflight {
@@ -70,8 +69,6 @@
 
 .erp-dev-data-profile-group {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
   width: 100%;
 }
 
@@ -257,10 +254,6 @@
 .erp-dev-data-profile {
   display: grid;
   min-width: 0;
-  gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--dev-data-border);
-  border-radius: 12px;
   cursor: pointer;
   transition:
     border-color 160ms ease,
@@ -268,20 +261,9 @@
     background-color 160ms ease;
 }
 
-.erp-dev-data-profile:hover,
-.erp-dev-data-profile:focus-within,
-.erp-dev-data-profile--selected {
-  border-color: var(--dev-data-primary);
-  background: var(--dev-data-selected);
-}
-
 .erp-dev-data-profile:focus-within {
   box-shadow: 0 0 0 2px
     color-mix(in srgb, var(--dev-data-primary) 18%, transparent);
-}
-
-.erp-dev-data-profile--selected {
-  background: var(--dev-data-selected);
 }
 
 .erp-dev-data-profile__radio-label {
@@ -306,8 +288,6 @@
 }
 
 .erp-dev-data-prepare-actions {
-  margin-top: 16px;
-  padding-top: 16px;
   border-top: 1px solid var(--dev-data-border);
 }
 

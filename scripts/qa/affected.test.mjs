@@ -22,6 +22,39 @@ function ids(plan) {
   return plan.commands.map((item) => item.id);
 }
 
+test("preview themes select development and built-entry isolation checks", () => {
+  for (const file of [
+    "web/src/dev-workbench/components/DevControlStandards.jsx",
+    "web/src/common/theme/erpAntdTheme.mjs",
+    "web/src/common/theme/erpThemePalette.mjs",
+    "web/scripts/style-l1/controlThemeAssertions.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const text = plan.followUps.find((item) => item.id === "browser-regression")?.text || "";
+    assert.match(text, /dev-ui-local-theme-isolation/u, file);
+    assert.match(text, /build:workbench/u, file);
+    assert.match(text, /test:workbench/u, file);
+    assert(!ids(plan).includes("full"), file);
+  }
+});
+
+test("select overflow changes retain the shared sample and real form follow-ups", () => {
+  for (const file of [
+    "web/src/common/components/select/AppSelect.jsx",
+    "web/src/common/components/select/SelectValueDisclosure.jsx",
+    "web/src/common/components/select/app-select.css",
+    "web/src/dev-workbench/components/DevSelectValueExample.jsx",
+    "web/src/dev-workbench/components/devSelectValueExample.css",
+    "web/src/dev-workbench/components/DevControlStandards.jsx",
+    "web/scripts/style-l1/selectValueDisclosureScenarios.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const text = plan.followUps.find((item) => item.id === "browser-regression")?.text || "";
+    for (const scenario of ["dev-ui-select-overflow", "business-select-values-sales", "business-select-values-purchase", "business-select-values-outsourcing", "business-select-values-bom", "business-select-values-shipment", "business-select-values-arrival"]) assert(text.includes(scenario), `${file}: ${scenario}`);
+    assert(!ids(plan).includes("full"), file);
+  }
+});
+
 test("business data consistency changes select the registered specialist and focused browser follow-up", () => {
   for (const file of [
     "web/src/erp/utils/xlsxWorkbook.mjs",
@@ -771,7 +804,17 @@ test("affected: lint configurations select their own boundary tests and static c
   const styles = buildAffectedPlan(["web/.stylelintrc"], { root: ROOT });
   assert.equal(styles.localGate, "focused");
   assert(ids(styles).includes("web-css"));
-  assert.deepEqual(selectedTests(styles), ["web/scripts/stylelint/styleBoundaries.test.mjs"]);
+  const styleTests = [
+    "web/scripts/stylelint/styleBoundaries.test.mjs",
+    "web/scripts/stylelint/styleDeclarationOwnership.test.mjs",
+  ];
+  assert.deepEqual(selectedTests(styles), styleTests);
+  for (const name of ["styleBoundaries", "styleDeclarationOwnership"]) {
+    const boundaryRule = buildAffectedPlan([`web/scripts/stylelint/${name}.mjs`], { root: ROOT });
+    assert.equal(boundaryRule.localGate, "focused");
+    assert(ids(boundaryRule).includes("web-css"));
+    assert.deepEqual(selectedTests(boundaryRule), styleTests);
+  }
   for (const plan of [eslint, styles]) {
     assert(!ids(plan).includes("web-test"));
     assert(!plan.followUps.some((item) => item.id === "browser-regression"));

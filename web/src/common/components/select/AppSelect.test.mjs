@@ -92,3 +92,68 @@ test('排序清空恢复声明的默认排序，界面显示用途提示', async
   assert.equal(query, 'updated_at:desc')
   assert.equal(document.querySelector('.ant-select-selection-placeholder').textContent, '排序方式')
 })
+
+test('完整值阅读包装保留公开 ref、非受控默认值和自定义字段映射', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: AppSelect } = await import('./AppSelect.jsx')
+  const ref = React.createRef()
+  const changes = []
+  await harness.render(h(AppSelect, {
+    ref,
+    'aria-label': '仓库引用',
+    defaultValue: 0,
+    prefix: h('span', null, '来源'),
+    fieldNames: { value: 'id', label: 'name' },
+    options: [{ id: 0, name: '零号仓库' }, { id: 1, name: '成品仓库' }],
+    onChange: (value) => changes.push(value),
+  }))
+  const input = document.querySelector('[role="combobox"]')
+  const root = input.closest('.ant-select')
+  assert.ok(ref.current.nativeElement === root, '公开 ref 仍指向选择框本身')
+  assert.equal(root.querySelector('.ant-select-selection-item').textContent, '零号仓库')
+  assert.equal(root.querySelector('.ant-select-prefix').textContent, '来源')
+  await act(() => ref.current.focus())
+  assert.ok(document.activeElement === input)
+  await act(() => input.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await harness.flush()
+  await harness.click([...document.querySelectorAll('.ant-select-item-option')].find((node) => node.textContent === '成品仓库'))
+  assert.deepEqual(changes, [1])
+  assert.equal(root.querySelector('.ant-select-selection-item').textContent, '成品仓库')
+  assert.ok(ref.current.nativeElement === root, '选择后不重建选择框根节点')
+})
+
+for (const mode of ['multiple', 'tags']) {
+  test(`${mode} 保留多值选择与清空，不测量单选完整值`, async (t) => {
+    const harness = await businessFormHarness(t)
+    const { default: AppSelect } = await import('./AppSelect.jsx')
+    const changes = []
+    const ref = React.createRef()
+    function Example() {
+      const [value, setValue] = React.useState(['sales'])
+      return h(AppSelect, {
+        ref,
+        mode,
+        'aria-label': '员工岗位',
+        value,
+        options: [{ value: 'sales', label: '业务' }, { value: 'warehouse', label: '仓库' }],
+        onChange: (next) => { changes.push(next); setValue(next) },
+      })
+    }
+    await harness.render(h(Example))
+    const input = document.querySelector('[role="combobox"]')
+    const root = input.closest('.app-select')
+    assert.ok(ref.current.nativeElement === root)
+    assert.equal(root.querySelectorAll('.ant-select-selection-item').length, 1)
+    await act(() => input.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+    await harness.flush()
+    await harness.click([...document.querySelectorAll('.ant-select-item-option')].find((node) => node.textContent === '仓库'))
+    assert.deepEqual(changes.at(-1), ['sales', 'warehouse'])
+    assert.equal(root.querySelectorAll('.ant-select-selection-item').length, 2)
+    assert.equal(root.querySelector('.app-select__inspect'), null)
+    await act(() => root.querySelector('.ant-select-clear').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+    await harness.flush()
+    assert.deepEqual(changes.at(-1), [])
+    assert.equal(root.querySelectorAll('.ant-select-selection-item').length, 0)
+    assert.ok(ref.current.nativeElement === root)
+  })
+}

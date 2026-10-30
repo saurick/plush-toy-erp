@@ -76,11 +76,6 @@
   margin-block: 12px;
 }
 
-.mobile-task-payment-kind > .ant-select,
-.mobile-task-business__content > label > .ant-select {
-  min-height: 44px;
-}
-
 .mobile-task-business > .mobile-role-tasks-page__detail-main > .workflow-task-info-card {
   flex-shrink: 0;
 }

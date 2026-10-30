@@ -3,7 +3,6 @@
   grid-template-columns: var(--erp-sidebar-width) minmax(0, 1fr);
   align-items: start;
   align-content: start;
-  gap: 12px;
 }
 
 .erp-dev-workspace-page > :not(.erp-dev-workspace-nav) {
@@ -50,20 +49,12 @@
 .erp-dev-workspace-nav__brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 48px;
-  min-height: 48px;
-  padding: 0 15px;
   border-bottom: 1px solid var(--dev-nav-border);
 }
 
 .erp-dev-workspace-nav__brand-mark {
   display: grid;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
   place-items: center;
-  border-radius: 8px;
   background: var(--erp-primary);
   color: var(--erp-on-accent);
   font-size: var(--erp-font-body);
@@ -173,8 +164,6 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px;
   overflow-y: auto;
 }
 
@@ -185,15 +174,11 @@
 .erp-dev-workspace-nav__route {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
-  min-height: 38px;
   align-items: center;
   column-gap: 10px;
-  padding: 7px 10px;
   border: 0;
   border-radius: 8px;
   color: var(--erp-text-muted);
-  font: inherit;
-  font-weight: 600;
   text-align: left;
   background: transparent;
   cursor: pointer;
@@ -245,7 +230,6 @@
   border: 1px solid transparent;
   border-radius: 8px;
   color: inherit;
-  font: inherit;
   text-align: left;
   background: transparent;
   cursor: pointer;
@@ -260,8 +244,6 @@
 
 .erp-dev-workspace-nav__actions {
   display: grid;
-  gap: 8px;
-  padding: 10px;
   border-top: 1px solid var(--dev-nav-border);
 }
 
@@ -372,12 +354,9 @@
   }
 
   .erp-dev-workspace-nav {
-    position: sticky;
     z-index: 30;
     top: 8px;
     display: grid;
-    width: 100%;
-    height: auto;
     min-height: 0;
     margin: 0 auto 12px;
   }
@@ -398,11 +377,8 @@
   }
 
   .erp-dev-workspace-nav__routes {
-    display: grid;
     gap: 0;
     padding: 0;
-    overflow-x: hidden;
-    overflow-y: hidden;
   }
 
   .erp-dev-workspace-nav__primary {
@@ -441,13 +417,8 @@
   }
 
   .erp-dev-workspace-nav__actions {
-    display: flex;
     align-items: center;
     padding: 8px 10px;
-  }
-
-  .erp-dev-workspace-nav__actions .ant-btn {
-    width: auto;
   }
 
   .erp-dev-workspace-nav__theme-toggle.erp-appearance-trigger.ant-btn {

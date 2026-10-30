@@ -14,6 +14,9 @@ DEV 工作台沿用 `docs/product/自动化测试策略.md` 的浅色桌面 smok
 4. 按改动运行样板或真实消费者的相关浏览器场景；共享组合变化两者都验证，新消费者同步 `scripts/qa/affected.mjs` 的定向映射。完成实际任务路径，并按正式设计核对延迟、刷新失败保留、范围切换、历史恢复、长文本与桌面收缩。涉及独立模式时执行[制品浏览器验收](../../../../server/deploy/workbench/README.md#artifact-browser-acceptance)，不能只测 Vite 或服务端桩页面。静态通过和几何数字只作辅助；交付说明实际迁移范围，不能将样板存在写成所有页面已治理。
 
 ## Implement with the existing design system.
+   - 样式修改先按[共享控件样式边界](../../../../docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)定位全局基线、属性维护文件、模块布局和 portal 根。按属性检索所有写入位置，核对实际命中规则；删除竞争声明后修改唯一维护位置，不把“新增覆盖且截图正常”当作治理完成。
+   - 修改共用控件时区分外框、真实输入、选中值、浮层选项与多行组件。只读/禁用、表格位置和导入长值属于状态组合，不能成为跳过高度/溢出断言的理由；模块尺寸差异使用已有组件规格或共享层消费的变量。全局治理才扩大到全仓扫描，普通修复按影响面处理。
+   - 下拉已选值或多列明细显示不全时，按[长值与多列合同](../../../../docs/product/ui-design/交互设计说明.md#select-overflow)复用 `AppSelect` 的完整值入口和共享明细滚动，不另做页内 tooltip 或复制表单。核对可编辑及锁定长值、键盘读取、清空/替换残值、窄区域与列增长；工作台 `control=select-overflow` 和 `selectValueDisclosureScenarios.mjs` 是当前组件演示与回归入口。
    - Reuse current page shells, shared business-page components, theme tokens, CSS variables, and existing interaction patterns before adding new abstractions.
    - Keep the themes actually supported by the changed page readable. Printing/PDF previews remain fixed light unless a separate design explicitly changes screen preview behavior.
    - 新增或调整页面、表格及自定义组件时，按[全局外观合同](../../../../docs/engineering/前端实现与交互约定.md#主题模式--theme-mode)核对本次涉及的主题、密度、表格线条等偏好在组件及实际调用页面生效；专用版式的例外沿用正式合同，并按影响验证切换、恢复和响应式行为。
@@ -37,6 +40,7 @@ DEV 工作台沿用 `docs/product/自动化测试策略.md` 的浅色桌面 smok
 已确认的视觉缺陷应补到现有浏览器回归中：根据该组件的设计，测量主标签与选中标记中心、标题与整栏中心、重复列的对齐及溢出；居中允许约 1 CSS px 的舍入差异。截图同时核对整体层次与密度，不能只证明按钮能点击或 CSS 写了 `center`。测试范围仍按实际触达的状态、主题与设备选择。
 
 ## Validate as regression, not just screenshot review.
+   - 先运行 `pnpm --dir web css`，同时核对单文件边界和跨文件声明归属；更改规则时，通过项目 Node 门禁运行 `web/scripts/stylelint/styleBoundaries.test.mjs` 与 `styleDeclarationOwnership.test.mjs`，验证错误声明确实被拒绝，合法布局、主题和断点仍可通过。共享样式补相关长文本、已选态与不刷新路由往返，复用 `singleSelectAssertions.mjs`、`styleIsolationAssertions.mjs`，不可用静态通过代替真实几何和隔离证据。
    - Cover default, interaction, recovery, and adjacent-area states.
    - For visible layout or interaction changes, verify the exact changed state and relevant boundaries in the real browser. Use named screenshots or Playwright artifacts for visual review or failure diagnosis; fix and recheck affected states when they expose a product defect.
    - Select visual evidence by state and risk rather than screenshot count. Cover default, changed interaction, recovery, relevant boundary and affected adjacent geometry; add print/PDF, mobile/dark or editor states only when touched. Reuse unchanged evidence for the same candidate.

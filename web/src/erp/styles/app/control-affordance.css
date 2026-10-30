@@ -47,6 +47,13 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   cursor: not-allowed;
 }
 
+.erp-sliding-segmented.ant-segmented .ant-segmented-group::before,
+.erp-sliding-tab-list::before {
+  border-radius: var(--erp-slider-radius, 6px);
+  background: var(--erp-slider-bg, var(--erp-primary-soft, #eef7ef));
+  box-shadow: var(--erp-slider-shadow, none);
+}
+
 .erp-sliding-segmented.ant-segmented {
   --erp-slider-bg: var(--erp-control-selected);
   --erp-slider-radius: 6px;
@@ -77,6 +84,8 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
 .erp-sliding-segmented.ant-segmented .ant-segmented-item {
   border-color: transparent;
   border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
   color: var(--erp-control-text);
 }
 
@@ -94,6 +103,8 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
 
 .erp-sliding-segmented.ant-segmented
   .ant-segmented-item.erp-segmented-item-selected {
+  background: transparent;
+  box-shadow: none;
   color: var(--erp-control-selected-text);
 }
 
@@ -448,10 +459,6 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   height: 44px;
   margin-block: -1px;
   padding-inline: 12px;
-}
-
-.erp-mobile-search .ant-input-affix-wrapper {
-  min-height: 44px;
 }
 
 .erp-mobile-search .ant-input-clear-icon,

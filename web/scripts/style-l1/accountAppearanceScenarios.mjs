@@ -1,12 +1,13 @@
-import { openERPAppearance } from './themeAssertions.mjs'
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
+import { openERPAppearance } from './themeAssertions.mjs'
 import { ERP_ACCENTS, WORKBENCH_APPEARANCE_STORAGE_KEY } from '../../src/common/theme/erpAppearance.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertReadableOnBackground } from './colorAssertions.mjs'
 import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 import { createMockAdminSessionToken } from '../mockAdminSessionToken.mjs'
+import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
 
 async function waitForSavedAppearance(page, expected) {
   await page.waitForFunction((expected) => {
@@ -188,11 +189,16 @@ export function createAccountAppearanceScenarios({
               status: 200,
               contentType: 'application/json',
               body: JSON.stringify({
-                jsonrpc: '2.0', id: body.id,
-                result: { code: 0, message: 'OK', data: {
-                  ...profile,
-                  access_token: createMockAdminSessionToken({ userID: id }),
-                } },
+                jsonrpc: '2.0',
+                id: body.id,
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: {
+                    ...profile,
+                    access_token: createMockAdminSessionToken({ userID: id }),
+                  },
+                },
               }),
             })
           })
@@ -292,11 +298,13 @@ export function createAccountAppearanceScenarios({
           const accountBefore = await page.evaluate(() => localStorage.getItem('admin_erp_preferences'))
           await openERPAppearance(page)
           const dialog = page.getByRole('dialog', { name: '外观与密度' })
+          await assertButtonSpacing(dialog, `workbench-${standalone ? 'standalone' : 'local'}-initial`)
           await dialog.getByRole('button', { name: '青绿', exact: true }).click()
           await dialog.getByText('浅色', { exact: true }).click()
           await dialog.getByText('标准', { exact: true }).click()
           await dialog.getByText('简洁', { exact: true }).click()
           await expectAppearance(chosen)
+          await assertButtonSpacing(dialog, `workbench-${standalone ? 'standalone' : 'local'}-appearance-change`)
           assert.deepEqual(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), WORKBENCH_APPEARANCE_STORAGE_KEY), chosen)
           assert.equal(await page.evaluate(() => localStorage.getItem('admin_erp_preferences')), accountBefore)
           assert.deepEqual(saves, [], '工作台操作不能写入 ERP 账号')

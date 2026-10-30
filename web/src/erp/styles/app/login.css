@@ -97,7 +97,6 @@
   align-items: stretch;
   gap: 16px;
   margin-top: 10px;
-  border-bottom: 1px solid var(--erp-border);
 }
 
 .erp-login-methods > button {
@@ -131,25 +130,13 @@
 
 .erp-login-card .ant-input:not(:where(.ant-input-affix-wrapper > input)),
 .erp-login-card .ant-input-affix-wrapper {
-  height: 44px;
-  min-height: 44px;
-  padding-block: 0;
   border-color: var(--erp-border-strong);
   background: var(--erp-surface-bg);
   font-size: var(--erp-font-body);
-  line-height: 42px;
 }
 
 .erp-login-card .ant-input-affix-wrapper .ant-input {
-  height: auto;
-  min-height: 0;
   background: transparent;
-  line-height: 42px;
-}
-
-.erp-login-card .ant-input-affix-wrapper {
-  height: 44px;
-  padding-block: 0;
 }
 
 .erp-login-password-toggle {
@@ -206,7 +193,6 @@
   border: 0;
   outline: none;
   box-shadow: none;
-  line-height: 44px;
 }
 
 .erp-login-card .erp-login-sms-code-compact .ant-btn.ant-btn-lg {

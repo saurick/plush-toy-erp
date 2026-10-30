@@ -69,9 +69,9 @@ import BusinessLineItemsTable, {
 
 const SHIPMENT_ITEM_COLUMNS = [
   { label: '产品', width: 220, flexible: true, required: true },
-  { label: 'SKU', width: 150 },
-  { label: '仓库', width: 128, required: true },
-  { label: '批次', width: 150 },
+  { label: 'SKU', width: 190 },
+  { label: '仓库', width: 220, required: true },
+  { label: '批次', width: 190 },
   { label: '数量', width: 180, required: true },
   { label: '单位', width: 94, required: true },
 ]

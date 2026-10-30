@@ -1,6 +1,6 @@
 // web/src/App.jsx
 import React, { Suspense, useEffect } from 'react'
-import { App as AntdApp, ConfigProvider, Empty, Grid, theme } from 'antd'
+import { App as AntdApp, ConfigProvider, Empty, Grid } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
@@ -21,7 +21,7 @@ import {
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
 import { WORKBENCH_APPEARANCE_STORAGE_KEY } from '@/common/theme/erpAppearance.mjs'
-import { ERP_DARK_PALETTE, getERPAccentTokens, getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
+import { createERPAntdTheme } from '@/common/theme/erpAntdTheme.mjs'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import '@/common/components/empty/empty-state.css'
 
@@ -113,7 +113,6 @@ function ThemedApp() {
     import.meta.env.DEV && /^\/__dev(?:\/|$)/u.test(location.pathname)
   const screens = Grid.useBreakpoint()
   const isPhoneViewport = !isDevWorkbenchRoute && screens.md === false
-  const tableCellPaddingBlock = appearance.density === 'compact' ? 4 : 9
 
   return (
     <ConfigProvider
@@ -123,42 +122,13 @@ function ThemedApp() {
       modal={{
         centered: true,
       }}
-      theme={{
-        algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
-        components: {
-          Button: {
-            controlHeight: isPhoneViewport ? 44 : 34,
-            paddingInline: 12,
-            paddingInlineSM: 12,
-            paddingInlineLG: 16,
-            primaryColor: isDark ? ERP_DARK_PALETTE.onAccent : accent.onPrimary,
-          },
-          Table: {
-            cellPaddingBlock: tableCellPaddingBlock,
-            cellPaddingBlockMD: tableCellPaddingBlock,
-            cellPaddingBlockSM: tableCellPaddingBlock,
-            cellPaddingInlineSM: 11,
-            headerBg: isDark ? ERP_DARK_PALETTE.surfaceSoft : '#f7f9f8',
-            headerColor: isDark ? ERP_DARK_PALETTE.textMuted : '#4d5d53',
-            rowSelectedBg: 'var(--erp-primary-softer)',
-            rowSelectedHoverBg: 'var(--erp-primary-soft)',
-            rowHoverBg: 'var(--erp-surface-bg-soft)',
-          },
-        },
-        token: {
-          ...getERPAccentTokens(isDark, accent),
-          colorInfo: isDark ? '#75b9ff' : '#3275c7',
-          borderRadius: 8,
-          fontSize: isPhoneViewport ? 16 : 14,
-          fontSizeSM: isPhoneViewport || isDevWorkbenchRoute ? 14 : 12,
-          controlHeight: isPhoneViewport ? 46 : 34,
-          controlHeightSM: isPhoneViewport ? 44 : 28,
-          controlHeightLG: isPhoneViewport ? 48 : 40,
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
-          ...getERPSurfaceTokens(isDark),
-        },
-      }}
+      theme={createERPAntdTheme({
+        isDark,
+        accent,
+        density: appearance.density,
+        mobile: isPhoneViewport,
+        workbench: isDevWorkbenchRoute,
+      })}
     >
       <AntdApp message={MESSAGE_CONFIG} notification={NOTIFICATION_CONFIG}>
         <AntdAppBridge />

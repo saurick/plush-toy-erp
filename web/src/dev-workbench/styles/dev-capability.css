@@ -1,23 +1,9 @@
 .erp-dev-customer-header {
-  display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  max-width: 1120px;
-  margin: 0 auto 12px;
-  border: 1px solid var(--erp-border);
-  border-radius: 12px;
-  background: var(--erp-surface-bg);
-  padding: 12px;
-  box-shadow:
-    0 1px 2px rgb(15 23 42 / 0.04),
-    0 8px 20px rgb(15 23 42 / 0.05);
 }
 
 .erp-dev-customer-header__copy {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
   align-items: flex-start;
   min-width: 0;
 }
@@ -65,7 +51,6 @@
   align-items: center;
   gap: 8px 10px;
   max-width: 100%;
-  margin-top: 8px;
 }
 
 .erp-dev-customer-selector .ant-select {
@@ -75,22 +60,14 @@
 
 .erp-dev-customer-selector__note.ant-typography {
   flex: 1 1 180px;
-  color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
 
 .erp-dev-customer-source {
-  display: grid;
   flex: 0 0 auto;
   gap: 4px;
-  width: min(300px, 100%);
-  border: 1px solid var(--erp-border);
-  border-radius: 12px;
-  background: var(--erp-surface-bg-soft);
-  padding: 9px 10px;
-  font-size: var(--erp-font-caption);
   overflow-wrap: anywhere;
 }
 
@@ -124,11 +101,6 @@
   grid-column: 1 / -1;
 }
 
-.erp-dev-customer-missing {
-  max-width: 1480px;
-  margin: 0 auto;
-}
-
 .erp-dev-customer-registered-list {
   display: grid;
   gap: 8px;
@@ -141,9 +113,14 @@
   gap: 18px;
 }
 
-.erp-dev-customer-panel__head,
+.erp-dev-customer-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .erp-dev-customer-console,
-.erp-dev-customer-menu-group__title,
 .erp-dev-customer-review-item__head,
 .erp-dev-customer-source-ref,
 .erp-dev-customer-field__head,
@@ -155,18 +132,9 @@
   min-width: 0;
 }
 
-.erp-dev-customer-panel__head {
-  margin-bottom: 10px;
-  color: var(--erp-text);
-}
-
-.erp-dev-customer-console {
-  background: linear-gradient(
-    135deg,
-    #ffffff 0%,
-    var(--erp-surface-bg-soft) 54%,
-    #eff6ff 100%
-  );
+.erp-dev-customer-menu-group__title {
+  justify-content: space-between;
+  min-width: 0;
 }
 
 .erp-dev-customer-console__status {
@@ -188,21 +156,20 @@
   line-height: 1.25;
 }
 
-.erp-dev-customer-decision-grid,
-.erp-dev-customer-quick-actions,
+.erp-dev-customer-decision-grid {
+  display: grid;
+}
+
+.erp-dev-customer-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .erp-dev-customer-review-list,
 .erp-dev-customer-source-ref-list {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.erp-dev-customer-decision-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.erp-dev-customer-quick-actions {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .erp-dev-customer-quick-action {
@@ -211,20 +178,14 @@
   gap: 10px;
   align-items: center;
   min-width: 0;
-  border: 1px solid var(--erp-border);
-  border-radius: 10px;
-  background: var(--erp-primary-softer);
   color: var(--erp-primary-strong);
   cursor: pointer;
-  padding: 10px;
   text-align: left;
 }
 
 .erp-dev-customer-quick-action:hover,
 .erp-dev-customer-quick-action:focus-visible {
   border-color: var(--erp-primary);
-  background: var(--erp-interactive-bg-hover);
-  outline: none;
 }
 
 .erp-dev-customer-quick-action__icon {
@@ -234,8 +195,6 @@
   align-items: center;
   justify-content: center;
   border-radius: 9px;
-  background: var(--erp-primary-soft);
-  color: var(--erp-primary-strong);
   font-size: 17px;
 }
 
@@ -275,7 +234,6 @@
 .erp-dev-customer-review-item,
 .erp-dev-customer-source-ref,
 .erp-dev-customer-tool,
-.erp-dev-customer-menu-group,
 .erp-dev-customer-guard,
 .erp-dev-customer-gate,
 .erp-dev-customer-asset,
@@ -285,6 +243,10 @@
   border-radius: 12px;
   background: var(--erp-surface-bg-soft);
   padding: 12px;
+}
+
+.erp-dev-customer-menu-group {
+  min-width: 0;
 }
 
 .erp-dev-customer-review-item .ant-typography,
@@ -426,14 +388,10 @@
 .erp-dev-customer-brand-mark {
   display: inline-flex;
   flex: 0 0 auto;
-  width: 74px;
-  height: 74px;
   align-items: center;
   justify-content: center;
-  border-radius: 18px;
   background: var(--erp-primary);
   color: var(--erp-on-accent);
-  font-size: 34px;
   font-weight: 760;
 }
 
@@ -441,17 +399,8 @@
   margin: 0 0 8px;
 }
 
-.erp-dev-customer-menu-groups {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
 .erp-dev-customer-menu-group__items {
-  display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
 }
 
 .erp-dev-customer-field__head {

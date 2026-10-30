@@ -12,11 +12,15 @@ const appearanceProperties = [
   'background-color',
   'box-shadow',
   'outline-width',
+  'white-space',
+  'text-overflow',
+  'overflow-x',
+  'overflow-y',
 ]
 
 async function readAppearance(input) {
   return input.evaluate(async (node, properties) => {
-    const owner = node.closest('.ant-input-affix-wrapper') || node
+    const owner = node.closest('.ant-select, .ant-input-affix-wrapper') || node
     await new Promise((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(resolve))
     )
@@ -37,7 +41,14 @@ async function readAppearance(input) {
         ])
       )
     }
-    return { input: read(node), owner: read(owner) }
+    const selected = owner.querySelector('.ant-select-selection-item')
+    const selector = owner.querySelector('.ant-select-selector')
+    return {
+      input: read(node),
+      owner: read(owner),
+      selected: selected ? read(selected) : null,
+      selector: selector ? read(selector) : null,
+    }
   }, appearanceProperties)
 }
 
@@ -45,7 +56,14 @@ async function captureStates(page, input) {
   await input.blur()
   await page.mouse.move(0, 0)
   const normal = await readAppearance(input)
-  await input.hover()
+  const hoverTarget = await input.evaluateHandle((node) =>
+    node.closest('.ant-select, .ant-input-affix-wrapper') || node
+  )
+  try {
+    await hoverTarget.asElement().hover()
+  } finally {
+    await hoverTarget.dispose()
+  }
   const hover = await readAppearance(input)
   await input.focus()
   const focus = await readAppearance(input)

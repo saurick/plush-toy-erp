@@ -48,6 +48,21 @@ export function createBusinessFormInteractionScenarios({
   } = createLineItemUnitAssertions({
     assert,
   })
+  const openShipmentDateFilters = async (page) => {
+    await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
+    const filters = page.getByRole('dialog', { name: '筛选条件' })
+    await filters.waitFor()
+    for (const label of ['实际出货日期', '计划出货日期']) {
+      await waitForFiniteAnimations(page)
+      await filters.locator('.erp-business-date-range-filter__type .ant-select-selector').click()
+      const popup = page.locator('.ant-select-dropdown:visible')
+      await popup.getByText('计划出货日期', { exact: true }).waitFor()
+      await popup.getByText('实际出货日期', { exact: true }).waitFor()
+      await popup.getByText(label, { exact: true }).click()
+      await filters.getByRole('group', { name: label, exact: true }).waitFor()
+    }
+    await waitForFiniteAnimations(page)
+  }
   const assertResponsiveSelectionActionBar = async (
     page,
     { scenarioName, maxVisibleActions }
@@ -203,9 +218,9 @@ export function createBusinessFormInteractionScenarios({
     }, label)
     assert(submitted, `页内业务表单缺少可用的“${label}”按钮`)
   }
-  let purchaseOrderMaterialReferenceAttempts = 0
-  let purchaseOrderMaterialReferenceMode = 'pending'
-  let purchaseOrderMaterialReferenceCounts = {}
+  let purchaseOrderUnitReferenceAttempts = 0
+  let purchaseOrderUnitReferenceMode = 'pending'
+  let purchaseOrderUnitReferenceCounts = {}
   let purchaseOrderPendingReferenceRequests = 0
   let purchaseOrderPendingReferenceReleased = false
   let purchaseOrderInitialReferenceStarted = Promise.resolve()
@@ -503,9 +518,9 @@ export function createBusinessFormInteractionScenarios({
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
-        purchaseOrderMaterialReferenceAttempts = 0
-        purchaseOrderMaterialReferenceMode = 'pending'
-        purchaseOrderMaterialReferenceCounts = {
+        purchaseOrderUnitReferenceAttempts = 0
+        purchaseOrderUnitReferenceMode = 'pending'
+        purchaseOrderUnitReferenceCounts = {
           pending: 0,
           fail: 0,
           empty: 0,
@@ -527,15 +542,15 @@ export function createBusinessFormInteractionScenarios({
 
         await page.route('**/rpc/masterdata', async (route) => {
           const body = route.request().postDataJSON() || {}
-          if (body.method !== 'list_materials') {
+          if (body.method !== 'list_units') {
             await route.fallback()
             return
           }
 
-          purchaseOrderMaterialReferenceAttempts += 1
-          const mode = purchaseOrderMaterialReferenceMode
-          purchaseOrderMaterialReferenceCounts[mode] =
-            Number(purchaseOrderMaterialReferenceCounts[mode] || 0) + 1
+          purchaseOrderUnitReferenceAttempts += 1
+          const mode = purchaseOrderUnitReferenceMode
+          purchaseOrderUnitReferenceCounts[mode] =
+            Number(purchaseOrderUnitReferenceCounts[mode] || 0) + 1
           if (mode === 'full') {
             try {
               await route.fallback()
@@ -553,19 +568,19 @@ export function createBusinessFormInteractionScenarios({
             result = {
               code: 0,
               message: 'OK',
-              data: { materials: [], total: 0, limit: 200, offset: 0 },
+              data: stylePaginatedRpcData([], 'units', body.params),
             }
           } else if (mode === 'fail') {
             result = {
               code: RpcErrorCode.INTERNAL,
-              message: '采购材料资料暂时不可用',
+              message: '采购单位资料暂时不可用',
               data: {},
             }
           } else {
             result = {
               code: 0,
               message: 'OK',
-              data: { materials: [], total: 0, limit: 200, offset: 0 },
+              data: stylePaginatedRpcData([], 'units', body.params),
             }
           }
 
@@ -648,7 +663,7 @@ export function createBusinessFormInteractionScenarios({
           '采购基础资料尚在加载时不应打开空白采购订单弹窗'
         )
 
-        purchaseOrderMaterialReferenceMode = 'fail'
+        purchaseOrderUnitReferenceMode = 'fail'
         await refreshButton.click()
         await withDeadline(
           purchaseOrderFailedRefreshSettled,
@@ -674,7 +689,7 @@ export function createBusinessFormInteractionScenarios({
           0,
           '采购参考资料刷新失败时不得误报“当前页面数据已刷新”'
         )
-        purchaseOrderMaterialReferenceMode = 'empty'
+        purchaseOrderUnitReferenceMode = 'empty'
         await refreshButton.click()
         await withDeadline(
           purchaseOrderEmptyRefreshSettled,
@@ -699,12 +714,12 @@ export function createBusinessFormInteractionScenarios({
           )}`
         )
         assert.equal(
-          purchaseOrderMaterialReferenceCounts.empty,
+          purchaseOrderUnitReferenceCounts.empty,
           1,
           '成功返回空材料集合应完成参考资料加载，不能被误判为请求失败'
         )
 
-        purchaseOrderMaterialReferenceMode = 'full'
+        purchaseOrderUnitReferenceMode = 'full'
         await refreshButton.click()
         await withDeadline(
           purchaseOrderFullRefreshSettled,
@@ -715,8 +730,8 @@ export function createBusinessFormInteractionScenarios({
           await refreshButton.elementHandle()
         )
         assert(
-          purchaseOrderMaterialReferenceCounts.full >= 1 &&
-            purchaseOrderMaterialReferenceAttempts >= 4,
+          purchaseOrderUnitReferenceCounts.full >= 1 &&
+            purchaseOrderUnitReferenceAttempts >= 4,
           '再次刷新应恢复完整材料参考资料，供来源导入继续使用'
         )
         await assertBusinessPageRefreshEntrypoint(page, {
@@ -761,6 +776,8 @@ export function createBusinessFormInteractionScenarios({
             '金额合计',
           ],
           afterOpen: async (modal) => {
+            await modal.locator('.ant-select').filter({ has: page.locator('input[id$="supplier_id"]') }).locator('.ant-select-selector').click()
+            await page.locator('.ant-select-dropdown:visible .ant-select-item-option:not(.ant-select-item-option-disabled)').first().click()
             await verifySourceImportPicker(page, {
               parentModal: modal,
               triggerButton: '从材料库添加',
@@ -1257,8 +1274,6 @@ export function createBusinessFormInteractionScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '出货单')
-        await expectText(page, '计划出货日期')
-        await expectText(page, '实际出货日期')
         await expectText(page, '新建出货单')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'shipment-date-filter-desktop',
@@ -1285,6 +1300,7 @@ export function createBusinessFormInteractionScenarios({
           scenarioName: 'shipment-date-filter-desktop',
           requireSearch: false,
         })
+        await openShipmentDateFilters(page)
         await assertNoHorizontalOverflow(page, 'shipment-date-filter-desktop')
       },
     },
@@ -1296,15 +1312,7 @@ export function createBusinessFormInteractionScenarios({
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '出货单')
-        await expectText(page, '计划出货日期')
-        await expectText(page, '实际出货日期')
-        await page
-          .locator(
-            '.erp-business-operation-panel button[aria-haspopup="dialog"]'
-          )
-          .click()
-        await page.getByRole('dialog', { name: '筛选条件' }).waitFor()
-        await waitForFiniteAnimations(page)
+        await openShipmentDateFilters(page)
         const metrics = await page.evaluate(() => {
           const control = document.querySelector(
             '.erp-business-date-range-filter'

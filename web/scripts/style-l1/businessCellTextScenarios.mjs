@@ -3,6 +3,7 @@ import {
   closeBusinessFormPage,
 } from './businessFormPageAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { assertSingleSelectValues } from './singleSelectAssertions.mjs'
 
 const longText = '布底贴12g衬，衣片与披肩按尺寸配套，腰带两端留孔。'.repeat(4)
 const multilineNote = Array.from(
@@ -189,16 +190,12 @@ export function createBusinessCellTextScenarios(deps) {
       if (config.key.startsWith('bom')) {
         const selected = line.locator('.ant-select-selection-item').first()
         const metrics = await selected.evaluate((node) => ({
-          width: node.clientWidth,
-          scrollWidth: node.scrollWidth,
-          height: node.clientHeight,
           text: node.textContent,
+          title: node.getAttribute('title'),
         }))
         deps.assert.equal(metrics.text, longText)
-        deps.assert.ok(
-          metrics.scrollWidth <= metrics.width + 1,
-          `selected material is clipped: ${JSON.stringify(metrics)}`
-        )
+        deps.assert.equal(metrics.title, longText, '长材料名称保留完整标题')
+        await assertSingleSelectValues(line, `business-cell-text-${config.key}`)
       }
       const details = line.locator('details')
       if (await details.count()) {

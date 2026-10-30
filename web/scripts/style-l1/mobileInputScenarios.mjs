@@ -163,36 +163,22 @@ export function createMobileInputScenarios() {
       await submit.click()
       assert.equal(JSON.parse(await output.textContent()).approvedQuantity, '')
 
-      for (const [action, label] of [
-        ['blocked', '标记阻塞'],
-        ['rejected', '退回'],
-        ['urge', '催办'],
-      ]) {
-        await page.getByRole('radio', { name: label, exact: true }).check()
-        assert(
-          await page
-            .getByRole('radio', { name: label, exact: true })
-            .isChecked()
-        )
-        assert.equal(
-          await page
-            .getByRole('radio')
-            .evaluateAll(
-              (radios) => radios.filter((radio) => radio.checked).length
-            ),
-          1
-        )
-        await quantity.waitFor({ state: 'detached' })
-        assert.equal(
-          await quantity.count(),
-          0,
-          '离开审批通过后不残留批准数量输入'
-        )
-        await page
-          .getByRole('button', { name: `确认${label}`, exact: true })
-          .click()
-        assert.equal(JSON.parse(await output.textContent()).action, action)
-      }
+      assert.deepEqual(
+        await page.getByRole('radio').evaluateAll((radios) => radios.map((radio) => radio.value)),
+        ['done', 'rejected'],
+        '审批表单只提供业务决定，阻塞与催办属于独立协作入口'
+      )
+      const reject = page.getByRole('radio', { name: '审批退回', exact: true })
+      await reject.check()
+      assert(await reject.isChecked())
+      assert.equal(
+        await page.getByRole('radio').evaluateAll((radios) => radios.filter((radio) => radio.checked).length),
+        1
+      )
+      await quantity.waitFor({ state: 'detached' })
+      assert.equal(await quantity.count(), 0, '离开审批通过后不残留批准数量输入')
+      await page.getByRole('button', { name: '确认审批退回', exact: true }).click()
+      assert.equal(JSON.parse(await output.textContent()).action, 'rejected')
       await page.getByRole('radio', { name: '审批通过', exact: true }).check()
       await quantity.waitFor()
       assert.equal(await quantity.inputValue(), '')

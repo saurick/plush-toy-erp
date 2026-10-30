@@ -93,7 +93,7 @@ export default function BusinessModal({
       width={resolveBusinessModalWidth(size, width)}
       className={['erp-business-modal', className].filter(Boolean).join(' ')}
       style={{
-        '--erp-business-action-modal-bg': token.colorBgElevated,
+        '--erp-business-action-modal-bg': token.colorBgContainer,
         '--erp-business-action-modal-border': token.colorBorder,
         '--erp-business-action-modal-divider': token.colorSplit,
         '--erp-business-action-modal-title': token.colorText,

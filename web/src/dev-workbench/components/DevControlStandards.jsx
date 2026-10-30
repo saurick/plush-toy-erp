@@ -1,5 +1,5 @@
 import React, { Suspense, useLayoutEffect, useRef, useState } from 'react'
-import { Button, ConfigProvider, Empty, Popover, theme } from 'antd'
+import { Button, Empty, Popover } from 'antd'
 import {
   DownOutlined,
   FilterOutlined,
@@ -18,12 +18,13 @@ import { Loading } from '@/common/components/loading'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import { getBusinessPagePresentation } from '@/erp/config/businessUsabilityCatalog.mjs'
 import { useERPTheme } from '@/common/theme/erpTheme'
-import { getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
+import ERPThemeScope from '@/common/theme/ERPThemeScope'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
 import DevSharedComponentGuide, { DevUIConsumerName, SHARED_COMPONENT_SEARCH_TEXT } from './DevSharedComponentGuide.jsx'
 import DevUIPaginationExample from './DevUIPaginationExample.jsx'
 import DevUIPageStateExamples from './DevUIPageStateExamples.jsx'
 import { BasicInputExample, DateInputExample } from './DevUIInputExamples.jsx'
+import DevSelectValueExample from './DevSelectValueExample.jsx'
 import {
   PROGRESS_SCOPE_OPTIONS,
   progressQueryFromURL,
@@ -143,8 +144,27 @@ const TOPICS = [
       ['领域选择', '已有来源或主数据选择器', '读取、搜索和来源快照合同由领域组件承接。'],
     ],
     checks: ['修改名称和类别，核对当前结果。', '清空内容，再恢复初始值。', '切换禁用与错误，核对值保留和状态外观。'],
-    source: 'antd: Button / Input · common/components/select · src/App.jsx: ConfigProvider · erp/styles/app/control-*.css',
+    source: 'antd: Button / Input · common/components/select · common/theme/erpAntdTheme.mjs · erp/styles/app/control-*.css',
     consumer: { ...MATERIAL_PAGE, task: '打开新建或编辑，核对字段输入、选择、清空与禁用；取消返回。' },
+  },
+  {
+    key: 'select-overflow',
+    title: '长值与多列',
+    summary: '查看完整值、搜索与明细横向滚动',
+    description: '使用正式选择框和明细表，体验长名称、导入锁定值及列数增加后的读取与填写。',
+    rules: [
+      ['已选长值', 'AppSelect', '保持单行和高度；实际截断时出现完整值入口，点击或键盘均可读取。'],
+      ['搜索与选项', '独立浮层宽度', '可搜索单选默认提供较宽选项层，长名称换行；已有专用宽度和远程选择合同优先。'],
+      ['多列明细', 'BusinessLineItemsTable', '按任务分配最小列宽；列数增加只在明细区域横向滚动，不压缩所有输入。'],
+      ['锁定与清空', '读取和编辑分开', '锁定字段仍可查看完整值；清空或更换值后关闭旧详情，不改变业务权限。'],
+    ],
+    checks: [
+      '点击产品、SKU 或仓库的信息图标，再用 Tab、Enter 和 Escape 核对读取、关闭和焦点返回。',
+      '搜索仓库后选择，再清空；核对原批次同时清空，完整值不残留。',
+      '切换长名称、窄区域和增加 4 列，横向查看右侧字段；恢复初始内容后继续填写。',
+    ],
+    source: 'AppSelect · SelectValueDisclosure · BusinessLineItemsTable · control-foundation.css',
+    consumer: { ...getBusinessPagePresentation('shipments'), task: '打开出货编辑页，核对产品、SKU、仓库、批次的完整值与明细横向滚动；无需保存真实单据。' },
   },
   {
     key: 'dates',
@@ -683,7 +703,7 @@ function ActionsExample() {
 
 export default function DevControlStandards() {
   const [params, setParams] = useSearchParams()
-  const { accent, effectiveTheme } = useERPTheme()
+  const { accent, appearance, effectiveTheme } = useERPTheme()
   const [mode, setMode] = useState(effectiveTheme)
   const current =
     TOPICS.find((topic) => topic.key === params.get('control')) || TOPICS[0]
@@ -790,48 +810,39 @@ export default function DevControlStandards() {
                   <strong>交互样例</strong>
                   <span>本地虚构数据 · 可反复操作</span>
                 </div>
-                <ConfigProvider
-                  theme={{
-                    algorithm:
-                      mode === 'dark'
-                        ? theme.darkAlgorithm
-                        : theme.defaultAlgorithm,
-                    token: {
-                      colorPrimary:
-                        mode === 'dark' ? accent.dark : accent.primary,
-                      ...getERPSurfaceTokens(mode === 'dark'),
-                    },
-                  }}
+                <ERPThemeScope
+                  mode={mode}
+                  accent={accent}
+                  density={appearance.density}
+                  workbench
+                  className="erp-control-library-stage"
                 >
-                  <div
-                    className="erp-control-library-stage"
-                    data-erp-theme={mode}
-                  >
-                    {current.key === 'counts' ? (
-                      <CountExample />
-                    ) : current.key === 'feedback' ? (
-                      <DevUIFeedbackExamples />
-                    ) : current.key === 'navigation' ? (
-                      <NavigationExample />
-                    ) : current.key === 'filters' ? (
-                      <FiltersExample />
-                    ) : current.key === 'actions' ? (
-                      <ActionsExample />
-                    ) : current.key === 'inputs' ? (
-                      <BasicInputExample />
-                    ) : current.key === 'dates' ? (
-                      <DateInputExample />
-                    ) : current.key === 'pagination' ? (
-                      <DevUIPaginationExample />
-                    ) : current.key === 'business-form' || current.key === 'source-picker' ? (
-                      <Suspense fallback={<Loading title="正在加载组件示例" />}>
-                        <DevUIBusinessExamples key={current.key} type={current.key} />
-                      </Suspense>
-                    ) : (
-                      <DevUIPageStateExamples />
-                    )}
-                  </div>
-                </ConfigProvider>
+                  {current.key === 'counts' ? (
+                    <CountExample />
+                  ) : current.key === 'feedback' ? (
+                    <DevUIFeedbackExamples />
+                  ) : current.key === 'navigation' ? (
+                    <NavigationExample />
+                  ) : current.key === 'filters' ? (
+                    <FiltersExample />
+                  ) : current.key === 'actions' ? (
+                    <ActionsExample />
+                  ) : current.key === 'inputs' ? (
+                    <BasicInputExample />
+                  ) : current.key === 'select-overflow' ? (
+                    <DevSelectValueExample />
+                  ) : current.key === 'dates' ? (
+                    <DateInputExample />
+                  ) : current.key === 'pagination' ? (
+                    <DevUIPaginationExample />
+                  ) : current.key === 'business-form' || current.key === 'source-picker' ? (
+                    <Suspense fallback={<Loading title="正在加载组件示例" />}>
+                      <DevUIBusinessExamples key={current.key} type={current.key} />
+                    </Suspense>
+                  ) : (
+                    <DevUIPageStateExamples />
+                  )}
+                </ERPThemeScope>
               </section>
               <aside className="erp-control-library-checks">
                 <h3>按这 3 步核对</h3>

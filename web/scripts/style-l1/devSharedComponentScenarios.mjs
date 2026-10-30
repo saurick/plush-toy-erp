@@ -1,6 +1,9 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
+import { assertControlPreviewThemeIsolation } from './controlThemeAssertions.mjs'
 import { createDevPaginationScenarios } from './devPaginationScenarios.mjs'
 import { createDevBusinessComponentScenarios } from './devBusinessComponentScenarios.mjs'
+import { createSelectValueDisclosureScenarios } from './selectValueDisclosureScenarios.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import {
   findUIDesignChapter,
   readUIDesignChapters,
@@ -10,8 +13,21 @@ export function createDevSharedComponentScenarios({
   assert,
   assertNoHorizontalOverflow,
   customerRuntimeEffectiveSession,
+  outputDir,
 }) {
   return [
+    {
+      name: 'dev-ui-local-theme-isolation',
+      path: '/__dev/ui-design?page=controls&control=actions',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const evidence = await assertControlPreviewThemeIsolation(page)
+        await assertNoHorizontalOverflow(page, '控件样例内外主题隔离')
+        await writeFile(`${outputDir}/control-preview-theme.json`, JSON.stringify(evidence, null, 2))
+      },
+    },
+    ...createSelectValueDisclosureScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevPaginationScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevBusinessComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
     {
@@ -304,9 +320,12 @@ export function createDevSharedComponentScenarios({
           name: '日期范围示例',
           exact: true,
         })
+        await waitForFiniteAnimations(page)
         await range
           .locator('.erp-business-date-range-filter__type .ant-select-selector')
           .click()
+        await waitForFiniteAnimations(page)
+        assert.equal(await range.getByRole('combobox', { name: '日期类型', exact: true }).getAttribute('aria-expanded'), 'true', '带标签的日期类型在点击后保持选项展开')
         await page
           .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
           .getByText('交货日期', { exact: true })

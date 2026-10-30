@@ -10,7 +10,15 @@ export function stylePaginatedMasterData(
   params = {},
   defaultLimit = 100
 ) {
-  return stylePaginatedRpcData(records, recordKey, params, defaultLimit)
+  // Match the material keyword fields before paging, as ListMaterials does.
+  const keyword = String(params.keyword || '')
+  const filtered = recordKey === 'materials' && keyword
+    ? records.filter((record) =>
+      ['code', 'name', 'category', 'spec', 'color'].some((field) => String(record[field] || '').includes(keyword)) ||
+      ['supplier_item_no', 'supplier_name'].some((field) => String(record[field] || '').toLowerCase().includes(keyword.toLowerCase()))
+    )
+    : records
+  return stylePaginatedRpcData(filtered, recordKey, params, defaultLimit)
 }
 
 export async function installMasterDataRpcMocks(page, context) {

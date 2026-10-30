@@ -16,7 +16,7 @@ body:has(.erp-dev-workspace-page) {
   --dev-workbench-section-gap: 8px;
   --dev-workbench-panel-padding: 10px 12px;
   min-height: 100vh;
-  row-gap: var(--dev-workbench-section-gap);
+  gap: var(--dev-workbench-section-gap) 12px;
   padding: 0 12px 12px 0;
   background: var(--erp-page-bg);
   color: var(--erp-text);
@@ -156,7 +156,7 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
 .erp-dev-workspace-nav__brand-mark {
   width: 26px;
   height: 26px;
-  flex-basis: 26px;
+  flex: 0 0 26px;
   border-radius: 6px;
 }
 
@@ -168,10 +168,13 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
 .erp-dev-workspace-nav__route {
   min-height: 32px;
   padding: 5px 10px;
+  font: inherit;
   font-size: var(--erp-font-small);
+  font-weight: 600;
 }
 
 .erp-dev-workspace-nav__secondary-route {
+  font: inherit;
   font-size: var(--erp-font-small);
   line-height: 20px;
 }

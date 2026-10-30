@@ -368,7 +368,6 @@
 }
 
 .erp-material-task-action--mobile .ant-input {
-  min-height: 44px;
   font-size: 16px;
 }
 
@@ -452,7 +451,6 @@
 }
 
 .erp-material-summary-modal--mobile .ant-input {
-  min-height: 44px;
   font-size: 16px;
 }
 

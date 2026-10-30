@@ -36,7 +36,6 @@
 .erp-dev-docs-shell {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: 14px;
   max-width: 1440px;
   align-self: stretch;
   margin: 0 auto;

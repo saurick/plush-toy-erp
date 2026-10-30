@@ -40,7 +40,7 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
    - 范围或页面入口不清时，用 `docs/当前真源与交接顺序.md` 与 `web/README.md` 定位；涉及交互设计时才读 `docs/product/ui-design/README.md` 与相关页面族说明。
    - Inspect the real runtime page and existing components when the task touches layout, density, spacing, styles, interactions, or visible page structure.
 
-2. 根据影响面读取上表的语义或实现分支，在现有组件、helper 和真实后端能力上修改。
+2. 根据影响面读取上表的语义或实现分支，在现有组件、helper 和真实后端能力上修改。样式变更按实现分支核对属性归属、竞争声明及模块/portal 作用域，并使用现有静态边界和浏览器断言守住。
 3. 按 `$plush-test-governance` 与 affected 计划完成相关检查。字段变化核对覆盖、清空和缺值；交互变化核对实际动作、请求生命周期、焦点和恢复；仅在新改动、失败或未解决风险需要时扩圈或重跑。
 
 ## Deliverable Standard

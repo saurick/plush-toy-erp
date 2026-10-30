@@ -12,8 +12,8 @@
   grid-template-columns: minmax(0, 1fr) minmax(210px, 280px);
   max-width: var(--customer-reading-width);
   gap: 18px 24px;
-  margin-bottom: 14px;
-  border-color: var(--customer-line);
+  margin: 0 auto 14px;
+  border: 1px solid var(--customer-line);
   border-radius: 16px;
   background: var(--customer-surface);
   padding: 20px 22px 18px;

@@ -1,0 +1,13 @@
+.erp-select-value-example {
+  min-width: 0;
+}
+
+.erp-select-value-example__viewport {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.erp-select-value-example__viewport--narrow {
+  width: 420px;
+}

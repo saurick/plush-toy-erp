@@ -160,7 +160,11 @@ export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSessi
         const table = page.locator('.erp-business-data-table-card--sticky')
         const root = page.locator('.erp-admin-content')
         await table.locator('tr.ant-table-row').last().waitFor()
-        if (inventory) await table.locator('tr.ant-table-row').last().getByRole('radio').check()
+        if (inventory) {
+          const lastRow = table.locator('tr.ant-table-row').last()
+          await lastRow.getByRole('checkbox').check()
+          assert((await lastRow.getAttribute('class')).includes('ant-table-row-selected'), '库存余额多选后保留选中行')
+        }
         await root.evaluate((node) => { node.scrollTop = node.scrollHeight })
         await assertStickyGeometry(page)
         await page.getByRole('button', { name: '筛选', exact: true }).click()

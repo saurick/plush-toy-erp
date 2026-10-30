@@ -20,7 +20,7 @@ export function createDevUIDesignDetailScenarios({
   return [
     ...createSearchCompositionScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevWorkCenterDesignScenarios({ assert, assertNoHorizontalOverflow }),
-    ...createDevSharedComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
+    ...createDevSharedComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession, outputDir }),
     ...createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevUIDesignPressureScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevUIPageStateScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),

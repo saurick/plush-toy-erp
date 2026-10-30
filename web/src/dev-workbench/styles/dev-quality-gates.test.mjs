@@ -47,35 +47,11 @@ test('quality gates styles: GitLab CI evidence stays compact and source-backed',
   assert.match(evidence[1], /border:\s*1px solid var\(--erp-border\);/u)
   assert.match(evidence[1], /background:\s*var\(--erp-surface-bg-soft\);/u)
   assert.doesNotMatch(evidence[1], /border-(?:inline-start|left):/u)
-  assert.match(css, /\.erp-dev-quality-server-evidence__facts/u)
-  assert.match(css, /\.erp-dev-quality-server-evidence__job-list/u)
-  assert.match(css, /--quality-server-job-width/u)
-  assert.match(css, /\.erp-dev-quality-server-pipeline__track/u)
-  assert.match(css, /\.erp-dev-quality-server-pipeline__relationship/u)
-  assert.match(css, /\.erp-dev-quality-server-pipeline__dag/u)
-  assert.match(css, /\.erp-dev-quality-server-evidence__view-switch/u)
-  assert.match(css, /\.erp-dev-quality-server-view/u)
-  assert.match(css, /\.erp-dev-quality-server-history__table/u)
-  assert.match(
-    css,
-    /\.erp-dev-quality-server-history__table-wrap[\s\S]*?overflow-x:\s*auto/u
-  )
-
-  assert.match(
-    css,
-    /\.erp-dev-quality-server-pipeline__phase\[data-phase='shards'\]/u
-  )
-  assert.match(css, /\.erp-dev-quality-server-pipeline__status--passed/u)
-  assert.match(css, /\.erp-dev-quality-server-pipeline__status-indicator/u)
-  assert.match(css, /\.erp-dev-quality-server-pipeline__node-guide-button/u)
+  assert.match(css, /\.erp-dev-quality-server-evidence > \.ant-btn\s*\{\s*justify-self:\s*start;/u)
+  assert.match(css, /\.erp-dev-quality-server-evidence \.ant-typography\s*\{[^}]*overflow-wrap:\s*anywhere;/u)
   assert.match(css, /\.erp-dev-quality-job-guide-drawer \.ant-drawer-body/u)
   assert.match(css, /\.erp-dev-quality-job-guide-drawer__group/u)
   assert.match(css, /\.erp-dev-quality-job-guide-drawer__checks/u)
-  assert.match(
-    css,
-    /\.erp-dev-quality-server-history__table td::before[\s\S]*?content:\s*attr\(data-label\)/u
-  )
-  assert.doesNotMatch(css, /\.erp-dev-quality-server-pipeline__connector/u)
 })
 
 test('quality gates styles: identity and content surfaces use the shared workbench combination', () => {

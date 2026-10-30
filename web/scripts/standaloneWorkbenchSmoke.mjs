@@ -12,6 +12,10 @@ import { chromium } from 'playwright'
 import { createStandaloneWorkbenchServer } from '../dev-server/standaloneWorkbench.mjs'
 import { hashWorkbenchPassword } from '../dev-server/workbenchSession.mjs'
 import { createQualityGateStyleSummary } from './style-l1/devQualityGateScenarios.mjs'
+import { assertButtonSpacing } from './style-l1/buttonSpacingAssertions.mjs'
+import { assertControlPreviewThemeIsolation } from './style-l1/controlThemeAssertions.mjs'
+import { openERPAppearance } from './style-l1/themeAssertions.mjs'
+import { waitForFiniteAnimations } from './style-l1/browserReadiness.mjs'
 import {
   assertRepositoryIdentityEqual,
   readRepositoryIdentity,
@@ -205,6 +209,23 @@ try {
   checks.push(
     'login restores deep link and the built standalone diagnostic branch'
   )
+
+  await openERPAppearance(page)
+  const appearance = page.getByRole('dialog', { name: '外观与密度' })
+  for (const [label, mode] of [['暗色', 'dark'], ['浅色', 'light']]) {
+    await appearance.getByText(label, { exact: true }).click()
+    await page.waitForFunction((expected) => document.documentElement.dataset.erpTheme === expected, mode)
+    await waitForFiniteAnimations(page, { selector: '.ant-modal-root' })
+    await assertButtonSpacing(appearance, `built-workbench-${mode}`)
+  }
+  await appearance.getByRole('button', { name: '关闭', exact: true }).click()
+  await appearance.waitFor({ state: 'hidden' })
+  checks.push('built standalone consumes the shared button baseline in both themes')
+
+  await page.goto(`${origin}/__dev/ui-design?page=controls&control=actions`)
+  const previewEvidence = await assertControlPreviewThemeIsolation(page)
+  await writeFile(path.join(output, 'control-preview-theme.json'), JSON.stringify(previewEvidence, null, 2))
+  checks.push('built standalone isolates preview controls and portals across all root/local theme combinations')
 
   await page.goto(
     `${origin}/__dev/business-topics?flow_topic=purchase_to_inventory&flow_topic_node=purchase_quality&flow_topic_step=purchase_quality%3Aposts_fact%3Apurchase_accepted`

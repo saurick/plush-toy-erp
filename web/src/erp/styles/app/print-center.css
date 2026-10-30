@@ -716,7 +716,6 @@
 .erp-print-shell .print-zoom-select .ant-select {
   width: 100%;
   min-width: 0;
-  height: max(32px, var(--erp-touch-target, 0px));
 }
 
 .erp-print-clause-tools__field {

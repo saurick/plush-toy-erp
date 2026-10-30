@@ -47,6 +47,9 @@ export function createPrintWorkspaceThemeScenario({
         for (const template of printTemplateCatalog.filter(
           (item) => item.runtime?.workspace
         )) {
+          const paperText = ['material-purchase-contract', 'processing-contract'].includes(template.key)
+            ? 'rgb(0, 0, 0)'
+            : 'rgb(17, 24, 39)'
           await gotoScenarioPath(
             page,
             `/erp/print-workspace/${template.key}?draft=fresh&state=theme-sync`
@@ -153,7 +156,7 @@ export function createPrintWorkspaceThemeScenario({
               )
               assert.equal(
                 metrics.paper.color,
-                'rgb(17, 24, 39)',
+                paperText,
                 `${label} 正文不随主题染色`
               )
               assert(metrics.overflow <= 1, `${label} 无页面横向溢出`)
@@ -264,7 +267,7 @@ export function createPrintWorkspaceThemeScenario({
             printed,
             {
               background: 'rgb(255, 255, 255)',
-              color: 'rgb(17, 24, 39)',
+              color: paperText,
               toolbar: 'none',
               panel: 'none',
               outlines: 0,

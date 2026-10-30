@@ -349,7 +349,7 @@ export function createDevQualityGateLayoutScenarios({
         assert(await page.locator('.erp-dev-quality-governance-view .ant-table-row').count() > 0)
         state.governanceWait = null
         await page.getByText('与当前改动有关', { exact: true }).click()
-        await page.getByText('当前筛选下没有相关门禁', { exact: true }).waitFor()
+        await page.getByText('当前没有待核对的改动', { exact: true }).waitFor()
         releaseGovernance()
         await page.waitForTimeout(100)
         assert.equal(await page.locator('.erp-dev-quality-governance-view .ant-table-row').count(), 0, '迟到的全部门禁结果不能覆盖已切换的相关范围')

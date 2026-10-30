@@ -1,4 +1,4 @@
-/* Extracted from src/erp/styles/app/print-responsive.css for DEV-only loading. */
+/* 工作台页面的共享排版；具体组件的属性归属由跨文件检查守住。 */
 .erp-dev-hub-card--without-icon {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -6,14 +6,15 @@
 .erp-dev-testing-validation {
   display: grid;
   min-width: 0;
-  gap: 12px;
-  border: 1px solid var(--erp-border);
-  border-radius: 16px;
-  background: var(--erp-surface-bg-soft);
-  padding: 14px;
 }
 
-.erp-dev-testing-validation__title,
+.erp-dev-testing-validation__title {
+  display: flex;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 16px;
+}
+
 .erp-dev-testing-validation-plan__head {
   display: flex;
   min-width: 0;
@@ -28,7 +29,6 @@
 }
 
 .erp-dev-testing-validation__title h2.ant-typography {
-  margin-top: 0;
   font-size: 20px;
 }
 
@@ -69,9 +69,6 @@
 
 .erp-dev-testing-validation-plan__identity {
   display: grid;
-  grid-template-columns:
-    minmax(100px, 0.7fr) minmax(130px, 1fr) minmax(100px, 0.7fr)
-    minmax(210px, 1.6fr);
   gap: 8px;
 }
 
@@ -240,7 +237,6 @@
 
   .erp-dev-hub-header,
   .erp-dev-hub-toolbar,
-  .erp-dev-testing-header,
   .erp-dev-testing-reader__toolbar,
   .erp-dev-ui-design-header,
   .erp-dev-ui-design-reader__toolbar,
@@ -312,7 +308,6 @@
 
   .erp-dev-testing-reader__toolbar .ant-segmented-group {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
   }
 
@@ -326,7 +321,10 @@
     white-space: normal;
   }
 
-  .erp-dev-testing-coverage-actions,
+  .erp-dev-testing-coverage-actions {
+    flex-direction: column;
+  }
+
   .erp-dev-testing-coverage-operation__head,
   .erp-dev-testing-coverage-section__head,
   .erp-dev-testing-coverage-card__head,
@@ -336,12 +334,10 @@
     flex-direction: column;
   }
 
-  .erp-dev-testing-coverage-actions .ant-btn,
   .erp-dev-testing-validation-plan__head .ant-btn {
     width: 100%;
   }
 
-  .erp-dev-testing-coverage-identity,
   .erp-dev-testing-coverage-grid,
   .erp-dev-testing-coverage-grid--code,
   .erp-dev-testing-coverage-policy-grid {
@@ -410,9 +406,8 @@
   }
 }
 
-/* Extracted from src/erp/styles/app/business-responsive.css for DEV-only loading. */
+/* 工作台页面的窄屏布局。 */
 @media screen and (max-width: 1200px) {
-  .erp-dev-customer-decision-grid,
   .erp-dev-customer-quick-actions,
   .erp-dev-customer-review-list,
   .erp-dev-customer-source-ref-list,
@@ -561,7 +556,6 @@
   .erp-dev-customer-review-item,
   .erp-dev-customer-source-ref,
   .erp-dev-customer-guard,
-  .erp-dev-customer-gate,
   .erp-dev-customer-asset,
   .erp-dev-customer-diff {
     min-width: 0;
@@ -572,13 +566,10 @@
     border-radius: 12px;
   }
 
-  .erp-dev-customer-decision-grid,
-  .erp-dev-customer-quick-actions,
   .erp-dev-customer-import-flow,
   .erp-dev-customer-db-targets,
   .erp-dev-customer-review-list,
   .erp-dev-customer-source-ref-list,
-  .erp-dev-customer-menu-groups,
   .erp-dev-customer-asset-grid,
   .erp-dev-customer-dry-run-metrics,
   .erp-dev-customer-test-apply-steps,
@@ -618,17 +609,11 @@
   .erp-dev-customer-db-target__head,
   .erp-dev-customer-formal-gate,
   .erp-dev-customer-guard,
-  .erp-dev-customer-console,
-  .erp-dev-customer-gate,
   .erp-dev-customer-asset__top,
   .erp-dev-customer-diff__type,
   .erp-dev-customer-import-flags > div {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .erp-dev-customer-gate {
-    display: flex;
   }
 
   .erp-dev-customer-dry-run-paths {
@@ -637,11 +622,6 @@
 
   .erp-dev-customer-db-target__body {
     grid-template-columns: 1fr;
-  }
-
-  .erp-dev-customer-console__status {
-    justify-items: start;
-    text-align: left;
   }
 
   .erp-dev-customer-panel__head :where(.ant-typography),
@@ -654,7 +634,7 @@
   }
 }
 
-/* Extracted from src/erp/styles/app/theme-overrides.css for DEV-only loading. */
+/* 工作台页面的主题变体。 */
 [data-erp-theme='dark'] .erp-dev-docs-title.ant-typography {
   color: var(--erp-text);
 }
@@ -777,7 +757,12 @@
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-dev-customer-header,
+[data-erp-theme='dark'] .erp-dev-customer-header {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+}
+
 [data-erp-theme='dark'] .erp-dev-customer-source,
 [data-erp-theme='dark'] .erp-dev-customer-panel {
   border-color: var(--erp-border);
@@ -788,19 +773,8 @@
     0 14px 32px rgb(0 0 0 / 0.26);
 }
 
-[data-erp-theme='dark'] .erp-dev-customer-console {
-  background: linear-gradient(
-    135deg,
-    var(--erp-text) 0%,
-    #102016 58%,
-    #172554 100%
-  );
-}
-
 [data-erp-theme='dark'] .erp-dev-customer-title.ant-typography,
-[data-erp-theme='dark'] .erp-dev-customer-console h2.ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-asset__value,
-[data-erp-theme='dark'] .erp-dev-customer-gate__main strong,
 [data-erp-theme='dark'] .erp-dev-customer-diff strong,
 [data-erp-theme='dark'] .erp-dev-customer-panel__head,
 [data-erp-theme='dark'] .erp-dev-customer-menu-group__title,
@@ -813,7 +787,6 @@
 
 [data-erp-theme='dark'] .erp-dev-customer-summary,
 [data-erp-theme='dark'] .erp-dev-customer-selector__note.ant-typography,
-[data-erp-theme='dark'] .erp-dev-customer-console__status .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-quick-action__copy small,
 [data-erp-theme='dark'] .erp-dev-customer-field__key,
 [data-erp-theme='dark'] .erp-dev-customer-review-item__path,
@@ -822,7 +795,6 @@
 [data-erp-theme='dark'] .erp-dev-customer-review-item .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-source-ref .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-asset__value small,
-[data-erp-theme='dark'] .erp-dev-customer-gate__main .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-diff .ant-typography {
   color: var(--erp-text-muted);
 }
@@ -887,7 +859,6 @@
 [data-erp-theme='dark'] .erp-dev-customer-tool,
 [data-erp-theme='dark'] .erp-dev-customer-menu-group,
 [data-erp-theme='dark'] .erp-dev-customer-guard,
-[data-erp-theme='dark'] .erp-dev-customer-gate,
 [data-erp-theme='dark'] .erp-dev-customer-asset,
 [data-erp-theme='dark'] .erp-dev-customer-diff,
 [data-erp-theme='dark'] .erp-dev-customer-quick-action {
@@ -995,10 +966,16 @@
 [data-erp-theme='dark'] .erp-dev-testing-header,
 [data-erp-theme='dark'] .erp-dev-testing-reader,
 [data-erp-theme='dark'] .erp-dev-testing-tier,
-[data-erp-theme='dark'] .erp-dev-testing-command-block,
-[data-erp-theme='dark'] .erp-dev-testing-validation-plan {
+[data-erp-theme='dark'] .erp-dev-testing-command-block {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.18),
+    0 14px 32px rgb(0 0 0 / 0.26);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan {
   color: var(--erp-text);
   box-shadow:
     0 1px 2px rgb(0 0 0 / 0.18),

@@ -75,6 +75,8 @@ pnpm install
 
 效能工作台的外观与密度独立保存在当前站点浏览器中，本地开发和独立部署入口均不读取或回写 ERP 账号偏好；刷新、页面切换和同源标签页沿用工作台设置，独立登录页也读取同一主题色与明暗模式。保存与恢复规则见[主题模式](../docs/engineering/前端实现与交互约定.md#主题模式--theme-mode)。
 
+主应用、独立工作台及控件局部预览的 Ant Design 基线统一由 [`src/common/theme/erpAntdTheme.mjs`](src/common/theme/erpAntdTheme.mjs) 提供，入口只选择设备和工作台规格；局部预览的 CSS 变量复用同一色板，浮层保留预览作用域，页面布局继续由所属模块维护。
+
 “开发资源”保留“工具清单 / 项目关系图”两个同级页签；`/__dev/development-resources?view=relationships` 默认按项目与目录、开发与交付、权限与业务选择主题，也可切换为按图模型浏览 DAG、有向有环图、无向关联和树／森林。点选节点查看关系；“接口契约与接入边界”示例共用生成的 RPC 入口标签，链接实际接口、授权和质量依据，外部接入明确标为待建设。
 
 图、分类和节点解释同源，模型、示例、节点及引用选项写入 URL；缩放、布局切换、全屏和正式依据入口继续复用现有能力。具体边界见[开发资源入口](../docs/engineering/研发效能工作台与CI-CD设计.md#development-resources)。
@@ -187,6 +189,8 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 需要一次收集多个页面问题时，可设置 `STYLE_L1_CONTINUE_ON_FAILURE=1`；失败仍使命令退出非零，逐场景结果写入本轮输出目录的 `scenario-results.json`。默认遇到第一个失败停止。高保真外观与效能工作台检查使用 `high-fidelity-*` 场景；具体名称由场景注册表维护。
 
 `pnpm test` 通过 [源码测试入口](scripts/runUnitTests.mjs) 自动发现测试，保留 4 路文件并发。
+
+`pnpm css` 同时运行 Stylelint 与跨文件声明归属检查，拦截模块作用域、共享控件覆盖和相同条件下的重复属性维护（含简写与分写重叠）；职责与例外见[共享控件样式边界](../docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)。
 
 发现范围、产物隔离与筛选方式见[源码测试说明](scripts/README.md#源码测试--unit-tests)；浏览器输入模板、no-write preflight、真实登录和持久测试数据范围见[前端回归脚本](scripts/README.md)与 [QA 操作](../scripts/qa/README.md)。页面级 mock 不能代替真实后端、目标发布或客户验收。
 

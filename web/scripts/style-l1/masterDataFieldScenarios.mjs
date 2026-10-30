@@ -982,12 +982,7 @@ export function createSupplierProcessingScenarios(deps) {
               result: {
                 code: 0,
                 message: 'OK',
-                data: {
-                  processes: processFixtures,
-                  total: processFixtures.length,
-                  limit: 100,
-                  offset: 0,
-                },
+                data: stylePaginatedRpcData(processFixtures, 'processes', body.params),
               },
             }),
           })
@@ -1031,7 +1026,7 @@ export function createSupplierProcessingScenarios(deps) {
                 : null
             }
             const selector = node.querySelector('.ant-select-selector')
-            const extra = node.querySelector('.ant-form-item-extra')
+            const followingSection = node.closest('.erp-business-form-section')?.nextElementSibling
             const tags = Array.from(
               node.querySelectorAll('.ant-select-selection-item')
             ).map(toRect)
@@ -1041,7 +1036,7 @@ export function createSupplierProcessingScenarios(deps) {
                 scrollWidth: node.scrollWidth,
               },
               selector: toRect(selector),
-              extra: toRect(extra),
+              followingSection: toRect(followingSection),
               tags,
             }
           })
@@ -1068,10 +1063,10 @@ export function createSupplierProcessingScenarios(deps) {
             `${state} 已选标签不得越过多选框边界: ${JSON.stringify(metrics)}`
           )
           assert(
-            metrics.extra &&
-              metrics.extra.top >= metrics.selector.bottom - 1 &&
-              metrics.tags.every((tag) => tag.bottom <= metrics.extra.top + 1),
-            `${state} 多选标签不得覆盖字段说明: ${JSON.stringify(metrics)}`
+            metrics.followingSection &&
+              metrics.followingSection.top >= metrics.selector.bottom - 1 &&
+              metrics.tags.every((tag) => tag.bottom <= metrics.followingSection.top + 1),
+            `${state} 多选标签不得覆盖后续表单内容: ${JSON.stringify(metrics)}`
           )
           assert(
             metrics.field.scrollWidth <= metrics.field.clientWidth + 1,

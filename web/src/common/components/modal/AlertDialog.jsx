@@ -2,6 +2,7 @@ import React from 'react'
 import AppModal from '@/common/components/modal/AppModal'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import './alert-dialog.css'
 
 export default function AlertDialog({
   open,
@@ -65,7 +66,7 @@ export default function AlertDialog({
         {title ? (
           <div
             id={titleId}
-            className="text-xl font-semibold leading-8 text-slate-900 sm:text-2xl"
+            className="text-xl font-semibold leading-8 sm:text-2xl"
             data-app-alert-title
           >
             {title}
@@ -75,7 +76,7 @@ export default function AlertDialog({
         {message ? (
           <div
             id={messageId}
-            className="whitespace-pre-line break-words text-sm leading-7 text-slate-600 sm:text-base"
+            className="whitespace-pre-line break-words text-sm leading-7 sm:text-base"
             data-app-alert-message
           >
             {message}

@@ -104,6 +104,7 @@ import { createOutsourcingSummaryScenarios } from './outsourcingSummaryScenarios
 import { createOutsourcingFormFieldsScenarios } from './outsourcingFormFieldsScenarios.mjs'
 import { createSalesOrderImportValidationScenarios } from './salesOrderImportValidationScenarios.mjs'
 import { createBusinessCellTextScenarios } from './businessCellTextScenarios.mjs'
+import { createBusinessSelectValueScenarios } from './businessSelectValueScenarios.mjs'
 import { createBusinessFieldDensityScenarios } from './businessFieldDensityScenarios.mjs'
 import { createDeliveryAddressScenarios } from './deliveryAddressScenarios.mjs'
 import { createContactEditorScenarios } from './contactEditorScenarios.mjs'
@@ -465,6 +466,10 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
     ...createBusinessCellTextScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createBusinessSelectValueScenarios({
       ...deps,
       customerRuntimeEffectiveSession,
     }),

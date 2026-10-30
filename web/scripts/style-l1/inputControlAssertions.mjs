@@ -944,19 +944,8 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
         const centerDelta = Math.abs(node.center - item.owner.center)
         const lineHeight = Number.parseFloat(node.lineHeight || '0')
         if (centerDelta > 1.5) return true
-        if (
-          node.className.includes('ant-select-selection-item') &&
-          node.whiteSpace === 'normal'
-        ) {
-          const padding =
-            Number.parseFloat(node.paddingTop) +
-            Number.parseFloat(node.paddingBottom)
-          return (
-            lineHeight <= 0 ||
-            node.height < lineHeight + padding - 1 ||
-            node.height > item.ownerInnerHeight + 1
-          )
-        }
+        if (node.className.includes('ant-select-selection-item') && node.whiteSpace !== 'nowrap') return true
+        if (node.top < item.owner.top - 1 || node.bottom > item.owner.bottom + 1) return true
         return (
           lineHeight > 0 && Math.abs(lineHeight - item.ownerInnerHeight) > 1.5
         )
@@ -969,7 +958,7 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
   assert.deepEqual(
     issues,
     [],
-    `${scenarioName} 控件文字与 caret 应垂直居中；单行文字行高匹配内高，换行选项的内容盒完整落在控件内: ${JSON.stringify(
+    `${scenarioName} 控件文字与 caret 应垂直居中；选中值保持单行，文字内容盒完整落在控件内: ${JSON.stringify(
       issues
     )}`
   )
@@ -1086,11 +1075,6 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
         ) {
           continue
         }
-        // 明细表下拉允许长选项换行，文字与内容盒由垂直节奏断言单独覆盖。
-        if (node.matches('.ant-select-single') && node.closest('td')) {
-          continue
-        }
-
         const height = getLayoutHeight(node)
         if (Math.abs(height - expectedHeight) > 1) {
           failures.push(describe(node, form, expectedHeight))

@@ -1,4 +1,6 @@
 import path from 'node:path'
+import { BUSINESS_SEARCH_SCOPES } from '../../src/erp/utils/businessSearchScopes.mjs'
+import { getBusinessModule } from '../../src/erp/config/businessModules.mjs'
 
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
@@ -260,7 +262,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
         })
       },
       verify: async (page) => {
-        await expectHeading(page, '出货单')
+        await expectHeading(page, getBusinessModule('shipments').title)
         await selectRow(page, 'SHIP-STYLE-L1')
         await clickSelectionAction(page, '生成应收')
         let modal = page.getByRole('dialog', { name: '生成应收' }).last()
@@ -359,16 +361,16 @@ export function createFinanceBusinessSourceScenarios(deps) {
           })
         },
         verify: async (page) => {
-          await expectHeading(page, '发票管理')
+          await expectHeading(page, getBusinessModule('invoices').tabLabel)
           await selectRow(page, 'INV-STYLE-L1')
           await clickSelectionAction(page, '相关单据')
           await page
             .getByRole('menuitem', { name: '来源单据', exact: true })
             .click()
 
-          await expectHeading(page, '出货单')
+          await expectHeading(page, getBusinessModule('shipments').title)
           await expectText(page, 'SHIP-STYLE-L1')
-          let search = page.getByPlaceholder('搜单号、客户、产品、款号')
+          let search = page.getByPlaceholder(BUSINESS_SEARCH_SCOPES.shipment.placeholder)
           assert.equal(await search.inputValue(), 'SHIP-STYLE-L1')
           let url = new URL(page.url())
           assert.equal(url.searchParams.get('shipment_id'), '1')
@@ -394,9 +396,9 @@ export function createFinanceBusinessSourceScenarios(deps) {
             .getByRole('menuitem', { name: '开票记录', exact: true })
             .click()
 
-          await expectHeading(page, '发票管理')
+          await expectHeading(page, getBusinessModule('invoices').tabLabel)
           await expectText(page, 'INV-STYLE-L1')
-          search = page.getByPlaceholder('搜单号、往来单位、产品、来源')
+          search = page.getByPlaceholder(BUSINESS_SEARCH_SCOPES.finance.placeholder)
           url = new URL(page.url())
           assert.equal(url.searchParams.get('source_type'), 'SHIPMENT')
           assert.equal(url.searchParams.get('source_id'), '1')
@@ -413,10 +415,8 @@ export function createFinanceBusinessSourceScenarios(deps) {
             )}`
           )
           await page.waitForFunction(
-            () =>
-              document.querySelector(
-                'input[placeholder="搜单号、往来单位、产品、来源"]'
-              )?.value === 'INV-STYLE-L1'
+            ({ input, value }) => input.value === value,
+            { input: await search.elementHandle(), value: 'INV-STYLE-L1' }
           )
           assert.equal(await search.inputValue(), 'INV-STYLE-L1')
           const firstInvoiceExactRequestCount = invoiceListRequests.filter(
@@ -431,14 +431,12 @@ export function createFinanceBusinessSourceScenarios(deps) {
             .getByRole('menuitem', { name: '来源单据', exact: true })
             .click()
 
-          await expectHeading(page, '出货单')
+          await expectHeading(page, getBusinessModule('shipments').title)
           await expectText(page, 'SHIP-STYLE-L1')
-          search = page.getByPlaceholder('搜单号、客户、产品、款号')
+          search = page.getByPlaceholder(BUSINESS_SEARCH_SCOPES.shipment.placeholder)
           await page.waitForFunction(
-            () =>
-              document.querySelector(
-                'input[placeholder="搜单号、客户、产品、款号"]'
-              )?.value === 'SHIP-STYLE-L1'
+            ({ input, value }) => input.value === value,
+            { input: await search.elementHandle(), value: 'SHIP-STYLE-L1' }
           )
           assert.equal(await search.inputValue(), 'SHIP-STYLE-L1')
           url = new URL(page.url())
@@ -456,14 +454,12 @@ export function createFinanceBusinessSourceScenarios(deps) {
             .getByRole('menuitem', { name: '开票记录', exact: true })
             .click()
 
-          await expectHeading(page, '发票管理')
+          await expectHeading(page, getBusinessModule('invoices').tabLabel)
           await expectText(page, 'INV-STYLE-L1')
-          search = page.getByPlaceholder('搜单号、往来单位、产品、来源')
+          search = page.getByPlaceholder(BUSINESS_SEARCH_SCOPES.finance.placeholder)
           await page.waitForFunction(
-            () =>
-              document.querySelector(
-                'input[placeholder="搜单号、往来单位、产品、来源"]'
-              )?.value === 'INV-STYLE-L1'
+            ({ input, value }) => input.value === value,
+            { input: await search.elementHandle(), value: 'INV-STYLE-L1' }
           )
           assert.equal(await search.inputValue(), 'INV-STYLE-L1')
           url = new URL(page.url())
@@ -500,12 +496,11 @@ export function createFinanceBusinessSourceScenarios(deps) {
             ).join(' / ')}`
           )
 
-          await clearFilters(page)
+          await search.fill('')
+          await search.press('Enter')
           await page.waitForFunction(
-            () =>
-              document.querySelector(
-                'input[placeholder="搜单号、往来单位、产品、来源"]'
-              )?.value === ''
+            ({ input, value }) => input.value === value,
+            { input: await search.elementHandle(), value: '' }
           )
           assert.equal(await search.inputValue(), '')
           url = new URL(page.url())
@@ -625,7 +620,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
         })
       },
       verify: async (page) => {
-        await expectHeading(page, '出货单')
+        await expectHeading(page, getBusinessModule('shipments').title)
         await selectRow(page, 'SHIP-STYLE-L1')
         await clickSelectionAction(page, '相关单据')
         await page

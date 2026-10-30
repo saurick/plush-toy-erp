@@ -11,6 +11,11 @@ const messages = stylelint.utils.ruleMessages(ruleName, {
   focus: '输入控件的焦点边框、阴影和 outline 由 control-focus.css 维护',
   radius:
     'AntD 输入控件圆角由 control-foundation.css 维护；组合接缝通过 --erp-control-radius 表达',
+  geometry:
+    '输入控件的高度、内层行高与纵向 padding 由 business-control-rhythm.css 维护；模块只定义布局或尺寸变量',
+  selectedText:
+    '单选值的裁剪与换行由 control-foundation.css 维护；选项浮层与多选标签独立处理',
+  singleLine: '单选值必须保持单行省略；完整名称通过标题或展开选项读取',
   page: '模块打印必须使用命名 @page，避免修改其他页面的纸张设置',
   controls:
     'Tab、筛选与移动搜索的外观由 control-affordance.css 维护；页面只定义布局和尺寸',
@@ -57,19 +62,45 @@ const controlClass =
 const focusPaint =
   /^(?:border(?:-.+)?|box-shadow|outline(?:-.+)?|--tw-ring.*)$/u
 const outerControlClass =
-  /^ant-(?:input|input-affix-wrapper|input-number|input-number-affix-wrapper|select-selector|picker)$/u
+  /^ant-(?:input|input-affix-wrapper|input-textarea-affix-wrapper|input-number|input-number-affix-wrapper|select-selector|picker)$/u
+const geometryControlClass =
+  /^ant-(?:input|input-affix-wrapper|input-textarea-affix-wrapper|input-number|input-number-affix-wrapper|input-number-input|input-number-input-wrap|select|select-single|select-multiple|select-selector|select-selection-item|select-selection-placeholder|select-selection-search|select-selection-search-input|select-selection-wrap|select-selection-overflow|picker|picker-input)$/u
+const controlGeometry =
+  /^(?:(?:min-|max-)?(?:height|block-size)|line-height|padding(?:-block(?:-start|-end)?|-top|-bottom)?)$/u
+const selectedTextProperties =
+  /^(?:white-space|text-overflow|overflow(?:-x|-y)?|overflow-wrap|word-break)$/u
+const rhythmFile = 'src/erp/styles/app/business-control-rhythm.css'
+const foundationFile = 'src/erp/styles/app/control-foundation.css'
 
-function targetsOuterControl(selector) {
+function targetsNode(selector, matches) {
   const lastCompound = selector.nodes.slice(
     selector.nodes.findLastIndex((node) => node.type === 'combinator') + 1
   )
   return lastCompound.some(
     (node) =>
-      (node.type === 'class' && outerControlClass.test(node.value)) ||
+      matches(node) ||
       (node.type === 'pseudo' &&
         [':is', ':where'].includes(node.value) &&
-        node.nodes.some(targetsOuterControl))
+        node.nodes.some((child) => targetsNode(child, matches)))
   )
+}
+
+function targetsClass(selector, classPattern) {
+  return targetsNode(selector, (node) => node.type === 'class' && classPattern.test(node.value))
+}
+
+function hasPositiveClass(selector, classPattern) {
+  return selector.nodes.some((node) =>
+    (node.type === 'class' && classPattern.test(node.value)) ||
+    (node.type === 'pseudo' && [':is', ':where'].includes(node.value) &&
+      node.nodes.length > 0 && node.nodes.every((child) => hasPositiveClass(child, classPattern)))
+  )
+}
+
+function targetsControlGeometry(selector) {
+  if (targetsClass(selector, geometryControlClass)) return true
+  return targetsNode(selector, (node) => node.type === 'tag' && ['input', 'textarea'].includes(node.value)) &&
+    hasPositiveClass(selector, /^ant-(?:input-affix-wrapper|input-textarea-affix-wrapper|input-number|input-number-affix-wrapper|input-number-input-wrap|select|select-selection-search|picker|picker-input)$/u)
 }
 
 function hasScope(selector) {
@@ -161,9 +192,8 @@ const rule = (enabled) => (root, result) => {
     })
     if (
       !appearanceOwner &&
-      relative !== 'src/erp/styles/app/tabs-motion.css' &&
       ((mobileControl && relative !== focusFile) ||
-        /erp-sliding-(?:tabs|segmented)|erp-filter-chip|ant-(?:segmented(?:-item(?:-label|-selected)?)?|tabs-tab(?:-btn|-active)?|tabs-ink-bar)(?![\w-])|erp-segmented-item-selected/u.test(
+        /erp-sliding-(?:tabs|segmented|tab-list)|erp-filter-chip|ant-(?:segmented(?:-item(?:-label|-selected)?)?|tabs-tab(?:-btn|-active)?|tabs-ink-bar)(?![\w-])|erp-segmented-item-selected/u.test(
           node.selector
         ))
     ) {
@@ -174,11 +204,34 @@ const rule = (enabled) => (root, result) => {
     }
     if (
       relative !== 'src/erp/styles/app/control-foundation.css' &&
-      selectors.nodes.some(targetsOuterControl)
+      selectors.nodes.some((selector) => targetsClass(selector, outerControlClass))
     ) {
       node.walkDecls(/^border-.*radius$/u, (decl) =>
         report(decl, messages.radius)
       )
+    }
+    if (
+      relative !== rhythmFile &&
+      selectors.nodes.some(targetsControlGeometry)
+    ) {
+      node.walkDecls(controlGeometry, (decl) => report(decl, messages.geometry))
+    }
+    if (selectors.nodes.some((selector) => targetsClass(selector, /^ant-select-selection-item$/u))) {
+      if (relative !== foundationFile) {
+        node.walkDecls(selectedTextProperties, (decl) => report(decl, messages.selectedText))
+      }
+      // 多选标签可以换行；单选值不能因所在页面、表格或只读状态改变合同。
+      if (selectors.nodes.some((selector) =>
+        targetsClass(selector, /^ant-select-selection-item$/u) &&
+        !hasPositiveClass(selector, /^ant-select-multiple$/u)
+      )) {
+        node.walkDecls('white-space', (decl) => {
+          if (decl.value !== 'nowrap') report(decl, messages.singleLine)
+        })
+        node.walkDecls('text-overflow', (decl) => {
+          if (decl.value !== 'ellipsis') report(decl, messages.singleLine)
+        })
+      }
     }
     for (const selector of selectors.nodes) {
       if (!shared && !hasScope(selector)) {

@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
-import { App as AntdApp, ConfigProvider, theme } from 'antd'
+import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import 'antd/dist/reset.css'
 import '../tailwind.css'
@@ -12,33 +12,17 @@ import AntdAppBridge from '@/common/components/AntdAppBridge'
 import ScrollEdges from '@/common/components/scroll/ScrollEdges'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
 import { WORKBENCH_APPEARANCE_STORAGE_KEY } from '@/common/theme/erpAppearance.mjs'
-import { ERP_DARK_PALETTE, getERPAccentTokens, getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
+import { createERPAntdTheme } from '@/common/theme/erpAntdTheme.mjs'
 import { MESSAGE_CONFIG, NOTIFICATION_CONFIG } from '@/common/utils/feedbackConfig.mjs'
 import DevWorkbenchRoutes from './DevWorkbenchRoutes.jsx'
 
 function StandaloneWorkbenchTheme() {
-  const { isDark, accent } = useERPTheme()
+  const { isDark, accent, appearance } = useERPTheme()
   return (
     <ConfigProvider
       locale={zhCN}
       button={{ autoInsertSpace: false }}
-      theme={{
-        algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
-        components: {
-          Button: {
-            primaryColor: isDark ? ERP_DARK_PALETTE.onAccent : accent.onPrimary,
-          },
-        },
-        token: {
-          ...getERPSurfaceTokens(isDark),
-          ...getERPAccentTokens(isDark, accent),
-          fontSize: 14,
-          fontSizeSM: 14,
-          controlHeight: 34,
-          controlHeightSM: 28,
-          borderRadius: 8,
-        },
-      }}
+      theme={createERPAntdTheme({ isDark, accent, density: appearance.density, workbench: true })}
     >
       <AntdApp message={MESSAGE_CONFIG} notification={NOTIFICATION_CONFIG}>
         <AntdAppBridge />

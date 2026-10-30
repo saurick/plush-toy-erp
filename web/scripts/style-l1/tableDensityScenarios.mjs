@@ -1,12 +1,12 @@
-import { openERPAppearance } from './themeAssertions.mjs'
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
+import { openERPAppearance } from './themeAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createTaskItemSemanticsScenarios } from './taskItemSemanticsScenarios.mjs'
 import { createBusinessProgressScenarios } from './businessProgressScenarios.mjs'
 import { createAuditLogScenarios } from './auditLogScenarios.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
-import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
+import { createDevQualityGateLayoutScenarios } from './devQualityGateLayoutScenarios.mjs'
 
 async function setDensity(page, label) {
   await openERPAppearance(page)
@@ -141,9 +141,11 @@ export function createTableDensityScenarios(deps) {
   const audit = createAuditLogScenarios(deps).find(
     (scenario) => scenario.name === 'system-audit-logs-desktop'
   )
-  const version = createDevVersionCenterScenarios(deps)[0]
-  const quality = createDevQualityGateScenarios(deps).find(
-    (scenario) => scenario.name === 'dev-quality-gates-desktop-light'
+  const version = createDevVersionCenterScenarios(deps).find(
+    (scenario) => scenario.name === 'dev-version-center-tabs-pagination-desktop'
+  )
+  const quality = createDevQualityGateLayoutScenarios(deps).find(
+    (scenario) => scenario.name === 'dev-quality-gates-layout-desktop-light'
   )
   return [
     ...['light', 'dark'].map((themeMode) => ({
@@ -271,39 +273,52 @@ export function createTableDensityScenarios(deps) {
         )
       },
     },
-    {
-      ...version,
-      name: 'table-density-dev-versions',
+    ...[false, true].map((standalone) => ({
+      name: `table-density-dev-versions${standalone ? '-standalone' : ''}`,
+      path: '/__dev/version-center?view=versions&target=demo-133',
+      viewport: version.viewport,
+      deviceScaleFactor: version.deviceScaleFactor,
+      beforeNavigate: async (page) => {
+        await version.beforeNavigate(page)
+        if (standalone) {
+          await page.route('**/__dev/**', async (route) => {
+            if (route.request().resourceType() !== 'document') return route.fallback()
+            const response = await page.request.get(new URL('/workbench.html', route.request().url()).href)
+            assert.equal(response.status(), 200, '独立工作台 HTML 入口必须可用')
+            await route.fulfill({ response })
+          })
+        }
+      },
       verify: async (page) => {
         await roundTrip(
           page,
           '.erp-dev-version-workspace tbody tr[data-row-key]',
-          'density-dev-versions'
+          `density-dev-versions${standalone ? '-standalone' : ''}`
         )
         await page.getByRole('tab', { name: '操作记录', exact: true }).click()
         await roundTrip(
           page,
           '.erp-dev-version-workspace tbody tr[data-row-key]',
-          'density-dev-operations'
+          `density-dev-operations${standalone ? '-standalone' : ''}`
         )
       },
-    },
+    })),
     {
-      ...quality,
       name: 'table-density-dev-quality',
+      path: quality.path,
+      viewport: quality.viewport,
+      beforeNavigate: quality.beforeNavigate,
       verify: async (page) => {
-        const views = page.locator('[aria-label="服务器门禁详情"]')
-        await views.getByText('Job 性能', { exact: true }).click()
         await roundTrip(
           page,
-          '.erp-dev-quality-server-performance__table tbody tr',
-          'density-dev-performance'
+          '.erp-dev-quality-history tbody tr[data-row-key]',
+          'density-dev-quality-history'
         )
-        await views.getByText('CI 历史', { exact: true }).click()
+        await page.getByRole('tab', { name: '门禁规则', exact: true }).click()
         await roundTrip(
           page,
-          '.erp-dev-quality-server-history__table tbody tr',
-          'density-dev-history'
+          '.erp-dev-quality-governance-view tbody tr[data-row-key]',
+          'density-dev-quality-governance'
         )
       },
     },

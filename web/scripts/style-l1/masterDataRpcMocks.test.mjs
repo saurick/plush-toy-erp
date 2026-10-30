@@ -39,3 +39,20 @@ test('style master-data mock treats a successful empty page as complete data', (
     }
   )
 })
+
+test('material search filters before pagination and clears back to all candidates', () => {
+  const records = [
+    { id: 1, name: '面料', color: '米白', supplier_item_no: 'AB-001' },
+    { id: 2, name: '面料', color: '灰', supplier_name: 'Sample Supplier' },
+    { id: 3, name: '包装', note: '只在备注中出现的关键字' },
+  ]
+  const result = stylePaginatedMasterData(records, 'materials', { keyword: '面料', limit: 1, offset: 1 })
+  assert.deepEqual(result, { materials: [records[1]], total: 2, limit: 1, offset: 1 })
+  for (const [keyword, expected] of [['米白', 1], ['ab-001', 1], ['sample supplier', 2]]) {
+    assert.deepEqual(stylePaginatedMasterData(records, 'materials', { keyword }).materials.map((record) => record.id), [expected])
+  }
+  for (const keyword of ['没有匹配材料', '只在备注中出现的关键字']) {
+    assert.equal(stylePaginatedMasterData(records, 'materials', { keyword }).total, 0)
+  }
+  assert.equal(stylePaginatedMasterData(records, 'materials', { keyword: '' }).total, 3)
+})

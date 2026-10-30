@@ -433,18 +433,6 @@ export const SERVER_JOB_ATTENTION = Object.freeze({
   healthy: Object.freeze({ label: '正常', color: 'success' }),
 })
 
-export const SERVER_VIEW_OPTIONS = Object.freeze([
-  Object.freeze({ label: '本次流水线', value: 'pipeline' }),
-  Object.freeze({ label: 'Job 性能', value: 'performance' }),
-  Object.freeze({ label: 'CI 历史', value: 'history' }),
-])
-
-export const SERVER_VIEW_HELP = Object.freeze({
-  pipeline: '核对本次提交的真实 needs、并行关系、Job 状态与耗时。',
-  performance: '比较近 20 次同名 Job 的中位数、P95、等待与重试。',
-  history: '按流水线回看近 20 次 push 与手动完整 CI 的结果与失败环节。',
-})
-
 export function qualityGateViewStatus(summary, view, summaryError) {
   if (view !== 'server') return summary?.status
   const evidence = summary?.serverEvidence

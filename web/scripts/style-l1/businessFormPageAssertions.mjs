@@ -116,10 +116,18 @@ export async function assertBusinessFormPage(page, editor) {
 }
 
 export async function closeBusinessFormPage(page, editor) {
-  const dirty = (await editor.getAttribute('data-unsaved')) === 'true'
+  const root = await editor.elementHandle()
   const inTask = /^\/m\/[a-z_]+\/tasks$/u.test(new URL(page.url()).pathname)
   await editor.getByRole('button', { name: inTask ? '返回办理' : '返回列表', exact: true }).click()
-  if (dirty)
-    { await page.getByRole('button', { name: '放弃修改', exact: true }).click() }
+  // 退出动作会重新核对表单值，等待实际确认结果，避免读取尚未更新的 dirty 标记。
+  await page.waitForFunction((element) =>
+    !element.isConnected || element.hidden || !element.getClientRects().length ||
+    [...document.querySelectorAll('.ant-modal-confirm button')].some((button) =>
+      button.textContent.trim() === '放弃修改' && button.getClientRects().length > 0
+    ), root)
+  if (await editor.isVisible()) {
+    await page.getByRole('button', { name: '放弃修改', exact: true }).click()
+  }
+  await root.dispose()
   await editor.waitFor({ state: 'hidden' })
 }

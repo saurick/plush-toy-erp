@@ -1,3 +1,107 @@
+/* 控件尺寸变体保持容器作用域；页面文件只分配布局与可用宽度。 */
+:where(#root, .ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
+  .ant-input-affix-wrapper > input {
+  padding: 0;
+}
+
+.erp-business-filter-control.ant-input-affix-wrapper,
+.erp-business-filter-control.ant-select,
+:where(.erp-business-filter-control.ant-select) .ant-select-selector {
+  min-height: var(--erp-business-control-height);
+  height: var(--erp-business-control-height);
+}
+
+.erp-business-date-range-filter__type.ant-select,
+:where(.erp-business-date-range-filter__type.ant-select) .ant-select-selector {
+  height: var(--erp-business-control-height);
+}
+
+.erp-business-action-form :where(.ant-select-multiple),
+:where(.erp-business-action-form) .ant-select-multiple .ant-select-selector {
+  height: auto;
+}
+
+.mobile-admin-review .ant-select {
+  height: 44px;
+}
+
+.mobile-task-payment-kind > .ant-select,
+.mobile-task-business__content > label > .ant-select {
+  min-height: 44px;
+}
+
+.erp-task-line-card .ant-input,
+.erp-task-line-card .ant-input-number-input {
+  min-height: 44px;
+}
+
+.erp-material-task-action--mobile .ant-input {
+  min-height: 44px;
+}
+
+.erp-material-summary-modal--mobile .ant-input {
+  min-height: 44px;
+}
+
+.erp-login-card .ant-input:not(:where(.ant-input-affix-wrapper > input)),
+.erp-login-card .ant-input-affix-wrapper {
+  height: 44px;
+  min-height: 44px;
+  padding-block: 0;
+  line-height: 42px;
+}
+
+.erp-login-card .ant-input-affix-wrapper .ant-input {
+  height: auto;
+  min-height: 0;
+  line-height: 42px;
+}
+
+.erp-business-action-form :where(textarea.ant-input, .ant-input-textarea-affix-wrapper) {
+  height: auto;
+  min-height: calc(
+    var(--erp-control-height, 36px) * var(--erp-textarea-rows, 3)
+  );
+}
+
+.erp-business-action-form :where(textarea.ant-input) {
+  padding-block: 9px;
+}
+
+.erp-line-item-details__fields :where(textarea.ant-input) {
+  min-height: var(--erp-control-height, 36px);
+}
+
+.erp-business-date-input.ant-picker {
+  height: var(--erp-business-control-height);
+}
+
+.erp-mobile-search .ant-input-affix-wrapper {
+  min-height: 44px;
+}
+
+#root .erp-login-sms-code-compact.ant-space-compact > .ant-input.ant-input-lg {
+  line-height: 44px;
+}
+
+.erp-print-shell .print-zoom-select .ant-select {
+  height: max(32px, var(--erp-touch-target, 0px));
+}
+
+@media (max-width: 767px) {
+  :where(#root, .ant-modal, .ant-drawer, .ant-popover)
+    .ant-input-affix-wrapper:has(.ant-input-clear-icon) {
+    padding-block: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .erp-dev-operation-history-filter-field .ant-select-selector,
+  .erp-dev-operation-history-filter-field .ant-input-affix-wrapper {
+    min-height: 44px;
+  }
+}
+
 .ant-form-item-additional > :is(.ant-form-item-extra, .ant-form-item-explain) {
   /* 将留白计入辅助区高度，保持表单校验出现和收起时的高度测量一致。 */
   padding-block-start: 6px;
@@ -123,7 +227,7 @@ body
   .ant-select-single
   .ant-select-selector
   :is(
-    .ant-select-selection-item:not(:where(td .ant-select-selection-item)),
+    .ant-select-selection-item,
     .ant-select-selection-placeholder,
     .ant-select-selection-search,
     .ant-select-selection-search-input
@@ -133,7 +237,7 @@ body
   .ant-select-single
   .ant-select-selector
   :is(
-    .ant-select-selection-item:not(:where(td .ant-select-selection-item)),
+    .ant-select-selection-item,
     .ant-select-selection-placeholder,
     .ant-select-selection-search,
     .ant-select-selection-search-input
@@ -237,10 +341,10 @@ body :is(.ant-modal, .erp-task-action-drawer) .ant-input-affix-wrapper.ant-input
 
 body
   :is(.ant-modal, .erp-task-action-drawer)
-  .erp-business-form
+  :is(.erp-business-form, .erp-business-action-form)
   :is(.ant-input-number-input, .ant-picker-input > input),
 #root
-  .erp-business-form
+  :is(.erp-business-form, .erp-business-action-form)
   :is(.ant-input-number-input, .ant-picker-input > input) {
   height: calc(var(--erp-control-height) - 2px);
   min-height: 0;
@@ -388,28 +492,19 @@ body :is(.ant-modal, .erp-task-action-drawer) .erp-business-form textarea.ant-in
   white-space: pre-wrap;
 }
 
-:is(#root, .ant-modal)
-  :is(.erp-business-form, .erp-business-action-form)
-  td
-  .ant-select-single,
-:is(#root, .ant-modal)
-  :is(.erp-business-form, .erp-business-action-form)
-  td
-  .ant-select-single
-  .ant-select-selector {
-  height: auto;
-  min-height: var(--erp-control-height, 36px);
+.erp-task-line-card .ant-select-single .ant-select-selector {
+  min-height: 44px;
 }
 
-:is(#root, .ant-modal)
-  :is(.erp-business-form, .erp-business-action-form)
-  td
-  .ant-select-single
-  .ant-select-selection-item {
-  height: auto;
-  padding-block: 6px;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-  text-overflow: clip;
-  white-space: normal;
+body
+  .ant-modal
+  .erp-item-field-with-unit
+  .ant-input-number-affix-wrapper
+  > .ant-input-number,
+#root
+  .erp-item-field-with-unit
+  .ant-input-number-affix-wrapper
+  > .ant-input-number {
+  height: calc(var(--erp-control-height, 36px) - 2px);
+  min-height: 0;
 }

@@ -250,7 +250,7 @@ export function createGlobalSurfaceScenarios({
             ) {
               background = getComputedStyle(parent).backgroundColor
             }
-            return { class: node.className, outside, background }
+            return { class: node.className, outside, background, hitClass: hit?.className, radius: getComputedStyle(node).borderRadius, box: { x: box.x, y: box.y, width: box.width, height: box.height } }
           })
           const panelSpacing = document.createElement('div')
           panelSpacing.style.cssText =
@@ -325,7 +325,7 @@ export function createGlobalSurfaceScenarios({
           assert.equal(navigation.selectedRadius, '0px')
           assert.equal(navigation.padding, '0px')
           assert.equal(navigation.fontSize, '14px')
-          assert.equal(navigation.fontWeight, '650')
+          assert.equal(navigation.fontWeight, '500')
           assert.equal(navigation.background, 'rgba(0, 0, 0, 0)')
           assert.equal(navigation.selectedBackground, 'rgba(0, 0, 0, 0)')
           assert(navigation.selectedShadow.includes('0px -2px 0px 0px inset'), `${route}: 内容导航保留 2px 下划线`)
@@ -343,7 +343,7 @@ export function createGlobalSurfaceScenarios({
           )
         }
         for (const corner of result.corners) {
-          assert.ok(corner.outside, `${route} 卡片内部不能越过圆角绘制`)
+          assert.ok(corner.outside, `${route} 卡片内部不能越过圆角绘制 ${JSON.stringify(corner)}`)
           assert.equal(
             corner.background,
             result.pageColor,

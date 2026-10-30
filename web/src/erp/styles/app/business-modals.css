@@ -1110,16 +1110,9 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  height: var(--erp-control-height, 36px);
-  min-height: var(--erp-control-height, 36px);
   border-color: var(--erp-business-action-field-border, #becdc4);
   background: var(--erp-business-action-field-bg, #ffffff);
   box-shadow: inset 0 1px 0 rgb(15 23 42 / 2%);
-}
-
-.erp-business-action-form :where(.ant-select-multiple),
-:where(.erp-business-action-form) .ant-select-multiple .ant-select-selector {
-  height: auto;
 }
 
 .erp-business-action-form
@@ -1132,15 +1125,6 @@
   border-color: #8fb6a1;
 }
 
-.erp-business-action-form
-  :where(
-    input.ant-input:not(:where(.ant-input-affix-wrapper > input)):not(
-        [type='hidden']
-      )
-  ) {
-  height: var(--erp-control-height, 36px);
-}
-
 .erp-business-action-form .erp-item-field-with-unit {
   display: flex;
   width: 100%;
@@ -1151,55 +1135,16 @@
   min-width: 0;
 }
 
-.erp-business-action-form :where(.ant-input-affix-wrapper input.ant-input) {
-  height: auto;
-  min-height: 0;
-  padding: 0;
-}
-
-.erp-business-action-form :where(.ant-input-number-input) {
-  height: calc(var(--erp-control-height, 36px) - 2px);
-}
-
-.erp-business-action-form :where(.ant-select-single) {
-  height: var(--erp-control-height, 36px);
-  min-height: var(--erp-control-height, 36px);
-}
-
 .erp-business-action-form :where(.ant-select-single .ant-select-selector) {
   align-items: center;
 }
 
-.erp-business-action-form
-  :where(
-    .ant-select-single .ant-select-selector .ant-select-selection-item,
-    .ant-select-single .ant-select-selector .ant-select-selection-placeholder,
-    .ant-select-single .ant-select-selector .ant-select-selection-search-input
-  ) {
-  height: calc(var(--erp-control-height, 36px) - 2px);
-  line-height: calc(var(--erp-control-height, 36px) - 2px);
-}
-
-.erp-business-action-form :where(textarea.ant-input) {
-  height: auto;
-  min-height: calc(
-    var(--erp-control-height, 36px) * var(--erp-textarea-rows, 3)
-  );
-  padding-block: 9px;
-}
-
 .erp-business-action-form :where(.ant-input-textarea-affix-wrapper) {
-  height: auto;
-  min-height: calc(
-    var(--erp-control-height, 36px) * var(--erp-textarea-rows, 3)
-  );
   border-color: var(--erp-business-action-field-border, #becdc4);
-  border-radius: var(--erp-business-control-radius, 12px);
   background: var(--erp-business-action-field-bg, #ffffff);
 }
 
 .erp-line-item-details__fields :where(textarea.ant-input) {
-  min-height: var(--erp-control-height, 36px);
   resize: none;
 }
 

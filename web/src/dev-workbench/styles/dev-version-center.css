@@ -745,8 +745,6 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-operation-history-filter-field .ant-select-selector,
-  .erp-dev-operation-history-filter-field .ant-input-affix-wrapper,
   .erp-dev-operation-history-filter-field .ant-segmented,
   .erp-dev-operation-history-filters__meta .ant-btn {
     min-height: 44px;

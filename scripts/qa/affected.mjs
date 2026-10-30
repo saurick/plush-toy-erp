@@ -885,6 +885,27 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
+    if (/(?:DevControlStandards|ERPThemeScope|erpAntdTheme|erpThemePalette|controlThemeAssertions)/u.test(file)) {
+      addFollowUp(
+        state,
+        "browser-regression",
+        "T5",
+        "运行 STYLE_L1_SCENARIOS=dev-ui-local-theme-isolation pnpm --dir web style:l1，并验证 build:workbench 与 test:workbench；核对内外明暗组合、按钮对比度、样例输入与浮层、主题往返恢复及全局偏好隔离。",
+        file,
+      );
+    }
+    if (
+      /^web\/src\/common\/components\/select\//u.test(file) ||
+      /(?:DevSelectValueExample|devSelectValueExample|DevControlStandards|selectValueDisclosureScenarios)/u.test(file)
+    ) {
+      addFollowUp(
+        state,
+        "browser-regression",
+        "T5",
+        "运行 STYLE_L1_SCENARIOS=dev-ui-select-overflow,business-select-values-sales,business-select-values-purchase,business-select-values-outsourcing,business-select-values-bom,business-select-values-shipment,business-select-values-arrival pnpm --dir web style:l1，核对完整值读取、锁定字段、清空替换、窄列与多列滚动，保留业务读取和授权合同。",
+        file,
+      );
+    }
     if (
       CONSISTENCY_SOURCES.has(file) ||
       file === "scripts/qa/business-data-consistency.mjs" ||
@@ -1217,14 +1238,21 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       continue;
     }
 
-    if (file === "web/eslint.config.js" || file === "web/.stylelintrc") {
+    if (
+      file === "web/eslint.config.js" ||
+      file === "web/.stylelintrc" ||
+      /^web\/scripts\/stylelint\/(?:styleBoundaries|styleDeclarationOwnership)(?:\.test)?\.mjs$/u.test(file)
+    ) {
       const eslint = file === "web/eslint.config.js";
       addFixed(state, eslint ? "webLint" : "webCss", file);
       addNodeTests(state, eslint ? [
         "web/scripts/navigationControls.test.mjs",
         "web/src/common/components/sharedComponentBoundaries.test.mjs",
         "web/src/erp/utils/selectControlContract.test.mjs",
-      ] : ["web/scripts/stylelint/styleBoundaries.test.mjs"], file, "T5");
+      ] : [
+        "web/scripts/stylelint/styleBoundaries.test.mjs",
+        "web/scripts/stylelint/styleDeclarationOwnership.test.mjs",
+      ], file, "T5");
       continue;
     }
 

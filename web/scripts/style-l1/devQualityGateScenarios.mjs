@@ -751,7 +751,7 @@ export function createDevQualityGateScenarios({
           .locator('.erp-dev-quality-header')
           .evaluate((node) => {
             const probe = document.createElement('span')
-            probe.style.backgroundColor = 'var(--erp-primary-softer)'
+            probe.style.backgroundColor = 'var(--erp-surface-bg)'
             node.append(probe)
             const expected = getComputedStyle(probe).backgroundColor
             probe.remove()
@@ -765,7 +765,7 @@ export function createDevQualityGateScenarios({
         assert.equal(
           headerSurface.background,
           headerSurface.expected,
-          '质量门禁页头使用当前主题浅底'
+          '质量门禁页头沿用共享页头的主题内容面'
         )
         assert(
           headerSurface.hasTitle && headerSurface.hasNavigation,

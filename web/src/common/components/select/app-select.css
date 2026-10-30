@@ -15,3 +15,56 @@
 .app-select__label::after {
   content: '：';
 }
+
+.app-select__prefix {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-select__inspect {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--erp-text-muted, #4d5d53);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.app-select__inspect:hover {
+  color: var(--erp-primary, #1677ff);
+  background: var(--erp-hover-bg, rgb(0 0 0 / 4%));
+}
+
+.app-select__inspect:focus-visible {
+  outline: 2px solid var(--erp-control-focus-border, #1677ff);
+  outline-offset: -2px;
+}
+
+.app-select-value-popover {
+  max-width: calc(100vw - 24px);
+}
+
+.app-select-value-popover__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.app-select-value-popover__text {
+  width: 320px;
+  max-width: calc(100vw - 48px);
+  max-height: 40vh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  user-select: text;
+}

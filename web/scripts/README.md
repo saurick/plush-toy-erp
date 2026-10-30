@@ -9,7 +9,7 @@
 | 任务 | 主要入口 | 说明 |
 | --- | --- | --- |
 | 源码单元与合同测试 | `pnpm test` / `runUnitTests.mjs` | [自动发现、筛选与覆盖率](#源码测试--unit-tests) |
-| 样式边界检查 | `pnpm css` / `stylelint/` | [共享控件样式边界](../../docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)；实际层叠仍须浏览器核对 |
+| 样式边界检查 | `pnpm css` / `stylelint/styleBoundaries.mjs`、`stylelint/styleDeclarationOwnership.mjs` | 检查属性归属、作用域及跨文件重复声明（含简写与分写重叠）；[共享控件样式边界](../../docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)，实际层叠仍须浏览器核对 |
 | 页面级浏览器回归（Style L1） | `pnpm style:l1` / `style-l1/` | [场景组织](#style-l1-场景组织)；默认 mock / 前端态，失败区分页面、mock wiring 与浏览器基础设施 |
 | 合同登录与移动认证 | `smoke:purchase-contract-real-login` / `smoke:processing-contract-real-login` / `smoke:mobile-auth-login-route` | [输入预检和执行边界](#写入和输出边界) |
 | 移动端 Workflow | `smoke:mobile-workflow-runtime-browser` | [任务动作与模拟证据](#执行范围与真实写入) |
