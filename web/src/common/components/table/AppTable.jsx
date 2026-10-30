@@ -15,7 +15,7 @@ function MeasuredHeaderTable({ style, ...props }) {
 
 const AppTable = React.forwardRef(
   (
-    { columns, className = '', locale, components, rowSelection, style, scrollToolbar = false, ...props },
+    { columns, className = '', locale, components, rowSelection, style, scrollToolbar = false, scrollControlsOnEmpty = false, ...props },
     ref
   ) => {
     const tableRef = useRef(null)
@@ -83,6 +83,7 @@ const AppTable = React.forwardRef(
           revision={scrollRevision}
           loading={props.loading}
           useToolbar={scrollToolbar}
+          allowEmpty={scrollControlsOnEmpty}
         />
       </>
     )

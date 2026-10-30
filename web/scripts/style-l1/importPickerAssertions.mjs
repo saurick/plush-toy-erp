@@ -3,6 +3,110 @@ import assert from 'node:assert/strict'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
+const pickerLayoutSelectors = [
+  ['dialog', '.ant-modal-content'],
+  ['toolbar', '.erp-source-import-picker__toolbar'],
+  ['selection', '.erp-source-import-picker__selection'],
+  ['header', '.ant-table-header'],
+  ['table', '.ant-table-body'],
+  ['pagination', '.erp-source-import-picker__pagination'],
+  ['footer', '.ant-modal-footer'],
+  ['confirm', '.erp-source-import-picker__footer-actions .ant-btn-primary'],
+]
+
+export async function readImportPickerLayout(picker) {
+  return picker.evaluate((root, selectors) => Object.fromEntries(selectors.map(([name, selector]) => {
+    const box = root.querySelector(selector).getBoundingClientRect()
+    let width = box.width
+    if (name === 'header') {
+      // Compare the complete column lane, including native scrollbar space.
+      const body = root.querySelector('.ant-table-body')
+      const reserved = root.querySelector('.ant-table-header .ant-table-cell-scrollbar')?.getBoundingClientRect().width || 0
+      width += body.offsetWidth - body.clientWidth - reserved
+    }
+    return [name, { x: box.x, y: box.y, width, height: box.height }]
+  })), pickerLayoutSelectors)
+}
+
+export async function assertImportPickerStableLayout(picker, before, label) {
+  const after = await readImportPickerLayout(picker)
+  for (const [name, box] of Object.entries(before)) {
+    for (const property of ['x', 'y', 'width', 'height']) {
+      assert.ok(Math.abs(after[name][property] - box[property]) <= 1,
+        `${label}: ${name}.${property} must stay stable (${box[property]} -> ${after[name][property]}): ${JSON.stringify({ before, after })}`)
+    }
+  }
+}
+
+export async function assertImportPickerStableDuring(picker, label, action) {
+  const before = await readImportPickerLayout(picker)
+  await picker.evaluate((root, { before, selectors }) => {
+    const probe = { active: true, frames: 0, changed: null }
+    root.__sourcePickerLayoutProbe = probe
+    const sample = () => {
+      if (!probe.active) return
+      probe.frames += 1
+      for (const [name, selector] of selectors) {
+        const box = root.querySelector(selector).getBoundingClientRect()
+        let width = box.width
+        if (name === 'header') {
+          const body = root.querySelector('.ant-table-body')
+          const reserved = root.querySelector('.ant-table-header .ant-table-cell-scrollbar')?.getBoundingClientRect().width || 0
+          width += body.offsetWidth - body.clientWidth - reserved
+        }
+        for (const property of ['x', 'y', 'width', 'height']) {
+          const after = property === 'width' ? width : box[property]
+          if (!probe.changed && Math.abs(after - before[name][property]) > 1) {
+            probe.changed = { name, property, before: before[name][property], after }
+          }
+        }
+      }
+      requestAnimationFrame(sample)
+    }
+    requestAnimationFrame(sample)
+  }, { before, selectors: pickerLayoutSelectors })
+  let result
+  try {
+    await action()
+    await picker.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  } finally {
+    result = await picker.evaluate((root) => {
+      const probe = root.__sourcePickerLayoutProbe
+      probe.active = false
+      delete root.__sourcePickerLayoutProbe
+      return { frames: probe.frames, changed: probe.changed }
+    })
+  }
+  assert.ok(result.frames > 0, `${label}: layout frames were sampled`)
+  assert.equal(result.changed, null, `${label}: layout changed during interaction ${JSON.stringify(result)}`)
+  await assertImportPickerStableLayout(picker, before, label)
+}
+
+async function exerciseImportPickerSelectionStability(picker, label) {
+  const onlySelected = picker.getByRole('checkbox', { name: '仅看已选', exact: true })
+  // Scroll to the control before measuring so deliberate navigation is not
+  // mistaken for a layout change caused by filtering or selection.
+  await onlySelected.scrollIntoViewIfNeeded()
+  const body = picker.locator('.ant-modal-body')
+  const scrollTop = await body.evaluate((node) => node.scrollTop)
+  const before = await readImportPickerLayout(picker)
+  await assertImportPickerStableDuring(picker, `${label}-empty-selection`, () => onlySelected.check())
+  await expectLocator(picker.locator('.ant-table-row')).toHaveCount(0)
+  await onlySelected.uncheck()
+  await picker.locator('.ant-table-row').first().waitFor()
+  await assertImportPickerStableLayout(picker, before, `${label}-restored`)
+  const firstSelectable = picker.locator('.ant-table-row input[type="checkbox"]:enabled').first()
+  await firstSelectable.scrollIntoViewIfNeeded()
+  await assertImportPickerStableDuring(picker, `${label}-select`, () => firstSelectable.check())
+  await body.evaluate((node, top) => { node.scrollTop = top }, scrollTop)
+  await assertImportPickerStableDuring(picker, `${label}-one-selected`, () => onlySelected.check())
+  await expectLocator(picker.locator('.ant-table-row')).toHaveCount(1)
+  await onlySelected.uncheck()
+  await picker.getByRole('button', { name: '清空已选', exact: true }).click()
+  await assertImportPickerStableLayout(picker, before, `${label}-cleared`)
+  await body.evaluate((node) => { node.scrollTop = 0 })
+}
+
 export async function assertImportToolbarLayout(page, picker, label) {
   const layout = await picker.evaluate((root) => {
     const toolbar = root.querySelector('.erp-source-import-picker__toolbar')
@@ -40,6 +144,9 @@ export async function assertImportPickerGeometry(page, picker, label) {
     await waitForFiniteAnimations(page)
     await assertBusinessModalViewport(page, picker, { label: `${label}-${viewport.width}` })
     await assertImportToolbarLayout(page, picker, `${label}-${viewport.width}`)
+    if (await picker.locator('.erp-source-import-picker').count()) {
+      await exerciseImportPickerSelectionStability(picker, `${label}-${viewport.width}`)
+    }
     for (const end of [false, true]) {
       await picker.evaluate((root, end) => {
         const scroller = root.querySelector('.ant-table-body, .ant-table-content')

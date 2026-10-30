@@ -407,12 +407,12 @@ export default function SourceImportPickerModal({
             </Button>
           </div>
         </div>
-        <div className="erp-source-import-picker__selection">
+        <div className={`erp-source-import-picker__selection${allowSelectAll && multiple && !serverPagination ? ' erp-source-import-picker__selection--select-all' : ''}`}>
           <Checkbox checked={onlySelected} onChange={(event) => { setOnlySelected(event.target.checked); setCurrentPage(1) }}>
             仅看已选
           </Checkbox>
           {allowSelectAll && multiple && !serverPagination && !onlySelected ? (
-            <Button onClick={() => updateSelectedRowKeys([...new Set([...selectedRowKeys, ...filteredRows.filter((row) => !isRowDisabled?.(row)).map(getKey)])])} disabled={loading || !filteredRows.length}>
+            <Button className="erp-source-import-picker__select-all" onClick={() => updateSelectedRowKeys([...new Set([...selectedRowKeys, ...filteredRows.filter((row) => !isRowDisabled?.(row)).map(getKey)])])} disabled={loading || !filteredRows.length}>
               全选筛选结果
             </Button>
           ) : null}
@@ -432,6 +432,7 @@ export default function SourceImportPickerModal({
                     <Tag
                       className="erp-source-import-picker__selection-tag"
                       key={item.key}
+                      title={item.label}
                     >
                       {item.label}
                     </Tag>
@@ -499,6 +500,7 @@ export default function SourceImportPickerModal({
         </div>
         <Table
           rowKey={rowKey}
+          scrollControlsOnEmpty
           size="small"
           loading={loading}
           dataSource={pagedRows}
@@ -535,7 +537,7 @@ export default function SourceImportPickerModal({
               )
             },
           })}
-          scroll={{ x: 760, y: 380 }}
+          scroll={{ x: 760, y: 'var(--erp-source-import-table-height)' }}
         />
         <div className="erp-source-import-picker__pagination">
           <Pagination

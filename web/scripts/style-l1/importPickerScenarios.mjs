@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { prepareUIDesignSandboxSource } from '../../src/dev-workbench/config/devUIDesign.mjs'
 import { createSalesOrderWorkbook } from './salesOrderImportWorkbookFixture.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
-import { assertImportPickerGeometry, assertImportToolbarLayout, assertImportFilterPrompt } from './importPickerAssertions.mjs'
+import { assertImportPickerGeometry, assertImportToolbarLayout, assertImportFilterPrompt, readImportPickerLayout, assertImportPickerStableLayout, assertImportPickerStableDuring } from './importPickerAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 async function choose(page, scope, label, text) {
@@ -41,10 +41,12 @@ rows: [
         const picker = page.getByRole('dialog', { name: '导入销售订单 Excel', exact: true })
         await picker.locator('.ant-table-row').first().waitFor()
         await assertImportPickerGeometry(page, picker, 'sales-excel-filter')
+        const layout = await readImportPickerLayout(picker)
         await assertImportFilterPrompt(page, picker, '原表客户筛选', '按原表客户筛选')
         await assertImportFilterPrompt(page, picker, '订单核对筛选', '按核对状态筛选', ['全部订单'])
         await choose(page, picker, '原表客户筛选', '未填写客户')
         assert.equal(await picker.locator('.ant-table-row').count(), 1)
+        await assertImportPickerStableLayout(picker, layout, 'sales-excel-one-result')
         await picker.locator('.ant-table-row input[type="checkbox"]').check()
         await choose(page, picker, '原表客户筛选', '暗色客户')
         assert.match(await picker.innerText(), /已选 1 条/u)
@@ -64,6 +66,7 @@ rows: [
         await choose(page, picker, '订单核对筛选', '待核对（1）')
         await choose(page, picker, '订单 SO-FILTER-A 的客户', 'CUS-STYLE-L1')
         await picker.getByText('暂无可导入记录', { exact: true }).waitFor()
+        await assertImportPickerStableLayout(picker, layout, 'sales-excel-empty-review')
         assert.equal(await picker.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '订单核对筛选', exact: true }) }).locator('.ant-select-selection-item').innerText(), '待核对（0）')
         await assertImportToolbarLayout(page, picker, 'sales-excel-empty-review')
         assert.match(await picker.innerText(), /已选 1 条/u)
@@ -133,20 +136,26 @@ path: '/erp/purchase/accessories',
         const picker = page.locator('.erp-source-import-picker-modal.ant-modal:visible')
         await picker.locator('.ant-table-row').first().waitFor()
         await assertImportPickerGeometry(page, picker, 'purchase-material-filter')
+        const layout = await readImportPickerLayout(picker)
         await assertImportFilterPrompt(page, picker, '库存分类', '按库存分类筛选')
         await picker.locator('.ant-table-row input[type="checkbox"]').first().check()
-        await choose(page, picker, '库存分类', '辅料')
-        await picker.getByText('暂无可选材料', { exact: true }).waitFor()
+        await assertImportPickerStableDuring(picker, 'purchase-material-empty-category', async () => {
+          await choose(page, picker, '库存分类', '辅料')
+          await picker.getByText('暂无可选材料', { exact: true }).waitFor()
+        })
+        await assertImportPickerStableLayout(picker, layout, 'purchase-material-filtered')
         await assertImportToolbarLayout(page, picker, 'purchase-material-empty-category')
         assert.equal(requests.at(-1).stock_category, 'AUXILIARY')
         assert.equal(requests.at(-1).purchase_supplier_id, 1)
         await picker.getByRole('checkbox', { name: '仅看已选', exact: true }).check()
         assert.equal(await picker.locator('.ant-table-row').count(), 1)
+        await assertImportPickerStableLayout(picker, layout, 'purchase-material-one-selected')
         await picker.getByRole('button', { name: '清空筛选', exact: true }).click()
         await picker.locator('.ant-table-row').first().waitFor()
         assert.match(await picker.innerText(), /已选 1 条/u)
         await assertImportFilterPrompt(page, picker, '库存分类', '按库存分类筛选')
         assert.equal(requests.at(-1).stock_category, undefined)
+        await assertImportPickerStableLayout(picker, layout, 'purchase-material-cleared')
         await capture(page, 'purchase-material-import')
         await picker.getByRole('button', { name: '添加到采购明细', exact: true }).click()
         await picker.waitFor({ state: 'hidden' })

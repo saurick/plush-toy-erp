@@ -1,5 +1,5 @@
 import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
-import { assertImportPickerGeometry, assertImportFilterPrompt } from './importPickerAssertions.mjs'
+import { assertImportPickerGeometry, assertImportFilterPrompt, readImportPickerLayout, assertImportPickerStableLayout, assertImportPickerStableDuring } from './importPickerAssertions.mjs'
 
 export function createShipmentSourceCandidateAssertions(deps) {
   const { assert, assertTextAbsent, expectText, outputDir, path } = deps
@@ -104,6 +104,7 @@ export function createShipmentSourceCandidateAssertions(deps) {
       .waitFor({ state: 'visible' })
     const searchInput = failedPicker.locator('.ant-input').first()
     await assertImportPickerGeometry(page, failedPicker, 'shipment-source-picker')
+    const layout = await readImportPickerLayout(failedPicker)
     await assertImportFilterPrompt(page, failedPicker, '导入来源客户', '按客户筛选')
     await assertImportFilterPrompt(page, failedPicker, '导入来源销售订单', '按销售订单筛选')
     const eligibleFilter = failedPicker.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '来源可导入条件', exact: true }) })
@@ -115,6 +116,7 @@ export function createShipmentSourceCandidateAssertions(deps) {
     await failedPicker.getByRole('combobox', { name: '来源可导入条件', exact: true }).press('ArrowDown')
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '不可导入（查看原因）' }).click()
     await failedPicker.getByText('暂无可导入销售订单行', { exact: true }).waitFor()
+    await assertImportPickerStableLayout(failedPicker, layout, 'shipment-empty-filter')
     assert.equal(shipmentSourceCandidateParams.at(-1).selectable, false)
     await failedPicker.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '来源可导入条件', exact: true }) }).locator('.ant-select-clear').click()
     await failedPicker.locator('.ant-table-row').first().waitFor()
@@ -123,11 +125,14 @@ export function createShipmentSourceCandidateAssertions(deps) {
     await failedPicker.getByRole('button', { name: '清空筛选', exact: true }).click()
     await failedPicker.locator('.ant-table-row').first().waitFor()
     assert.equal(shipmentSourceCandidateParams.at(-1).selectable, undefined)
-    await searchInput.fill('NO-SOURCE-IMPORT-RESULT')
-    await searchInput.press('Enter')
-    await failedPicker
-      .getByText('暂无可导入销售订单行', { exact: true })
-      .waitFor({ state: 'visible', timeout: 10_000 })
+    await assertImportPickerStableDuring(failedPicker, 'shipment-empty-search', async () => {
+      await searchInput.fill('NO-SOURCE-IMPORT-RESULT')
+      await searchInput.press('Enter')
+      await failedPicker
+        .getByText('暂无可导入销售订单行', { exact: true })
+        .waitFor({ state: 'visible', timeout: 10_000 })
+    })
+    await assertImportPickerStableLayout(failedPicker, layout, 'shipment-empty-search')
     await searchInput.fill('')
     await searchInput.press('Enter')
     const firstPageSourceRow = failedPicker
@@ -155,6 +160,7 @@ export function createShipmentSourceCandidateAssertions(deps) {
     await failedPicker.getByRole('checkbox', { name: '仅看已选', exact: true }).check()
     assert.equal(await failedPicker.locator('.ant-table-row').count(), 2)
     assert.equal(shipmentSourceCandidateParams.length, requestsBeforeSelected)
+    await assertImportPickerStableLayout(failedPicker, layout, 'shipment-two-selected')
     await failedPicker.getByRole('checkbox', { name: '仅看已选', exact: true }).uncheck()
     await secondPageSourceRow.waitFor()
     await failedPicker

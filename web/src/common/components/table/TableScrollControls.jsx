@@ -9,6 +9,7 @@ export default function TableScrollControls({
   revision,
   loading = false,
   useToolbar = false,
+  allowEmpty = false,
 }) {
   const id = useId()
   const [hosts, setHosts] = useState(null)
@@ -41,7 +42,8 @@ export default function TableScrollControls({
       binding.wrapper === wrapper &&
       binding.scroller === scroller &&
       binding.table === table &&
-      binding.toolbar === toolbar
+      binding.toolbar === toolbar &&
+      binding.allowEmpty === allowEmpty
     ) {
       binding.refresh()
       return
@@ -116,7 +118,7 @@ export default function TableScrollControls({
       const row = table.querySelector(
         isAntTable ? 'tbody > tr.ant-table-row' : 'tbody > tr'
       )
-      const enabled = maxLeft > 2 && row && scroller.clientWidth
+      const enabled = maxLeft > 2 && (row || allowEmpty) && scroller.clientWidth
       contentHeight = loadingContainer?.scrollHeight || 0
       if (!enabled) {
         setPosition(null)
@@ -154,7 +156,7 @@ export default function TableScrollControls({
         }
       })
       let fixedWidth = 0
-      Array.from(row.cells).forEach((cell) => {
+      Array.from(row?.cells || wrapper.querySelector('thead tr')?.cells || []).forEach((cell) => {
         if (getComputedStyle(cell).position === 'sticky') {
           fixedWidth += cell.getBoundingClientRect().width
         }
@@ -234,13 +236,14 @@ export default function TableScrollControls({
       scroller,
       table,
       toolbar,
+      allowEmpty,
       dispose,
       // Data changes must update the occupied space before paint, even while
       // vertical scrolling keeps the dock hidden until the idle timer ends.
       refresh: measure,
     }
     measure()
-  }, [tableRef, revision, useToolbar, id, busy])
+  }, [tableRef, revision, useToolbar, allowEmpty, id, busy])
 
   useLayoutEffect(
     () => () => {
