@@ -16634,7 +16634,10 @@
       "total": 1
     },
     "message": "OK",
-    "params": {},
+    "params": {
+      "customer_id": 2,
+      "selectable": true
+    },
     "test": "TestJSONRPCListShipmentSourceCandidatesAllowsUpdateWithoutCreate"
   },
   "operational_fact.list_shipments": {

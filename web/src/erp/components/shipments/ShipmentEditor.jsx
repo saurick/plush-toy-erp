@@ -15,6 +15,7 @@ import {
 import TaskSourceFacts from '../business-list/TaskSourceFacts.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
+import FilterSelect from '@/common/components/select/FilterSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { ShipmentStatus } from '../../../common/consts/statuses.generated.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
@@ -49,7 +50,6 @@ import {
   createBlankShipmentItem,
   filterShipmentInventoryLotOptions,
   filterShipmentProductSKUOptions,
-  formatQuantity,
 } from '../../utils/businessLineItems.mjs'
 import { numeric20Scale6Units } from '../../utils/numeric20Scale6.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
@@ -1003,6 +1003,9 @@ export default function ShipmentEditor({
   onSalesOrderSourcePageChange,
   onSalesOrderSourceReload,
   onSalesOrderSourceSearchChange,
+  salesOrderSourceFilters = {},
+  salesOrderSourceOrderOptions = [],
+  onSalesOrderSourceFiltersChange,
   salesOrderSourcePageSize = 20,
   saving = false,
   selectedSalesOrder,
@@ -1176,10 +1179,56 @@ export default function ShipmentEditor({
                         onPageChange={onSalesOrderSourcePageChange}
                         onReload={onSalesOrderSourceReload}
                         onSearchChange={onSalesOrderSourceSearchChange}
+                        getSelectionGroup={(item) => item.sales_order_id}
+                        hasActiveFilters={Object.values(salesOrderSourceFilters).some((value) => value !== undefined)}
+                        onClearFilters={() => onSalesOrderSourceFiltersChange?.({})}
+                        renderFilters={({ selectedRows, confirmSelectionReset }) => {
+                          const changeSource = (next) => {
+                            const apply = () => onSalesOrderSourceFiltersChange?.(next)
+                            const selected = selectedRows[0]
+                            if (selected && ((next.customerID && next.customerID !== selected.customer_id) ||
+                              (next.salesOrderID && next.salesOrderID !== selected.sales_order_id))) confirmSelectionReset(apply)
+                            else apply()
+                          }
+                          return [
+                            <Select
+                              key="customer"
+                              aria-label="导入来源客户"
+                              placeholder="按客户筛选"
+                              allowClear
+                              showSearch
+                              optionFilterProp="label"
+                              disabled={Boolean(selectedSalesOrder)}
+                              options={customerOptions}
+                              value={selectedSalesOrder?.customer_id || salesOrderSourceFilters.customerID}
+                              onChange={(customerID) => changeSource({ ...salesOrderSourceFilters, customerID, salesOrderID: undefined })}
+                            />,
+                            <Select
+                              key="order"
+                              aria-label="导入来源销售订单"
+                              placeholder="按销售订单筛选"
+                              allowClear
+                              showSearch
+                              optionFilterProp="label"
+                              disabled={Boolean(selectedSalesOrder)}
+                              options={selectedSalesOrder ? salesOrderOptions : salesOrderSourceOrderOptions}
+                              value={selectedSalesOrder?.id || salesOrderSourceFilters.salesOrderID}
+                              onChange={(salesOrderID) => changeSource({ ...salesOrderSourceFilters, salesOrderID })}
+                            />,
+                            <FilterSelect
+                              key="eligible"
+                              label="可导入状态"
+                              placeholder="按可导入状态筛选"
+                              emptyValue="all"
+                              aria-label="来源可导入条件"
+                              value={salesOrderSourceFilters.selectable === undefined ? 'all' : salesOrderSourceFilters.selectable ? 'yes' : 'no'}
+                              onChange={(value) => onSalesOrderSourceFiltersChange?.({ ...salesOrderSourceFilters, selectable: !value || value === 'all' ? undefined : value === 'yes' })}
+                              options={[{ value: 'yes', label: '可导入' }, { value: 'no', label: '不可导入（查看原因）' }]}
+                            />,
+                          ]
+                        }}
                         getSelectedLabel={(item) =>
-                          `第 ${item?.line_no || '-'} 行 / ${formatQuantity(
-                            item?.remainingQuantity
-                          )}`
+                          `${item.order_no} · 第 ${item?.line_no || '-'} 行 · ${item.product_name_snapshot || item.product_name || '产品'}`
                         }
                         getRowDisabledReason={(item) => item.disabledReason}
                         isRowDisabled={(item) => Boolean(item.disabledReason)}

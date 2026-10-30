@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { UploadOutlined } from '@ant-design/icons'
 import { Space, Typography } from 'antd'
 import Select from '@/common/components/select/AppSelect'
+import FilterSelect from '@/common/components/select/FilterSelect'
 import Table from '@/common/components/table/AppTable'
 import SalesOrderBatchImportEditor from './SalesOrderBatchImportEditor.jsx'
 import { SalesOrderImportImage } from './SalesOrderSourceEvidence.jsx'
@@ -119,6 +120,18 @@ export default function SalesOrderExcelImport({
   const [defaultCurrency, setDefaultCurrency] = useState(undefined)
   const [customerMappings, setCustomerMappings] = useState({})
   const [drafts, setDrafts] = useState(null)
+  const [sourceCustomer, setSourceCustomer] = useState(undefined)
+  const [reviewOnly, setReviewOnly] = useState(false)
+  const previewOrders = useMemo(() => (workbook?.orders || []).map((order) => {
+    const draft = buildSalesOrderImportDraft(order, { customers, units, defaultUnitID, defaultCurrency, customerMappings })
+    const issues = [
+      draft.review.missingCustomer && '待选择客户',
+      draft.review.missingUnitCount > 0 && `${draft.review.missingUnitCount} 条明细待补单位`,
+      !draft.values.currency && '待补币种',
+      ...(draft.review.warnings || []),
+    ].filter(Boolean)
+    return { ...order, reviewIssues: issues }
+  }), [workbook, customers, units, defaultUnitID, defaultCurrency, customerMappings])
 
   useEffect(
     () => () => {
@@ -151,6 +164,8 @@ export default function SalesOrderExcelImport({
     setDefaultUnitID(undefined)
     setDefaultCurrency(undefined)
     setCustomerMappings({})
+    setSourceCustomer(undefined)
+    setReviewOnly(false)
     try {
       if (file.size > MAX_XLSX_FILE_BYTES) {
         throw new XlsxImportError(
@@ -210,6 +225,7 @@ export default function SalesOrderExcelImport({
             aria-label={`订单 ${order.order_no} 的客户`}
             style={{ width: '100%' }}
             showSearch
+            allowClear
             optionFilterProp="label"
             value={matched}
             placeholder="请选择对应客户"
@@ -229,6 +245,7 @@ export default function SalesOrderExcelImport({
         )
       },
     },
+    { title: '核对提示', key: 'review', width: 180, render: (_, order) => order.reviewIssues.join('；') || '已补全，仍需核对明细' },
   ]
 
   return (
@@ -293,7 +310,34 @@ export default function SalesOrderExcelImport({
           </Space>
         }
         searchPlaceholder="搜索订单编号、客户或产品名称"
-        rows={workbook?.orders || []}
+        rows={previewOrders}
+        filterResetKey={JSON.stringify([sourceCustomer, reviewOnly])}
+        filterRow={(order) => (sourceCustomer === undefined || order.customer === sourceCustomer) && (!reviewOnly || order.reviewIssues.length > 0)}
+        renderFilters={() => [
+          <Select
+            key="customer"
+            aria-label="原表客户筛选"
+            placeholder="按原表客户筛选"
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            value={sourceCustomer}
+            onChange={setSourceCustomer}
+            options={[...new Set(previewOrders.map((order) => order.customer))].map((customer) => ({ value: customer, label: customer || '未填写客户' }))}
+          />,
+          <FilterSelect
+            key="review"
+            label="核对状态"
+            placeholder="按核对状态筛选"
+            emptyValue="all"
+            aria-label="订单核对筛选"
+            value={reviewOnly ? 'review' : 'all'}
+            onChange={(value) => setReviewOnly(value === 'review')}
+            options={[{ value: 'review', label: `待核对（${previewOrders.filter((order) => order.reviewIssues.length).length}）` }]}
+          />,
+        ]}
+        hasActiveFilters={sourceCustomer !== undefined || reviewOnly}
+        onClearFilters={() => { setSourceCustomer(undefined); setReviewOnly(false) }}
         columns={previewColumns}
         rowKey="order_no"
         multiple

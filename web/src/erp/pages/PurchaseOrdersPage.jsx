@@ -797,7 +797,7 @@ export default function PurchaseOrdersPage() {
 
   const handleSupplierChange = (supplierID) => {
     const supplier = suppliers.find((item) => item.id === supplierID)
-    form.setFieldValue('supplier_snapshot', buildSupplierSnapshot(supplier))
+    form.setFields([{ name: 'supplier_snapshot', value: buildSupplierSnapshot(supplier) }])
     if (!editingOrder?.id) {
       form.setFieldsValue(buildPurchaseOrderSupplierDefaults(supplier))
     }
@@ -808,7 +808,7 @@ export default function PurchaseOrdersPage() {
       ) {
         return
       }
-      form.setFieldValue('supplier_snapshot', snapshot)
+      form.setFields([{ name: 'supplier_snapshot', value: snapshot }])
     })
   }
 

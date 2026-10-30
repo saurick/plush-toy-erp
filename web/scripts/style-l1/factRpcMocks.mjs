@@ -144,6 +144,8 @@ const SINGLE_FACT_RECONCILIATION_CREATE_KEYS = new Set([
 const SHIPMENT_SOURCE_CANDIDATE_LIST_KEYS = new Set([
   'keyword',
   'sales_order_id',
+  'customer_id',
+  'selectable',
   'limit',
   'offset',
 ])
@@ -169,6 +171,8 @@ export function mockShipmentSourceCandidates(params = {}, candidates = []) {
     limit > 200 ||
     !Number.isSafeInteger(offset) ||
     offset < 0 ||
+    (params.customer_id !== undefined && (!Number.isSafeInteger(params.customer_id) || params.customer_id <= 0)) ||
+    (params.selectable !== undefined && typeof params.selectable !== 'boolean') ||
     (params.sales_order_id !== undefined &&
       (!Number.isSafeInteger(salesOrderID) || salesOrderID <= 0))
   ) {
@@ -181,6 +185,8 @@ export function mockShipmentSourceCandidates(params = {}, candidates = []) {
     .trim()
     .toLowerCase()
   const filtered = candidates.filter((candidate) => {
+    if (params.customer_id && candidate.customer_id !== params.customer_id) return false
+    if (params.selectable !== undefined && candidate.selectable !== params.selectable) return false
     if (
       salesOrderID &&
       Number(candidate.sales_order_id || 0) !== salesOrderID

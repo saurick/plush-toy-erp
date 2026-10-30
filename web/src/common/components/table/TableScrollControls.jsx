@@ -101,14 +101,22 @@ export default function TableScrollControls({
       frame = 0
       syncLoadingHeight()
       if (loadingRef.current) return
+      // Keep the separate header's scroll range equal to the body. WebKit can
+      // reserve native scrollbar space that Ant's mount-time probe omits.
+      scroller.classList.add('app-table-scroll-enhanced')
+      if (isAntTable) {
+        const header = scroller.parentElement?.querySelector(':scope > .ant-table-header')
+        const reserved = header?.querySelector('.ant-table-cell-scrollbar')?.getBoundingClientRect().width || 0
+        const style = getComputedStyle(scroller)
+        const gutter = scroller.offsetWidth - scroller.clientWidth - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth)
+        const gap = header ? Math.max(0, gutter - reserved) : 0
+        wrapper.style.setProperty('--app-table-header-scroll-gap', `${gap}px`)
+      }
       const maxLeft = scroller.scrollWidth - scroller.clientWidth
       const row = table.querySelector(
         isAntTable ? 'tbody > tr.ant-table-row' : 'tbody > tr'
       )
       const enabled = maxLeft > 2 && row && scroller.clientWidth
-      // Keep native scrollbar geometry stable for the lifetime of the binding.
-      // Toggling it with overflow makes near-fit nested tables oscillate.
-      scroller.classList.add('app-table-scroll-enhanced')
       contentHeight = loadingContainer?.scrollHeight || 0
       if (!enabled) {
         setPosition(null)
@@ -214,6 +222,7 @@ export default function TableScrollControls({
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', schedule)
       scroller.classList.remove('app-table-scroll-enhanced')
+      wrapper.style.removeProperty('--app-table-header-scroll-gap')
       delete wrapper.dataset.tableScrollId
       if (!toolbar) topHost.remove()
       bottomHost.remove()

@@ -18,7 +18,9 @@ export function stylePaginatedMasterData(
       ['supplier_item_no', 'supplier_name'].some((field) => String(record[field] || '').toLowerCase().includes(keyword.toLowerCase()))
     )
     : records
-  return stylePaginatedRpcData(filtered, recordKey, params, defaultLimit)
+  const candidates = recordKey === 'materials' && params.stock_category
+    ? filtered.filter((record) => record.stock_category === params.stock_category) : filtered
+  return stylePaginatedRpcData(candidates, recordKey, params, defaultLimit)
 }
 
 export async function installMasterDataRpcMocks(page, context) {

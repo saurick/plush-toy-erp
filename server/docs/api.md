@@ -796,7 +796,7 @@ Product Core 登记六个 process key：销售、采购和 Shipment 三条可配
 
 该域承载已登记的生产、委外、出货、库存预留和财务事实方法。出货主路径当前包括：
 
-用途：查询可出货销售订单行、创建出货草稿、确认真实出货、取消草稿或已出货单，以及按 ID 精确读取或列表查询出货单。`list_shipment_source_candidates` 与绑定销售订单或订单行的 `create_shipment_with_items` 都要求 `shipment.create + sales_order.read + sales_order_item.read`。
+用途：查询可出货销售订单行、创建出货草稿、确认真实出货、取消草稿或已出货单，以及按 ID 精确读取或列表查询出货单。`list_shipment_source_candidates` 要求 `shipment.create` 或 `shipment.update`，并同时具备 `sales_order.read + sales_order_item.read`；绑定销售订单或订单行的 `create_shipment_with_items` 要求 `shipment.create + sales_order.read + sales_order_item.read`。
 
 `get_shipment` 与 `list_shipments` 均只读且要求 `shipment.read`。公开 `submit_shipment_release` 已退出；正式页面使用 `customer_config.start_finished_goods_delivery_process` 启动 active revision。
 
@@ -804,7 +804,9 @@ Product Core 登记六个 process key：销售、采购和 Shipment 三条可配
 
 `cancel_shipment` 按原状态分支：`DRAFT -> CANCELLED` 只终止未出库草稿，不写库存；`SHIPPED -> CANCELLED` 才逐行写库存 `REVERSAL`。active `finished_goods_delivery` 流程、未结成品质检、active 出货放行任务或非取消应收 / 发票都会阻断取消；草稿已提交放行时，须先将任务完成或退回。重复取消依真实 `shipped_at` 判断是否曾出库，不会把草稿取消误写成库存冲正。
 
-候选响应的 `total` 是相同关键词 / 销售订单过滤条件下的完整结果数，`items` 只包含当前 `limit / offset` 页；前端必须使用服务端分页、远程搜索与该 `total`，不得再客户端拼接有上限的销售订单、明细和出货列表。
+候选支持 `keyword`、`sales_order_id`、`customer_id` 与可选布尔值 `selectable` 联合筛选。`selectable=true` 仅可导入，`false` 仅不可导入，省略时查询全部；客户与订单不一致时返回空集。所有条件在统计总数和分页之前应用，响应的 `total` 是完整结果数，`shipment_source_candidates` 只包含当前 `limit / offset` 页。前端不得只过滤当前页或拼接有上限的出货列表。
+
+可导入判定沿用来源行状态、真实 `SHIPPED` 数量及来源一致性；草稿和取消单不占数量。表格“已确认出货”与该口径一致。筛选不改变出货写入、权限或库存门禁；查询不写业务表，沿用现有请求日志和错误映射。
 
 生产、委外和财务的状态方法继续使用 canonical RPC：`post_production_fact / cancel_production_fact`、`post_outsourcing_fact / cancel_outsourcing_fact`、`post_finance_fact / settle_finance_fact / cancel_finance_fact`。
 
@@ -38407,92 +38409,92 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:615`。 |
+| `result.data.shipment` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:633`。 |
 
 **`shipment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
-| `result.data.shipment.created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
-| `result.data.shipment.customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:683`。 |
-| `result.data.shipment.customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:684`。 |
-| `result.data.shipment.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:685`。 |
-| `result.data.shipment.finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:694`。 |
-| `result.data.shipment.finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:692`。 |
-| `result.data.shipment.finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:693`。 |
-| `result.data.shipment.finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:688`。 |
-| `result.data.shipment.finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:689`。 |
-| `result.data.shipment.finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:690`。 |
-| `result.data.shipment.finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:691`。 |
-| `result.data.shipment.freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
-| `result.data.shipment.freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
-| `result.data.shipment.gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
-| `result.data.shipment.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:680`。 |
+| `result.data.shipment.carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:717`。 |
+| `result.data.shipment.created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
+| `result.data.shipment.customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
+| `result.data.shipment.customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
+| `result.data.shipment.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipment.finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
+| `result.data.shipment.finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
+| `result.data.shipment.finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
+| `result.data.shipment.finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
+| `result.data.shipment.finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
+| `result.data.shipment.finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
+| `result.data.shipment.finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
+| `result.data.shipment.freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
+| `result.data.shipment.freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
+| `result.data.shipment.gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:720`。 |
+| `result.data.shipment.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
 
 **`shipment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:695`。 |
-| `result.data.shipment.items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
-| `result.data.shipment.items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
+| `result.data.shipment.idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
+| `result.data.shipment.items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
+| `result.data.shipment.items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
 
 **`shipment.items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:735`。 |
-| `result.data.shipment.items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:738`。 |
-| `result.data.shipment.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:740`。 |
-| `result.data.shipment.items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:736`。 |
-| `result.data.shipment.items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
-| `result.data.shipment.items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
-| `result.data.shipment.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
-| `result.data.shipment.items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:737`。 |
-| `result.data.shipment.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
-| `result.data.shipment.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
-| `result.data.shipment.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
-| `result.data.shipment.items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
-| `result.data.shipment.items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
-| `result.data.shipment.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
-| `result.data.shipment.items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
-| `result.data.shipment.items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:734`。 |
+| `result.data.shipment.items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:753`。 |
+| `result.data.shipment.items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:756`。 |
+| `result.data.shipment.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:758`。 |
+| `result.data.shipment.items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:754`。 |
+| `result.data.shipment.items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:742`。 |
+| `result.data.shipment.items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:749`。 |
+| `result.data.shipment.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:757`。 |
+| `result.data.shipment.items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:755`。 |
+| `result.data.shipment.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:745`。 |
+| `result.data.shipment.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:746`。 |
+| `result.data.shipment.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:750`。 |
+| `result.data.shipment.items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:744`。 |
+| `result.data.shipment.items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:743`。 |
+| `result.data.shipment.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:748`。 |
+| `result.data.shipment.items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:751`。 |
+| `result.data.shipment.items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:752`。 |
 
 **`shipment.items[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:741`。 |
-| `result.data.shipment.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipment.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:759`。 |
+| `result.data.shipment.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:747`。 |
 
 **`shipment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
-| `result.data.shipment.package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
-| `result.data.shipment.planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:696`。 |
-| `result.data.shipment.quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
-| `result.data.shipment.receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
-| `result.data.shipment.sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:682`。 |
-| `result.data.shipment.shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:681`。 |
-| `result.data.shipment.shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:697`。 |
-| `result.data.shipment.shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
-| `result.data.shipment.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:686`。 |
-| `result.data.shipment.tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
-| `result.data.shipment.tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
-| `result.data.shipment.total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
-| `result.data.shipment.tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
-| `result.data.shipment.transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
-| `result.data.shipment.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
+| `result.data.shipment.package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:719`。 |
+| `result.data.shipment.planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
+| `result.data.shipment.quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
+| `result.data.shipment.receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:723`。 |
+| `result.data.shipment.sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
+| `result.data.shipment.shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
+| `result.data.shipment.shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipment.shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:722`。 |
+| `result.data.shipment.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
+| `result.data.shipment.tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
+| `result.data.shipment.tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
+| `result.data.shipment.total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipment.tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:718`。 |
+| `result.data.shipment.transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:716`。 |
+| `result.data.shipment.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
 
 **`shipment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:687`。 |
-| `result.data.shipment.volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipment.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
+| `result.data.shipment.volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
 
 ```json
 {
@@ -40765,92 +40767,92 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:615`。 |
+| `result.data.shipment` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:633`。 |
 
 **`shipment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
-| `result.data.shipment.created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
-| `result.data.shipment.customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:683`。 |
-| `result.data.shipment.customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:684`。 |
-| `result.data.shipment.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:685`。 |
-| `result.data.shipment.finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:694`。 |
-| `result.data.shipment.finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:692`。 |
-| `result.data.shipment.finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:693`。 |
-| `result.data.shipment.finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:688`。 |
-| `result.data.shipment.finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:689`。 |
-| `result.data.shipment.finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:690`。 |
-| `result.data.shipment.finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:691`。 |
-| `result.data.shipment.freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
-| `result.data.shipment.freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
-| `result.data.shipment.gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
-| `result.data.shipment.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:680`。 |
+| `result.data.shipment.carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:717`。 |
+| `result.data.shipment.created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
+| `result.data.shipment.customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
+| `result.data.shipment.customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
+| `result.data.shipment.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipment.finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
+| `result.data.shipment.finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
+| `result.data.shipment.finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
+| `result.data.shipment.finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
+| `result.data.shipment.finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
+| `result.data.shipment.finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
+| `result.data.shipment.finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
+| `result.data.shipment.freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
+| `result.data.shipment.freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
+| `result.data.shipment.gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:720`。 |
+| `result.data.shipment.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
 
 **`shipment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:695`。 |
-| `result.data.shipment.items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
-| `result.data.shipment.items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
+| `result.data.shipment.idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
+| `result.data.shipment.items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
+| `result.data.shipment.items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
 
 **`shipment.items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:735`。 |
-| `result.data.shipment.items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:738`。 |
-| `result.data.shipment.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:740`。 |
-| `result.data.shipment.items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:736`。 |
-| `result.data.shipment.items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
-| `result.data.shipment.items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
-| `result.data.shipment.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
-| `result.data.shipment.items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:737`。 |
-| `result.data.shipment.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
-| `result.data.shipment.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
-| `result.data.shipment.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
-| `result.data.shipment.items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
-| `result.data.shipment.items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
-| `result.data.shipment.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
-| `result.data.shipment.items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
-| `result.data.shipment.items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:734`。 |
+| `result.data.shipment.items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:753`。 |
+| `result.data.shipment.items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:756`。 |
+| `result.data.shipment.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:758`。 |
+| `result.data.shipment.items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:754`。 |
+| `result.data.shipment.items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:742`。 |
+| `result.data.shipment.items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:749`。 |
+| `result.data.shipment.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:757`。 |
+| `result.data.shipment.items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:755`。 |
+| `result.data.shipment.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:745`。 |
+| `result.data.shipment.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:746`。 |
+| `result.data.shipment.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:750`。 |
+| `result.data.shipment.items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:744`。 |
+| `result.data.shipment.items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:743`。 |
+| `result.data.shipment.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:748`。 |
+| `result.data.shipment.items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:751`。 |
+| `result.data.shipment.items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:752`。 |
 
 **`shipment.items[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:741`。 |
-| `result.data.shipment.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipment.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:759`。 |
+| `result.data.shipment.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:747`。 |
 
 **`shipment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
-| `result.data.shipment.package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
-| `result.data.shipment.planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:696`。 |
-| `result.data.shipment.quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
-| `result.data.shipment.receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
-| `result.data.shipment.sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:682`。 |
-| `result.data.shipment.shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:681`。 |
-| `result.data.shipment.shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:697`。 |
-| `result.data.shipment.shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
-| `result.data.shipment.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:686`。 |
-| `result.data.shipment.tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
-| `result.data.shipment.tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
-| `result.data.shipment.total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
-| `result.data.shipment.tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
-| `result.data.shipment.transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
-| `result.data.shipment.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
+| `result.data.shipment.package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:719`。 |
+| `result.data.shipment.planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
+| `result.data.shipment.quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
+| `result.data.shipment.receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:723`。 |
+| `result.data.shipment.sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
+| `result.data.shipment.shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
+| `result.data.shipment.shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipment.shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:722`。 |
+| `result.data.shipment.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
+| `result.data.shipment.tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
+| `result.data.shipment.tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
+| `result.data.shipment.total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipment.tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:718`。 |
+| `result.data.shipment.transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:716`。 |
+| `result.data.shipment.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
 
 **`shipment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:687`。 |
-| `result.data.shipment.volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipment.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
+| `result.data.shipment.volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
 
 ```json
 {
@@ -41843,92 +41845,92 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:615`。 |
+| `result.data.shipment` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:633`。 |
 
 **`shipment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
-| `result.data.shipment.created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
-| `result.data.shipment.customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:683`。 |
-| `result.data.shipment.customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:684`。 |
-| `result.data.shipment.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:685`。 |
-| `result.data.shipment.finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:694`。 |
-| `result.data.shipment.finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:692`。 |
-| `result.data.shipment.finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:693`。 |
-| `result.data.shipment.finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:688`。 |
-| `result.data.shipment.finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:689`。 |
-| `result.data.shipment.finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:690`。 |
-| `result.data.shipment.finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:691`。 |
-| `result.data.shipment.freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
-| `result.data.shipment.freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
-| `result.data.shipment.gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
-| `result.data.shipment.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:680`。 |
+| `result.data.shipment.carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:717`。 |
+| `result.data.shipment.created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
+| `result.data.shipment.customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
+| `result.data.shipment.customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
+| `result.data.shipment.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipment.finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
+| `result.data.shipment.finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
+| `result.data.shipment.finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
+| `result.data.shipment.finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
+| `result.data.shipment.finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
+| `result.data.shipment.finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
+| `result.data.shipment.finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
+| `result.data.shipment.freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
+| `result.data.shipment.freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
+| `result.data.shipment.gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:720`。 |
+| `result.data.shipment.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
 
 **`shipment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:695`。 |
-| `result.data.shipment.items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
-| `result.data.shipment.items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
+| `result.data.shipment.idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
+| `result.data.shipment.items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
+| `result.data.shipment.items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
 
 **`shipment.items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:735`。 |
-| `result.data.shipment.items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:738`。 |
-| `result.data.shipment.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:740`。 |
-| `result.data.shipment.items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:736`。 |
-| `result.data.shipment.items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
-| `result.data.shipment.items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
-| `result.data.shipment.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
-| `result.data.shipment.items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:737`。 |
-| `result.data.shipment.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
-| `result.data.shipment.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
-| `result.data.shipment.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
-| `result.data.shipment.items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
-| `result.data.shipment.items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
-| `result.data.shipment.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
-| `result.data.shipment.items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
-| `result.data.shipment.items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:734`。 |
+| `result.data.shipment.items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:753`。 |
+| `result.data.shipment.items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:756`。 |
+| `result.data.shipment.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:758`。 |
+| `result.data.shipment.items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:754`。 |
+| `result.data.shipment.items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:742`。 |
+| `result.data.shipment.items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:749`。 |
+| `result.data.shipment.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:757`。 |
+| `result.data.shipment.items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:755`。 |
+| `result.data.shipment.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:745`。 |
+| `result.data.shipment.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:746`。 |
+| `result.data.shipment.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:750`。 |
+| `result.data.shipment.items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:744`。 |
+| `result.data.shipment.items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:743`。 |
+| `result.data.shipment.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:748`。 |
+| `result.data.shipment.items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:751`。 |
+| `result.data.shipment.items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:752`。 |
 
 **`shipment.items[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:741`。 |
-| `result.data.shipment.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipment.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:759`。 |
+| `result.data.shipment.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:747`。 |
 
 **`shipment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
-| `result.data.shipment.package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
-| `result.data.shipment.planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:696`。 |
-| `result.data.shipment.quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
-| `result.data.shipment.receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
-| `result.data.shipment.sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:682`。 |
-| `result.data.shipment.shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:681`。 |
-| `result.data.shipment.shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:697`。 |
-| `result.data.shipment.shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
-| `result.data.shipment.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:686`。 |
-| `result.data.shipment.tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
-| `result.data.shipment.tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
-| `result.data.shipment.total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
-| `result.data.shipment.tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
-| `result.data.shipment.transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
-| `result.data.shipment.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
+| `result.data.shipment.package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:719`。 |
+| `result.data.shipment.planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
+| `result.data.shipment.quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
+| `result.data.shipment.receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:723`。 |
+| `result.data.shipment.sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
+| `result.data.shipment.shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
+| `result.data.shipment.shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipment.shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:722`。 |
+| `result.data.shipment.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
+| `result.data.shipment.tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
+| `result.data.shipment.tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
+| `result.data.shipment.total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipment.tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:718`。 |
+| `result.data.shipment.transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:716`。 |
+| `result.data.shipment.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
 
 **`shipment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:687`。 |
-| `result.data.shipment.volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipment.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
+| `result.data.shipment.volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
 
 ```json
 {
@@ -43219,10 +43221,12 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
+| `customer_id` | integer | 条件必填（customer_id 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "customer_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:519`。 |
 | `keyword` | string | 条件必填（keyword 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:503`。 |
-| `limit` | integer | 条件必填（limit 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "limit")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; value > 200”。 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:519`。 |
-| `offset` | integer | 条件必填（offset 有值） | 解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "offset")`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:527`。 |
+| `limit` | integer | 条件必填（limit 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "limit")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; value > 200”。 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:535`。 |
+| `offset` | integer | 条件必填（offset 有值） | 解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "offset")`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:543`。 |
 | `sales_order_id` | integer | 条件必填（sales_order_id 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "sales_order_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:511`。 |
+| `selectable` | boolean | 条件必填（selectable 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:527`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -43230,7 +43234,10 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 {
   "jsonrpc": "2.0",
   "method": "list_shipment_source_candidates",
-  "params": {},
+  "params": {
+    "customer_id": 2,
+    "selectable": true
+  },
   "id": "rpc-demo-operational_fact.list_shipment_source_candidates"
 }
 ```
@@ -43250,46 +43257,46 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.limit` | number | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:44`。 |
 | `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:45`。 |
 | `result.data.shipment_source_candidates` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:42`。 |
-| `result.data.shipment_source_candidates[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:636`。 |
+| `result.data.shipment_source_candidates[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:654`。 |
 
 **`shipment_source_candidates[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment_source_candidates[].color_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:657`。 |
-| `result.data.shipment_source_candidates[].currency` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:643`。 |
-| `result.data.shipment_source_candidates[].customer_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:644`。 |
-| `result.data.shipment_source_candidates[].customer_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:647`。 |
-| `result.data.shipment_source_candidates[].customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:645`。 |
-| `result.data.shipment_source_candidates[].delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:646`。 |
-| `result.data.shipment_source_candidates[].disabled_reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:667`。 |
-| `result.data.shipment_source_candidates[].line_no` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:649`。 |
-| `result.data.shipment_source_candidates[].line_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:650`。 |
-| `result.data.shipment_source_candidates[].order_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:640`。 |
-| `result.data.shipment_source_candidates[].order_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:641`。 |
-| `result.data.shipment_source_candidates[].order_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:642`。 |
-| `result.data.shipment_source_candidates[].ordered_quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:663`。 |
-| `result.data.shipment_source_candidates[].product_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:653`。 |
-| `result.data.shipment_source_candidates[].product_code_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:655`。 |
-| `result.data.shipment_source_candidates[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:651`。 |
+| `result.data.shipment_source_candidates[].color_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:675`。 |
+| `result.data.shipment_source_candidates[].currency` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:661`。 |
+| `result.data.shipment_source_candidates[].customer_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:662`。 |
+| `result.data.shipment_source_candidates[].customer_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:665`。 |
+| `result.data.shipment_source_candidates[].customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:663`。 |
+| `result.data.shipment_source_candidates[].delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:664`。 |
+| `result.data.shipment_source_candidates[].disabled_reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:685`。 |
+| `result.data.shipment_source_candidates[].line_no` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:667`。 |
+| `result.data.shipment_source_candidates[].line_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:668`。 |
+| `result.data.shipment_source_candidates[].order_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:658`。 |
+| `result.data.shipment_source_candidates[].order_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:659`。 |
+| `result.data.shipment_source_candidates[].order_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:660`。 |
+| `result.data.shipment_source_candidates[].ordered_quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:681`。 |
+| `result.data.shipment_source_candidates[].product_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:671`。 |
+| `result.data.shipment_source_candidates[].product_code_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:673`。 |
+| `result.data.shipment_source_candidates[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:669`。 |
 
 **`shipment_source_candidates[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment_source_candidates[].product_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:654`。 |
-| `result.data.shipment_source_candidates[].product_name_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:656`。 |
-| `result.data.shipment_source_candidates[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:652`。 |
-| `result.data.shipment_source_candidates[].remaining_quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:665`。 |
-| `result.data.shipment_source_candidates[].sales_order_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:639`。 |
-| `result.data.shipment_source_candidates[].sales_order_item_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:648`。 |
-| `result.data.shipment_source_candidates[].selectable` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:666`。 |
-| `result.data.shipment_source_candidates[].shipped_quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:664`。 |
-| `result.data.shipment_source_candidates[].sku_code` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:658`。 |
-| `result.data.shipment_source_candidates[].sku_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:659`。 |
-| `result.data.shipment_source_candidates[].unit_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:661`。 |
-| `result.data.shipment_source_candidates[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:660`。 |
-| `result.data.shipment_source_candidates[].unit_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:662`。 |
+| `result.data.shipment_source_candidates[].product_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:672`。 |
+| `result.data.shipment_source_candidates[].product_name_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:674`。 |
+| `result.data.shipment_source_candidates[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:670`。 |
+| `result.data.shipment_source_candidates[].remaining_quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:683`。 |
+| `result.data.shipment_source_candidates[].sales_order_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:657`。 |
+| `result.data.shipment_source_candidates[].sales_order_item_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:666`。 |
+| `result.data.shipment_source_candidates[].selectable` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:684`。 |
+| `result.data.shipment_source_candidates[].shipped_quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:682`。 |
+| `result.data.shipment_source_candidates[].sku_code` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:676`。 |
+| `result.data.shipment_source_candidates[].sku_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:677`。 |
+| `result.data.shipment_source_candidates[].unit_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:679`。 |
+| `result.data.shipment_source_candidates[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:678`。 |
+| `result.data.shipment_source_candidates[].unit_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:680`。 |
 
 **顶层字段**
 
@@ -43414,92 +43421,92 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:153`。 |
 | `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:153`。 |
 | `result.data.shipments` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:153`。 |
-| `result.data.shipments[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:673`。 |
+| `result.data.shipments[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:691`。 |
 
 **`shipments[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipments[].carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
-| `result.data.shipments[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
-| `result.data.shipments[].customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:683`。 |
-| `result.data.shipments[].customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:684`。 |
-| `result.data.shipments[].delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:685`。 |
-| `result.data.shipments[].finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:694`。 |
-| `result.data.shipments[].finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:692`。 |
-| `result.data.shipments[].finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:693`。 |
-| `result.data.shipments[].finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:688`。 |
-| `result.data.shipments[].finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:689`。 |
-| `result.data.shipments[].finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:690`。 |
-| `result.data.shipments[].finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:691`。 |
-| `result.data.shipments[].freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
-| `result.data.shipments[].freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
-| `result.data.shipments[].gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
-| `result.data.shipments[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:680`。 |
+| `result.data.shipments[].carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:717`。 |
+| `result.data.shipments[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
+| `result.data.shipments[].customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
+| `result.data.shipments[].customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
+| `result.data.shipments[].delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipments[].finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
+| `result.data.shipments[].finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
+| `result.data.shipments[].finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
+| `result.data.shipments[].finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
+| `result.data.shipments[].finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
+| `result.data.shipments[].finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
+| `result.data.shipments[].finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
+| `result.data.shipments[].freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
+| `result.data.shipments[].freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
+| `result.data.shipments[].gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:720`。 |
+| `result.data.shipments[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
 
 **`shipments[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipments[].idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:695`。 |
-| `result.data.shipments[].items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
-| `result.data.shipments[].items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
+| `result.data.shipments[].idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
+| `result.data.shipments[].items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
+| `result.data.shipments[].items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
 
 **`shipments[].items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipments[].items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:735`。 |
-| `result.data.shipments[].items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:738`。 |
-| `result.data.shipments[].items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:740`。 |
-| `result.data.shipments[].items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:736`。 |
-| `result.data.shipments[].items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
-| `result.data.shipments[].items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
-| `result.data.shipments[].items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
-| `result.data.shipments[].items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:737`。 |
-| `result.data.shipments[].items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
-| `result.data.shipments[].items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
-| `result.data.shipments[].items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
-| `result.data.shipments[].items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
-| `result.data.shipments[].items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
-| `result.data.shipments[].items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
-| `result.data.shipments[].items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
-| `result.data.shipments[].items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:734`。 |
+| `result.data.shipments[].items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:753`。 |
+| `result.data.shipments[].items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:756`。 |
+| `result.data.shipments[].items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:758`。 |
+| `result.data.shipments[].items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:754`。 |
+| `result.data.shipments[].items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:742`。 |
+| `result.data.shipments[].items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:749`。 |
+| `result.data.shipments[].items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:757`。 |
+| `result.data.shipments[].items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:755`。 |
+| `result.data.shipments[].items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:745`。 |
+| `result.data.shipments[].items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:746`。 |
+| `result.data.shipments[].items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:750`。 |
+| `result.data.shipments[].items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:744`。 |
+| `result.data.shipments[].items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:743`。 |
+| `result.data.shipments[].items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:748`。 |
+| `result.data.shipments[].items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:751`。 |
+| `result.data.shipments[].items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:752`。 |
 
 **`shipments[].items[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipments[].items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:741`。 |
-| `result.data.shipments[].items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipments[].items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:759`。 |
+| `result.data.shipments[].items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:747`。 |
 
 **`shipments[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipments[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
-| `result.data.shipments[].package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
-| `result.data.shipments[].planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:696`。 |
-| `result.data.shipments[].quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
-| `result.data.shipments[].receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
-| `result.data.shipments[].sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:682`。 |
-| `result.data.shipments[].shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:681`。 |
-| `result.data.shipments[].shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:697`。 |
-| `result.data.shipments[].shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
-| `result.data.shipments[].status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:686`。 |
-| `result.data.shipments[].tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
-| `result.data.shipments[].tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
-| `result.data.shipments[].total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
-| `result.data.shipments[].tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
-| `result.data.shipments[].transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
-| `result.data.shipments[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipments[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
+| `result.data.shipments[].package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:719`。 |
+| `result.data.shipments[].planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
+| `result.data.shipments[].quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
+| `result.data.shipments[].receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:723`。 |
+| `result.data.shipments[].sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
+| `result.data.shipments[].shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
+| `result.data.shipments[].shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipments[].shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:722`。 |
+| `result.data.shipments[].status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
+| `result.data.shipments[].tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
+| `result.data.shipments[].tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
+| `result.data.shipments[].total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipments[].tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:718`。 |
+| `result.data.shipments[].transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:716`。 |
+| `result.data.shipments[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
 
 **`shipments[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipments[].version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:687`。 |
-| `result.data.shipments[].volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipments[].version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
+| `result.data.shipments[].volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
 
 **顶层字段**
 
@@ -45680,92 +45687,92 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:615`。 |
+| `result.data.shipment` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:633`。 |
 
 **`shipment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
-| `result.data.shipment.created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
-| `result.data.shipment.customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:683`。 |
-| `result.data.shipment.customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:684`。 |
-| `result.data.shipment.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:685`。 |
-| `result.data.shipment.finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:694`。 |
-| `result.data.shipment.finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:692`。 |
-| `result.data.shipment.finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:693`。 |
-| `result.data.shipment.finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:688`。 |
-| `result.data.shipment.finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:689`。 |
-| `result.data.shipment.finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:690`。 |
-| `result.data.shipment.finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:691`。 |
-| `result.data.shipment.freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
-| `result.data.shipment.freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
-| `result.data.shipment.gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
-| `result.data.shipment.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:680`。 |
+| `result.data.shipment.carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:717`。 |
+| `result.data.shipment.created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
+| `result.data.shipment.customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
+| `result.data.shipment.customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
+| `result.data.shipment.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipment.finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
+| `result.data.shipment.finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
+| `result.data.shipment.finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
+| `result.data.shipment.finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
+| `result.data.shipment.finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
+| `result.data.shipment.finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
+| `result.data.shipment.finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
+| `result.data.shipment.freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
+| `result.data.shipment.freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
+| `result.data.shipment.gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:720`。 |
+| `result.data.shipment.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
 
 **`shipment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:695`。 |
-| `result.data.shipment.items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
-| `result.data.shipment.items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
+| `result.data.shipment.idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
+| `result.data.shipment.items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
+| `result.data.shipment.items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
 
 **`shipment.items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:735`。 |
-| `result.data.shipment.items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:738`。 |
-| `result.data.shipment.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:740`。 |
-| `result.data.shipment.items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:736`。 |
-| `result.data.shipment.items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
-| `result.data.shipment.items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
-| `result.data.shipment.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
-| `result.data.shipment.items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:737`。 |
-| `result.data.shipment.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
-| `result.data.shipment.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
-| `result.data.shipment.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
-| `result.data.shipment.items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
-| `result.data.shipment.items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
-| `result.data.shipment.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
-| `result.data.shipment.items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
-| `result.data.shipment.items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:734`。 |
+| `result.data.shipment.items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:753`。 |
+| `result.data.shipment.items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:756`。 |
+| `result.data.shipment.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:758`。 |
+| `result.data.shipment.items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:754`。 |
+| `result.data.shipment.items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:742`。 |
+| `result.data.shipment.items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:749`。 |
+| `result.data.shipment.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:757`。 |
+| `result.data.shipment.items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:755`。 |
+| `result.data.shipment.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:745`。 |
+| `result.data.shipment.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:746`。 |
+| `result.data.shipment.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:750`。 |
+| `result.data.shipment.items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:744`。 |
+| `result.data.shipment.items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:743`。 |
+| `result.data.shipment.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:748`。 |
+| `result.data.shipment.items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:751`。 |
+| `result.data.shipment.items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:752`。 |
 
 **`shipment.items[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:741`。 |
-| `result.data.shipment.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipment.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:759`。 |
+| `result.data.shipment.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:747`。 |
 
 **`shipment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
-| `result.data.shipment.package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
-| `result.data.shipment.planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:696`。 |
-| `result.data.shipment.quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
-| `result.data.shipment.receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
-| `result.data.shipment.sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:682`。 |
-| `result.data.shipment.shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:681`。 |
-| `result.data.shipment.shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:697`。 |
-| `result.data.shipment.shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
-| `result.data.shipment.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:686`。 |
-| `result.data.shipment.tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
-| `result.data.shipment.tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
-| `result.data.shipment.total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
-| `result.data.shipment.tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
-| `result.data.shipment.transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
-| `result.data.shipment.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
+| `result.data.shipment.package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:719`。 |
+| `result.data.shipment.planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
+| `result.data.shipment.quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
+| `result.data.shipment.receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:723`。 |
+| `result.data.shipment.sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
+| `result.data.shipment.shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
+| `result.data.shipment.shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipment.shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:722`。 |
+| `result.data.shipment.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
+| `result.data.shipment.tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
+| `result.data.shipment.tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
+| `result.data.shipment.total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipment.tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:718`。 |
+| `result.data.shipment.transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:716`。 |
+| `result.data.shipment.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
 
 **`shipment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:687`。 |
-| `result.data.shipment.volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipment.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
+| `result.data.shipment.volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
 
 ```json
 {
@@ -45994,92 +46001,92 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:615`。 |
+| `result.data.shipment` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:633`。 |
 
 **`shipment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
-| `result.data.shipment.created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
-| `result.data.shipment.customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:683`。 |
-| `result.data.shipment.customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:684`。 |
-| `result.data.shipment.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:685`。 |
-| `result.data.shipment.finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:694`。 |
-| `result.data.shipment.finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:692`。 |
-| `result.data.shipment.finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:693`。 |
-| `result.data.shipment.finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:688`。 |
-| `result.data.shipment.finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:689`。 |
-| `result.data.shipment.finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:690`。 |
-| `result.data.shipment.finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:691`。 |
-| `result.data.shipment.freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
-| `result.data.shipment.freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
-| `result.data.shipment.gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
-| `result.data.shipment.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:680`。 |
+| `result.data.shipment.carrier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:717`。 |
+| `result.data.shipment.created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
+| `result.data.shipment.customer_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
+| `result.data.shipment.customer_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:702`。 |
+| `result.data.shipment.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipment.finance_release_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
+| `result.data.shipment.finance_release_process_instance_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:710`。 |
+| `result.data.shipment.finance_release_process_node_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
+| `result.data.shipment.finance_release_status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
+| `result.data.shipment.finance_release_version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
+| `result.data.shipment.finance_released_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
+| `result.data.shipment.finance_released_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:709`。 |
+| `result.data.shipment.freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
+| `result.data.shipment.freight_currency` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
+| `result.data.shipment.gross_weight_kg` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:720`。 |
+| `result.data.shipment.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
 
 **`shipment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:695`。 |
-| `result.data.shipment.items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
-| `result.data.shipment.items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
+| `result.data.shipment.idempotency_key` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:713`。 |
+| `result.data.shipment.items` | array | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
+| `result.data.shipment.items[]` | object | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
 
 **`shipment.items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:735`。 |
-| `result.data.shipment.items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:738`。 |
-| `result.data.shipment.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:740`。 |
-| `result.data.shipment.items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:736`。 |
-| `result.data.shipment.items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
-| `result.data.shipment.items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:731`。 |
-| `result.data.shipment.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:739`。 |
-| `result.data.shipment.items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:737`。 |
-| `result.data.shipment.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:727`。 |
-| `result.data.shipment.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:728`。 |
-| `result.data.shipment.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:732`。 |
-| `result.data.shipment.items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
-| `result.data.shipment.items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
-| `result.data.shipment.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
-| `result.data.shipment.items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
-| `result.data.shipment.items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:734`。 |
+| `result.data.shipment.items[].amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:753`。 |
+| `result.data.shipment.items[].case_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:756`。 |
+| `result.data.shipment.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:758`。 |
+| `result.data.shipment.items[].currency_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:754`。 |
+| `result.data.shipment.items[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:742`。 |
+| `result.data.shipment.items[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:749`。 |
+| `result.data.shipment.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:757`。 |
+| `result.data.shipment.items[].package_description` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:755`。 |
+| `result.data.shipment.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:745`。 |
+| `result.data.shipment.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:746`。 |
+| `result.data.shipment.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:750`。 |
+| `result.data.shipment.items[].sales_order_item_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:744`。 |
+| `result.data.shipment.items[].shipment_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:743`。 |
+| `result.data.shipment.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:748`。 |
+| `result.data.shipment.items[].unit_net_weight_g_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:751`。 |
+| `result.data.shipment.items[].unit_price_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:752`。 |
 
 **`shipment.items[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:741`。 |
-| `result.data.shipment.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipment.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:759`。 |
+| `result.data.shipment.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:747`。 |
 
 **`shipment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:712`。 |
-| `result.data.shipment.package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:701`。 |
-| `result.data.shipment.planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:696`。 |
-| `result.data.shipment.quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:706`。 |
-| `result.data.shipment.receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
-| `result.data.shipment.sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:682`。 |
-| `result.data.shipment.shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:681`。 |
-| `result.data.shipment.shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:697`。 |
-| `result.data.shipment.shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
-| `result.data.shipment.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:686`。 |
-| `result.data.shipment.tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:707`。 |
-| `result.data.shipment.tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:708`。 |
-| `result.data.shipment.total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:711`。 |
-| `result.data.shipment.tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
-| `result.data.shipment.transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:698`。 |
-| `result.data.shipment.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:730`。 |
+| `result.data.shipment.package_count` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:719`。 |
+| `result.data.shipment.planned_ship_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:714`。 |
+| `result.data.shipment.quoted_freight_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:724`。 |
+| `result.data.shipment.receivable_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:723`。 |
+| `result.data.shipment.sales_order_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:700`。 |
+| `result.data.shipment.shipment_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:699`。 |
+| `result.data.shipment.shipped_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:715`。 |
+| `result.data.shipment.shipping_mark` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:722`。 |
+| `result.data.shipment.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:704`。 |
+| `result.data.shipment.tax_amount_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:725`。 |
+| `result.data.shipment.tax_mode_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:726`。 |
+| `result.data.shipment.total_net_weight_g` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:729`。 |
+| `result.data.shipment.tracking_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:718`。 |
+| `result.data.shipment.transport_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:716`。 |
+| `result.data.shipment.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:733`。 |
 
 **`shipment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.shipment.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:687`。 |
-| `result.data.shipment.volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:703`。 |
+| `result.data.shipment.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:705`。 |
+| `result.data.shipment.volume_m3` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_shipment.go:721`。 |
 
 ```json
 {

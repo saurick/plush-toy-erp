@@ -312,6 +312,11 @@
     .search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(var(--brand-rgb), .11); }
     .search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; }
     .search svg { color: var(--text-3); }
+    .import-review-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; min-width:0; }
+    .import-review-toolbar > .control { flex:0 1 200px; width:200px; min-width:0; max-width:100%; }
+    .import-review-search-actions { display:flex; flex:1 1 360px; align-items:center; gap:8px; min-width:min(100%,360px); }
+    .import-review-search-actions > .search { flex:1 1 0; min-width:0; }
+    .import-review-selection { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
     .command-actions { min-width: 0; margin-left: auto; display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
     .inventory-command { flex-wrap: wrap; }
     .inventory-navigation { display: flex; min-width: 0; max-width: 100%; flex-wrap: wrap; align-items: center; gap: 7px; }
@@ -18324,25 +18329,40 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<span style="display:inline-flex;gap:0"><button class="btn primary" data-action="new-record" ${disabled?'disabled':''}>${icon('plus')}新建 BOM</button><details class="business-action-menu" style="position:relative"><summary class="btn primary" aria-label="更多新建方式" style="list-style:none">⌄</summary><div class="surface" style="position:absolute;right:0;top:100%;z-index:20;padding:8px;width:180px"><button class="btn" data-action="bom-import-new" ${disabled?'disabled':''}>${icon('upload')}从 Excel 新建</button><button class="btn" data-action="bom-import-format">查看 Excel 格式</button></div></details></span>`;
     }
 
+    function renderImportReviewFilter(kind) {
+      const value=state.importReviewFilter||'';
+      const label=kind==='bom'?'核对结果':'可导入状态';
+      const filterOptions=kind==='bom'?[['issues','全部待补全'],['material_id','待选择材料'],['unit_id','待选择单位']]:[['yes','可导入'],['no','不可导入（查看原因）']];
+      const options=[['',`按${label}筛选`],...filterOptions];
+      return `<div class="import-review-toolbar" role="group" aria-label="导入筛选与搜索"><label class="control"><ui-select aria-label="导入核对筛选" placeholder="${options[0][1]}" data-import-review-filter>${options.map(([key,label])=>`<option value="${key}" ${value===key?'selected':''}>${label}</option>`).join('')}</ui-select></label><div class="import-review-search-actions"><label class="search">${icon('search')}<input type="search" aria-label="搜索导入记录" placeholder="搜索原表或来源内容" value="${escapeHTML(state.importReviewKeyword||'')}" data-import-review-search></label><button class="btn primary" data-action="search-import-review">搜索</button><button class="btn" data-action="clear-import-review-filter">清空筛选</button></div></div>`;
+    }
+    function matchesImportReviewSearch(values) { return values.join(' ').toLowerCase().includes((state.importReviewKeyword||'').toLowerCase()); }
+    document.addEventListener('change',event=>{
+      if(event.target.matches('[data-import-review-filter]')){state.importReviewFilter=event.target.value;renderFloating();}
+    });
+    document.addEventListener('keydown',event=>{
+      if(event.key==='Enter'&&!event.isComposing&&event.target.matches('[data-import-review-search]')){event.preventDefault();state.importReviewKeyword=event.target.value.trim();renderFloating();}
+    });
+
     function renderBOMImportPreview() {
       const creating = state.bomImportTarget === 'new';
       const replacing = !creating && state.bomImportMode === 'replace';
       const title = creating ? '从 Excel 新建 BOM' : '导入材料明细';
       const rows = [['短毛绒','身体前片','0.42','码'],['填充棉','身体','0.18','千克']];
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(760px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong>${title}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><p class="data-note">演示材料明细.xlsx / 材料分析明细表 · 2 个部位</p><p class="data-note">${creating?'带入编辑页核对，保存草稿后才新建 BOM。':'仅导入明细，产品、版本、订单数量和其他表头保留当前草稿内容。'}</p><div class="source-summary-table"><table><thead><tr><th>材料</th><th>部位</th><th>单位用量</th><th>单位</th><th>校对</th></tr></thead><tbody>${rows.map(row=>`<tr>${row.map(value=>`<td>${value}</td>`).join('')}<td>已匹配</td></tr>`).join('')}</tbody></table></div>${!creating&&state.lineCount?`<fieldset style="border:0;padding:12px 0"><legend>当前草稿已有 ${state.lineCount} 个部位</legend><label><input type="radio" name="bom-import-mode" data-action="bom-import-mode" data-value="append" ${!replacing?'checked':''}/> 追加，保留当前明细</label> <label><input type="radio" name="bom-import-mode" data-action="bom-import-mode" data-value="replace" ${replacing?'checked':''}/> 替换当前明细</label></fieldset>`:''}${replacing?'<div class="rm-callout warning">确认后将替换当前草稿明细，保存前可撤销本次导入。</div>':''}</div><footer class="modal-foot"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-import">${creating?'带入并核对':replacing?'替换并带入 2 个部位':'追加 2 个部位'}</button></footer></section></div>`;
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(760px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong>${title}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><p class="data-note">演示材料明细.xlsx / 材料分析明细表 · 2 个部位</p><p class="data-note">${creating?'带入编辑页核对，保存草稿后才新建 BOM。':'仅导入明细，产品、版本、订单数量和其他表头保留当前草稿内容。'}</p>${renderImportReviewFilter('bom')}<p class="data-note">筛选仅用于核对；确认后仍带入全部 2 个部位。</p><div class="source-summary-table"><table><thead><tr><th>材料</th><th>部位</th><th>单位用量</th><th>单位</th><th>校对</th></tr></thead><tbody>${(state.importReviewFilter?[]:rows).filter(matchesImportReviewSearch).map(row=>`<tr>${row.map(value=>`<td>${value}</td>`).join('')}<td>已匹配</td></tr>`).join('')}</tbody></table></div>${!creating&&state.lineCount?`<fieldset style="border:0;padding:12px 0"><legend>当前草稿已有 ${state.lineCount} 个部位</legend><label><input type="radio" name="bom-import-mode" data-action="bom-import-mode" data-value="append" ${!replacing?'checked':''}/> 追加，保留当前明细</label> <label><input type="radio" name="bom-import-mode" data-action="bom-import-mode" data-value="replace" ${replacing?'checked':''}/> 替换当前明细</label></fieldset>`:''}${replacing?'<div class="rm-callout warning">确认后将替换当前草稿明细，保存前可撤销本次导入。</div>':''}</div><footer class="modal-foot"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-import">${creating?'带入并核对':replacing?'替换并带入 2 个部位':'追加 2 个部位'}</button></footer></section></div>`;
     }
 
     function renderImportPreviewModal() {
       if (state.importMode === 'bom') return renderBOMImportPreview();
       const title = '从销售订单带入明细';
       const source = 'SO-20260924-006 · 可出货明细';
-      const metrics = [['订单行','3'],['可出货','2'],['需确认','1'],['不可带入','0']];
+      const metrics = [['订单行','3'],['可出货','2'],['需确认','0'],['不可带入','1']];
       const columns = ['销售订单行','产品 / SKU','可出货数量','结果'];
       const rows = [
-        ['行 1','IP 联名公仔 / 18cm 蓝色','1,200 个','可带入'],['行 2','节庆毛绒礼盒 / 米白','800 套','可带入'],['行 3','海洋系列抱枕 / 30cm','0 个','待库存确认']
+        ['行 1','IP 联名公仔 / 18cm 蓝色','1,200 个','可带入'],['行 2','节庆毛绒礼盒 / 米白','800 套','可带入'],['行 3','海洋系列抱枕 / 30cm','0 个','来源行已关闭']
       ];
       const sourceControl = `<label class="control"><span>订单</span><ui-select aria-label="选择销售订单"><option>SO-20260924-006</option><option>SO-20260925-001</option><option>SO-20260923-011</option></ui-select></label>`;
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(820px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong>${title}</strong><span class="badge info">预检</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><section class="detail-section"><div class="task-create-object"><span class="badge">来源</span><div><strong>${source}</strong><span>仅带入当前订单仍可出货的产品与客户快照</span></div>${sourceControl}</div></section><div class="import-metrics">${metrics.map(([label,value],index)=>`<section class="import-metric ${index===2?'warning':index===3?'danger':''}"><span>${label}</span><strong>${value}</strong></section>`).join('')}</div><section class="detail-section"><h3>可带入订单行</h3><div class="source-summary-table"><table><thead><tr>${columns.map(label=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${rows.map((row,rowIndex)=>`<tr>${row.map((value,index)=>`<td>${index===row.length-1?`<span class="badge ${rowIndex===rows.length-1?'warning':'success'}">${value}</span>`:value}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section><div class="rm-callout warning" style="margin-top:12px">带入数量仍需仓库批次与库存校验；销售订单本身不会因此变更为已出货。</div></div><footer class="modal-foot"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-import">带入 2 条明细</button></footer></section></div>`;
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(820px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong>${title}</strong><span class="badge info">预检</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><section class="detail-section"><div class="task-create-object"><span class="badge">来源</span><div><strong>${source}</strong><span>仅带入当前订单仍可出货的产品与客户快照</span></div>${sourceControl}</div></section><div class="import-metrics">${metrics.map(([label,value],index)=>`<section class="import-metric ${index===2?'warning':index===3?'danger':''}"><span>${label}</span><strong>${value}</strong></section>`).join('')}</div>${renderImportReviewFilter('shipment')}<p class="data-note">先按客户和销售订单缩小范围；勾选跨页保留，切换其他订单须确认清空。销售 Excel 按原表客户与待核对筛选。</p><section class="detail-section"><h3>来源订单行</h3><div class="source-summary-table"><table><thead><tr>${columns.map(label=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${rows.filter(row=>(!state.importReviewFilter||(state.importReviewFilter==='yes'?row[3]==='可带入':row[3]!=='可带入'))&&matchesImportReviewSearch(row)).map((row,rowIndex)=>`<tr>${row.map((value,index)=>`<td>${index===row.length-1?`<span class="badge ${rowIndex===rows.length-1?'warning':'success'}">${value}</span>`:value}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section><div class="rm-callout warning" style="margin-top:12px">带入数量仍需仓库批次与库存校验；销售订单本身不会因此变更为已出货。</div></div><footer class="modal-foot"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-import">带入 2 条明细</button></footer></section></div>`;
     }
 
     function renderMediaSortModal() {
@@ -18926,10 +18946,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       else if (action === 'form-anchor') { const section=document.getElementById(target.dataset.target); if(section){section.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});const heading=section.querySelector('.section-title');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}} }
       else if (action === 'bom-import-format') { state.overlay='bom-import-format';renderFloating(); }
-      else if (action === 'bom-import' || action === 'bom-import-new') { state.importMode='bom';state.bomImportTarget=action==='bom-import-new'?'new':'items';state.bomImportMode='append';state.overlay='import-preview';renderFloating(); }
+      else if (action === 'search-import-review') { state.importReviewKeyword=document.querySelector('[data-import-review-search]')?.value.trim()||'';renderFloating(); }
+      else if (action === 'clear-import-review-filter') { state.importReviewFilter='';state.importReviewKeyword='';renderFloating(); }
+      else if (action === 'bom-import' || action === 'bom-import-new') { state.importReviewFilter='';state.importReviewKeyword=''; state.importMode='bom';state.bomImportTarget=action==='bom-import-new'?'new':'items';state.bomImportMode='append';state.overlay='import-preview';renderFloating(); }
       else if (action === 'bom-import-mode') { state.bomImportMode=target.dataset.value;renderFloating(); }
       else if (action === 'bom-import-undo') { if(state.bomImportUndo){state.lineCount=state.bomImportUndo.lineCount;state.formDirty=state.bomImportUndo.dirty;state.bomImportUndo=null;renderAll();} }
-      else if (action === 'shipment-import') { state.importMode='shipment';state.overlay='import-preview';renderFloating(); }
+      else if (action === 'shipment-import') { state.importReviewFilter='';state.importReviewKeyword='';state.importMode='shipment';state.overlay='import-preview';renderFloating(); }
       else if (action === 'confirm-import') { const isBom=state.importMode==='bom';if(isBom){if(state.bomImportTarget==='new'){openEntityForm('bom','create');state.lineCount=2;state.bomImportUndo=null;}else{state.bomImportUndo={lineCount:state.lineCount,dirty:state.formDirty};state.lineCount=state.bomImportMode==='replace'?2:state.lineCount+2;}}else state.lineCount=Math.max(state.lineCount,3);state.formDirty=true;state.overlay=null;renderAll();toast(isBom?'已带入明细，请核对后保存草稿':'已带入可出货销售订单明细'); }
       else if (action === 'fake-upload') {
         if (state.overlay === 'import-preview') { openAttachmentManager('business', state.importMode === 'bom' ? '当前 BOM 草稿 · Excel 来源' : '当前出货草稿'); return; }

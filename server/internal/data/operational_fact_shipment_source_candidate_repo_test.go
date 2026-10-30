@@ -27,6 +27,60 @@ type shipmentSourceCandidateFixture struct {
 	warehouseID  int
 }
 
+func TestOperationalFactRepoListShipmentSourceCandidatesFiltersBeforePagination(t *testing.T) {
+	ctx := context.Background()
+	f := newShipmentSourceCandidateFixture(t, "source_filters")
+	order := f.createOrder(t, "SO-FILTER", biz.SalesOrderStatusActive)
+	for i := 1; i <= 6; i++ {
+		line := f.createOrderItem(t, order.ID, i, biz.SalesOrderItemStatusOpen, 10)
+		if i%2 == 0 {
+			f.createShipmentItem(t, fmt.Sprintf("SHIP-FILTER-%d", i), biz.ShipmentStatusShipped, order.ID, line.ID, 10)
+		}
+	}
+	closed := f.createOrderItem(t, order.ID, 7, biz.SalesOrderItemStatusClosed, 10)
+	f.createShipmentItem(t, "DRAFT-FILTER", biz.ShipmentStatusDraft, order.ID, closed.ID, 10)
+	other := f.createOrder(t, "SO-OTHER", biz.SalesOrderStatusActive)
+	foreignCustomer := f.client.Customer.Create().SetCode("OTHER-FILTER").SetName("其他客户").SaveX(ctx)
+	f.client.SalesOrder.UpdateOneID(other.ID).SetCustomerID(foreignCustomer.ID).SaveX(ctx)
+	f.createOrderItem(t, other.ID, 1, biz.SalesOrderItemStatusOpen, 20)
+	for _, selectable := range []bool{true, false} {
+		want := 4
+		if selectable {
+			want = 3
+		}
+		seen := map[int]bool{}
+		for offset := 0; offset < want; offset++ {
+			rows, total, err := f.repo.ListShipmentSourceCandidates(ctx, biz.ShipmentSourceCandidateFilter{
+				CustomerID: f.customerID, Selectable: &selectable, Limit: 1, Offset: offset,
+			})
+			if err != nil || total != want || len(rows) != 1 {
+				t.Fatalf("selectable=%v offset=%d total=%d rows=%d err=%v", selectable, offset, total, len(rows), err)
+			}
+			if rows[0].Selectable != selectable || rows[0].CustomerID != f.customerID || seen[rows[0].SalesOrderItemID] {
+				t.Fatalf("incorrect filtered row: %#v", rows[0])
+			}
+			seen[rows[0].SalesOrderItemID] = true
+		}
+	}
+	rows, total, err := f.repo.ListShipmentSourceCandidates(ctx, biz.ShipmentSourceCandidateFilter{CustomerID: foreignCustomer.ID, SalesOrderID: order.ID, Limit: 1})
+	if err != nil || total != 0 || len(rows) != 0 {
+		t.Fatalf("mismatched customer/order should be empty: %d %v", total, err)
+	}
+	// A shipped header with a foreign source invalidates the entire header order
+	// and the foreign source line, even when that row is beyond the current page.
+	foreignLine := f.createOrderItem(t, other.ID, 2, biz.SalesOrderItemStatusOpen, 20)
+	f.createShipmentItem(t, "CORRUPT-FILTER", biz.ShipmentStatusShipped, order.ID, foreignLine.ID, 1)
+	eligible := true
+	rows, total, err = f.repo.ListShipmentSourceCandidates(ctx, biz.ShipmentSourceCandidateFilter{SalesOrderID: order.ID, Selectable: &eligible, Limit: 1})
+	if err != nil || total != 0 || len(rows) != 0 {
+		t.Fatalf("corrupted source should be excluded before pagination: %d %v", total, err)
+	}
+	rows, _, err = f.repo.ListShipmentSourceCandidates(ctx, biz.ShipmentSourceCandidateFilter{SalesOrderID: other.ID, Selectable: &eligible, Limit: 10})
+	if err != nil || len(rows) != 1 || !rows[0].Selectable {
+		t.Fatalf("foreign corrupt line should be excluded: %#v %v", rows, err)
+	}
+}
+
 func newShipmentSourceCandidateFixture(t *testing.T, name string) *shipmentSourceCandidateFixture {
 	t.Helper()
 	client := enttest.Open(t, dialect.SQLite, "file:"+name+"?mode=memory&cache=shared&_fk=1")

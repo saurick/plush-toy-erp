@@ -441,7 +441,7 @@
   font-weight: 780;
 }
 
-.erp-source-import-picker__title small {
+.erp-source-import-picker__description {
   color: var(--erp-sales-order-lines-text-muted, #6b7788);
   font-size: var(--erp-font-caption);
   line-height: 1.45;
@@ -461,14 +461,37 @@
   gap: 8px;
 }
 
+.erp-source-import-picker__filters {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.erp-source-import-picker__filters > .ant-select {
+  flex: 0 1 240px;
+  width: 240px;
+  max-width: 100%;
+}
+
+.erp-source-import-picker__search-actions {
+  display: flex;
+  flex: 1 1 360px;
+  min-width: min(100%, 360px);
+  align-items: center;
+  gap: 8px;
+}
+
 .erp-source-import-picker__search.ant-input-affix-wrapper {
   min-width: 0;
-  flex: 1 1 280px;
+  flex: 1 1 0;
 }
 
 .erp-source-import-picker__clear-filter.ant-btn {
   flex: 0 0 auto;
-  margin-inline-start: auto;
 }
 
 .erp-source-import-picker .ant-table-wrapper {
@@ -491,6 +514,7 @@
 
 .erp-source-import-picker__selection {
   display: flex;
+  flex-wrap: wrap;
   min-width: 0;
   align-items: center;
   justify-content: space-between;
@@ -1172,11 +1196,6 @@
 .erp-business-action-modal .ant-table-container {
   overflow: hidden;
   border-radius: 8px;
-}
-
-.erp-business-action-modal .ant-table-content,
-.erp-business-action-modal .ant-table-body {
-  scrollbar-gutter: stable;
 }
 
 .erp-business-action-modal--recycle .ant-modal-body,

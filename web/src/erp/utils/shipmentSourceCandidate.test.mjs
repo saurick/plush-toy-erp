@@ -47,6 +47,14 @@ function candidate(overrides = {}) {
   }
 }
 
+test('source filters preserve exact customer/order and both eligibility values', () => {
+  for (const selectable of [true, false]) {
+    assert.deepEqual(shipmentSourceCandidateListParams({ customerID: 8, salesOrderID: 7, selectable, page: 2 }),
+      { customer_id: 8, sales_order_id: 7, selectable, limit: 20, offset: 20 })
+  }
+  assert.deepEqual(shipmentSourceCandidateListParams({}), { limit: 20, offset: 0 })
+})
+
 test('shipment source candidate request maps search and server page exactly', () => {
   assert.deepEqual(
     shipmentSourceCandidateListParams({

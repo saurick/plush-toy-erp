@@ -22,6 +22,24 @@ type shipmentSourceCandidateJSONRPCRepo struct {
 	filter         biz.ShipmentSourceCandidateFilter
 }
 
+func TestJSONRPCListShipmentSourceCandidatesFilterParams(t *testing.T) {
+	for _, selectable := range []bool{true, false} {
+		filter, ok := shipmentSourceCandidateFilterFromParams(map[string]any{"customer_id": 2, "sales_order_id": 3, "selectable": selectable, "limit": 1, "offset": 2})
+		if !ok || filter.CustomerID != 2 || filter.SalesOrderID != 3 || filter.Selectable == nil || *filter.Selectable != selectable {
+			t.Fatalf("filter not preserved: %#v", filter)
+		}
+	}
+	for _, params := range []map[string]any{{"customer_id": 0}, {"customer_id": -1}, {"customer_id": "2"}, {"customer_id": 1.5}, {"selectable": "true"}, {"selectable": nil}, {"selectable": 1}} {
+		if _, ok := shipmentSourceCandidateFilterFromParams(params); ok {
+			t.Fatalf("accepted invalid filter: %#v", params)
+		}
+	}
+	filter, ok := shipmentSourceCandidateFilterFromParams(map[string]any{})
+	if !ok || filter.Selectable != nil || filter.CustomerID != 0 {
+		t.Fatal("omitted filters must preserve unfiltered query")
+	}
+}
+
 func (r *shipmentSourceCandidateJSONRPCRepo) ListShipmentSourceCandidates(
 	_ context.Context,
 	filter biz.ShipmentSourceCandidateFilter,
@@ -240,7 +258,7 @@ func TestJSONRPCListShipmentSourceCandidatesAllowsUpdateWithoutCreate(t *testing
 		),
 		repo,
 	)
-	_, result, err := dispatcher.handleOperationalFact(ctx, "list_shipment_source_candidates", "update-only", mustJSONRPCStruct(t, map[string]any{}))
+	_, result, err := dispatcher.handleOperationalFact(ctx, "list_shipment_source_candidates", "update-only", mustJSONRPCStruct(t, map[string]any{"customer_id": 2, "selectable": true}))
 	if err != nil || result == nil || result.Code != errcode.OK.Code {
 		t.Fatalf("update-only candidate response=%#v err=%v", result, err)
 	}

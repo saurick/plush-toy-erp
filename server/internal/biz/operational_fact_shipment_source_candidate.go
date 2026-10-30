@@ -62,6 +62,8 @@ type ShipmentSourceCandidate struct {
 type ShipmentSourceCandidateFilter struct {
 	Keyword      string
 	SalesOrderID int
+	CustomerID   int
+	Selectable   *bool
 	Limit        int
 	Offset       int
 }
@@ -94,7 +96,7 @@ func (uc *OperationalFactUsecase) ListShipmentSourceCandidates(
 func normalizeShipmentSourceCandidateFilter(in ShipmentSourceCandidateFilter) (ShipmentSourceCandidateFilter, error) {
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	if utf8.RuneCountInString(in.Keyword) > shipmentSourceCandidateMaxKeywordRunes ||
-		in.SalesOrderID < 0 ||
+		in.SalesOrderID < 0 || in.CustomerID < 0 ||
 		in.Limit <= 0 || in.Limit > 200 ||
 		in.Offset < 0 {
 		return ShipmentSourceCandidateFilter{}, ErrBadParam

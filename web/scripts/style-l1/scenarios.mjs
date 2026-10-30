@@ -1,4 +1,5 @@
 import { createBusinessQuickCountsScenarios } from './businessQuickCountsScenarios.mjs'
+import { createImportPickerScenarios } from './importPickerScenarios.mjs'
 import { createPerformanceReferenceScenarios } from './performanceReferenceScenarios.mjs'
 import { createSearchSubmissionScenarios } from './searchSubmissionScenarios.mjs'
 import { createDensityCompletionScenarios } from './densityCompletionScenarios.mjs'
@@ -953,5 +954,5 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
   ]
-  return [...scenarios, ...createScrollEdgeScenarios(scenarios, { outputDir }), ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession }), ...createDensityCompletionScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
+  return [...scenarios, ...createImportPickerScenarios({ ...deps, customerRuntimeEffectiveSession, outputDir }), ...createScrollEdgeScenarios(scenarios, { outputDir }), ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession }), ...createDensityCompletionScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
 }

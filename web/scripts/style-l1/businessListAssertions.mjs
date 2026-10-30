@@ -880,7 +880,6 @@ export function createBusinessListAssertions({ outputDir }) {
       `${scenarioName} 来源导入表格不应默认省略关键列: ${JSON.stringify(metrics)}`
     )
     assert(metrics.hasPagination, `${scenarioName} 来源导入选择器缺少分页`)
-    await expectText(picker, '已选 0 条')
     await expectText(picker, `未选择${selectedNoun}`)
     assert.equal(
       await picker.getByRole('button', { name: '清空已选' }).count(),
@@ -1000,7 +999,7 @@ export function createBusinessListAssertions({ outputDir }) {
         force: true,
       })
       await assertTextAbsent(page, `已选 ${collapseSelectTexts.length} 条`)
-      await expectText(picker, '已选 0 条')
+      await expectText(picker, `未选择${selectedNoun}`)
     }
 
     if (selectText) {
@@ -1084,7 +1083,7 @@ export function createBusinessListAssertions({ outputDir }) {
         0,
         `${scenarioName} 清空已选后按钮应从来源选择器中移除`
       )
-      await expectText(picker, '已选 0 条')
+      await expectText(picker, `未选择${selectedNoun}`)
       const clearedImportDisabled = await importButton.evaluate(
         (button) => button.disabled
       )

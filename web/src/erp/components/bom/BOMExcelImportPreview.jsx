@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Form, Radio, Space, Typography, Button } from 'antd'
 import { UndoOutlined } from '@ant-design/icons'
+import FilterSelect from '@/common/components/select/FilterSelect'
+import SearchInput from '@/common/components/SearchInput'
 import Table from '@/common/components/table/AppTable'
 import BusinessModal from '../business-list/BusinessModal.jsx'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
@@ -48,10 +50,19 @@ export default function BOMExcelImportPreview({
   onConfirm,
 }) {
   const [mode, setMode] = useState('append')
-  useEffect(() => setMode('append'), [pending])
+  const [reviewFilter, setReviewFilter] = useState('')
+  const [keyword, setKeyword] = useState('')
+  const [page, setPage] = useState(1)
+  useEffect(() => { setMode('append'); setReviewFilter(''); setKeyword(''); setPage(1) }, [pending])
   const detailsOnly = pending?.target === 'items'
   const draft = pending?.draft
   const rows = draft?.values.items || []
+  const visibleRows = rows.filter((item) => {
+    const issues = getBOMImportLineIssues(item)
+    const matchesReview = !reviewFilter || (reviewFilter === 'issues' ? issues.length > 0 : issues.some((issue) => issue.field === reviewFilter))
+    const text = [item._import_source?.materialName, item.position, ...(item._import_source?.cells || []).map((cell) => cell.value)].join(' ').toLowerCase()
+    return matchesReview && text.includes(keyword.trim().toLowerCase())
+  })
   const quantityNotice = detailsOnly
     ? describeBOMImportQuantity(currentQuantity, draft?.values.quantity_text, { pending: true })
     : ''
@@ -141,13 +152,38 @@ export default function BOMExcelImportPreview({
             : ''}
         </Typography.Text>
         {quantityNotice ? <Typography.Text>{quantityNotice}</Typography.Text> : null}
+        <div className="erp-source-import-picker__toolbar" role="group" aria-label="导入筛选与搜索">
+          <div className="erp-source-import-picker__filters">
+            <FilterSelect
+              label="核对结果"
+              placeholder="按核对结果筛选"
+              aria-label="BOM 核对筛选"
+              value={reviewFilter}
+              onChange={(value) => { setReviewFilter(value || ''); setPage(1) }}
+              options={[{ value: 'issues', label: '全部待补全' }, { value: 'material_id', label: '待选择材料' }, { value: 'unit_id', label: '待选择单位' }]}
+            />
+          </div>
+          <div className="erp-source-import-picker__search-actions">
+            <SearchInput
+              className="erp-source-import-picker__search"
+              aria-label="搜索 BOM 导入明细"
+              placeholder="搜索材料、部位或原表内容"
+              value={keyword}
+              onSearch={(value) => { setKeyword(value); setPage(1) }}
+            />
+            <Button className="erp-source-import-picker__clear-filter" disabled={!keyword && !reviewFilter} onClick={() => { setKeyword(''); setReviewFilter(''); setPage(1) }}>清空筛选</Button>
+          </div>
+        </div>
+        <Typography.Text type="secondary" role="status">当前显示 {visibleRows.length} / {rows.length} 个部位；筛选仅用于核对，确认后带入全部 {rows.length} 个部位。</Typography.Text>
         <Table
           rowKey={(item) => item._import_source.rowNumber}
           size="small"
           columns={columns}
-          dataSource={rows}
+          dataSource={visibleRows}
           scroll={{ x: Math.max(580, columns.length * 140) }}
           pagination={{
+            current: page,
+            onChange: setPage,
             pageSize: 5,
             showSizeChanger: false,
             hideOnSinglePage: true,

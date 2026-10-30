@@ -123,6 +123,10 @@
   height: 0;
 }
 
+.app-table .ant-table-header {
+  margin-inline-end: var(--app-table-header-scroll-gap, 0px);
+}
+
 @media (hover: none), (pointer: coarse) {
   .app-table-scroll-buttons .ant-btn {
     width: 44px;

@@ -495,7 +495,7 @@ func shipmentDraftSaveFromParams(pm map[string]any) (*biz.ShipmentDraftSave, boo
 }
 
 func shipmentSourceCandidateFilterFromParams(pm map[string]any) (biz.ShipmentSourceCandidateFilter, bool) {
-	if !shipmentItemAllowsOnly(pm, "keyword", "sales_order_id", "limit", "offset") {
+	if !shipmentItemAllowsOnly(pm, "keyword", "sales_order_id", "customer_id", "selectable", "limit", "offset") {
 		return biz.ShipmentSourceCandidateFilter{}, false
 	}
 	keyword := ""
@@ -513,6 +513,22 @@ func shipmentSourceCandidateFilterFromParams(pm map[string]any) (biz.ShipmentSou
 			return biz.ShipmentSourceCandidateFilter{}, false
 		}
 		salesOrderID = value
+	}
+	customerID := 0
+	if _, exists := pm["customer_id"]; exists {
+		value, ok := getRequiredJSONRPCPositiveInt(pm, "customer_id")
+		if !ok {
+			return biz.ShipmentSourceCandidateFilter{}, false
+		}
+		customerID = value
+	}
+	var selectable *bool
+	if raw, exists := pm["selectable"]; exists {
+		value, ok := raw.(bool)
+		if !ok {
+			return biz.ShipmentSourceCandidateFilter{}, false
+		}
+		selectable = &value
 	}
 	limit := 50
 	if _, exists := pm["limit"]; exists {
@@ -533,6 +549,8 @@ func shipmentSourceCandidateFilterFromParams(pm map[string]any) (biz.ShipmentSou
 	return biz.ShipmentSourceCandidateFilter{
 		Keyword:      keyword,
 		SalesOrderID: salesOrderID,
+		CustomerID:   customerID,
+		Selectable:   selectable,
 		Limit:        limit,
 		Offset:       offset,
 	}, true

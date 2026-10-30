@@ -1,5 +1,6 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import FilterSelect from '@/common/components/select/FilterSelect'
 import SourceImportPickerModal from './business-list/SourceImportPickerModal.jsx'
 import { ReferenceRecordsContext } from './RemoteReferenceSelect.jsx'
 import {
@@ -24,13 +25,14 @@ function RemoteReferencePickerContent({
   referenceType,
   open,
   params = {},
+  filters = [],
   context,
   ...props
 }) {
   const canRead = canReadReference(context?.adminProfile, referenceType)
   const accept = useRef(context)
   accept.current = context
-  const [query, setQuery] = useState({ page: 1, keyword: '', retry: 0 })
+  const [query, setQuery] = useState({ page: 1, keyword: '', retry: 0, filters: {} })
   const [data, setData] = useState({ rows: [], total: 0, page: 1, loading: false, failed: false })
   const paramsKey = JSON.stringify(params)
   const handleSearchChange = useCallback((keyword) => {
@@ -39,7 +41,7 @@ function RemoteReferencePickerContent({
       : { ...current, page: 1, keyword })
   }, [])
   useEffect(() => {
-    if (!open) setQuery({ page: 1, keyword: '', retry: 0 })
+    if (!open) setQuery({ page: 1, keyword: '', retry: 0, filters: {} })
   }, [open])
   useEffect(() => {
     if (!open || !canRead) {
@@ -54,6 +56,7 @@ function RemoteReferencePickerContent({
         {
           ...(descriptor.active ? { active_only: true } : {}),
           ...JSON.parse(paramsKey),
+          ...query.filters,
           keyword: query.keyword,
           offset: (query.page - 1) * 50,
           limit: 50,
@@ -81,6 +84,22 @@ function RemoteReferencePickerContent({
   return (
     <SourceImportPickerModal
       {...props}
+      renderFilters={filters.length ? () => filters.map((filter) => (
+        <FilterSelect
+          key={filter.key}
+          label={filter.label}
+          aria-label={filter.label}
+          placeholder={`按${filter.label}筛选`}
+          allowClear
+          options={filter.options}
+          value={query.filters[filter.key]}
+          onChange={(value) => setQuery((current) => ({ ...current,
+            page: 1,
+            filters: { ...current.filters, [filter.key]: value === '' ? undefined : value } }))}
+        />
+      )) : undefined}
+      hasActiveFilters={Object.values(query.filters).some((value) => value !== undefined)}
+      onClearFilters={() => setQuery((current) => ({ ...current, page: 1, keyword: '', filters: {} }))}
       open={open}
       importDisabled={props.importDisabled || !canRead || data.failed}
       serverPagination

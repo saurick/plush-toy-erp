@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"entgo.io/ent/dialect/sql"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -29,7 +30,7 @@ func (r *operationalFactRepo) ListShipmentSourceCandidates(
 	filter biz.ShipmentSourceCandidateFilter,
 ) ([]*biz.ShipmentSourceCandidate, int, error) {
 	if r == nil || r.data == nil || r.data.postgres == nil ||
-		filter.SalesOrderID < 0 || filter.Limit <= 0 || filter.Limit > 200 || filter.Offset < 0 {
+		filter.SalesOrderID < 0 || filter.CustomerID < 0 || filter.Limit <= 0 || filter.Limit > 200 || filter.Offset < 0 {
 		return nil, 0, biz.ErrBadParam
 	}
 
@@ -37,6 +38,18 @@ func (r *operationalFactRepo) ListShipmentSourceCandidates(
 		Where(salesorderitem.HasSalesOrderWith(salesorder.LifecycleStatus(biz.SalesOrderStatusActive)))
 	if filter.SalesOrderID > 0 {
 		query = query.Where(salesorderitem.SalesOrderID(filter.SalesOrderID))
+	}
+	if filter.CustomerID > 0 {
+		query.Where(salesorderitem.HasSalesOrderWith(salesorder.CustomerID(filter.CustomerID)))
+	}
+	if filter.Selectable != nil {
+		query.Where(func(s *sql.Selector) {
+			eligible := shipmentSourceSelectablePredicate(s)
+			if !*filter.Selectable {
+				eligible = sql.Not(eligible)
+			}
+			s.Where(eligible)
+		})
 	}
 	if filter.Keyword != "" {
 		keyword := filter.Keyword
@@ -120,6 +133,37 @@ func (r *operationalFactRepo) ListShipmentSourceCandidates(
 		out = append(out, candidate)
 	}
 	return out, total, nil
+}
+
+// Apply eligibility before count/pagination. These correlated reads mirror
+// loadShipmentSourceLineQuantities, including corruption of any line under the
+// same shipped header; drafts and cancelled shipments never consume quantity.
+func shipmentSourceSelectablePredicate(s *sql.Selector) *sql.Predicate {
+	lines := sql.Table(shipmentitem.Table).As("source_ship_line")
+	headers := sql.Table(shipment.Table).As("source_ship_header")
+	sources := sql.Table(salesorderitem.Table).As("source_ship_order_line")
+	shipped := func() *sql.Selector {
+		return sql.Select().From(lines).
+			Join(headers).On(lines.C(shipmentitem.FieldShipmentID), headers.C(shipment.FieldID)).
+			Where(sql.EQ(headers.C(shipment.FieldStatus), biz.ShipmentStatusShipped))
+	}
+	quantity := shipped().Select("COALESCE(" + sql.Sum(lines.C(shipmentitem.FieldQuantity)) + ", 0)").
+		Where(sql.ColumnsEQ(lines.C(shipmentitem.FieldSalesOrderItemID), s.C(salesorderitem.FieldID)))
+	corrupt := shipped().Select(lines.C(shipmentitem.FieldID)).
+		LeftJoin(sources).On(lines.C(shipmentitem.FieldSalesOrderItemID), sources.C(salesorderitem.FieldID)).
+		Where(sql.Or(
+			sql.And(sql.ColumnsEQ(lines.C(shipmentitem.FieldSalesOrderItemID), s.C(salesorderitem.FieldID)),
+				sql.Or(sql.IsNull(headers.C(shipment.FieldSalesOrderID)), sql.ColumnsNEQ(headers.C(shipment.FieldSalesOrderID), s.C(salesorderitem.FieldSalesOrderID)))),
+			sql.And(sql.ColumnsEQ(headers.C(shipment.FieldSalesOrderID), s.C(salesorderitem.FieldSalesOrderID)),
+				sql.Or(sql.IsNull(lines.C(shipmentitem.FieldSalesOrderItemID)), sql.ColumnsNEQ(sources.C(salesorderitem.FieldSalesOrderID), headers.C(shipment.FieldSalesOrderID)))),
+		))
+	return sql.And(
+		sql.EQ(s.C(salesorderitem.FieldLineStatus), biz.SalesOrderItemStatusOpen),
+		sql.P(func(b *sql.Builder) {
+			b.Wrap(func(b *sql.Builder) { b.Join(quantity) }).WriteOp(sql.OpLT).Ident(s.C(salesorderitem.FieldOrderedQuantity))
+		}),
+		sql.Not(sql.Exists(corrupt)),
+	)
 }
 
 func shipmentSourceCandidateFromEnt(

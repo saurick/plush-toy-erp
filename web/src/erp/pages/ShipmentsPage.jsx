@@ -37,6 +37,8 @@ import { shipmentApprovalPath } from '../utils/shipmentApproval.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import {
   ShipmentStatus,
+  SalesOrderStatus,
+  SalesOrderItemStatus,
   ShipmentFinanceReleaseStatus,
   OperationalFactStatus,
 } from '../../common/consts/statuses.generated.mjs'
@@ -361,6 +363,7 @@ export default function ShipmentsPage() {
   const financeSourceInFlightRef = useRef(false)
   const qualitySourceInFlightRef = useRef(false)
   const salesOrderSourceQueryRef = useRef({ keyword: '', page: 1 })
+  const [salesOrderSourceFilters, setSalesOrderSourceFilters] = useState({ selectable: true })
   const selectedSalesOrderID = Form.useWatch('sales_order_id', shipmentForm)
   const routeSalesOrderID = searchParamPositiveInt(
     searchParams,
@@ -848,7 +851,7 @@ export default function ShipmentsPage() {
       },
       {
         align: 'right',
-        title: '已生成出货',
+        title: '已确认出货',
         dataIndex: 'shippedQuantity',
         width: 100,
         render: formatQuantity,
@@ -869,19 +872,21 @@ export default function ShipmentsPage() {
         title: '状态',
         dataIndex: 'line_status',
         width: 100,
+        render: (value) => value === SalesOrderItemStatus.OPEN ? '待出货' : '已关闭',
       },
     ],
     [productOptions, productSKUOptions]
   )
 
   const loadSalesOrderSources = useCallback(
-    async ({ keyword = '', page = 1 } = {}) => {
+    async ({ keyword = '', page = 1, filters = salesOrderSourceQueryRef.current.filters || {} } = {}) => {
       const normalizedKeyword = String(keyword || '').trim()
       const normalizedPage = Number(page) || 1
       const request = beginLatestRequest('shipment-source-candidates')
       salesOrderSourceQueryRef.current = {
         keyword: normalizedKeyword,
         page: normalizedPage,
+        filters,
       }
       setSalesOrderSourceCurrent(normalizedPage)
       setSalesOrderSourceLoadFailed(false)
@@ -891,7 +896,9 @@ export default function ShipmentsPage() {
           keyword: normalizedKeyword,
           page: normalizedPage,
           pageSize: SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE,
-          salesOrderID: shipmentForm.getFieldValue('sales_order_id'),
+          salesOrderID: shipmentForm.getFieldValue('sales_order_id') || filters.salesOrderID,
+          customerID: filters.customerID,
+          selectable: filters.selectable,
         })
         const data = await listShipmentSourceCandidates(params, {
           signal: request.signal,
@@ -993,9 +1000,11 @@ export default function ShipmentsPage() {
     setSalesOrderSourceTotal(0)
     setSalesOrderSourceCurrent(1)
     setSalesOrderSourceLoadFailed(false)
-    salesOrderSourceQueryRef.current = { keyword: '', page: 1 }
+    const filters = { selectable: true }
+    setSalesOrderSourceFilters(filters)
+    salesOrderSourceQueryRef.current = { keyword: '', page: 1, filters }
     setSalesOrderImportOpen(true)
-    loadSalesOrderSources({ keyword: '', page: 1 })
+    loadSalesOrderSources({ keyword: '', page: 1, filters })
   }
 
   const importSalesOrderToShipment = async (sourceItems = []) => {
@@ -2056,6 +2065,13 @@ export default function ShipmentsPage() {
         salesOrderItems={salesOrderItems}
         salesOrderItemOptions={salesOrderItemOptions}
         salesOrderOptions={salesOrderOptions}
+        salesOrderSourceFilters={salesOrderSourceFilters}
+        salesOrderSourceOrderOptions={salesOrders.filter((order) => order.lifecycle_status === SalesOrderStatus.ACTIVE &&
+          (!salesOrderSourceFilters.customerID || order.customer_id === salesOrderSourceFilters.customerID)).map(salesOrderOption).filter(Boolean)}
+        onSalesOrderSourceFiltersChange={(filters) => {
+          setSalesOrderSourceFilters(filters)
+          loadSalesOrderSources({ ...salesOrderSourceQueryRef.current, page: 1, filters })
+        }}
         salesOrderSourceCurrent={salesOrderSourceCurrent}
         salesOrderSourceEmptyDescription={
           salesOrderSourceLoadFailed

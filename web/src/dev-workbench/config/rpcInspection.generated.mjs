@@ -17711,6 +17711,20 @@ export const RpcInspection = Object.freeze({
         path: 'server/internal/service/jsonrpc_operational_fact.go',
       }),
       parameters: Object.freeze([Object.freeze({
+        description: '解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "customer_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。',
+        expression: 'getRequiredJSONRPCPositiveInt(pm, "customer_id")',
+        name: 'customer_id',
+        required: '条件必填（customer_id 有值）',
+        requiredWhen: Object.freeze([Object.freeze({
+          field: 'customer_id',
+          presence: 'present',
+        })]),
+        source: Object.freeze({
+          line: 519,
+          path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
+        }),
+        type: 'integer',
+      }), Object.freeze({
         description: ' 拒绝条件：“!ok”。',
         expression: 'raw.(string)',
         name: 'keyword',
@@ -17734,7 +17748,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 519,
+          line: 535,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'integer',
@@ -17748,7 +17762,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 527,
+          line: 543,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'integer',
@@ -17766,6 +17780,20 @@ export const RpcInspection = Object.freeze({
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'integer',
+      }), Object.freeze({
+        description: ' 拒绝条件：“!ok”。',
+        expression: 'raw.(bool)',
+        name: 'selectable',
+        required: '条件必填（selectable 有值）',
+        requiredWhen: Object.freeze([Object.freeze({
+          field: 'selectable',
+          presence: 'present',
+        })]),
+        source: Object.freeze({
+          line: 527,
+          path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
+        }),
+        type: 'boolean',
       })]),
       response: Object.freeze([]),
     }),

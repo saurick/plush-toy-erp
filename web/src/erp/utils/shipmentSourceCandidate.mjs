@@ -55,6 +55,8 @@ export function shipmentSourceCandidateListParams({
   page = 1,
   pageSize = SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE,
   salesOrderID,
+  customerID,
+  selectable,
 } = {}) {
   const normalizedPage = Number(page)
   const normalizedPageSize = Number(pageSize)
@@ -79,6 +81,9 @@ export function shipmentSourceCandidateListParams({
   if (normalizedKeyword) params.keyword = normalizedKeyword
   const normalizedSalesOrderID = positiveInt(salesOrderID)
   if (normalizedSalesOrderID) params.sales_order_id = normalizedSalesOrderID
+  const normalizedCustomerID = positiveInt(customerID)
+  if (normalizedCustomerID) params.customer_id = normalizedCustomerID
+  if (typeof selectable === 'boolean') params.selectable = selectable
   return params
 }
 

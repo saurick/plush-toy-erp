@@ -8,6 +8,7 @@ import { Button, Form, Input, InputNumber, Space } from 'antd'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import RemoteReferencePicker from '../RemoteReferencePicker.jsx'
+import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../../utils/warehouseClassification.mjs'
 import Select from '@/common/components/select/AppSelect'
 import {
   formatUnitQuantitySummary,
@@ -356,6 +357,7 @@ export function PurchaseOrderFormFields({
             <RemoteReferencePicker
               referenceType="materials"
               params={materialParams}
+              filters={[{ key: 'stock_category', label: '库存分类', options: MATERIAL_STOCK_CATEGORY_OPTIONS }]}
               open={materialImportOpen}
               title={<BusinessHelpLabel label="从材料库添加" description="这里只选择材料档案；数量、单价和预计到货日期在编辑页的采购明细里维护。" />}
               rows={materials}
