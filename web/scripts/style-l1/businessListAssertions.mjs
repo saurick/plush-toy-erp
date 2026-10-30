@@ -881,7 +881,7 @@ export function createBusinessListAssertions({ outputDir }) {
     )
     assert(metrics.hasPagination, `${scenarioName} 来源导入选择器缺少分页`)
     await expectText(picker, '已选 0 条')
-    await expectText(picker, `请先选择${selectedNoun}`)
+    await expectText(picker, `未选择${selectedNoun}`)
     assert.equal(
       await picker.getByRole('button', { name: '清空已选' }).count(),
       0,
