@@ -48,7 +48,7 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     await goto(page, '/erp/warehouse/shipments')
     await page.getByRole('button', { name: /新建出货单$/u }).click()
     const form = page.locator('.erp-business-form-page:visible')
-    await form.getByText('实际总净重（克）', { exact: true }).waitFor()
+    await form.getByText('填写出货明细后显示预计总净重。', { exact: true }).waitFor()
     if (!baseline) assert.equal(await form.getByText('预计总净重暂不可计算', { exact: true }).count(), 0, '空白表单不应伪装重量异常')
     await capture(page, 'shipment-empty', form)
     await form.getByRole('button', { name: '从销售订单导入', exact: true }).click()

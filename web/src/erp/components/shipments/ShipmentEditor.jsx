@@ -483,7 +483,7 @@ function shipmentWeightText(value, emptyText = '待补齐') {
 
 function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
   const items = Form.useWatch('items', form) || EMPTY_SHIPMENT_ITEMS
-  const manualWeight = Form.useWatch('total_net_weight_g', form)
+  const manualWeight = Form.useWatch('total_net_weight_g', { form, preserve: true })
   const manualItemsSignature = Form.useWatch(
     'total_net_weight_items_signature',
     form
@@ -507,7 +507,7 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
       return
     }
     if (!manualItemsSignature) {
-      form.setFieldValue('total_net_weight_items_signature', itemsSignature)
+      form.setFieldsValue({ total_net_weight_items_signature: itemsSignature })
       return
     }
     if (manualItemsSignature !== itemsSignature) {
@@ -526,28 +526,28 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
   ])
 
   return (
-    <section className="erp-master-contact-list erp-shipment-weight-summary">
+    <section className="erp-shipment-weight-summary">
       <Form.Item name="total_net_weight_items_signature" hidden>
         <Input />
       </Form.Item>
       {preview.complete ? (
         <div className="erp-business-inline-note" role="note">
           <Text strong>预计总净重：{preview.totalNetWeightG} 克</Text>
-          <Text type="secondary">按当前明细和产品 / SKU 单重自动计算</Text>
         </div>
-      ) : (
-        <>
-          {hasWeightInput ? <Alert
+      ) : hasWeightInput ? (
+        <div className="erp-shipment-weight-summary__manual">
+          <Alert
+            className="erp-shipment-weight-summary__notice"
             showIcon
             type="warning"
             message="预计总净重暂不可计算"
             description={`${
               preview.issues[0]?.message || '当前明细缺少可用单重'
-            }。系统不会显示或提交部分合计；可补齐产品档案，或按整单实际称重填写下方总净重。`}
-          /> : <p className="erp-business-inline-note">填写出货明细后显示预计总净重。</p>}
+            }。系统不会显示或提交部分合计；请补齐档案，或填写整单实称净重。`}
+          />
           <Form.Item
-            className="erp-business-action-form__field"
-            extra="选填。该数值与当前整组出货明细绑定；产品、SKU、单位、数量、增删行或重新导入后需要重新填写。"
+            className="erp-business-action-form__field erp-shipment-weight-summary__field"
+            extra="选填；明细变更后需重填。"
             label="实际总净重（克）"
             name="total_net_weight_g"
             rules={[
@@ -567,14 +567,17 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
               stringMode
               style={{ width: '100%' }}
               onChange={(value) =>
-                form.setFieldValue(
-                  'total_net_weight_items_signature',
-                  String(value ?? '').trim() ? itemsSignature : undefined
-                )
+                form.setFieldsValue({
+                  total_net_weight_items_signature: String(value ?? '').trim()
+                    ? itemsSignature
+                    : undefined,
+                })
               }
             />
           </Form.Item>
-        </>
+        </div>
+      ) : (
+        <p className="erp-business-inline-note">填写出货明细后显示预计总净重。</p>
       )}
     </section>
   )

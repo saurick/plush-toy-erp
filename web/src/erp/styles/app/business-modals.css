@@ -1083,6 +1083,30 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.erp-shipment-weight-summary {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.erp-shipment-weight-summary__manual {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.erp-shipment-weight-summary__notice {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.erp-shipment-weight-summary__field.ant-form-item {
+  flex: 0 1 240px;
+  width: min(100%, 240px);
+  min-width: 0;
+  margin: 0;
+}
+
 .erp-master-contact-list__head {
   display: flex;
   align-items: center;

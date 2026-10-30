@@ -295,12 +295,17 @@ export function createShipmentWeightScenarios(deps) {
   const { assertLineItemAddActionScrollsToNewRow } =
     createBusinessFormalAssertions(deps)
   return [
-    {
-      name: 'shipment-net-weight-desktop',
+    ...[
+      { variant: 'desktop', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 },
+      { variant: 'compact-desktop', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2, focused: true },
+      { variant: 'compact-dark', viewport: { width: 1440, height: 900 }, themeMode: 'dark', focused: true },
+      { variant: 'compact-narrow', viewport: { width: 1440, height: 900 }, targetViewport: { width: 390, height: 844 }, focused: true },
+    ].map(({ variant, targetViewport, focused, ...presentation }) => ({
+      name: `shipment-net-weight-${variant}`,
       path: '/erp/warehouse/shipments',
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
-      viewport: { width: 1440, height: 900 },
+      ...presentation,
       verify: async (page) => {
         await expectText(page, '出货单')
         await expectButton(page, '新建出货单')
@@ -331,41 +336,101 @@ export function createShipmentWeightScenarios(deps) {
             weightColumnMetrics
           )}`
         )
-        await verifyBusinessActionFormModal(page, {
+        const formChecks = {
           buttonName: '新建出货单',
           titleText: '新建出货单',
           minFieldCount: 12,
-          screenshotName: 'shipment-net-weight-incomplete',
+          screenshotName: `shipment-net-weight-empty-${variant}`,
           expectedTexts: [
             '出货明细',
             '从销售订单导入',
             '填写出货明细后显示预计总净重。',
-            '实际总净重（克）',
           ],
           afterOpen: async (modal) => {
+            if (targetViewport) await page.setViewportSize(targetViewport)
+            const summary = modal.locator('.erp-shipment-weight-summary')
+            const weight = modal.getByLabel('实际总净重（克）', { exact: true })
+            const quantity = modal.getByLabel('数量', { exact: true })
+            assert.equal(await weight.count(), 0, '空白明细不显示人工补录框')
+            const emptyHeight = await summary.evaluate((node) => node.getBoundingClientRect().height)
+            assert(emptyHeight <= 40, `空白重量区只占一行：${emptyHeight}`)
+            await quantity.fill('2')
+            await weight.waitFor({ state: 'visible' })
+            await weight.fill('1500')
+            await summary.scrollIntoViewIfNeeded()
+            const manualLayout = await summary.evaluate((node) => {
+              const bounds = node.getBoundingClientRect()
+              const field = node.querySelector('.erp-shipment-weight-summary__field').getBoundingClientRect()
+              const notice = node.querySelector('.erp-shipment-weight-summary__notice').getBoundingClientRect()
+              return {
+                summary: { width: bounds.width, height: bounds.height },
+                field: { left: field.left, right: field.right, width: field.width, top: field.top },
+                notice: { right: notice.right, bottom: notice.bottom, top: notice.top },
+                fits: field.left >= bounds.left - 1 && field.right <= bounds.right + 1 && notice.right <= bounds.right + 1,
+              }
+            })
+            assert(manualLayout.field.width <= 241, `补录框不应随整页拉伸：${JSON.stringify(manualLayout)}`)
+            assert(manualLayout.fits, `重量提示和补录框应留在当前区域：${JSON.stringify(manualLayout)}`)
+            if (targetViewport) {
+              assert(manualLayout.field.top >= manualLayout.notice.bottom, '窄屏补录框应排在原因提示下方')
+            } else {
+              assert(Math.abs(manualLayout.field.top - manualLayout.notice.top) <= 1, '桌面提示和补录框应并排对齐')
+            }
+            await summary.screenshot({ path: path.join(outputDir, `shipment-net-weight-manual-${variant}.png`) })
+            await assertNoHorizontalOverflow(page, `shipment-net-weight-manual-${variant}`)
+            await quantity.fill('3')
+            await page.waitForFunction(() => document.querySelector('#total_net_weight_g')?.value === '')
+            await weight.fill('1600')
+            await quantity.fill('')
+            await weight.waitFor({ state: 'hidden' })
+            await quantity.fill('2')
+            await weight.waitFor({ state: 'visible' })
+            assert.equal(await weight.inputValue(), '', '清空明细再输入不能恢复旧人工重量')
+            await weight.fill('1700')
             for (const name of ['SKU', '批次']) {
               const input = modal.getByRole('combobox', { name, exact: true })
               assert.equal(await input.isDisabled(), true)
               const control = input.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
               assert.equal(await control.locator('.ant-select-selection-placeholder').innerText(), '请先选择产品')
             }
-            await modal.getByLabel('产品').click()
+            await modal.locator('#items_0_product_id').click()
             await page.getByText('PROD-STYLE-L1').last().click()
+            await expectText(page, '预计总净重：850 克')
+            await weight.waitFor({ state: 'hidden' })
+            await quantity.fill('')
+            await weight.waitFor({ state: 'visible' })
+            assert.equal(await weight.inputValue(), '', '恢复自动计算时应清空旧人工重量')
             await modal.getByLabel('数量').fill('10')
             await expectText(page, '预计总净重：4250 克')
+            assert.equal(await weight.count(), 0, '完整自动计算时不显示补录框')
+            const calculatedHeight = await summary.evaluate((node) => node.getBoundingClientRect().height)
+            assert(calculatedHeight <= 40, `预计净重只占一行：${calculatedHeight}`)
             await modal.screenshot({
-              path: path.join(outputDir, 'shipment-net-weight-predicted.png'),
+              path: path.join(outputDir, `shipment-net-weight-predicted-${variant}.png`),
             })
+            if (targetViewport) await page.setViewportSize(presentation.viewport)
             await assertLineItemAddActionScrollsToNewRow(modal, {
-              scenarioName: 'shipment-net-weight-incomplete',
+              scenarioName: `shipment-net-weight-${variant}`,
               targetRowCount: 5,
               addButtonName: '添加出货明细',
             })
           },
-        })
-        await assertNoHorizontalOverflow(page, 'shipment-net-weight-desktop')
+        }
+        if (focused) {
+          await page.getByRole('button', { name: /新建出货单$/u }).click()
+          const editor = page.getByRole('region', { name: '新建出货单', exact: true })
+          await editor.waitFor({ state: 'visible' })
+          await formChecks.afterOpen(editor)
+          await editor.getByRole('button', { name: '返回列表', exact: true }).click()
+          const discard = page.getByRole('button', { name: '放弃修改', exact: true })
+          if (await discard.isVisible()) await discard.click()
+          await editor.waitFor({ state: 'hidden' })
+        } else {
+          await verifyBusinessActionFormModal(page, formChecks)
+        }
+        await assertNoHorizontalOverflow(page, `shipment-net-weight-${variant}`)
       },
-    },
+    })),
   ]
 }
 
