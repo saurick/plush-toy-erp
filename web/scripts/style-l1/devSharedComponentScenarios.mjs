@@ -4,6 +4,7 @@ import { createDevPaginationScenarios } from './devPaginationScenarios.mjs'
 import { createDevBusinessComponentScenarios } from './devBusinessComponentScenarios.mjs'
 import { createSelectValueDisclosureScenarios } from './selectValueDisclosureScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { isAcceptedFocusBorder } from './colorAssertions.mjs'
 import {
   findUIDesignChapter,
   readUIDesignChapters,
@@ -16,6 +17,60 @@ export function createDevSharedComponentScenarios({
   outputDir,
 }) {
   return [
+    ...['light', 'dark'].map((themeMode) => ({
+      name: `shared-input-error-focus-${themeMode}`,
+      path: '/__dev/ui-design?page=controls&control=inputs',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      themeMode,
+      verify: async (page) => {
+        const stage = page.locator('.erp-control-library-stage')
+        await stage.getByLabel('产品名称', { exact: true }).waitFor()
+        await page.getByLabel('控件样例主题', { exact: true })
+          .getByText(themeMode === 'dark' ? '深色' : '浅色', { exact: true }).click()
+        const error = stage.getByRole('radio', { name: '错误', exact: true })
+        await error.locator('..').click()
+        const readFocus = (input) => input.evaluate((node) => {
+          const owner = node.closest('.ant-input-affix-wrapper') || node
+          const style = getComputedStyle(owner)
+          const box = owner.getBoundingClientRect()
+          const inputBox = node.getBoundingClientRect()
+          return {
+            borderColor: style.borderColor,
+            expectedFocusBorder: style.getPropertyValue('--erp-control-focus-border').trim(),
+            boxShadow: style.boxShadow,
+            error: owner.classList.contains('ant-input-status-error'),
+            contained: inputBox.left >= box.left - 1 && inputBox.right <= box.right + 1,
+          }
+        })
+        const evidence = []
+        for (const label of ['产品名称']) {
+          const input = stage.getByLabel(label, { exact: true })
+          await input.focus()
+          await waitForFiniteAnimations(page)
+          const focused = await readFocus(input)
+          assert(focused.error, `${label} 保留错误状态`)
+          assert(isAcceptedFocusBorder(focused), `${label} 错误时仍使用主题焦点边框：${JSON.stringify(focused)}`)
+          assert(focused.boxShadow.includes('inset'), `${label} 错误时的焦点环应在控件内：${JSON.stringify(focused)}`)
+          assert(focused.contained, `${label} 输入框不能撑出焦点外框`)
+          await error.focus()
+          await waitForFiniteAnimations(page)
+          const blurred = await readFocus(input)
+          assert(blurred.error, `${label} 失焦后保留错误状态`)
+          assert.notEqual(blurred.borderColor, focused.borderColor, `${label} 失焦后恢复错误边框`)
+          evidence.push({ label, focused, blurred })
+        }
+        await stage.getByLabel('产品名称', { exact: true }).focus()
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: `${outputDir}/input-error-focus-${themeMode}-4k.png` })
+        await writeFile(`${outputDir}/input-error-focus-${themeMode}.json`, JSON.stringify(evidence, null, 2))
+        await stage.getByRole('radio', { name: '正常', exact: true }).locator('..').click()
+        assert.equal(await stage.locator('.ant-input-status-error').count(), 0, '恢复正常后清除错误外观')
+        await stage.getByRole('radio', { name: '禁用', exact: true }).locator('..').click()
+        assert(await stage.getByLabel('产品名称', { exact: true }).isDisabled())
+        await assertNoHorizontalOverflow(page, `shared-input-error-focus-${themeMode}`)
+      },
+    })),
     {
       name: 'dev-ui-local-theme-isolation',
       path: '/__dev/ui-design?page=controls&control=actions',

@@ -852,6 +852,16 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
             : ownerHeight -
               (numberFromPx(ownerStyle.borderTopWidth) || 0) -
               (numberFromPx(ownerStyle.borderBottomWidth) || 0)
+        const ownerMinHeight = numberFromPx(ownerStyle.minHeight)
+        const ownerMinInnerHeight = ownerMinHeight === null
+          ? null
+          : ownerMinHeight -
+            (numberFromPx(ownerStyle.borderTopWidth) || 0) -
+            (numberFromPx(ownerStyle.borderBottomWidth) || 0)
+        const isReferenceSelect = Boolean(
+          owner.matches('.ant-select-selector') &&
+          owner.closest('.ant-select')?.classList.contains('app-select--reference')
+        )
         const affixInput = owner.matches('.ant-input-affix-wrapper')
           ? owner.querySelector('input.ant-input')
           : null
@@ -879,6 +889,11 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
           : []
         return {
           owner: describeNode(owner),
+          isReferenceSelect,
+          ownerMinInnerHeight,
+          referenceTextClipped: isReferenceSelect && Array.from(
+            owner.querySelectorAll('.app-select__reference-name')
+          ).some((node) => node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1),
           ownerInnerHeight:
             ownerInnerHeight === null
               ? null
@@ -940,14 +955,25 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
     }
 
     if (item.selectTextNodes.length > 0 && item.ownerInnerHeight !== null) {
+      if (item.referenceTextClipped) return true
+      if (item.isReferenceSelect && !(item.ownerMinInnerHeight > 0)) return true
       return item.selectTextNodes.some((node) => {
         const centerDelta = Math.abs(node.center - item.owner.center)
         const lineHeight = Number.parseFloat(node.lineHeight || '0')
         if (centerDelta > 1.5) return true
-        if (node.className.includes('ant-select-selection-item') && node.whiteSpace !== 'nowrap') return true
+        if (!item.isReferenceSelect && node.className.includes('ant-select-selection-item') && node.whiteSpace !== 'nowrap') return true
         if (node.top < item.owner.top - 1 || node.bottom > item.owner.bottom + 1) return true
+        // 业务引用可自动增高；搜索光标仍按控件最小高度保持单行。
+        const referenceLabel = item.isReferenceSelect &&
+          (node.className.includes('ant-select-selection-item') ||
+            node.className.includes('ant-select-selection-placeholder'))
+        if (referenceLabel) return lineHeight > node.height + 1.5
+        const expectedLineHeight = item.isReferenceSelect
+          ? item.ownerMinInnerHeight
+          : item.ownerInnerHeight
         return (
-          lineHeight > 0 && Math.abs(lineHeight - item.ownerInnerHeight) > 1.5
+          lineHeight > 0 && expectedLineHeight !== null &&
+          Math.abs(lineHeight - expectedLineHeight) > 1.5
         )
       })
     }
@@ -958,7 +984,7 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
   assert.deepEqual(
     issues,
     [],
-    `${scenarioName} 控件文字与 caret 应垂直居中；选中值保持单行，文字内容盒完整落在控件内: ${JSON.stringify(
+    `${scenarioName} 控件文字与 caret 应垂直居中；普通单选保持单行，业务引用文字完整落在控件内: ${JSON.stringify(
       issues
     )}`
   )

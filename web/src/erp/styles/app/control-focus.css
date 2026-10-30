@@ -22,11 +22,10 @@ body
   ):not(.ant-pagination-size-changer):is(:focus-within, .ant-select-open)
   > .ant-select-selector,
 body
-  .erp-item-field-with-unit
-  .ant-input-affix-wrapper.ant-input-outlined.ant-input-status-error:focus-within,
-body
-  .erp-business-action-modal
-  .ant-input.ant-input-outlined.ant-input-status-error:focus {
+  .ant-input-outlined.ant-input-status-error:not(
+    .ant-input-disabled,
+    .ant-input-affix-wrapper-disabled
+  ):focus-within {
   border-color: var(--erp-control-focus-border);
   box-shadow: var(
     --erp-control-focus-shadow,
