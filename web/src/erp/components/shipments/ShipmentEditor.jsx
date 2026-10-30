@@ -742,7 +742,7 @@ function ShipmentItemFormFields({
             disabled={sourceLocked || !Number(productID || 0)}
             optionFilterProp="label"
             options={filteredProductSKUOptions}
-            placeholder="请选择 SKU"
+            placeholder={!Number(productID || 0) ? '请先选择产品' : sourceLocked ? '来源未指定规格' : '选择产品规格'}
             showSearch
             onChange={(nextID) =>
               applyItemPatch(buildShipmentSKUChangePatch(nextID, productSKUs))
@@ -773,7 +773,7 @@ function ShipmentItemFormFields({
             disabled={!Number(productID || 0)}
             optionFilterProp="label"
             options={filteredInventoryLotOptions}
-            placeholder="请选择批次"
+            placeholder={Number(productID || 0) ? '选择批次' : '请先选择产品'}
             showSearch
           />
         </Form.Item>,

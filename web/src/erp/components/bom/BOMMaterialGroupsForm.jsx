@@ -525,7 +525,7 @@ export default function BOMMaterialGroupsForm({
                                         options={unitOptions}
                                         showSearch
                                         optionFilterProp="searchText"
-                                        placeholder="单位"
+                                        placeholder="选择单位"
                                         popupMatchSelectWidth={180}
                                         onChange={(unitID) => {
                                           onItemsChange?.()

@@ -737,7 +737,7 @@ export default function OutsourcingOrderForm({
                         tooltip="可选；选择规格后固定使用该规格的单位。需要调整单位时先清除规格。"
                       >
                         <Select
-                          placeholder="请选择产品规格"
+                          placeholder={productID ? '选择产品规格' : '请先选择产品 / 半成品'}
                           allowClear
                           showSearch
                           disabled={taskReadOnly || !productID}

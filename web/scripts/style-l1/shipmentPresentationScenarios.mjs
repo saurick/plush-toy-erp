@@ -268,7 +268,7 @@ export function createShipmentWeightScenarios(deps) {
         await expectText(page, '出货单')
         await expectButton(page, '新建出货单')
         await page
-          .locator('.erp-business-data-table-card .ant-table-content')
+          .locator('.erp-business-data-table-card .ant-table-body, .erp-business-data-table-card .ant-table-content')
           .first()
           .evaluate((element) => {
             element.scrollLeft = element.scrollWidth
@@ -288,7 +288,7 @@ export function createShipmentWeightScenarios(deps) {
               .trim(),
           }))
         assert(
-          weightColumnMetrics.headers.includes('实际/最终总净重（克）') &&
+          weightColumnMetrics.headers.includes('总净重（克）') &&
             weightColumnMetrics.text.includes('待确认'),
           `出货列表应显示总净重列和草稿待确认状态: ${JSON.stringify(
             weightColumnMetrics
@@ -306,6 +306,12 @@ export function createShipmentWeightScenarios(deps) {
             '实际总净重（克）',
           ],
           afterOpen: async (modal) => {
+            for (const name of ['SKU', '批次']) {
+              const input = modal.getByRole('combobox', { name, exact: true })
+              assert.equal(await input.isDisabled(), true)
+              const control = input.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+              assert.equal(await control.locator('.ant-select-selection-placeholder').innerText(), '请先选择产品')
+            }
             await modal.getByLabel('产品').click()
             await page.getByText('PROD-STYLE-L1').last().click()
             await modal.getByLabel('数量').fill('10')

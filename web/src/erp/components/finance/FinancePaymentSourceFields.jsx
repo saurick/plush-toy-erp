@@ -104,11 +104,11 @@ export default function FinancePaymentSourceFields({ form, profile, open, source
     <>
       <Form.Item
         name="source_type"
-        label="关联单据"
+        label="单据类型"
         rules={[{ required: true, message: '请选择单据类型' }]}
       >
         <Select
-          placeholder="请选择关联单据"
+          placeholder="选择单据类型"
           disabled={Boolean(sourceContext)}
           options={Object.entries(sources)
             .filter(([key]) =>
@@ -130,7 +130,7 @@ export default function FinancePaymentSourceFields({ form, profile, open, source
         help={error || '首款、分期款及发货前尾款均关联原订单；币种随订单带入。'}
       >
         <Select
-          placeholder="请选择订单 / 合同"
+          placeholder={sourceContext ? '随来源带入' : !party ? '请先选择往来方' : !sourceType ? '请先选择单据类型' : '选择订单 / 合同'}
           showSearch
           optionFilterProp="label"
           loading={loading}

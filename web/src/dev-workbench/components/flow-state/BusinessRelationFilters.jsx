@@ -42,7 +42,7 @@ export default function BusinessRelationFilters({
                 key={key}
                 label={label}
                 aria-label={label}
-                placeholder={`全部${label.replace('参与', '').replace('办理', '')}`}
+                placeholder={`按${label}筛选`}
                 emptyValue="all"
                 value={filters[key]}
                 showSearch

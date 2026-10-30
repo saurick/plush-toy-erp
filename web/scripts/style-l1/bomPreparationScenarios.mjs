@@ -1,8 +1,9 @@
+import { expect as expectLocator } from 'playwright/test'
 import { chooseWorkspaceEditor } from './businessEditorWorkspaceTools.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 export function createBOMPreparationScenarios(deps) {
-  return ['create', 'multiple', 'stale', 'read-failure'].map((mode) => {
+  return ['create', 'multiple', 'stale', 'read-failure', 'unlinked-product'].map((mode) => {
     const mobile = mode.endsWith('mobile')
     const readonly = mode === 'readonly-mobile'
     const orderNo = `SO-BOM-PREPARE-${mode}`
@@ -35,7 +36,7 @@ export function createBOMPreparationScenarios(deps) {
         rejectSave = mode === 'create'
         rejectRead = mode === 'read-failure'
         order = { id: 1, order_no: orderNo, customer_id: 1, currency: 'CNY', customer_snapshot: { name: '模拟客户' }, order_date: 1791648000, lifecycle_status: 'active', version: 1, item_count: 1 }
-        item = { id: 1, sales_order_id: 1, line_no: 1, product_id: 1, product_sku_id: null, bom_id: ['create', 'multiple'].includes(mode) ? null : 2, requested_product_name: '模拟工程产品', ordered_quantity: '100', pre_shipment_sample_quantity: '2', unit_id: 1, unit_price: '10', amount: '1000', line_status: 'open' }
+        item = { id: 1, sales_order_id: 1, line_no: 1, product_id: mode === 'unlinked-product' ? null : 1, product_sku_id: null, bom_id: ['create', 'multiple', 'unlinked-product'].includes(mode) ? null : 2, requested_product_name: '模拟工程产品', ordered_quantity: '100', pre_shipment_sample_quantity: '2', unit_id: 1, unit_price: '10', amount: '1000', line_status: 'open' }
         records = mode === 'create' ? [] : [structuredClone(original)]
         if (mode === 'multiple') records.push({ ...structuredClone(original), id: 3, version: 'V3', items: [{ ...original.items[0], id: 12, bom_header_id: 3 }] })
         if (mobile) {
@@ -103,6 +104,30 @@ export function createBOMPreparationScenarios(deps) {
         await page.getByRole('button', { name: '工程资料', exact: true }).click()
         const engineering = page.locator('[data-business-form-page]').filter({ has: page.locator('.erp-sales-order-engineering-form') })
         await engineering.waitFor()
+        if (mode === 'unlinked-product') {
+          const source = engineering.locator('.erp-sales-order-engineering-form')
+          const product = source.getByLabel('工程产品', { exact: true })
+          const sku = source.getByLabel('规格（选填）', { exact: true })
+          const bom = source.getByLabel('工程 BOM', { exact: true })
+          const control = (input) => input.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+          for (const input of [sku, bom]) {
+            await expectLocator(input).toBeDisabled()
+            await expectLocator(control(input).locator('.ant-select-selection-placeholder')).toHaveText('请先选择工程产品')
+          }
+          await product.click()
+          await page.locator('.ant-select-dropdown:visible .ant-select-item-option:not(.ant-select-item-option-disabled)').first().click()
+          await expectLocator(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
+          await expectLocator(sku).toBeEnabled()
+          await expectLocator(bom).toBeEnabled()
+          await control(product).locator('.ant-select-clear').click()
+          for (const input of [sku, bom]) {
+            await expectLocator(input).toBeDisabled()
+            await expectLocator(control(input).locator('.ant-select-selection-placeholder')).toHaveText('请先选择工程产品')
+          }
+          deps.assert.deepEqual(writes, [], '选产品与清空仅更新工程草稿，不写来源或 BOM')
+          await deps.assertNoHorizontalOverflow(page)
+          return
+        }
         const editor = page.locator('.erp-bom-editor:visible')
         deps.assert.equal(new URL(page.url()).pathname, '/erp/sales/project-orders/sales-orders', 'all editing remains in the business workspace')
         deps.assert.equal(await engineering.getByRole('button', { name: '返回办理', exact: true }).count(), 0)

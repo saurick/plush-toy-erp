@@ -8,15 +8,18 @@ export function hasSelectValue(value) {
 }
 
 // Labels remain visible after selection; form controls keep their Form.Item label.
-const AppSelect = React.forwardRef(({
-  label,
-  placeholder,
-  allowClear = true,
-  className = '',
-  prefix,
-  value,
-  ...props
-}, ref) => {
+const AppSelect = React.forwardRef((inputProps, ref) => {
+  const {
+    label,
+    placeholder,
+    allowClear = true,
+    className = '',
+    prefix,
+    value,
+    ...props
+  } = inputProps
+  // 显式受控空值保持受控，省略 value 的输入仍使用 defaultValue。
+  const selectValue = Object.hasOwn(inputProps, 'value') && value === undefined ? null : value
   const selectRef = useRef(null)
   useImperativeHandle(ref, () => selectRef.current)
   const basePrefix = prefix ?? (label && hasSelectValue(value) ? <span className="app-select__label">{label}</span> : undefined)
@@ -30,7 +33,7 @@ const AppSelect = React.forwardRef(({
         <Select
           {...props}
           ref={selectRef}
-          value={value}
+          value={selectValue}
           aria-label={props['aria-label'] || label}
           placeholder={placeholder || label || props['aria-label']}
           prefix={basePrefix || display.overflow ? (

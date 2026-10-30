@@ -734,10 +734,10 @@ export function PurchaseOrderFormFields({
           <Select
             allowClear
             options={PURCHASE_INVOICE_REQUIRED_OPTIONS}
-            placeholder="请选择"
+            placeholder="选择是否需要发票"
             onChange={(value) => {
               if (value !== true) {
-                form.setFieldValue('invoice_category', undefined)
+                form.setFieldsValue({ invoice_category: undefined })
               }
             }}
           />
@@ -748,17 +748,17 @@ export function PurchaseOrderFormFields({
           name="invoice_category"
           label="发票类别"
           rules={[
-            {
-              required: invoiceRequired === true,
+            ({ getFieldValue }) => ({
+              required: getFieldValue('invoice_required') === true,
               message: '请选择发票类别',
-            },
+            }),
           ]}
         >
           <Select
             allowClear
             disabled={taskReadOnly || invoiceRequired !== true}
             options={PURCHASE_INVOICE_CATEGORY_OPTIONS}
-            placeholder="请先选择需要发票"
+            placeholder={invoiceRequired === true ? '选择发票类别' : '请先选择需要发票'}
           />
         </Form.Item>
       </BusinessFormSection>

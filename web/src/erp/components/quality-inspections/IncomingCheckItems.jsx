@@ -97,7 +97,7 @@ export function IncomingCheckItemsForm() {
                     >
                       <Select
                         allowClear
-                        placeholder="请选择"
+                        placeholder="选择检查范围"
                         options={[
                           { value: 'FULL', label: '全检' },
                           { value: 'SAMPLE', label: '抽检' },

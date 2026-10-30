@@ -155,6 +155,17 @@ export function createOutsourcingFormFieldsScenarios({
           .fill('保留的逐行备注')
         await clearSelect(editor.locator('input#outsourcing-order-editor_items_0_product_sku_id'))
         assert.equal(await unit.isDisabled(), false)
+        const product = editor.locator('input#outsourcing-order-editor_items_0_product_id')
+        const sku = editor.locator('input#outsourcing-order-editor_items_0_product_sku_id')
+        await clearSelect(product)
+        assert.equal(await sku.isDisabled(), true)
+        const skuControl = sku.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+        assert.equal(await skuControl.locator('.ant-select-selection-placeholder').innerText(), '请先选择产品 / 半成品')
+        await product.press('ArrowDown')
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option:not(.ant-select-item-option-disabled)').first().click()
+        await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+        assert.equal(await sku.isDisabled(), false)
+        assert.equal(await skuControl.locator('.ant-select-selection-placeholder').innerText(), '选择产品规格')
         assert.equal(
           await editor.locator('input#outsourcing-order-editor_items_0_sku_code_snapshot').inputValue(),
           ''
@@ -196,10 +207,10 @@ export function createOutsourcingFormFieldsScenarios({
             response.request().postDataJSON()?.method ===
               'list_contacts_by_owner' &&
             Number(response.request().postDataJSON()?.params?.owner_id) === 2
-        )
+        ).then((response) => ({ response }), (error) => ({ error }))
         await selectOption(
           editor.locator('input#outsourcing-order-editor_supplier_id'),
-          'SUP-2 / 模拟乙加工厂'
+          'SUP-2 模拟乙加工厂'
         )
         assert.equal(
           await editor.locator('input#outsourcing-order-editor_payment_term_days').inputValue(),
@@ -211,7 +222,9 @@ export function createOutsourcingFormFieldsScenarios({
           .fill('合同自定联系人')
         assert.equal(contactsRequested, true)
         releaseContacts()
-        await (await contactResponse).finished()
+        const contactOutcome = await contactResponse
+        if (contactOutcome.error) throw contactOutcome.error
+        await contactOutcome.response.finished()
         await editor.locator('input#outsourcing-order-editor_supplier_snapshot_contact_name').click()
         await page
           .locator(
@@ -230,7 +243,7 @@ export function createOutsourcingFormFieldsScenarios({
           .press('Tab')
         await selectOption(
           editor.locator('input#outsourcing-order-editor_supplier_id'),
-          'SUP-3 / 模拟未设账期加工厂'
+          'SUP-3 模拟未设账期加工厂'
         )
         assert.equal(
           await editor.locator('input#outsourcing-order-editor_payment_term_days').inputValue(),

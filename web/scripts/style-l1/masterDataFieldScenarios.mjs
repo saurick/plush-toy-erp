@@ -1,3 +1,4 @@
+import { expect as expectLocator } from 'playwright/test'
 import { readFile, writeFile } from 'node:fs/promises'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
@@ -997,6 +998,20 @@ export function createSupplierProcessingScenarios(deps) {
           )
           .last()
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        const invoiceRequired = modal.locator('.ant-select').filter({ has: page.locator('input[id$="default_invoice_required"]') })
+        const invoiceCategory = modal.locator('.ant-select').filter({ has: page.locator('input[id$="default_invoice_category"]') })
+        assert.equal(await invoiceCategory.locator('.ant-select-selection-placeholder').innerText(), '请先选择需要发票')
+        await invoiceRequired.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^需要发票$/u }).click()
+        await expectLocator(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
+        assert.equal(await invoiceCategory.locator('.ant-select-selection-placeholder').innerText(), '选择默认发票类别')
+        await invoiceCategory.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '出口普通发票' }).click()
+        await expectLocator(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
+        await invoiceRequired.locator('.ant-select-clear').click()
+        assert.equal(await invoiceCategory.getByRole('combobox').isDisabled(), true)
+        assert.equal(await invoiceCategory.locator('.ant-select-selection-item').count(), 0)
+        assert.equal(await invoiceCategory.locator('.ant-select-selection-placeholder').innerText(), '请先选择需要发票')
         const processField = modal
           .locator('.ant-form-item')
           .filter({ hasText: '可加工工序' })

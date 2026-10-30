@@ -469,12 +469,12 @@ export function MasterDataFormFields({
             className="erp-business-action-form__field"
             label={<BusinessHelpLabel label="标准生产路线位置" description="将工序明确绑定到固定生产路线；不能根据名称、类别或排序自动推断。" />}
             name="production_route_operation_code"
-            extra="每个路线位置只能绑定一条启用工序。"
+            extra="未选择时不参与标准生产路线；每个路线位置只能绑定一条启用工序。"
           >
             <Select
               allowClear
               options={PRODUCTION_ROUTE_OPERATION_OPTIONS}
-              placeholder="不参与标准生产路线"
+              placeholder="选择路线位置（可选）"
             />
           </Form.Item>
           <Form.Item
@@ -672,10 +672,10 @@ export function MasterDataFormFields({
               <Select
                 allowClear
                 options={PURCHASE_INVOICE_REQUIRED_OPTIONS}
-                placeholder="请选择"
+                placeholder="选择是否需要发票"
                 onChange={(value) => {
                   if (value !== true) {
-                    form?.setFieldValue('default_invoice_category', undefined)
+                    form?.setFieldsValue({ default_invoice_category: undefined })
                   }
                 }}
               />
@@ -686,17 +686,17 @@ export function MasterDataFormFields({
               label="默认发票类别"
               name="default_invoice_category"
               rules={[
-                {
-                  required: defaultInvoiceRequired === true,
+                ({ getFieldValue }) => ({
+                  required: getFieldValue('default_invoice_required') === true,
                   message: '请选择默认发票类别',
-                },
+                }),
               ]}
             >
               <Select
                 allowClear
                 disabled={defaultInvoiceRequired !== true}
                 options={PURCHASE_INVOICE_CATEGORY_OPTIONS}
-                placeholder="请先选择需要发票"
+                placeholder={defaultInvoiceRequired === true ? '选择默认发票类别' : '请先选择需要发票'}
               />
             </Form.Item>
           </BusinessFormSection>

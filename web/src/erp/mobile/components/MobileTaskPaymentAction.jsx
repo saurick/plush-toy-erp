@@ -88,7 +88,7 @@ sourceContext: context,
               本次收付款用途
               <Select
                 allowClear={false /* 不可清空：收付用途决定登记单据合同，必须明确预收预付或结算。 */}
-                placeholder="本次收付款用途"
+                placeholder="选择款项用途"
                 aria-label="本次收付款用途"
                 value={kind}
                 disabled={loading}

@@ -157,3 +157,64 @@ for (const mode of ['multiple', 'tags']) {
     assert.ok(ref.current.nativeElement === root)
   })
 }
+
+for (const kind of ['AppSelect', 'FilterSelect']) {
+  test(`${kind} 数量更新后由外部清空，不回显旧标签或产生选中值告警`, async (t) => {
+    const harness = await businessFormHarness(t)
+    const { default: Select } = await import(`./${kind}.jsx`)
+    const emptyValue = kind === 'FilterSelect' ? 'all' : undefined
+    const warnings = []
+    t.mock.method(console, 'error', (...args) => warnings.push(args.map(String).join(' ')))
+    let changeCount
+    let resetFilter
+    function Example() {
+      const [value, setValue] = React.useState(emptyValue)
+      const [count, setCount] = React.useState(1)
+      changeCount = setCount
+      resetFilter = () => setValue(emptyValue)
+      return h(Select, {
+        label: '核对状态',
+        placeholder: '按核对状态筛选',
+        value,
+        ...(kind === 'FilterSelect' ? { emptyValue } : {}),
+        onChange: setValue,
+        options: [{ value: 'review', label: `待核对（${count}）` }],
+      })
+    }
+    await harness.render(h(Example))
+    const input = document.querySelector('[role="combobox"]')
+    const control = input.closest('.ant-select')
+    await act(() => input.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+    await harness.flush()
+    await harness.click(document.querySelector('.ant-select-item-option'))
+    await act(() => changeCount(0))
+    await harness.flush()
+    assert.equal(control.querySelector('.ant-select-selection-item').textContent, '待核对（0）')
+    await act(() => resetFilter())
+    await harness.flush()
+    assert.equal(control.querySelector('.ant-select-selection-placeholder').textContent, '按核对状态筛选')
+    assert.equal(Boolean(control.querySelector('.ant-select-selection-item')), false)
+    assert.deepEqual(warnings, [])
+  })
+}
+
+test('显式空值不回选默认值，非受控默认值及零、false、业务空字符串保留', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: AppSelect } = await import('./AppSelect.jsx')
+  const options = [
+    { value: 'one', label: '默认对象' },
+    { value: 0, label: '零' },
+    { value: false, label: '否' },
+    { value: '', label: '未填写客户' },
+  ]
+  const examples = [
+    h(AppSelect, { key: 'default', defaultValue: 'one', options }),
+    h(AppSelect, { key: 'empty', defaultValue: 'one', value: undefined, options, placeholder: '选择对象' }),
+    ...[0, false, ''].map((value) => h(AppSelect, { key: String(value), value, options })),
+  ]
+  await harness.render(h(React.Fragment, null, ...examples))
+  const controls = [...document.querySelectorAll('.app-select')]
+  assert.equal(controls[0].querySelector('.ant-select-selection-item').textContent, '默认对象')
+  assert.equal(controls[1].querySelector('.ant-select-selection-placeholder').textContent, '选择对象')
+  assert.deepEqual(controls.slice(2).map((control) => control.querySelector('.ant-select-selection-item').textContent), ['零', '否', '未填写客户'])
+})

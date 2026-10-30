@@ -6,6 +6,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
 export default function MaterialSupplierSelect({
   outsourcingOnly = false,
+  placeholder = outsourcingOnly ? '选择加工厂' : '选择厂商 / 供应商',
   ...props
 }) {
   const [options, setOptions] = useState([])
@@ -53,7 +54,7 @@ export default function MaterialSupplierSelect({
         optionFilterProp="label"
         options={options}
         loading={loading}
-        placeholder="选择厂商 / 供应商"
+        placeholder={placeholder}
       />
       {error ? (
         <span role="alert">

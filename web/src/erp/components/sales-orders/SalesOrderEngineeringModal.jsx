@@ -106,7 +106,7 @@ function EngineeringRow({ field, form, context, readOnly, referenceActions, onOp
         <div>
           <Form.Item label="规格（选填）" name={[field.name, 'product_sku_id']}>
             <EngineeringSourceSelect
-              placeholder="请选择规格（选填）"
+              placeholder={productID ? '选择规格' : '请先选择工程产品'}
               allowClear
               disabled={readOnly || !productID}
               options={(context?.skus || [])
@@ -124,7 +124,7 @@ function EngineeringRow({ field, form, context, readOnly, referenceActions, onOp
             <EngineeringSourceSelect
               allowClear
               disabled={readOnly || !productID}
-              placeholder="选择该产品的 BOM"
+              placeholder={productID ? '选择该产品的 BOM' : '请先选择工程产品'}
               options={(context?.boms || [])
                 .filter(
                   (item) =>

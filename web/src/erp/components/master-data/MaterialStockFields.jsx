@@ -98,7 +98,7 @@ export default function MaterialStockFields({ form }) {
           loading={loading}
           disabled={!category || category === 'UNCLASSIFIED'}
           options={options}
-          placeholder="选择常用入库仓"
+          placeholder={!category || category === 'UNCLASSIFIED' ? '请先选择库存类别' : '选择常用入库仓'}
         />
       </Form.Item>
     </>

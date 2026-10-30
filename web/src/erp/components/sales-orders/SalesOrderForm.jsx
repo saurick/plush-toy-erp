@@ -1100,6 +1100,7 @@ export function SalesOrderItemsFormSection({
                       <Form.Item
                         className="erp-line-item-field erp-line-item-field--source"
                         label="已有规格（选填）"
+                        tooltip="没有现成规格时，可由工程后续关联。"
                         name={[field.name, 'product_sku_id']}
                       >
                         <RemoteReferenceSelect
@@ -1109,7 +1110,7 @@ export function SalesOrderItemsFormSection({
                           disabled={!canEditLine}
                           optionFilterProp="label"
                           options={skuOptions}
-                          placeholder="工程可后续关联"
+                          placeholder="选择已有规格"
                           onChange={(value, option) => {
                             const sku =
                               option?.sku ||

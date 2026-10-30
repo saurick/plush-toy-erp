@@ -1381,7 +1381,7 @@ export default function ApprovalResponsibilityPanel({
                           key
                         )}
                         placeholder={getFieldValue(`${key}_role`)
-                          ? '显示该岗位员工；不可用账号会标明原因'
+                          ? '选择审批员工'
                           : '请先选择审批岗位'}
                       />
                     </Form.Item>

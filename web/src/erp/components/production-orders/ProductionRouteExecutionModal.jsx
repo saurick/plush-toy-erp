@@ -1565,7 +1565,7 @@ onCancel: () => resolve(false),
                   actionAttemptRef.current = null
                   setSelectedBatchID(batchID)
                 }}
-                placeholder="选择当前返工批次"
+                placeholder={assignmentOnly ? '选择返工批次' : '选择在制批次'}
               />
             ) : (
               <Table

@@ -128,7 +128,7 @@ export function FinancePaymentEditor({
           rules={[{ required: true, message: '请选择往来方' }]}
         >
           <Select
-            placeholder={partyIsCustomer ? '客户' : '供应商'}
+            placeholder={partyIsCustomer ? '选择客户' : '选择供应商'}
             key={partyIsCustomer ? 'customer' : 'supplier'}
             showSearch
             optionFilterProp="label"
