@@ -10,7 +10,7 @@ import FinancePaymentSourceFields from './FinancePaymentSourceFields.jsx'
 
 import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 
-import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
@@ -64,19 +64,19 @@ export function FinancePaymentEditor({
             open={paymentOpen}
           />
         </Form.Item>
-        <BusinessFormSectionTitle>往来与金额</BusinessFormSectionTitle>
-        {refundSource ? (
-          <p className="erp-business-inline-note">
-            退回原款 {refundSource.payment_no}；当前可退{' '}
-            {refundSource.available_amount} {refundSource.currency}
-            。实际退款须保留独立凭据。
-          </p>
+        <BusinessFormSection title="往来与金额">
+          {refundSource ? (
+            <p className="erp-business-inline-note">
+              退回原款 {refundSource.payment_no}；当前可退{' '}
+              {refundSource.available_amount} {refundSource.currency}
+              。实际退款须保留独立凭据。
+            </p>
         ) : null}
-        <Form.Item name="kind" label="款项用途" rules={[{ required: true }]}>
-          <Select
-            placeholder="请选择款项用途"
-            disabled={Boolean(refundSource || sourceContext)}
-            options={
+          <Form.Item name="kind" label="款项用途" rules={[{ required: true }]}>
+            <Select
+              placeholder="请选择款项用途"
+              disabled={Boolean(refundSource || sourceContext)}
+              options={
               refundSource
                 ? [{ value: FinancePaymentKind.REFUND, label: '实际退款' }]
                 : [
@@ -90,7 +90,7 @@ export function FinancePaymentEditor({
                     },
                   ]
             }
-            onChange={() =>
+              onChange={() =>
               paymentForm.setFieldsValue({
                 source_type: undefined,
                 source_id: undefined,
@@ -98,21 +98,21 @@ export function FinancePaymentEditor({
                 purpose_note: undefined,
               })
             }
-          />
-        </Form.Item>
-        <Form.Item
-          name="direction"
-          label="收付款方向"
-          rules={[{ required: true }]}
-        >
-          <Select
-            placeholder="请选择收付款方向"
-            options={[
+            />
+          </Form.Item>
+          <Form.Item
+            name="direction"
+            label="收付款方向"
+            rules={[{ required: true }]}
+          >
+            <Select
+              placeholder="请选择收付款方向"
+              options={[
               { value: 'RECEIPT', label: '收款' },
               { value: 'DISBURSEMENT', label: '付款' },
             ]}
-            disabled={Boolean(refundSource || sourceContext)}
-            onChange={() =>
+              disabled={Boolean(refundSource || sourceContext)}
+              onChange={() =>
               paymentForm.setFieldsValue({
                 counterparty_id: undefined,
                 source_type: undefined,
@@ -120,39 +120,39 @@ export function FinancePaymentEditor({
                 currency: undefined,
               })
             }
-          />
-        </Form.Item>
-        <Form.Item
-          name="counterparty_id"
-          label={partyIsCustomer ? '客户' : '供应商'}
-          rules={[{ required: true, message: '请选择往来方' }]}
-        >
-          <Select
-            placeholder={partyIsCustomer ? '选择客户' : '选择供应商'}
-            key={partyIsCustomer ? 'customer' : 'supplier'}
-            showSearch
-            optionFilterProp="label"
-            loading={referenceLoading}
-            disabled={Boolean(refundSource || sourceContext)}
-            onChange={() =>
+            />
+          </Form.Item>
+          <Form.Item
+            name="counterparty_id"
+            label={partyIsCustomer ? '客户' : '供应商'}
+            rules={[{ required: true, message: '请选择往来方' }]}
+          >
+            <Select
+              placeholder={partyIsCustomer ? '选择客户' : '选择供应商'}
+              key={partyIsCustomer ? 'customer' : 'supplier'}
+              showSearch
+              optionFilterProp="label"
+              loading={referenceLoading}
+              disabled={Boolean(refundSource || sourceContext)}
+              onChange={() =>
               paymentForm.setFieldsValue({
                 source_id: undefined,
                 currency: undefined,
               })
             }
-            options={partyOptions}
+              options={partyOptions}
+            />
+          </Form.Item>
+          <FinancePaymentSourceFields
+            form={paymentForm}
+            profile={adminProfile}
+            open={paymentOpen}
+            sourceContext={sourceContext}
           />
-        </Form.Item>
-        <FinancePaymentSourceFields
-          form={paymentForm}
-          profile={adminProfile}
-          open={paymentOpen}
-          sourceContext={sourceContext}
-        />
-        <Form.Item
-          name="purpose_note"
-          label={refundSource ? '退款原因' : '款项说明'}
-          rules={
+          <Form.Item
+            name="purpose_note"
+            label={refundSource ? '退款原因' : '款项说明'}
+            rules={
             refundSource
               ? [
                   {
@@ -163,27 +163,27 @@ export function FinancePaymentEditor({
                 ]
               : []
           }
-        >
-          <Input
-            maxLength={255}
-            placeholder={
+          >
+            <Input
+              maxLength={255}
+              placeholder={
               refundSource
                 ? '说明取消、退货或多收多付的原因'
                 : '例如：订单首款、第二期款或发货前尾款'
             }
-          />
-        </Form.Item>
-        <Form.Item
-          name="payment_no"
-          label="收付款单号"
-          rules={[{ required: true, whitespace: true, message: '请填写单号' }]}
-        >
-          <Input maxLength={64} />
-        </Form.Item>
-        <Form.Item
-          name="amount"
-          label="实收 / 实付金额"
-          rules={[
+            />
+          </Form.Item>
+          <Form.Item
+            name="payment_no"
+            label="收付款单号"
+            rules={[{ required: true, whitespace: true, message: '请填写单号' }]}
+          >
+            <Input maxLength={64} />
+          </Form.Item>
+          <Form.Item
+            name="amount"
+            label="实收 / 实付金额"
+            rules={[
             { required: true, message: '请填写金额' },
             {
               validator: (_, value) =>
@@ -198,21 +198,23 @@ export function FinancePaymentEditor({
                     : Promise.resolve(),
             },
           ]}
-        >
-          <Input inputMode="decimal" />
-        </Form.Item>
-        <Form.Item name="currency" label="币种" rules={[{ required: true }]}>
-          <Select
-            placeholder="请选择币种"
-            disabled={paymentKind !== FinancePaymentKind.SETTLEMENT}
-            options={BUSINESS_CURRENCY_OPTIONS}
-          />
-        </Form.Item>
-        <Form.Item name="occurred_at" label="发生时间">
-          <DateTimeInput />
-        </Form.Item>
-        <BusinessFormSectionTitle>账户与凭据</BusinessFormSectionTitle>
-        <FinancePaymentEvidenceFields form={paymentForm} open={paymentOpen} accountSuggestions={accountSuggestions} canRead={hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYMENT_READ)} />
+          >
+            <Input inputMode="decimal" />
+          </Form.Item>
+          <Form.Item name="currency" label="币种" rules={[{ required: true }]}>
+            <Select
+              placeholder="请选择币种"
+              disabled={paymentKind !== FinancePaymentKind.SETTLEMENT}
+              options={BUSINESS_CURRENCY_OPTIONS}
+            />
+          </Form.Item>
+          <Form.Item name="occurred_at" label="发生时间">
+            <DateTimeInput />
+          </Form.Item>
+        </BusinessFormSection>
+        <BusinessFormSection title="账户与凭据">
+          <FinancePaymentEvidenceFields form={paymentForm} open={paymentOpen} accountSuggestions={accountSuggestions} canRead={hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYMENT_READ)} />
+        </BusinessFormSection>
       </Form>
     </BusinessFormPage>
   )

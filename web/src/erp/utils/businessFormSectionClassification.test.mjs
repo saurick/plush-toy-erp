@@ -31,33 +31,29 @@ function assertUsesSharedSectionTitle(relativePath) {
   assert(!value.includes('className="erp-business-action-form__section-title"'))
 }
 
-test('shared section title exposes heading semantics and a responsive divider', () => {
+test('shared section headings keep semantics and use one compact title band', () => {
   const componentSource = source(
     '../components/business-list/BusinessFormSectionTitle.jsx'
   )
-  const modalStyles = source('../styles/app/business-modals.css')
-  const responsiveStyles = source('../styles/app/business-responsive.css')
+  const headingStyles = source('../components/business-list/businessFormSections.css')
+  const lineHeaderSource = source('../components/business-list/BusinessLineItemsFooter.jsx')
 
   assert.match(componentSource, /role="heading"/u)
   assert.match(componentSource, /aria-level=\{3\}/u)
   assert.match(componentSource, /section-title-text/u)
-  assert.match(modalStyles, /\.erp-business-action-form__section-title::after/u)
-  assert.match(modalStyles, /--erp-business-action-modal-divider/u)
-  assert.match(responsiveStyles, /section-title[\s\S]*gap: 10px/u)
+  assert.match(componentSource, /erp-business-form-heading/u)
+  assert.match(lineHeaderSource, /erp-business-form-heading/u)
+  assert.match(headingStyles, /min-height: 32px/u)
+  assert.doesNotMatch(headingStyles, /section-title::after/u)
 })
 
 test('all governed long forms use the shared section-title component', () => {
-  const paths = [
+  assertUsesSharedSectionTitle('../components/business-list/BusinessFormSection.jsx')
+  for (const relativePath of [
     '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx',
     '../components/finance/FinancePaymentEditor.jsx',
     '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx',
-    '../components/business-list/BusinessFormSection.jsx',
-  ]
-
-  for (const relativePath of paths) {
-    assertUsesSharedSectionTitle(relativePath)
-  }
-  for (const relativePath of [
+    '../components/business-list/BusinessDetailsModal.jsx',
     '../components/purchase-orders/PurchaseOrderForm.jsx',
     '../components/bom/BOMVersionForms.jsx',
     '../components/sales-orders/SalesOrderForm.jsx',

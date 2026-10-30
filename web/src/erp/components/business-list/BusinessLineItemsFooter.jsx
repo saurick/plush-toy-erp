@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react'
 import { PlusOutlined } from '@ant-design/icons'
 import { Button, Popover } from 'antd'
+import './businessFormSections.css'
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ')
@@ -51,9 +52,9 @@ export function BusinessLineItemsHeader({
   onAdd,
 }) {
   return (
-    <div className="erp-sales-order-lines-form__head">
+    <div className="erp-business-form-heading erp-sales-order-lines-form__head">
       <div>
-        <strong>{title}</strong>
+        <strong role="heading" aria-level={3} tabIndex={-1}>{title}</strong>
         {description ? <span>{description}</span> : null}
       </div>
       {children || onAdd ? (

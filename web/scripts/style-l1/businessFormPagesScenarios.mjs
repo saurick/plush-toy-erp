@@ -6,6 +6,7 @@ import {
   closeBusinessFormPage,
 } from './businessFormPageAssertions.mjs'
 import { createBusinessFormPageDraftScenarios } from './businessFormPageDraftScenarios.mjs'
+import { createBusinessFormModeScenarios } from './businessFormModeScenarios.mjs'
 import { createBusinessFormFullscreenScenarios } from './businessFormFullscreenScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { assertBusinessFormSections } from './businessFormSectionAssertions.mjs'
@@ -262,6 +263,7 @@ export function createBusinessFormPagesScenarios(deps) {
     ...createBusinessFormFullscreenScenarios(deps, scenarios),
     ...createBusinessFormPageDraftScenarios(deps),
     ...scenarios,
+    ...createBusinessFormModeScenarios(deps, documents),
     ...['create', 'edit'].map((mode) => {
       const requests = []
       let quotaRejected = false

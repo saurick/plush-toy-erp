@@ -16,6 +16,7 @@ import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTab
 import { message } from '@/common/utils/antdApp'
 import BOMMaterialCreateModal from './BOMMaterialCreateModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import '../business-list/businessFormSections.css'
 import {
   BOM_PART_FIELDS,
   groupBOMMaterials,
@@ -325,7 +326,7 @@ export default function BOMMaterialGroupsForm({
 
   return (
     <section className="erp-bom-material-groups" aria-label="材料分析明细表">
-      <div className="erp-bom-material-groups__heading">
+      <div className="erp-business-form-heading erp-bom-material-groups__heading">
         <h2>材料分析明细表</h2>
         {actions || (canEdit ? <span>Tab 换格 · 支持粘贴部位数据</span> : null)}
       </div>

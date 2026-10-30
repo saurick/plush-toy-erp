@@ -616,10 +616,6 @@
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-business-action-form__section-title {
-  color: var(--erp-text-muted);
-}
-
 [data-erp-theme='dark']
   .erp-business-action-form
   :where(

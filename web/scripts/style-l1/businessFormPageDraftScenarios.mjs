@@ -27,7 +27,7 @@ export function createBusinessFormPageDraftScenarios(deps) {
   }
   const draftScenarios = [
     ['material', 'MATERIAL_ISSUE', '编辑生产领料草稿'],
-    ['completion', 'FINISHED_GOODS_RECEIPT', '核对待入库完工报告'],
+    ['completion', 'FINISHED_GOODS_RECEIPT', '核对成品收仓草稿'],
     ['rework', 'REWORK', '编辑返工草稿'],
   ].map(([key, factType, title]) => ({
     name: `business-form-page-production-${key}-draft`,
@@ -151,7 +151,7 @@ export function createBusinessFormPageDraftScenarios(deps) {
       effectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await page.getByRole('tab', { name: /红冲/ }).click()
+        await page.getByRole('tab', { name: '账款调整', exact: true }).click()
         await page
           .getByRole('button', { name: '登记红冲', exact: true })
           .click()

@@ -178,7 +178,7 @@ materials
       viewport: { width: 1440, height: 900 },
       beforeNavigate: install,
       verify: async (page) => {
-        await deps.expectHeading(page, '库存台账')
+        await deps.expectHeading(page, '库存查询')
         await page
           .getByRole('button', { name: '仓库设置', exact: true })
           .click()
@@ -220,15 +220,7 @@ materials
         // The shared modal restores trigger focus 80 ms after its close transition.
         await page.waitForTimeout(120)
         await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
-        await page
-          .locator('.ant-select')
-          .filter({ has: page.getByRole('combobox', { name: '材料库存类别' }) })
-          .locator('.ant-select-selector')
-          .click()
-        await page
-          .locator('.ant-select-dropdown:visible')
-          .getByText('辅料', { exact: true })
-          .click()
+        await page.getByRole('group', { name: '材料库存类别', exact: true }).getByRole('button', { name: '辅料', exact: true }).click()
         await page.waitForFunction(() =>
           document
             .querySelector('.erp-business-data-table-card')

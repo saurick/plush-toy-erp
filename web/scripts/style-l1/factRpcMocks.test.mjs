@@ -8,6 +8,7 @@ import {
 } from './factRpcMocks.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
 import { createWorkflowSourceTaskFixture } from './workflowSourceTaskFixtures.mjs'
+import { canEditShipmentDraft } from '../../src/erp/utils/operationalActionAvailability.mjs'
 
 const factMockSource = readFileSync(
   new URL('./factRpcMocks.mjs', import.meta.url),
@@ -526,12 +527,14 @@ test('style-l1 shipment draft cancellation is visible on the canonical reread', 
   const call = await operationalFactMockHarness()
   const before = await call('get_shipment', { id: 1 })
   assert.equal(before.result.data.shipment.status, 'DRAFT')
+  assert.equal(canEditShipmentDraft(before.result.data.shipment), true, 'the untouched fixture draft satisfies the production editing guard')
 
   const cancelled = await call('cancel_shipment', { id: 1 })
   assert.equal(cancelled.result.data.shipment.status, 'CANCELLED')
 
   const reread = await call('list_shipments', { limit: 20, offset: 0 })
   assert.equal(reread.result.data.shipments[0].status, 'CANCELLED')
+  assert.equal(canEditShipmentDraft(reread.result.data.shipments[0]), false)
 })
 
 test('style-l1 production fact list preserves source filters, total and requested slices', async () => {

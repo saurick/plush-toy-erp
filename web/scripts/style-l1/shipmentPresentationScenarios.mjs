@@ -1,5 +1,7 @@
 import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
 import { assertImportPickerGeometry, assertImportFilterPrompt, readImportPickerLayout, assertImportPickerStableLayout, assertImportPickerStableDuring } from './importPickerAssertions.mjs'
+import { assertBusinessSectionTitleBands, assertCurrentBusinessSection } from './businessFormSectionAssertions.mjs'
+import { chooseSelectOption } from './selectControlActions.mjs'
 
 export function createShipmentSourceCandidateAssertions(deps) {
   const { assert, assertTextAbsent, expectText, outputDir, path } = deps
@@ -295,6 +297,50 @@ export function createShipmentWeightScenarios(deps) {
   const { assertLineItemAddActionScrollsToNewRow } =
     createBusinessFormalAssertions(deps)
   return [
+    ...[
+      { variant: 'desktop', viewport: { width: 1920, height: 1080 }, themeMode: 'light', deviceScaleFactor: 2 },
+      { variant: 'dark', viewport: { width: 1440, height: 900 }, themeMode: 'dark', deviceScaleFactor: 1 },
+      { variant: 'narrow', viewport: { width: 1440, height: 900 }, targetViewport: { width: 390, height: 844 }, themeMode: 'light', deviceScaleFactor: 2 },
+    ].map(({ variant, targetViewport, ...presentation }) => ({
+      name: `shipment-readonly-sections-${variant}`,
+      path: '/erp/warehouse/shipments',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      ...presentation,
+      verify: async (page) => {
+        await page.getByText('SHIP-STYLE-L1', { exact: true }).first().click()
+        await page.getByRole('button', { name: '查看明细', exact: false }).click()
+        const editor = page.getByRole('region', { name: '查看出货明细', exact: true })
+        await editor.waitFor()
+        if (targetViewport) await page.setViewportSize(targetViewport)
+        const details = editor.getByRole('region', { name: '出货明细', exact: true })
+        assert.equal(await details.getByRole('heading', { name: '出货明细', exact: true }).count(), 1)
+        assert.equal(await editor.getAttribute('data-readonly'), 'true')
+        await assertBusinessSectionTitleBands(editor)
+        const nav = editor.getByRole('navigation', { name: '表单分区' })
+        const jump = async (title) => {
+          const button = nav.getByRole('button', { name: title, exact: true })
+          if (await button.isVisible()) await button.click()
+          else await chooseSelectOption(nav.getByRole('combobox', { name: '跳转到', exact: true }), await editor.getByRole('region', { name: title, exact: true }).getAttribute('id'))
+          await assertCurrentBusinessSection(page, editor, title)
+        }
+        for (const title of ['财务审批', '出货明细', '收货信息', '财务审批', '备注与附件']) {
+          await jump(title)
+        }
+        await jump('财务审批')
+        const number = editor.getByRole('textbox', { name: /出货单号/u })
+        assert.equal(await number.isDisabled(), true)
+        await number.scrollIntoViewIfNeeded()
+        const box = await number.boundingBox()
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+        await assertCurrentBusinessSection(page, editor, '单据与客户')
+        assert.equal(await number.inputValue(), 'SHIP-STYLE-L1')
+        assert.equal(await editor.getAttribute('data-unsaved'), 'false')
+        await jump('出货明细')
+        await assertNoHorizontalOverflow(page, `shipment-readonly-sections-${variant}`)
+        await page.screenshot({ path: path.join(outputDir, `shipment-readonly-sections-${variant}.png`), fullPage: true })
+      },
+    })),
     ...[
       { variant: 'desktop', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 },
       { variant: 'compact-desktop', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2, focused: true },

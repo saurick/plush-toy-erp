@@ -1,5 +1,6 @@
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { assertBusinessSectionInteractions, assertBusinessSectionTitleBands } from './businessFormSectionAssertions.mjs'
 
 export async function openBusinessRecordDetails(
   page,
@@ -35,6 +36,7 @@ export async function openBusinessRecordDetails(
 }
 
 export function createBusinessDetailsScenarios(deps) {
+  const processRequirement = `工艺说明第一行。\n${'缝线颜色按确认样品执行。'.repeat(6)}`
   const {
     assert,
     assertDarkThemeContrast,
@@ -291,7 +293,7 @@ export function createBusinessDetailsScenarios(deps) {
         domain: 'purchase_receipt',
         rpc: 'purchase',
         path: '/erp/warehouse/inbound',
-        heading: '采购入库',
+        heading: '采购收货',
         title: '采购入库详情',
         numberKey: 'receipt_no',
         copyLabel: '入库单号',
@@ -321,7 +323,7 @@ export function createBusinessDetailsScenarios(deps) {
                 : '样式产品',
             product_code_snapshot: `PROD-${index + 1}`,
             product_no_snapshot: `PROD-${index + 1}`,
-            process_requirement: '缝线颜色按确认样品执行。'.repeat(6),
+            process_requirement: processRequirement,
             material_id: 1,
             warehouse_id: 1,
             unit_id: 1,
@@ -393,7 +395,8 @@ export function createBusinessDetailsScenarios(deps) {
           )
         },
         verify: async (page) => {
-          await expectHeading(page, config.heading)
+          if (isReceipt) await page.getByRole('tab', { name: '采购收货', exact: true, selected: true }).waitFor()
+          else await expectHeading(page, config.heading)
           const row = page
             .getByRole('row')
             .filter({ has: page.getByText(recordNo, { exact: true }) })
@@ -409,6 +412,8 @@ export function createBusinessDetailsScenarios(deps) {
           })
           await modal.waitFor()
           assert.equal(await page.getByRole('dialog').count(), 1)
+          await assertBusinessSectionTitleBands(modal)
+          if (retryFailure) await modal.getByRole('heading', { name: /^销售订单明细/u }).waitFor()
           await page
             .context()
             .grantPermissions(['clipboard-read', 'clipboard-write'])
@@ -446,6 +451,7 @@ export function createBusinessDetailsScenarios(deps) {
             await modal.getByRole('button', { name: '重试' }).click()
           }
           await modal.getByText('明细 1', { exact: true }).waitFor()
+          await assertBusinessSectionInteractions(page, modal)
           assert.equal(
             await modal.locator('.erp-business-row-item-card').count(),
             10
@@ -453,7 +459,10 @@ export function createBusinessDetailsScenarios(deps) {
           assert.equal(fullReads, isReceipt ? 0 : retryFailure ? 2 : 1)
           const metrics = await assertWideDetailsModal(page, modal)
           assert.equal(metrics.columns, 6)
-          assert.equal(metrics.fullFieldGaps.length, retryFailure ? 30 : 10)
+          assert.equal(metrics.fullFieldGaps.length, retryFailure ? 20 : 10)
+          if (retryFailure) {
+            assert.deepEqual(await modal.locator('.erp-business-row-item-card').first().locator('.erp-business-row-item-card__field--full dt').allTextContents(), ['工艺要求', '备注'])
+          }
           await assertFixedDetailPagination(page, modal)
           if (retryFailure) {
             const rows = await modal
@@ -475,24 +484,24 @@ export function createBusinessDetailsScenarios(deps) {
               '未出货数',
               '单位',
             ])
-            assert.deepEqual(rows[2], ['单价', '金额', '工程 / 打样', '设计师'])
+            assert.deepEqual(rows[2], ['单价', '金额', '工程资料', '设计师'])
             assert.equal(
               await modal
                 .locator('.erp-business-row-item-card')
                 .first()
                 .locator('dt')
                 .count(),
-              22,
+              21,
               '销售明细所有字段均应保留'
             )
             const sample = modal
               .locator('.erp-business-row-item-card')
               .first()
               .locator('dd')
-              .filter({ hasText: '打样说明第一行' })
+              .filter({ hasText: '工艺说明第一行' })
             assert.equal(
               await sample.innerText(),
-              '打样说明第一行。\n第二行请核对尺寸。'
+              processRequirement
             )
           }
           await modal.screenshot({
@@ -535,7 +544,7 @@ export function createBusinessDetailsScenarios(deps) {
           if (retryFailure) {
             await page.setViewportSize({ width: 390, height: 1000 })
             await modal
-              .locator('section')
+              .getByRole('region', { name: /^销售订单明细/u })
               .evaluate((node) => node.scrollIntoView({ block: 'start' }))
             await modal.screenshot({
               animations: 'disabled',
@@ -848,6 +857,8 @@ export function createBusinessDetailsScenarios(deps) {
             .dblclick()
           if (count === 0) {
             await modal.getByText('当前采购订单暂无明细', { exact: true }).waitFor()
+            await modal.getByRole('heading', { name: /^采购订单明细/u }).waitFor()
+            await assertBusinessSectionInteractions(page, modal)
             assert.equal(await modal.locator('.ant-pagination').count(), 0)
             assert.equal(await modal.locator('.erp-business-details-pagination .ant-pagination-total-text').count(), 0)
           } else {

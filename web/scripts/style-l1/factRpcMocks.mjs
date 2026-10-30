@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises'
 import { WorkCenterPaginationPolicy } from '../../src/common/consts/policies.generated.mjs'
+import { ShipmentFinanceReleaseStatus } from '../../src/common/consts/statuses.generated.mjs'
 import { getAllowedMobileRoleKeys } from '../../src/erp/utils/mobileRolePermissions.mjs'
 import { requireWorkflowTaskExplainParams } from '../../src/erp/utils/workflowTaskActionAccess.mjs'
 import { isWorkflowApprovalTask } from '../../src/erp/utils/workflowTaskActionContract.mjs'
@@ -382,6 +383,8 @@ export async function installFactRpcMocks(page, context) {
       id: 1,
       shipment_no: 'SHIP-STYLE-L1',
       status: shipmentStatus,
+      finance_release_status: ShipmentFinanceReleaseStatus.PENDING,
+      finance_release_version: 1,
       sales_order_id: 1,
       customer_id: 1,
       customer_snapshot: '暗色客户',

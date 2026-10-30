@@ -1,9 +1,10 @@
 import React from 'react'
+import './businessFormSections.css'
 
 export default function BusinessFormSectionTitle({ children, id, tabIndex }) {
   return (
     <div
-      className="erp-business-action-form__section-title"
+      className="erp-business-form-heading erp-business-action-form__section-title"
       id={id}
       tabIndex={tabIndex}
       role="heading"

@@ -12,7 +12,7 @@ import BusinessCompactFieldTable, {
   BusinessOptionalField,
 } from '../business-list/BusinessCompactFieldTable.jsx'
 
-import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import BusinessLineItemsFooter, {
   BusinessLineItemsHeader,
 } from '../business-list/BusinessLineItemsFooter.jsx'
@@ -119,39 +119,37 @@ export default function PurchaseReceiptExceptionModal({
             : '调整会保留原入库记录并生成差额调整记录，不会改写原入库明细。'
         }
       />
-      <Form form={form} layout="vertical" preserve={false} disabled={loading}>
-        <BusinessFormSectionTitle>整单信息</BusinessFormSectionTitle>
-        <Space size={16} style={{ width: '100%' }} align="start">
-          <Form.Item
-            name={isReturn ? 'returned_at' : 'adjusted_at'}
-            label={isReturn ? '退货时间' : '调整时间'}
-          >
-            <DateTimeInput />
-          </Form.Item>
-          {!isReturn ? (
+      <Form form={form} className="erp-business-action-form" layout="vertical" preserve={false} disabled={loading}>
+        <BusinessFormSection title="整单信息" layout="content">
+          <Space size={16} style={{ width: '100%' }} align="start">
             <Form.Item
-              name="reason"
-              label="调整原因"
-              rules={[
+              name={isReturn ? 'returned_at' : 'adjusted_at'}
+              label={isReturn ? '退货时间' : '调整时间'}
+            >
+              <DateTimeInput />
+            </Form.Item>
+            {!isReturn ? (
+              <Form.Item
+                name="reason"
+                label="调整原因"
+                rules={[
                 { required: true, whitespace: true, message: '请填写调整原因' },
               ]}
-            >
-              <BusinessTextArea maxLength={255} />
-            </Form.Item>
+              >
+                <BusinessTextArea maxLength={255} />
+              </Form.Item>
           ) : null}
-        </Space>
-        <Form.List name="items">
-          {(fields, { add, remove }) => (
-            <>
-              <BusinessLineItemsHeader
-                title={detailTitle}
-                addLabel={`添加${detailTitle}`}
-                onAdd={() => appendExceptionLine(add, fields.length)}
-              />
-              <BusinessCompactFieldTable
-                label={detailTitle}
-                showSequence
-                columns={[
+          </Space>
+        </BusinessFormSection>
+        <BusinessFormSection title={detailTitle} showHeading={false} layout="content">
+          <Form.List name="items">
+            {(fields, { add, remove }) => (
+              <>
+                <BusinessLineItemsHeader title={detailTitle} />
+                <BusinessCompactFieldTable
+                  label={detailTitle}
+                  showSequence
+                  columns={[
                   { label: '来源明细', required: true },
                   ...(!isReturn
                     ? [{ label: '调整方式', required: true, width: 144 }]
@@ -164,28 +162,28 @@ export default function PurchaseReceiptExceptionModal({
                   ...(!isReturn ? [{ label: '调整目标' }] : []),
                   { label: '操作', width: 52 },
                 ]}
-              >
-                {fields.map(({ key, ...field }, index) => (
-                  <BusinessCompactFieldRow
-                    key={key}
-                    rowRef={(node) => registerLineItemRow(index, node)}
-                    className="erp-purchase-receipt-exception-row"
-                    label={`${isReturn ? '退货' : '调整'}明细 ${index + 1}`}
-                    sequence={index + 1}
-                    cells={[
-                      <Form.Item
-                        {...field}
-                        name={[field.name, 'purchase_receipt_item_id']}
-                        label={`来源明细 ${index + 1}`}
-                        rules={[{ required: true, message: '请选择入库明细' }]}
-                      >
-                        <Select
-                          placeholder="请选择入库明细"
-                          showSearch
-                          optionFilterProp="label"
-                          options={itemOptions}
-                        />
-                      </Form.Item>,
+                >
+                  {fields.map(({ key, ...field }, index) => (
+                    <BusinessCompactFieldRow
+                      key={key}
+                      rowRef={(node) => registerLineItemRow(index, node)}
+                      className="erp-purchase-receipt-exception-row"
+                      label={`${isReturn ? '退货' : '调整'}明细 ${index + 1}`}
+                      sequence={index + 1}
+                      cells={[
+                        <Form.Item
+                          {...field}
+                          name={[field.name, 'purchase_receipt_item_id']}
+                          label={`来源明细 ${index + 1}`}
+                          rules={[{ required: true, message: '请选择入库明细' }]}
+                        >
+                          <Select
+                            placeholder="请选择入库明细"
+                            showSearch
+                            optionFilterProp="label"
+                            options={itemOptions}
+                          />
+                        </Form.Item>,
                       !isReturn ? (
                         <Form.Item
                           {...field}
@@ -201,14 +199,14 @@ export default function PurchaseReceiptExceptionModal({
                           />
                         </Form.Item>
                       ) : null,
-                      <Form.Item
-                        {...field}
-                        name={[field.name, 'quantity']}
-                        dependencies={[
+                        <Form.Item
+                          {...field}
+                          name={[field.name, 'quantity']}
+                          dependencies={[
                           ['items', field.name, 'purchase_receipt_item_id'],
                         ]}
-                        label={isReturn ? '退货数量' : '调整数量'}
-                        rules={[
+                          label={isReturn ? '退货数量' : '调整数量'}
+                          rules={[
                           unitQuantityRuleFromOptions(
                             quantityUnitOptions,
                             () =>
@@ -235,9 +233,9 @@ export default function PurchaseReceiptExceptionModal({
                                 : Promise.reject(new Error('数量必须大于 0')),
                           },
                         ]}
-                      >
-                        <Input inputMode="decimal" />
-                      </Form.Item>,
+                        >
+                          <Input inputMode="decimal" />
+                        </Form.Item>,
                       !isReturn ? (
                         <Form.Item noStyle shouldUpdate>
                           {({ getFieldValue }) => {
@@ -293,7 +291,7 @@ export default function PurchaseReceiptExceptionModal({
                         </Form.Item>
                       ) : null,
                     ].filter(Boolean)}
-                    actions={
+                      actions={
                       fields.length > 1 ? (
                         <Button
                           type="text"
@@ -304,26 +302,26 @@ export default function PurchaseReceiptExceptionModal({
                         />
                       ) : null
                     }
-                  >
-                    <BusinessOptionalField
-                      name={['items', field.name, 'note']}
-                      label="明细备注"
                     >
-                      <Form.Item
-                        {...field}
-                        name={[field.name, 'note']}
+                      <BusinessOptionalField
+                        name={['items', field.name, 'note']}
                         label="明细备注"
                       >
-                        <BusinessTextArea maxLength={255} />
-                      </Form.Item>
-                    </BusinessOptionalField>
-                  </BusinessCompactFieldRow>
+                        <Form.Item
+                          {...field}
+                          name={[field.name, 'note']}
+                          label="明细备注"
+                        >
+                          <BusinessTextArea maxLength={255} />
+                        </Form.Item>
+                      </BusinessOptionalField>
+                    </BusinessCompactFieldRow>
                 ))}
-              </BusinessCompactFieldTable>
-              <BusinessLineItemsFooter
-                addLabel={`添加${detailTitle}`}
-                onAdd={() => appendExceptionLine(add, fields.length)}
-                stats={[
+                </BusinessCompactFieldTable>
+                <BusinessLineItemsFooter
+                  addLabel={`添加${detailTitle}`}
+                  onAdd={() => appendExceptionLine(add, fields.length)}
+                  stats={[
                   {
                     key: 'count',
                     label: '已录入',
@@ -331,14 +329,16 @@ export default function PurchaseReceiptExceptionModal({
                     suffix: '条',
                   },
                 ]}
-              />
-            </>
+                />
+              </>
           )}
-        </Form.List>
-        <BusinessFormSectionTitle>整单备注</BusinessFormSectionTitle>
-        <Form.Item name="note" label="备注说明" style={{ marginTop: 16 }}>
-          <BusinessTextArea minRows={3} maxLength={255} showCount />
-        </Form.Item>
+          </Form.List>
+        </BusinessFormSection>
+        <BusinessFormSection title="整单备注">
+          <Form.Item name="note" label="备注说明">
+            <BusinessTextArea minRows={3} maxLength={255} showCount />
+          </Form.Item>
+        </BusinessFormSection>
       </Form>
     </BusinessModal>
   )

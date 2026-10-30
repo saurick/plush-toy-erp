@@ -4,6 +4,7 @@ import Modal from '@/common/components/modal/AppModal'
 import { resolveBusinessModalWidth } from '../../utils/modalSizes.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import BusinessFormPage from './BusinessFormPage.jsx'
+import BusinessFormSectionScope from './BusinessFormSectionScope.jsx'
 
 export default function BusinessModal({
   size = 'localAction',
@@ -100,6 +101,10 @@ export default function BusinessModal({
         '--erp-business-action-modal-muted': token.colorTextSecondary,
         ...style,
       }}
-    />
+    >
+      <BusinessFormSectionScope open={props.open} loading={props.loading} disabled={busy}>
+        {props.children}
+      </BusinessFormSectionScope>
+    </Modal>
   )
 }

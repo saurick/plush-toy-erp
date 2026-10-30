@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Select from '@/common/components/select/AppSelect'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { activeFormSectionIndex } from '../../utils/businessFormSections.mjs'
+import { BusinessFormSectionContext } from './BusinessFormSectionContext.js'
 
 function renderSectionPopup(menu) {
   // 跳转后由分区标题接收焦点，阻止弹层再次聚焦选择框。
@@ -24,6 +25,17 @@ export default function BusinessFormBody({ open, active: presented = true, loadi
   const [sections, setSections] = useState([])
   const [active, setActive] = useState('')
   const [scrollArea, setScrollArea] = useState({ shared: false, top: 0, height: 0 })
+  const activateSection = useCallback((id) => {
+    const body = bodyRef.current
+    if (!body) return
+    const scroller = formSectionScroller(body)
+    navigationAnchor.current = { id, top: scroller.scrollTop }
+    setActive(id)
+  }, [])
+  const sectionNavigation = useMemo(() => ({
+    activeSectionID: open && presented && !loading ? active : '',
+    activateSection: open && presented && !loading ? activateSection : null,
+  }), [active, activateSection, loading, open, presented])
 
   useEffect(() => {
     if (!open) rememberedScroll.current = 0
@@ -196,7 +208,9 @@ export default function BusinessFormBody({ open, active: presented = true, loadi
         className="erp-business-form-page__body"
         inert={busy || loading ? '' : undefined}
       >
-        {children}
+        <BusinessFormSectionContext.Provider value={sectionNavigation}>
+          {children}
+        </BusinessFormSectionContext.Provider>
         <MobileBackToTop mobileOnly enabled={open && !loading && !busy} />
       </div>
     </div>

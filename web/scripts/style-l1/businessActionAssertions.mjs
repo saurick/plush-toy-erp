@@ -13,6 +13,7 @@ import {
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { assertBusinessSectionTitleBands } from './businessFormSectionAssertions.mjs'
 
 export function createBusinessActionAssertions({ outputDir }) {
   async function verifyBusinessActionFormModal(
@@ -37,6 +38,7 @@ export function createBusinessActionAssertions({ outputDir }) {
       )
       .last()
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
+    await assertBusinessSectionTitleBands(modal)
     await expectText(page, titleText)
     const isPage = isBusinessFormPageTitle(titleText)
     if (isPage) await assertBusinessFormPage(page, modal)

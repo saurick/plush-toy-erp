@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { RedoOutlined } from '@ant-design/icons'
-import { Alert, Button, Divider, Spin } from 'antd'
+import { Alert, Button, Spin } from 'antd'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -12,6 +12,7 @@ import BusinessDetailsPagination, {
 } from './BusinessDetailsPagination.jsx'
 import BusinessRowItemCards from './BusinessRowItemCards.jsx'
 import BusinessRecordDetails from './BusinessRecordDetails.jsx'
+import BusinessFormSection from './BusinessFormSection.jsx'
 
 const EMPTY_LINE_ITEMS = Object.freeze([])
 
@@ -92,53 +93,55 @@ function BusinessLineItems({ config, record, state, contentRef }) {
     title = '完整明细',
   } = config
   const { loadState, pageItems, pageStart, retry } = state
-  if (loadState.status === 'success' && loadState.items.length === 0) {
-    return <section aria-label={title} ref={contentRef}><p className="erp-business-inline-note">{emptyDescription}</p></section>
-  }
   return (
-    <section aria-label={title} ref={contentRef}>
-      <Divider orientation="left" plain>
-        {loadState.status === 'success'
+    <div ref={contentRef}>
+      <BusinessFormSection
+        title={loadState.status === 'success'
           ? `${title}（共 ${loadState.items.length} 条）`
           : title}
-      </Divider>
-      {loadState.status === 'loading' || loadState.status === 'idle' ? (
-        <div className="erp-business-detail-items__loading">
-          <Spin size="small" />
-          <span>正在加载明细…</span>
-        </div>
+        layout="content"
+      >
+        {loadState.status === 'success' && loadState.items.length === 0 ? (
+          <p className="erp-business-inline-note">{emptyDescription}</p>
+        ) : null}
+        {loadState.status === 'loading' || loadState.status === 'idle' ? (
+          <div className="erp-business-detail-items__loading">
+            <Spin size="small" />
+            <span>正在加载明细…</span>
+          </div>
       ) : null}
-      {loadState.status === 'error' ? (
-        <Alert
-          action={
-            <Button
-              size="small"
-              className="erp-business-retry-button"
-              icon={<RedoOutlined aria-hidden="true" />}
-              onClick={retry}
-            >
-              重试
-            </Button>
+        {loadState.status === 'error' ? (
+          <Alert
+            action={
+              <Button
+                size="small"
+                className="erp-business-retry-button"
+                icon={<RedoOutlined aria-hidden="true" />}
+                onClick={retry}
+              >
+                重试
+              </Button>
           }
-          message={getActionErrorMessage(loadState.error, '加载明细失败')}
-          showIcon
-          type="error"
-        />
-      ) : null}
-      {loadState.status === 'success' && pageItems.length > 0 ? (
-        <div className="erp-business-detail-items__items">
-          <BusinessRowItemCards
-            getItemFields={getItemFields}
-            getItemKey={getItemKey}
-            getItemLabel={getItemLabel}
-            getItemSummary={getItemSummary}
-            items={pageItems}
-            record={record}
-            startIndex={pageStart}
+            message={getActionErrorMessage(loadState.error, '加载明细失败')}
+            showIcon
+            type="error"
           />
-        </div>
       ) : null}
-    </section>
+        {loadState.status === 'success' && pageItems.length > 0 ? (
+          <div className="erp-business-detail-items__items">
+            <BusinessRowItemCards
+              getItemFields={getItemFields}
+              getItemKey={getItemKey}
+              getItemLabel={getItemLabel}
+              getItemSummary={getItemSummary}
+              items={pageItems}
+              record={record}
+              startIndex={pageStart}
+            />
+          </div>
+      ) : null}
+      </BusinessFormSection>
+    </div>
   )
 }
 
@@ -187,7 +190,11 @@ export default function BusinessDetailsModal({
       width={width}
       onCancel={onClose}
     >
-      <BusinessRecordDetails columns={columns} record={record} />
+      {lineItems ? (
+        <BusinessFormSection title="单据信息" layout="content">
+          <BusinessRecordDetails columns={columns} record={record} />
+        </BusinessFormSection>
+      ) : <BusinessRecordDetails columns={columns} record={record} />}
       {lineItems ? (
         <BusinessLineItems
           config={lineItems}

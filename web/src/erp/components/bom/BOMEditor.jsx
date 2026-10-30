@@ -315,7 +315,7 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
         <Form name={inWorkspace ? `bom-${formID}` : undefined} form={form} layout="vertical" className="erp-business-action-form" disabled={!writable || saving} onValuesChange={changeValues}>
           <BOMHeaderFormFields form={form} disabled={!writable} productDisabled={editorMode === 'edit' || (inWorkspace && Boolean(initialValues?.product_id))} productActions={writable && editorMode !== 'edit' ? renderProductActions?.({ onSelect: (product) => { setProducts((current) => mergeReferenceRecords(current, [product])); form.setFieldValue('product_id', product.id) } }) : null} productOptions={productOptions} versionSuggestion={suggestion} onUseVersionSuggestion={() => form.setFieldValue('version', suggestion)} attachmentPanel={<BusinessAttachmentPanel ref={attachment} ownerType="bom_header" ownerId={detail?.id} title="BOM 附件" description="色卡、工艺图、作业说明和原始材料清单" canUpload={writable} canWithdraw={writable && canUpdate} variant="inline" compact />}>
             {review ? <BOMImportReviewSummary form={form} review={review} productOptions={productOptions} /> : null}
-            <BusinessFormSection title="材料分析明细表" showHeading={false}>
+            <BusinessFormSection title="材料分析明细表" showHeading={editorMode === 'copy'}>
               {editorMode === 'copy' ? <p>保存后会复制原版本的全部材料和部位，可在新草稿继续编辑。</p> : (
                 <BOMMaterialGroupsForm
                   form={form}

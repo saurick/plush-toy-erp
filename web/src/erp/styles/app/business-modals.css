@@ -31,6 +31,13 @@
   scrollbar-gutter: stable;
 }
 
+.erp-business-modal .ant-modal-body:where(:has(> .erp-business-form-section)) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--erp-form-section-gap);
+}
+
 .erp-permission-modal.ant-modal,
 .erp-business-entry-modal.ant-modal {
   max-width: calc(100vw - 32px);
@@ -194,6 +201,10 @@
   gap: var(--erp-form-field-gap, 16px 18px);
 }
 
+.erp-business-action-form:has(> .erp-business-form-section) {
+  row-gap: var(--erp-form-section-gap);
+}
+
 .erp-business-action-form .ant-form-item {
   width: 100%;
   max-width: 100%;
@@ -236,26 +247,6 @@
 
 .erp-business-action-form__field--full.ant-form-item {
   grid-column: 1 / -1;
-}
-
-.erp-business-action-form__section-title {
-  display: flex;
-  grid-column: 1 / -1;
-  min-width: 0;
-  align-items: center;
-  gap: 12px;
-  color: #5d6a7a;
-  font-size: var(--erp-font-body);
-  font-weight: 750;
-  line-height: 22px;
-}
-
-.erp-business-action-form__section-title::after {
-  min-width: 24px;
-  height: 1px;
-  flex: 1 1 auto;
-  background: var(--erp-business-action-modal-divider, #d8e3dc);
-  content: '';
 }
 
 .erp-business-details-modal__copy-value {
@@ -301,10 +292,10 @@
   grid-column: 1 / -1;
   gap: 12px;
   min-width: 0;
-  border: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
+  border: var(--erp-line-items-section-border-width, 1px) solid var(--erp-sales-order-lines-border, #d7e2dc);
   border-radius: 8px;
   background: var(--erp-sales-order-lines-bg, #f8fbf9);
-  padding: 14px 14px 12px;
+  padding: var(--erp-line-items-section-padding, 14px 14px 12px);
 }
 
 .erp-line-items-form__import-row {
@@ -343,20 +334,12 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
 }
 
 .erp-sales-order-lines-form__head > div {
   display: grid;
   gap: 3px;
   min-width: 0;
-}
-
-.erp-sales-order-lines-form__head strong {
-  color: var(--erp-sales-order-lines-title, #172033);
-  font-size: var(--erp-font-emphasis);
-  font-weight: 780;
 }
 
 .erp-sales-order-lines-form__head span {
@@ -1186,8 +1169,8 @@
 }
 
 .erp-purchase-receipt-inline-item-editor__head {
-  display: flex;
-  align-items: flex-start;
+  --erp-form-heading-padding-block: 0px;
+
   justify-content: space-between;
   gap: 12px;
   min-width: 0;

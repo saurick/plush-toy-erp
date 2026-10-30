@@ -7,7 +7,7 @@ import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
-import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import {
   inventoryLotOption,
   warehouseOptionFromRecord,
@@ -256,27 +256,27 @@ export default function OutsourcingOrderSourceFactModal({
         preserve={false}
         disabled={loading}
       >
-        <BusinessFormSectionTitle>仓库与批次</BusinessFormSectionTitle>
-        <Form.Item
-          name="warehouse_id"
-          label="仓库"
-          rules={[{ required: true, message: '请选择办理仓库' }]}
-        >
-          <Select
-            showSearch
-            optionFilterProp="label"
-            options={warehouseOptions}
-            placeholder="选择仓库"
-          />
-        </Form.Item>
-        {returnReceipt ? (
+        <BusinessFormSection title="仓库与批次">
           <Form.Item
-            name="lot_selection"
-            label="回货批次方式"
-            rules={[{ required: true, message: '请选择回货批次方式' }]}
+            name="warehouse_id"
+            label="仓库"
+            rules={[{ required: true, message: '请选择办理仓库' }]}
           >
-            <Radio.Group
-              options={[
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={warehouseOptions}
+              placeholder="选择仓库"
+            />
+          </Form.Item>
+          {returnReceipt ? (
+            <Form.Item
+              name="lot_selection"
+              label="回货批次方式"
+              rules={[{ required: true, message: '请选择回货批次方式' }]}
+            >
+              <Radio.Group
+                options={[
                 {
                   label: '选择已有批次',
                   value: SOURCE_INBOUND_LOT_SELECTION.EXISTING,
@@ -286,7 +286,7 @@ export default function OutsourcingOrderSourceFactModal({
                   value: SOURCE_INBOUND_LOT_SELECTION.NEW,
                 },
               ]}
-              onChange={(event) => {
+                onChange={(event) => {
                 const nextSelection = event.target.value
                 form.setFieldsValue({
                   lot_id:
@@ -296,10 +296,10 @@ export default function OutsourcingOrderSourceFactModal({
                   new_lot_no: undefined,
                 })
               }}
-            />
-          </Form.Item>
+              />
+            </Form.Item>
         ) : null}
-        {!returnReceipt ||
+          {!returnReceipt ||
         lotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING ? (
           <Form.Item
             name="lot_id"
@@ -324,23 +324,24 @@ export default function OutsourcingOrderSourceFactModal({
             />
           </Form.Item>
         ) : null}
-        {returnReceipt && lotSelection === SOURCE_INBOUND_LOT_SELECTION.NEW ? (
-          <Form.Item
-            name="new_lot_no"
-            label="新批次号"
-            rules={[
+          {returnReceipt && lotSelection === SOURCE_INBOUND_LOT_SELECTION.NEW ? (
+            <Form.Item
+              name="new_lot_no"
+              label="新批次号"
+              rules={[
               { required: true, message: '请填写本次回货的新批次号' },
               { max: 64, message: '新批次号不能超过 64 个字符' },
             ]}
-          >
-            <Input maxLength={64} placeholder="填写本次回货的新批次号" />
-          </Form.Item>
+            >
+              <Input maxLength={64} placeholder="填写本次回货的新批次号" />
+            </Form.Item>
         ) : null}
-        <BusinessFormSectionTitle>数量与时间</BusinessFormSectionTitle>
-        <Form.Item
-          name="quantity"
-          label="本次办理数量"
-          rules={[
+        </BusinessFormSection>
+        <BusinessFormSection title="数量与时间">
+          <Form.Item
+            name="quantity"
+            label="本次办理数量"
+            rules={[
             unitQuantityRuleFromOptions(quantityUnitOptions, item?.unit_id),
             { required: true, message: '请填写办理数量' },
             {
@@ -364,23 +365,24 @@ export default function OutsourcingOrderSourceFactModal({
               },
             },
           ]}
-        >
-          <Input inputMode="decimal" placeholder="填写本次办理数量" />
-        </Form.Item>
-        <Form.Item
-          name="occurred_at"
-          label="发生时间"
-          rules={[{ required: true, message: '请选择发生时间' }]}
-        >
-          <DateTimeInput />
-        </Form.Item>
-        <Form.Item
-          className="erp-business-action-form__field--full"
-          name="note"
-          label="备注"
-        >
-          <Input.TextArea rows={3} maxLength={255} showCount />
-        </Form.Item>
+          >
+            <Input inputMode="decimal" placeholder="填写本次办理数量" />
+          </Form.Item>
+          <Form.Item
+            name="occurred_at"
+            label="发生时间"
+            rules={[{ required: true, message: '请选择发生时间' }]}
+          >
+            <DateTimeInput />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field--full"
+            name="note"
+            label="备注"
+          >
+            <Input.TextArea rows={3} maxLength={255} showCount />
+          </Form.Item>
+        </BusinessFormSection>
       </Form>
     </BusinessModal>
   )

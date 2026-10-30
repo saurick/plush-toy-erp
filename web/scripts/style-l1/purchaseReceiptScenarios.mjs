@@ -2,6 +2,7 @@ import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { assertBusinessSectionInteractions } from './businessFormSectionAssertions.mjs'
 
 export function createPurchaseReceiptScenarios(deps) {
   const {
@@ -318,7 +319,7 @@ export function createPurchaseReceiptScenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const addButtonName = mode === 'return' ? '添加退货明细' : '添加调整明细'
-        await expectHeading(page, '采购入库')
+        await page.getByRole('tab', { name: '采购收货', exact: true, selected: true }).waitFor()
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, triggerName)
         const modal = page.getByRole('dialog', { name: title, exact: true })
@@ -328,6 +329,7 @@ export function createPurchaseReceiptScenarios(deps) {
           { width: 390, height: 844 },
         ]) {
           await page.setViewportSize(viewport)
+          await assertBusinessSectionInteractions(page, modal)
           for (let count = 0; count < 3; count += 1) {
             const rows = modal.locator('.erp-purchase-receipt-exception-row')
             const before = await rows.count()

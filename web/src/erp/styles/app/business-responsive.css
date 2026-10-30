@@ -708,14 +708,9 @@ body
     grid-column: auto;
   }
 
-  .erp-business-action-form__section-title {
-    grid-column: auto;
-    gap: 10px;
-  }
-
   .erp-sales-order-lines-form {
     grid-column: auto;
-    padding: 12px;
+    padding: var(--erp-line-items-section-padding, 12px);
   }
 
   .erp-master-contact-list {
@@ -723,7 +718,12 @@ body
     padding: 12px;
   }
 
-  .erp-sales-order-lines-form__head,
+  .erp-sales-order-lines-form__head {
+    --erp-form-heading-align: stretch;
+
+    flex-direction: column;
+  }
+
   .erp-line-items-form__footer,
   .erp-master-contact-list__head,
   .erp-sales-order-lines-form__row-head {

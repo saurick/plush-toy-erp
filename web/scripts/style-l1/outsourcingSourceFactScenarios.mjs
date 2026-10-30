@@ -1,4 +1,5 @@
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { assertBusinessSectionInteractions } from './businessFormSectionAssertions.mjs'
 
 export function createOutsourcingSourceFactScenarios(deps) {
   const {
@@ -341,6 +342,7 @@ export function createOutsourcingSourceFactScenarios(deps) {
             `${error.message}; 当前消息=${JSON.stringify(notices)}; 委外事实请求=${JSON.stringify(operationalFactMethods)}`
           )
         }
+        await assertBusinessSectionInteractions(page, modal)
         const modalText = String((await modal.innerText()) || '').replace(
           /\s+/gu,
           ' '

@@ -5,6 +5,7 @@ import {
 } from './businessFormPageAssertions.mjs'
 import { createBusinessColumnPriorityScenarios } from './businessColumnPriorityScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { assertBusinessSectionTitleBands } from './businessFormSectionAssertions.mjs'
 
 export function createBusinessPageContractScenarios({
   customerRuntimeEffectiveSession,
@@ -76,6 +77,7 @@ export function createBusinessPageContractScenarios({
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(modal, titleText)
     await assertBusinessFormPage(page, modal)
+    await assertBusinessSectionTitleBands(modal)
 
     const metrics = await modal.evaluate((node) => {
       const form = node.querySelector('.erp-business-action-form')
@@ -86,6 +88,11 @@ export function createBusinessPageContractScenarios({
         const rect = section.getBoundingClientRect()
         const style = window.getComputedStyle(section)
         const dividerStyle = window.getComputedStyle(section, '::after')
+        const parent = section.parentElement
+        const parentRect = parent.getBoundingClientRect()
+        const parentStyle = getComputedStyle(parent)
+        const contentLeft = parentRect.left + Number.parseFloat(parentStyle.paddingLeft) + Number.parseFloat(parentStyle.borderLeftWidth)
+        const contentRight = parentRect.right - Number.parseFloat(parentStyle.paddingRight) - Number.parseFloat(parentStyle.borderRightWidth)
         return {
           text: String(section.textContent || '').trim(),
           role: section.getAttribute('role') || '',
@@ -94,6 +101,11 @@ export function createBusinessPageContractScenarios({
           left: rect.left,
           right: rect.right,
           width: rect.width,
+          contentLeft,
+          contentRight,
+          minimumHeight: style.minHeight,
+          titleBand: section.classList.contains('erp-business-form-heading'),
+          dividerContent: dividerStyle.content,
           color: style.color,
           dividerWidth: Number.parseFloat(dividerStyle.width || '0'),
           dividerHeight: Number.parseFloat(dividerStyle.height || '0'),
@@ -131,16 +143,15 @@ export function createBusinessPageContractScenarios({
         (section, index) =>
           section.role === 'heading' &&
           section.ariaLevel === '3' &&
-          Math.abs(section.left - metrics.form.left) <= 1 &&
-          Math.abs(section.right - metrics.form.right) <= 1 &&
-          Math.abs(section.width - metrics.form.width) <= 2 &&
-          section.dividerWidth >= 24 &&
-          section.dividerHeight >= 1 &&
-          !['transparent', 'rgba(0, 0, 0, 0)'].includes(section.dividerColor) &&
+          Math.abs(section.left - section.contentLeft) <= 1 &&
+          Math.abs(section.right - section.contentRight) <= 1 &&
+          section.minimumHeight === '32px' &&
+          section.titleBand &&
+          section.dividerContent === 'none' &&
           Boolean(section.color) &&
           (index === 0 || section.top > metrics.sections[index - 1].top)
       ),
-      `${scenarioName} 分区标题语义、跨列、分隔线或顺序异常: ${JSON.stringify(
+      `${scenarioName} 分区标题语义、跨列、标题带或顺序异常: ${JSON.stringify(
         metrics
       )}`
     )
@@ -153,8 +164,9 @@ export function createBusinessPageContractScenarios({
 
     const firstControl = modal
       .locator(
-        'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), [role="combobox"]:not([aria-disabled="true"])'
+        'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), [role="combobox"]:not([disabled]):not([aria-disabled="true"])'
       )
+      .filter({ visible: true })
       .first()
     await firstControl.focus()
     assert.equal(
@@ -221,7 +233,7 @@ export function createBusinessPageContractScenarios({
         await gotoScenarioPath(page, '/erp/finance/payments', {
           waitUntil: 'domcontentloaded',
         })
-        await expectHeading(page, '收付款与核销')
+        await page.getByRole('tab', { name: '收付款', exact: true, selected: true }).waitFor()
         await assertClassifiedBusinessFormPage(page, {
           buttonName: '登记收付款',
           titleText: '登记收付款',
@@ -251,7 +263,7 @@ export function createBusinessPageContractScenarios({
         await gotoScenarioPath(page, '/erp/finance/payments', {
           waitUntil: 'domcontentloaded',
         })
-        await expectHeading(page, '收付款与核销')
+        await page.getByRole('tab', { name: '收付款', exact: true, selected: true }).waitFor()
         await assertClassifiedBusinessFormPage(page, {
           buttonName: '登记收付款',
           titleText: '登记收付款',

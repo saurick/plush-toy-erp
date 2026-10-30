@@ -1,7 +1,165 @@
 import assert from 'node:assert/strict'
+import { appendFile } from 'node:fs/promises'
 import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
+
+export async function assertBusinessSectionTitleBands(editor) {
+  await waitForFiniteAnimations(editor.page())
+  const coverage = await editor.evaluate((root) => [...root.querySelectorAll('[data-form-section]')].filter((section) => section.getClientRects().length).map((section) => ({
+    title: section.dataset.formSection,
+    headings: [...section.querySelectorAll('.erp-business-form-heading')].filter((heading) => heading.closest('[data-form-section]') === section).map((heading) => heading.querySelector('.erp-business-action-form__section-title-text, h2, strong[role="heading"]')?.textContent.trim()),
+  })))
+  for (const section of coverage) {
+    assert.ok(section.headings.includes(section.title), `every visible section retains its shared title in this mode: ${JSON.stringify(section)}`)
+  }
+  const { headings, surfaces } = await editor.evaluate((root) => {
+    const backgroundLayers = (node) => {
+      const layers = []
+      for (let ancestor = node; ancestor; ancestor = ancestor.parentElement) {
+        layers.unshift(getComputedStyle(ancestor).backgroundColor)
+      }
+      return layers
+    }
+    return {
+      headings: [...root.querySelectorAll('.erp-business-form-heading')].filter((node) => node.getClientRects().length).map((node) => {
+    const style = getComputedStyle(node)
+        const label = node.querySelector('.erp-business-action-form__section-title-text, h2, strong[role="heading"]')
+        const marker = getComputedStyle(label, '::before')
+    return {
+      text: (label || node).textContent.trim().slice(0, 80),
+      height: node.getBoundingClientRect().height,
+      minimumHeight: style.minHeight,
+      background: style.backgroundColor,
+          foreground: style.color,
+          marker: { content: marker.content, width: marker.width, height: marker.height, background: marker.backgroundColor },
+          labelLeft: label.getBoundingClientRect().left - node.getBoundingClientRect().left,
+          labelTop: label.getBoundingClientRect().top - node.getBoundingClientRect().top,
+      divider: getComputedStyle(node, '::after').content,
+          singleLineLabel: node.classList.contains('erp-business-action-form__section-title') && label.getBoundingClientRect().height <= 24,
+    }
+      }),
+      surfaces: [...root.querySelectorAll('th, input:disabled, textarea:disabled, input[readonly]')].filter((node) => node.getClientRects().length).slice(0, 12).map(backgroundLayers),
+    }
+  })
+  const backgrounds = surfaces.map((layers) => layers.reduce((surface, layer) => {
+    const color = parseRgb(layer)
+    assert.ok(color, `readable background color: ${layer}`)
+    return color.slice(0, 3).map((channel, index) => channel * color[3] + surface[index] * (1 - color[3]))
+  }, [255, 255, 255]))
+  for (const heading of headings) {
+    const detail = JSON.stringify(heading)
+    assert.equal(heading.minimumHeight, '32px', `section titles use the compact shared band: ${detail}`)
+    assert.ok(heading.background && !['transparent', 'rgba(0, 0, 0, 0)'].includes(heading.background), `section title is distinct from input and table borders: ${detail}`)
+    assert.ok(!['none', 'normal'].includes(heading.marker.content) && heading.marker.width === '3px' && heading.marker.height === '14px', `section titles retain their short marker: ${detail}`)
+    assert.ok(heading.labelLeft >= 11 && heading.labelLeft <= 13, `title and marker stay aligned when actions wrap: ${detail}`)
+    const fill = parseRgb(heading.background)
+    const ink = parseRgb(heading.foreground)
+    const marker = parseRgb(heading.marker.background)
+    assert.ok(fill && ink && marker, `section heading colors resolve: ${detail}`)
+    assert.ok(getContrastRatio(ink, fill) >= 4.5, `section title text remains readable: ${detail}`)
+    assert.ok(getContrastRatio(marker, fill) >= 3, `section title marker is visible: ${detail}`)
+    for (const background of backgrounds) {
+      assert.ok(Math.max(...fill.slice(0, 3).map((channel, index) => Math.abs(channel - background[index]))) >= 8, `section title fill differs from rendered table and readonly surfaces: ${JSON.stringify({ heading, background })}`)
+    }
+    assert.equal(heading.divider, 'none', `section titles do not retain the decorative long divider: ${detail}`)
+    if (heading.singleLineLabel) assert.ok(heading.height >= 32 && heading.height <= 34, `a single-line title stays compact: ${detail}`)
+  }
+}
+
+export async function assertCurrentBusinessSection(page, editor, title) {
+  const id = await editor.locator(`[data-form-section=${JSON.stringify(title)}]`).getAttribute('id')
+  await page.waitForFunction((sectionID) => document.getElementById(sectionID)?.dataset.currentFormSection === 'true', id)
+  assert.equal(await editor.locator('[data-current-form-section="true"]').count(), 1, 'the current region is exclusive within its page or dialog')
+  const metrics = await editor.evaluate((root) => {
+    const node = root.querySelector('[data-current-form-section="true"]')
+    return {
+    background: getComputedStyle(node).backgroundColor,
+    border: getComputedStyle(node).borderTopWidth,
+    titleBand: node.querySelector('.erp-business-form-heading') ? getComputedStyle(node.querySelector('.erp-business-form-heading')).backgroundColor : null,
+    otherBands: [...root.querySelectorAll('[data-form-section]:not([data-current-form-section="true"]) .erp-business-form-heading')].filter((heading) => heading.getClientRects().length).map((heading) => getComputedStyle(heading).backgroundColor),
+    otherBackgrounds: [...root.querySelectorAll('[data-form-section]:not([data-current-form-section="true"])')].filter((section) => section.getClientRects().length).map((section) => ({ title: section.dataset.formSection, background: getComputedStyle(section).backgroundColor, border: getComputedStyle(section).borderTopColor })),
+    }
+  })
+  assert.equal(metrics.border, '1px', JSON.stringify(metrics))
+  assert.ok(metrics.background && !['transparent', 'rgba(0, 0, 0, 0)'].includes(metrics.background), JSON.stringify(metrics))
+  for (const otherBand of metrics.otherBands) {
+    const current = parseRgb(metrics.titleBand)
+    const other = parseRgb(otherBand)
+    assert.ok(current && other && Math.max(...current.slice(0, 3).map((channel, index) => Math.abs(channel - other[index]))) >= 20, `the current section is visibly distinct from ordinary title bands: ${JSON.stringify(metrics)}`)
+  }
+  for (const other of metrics.otherBackgrounds) {
+    assert.equal(parseRgb(other.background)?.[3], 0, `inactive section does not retain a selection background: ${JSON.stringify(other)}`)
+    assert.equal(parseRgb(other.border)?.[3], 0, `inactive section does not retain a selection border: ${JSON.stringify(other)}`)
+  }
+}
+
+export async function assertBusinessSectionSpacing(editor, previous) {
+  await waitForFiniteAnimations(editor.page())
+  const layout = await editor.evaluate((root) => [...root.querySelectorAll('[data-form-section]')]
+    .filter((node) => node.getClientRects().length && !node.parentElement.closest('[data-form-section]'))
+    .map((node) => {
+      const rect = node.getBoundingClientRect()
+      const origin = root.getBoundingClientRect()
+      let top = rect.top - origin.top
+      let left = rect.left - origin.left
+      // 点击标题或目录可以滚动；比较内容坐标，避免将正常定位误判为布局跳动。
+      for (let ancestor = node.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        top += ancestor.scrollTop
+        left += ancestor.scrollLeft
+        if (ancestor === root) break
+      }
+      const style = getComputedStyle(node)
+      return {
+        title: node.dataset.formSection,
+        top,
+        left,
+        width: rect.width,
+        height: rect.height,
+        borders: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+      }
+    }))
+  for (const [index, section] of layout.entries()) {
+    assert.deepEqual(section.borders, ['1px', '1px', '1px', '1px'], `all selection states reserve the same section border: ${JSON.stringify(section)}`)
+    if (index) {
+      const before = layout[index - 1]
+      const gap = section.top - before.top - before.height
+      assert.ok(Math.abs(gap - 12) <= 0.5, `adjacent sections retain 12px of external space: ${JSON.stringify({ before: before.title, after: section.title, gap })}`)
+    }
+    if (previous) {
+      const before = previous.find((entry) => entry.title === section.title)
+      assert.ok(before, `section remains mounted while selection changes: ${section.title}`)
+      for (const property of ['top', 'left', 'width', 'height']) {
+        assert.ok(Math.abs(section[property] - before[property]) <= 0.5, `selection does not move or resize sections: ${JSON.stringify({ title: section.title, property, before: before[property], after: section[property] })}`)
+      }
+    }
+  }
+  if (previous) assert.equal(layout.length, previous.length, 'selection keeps the same visible sections')
+  if (process.env.STYLE_L1_OUTPUT_DIR) {
+    await appendFile(`${process.env.STYLE_L1_OUTPUT_DIR}/section-spacing.jsonl`, `${JSON.stringify({
+      path: new URL(editor.page().url()).pathname,
+      viewport: editor.page().viewportSize(),
+      selectionCompared: Boolean(previous),
+      sections: layout,
+    })}\n`)
+  }
+  return layout
+}
+
+export async function assertBusinessSectionInteractions(page, editor) {
+  await assertBusinessSectionTitleBands(editor)
+  const layout = await assertBusinessSectionSpacing(editor)
+  const titles = await editor.locator('[data-form-section]:visible').evaluateAll((nodes) => nodes.map((node) => node.dataset.formSection))
+  for (const title of [...titles, ...titles.slice(0, 1)]) {
+    const section = editor.locator(`[data-form-section=${JSON.stringify(title)}]`)
+    const heading = section.locator('.erp-business-form-heading').first()
+    await heading.click()
+    await assertCurrentBusinessSection(page, editor, title)
+    await assertBusinessSectionSpacing(editor, layout)
+  }
+  return titles
+}
 
 export async function assertBusinessFormNavigationSurface(page, editor) {
   await waitForFiniteAnimations(page)
@@ -107,12 +265,14 @@ async function assertAttachmentSummary(page, attachment) {
 }
 
 export async function assertBusinessFormSections(page, editor, key) {
+  await assertBusinessSectionTitleBands(editor)
   const titles = expectedSections[key]
   if (!titles) {
     assert.equal(
       await editor.getByRole('navigation', { name: '表单分区' }).count(),
       0
     )
+    await assertBusinessSectionInteractions(page, editor)
     return
   }
   const initialViewport = page.viewportSize()
@@ -121,6 +281,8 @@ export async function assertBusinessFormSections(page, editor, key) {
   await nav.getByRole('button', { name: titles[0], exact: true }).waitFor()
   assert.deepEqual(await nav.getByRole('button').allTextContents(), titles)
   await assertBusinessFormNavigationSurface(page, editor)
+  await assertCurrentBusinessSection(page, editor, titles[0])
+  const layout = await assertBusinessSectionSpacing(editor)
   const sections = editor.locator('[data-form-section]')
   const body = editor.locator('.erp-business-form-page__body')
   assert.equal(
@@ -149,6 +311,8 @@ export async function assertBusinessFormSections(page, editor, key) {
     )
     return current?.textContent === title
   }, titles.at(-1))
+  await assertCurrentBusinessSection(page, editor, titles.at(-1))
+  await assertBusinessSectionSpacing(editor, layout)
   assert.equal(
     await body.evaluate(
       () =>
@@ -182,6 +346,14 @@ export async function assertBusinessFormSections(page, editor, key) {
       )?.textContent === title,
     titles[0]
   )
+  await assertCurrentBusinessSection(page, editor, titles[0])
+  await assertBusinessSectionSpacing(editor, layout)
+  const lastField = sections.last().locator('input:not(:disabled):not([type="hidden"]), textarea:not(:disabled), button:not(:disabled)').first()
+  if (await lastField.count()) {
+    await lastField.focus()
+    await assertCurrentBusinessSection(page, editor, titles.at(-1))
+    assert.equal(await editor.getAttribute('data-unsaved'), 'false', 'focus and section changes do not alter the draft')
+  }
   for (const width of [1024, 390]) {
     await page.setViewportSize({ width, height: 844 })
     const picker = nav.getByRole('combobox', { name: '跳转到', exact: true })
@@ -206,6 +378,9 @@ export async function assertBusinessFormSections(page, editor, key) {
       throw new Error(`${error.message}; target=${target}; ${JSON.stringify(diagnostic)}`)
     })
     await assertBusinessFormPage(page, editor)
+    await assertBusinessSectionTitleBands(editor)
+    await assertBusinessSectionSpacing(editor)
+    await assertCurrentBusinessSection(page, editor, titles[1])
     assert.equal(await readSelectValue(picker), target)
     if (width === 390 && (await attachment.count())) {
       await assertAttachmentSummary(page, attachment)

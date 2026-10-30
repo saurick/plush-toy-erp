@@ -1120,19 +1120,15 @@ export default function ShipmentEditor({
                 />
               ) : null}
               {isViewModal && modalSelectedShipment ? (
-                <section className="erp-master-contact-list erp-shipment-modal-items">
+                <section className="erp-sales-order-lines-form erp-shipment-modal-items">
+                  <BusinessLineItemsHeader title="出货明细">
+                    <Tag>{modalSelectedShipment.items?.length || 0} 行</Tag>
+                  </BusinessLineItemsHeader>
                   <ShipmentWeightDetailSummary
                     shipment={modalSelectedShipment}
                     products={products}
                     productSKUs={productSKUs}
                   />
-                  <div className="erp-master-contact-list__head">
-                    <div>
-                      <strong>已保存出货明细</strong>
-                      <span>当前出货单已保存的明细只读展示。</span>
-                    </div>
-                    <Tag>{modalSelectedShipment.items?.length || 0} 行</Tag>
-                  </div>
                   <ShipmentItemsTable
                     inventoryLotOptions={inventoryLotOptions}
                     items={modalSelectedShipment.items || []}
@@ -1148,7 +1144,7 @@ export default function ShipmentEditor({
               {isWritableModal ? (
                 <Form.List name="items">
                   {(fields, { add, remove }) => (
-                    <section className="erp-master-contact-list erp-shipment-modal-items">
+                    <section className="erp-sales-order-lines-form erp-shipment-modal-items">
                       <BusinessLineItemsHeader
                         title="出货明细"
                         description="确认出货时才会扣减相应库存。"

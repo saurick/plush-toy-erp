@@ -55,6 +55,7 @@
   --erp-topbar-height: 48px;
   --erp-page-padding: 12px;
   --erp-page-gap: 9px;
+  --erp-form-section-gap: 12px;
   --erp-work-item-padding: 12px;
   --erp-work-item-gap: 8px;
   --erp-work-item-radius: 16px;
@@ -72,7 +73,6 @@
     --erp-form-body-padding-block: 10px;
     --erp-form-field-gap: 10px 12px;
     --erp-form-label-gap: 4px;
-    --erp-form-section-gap: 12px;
   }
 }
 

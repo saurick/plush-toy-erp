@@ -4,18 +4,8 @@
 }
 
 .erp-bom-material-groups__heading {
-  display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 8px;
   margin: 0 0 12px;
-}
-
-.erp-bom-material-groups__heading h2 {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
 }
 
 .erp-bom-material-groups__heading > span,
