@@ -97,6 +97,7 @@ function BOMMaterialSelect({ canCreateMaterial, onCreateMaterial, ...props }) {
     <RemoteReferenceSelect
       referenceType="materials"
       params={{ active_only: false }}
+      presentation="reference"
       {...props}
       ref={selectRef}
       open={open}

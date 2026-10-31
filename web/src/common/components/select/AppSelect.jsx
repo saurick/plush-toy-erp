@@ -16,6 +16,7 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
     className = '',
     prefix,
     value,
+    presentation,
     ...props
   } = inputProps
   // 显式受控空值保持受控，省略 value 的输入仍使用 defaultValue。
@@ -23,7 +24,7 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
   const selectRef = useRef(null)
   useImperativeHandle(ref, () => selectRef.current)
   const basePrefix = prefix ?? (label && hasSelectValue(value) ? <span className="app-select__label">{label}</span> : undefined)
-  const display = useSelectValueDisclosure(selectRef, props.mode, props.showSearch, !!basePrefix)
+  const display = useSelectValueDisclosure(selectRef, props.mode, props.showSearch, !!basePrefix, presentation === 'reference')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const inspectable = display.overflow && !(props.open ?? dropdownOpen)
   const onOpenChange = props.onOpenChange || props.onDropdownVisibleChange

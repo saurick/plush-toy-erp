@@ -6,6 +6,7 @@ import { styleRpcResult } from './rpcMockResult.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { exerciseTableScrollControls } from './tableScrollControlAssertions.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
+import { createBOMMaterialDropdownStabilityScenarios } from './bomMaterialDropdownStabilityScenarios.mjs'
 
 async function chooseImportedReference(page, control, query, label) {
   await control.click()
@@ -219,6 +220,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
     },
   ]
   return [
+    ...createBOMMaterialDropdownStabilityScenarios(deps),
     ...scenarios,
     {
       ...scenarios[0],

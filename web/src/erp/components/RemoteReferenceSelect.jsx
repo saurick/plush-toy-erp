@@ -56,6 +56,8 @@ const RemoteReferenceSelect = forwardRef(
       onSearch,
       onRecords,
       mapOption,
+      listHeight = 256,
+      popupRender,
       ...props
     },
     ref
@@ -218,6 +220,11 @@ const RemoteReferenceSelect = forwardRef(
         ),
       ]
     }, [options, selectedOptions, initialOptions, selectedID])
+    const renderPopup = useCallback((menu) => {
+      // 加载、搜索和空结果沿用候选列表高度，避免浮层重新选择展开方向。
+      const content = <div style={{ minHeight: listHeight }}>{menu}</div>
+      return popupRender ? popupRender(content) : content
+    }, [listHeight, popupRender])
     return (
       <Component
         {...props}
@@ -225,6 +232,8 @@ const RemoteReferenceSelect = forwardRef(
         value={value}
         disabled={disabled}
         options={displayOptions}
+        listHeight={listHeight}
+        popupRender={renderPopup}
         loading={loading}
         showSearch
         filterOption={false}

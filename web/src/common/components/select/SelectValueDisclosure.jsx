@@ -3,7 +3,7 @@ import { Button, Popover } from 'antd'
 import { InfoCircleOutlined } from '@ant-design/icons'
 
 // Keep the Select root and its public ref intact: form layout and focus still belong to Select.
-export function useSelectValueDisclosure(selectRef, mode, showSearch, hasPrefix) {
+export function useSelectValueDisclosure(selectRef, mode, showSearch, hasPrefix, referencePresentation = false) {
   const [display, setDisplay] = useState({ element: null, text: '', overflow: false, popupWidth: undefined })
   const measured = useRef(display)
   const measure = useCallback(() => {
@@ -15,15 +15,15 @@ export function useSelectValueDisclosure(selectRef, mode, showSearch, hasPrefix)
     const prefix = element?.querySelector('.ant-select-prefix')
     const reserved = reader ? reader.getBoundingClientRect().width + (hasPrefix ? 4 : parseFloat(getComputedStyle(prefix).marginInlineEnd) || 0) : 0
     const overflow = !!text && item.clientWidth > 0 && item.scrollWidth > item.clientWidth + reserved + 1
-    const popupWidth = element && !mode && (showSearch || overflow)
-      ? Math.max(element.getBoundingClientRect().width, Math.min(360, window.innerWidth - 24))
+    const popupWidth = element && !mode && (showSearch || overflow || referencePresentation)
+      ? Math.max(element.getBoundingClientRect().width, Math.min(referencePresentation ? 560 : 360, window.innerWidth - 24))
       : undefined
     const previous = measured.current
     if (previous.element !== element || previous.text !== text || previous.overflow !== overflow || previous.popupWidth !== popupWidth) {
       measured.current = { element, text, overflow, popupWidth }
       setDisplay(measured.current)
     }
-  }, [selectRef, mode, showSearch, hasPrefix])
+  }, [selectRef, mode, showSearch, hasPrefix, referencePresentation])
 
   useLayoutEffect(() => { measure() })
   useEffect(() => {
