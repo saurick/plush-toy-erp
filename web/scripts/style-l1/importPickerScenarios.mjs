@@ -6,6 +6,7 @@ import { createSalesOrderWorkbook } from './salesOrderImportWorkbookFixture.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { assertImportPickerGeometry, assertImportToolbarLayout, assertImportFilterPrompt, readImportPickerLayout, assertImportPickerStableLayout, assertImportPickerStableDuring } from './importPickerAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { chooseSelectOption } from './selectControlActions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 async function choose(page, scope, label, text) {
@@ -331,6 +332,118 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
       },
     },
     {
+      name: 'import-selection-purchase-design',
+      path: '/__style-fixtures/purchase-import-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        const source = prepareUIDesignSandboxSource(await readFile(new URL('../../../docs/product/ui-design/index.html', import.meta.url), 'utf8'))
+        await page.route('**/__style-fixtures/purchase-import-design', (route) => route.fulfill({
+          contentType: 'text/html; charset=utf-8',
+          body: `<!doctype html><html><head><style>html,body{height:100%;margin:0}body{display:grid;grid-template-rows:auto minmax(0,1fr)}h1{margin:0;font:14px system-ui}iframe{width:100%;height:100%;border:0;display:block}</style></head><body><h1>采购导入原型验证</h1><iframe title="采购导入原型" sandbox="allow-scripts" srcdoc="${source.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"></iframe></body></html>`,
+        }))
+      },
+      verify: async (page) => {
+        const design = page.frameLocator('iframe[title="采购导入原型"]')
+        await design.getByRole('button', { name: '采购管理', exact: true }).click()
+        await design.locator('[data-action="new-record"]').click()
+        const form = design.locator('.form-view')
+        const importButton = form.locator('[data-action="purchase-import"]')
+        const picker = design.getByRole('dialog', { name: '从材料库添加', exact: true })
+        await importButton.click()
+        await design.getByText('请先选择供应商', { exact: true }).waitFor()
+        await expectLocator(picker).toHaveCount(0)
+        await chooseSelectOption(form.locator('[data-form-field="party"]'), { index: 0 })
+        const note = form.locator('[data-form-field="remark"]')
+        await note.fill('采购原型核对，导入与取消均保留')
+        const lineRows = form.locator('.line-items tbody[data-form-row], .line-items tbody:not([data-form-row]) > tr')
+        const before = await lineRows.count()
+        await importButton.click()
+        const count = picker.locator('#purchase-import-selected-count')
+        const confirm = picker.getByRole('button', { name: '添加到采购明细', exact: true })
+        const header = picker.getByRole('checkbox', { name: '全选本页', exact: true })
+        const rowChecks = picker.locator('tbody input[type="checkbox"]')
+        await expectLocator(count).toHaveText('已选 2 条')
+        await picker.getByRole('button', { name: '清空已选', exact: true }).click()
+        await expectLocator(count).toHaveText('已选 0 条')
+        await expectLocator(confirm).toBeDisabled()
+        await expectLocator(rowChecks).toHaveCount(5)
+        await rowChecks.first().check()
+        assert.equal(await header.evaluate((node) => node.indeterminate), true)
+        await header.check()
+        await expectLocator(count).toHaveText('已选 5 条')
+        await picker.getByRole('button', { name: '下一页', exact: true }).click()
+        await expectLocator(rowChecks).toHaveCount(3)
+        await header.check()
+        await expectLocator(count).toHaveText('已选 8 条')
+        await picker.getByRole('button', { name: '上一页', exact: true }).click()
+        await header.uncheck()
+        await expectLocator(count).toHaveText('已选 3 条')
+        await picker.getByRole('button', { name: '全选筛选结果（8 条）', exact: true }).click()
+        await expectLocator(count).toHaveText('已选 8 条')
+        await expectLocator(picker.getByRole('button', { name: '全选筛选结果（8 条）', exact: true })).toBeDisabled()
+        await picker.getByRole('button', { name: '清空已选', exact: true }).click()
+        const filter = picker.locator('[data-import-review-filter]')
+        await chooseSelectOption(filter, { label: '辅料' })
+        await expectLocator(rowChecks).toHaveCount(2)
+        await expectLocator(picker.getByRole('button', { name: /全选筛选结果/u })).toHaveCount(0)
+        await header.check()
+        await chooseSelectOption(filter, { label: '主料' })
+        await expectLocator(count).toHaveText('已选 2 条')
+        await picker.getByRole('button', { name: '全选筛选结果（6 条）', exact: true }).click()
+        await expectLocator(count).toHaveText('已选 8 条')
+        await expectLocator(confirm).toContainText('（8 条）')
+        assert.equal(await confirm.getAttribute('aria-describedby'), 'purchase-import-selected-count')
+        const search = picker.getByRole('searchbox', { name: '搜索导入记录', exact: true })
+        await search.fill('不存在的材料'); await search.press('Enter')
+        await expectLocator(rowChecks).toHaveCount(0)
+        await expectLocator(header).toBeDisabled()
+        await expectLocator(count).toHaveText('已选 8 条')
+        await picker.getByRole('button', { name: '清空筛选', exact: true }).click()
+        await search.fill('短毛绒'); await search.press('Enter')
+        await expectLocator(rowChecks).toHaveCount(1)
+        const onlySelected = picker.getByRole('checkbox', { name: '仅看已选', exact: true })
+        await onlySelected.check()
+        await expectLocator(rowChecks).toHaveCount(5)
+        await expectLocator(picker.getByRole('button', { name: /全选筛选结果/u })).toHaveCount(0)
+        await onlySelected.uncheck()
+        await expectLocator(rowChecks).toHaveCount(1)
+        assert.equal(await search.inputValue(), '短毛绒')
+        await picker.getByRole('button', { name: '清空筛选', exact: true }).click()
+        for (const width of [1920, 1024, 390]) {
+          await page.setViewportSize({ width, height: 600 })
+          await waitForFiniteAnimations(page)
+          const layout = await picker.evaluate((node) => {
+            const box = node.getBoundingClientRect()
+            const selectors = ['.import-review-toolbar', '.import-review-selection', '.import-review-selection-actions', '.import-review-selection-summary', '.modal-foot']
+            return { left: box.left, right: box.right, viewport: innerWidth, overflow: selectors.filter((selector) => { const element = node.querySelector(selector); return element.scrollWidth > element.clientWidth + 1 }) }
+          })
+          assert.ok(layout.left >= 0 && layout.right <= layout.viewport + 1)
+          assert.deepEqual(layout.overflow, [], `采购选择布局 ${width}`)
+          await picker.locator('.modal-body').hover()
+          await page.mouse.wheel(0, 900)
+          await expectLocator(confirm).toBeVisible()
+        }
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: `${outputDir}/purchase-import-prototype-4k.png` })
+        await picker.getByRole('button', { name: '取消', exact: true }).click()
+        await expectLocator(lineRows).toHaveCount(before)
+        assert.equal(await note.inputValue(), '采购原型核对，导入与取消均保留')
+        await importButton.click()
+        await expectLocator(count).toHaveText('已选 2 条')
+        await picker.getByRole('button', { name: '全选筛选结果（8 条）', exact: true }).click()
+        await confirm.click()
+        await expectLocator(picker).toHaveCount(0)
+        await expectLocator(lineRows).toHaveCount(before + 8)
+        const materials = await form.locator('ui-select[data-form-field^="item-"]').evaluateAll((nodes) => nodes.slice(-8).map((node) => node.value))
+        assert.equal(new Set(materials).size, 8)
+        assert.equal(materials.includes('洗水标'), true)
+        assert.equal(materials.includes('颗粒绒 / 奶油色'), true)
+        assert.equal(await note.inputValue(), '采购原型核对，导入与取消均保留')
+      },
+    },
+    {
       name: 'import-toolbar-design-preview',
       path: '/__style-fixtures/import-toolbar-design',
       viewport: base.viewport,
@@ -343,7 +456,7 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
         }))
       },
       verify: async (page) => {
-        for (const [kind, menu] of [['bom', '产品工程'], ['shipment', '出货管理']]) {
+        for (const [kind, menu] of [['bom', '产品工程'], ['purchase', '采购管理'], ['shipment', '出货管理']]) {
           if (kind !== 'bom') await page.reload()
           const frame = page.frameLocator('iframe')
           await frame.getByRole('button', { name: menu, exact: true }).click()
@@ -352,11 +465,20 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
             await frame.locator('[data-action="bom-import-new"]').click()
           } else {
             await frame.locator('[data-action="new-record"]').click()
+            if (kind === 'purchase') await chooseSelectOption(frame.locator('[data-form-field="party"]'), { index: 0 })
             await frame.locator(`[data-action="${kind}-import"]`).click()
           }
           const dialog = frame.locator('.overlay .modal:visible').last()
           const before = await dialog.locator('tbody tr').count()
           assert.ok(before > 0)
+          if (kind === 'purchase') {
+            const pageSelection = dialog.getByRole('checkbox', { name: '全选本页', exact: true })
+            await pageSelection.check()
+            await pageSelection.uncheck()
+            assert.equal(await dialog.locator('.import-review-selection-summary').innerText(), '已选 0 条')
+            await pageSelection.check()
+            assert.match(await dialog.locator('.import-review-selection-summary').innerText(), /已选 5 条/u)
+          }
           const label = kind === 'purchase' ? '库存分类' : kind === 'bom' ? '核对结果' : '可导入状态'
           assert.equal(await dialog.locator('[data-import-review-filter] .design-select-value').innerText(), `按${label}筛选`)
           for (const width of [1440, 390]) {

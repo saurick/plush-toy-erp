@@ -316,7 +316,11 @@
     .import-review-toolbar > .control { flex:0 1 200px; width:200px; min-width:0; max-width:100%; }
     .import-review-search-actions { display:flex; flex:1 1 360px; align-items:center; gap:8px; min-width:min(100%,360px); }
     .import-review-search-actions > .search { flex:1 1 0; min-width:0; }
-    .import-review-selection { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
+    .import-review-selection { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; min-height:34px; margin-bottom:12px; }
+    .import-review-selection-actions, .import-review-selection-summary { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; min-height:34px; }
+    .import-review-selection label, .import-review-selection-summary > span { white-space:nowrap; }
+    .purchase-import-table { min-height:248px; }
+    .import-review-pagination { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-top:12px; }
     .command-actions { min-width: 0; margin-left: auto; display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
     .inventory-command { flex-wrap: wrap; }
     .inventory-navigation { display: flex; min-width: 0; max-width: 100%; flex-wrap: wrap; align-items: center; gap: 7px; }
@@ -4940,7 +4944,7 @@
       financeDueView: 'list', financeDueFilter: 'all', financeDueSearch: '',
       printTab: 'samples', printTemplate: '采购合同', printWorkspaceSource: 'PO-20260924-013',
       formDirty: false, formErrors: {}, formValues: {}, lineCount: 2, pendingNav: null, formSourcePage: 'sales', formReturnPage: 'sales', formMode: 'create', formRecordId: null,
-      taskCreateRecordId: null, taskCreatePage: null, relatedTaskOrderId: null, taskCreateError: '', taskCreateValues: {}, importMode: '', bomImportTarget: 'items', bomImportMode: 'append', bomImportUndo: null,
+      taskCreateRecordId: null, taskCreatePage: null, relatedTaskOrderId: null, taskCreateError: '', taskCreateValues: {}, importMode: '', bomImportTarget: 'items', bomImportMode: 'append', bomImportUndo: null, purchaseImportSelected: [0, 1], purchaseImportPage: 1, importOnlySelected: false,
       attachmentOwner: '', attachmentContext: 'business', attachmentMode: 'all', attachmentPrimary: 'ATT-IMG-1', attachmentReturnOverlay: null, attachmentReturnDrawer: null, attachmentExpanded: new Set(),
       attachmentFiles: [
         { id:'ATT-IMG-1', name:'产品正面图.jpg', kind:'image', size:'1.8 MB', status:'done', progress:100, uploader:'何敏', time:'今天 09:18', art:0 },
@@ -16593,7 +16597,7 @@ return {orders,financeCustomers};})();
           label='规格、船头版与补充说明';
           extra=detail('类别',select('category','类别',['新单','返单']))+detail('船头版数量',input('sample','船头版数量',2,'number','min="0"'))+detail('已有规格（选填）',select('sku','已有规格',['30cm / 米白','18cm / 蓝色']))+`<div class="document-line-facts"><span>生产数量 <output data-production-quantity="${i}"></output></span><span>未出货数 ${escapeHTML(value('qty',1200))}</span><span>工程设计师 周敏</span></div><div class="document-line-notes">${note('process','工艺要求','绣花定位按确认稿')}${note('note','备注')}</div>`;
         }else if(purchase){
-          cells=[i+1,select('item','材料名称',['短毛绒 2mm / 米白','PP 棉','塑料眼']),unit,price,quantity,amount,input('line-date','预计到货','2026-10-04','date'),actions];
+          cells=[i+1,select('item','材料名称',[...new Set(['短毛绒 2mm / 米白','PP 棉','塑料眼',...PURCHASE_IMPORT_MATERIALS.map(material=>material.name)])]),unit,price,quantity,amount,input('line-date','预计到货','2026-10-04','date'),actions];
           label='来源、下单资料与备注';
           extra=[['source-order','产品订单编号','SO-20260912-009'],['product-code','产品编号','PL-30-W'],['product-name','产品名称','节庆毛绒礼盒'],['material-code','下单材料编码','MAT-FAB-0021'],['material-name','下单材料名称','短毛绒 2mm'],['color','下单颜色','米白']].map(([key,title,fallback])=>detail(title,input(key,title,fallback,'text',`data-line-summary-label="${title}"`))).join('')+`<div class="document-line-notes">${note('note','备注')}</div>`;
         }else if(outsourcing){
@@ -16632,7 +16636,7 @@ return {orders,financeCustomers};})();
               <div class="field required"><label>${isSales?'订单日期':'采购日期'}</label><input type="date" value="2026-09-25" data-form-field="order-date" /></div>
               ${isSales?'<div class="field"><label>销售负责人</label><ui-select data-form-field="owner"><option>何敏</option><option>林晓</option></ui-select></div>':'<div class="field"><label>采购负责人</label><ui-select data-form-field="owner"><option>陈强</option><option>林晓</option></ui-select></div>'}
             <div class="field required"><label>${isSales?'计划交付日期':'预计到货日期'}</label><input type="date" value="2026-10-10" data-form-field="date" /></div></div></section>
-<section class="form-section" id="items"><h2 class="section-title"><span class="form-section-title-label">${isSales?'订货明细':'采购明细'}</span> ${!isSales||state.lineCount?renderLineAddButton(isSales?'添加订货明细':'添加采购明细'):''}</h2>
+<section class="form-section" id="items"><h2 class="section-title"><span class="form-section-title-label">${isSales?'订货明细':'采购明细'}</span> ${!isSales?'<button class="btn" data-action="purchase-import" style="margin-left:auto;height:30px">从材料库添加</button>':''}${!isSales||state.lineCount?renderLineAddButton(isSales?'添加订货明细':'添加采购明细'):''}</h2>
               ${renderDocumentLines(type)}
               ${renderLineAddContinuation(isSales?'添加订货明细':'添加采购明细')}
             </section>
@@ -18069,6 +18073,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if (state.overlay === 'handling-confirm') html += renderHandlingConfirmation();
       if (html && !root.childElementCount) floatingReturnFocus = document.activeElement;
       root.innerHTML = html;
+      const purchasePageSelection=root.querySelector('[data-action="purchase-import-page"]');
+      if(purchasePageSelection)purchasePageSelection.indeterminate=purchasePageSelection.dataset.partial==='true';
       syncDevFulfillmentConnections();
       if(state.overlay==='handling-confirm')root.querySelector('.drawer-layer')?.setAttribute('inert','');
       root.querySelectorAll('.overlay .modal').forEach(modal => {
@@ -18360,17 +18366,18 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
     function renderImportReviewFilter(kind) {
       const value=state.importReviewFilter||'';
-      const label=kind==='bom'?'核对结果':'可导入状态';
-      const filterOptions=kind==='bom'?[['issues','全部待补全'],['material_id','待选择材料'],['unit_id','待选择单位']]:[['yes','可导入'],['no','不可导入（查看原因）']];
+      const label=kind==='purchase'?'库存分类':kind==='bom'?'核对结果':'可导入状态';
+      const filterOptions=kind==='purchase'?[['MAIN','主料'],['AUXILIARY','辅料'],['PACKAGING','包材'],['OTHER','其他材料']]:kind==='bom'?[['issues','全部待补全'],['material_id','待选择材料'],['unit_id','待选择单位']]:[['yes','可导入'],['no','不可导入（查看原因）']];
       const options=[['',`按${label}筛选`],...filterOptions];
       return `<div class="import-review-toolbar" role="group" aria-label="导入筛选与搜索"><label class="control"><ui-select aria-label="导入核对筛选" placeholder="${options[0][1]}" data-import-review-filter>${options.map(([key,label])=>`<option value="${key}" ${value===key?'selected':''}>${label}</option>`).join('')}</ui-select></label><div class="import-review-search-actions"><label class="search">${icon('search')}<input type="search" aria-label="搜索导入记录" placeholder="搜索原表或来源内容" value="${escapeHTML(state.importReviewKeyword||'')}" data-import-review-search></label><button class="btn primary" data-action="search-import-review">搜索</button><button class="btn" data-action="clear-import-review-filter">清空筛选</button></div></div>`;
     }
     function matchesImportReviewSearch(values) { return values.join(' ').toLowerCase().includes((state.importReviewKeyword||'').toLowerCase()); }
     document.addEventListener('change',event=>{
-      if(event.target.matches('[data-import-review-filter]')){state.importReviewFilter=event.target.value;renderFloating();}
+      if(event.target.matches('[data-import-only-selected]')){state.importOnlySelected=event.target.checked;state.purchaseImportPage=1;renderFloating();}
+      if(event.target.matches('[data-import-review-filter]')){state.importReviewFilter=event.target.value;if(state.importMode==='purchase')state.purchaseImportPage=1;renderFloating();}
     });
     document.addEventListener('keydown',event=>{
-      if(event.key==='Enter'&&!event.isComposing&&event.target.matches('[data-import-review-search]')){event.preventDefault();state.importReviewKeyword=event.target.value.trim();renderFloating();}
+      if(event.key==='Enter'&&!event.isComposing&&event.target.matches('[data-import-review-search]')){event.preventDefault();state.importReviewKeyword=event.target.value.trim();if(state.importMode==='purchase')state.purchaseImportPage=1;renderFloating();}
     });
 
     function renderBOMImportPreview() {
@@ -18381,8 +18388,60 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(760px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong>${title}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><p class="data-note">演示材料明细.xlsx / 材料分析明细表 · 2 个部位</p><p class="data-note">${creating?'带入编辑页核对，保存草稿后才新建 BOM。':'仅导入明细，产品、版本、订单数量和其他表头保留当前草稿内容。'}</p>${renderImportReviewFilter('bom')}<p class="data-note">整份文件导入；筛选仅用于核对，确认后仍带入全部 2 个部位。</p><div class="source-summary-table"><table><thead><tr><th>材料</th><th>部位</th><th>单位用量</th><th>单位</th><th>校对</th></tr></thead><tbody>${(state.importReviewFilter?[]:rows).filter(matchesImportReviewSearch).map(row=>`<tr>${row.map(value=>`<td>${value}</td>`).join('')}<td>已匹配</td></tr>`).join('')}</tbody></table></div>${!creating&&state.lineCount?`<fieldset style="border:0;padding:12px 0"><legend>当前草稿已有 ${state.lineCount} 个部位</legend><label><input type="radio" name="bom-import-mode" data-action="bom-import-mode" data-value="append" ${!replacing?'checked':''}/> 追加，保留当前明细</label> <label><input type="radio" name="bom-import-mode" data-action="bom-import-mode" data-value="replace" ${replacing?'checked':''}/> 替换当前明细</label></fieldset>`:''}${replacing?'<div class="rm-callout warning">确认后将替换当前草稿明细，保存前可撤销本次导入。</div>':''}</div><footer class="modal-foot"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-import" aria-label="${creating?'带入并核对（2 个部位）':replacing?'替换并带入 2 个部位':'追加 2 个部位'}">${creating?'带入并核对（2 个部位）':replacing?'替换并带入 2 个部位':'追加 2 个部位'}</button></footer></section></div>`;
     }
 
+    const PURCHASE_IMPORT_MATERIALS = Object.freeze([
+      {name:'短毛绒 2mm / 米白',unit:'码',category:'MAIN'},
+      {name:'塑料眼',unit:'个',category:'AUXILIARY'},
+      {name:'填充棉',unit:'千克',category:'MAIN'},
+      {name:'长毛绒 / 深棕 / 用于身体和四肢的长名称材料',unit:'码',category:'MAIN'},
+      {name:'水晶超柔 / 浅粉',unit:'码',category:'MAIN'},
+      {name:'里布 / 原白',unit:'码',category:'MAIN'},
+      {name:'颗粒绒 / 奶油色',unit:'码',category:'MAIN'},
+      {name:'洗水标',unit:'个',category:'AUXILIARY'},
+    ]);
+    function purchaseImportView() {
+      const materials=PURCHASE_IMPORT_MATERIALS.map((material,index)=>({...material,index}));
+      const filtered=materials.filter(material=>(!state.importReviewFilter||material.category===state.importReviewFilter)&&matchesImportReviewSearch([material.name,material.unit]));
+      const rows=state.importOnlySelected?materials.filter(material=>state.purchaseImportSelected.includes(material.index)):filtered;
+      const pages=Math.max(1,Math.ceil(rows.length/5));
+      const page=Math.max(1,Math.min(state.purchaseImportPage||1,pages));
+      return {filtered,rows,pages,page,paged:rows.slice((page-1)*5,page*5)};
+    }
+    function updatePurchaseImportSelection(indices,checked) {
+      const selected=new Set(state.purchaseImportSelected);
+      indices.filter(index=>PURCHASE_IMPORT_MATERIALS[index]).forEach(index=>checked?selected.add(index):selected.delete(index));
+      state.purchaseImportSelected=[...selected];
+      renderFloating();
+    }
+    function renderPurchaseMaterialPreview() {
+      const view=purchaseImportView();
+      const selected=state.purchaseImportSelected;
+      const pageSelected=view.paged.filter(material=>selected.includes(material.index)).length;
+      const allFiltered=view.filtered.length>0&&view.filtered.every(material=>selected.includes(material.index));
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(960px,100%)" role="dialog" aria-modal="true" aria-label="从材料库添加">
+        <header class="modal-head"><strong>从材料库添加</strong><button class="btn ghost close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header>
+        <div class="modal-body">
+          <p class="data-note">选择材料后，在采购明细填写数量、单价与到货日期。</p>
+          ${renderImportReviewFilter('purchase')}
+          <div class="import-review-selection">
+            <div class="import-review-selection-actions"><label><input type="checkbox" data-import-only-selected ${state.importOnlySelected?'checked':''}/> 仅看已选</label>
+              ${!state.importOnlySelected&&view.filtered.length>5?`<button class="btn" data-action="purchase-import-filtered" ${allFiltered?'disabled':''}>全选筛选结果（${view.filtered.length} 条）</button>`:''}
+            </div>
+            <div class="import-review-selection-summary"><span id="purchase-import-selected-count" role="status">已选 ${selected.length} 条</span>${selected.length?'<button class="btn ghost" data-action="purchase-import-clear">清空已选</button>':''}</div>
+          </div>
+          <p class="data-note">筛选与翻页保留已选材料；全选仅影响当前范围，不清空其他已选。</p>
+          <div class="purchase-import-table source-summary-table"><table><thead><tr><th><input type="checkbox" aria-label="全选本页" title="全选本页" data-action="purchase-import-page" data-partial="${pageSelected>0&&pageSelected<view.paged.length}" ${view.paged.length&&pageSelected===view.paged.length?'checked':''} ${view.paged.length?'':'disabled'}/></th><th>材料名称</th><th>单位</th></tr></thead>
+            <tbody>${view.paged.map(material=>`<tr><td><input type="checkbox" aria-label="选择${escapeHTML(material.name)}" data-action="purchase-import-select" data-index="${material.index}" ${selected.includes(material.index)?'checked':''}/></td><td>${escapeHTML(material.name)}</td><td>${material.unit}</td></tr>`).join('')}</tbody></table>
+            ${view.rows.length?'':`<p class="data-note" role="status">${state.importOnlySelected?'尚未选择材料':'没有符合条件的材料'}</p>`}
+          </div>
+          <nav class="import-review-pagination" aria-label="材料分页"><span>第 ${view.page} 页 / 共 ${view.pages} 页 · ${view.rows.length} 条</span><span><button class="btn" data-action="purchase-import-pagination" data-value="${view.page-1}" ${view.page===1?'disabled':''}>上一页</button> <button class="btn" data-action="purchase-import-pagination" data-value="${view.page+1}" ${view.page===view.pages?'disabled':''}>下一页</button></span></nav>
+        </div>
+        <footer class="modal-foot"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-import" ${selected.length?'':'disabled'} aria-label="添加到采购明细" aria-describedby="purchase-import-selected-count">添加到采购明细（${selected.length} 条）</button></footer>
+      </section></div>`;
+    }
+
     function renderImportPreviewModal() {
       if (state.importMode === 'bom') return renderBOMImportPreview();
+      if (state.importMode === 'purchase') return renderPurchaseMaterialPreview();
       const title = '从销售订单带入明细';
       const source = 'SO-20260924-006 · 可出货明细';
       const metrics = [['订单行','3'],['可出货','2'],['需确认','0'],['不可带入','1']];
@@ -18984,11 +19043,23 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       else if (action === 'form-anchor') { const section=document.getElementById(target.dataset.target); if(section){section.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});const heading=section.querySelector('.section-title');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}} }
       else if (action === 'bom-import-format') { state.overlay='bom-import-format';renderFloating(); }
-      else if (action === 'search-import-review') { state.importReviewKeyword=document.querySelector('[data-import-review-search]')?.value.trim()||'';renderFloating(); }
-      else if (action === 'clear-import-review-filter') { state.importReviewFilter='';state.importReviewKeyword='';renderFloating(); }
+      else if (action === 'search-import-review') { state.importReviewKeyword=document.querySelector('[data-import-review-search]')?.value.trim()||'';if(state.importMode==='purchase')state.purchaseImportPage=1;renderFloating(); }
+      else if (action === 'clear-import-review-filter') { if(state.importMode==='purchase'){state.purchaseImportPage=1;state.importOnlySelected=false;} state.importReviewFilter='';state.importReviewKeyword='';renderFloating(); }
       else if (action === 'bom-import' || action === 'bom-import-new') { state.importReviewFilter='';state.importReviewKeyword=''; state.importMode='bom';state.bomImportTarget=action==='bom-import-new'?'new':'items';state.bomImportMode='append';state.overlay='import-preview';renderFloating(); }
       else if (action === 'bom-import-mode') { state.bomImportMode=target.dataset.value;renderFloating(); }
       else if (action === 'bom-import-undo') { if(state.bomImportUndo){state.lineCount=state.bomImportUndo.lineCount;state.formDirty=state.bomImportUndo.dirty;state.bomImportUndo=null;renderAll();} }
+      else if (action === 'purchase-import') { captureFormDraft();if(!state.formValues.party){toast('请先选择供应商');return;}state.importReviewFilter='';state.importReviewKeyword='';state.importOnlySelected=false;state.purchaseImportPage=1;state.purchaseImportSelected=[0,1];state.importMode='purchase';state.overlay='import-preview';renderFloating(); }
+      else if (action === 'purchase-import-page') { updatePurchaseImportSelection(purchaseImportView().paged.map(material=>material.index),target.checked); }
+      else if (action === 'purchase-import-filtered') { updatePurchaseImportSelection(purchaseImportView().filtered.map(material=>material.index),true); }
+      else if (action === 'purchase-import-clear') { state.purchaseImportSelected=[];state.purchaseImportPage=1;renderFloating(); }
+      else if (action === 'purchase-import-select') { updatePurchaseImportSelection([Number(target.dataset.index)],target.checked); }
+      else if (action === 'purchase-import-pagination') { state.purchaseImportPage=Number(target.dataset.value);renderFloating(); }
+      else if (action === 'confirm-import'&&state.importMode==='purchase') {
+        if(!state.purchaseImportSelected.length)return;
+        const rows=formRowData();
+        const added=state.purchaseImportSelected.map(index=>({id:`line-${++state.lineSerial}`,values:{item:PURCHASE_IMPORT_MATERIALS[index].name,unit:PURCHASE_IMPORT_MATERIALS[index].unit,qty:'',price:''},readonly:[]}));
+        applyFormRows([...rows,...added]);state.formDirty=true;state.overlay=null;renderAll();toast('材料已添加，请填写数量与单价');
+      }
       else if (action === 'shipment-import') { state.importReviewFilter='';state.importReviewKeyword='';state.importMode='shipment';state.overlay='import-preview';renderFloating(); }
       else if (action === 'confirm-import') { const isBom=state.importMode==='bom';if(isBom){if(state.bomImportTarget==='new'){openEntityForm('bom','create');state.lineCount=2;state.bomImportUndo=null;}else{state.bomImportUndo={lineCount:state.lineCount,dirty:state.formDirty};state.lineCount=state.bomImportMode==='replace'?2:state.lineCount+2;}}else state.lineCount=Math.max(state.lineCount,3);state.formDirty=true;state.overlay=null;renderAll();toast(isBom?'已带入明细，请核对后保存草稿':'已带入可出货销售订单明细'); }
       else if (action === 'fake-upload') {
