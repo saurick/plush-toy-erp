@@ -17,7 +17,7 @@ const pickerLayoutSelectors = [
 export async function readImportPickerLayout(picker) {
   return picker.evaluate((root, selectors) => Object.fromEntries(selectors.map(([name, selector]) => {
     const box = root.querySelector(selector).getBoundingClientRect()
-    let width = box.width
+    let { width } = box
     if (name === 'header') {
       // Compare the complete column lane, including native scrollbar space.
       const body = root.querySelector('.ant-table-body')
@@ -48,7 +48,7 @@ export async function assertImportPickerStableDuring(picker, label, action) {
       probe.frames += 1
       for (const [name, selector] of selectors) {
         const box = root.querySelector(selector).getBoundingClientRect()
-        let width = box.width
+        let { width } = box
         if (name === 'header') {
           const body = root.querySelector('.ant-table-body')
           const reserved = root.querySelector('.ant-table-header .ant-table-cell-scrollbar')?.getBoundingClientRect().width || 0
@@ -122,6 +122,15 @@ export async function assertImportToolbarLayout(page, picker, label) {
       clear: box(clear),
       controls: [...toolbar.querySelectorAll('.ant-select'), search, clear].map(box),
       selection: root.querySelector('.erp-source-import-picker__selection') ? box(root.querySelector('.erp-source-import-picker__selection')) : null,
+      selectionGroups: [...root.querySelectorAll('.erp-source-import-picker__selection-actions, .erp-source-import-picker__selection-summary')].map((node) => ({
+        box: box(node),
+        overflow: node.scrollWidth > node.clientWidth + 1,
+        controls: [...node.children].map(box),
+      })),
+      footerActions: root.querySelector('.erp-source-import-picker__footer-actions') ? {
+        box: box(root.querySelector('.erp-source-import-picker__footer-actions')),
+        buttons: [...root.querySelectorAll('.erp-source-import-picker__footer-actions > button')].map(box),
+      } : null,
       overflow: toolbar.scrollWidth > toolbar.clientWidth + 1,
     }
   })
@@ -133,6 +142,18 @@ export async function assertImportToolbarLayout(page, picker, label) {
     assert.ok(layout.controls.every((box) => Math.abs(box.top - layout.search.top) <= 1), `${label}: desktop filters and search share one row: ${JSON.stringify(layout)}`)
   }
   if (layout.selection) assert.ok(layout.selection.top >= layout.toolbar.bottom - 1, `${label}: selections stay below the filter toolbar`)
+  for (const group of layout.selectionGroups) {
+    assert.equal(group.overflow, false, `${label}: selection controls and summaries do not overflow: ${JSON.stringify(group)}`)
+    assert.ok(group.controls.every((control) => control.left >= group.box.left - 1 && control.right <= group.box.right + 1), `${label}: selection controls remain contained`)
+    for (let index = 1; index < group.controls.length; index++) {
+      const previous = group.controls[index - 1]; const current = group.controls[index]
+      assert.ok(current.left >= previous.right - 1 || current.top >= previous.bottom - 1, `${label}: selection controls cannot overlap`)
+    }
+  }
+  if (layout.footerActions) {
+    const { box, buttons } = layout.footerActions
+    assert.ok(buttons.every((button) => button.left >= box.left - 1 && button.right <= box.right + 1), `${label}: import counts and footer actions remain contained`)
+  }
   console.log(`[import-toolbar] ${label} viewport=${page.viewportSize().width} height=${layout.toolbar.height} searchWidth=${layout.search.width}`)
   return layout
 }

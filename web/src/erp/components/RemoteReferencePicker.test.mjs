@@ -30,10 +30,11 @@ async function harness(t, handler) {
   const { ReferenceRecordsContext } = await import('./RemoteReferenceSelect.jsx')
   const columns = [{ title: '材料名称', dataIndex: 'name' }]
   const button = (text) => [...document.querySelectorAll('button')]
-    .find((node) => node.textContent.replace(/\s+/gu, '') === text)
+    .find((node) => node.getAttribute('aria-label') === text || node.textContent.replace(/\s+/gu, '') === text)
   return {
     ...view,
     calls,
+    hint: () => document.querySelector('.erp-source-import-picker__footer [role="status"]')?.textContent || '',
     accepted,
     button,
     renderPicker: (props, profile) => view.render(createElement(
@@ -41,11 +42,11 @@ async function harness(t, handler) {
       { value: { adminProfile: profile, materials: (rows) => accepted.push(...rows) } },
       createElement(Picker, {
         referenceType: 'materials',
-open: true,
-title: '选择材料',
+        open: true,
+        title: '选择材料',
         importText: '加入明细',
-columns,
-...props,
+        columns,
+        ...props,
       })
     )),
     nextPage: () => view.act(async () => document.querySelector('.ant-pagination-next button').click()),
@@ -146,4 +147,127 @@ test('clearing a candidate filter restores the prompt and removes the query cond
   assert.equal(Object.hasOwn(view.calls.at(-1).params, 'stock_category'), false)
   assert.equal(view.button('清空筛选').disabled, true)
   assert.equal(control.querySelector('.ant-select-selection-placeholder').textContent, '按库存分类筛选')
+})
+function completeMaterialPage(params, count = 251) {
+  return {
+    materials: Array.from({ length: Math.min(params.limit, Math.max(0, count - params.offset)) }, (_, index) => ({
+      id: params.offset + index + 1, name: `完整材料${params.offset + index + 1}`,
+    })),
+    total: count,
+    limit: params.limit,
+    offset: params.offset,
+  }
+}
+
+const allFilteredButton = () => [...document.querySelectorAll('button')].find((node) => node.textContent.includes('全选筛选结果'))
+
+test('filtered selection reads every page in the supplier scope and imports all selected snapshots', async (t) => {
+  let imported
+  const view = await harness(t, (params) => completeMaterialPage(params))
+  await view.renderPicker({ params: { purchase_supplier_id: 9, stock_category: 'MAIN' }, onImport: (rows) => { imported = rows } })
+  await view.select(1)
+  await view.nextPage()
+  await view.act(async () => document.querySelector('input[aria-label="全选本页"]').click())
+  assert.match(document.body.textContent, /已选 51 条/u)
+  await view.act(async () => allFilteredButton().click())
+  assert.deepEqual(view.calls.map(({ params }) => [params.offset, params.limit]), [[0, 50], [50, 50], [0, 200], [200, 200]])
+  assert.equal(view.calls.every(({ params }) => params.purchase_supplier_id === 9 && params.stock_category === 'MAIN' && params.active_only === true), true)
+  assert.match(document.body.textContent, /已选 251 条/u)
+  assert.equal(allFilteredButton().disabled, true)
+  assert.match(view.button('加入明细').textContent, /（251 条）/u)
+  assert.equal(document.querySelectorAll('.erp-source-import-picker__selection-tag').length, 3, 'the closed summary renders only two labels and the overflow trigger')
+  await view.act(async () => view.button('加入明细').click())
+  assert.equal(imported.length, 251)
+  assert.equal(new Set(imported.map((row) => row.id)).size, 251)
+  assert.equal(imported.some((row) => row.id === 251 && row.name === '完整材料251'), true)
+  await view.select(51)
+  assert.match(document.body.textContent, /已选 250 条/u)
+  assert.equal(allFilteredButton().disabled, false)
+})
+
+test('a failed or inconsistent filtered batch preserves selections and can be retried explicitly', async (t) => {
+  let failure = 'network'
+  const view = await harness(t, (params) => {
+    if (params.limit === 200 && failure === 'initial-total') return completeMaterialPage(params, 252)
+    if (params.limit === 200 && params.offset === 200) {
+      if (failure === 'network') throw new Error('模拟读取失败')
+      if (failure === 'duplicate') return { ...completeMaterialPage(params), materials: [{ id: 1, name: '重复材料' }] }
+      if (failure === 'total') return completeMaterialPage(params, 252)
+    }
+    return completeMaterialPage(params)
+  })
+  await view.renderPicker({})
+  await view.select(1)
+  for (const scenario of ['network', 'duplicate', 'total', 'initial-total']) {
+    failure = scenario
+    await view.act(async () => allFilteredButton().click())
+    assert.match(document.body.textContent, /已选 1 条/u)
+    assert.equal(view.hint(), '未能全选筛选结果，请重试；原有选择已保留')
+    assert.equal(view.button('加入明细').disabled, false)
+  }
+  failure = ''
+  await view.act(async () => allFilteredButton().click())
+  assert.match(document.body.textContent, /已选 251 条/u)
+  assert.equal(view.hint(), '')
+})
+
+test('clearing or closing during filtered selection aborts the batch and ignores late records', async (t) => {
+  const pending = []
+  const view = await harness(t, (params, request) => params.limit === 200
+    ? new Promise((resolve) => pending.push({ request, resolve: () => resolve(completeMaterialPage(params, 100)) }))
+    : completeMaterialPage(params, 100))
+  await view.renderPicker({})
+  await view.select(1)
+  await view.act(async () => allFilteredButton().click())
+  assert.equal(view.button('加入明细').disabled, true)
+  assert.equal(view.hint(), '正在选择筛选结果，请稍候')
+  assert.equal(document.querySelector('input[aria-label="全选本页"]').disabled, true)
+  await view.act(async () => view.button('清空已选').click())
+  assert.equal(pending[0].request.init.signal.aborted, true)
+  await view.act(async () => pending[0].resolve())
+  assert.match(view.button('加入明细').textContent, /（0 条）/u)
+  assert.equal(view.accepted.length, 50, 'late batches cannot enter the shared reference cache')
+  await view.act(async () => allFilteredButton().click())
+  await view.renderPicker({ open: false })
+  assert.equal(pending[1].request.init.signal.aborted, true)
+  await view.act(async () => pending[1].resolve())
+  await view.renderPicker({ open: true })
+  assert.match(view.button('加入明细').textContent, /（0 条）/u)
+})
+
+test('changing category during filtered selection aborts the old query while retaining earlier selections', async (t) => {
+  let finish
+  let signal
+  const view = await harness(t, (params, request) => params.limit === 200
+    ? new Promise((resolve) => { signal = request.init.signal; finish = () => resolve(completeMaterialPage(params, 100)) })
+    : completeMaterialPage(params, 100))
+  await view.renderPicker({ filters: [{ key: 'stock_category', label: '库存分类', options: [{ value: 'MAIN', label: '主料' }] }] })
+  await view.select(1)
+  await view.act(async () => allFilteredButton().click())
+  const input = document.querySelector('input[aria-label="库存分类"]')
+  await view.act(async () => input.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await view.act(async () => document.querySelector('.ant-select-item-option').click())
+  assert.equal(signal.aborted, true)
+  assert.equal(view.calls.at(-1).params.stock_category, 'MAIN')
+  await view.act(async () => finish())
+  assert.match(document.body.textContent, /已选 1 条/u)
+  assert.equal(view.accepted.length, 100, 'only the two displayed pages enter the cache')
+  assert.equal(view.hint(), '')
+})
+
+test('revoking permission during filtered selection discards the batch and its cache updates', async (t) => {
+  let finish
+  let signal
+  const view = await harness(t, (params, request) => params.limit === 200
+    ? new Promise((resolve) => { signal = request.init.signal; finish = () => resolve(completeMaterialPage(params, 100)) })
+    : completeMaterialPage(params, 100))
+  await view.renderPicker({})
+  await view.act(async () => allFilteredButton().click())
+  await view.renderPicker({}, { id: 1, effective_session: { actions: [] } })
+  assert.equal(signal.aborted, true)
+  await view.act(async () => finish())
+  assert.equal(view.accepted.length, 50)
+  assert.equal(view.button('加入明细').disabled, true)
+  assert.equal(Boolean(allFilteredButton()), false)
+  assert.equal(document.querySelectorAll('.ant-table-row').length, 0)
 })

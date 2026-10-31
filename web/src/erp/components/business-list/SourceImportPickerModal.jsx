@@ -1,5 +1,5 @@
 import { RollbackOutlined } from '@ant-design/icons'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Button, Checkbox, Empty, Popover, Tag, Typography } from 'antd'
 import { modal } from '@/common/utils/antdApp'
 import Pagination from '@/common/components/pagination/AppPagination'
@@ -74,6 +74,21 @@ function defaultSelectedLabel(row = {}) {
   )
 }
 
+function SelectedRecordsPopover({ items }) {
+  return (
+    <div className="erp-source-import-picker__selected-popover-content">
+      <Text strong>已选 {items.length} 条</Text>
+      <div className="erp-source-import-picker__selected-popover-items">
+        {items.map((item) => (
+          <Tag className="erp-source-import-picker__selected-popover-item" key={item.key} title={item.label}>
+            {item.label}
+          </Tag>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function SourceImportPickerModal({
   open,
   title,
@@ -101,6 +116,8 @@ export default function SourceImportPickerModal({
   hasActiveFilters = false,
   onClearFilters,
   getSelectionGroup,
+  selectionGroup,
+  selectAllDisabledReason,
   onCancel,
   onImport,
   onReload,
@@ -111,7 +128,8 @@ export default function SourceImportPickerModal({
   current: serverCurrentPage,
   onPageChange,
   onSearchChange,
-  allowSelectAll = false,
+  allowSelectAll = true,
+  onSelectAllFiltered,
   expandable,
 }) {
   const [keyword, setKeyword] = useState('')
@@ -121,6 +139,20 @@ export default function SourceImportPickerModal({
   )
   const [currentPage, setCurrentPage] = useState(1)
   const [onlySelected, setOnlySelected] = useState(false)
+  const [selectingAll, setSelectingAll] = useState(false)
+  const [selectAllError, setSelectAllError] = useState('')
+  const [allFilteredKeys, setAllFilteredKeys] = useState([])
+  const selectAllRequest = useRef(null)
+  const selectionSummaryId = useId()
+  useEffect(() => {
+    setSelectingAll(false)
+    setSelectAllError('')
+    setAllFilteredKeys([])
+    return () => {
+      selectAllRequest.current?.abort()
+      selectAllRequest.current = null
+    }
+  }, [open, keyword, filterResetKey, onSelectAllFiltered, selectionGroup])
   const effectiveCurrentPage =
     serverPagination && !onlySelected && Number.isSafeInteger(serverCurrentPage)
       ? serverCurrentPage
@@ -163,34 +195,43 @@ export default function SourceImportPickerModal({
   )
 
   useEffect(() => {
-    if (selectedRowKeys.length === 0) return
     setSelectedRowSnapshotsByKey((current) => {
+      if (current.size === 0) return current
       let changed = false
       const next = new Map(current)
-      selectedRowKeys.forEach((key) => {
-        const normalizedKey = String(key)
+      current.forEach((snapshot, normalizedKey) => {
         const currentRow = rowsByKey.get(normalizedKey)
-        if (currentRow && current.get(normalizedKey) !== currentRow) {
+        if (currentRow && snapshot !== currentRow) {
           next.set(normalizedKey, currentRow)
           changed = true
         }
       })
       return changed ? next : current
     })
-  }, [rowsByKey, selectedRowKeys])
+  }, [rowsByKey])
 
-  const selectedRows = selectedRowKeys
-    .map((key) => rowsByKey.get(String(key)) || selectedRowSnapshotsByKey.get(String(key)))
-    .filter(Boolean)
+  const selectedRows = useMemo(() => selectedRowKeys
+    .map((key) => selectedRowSnapshotsByKey.get(String(key)) || rowsByKey.get(String(key)))
+    .filter(Boolean), [selectedRowKeys, rowsByKey, selectedRowSnapshotsByKey])
+  const selectableFilteredRows = useMemo(() => filteredRows.filter((row) => !isRowDisabled?.(row)), [filteredRows, isRowDisabled])
+  const filteredGroups = getSelectionGroup ? new Set(selectableFilteredRows.map(getSelectionGroup)) : null
+  const groupSelectionHint = getSelectionGroup && (serverPagination ? selectionGroup == null : filteredGroups.size > 1)
+    ? '先按销售订单筛选，再全选'
+    : ''
+  const bulkSelectionHint = selectAllDisabledReason || groupSelectionHint
   const visibleTotal = onlySelected ? selectedRows.length : serverPagination ? serverTotal : filteredRows.length
   const hasInvalidSelectedRows =
     typeof isRowDisabled === 'function' &&
     selectedRows.some((row) => isRowDisabled(row))
   const canImport =
     !loading &&
+    !selectingAll &&
     !importDisabled &&
     selectedRows.length > 0 &&
     !hasInvalidSelectedRows
+  const selectionHint = selectingAll
+    ? '正在选择筛选结果，请稍候'
+    : selectAllError || (multiple && !onlySelected && (serverPagination ? serverTotal : filteredRows.length) > 0 ? bulkSelectionHint : '')
 
   useEffect(() => {
     if (loading) return
@@ -241,7 +282,25 @@ export default function SourceImportPickerModal({
     return filteredRows.slice(start, start + pageSize)
   }, [effectiveCurrentPage, filteredRows, pageSize, serverPagination, onlySelected, selectedRows])
 
+  const selectedKeys = useMemo(() => new Set(selectedRowKeys), [selectedRowKeys])
+  const filteredTotal = serverPagination ? serverTotal : selectableFilteredRows.length
+  const showSelectAllFiltered = allowSelectAll && multiple && !onlySelected &&
+    (serverPagination ? typeof onSelectAllFiltered === 'function' : true) &&
+    (serverPagination ? serverTotal : filteredRows.length) > pageSize
+  const pageHasMixedGroups = Boolean(getSelectionGroup && new Set(pagedRows.filter((row) => !isRowDisabled?.(row)).map(getSelectionGroup)).size > 1)
+  const filteredSelectionComplete = (serverPagination ? allFilteredKeys : selectableFilteredRows.map(getKey))
+  const allFilteredSelected = filteredSelectionComplete.length > 0 && filteredSelectionComplete.every((key) => selectedKeys.has(key))
+
+  const cancelSelectAll = () => {
+    selectAllRequest.current?.abort()
+    selectAllRequest.current = null
+    setSelectingAll(false)
+    setSelectAllError('')
+    setAllFilteredKeys([])
+  }
+
   const handleKeywordChange = (rawKeyword) => {
+    cancelSelectAll()
     const nextKeyword = Number.isSafeInteger(searchMaxLength)
       ? [...rawKeyword].slice(0, searchMaxLength).join('')
       : rawKeyword
@@ -257,16 +316,18 @@ export default function SourceImportPickerModal({
   }
 
   const handlePageChange = (page) => {
+    cancelSelectAll()
     setCurrentPage(page)
     if (!onlySelected) onPageChange?.(page, pageSize, keyword)
   }
   const searchAccessibleLabel = searchHint || searchPlaceholder
 
-  const updateSelectedRowKeys = (nextKeys = []) => {
+  const updateSelectedRowKeys = (nextKeys = [], additionalRows = []) => {
     const normalizedKeys = Array.isArray(nextKeys) ? nextKeys : []
+    const candidatesByKey = new Map([...rowsByKey, ...additionalRows.map((row) => [String(getKey(row)), row])])
     if (getSelectionGroup && selectedRows.length) {
       const addedRow = normalizedKeys.filter((key) => !selectedRowKeys.includes(key))
-        .map((key) => rowsByKey.get(String(key))).find(Boolean)
+        .map((key) => candidatesByKey.get(String(key))).find(Boolean)
       if (addedRow && getSelectionGroup(addedRow) !== getSelectionGroup(selectedRows[0])) {
         modal.confirm({
           title: '切换销售订单？',
@@ -274,24 +335,25 @@ export default function SourceImportPickerModal({
           okText: '切换并重新选择',
           cancelText: '保留已选',
           onOk: () => replaceSelection(normalizedKeys.filter((key) => {
-            const row = rowsByKey.get(String(key))
+            const row = candidatesByKey.get(String(key))
             return row && getSelectionGroup(row) === getSelectionGroup(addedRow)
-          })),
+          }), additionalRows),
         })
         return
       }
     }
-    replaceSelection(normalizedKeys)
+    replaceSelection(normalizedKeys, additionalRows)
   }
 
-  const replaceSelection = (normalizedKeys) => {
+  const replaceSelection = (normalizedKeys, additionalRows = []) => {
     setSelectedRowKeys(normalizedKeys)
     setSelectedRowSnapshotsByKey((current) => {
+      const incoming = new Map(additionalRows.map((row) => [String(getKey(row)), row]))
       const next = new Map()
       normalizedKeys.forEach((key) => {
         const normalizedKey = String(key)
         const row =
-          rowsByKey.get(normalizedKey) || current.get(normalizedKey) || null
+          incoming.get(normalizedKey) || rowsByKey.get(normalizedKey) || current.get(normalizedKey) || null
         if (row) {
           next.set(normalizedKey, row)
         }
@@ -334,8 +396,41 @@ export default function SourceImportPickerModal({
   }
 
   const clearSelection = () => {
+    cancelSelectAll()
     setSelectedRowKeys([])
     setSelectedRowSnapshotsByKey(new Map())
+  }
+
+  const selectAllFiltered = async () => {
+    if (loading || importDisabled || bulkSelectionHint || selectAllRequest.current || !showSelectAllFiltered) return
+    const request = new AbortController()
+    selectAllRequest.current = request
+    setSelectingAll(true)
+    setSelectAllError('')
+    try {
+      const candidates = serverPagination
+        ? await onSelectAllFiltered({ signal: request.signal, expectedTotal: serverTotal })
+        : filteredRows
+      if (request.signal.aborted || selectAllRequest.current !== request) return
+      const eligibleRows = candidates.filter((row) => !isRowDisabled?.(row))
+      if (getSelectionGroup && (new Set(eligibleRows.map(getSelectionGroup)).size > 1 ||
+        (selectionGroup != null && eligibleRows.some((row) => getSelectionGroup(row) !== selectionGroup)))) {
+        setSelectAllError('筛选结果包含其他销售订单，请重新加载后重选；原有选择已保留')
+        return
+      }
+      const keys = eligibleRows.map(getKey)
+      updateSelectedRowKeys([...new Set([...selectedRowKeys, ...keys])], candidates)
+      setAllFilteredKeys(keys)
+    } catch {
+      if (!request.signal.aborted && selectAllRequest.current === request) {
+        setSelectAllError('未能全选筛选结果，请重试；原有选择已保留')
+      }
+    } finally {
+      if (selectAllRequest.current === request) {
+        selectAllRequest.current = null
+        setSelectingAll(false)
+      }
+    }
   }
 
   const confirmSelectionReset = (onConfirm) => {
@@ -362,18 +457,24 @@ export default function SourceImportPickerModal({
       }
       footer={
         <div className="erp-source-import-picker__footer">
+          {selectionHint ? (
+            <Text type={selectAllError ? 'danger' : 'secondary'} role="status">
+              {selectionHint}
+            </Text>
+          ) : null}
           <div className="erp-source-import-picker__footer-actions">
             {typeof onReload === 'function' ? (
               <Button
                 disabled={loading}
-                onClick={() => onReload(keyword, serverPagination && onlySelected ? serverCurrentPage : effectiveCurrentPage)}
+                onClick={() => { cancelSelectAll(); onReload(keyword, serverPagination && onlySelected ? serverCurrentPage : effectiveCurrentPage) }}
               >
                 重新加载
               </Button>
             ) : null}
             <Button onClick={onCancel}>{cancelText}</Button>
-            <Button type="primary" disabled={!canImport} onClick={handleImport}>
+            <Button type="primary" disabled={!canImport} onClick={handleImport} aria-label={importText} aria-describedby={selectionSummaryId}>
               {importText}
+              {multiple ? <span className="erp-source-import-picker__import-count" aria-hidden="true">（{selectedRows.length} 条）</span> : null}
             </Button>
           </div>
         </div>
@@ -407,96 +508,83 @@ export default function SourceImportPickerModal({
             </Button>
           </div>
         </div>
-        <div className={`erp-source-import-picker__selection${allowSelectAll && multiple && !serverPagination ? ' erp-source-import-picker__selection--select-all' : ''}`}>
-          <Checkbox checked={onlySelected} onChange={(event) => { setOnlySelected(event.target.checked); setCurrentPage(1) }}>
-            仅看已选
-          </Checkbox>
-          {allowSelectAll && multiple && !serverPagination && !onlySelected ? (
-            <Button className="erp-source-import-picker__select-all" onClick={() => updateSelectedRowKeys([...new Set([...selectedRowKeys, ...filteredRows.filter((row) => !isRowDisabled?.(row)).map(getKey)])])} disabled={loading || !filteredRows.length}>
-              全选筛选结果
-            </Button>
-          ) : null}
-          <div
-            className="erp-source-import-picker__selection-items"
-            aria-atomic="true"
-            aria-live="polite"
-          >
-            {selectedSummaryItems.length > 0 ? (
-              <>
-                <Text type="secondary">
-                  已选 <strong>{selectedSummaryItems.length}</strong> 条：
-                </Text>
-                {selectedSummaryItems
-                  .slice(0, SELECTED_SUMMARY_VISIBLE_LIMIT)
-                  .map((item) => (
-                    <Tag
-                      className="erp-source-import-picker__selection-tag"
-                      key={item.key}
-                      title={item.label}
-                    >
-                      {item.label}
-                    </Tag>
-                  ))}
-                {selectedSummaryItems.length >
-                SELECTED_SUMMARY_VISIBLE_LIMIT ? (
-                  <Popover
-                    trigger={['hover', 'click', 'focus']}
-                    placement="bottomLeft"
-                    destroyOnHidden
-                    classNames={{
-                      root: 'erp-source-import-picker__selected-popover',
-                    }}
-                    content={
-                      <div className="erp-source-import-picker__selected-popover-content">
-                        <Text strong>
-                          已选 {selectedSummaryItems.length} 条
-                        </Text>
-                        <div className="erp-source-import-picker__selected-popover-items">
-                          {selectedSummaryItems.map((item) => (
-                            <Tag
-                              className="erp-source-import-picker__selected-popover-item"
-                              key={item.key}
-                              title={item.label}
-                            >
-                              {item.label}
-                            </Tag>
-                          ))}
-                        </div>
-                      </div>
-                    }
-                  >
-                    <Tag
-                      aria-label={`显示全部已选${selectedNoun}，共 ${selectedSummaryItems.length} 条`}
-                      className="erp-source-import-picker__selection-tag erp-source-import-picker__selection-more"
-                      role="button"
-                      tabIndex={0}
-                    >
-                      {`+${
-                        selectedSummaryItems.length -
-                        SELECTED_SUMMARY_VISIBLE_LIMIT
-                      }`}
-                    </Tag>
-                  </Popover>
-                ) : null}
-                {hasInvalidSelectedRows ? (
-                  <Text type="danger">所选来源已不可导入，请清空后重选</Text>
-                ) : null}
-              </>
-            ) : (
-              <Text type="secondary">未选择{selectedNoun}</Text>
-            )}
+        <div className="erp-source-import-picker__selection">
+          <div className="erp-source-import-picker__selection-actions">
+            <Checkbox checked={onlySelected} onChange={(event) => { cancelSelectAll(); setOnlySelected(event.target.checked); setCurrentPage(1) }}>
+              仅看已选
+            </Checkbox>
+            {showSelectAllFiltered ? (
+              <Button className="erp-source-import-picker__select-all" aria-label={`全选筛选结果（${filteredTotal} 条）`} title={bulkSelectionHint || undefined} onClick={selectAllFiltered} loading={selectingAll} disabled={loading || importDisabled || Boolean(bulkSelectionHint) || !filteredTotal || allFilteredSelected}>
+                全选筛选结果（{filteredTotal} 条）
+              </Button>
+            ) : null}
           </div>
-          {selectedSummaryItems.length > 0 ? (
-            <Button
-              className="erp-source-import-picker__clear-selection"
-              type="link"
-              size="small"
-              title={`清空已选${selectedNoun}`}
-              onClick={clearSelection}
+          <div className="erp-source-import-picker__selection-summary">
+            <div
+              className="erp-source-import-picker__selection-items"
+              aria-atomic="true"
+              aria-live="polite"
             >
-              清空已选
-            </Button>
-          ) : null}
+              {selectedSummaryItems.length > 0 ? (
+                <>
+                  <Text type="secondary" id={selectionSummaryId}>
+                    已选 <strong>{selectedSummaryItems.length}</strong> 条：
+                  </Text>
+                  {selectedSummaryItems
+                    .slice(0, SELECTED_SUMMARY_VISIBLE_LIMIT)
+                    .map((item) => (
+                      <Tag
+                        className="erp-source-import-picker__selection-tag"
+                        key={item.key}
+                        title={item.label}
+                      >
+                        {item.label}
+                      </Tag>
+                    ))}
+                  {selectedSummaryItems.length >
+                  SELECTED_SUMMARY_VISIBLE_LIMIT ? (
+                    <Popover
+                      trigger={['hover', 'click', 'focus']}
+                      placement="bottomLeft"
+                      destroyOnHidden
+                      classNames={{
+                        root: 'erp-source-import-picker__selected-popover',
+                      }}
+                      content={<SelectedRecordsPopover items={selectedSummaryItems} />}
+                    >
+                      <Tag
+                        aria-label={`显示全部已选${selectedNoun}，共 ${selectedSummaryItems.length} 条`}
+                        className="erp-source-import-picker__selection-tag erp-source-import-picker__selection-more"
+                        role="button"
+                        tabIndex={0}
+                      >
+                        {`+${
+                          selectedSummaryItems.length -
+                          SELECTED_SUMMARY_VISIBLE_LIMIT
+                        }`}
+                      </Tag>
+                    </Popover>
+                  ) : null}
+                  {hasInvalidSelectedRows ? (
+                    <Text type="danger">所选来源已不可导入，请清空后重选</Text>
+                  ) : null}
+                </>
+              ) : (
+                <Text type="secondary" id={selectionSummaryId}>未选择{selectedNoun}</Text>
+              )}
+            </div>
+            {selectedSummaryItems.length > 0 ? (
+              <Button
+                className="erp-source-import-picker__clear-selection"
+                type="link"
+                size="small"
+                title={`清空已选${selectedNoun}`}
+                onClick={clearSelection}
+              >
+                清空已选
+              </Button>
+            ) : null}
+          </div>
         </div>
         <Table
           rowKey={rowKey}
@@ -514,12 +602,13 @@ export default function SourceImportPickerModal({
             type: multiple ? 'checkbox' : 'radio',
             selectedRowKeys,
             preserveSelectedRowKeys: true,
-            hideSelectAll: Boolean(getSelectionGroup && new Set(pagedRows.map(getSelectionGroup)).size > 1),
-            onChange: updateSelectedRowKeys,
+            onChange: (keys) => { if (!loading && !selectingAll) updateSelectedRowKeys(keys) },
             getCheckboxProps: (row) => ({
+              'aria-label': '选择此条记录',
               disabled:
-                typeof isRowDisabled === 'function' && isRowDisabled(row),
+                loading || selectingAll || (typeof isRowDisabled === 'function' && isRowDisabled(row)),
             }),
+            getTitleCheckboxProps: () => ({ 'aria-label': '全选本页', title: pageHasMixedGroups ? '先按销售订单筛选，再全选' : '全选本页', disabled: loading || selectingAll || pageHasMixedGroups || pagedRows.every((row) => isRowDisabled?.(row)) }),
           }}
           rowClassName={(row) =>
             typeof isRowDisabled === 'function' && isRowDisabled(row)
@@ -529,6 +618,7 @@ export default function SourceImportPickerModal({
           onRow={(row) => ({
             onClick: (event) => {
               if (isInteractiveRowTarget(event.target)) return
+              if (loading || selectingAll) return
               if (typeof isRowDisabled === 'function' && isRowDisabled(row)) {
                 return
               }

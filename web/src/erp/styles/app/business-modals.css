@@ -508,15 +508,35 @@
 }
 
 .erp-source-import-picker__selection {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   min-width: 0;
   min-height: calc(max(var(--erp-business-control-height), var(--erp-touch-target, 0px)) + 11px);
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   border-top: 1px dashed var(--erp-source-import-selection-border, #dbe7df);
   padding-top: 10px;
+}
+
+.erp-source-import-picker__selection-actions,
+.erp-source-import-picker__selection-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-source-import-picker__selection-actions {
+  flex-wrap: wrap;
+}
+
+.erp-source-import-picker__selection-actions > .ant-checkbox-wrapper {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.erp-source-import-picker__selection-summary {
+  justify-content: flex-end;
 }
 
 .erp-source-import-picker__selection-items {
@@ -643,45 +663,24 @@
   gap: 8px;
 }
 
+.erp-source-import-picker__import-count {
+  font-variant-numeric: tabular-nums;
+}
+
 @media screen and (max-width: 600px) {
   .erp-source-import-picker__selection {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: max(var(--erp-business-control-height), var(--erp-touch-target, 0px)) minmax(28px, auto);
-    min-height: calc(max(var(--erp-business-control-height), var(--erp-touch-target, 0px)) + 45px);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(calc(max(var(--erp-business-control-height), var(--erp-touch-target, 0px)) + var(--erp-business-control-height) + 4px), auto) minmax(max(var(--erp-business-control-height), var(--erp-touch-target, 0px)), auto);
     row-gap: 6px;
   }
 
-  .erp-source-import-picker__selection > .ant-checkbox-wrapper {
-    grid-area: 1 / 1;
-  }
-
-  .erp-source-import-picker__select-all {
-    grid-area: 1 / 2;
-    justify-self: end;
-  }
-
-  .erp-source-import-picker__selection > .erp-source-import-picker__clear-selection {
-    grid-area: 1 / 2;
-    justify-self: end;
+  .erp-source-import-picker__selection-actions {
+    justify-content: space-between;
+    gap: 4px;
   }
 
   .erp-source-import-picker__selection-items {
-    grid-area: 2 / 1 / auto / -1;
-    min-height: 28px;
     justify-content: flex-start;
-  }
-
-  .erp-source-import-picker__selection--select-all {
-    grid-template-rows: max(var(--erp-business-control-height), var(--erp-touch-target, 0px)) minmax(max(var(--erp-business-control-height), var(--erp-touch-target, 0px)), auto);
-  }
-
-  .erp-source-import-picker__selection--select-all .erp-source-import-picker__selection-items {
-    grid-column-end: 2;
-  }
-
-  .erp-source-import-picker__selection--select-all > .erp-source-import-picker__clear-selection {
-    grid-row-start: 2;
   }
 
   .erp-source-import-picker__footer {
@@ -696,8 +695,19 @@
   }
 
   .erp-source-import-picker__footer-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-area: 2 / 1;
+  }
+
+  .erp-source-import-picker__footer-actions > .ant-btn {
     justify-self: end;
+  }
+
+  .erp-source-import-picker__footer-actions > .ant-btn-primary {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 }
 

@@ -1101,9 +1101,32 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
         ) {
           continue
         }
+        let controlExpectedHeight = expectedHeight
+        const referenceName = node.matches('.app-select--reference.ant-select-single')
+          ? node.querySelector('.app-select__reference-name')
+          : null
+        if (referenceName) {
+          const selector = node.querySelector('.ant-select-selector')
+          const nameStyle = window.getComputedStyle(referenceName)
+          const nameBox = referenceName.getBoundingClientRect()
+          const selectorStyle = selector && window.getComputedStyle(selector)
+          const selectorBox = selector?.getBoundingClientRect()
+          const lineHeight = Number.parseFloat(nameStyle.lineHeight)
+          const borderHeight = selectorStyle
+            ? Number.parseFloat(selectorStyle.borderTopWidth) + Number.parseFloat(selectorStyle.borderBottomWidth)
+            : NaN
+          // 名称多出的行高叠加标准框高；来源锁定的无边框值仍使用自身边框厚度。
+          controlExpectedHeight = Math.max(expectedHeight, expectedHeight + nameBox.height - lineHeight + borderHeight - 2)
+          if (!selectorBox || !Number.isFinite(controlExpectedHeight) || nameStyle.whiteSpace !== 'normal' ||
+            referenceName.scrollWidth > referenceName.clientWidth + 1 || referenceName.scrollHeight > referenceName.clientHeight + 1 ||
+            nameBox.top < selectorBox.top - 1 || nameBox.bottom > selectorBox.bottom + 1) {
+            failures.push({ ...describe(node, form, controlExpectedHeight), reason: '业务引用名称未完整显示在控件内' })
+            continue
+          }
+        }
         const height = getLayoutHeight(node)
-        if (Math.abs(height - expectedHeight) > 1) {
-          failures.push(describe(node, form, expectedHeight))
+        if (Math.abs(height - controlExpectedHeight) > 1) {
+          failures.push(describe(node, form, controlExpectedHeight))
         }
       }
     }

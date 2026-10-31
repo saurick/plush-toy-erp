@@ -3,10 +3,55 @@ import test from 'node:test'
 
 import {
   normalizeShipmentSourceCandidate,
+  loadShipmentSourceSelection,
   shipmentSourceCandidateListParams,
   shipmentSourceOrderFromCandidate,
   validateShipmentSourceCandidatePage,
 } from './shipmentSourceCandidate.mjs'
+
+test('shipment filtered selection reads complete scoped pages and normalizes every source line', async () => {
+  const requests = []
+  const data = Array.from({ length: 205 }, (_, index) => candidate({ sales_order_item_id: index + 1, line_no: index + 1 }))
+  const params = shipmentSourceCandidateListParams({ salesOrderID: 7, customerID: 8, selectable: true, keyword: '小熊', page: 2 })
+  const rows = await loadShipmentSourceSelection(async (query) => {
+    requests.push(query)
+    return { shipment_source_candidates: data.slice(query.offset, query.offset + query.limit), total: 205, limit: query.limit, offset: query.offset }
+  }, params, { signal: new AbortController().signal, expectedTotal: 205 })
+  assert.deepEqual(requests.map((query) => query.offset), [0, 200])
+  assert.equal(requests.every((query) => query.sales_order_id === 7 && query.customer_id === 8 && query.selectable && query.keyword === '小熊'), true)
+  assert.equal(rows.length, 205)
+  assert.equal(rows.at(-1).id, 205)
+  assert.equal(rows.at(-1).remainingQuantity, '11.5')
+  assert.equal(rows.at(-1).disabledReason, '')
+})
+
+test('shipment filtered selection rejects unscoped, ineligible, mixed, incomplete or changed batches', async () => {
+  const base = { sales_order_id: 7, customer_id: 8, selectable: true }
+  const options = { signal: new AbortController().signal, expectedTotal: 1 }
+  let calls = 0
+  const listPage = async (query, records = [candidate()]) => {
+    calls++
+    return { shipment_source_candidates: records, total: records.length, limit: query.limit, offset: query.offset }
+  }
+  for (const params of [{ ...base, sales_order_id: undefined }, { ...base, selectable: false }]) {
+    await assert.rejects(loadShipmentSourceSelection(listPage, params, options), { isInvalidResponse: true })
+  }
+  assert.equal(calls, 0)
+  for (const overrides of [{ sales_order_id: 9 }, { customer_id: 9 }, { selectable: false }]) {
+    await assert.rejects(loadShipmentSourceSelection((query) => listPage(query, [candidate(overrides)]), base, options), { isInvalidResponse: true })
+  }
+  await assert.rejects(loadShipmentSourceSelection(listPage, base, { ...options, expectedTotal: 2 }), { isInvalidResponse: true })
+  await assert.rejects(loadShipmentSourceSelection(async (query) => ({ shipment_source_candidates: [], total: 2, limit: query.limit, offset: query.offset }), base, { ...options, expectedTotal: 2 }), { isInvalidResponse: true })
+})
+
+test('shipment filtered selection ignores a late batch after cancellation', async () => {
+  const request = new AbortController()
+  const rows = await loadShipmentSourceSelection(async (query) => {
+    request.abort()
+    return { shipment_source_candidates: [candidate()], total: 1, limit: query.limit, offset: query.offset }
+  }, { sales_order_id: 7, selectable: true }, { signal: request.signal, expectedTotal: 1 })
+  assert.deepEqual(rows, [])
+})
 
 function candidate(overrides = {}) {
   return {

@@ -1,6 +1,7 @@
 import { SalesOrderItemStatus, SalesOrderStatus } from '../../common/consts/statuses.generated.mjs'
 import { positiveInt } from './businessLineItems.mjs'
 import { isBusinessCurrency } from './businessCurrency.mjs'
+import { listAllPaginatedRecords } from './referencePagination.mjs'
 import {
   compareNumeric20Scale6Units,
   numeric20Scale6Units,
@@ -207,6 +208,21 @@ export function normalizeShipmentSourceCandidate(row = {}) {
       ? ''
       : DISABLED_REASON_TEXT[disabledReasonCode] || '当前来源行不可导入',
   }
+}
+
+export async function loadShipmentSourceSelection(listPage, params, { signal, expectedTotal }) {
+  if (!positiveInt(params.sales_order_id) || params.selectable !== true) throw invalidCandidateResponse()
+  const data = await listAllPaginatedRecords(listPage, params, 'shipment_source_candidates', { signal }, {
+    invalidResponseMessage: '销售订单来源列表不完整，请重新加载后重试',
+    recordIdentityKey: (row) => String(row.sales_order_item_id),
+  })
+  if (signal.aborted) return []
+  const rows = data.shipment_source_candidates
+  if (data.total !== expectedTotal || rows.some((row) => row.sales_order_id !== params.sales_order_id ||
+    (params.customer_id && row.customer_id !== params.customer_id) || row.selectable !== true)) {
+    throw invalidCandidateResponse()
+  }
+  return rows.map(normalizeShipmentSourceCandidate)
 }
 
 export function shipmentSourceOrderFromCandidate(row = {}) {

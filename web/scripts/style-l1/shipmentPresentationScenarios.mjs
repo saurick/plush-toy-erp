@@ -2,6 +2,8 @@ import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
 import { assertImportPickerGeometry, assertImportFilterPrompt, readImportPickerLayout, assertImportPickerStableLayout, assertImportPickerStableDuring } from './importPickerAssertions.mjs'
 import { assertBusinessSectionTitleBands, assertCurrentBusinessSection } from './businessFormSectionAssertions.mjs'
 import { chooseSelectOption } from './selectControlActions.mjs'
+import { mockShipmentSourceCandidates } from './factRpcMocks.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createShipmentSourceCandidateAssertions(deps) {
   const { assert, assertTextAbsent, expectText, outputDir, path } = deps
@@ -482,6 +484,7 @@ export function createShipmentWeightScenarios(deps) {
 
 export function createShipmentSourceCandidateScenarios(deps) {
   const {
+    assert, path, outputDir,
     expectButton,
     expectHeading,
     verifyBusinessActionFormModal,
@@ -492,6 +495,125 @@ export function createShipmentSourceCandidateScenarios(deps) {
     verifyShipmentSourceCandidateContract,
   } = createShipmentSourceCandidateAssertions(deps)
   return [
+    {
+      name: 'shipment-source-bulk-selection',
+      path: '/erp/warehouse/shipments',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const requests = []
+        let failBulk = true
+        const records = Array.from({ length: 205 }, (_, index) => ({
+          sales_order_id: 1,
+          order_no: 'SO-BULK-A',
+          order_status: 'active',
+          order_version: 2,
+          currency: 'USD',
+          customer_id: 1,
+          customer_name: '批量选择模拟客户',
+          customer_snapshot: { code: 'CUS-STYLE-L1', name: '批量选择模拟客户' },
+          sales_order_item_id: index + 1,
+          line_no: index + 1,
+          line_status: 'open',
+          product_id: 1,
+          product_code: 'PROD-STYLE-L1-01',
+          product_name: `模拟出货产品${index + 1}`,
+          product_code_snapshot: 'PROD-STYLE-L1-01',
+          product_name_snapshot: `模拟出货产品${index + 1}`,
+          product_sku_id: 1,
+          sku_code: 'SKU-STYLE-L1-01',
+          sku_name: '米白',
+          unit_id: 1,
+          unit_code: 'PCS',
+          unit_name: '个',
+          ordered_quantity: '12',
+          shipped_quantity: '0',
+          remaining_quantity: '12',
+          selectable: true,
+          disabled_reason: '',
+        }))
+        const otherOrder = { ...records[0], sales_order_id: 2, order_no: 'SO-BULK-B', sales_order_item_id: 300 }
+        const candidates = [...records.slice(0, 10), otherOrder, ...records.slice(10)]
+        await page.route('**/rpc/operational_fact', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (body.method !== 'list_shipment_source_candidates') return route.fallback()
+          const { params } = body
+          requests.push(params)
+          const failed = failBulk && params.limit === 200 && params.offset === 200
+          if (failed) failBulk = false
+          await route.fulfill({ contentType: 'application/json',
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: body.id,
+            result: failed ? { code: 50000, message: '模拟来源读取失败', data: {} }
+              : { code: 0, message: 'OK', data: mockShipmentSourceCandidates(params, candidates) },
+          }) })
+        })
+        await page.getByRole('button', { name: /新建出货单$/u }).click()
+        const editor = page.getByRole('region', { name: '新建出货单', exact: true })
+        await editor.getByRole('button', { name: '从销售订单导入', exact: true }).click()
+        const picker = page.getByRole('dialog').filter({ hasText: '从销售订单导入出货明细' })
+        const header = picker.getByRole('checkbox', { name: '全选本页', exact: true })
+        const count = picker.locator('.erp-source-import-picker__selection-items > .ant-typography')
+        const confirm = picker.getByRole('button', { name: '导入', exact: true })
+        await picker.locator('.ant-table-row').first().waitFor()
+        assert.equal(await header.isVisible(), true)
+        assert.equal(await header.isDisabled(), true)
+        assert.equal(await picker.getByRole('button', { name: '全选筛选结果（206 条）', exact: true }).isDisabled(), true)
+        await picker.getByText('先按销售订单筛选，再全选', { exact: true }).waitFor()
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: path.join(outputDir, 'shipment-selection-mixed-4k.png') })
+        await picker.locator('.ant-table-row input[type="checkbox"]').nth(2).check()
+        await picker.getByRole('combobox', { name: '导入来源销售订单', exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'SO-BULK-A' }).click()
+        await picker.getByRole('button', { name: '全选筛选结果（205 条）', exact: true }).waitFor()
+        assert.equal(await header.isDisabled(), false)
+        await header.check()
+        await picker.getByText('已选 20 条：', { exact: false }).waitFor()
+        await picker.getByRole('button', { name: '下一页', exact: true }).click()
+        await picker.getByText('模拟出货产品21', { exact: false }).first().waitFor()
+        await header.check()
+        await picker.getByText('已选 40 条：', { exact: false }).waitFor()
+        const all = picker.getByRole('button', { name: '全选筛选结果（205 条）', exact: true })
+        await all.click()
+        await picker.getByText('未能全选筛选结果，请重试；原有选择已保留', { exact: true }).waitFor()
+        assert.match(await count.innerText(), /已选 40 条/u)
+        await all.click()
+        await picker.getByText('已选 205 条：', { exact: false }).waitFor()
+        assert.match(await confirm.innerText(), /205 条/u)
+        assert.equal(requests.filter((params) => params.limit === 200).every((params) => params.sales_order_id === 1 && params.selectable === true), true)
+        for (const width of [1920, 1024, 736, 390]) {
+          await page.setViewportSize({ width, height: 1080 })
+          await waitForFiniteAnimations(page)
+          await assertImportPickerStableDuring(picker, `shipment-bulk-selected-${width}`, async () => {
+            await picker.getByRole('checkbox', { name: '仅看已选', exact: true }).check()
+            await picker.getByRole('checkbox', { name: '仅看已选', exact: true }).uncheck()
+          })
+        }
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await waitForFiniteAnimations(page)
+        await picker.locator('.ant-table-body').evaluate((node) => { node.scrollLeft = 0; node.scrollTop = 0 })
+        await page.waitForFunction(() => {
+          const root = document.querySelector('.erp-source-import-picker-modal.ant-modal')
+          const headers = [...root.querySelectorAll('.ant-table-header th')]
+          const cells = [...root.querySelector('.ant-table-row').children]
+          return cells.every((cell, index) => {
+            const header = headers[index].getBoundingClientRect(); const body = cell.getBoundingClientRect()
+            return Math.abs(header.width - body.width) <= 1.5 && Math.abs(header.left - body.left) <= 1.5
+          })
+        })
+        await page.screenshot({ path: path.join(outputDir, 'shipment-selection-scoped-4k.png') })
+        await header.uncheck()
+        await picker.getByText('已选 185 条：', { exact: false }).waitFor()
+        await all.click()
+        await picker.getByText('已选 205 条：', { exact: false }).waitFor()
+        await confirm.click()
+        assert.equal(await editor.locator('.erp-sales-order-lines-form__row').count(), 205)
+        assert.equal(await editor.getByRole('combobox', { name: '销售订单', exact: true }).isDisabled(), true, 'the imported source order is locked in the editor')
+      },
+    },
     {
       name: 'shipment-source-candidates-desktop',
       path: '/erp/warehouse/shipments',

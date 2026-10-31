@@ -8,6 +8,7 @@ import {
   remoteReferences,
 } from '../utils/remoteReferences.mjs'
 import { showPageLoadError } from './PageLoadFeedback.jsx'
+import { listAllReferenceRecords } from '../utils/referencePagination.mjs'
 
 export default function RemoteReferencePicker(props) {
   const { referenceType, params } = props
@@ -35,6 +36,28 @@ function RemoteReferencePickerContent({
   const [query, setQuery] = useState({ page: 1, keyword: '', retry: 0, filters: {} })
   const [data, setData] = useState({ rows: [], total: 0, page: 1, loading: false, failed: false })
   const paramsKey = JSON.stringify(params)
+  const loadFilteredRows = useCallback(async ({ signal, expectedTotal }) => {
+    const descriptor = remoteReferences[referenceType]
+    try {
+      const result = await listAllReferenceRecords(descriptor.list, {
+        ...(descriptor.active ? { active_only: true } : {}),
+        ...JSON.parse(paramsKey),
+        ...query.filters,
+        keyword: query.keyword,
+      }, referenceType, { signal })
+      if (signal.aborted) return []
+      if (result.total !== expectedTotal) {
+        const error = new Error('筛选结果已变化，请重新加载后重选')
+        error.isInvalidResponse = true
+        throw error
+      }
+      if (!signal.aborted) accept.current?.[referenceType]?.(result[referenceType])
+      return result[referenceType]
+    } catch (error) {
+      if (!signal.aborted && !isRpcAbortError(error)) showPageLoadError(error, '全选筛选结果')
+      throw error
+    }
+  }, [referenceType, paramsKey, query.filters, query.keyword])
   const handleSearchChange = useCallback((keyword) => {
     setQuery((current) => current.keyword === keyword
       ? current
@@ -110,6 +133,7 @@ function RemoteReferencePickerContent({
       current={data.page}
       onPageChange={(page) => setQuery((current) => ({ ...current, page }))}
       onSearchChange={handleSearchChange}
+      onSelectAllFiltered={canRead ? loadFilteredRows : undefined}
       onReload={() =>
         setQuery((current) => ({ ...current, retry: current.retry + 1 }))
       }

@@ -1006,6 +1006,7 @@ export default function ShipmentEditor({
   onSalesOrderSourcePageChange,
   onSalesOrderSourceReload,
   onSalesOrderSourceSearchChange,
+  onSalesOrderSourceSelectAll,
   salesOrderSourceFilters = {},
   salesOrderSourceOrderOptions = [],
   onSalesOrderSourceFiltersChange,
@@ -1178,7 +1179,11 @@ export default function ShipmentEditor({
                         onPageChange={onSalesOrderSourcePageChange}
                         onReload={onSalesOrderSourceReload}
                         onSearchChange={onSalesOrderSourceSearchChange}
+                        onSelectAllFiltered={onSalesOrderSourceSelectAll}
                         getSelectionGroup={(item) => item.sales_order_id}
+                        selectionGroup={selectedSalesOrder?.id || salesOrderSourceFilters.salesOrderID}
+                        selectAllDisabledReason={salesOrderSourceFilters.selectable !== true ? '先筛选为可导入明细，再全选' : undefined}
+                        filterResetKey={JSON.stringify([selectedSalesOrder?.id, salesOrderSourceFilters, canImportSalesOrderSource])}
                         hasActiveFilters={Object.values(salesOrderSourceFilters).some((value) => value !== undefined)}
                         onClearFilters={() => onSalesOrderSourceFiltersChange?.({})}
                         renderFilters={({ selectedRows, confirmSelectionReset }) => {

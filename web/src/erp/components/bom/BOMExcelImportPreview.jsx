@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 import { Alert, Form, Radio, Space, Typography, Button } from 'antd'
 import { UndoOutlined } from '@ant-design/icons'
 import FilterSelect from '@/common/components/select/FilterSelect'
@@ -53,6 +53,7 @@ export default function BOMExcelImportPreview({
   const [reviewFilter, setReviewFilter] = useState('')
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
+  const importScopeId = useId()
   useEffect(() => { setMode('append'); setReviewFilter(''); setKeyword(''); setPage(1) }, [pending])
   const detailsOnly = pending?.target === 'items'
   const draft = pending?.draft
@@ -133,9 +134,13 @@ export default function BOMExcelImportPreview({
           ? `替换并带入 ${rows.length} 个部位`
           : detailsOnly && existingCount
             ? `追加 ${rows.length} 个部位`
-            : '带入并核对'
+            : `带入并核对（${rows.length} 个部位）`
       }
-      okButtonProps={{ disabled: appendExceedsLimit }}
+      okButtonProps={{
+        disabled: appendExceedsLimit || rows.length === 0,
+        'aria-label': replacing ? `替换并带入 ${rows.length} 个部位` : detailsOnly && existingCount ? `追加 ${rows.length} 个部位` : '带入并核对',
+        'aria-describedby': importScopeId,
+      }}
       cancelText="取消"
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -174,7 +179,7 @@ export default function BOMExcelImportPreview({
             <Button className="erp-source-import-picker__clear-filter" disabled={!keyword && !reviewFilter} onClick={() => { setKeyword(''); setReviewFilter(''); setPage(1) }}>清空筛选</Button>
           </div>
         </div>
-        <Typography.Text type="secondary" role="status">当前显示 {visibleRows.length} / {rows.length} 个部位；筛选仅用于核对，确认后带入全部 {rows.length} 个部位。</Typography.Text>
+        <Typography.Text type="secondary" role="status" id={importScopeId}>整份文件导入；筛选结果 {visibleRows.length} / {rows.length} 个部位。筛选仅用于核对，确认后带入全部 {rows.length} 个部位。</Typography.Text>
         <Table
           rowKey={(item) => item._import_source.rowNumber}
           size="small"

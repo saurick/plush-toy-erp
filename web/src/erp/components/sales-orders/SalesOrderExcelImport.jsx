@@ -278,7 +278,7 @@ export default function SalesOrderExcelImport({
               条明细。可多选或全选，展开订单核对明细，再批量保存草稿。
             </Typography.Text>
             <Typography.Text type="secondary">
-              同一订单编号的行归入同一张订单。图片随单保存为附件；原表资料保留供核对。
+              同一订单编号的行归入同一张订单；缺失资料在下一步补齐后才能保存。图片随单保存为附件；原表资料保留供核对。
             </Typography.Text>
             {workbook?.ignoredSheets.length ? (
               <Typography.Text type="secondary">

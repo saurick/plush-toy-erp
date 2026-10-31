@@ -21,7 +21,7 @@ import { applyBusinessFormReadback } from '../utils/businessFormReadback.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 
-import { loadReferenceIDs } from '../utils/remoteReferences.mjs'
+import { loadReferenceIDs, mergeReferenceRecords } from '../utils/remoteReferences.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { sourceBusinessActionUUID,
@@ -191,6 +191,7 @@ import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import {
   SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE,
   normalizeShipmentSourceCandidate,
+  loadShipmentSourceSelection,
   shipmentSourceCandidateListParams,
   shipmentSourceOrderFromCandidate,
 } from '../utils/shipmentSourceCandidate.mjs'
@@ -878,6 +879,16 @@ export default function ShipmentsPage() {
     [productOptions, productSKUOptions]
   )
 
+  const acceptSalesOrderSourceRows = useCallback((rows) => {
+    setSalesOrderSourceItems((current) => mergeReferenceRecords(current, rows))
+    setSalesOrderItems((currentItems) => mergeReferenceRecords(currentItems, rows))
+    setShipmentSourceRows((current) => mergeReferenceRecords(current, rows))
+    setSalesOrders((current) => mergeReferenceRecords(
+      current.filter((order) => Number.isSafeInteger(Number(order?.id)) && Number(order.id) > 0),
+      rows.map(shipmentSourceOrderFromCandidate)
+    ))
+  }, [])
+
   const loadSalesOrderSources = useCallback(
     async ({ keyword = '', page = 1, filters = salesOrderSourceQueryRef.current.filters || {} } = {}) => {
       const normalizedKeyword = String(keyword || '').trim()
@@ -907,41 +918,9 @@ export default function ShipmentsPage() {
         const nextSourceRows = data.shipment_source_candidates.map(
           normalizeShipmentSourceCandidate
         )
-        const nextOrders = nextSourceRows.map(shipmentSourceOrderFromCandidate)
         setSalesOrderSources(nextSourceRows)
         setSalesOrderSourceTotal(data.total)
-        setSalesOrderSourceItems((currentItems) => {
-          const byID = new Map(
-            currentItems.map((item) => [Number(item?.id || 0), item])
-          )
-          nextSourceRows.forEach((item) => byID.set(Number(item.id), item))
-          return [...byID.values()]
-        })
-        setSalesOrderItems((currentItems) => {
-          const byID = new Map(
-            currentItems.map((item) => [Number(item?.id || 0), item])
-          )
-          nextSourceRows.forEach((item) => byID.set(Number(item.id), item))
-          return [...byID.values()]
-        })
-        setShipmentSourceRows((currentRows) => {
-          const byID = new Map(
-            currentRows.map((item) => [Number(item?.id || 0), item])
-          )
-          nextSourceRows.forEach((item) => byID.set(Number(item.id), item))
-          return [...byID.values()]
-        })
-        setSalesOrders((currentOrders) => {
-          const byID = new Map(
-            currentOrders
-              .map((order) => [Number(order?.id || 0), order])
-              .filter(
-                ([orderID]) => Number.isSafeInteger(orderID) && orderID > 0
-              )
-          )
-          nextOrders.forEach((order) => byID.set(Number(order.id), order))
-          return [...byID.values()]
-        })
+        acceptSalesOrderSourceRows(nextSourceRows)
         return true
       } catch (error) {
         if (isRpcAbortError(error) || !request.isCurrent()) return false
@@ -957,8 +936,27 @@ export default function ShipmentsPage() {
         }
       }
     },
-    [beginLatestRequest, shipmentForm]
+    [beginLatestRequest, shipmentForm, acceptSalesOrderSourceRows]
   )
+
+  const handleSalesOrderSourceSelectAll = useCallback(async ({ signal, expectedTotal }) => {
+    try {
+      if (!canImportSalesOrderSource) throw new Error('当前账号不能读取销售订单来源行')
+      const { keyword, filters = {} } = salesOrderSourceQueryRef.current
+      const params = shipmentSourceCandidateListParams({
+        keyword,
+        salesOrderID: shipmentForm.getFieldValue('sales_order_id') || filters.salesOrderID,
+        customerID: filters.customerID,
+        selectable: filters.selectable,
+      })
+      const rows = await loadShipmentSourceSelection(listShipmentSourceCandidates, params, { signal, expectedTotal })
+      if (!signal.aborted) acceptSalesOrderSourceRows(rows)
+      return rows
+    } catch (error) {
+      if (!signal.aborted && !isRpcAbortError(error)) showPageLoadError(error, '全选销售订单来源')
+      throw error
+    }
+  }, [canImportSalesOrderSource, shipmentForm, acceptSalesOrderSourceRows])
 
   const handleSalesOrderSourceSearch = useCallback(
     (keyword) => {
@@ -2089,6 +2087,7 @@ export default function ShipmentsPage() {
         shipmentSourceRows={shipmentSourceRows}
         sourceLoading={sourceLoading}
         onSalesOrderSourcePageChange={handleSalesOrderSourcePageChange}
+        onSalesOrderSourceSelectAll={handleSalesOrderSourceSelectAll}
         onSalesOrderSourceReload={handleSalesOrderSourceReload}
         onSalesOrderSourceSearchChange={handleSalesOrderSourceSearch}
         unitOptions={unitOptions}
