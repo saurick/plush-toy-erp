@@ -51,7 +51,7 @@ export function renderCatalog(catalog) {
     'permissions.generated.mjs': moduleSource('server/internal/biz/rbac.go', { PermissionCode: catalog.permissions, PermissionLabel: catalog.permissionLabels }),
     'sourceActionPermissions.generated.mjs': moduleSource('server/internal/biz/source_action_permission.go；前端用于说明与预检，最终授权由后端执行', { SourceActionReadPermissions: catalog.sourceActionPermissions }),
     'statuses.generated.mjs': moduleSource('server/internal/core/status 及 server/cmd/public-contracts 登记的 biz 领域声明', catalog.states),
-    'attachments.generated.mjs': moduleSource('server/internal/biz/business_attachment.go', { AttachmentPolicy: catalog.attachments }),
+    'attachments.generated.mjs': moduleSource('server/internal/biz/business_attachment.go、server/internal/biz/document_product_preview.go', { AttachmentPolicy: catalog.attachments }),
     'numeric.generated.mjs': moduleSource('server/internal/core/value/numeric.go', { NumericContract: numeric }),
     'policies.generated.mjs': moduleSource('server/internal/biz/business_pagination.go、server/internal/biz/work_center_pagination.go、server/internal/biz/admin_password.go、server/internal/biz/bom_source_snapshot.go、server/internal/biz/help_content.go、server/internal/biz/sales_order_export.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go', catalog.policies),
     'rpcMethods.generated.mjs': moduleSource('server/api/jsonrpc/v1/jsonrpc.pb.go 消息描述、HTTP binding、Swagger 及 server/internal/service 的实际分发', { RpcTransport: catalog.rpcTransport, RpcDomain: domains, RpcMethod: catalog.rpc }),

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Tag, Typography } from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
+import { documentProductGalleryColumn } from '../components/business-list/BusinessDocumentProductGallery.jsx'
+import { DOCUMENT_PRODUCT_SOURCES } from '../utils/businessProductGallery.mjs'
 import { applyBusinessFormReadback } from '../utils/businessFormReadback.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
@@ -271,7 +273,7 @@ export default function ProductionOrdersPage() {
   const outletContext = useBusinessPageContext()
   const taskSource = outletContext?.taskCommand?.kind === 'production_plan' ? outletContext.taskCommand : null
   const reportBusinessResult = useWorkflowTaskBusinessResult()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = useMemo(() => outletContext?.adminProfile || {}, [outletContext?.adminProfile])
   const allowedMenuPaths = outletContext?.allowedMenuPaths || []
   const navigate = useBusinessNavigate()
   const location = useLocation()
@@ -1616,12 +1618,16 @@ export default function ProductionOrdersPage() {
     ],
     []
   )
+  const listColumns = useMemo(
+    () => [...documentProductGalleryColumn(DOCUMENT_PRODUCT_SOURCES.PRODUCTION_ORDER, adminProfile), ...columns],
+    [adminProfile, columns]
+  )
   const { tableColumns, exportColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
       moduleKey: 'production-orders',
       moduleTitle: '生产订单',
-      columns,
+      columns: listColumns,
     })
   const loadExportOrders = useCallback(
     async ({ signal }) => {

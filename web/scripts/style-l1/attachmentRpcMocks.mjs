@@ -53,6 +53,18 @@ export async function installAttachmentRpcMocks(page, context) {
     let message = 'OK'
     let data = {}
     switch (method) {
+      case 'list_document_product_previews': {
+        const productID = params.source_type === 'production_order' ? 301 : 1
+        const knownID = params.source_type === 'production_order' ? 71 : 1
+        data = { previews: (params.document_ids || []).map((documentID) => ({
+          document_id: documentID,
+          product_count: documentID === knownID ? 1 : 0,
+          product_id: documentID === knownID ? productID : 0,
+          product_name: documentID === knownID ? '样式产品' : '',
+          product_code: documentID === knownID ? 'PROD-STYLE-L1' : '',
+        })) }
+        break
+      }
       case 'list_product_image_references':
         data = {
           images: (params.product_ids || []).map((product_id) => ({

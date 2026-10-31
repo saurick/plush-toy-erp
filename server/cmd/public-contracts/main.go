@@ -615,6 +615,26 @@ func collectCatalog(root string, review bool) (catalog, error) {
 	if len(out.Attachments) != len(limits)+len(maps) {
 		return out, fmt.Errorf("missing attachment declaration")
 	}
+	productPreview, err := parse(root, "server/internal/biz/document_product_preview.go")
+	if err != nil {
+		return out, err
+	}
+	previewSources, err := namedStringConstants(productPreview, "DocumentProductPreview", []string{"SalesOrder", "ProductionOrder", "OutsourcingOrder"})
+	if err != nil {
+		return out, err
+	}
+	out.Attachments["documentProductPreviewSources"] = previewSources
+	err = declarations(productPreview, token.CONST, func(name string, expr ast.Expr) error {
+		if name != "DocumentProductPreviewBatchLimit" {
+			return nil
+		}
+		limit, err := integer(expr)
+		out.Attachments["documentProductPreviewBatchLimit"] = limit
+		return err
+	})
+	if err != nil {
+		return out, err
+	}
 	numeric, err := parse(root, "server/internal/core/value/numeric.go")
 	if err != nil {
 		return out, err

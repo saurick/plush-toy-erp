@@ -138,6 +138,48 @@
   display: none;
 }
 
+.erp-product-gallery-preview__products {
+  display: flex;
+  flex-shrink: 0;
+  max-width: 100%;
+  gap: 8px;
+  padding: 4px;
+  overflow-x: auto;
+}
+
+.erp-product-gallery-preview__products > button[aria-pressed='true'] {
+  border-color: #a7d7b6;
+}
+
+.erp-product-gallery-preview__product-name {
+  display: grid;
+  min-width: 0;
+  max-width: 220px;
+  gap: 2px;
+  text-align: left;
+}
+
+.erp-product-gallery-preview__product-name > span,
+.erp-product-gallery-preview__product-name > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-product-gallery-preview__products small {
+  color: #cbd5e1;
+  font-size: var(--erp-font-caption);
+}
+
+.erp-product-gallery-preview__photos {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 .erp-task-image-preview__status {
   display: flex;
   align-items: center;

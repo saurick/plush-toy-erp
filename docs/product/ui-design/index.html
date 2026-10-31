@@ -1794,6 +1794,16 @@
     .product-image-preview-stage .product-art { width: min(70vw, 560px); height: min(70vw, 560px); transform: scale(var(--preview-scale, 1)); transition: transform .16s ease; }
     .product-image-preview-tools { display: flex; align-items: center; justify-content: center; gap: 8px; }
     .product-image-preview-tools .data-note { margin-left: 8px; }
+    .product-gallery-trigger { display: inline-flex; align-items: center; gap: 14px; padding: 0; border: 0; background: transparent; color: var(--text); text-align: left; }
+    .product-gallery-trigger > span:last-child { display: grid; gap: 3px; white-space: nowrap; }
+    .product-gallery-trigger small { color: var(--text-3); font-size: 12px; }
+    .product-gallery-thumb { width: 48px; height: 48px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 7px; box-shadow: 3px 3px 0 var(--surface-muted), 5px 5px 0 var(--line); overflow: hidden; }
+    .product-image-gallery .product-image-preview-stage { min-height: min(48vh, 420px); }
+    .product-gallery-choices { display: flex; gap: 8px; padding: 12px 0; overflow-x: auto; }
+    .product-gallery-choices button { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .product-gallery-choices svg { width: 42px; height: 42px; }
+    .product-gallery-choices button[aria-pressed="true"] { border-color: var(--brand); background: var(--brand-soft); }
+    .product-gallery-photo-switch { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; }
     .priority-identity .product-cell { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
     .priority-identity .product-cell > span:last-child { min-width: 0; margin-top: 0; }
     .priority-identity .product-thumb { margin-top: 0; width: 64px; height: 64px; flex-basis: 64px; }
@@ -4912,9 +4922,9 @@
       tableLines: initialAppearance.tableLines,
       mode: initialAppearance.mode,
       accent: initialAppearance.accent,
-      visibleColumns: new Set(['no', 'party', 'status', 'date', 'metric', 'owner', 'risk']),
+      visibleColumns: new Set(['gallery', 'no', 'party', 'status', 'date', 'metric', 'owner', 'risk']),
       columnDraft: null,
-      columnOrder: ['no', 'party', 'status', 'date', 'metric', 'owner', 'progress', 'risk'],
+      columnOrder: ['gallery', 'no', 'party', 'status', 'date', 'metric', 'owner', 'progress', 'risk'],
       filterParty: '', filterOwner: 'all', filterRisk: 'all', filterIncludeEnded: true, filterDateFrom: '', filterDateTo: '',
       historySource: '客户档案',
       overlay: null, drawer: null, taskStep: 1, taskMaxStep: 1, taskAction: 'complete', boardStatus: 'all', boardPage: 1, boardPageSize: 20, boardMode: taskHandlingPreview ? 'todo' : 'all', boardSearch: '', boardRole: 'all', trackingFilters: {}, trackingPageSizes: {},
@@ -6567,6 +6577,7 @@ active = new Set()
         ['status', '状态', 'status'], ['date', config.dateLabel || '业务日期', 'date'], ['metric', config.metricLabel || '金额', 'metric'],
         ['owner', '负责人', 'owner'], ['progress', '当前进度', 'progress'], ['risk', '业务提醒', 'risk']
       ];
+      if (['sales','production','outsourcing','shipments'].includes(config.key)) defs.unshift(['gallery','产品图片','gallery']);
       if (config.key === 'sales') {
         defs.find(([key]) => key === 'no')[1] = '订单编号';
         defs.find(([key]) => key === 'party')[1] = '客户与跟单';
@@ -6941,6 +6952,7 @@ active = new Set()
     function renderTableRow(row, config, cols) {
       const productIndex = Math.max(0, config.rows.indexOf(row));
       const cells = {
+        gallery: `<button type="button" class="product-gallery-trigger" data-action="product-gallery-preview" data-count="${Math.min(3,Math.max(1,Number(row.lines)||1))}" data-label="${escapeHTML(row.no)}" aria-label="查看${escapeHTML(row.no)}的全部产品图片"><span class="product-gallery-thumb">${renderProductArt(productIndex,rowItem(row,config))}</span><span>共 ${Math.min(3,Math.max(1,Number(row.lines)||1))} 款产品<small>查看图片</small></span></button>`,
         no: `<button class="entity-link mono" data-action="open-detail" data-id="${row.id}">${row.no}</button><span class="subline">${row.lines} 条明细</span>`,
         party: config.key === 'products' ? `<span class="product-cell">${renderProductThumb(productIndex,rowParty(row,config))}<span><span class="strong">${rowParty(row, config)}</span><span class="subline">${rowItem(row, config)}</span></span></span>` : `<span class="strong">${rowParty(row, config)}</span><span class="subline">${rowItem(row, config)}</span>`,
         status: `<span class="badge ${badgeClass(row)}">${row.statusText}</span>`,
@@ -18407,7 +18419,13 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderProductImagePreview() {
       const preview = state.productImagePreview || { seed: 0, label: '产品' };
       const scale = Math.max(1, Math.min(3, Number(state.productImageScale) || 1));
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal product-image-preview" role="dialog" aria-modal="true" aria-label="${escapeHTML(preview.label)}图片预览"><header class="modal-head"><strong>${escapeHTML(preview.label)}</strong><span class="data-note">产品图片预览</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭图片预览">${icon('close')}</button></header><div class="modal-body"><div class="product-image-preview-stage" style="--preview-scale:${scale}">${renderProductArt(preview.seed,preview.label)}</div></div><footer class="modal-foot product-image-preview-tools"><button class="btn" data-action="product-image-zoom" data-value="out" ${scale<=1?'disabled':''}>缩小</button><button class="btn" data-action="product-image-zoom" data-value="reset">适应屏幕</button><button class="btn" data-action="product-image-zoom" data-value="in" ${scale>=3?'disabled':''}>放大</button><span class="data-note">滚轮或双指缩放 · 放大后拖动查看</span></footer></section></div>`;
+      const products=preview.products || [{seed:preview.seed,label:preview.label,photoCount:2}];
+      const index=preview.productIndex || 0;
+      const product=products[index];
+      const photo=preview.photoIndex || 0;
+      const choices=products.length>1?`<div class="product-gallery-choices" role="group" aria-label="切换产品">${products.map((item,i)=>`<button type="button" class="btn" data-action="product-gallery-product" data-index="${i}" aria-pressed="${i===index}">${item.photoCount?renderProductArt(item.seed,item.label):icon('image')}<span>${escapeHTML(item.label)}</span></button>`).join('')}</div>`:'';
+      const pictures=`<div class="product-gallery-photo-switch" role="group" aria-label="切换当前产品图片"><button type="button" class="btn" data-action="product-gallery-photo" data-value="-1" aria-label="上一张图片" ${photo===0||!product.photoCount?'disabled':''}>${icon('left')}</button><span>${product.photoCount?`${photo?'辅图':'主图'} · ${photo+1} / ${product.photoCount} 张`:'暂无图片'}</span><button type="button" class="btn" data-action="product-gallery-photo" data-value="1" aria-label="下一张图片" ${photo>=product.photoCount-1?'disabled':''}>${icon('right')}</button></div>`;
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal product-image-preview ${products.length>1?'product-image-gallery':''}" role="dialog" aria-modal="true" aria-label="${escapeHTML(preview.label)}图片预览"><header class="modal-head"><strong>${escapeHTML(product.label)}</strong><span class="data-note">${products.length>1?`${escapeHTML(preview.label)} · 产品 ${index+1} / ${products.length}`:'产品图片预览'}</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭图片预览">${icon('close')}</button></header><div class="modal-body"><div class="product-image-preview-stage" style="--preview-scale:${scale}">${product.photoCount?renderProductArt(product.seed+photo,product.label):'<div class="empty">该产品暂无图片</div>'}</div>${choices}${pictures}</div><footer class="modal-foot product-image-preview-tools"><button class="btn" data-action="product-image-zoom" data-value="out" ${scale<=1||!product.photoCount?'disabled':''}>缩小</button><button class="btn" data-action="product-image-zoom" data-value="reset" ${!product.photoCount?'disabled':''}>适应屏幕</button><button class="btn" data-action="product-image-zoom" data-value="in" ${scale>=3||!product.photoCount?'disabled':''}>放大</button><span class="data-note">滚轮或双指缩放 · 放大后拖动查看</span></footer></section></div>`;
     }
 
     function renderThemeModal() {
@@ -18921,6 +18939,9 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'open-theme') { state.overlay = 'theme'; renderFloating(); }
       else if (action === 'task-associations') { state.taskAssociationsId=target.dataset.id;state.overlay='task-associations';renderFloating(); }
       else if (action === 'product-image-preview') { state.productImageReturnOverlay=state.overlay==='task-associations'?'task-associations':null;state.productImagePreview={seed:Number(target.dataset.seed)||0,label:target.dataset.label||'产品'};state.productImageScale=1;state.overlay='product-image-preview';renderFloating(); }
+      else if (action === 'product-gallery-preview') { const count=Math.max(1,Math.min(3,Number(target.dataset.count)||1));state.productImageReturnOverlay=null;state.productImagePreview={label:target.dataset.label||'单据产品',productIndex:0,photoIndex:0,products:[{seed:0,label:'浅棕小熊',photoCount:2},{seed:1,label:'长耳兔',photoCount:1},{seed:2,label:'节庆抱枕',photoCount:0}].slice(0,count)};state.productImageScale=1;state.overlay='product-image-preview';renderFloating(); }
+      else if (action === 'product-gallery-product') { const index=Number(target.dataset.index)||0;state.productImagePreview.productIndex=index;state.productImagePreview.photoIndex=0;state.productImageScale=1;renderFloating();document.querySelector(`[data-action="product-gallery-product"][data-index="${index}"]`)?.focus(); }
+      else if (action === 'product-gallery-photo') { const preview=state.productImagePreview;const product=(preview.products||[{photoCount:2}])[preview.productIndex||0];preview.photoIndex=Math.max(0,Math.min(product.photoCount-1,(preview.photoIndex||0)+Number(target.dataset.value)));state.productImageScale=1;renderFloating();document.querySelector('[data-action="close-overlay"][aria-label="关闭图片预览"]')?.focus(); }
       else if (action === 'product-image-zoom') { const direction=target.dataset.value;state.productImageScale=direction==='reset'?1:Math.max(1,Math.min(3,state.productImageScale+(direction==='in'?0.25:-0.25)));renderFloating(); }
       else if (action === 'task-create-continue') { state.overlay='task-create';renderFloating(); }
       else if (action === 'task-create-discard') { state.taskCreateValues={};closeLinkedDrawer(); }

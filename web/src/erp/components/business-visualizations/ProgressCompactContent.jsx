@@ -1,7 +1,12 @@
-import React from 'react'
+import React, { useCallback } from 'react'
 import { Tag } from 'antd'
 import { FileTextOutlined } from '@ant-design/icons'
-import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import ProductIdentity, { ProductThumbnail } from '../master-data/ProductIdentity.jsx'
+import BusinessProductGallery from '../business-list/BusinessProductGallery.jsx'
+import { canReadDocumentProductGallery } from '../business-list/BusinessDocumentProductGallery.jsx'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import { loadDocumentGalleryProducts } from '../../api/documentProductGalleryApi.mjs'
+import { DOCUMENT_PRODUCT_SOURCES } from '../../utils/businessProductGallery.mjs'
 import ProgressMetricHint from './ProgressMetricHint.jsx'
 import { WorkflowTaskBlockedTag } from '../workflow/WorkflowTaskBlocker.jsx'
 import WorkflowTaskReason from '../workflow/WorkflowTaskReason.jsx'
@@ -15,10 +20,19 @@ import {
 } from '../../utils/businessProgress.mjs'
 
 export function ProgressProductIdentity({ row, compact = false, children }) {
+  const { adminProfile } = useBusinessPageContext() || {}
+  const source = row.view === 'production' ? DOCUMENT_PRODUCT_SOURCES.PRODUCTION_ORDER : DOCUMENT_PRODUCT_SOURCES.SALES_ORDER
+  const loadProducts = useCallback((options) => loadDocumentGalleryProducts(source, row.id, options), [source, row.id])
+  const multiple = row.product_count > 1 && row.product_id > 0 && canReadDocumentProductGallery(adminProfile, source)
+  const gallery = multiple ? (
+    <BusinessProductGallery key={`${source}:${row.id}:${row.updated_at}`} products={[{ productID: row.product_id, name: row.product }]} title={row.order_no} loadProducts={loadProducts} compact renderThumbnail={(product) => <ProductThumbnail productId={product.productID} name={product.name} code={product.code} preview={false} />}>
+      <ProductThumbnail productId={row.product_id} name={row.product} preview={false} />
+    </BusinessProductGallery>
+  ) : undefined
   const identity = progressIdentityPresentation(row)
   const content = children ?? identity.product
   return identity.hasProduct ? (
-    <ProductIdentity className="erp-progress-product" productId={row.product_id} name={row.product} compact={compact}>
+    <ProductIdentity className="erp-progress-product" productId={row.product_id} name={row.product} compact={compact} thumbnail={gallery}>
       {content}
     </ProductIdentity>
   ) : <span className="erp-progress-product erp-progress-product--empty"><span className="erp-task-product-image erp-task-product-image--placeholder" aria-label="未关联产品／物料"><FileTextOutlined aria-hidden="true" /></span>{content}</span>

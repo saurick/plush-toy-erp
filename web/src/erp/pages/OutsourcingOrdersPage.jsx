@@ -61,6 +61,8 @@ import OutsourcingReturnQualityInspectionModal from '../components/quality-inspe
 import OutsourcingReturnDispositionModal from '../components/quality-inspections/OutsourcingReturnDispositionModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
 import { buildOutsourcingOrderColumns } from '../components/outsourcing-orders/outsourcingOrderColumns.jsx'
+import { documentProductGalleryColumn } from '../components/business-list/BusinessDocumentProductGallery.jsx'
+import { DOCUMENT_PRODUCT_SOURCES } from '../utils/businessProductGallery.mjs'
 
 import {
   downloadBusinessAttachment,
@@ -537,6 +539,11 @@ export default function OutsourcingOrdersPage() {
     [resolveSupplierName]
   )
 
+  const listColumns = useMemo(
+    () => [...documentProductGalleryColumn(DOCUMENT_PRODUCT_SOURCES.OUTSOURCING_ORDER, adminProfile), ...dataColumns],
+    [adminProfile, dataColumns]
+  )
+
   const detailColumns = useMemo(
     () => [
       ...dataColumns,
@@ -606,7 +613,7 @@ export default function OutsourcingOrdersPage() {
     adminProfile,
     moduleKey: OUTSOURCING_ORDERS_MODULE_KEY,
     moduleTitle: '加工合同列表',
-    columns: dataColumns,
+    columns: listColumns,
   })
 
   const { exporting, exportRows: exportOrders } = useBusinessListExport({

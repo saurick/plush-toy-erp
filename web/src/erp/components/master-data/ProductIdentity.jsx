@@ -12,6 +12,7 @@ import {
   PRODUCT_IMAGES_CHANGED,
 } from '../../utils/productImageReferences.mjs'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
+import BusinessProductGallery from '../business-list/BusinessProductGallery.jsx'
 import '../workflow/workflowTaskIdentity.css'
 import './productIdentity.css'
 
@@ -96,6 +97,7 @@ function ProductPicture({ productID, name, code, read, preview }) {
 
 export function ProductThumbnail({ productId, name, code, preview = true }) {
   const { adminProfile } = useBusinessPageContext() || {}
+  const [pictureRevision, setPictureRevision] = useState(0)
   const productID = Number(productId || 0)
   const allowed =
     Number.isSafeInteger(productID) &&
@@ -104,20 +106,25 @@ export function ProductThumbnail({ productId, name, code, preview = true }) {
   const accessKey = allowed
     ? workflowTaskAdminAccessRequestIdentity(adminProfile)
     : ''
-  return allowed ? (
+  const picture = allowed ? (
     <ProductPicture
-      key={`${accessKey}:${productID}`}
+      key={`${accessKey}:${productID}:${pictureRevision}`}
       productID={productID}
       name={name}
       code={code}
       read={referenceLoader(adminProfile, accessKey)}
-      preview={preview}
+      preview={false}
     />
   ) : (
     <span className="erp-product-identity__picture">
       <WorkflowTaskProductImage item={{ kind: 'product', productID, name }} preview={preview} />
     </span>
   )
+  return preview && allowed ? (
+    <BusinessProductGallery products={[{ productID, name: name || '产品', code }]} title={name || '产品'} compact onClose={() => setPictureRevision((value) => value + 1)}>
+      {picture}
+    </BusinessProductGallery>
+  ) : picture
 }
 
 export default function ProductIdentity({
@@ -128,17 +135,18 @@ export default function ProductIdentity({
   compact = false,
   preview = true,
   className = '',
+  thumbnail,
 }) {
   return (
     <span
       className={`erp-product-identity${compact ? ' erp-product-identity--compact' : ''}${className ? ` ${className}` : ''}`}
     >
-      <ProductThumbnail
+      {thumbnail ?? <ProductThumbnail
         productId={productId}
         name={name}
         code={code}
         preview={preview}
-      />
+      />}
       <span className="erp-product-identity__text">
         {children || name || '产品'}
         {code ? <small>{code}</small> : null}

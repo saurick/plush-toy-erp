@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
+import { assertVisibleBusinessFormControlHeight } from './inputControlAssertions.mjs'
 
 async function installImages(page) {
   const image = await page.evaluate(() => {
@@ -29,11 +30,17 @@ async function installImages(page) {
     const { method, params = {} } = body
     const probe = page.productImageProbe
     if (
-      !['list_product_image_references', 'download_attachment'].includes(method)
+      !['list_product_image_references', 'list_attachments', 'download_attachment'].includes(method)
     ) {
       return route.fallback()
     }
     probe.requests.push({ method, params })
+    if (method === 'list_attachments') {
+      if (params.owner_type !== 'product') return route.fallback()
+      const productID = Number(params.owner_id)
+      const attachments = productID === 2 || (productID === 1 && probe.cleared) ? [] : [{ id: 900000 + productID, owner_type: 'product', owner_id: productID, attachment_type: 'product_image', slot_key: 'primary', mime_type: 'image/png', file_name: '模拟主图.png' }]
+      return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, message: '', data: { attachments } } } })
+    }
     if (method === 'list_product_image_references') {
       if (probe.failReferences) {
         return route.fulfill({
@@ -95,6 +102,7 @@ async function closeImage(page) {
   await page
     .locator('.erp-task-image-preview__stage')
     .waitFor({ state: 'detached' })
+  await page.locator('.erp-task-image-preview').waitFor({ state: 'detached' })
 }
 
 export function createProductIdentityScenarios({
@@ -178,7 +186,7 @@ export function createProductIdentityScenarios({
           .filter({ hasText: '识图产品 2' })
           .first()
         assert.equal(
-          await empty.locator('.erp-task-product-image button').count(),
+          await empty.locator('.erp-task-product-image img').count(),
           0
         )
         const geometry = await row
@@ -199,9 +207,9 @@ export function createProductIdentityScenarios({
         await page
           .getByRole('button', { name: '刷新当前页', exact: false })
           .click()
-        await button.waitFor({ state: 'detached' })
+        await row.locator('.erp-task-product-image[data-image-state="empty"]').waitFor()
         assert.equal(
-          await row.locator('.erp-task-product-image button').count(),
+          await row.locator('.erp-task-product-image img').count(),
           0,
           'refresh must discard cleared image'
         )
@@ -236,9 +244,10 @@ export function createProductIdentityScenarios({
           .locator('.erp-business-form-page:not([hidden])')
           .last()
         await modal.waitFor()
-        await modal.getByRole('combobox', { name: /产品$/ }).click()
+        await modal.getByRole('combobox', { name: /产品$/ }).press('ArrowDown')
         const option = page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: 'PROD-STYLE-L1' })
           .first()
         await option.locator('.erp-task-product-image img').waitFor()
         assert.equal(
@@ -248,7 +257,7 @@ export function createProductIdentityScenarios({
         )
         await option.click()
         const preview = modal
-          .locator('.erp-product-identity .erp-task-product-image button')
+          .locator('.erp-product-identity .erp-product-gallery__trigger')
           .first()
         await preview.click()
         await closeImage(page)
@@ -331,10 +340,10 @@ export function createProductIdentityScenarios({
             : '.erp-business-details-modal:visible'
         )
         if (production) {
-          await identityRoot.locator('details').first().locator('summary').click()
+          await identityRoot.locator('.erp-product-field-control:visible').first().waitFor({ state: 'visible' })
         }
         const image = identityRoot
-          .locator(production ? '.erp-product-field-control button' : '.erp-product-identity button')
+          .locator(production ? '.erp-product-field-control:visible .erp-product-gallery__trigger' : '.erp-product-identity button')
           .first()
         await image.click().catch(async (error) => {
           const identities = await identityRoot
@@ -354,8 +363,26 @@ export function createProductIdentityScenarios({
         })
         await closeImage(page)
         if (production) {
-          const main = identityRoot.locator('.erp-compact-field-table__fields').first()
+          const main = identityRoot.locator('.erp-product-field-control:visible').first()
           assert.ok((await main.boundingBox()).height < 140, '长产品名与图片不应挤成高列')
+          await assertVisibleBusinessFormControlHeight(page, '图集旁的自然换行业务引用')
+          for (const kind of ['plain', 'undersized-select']) {
+            await page.evaluate((type) => {
+              const form = [...document.querySelectorAll('.erp-business-action-form')].find((node) => node.getBoundingClientRect().width > 0)
+              const probe = type === 'plain' ? document.createElement('input') : form.querySelector('.ant-select-single').cloneNode(true)
+              probe.dataset.galleryHeightProbe = type
+              if (type === 'plain') probe.className = 'ant-input'
+              probe.setAttribute('aria-label', '图片回归高度反例')
+              const height = type === 'plain' ? '54px' : '20px'
+              for (const [property, value] of Object.entries({ height, 'min-height': '0', 'max-height': height, width: '200px', display: 'block', overflow: 'hidden' })) probe.style.setProperty(property, value, 'important')
+              form.append(probe)
+            }, kind)
+            try {
+              await assert.rejects(() => assertVisibleBusinessFormControlHeight(page, '高度反例必须拒绝'), /高度未统一/)
+            } finally {
+              await page.locator('[data-gallery-height-probe]').evaluateAll((nodes) => nodes.forEach((node) => node.remove()))
+            }
+          }
         }
         await page.screenshot({
           path: path.join(
@@ -509,10 +536,12 @@ export function createProductIdentityScenarios({
             'unreadable product metadata and thumbnails must not be requested'
           )
         } else {
-          const retry = identity.getByRole('button', { name: /^重试.+图片$/ })
-          await retry.waitFor()
+          await identity.locator('.erp-task-product-image[data-image-state="failed"]').waitFor()
+          const preview = identity.getByRole('button', { name: /^查看.+大图$/ })
           page.productImageProbe.failReferences = false
-          await retry.press('Enter')
+          await preview.press('Enter')
+          await page.waitForFunction(() => document.querySelector('.erp-task-image-preview__stage img')?.naturalWidth === 400)
+          await closeImage(page)
           await identity.locator('.erp-task-product-image img').waitFor()
           assert.equal(
             await identity.locator('.erp-product-identity__retry').count(),

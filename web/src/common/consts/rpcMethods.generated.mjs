@@ -64,6 +64,7 @@ export const RpcMethod = Object.freeze({
     CLEAR_PRODUCT_IMAGE: 'clear_product_image',
     DOWNLOAD_ATTACHMENT: 'download_attachment',
     LIST_ATTACHMENTS: 'list_attachments',
+    LIST_DOCUMENT_PRODUCT_PREVIEWS: 'list_document_product_previews',
     LIST_PRODUCT_IMAGE_REFERENCES: 'list_product_image_references',
     UPLOAD_ATTACHMENT: 'upload_attachment',
     WITHDRAW_ATTACHMENT: 'withdraw_attachment',

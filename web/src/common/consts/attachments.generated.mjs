@@ -1,6 +1,12 @@
 // 由 `node scripts/gen-public-contracts.mjs` 生成；请勿手改。
-// 真源：server/internal/biz/business_attachment.go。
+// 真源：server/internal/biz/business_attachment.go、server/internal/biz/document_product_preview.go。
 export const AttachmentPolicy = Object.freeze({
+  documentProductPreviewBatchLimit: 80,
+  documentProductPreviewSources: Object.freeze({
+    OUTSOURCING_ORDER: 'outsourcing_order',
+    PRODUCTION_ORDER: 'production_order',
+    SALES_ORDER: 'sales_order',
+  }),
   fileTypes: Object.freeze({
     '.csv': Object.freeze(['text/csv']),
     '.doc': Object.freeze(['application/msword']),

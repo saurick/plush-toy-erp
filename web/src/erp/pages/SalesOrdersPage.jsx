@@ -74,7 +74,9 @@ import {
 import {
   normalizeSalesOrderItemFormValue,
 } from '../components/sales-orders/SalesOrderForm.jsx'
-import WorkflowTaskProductImage from '../components/workflow/WorkflowTaskProductImage.jsx'
+import { ProductThumbnail } from '../components/master-data/ProductIdentity.jsx'
+import { documentProductGalleryColumn } from '../components/business-list/BusinessDocumentProductGallery.jsx'
+import { DOCUMENT_PRODUCT_SOURCES } from '../utils/businessProductGallery.mjs'
 import SalesOrderEngineeringModal from '../components/sales-orders/SalesOrderEngineeringModal.jsx'
 import EngineeringMaterialRequestModal from '../components/sales-orders/EngineeringMaterialRequestModal.jsx'
 import { getEngineeringMaterialPermissions } from '../utils/engineeringMaterialTask.mjs'
@@ -438,15 +440,7 @@ export default function SalesOrdersPage() {
         label: '产品图',
         media: true,
         value: (
-          <WorkflowTaskProductImage
-            item={{
-              kind: 'product',
-              name: salesOrderRequirementName(item),
-              productID: item?.product_id,
-              imageAttachmentID: item?.product_image_attachment_id,
-            }}
-            preview
-          />
+          <ProductThumbnail productId={item?.product_id} name={salesOrderRequirementName(item)} code={item?.product_code_snapshot} />
         ),
       },
       {
@@ -1381,8 +1375,8 @@ export default function SalesOrdersPage() {
     [adminProfile]
   )
   const orderListColumns = useMemo(
-    () => buildSalesOrderListColumns(orderDataColumns),
-    [orderDataColumns]
+    () => [...documentProductGalleryColumn(DOCUMENT_PRODUCT_SOURCES.SALES_ORDER, adminProfile), ...buildSalesOrderListColumns(orderDataColumns)],
+    [orderDataColumns, adminProfile]
   )
   const columnOrderProfile = useMemo(
     () => buildSalesOrderColumnProfile(adminProfile, orderListColumns),

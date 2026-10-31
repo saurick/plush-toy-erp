@@ -66,6 +66,14 @@ export async function listProductImageReferences(params = {}) {
   return requireRpcArray(result, 'images', '产品图片数据不完整，请重新读取')
 }
 
+export async function listDocumentProductPreviews(params = {}) {
+  const result = await attachmentRpc.call(
+    RpcMethod.attachment.LIST_DOCUMENT_PRODUCT_PREVIEWS,
+    params
+  )
+  return requireRpcArray(result, 'previews', '单据产品图片数据不完整，请重新读取')
+}
+
 export async function uploadProductImage(params = {}) {
   const { product_id: productID, ...rest } = params
   const image = await uploadBusinessAttachment({

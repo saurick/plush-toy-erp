@@ -77,6 +77,14 @@ func (s *rpcInspector) parameterRule(name string, call *ast.CallExpr, env rpcIns
 	if kind == "" {
 		return
 	}
+	// A domain lookup can derive a permission list or an object from an already
+	// parsed scalar. Its return shape is not the JSON input's accepted shape.
+	if scalar && fn.fn.Type.Params != nil && len(fn.fn.Type.Params.List) > 0 {
+		inputKind := resultType(fn.fn.Type.Params.List[0].Type)
+		if inputKind != "" && inputKind != kind {
+			return
+		}
+	}
 	if scalar && kind == "boolean" {
 		return
 	}

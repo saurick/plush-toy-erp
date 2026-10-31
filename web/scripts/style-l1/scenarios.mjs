@@ -53,6 +53,7 @@ import { createMobileInputScenarios } from './mobileInputScenarios.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
 import { createWorkCenterPaginationScenarios } from './workCenterPaginationScenarios.mjs'
 import { createTaskImagePreviewScenarios } from './taskImagePreviewScenarios.mjs'
+import { createProductGalleryScenarios } from './productGalleryScenarios.mjs'
 import { createProductIdentityScenarios } from './productIdentityScenarios.mjs'
 import { createCustomerSessionScenarios } from './customerSessionScenarios.mjs'
 import { createHelpCenterScenarios } from './helpCenterScenarios.mjs'
@@ -667,6 +668,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       customerRuntimeEffectiveSession,
     }),
+    ...createProductGalleryScenarios({ outputDir, customerRuntimeEffectiveSession }),
     ...createTaskCalendarScenarios(deps),
     ...createTaskCurrentFocusScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createTaskDetailVariantScenarios({ ...deps, customerRuntimeEffectiveSession }),

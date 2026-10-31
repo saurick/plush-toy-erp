@@ -32,6 +32,8 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 	}
 
 	switch method {
+	case "list_document_product_previews":
+		return id, d.listDocumentProductPreviews(ctx, pm), nil
 	case "list_product_image_references":
 		if res := d.requireBusinessAttachmentOwnerPermission(ctx, biz.BusinessAttachmentOwnerProduct, false); res != nil {
 			return id, res, nil

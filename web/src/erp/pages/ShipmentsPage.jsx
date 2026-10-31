@@ -102,7 +102,9 @@ import ShipmentTaskItems from '../components/shipments/ShipmentTaskItems.jsx'
 import { submitShipmentDraft } from '../components/shipments/submitShipmentDraft.mjs'
 import ShipmentFinanceSourceModal from '../components/shipments/ShipmentFinanceSourceModal.jsx'
 import ShipmentQualityInspectionModal from '../components/quality-inspections/ShipmentQualityInspectionModal.jsx'
-import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
+import ProductIdentity, { ProductThumbnail } from '../components/master-data/ProductIdentity.jsx'
+import BusinessProductGallery from '../components/business-list/BusinessProductGallery.jsx'
+import { normalizeGalleryProducts } from '../utils/businessProductGallery.mjs'
 import {
   buildShipmentColumns,
   SHIPMENT_DATE_FILTER_OPTIONS,
@@ -1490,12 +1492,31 @@ export default function ShipmentsPage() {
     () => buildShipmentColumns({ salesOrdersByID }),
     [salesOrdersByID]
   )
+  const productsByID = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
+  const listColumns = useMemo(() => [
+    ...(hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ) ? [{
+      key: 'product_gallery',
+      title: '产品图片',
+      width: 180,
+      defaultPriority: 5,
+      exportable: false,
+      render: (_value, record) => {
+        const entries = normalizeGalleryProducts(record.items).map((product) => ({ ...product, name: productsByID.get(product.productID)?.name || product.name, code: productsByID.get(product.productID)?.code || product.code }))
+        return entries.length ? (
+          <BusinessProductGallery products={entries} title={record.shipment_no} renderThumbnail={(product) => <ProductThumbnail productId={product.productID} name={product.name} code={product.code} preview={false} />}>
+            <ProductThumbnail productId={entries[0].productID} name={entries[0].name} code={entries[0].code} preview={false} />
+          </BusinessProductGallery>
+        ) : <span className="erp-document-product-gallery__empty">暂无关联产品</span>
+      },
+    }] : []),
+    ...columns,
+  ], [adminProfile, columns, productsByID])
   const { tableColumns, exportColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
       moduleKey: SHIPMENTS_MODULE_KEY,
       moduleTitle: '出货单',
-      columns,
+      columns: listColumns,
     })
   const loadExportRows = useCallback(
     async ({ signal }) => {

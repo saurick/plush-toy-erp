@@ -1914,6 +1914,28 @@
     },
     "test": "TestJsonrpcDispatcher_AttachmentWriteAPIRequiresOwnerModuleEnabled"
   },
+  "attachment.list_document_product_previews": {
+    "basis": "handler-fixture",
+    "data": {
+      "previews": [
+        {
+          "document_id": 11,
+          "product_code": "DEMO-BEAR",
+          "product_count": 2,
+          "product_id": 7,
+          "product_name": "模拟小熊"
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "document_ids": [
+        11
+      ],
+      "source_type": "sales_order"
+    },
+    "test": "TestJsonrpcDocumentProductPreviews"
+  },
   "attachment.list_product_image_references": {
     "basis": "handler-fixture",
     "data": {

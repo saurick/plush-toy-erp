@@ -15,6 +15,7 @@
 | 页面壳和通用展示 | `ERPLayout.jsx`、`ERPPageActions.jsx`、`business-list/*` | 布局、列表页头、导航和状态展示；账号固定侧栏底部，刷新与窄屏导航共用页面操作组件 |
 | 账号身份 | `AccountIdentity.jsx`、`accountIdentity.css` | 桌面账号入口和手机“我的”共用的默认文字头像、姓名、账号及实际所属岗位；头像颜色按账号固定，完整岗位在账号卡片换行展示 |
 | 业务列表共享层   | `business-list/*`                                                              | 列表壳、表单弹窗、附件、明细行、列顺序、协同任务面板和来源选择 |
+| 产品图片图集 | `business-list/BusinessProductGallery.jsx`、`BusinessDocumentProductGallery.jsx` | 单据列表以主图缩略图和去重款数打开全部关联产品；单品身份共用主图 / 辅图切换、缩放、失败重试和关闭恢复。批量摘要仅支持正式关联，物料和未关联需求不借图 |
 | 业务日期输入和范围筛选 | [`business-list/BusinessDateInputs.jsx`](business-list/BusinessDateInputs.jsx) | `DateInput`、`DateTimeInput`、`DateRangeFilter` 的独立入口，共用日期格式、选值、清空与范围约束 |
 | 主数据和源单据   | `master-data/*`、`sales-orders/*`、`purchase-orders/*`、`outsourcing-orders/*` | 领域列配置、表单、业务动作面板和来源生成入口                   |
 | 事实和质量       | `operational-facts/*`、`quality-inspections/*`、`shipments/*`                  | Operational Fact、质检、出货相关展示和表单入口                 |
