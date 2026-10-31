@@ -13,8 +13,6 @@ export function BusinessLineItemsAddButton({
   addLoading = false,
   addButtonClassName,
   addButtonProps,
-  ariaLabel,
-  placement = 'footer',
   onAdd,
 }) {
   if (!onAdd) return null
@@ -24,10 +22,9 @@ export function BusinessLineItemsAddButton({
       {...addButtonProps}
       type={addButtonProps?.type ?? 'default'}
       icon={addButtonProps?.icon ?? <PlusOutlined aria-hidden="true" />}
-      aria-label={ariaLabel || addLabel}
+      aria-label={addLabel}
       className={classNames(
         'erp-line-items-form__add-button',
-        `erp-line-items-form__add-button--${placement}`,
         addButtonClassName,
         addButtonProps?.className
       )}
@@ -40,37 +37,17 @@ export function BusinessLineItemsAddButton({
   )
 }
 
-export function BusinessLineItemsHeader({
-  title,
-  description,
-  children,
-  addLabel = '添加明细',
-  addDisabled = false,
-  addLoading = false,
-  addButtonClassName,
-  addButtonProps,
-  onAdd,
-}) {
+export function BusinessLineItemsHeader({ title, description, children }) {
   return (
     <div className="erp-business-form-heading erp-sales-order-lines-form__head">
       <div>
-        <strong role="heading" aria-level={3} tabIndex={-1}>{title}</strong>
+        <strong role="heading" aria-level={3} tabIndex={-1}>
+          {title}
+        </strong>
         {description ? <span>{description}</span> : null}
       </div>
-      {children || onAdd ? (
-        <div className="erp-line-items-form__head-actions">
-          {children}
-          <BusinessLineItemsAddButton
-            addLabel={addLabel}
-            addDisabled={addDisabled}
-            addLoading={addLoading}
-            addButtonClassName={addButtonClassName}
-            addButtonProps={addButtonProps}
-            ariaLabel={`在顶部${addLabel}`}
-            placement="head"
-            onAdd={onAdd}
-          />
-        </div>
+      {children ? (
+        <div className="erp-line-items-form__head-actions">{children}</div>
       ) : null}
     </div>
   )

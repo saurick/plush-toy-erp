@@ -682,14 +682,7 @@ export function SalesOrderItemsFormSection({
       <Form.List name="items">
         {(fields, { add, remove }) => (
           <>
-            <BusinessLineItemsHeader
-              title="订货明细"
-              addLabel="添加订货明细"
-              addDisabled={!canCreateItem}
-              onAdd={
-                fields.length > 0 ? () => appendSalesOrderLine(add) : undefined
-              }
-            />
+            <BusinessLineItemsHeader title="订货明细" />
             {fields.length === 0 ? (
               <BusinessLineItemsEmpty>
                 暂无订货明细，可先保存订单草稿

@@ -1149,9 +1149,6 @@ export default function ShipmentEditor({
                       <BusinessLineItemsHeader
                         title="出货明细"
                         description="确认出货时才会扣减相应库存。"
-                        addLabel="添加出货明细"
-                        addDisabled={Boolean(selectedSalesOrder)}
-                        onAdd={taskFocused ? undefined : () => appendShipmentItem(add, fields.length)}
                       >
                         {!taskFocused ? (
                           <Button

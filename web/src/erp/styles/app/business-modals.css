@@ -723,7 +723,7 @@
   min-width: 0;
   overflow: visible;
   border-top: 1px dashed var(--erp-sales-order-lines-border, #d7e2dc);
-  padding-top: 10px;
+  padding: 10px 12px;
 }
 
 .erp-line-items-form__footer-actions {

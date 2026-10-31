@@ -185,12 +185,7 @@ export default function ContactFormList({ form, entityLabel }) {
     >
       {(fields, { add, remove }, { errors }) => (
         <div className="erp-master-contact-list erp-contact-editor">
-          <BusinessLineItemsHeader
-            title="联系人"
-            addLabel="添加联系人"
-            addDisabled={componentDisabled}
-            onAdd={() => appendContact(add, fields.length)}
-          />
+          <BusinessLineItemsHeader title="联系人" />
           <TableScrollRegion className="erp-master-contact-list__items">
             <table
               className="erp-contact-editor__table"

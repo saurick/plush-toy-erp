@@ -9,7 +9,6 @@
 }
 
 .erp-bom-material-groups__heading > span,
-.erp-bom-material-groups__count,
 .erp-bom-material-cell__context {
   color: var(--erp-text-muted, #64748b);
   font-size: var(--erp-font-caption);
@@ -154,12 +153,8 @@
   margin-left: auto;
 }
 
-.erp-bom-add-material {
+.erp-bom-material-groups > .erp-line-items-form__footer {
   margin-top: 12px;
-}
-
-.erp-bom-material-groups__count {
-  margin-top: 8px;
 }
 
 .erp-bom-col-material {

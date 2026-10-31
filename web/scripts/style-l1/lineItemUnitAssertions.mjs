@@ -490,10 +490,13 @@ export function createLineItemUnitAssertions({ assert }) {
 
   const assertLineItemFooterFollowsModalScroll = async (
     modal,
-    { scenarioName }
+    {
+      scenarioName,
+      listSelector = '.erp-sales-order-lines-form__list, .erp-bom-parts-scroll',
+    }
   ) => {
-    const metrics = await modal.evaluate((node) => {
-      const list = node.querySelector('.erp-sales-order-lines-form__list')
+    const metrics = await modal.evaluate((node, args) => {
+      const list = node.querySelector(args.listSelector)
       const footer = node.querySelector('.erp-line-items-form__footer')
       const addButton = footer?.querySelector(
         '.erp-line-items-form__add-button'
@@ -501,8 +504,36 @@ export function createLineItemUnitAssertions({ assert }) {
       const modalBody =
         node.querySelector('.erp-business-form-page__body, .ant-modal-body') ||
         node.closest('.erp-business-form-page__body, .ant-modal-body')
-      const section = node.querySelector('.erp-sales-order-lines-form')
+      const section = footer?.closest(
+        '.erp-sales-order-lines-form, .erp-bom-material-groups, .erp-master-contact-list'
+      ) || footer?.parentElement
+      const borderedSection = footer?.closest('.erp-business-form-section') || footer
+      const sectionRect = borderedSection?.getBoundingClientRect()
+      const statsRect = footer?.querySelector('.erp-line-items-form__stats')?.getBoundingClientRect()
       const footerStyle = footer ? window.getComputedStyle(footer) : null
+      const buttonStyle = addButton ? window.getComputedStyle(addButton) : null
+      const buttonChildren = addButton
+        ? Array.from(addButton.children).filter(
+            (child) => child.getBoundingClientRect().width > 0 &&
+              !['absolute', 'fixed'].includes(window.getComputedStyle(child).position)
+          )
+        : []
+      const naturalButtonWidth = buttonStyle
+        ? Math.max(
+            parseFloat(buttonStyle.minWidth) || 0,
+            buttonChildren.reduce(
+              (width, child) => width + child.getBoundingClientRect().width,
+              0
+            ) +
+              Math.max(0, buttonChildren.length - 1) *
+                (parseFloat(buttonStyle.columnGap) || 0) +
+              ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+                .reduce(
+                  (width, property) => width + (parseFloat(buttonStyle[property]) || 0),
+                  0
+                )
+          )
+        : 0
 
       if (list) {
         list.scrollLeft = 0
@@ -529,6 +560,17 @@ export function createLineItemUnitAssertions({ assert }) {
         hasList: Boolean(list),
         hasFooter: Boolean(footer),
         hasAddButton: Boolean(addButton),
+        headerAddButtonCount: node.querySelectorAll(
+          '.erp-sales-order-lines-form__head .erp-line-items-form__add-button'
+        ).length,
+        footerAddButtonCount: footer?.querySelectorAll(
+          '.erp-line-items-form__add-button'
+        ).length || 0,
+        buttonWidth: buttonAfterRect?.width || 0,
+        naturalButtonWidth,
+        buttonInsetLeft: (buttonAfterRect?.left || 0) - (sectionRect?.left || 0),
+        buttonInsetBottom: (sectionRect?.bottom || 0) - (buttonAfterRect?.bottom || 0),
+        statsInsetRight: statsRect ? (sectionRect?.right || 0) - statsRect.right : null,
         footerInModalBody: Boolean(modalBody?.contains(footer)),
         footerInsideHorizontalList: Boolean(list?.contains(footer)),
         addButtonInsideFooter: Boolean(footer?.contains(addButton)),
@@ -548,14 +590,30 @@ export function createLineItemUnitAssertions({ assert }) {
           (buttonAfterRect?.left || 0) - (buttonBeforeRect?.left || 0)
         ),
       }
-    })
+    }, { listSelector })
 
     assert(
-      metrics.hasList && metrics.hasFooter && metrics.hasAddButton,
-      `${scenarioName} 明细列表、footer 和添加条目按钮应同时存在: ${JSON.stringify(
+      metrics.hasFooter && metrics.hasAddButton,
+      `${scenarioName} footer 和添加条目按钮应同时存在: ${JSON.stringify(
         metrics
       )}`
     )
+    assert.equal(metrics.headerAddButtonCount, 0, `${scenarioName} 顶部不重复添加入口`)
+    assert.equal(metrics.footerAddButtonCount, 1, `${scenarioName} 底部保留一个添加入口`)
+    assert(
+      Math.abs(metrics.buttonWidth - metrics.naturalButtonWidth) <= 2,
+      `${scenarioName} 添加按钮宽度应由图标、文字与正常留白决定: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.buttonInsetLeft >= 12 && metrics.buttonInsetBottom >= 10,
+      `${scenarioName} 添加按钮与分区边框应保留左右12px、底部10px留白: ${JSON.stringify(metrics)}`
+    )
+    if (metrics.statsInsetRight !== null) {
+      assert(
+        metrics.statsInsetRight >= 12,
+        `${scenarioName} 底部统计与分区右边框应保留12px留白: ${JSON.stringify(metrics)}`
+      )
+    }
     assert.equal(
       metrics.footerInModalBody,
       true,
@@ -612,7 +670,6 @@ export function createLineItemUnitAssertions({ assert }) {
       scenarioName,
       targetRowCount = 6,
       addButtonName = '添加条目',
-      headerAddWhenEmpty = true,
       maxAverageAddMs = 900,
       maxSingleAddMs = 1800,
       maxAverageScrollFrameMs = 24,
@@ -630,12 +687,7 @@ export function createLineItemUnitAssertions({ assert }) {
       exact: true,
     })
     await addButton.waitFor({ state: 'visible', timeout: 5_000 })
-    const initialRowCount = await modal.locator(rowSelector).count()
-    if (initialRowCount === 0 && !headerAddWhenEmpty) {
-      assert.equal(await headerAddButton.count(), 0, `${scenarioName} 空明细仅保留底部添加入口`)
-    } else {
-      await headerAddButton.waitFor({ state: 'visible', timeout: 5_000 })
-    }
+    assert.equal(await headerAddButton.count(), 0, `${scenarioName} 空明细与已有明细均只保留底部添加入口`)
     assert.equal(
       await addButton.evaluate((button) =>
         Boolean(button.closest('.erp-line-items-form__footer'))
@@ -661,15 +713,8 @@ export function createLineItemUnitAssertions({ assert }) {
       const endedAt = await modal.evaluate(() => performance.now())
       addDurations.push(Math.round(endedAt - startedAt))
     }
-    await headerAddButton.waitFor({ state: 'visible', timeout: 5_000 })
-    assert.equal(await headerAddButton.count(), 1)
-    assert.equal(
-      await headerAddButton.evaluate((button) =>
-        Boolean(button.closest('.erp-sales-order-lines-form__head'))
-      ),
-      true,
-      `${scenarioName} 非空明细的顶部添加入口应位于标题行`
-    )
+    assert.equal(await headerAddButton.count(), 0, `${scenarioName} 连续添加后不出现顶部重复入口`)
+    await assertLineItemFooterFollowsModalScroll(modal, { scenarioName, listSelector })
 
     await new Promise((resolve) => {
       setTimeout(resolve, 450)

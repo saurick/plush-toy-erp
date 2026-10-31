@@ -1,4 +1,5 @@
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 
 export function createQualitySourceActionScenarios(deps) {
   const {
@@ -849,15 +850,23 @@ export function createQualitySourceActionScenarios(deps) {
           await modal.waitFor({ state: 'visible', timeout: 10_000 })
           await modal.getByText('全检与抽检分别记录，未检不视为合格。', { exact: true }).waitFor()
           await modal.screenshot({ path: path.resolve(outputDir, 'quality-incoming-checks-desktop.png') })
+          await createLineItemUnitAssertions({ assert }).assertLineItemFooterFollowsModalScroll(
+            modal,
+            { scenarioName: 'quality-checks-desktop-spacing', listSelector: '.erp-compact-field-table' }
+          )
           const checkRows = modal.getByRole('table', { name: '质检检查项', exact: true }).locator('tbody')
           assert.equal(await checkRows.count(), 3)
-          await modal.getByRole('button', { name: '在顶部添加检查项', exact: true }).click()
+          await modal.getByRole('button', { name: '添加检查项', exact: true }).click()
           assert.equal(await checkRows.count(), 4)
           await checkRows.last().getByText('未检', { exact: true }).waitFor()
           await modal.getByRole('button', { name: '移除此检查项 4', exact: true }).click()
           assert.equal(await checkRows.count(), 3)
           await page.setViewportSize({ width: 390, height: 844 })
           await page.waitForTimeout(300)
+          await createLineItemUnitAssertions({ assert }).assertLineItemFooterFollowsModalScroll(
+            modal,
+            { scenarioName: 'quality-checks-mobile-spacing', listSelector: '.erp-compact-field-table' }
+          )
           const modalText = String((await modal.innerText()) || '').replace(
             /\s+/gu,
             ' '

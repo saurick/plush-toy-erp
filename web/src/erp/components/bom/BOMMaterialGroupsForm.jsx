@@ -16,6 +16,7 @@ import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTab
 import { message } from '@/common/utils/antdApp'
 import BOMMaterialCreateModal from './BOMMaterialCreateModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import '../business-list/businessFormSections.css'
 import {
   BOM_PART_FIELDS,
@@ -766,22 +767,22 @@ export default function BOMMaterialGroupsForm({
                 </table>
               </TableScrollRegion>
             )}
-            {canEdit ? (
-              <Button
-                block
-                className="erp-bom-add-material erp-line-items-form__add-button"
-                disabled={fields.length >= MAX_PARTS}
-                onClick={() => {
-                  add(blankPart())
-                  setFocusRequest({ index: fields.length, material: true })
-                }}
-              >
-                ＋ 添加物料
-              </Button>
-            ) : null}
-            <div className="erp-bom-material-groups__count">
-              {groups.length} 种物料 · {fields.length} 个部位
-            </div>
+            <BusinessLineItemsFooter
+              addLabel="添加物料"
+              addDisabled={fields.length >= MAX_PARTS}
+              onAdd={
+                canEdit
+                  ? () => {
+                      add(blankPart())
+                      setFocusRequest({ index: fields.length, material: true })
+                    }
+                  : undefined
+              }
+              stats={[
+                { key: 'materials', value: groups.length, suffix: '种物料' },
+                { key: 'parts', value: fields.length, suffix: '个部位' },
+              ]}
+            />
           </>
         )}
       </Form.List>

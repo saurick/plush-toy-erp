@@ -5,6 +5,7 @@ import {
 import { styleRpcResult } from './rpcMockResult.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { exerciseTableScrollControls } from './tableScrollControlAssertions.mjs'
+import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 
 async function chooseImportedReference(page, control, query, label) {
   await control.click()
@@ -40,6 +41,10 @@ export async function verifyBOMMaterialGroups(
   await modal.waitFor({ state: 'visible' })
   const groups = modal.locator('.erp-bom-material-group')
   await groups.first().waitFor({ state: 'visible' })
+  await createLineItemUnitAssertions({ assert }).assertLineItemFooterFollowsModalScroll(
+    modal,
+    { scenarioName: 'bom-material-groups-desktop' }
+  )
   const partsScroll = modal.locator('.erp-bom-parts-scroll')
   const hasHorizontalOverflow = await partsScroll.evaluate(
     (node) => node.scrollWidth > node.clientWidth + 1
@@ -230,9 +235,13 @@ export function createBOMMaterialGroupsScenarios(deps) {
         const first = groups.first()
         const parts = first.locator('tr[data-bom-part-index]')
         const addMaterial = editor.getByRole('button', {
-          name: '＋ 添加物料',
+          name: '添加物料',
           exact: true,
         })
+        await createLineItemUnitAssertions({ assert }).assertLineItemFooterFollowsModalScroll(
+          editor,
+          { scenarioName: 'bom-material-groups-before-selection' }
+        )
         await addMaterial.click()
         for (let count = 2; count <= 3; count += 1) {
           await first
@@ -982,7 +991,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         )
         deps.assert.equal(
           await editor
-            .getByRole('button', { name: '＋ 添加物料', exact: true })
+            .getByRole('button', { name: '添加物料', exact: true })
             .isDisabled(),
           true
         )

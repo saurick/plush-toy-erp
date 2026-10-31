@@ -78,6 +78,21 @@ export function createBusinessFormPagesScenarios(deps) {
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       await editor.getByRole('heading', { name: title, exact: true }).waitFor()
       await assertBusinessFormPage(page, editor)
+      if (['bom', 'sales', 'purchase', 'outsourcing', 'shipment', 'production', 'customers', 'suppliers'].includes(key)) {
+        await createLineItemUnitAssertions(deps).assertLineItemFooterFollowsModalScroll(
+          editor,
+          {
+            scenarioName: `business-form-page-${key}-desktop`,
+            listSelector: ['customers', 'suppliers'].includes(key)
+              ? '.erp-master-contact-list__items'
+              : key === 'production'
+                ? '.erp-compact-field-table'
+                : key === 'bom'
+                  ? '.erp-bom-parts-scroll'
+                  : '.erp-sales-order-lines-form__list',
+          }
+        )
+      }
       if (page.viewportSize().width >= 768 && !new URL(page.url()).pathname.startsWith('/m/')) {
         const normal = await editor.boundingBox()
         await editor.getByRole('button', { name: '全屏编辑', exact: true }).click()
@@ -540,7 +555,7 @@ export function createBusinessFormPagesScenarios(deps) {
           await assertLineItemAddActionScrollsToNewRow(editor, {
             scenarioName: name,
             targetRowCount: 10,
-            ...(key === 'sales' ? { addButtonName: '添加订货明细', headerAddWhenEmpty: false } : {}),
+            ...(key === 'sales' ? { addButtonName: '添加订货明细' } : {}),
             ...(key === 'purchase'
               ? { addButtonName: '添加采购明细' }
               : {}),

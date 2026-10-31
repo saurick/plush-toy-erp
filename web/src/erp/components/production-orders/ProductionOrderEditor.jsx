@@ -556,16 +556,7 @@ export default function ProductionOrderEditor({
                 size="middle"
                 style={{ width: '100%' }}
               >
-                <BusinessLineItemsHeader
-                  title="生产明细"
-                  addLabel="添加生产明细"
-                  addDisabled={readOnly}
-                  onAdd={
-                    readOnly
-                      ? undefined
-                      : () => appendProductionLine(add, fields.length)
-                  }
-                />
+                <BusinessLineItemsHeader title="生产明细" />
                 <BusinessCompactFieldTable
                   label="生产明细"
                   showSequence

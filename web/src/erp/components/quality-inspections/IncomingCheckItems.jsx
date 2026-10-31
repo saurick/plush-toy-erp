@@ -26,9 +26,6 @@ export function IncomingCheckItemsForm() {
             <BusinessLineItemsHeader
               title="检查项目"
               description="全检与抽检分别记录，未检不视为合格。"
-              addLabel="添加检查项"
-              addDisabled={fields.length >= 50}
-              onAdd={() => appendCheckItem(add, fields.length)}
             />
             <BusinessCompactFieldTable
               label="质检检查项"

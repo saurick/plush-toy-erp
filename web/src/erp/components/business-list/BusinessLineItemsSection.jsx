@@ -40,7 +40,6 @@ export default function BusinessLineItemsSection({
               <BusinessLineItemsHeader
                 title={title}
                 description={description}
-                {...normalizedFooterProps}
               >
                 {headerActions ?? normalizedFooterProps?.children}
               </BusinessLineItemsHeader>
