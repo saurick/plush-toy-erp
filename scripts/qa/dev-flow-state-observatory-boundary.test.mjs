@@ -125,7 +125,9 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.doesNotMatch(guide, /renderTopics|value: 'topics'/u);
   assert.doesNotMatch(page, /<details[^>]*data-business-chain-topics/u);
   assert.match(guide, /aria-label="流程视图"/u);
-  assert.doesNotMatch(guide, />查看相关专题</u);
+  assert.match(guide, /relatedChainKnown = businessCatalog\?\.businessChains\.some\(\(chain\) => chain\.key === relatedChainKey\)/u);
+  assert.match(guide, /!scoped && !selection\?\.invalid && relatedChainKnown/u);
+  assert.match(guide, /onOpenTopics\(relatedChainKey\)/u);
   assert.doesNotMatch(guide, /按业务查阅|返回完整流程|topic-nodes/u);
   assert.doesNotMatch(guide, /aria-label="履约流程视图"/u);
   assert.match(guide, /aria-label="流程详情"/u);

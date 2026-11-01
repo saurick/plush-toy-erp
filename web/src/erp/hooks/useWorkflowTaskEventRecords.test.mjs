@@ -1,66 +1,51 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
-import vm from 'node:vm'
 import * as React from 'react'
-import { installTestDOM } from '../../../scripts/test/reactRuntime.mjs'
-import * as identities from '../utils/workflowTaskActionAccess.mjs'
+import { createReactTestHarness } from '../../../scripts/test/reactRuntime.mjs'
 
 async function mount(t) {
-  const dom = installTestDOM()
-  const { createRoot } = await import('react-dom/client')
+  const ui = await createReactTestHarness(t)
+  const [{ default: hook }, { JsonRpc }, { RpcMethod }] = await Promise.all([
+    import('./useWorkflowTaskEventRecords.js'),
+    import('../../common/utils/jsonRpc.js'),
+    import('../../common/consts/rpcMethods.generated.mjs'),
+  ])
   const pending = []
-  const listWorkflowTaskEvents = (id, options) =>
-    new Promise((resolve, reject) =>
-      pending.push({ id, ...options, resolve, reject })
-    )
-  const source = readFileSync(
-    new URL('./useWorkflowTaskEventRecords.js', import.meta.url),
-    'utf8'
-  )
-    .replace(
-      /import\s+\{([\s\S]*?)\}\s+from\s+'([^']+)'\n/gu,
-      (_, names, path) =>
-        `const {${names}} = __modules__[${JSON.stringify(path)}]\n`
-    )
-    .replace(
-      'export default function useWorkflowTaskEventRecords',
-      'function useWorkflowTaskEventRecords'
-    )
-  const module = { exports: {} }
-  vm.runInNewContext(
-    `${source}\nmodule.exports = useWorkflowTaskEventRecords`,
-    {
-      module,
-      AbortController,
-      __modules__: {
-        react: React,
-        '../api/workflowApi.mjs': { listWorkflowTaskEvents },
-        '../utils/workflowTaskActionAccess.mjs': identities,
-      },
-    }
-  )
-  const hook = module.exports
+  const originalCall = JsonRpc.prototype.call
+  t.after(() => { JsonRpc.prototype.call = originalCall })
+  JsonRpc.prototype.call = (method, params, options) => {
+    assert.equal(method, RpcMethod.workflow.LIST_TASK_EVENTS)
+    const id = params.task_id
+    const scope = params.scope || 'task'
+    return new Promise((resolve, reject) => pending.push({
+      id,
+      scope,
+      beforeEventId: params.before_event_id || 0,
+      signal: options.signal,
+      reject,
+      resolve: (data) => resolve({
+        code: 0,
+        data: {
+          ...data,
+          items: data.items.map((item) => scope === 'task' ? item : {
+            ...item,
+            task_id: id,
+            task: { id, task_name: '模拟处理任务', task_group: 'engineering_material_request', owner_role_key: 'engineering' },
+          }),
+        },
+      }),
+    }))
+  }
   let current
   const Harness = (props) => {
     current = hook(props)
     return null
   }
-  const container = document.createElement('div')
-  document.body.append(container)
-  const root = createRoot(container)
-  const render = (props) =>
-    React.act(async () => root.render(React.createElement(Harness, props)))
-  const flush = (action) =>
-    React.act(async () => {
-      action?.()
-      await Promise.resolve()
-    })
-  t.after(async () => {
-    await React.act(async () => root.unmount())
-    container.remove()
-    dom.restore()
-  })
+  const render = (props) => ui.render(React.createElement(Harness, props))
+  const flush = async (action) => {
+    await ui.act(async () => { action?.() })
+    await ui.flush()
+  }
   return {
     pending,
     render,

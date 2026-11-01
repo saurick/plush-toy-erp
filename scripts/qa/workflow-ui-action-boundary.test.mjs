@@ -549,7 +549,7 @@ test("mobile task actions explain backend access before submitting actions", () 
     "await mutationAttempts.run({",
     retainedAttemptGuardIndex,
   );
-  const urgeReasonGuardIndex = source.indexOf("if (!reason)");
+  const urgeReasonInputIndex = source.indexOf("const reason = String(urgeReasonByTaskID[scopedTaskKey]");
   const urgeRetainedAttemptGuardIndex = source.indexOf(
     "const accessVerified = await verifyNewWorkflowTaskMutationAttempt({",
     retainedAttemptGuardIndex + 1,
@@ -615,13 +615,13 @@ test("mobile task actions explain backend access before submitting actions", () 
   );
   assert.match(
     submitGuardSource,
-    /REASON_REQUIRED_ACTION_MODES[\s\S]*block[\s\S]*reject[\s\S]*resume[\s\S]*urge/u,
-    "shared submit guard must centralize reason-required workflow actions",
+    /const input = workflowTaskActionInput\(task, normalizedActionKey\)/u,
+    "shared submit guard must derive input requirements from the shared task action contract",
   );
   assert.match(
     submitGuardSource,
-    /REASON_REQUIRED_ACTION_MODES\.has\(normalizedActionKey\)[\s\S]*!String\(reason \|\| ''\)\.trim\(\)/u,
-    "shared submit guard must reject missing reason before backend explain",
+    /normalizedActionKey !== 'complete' && input\.required &&\s*!String\(reason \|\| ''\)\.trim\(\)/u,
+    "shared submit guard must reject missing required input while preserving optional explanations",
   );
   assert.match(
     submitGuardSource,
@@ -700,9 +700,9 @@ test("mobile task actions explain backend access before submitting actions", () 
     "mobile status actions must explain backend access for new intents",
   );
   assert(
-    urgeReasonGuardIndex >= 0 &&
-      urgeReasonGuardIndex < urgeRetainedAttemptGuardIndex,
-    "mobile urge reason must be validated before creating or replaying an attempt",
+    urgeReasonInputIndex >= 0 &&
+      urgeReasonInputIndex < urgeRetainedAttemptGuardIndex,
+    "mobile urge must bind its optional explanation before creating or replaying an attempt",
   );
   assert(
     urgeRetainedAttemptGuardIndex >= 0 &&
