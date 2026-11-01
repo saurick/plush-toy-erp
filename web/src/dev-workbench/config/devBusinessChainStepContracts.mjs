@@ -494,23 +494,29 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         capabilityKeys: [PermissionCode.OUTSOURCING_RETURN_RECEIPT_CREATE],
         stateRefs: [
           state('source.outsourcing_order', 'confirmed', 'precondition'),
-          state('fact.outsourcing', 'DRAFT', 'result'),
+          state('fact.outsourcing', 'POSTED', 'result'),
         ],
+        stateTransitionRefs: [transition('fact.outsourcing', 'DRAFT->POSTED')],
       }),
       'outsourcing_return:creates_fact_draft:outsourcing_quality': step({
         responsibilityMode: 'human',
         ownerPoolKeys: ['quality'],
         capabilityKeys: [PermissionCode.QUALITY_INSPECTION_CREATE],
-        stateRefs: [state('fact.quality_inspection', 'DRAFT', 'result')],
+        stateRefs: [
+          state('fact.outsourcing', 'POSTED', 'precondition'),
+          state('fact.quality_inspection', 'DRAFT', 'result'),
+        ],
       }),
       'outsourcing_quality:posts_fact:outsourcing_lot': step({
         responsibilityMode: 'human',
-        ownerPoolKeys: ['quality', 'warehouse'],
+        ownerPoolKeys: ['quality'],
         stateTransitionRefs: [
+          transition('fact.quality_inspection', 'DRAFT->SUBMITTED'),
           transition('fact.quality_inspection', 'SUBMITTED->PASSED'),
-          transition('fact.outsourcing', 'DRAFT->POSTED'),
+          transition('fact.inventory_lot', 'ACTIVE->HOLD'),
+          transition('fact.inventory_lot', 'HOLD->ACTIVE'),
         ],
-        stateRefs: [state('fact.inventory_lot', 'ACTIVE', 'result')],
+        stateRefs: [state('fact.outsourcing', 'POSTED', 'precondition'), state('fact.inventory_lot', 'ACTIVE', 'result')],
       }),
       'outsourcing_lot:creates_fact_draft:outsourcing_payable_draft': step({
         responsibilityMode: 'human',

@@ -641,11 +641,12 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'outsourcing_issue',
         'outsourcing_return',
-        '按来源登记回货',
+        '按来源登记回货并过账',
         'returns',
         {
           action:
-            'OperationalFactUsecase.CreateOutsourcingReturnReceiptFromOrder',
+            'OperationalFactUsecase.CreateOutsourcingReturnReceiptFromOrder / PostOutsourcingFact',
+          condition: '按已确认合同登记回货，仓库显式过账形成回货与库存流水；草稿不能创建回货质检。',
           factBoundary: 'outsourcing_return_receipt',
           sourceRefs: ['server/internal/biz/operational_fact.go'],
         }
@@ -653,23 +654,25 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'outsourcing_return',
         'outsourcing_quality',
-        '回货创建质检',
+        '已过账回货创建质检草稿',
         'creates_fact_draft',
         {
           action:
             'InventoryUsecase.CreateQualityInspectionFromOutsourcingReturn',
           factBoundary: 'quality_inspection_fact',
+          condition: '回货已过账且没有有效检验；此步只创建检验草稿，不冻结批次或新增库存数量。',
           sourceRefs: ['server/internal/biz/quality_inspection.go'],
         }
       ),
       chainEdge(
         'outsourcing_quality',
         'outsourcing_lot',
-        '检验通过后入库',
+        '提交检验冻结，合格后恢复可用',
         'posts_fact',
         {
-          action: 'InventoryUsecase.PassQualityInspection',
-          factBoundary: 'inventory_txn_and_lot',
+          action: 'InventoryUsecase.SubmitQualityInspection / PassQualityInspection',
+          factBoundary: 'quality_inspection_fact',
+          condition: '回货已过账；检验草稿须先提交以冻结批次，再正式判定合格并恢复可用，不重复过账回货或增加库存。',
           sourceRefs: [
             'server/internal/biz/quality_inspection.go',
             'server/internal/biz/inventory.go',
