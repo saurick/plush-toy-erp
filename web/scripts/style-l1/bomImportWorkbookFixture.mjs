@@ -105,6 +105,8 @@ export function createBOMImportWorkbookFixture({
   mergedNotes = false,
   unmatchedProduct = false,
   highPrecision = false,
+  additionalParts = 0,
+  additionalColumns = 0,
 } = {}) {
   const merges = ['H5:I5']
   const rows = [
@@ -214,6 +216,18 @@ export function createBOMImportWorkbookFixture({
     rows[6][1] = supplierItemNo
     rows[6][5] = { value: '0.02', style: 1 }
     rows[6][6] = { value: '2.2', style: 2, formula: 'F7*G$3*1.1' }
+  }
+  for (let index = 0; index < additionalParts; index += 1) {
+    rows.splice(rows.length - 1, 0, [
+      '样式材料', '示例织造AB-001#-02#米白', '短毛绒 300g', '个',
+      `预览部位${index + 3}`, '0.5', '55', '贴衬', '激光', '分页核对',
+    ])
+  }
+  for (let index = 0; index < additionalColumns; index += 1) {
+    rows[4].push(`原表补充列${index + 1}`)
+    for (const row of rows.slice(5, -1)) {
+      row[10 + index] = `补充内容${index + 1}`
+    }
   }
   return createStoredZip({
     'xl/workbook.xml':

@@ -8,6 +8,7 @@ import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { exerciseTableScrollControls } from './tableScrollControlAssertions.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { createBOMMaterialDropdownStabilityScenarios } from './bomMaterialDropdownStabilityScenarios.mjs'
+import { createBOMImportPreviewScenarios } from './bomImportPreviewScenarios.mjs'
 
 async function chooseImportedReference(page, control, query, label) {
   await control.click()
@@ -221,6 +222,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
     },
   ]
   return [
+    ...createBOMImportPreviewScenarios(deps),
     ...createBOMMaterialDropdownStabilityScenarios(deps),
     ...scenarios,
     {

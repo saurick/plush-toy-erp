@@ -77,7 +77,8 @@ export default function TableScrollControls({
       const style = getComputedStyle(node)
       const clipX = /auto|scroll|hidden|clip/.test(style.overflowX)
       const clipY = /auto|scroll|hidden|clip/.test(style.overflowY)
-      if (clipX || clipY) ancestors.push({ node, clipX, clipY })
+      // 弹窗挂载时样式可能尚未生效，受控容器仍须直接监听滚动。
+      if (node === scroller || clipX || clipY) ancestors.push({ node, clipX, clipY })
     }
     const scrollTops = new Map(
       ancestors.map(({ node }) => [node, node.scrollTop])

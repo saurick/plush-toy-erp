@@ -207,3 +207,14 @@
   -webkit-text-fill-color: var(--erp-text);
   opacity: 1;
 }
+
+.erp-bom-import-preview .ant-modal-content {
+  height: min(90dvh, calc(100dvh - var(--erp-modal-viewport-gap)));
+}
+
+.erp-bom-import-preview__content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}

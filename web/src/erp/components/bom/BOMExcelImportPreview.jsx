@@ -108,6 +108,7 @@ export default function BOMExcelImportPreview({
       open={Boolean(pending)}
       title={detailsOnly ? '导入材料明细' : '从 Excel 新建 BOM'}
       size="lineItems"
+      className="erp-bom-import-preview"
       onCancel={onCancel}
       onOk={() => onConfirm(detailsOnly ? mode : 'replace')}
       okText={
@@ -124,7 +125,7 @@ export default function BOMExcelImportPreview({
       }}
       cancelText="取消"
     >
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <div className="erp-bom-import-preview__content" data-table-scroll-scope>
         <Typography.Text>
           {draft?.review.fileName} / {draft?.review.sheetName} · 已读取{' '}
           {rows.length} 个部位
@@ -158,10 +159,13 @@ export default function BOMExcelImportPreview({
               onSearch={(value) => { setKeyword(value); setPage(1) }}
             />
             <Button className="erp-source-import-picker__clear-filter" disabled={!keyword && !reviewFilter} onClick={() => { setKeyword(''); setReviewFilter(''); setPage(1) }}>清空筛选</Button>
+            <div data-table-scroll-toolbar />
           </div>
         </div>
         <Typography.Text type="secondary" role="status" id={importScopeId}>整份文件导入；筛选结果 {visibleRows.length} / {rows.length} 个部位。筛选仅用于核对，确认后带入全部 {rows.length} 个部位。</Typography.Text>
         <Table
+          scrollToolbar
+          scrollControlsOnEmpty
           rowKey={(item) => item._import_source.rowNumber}
           size="small"
           columns={columns}
@@ -176,7 +180,7 @@ export default function BOMExcelImportPreview({
           pagination={{
             current: page,
             onChange: setPage,
-            pageSize: 5,
+            pageSize: 10,
             showSizeChanger: false,
             hideOnSinglePage: true,
           }}
@@ -208,7 +212,7 @@ export default function BOMExcelImportPreview({
             message="确认后将替换当前草稿明细，保存前可撤销本次导入。"
           />
         ) : null}
-      </Space>
+      </div>
     </BusinessModal>
   )
 }
