@@ -552,13 +552,6 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       {
         task_id: urgeStrictTask.id,
         expected_version: urgeStrictTask.version,
-        idempotency_key: 'mock-urge-empty-reason',
-        action: 'urge_task',
-        reason: '   ',
-      },
-      {
-        task_id: urgeStrictTask.id,
-        expected_version: urgeStrictTask.version,
         idempotency_key: 'mock-urge-padded-action',
         action: ' urge_task ',
         reason: '请尽快处理',
@@ -567,6 +560,16 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       const invalid = await workflowCall('urge_task', invalidParams)
       assert.notEqual(invalid.result.code, 0)
     }
+
+    const emptyReasonUrge = await workflowCall('urge_task', {
+      task_id: urgeStrictTask.id,
+      expected_version: urgeStrictTask.version,
+      idempotency_key: 'mock-urge-empty-reason',
+      action: 'urge_task',
+      reason: '   ',
+    })
+    assert.equal(emptyReasonUrge.result.code, 0)
+    assert.equal(emptyReasonUrge.result.data.task.id, urgeStrictTask.id)
 
     const validExplain = await workflowCall('explain_action_access', {
       task_id: urgeStrictTask.id,

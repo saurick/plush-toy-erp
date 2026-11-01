@@ -68,10 +68,13 @@ test('semantic interactive controls expose pointer and disabled feedback', () =>
     controlAffordanceSource,
     /\)\s*\{\s*cursor:\s*pointer;\s*\}/u
   )
-  assert.match(
-    controlAffordanceSource,
-    /\[role='menuitem'\]\[aria-disabled='true'\][\s\S]*?cursor:\s*not-allowed;/u
-  )
+  const disabledRule = controlAffordanceSource.match(/:where\(([^{}]+)\)\[aria-disabled='true'\]\s*\{([^{}]+)\}/u)
+  assert.ok(disabledRule)
+  const disabledControls = disabledRule[1].split(',').map((selector) => selector.trim())
+  for (const role of ['button', 'link', 'menuitem', 'option', 'tab', 'treeitem']) {
+    assert.ok(disabledControls.includes(`[role='${role}']`), role)
+  }
+  assert.match(disabledRule[2], /cursor:\s*not-allowed;/u)
 })
 
 test('mobile progress uses an anchored dropdown without desktop date inputs', () => {

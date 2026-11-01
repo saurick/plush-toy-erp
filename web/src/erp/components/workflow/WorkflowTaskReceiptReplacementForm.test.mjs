@@ -5,8 +5,9 @@ import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mj
 
 test('warehouse replacement counting uses the exact existing disposition without purchasing create access', async (t) => {
   const ui = await createReactTestHarness(t)
-  const [{ App }, { createMemoryRouter, RouterProvider }, { BusinessPageContext }, { default: Editor }, { JsonRpc }] = await Promise.all([
+  const [{ App }, { createMemoryRouter, RouterProvider }, { BusinessPageContext }, { default: Editor }, { JsonRpc }, { ERPThemeProvider }] = await Promise.all([
     import('antd'), import('react-router-dom'), import('../../hooks/useBusinessPageContext.js'), import('./WorkflowTaskReceiptReplacementForm.jsx'), import('../../../common/utils/jsonRpc.js'),
+    import('../../../common/theme/erpTheme.jsx'),
   ])
   const original = JsonRpc.prototype.call
   t.after(() => { JsonRpc.prototype.call = original })
@@ -33,10 +34,10 @@ test('warehouse replacement counting uses the exact existing disposition without
   }
   const router = createMemoryRouter([{ path: '/', element: h(Harness) }], { future: { v7_relativeSplatPath: true } })
   t.after(() => router.dispose())
-  await ui.render(h(RouterProvider, { router, future: { v7_startTransition: true } }))
+  await ui.render(h(ERPThemeProvider, null, h(RouterProvider, { router, future: { v7_startTransition: true } })))
   await ui.flush()
   assert.equal(calls.filter((call) => call.method === 'get_purchase_rejection_disposition').length, 1, 'the existing editor reuses the confirmed source record')
-  assert.match(actionHost.textContent, /确认处置/u)
+  assert.match(actionHost.textContent, /确认处置/u, ui.container.textContent)
   assert.doesNotMatch(actionHost.textContent, /生成处置草稿|继续登记|取消处置/u)
   const input = ui.container.querySelector('input[id$="counted_quantity"]')
   assert.ok(input)

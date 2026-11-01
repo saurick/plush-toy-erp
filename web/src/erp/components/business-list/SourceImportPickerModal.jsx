@@ -346,6 +346,7 @@ export default function SourceImportPickerModal({
         .map((key) => candidatesByKey.get(String(key))).find(Boolean)
       if (addedRow && getSelectionGroup(addedRow) !== getSelectionGroup(selectedRows[0])) {
         modal.confirm({
+          maskClosable: true,
           title: '切换销售订单？',
           content: `每次只能导入同一张销售订单。切换将清空已选的 ${selectedRows.length} 条明细。`,
           okText: '切换并重新选择',
@@ -452,6 +453,7 @@ export default function SourceImportPickerModal({
   const confirmSelectionReset = (onConfirm) => {
     if (!selectedRows.length) return onConfirm()
     modal.confirm({
+      maskClosable: true,
       title: '切换导入来源？',
       content: `切换将清空已选的 ${selectedRows.length} 条明细，是否继续？`,
       okText: '切换并清空已选',

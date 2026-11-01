@@ -121,7 +121,7 @@ test('任务办理直接显示清单，筛选清空和历史导航恢复时保�
   assert.equal(v.params().has('role'), false)
   assert.equal(v.params().has('kind'), false)
   assert.equal(
-    v.container.querySelectorAll('.ant-table-row').length,
+    v.container.querySelectorAll('.erp-dev-task-catalog .ant-table-row').length,
     TASK_HANDLING_ROWS.length
   )
 })
@@ -193,7 +193,7 @@ test('审核清单展示具体事项及办理岗位，岗位和类型组合筛�
     ['老板', '订单审批'],
   ]) {
     await v.choose('办理岗位', role)
-    const dataRows = [...v.container.querySelectorAll('.ant-table-row')]
+    const dataRows = [...v.container.querySelectorAll('.erp-dev-task-catalog .ant-table-row')]
     assert(dataRows.length > 0)
     assert(
       dataRows.every(
@@ -354,7 +354,7 @@ test('已移除的演示参数提供明确恢复入口，重新选择后直接�
   assert.equal(v.container.querySelector('[role="alert"]'), null)
   assert.equal(v.container.querySelector('[role="tab"]'), null)
   assert.equal(
-    v.container.querySelectorAll('.ant-table-row').length,
+    v.container.querySelectorAll('.erp-dev-task-catalog .ant-table-row').length,
     TASK_HANDLING_ROWS.length
   )
 })

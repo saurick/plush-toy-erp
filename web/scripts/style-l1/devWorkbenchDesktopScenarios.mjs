@@ -114,9 +114,16 @@ export function createDevWorkbenchDesktopScenarios({
         assert.deepEqual(await common.locator('dt').allTextContents(), ['标记任务受阻', '解除任务阻塞', '转交任务', '催办任务'])
         assert.equal(await common.getByRole('button').count(), 0, 'the workbench describes conditions without granting task actions')
         const inputs = page.getByRole('region', { name: '必填与选填', exact: true })
-        assert.match(await inputs.innerText(), /解除任务阻塞.*处理说明选填/su)
-        assert.match(await inputs.innerText(), /收付款、库存调整和生产异常审批通过.*审批意见必填/su)
+        const inputRows = inputs.locator('.ant-table-row')
+        assert.equal(await inputRows.count(), 9)
+        for (const [action, input] of [
+          ['解除任务阻塞', '处理说明选填'], ['催办任务', '催办说明选填'],
+          ['普通审批通过、用料审核通过', '审批意见选填'],
+          ['收付款、库存调整和生产异常审批通过', '审批意见必填'],
+          ['退回／驳回', '退回原因必填'], ['完成协调跟进', '处理结果必填'],
+        ]) assert.match(await inputRows.filter({ hasText: action }).innerText(), new RegExp(input, 'u'))
         assert.match(await inputs.innerText(), /未补充说明.*未记录/su)
+        assert.equal(await inputs.getByRole('button').count(), 0)
         const approvalRow = page.locator('[data-row-key="process/sales_order_acceptance/order_approval"]')
         assert.match(await approvalRow.innerText(), /审批通过 \/ 审批退回/u)
         const header = page.locator('.erp-dev-task-handling__header')
@@ -1333,28 +1340,7 @@ export function createDevWorkbenchDesktopScenarios({
       await assertNoHorizontalOverflow(page, item.route)
     },
   }))
-  return [...scenarios, {
-    name: 'dev-task-input-rules-desktop-light',
-    path: DEV_TASK_HANDLING_ROUTE,
-    viewport: { width: 1920, height: 1080 },
-    deviceScaleFactor: 2,
-    verify: async (page) => {
-      const section = page.getByRole('region', { name: '必填与选填', exact: true })
-      await section.waitFor()
-      const rows = section.locator('.ant-table-row')
-      assert.equal(await rows.count(), 9)
-      for (const [action, input] of [
-        ['解除任务阻塞', '处理说明选填'], ['催办任务', '催办说明选填'],
-        ['普通审批通过、用料审核通过', '审批意见选填'],
-        ['收付款、库存调整和生产异常审批通过', '审批意见必填'],
-        ['退回／驳回', '退回原因必填'], ['完成协调跟进', '处理结果必填'],
-      ]) assert.match(await rows.filter({ hasText: action }).innerText(), new RegExp(input, 'u'))
-      assert.match(await section.innerText(), /未补充说明.*未记录/su)
-      assert.equal(await section.getByRole('button').count(), 0)
-      await section.scrollIntoViewIfNeeded()
-      await assertNoHorizontalOverflow(page, 'task-input-rules')
-    },
-  }, createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow })]
+  return [...scenarios, createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow })]
 }
 
 function createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow }) {

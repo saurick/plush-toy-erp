@@ -121,11 +121,11 @@ test('processing record details retain exact audit evidence on desktop and mobil
     assert.ok(evidence)
     assert.deepEqual(
       [...evidence.querySelectorAll('dt')].map((item) => item.textContent),
-      ['记录分类', '精确时间', '任务版本']
+      ['记录分类', '精确时间', '处理说明', '任务版本']
     )
     assert.deepEqual(
       [...evidence.querySelectorAll('dd')].map((item) => item.textContent),
-      ['进度', formatWorkflowTaskEventTime(event.created_at), '版本 4']
+      ['进度', formatWorkflowTaskEventTime(event.created_at), '未补充说明', '版本 4']
     )
   }
 })
@@ -149,11 +149,11 @@ test('processing record details keep missing audit evidence explicit without inv
   assert.ok(evidence)
   assert.deepEqual(
     [...evidence.querySelectorAll('dt')].map((item) => item.textContent),
-    ['记录分类', '精确时间']
+    ['记录分类', '精确时间', '处理说明']
   )
   assert.deepEqual(
     [...evidence.querySelectorAll('dd')].map((item) => item.textContent),
-    ['进度', '时间未记录']
+    ['进度', '时间未记录', '未补充说明']
   )
 })
 

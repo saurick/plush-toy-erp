@@ -166,6 +166,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/transaction-browser-cancellation.test.mjs",
     "scripts/qa/transaction-browser-network.test.mjs",
     "scripts/qa/transaction-flow-fields-browser.test.mjs",
+    "scripts/qa/transaction-fulfillment-chains.test.mjs",
     "scripts/qa/transaction-real-backend-browser.test.mjs",
     "scripts/qa/transaction-request-cancellation-browser.test.mjs",
     "scripts/qa/transaction-shared-surfaces-browser.test.mjs",

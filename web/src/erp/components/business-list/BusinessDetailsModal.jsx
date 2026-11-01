@@ -96,7 +96,7 @@ function BusinessLineItems({ config, record, state, contentRef }) {
   return (
     <div ref={contentRef}>
       <BusinessFormSection
-        title={loadState.status === 'success'
+        title={loadState.status === 'success' && loadState.items.length > 0
           ? `${title}（共 ${loadState.items.length} 条）`
           : title}
         layout="content"

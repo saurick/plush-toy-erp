@@ -149,6 +149,10 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 	}
 	createAndPostPurchaseReceipt(t, ctx, inventoryUC, "DBG-PR-CLEAR-001", fixtures, stringPtr("DBG-LOT-CLEAR-001"), mustDecimal(t, "8"))
 	createDebugOutsourcingOrderWithProcess(t, ctx, client, fixtures)
+	numberCounters := client.WorkflowTaskNumberCounter.Query().AllX(ctx)
+	if len(numberCounters) == 0 {
+		t.Fatal("seeded workflow tasks must allocate task numbers")
+	}
 
 	preview, err := uc.ClearBusinessData(ctx, biz.DebugBusinessDataClearInput{DryRun: true})
 	if err != nil {
@@ -189,6 +193,14 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 		t.Fatalf("unexpected clear result %#v", result)
 	}
 	assertProjectBusinessTablesEmpty(t, ctx, data)
+	if got := client.WorkflowTaskNumberCounter.Query().CountX(ctx); got != len(numberCounters) {
+		t.Fatalf("business cleanup changed task number counter count: got %d want %d", got, len(numberCounters))
+	}
+	for _, before := range numberCounters {
+		if after := client.WorkflowTaskNumberCounter.GetX(ctx, before.ID); after.LastValue != before.LastValue {
+			t.Fatalf("business cleanup reset task number counter %s: got %d want %d", before.ID, after.LastValue, before.LastValue)
+		}
+	}
 	if actual := client.HelpSupplement.GetX(ctx, helpDraft.ID); actual.DraftMarkdown != helpDraft.DraftMarkdown || actual.Version != 1 || actual.PublishedVersion != 1 {
 		t.Fatalf("business cleanup changed enterprise help content: %#v", actual)
 	}
@@ -224,6 +236,7 @@ func TestDebugBusinessDataClearClassifiesEveryGeneratedTableAndKeepsForeignKeyOr
 		"help_feedbacks": {}, "help_supplement_revisions": {}, "help_supplements": {},
 		"roles": {}, "role_data_scopes": {}, "role_permissions": {}, "role_profiles": {},
 		"runtime_audit_events": {}, "runtime_markers": {}, "work_pools": {}, "work_pool_memberships": {},
+		"workflow_task_number_counters": {},
 	}
 	clearIndex := make(map[string]int, len(debugBusinessDataClearTables))
 	for index, tableName := range debugBusinessDataClearTables {
