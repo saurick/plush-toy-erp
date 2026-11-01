@@ -68,11 +68,34 @@ type ShipmentSourceCandidateFilter struct {
 	Offset       int
 }
 
+// ShipmentSourceOrderOption describes an order with at least one source line in
+// the requested eligibility scope, independently of keyword and pagination.
+type ShipmentSourceOrderOption struct {
+	SalesOrderID         int
+	OrderNo              string
+	CustomerID           int
+	CustomerCode         string
+	CustomerName         string
+	CustomerNameSnapshot string
+}
+
 // ShipmentSourceCandidateRepo owns the cross-domain shipment-source read
 // projection. Keeping it as a capability interface avoids widening the base
 // operational-fact adapter contract used by isolated test doubles.
 type ShipmentSourceCandidateRepo interface {
 	ListShipmentSourceCandidates(ctx context.Context, filter ShipmentSourceCandidateFilter) ([]*ShipmentSourceCandidate, int, error)
+	ListShipmentSourceOrderOptions(ctx context.Context, selectable *bool) ([]*ShipmentSourceOrderOption, error)
+}
+
+func (uc *OperationalFactUsecase) ListShipmentSourceOrderOptions(ctx context.Context, selectable *bool) ([]*ShipmentSourceOrderOption, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(ShipmentSourceCandidateRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ListShipmentSourceOrderOptions(ctx, selectable)
 }
 
 func (uc *OperationalFactUsecase) ListShipmentSourceCandidates(

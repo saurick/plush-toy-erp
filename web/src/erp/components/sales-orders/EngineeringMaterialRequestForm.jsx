@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button, Form, Radio, Space, Spin, Tag } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import { MaterialRequestStatus, SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import EngineeringMaterialPurchaseOrders from './EngineeringMaterialPurchaseOrders.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
@@ -400,13 +401,14 @@ export default function EngineeringMaterialRequestForm({
                   taskProcessing
                     ? decision === 'reject'
                       ? '退回原因'
-                      : '审批意见'
+                      : '审批意见（选填）'
                     : '审批备注 / 退回原因'
                 }
                 name="note"
               >
                 <BusinessTextArea
-                  maxLength={255}
+                  showCount
+                  maxLength={BusinessTextPolicy.noteMaxCharacters}
                   minRows={2}
                   disabled={saving}
                 />

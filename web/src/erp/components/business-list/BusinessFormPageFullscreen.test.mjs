@@ -9,6 +9,7 @@ test('fullscreen retains the mounted draft, pending attachments and clamped scro
   // The router's Request constructor comes from the host runtime.
   globalThis.AbortController = nativeAbortController
   registerJSXTestLoader()
+  const { ERPThemeProvider } = await import('../../../common/theme/erpTheme.jsx')
   const [
     { createRoot },
     { createMemoryRouter, RouterProvider },
@@ -44,7 +45,7 @@ test('fullscreen retains the mounted draft, pending attachments and clamped scro
           Form,
           { form, initialValues: { note: '' } },
           h(Form.Item, { name: 'note' }, h(Input, { 'aria-label': '单据备注' })),
-          h('div', { 'data-lines': true }, '宽明细'),
+          h('div', { 'data-lines': true }, '宽明细', h('button', { type: 'button', 'aria-expanded': true }, '已展开明细组')),
           h(Attachment)
         )
       )
@@ -60,7 +61,7 @@ test('fullscreen retains the mounted draft, pending attachments and clamped scro
     container.remove()
     dom.restore()
   })
-  await act(async () => root.render(h(RouterProvider, { router, future: { v7_startTransition: true } })))
+  await act(async () => root.render(h(ERPThemeProvider, null, h(RouterProvider, { router, future: { v7_startTransition: true } }))))
   await act(async () => new Promise((resolve) => window.requestAnimationFrame(resolve)))
   const shell = container.querySelector('.erp-admin-shell')
   const editor = container.querySelector('.erp-business-form-page')

@@ -1,6 +1,5 @@
 import React, { useEffect, useId, useState } from 'react'
-import { Alert, Form, Radio, Space, Typography, Button } from 'antd'
-import { UndoOutlined } from '@ant-design/icons'
+import { Alert, Button, Empty, Radio, Space, Typography } from 'antd'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import SearchInput from '@/common/components/SearchInput'
 import Table from '@/common/components/table/AppTable'
@@ -13,31 +12,13 @@ import {
 } from '../../utils/bomXlsxImport.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 import { formatBOMSourceNumber } from '../../utils/bomSourceValues.mjs'
+import BOMImportLineStatus from './BOMImportLineStatus.jsx'
 
 export function bomImportItemsSnapshot(values) {
   return businessFormSnapshot({
     items: values.items,
     quantity_text: values.quantity_text,
   })
-}
-
-export function BOMImportUndoAction({ form, undo, disabled, onUndo }) {
-  const current = Form.useWatch(bomImportItemsSnapshot, {
-    form,
-    preserve: true,
-  })
-  if (!undo || current !== undo.appliedSnapshot) return null
-  return (
-    <Button
-      size="small"
-      aria-label="撤销本次导入"
-      icon={<UndoOutlined />}
-      disabled={disabled}
-      onClick={onUndo}
-    >
-      撤销本次导入
-    </Button>
-  )
 }
 
 export default function BOMExcelImportPreview({
@@ -85,7 +66,7 @@ export default function BOMExcelImportPreview({
               : item._import_source?.materialName || '待选择材料'}
           </span>
           <Typography.Text type="secondary">
-            原表第 {item._import_source?.rowNumber} 行 ·{' '}
+            Excel 第 {item._import_source?.rowNumber} 行 ·{' '}
             {item._import_source?.materialName}
           </Typography.Text>
         </Space>
@@ -105,9 +86,9 @@ export default function BOMExcelImportPreview({
     {
       title: '校对',
       key: 'review',
-      width: 90,
+      width: 140,
       render: (_, item) =>
-        getBOMImportLineIssues(item).length ? '待补全' : '已匹配',
+        <BOMImportLineStatus issues={getBOMImportLineIssues(item)} rowNumber={item._import_source?.rowNumber} />,
     },
   ]
   const columns = draft?.review.columns?.length
@@ -185,6 +166,12 @@ export default function BOMExcelImportPreview({
           size="small"
           columns={columns}
           dataSource={visibleRows}
+          locale={{ emptyText: <Empty description={keyword.trim()
+            ? '没有符合条件的部位'
+            : reviewFilter === 'material_id' ? '当前没有待选择材料的部位'
+              : reviewFilter === 'unit_id' ? '当前没有待选择单位的部位'
+                : reviewFilter ? '当前没有待补全的部位' : '文件中没有可导入的部位'}
+          /> }}
           scroll={{ x: Math.max(580, columns.length * 140) }}
           pagination={{
             current: page,

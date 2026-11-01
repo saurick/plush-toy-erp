@@ -1,6 +1,8 @@
 import React from 'react'
 import { Button, Form, Input, Space, Typography } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import Select from '@/common/components/select/AppSelect'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
@@ -106,8 +108,8 @@ export function IncomingCheckItemsForm() {
                       name={[name, 'note']}
                       label="说明 / 抽检范围"
                     >
-                      <Input
-                        maxLength={500}
+                      <BusinessTextArea
+                        maxLength={BusinessTextPolicy.noteMaxCharacters}
                         placeholder="抽检数量、位置、不适用原因等"
                       />
                     </Form.Item>,

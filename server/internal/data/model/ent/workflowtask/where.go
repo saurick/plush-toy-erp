@@ -55,6 +55,11 @@ func IDLTE(id int) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldLTE(FieldID, id))
 }
 
+// TaskNo applies equality check predicate on the "task_no" field. It's identical to TaskNoEQ.
+func TaskNo(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldTaskNo, v))
+}
+
 // TaskCode applies equality check predicate on the "task_code" field. It's identical to TaskCodeEQ.
 func TaskCode(v string) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldTaskCode, v))
@@ -218,6 +223,71 @@ func CreatedAt(v time.Time) predicate.WorkflowTask {
 // UpdatedAt applies equality check predicate on the "updated_at" field. It's identical to UpdatedAtEQ.
 func UpdatedAt(v time.Time) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldUpdatedAt, v))
+}
+
+// TaskNoEQ applies the EQ predicate on the "task_no" field.
+func TaskNoEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldTaskNo, v))
+}
+
+// TaskNoNEQ applies the NEQ predicate on the "task_no" field.
+func TaskNoNEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldTaskNo, v))
+}
+
+// TaskNoIn applies the In predicate on the "task_no" field.
+func TaskNoIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldTaskNo, vs...))
+}
+
+// TaskNoNotIn applies the NotIn predicate on the "task_no" field.
+func TaskNoNotIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldTaskNo, vs...))
+}
+
+// TaskNoGT applies the GT predicate on the "task_no" field.
+func TaskNoGT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldTaskNo, v))
+}
+
+// TaskNoGTE applies the GTE predicate on the "task_no" field.
+func TaskNoGTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldTaskNo, v))
+}
+
+// TaskNoLT applies the LT predicate on the "task_no" field.
+func TaskNoLT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldTaskNo, v))
+}
+
+// TaskNoLTE applies the LTE predicate on the "task_no" field.
+func TaskNoLTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldTaskNo, v))
+}
+
+// TaskNoContains applies the Contains predicate on the "task_no" field.
+func TaskNoContains(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContains(FieldTaskNo, v))
+}
+
+// TaskNoHasPrefix applies the HasPrefix predicate on the "task_no" field.
+func TaskNoHasPrefix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasPrefix(FieldTaskNo, v))
+}
+
+// TaskNoHasSuffix applies the HasSuffix predicate on the "task_no" field.
+func TaskNoHasSuffix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasSuffix(FieldTaskNo, v))
+}
+
+// TaskNoEqualFold applies the EqualFold predicate on the "task_no" field.
+func TaskNoEqualFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEqualFold(FieldTaskNo, v))
+}
+
+// TaskNoContainsFold applies the ContainsFold predicate on the "task_no" field.
+func TaskNoContainsFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContainsFold(FieldTaskNo, v))
 }
 
 // TaskCodeEQ applies the EQ predicate on the "task_code" field.

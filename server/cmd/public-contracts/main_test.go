@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"server/internal/biz"
+	corevalue "server/internal/core/value"
 )
 
 func TestPublicPermissionCatalogMatchesRegisteredPermissions(t *testing.T) {
@@ -35,6 +36,9 @@ func TestPublicPermissionCatalogMatchesRegisteredPermissions(t *testing.T) {
 	}
 	if got.Attachments["maxBytes"] != int64(biz.BusinessAttachmentMaxBytes) {
 		t.Fatal("attachment limit differs")
+	}
+	if !reflect.DeepEqual(got.Policies["BusinessTextPolicy"], map[string]int64{"noteMaxCharacters": corevalue.BusinessNoteMaxCharacters}) {
+		t.Fatal("business remark limit differs from storage validation")
 	}
 	if got.Policies["BOMSourcePolicy"]["scale"] != biz.BOMSourceMaxScale || got.States["BOMLossSource"]["HEADER"] != biz.BOMLossSourceHeader {
 		t.Fatal("BOM source constraints or loss provenance differ from domain declarations")

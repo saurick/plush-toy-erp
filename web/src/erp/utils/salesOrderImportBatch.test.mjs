@@ -120,6 +120,29 @@ test('batch preflight identifies missing references, currencies and unit precisi
   ])
 })
 
+test('batch review validates contacts from every order without a mounted form error cache', async () => {
+  const entries = makeEntries()
+  entries[0].values.contact_email = 'invalid-email'
+  entries[1].values.contact_phone = 'phone-abc'
+  entries.forEach((entry) => { entry.formErrors = [] })
+  const reviewed = reviewSalesOrderImportEntries(entries, { customers, units })
+  assert.deepEqual(reviewed.map((entry) => entry.issues.map((issue) => issue.name)), [
+    [['contact_email']],
+    [['contact_phone']],
+  ])
+  await saveSalesOrderImportBatch(reviewed, {
+    ...defaults,
+    saveOrder: async () => assert.fail('an invalid contact must block its draft'),
+  })
+  entries[0].values.contact_email = ' buyer@example.com '
+  entries[1].values.contact_phone = '+86 138 0013 8000'
+  const corrected = reviewSalesOrderImportEntries(entries, { customers, units })
+  assert.deepEqual(corrected.map((entry) => entry.issues), [[], []])
+  entries[0].values.contact_email = ''
+  entries[1].values.contact_phone = '   '
+  assert.deepEqual(reviewSalesOrderImportEntries(entries, { customers, units }).map((entry) => entry.issues), [[], []])
+})
+
 test('batch review deduplicates each field and preserves distinct line and optional form errors', () => {
   const entries = makeEntries()
   const first = entries[0]

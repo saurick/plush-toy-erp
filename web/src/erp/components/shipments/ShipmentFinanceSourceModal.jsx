@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react'
-import { Alert, Descriptions, Form, Input } from 'antd'
+import { Alert, Descriptions, Form } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import Select from '@/common/components/select/AppSelect'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
@@ -91,7 +93,7 @@ export default function ShipmentFinanceSourceModal({
           <DateTimeInput />
         </Form.Item>
         <Form.Item name="note" label="备注">
-          <Input.TextArea rows={3} maxLength={255} showCount />
+          <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
         </Form.Item>
       </Form>
     </BusinessModal>

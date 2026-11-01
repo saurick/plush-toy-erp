@@ -1534,6 +1534,26 @@ func TestWorkflowUsecase_UpsertBusinessStateRejectsInvalidStatus(t *testing.T) {
 	}
 }
 
+func TestWorkflowUsecase_ResumeAndUrgeAllowEmptyExplanation(t *testing.T) {
+	for _, reason := range []string{"", "  \t "} {
+		repo := &stubWorkflowRepo{currentTask: &WorkflowTask{ID: 1, TaskStatusKey: "blocked", Version: 3, Payload: map[string]any{"blocked_reason": "旧阻塞原因", "rejected_reason": "旧退回原因"}}}
+		uc := NewWorkflowUsecase(repo)
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{ID: 1, ExpectedVersion: 3, TaskStatusKey: "ready", Reason: reason}, 7, QualityRoleKey)
+		if err != nil || repo.updateTaskInput == nil || repo.updateTaskInput.Reason != "" {
+			t.Fatalf("resume must accept and normalize an empty explanation: input=%#v err=%v", repo.updateTaskInput, err)
+		}
+		for _, key := range []string{"blocked_reason", "rejected_reason"} {
+			if _, found := repo.updateTaskInput.Payload[key]; found {
+				t.Fatalf("resume must clear stale %s", key)
+			}
+		}
+		_, err = uc.UrgeTask(context.Background(), &WorkflowTaskUrge{ID: 1, ExpectedVersion: 3, CommandKey: "urge_task", IdempotencyKey: "empty-urge", Action: "urge_task", Reason: reason}, 7, QualityRoleKey)
+		if err != nil || repo.urgeTaskInput == nil || repo.urgeTaskInput.Reason != "" {
+			t.Fatalf("urge must accept and normalize an empty explanation: input=%#v err=%v", repo.urgeTaskInput, err)
+		}
+	}
+}
+
 func TestWorkflowUsecase_UrgeTaskRejectsInvalidInput(t *testing.T) {
 	uc := NewWorkflowUsecase(&stubWorkflowRepo{})
 
@@ -1543,7 +1563,6 @@ func TestWorkflowUsecase_UrgeTaskRejectsInvalidInput(t *testing.T) {
 	}{
 		{name: "empty task id", input: &WorkflowTaskUrge{ExpectedVersion: 1, CommandKey: "urge_task", IdempotencyKey: "urge-empty-task", Action: "urge_task", Reason: "请处理"}},
 		{name: "invalid action", input: &WorkflowTaskUrge{ID: 1, ExpectedVersion: 1, CommandKey: "urge_task", IdempotencyKey: "urge-invalid-action", Action: "comment", Reason: "请处理"}},
-		{name: "empty reason", input: &WorkflowTaskUrge{ID: 1, ExpectedVersion: 1, CommandKey: "urge_task", IdempotencyKey: "urge-empty-reason", Action: "urge_task", Reason: "   "}},
 	}
 
 	for _, tc := range cases {

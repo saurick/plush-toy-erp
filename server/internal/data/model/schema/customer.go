@@ -3,6 +3,8 @@ package schema
 import (
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
@@ -58,7 +60,7 @@ func (Customer) Fields() []ent.Field {
 		field.String("note").
 			Optional().
 			Nillable().
-			MaxLen(255),
+			Validate(corevalue.ValidateBusinessNote),
 		field.Time("created_at").
 			Default(time.Now).
 			Immutable(),

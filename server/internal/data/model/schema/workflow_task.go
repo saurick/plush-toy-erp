@@ -3,6 +3,9 @@ package schema
 import (
 	"time"
 
+	corevalue "server/internal/core/value"
+	"server/internal/data/model/tasknumber"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -15,9 +18,14 @@ type WorkflowTask struct {
 	ent.Schema
 }
 
+func (WorkflowTask) Hooks() []ent.Hook {
+	return []ent.Hook{tasknumber.Hook()}
+}
+
 func (WorkflowTask) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
+			"workflow_tasks_number_present":          "length(trim(task_no)) BETWEEN 15 AND 30",
 			"workflow_tasks_status_allowed":          "task_status_key IN ('ready', 'blocked', 'done', 'rejected', 'withdrawn')",
 			"workflow_tasks_version_positive":        "version > 0",
 			"workflow_tasks_source_paired":           "((source_type IS NULL AND source_id IS NULL) OR (source_type IS NOT NULL AND length(trim(source_type)) > 0 AND source_id IS NOT NULL AND source_id > 0))",
@@ -30,6 +38,11 @@ func (WorkflowTask) Annotations() []schema.Annotation {
 
 func (WorkflowTask) Fields() []ent.Field {
 	return []ent.Field{
+		field.String("task_no").
+			NotEmpty().
+			MaxLen(32).
+			Immutable().
+			Validate(corevalue.ValidateWorkflowTaskNumber),
 		field.String("task_code").
 			NotEmpty().
 			MaxLen(64),
@@ -92,7 +105,7 @@ func (WorkflowTask) Fields() []ent.Field {
 		field.String("blocked_reason").
 			Optional().
 			Nillable().
-			MaxLen(255),
+			Validate(corevalue.ValidateBusinessNote),
 		field.Time("due_at").
 			Optional().
 			Nillable(),
@@ -174,6 +187,7 @@ func (WorkflowTask) Edges() []ent.Edge {
 
 func (WorkflowTask) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("task_no").Unique(),
 		index.Fields("task_code").Unique(),
 		index.Fields("source_type", "source_id"),
 		index.Fields("owner_role_key", "task_status_key"),

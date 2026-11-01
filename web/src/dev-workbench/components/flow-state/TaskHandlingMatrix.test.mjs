@@ -70,7 +70,7 @@ test('矩阵筛选及重置保留工作台入口，展开后选择动作不会�
   )
   await v.choose('办理类型', '单据与明细编辑')
   assert.equal(v.params().get('kind'), 'authoring')
-  assert(v.root.querySelectorAll('.ant-table-row').length < TASK_HANDLING_ROWS.length)
+  assert(v.root.querySelectorAll('.erp-dev-task-catalog .ant-table-row').length < TASK_HANDLING_ROWS.length)
   await v.click(v.root.querySelector('[data-row-key="sewing_execute"] button'))
   assert.equal(v.params().get('stage'), 'sewing_execute')
   const actions = v.root.querySelector(
@@ -100,7 +100,7 @@ test('矩阵筛选及重置保留工作台入口，展开后选择动作不会�
   assert.equal(v.params().has('kind'), false)
   assert.equal(v.params().has('action'), false)
   assert.equal(
-    v.root.querySelectorAll('.ant-table-row').length,
+    v.root.querySelectorAll('.erp-dev-task-catalog .ant-table-row').length,
     TASK_HANDLING_ROWS.length
   )
 })
@@ -108,7 +108,7 @@ test('矩阵筛选及重置保留工作台入口，展开后选择动作不会�
 test('工程筛选直接说明编制、自动送审与审批交接，不出现订单审批或其他岗位动作', async (t) => {
   const v = await mount(t)
   await v.choose('办理岗位', '工程')
-  const rows = [...v.root.querySelectorAll('.ant-table-row')]
+  const rows = [...v.root.querySelectorAll('.erp-dev-task-catalog .ant-table-row')]
   assert.equal(rows.length, 2)
   assert.match(v.root.textContent, /本次办理.*审批与交接/u)
   assert(rows.every((row) => row.children[1]?.textContent === '工程'))
@@ -130,7 +130,7 @@ test('岗位切换核对九岗位完整集合，清空后恢复固定执行和�
     ['finance', '财务'], ['pmc', 'PMC'], ['boss', '老板'],
   ]) {
     await v.choose('办理岗位', label)
-    const keys = [...v.root.querySelectorAll('.ant-table-row')].map((row) => row.getAttribute('data-row-key'))
+    const keys = [...v.root.querySelectorAll('.erp-dev-task-catalog .ant-table-row')].map((row) => row.getAttribute('data-row-key'))
     assert.deepEqual(keys, TASK_HANDLING_ROWS.filter((row) => row.roleKeys.includes(key)).map((row) => row.key))
     assert(keys.length > 0, label)
     assert.equal(v.params().has('stage'), false)

@@ -36,6 +36,7 @@ test('workflow assignment select separates the role pool from named employees', 
     ),
     ['pool', 21, 22]
   )
+  assert.equal(flattenWorkflowAssignmentSelectOptions(groups)[1].identity.name, '王主管')
   assert.match(
     flattenWorkflowAssignmentSelectOptions(groups)[1].label,
     /王主管（production01）/u

@@ -20,6 +20,7 @@ var (
 type WorkflowTask struct {
 	Discovery             *WorkflowTaskDiscovery
 	ID                    int
+	TaskNo                string
 	TaskCode              string
 	TaskGroup             string
 	TaskName              string

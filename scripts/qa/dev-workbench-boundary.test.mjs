@@ -266,18 +266,42 @@ const businessSampleFormStateDependencies = [
   "components/business-list/businessFormReadOnly.mjs",
   "hooks/useWorkflowTaskBusinessBusy.js",
 ];
+const selectValueSamplePresentationImports = new Set([
+  "components/business-list/BusinessLineItemsTable.jsx",
+  "components/workflow/WorkflowTaskImagePlaceholder.jsx",
+  "components/master-data/productIdentity.css",
+  "utils/referenceSelectOptions.mjs",
+]);
+const commonSamplePresentationDependencies = [
+  "web/src/common/components/navigation/SlidingSegmented.jsx",
+  "web/src/common/components/navigation/useSlidingIndicator.js",
+  "web/src/common/components/select/SelectPresentationContext.jsx",
+  "web/src/common/components/select/useSelectPopupWidth.mjs",
+  "web/src/common/theme/erpThemeContext.jsx",
+  "web/src/common/theme/erpAppearance.mjs",
+  "web/src/common/theme/erpThemeMode.mjs",
+  "web/src/common/consts/numeric.generated.mjs",
+  "web/src/common/consts/statuses.generated.mjs",
+  "server/internal/biz/admin_erp_appearance.json",
+  "server/internal/unitpolicy/units.json",
+];
 const allowedERPImportsByFile = new Map([
   ["web/src/dev-workbench/components/flow-state/FinanceRelationshipsView.jsx", new Set(["utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/components/flow-state/FinanceTraceView.jsx", new Set(["api/operationalFactApi.mjs", "components/finance/financePaymentPresentation.jsx"])],
   ["web/src/dev-workbench/config/devFulfillmentRelations.mjs", new Set(["utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/config/devTaskHandling.mjs", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs", "utils/workflowTaskActionPresentation.mjs"])],
   ["web/src/dev-workbench/config/devTaskHandlingResponsibilities.test.mjs", new Set(["utils/roleKeys.mjs"])],
-  ["web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs", "utils/workflowTaskActionFlow.mjs"])],
+  ["web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs", "utils/workflowTaskActionFlow.mjs", "utils/workflowTaskActionContract.mjs"])],
+  ["web/src/dev-workbench/config/devFlowActionRules.mjs", new Set(["utils/workflowTaskActionFlow.mjs"])],
   ["web/src/dev-workbench/config/devPermissionRelationshipGraph.mjs", new Set(["utils/rolePermissionPolicy.mjs"])],
   ["web/src/dev-workbench/config/devRoleResponsibilities.mjs", new Set(["utils/rolePermissionPolicy.mjs"])],
   [
     "web/src/dev-workbench/components/DevUIBusinessExamples.jsx",
     businessSamplePresentationImports,
+  ],
+  [
+    "web/src/dev-workbench/components/DevSelectValueExample.jsx",
+    selectValueSamplePresentationImports,
   ],
   [
     "web/src/dev-workbench/components/DevUIPageStateExamples.jsx",
@@ -393,6 +417,7 @@ const allowedERPImportsByFile = new Map([
     "web/src/dev-workbench/components/DevUIInputExamples.jsx",
     new Set([
       "components/business-list/BusinessDateInputs.jsx",
+      "components/business-list/BusinessTextArea.jsx",
       "utils/dateRange.mjs",
       "utils/workflowTaskTiming.mjs",
     ]),
@@ -513,6 +538,9 @@ test("task handling projections keep pure classification helpers consumer scoped
   assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/workflowTaskActionFlow.mjs"), false);
   assert.equal(isAllowedERPImport("web/src/dev-workbench/config/devTaskHandling.mjs", "@/erp/utils/workflowTaskActionPresentation.mjs"), true);
   assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/workflowTaskActionPresentation.mjs"), false);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", "@/erp/utils/workflowTaskActionContract.mjs"), true);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/workflowTaskActionContract.mjs"), false);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/config/devFlowActionRules.mjs", "@/erp/utils/workflowTaskActionFlow.mjs"), true);
   const pending = ["web/src/erp/utils/taskHandlingPolicy.mjs", "web/src/erp/utils/workflowTaskActionFlow.mjs", "web/src/erp/utils/workflowTaskActionPresentation.mjs"];
   const visited = new Set();
   while (pending.length) {
@@ -528,6 +556,21 @@ test("task handling projections keep pure classification helpers consumer scoped
       pending.push(path.posix.join(path.posix.dirname(file), specifier));
     }
   }
+});
+
+test("select value samples use only pure option builders, line renderers and image placeholders", () => {
+  const sample = "web/src/dev-workbench/components/DevSelectValueExample.jsx";
+  for (const module of selectValueSamplePresentationImports) {
+    assert.equal(isAllowedERPImport(sample, `@/erp/${module}`), true);
+    assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", `@/erp/${module}`), false);
+  }
+  for (const module of [
+    "components/master-data/ProductIdentity.jsx",
+    "components/workflow/WorkflowTaskProductImage.jsx",
+    "api/attachmentApi.mjs",
+    "api/masterDataOrderApi.mjs",
+    "pages/PurchaseOrdersPage.jsx",
+  ]) assert.equal(isAllowedERPImport(sample, `@/erp/${module}`), false);
 });
 
 test("dev workbench boundary: ERP imports stay on explicit adapters and presentation samples", () => {
@@ -562,11 +605,14 @@ test("shared component consumers read only page presentation metadata", () => {
 });
 
 function assertBusinessSamplePresentationGraph(readSource = read) {
-  const dependencies = [
+  const erpDependencies = [
     ...businessSamplePresentationImports,
+    ...selectValueSamplePresentationImports,
     ...businessSampleFormStateDependencies,
     "components/business-list/BusinessFormBody.jsx",
     "components/business-list/BusinessFormPageContext.js",
+    "components/business-list/BusinessFormSectionContext.js",
+    "components/business-list/BusinessFormSectionScope.jsx",
     "components/business-list/BusinessFormSectionTitle.jsx",
     "components/business-list/BusinessCompactFieldTable.jsx",
     "components/business-list/BusinessLineItemsFooter.jsx",
@@ -577,10 +623,20 @@ function assertBusinessSamplePresentationGraph(readSource = read) {
     "utils/businessFormSections.mjs",
     "utils/dateRange.mjs",
     "utils/modalSizes.mjs",
+    "utils/referenceSelectOptions.mjs",
+    "utils/unitQuantity.mjs",
+    "utils/numeric20Scale6.mjs",
     "styles/app/business-form-page.css",
     "hooks/useBusinessPageContext.js",
     "components/business-list/businessLineItemCards.css",
+    "components/business-list/businessLineItemGroups.css",
+    "components/business-list/businessFormSections.css",
+    "components/workflow/workflowTaskIdentity.css",
   ].map((file) => `web/src/erp/${file}`);
+  const dependencies = [...new Set([
+    ...erpDependencies,
+    ...commonSamplePresentationDependencies,
+  ])];
   const allowed = new Set([
     ...dependencies,
     "react", "react-dom", "react-router-dom", "antd", "@ant-design/icons",
@@ -594,16 +650,22 @@ function assertBusinessSamplePresentationGraph(readSource = read) {
     "web/src/common/components/pagination/AppPagination",
     "web/src/common/components/SearchInput",
     "web/src/common/components/scroll/MobileBackToTop",
+    "web/src/common/components/navigation/SlidingSegmented",
+    "web/src/common/components/navigation/useSlidingIndicator",
   ]);
-  const sample = "web/src/dev-workbench/components/DevUIBusinessExamples.jsx";
-  for (const file of [sample, ...dependencies]) {
+  const samples = [
+    "web/src/dev-workbench/components/DevUIBusinessExamples.jsx",
+    "web/src/dev-workbench/components/DevUIInputExamples.jsx",
+    "web/src/dev-workbench/components/DevSelectValueExample.jsx",
+  ];
+  for (const file of [...samples, ...dependencies]) {
     const source = readSource(file);
     assert.doesNotMatch(
       source,
       /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u,
       `${file} must not perform business I/O or browser persistence`,
     );
-    if (file === sample) continue;
+    if (samples.includes(file)) continue;
     for (const match of source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)) {
       const specifier = match[1];
       const resolved = specifier.startsWith("@/")
@@ -638,8 +700,12 @@ test("business component samples retain a closed presentation dependency graph",
 });
 
 test("business form presentation dependencies reject unregistered imports", () => {
-  for (const module of businessSampleFormStateDependencies) {
-    const file = `web/src/erp/${module}`;
+  for (const file of [
+    ...businessSampleFormStateDependencies.map((module) => `web/src/erp/${module}`),
+    ...commonSamplePresentationDependencies.filter((module) => /\.[cm]?[jt]sx?$/u.test(module)),
+    "web/src/erp/components/workflow/WorkflowTaskImagePlaceholder.jsx",
+    "web/src/erp/utils/referenceSelectOptions.mjs",
+  ]) {
     const specifier = "./UnregisteredPresentation.jsx";
     for (const injection of [
       `import UnregisteredPresentation from '${specifier}';`,
@@ -656,8 +722,14 @@ test("business form presentation dependencies reject unregistered imports", () =
 });
 
 test("business form presentation dependencies reject business I/O and persistence", () => {
-  for (const module of businessSampleFormStateDependencies) {
-    const file = `web/src/erp/${module}`;
+  for (const file of [
+    ...businessSampleFormStateDependencies.map((module) => `web/src/erp/${module}`),
+    ...commonSamplePresentationDependencies.filter((module) => /\.[cm]?[jt]sx?$/u.test(module)),
+    "web/src/erp/components/workflow/WorkflowTaskImagePlaceholder.jsx",
+    "web/src/erp/utils/referenceSelectOptions.mjs",
+    "web/src/dev-workbench/components/DevSelectValueExample.jsx",
+    "web/src/dev-workbench/components/DevUIInputExamples.jsx",
+  ]) {
     for (const injection of [
       "import { listOrders } from '@/erp/api/masterDataOrderApi.mjs';",
       "fetch('/business-records');",
@@ -682,6 +754,8 @@ test("feedback sample modal dependencies remain presentation-only", () => {
     "../../utils/modalSizes.mjs",
     "./BusinessModal.jsx",
     "./BusinessFormPage.jsx",
+    "./BusinessFormSectionScope.jsx",
+    "./BusinessFormSectionContext.js",
     "../../hooks/useBusinessPageContext.js",
     "../../common/utils/feedbackConfig.mjs",
     "@/common/components/modal/AppModal",
@@ -695,6 +769,8 @@ test("feedback sample modal dependencies remain presentation-only", () => {
     "web/src/common/components/modal/AppModal.jsx",
     "web/src/common/components/layout/SurfacePanel.jsx",
     "web/src/erp/hooks/useBusinessPageContext.js",
+    "web/src/erp/components/business-list/BusinessFormSectionScope.jsx",
+    "web/src/erp/components/business-list/BusinessFormSectionContext.js",
   ]) {
     const source = read(file);
     for (const match of source.matchAll(
@@ -770,7 +846,13 @@ test("date input samples keep shared pickers free of business dependencies", () 
       "dayjs", "dayjs/plugin/customParseFormat.js",
     ])],
     ["web/src/common/components/select/AppSelect.jsx", new Set([
-      "react", "antd", "./app-select.css",
+      "react", "antd", "./app-select.css", "./useSelectPopupWidth.mjs", "./SelectPresentationContext.jsx",
+    ])],
+    ["web/src/common/components/select/useSelectPopupWidth.mjs", new Set([
+      "react",
+    ])],
+    ["web/src/common/components/select/SelectPresentationContext.jsx", new Set([
+      "react",
     ])],
   ]);
   for (const [file, allowed] of dependencies) {

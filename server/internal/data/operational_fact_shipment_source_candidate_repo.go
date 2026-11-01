@@ -7,6 +7,7 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorder"
@@ -43,13 +44,7 @@ func (r *operationalFactRepo) ListShipmentSourceCandidates(
 		query.Where(salesorderitem.HasSalesOrderWith(salesorder.CustomerID(filter.CustomerID)))
 	}
 	if filter.Selectable != nil {
-		query.Where(func(s *sql.Selector) {
-			eligible := shipmentSourceSelectablePredicate(s)
-			if !*filter.Selectable {
-				eligible = sql.Not(eligible)
-			}
-			s.Where(eligible)
-		})
+		query.Where(shipmentSourceEligibilityFilter(*filter.Selectable))
 	}
 	if filter.Keyword != "" {
 		keyword := filter.Keyword
@@ -133,6 +128,48 @@ func (r *operationalFactRepo) ListShipmentSourceCandidates(
 		out = append(out, candidate)
 	}
 	return out, total, nil
+}
+
+func shipmentSourceEligibilityFilter(selectable bool) predicate.SalesOrderItem {
+	return func(s *sql.Selector) {
+		eligible := shipmentSourceSelectablePredicate(s)
+		if !selectable {
+			eligible = sql.Not(eligible)
+		}
+		s.Where(eligible)
+	}
+}
+
+func (r *operationalFactRepo) ListShipmentSourceOrderOptions(ctx context.Context, selectable *bool) ([]*biz.ShipmentSourceOrderOption, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil {
+		return nil, biz.ErrBadParam
+	}
+	linePredicates := []predicate.SalesOrderItem{salesorderitem.ProductIDNotNil()}
+	if selectable != nil {
+		linePredicates = append(linePredicates, shipmentSourceEligibilityFilter(*selectable))
+	}
+	// Query orders through qualifying lines, so each order is returned once and
+	// no source-page boundary can remove a valid customer or order option.
+	orders, err := r.data.postgres.SalesOrder.Query().
+		Where(salesorder.LifecycleStatus(biz.SalesOrderStatusActive), salesorder.HasItemsWith(linePredicates...)).
+		Select(salesorder.FieldID, salesorder.FieldOrderNo, salesorder.FieldCustomerID, salesorder.FieldCustomerSnapshot).
+		WithCustomer().Order(ent.Desc(salesorder.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*biz.ShipmentSourceOrderOption, 0, len(orders))
+	for _, order := range orders {
+		customerRow, err := order.Edges.CustomerOrErr()
+		if err != nil {
+			return nil, err
+		}
+		snapshotName, _ := order.CustomerSnapshot["name"].(string)
+		out = append(out, &biz.ShipmentSourceOrderOption{
+			SalesOrderID: order.ID, OrderNo: order.OrderNo, CustomerID: order.CustomerID,
+			CustomerCode: customerRow.Code, CustomerName: customerRow.Name, CustomerNameSnapshot: snapshotName,
+		})
+	}
+	return out, nil
 }
 
 // Apply eligibility before count/pagination. These correlated reads mirror

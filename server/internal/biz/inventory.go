@@ -342,7 +342,6 @@ type BOMItem struct {
 
 type BOMHeaderCreate struct {
 	ProductID     int
-	Version       string
 	Status        string
 	EffectiveFrom *time.Time
 	EffectiveTo   *time.Time
@@ -358,7 +357,6 @@ type BOMHeaderCreate struct {
 }
 
 type BOMHeaderUpdate struct {
-	Version       string
 	EffectiveFrom *time.Time
 	EffectiveTo   *time.Time
 	SourceOrderNo *string
@@ -1204,7 +1202,6 @@ func inventoryTxnDirectionMatchesType(txnType string, direction int) bool {
 }
 
 func normalizeBOMHeaderCreate(in BOMHeaderCreate) (BOMHeaderCreate, error) {
-	in.Version = strings.TrimSpace(in.Version)
 	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
 	if in.Status == "" {
 		in.Status = BOMStatusDraft
@@ -1218,7 +1215,6 @@ func normalizeBOMHeaderCreate(in BOMHeaderCreate) (BOMHeaderCreate, error) {
 	in.Auditor = normalizeOptionalString(in.Auditor)
 	in.HairDirection = normalizeOptionalString(in.HairDirection)
 	if in.ProductID <= 0 ||
-		in.Version == "" ||
 		!IsCreatableBOMStatus(in.Status) {
 		return BOMHeaderCreate{}, ErrBadParam
 	}
@@ -1229,7 +1225,6 @@ func normalizeBOMHeaderCreate(in BOMHeaderCreate) (BOMHeaderCreate, error) {
 }
 
 func normalizeBOMHeaderUpdate(in BOMHeaderUpdate) (BOMHeaderUpdate, error) {
-	in.Version = strings.TrimSpace(in.Version)
 	in.Note = normalizeOptionalString(in.Note)
 	in.SourceOrderNo = normalizeOptionalString(in.SourceOrderNo)
 	in.QuantityText = normalizeOptionalString(in.QuantityText)
@@ -1238,9 +1233,6 @@ func normalizeBOMHeaderUpdate(in BOMHeaderUpdate) (BOMHeaderUpdate, error) {
 	in.Maker = normalizeOptionalString(in.Maker)
 	in.Auditor = normalizeOptionalString(in.Auditor)
 	in.HairDirection = normalizeOptionalString(in.HairDirection)
-	if in.Version == "" {
-		return BOMHeaderUpdate{}, ErrBadParam
-	}
 	if in.EffectiveFrom != nil && in.EffectiveTo != nil && !in.EffectiveFrom.Before(*in.EffectiveTo) {
 		return BOMHeaderUpdate{}, ErrBadParam
 	}

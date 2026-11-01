@@ -184,13 +184,13 @@ test('workflowTaskActionSubmitGuard: required reason stops before backend explai
   assert.deepEqual(warnings, ['请先填写退回原因'])
 })
 
-test('workflowTaskActionSubmitGuard: resume requires an unblock explanation', async () => {
+test('workflowTaskActionSubmitGuard: empty resume explanation still requires backend permission', async () => {
   let explainCalls = 0
   const warnings = []
   const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
     explainWorkflowActionAccess: async () => {
       explainCalls += 1
-      return { actions: [{ action_key: 'resume', allowed: true }] }
+      return { source_access: { applicable: true, allowed: true, resolved: true }, actions: [{ action_key: 'resume', allowed: true }] }
     },
   })
 
@@ -201,9 +201,23 @@ test('workflowTaskActionSubmitGuard: resume requires an unblock explanation', as
     onWarning: (message) => warnings.push(message),
   })
 
-  assert.equal(allowed, false)
-  assert.equal(explainCalls, 0)
-  assert.deepEqual(warnings, ['请先填写阻塞解除说明'])
+  assert.equal(allowed, true)
+  assert.equal(explainCalls, 1)
+  assert.deepEqual(warnings, [])
+})
+
+test('workflowTaskActionSubmitGuard: optional explanations never bypass denied permissions', async () => {
+  for (const actionKey of ['resume', 'urge']) {
+    for (const allowed of [true, false]) {
+      const requests = []
+      const verify = bindWorkflowActionSubmitGuard({ explain: async (params) => {
+        requests.push(params)
+        return { source_access: { applicable: true, allowed: true, resolved: true }, actions: [{ action_key: actionKey, allowed }] }
+      } })
+      assert.equal(await verify({ task: { id: 42 }, actionKey, reason: ' ' }), allowed)
+      assert.deepEqual(requests, [{ task_id: 42, action_key: actionKey }])
+    }
+  }
 })
 
 test('workflowTaskActionSubmitGuard: missing requested backend action denies before submit', async () => {

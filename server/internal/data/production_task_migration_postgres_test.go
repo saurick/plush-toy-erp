@@ -30,10 +30,10 @@ VALUES (1,'sales','业务','business_default',true,7,now(),now()),(2,'warehouse'
 INSERT INTO permissions (id,permission_key,name,module,action,resource,builtin,created_at,updated_at)
 VALUES (1,'production.completion.create','收仓','production','create','completion',true,now(),now()),(2,'purchase.receipt.create','点数','purchase','create','receipt',true,now(),now()),(3,'shipment.ship','发货','shipment','ship','shipment',true,now(),now()),(4,'production.wip.rework','旧返工','production','rework','wip',true,now(),now()),(5,'production.exception.submit','方案','production','submit','exception',true,now(),now());
 INSERT INTO role_permissions (role_id,permission_id,created_at) VALUES (2,3,now()),(3,2,now()),(4,1,now()),(4,4,now()),(5,3,now()),(5,4,now());
-INSERT INTO workflow_tasks (id,task_code,task_group,task_name,source_type,source_id,task_status_key,owner_role_key,owner_pool_key,required_capability_key,version,payload,created_at,updated_at)
-VALUES (1,'source-handoff-purchase-arrival-1','handoff_purchase_arrival','旧到货','purchase_order',1,'ready','quality','quality','purchase.receipt.create',2,'{"source_task_producer":"fulfillment.source","source_task_contract":"workflow.source-task/v1","source_task_intent_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',now(),now()),
-(2,'source-handoff-production-completion-2','handoff_production_completion','旧入库','production_wip_batch',2,'done','production','production','production.completion.create',3,'{"source_task_producer":"fulfillment.source","source_task_contract":"workflow.source-task/v1"}',now(),now()),
-(3,'source-handoff-production-exception-3','handoff_production_exception','旧异常','production_wip_batch',3,'blocked','production','production','production.wip.rework',4,'{"source_task_producer":"fulfillment.source","source_task_contract":"workflow.source-task/v1"}',now(),now());
+INSERT INTO workflow_tasks (id,task_no,task_code,task_group,task_name,source_type,source_id,task_status_key,owner_role_key,owner_pool_key,required_capability_key,version,payload,created_at,updated_at)
+VALUES (1,'RW'||to_char(now() AT TIME ZONE 'Asia/Shanghai','YYYYMMDD')||'-0001','source-handoff-purchase-arrival-1','handoff_purchase_arrival','旧到货','purchase_order',1,'ready','quality','quality','purchase.receipt.create',2,'{"source_task_producer":"fulfillment.source","source_task_contract":"workflow.source-task/v1","source_task_intent_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',now(),now()),
+(2,'RW'||to_char(now() AT TIME ZONE 'Asia/Shanghai','YYYYMMDD')||'-0002','source-handoff-production-completion-2','handoff_production_completion','旧入库','production_wip_batch',2,'done','production','production','production.completion.create',3,'{"source_task_producer":"fulfillment.source","source_task_contract":"workflow.source-task/v1"}',now(),now()),
+(3,'RW'||to_char(now() AT TIME ZONE 'Asia/Shanghai','YYYYMMDD')||'-0003','source-handoff-production-exception-3','handoff_production_exception','旧异常','production_wip_batch',3,'blocked','production','production','production.wip.rework',4,'{"source_task_producer":"fulfillment.source","source_task_contract":"workflow.source-task/v1"}',now(),now());
 `); err != nil {
 		t.Fatal(err)
 	}
@@ -119,8 +119,8 @@ func TestProductionOrderPostgresTerminalAssigneeRequiresOriginalProof(t *testing
 					t.Fatal(err)
 				}
 			}
-			_, err = tx.ExecContext(ctx, `INSERT INTO workflow_tasks (id,task_code,task_group,task_name,source_type,source_id,task_status_key,owner_role_key,version,payload,created_at,updated_at)
-VALUES(2,'review-proof','handoff_production_completion','历史终态','production_wip_batch',2,'done','warehouse',4,'{}',now(),now());
+			_, err = tx.ExecContext(ctx, `INSERT INTO workflow_tasks (id,task_no,task_code,task_group,task_name,source_type,source_id,task_status_key,owner_role_key,version,payload,created_at,updated_at)
+VALUES(2,'RW'||to_char(now() AT TIME ZONE 'Asia/Shanghai','YYYYMMDD')||'-0001','review-proof','handoff_production_completion','历史终态','production_wip_batch',2,'done','warehouse',4,'{}',now(),now());
 INSERT INTO workflow_task_events(task_id,task_version,event_type,from_status_key,to_status_key,payload,created_at)
 VALUES(2,4,'source_updated','done','done','{"source":"production_task_responsibility_migration"}',now());`)
 			if err != nil {

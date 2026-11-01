@@ -226,7 +226,7 @@ export function requireWorkflowTaskMutationParams(
   }
   const normalizedReason = String(params.reason || '').trim()
   if (
-    ['block', 'reject', 'resume', 'urge', 'assign'].includes(
+    ['block', 'reject', 'assign'].includes(
       normalizedOperation
     ) &&
     !normalizedReason

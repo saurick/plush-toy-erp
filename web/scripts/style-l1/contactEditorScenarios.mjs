@@ -14,7 +14,8 @@ async function measureContacts(editor, narrow = false) {
         fields: [...row.querySelectorAll('input.ant-input')]
           .filter((input) => input.getBoundingClientRect().width > 0)
           .map((input) => {
-            const { x, y, width, height } = input.getBoundingClientRect()
+            const control = input.closest('.ant-input-affix-wrapper') || input
+            const { x, y, width, height } = control.getBoundingClientRect()
             return { x, y, width, height }
           }),
       })
@@ -49,7 +50,8 @@ async function measureDesignContacts(editor, narrow = false) {
       height: row.getBoundingClientRect().height,
       fields: [...row.querySelectorAll('input:not([type="radio"])')].map(
         (input) => {
-          const { x, y, width, height } = input.getBoundingClientRect()
+          const control = input.closest('.ant-input-affix-wrapper') || input
+            const { x, y, width, height } = control.getBoundingClientRect()
           return { x, y, width, height }
         }
       ),
@@ -115,11 +117,11 @@ export function createContactEditorScenarios({
         await editor
           .getByRole('textbox', { name: '备注', exact: true })
           .count(),
-        0
+        await rows.count()
       )
       await waitForFiniteAnimations(page)
       const metrics = await measureContacts(editor)
-      assert.ok(metrics.height < 260, JSON.stringify(metrics))
+      assert.ok(metrics.rows.every((row) => row.height <= 80), JSON.stringify(metrics))
       await editor.screenshot({
         path: `${outputDir}/contact-editor-${kind}-compact.png`,
       })
@@ -168,14 +170,14 @@ export function createContactEditorScenarios({
         await editor
           .getByRole('textbox', { name: '备注', exact: true })
           .count(),
-        0
+        await rows.count()
       )
       assert.ok(
         (
           await editor
-            .locator('.erp-contact-editor__note-summary')
+            .getByLabel('备注', { exact: true })
             .first()
-            .textContent()
+            .inputValue()
         ).includes('请先电话确认')
       )
       await editor
@@ -231,15 +233,9 @@ export function createContactEditorScenarios({
         .click()
       assert.equal(await rows.count(), 1)
       assert.equal(await editor.getByRole('radio').count(), 0)
-      await editor
-        .getByRole('button', { name: '展开联系人备注 1', exact: true })
-        .click()
       const note = rows.first().getByLabel('备注', { exact: true })
       assert.equal(await note.inputValue(), '工作日联系\n请先电话确认')
       await note.fill('长备注'.repeat(60))
-      await editor
-        .getByRole('button', { name: '收起联系人备注 1', exact: true })
-        .click()
       await save.click()
       await page.waitForFunction(
         () => JSON.parse(document.querySelector('pre').textContent).length === 1
@@ -250,11 +246,8 @@ export function createContactEditorScenarios({
         await editor
           .getByRole('textbox', { name: '备注', exact: true })
           .count(),
-        0
+        await rows.count()
       )
-      await editor
-        .getByRole('button', { name: '展开联系人备注 1', exact: true })
-        .click()
       assert.equal(await note.inputValue(), '长备注'.repeat(60))
       await note.fill('')
       await save.click()
@@ -262,12 +255,9 @@ export function createContactEditorScenarios({
         () =>
           JSON.parse(document.querySelector('pre').textContent)[0].note === ''
       )
-      await editor
-        .getByRole('button', { name: '收起联系人备注 1', exact: true })
-        .click()
       assert.equal(
-        await editor.locator('.erp-contact-editor__note-summary').count(),
-        0
+        await note.inputValue(),
+        ''
       )
       await rows.first().getByLabel('联系人', { exact: true }).fill('')
       await save.click()
@@ -297,7 +287,7 @@ export function createContactEditorScenarios({
         await editor
           .getByRole('textbox', { name: '备注', exact: true })
           .count(),
-        0
+        await rows.count()
       )
       assert.equal(
         await page.evaluate(
@@ -333,13 +323,7 @@ export function createContactEditorScenarios({
       await editor
         .getByRole('radio', { name: '设为主联系人 2', exact: true })
         .check()
-      await editor
-        .getByRole('button', { name: '展开联系人备注 1', exact: true })
-        .click()
       await editor.locator('#contact-0-note').fill('工作日联系\n先电话确认')
-      await editor
-        .getByRole('button', { name: '收起联系人备注 1', exact: true })
-        .click()
       await editor
         .getByRole('button', { name: '复制联系人 1', exact: true })
         .click()
@@ -371,20 +355,17 @@ export function createContactEditorScenarios({
       )
       assert.ok(
         (
-          await editor.locator('.compact-contact-summary').textContent()
+          await editor.locator('#contact-0-note').inputValue()
         ).includes('先电话确认')
       )
       await waitForFiniteAnimations(page)
       const metrics = await measureDesignContacts(editor)
-      assert.ok(metrics.height < 260, JSON.stringify(metrics))
+      assert.ok(metrics.rows.every((row) => row.height <= 80), JSON.stringify(metrics))
       await editor.screenshot({
         path: `${outputDir}/contact-editor-design-compact.png`,
       })
       await page.setViewportSize({ width: 1120, height: 1000 })
       await measureDesignContacts(editor, true)
-      await editor
-        .getByRole('button', { name: '查看联系人备注 1', exact: true })
-        .click()
       assert.equal(
         await editor.locator('#contact-0-note').inputValue(),
         '工作日联系\n先电话确认'

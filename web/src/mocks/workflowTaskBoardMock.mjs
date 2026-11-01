@@ -82,6 +82,8 @@ function isTaskDueSoon(task, snapshotAt) {
 function matchesKeyword(task = {}, keyword = '') {
   const normalizedKeyword = normalizeText(keyword).toLowerCase()
   if (!normalizedKeyword) return true
+  const taskNumber = workflowTaskMockNumberKeyword(keyword)
+  if (taskNumber) return normalizeText(task.task_no).toUpperCase() === taskNumber
   const payload =
     task.payload && typeof task.payload === 'object' ? task.payload : {}
   const values = [
@@ -120,6 +122,11 @@ function matchesKeyword(task = {}, keyword = '') {
       .toLowerCase()
       .includes(normalizedKeyword)
   )
+}
+
+export function workflowTaskMockNumberKeyword(keyword) {
+  const value = normalizeText(keyword).toUpperCase()
+  return /^RW[0-9]{8}-[0-9]{4,19}$/u.test(value) ? value : ''
 }
 
 function matchesStatus(task, status, snapshotAt) {

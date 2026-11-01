@@ -1,6 +1,8 @@
 # Ent + Atlas 数据模型与迁移
 
 Ent schema 负责数据结构，Atlas 负责版本化 migration；生成代码位于 `server/internal/data/model/ent`，迁移位于 `server/internal/data/model/migrate`。以下生成与迁移命令在仓库的 `server/` 目录执行。
+
+Ent 生成启用 `sql/execquery`，供任务编号在现有任务事务内通过参数化 SQL 原子分配每日流水；其他业务写入仍沿用 repository/usecase。任务编号计数器不使用任务主键，也不扫描任务列表计算下一个编号。
 **严禁** 绕过 Atlas 直接创建或改写结构迁移，也严禁手动执行
 `ALTER TABLE` / `CREATE TABLE`。Ent 无法表达的一次性数据回填或历史对象
 退出必须走下文的受控 Atlas custom migration，不得混入普通结构迁移或直接写
@@ -20,6 +22,12 @@ CHECK/UNIQUE/FK 约束。
     make data
     ```
     *解释：此命令会自动运行 `atlas migrate diff` (根据你的 schema 变更生成 `.sql` 文件) 和 `ent generate` (更新 Go 客户端代码)。*
+
+    普通备注使用 `core/value.ValidateBusinessNote` 按 Unicode 字符计数；Ent
+    `MaxLen` 按字节校验，不能表达“2000 个中文或英文字符”。PostgreSQL 中无显式
+    `SchemaType` 的常规 String 长度校验不产生物理列长度；此类纯校验调整仍运行
+    `make data` 留零结构差异证据，数据库门禁不要求制造空 migration。可空、列名、
+    实际类型、索引及约束变化继续要求正式 migration；schema 测试文件不算结构定义。
 
     生成后必须审查新增 SQL。命中 `DROP TABLE` / `DROP COLUMN`、类型变更、
     `SET NOT NULL`、带默认值的非空列、存量表已验证 CHECK/FK、高增长表索引、

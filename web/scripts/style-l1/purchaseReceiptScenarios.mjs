@@ -3,6 +3,7 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertBusinessSectionInteractions } from './businessFormSectionAssertions.mjs'
+import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
 
 export function createPurchaseReceiptScenarios(deps) {
   const {
@@ -330,6 +331,7 @@ export function createPurchaseReceiptScenarios(deps) {
         ]) {
           await page.setViewportSize(viewport)
           await assertBusinessSectionInteractions(page, modal)
+          await assertBusinessNoteTextAreas(modal)
           for (let count = 0; count < 3; count += 1) {
             const rows = modal.locator('.erp-purchase-receipt-exception-row')
             const before = await rows.count()
@@ -356,16 +358,13 @@ export function createPurchaseReceiptScenarios(deps) {
         }
         const noteRows = modal.locator('.erp-purchase-receipt-exception-row')
         for (const [index, note] of ['待移除说明', '保留的明细说明'].entries()) {
-          await noteRows.nth(index).locator('summary').click()
           await noteRows.nth(index).getByLabel('明细备注', { exact: true }).fill(note)
-          await noteRows.nth(index).locator('summary').click()
         }
         await noteRows.first().getByRole('button', { name: '移除明细 1' }).click()
-        assert.match(await noteRows.first().locator('summary').innerText(), /保留的明细说明/u)
-        await noteRows.first().locator('summary').click()
+        assert.ok(await noteRows.first().getByLabel('明细备注', { exact: true }).isVisible(), '移除前行后备注仍直接可填')
         assert.equal(await noteRows.first().getByLabel('明细备注', { exact: true }).inputValue(), '保留的明细说明')
         await noteRows.first().getByLabel('明细备注', { exact: true }).fill('')
-        assert.doesNotMatch(await noteRows.first().locator('summary').innerText(), /保留的明细说明/u)
+        assert.equal(await noteRows.first().getByLabel('明细备注', { exact: true }).inputValue(), '')
         await page.setViewportSize({ width: 1440, height: 900 })
         await modal.getByRole('button', { name: /^取\s*消$/u }).click()
         await modal.waitFor({ state: 'hidden' })
@@ -590,7 +589,7 @@ export function createPurchaseReceiptScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '采购入库')
+        await page.getByRole('tab', { name: '采购收货', exact: true, selected: true }).waitFor()
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, '退货与调整记录')
 

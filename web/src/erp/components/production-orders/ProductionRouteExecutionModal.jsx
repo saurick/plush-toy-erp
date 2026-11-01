@@ -17,6 +17,8 @@ import {
 } from 'antd'
 
 import { BranchesOutlined, ReloadOutlined } from '@ant-design/icons'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
@@ -1340,9 +1342,9 @@ onCancel: () => resolve(false),
               <Input maxLength={128} placeholder="例如：彩盒 V3" />
             </Form.Item>
             <Form.Item name="note" label="确认说明">
-              <Input.TextArea
-                rows={3}
-                maxLength={255}
+              <BusinessTextArea
+                minRows={2}
+                maxLength={BusinessTextPolicy.noteMaxCharacters}
                 showCount
                 placeholder="可填写版面、颜色、包装方式等核对说明"
               />

@@ -11,6 +11,7 @@ import { createEmptyStateScenarios } from './emptyStateScenarios.mjs'
 import { createPageHeaderScenarios } from './pageHeaderScenarios.mjs'
 import { createTaskCalendarScenarios } from './taskCalendarScenarios.mjs'
 import { createTaskCurrentFocusScenarios } from './taskCurrentFocusScenarios.mjs'
+import { createTaskFlowRecordScenarios } from './taskFlowRecordScenarios.mjs'
 import { createTaskFusedFlowScenarios } from './taskFusedFlowScenarios.mjs'
 import { createTaskDetailVariantScenarios } from './taskDetailVariantScenarios.mjs'
 import { createBusinessStatusCountsScenarios } from './businessStatusCountsScenarios.mjs'
@@ -114,6 +115,7 @@ import { createFormDensityScenarios } from './formDensityScenarios.mjs'
 import { createTableDensityScenarios } from './tableDensityScenarios.mjs'
 import { createTableLinesScenarios } from './tableLinesScenarios.mjs'
 import { createAccountAppearanceScenarios } from './accountAppearanceScenarios.mjs'
+import { createBusinessFormDisplayScenarios } from './businessFormDisplayScenarios.mjs'
 import { createDevWorkbenchThemeScenarios } from './devWorkbenchThemeScenarios.mjs'
 import { createDevWorkbenchThemeAuditScenarios } from './devWorkbenchThemeAuditScenarios.mjs'
 import { createDevWorkbenchSwitchScenarios } from './devWorkbenchSwitchScenarios.mjs'
@@ -429,6 +431,7 @@ export function createStyleL1Scenarios(deps) {
       ...deps,
       customerRuntimeEffectiveSession,
     }),
+    ...createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSession, outputDir }),
     ...createDevWorkbenchThemeScenarios({ assertNoHorizontalOverflow, outputDir }),
     ...createDevWorkbenchThemeAuditScenarios({ assertNoHorizontalOverflow, outputDir }),
     ...createDevWorkbenchSwitchScenarios(deps),
@@ -601,6 +604,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       customerRuntimeEffectiveSession,
       gotoScenarioPath,
+      assertLineItemsUnifiedHorizontalScroll,
     }),
     ...createBusinessTableScrollScenarios({
       outputDir,
@@ -671,6 +675,7 @@ export function createStyleL1Scenarios(deps) {
     ...createProductGalleryScenarios({ outputDir, customerRuntimeEffectiveSession }),
     ...createTaskCalendarScenarios(deps),
     ...createTaskCurrentFocusScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createTaskFlowRecordScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createTaskDetailVariantScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createTaskFusedFlowScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createInformationDensityScenarios({ ...deps, customerRuntimeEffectiveSession }),
@@ -870,7 +875,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
-    ...createBOMPaginationScenarios({ assert, customerRuntimeEffectiveSession, assertNoHorizontalOverflow }),
+    ...createBOMPaginationScenarios({ assert, customerRuntimeEffectiveSession, assertNoHorizontalOverflow, outputDir, path }),
     ...createProductIdentityScenarios({
       customerRuntimeEffectiveSession,
       outputDir,

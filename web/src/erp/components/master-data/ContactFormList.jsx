@@ -1,6 +1,7 @@
-import React, { useId, useState } from 'react'
+import React, { useId } from 'react'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Form, Input, Radio, Space } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessLineItemsFooter, {
@@ -13,6 +14,7 @@ import {
 } from '../../utils/contactValidation.mjs'
 import { withPrimaryContact } from './contactFormRows.mjs'
 import './contactFormList.css'
+import '../business-list/businessLineItemGroups.css'
 
 const contactFields = [
   {
@@ -42,23 +44,21 @@ function ContactRow({
   onCopy,
   onRemove,
 }) {
-  const [noteOpen, setNoteOpen] = useState(false)
-  const noteID = useId()
   const columns = multiple ? 8 : 7
-  const note = String(row?.note || '')
 
   return (
     <tbody
-      className="erp-master-contact-list__row"
+      className="erp-master-contact-list__row erp-editable-line-group"
       aria-label={`第 ${index + 1} 位联系人`}
       ref={registerRow}
     >
       <tr className="erp-contact-editor__fields">
         <td
-          className="erp-contact-editor__sequence"
+          className="erp-contact-editor__sequence erp-editable-line-group__sequence"
+          rowSpan={2}
           aria-label={`第 ${index + 1} 位`}
         >
-          {index + 1}
+          <span className="erp-editable-line-group__number">{index + 1}</span>
         </td>
         {contactFields.map(({ name, label, rules }) => (
           <td key={name} className={`erp-contact-editor__${name}`}>
@@ -97,16 +97,6 @@ function ContactRow({
             <Button
               type="text"
               size="small"
-              aria-label={`${noteOpen ? '收起' : '展开'}联系人备注 ${index + 1}`}
-              aria-expanded={noteOpen}
-              aria-controls={noteID}
-              onClick={() => setNoteOpen((open) => !open)}
-            >
-              {noteOpen ? '收起' : '备注'}
-            </Button>
-            <Button
-              type="text"
-              size="small"
               icon={<CopyOutlined />}
               aria-label={`复制联系人条目 ${index + 1}`}
               onClick={onCopy}
@@ -123,31 +113,13 @@ function ContactRow({
           </Space>
         </td>
       </tr>
-      {note && !noteOpen ? (
-        <tr className="erp-contact-editor__note-summary">
-          <td colSpan={columns}>
-            <button
-              type="button"
-              aria-label={`查看联系人备注 ${index + 1}`}
-              onClick={() => setNoteOpen(true)}
-            >
-              <span>备注：</span>
-              {note}
-            </button>
-          </td>
-        </tr>
-      ) : null}
-      <tr
-        className="erp-contact-editor__note-editor"
-        hidden={!noteOpen}
-        id={noteID}
-      >
-        <td colSpan={columns}>
+      <tr className="erp-contact-editor__note-editor">
+        <td colSpan={columns - 1}>
           <Form.Item label="备注" name={[field.name, 'note']}>
             <BusinessTextArea
               allowClear
               showCount
-              maxLength={200}
+              maxLength={BusinessTextPolicy.noteMaxCharacters}
               minRows={2}
             />
           </Form.Item>

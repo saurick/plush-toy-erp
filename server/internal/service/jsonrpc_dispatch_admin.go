@@ -371,13 +371,13 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		}, nil
 
 	case "set_erp_appearance":
-		if res := rejectUnknownAdminParams(pm, "theme_mode", "accent", "density", "tableLines"); res != nil {
+		if res := rejectUnknownAdminParams(pm, "theme_mode", "accent", "density", "tableLines", "formDisplay"); res != nil {
 			return id, res, nil
 		}
 		patch := biz.AdminERPAppearancePatch{}
 		for key, target := range map[string]**string{
 			"theme_mode": &patch.ThemeMode, "accent": &patch.Accent, "density": &patch.Density,
-			"tableLines": &patch.TableLines,
+			"tableLines": &patch.TableLines, "formDisplay": &patch.FormDisplay,
 		} {
 			if raw, exists := pm[key]; exists {
 				value, ok := raw.(string)

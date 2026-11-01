@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -82,7 +84,7 @@ func (ShipmentItem) Fields() []ent.Field {
 		field.String("currency_snapshot").NotEmpty().Default("CNY").MaxLen(16),
 		field.String("package_description").Optional().Nillable().MaxLen(255),
 		field.String("case_no").Optional().Nillable().MaxLen(128),
-		field.String("note").Optional().Nillable().MaxLen(255),
+		field.String("note").Optional().Nillable().Validate(corevalue.ValidateBusinessNote),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
 	}

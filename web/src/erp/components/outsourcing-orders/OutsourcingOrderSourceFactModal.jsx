@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react'
 import { Alert, Descriptions, Form, Input, Radio } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import Select from '@/common/components/select/AppSelect'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
@@ -277,94 +279,94 @@ export default function OutsourcingOrderSourceFactModal({
             >
               <Radio.Group
                 options={[
-                {
-                  label: '选择已有批次',
-                  value: SOURCE_INBOUND_LOT_SELECTION.EXISTING,
-                },
-                {
-                  label: '填写新批次号',
-                  value: SOURCE_INBOUND_LOT_SELECTION.NEW,
-                },
-              ]}
+                  {
+                    label: '选择已有批次',
+                    value: SOURCE_INBOUND_LOT_SELECTION.EXISTING,
+                  },
+                  {
+                    label: '填写新批次号',
+                    value: SOURCE_INBOUND_LOT_SELECTION.NEW,
+                  },
+                ]}
                 onChange={(event) => {
-                const nextSelection = event.target.value
-                form.setFieldsValue({
-                  lot_id:
-                    nextSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
-                      ? lotOptions[0]?.value
-                      : undefined,
-                  new_lot_no: undefined,
-                })
-              }}
+                  const nextSelection = event.target.value
+                  form.setFieldsValue({
+                    lot_id:
+                      nextSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+                        ? lotOptions[0]?.value
+                        : undefined,
+                    new_lot_no: undefined,
+                  })
+                }}
               />
             </Form.Item>
-        ) : null}
+          ) : null}
           {!returnReceipt ||
-        lotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING ? (
-          <Form.Item
-            name="lot_id"
-            label={returnReceipt ? '已有产品批次' : '材料批次'}
-            rules={[
-              {
-                required: true,
-                message: returnReceipt
-                  ? '请选择已有产品批次'
-                  : '请选择已有材料批次',
-              },
-            ]}
-          >
-            <Select
-              showSearch
-              optionFilterProp="label"
-              options={lotOptions}
-              notFoundContent={
-                returnReceipt ? '暂无匹配的已有产品批次' : '暂无可用材料批次'
-              }
-              placeholder={returnReceipt ? '选择已有产品批次' : '选择材料批次'}
-            />
-          </Form.Item>
-        ) : null}
+          lotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING ? (
+            <Form.Item
+              name="lot_id"
+              label={returnReceipt ? '已有产品批次' : '材料批次'}
+              rules={[
+                {
+                  required: true,
+                  message: returnReceipt
+                    ? '请选择已有产品批次'
+                    : '请选择已有材料批次',
+                },
+              ]}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                options={lotOptions}
+                notFoundContent={
+                  returnReceipt ? '暂无匹配的已有产品批次' : '暂无可用材料批次'
+                }
+                placeholder={returnReceipt ? '选择已有产品批次' : '选择材料批次'}
+              />
+            </Form.Item>
+          ) : null}
           {returnReceipt && lotSelection === SOURCE_INBOUND_LOT_SELECTION.NEW ? (
             <Form.Item
               name="new_lot_no"
               label="新批次号"
               rules={[
-              { required: true, message: '请填写本次回货的新批次号' },
-              { max: 64, message: '新批次号不能超过 64 个字符' },
-            ]}
+                { required: true, message: '请填写本次回货的新批次号' },
+                { max: 64, message: '新批次号不能超过 64 个字符' },
+              ]}
             >
               <Input maxLength={64} placeholder="填写本次回货的新批次号" />
             </Form.Item>
-        ) : null}
+          ) : null}
         </BusinessFormSection>
         <BusinessFormSection title="数量与时间">
           <Form.Item
             name="quantity"
             label="本次办理数量"
             rules={[
-            unitQuantityRuleFromOptions(quantityUnitOptions, item?.unit_id),
-            { required: true, message: '请填写办理数量' },
-            {
-              validator: (_, value) => {
-                const quantity = numeric20Scale6Units(value)
-                const remaining = numeric20Scale6Units(
-                  quantitySummary.remaining
-                )
-                if (!isPositiveNumeric20Scale6Units(quantity)) {
-                  return Promise.reject(new Error('办理数量必须大于 0'))
-                }
-                if (
-                  remaining === null ||
-                  compareNumeric20Scale6Units(quantity, remaining) > 0
-                ) {
-                  return Promise.reject(
-                    new Error('办理数量不能超过当前剩余数量')
+              unitQuantityRuleFromOptions(quantityUnitOptions, item?.unit_id),
+              { required: true, message: '请填写办理数量' },
+              {
+                validator: (_, value) => {
+                  const quantity = numeric20Scale6Units(value)
+                  const remaining = numeric20Scale6Units(
+                    quantitySummary.remaining
                   )
-                }
-                return Promise.resolve()
+                  if (!isPositiveNumeric20Scale6Units(quantity)) {
+                    return Promise.reject(new Error('办理数量必须大于 0'))
+                  }
+                  if (
+                    remaining === null ||
+                    compareNumeric20Scale6Units(quantity, remaining) > 0
+                  ) {
+                    return Promise.reject(
+                      new Error('办理数量不能超过当前剩余数量')
+                    )
+                  }
+                  return Promise.resolve()
+                },
               },
-            },
-          ]}
+            ]}
           >
             <Input inputMode="decimal" placeholder="填写本次办理数量" />
           </Form.Item>
@@ -380,7 +382,7 @@ export default function OutsourcingOrderSourceFactModal({
             name="note"
             label="备注"
           >
-            <Input.TextArea rows={3} maxLength={255} showCount />
+            <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
           </Form.Item>
         </BusinessFormSection>
       </Form>

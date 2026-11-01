@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -115,7 +117,7 @@ func (WorkflowTaskEvent) Fields() []ent.Field {
 		field.String("reason").
 			Optional().
 			Nillable().
-			MaxLen(255),
+			Validate(corevalue.ValidateBusinessNote),
 		field.JSON("payload", map[string]any{}).
 			Optional(),
 		field.Time("created_at").

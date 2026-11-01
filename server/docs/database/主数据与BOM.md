@@ -38,7 +38,7 @@
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| `version` | `varchar` | `string` | 非空 | — | 并发控制版本；写动作通常使用 CAS 校验，不能由调用方任意跳号。 |
+| `version` | `varchar` | `string` | 非空 | — | 产品内的 BOM 业务版号；新建和复制由后端分配 V1、V2 等，编辑保持原值。并发控制另用由 updated_at 派生的 edit_version。 |
 | `status` | `varchar` | `string` | 非空 | `'DRAFT'` | 对象生命周期状态；允许值和组合约束见本表 CHECK 与生命周期说明。 |
 | `effective_from` | `timestamp with time zone` | `time.Time` | 可空 | — | — |
 | `effective_to` | `timestamp with time zone` | `time.Time` | 可空 | — | — |

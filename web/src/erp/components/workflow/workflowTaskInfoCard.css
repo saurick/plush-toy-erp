@@ -34,9 +34,10 @@
 .workflow-task-info-card__details > summary::-webkit-details-marker { display: none; }
 .workflow-task-info-card__details[open] > summary > .anticon { transform: rotate(180deg); }
 .workflow-task-info-card__details .erp-task-timing { margin: 8px 0 0; }
-.workflow-task-info-card__classification { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; margin: 8px 0; }
-.workflow-task-info-card__classification dt { color: var(--erp-text-muted); }
-.workflow-task-info-card__classification dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.workflow-task-info-card__classification, .workflow-task-info-card__number { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; margin: 8px 0; }
+.workflow-task-info-card__classification dt, .workflow-task-info-card__number dt { color: var(--erp-text-muted); }
+.workflow-task-info-card__classification dd, .workflow-task-info-card__number dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.workflow-task-info-card__number { align-items: center; font-variant-numeric: tabular-nums; }
 .workflow-task-info-card--business:empty { display: none; }
 .mobile-role-tasks-page--task-info .workflow-task-info-card__details > summary { min-height: 44px; }
 @media (pointer: coarse) { .workflow-task-info-card__details > summary { min-height: 44px; } }

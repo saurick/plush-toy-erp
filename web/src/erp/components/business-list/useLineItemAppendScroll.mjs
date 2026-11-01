@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { revealBusinessLineItemElement } from './businessLineItemDisclosure.mjs'
 
 function canFocusLineInput(input) {
   const rect = input.getBoundingClientRect()
@@ -13,7 +14,7 @@ function canFocusLineInput(input) {
   )
 }
 
-export function useLineItemAppendScroll(itemCount) {
+export function useLineItemAppendScroll(itemCount, { initialFocusSelector } = {}) {
   const pendingScrollIndexRef = useRef(null)
   const rowRefs = useRef([])
   const scrollFrameRef = useRef(null)
@@ -47,6 +48,13 @@ export function useLineItemAppendScroll(itemCount) {
       return
     }
 
+    if (target?.isConnected) {
+      revealBusinessLineItemElement(target, pendingIndex)
+      if (target.closest('[data-line-item-collapsed="true"]') && attempt < 3) {
+        scrollFrameRef.current = window.requestAnimationFrame(() => flushPendingScroll(attempt + 1))
+        return
+      }
+    }
     pendingScrollIndexRef.current = null
     scrollFrameRef.current = null
     if (!target?.isConnected) return
@@ -54,10 +62,11 @@ export function useLineItemAppendScroll(itemCount) {
     const inputs = Array.from(
       target.querySelectorAll('input:not([type="hidden"]), textarea, select')
     ).filter(canFocusLineInput)
-    // 保留 BOM 等表单已指定的字段；其余新行从首个可编辑控件开始录入。
+    const initialInput = initialFocusSelector ? target.querySelector(initialFocusSelector) : null
+    // 保留表单已指定的焦点；身份入口移至操作列时仍从该入口录入。
     const focusTarget = inputs.includes(document.activeElement)
       ? document.activeElement
-      : inputs[0]
+      : inputs.includes(initialInput) ? initialInput : inputs[0]
     const scrollOptions = {
       behavior: 'auto',
       block: 'nearest',
@@ -73,7 +82,7 @@ export function useLineItemAppendScroll(itemCount) {
     target.scrollIntoView(scrollOptions)
     focusTarget?.focus({ preventScroll: true })
     focusTarget?.scrollIntoView(scrollOptions)
-  }, [])
+  }, [initialFocusSelector])
 
   const requestLineItemScroll = useCallback(
     (index) => {

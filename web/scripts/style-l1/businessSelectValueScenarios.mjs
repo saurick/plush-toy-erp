@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertSingleSelectValues } from './singleSelectAssertions.mjs'
+import { assertShipmentLineGrouping } from './shipmentLineGroupingAssertions.mjs'
 import { closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import {
@@ -10,6 +11,8 @@ import {
 
 const longName = '模拟长名称：米白小号配套材料与包装规格，保留完整来源识别信息'
 const records = {
+  customers: [{ id: 1, code: 'SELECT-CUSTOMER-001', name: '模拟订货客户', short_name: '订货客户', is_active: true }],
+  suppliers: [{ id: 1, code: 'SELECT-SUPPLIER-001', name: '模拟甲厂', short_name: '甲厂', supplier_type: 'mixed', is_active: true }],
   products: [
     {
       id: 1,
@@ -37,6 +40,24 @@ const records = {
       code: 'SELECT-MATERIAL-001',
       name: longName,
       supplier_id: 1,
+      supplier_name: '模拟甲厂',
+      supplier_item_no: 'SUP-STYLE-001',
+      spec: '10mm',
+      color: '米白',
+      stock_category: 'MAIN',
+      default_warehouse_id: 1,
+      default_unit_id: 1,
+      is_active: true,
+    },
+    {
+      id: 1002,
+      code: 'SELECT-MATERIAL-002',
+      name: longName,
+      supplier_id: 2,
+      supplier_name: '模拟乙厂',
+      supplier_item_no: 'SUP-STYLE-002',
+      spec: '20mm',
+      color: '黑色',
       stock_category: 'MAIN',
       default_warehouse_id: 1,
       default_unit_id: 1,
@@ -157,6 +178,17 @@ export function createBusinessSelectValueScenarios(deps) {
     deviceScaleFactor: 2,
     beforeNavigate: async (page) => {
       await installLongReferenceOptions(page)
+      if (config.key === 'shipment') {
+        await page.route('**/rpc/*', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON() || {}
+          const key = method === 'list_products' ? 'products' : method === 'list_units' ? 'units' : ''
+          if (!key) return route.fallback()
+          const extra = key === 'products'
+            ? { id: 2, code: 'SELECT-PRODUCT-002', name: '模拟小兔', default_unit_id: 1, is_active: true }
+            : { id: 2, code: 'CTN', name: '箱', precision: 0, is_active: true }
+          await route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(stylePaginatedRpcData([...records[key], extra], key, params)) } })
+        })
+      }
       if (config.key === 'arrival') {
         await page.route('**/rpc/purchase_order', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
@@ -244,18 +276,14 @@ export function createBusinessSelectValueScenarios(deps) {
           `business-select-values-${config.key}`,
           deps.outputDir
         )
-        const reader = modal.locator('.app-select__inspect').first()
-        await reader.click()
-        const valueDialog = page.locator('.app-select-value-popover [role="dialog"]')
-        await valueDialog.waitFor()
-        await waitForFiniteAnimations(page)
-        await page.waitForFunction(() => document.activeElement === document.querySelector('.app-select-value-popover [role="dialog"]'), null, { timeout: 1500 })
-        assert(await valueDialog.evaluate((node) => node === document.activeElement), '单据弹窗内也能聚焦完整值')
-        assert((await valueDialog.innerText()).includes(longName), '到货仓库完整名称可读')
-        await valueDialog.press('Escape')
-        await valueDialog.waitFor({ state: 'hidden' })
-        assert(await modal.isVisible(), 'Escape 只关闭完整值，不关闭到货单据')
-        assert(await reader.evaluate((node) => node === document.activeElement), '焦点回到原单据的阅读入口')
+        const warehouse = selectField(modal, 'warehouse_id')
+        assert.equal(await warehouse.locator('.ant-select-selection-item').innerText(), records.warehouses[0].name, '到货仓库选中后只显示名称')
+        assert.equal(await warehouse.locator('.app-select__inspect').count(), 0, '宽屏名称已完整显示，不额外占用信息按钮')
+        await page.setViewportSize({ width: 1024, height: 1080 })
+        await assertSingleSelectValues(modal, 'arrival-narrow-readable')
+        assert((await warehouse.locator('.app-select__reference-name').innerText()).includes(longName), '窄弹窗直接显示完整仓库名称')
+        assert.equal(await warehouse.locator('.app-select__inspect').count(), 0, '完整换行不依赖额外点击')
+        await page.setViewportSize({ width: 1920, height: 1080 })
         await modal.getByRole('button', { name: /^关\s*闭$/u }).click()
         return
       }
@@ -274,11 +302,27 @@ export function createBusinessSelectValueScenarios(deps) {
             .querySelector('.erp-business-form-page:not([hidden])')
             ?.getAttribute('aria-busy') === 'false'
       )
+      if (['sales', 'purchase', 'outsourcing'].includes(config.key)) {
+        const partyType = config.key === 'sales' ? 'customers' : 'suppliers'
+        const party = selectField(editor, config.key === 'sales' ? 'customer_id' : 'supplier_id')
+        await chooseFirst(page, party.locator('.ant-select-selector'))
+        assert.equal(await party.locator('.ant-select-selection-item').innerText(), records[partyType][0].name, '单据表头往来方选中后只显示名称')
+        await party.getByRole('combobox').press('ArrowDown')
+        const menu = page.locator('.ant-select-dropdown:visible')
+        await menu.locator('.ant-select-item-option').first().waitFor()
+        assert((await menu.innerText()).includes(records[partyType][0].code), '往来方编码保留在候选项')
+        await party.getByRole('combobox').press('Escape')
+        await menu.waitFor({ state: 'hidden' })
+      }
       if (config.add) {
         await editor.getByRole('button', { name: config.add }).first().click()
       }
 
       if (config.key === 'shipment') {
+        await assertShipmentLineGrouping(page, editor, deps.outputDir)
+        await closeBusinessFormPage(page, editor)
+        await page.getByRole('button', { name: config.open }).click()
+        await editor.waitFor()
         await editor.getByRole('button', { name: '从销售订单导入' }).click()
         const picker = page.locator(
           '.erp-source-import-picker-modal.ant-modal:visible'
@@ -300,6 +344,14 @@ export function createBusinessSelectValueScenarios(deps) {
         const line = lines.first()
         const sku = line.getByRole('combobox', { name: 'SKU', exact: true })
         assert.equal(await sku.isDisabled(), true, '导入后 SKU 仍按来源锁定')
+        const product = selectField(line, 'product_id')
+        const productHeading = editor.locator('.erp-line-item-identity-group').first()
+        assert((await productHeading.innerText()).includes(longName), '真实出货页在产品组标题显示完整名称')
+        assert((await productHeading.innerText()).includes(records.products[0].code), '产品编码独立显示在组标题')
+        const skuControl = selectField(line, 'product_sku_id')
+        assert.equal(await skuControl.locator('.ant-select-selection-item').innerText(), records.product_skus[0].sku_name, '锁定规格只显示规格名称')
+        assert.equal(await product.locator('.ant-select-arrow').count(), 0, '锁定产品不显示可编辑箭头')
+        assert(await product.getByRole('combobox').isDisabled(), '产品组标题不会解除单行来源锁定')
         await assertSingleSelectValues(editor, 'shipment-imported', 6)
         await chooseFirst(
           page,
@@ -316,6 +368,7 @@ export function createBusinessSelectValueScenarios(deps) {
           deps.outputDir,
           8
         )
+        await editor.locator('.erp-sales-order-lines-form__list').screenshot({ path: `${deps.outputDir}/shipment-reference-row.png` })
         const warehouse = selectField(line, 'warehouse_id')
         const selectedHeight = (await warehouse.boundingBox()).height
         await warehouse.locator('.ant-select-clear').click()
@@ -323,12 +376,11 @@ export function createBusinessSelectValueScenarios(deps) {
           await warehouse.locator('.ant-select-selection-item').count(),
           0
         )
-        assert.ok(
-          Math.abs((await warehouse.boundingBox()).height - selectedHeight) <=
-            1,
-          '清空来源选择后控件高度不变'
-        )
+        const emptyHeight = (await warehouse.boundingBox()).height
+        assert.ok(emptyHeight >= 32 && emptyHeight <= selectedHeight + 1, '清空后恢复标准框高')
+        assert.equal(await warehouse.locator('xpath=..').locator('.app-select__reference-code').count(), 0, '清空后不残留编码')
         await chooseFirst(page, warehouse.locator('.ant-select-selector'))
+        assert.ok(Math.abs((await warehouse.boundingBox()).height - selectedHeight) <= 1, '重选后按当前名称恢复高度')
         await assertSingleSelectValues(editor, 'shipment-reselected', 8)
       } else {
         if (config.key === 'purchase') {
@@ -367,6 +419,54 @@ export function createBusinessSelectValueScenarios(deps) {
           deps.outputDir
         )
         if (config.key === 'bom') {
+          const material = selectField(table, 'material_id')
+          const cell = material.locator('xpath=ancestor::td[1]')
+          const assertNameOnly = async (name) => {
+            assert.equal(await material.locator('.app-select__reference-name').innerText(), name, 'BOM 选择后保留完整物料名称')
+            assert.equal(await material.locator('.ant-select-selection-item').innerText(), name, 'BOM 选中标签只显示名称')
+            assert.equal(await cell.locator('.app-select__reference-code').count(), 0, 'BOM 名称列不另显编码')
+            assert.equal(await cell.locator('.erp-bom-material-cell__context').count(), 0, 'BOM 已选名称下不重复显示厂商或颜色')
+          }
+          const assertMaterialDetails = async (record) => {
+            assert.equal(await cell.locator('xpath=following-sibling::td[1]').innerText(), record?.supplier_item_no || '—', '厂商料号跟随当前物料')
+            assert.equal(await cell.locator('xpath=following-sibling::td[2]').innerText(), record?.spec || '—', '规格跟随当前物料')
+          }
+          await assertNameOnly(longName)
+          await assertMaterialDetails(records.materials[0])
+          const materialWidth = await material.evaluate((node) => node.closest('td').getBoundingClientRect().width)
+          assert(materialWidth >= 279, `BOM 物料列不被其他明细列挤窄: ${materialWidth}`)
+          await material.getByRole('combobox').fill(records.materials[0].code)
+          const menu = page.locator('.ant-select-dropdown:visible')
+          await menu.locator('.ant-select-item-option').first().waitFor()
+          assert((await menu.boundingBox()).width >= 559, 'BOM 候选列表独立加宽')
+          const option = menu.locator('.ant-select-item-option').filter({ hasText: records.materials[0].code }).first()
+          for (const text of [longName, records.materials[0].code, records.materials[0].supplier_name, records.materials[0].supplier_item_no, records.materials[0].spec, records.materials[0].color]) {
+            assert((await option.innerText()).includes(text), `BOM 下拉候选保留辨认信息：${text}`)
+          }
+          await page.screenshot({ path: `${deps.outputDir}/bom-material-name-dropdown.png` })
+          await option.click()
+          await menu.waitFor({ state: 'hidden' })
+          await assertNameOnly(longName)
+          await material.getByRole('combobox').fill(records.materials[1].code)
+          const replacement = menu.locator('.ant-select-item-option').filter({ hasText: records.materials[1].code }).first()
+          await replacement.waitFor()
+          assert((await replacement.innerText()).includes(longName), '同名物料仍能按编码定位')
+          assert((await replacement.innerText()).includes(records.materials[1].supplier_name), '替换物料的候选保留厂商')
+          assert((await replacement.innerText()).includes(records.materials[1].color), '替换物料的候选保留颜色')
+          await replacement.click()
+          await menu.waitFor({ state: 'hidden' })
+          await assertNameOnly(records.materials[1].name)
+          await assertMaterialDetails(records.materials[1])
+          await page.screenshot({ path: `${deps.outputDir}/bom-material-same-name-selected.png` })
+          await material.locator('.ant-select-clear').click()
+          assert.equal(await material.locator('.app-select__reference-name').count(), 0, 'BOM 清空不残留旧名称')
+          assert.equal(await cell.locator('.app-select__reference-code').count(), 0, 'BOM 清空不残留旧编码')
+          await assertMaterialDetails(null)
+          assert.equal(await selectField(table, 'unit_id').locator('.ant-select-selection-item').count(), 0, '清空物料同时清空关联单位')
+          await chooseFirst(page, material.locator('.ant-select-selector'))
+          await assertNameOnly(longName)
+          await assertMaterialDetails(records.materials[0])
+          await assertSingleSelectValues(table, 'bom-reselected')
           const input = table.locator('.ant-select:not(.ant-select-disabled) input').first()
           await assertControlStyleSurvivesVisits(page, {
             input,

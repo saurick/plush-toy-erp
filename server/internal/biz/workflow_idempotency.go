@@ -170,7 +170,7 @@ func prepareWorkflowTaskStatusMutation(in *WorkflowTaskStatusUpdate, actorID int
 	if in.BusinessStatusKey != "" && !IsValidWorkflowBusinessState(in.BusinessStatusKey) {
 		return ErrBadParam
 	}
-	if in.TaskStatusKey == "ready" || in.TaskStatusKey == "blocked" || in.TaskStatusKey == "rejected" {
+	if in.TaskStatusKey == "blocked" || in.TaskStatusKey == "rejected" {
 		in.Reason = workflowTransitionReason(in, in.TaskStatusKey)
 		if in.Reason == "" {
 			return ErrBadParam
@@ -216,7 +216,7 @@ func prepareWorkflowTaskUrgeMutation(in *WorkflowTaskUrge, actorID int) error {
 		in.Payload = map[string]any{}
 	}
 	if in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 || in.IdempotencyKey == "" ||
-		!IsValidWorkflowTaskUrgeAction(in.Action) || in.Reason == "" || in.CommandKey == "" ||
+		!IsValidWorkflowTaskUrgeAction(in.Action) || in.CommandKey == "" ||
 		utf8.RuneCountInString(in.CommandKey) > workflowTaskCommandKeyMaxLength ||
 		utf8.RuneCountInString(in.IdempotencyKey) > workflowTaskIdempotencyKeyMaxLength {
 		return ErrBadParam

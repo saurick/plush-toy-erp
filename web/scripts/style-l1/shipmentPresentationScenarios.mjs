@@ -1,4 +1,5 @@
 import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
+import { assertImportUndoPlacement } from './importUndoAssertions.mjs'
 import { assertImportPickerGeometry, assertImportFilterPrompt, readImportPickerLayout, assertImportPickerStableLayout, assertImportPickerStableDuring } from './importPickerAssertions.mjs'
 import { assertBusinessSectionTitleBands, assertCurrentBusinessSection } from './businessFormSectionAssertions.mjs'
 import { chooseSelectOption } from './selectControlActions.mjs'
@@ -111,29 +112,23 @@ export function createShipmentSourceCandidateAssertions(deps) {
     const layout = await readImportPickerLayout(failedPicker)
     await assertImportFilterPrompt(page, failedPicker, '导入来源客户', '按客户筛选')
     await assertImportFilterPrompt(page, failedPicker, '导入来源销售订单', '按销售订单筛选')
-    const eligibleFilter = failedPicker.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '来源可导入条件', exact: true }) })
-    assert.equal(await eligibleFilter.locator('.ant-select-selection-item').innerText(), '可导入')
-    await eligibleFilter.locator('.ant-select-clear').click()
-    await failedPicker.locator('.ant-table-row').first().waitFor()
-    assert.equal(shipmentSourceCandidateParams.at(-1).selectable, undefined)
-    await assertImportFilterPrompt(page, failedPicker, '来源可导入条件', '按可导入状态筛选', ['全部来源'])
-    await failedPicker.getByRole('combobox', { name: '来源可导入条件', exact: true }).press('ArrowDown')
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '不可导入（查看原因）' }).click()
-    await failedPicker.getByText('暂无可导入销售订单行', { exact: true }).waitFor()
+    assert.equal(shipmentSourceCandidateParams.at(-1).selectable, true)
+    assert.equal(await failedPicker.getByRole('combobox', { name: '来源可导入条件', exact: true }).count(), 0)
+    await failedPicker.getByRole('button', { name: '查看不可导入原因', exact: true }).click()
+    await failedPicker.getByText('当前范围没有不可导入明细', { exact: true }).waitFor()
     await assertImportPickerStableLayout(failedPicker, layout, 'shipment-empty-filter')
     assert.equal(shipmentSourceCandidateParams.at(-1).selectable, false)
-    await failedPicker.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '来源可导入条件', exact: true }) }).locator('.ant-select-clear').click()
+    await failedPicker.getByRole('button', { name: '返回可导入明细', exact: true }).click()
     await failedPicker.locator('.ant-table-row').first().waitFor()
-    assert.equal(shipmentSourceCandidateParams.at(-1).selectable, undefined)
-    await assertImportFilterPrompt(page, failedPicker, '来源可导入条件', '按可导入状态筛选', ['全部来源'])
+    assert.equal(shipmentSourceCandidateParams.at(-1).selectable, true)
     await failedPicker.getByRole('button', { name: '清空筛选', exact: true }).click()
     await failedPicker.locator('.ant-table-row').first().waitFor()
-    assert.equal(shipmentSourceCandidateParams.at(-1).selectable, undefined)
+    assert.equal(shipmentSourceCandidateParams.at(-1).selectable, true)
     await assertImportPickerStableDuring(failedPicker, 'shipment-empty-search', async () => {
       await searchInput.fill('NO-SOURCE-IMPORT-RESULT')
       await searchInput.press('Enter')
       await failedPicker
-        .getByText('暂无可导入销售订单行', { exact: true })
+        .getByText('没有符合条件的可导入明细', { exact: true })
         .waitFor({ state: 'visible', timeout: 10_000 })
     })
     await assertImportPickerStableLayout(failedPicker, layout, 'shipment-empty-search')
@@ -184,7 +179,7 @@ export function createShipmentSourceCandidateAssertions(deps) {
       0,
       '实际运费不应提供独立币种选择'
     )
-    await modal.getByLabel('实际运费金额').fill('12.5')
+    await modal.getByLabel('实际运费金额', { exact: true }).fill('12.5')
     assert.equal(
       (await modal.getByLabel('实际运费币种（自动）').textContent()).trim(),
       'USD',
@@ -204,7 +199,6 @@ export function createShipmentSourceCandidateAssertions(deps) {
     await modal.screenshot({
       path: path.join(outputDir, 'shipment-source-one-currency-modal.png'),
     })
-    await modal.locator('.erp-line-item-details > summary').first().click()
     await expectText(page, '销售订单行追溯')
     assert.equal(
       await modal.getByText('销售订单行追溯', { exact: true }).count(),
@@ -484,9 +478,13 @@ export function createShipmentWeightScenarios(deps) {
 
 export function createShipmentSourceCandidateScenarios(deps) {
   const {
-    assert, path, outputDir,
+    assert,
+    assertNoHorizontalOverflow,
     expectButton,
     expectHeading,
+    expectText,
+    outputDir,
+    path,
     verifyBusinessActionFormModal,
     customerRuntimeEffectiveSession,
   } = deps
@@ -506,47 +504,27 @@ export function createShipmentSourceCandidateScenarios(deps) {
         const requests = []
         let failBulk = true
         const records = Array.from({ length: 205 }, (_, index) => ({
-          sales_order_id: 1,
-          order_no: 'SO-BULK-A',
-          order_status: 'active',
-          order_version: 2,
-          currency: 'USD',
-          customer_id: 1,
-          customer_name: '批量选择模拟客户',
+          sales_order_id: 1, order_no: 'SO-BULK-A', order_status: 'active', order_version: 2,
+          currency: 'USD', customer_id: 1, customer_name: '批量选择模拟客户',
           customer_snapshot: { code: 'CUS-STYLE-L1', name: '批量选择模拟客户' },
-          sales_order_item_id: index + 1,
-          line_no: index + 1,
-          line_status: 'open',
-          product_id: 1,
-          product_code: 'PROD-STYLE-L1-01',
-          product_name: `模拟出货产品${index + 1}`,
-          product_code_snapshot: 'PROD-STYLE-L1-01',
-          product_name_snapshot: `模拟出货产品${index + 1}`,
-          product_sku_id: 1,
-          sku_code: 'SKU-STYLE-L1-01',
-          sku_name: '米白',
-          unit_id: 1,
-          unit_code: 'PCS',
-          unit_name: '个',
-          ordered_quantity: '12',
-          shipped_quantity: '0',
-          remaining_quantity: '12',
-          selectable: true,
-          disabled_reason: '',
+          sales_order_item_id: index + 1, line_no: index + 1, line_status: 'open',
+          product_id: 1, product_code: 'PROD-STYLE-L1-01', product_name: `模拟出货产品${index + 1}`,
+          product_code_snapshot: 'PROD-STYLE-L1-01', product_name_snapshot: `模拟出货产品${index + 1}`,
+          product_sku_id: 1, sku_code: 'SKU-STYLE-L1-01', sku_name: '米白',
+          unit_id: 1, unit_code: 'PCS', unit_name: '个',
+          ordered_quantity: '12', shipped_quantity: '0', remaining_quantity: '12', selectable: true, disabled_reason: '',
         }))
         const otherOrder = { ...records[0], sales_order_id: 2, order_no: 'SO-BULK-B', sales_order_item_id: 300 }
         const candidates = [...records.slice(0, 10), otherOrder, ...records.slice(10)]
         await page.route('**/rpc/operational_fact', async (route) => {
           const body = route.request().postDataJSON() || {}
           if (body.method !== 'list_shipment_source_candidates') return route.fallback()
-          const { params } = body
+          const params = body.params
           requests.push(params)
           const failed = failBulk && params.limit === 200 && params.offset === 200
           if (failed) failBulk = false
-          await route.fulfill({ contentType: 'application/json',
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: body.id,
+          await route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+            jsonrpc: '2.0', id: body.id,
             result: failed ? { code: 50000, message: '模拟来源读取失败', data: {} }
               : { code: 0, message: 'OK', data: mockShipmentSourceCandidates(params, candidates) },
           }) })
@@ -612,6 +590,163 @@ export function createShipmentSourceCandidateScenarios(deps) {
         await confirm.click()
         assert.equal(await editor.locator('.erp-sales-order-lines-form__row').count(), 205)
         assert.equal(await editor.getByRole('combobox', { name: '销售订单', exact: true }).isDisabled(), true, 'the imported source order is locked in the editor')
+      },
+    },
+    {
+      name: 'shipment-import-undo-design',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      verify: async (page) => {
+        await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
+        await page.getByRole('button', { name: /全屏预览/u }).click()
+        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        await frame.locator('.nav-item[data-page="shipping-hub"]').click()
+        await frame.locator('[data-action="new-record"]').click()
+        const form = frame.locator('.form-view')
+        const note = form.locator('[data-form-field="remark"]')
+        const weight = form.locator('[data-form-field="total-net-weight"]')
+        const rows = () => form.locator('.line-items tbody[data-form-row], .line-items tbody:not([data-form-row]):not(.document-line-product-heading) > tr').count()
+        if (await rows() === 0) {
+          assert.equal(await weight.count(), 0, '设计样例的空明细不显示人工重量补录')
+          await form.getByRole('button', { name: '添加出货明细', exact: true }).click()
+        }
+        const originalRows = await rows()
+        await weight.fill('1500')
+        await form.locator('[data-action="shipment-import"]').click()
+        await frame.locator('[data-action="confirm-import"]').click()
+        assert.ok(await rows() > originalRows)
+        await note.fill('导入后保留的备注')
+        await form.getByRole('button', { name: '撤销本次导入', exact: true }).click()
+        assert.equal(await rows(), originalRows)
+        assert.equal(await note.inputValue(), '导入后保留的备注')
+        assert.equal(await weight.inputValue(), '1500')
+        await form.locator('[data-action="shipment-import"]').click()
+        await frame.locator('[data-action="confirm-import"]').click()
+        await weight.fill('1800')
+        assert.equal(await form.getByRole('button', { name: '撤销本次导入', exact: true }).isDisabled(), true)
+        assert.equal(await form.locator('[data-form-import-undo-hint="shipment"]').count(), 0)
+      },
+    },
+    {
+      name: 'shipment-import-undo-desktop',
+      path: '/erp/warehouse/shipments',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const shipmentWrites = []
+        page.on('request', (request) => {
+          if (!request.url().includes('/rpc/operational_fact') || request.method() !== 'POST') return
+          const body = request.postDataJSON()
+          if (['create_shipment_with_items', 'save_shipment_draft', 'ship_shipment', 'cancel_shipment'].includes(body?.method)) {
+            shipmentWrites.push(body.method)
+          }
+        })
+        await expectHeading(page, '出货单')
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建出货单',
+          titleText: '新建出货单',
+          minFieldCount: 12,
+          screenshotName: 'shipment-import-undo-desktop',
+          afterOpen: async (editor) => {
+            const importButton = editor.getByRole('button', { name: '从销售订单导入', exact: true })
+            const undoButton = editor.getByRole('button', { name: '撤销本次导入', exact: true })
+            const addButton = editor.getByRole('button', { name: '添加出货明细', exact: true })
+            const importRows = async (indexes) => {
+              await importButton.click()
+              const picker = page.locator('.erp-source-import-picker-modal.ant-modal:visible').last()
+              const rows = picker.locator('.ant-table-row')
+              await rows.first().waitFor({ state: 'visible' })
+              for (const index of indexes) await rows.nth(index).locator('.ant-checkbox-wrapper').first().click()
+              await picker.locator('.erp-source-import-picker__footer-actions .ant-btn-primary').click()
+              await picker.waitFor({ state: 'hidden' })
+            }
+            const waitUndoReady = () => page.waitForFunction(() =>
+              [...document.querySelectorAll('.erp-business-import-actions button')]
+                .some((button) => button.textContent.includes('撤销本次导入') && !button.disabled))
+            assert.equal(await undoButton.count(), 0, '新建时没有撤销记录')
+            await editor.getByLabel('收货人', { exact: true }).fill('导入前收货人')
+            await editor.locator('#note').fill('导入前备注')
+            await editor.getByLabel('数量', { exact: true }).fill('2')
+            await editor.getByLabel('实际总净重（克）', { exact: true }).fill('1500')
+            await importRows([0, 1])
+            await waitUndoReady()
+            await assertImportUndoPlacement(editor)
+            assert.equal(await editor.getByRole('button', { name: /移除明细/u }).count(), 3)
+            await importButton.click()
+            const duplicatePicker = page.locator('.erp-source-import-picker-modal.ant-modal:visible').last()
+            await duplicatePicker.locator('.ant-table-row').first().locator('.ant-checkbox-wrapper').first()
+              .click()
+            await duplicatePicker.locator('.erp-source-import-picker__footer-actions .ant-btn-primary').click()
+            await expectText(page, '所选销售订单来源行已在当前出货明细中')
+            assert.equal(await duplicatePicker.isVisible(), true)
+            await duplicatePicker.getByRole('button', { name: '取消', exact: true }).click()
+            await duplicatePicker.waitFor({ state: 'hidden' })
+            assert.equal(await undoButton.isEnabled(), true, '重复来源不替换或破坏上一次撤销记录')
+            await editor.locator('#note').fill('导入后另填的备注')
+            assert.equal(await undoButton.isEnabled(), true, '无关备注不使撤销失效')
+            await editor.locator('.erp-business-source-summary').scrollIntoViewIfNeeded()
+            await assertNoHorizontalOverflow(page)
+            await page.waitForFunction(() => !document.querySelector('.ant-message-notice'), null, { timeout: 5000 })
+            await page.screenshot({ path: path.join(outputDir, 'shipment-import-undo-ready-4k.png') })
+            await undoButton.focus()
+            await page.keyboard.press('Enter')
+            await undoButton.waitFor({ state: 'hidden' })
+            assert.equal(await importButton.evaluate((button) => button === document.activeElement), true, '撤销后焦点回到来源导入入口')
+            assert.equal(await editor.getByRole('button', { name: /移除明细/u }).count(), 1, '恢复导入前手工明细')
+            assert.equal(await addButton.isEnabled(), true, '来源解除后恢复手工添加')
+            assert.equal(await editor.locator('.erp-business-source-summary').count(), 0, '撤销不能留下订单摘要')
+            assert.equal(await editor.getByLabel('收货人', { exact: true }).inputValue(), '导入前收货人')
+            assert.equal(await editor.locator('#note').inputValue(), '导入后另填的备注')
+            assert.equal(await editor.getByLabel('实际总净重（克）', { exact: true }).inputValue(), '1500')
+
+            await importRows([0])
+            await waitUndoReady()
+            await importRows([1])
+            await waitUndoReady()
+            assert.equal(await editor.getByRole('button', { name: /移除明细/u }).count(), 3)
+            await undoButton.click()
+            await undoButton.waitFor({ state: 'hidden' })
+            assert.equal(await editor.getByRole('button', { name: /移除明细/u }).count(), 2, '第二批撤销保留原手工明细和第一批来源行')
+            assert.equal(await editor.locator('.erp-business-source-summary').count(), 1)
+            assert.equal(await addButton.isDisabled(), true, '保留第一批的订单关联')
+
+            await importRows([1])
+            await waitUndoReady()
+            const quantity = editor.getByLabel('数量', { exact: true }).last()
+            const originalQuantity = await quantity.inputValue()
+            await quantity.fill('7')
+            assert.equal(await editor.getByText('来源或明细已修改，不能快速撤销；可逐行移除。', { exact: true }).count(), 0)
+            assert.equal(await undoButton.isDisabled(), true)
+            await quantity.fill(originalQuantity)
+            assert.equal(await undoButton.isDisabled(), true, '改回原值也不恢复旧撤销快照')
+            await page.setViewportSize({ width: 1024, height: 900 })
+            await editor.locator('.erp-business-source-summary').scrollIntoViewIfNeeded()
+            await assertNoHorizontalOverflow(page)
+            const summaryFits = await editor.locator('.erp-business-source-summary').evaluate((node) => {
+              const bounds = node.getBoundingClientRect()
+              return [...node.children].every((child) => {
+                const box = child.getBoundingClientRect()
+                return box.left >= bounds.left - 1 && box.right <= bounds.right + 1
+              })
+            })
+            assert.equal(summaryFits, true, '来源摘要在窄屏内换行，不覆盖相邻区域')
+            await assertImportUndoPlacement(editor, { narrow: true })
+            await page.setViewportSize({ width: 1920, height: 1080 })
+          },
+        })
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建出货单',
+          titleText: '新建出货单',
+          screenshotName: 'shipment-import-undo-reopened',
+          afterOpen: async (editor) => {
+            assert.equal(await editor.getByRole('button', { name: '撤销本次导入', exact: true }).count(), 0)
+            assert.equal(await editor.locator('#note').inputValue(), '')
+            assert.equal(await editor.locator('.erp-business-source-summary').count(), 0)
+          },
+        })
+        assert.deepEqual(shipmentWrites, [], '导入、撤销与关闭只修改本地表单，不写业务事实')
       },
     },
     {

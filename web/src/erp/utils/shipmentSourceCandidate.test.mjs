@@ -447,3 +447,28 @@ test('shipment source candidate normalization keeps backend quantity truth and s
     '已全部确认出货'
   )
 })
+
+test('source filter options use the complete eligibility scope and preserve only the current empty scope as disabled context', async () => {
+  const { shipmentSourceFilterOptions, validateShipmentSourceOrderOptions } = await import('./shipmentSourceCandidate.mjs')
+  const orders = [
+    { sales_order_id: 7, order_no: 'SO-007', customer_id: 8, customer_code: 'CUS-8', customer_name: '客户甲', customer_name_snapshot: '下单时客户甲' },
+    { sales_order_id: 9, order_no: 'SO-009', customer_id: 10, customer_code: 'CUS-10', customer_name: '客户乙', customer_name_snapshot: '' },
+    { sales_order_id: 11, order_no: 'SO-011', customer_id: 8, customer_code: 'CUS-8', customer_name: '客户甲', customer_name_snapshot: '' },
+  ]
+  assert.equal(validateShipmentSourceOrderOptions(orders), orders)
+  const options = shipmentSourceFilterOptions(orders, { customerID: 8 })
+  assert.deepEqual(options.customers.map((option) => option.value), [8, 10])
+  assert.deepEqual(options.orders.map((option) => option.value), [7, 11])
+  assert.equal(options.orders[0].label, 'SO-007 · 下单时客户甲')
+  const empty = shipmentSourceFilterOptions([], {
+    customerID: 8,
+    salesOrderID: 7,
+    customerOptions: options.customers,
+    salesOrderOptions: options.orders,
+  })
+  assert.deepEqual(empty.customers, [{ ...options.customers[0], disabled: true }])
+  assert.deepEqual(empty.orders, [{ ...options.orders[0], disabled: true }])
+  for (const invalid of [undefined, {}, [orders[0], orders[0]], [{ ...orders[0], customer_id: 0 }], [{ ...orders[0], customer_name: '' }]]) {
+    assert.throws(() => validateShipmentSourceOrderOptions(invalid), /不完整/u)
+  }
+})

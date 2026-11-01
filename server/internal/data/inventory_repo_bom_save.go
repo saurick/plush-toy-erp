@@ -38,13 +38,17 @@ func (r *inventoryRepo) SaveBOMWithItems(ctx context.Context, id int, in *biz.BO
 				return nil, biz.ErrBadParam
 			}
 		}
+		version, err := allocateBOMVersion(ctx, tx, r.data.sqlDialect, in.ProductID)
+		if err != nil {
+			return nil, err
+		}
 		if err := validateBOMSaveReferences(ctx, tx, r.data.sqlDialect, in.ProductID, items); err != nil {
 			return nil, err
 		}
 		editTime := nextBOMEditTime(0)
 		headerRow, err = tx.BOMHeader.Create().
 			SetProductID(in.ProductID).
-			SetVersion(in.Version).
+			SetVersion(version).
 			SetStatus(biz.BOMStatusDraft).
 			SetNillableEffectiveFrom(in.EffectiveFrom).
 			SetNillableEffectiveTo(in.EffectiveTo).
@@ -116,7 +120,6 @@ func (r *inventoryRepo) SaveBOMWithItems(ctx context.Context, id int, in *biz.BO
 				bomheader.UpdatedAtGTE(expectedStart),
 				bomheader.UpdatedAtLT(expectedStart.Add(time.Microsecond)),
 			).
-			SetVersion(in.Version).
 			SetUpdatedAt(nextEditTime)
 		applyBOMHeaderOptionalFields(update.Mutation(), &in.BOMHeaderUpdate)
 		affected, err := update.Save(ctx)
@@ -199,6 +202,26 @@ func (r *inventoryRepo) SaveBOMWithItems(ctx context.Context, id int, in *biz.BO
 		Header: entBOMHeaderToBiz(headerRow),
 		Items:  bomItemRowsToBiz(itemRows),
 	}, nil
+}
+
+func allocateBOMVersion(ctx context.Context, tx *ent.Tx, sqlDialect string, productID int) (string, error) {
+	// Lock the product before taking reference share locks, so concurrent first
+	// versions and copies serialize without a lock-upgrade deadlock.
+	query := tx.Product.Query().Where(product.ID(productID))
+	if sqlDialect == dialect.Postgres {
+		query.Where(func(s *entsql.Selector) { s.ForUpdate() })
+	}
+	if _, err := query.Only(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return "", biz.ErrProductNotFound
+		}
+		return "", err
+	}
+	versions, err := tx.BOMHeader.Query().Where(bomheader.ProductID(productID)).Select(bomheader.FieldVersion).Strings(ctx)
+	if err != nil {
+		return "", err
+	}
+	return biz.NextBOMVersion(versions)
 }
 
 func bomItemRowsToBiz(rows []*ent.BOMItem) []*biz.BOMItem {

@@ -1,3 +1,5 @@
+import { materialOption } from './referenceSelectOptions.mjs'
+
 export function purchaseMaterialMatchesSupplier(material, supplierID) {
   return (
     !material?.supplier_id ||
@@ -7,12 +9,12 @@ export function purchaseMaterialMatchesSupplier(material, supplierID) {
 
 export function purchaseMaterialOption(material, supplierID) {
   const matches = purchaseMaterialMatchesSupplier(material, supplierID)
+  const option = materialOption(material)
   return {
+    ...option,
     value: material.id,
     label: [
-      material.code,
-      material.name,
-      material.supplier_item_no,
+      option?.label,
       matches ? '' : '其他厂商，需重选',
     ]
       .filter(Boolean)

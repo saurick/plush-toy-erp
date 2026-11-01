@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import Select from '@/common/components/select/AppSelect'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
@@ -307,10 +309,10 @@ export default function ShipmentQualityInspectionModal({
           <Input maxLength={64} autoComplete="off" readOnly />
         </Form.Item>
         <Form.Item name="note" label="送检备注">
-          <Input.TextArea
+          <BusinessTextArea
+            minRows={2}
             aria-label="送检备注"
-            rows={3}
-            maxLength={255}
+            maxLength={BusinessTextPolicy.noteMaxCharacters}
             showCount
           />
         </Form.Item>

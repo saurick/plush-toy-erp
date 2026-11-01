@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"server/internal/biz"
+	corevalue "server/internal/core/value"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/workflowtask"
@@ -308,6 +309,9 @@ func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.Work
 }
 
 func workflowTaskKeywordPredicate(keyword string) predicate.WorkflowTask {
+	if number, exact := corevalue.NormalizeWorkflowTaskNumber(keyword); exact {
+		return workflowtask.TaskNoEQ(number)
+	}
 	return workflowtask.Or(
 		workflowTaskDiscoveryKeywordPredicate(keyword),
 		workflowtask.TaskCodeContainsFold(keyword),

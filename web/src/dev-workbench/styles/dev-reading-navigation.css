@@ -1,0 +1,5 @@
+.erp-dev-reading-link {
+  color: var(--erp-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

@@ -1,6 +1,8 @@
 package schema
 
 import (
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -30,9 +32,9 @@ func (EngineeringMaterialRequest) Fields() []ent.Field {
 		field.Time("finance_reviewed_at").Optional().Nillable(),
 		field.Int("rejected_by").Optional().Nillable().Positive(),
 		field.Time("rejected_at").Optional().Nillable(),
-		field.String("review_note").Optional().Nillable().MaxLen(255),
-		field.String("boss_review_note").Optional().Nillable().MaxLen(255),
-		field.String("finance_review_note").Optional().Nillable().MaxLen(255),
+		field.String("review_note").Optional().Nillable().Validate(corevalue.ValidateBusinessNote),
+		field.String("boss_review_note").Optional().Nillable().Validate(corevalue.ValidateBusinessNote),
+		field.String("finance_review_note").Optional().Nillable().Validate(corevalue.ValidateBusinessNote),
 	}
 }
 func (EngineeringMaterialRequest) Edges() []ent.Edge {

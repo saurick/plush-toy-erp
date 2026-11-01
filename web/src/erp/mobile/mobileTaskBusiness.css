@@ -250,9 +250,28 @@
 }
 
 .mobile-task-device-scope {
-  flex-basis: 100%;
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  display: flex;
+  flex: 0 0 100%;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 6px;
+  background: var(--erp-primary-softer);
+  color: var(--erp-text);
+  font-size: var(--erp-font-body);
+  line-height: var(--erp-line-body);
+}
+
+.mobile-task-device-scope__icon {
+  flex: 0 0 auto;
+  color: var(--erp-primary-strong);
+  font-size: 16px;
+}
+
+.mobile-task-device-scope strong {
+  color: var(--erp-primary-strong);
+  font-weight: 600;
 }
 
 .mobile-task-business[data-business-form-editing='true'] > .mobile-role-action-bar {

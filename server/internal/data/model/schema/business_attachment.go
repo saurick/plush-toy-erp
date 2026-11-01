@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"server/internal/biz"
+	corevalue "server/internal/core/value"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
@@ -68,7 +69,7 @@ func (BusinessAttachment) Fields() []ent.Field {
 		field.String("note").
 			Optional().
 			Nillable().
-			MaxLen(255),
+			Validate(corevalue.ValidateBusinessNote),
 		field.Time("withdrawn_at").
 			Optional().
 			Nillable(),

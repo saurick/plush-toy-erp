@@ -1,5 +1,7 @@
 import { createSalesOrderWorkbook } from './salesOrderImportWorkbookFixture.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { assertBusinessFormScrollTracking } from './businessFormSectionAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createSalesOrderImportValidationScenarios(deps) {
   const { assert } = deps
@@ -93,7 +95,7 @@ export function createSalesOrderImportValidationScenarios(deps) {
           () =>
             !document.querySelector('button[aria-label="导入 Excel"]').disabled
         )
-        await page.locator('[data-sales-order-import-input]').setInputFiles({
+        const workbookFile = {
           name: '模拟缺项订单.xlsx',
           mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -136,15 +138,25 @@ export function createSalesOrderImportValidationScenarios(deps) {
               },
             ],
           }),
-        })
+        }
         const picker = page.getByRole('dialog', { name: /导入销售订单 Excel/u })
-        await picker
-          .getByRole('button', { name: '全选筛选结果', exact: true })
-          .click()
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          await page.locator('[data-sales-order-import-input]').setInputFiles(workbookFile)
+          await picker.waitFor({ state: 'visible' })
+          await waitForFiniteAnimations(page)
+          await picker.getByRole('button', { name: '全选筛选结果', exact: true }).click()
+          await page.waitForFunction((button) => !button.disabled, await picker.getByRole('button', { name: '核对所选订单', exact: true }).elementHandle())
+          assert.equal(await picker.locator('.ant-table-tbody .ant-table-row input[type="checkbox"]:checked').count(), 2, '预览每次打开都能选择全部订单')
+          if (attempt < 2) {
+            await picker.getByRole('button', { name: '取消', exact: true }).click()
+            await picker.waitFor({ state: 'hidden' })
+          }
+        }
         await picker
           .getByRole('button', { name: '核对所选订单', exact: true })
           .click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await assertBusinessFormScrollTracking(page, editor)
         const issues = editor.locator('[data-sales-import-issue-count]')
         const save = editor.getByRole('button', {
           name: '保存全部 2 张草稿',
@@ -153,9 +165,11 @@ export function createSalesOrderImportValidationScenarios(deps) {
         const select = async (id, text) => {
           const input = editor.locator(`input#sales-order-import_${id}`)
           await input.press('ArrowDown')
-          await input.press('Enter')
+          const dropdown = page.locator('.ant-select-dropdown:visible')
+          await dropdown.locator('.ant-select-item-option').filter({ hasText: text }).click()
+          await dropdown.waitFor({ state: 'hidden' })
           await editor.locator(`.ant-select:has(input#sales-order-import_${id}) .ant-select-selection-item`)
-            .filter({ hasText: text }).waitFor()
+            .filter({ hasText: id === 'customer_id' ? '模拟匹配客户' : text }).waitFor()
         }
         const waitForCount = (count) =>
           editor.locator(`[data-sales-import-issue-count="${count}"]`).waitFor()
@@ -220,10 +234,16 @@ export function createSalesOrderImportValidationScenarios(deps) {
         await issues.waitFor({ state: 'hidden' })
 
         await editor.locator('#sales-order-import_contact_email').fill('invalid-email')
+        await waitForCount(1)
         await editor
           .getByRole('button', { name: '下一单', exact: true })
           .click()
         await waitForCount(5)
+        await editor.getByRole('button', { name: '上一单', exact: true }).click()
+        assert.equal(await editor.locator('#sales-order-import_contact_email').inputValue(), 'invalid-email', '跨单切换保留已录入邮箱')
+        await editor.getByRole('button', { name: '下一单', exact: true }).click()
+        await waitForCount(5)
+        await assertBusinessFormScrollTracking(page, editor)
         await completeCommercialConditions()
         await waitForCount(3)
         await save.click()
@@ -261,13 +281,10 @@ export function createSalesOrderImportValidationScenarios(deps) {
         assert.equal(saves.length, 0)
         await editor.locator('#sales-order-import_items_0_ordered_quantity').fill('4')
         await issues.waitFor({ state: 'hidden' })
-        const details = editor.locator('.erp-line-item-details').first()
-        await details.locator('summary').click()
         await editor.locator('#sales-order-import_items_0_pre_shipment_sample_quantity').fill('0.5')
-        await details.locator('summary').click()
         await save.click()
         await waitForFocus('items_0_pre_shipment_sample_quantity')
-        assert.equal(await details.getAttribute('open'), '')
+        assert.ok(await editor.locator('#sales-order-import_items_0_pre_shipment_sample_quantity').isVisible())
         assert.equal(saves.length, 0)
         await editor.locator('#sales-order-import_items_0_pre_shipment_sample_quantity').fill('0')
         await issues.waitFor({ state: 'hidden' })

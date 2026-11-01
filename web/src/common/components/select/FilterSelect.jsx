@@ -10,6 +10,7 @@ const FilterSelect = React.forwardRef(({
   ...props
 }, ref) => (
   <AppSelect
+    presentation="compact"
     {...props}
     ref={ref}
     value={isEmptyFilterValue(value, emptyValue) ? undefined : value}

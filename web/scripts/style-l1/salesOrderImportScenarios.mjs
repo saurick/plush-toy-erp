@@ -372,9 +372,9 @@ export function createSalesOrderImportScenarios(deps) {
               await editor
                 .locator('.erp-sales-order-lines-form__row')
                 .nth(i)
-                .locator('details')
-                .getAttribute('open'),
-              null
+                .locator('textarea[id$="_note"]')
+                .isVisible(),
+              true
             )
           }
           if (salesOrderSourcePayment(order.lines.map((line) => line.item)).notes.length) {
@@ -385,7 +385,6 @@ export function createSalesOrderImportScenarios(deps) {
         await chooseOrder(0)
         if (!process.env.SALES_ORDER_IMPORT_TEST_FILE) {
           const originalNote = parsed.orders[0].lines[0].item.note || ''
-          await editor.locator('.erp-line-item-details > summary').first().click()
           await editor.locator('#sales-order-import_items_0_note').fill('模拟逐单编辑保留校验')
           await editor.locator('#sales-order-import_contact_email').fill('invalid-email')
           await chooseOrder(1)
@@ -395,10 +394,7 @@ export function createSalesOrderImportScenarios(deps) {
           assert.equal(mutations.length, 0)
           assert.equal(await editor.locator('#sales-order-import_items_0_note').inputValue(), '模拟逐单编辑保留校验')
           await editor.locator('#sales-order-import_contact_email').fill('')
-          const noteDetails = editor.locator('.erp-line-item-details').first()
-          if ((await noteDetails.getAttribute('open')) === null) await noteDetails.locator('summary').click()
           await editor.locator('#sales-order-import_items_0_note').fill(originalNote)
-          await noteDetails.locator('summary').click()
         }
         await editor
           .getByRole('button', {
@@ -508,7 +504,7 @@ export function createSalesOrderImportScenarios(deps) {
         await editor.getByRole('heading', { name: '编辑销售订单', exact: true }).waitFor()
         await checkPaymentRecords(parsed.orders[0])
         assert.equal(await editor.locator('.erp-sales-order-lines-form__row').count(), parsed.orders[0].lines.length)
-        assert.equal(await editor.locator('.erp-line-item-details').first().getAttribute('open'), null)
+        assert.ok(await editor.locator('.erp-line-item-details').first().getByLabel('备注', { exact: true }).isVisible())
         const sourceButton = editor.getByRole('button', { name: `核对原表：${parsed.orders[0].lines[0].sheetName} 第 ${parsed.orders[0].lines[0].rowNumber} 行`, exact: true })
         await page.setViewportSize({ width: 390, height: 844 })
         await sourceButton.scrollIntoViewIfNeeded()

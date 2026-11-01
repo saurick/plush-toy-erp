@@ -1,5 +1,6 @@
 import React from 'react'
 import { theme } from 'antd'
+import { revealBusinessLineItemErrors } from './businessLineItemDisclosure.mjs'
 import Modal from '@/common/components/modal/AppModal'
 import { resolveBusinessModalWidth } from '../../utils/modalSizes.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
@@ -36,17 +37,19 @@ export default function BusinessModal({
     if (submittingRef.current || busy || okButtonProps?.disabled || (inline && readOnly)) return
     submittingRef.current = true
     setSubmitting(true)
+    const focusErrors = (fields) => {
+      if (!fields?.length) return
+      revealBusinessLineItemErrors(form, fields)
+      form?.scrollToField(fields[0].name, { focus: true, block: 'nearest' })
+    }
     try {
-      return await onOk?.(event)
+      const result = await onOk?.(event)
+      focusErrors(form?.getFieldsError().filter((field) => field.errors.length > 0))
+      return result
     } catch (error) {
       // Ant Form has already attached validation errors to the fields.
       if (!Array.isArray(error?.errorFields)) throw error
-      if (error.errorFields[0]) {
-        form?.scrollToField(error.errorFields[0].name, {
-          focus: true,
-          block: 'nearest',
-        })
-      }
+      focusErrors(error.errorFields)
       return undefined
     } finally {
       submittingRef.current = false

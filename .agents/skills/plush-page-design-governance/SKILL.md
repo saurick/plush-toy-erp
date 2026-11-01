@@ -7,7 +7,7 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
 
 从当前任务的 checkout / Worktree 内用 `git rev-parse --show-toplevel` 核对仓库根；下文命令以该根目录为工作目录，仓库内引用也相对它解析。
 
-让页面的岗位任务、字段、动作和反馈清楚可用，并保持后端能力、Workflow / Fact、RBAC 与菜单真源一致。评估默认只给结论；实现请求连续完成当前授权范围及必要验证。
+让页面的岗位任务、字段、动作和反馈清楚可用，并保持后端能力、Workflow / Fact、RBAC 与菜单真源一致。评估按用户要求交付结论、图示或交互原型；实现请求连续完成当前授权范围及必要验证。
 
 ## Project Page Gates
 

@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { businessModuleDefinitions } from '../../src/erp/config/businessModules.mjs'
+import { assertLineItemGrouping } from './lineItemGroupingAssertions.mjs'
 import {
   assertTableHeaderControlsFit,
   assertTableSemanticAlignment,
@@ -131,6 +132,7 @@ export function createTableAlignmentScenarios({
   outputDir,
   customerRuntimeEffectiveSession,
   gotoScenarioPath,
+  assertLineItemsUnifiedHorizontalScroll,
 }) {
   const fixtures = ['light', 'dark', 'mobile'].map((mode) => ({
     name: `global-table-alignment-${mode}`,
@@ -164,7 +166,7 @@ export function createTableAlignmentScenarios({
       )
       assert.match(
         await calculationBasis.textContent(),
-        /提交审批时会冻结本次订单、BOM.*后续资料变更不会自动改写/u
+        /自动送审时会冻结本次订单、BOM.*后续资料变更不会自动改写/u
       )
       const evidence = []
       evidence.push(await measureTables(page))
@@ -339,8 +341,84 @@ export function createTableAlignmentScenarios({
       })
     },
   }))
+  const groupingFixtures = ['light', 'dark', 'narrow'].map((mode) => ({
+    name: `business-line-grouping-${mode}`,
+    path: '/scripts/test/TableAlignmentFixture.html',
+    viewport: { width: mode === 'narrow' ? 390 : 1440, height: 1000 },
+    verify: async (page) => {
+      await page.locator('#native-table .erp-editable-line-group').last().waitFor()
+      if (mode === 'dark') await page.locator('#toggle-theme').click()
+      const evidence = {
+        document: await assertLineItemGrouping(page.locator('#native-table')),
+        compact: await assertLineItemGrouping(page.locator('#compact-table')),
+      }
+      await page.getByRole('button', { name: '复制联系人条目 1', exact: true }).click()
+      evidence.contacts = await assertLineItemGrouping(page.locator('#contact-table'))
+      await page.getByRole('button', { name: '移除联系人条目 2', exact: true }).click()
+      assert.equal(await page.locator('#contact-table .erp-editable-line-group').count(), 1)
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, '明细溢出应保持在自身滚动区内')
+      await writeFile(
+        path.join(outputDir, `business-line-grouping-${mode}.json`),
+        JSON.stringify(evidence, null, 2)
+      )
+      for (const table of ['native', 'compact', 'contact']) {
+        await page.locator(`#${table}-table`).screenshot({
+          path: path.join(outputDir, `business-line-grouping-${mode}-${table}.png`),
+        })
+      }
+    },
+  }))
+  const groupedDocuments = [
+    ['purchase', '/erp/purchase/accessories', '新建采购订单', '添加采购明细'],
+    ['sales', '/erp/sales/project-orders/sales-orders', '新建订单', '添加订货明细'],
+    ['outsourcing', '/erp/purchase/processing-contracts', '新建加工合同', '添加加工明细'],
+    ['shipment', '/erp/warehouse/shipments', '新建出货单', '添加出货明细'],
+    ['production', '/erp/production/orders', '新建生产订单', '添加生产明细'],
+  ].map(([kind, route, trigger, addLabel]) => ({
+    name: `business-line-grouping-${kind}`,
+    path: route,
+    auth: 'admin',
+    effectiveSession: {
+      ...customerRuntimeEffectiveSession,
+      pages: [...customerRuntimeEffectiveSession.pages, 'production-orders'],
+    },
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
+    verify: async (page) => {
+      await page.getByRole('button', { name: trigger }).click()
+      const editor = page.locator('.erp-business-form-page:not([hidden])')
+      const table = editor.locator(kind === 'production' ? '.erp-compact-field-table' : '.erp-sales-order-lines-form__list')
+      const groups = table.locator('.erp-editable-line-group')
+      await editor.waitFor()
+      for (let count = await groups.count(); count < 2; count += 1) {
+        await editor.getByRole('button', { name: addLabel, exact: true }).first().click()
+        await groups.nth(count).waitFor()
+      }
+      await assertLineItemGrouping(table)
+      await groups.nth(1).getByRole('textbox').last().fill('保留第二条明细备注')
+      await groups.first().getByRole('button', { name: /移除/u }).click()
+      assert.equal(await groups.count(), 1)
+      assert.equal(await groups.first().getByRole('textbox').last().inputValue(), '保留第二条明细备注', '移除后保留原条目的输入与归属')
+      assert.equal(await groups.first().locator('.erp-editable-line-group__number').textContent(), '1')
+      await editor.getByRole('button', { name: addLabel, exact: true }).first().click()
+      await page.setViewportSize({ width: 720, height: 1000 })
+      if (kind === 'purchase') {
+        await assertLineItemsUnifiedHorizontalScroll(editor, {
+          scenarioName: 'business-line-grouping-purchase',
+          minRows: 2,
+        })
+      }
+      await assertLineItemGrouping(table)
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false)
+      await page.setViewportSize({ width: 1920, height: 1080 })
+      await groups.nth(1).getByRole('textbox').last().fill('这条备注与上方主字段属于同一条明细。')
+      await table.screenshot({ path: path.join(outputDir, `business-line-grouping-${kind}-items.png`) })
+    },
+  }))
   return [
     ...fixtures,
+    ...groupingFixtures,
+    ...groupedDocuments,
     {
       name: 'global-table-alignment-business-pages',
       path: businessModuleDefinitions[0].path,

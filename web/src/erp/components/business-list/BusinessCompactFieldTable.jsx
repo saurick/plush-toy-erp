@@ -1,7 +1,9 @@
 import React from 'react'
-import { Form } from 'antd'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
+import SelectPresentationContext from '@/common/components/select/SelectPresentationContext.jsx'
 import './businessCompactFieldTable.css'
+import './businessLineItemGroups.css'
+import { useBusinessLineItemDisclosure } from './BusinessLineItemDisclosureContext.js'
 
 export default function BusinessCompactFieldTable({
   columns,
@@ -58,24 +60,31 @@ export function BusinessCompactFieldRow({
   className = '',
   rowRef,
   sequence,
+  lineItemIndex,
 }) {
+  const disclosure = useBusinessLineItemDisclosure()
   return (
     <tbody
-      className={`erp-compact-field-table__row ${className}`.trim()}
+      className={`erp-compact-field-table__row erp-editable-line-group ${className}`.trim()}
       aria-label={label}
       ref={rowRef}
+      hidden={disclosure?.hidden}
+      data-line-item-collapsed={disclosure?.hidden ? 'true' : undefined}
+      data-line-item-index={disclosure?.index ?? lineItemIndex}
+      onFocusCapture={disclosure?.onFocus}
     >
       <tr className="erp-compact-field-table__fields">
         {sequence !== undefined ? (
           <td
-            className="erp-compact-field-table__sequence"
+            className="erp-compact-field-table__sequence erp-editable-line-group__sequence"
+            rowSpan={children ? 2 : 1}
             aria-label={`第 ${sequence} 条`}
           >
-            {sequence}
+            <span className="erp-editable-line-group__number">{sequence}</span>
           </td>
         ) : null}
         {cells.map((cell, index) => (
-          <td key={index}>{cell}</td>
+          <td key={index}><SelectPresentationContext.Provider value="reference">{cell}</SelectPresentationContext.Provider></td>
         ))}
         {actions !== undefined ? (
           <td className="erp-compact-field-table__actions">{actions}</td>
@@ -86,8 +95,7 @@ export function BusinessCompactFieldRow({
           <td
             colSpan={
               cells.length +
-              (actions !== undefined ? 1 : 0) +
-              (sequence !== undefined ? 1 : 0)
+              (actions !== undefined ? 1 : 0)
             }
           >
             {children}
@@ -95,23 +103,6 @@ export function BusinessCompactFieldRow({
         </tr>
       ) : null}
     </tbody>
-  )
-}
-
-export function BusinessOptionalField({ name, label = '备注', children }) {
-  const form = Form.useFormInstance()
-  const rootValue = Form.useWatch(name[0], { form, preserve: true })
-  const value = name.slice(1).reduce((current, key) => current?.[key], rootValue)
-  return (
-    <details className="erp-optional-field">
-      <summary>
-        <span>{label}</span>
-        {String(value ?? '').trim() ? (
-          <span className="erp-optional-field__summary">{String(value)}</span>
-        ) : null}
-      </summary>
-      <div className="erp-optional-field__body">{children}</div>
-    </details>
   )
 }
 

@@ -89,13 +89,14 @@ export function paymentAllocationExportValue(record) {
 
 export function partyOption(record, fallback) {
   const code = String(
-    record?.customer_code || record?.supplier_code || ''
+    record?.customer_code || record?.supplier_code || record?.code || ''
   ).trim()
   const name = String(
     record?.name || record?.customer_name || record?.supplier_name || ''
   ).trim()
   return {
     value: Number(record?.id),
+    identity: { name: name || fallback, code },
     label: [code, name].filter(Boolean).join(' ') || fallback,
   }
 }

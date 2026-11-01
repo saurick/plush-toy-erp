@@ -3,5 +3,6 @@
   "accents": ["blue", "green", "teal", "yellow", "pink", "mauve", "orange", "purple"],
   "densities": ["standard", "compact"],
   "table_lines": ["simple", "grid"],
-  "defaults": { "theme_mode": "system", "accent": "blue", "density": "compact", "tableLines": "grid" }
+  "form_displays": ["all", "section"],
+  "defaults": { "theme_mode": "system", "accent": "blue", "density": "compact", "tableLines": "grid", "formDisplay": "all" }
 }

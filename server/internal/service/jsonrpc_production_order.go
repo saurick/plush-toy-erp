@@ -11,6 +11,7 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
+	corevalue "server/internal/core/value"
 	"server/internal/errcode"
 
 	"github.com/shopspring/decimal"
@@ -346,7 +347,7 @@ func productionOrderDraftFromParams(pm map[string]any) (biz.ProductionOrderDraft
 	if !ok {
 		return biz.ProductionOrderDraft{}, "", false
 	}
-	note, ok := productionOrderOptionalString(pm, "note", 255)
+	note, ok := productionOrderOptionalString(pm, "note", corevalue.BusinessNoteMaxCharacters)
 	if !ok {
 		return biz.ProductionOrderDraft{}, "", false
 	}
@@ -370,7 +371,7 @@ func productionOrderDraftFromParams(pm map[string]any) (biz.ProductionOrderDraft
 		bomID, ok7 := productionOrderOptionalPositiveInt(item, "bom_header_id")
 		routeCode, ok8 := productionOrderOptionalString(item, "route_code", 64)
 		customerInspectionRequired, ok9 := productionOrderOptionalBool(item, "customer_inspection_required", false)
-		itemNote, ok10 := productionOrderOptionalString(item, "note", 255)
+		itemNote, ok10 := productionOrderOptionalString(item, "note", corevalue.BusinessNoteMaxCharacters)
 		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !ok6 || !ok7 || !ok8 || !ok9 || !ok10 {
 			return biz.ProductionOrderDraft{}, "", false
 		}

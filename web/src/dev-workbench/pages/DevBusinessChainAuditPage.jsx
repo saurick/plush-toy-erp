@@ -19,6 +19,8 @@ import SearchInput from '@/common/components/SearchInput'
 import { MermaidDiagram } from '@/common/components/markdown'
 import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import { DevReadingReturn } from '../components/DevReadingNavigation.jsx'
+import { ChainCapabilityLinks } from '../components/DevProductCoreRelations.jsx'
 import DevChainAuditEvidence, {
   ChainAuditEvidenceLinks,
   ChainAuditFindings,
@@ -343,6 +345,7 @@ function ChainSteps({ data, chain, status, keyword, stepKey, updateQuery }) {
         <Alert type="warning" showIcon message="所选批次没有这条链路" action={<Button onClick={() => updateQuery({ chain: null, step: null, scope: null, q: null, status: null })}>查看全部链路</Button>} />
       ) : null}
       <Table
+        className="erp-dev-chain-audit__steps"
         rowKey="rowKey"
         size="middle"
         dataSource={rows}
@@ -393,6 +396,12 @@ export default function DevBusinessChainAuditPage() {
   const stepKey = searchParams.get('step') || ''
   const detailsOpen = searchParams.get('details') === 'report' || view !== 'chains'
   const showSteps = chain !== 'all' || Boolean(stepKey || keyword) || status !== 'all' || searchParams.get('scope') === 'steps'
+  useEffect(() => {
+    if (!batch || searchParams.get('batch') === batch) return
+    const next = new URLSearchParams(searchParams)
+    next.set('batch', batch)
+    setSearchParams(next, { replace: true, state: navigationState })
+  }, [batch, searchParams, setSearchParams, navigationState])
   const updateQuery = (patch) => {
     const next = new URLSearchParams(searchParams)
     if (batch) next.set('batch', batch)
@@ -464,6 +473,7 @@ export default function DevBusinessChainAuditPage() {
   const definition = data?.definitionComparison?.status === 'changed' ? '定义已变化，需复验' : data?.definitionComparison?.status !== 'unchanged' ? '定义待核对' : ''
   return (
     <div className="erp-dev-chain-audit" data-dev-chain-audit>
+      <DevReadingReturn ready={!catalog.loading && (!batch || !loaded.loading)} />
       <header className="erp-dev-chain-audit__header">
         <div className="erp-dev-chain-audit__heading">
           {showSteps ? <Button type="text" icon={<LeftOutlined aria-hidden="true" />} onClick={() => updateQuery({ chain: null, step: null, q: null, status: null, scope: null })}>收起步骤</Button> : null}
@@ -487,6 +497,7 @@ export default function DevBusinessChainAuditPage() {
           <Button icon={<ReloadOutlined aria-hidden="true" />} onClick={() => setRevision((value) => value + 1)} loading={catalog.loading}>重新读取</Button>
         </Space>
       </header>
+      <ChainCapabilityLinks chainKey={chain} fromLabel="链路实测报告" report />
       {catalog.error ? <Alert type="error" showIcon message={catalog.error} description="目录读取失败，已停止展示上次报告。可点击重新读取。" /> : null}
       {!catalog.error && error ? <Alert type="error" showIcon message={error} description="未将缺失或损坏的报告判为通过。" /> : null}
       {!catalog.error && !batch && !catalog.loading ? (

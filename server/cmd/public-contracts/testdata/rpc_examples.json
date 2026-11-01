@@ -1182,6 +1182,7 @@
         "appearance": {
           "accent": "purple",
           "density": "compact",
+          "formDisplay": "all",
           "tableLines": "grid",
           "theme_mode": "dark"
         },
@@ -1522,6 +1523,7 @@
         "appearance": {
           "accent": "green",
           "density": "compact",
+          "formDisplay": "section",
           "tableLines": "grid",
           "theme_mode": "dark"
         },
@@ -1539,7 +1541,8 @@
     },
     "message": "OK",
     "params": {
-      "accent": "green"
+      "accent": "green",
+      "formDisplay": "section"
     },
     "test": "TestJsonrpcDispatcher_AdminSetERPAppearance"
   },
@@ -1550,6 +1553,7 @@
         "appearance": {
           "accent": "blue",
           "density": "compact",
+          "formDisplay": "all",
           "tableLines": "grid",
           "theme_mode": "system"
         },
@@ -2035,6 +2039,7 @@
         "appearance": {
           "accent": "blue",
           "density": "compact",
+          "formDisplay": "all",
           "tableLines": "grid",
           "theme_mode": "system"
         },
@@ -2107,6 +2112,7 @@
         "appearance": {
           "accent": "blue",
           "density": "compact",
+          "formDisplay": "all",
           "tableLines": "grid",
           "theme_mode": "system"
         },
@@ -2193,6 +2199,7 @@
         "appearance": {
           "accent": "blue",
           "density": "compact",
+          "formDisplay": "all",
           "tableLines": "grid",
           "theme_mode": "system"
         },
@@ -2360,8 +2367,7 @@
     "message": "OK",
     "params": {
       "product_id": 1,
-      "source_id": 1,
-      "version": "V2"
+      "source_id": 1
     },
     "test": "TestJsonrpcDispatcher_BOMVersionLifecycle"
   },
@@ -2517,8 +2523,7 @@
         }
       ],
       "product_id": 1,
-      "quantity_text": "100",
-      "version": "CAS-V1"
+      "quantity_text": "100"
     },
     "test": "TestJsonrpcDispatcher_BOMAggregateSaveRequiresExpectedVersionAndMapsConflict"
   },
@@ -16653,6 +16658,16 @@
           "unit_name": "只"
         }
       ],
+      "source_orders": [
+        {
+          "customer_code": "CUS-002",
+          "customer_id": 2,
+          "customer_name": "当前客户",
+          "customer_name_snapshot": "订单客户",
+          "order_no": "SO-001",
+          "sales_order_id": 1
+        }
+      ],
       "total": 1
     },
     "message": "OK",
@@ -21183,6 +21198,7 @@
       "sales_order_items": [
         {
           "amount": null,
+          "bom_id": null,
           "color_snapshot": null,
           "created_at": -62135596800,
           "customer_product_no": null,
@@ -21205,7 +21221,6 @@
           "production_quantity": "10",
           "requested_product_name": null,
           "sales_order_id": 1,
-          "bom_id": null,
           "shipped_quantity": null,
           "unit_id": 1,
           "unit_price": null,
@@ -21227,6 +21242,7 @@
       "items": [
         {
           "amount": null,
+          "bom_id": null,
           "color_snapshot": null,
           "created_at": -62135596800,
           "currency": "USD",
@@ -21255,7 +21271,6 @@
           "requested_product_name": null,
           "sales_order_id": 1,
           "sales_owner": null,
-          "bom_id": null,
           "shipped_quantity": null,
           "unit_id": 0,
           "unit_name": "只",
@@ -21502,7 +21517,8 @@
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 2
+        "version": 2,
+        "task_no": "RW20261018-0029"
       }
     },
     "message": "任务阻塞已记录",
@@ -21559,7 +21575,8 @@
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 2
+        "version": 2,
+        "task_no": "RW20261018-0029"
       }
     },
     "message": "任务动作已完成",
@@ -21612,7 +21629,8 @@
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 0
+        "version": 0,
+        "task_no": "RW20261018-0029"
       }
     },
     "message": "跟进任务已创建",
@@ -21667,7 +21685,8 @@
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 0
+        "version": 0,
+        "task_no": "RW20261018-0029"
       }
     },
     "message": "任务已创建",
@@ -21953,7 +21972,8 @@
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 1
+        "version": 1,
+        "task_no": "RW20261018-0029"
       }
     },
     "message": "OK",
@@ -22310,7 +22330,8 @@
           "updated_at": -62135596800,
           "updated_by": null,
           "urge_count": 0,
-          "version": 1
+          "version": 1,
+          "task_no": "RW20261018-0029"
         }
       ],
       "limit": 8,
@@ -22440,7 +22461,16 @@
           "reason": "等待库位确认",
           "task_id": 42,
           "task_version": 3,
-          "to_status_key": "blocked"
+          "to_status_key": "blocked",
+          "task": {
+            "id": 42,
+            "task_name": "核对收货库位",
+            "task_group": "warehouse_receiving",
+            "owner_role_key": "warehouse",
+            "required_capability_key": null,
+            "source_type": "purchase_receipt",
+            "source_id": 6
+          }
         }
       ],
       "truncated": false
@@ -22449,9 +22479,10 @@
     "params": {
       "before_event_id": 0,
       "limit": 100,
-      "task_id": 42
+      "task_id": 42,
+      "scope": "flow"
     },
-    "test": "TestJsonrpcDispatcher_WorkflowListTaskEventsSupportsNonApprovalTasksWithoutActorID"
+    "test": "TestWorkflowTaskFlowEventsRequirePermissionAndBoundedScope"
   },
   "workflow.list_tasks": {
     "basis": "handler-fixture",
@@ -22558,7 +22589,8 @@
           "updated_at": -62135596800,
           "updated_by": null,
           "urge_count": 0,
-          "version": 1
+          "version": 1,
+          "task_no": "RW20261018-0029"
         }
       ],
       "next_cursor": "",
@@ -22643,7 +22675,8 @@
         "updated_at": 1792394185,
         "updated_by": 7,
         "urge_count": 0,
-        "version": 2
+        "version": 2,
+        "task_no": "RW20261018-0029"
       }
     },
     "params": {
@@ -22693,7 +22726,8 @@
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 2
+        "version": 2,
+        "task_no": "RW20261018-0029"
       }
     },
     "message": "任务退回已记录",
@@ -22747,7 +22781,8 @@
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 2
+        "version": 2,
+        "task_no": "RW20261018-0029"
       }
     },
     "message": "任务已解除阻塞，可继续处理",
@@ -22758,7 +22793,6 @@
       "payload": {
         "surface_key": "mobile_role_tasks"
       },
-      "reason": "阻塞资料已补齐",
       "task_id": 44
     },
     "test": "TestJsonrpcDispatcher_WorkflowResumeTaskActionReplaysReceiptAndRejectsNewAttempt"
@@ -22805,7 +22839,8 @@
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 2
+        "version": 2,
+        "task_no": "RW20261018-0029"
       }
     },
     "message": "任务催办已记录",
@@ -22823,7 +22858,6 @@
         ],
         "surface_key": " mobile_role_tasks "
       },
-      "reason": "请今天确认",
       "task_id": 1
     },
     "test": "TestJsonrpcDispatcher_WorkflowUrgeTaskRecordsEventIntent"

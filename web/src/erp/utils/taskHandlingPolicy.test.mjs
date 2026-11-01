@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { isWorkflowApprovalTask, WORKFLOW_APPROVAL_CAPABILITY_KEYS } from './workflowTaskActionContract.mjs'
-import { TASK_STAGE_HANDLING, taskDeviceNotice, taskHandlingMatrix, taskHandlingPolicy, taskNeedsDesktop } from './taskHandlingPolicy.mjs'
+import { TASK_STAGE_HANDLING, taskDeviceNotice, taskHandlingMatrix, taskHandlingPolicy, taskNeedsDesktop, taskReadOnlyNotice } from './taskHandlingPolicy.mjs'
 
 test('每个正式任务环节有设备分工，目录新增或删除不能静默遗漏', () => {
   assert.deepEqual(Object.keys(TASK_STAGE_HANDLING).sort(), catalog.stages.map((stage) => stage.key).sort())
@@ -18,11 +18,14 @@ test('每个正式任务环节有设备分工，目录新增或删除不能静�
 test('分类使用正式环节和具体任务能力，不能按来源单据或名称统一禁用手机', () => {
   const purchase = { discovery: { stage_key: 'purchasing' }, source_type: 'purchase_order' }
   assert.equal(taskNeedsDesktop(purchase), true)
+  assert.equal(taskReadOnlyNotice(purchase), '业务资料仅供查看')
   assert.equal(taskNeedsDesktop({ ...purchase, task_group: 'handoff_purchase_arrival' }), false)
+  assert.equal(taskReadOnlyNotice({ ...purchase, task_group: 'handoff_purchase_arrival' }), '')
   for (const capability of WORKFLOW_APPROVAL_CAPABILITY_KEYS) {
     const task = { ...purchase, required_capability_key: capability }
     assert.equal(taskHandlingPolicy(task).kind, 'decision')
     assert.equal(taskNeedsDesktop(task), false)
+    assert.equal(taskReadOnlyNotice(task), '')
   }
   assert.equal(taskHandlingPolicy({ task_name: '编辑 BOM', source_type: 'bom' }), null)
   assert.equal(taskHandlingPolicy({ discovery: { stage_key: 'unregistered' } }), null)
@@ -31,13 +34,17 @@ test('分类使用正式环节和具体任务能力，不能按来源单据或�
 test('工程资料与修订在电脑办理，出货区分编制和实际执行，历史不出现继续办理提示', () => {
   for (const group of ['engineering_data', 'engineering_material_revision']) {
     assert.equal(taskNeedsDesktop({ task_group: group }), true)
+    assert.equal(taskReadOnlyNotice({ task_group: group }), 'BOM 仅供查看')
+    assert.equal(taskReadOnlyNotice({ task_group: group, required_capability_key: WORKFLOW_APPROVAL_CAPABILITY_KEYS[0] }), '')
   }
   const shipment = { task_group: 'handoff_shipment_execute', task_status_key: 'ready' }
   assert.equal(taskHandlingPolicy(shipment).mobile, 'limited')
+  assert.equal(taskReadOnlyNotice(shipment), '')
   assert.match(taskDeviceNotice(shipment), /草稿编制和提交审批在电脑/)
   for (const task_status_key of ['done', 'rejected', 'withdrawn']) {
     assert.equal(taskDeviceNotice({ ...shipment, task_status_key }), '')
     assert.equal(taskDeviceNotice({ task_group: 'engineering_data', task_status_key }), '')
+    assert.equal(taskReadOnlyNotice({ task_group: 'engineering_data', task_status_key }), '')
   }
 })
 

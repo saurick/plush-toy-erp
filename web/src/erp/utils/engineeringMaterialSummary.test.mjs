@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import {
   formatMaterialQuantity,
   formatMaterialSourceQuantity,
@@ -108,8 +109,8 @@ test('inventory missing access and incompatible units never become zero stock', 
 })
 
 test('Chinese and ASCII notes match the source storage boundary', () => {
-  assert.equal(materialNoteFits('注'.repeat(85)), true)
-  assert.equal(materialNoteFits('注'.repeat(86)), false)
-  assert.equal(materialNoteFits('a'.repeat(255)), true)
-  assert.equal(materialNoteFits('a'.repeat(256)), false)
+  assert.equal(materialNoteFits('注'.repeat(BusinessTextPolicy.noteMaxCharacters)), true)
+  assert.equal(materialNoteFits('注'.repeat(BusinessTextPolicy.noteMaxCharacters + 1)), false)
+  assert.equal(materialNoteFits('a'.repeat(BusinessTextPolicy.noteMaxCharacters)), true)
+  assert.equal(materialNoteFits('a'.repeat(BusinessTextPolicy.noteMaxCharacters + 1)), false)
 })

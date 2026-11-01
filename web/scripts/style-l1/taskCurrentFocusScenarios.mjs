@@ -95,7 +95,7 @@ deviceScaleFactor: mobile ? 1 : 2,
               { id: 722, event_type: blocked ? 'status_changed' : 'payload_refreshed', from_status_key: 'ready', to_status_key: fixture.task_status_key, created_at: 1790085690, actor_display_name: '工程演示人员', actor_role_key: 'engineering', task_version: 2, reason: blocked ? fixture.blocked_reason.repeat(5) : '已补充任务资料，原办理记录保留。' },
               { id: 721, event_type: 'created', created_at: 1790085600, to_status_key: 'ready', task_version: 1 },
             ]
-            return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, data: { items, truncated: false } } } })
+            return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, data: { items: items.map(item => ({ ...item, task_id: fixture.id, ...(body.params.scope === 'flow' ? { task: { id: fixture.id, task_name: fixture.task_name, task_group: fixture.task_group, owner_role_key: fixture.owner_role_key, required_capability_key: fixture.required_capability_key, source_type: fixture.source_type, source_id: fixture.source_id } } : {}) })), truncated: false } } } })
           }
           if (body?.method === 'explain_action_access' && body.params.task_id === fixture.id) {
             const permitted = blocked ? ['resume', 'urge'] : ['complete', 'block', 'reject', 'urge']
@@ -160,7 +160,7 @@ deviceScaleFactor: mobile ? 1 : 2,
         assert.equal(await track.locator(':scope > ol [data-linked-task="true"]').count(), 0, '本任务当前责任已在上方突出，不再重复一个当前节点卡片')
         assert.equal(handlingReads, 0, '默认详情不请求整单任务链')
         const records = detail.getByTestId('workflow-task-event-trail')
-        await records.getByRole('heading', { name: '本任务处理记录', exact: true }).waitFor()
+        await records.getByRole('heading', { name: '流程处理记录', exact: true }).waitFor()
         assert.equal(await records.locator('details, summary').count(), 0)
         assert.match(await records.locator('.workflow-task-event-trail__head').innerText(), /2 条/u)
         assert.doesNotMatch(await records.locator('.workflow-task-event-trail__head').innerText(), /最近在前|从早到晚/u)

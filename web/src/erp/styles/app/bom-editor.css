@@ -23,7 +23,7 @@
 
 .erp-bom-parts-table {
   width: 100%;
-  min-width: 1420px;
+  min-width: 1620px;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -84,10 +84,6 @@
 .erp-bom-center-cell .ant-select-selection-placeholder {
   padding-inline: 0;
   text-align: center;
-}
-
-.erp-bom-center-cell .erp-bom-import-line-status {
-  justify-content: center;
 }
 
 .erp-bom-parts-table .erp-bom-number-cell,
@@ -199,10 +195,15 @@
 }
 .erp-bom-header-note {
   grid-column: 1 / -1;
-  --erp-textarea-rows: 2;
 }
 @container business-form-fields (max-width: 520px) {
   .erp-bom-header-primary > .erp-business-form-section__fields {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.erp-bom-editor .erp-bom-version:disabled {
+  color: var(--erp-text);
+  -webkit-text-fill-color: var(--erp-text);
+  opacity: 1;
 }

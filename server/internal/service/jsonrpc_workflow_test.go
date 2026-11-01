@@ -2142,7 +2142,7 @@ func TestJsonrpcDispatcher_WorkflowActionExactReplaySurvivesSourceReadPermission
 	}
 }
 
-func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsEmptyReason(t *testing.T) {
+func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsNonTextReason(t *testing.T) {
 	repo := &stubWorkflowJSONRPCRepo{}
 	j := &jsonrpcDispatcher{
 		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
@@ -2155,7 +2155,7 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsEmptyReason(t *testing.T) {
 		"expected_version": float64(1),
 		"idempotency_key":  "workflow-unrelated-urge-1",
 		"action":           "urge_task",
-		"reason":           " \t ",
+		"reason":           float64(7),
 		"payload": map[string]any{
 			"surface_key": "mobile_role_tasks",
 		},
@@ -2169,10 +2169,10 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsEmptyReason(t *testing.T) {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	if res == nil || res.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected invalid param for empty urge reason, got %#v", res)
+		t.Fatalf("expected invalid param for non-text urge reason, got %#v", res)
 	}
 	if repo.urgeInput != nil {
-		t.Fatalf("empty urge reason must not record urge input, got %#v", repo.urgeInput)
+		t.Fatalf("non-text urge reason must not record urge input, got %#v", repo.urgeInput)
 	}
 }
 
@@ -2842,6 +2842,47 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsUseServerStatusAndActorR
 				t.Fatalf("expected server-derived actor role %q, got %q", biz.QualityRoleKey, repo.updateActorRoleKey)
 			}
 		})
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowOptionalExplanationContracts(t *testing.T) {
+	for _, method := range []string{"resume_task_action", "urge_task"} {
+		for _, value := range []any{nil, "", "  ", "  已核对  ", float64(12), true} {
+			t.Run(fmt.Sprintf("%s/%v", method, value), func(t *testing.T) {
+				repo := &stubWorkflowJSONRPCRepo{currentTask: &biz.WorkflowTask{ID: 43, TaskGroup: "generic", SourceType: "generic-source", SourceID: 1, TaskStatusKey: "blocked", OwnerRoleKey: biz.QualityRoleKey, Version: 1, Payload: map[string]any{"blocked_reason": "旧原因"}}}
+				j := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard)), adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.QualityRoleKey}, biz.PermissionWorkflowTaskUpdate)}, workflowUC: biz.NewWorkflowUsecase(repo), customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled")}
+				params := map[string]any{"task_id": float64(43), "expected_version": float64(1), "idempotency_key": "optional-explanation", "payload": map[string]any{}}
+				if method == "resume_task_action" {
+					params["action_key"] = "resume"
+				} else {
+					params["action"] = "urge_task"
+				}
+				if value != nil {
+					params["reason"] = value
+				}
+				_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), method, "1", mustJSONRPCStruct(t, params))
+				_, isText := value.(string)
+				if value != nil && !isText {
+					if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || repo.updateInput != nil || repo.urgeInput != nil {
+						t.Fatalf("non-text explanation must fail before mutation: result=%#v err=%v", res, err)
+					}
+					return
+				}
+				if err != nil || res == nil || res.Code != errcode.OK.Code {
+					t.Fatalf("optional explanation must succeed: result=%#v err=%v", res, err)
+				}
+				want := ""
+				if text, ok := value.(string); ok {
+					want = strings.TrimSpace(text)
+				}
+				if method == "resume_task_action" && (repo.updateInput == nil || repo.updateInput.Reason != want) {
+					t.Fatalf("resume explanation mismatch: %#v", repo.updateInput)
+				}
+				if method == "urge_task" && (repo.urgeInput == nil || repo.urgeInput.Reason != want) {
+					t.Fatalf("urge explanation mismatch: %#v", repo.urgeInput)
+				}
+			})
+		}
 	}
 }
 

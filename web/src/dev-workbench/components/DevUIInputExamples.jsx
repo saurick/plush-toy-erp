@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
 import { Button, Input } from 'antd'
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import BusinessTextArea from '@/erp/components/business-list/BusinessTextArea.jsx'
 import {
   DateInput,
   DateTimeInput,
@@ -28,6 +30,7 @@ export function BasicInputExample() {
   const [state, setState] = useState('normal')
   const [name, setName] = useState('布偶熊')
   const [category, setCategory] = useState('toy')
+  const [note, setNote] = useState('')
   const disabled = state === 'disabled'
   const status = state === 'error' ? 'error' : undefined
   return (
@@ -68,6 +71,20 @@ export function BasicInputExample() {
           />
         </div>
       </div>
+      <div className="erp-control-input-field">
+        <label htmlFor="control-remark">备注</label>
+        <BusinessTextArea
+          id="control-remark"
+          minRows={2}
+          maxLength={BusinessTextPolicy.noteMaxCharacters}
+          showCount
+          allowClear
+          value={note}
+          disabled={disabled}
+          status={status}
+          onChange={(event) => setNote(event.target.value)}
+        />
+      </div>
       {status && (
         <p role="alert">错误外观由示例状态触发；正式页面按字段校验结果设置。</p>
       )}
@@ -85,6 +102,7 @@ export function BasicInputExample() {
           onClick={() => {
             setName('布偶熊')
             setCategory('toy')
+            setNote('')
             setState('normal')
           }}
         >

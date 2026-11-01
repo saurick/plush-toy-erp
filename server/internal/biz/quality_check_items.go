@@ -5,6 +5,7 @@ import (
 	"unicode/utf8"
 
 	"server/internal/core/qualitycheck"
+	corevalue "server/internal/core/value"
 )
 
 // NormalizeQualityCheckItems validates operator evidence independently of the
@@ -25,7 +26,7 @@ func NormalizeQualityCheckItems(items []qualitycheck.Item, result string) ([]qua
 		item.Note = strings.TrimSpace(item.Note)
 		item.Result = strings.TrimSpace(item.Result)
 		item.Scope = strings.TrimSpace(item.Scope)
-		if item.Name == "" || utf8.RuneCountInString(item.Name) > 80 || utf8.RuneCountInString(item.Requirement) > 255 || utf8.RuneCountInString(item.Observation) > 255 || utf8.RuneCountInString(item.Note) > 500 {
+		if item.Name == "" || utf8.RuneCountInString(item.Name) > 80 || utf8.RuneCountInString(item.Requirement) > 255 || utf8.RuneCountInString(item.Observation) > 255 || utf8.RuneCountInString(item.Note) > corevalue.BusinessNoteMaxCharacters {
 			return nil, ErrBadParam
 		}
 		switch item.Result {

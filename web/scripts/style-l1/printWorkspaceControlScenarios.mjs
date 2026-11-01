@@ -462,23 +462,13 @@ export function createPrintWorkspaceControlScenarios({
             await page.getByText('点击纸面填写', { exact: true }).count(),
             0
           )
-          const tableDetails = panel
-            .getByRole('region', { name: '表格操作', exact: true })
-            .locator(':scope > details')
-          assert(
-            await tableDetails.evaluate((node) => node.open),
-            '常用表格操作默认展开'
-          )
-          for (const title of ['末尾附图', '计算规则', '模板内容']) {
-            const group = panel
-              .getByRole('region', { name: title, exact: true })
-              .locator(':scope > details')
+          for (const title of ['表格操作', '条款编辑', '末尾附图', '模板内容']) {
+            const group = panel.getByRole('region', { name: title, exact: true })
             if (await group.count()) {
-              assert.equal(
-                await group.evaluate((node) => node.open),
-                false,
-                `${title} 默认收起`
-              )
+              assert.equal(await group.locator(':scope > details').count(), 0, `${title} 不隐藏编辑入口`)
+              assert(await group.locator(':scope > .erp-print-shell__tool-content').isVisible(), `${title} 直接可见`)
+              const heading = await group.locator(':scope > h3').evaluate((node) => ({ font: Number.parseFloat(getComputedStyle(node).fontSize), gap: Number.parseFloat(getComputedStyle(node).columnGap) }))
+              assert(heading.font >= 14 && heading.gap >= 8, `${title} 标题与数量保持可读间距: ${JSON.stringify(heading)}`)
             }
           }
           const zoom = page.getByRole('combobox', { name: '显示比例', exact: true })
@@ -744,19 +734,9 @@ export function createPrintWorkspaceControlScenarios({
               ),
               '选择状态和返回入口紧邻当前工具'
             )
-            await tableDetails.locator(':scope > summary').click()
-            await page.waitForFunction(
-              () =>
-                document.querySelector('[data-print-workspace-mode]').dataset
-                  .printWorkspaceMode === 'edit'
-            )
-            assert.equal(await selection.count(), 0, '收起表格工具同时退出选择')
-            await tableDetails.locator(':scope > summary').focus()
-            await tableDetails.locator(':scope > summary').press('Space')
-            assert(
-              await tableDetails.evaluate((node) => node.open),
-              '键盘可重新展开工具'
-            )
+            await page.getByRole('button', { name: '返回编辑', exact: true }).click()
+            await page.waitForFunction(() => document.querySelector('[data-print-workspace-mode]').dataset.printWorkspaceMode === 'edit')
+            assert.equal(await selection.count(), 0, '返回编辑清除选择并保留工具')
             await action.click()
             await page.keyboard.press('Escape')
             await page.waitForFunction(() =>

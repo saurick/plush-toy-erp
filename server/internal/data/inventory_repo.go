@@ -1542,6 +1542,10 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 	if in.ProductID != source.ProductID {
 		return nil, biz.ErrBadParam
 	}
+	version, err := allocateBOMVersion(ctx, tx, r.data.sqlDialect, source.ProductID)
+	if err != nil {
+		return nil, err
+	}
 	sourceOrderNo := source.SourceOrderNo
 	if in.SourceOrderNo != nil {
 		sourceOrderNo = in.SourceOrderNo
@@ -1583,8 +1587,9 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 	}
 	target, err := tx.BOMHeader.Create().
 		SetProductID(source.ProductID).
-		SetVersion(in.Version).
+		SetVersion(version).
 		SetStatus(biz.BOMStatusDraft).
+		SetUpdatedAt(nextBOMEditTime(0)).
 		SetNillableEffectiveFrom(in.EffectiveFrom).
 		SetNillableEffectiveTo(in.EffectiveTo).
 		SetNillableSourceOrderNo(sourceOrderNo).

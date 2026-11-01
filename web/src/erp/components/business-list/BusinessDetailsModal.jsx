@@ -109,7 +109,7 @@ function BusinessLineItems({ config, record, state, contentRef }) {
             <Spin size="small" />
             <span>正在加载明细…</span>
           </div>
-      ) : null}
+        ) : null}
         {loadState.status === 'error' ? (
           <Alert
             action={
@@ -121,12 +121,12 @@ function BusinessLineItems({ config, record, state, contentRef }) {
               >
                 重试
               </Button>
-          }
+            }
             message={getActionErrorMessage(loadState.error, '加载明细失败')}
             showIcon
             type="error"
           />
-      ) : null}
+        ) : null}
         {loadState.status === 'success' && pageItems.length > 0 ? (
           <div className="erp-business-detail-items__items">
             <BusinessRowItemCards
@@ -139,7 +139,7 @@ function BusinessLineItems({ config, record, state, contentRef }) {
               startIndex={pageStart}
             />
           </div>
-      ) : null}
+        ) : null}
       </BusinessFormSection>
     </div>
   )

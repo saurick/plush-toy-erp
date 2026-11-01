@@ -1712,7 +1712,7 @@ func normalizeProductionFactDraftSave(in *ProductionFactDraftSave, factType, sou
 	default:
 		return nil, ErrBadParam
 	}
-	if out.Note != nil && len([]rune(*out.Note)) > 255 {
+	if out.Note != nil && len([]rune(*out.Note)) > value.BusinessNoteMaxCharacters {
 		return nil, ErrBadParam
 	}
 	return &out, nil
@@ -1751,7 +1751,7 @@ func normalizeOutsourcingFactDraftSave(in *OutsourcingFactDraftSave, factType st
 	default:
 		return nil, ErrBadParam
 	}
-	if out.Note != nil && len([]rune(*out.Note)) > 255 {
+	if out.Note != nil && len([]rune(*out.Note)) > value.BusinessNoteMaxCharacters {
 		return nil, ErrBadParam
 	}
 	return &out, nil

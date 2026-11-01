@@ -8,6 +8,35 @@ import {
   presentWorkflowTaskEvent,
 } from './workflowTaskEventPresentation.mjs'
 
+test('optional empty explanation preserves the real action and never reuses a blocked reason', () => {
+  const task = { task_group: 'generic', blocked_reason: '旧阻塞原因' }
+  const item = presentWorkflowTaskEvent({ event_type: 'status_changed', from_status_key: 'blocked', to_status_key: 'ready', reason: '  ', payload: { blocked_reason: '旧阻塞原因', last_urge_reason: '上次催办说明' }, actor_display_name: '办理人', created_at: 1793370000 }, { task })
+  assert.equal(item.label, '任务已恢复待处理')
+  assert.equal(item.actorName, '办理人')
+  assert.equal(item.reason, '')
+  assert.equal(item.reasonMissing, false)
+  assert.equal(item.reasonDetail, '未补充说明')
+  assert.doesNotMatch(item.label, /已解决/u)
+})
+
+test('missing required reasons and followup results are marked without fabricating content', () => {
+  for (const [task, status, label] of [
+    [{}, 'blocked', '受阻原因'],
+    [{}, 'rejected', '退回原因'],
+    [{ task_group: 'business_followup' }, 'done', '处理结果'],
+    [{ required_capability_key: 'finance.payment.approve' }, 'done', '审批意见'],
+  ]) {
+    const item = presentWorkflowTaskEvent({ event_type: 'status_changed', to_status_key: status }, { task })
+    assert.equal(item.reason, '')
+    assert.equal(item.reasonLabel, label)
+    assert.equal(item.reasonMissing, true)
+    assert.equal(item.reasonDetail, '未记录')
+  }
+  const result = presentWorkflowTaskEvent({ event_type: 'status_changed', to_status_key: 'done', payload: { feedback: '已核对包装要求' } }, { task: { task_group: 'business_followup' } })
+  assert.equal(result.reason, '已核对包装要求')
+  assert.equal(result.reasonMissing, false)
+})
+
 test('task event adapter derives approval wording from the shared task classification', () => {
   const events = [{ event_type: 'status_changed', from_status_key: 'ready', to_status_key: 'done' }]
   for (const task of [{ owner_role_key: 'boss' }, { payload: { notification_type: 'approval_required' } }]) {

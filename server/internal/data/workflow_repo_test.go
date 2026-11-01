@@ -1207,6 +1207,64 @@ func TestWorkflowRepo_UpsertWorkflowBusinessStateUpdatesExisting(t *testing.T) {
 	}
 }
 
+func TestWorkflowRepo_OptionalExplanationKeepsAuditAndClearsStaleReason(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_optional_explanation?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	uc := biz.NewWorkflowUsecase(repo)
+	task, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{TaskCode: "TASK-OPTIONAL-REASON", TaskGroup: "generic", TaskName: "核对资料", SourceType: "generic-source", SourceID: 1, TaskStatusKey: "ready", OwnerRoleKey: biz.QualityRoleKey}, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocked, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{ID: task.ID, ExpectedVersion: task.Version, CommandKey: "block_task_action", IdempotencyKey: "optional-block", TaskStatusKey: "blocked", Reason: "等资料"}, 7, biz.QualityRoleKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resume := &biz.WorkflowTaskStatusUpdate{ID: task.ID, ExpectedVersion: blocked.Version, CommandKey: "resume_task_action", IdempotencyKey: "optional-resume", TaskStatusKey: "ready"}
+	resumed, err := uc.UpdateTaskStatus(ctx, resume, 7, biz.QualityRoleKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resumed.TaskStatusKey != "ready" || resumed.BlockedReason != nil {
+		t.Fatalf("unexpected resume result: %#v", resumed)
+	}
+	if _, found := resumed.Payload["blocked_reason"]; found {
+		t.Fatal("resume retained stale blocked reason")
+	}
+	replayed, err := uc.UpdateTaskStatus(ctx, resume, 7, biz.QualityRoleKey)
+	if err != nil || replayed.Version != resumed.Version {
+		t.Fatalf("empty explanation replay failed: %v", err)
+	}
+	for index, reason := range []string{"请跟进交期", ""} {
+		resumed, err = uc.UrgeTask(ctx, &biz.WorkflowTaskUrge{ID: task.ID, ExpectedVersion: resumed.Version, CommandKey: "urge_task", IdempotencyKey: fmt.Sprintf("optional-urge-%d", index), Action: "urge_task", Reason: reason}, 7, biz.QualityRoleKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if resumed.Payload["last_urge_reason"] != "" {
+		t.Fatalf("empty urge reused earlier explanation: %#v", resumed.Payload)
+	}
+	events, err := client.WorkflowTaskEvent.Query().Where(workflowtaskevent.TaskID(task.ID)).Order(ent.Asc(workflowtaskevent.FieldID)).All(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 5 {
+		t.Fatalf("want created, blocked, resumed and two urge events, got %d", len(events))
+	}
+	if events[1].Reason == nil || *events[1].Reason != "等资料" {
+		t.Fatal("original blocked reason was lost")
+	}
+	for _, index := range []int{2, 4} {
+		if events[index].ActorID == nil || *events[index].ActorID != 7 || events[index].CreatedAt.IsZero() {
+			t.Fatal("empty explanation lost actor or time")
+		}
+		if events[index].Reason != nil && strings.TrimSpace(*events[index].Reason) != "" {
+			t.Fatal("empty explanation was fabricated or reused")
+		}
+	}
+}
+
 func TestWorkflowRepo_UrgeWorkflowTaskWritesEventAndPayload(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_urge_repo?mode=memory&cache=shared&_fk=1")

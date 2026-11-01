@@ -239,3 +239,6 @@ type WorkflowTask func(*sql.Selector)
 
 // WorkflowTaskEvent is the predicate function for workflowtaskevent builders.
 type WorkflowTaskEvent func(*sql.Selector)
+
+// WorkflowTaskNumberCounter is the predicate function for workflowtasknumbercounter builders.
+type WorkflowTaskNumberCounter func(*sql.Selector)

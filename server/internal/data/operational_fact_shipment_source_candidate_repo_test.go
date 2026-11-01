@@ -27,6 +27,38 @@ type shipmentSourceCandidateFixture struct {
 	warehouseID  int
 }
 
+func TestOperationalFactRepoShipmentSourceOrderOptionsExcludeUnusableOrders(t *testing.T) {
+	f := newShipmentSourceCandidateFixture(t, "source_order_options")
+	ctx := context.Background()
+	active := f.createOrder(t, "SO-OPTIONS-A", biz.SalesOrderStatusActive)
+	f.createOrderItem(t, active.ID, 1, biz.SalesOrderItemStatusOpen, 10)
+	f.createOrderItem(t, active.ID, 2, biz.SalesOrderItemStatusOpen, 20)
+	other := f.createOrder(t, "SO-OPTIONS-B", biz.SalesOrderStatusActive)
+	f.createOrderItem(t, other.ID, 1, biz.SalesOrderItemStatusOpen, 10)
+	closed := f.createOrder(t, "SO-OPTIONS-CLOSED", biz.SalesOrderStatusActive)
+	f.createOrderItem(t, closed.ID, 1, biz.SalesOrderItemStatusClosed, 10)
+	shipped := f.createOrder(t, "SO-OPTIONS-SHIPPED", biz.SalesOrderStatusActive)
+	line := f.createOrderItem(t, shipped.ID, 1, biz.SalesOrderItemStatusOpen, 10)
+	f.createShipmentItem(t, "SHP-OPTIONS", biz.ShipmentStatusShipped, shipped.ID, line.ID, 10)
+	draft := f.createOrder(t, "SO-OPTIONS-DRAFT", biz.SalesOrderStatusDraft)
+	f.createOrderItem(t, draft.ID, 1, biz.SalesOrderItemStatusOpen, 10)
+	for _, selectable := range []bool{true, false} {
+		options, err := f.repo.ListShipmentSourceOrderOptions(ctx, &selectable)
+		if err != nil || len(options) != 2 {
+			t.Fatalf("eligibility=%v options=%#v err=%v", selectable, options, err)
+		}
+		want := []int{shipped.ID, closed.ID}
+		if selectable {
+			want = []int{other.ID, active.ID}
+		}
+		for i, option := range options {
+			if option.SalesOrderID != want[i] {
+				t.Fatalf("eligibility=%v index=%d got=%d want=%d", selectable, i, option.SalesOrderID, want[i])
+			}
+		}
+	}
+}
+
 func TestOperationalFactRepoListShipmentSourceCandidatesFiltersBeforePagination(t *testing.T) {
 	ctx := context.Background()
 	f := newShipmentSourceCandidateFixture(t, "source_filters")
@@ -69,11 +101,28 @@ func TestOperationalFactRepoListShipmentSourceCandidatesFiltersBeforePagination(
 	// A shipped header with a foreign source invalidates the entire header order
 	// and the foreign source line, even when that row is beyond the current page.
 	foreignLine := f.createOrderItem(t, other.ID, 2, biz.SalesOrderItemStatusOpen, 20)
+	for _, selectable := range []bool{true, false} {
+		options, err := f.repo.ListShipmentSourceOrderOptions(ctx, &selectable)
+		want := 1
+		if selectable {
+			want = 2
+		}
+		if err != nil || len(options) != want {
+			t.Fatalf("option scope=%v want=%d options=%#v err=%v", selectable, want, options, err)
+		}
+		if options[len(options)-1].SalesOrderID != order.ID || options[len(options)-1].CustomerNameSnapshot != "订单客户快照-SO-FILTER" {
+			t.Fatalf("order identity/snapshot lost: %#v", options)
+		}
+	}
 	f.createShipmentItem(t, "CORRUPT-FILTER", biz.ShipmentStatusShipped, order.ID, foreignLine.ID, 1)
 	eligible := true
 	rows, total, err = f.repo.ListShipmentSourceCandidates(ctx, biz.ShipmentSourceCandidateFilter{SalesOrderID: order.ID, Selectable: &eligible, Limit: 1})
 	if err != nil || total != 0 || len(rows) != 0 {
 		t.Fatalf("corrupted source should be excluded before pagination: %d %v", total, err)
+	}
+	options, err := f.repo.ListShipmentSourceOrderOptions(ctx, &eligible)
+	if err != nil || len(options) != 1 || options[0].SalesOrderID != other.ID || options[0].CustomerID != foreignCustomer.ID {
+		t.Fatalf("corrupted order must not remain in eligible filter options: %#v %v", options, err)
 	}
 	rows, _, err = f.repo.ListShipmentSourceCandidates(ctx, biz.ShipmentSourceCandidateFilter{SalesOrderID: other.ID, Selectable: &eligible, Limit: 10})
 	if err != nil || len(rows) != 1 || !rows[0].Selectable {

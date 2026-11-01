@@ -39,14 +39,14 @@ func TestNormalizeAdminERPPreferencesDropsEmptyOrders(t *testing.T) {
 }
 
 func TestAdminERPAppearanceDefaultsPreserveSavedChoices(t *testing.T) {
-	want := AdminERPAppearance{ThemeMode: "system", Accent: "blue", Density: "compact", TableLines: "grid"}
+	want := AdminERPAppearance{ThemeMode: "system", Accent: "blue", Density: "compact", TableLines: "grid", FormDisplay: "all"}
 	if got := NormalizeAdminERPPreferences(AdminERPPreferences{}).Appearance; got != want {
 		t.Fatalf("account without saved preferences = %+v, want %+v", got, want)
 	}
 	for _, density := range []string{"standard", "compact"} {
 		for _, lines := range []string{"simple", "grid"} {
 			t.Run(density+"/"+lines, func(t *testing.T) {
-				saved := AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: density, TableLines: lines}
+				saved := AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: density, TableLines: lines, FormDisplay: "all"}
 				if got := NormalizeAdminERPAppearance(saved); got != saved {
 					t.Fatalf("saved appearance changed: got %+v, want %+v", got, saved)
 				}
@@ -54,19 +54,19 @@ func TestAdminERPAppearanceDefaultsPreserveSavedChoices(t *testing.T) {
 		}
 	}
 	partial := AdminERPAppearance{ThemeMode: "light", Accent: "teal", Density: "standard"}
-	if got := NormalizeAdminERPAppearance(partial); got != (AdminERPAppearance{ThemeMode: "light", Accent: "teal", Density: "standard", TableLines: "grid"}) {
+	if got := NormalizeAdminERPAppearance(partial); got != (AdminERPAppearance{ThemeMode: "light", Accent: "teal", Density: "standard", TableLines: "grid", FormDisplay: "all"}) {
 		t.Fatalf("only missing fields should receive defaults: %+v", got)
 	}
 }
 
 func TestAdminERPAppearancePatchPreservesUnchangedFields(t *testing.T) {
-	current := AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: "compact", TableLines: "grid"}
+	current := AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: "compact", TableLines: "grid", FormDisplay: "all"}
 	green := "green"
 	patch := AdminERPAppearancePatch{Accent: &green}
 	if err := patch.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if got := patch.Apply(current); got != (AdminERPAppearance{ThemeMode: "dark", Accent: "green", Density: "compact", TableLines: "grid"}) {
+	if got := patch.Apply(current); got != (AdminERPAppearance{ThemeMode: "dark", Accent: "green", Density: "compact", TableLines: "grid", FormDisplay: "all"}) {
 		t.Fatalf("mobile color update lost desktop preferences: %+v", got)
 	}
 	if got := NormalizeAdminERPPreferences(AdminERPPreferences{}).Appearance; got != adminERPAppearanceContract.Defaults {
@@ -77,11 +77,11 @@ func TestAdminERPAppearancePatchPreservesUnchangedFields(t *testing.T) {
 	if err := linesPatch.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if got := linesPatch.Apply(current); got != (AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: "compact", TableLines: "simple"}) {
+	if got := linesPatch.Apply(current); got != (AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: "compact", TableLines: "simple", FormDisplay: "all"}) {
 		t.Fatalf("table line update lost other preferences: %+v", got)
 	}
 	for _, invalid := range []string{"", "Dark", " dark ", "__proto__", "unknown"} {
-		for _, patch := range []AdminERPAppearancePatch{{ThemeMode: &invalid}, {Accent: &invalid}, {Density: &invalid}, {TableLines: &invalid}} {
+		for _, patch := range []AdminERPAppearancePatch{{ThemeMode: &invalid}, {Accent: &invalid}, {Density: &invalid}, {TableLines: &invalid}, {FormDisplay: &invalid}} {
 			if !errors.Is(patch.Validate(), ErrBadParam) {
 				t.Fatalf("invalid appearance accepted: %+v", patch)
 			}
@@ -92,15 +92,32 @@ func TestAdminERPAppearancePatchPreservesUnchangedFields(t *testing.T) {
 	}
 }
 
+func TestAdminERPAppearanceFormDisplay(t *testing.T) {
+	current := NormalizeAdminERPAppearance(AdminERPAppearance{ThemeMode: "dark", Accent: "teal"})
+	for _, display := range adminERPAppearanceContract.FormDisplays {
+		patch := AdminERPAppearancePatch{FormDisplay: &display}
+		if err := patch.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		got := patch.Apply(current)
+		if got.FormDisplay != display || got.Accent != current.Accent || got.Density != current.Density || got.ThemeMode != current.ThemeMode || got.TableLines != current.TableLines {
+			t.Fatalf("form display patch overwrote other preferences: %+v", got)
+		}
+	}
+	if current.FormDisplay != "all" {
+		t.Fatalf("missing form display must default to all: %+v", current)
+	}
+}
+
 func TestAdminERPAppearanceNewAccentsPreserveAccountPreferences(t *testing.T) {
-	current := AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: "compact", TableLines: "grid"}
+	current := AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: "compact", TableLines: "grid", FormDisplay: "all"}
 	for _, accent := range []string{"teal", "mauve"} {
 		t.Run(accent, func(t *testing.T) {
 			patch := AdminERPAppearancePatch{Accent: &accent}
 			if err := patch.Validate(); err != nil {
 				t.Fatal(err)
 			}
-			want := AdminERPAppearance{ThemeMode: "dark", Accent: accent, Density: "compact", TableLines: "grid"}
+			want := AdminERPAppearance{ThemeMode: "dark", Accent: accent, Density: "compact", TableLines: "grid", FormDisplay: "all"}
 			if got := NormalizeAdminERPPreferences(AdminERPPreferences{Appearance: patch.Apply(current)}).Appearance; got != want {
 				t.Fatalf("accent preference was lost or changed other appearance fields: %+v", got)
 			}

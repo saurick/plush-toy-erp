@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -97,7 +99,7 @@ func (Shipment) Fields() []ent.Field {
 		field.Int("finance_released_by").Optional().Nillable().Positive(),
 		field.Int("finance_release_process_instance_id").Optional().Nillable().Positive(),
 		field.Int("finance_release_process_node_id").Optional().Nillable().Positive(),
-		field.String("finance_release_note").Optional().Nillable().MaxLen(255),
+		field.String("finance_release_note").Optional().Nillable().Validate(corevalue.ValidateBusinessNote),
 		field.String("idempotency_key").NotEmpty().MaxLen(128),
 		field.Time("planned_ship_at").Optional().Nillable(),
 		field.Time("shipped_at").Optional().Nillable(),
@@ -117,7 +119,7 @@ func (Shipment) Fields() []ent.Field {
 		optionalDecimalField("total_net_weight_g"),
 		// Internal immutable create-intent snapshot used only for idempotency comparison.
 		optionalDecimalField("requested_total_net_weight_g"),
-		field.String("note").Optional().Nillable().MaxLen(255),
+		field.String("note").Optional().Nillable().Validate(corevalue.ValidateBusinessNote),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
 	}

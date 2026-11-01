@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createMobileTaskHandlingCoverageScenarios } from './mobileTaskHandlingCoverageScenarios.mjs'
 import { createTaskBusinessReturnScenarios } from './taskBusinessReturnScenarios.mjs'
 import { createTaskFusedFlowScenarios } from './taskFusedFlowScenarios.mjs'
@@ -38,9 +39,17 @@ async function stableSteps(page, steps, assert, to = 0) {
   const before = await steps.boundingBox()
   await steps.getByRole('tab').nth(to).click()
   await steps.getByRole('tab').nth(1).click()
+  await waitForFiniteAnimations(page)
   const after = await steps.boundingBox()
   assert.equal(await steps.evaluate((node, previous) => node === previous, handle), true, 'step navigation retains the original strip')
   for (const key of ['x', 'y', 'width', 'height']) assert.ok(Math.abs(before[key] - after[key]) <= 1, `${key}: ${before[key]} -> ${after[key]}`)
+}
+
+async function assertCompactTaskDrawer(page, assert) {
+  await waitForFiniteAnimations(page)
+  const geometry = await page.locator('.erp-task-action-drawer-root .ant-drawer-content-wrapper').evaluate((node) => ({ width: node.getBoundingClientRect().width, right: node.getBoundingClientRect().right, viewport: innerWidth }))
+  assert.ok(Math.abs(geometry.width - Math.min(720, geometry.viewport - 24)) <= 1, 'simple task steps retain the ordinary drawer width')
+  assert.ok(Math.abs(geometry.right - geometry.viewport) <= 1, 'the drawer remains anchored to the right')
 }
 
 export function createTaskUnifiedHandlingScenarios(deps) {
@@ -372,13 +381,17 @@ process_instance_id: null,
       verify: async (page) => {
         const steps = await openTask(page, task, mobile)
         assert.equal(await steps.getByRole('tab').nth(2).isEnabled(), false)
+        if (!mobile) await assertCompactTaskDrawer(page, assert)
         await steps.getByRole('tab').nth(1).click()
+        if (!mobile) await assertCompactTaskDrawer(page, assert)
         if (!mobile) await page.getByRole('radio', { name: kind === 'decision' ? '审批通过' : '完成跟进任务', exact: true }).check()
         const reason = page.locator('textarea:visible').first()
+        const input = kind === 'decision' ? '' : '本次核对意见'
         if (await reason.count()) {
-          await reason.fill('本次核对意见')
+          assert.equal(await reason.evaluate((node) => node.required), kind !== 'decision')
+          await reason.fill(input)
           await stableSteps(page, steps, assert)
-          assert.equal(await reason.inputValue(), '本次核对意见')
+          assert.equal(await reason.inputValue(), input)
         }
         assert.equal(await page.getByTestId('mobile-task-fact-form').count(), 0)
         if (mobile) {
@@ -391,10 +404,17 @@ process_instance_id: null,
         assert.equal(submissions.length, 1)
         assert.equal(submissions[0].task_id, task.id)
         assert.equal(submissions[0].expected_version, 1)
-        assert.equal(mobile ? submissions[0].payload.feedback : submissions[0].reason, '本次核对意见')
+        assert.equal((mobile ? submissions[0].payload.feedback : submissions[0].reason) || '', input)
         assert.ok(submissions[0].idempotency_key)
         await stableSteps(page, steps, assert)
         await steps.getByRole('tab').nth(2).click()
+        if (!mobile) {
+          await assertCompactTaskDrawer(page, assert)
+          const viewport = page.viewportSize()
+          await page.setViewportSize({ ...viewport, width: 700 })
+          await assertCompactTaskDrawer(page, assert)
+          await page.setViewportSize(viewport)
+        }
         assert.equal(submissions.length, 1, 'reviewing the confirmed result never repeats a task write')
         await assertNoHorizontalOverflow(page, `task-unified-${kind}`)
         await waitForFiniteAnimations(page)
@@ -447,10 +467,10 @@ process_instance_id: null,
           await stableSteps(page, steps, assert)
         } else {
           assert.equal(new URL(page.url()).pathname, '/erp/task-board')
-          await editor.getByLabel('BOM 版本', { exact: true }).fill('BOM-本次任务草稿')
+          await editor.getByLabel('来源订单号', { exact: true }).fill('BOM-本次任务草稿')
           await steps.getByRole('tab').nth(0).click()
           await steps.getByRole('tab').nth(1).click()
-          assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), 'BOM-本次任务草稿')
+          assert.equal(await editor.getByLabel('来源订单号', { exact: true }).inputValue(), 'BOM-本次任务草稿')
           await page.getByRole('button', { name: '保存草稿', exact: true }).click()
           await page.waitForFunction(() => document.querySelector('#erp-task-action-step-confirm-tab')?.disabled === false)
           await steps.getByRole('tab').nth(2).click()
@@ -533,6 +553,7 @@ process_instance_id: null,
         await steps.getByRole('tab').nth(1).click()
         if (!mobile) await page.getByRole('radio', { name: '审批通过', exact: true }).check()
         const reason = page.locator('textarea:visible').first()
+        assert.equal(await reason.evaluate((node) => node.required), true, 'the formal approval opinion remains required')
         await reason.fill('已核对本次申请和原始依据')
         if (definition.key === 'exception') await page.getByLabel(/^批准数量/u).fill('8.25')
         if (definition.key === 'inventory' && mobile) await page.getByText('盘点差异待核对', { exact: true }).filter({ visible: true }).waitFor()
@@ -585,7 +606,7 @@ process_instance_id: null,
         assert.equal(await actionPanel.getByTestId('mobile-task-business-source').count(), 0, 'source metadata belongs only to step one')
         let input
         if (!mobile) {
-          input = editor.getByLabel('BOM 版本', { exact: true })
+          input = editor.getByLabel('来源订单号', { exact: true })
           await input.fill('未保存的 BOM，协作关闭后继续编辑')
         }
         const location = page.url()
@@ -895,7 +916,75 @@ process_instance_id: null,
       await page.screenshot({ path: path.join(outputDir, 'task-unified-business-initiation.png') })
     },
   }
-  return [...capture, ...onsite, ...authoring, ...decisions, ...permissions, ...formalApprovals, ...histories, ...shipmentDrafts, ...informationAndCollaboration, ...contextualActions, ...transfers, ...nativeTransfers, initiation].map((scenario) => ({
+  const optionalExplanations = ['resume', 'urge'].flatMap((mode) => [false, true].map((mobile) => {
+    const base = decisions.find((scenario) => scenario.name === `task-unified-coordination-${mobile ? 'mobile' : 'desktop'}`)
+    const task = { ...base.workflowTaskFixtures[0], task_group: 'material_check', task_status_key: mode === 'resume' ? 'blocked' : 'ready', blocked_reason: mode === 'resume' ? '旧受阻记录' : null, payload: { last_urge_reason: '上次催办说明' } }
+    const submissions = []
+    let current
+    let failuresRemaining
+    return {
+      ...base,
+      name: `task-optional-explanation-${mode}-${mobile ? 'mobile' : 'desktop'}`,
+      workflowTaskFixtures: [task],
+      beforeNavigate: async (page) => {
+        submissions.length = 0
+        current = structuredClone(task)
+        failuresRemaining = 2
+        await base.beforeNavigate(page)
+        await page.route('**/rpc/workflow', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method === 'get_task') return rpcResponder(route, id, { task: current })
+          if (method === 'explain_action_access') return rpcResponder(route, id, { source_access: { applicable: true, resolved: true, allowed: true }, actions: [{ action_key: mode, allowed: true, owner_role_matched: true }] })
+          if (method === 'list_task_events') return rpcResponder(route, id, { items: current.version > 1 ? [{ id: 7, task_id: task.id, event_type: mode === 'resume' ? 'status_changed' : 'urge_task', from_status_key: task.task_status_key, to_status_key: 'ready', actor_display_name: '模拟办理人', created_at: 1793370000 }] : [], truncated: false })
+          if (method === (mode === 'resume' ? 'resume_task_action' : 'urge_task')) {
+            submissions.push(params)
+            if (failuresRemaining > 0) {
+              failuresRemaining -= 1
+              return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: RpcErrorCode.INTERNAL, message: '模拟暂时失败，请重试' } } })
+            }
+            current = { ...current, version: current.version + 1, task_status_key: 'ready', blocked_reason: null, payload: { last_urge_reason: '' }, ...(mode === 'urge' ? { urge_count: 1, last_urged_at: 1793370000, last_urged_by: 1, last_urged_by_role_key: 'engineering' } : {}) }
+            return rpcResponder(route, id, { task: current })
+          }
+          return route.fallback()
+        })
+      },
+      verify: async (page) => {
+        const steps = await openTask(page, task, mobile)
+        await steps.getByRole('tab').nth(1).click()
+        await page.getByRole('button', { name: '更多', exact: true }).filter({ visible: true }).click()
+        const title = mode === 'resume' ? '解除任务阻塞' : '催办任务'
+        await page.getByRole('menuitem', { name: title, exact: true }).click()
+        const dialog = page.getByRole('dialog', { name: title, exact: true })
+        const input = dialog.getByRole('textbox', { name: mode === 'resume' ? '处理说明（选填）' : '催办说明（选填）', exact: true })
+        await input.fill('本次说明')
+        await input.fill('')
+        assert.equal(await input.getAttribute('required'), null)
+        const submit = dialog.getByRole('button', { name: mode === 'resume' ? '解除阻塞' : '提交催办', exact: true })
+        assert.equal(await submit.isEnabled(), true)
+        assert.equal(await dialog.getByRole('button', { name: '核对并确认', exact: true }).count(), 0)
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: path.join(outputDir, `optional-${mode}-${mobile ? 'mobile' : 'desktop'}-input.png`) })
+        const isSubmission = (response) => response.url().includes('/rpc/workflow') && response.request().postDataJSON()?.method === (mode === 'resume' ? 'resume_task_action' : 'urge_task')
+        await Promise.all([page.waitForResponse(isSubmission), submit.click()])
+        await page.waitForFunction(() => !document.querySelector('.erp-task-collaboration-modal .ant-btn-loading'))
+        assert.equal(submissions.length, 2)
+        assert.equal(await input.inputValue(), '')
+        await Promise.all([page.waitForResponse(isSubmission), submit.click()])
+        const receipt = page.getByTestId('workflow-task-action-receipt').filter({ visible: true })
+        await receipt.waitFor()
+        assert.equal(submissions.length, 3)
+        for (const request of submissions) {
+          assert.deepEqual(request, submissions[0], 'automatic and manual retries keep the same version, empty explanation and idempotency key')
+          assert.equal(Object.hasOwn(request, 'reason'), false)
+          assert.equal(request.expected_version, task.version)
+        }
+        assert.doesNotMatch(await receipt.innerText(), /旧受阻记录|上次催办说明|问题已解决|未补充说明/u)
+        await assertNoHorizontalOverflow(page, `optional-${mode}-${mobile ? 'mobile' : 'desktop'}`)
+        await page.screenshot({ path: path.join(outputDir, `optional-${mode}-${mobile ? 'mobile' : 'desktop'}.png`) })
+      },
+    }
+  }))
+  return [...capture, ...onsite, ...authoring, ...decisions, ...permissions, ...formalApprovals, ...histories, ...shipmentDrafts, ...informationAndCollaboration, ...contextualActions, ...transfers, ...nativeTransfers, initiation, ...optionalExplanations].map((scenario) => ({
     ...scenario,
     beforeNavigate: async (page) => {
       page.taskUnifiedErrors = []

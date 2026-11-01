@@ -37,19 +37,22 @@ export function BusinessLineItemsAddButton({
   )
 }
 
-export function BusinessLineItemsHeader({ title, description, children }) {
+export function BusinessLineItemsHeader({ title, description, notice, children }) {
   return (
-    <div className="erp-business-form-heading erp-sales-order-lines-form__head">
-      <div>
-        <strong role="heading" aria-level={3} tabIndex={-1}>
-          {title}
-        </strong>
-        {description ? <span>{description}</span> : null}
+    <>
+      <div className="erp-business-form-heading erp-sales-order-lines-form__head">
+        <div>
+          <strong role="heading" aria-level={3} tabIndex={-1}>
+            {title}
+          </strong>
+          {description ? <span>{description}</span> : null}
+        </div>
+        {children ? (
+          <div className="erp-line-items-form__head-actions">{children}</div>
+        ) : null}
       </div>
-      {children ? (
-        <div className="erp-line-items-form__head-actions">{children}</div>
-      ) : null}
-    </div>
+      {notice}
+    </>
   )
 }
 

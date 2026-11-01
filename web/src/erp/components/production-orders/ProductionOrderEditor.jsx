@@ -4,12 +4,14 @@ import {
   DeleteOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import Table from '@/common/components/table/AppTable'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
+import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.jsx'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
 } from '../business-list/BusinessCompactFieldTable.jsx'
@@ -217,8 +219,6 @@ function RowReference({
     form.setFieldValue('items', items)
   }
 
-  const customerInspection = watchedRow.customer_inspection_required
-  const { note } = watchedRow
   return (
     <BusinessCompactFieldRow
       className="erp-production-order-line"
@@ -373,78 +373,63 @@ function RowReference({
       <Form.Item name={[field.name, 'line_no']} hidden>
         <Input />
       </Form.Item>
-      <details
-        className="erp-line-item-details erp-optional-field"
-        open={!routeCode || undefined}
-      >
-        <summary>
-          <span>路线、验货与备注</span>
-          <span className="erp-optional-field__summary">
-            {routeCode === PRODUCTION_WIP_ROUTE_CODE
-              ? '毛绒标准路线'
-              : '请选择生产路线'}
-            {customerInspection ? ' · 需要客户验货' : ' · 无需客户验货'}
-            {note ? ` · ${note}` : ''}
-          </span>
-        </summary>
-        <div className="erp-compact-field-table__supplement erp-production-order-line__supplement">
-          <Form.Item
-            name={[field.name, 'route_code']}
-            label="生产路线"
-            rules={[{ required: true, message: '请选择生产路线' }]}
-            tooltip={{
-              title:
-                '发布后冻结为“布料加工 → 车缝 → 手工 → 包装”，车缝和手工分别决定本厂或外发。',
-              trigger: ['hover', 'focus', 'click'],
-              icon: (
-                <QuestionCircleOutlined
-                  tabIndex={0}
-                  aria-label="查看生产路线说明"
-                />
-              ),
-            }}
-          >
-            <Select
-              placeholder="请选择生产路线"
-              disabled={readOnly}
-              options={[
-                {
-                  value: PRODUCTION_WIP_ROUTE_CODE,
-                  label: '毛绒标准路线（先车缝、后手工）',
-                },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item
-            name={[field.name, 'customer_inspection_required']}
-            label="客户验货"
-            valuePropName="checked"
-            tooltip={{
-              title: '仅订单明确要求时开启；不等同于系统验收。',
-              trigger: ['hover', 'focus', 'click'],
-              icon: (
-                <QuestionCircleOutlined
-                  tabIndex={0}
-                  aria-label="查看客户验货说明"
-                />
-              ),
-            }}
-          >
-            <Switch
-              disabled={readOnly || routeCode !== PRODUCTION_WIP_ROUTE_CODE}
-              checkedChildren="需要"
-              unCheckedChildren="不需要"
-            />
-          </Form.Item>
-          <Form.Item
-            className="erp-production-order-line__note"
-            name={[field.name, 'note']}
-            label="明细备注"
-          >
-            <BusinessTextArea disabled={readOnly} maxLength={255} />
-          </Form.Item>
-        </div>
-      </details>
+      <div className="erp-compact-field-table__supplement erp-production-order-line__supplement">
+        <Form.Item
+          name={[field.name, 'route_code']}
+          label="生产路线"
+          rules={[{ required: true, message: '请选择生产路线' }]}
+          tooltip={{
+            title:
+              '发布后冻结为“布料加工 → 车缝 → 手工 → 包装”，车缝和手工分别决定本厂或外发。',
+            trigger: ['hover', 'focus', 'click'],
+            icon: (
+              <QuestionCircleOutlined
+                tabIndex={0}
+                aria-label="查看生产路线说明"
+              />
+            ),
+          }}
+        >
+          <Select
+            placeholder="请选择生产路线"
+            disabled={readOnly}
+            options={[
+              {
+                value: PRODUCTION_WIP_ROUTE_CODE,
+                label: '毛绒标准路线（先车缝、后手工）',
+              },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item
+          name={[field.name, 'customer_inspection_required']}
+          label="客户验货"
+          valuePropName="checked"
+          tooltip={{
+            title: '仅订单明确要求时开启；不等同于系统验收。',
+            trigger: ['hover', 'focus', 'click'],
+            icon: (
+              <QuestionCircleOutlined
+                tabIndex={0}
+                aria-label="查看客户验货说明"
+              />
+            ),
+          }}
+        >
+          <Switch
+            disabled={readOnly || routeCode !== PRODUCTION_WIP_ROUTE_CODE}
+            checkedChildren="需要"
+            unCheckedChildren="不需要"
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-production-order-line__note"
+          name={[field.name, 'note']}
+          label="明细备注"
+        >
+          <BusinessTextArea disabled={readOnly} maxLength={BusinessTextPolicy.noteMaxCharacters} />
+        </Form.Item>
+      </div>
     </BusinessCompactFieldRow>
   )
 }
@@ -557,10 +542,18 @@ export default function ProductionOrderEditor({
                 style={{ width: '100%' }}
               >
                 <BusinessLineItemsHeader title="生产明细" />
-                <BusinessCompactFieldTable
-                  label="生产明细"
-                  showSequence
-                  columns={[
+                <BusinessGroupedLineItems
+                  fields={fields}
+                  form={form}
+                  table={BusinessCompactFieldTable}
+                  getGroup={(item) => ({
+                    key: item.product_id || undefined,
+                    label: normalizedOptions.product.find((option) => Number(option.value) === Number(item.product_id))?.label || '待选择产品',
+                  })}
+                  tableProps={{
+                    label: '生产明细',
+                    showSequence: true,
+                    columns: [
                     { label: '销售订单行' },
                     { label: '产品', required: true, width: '28%' },
                     { label: '规格' },
@@ -568,9 +561,9 @@ export default function ProductionOrderEditor({
                     { label: '计划数量', required: true, width: 180 },
                     { label: 'BOM 版本' },
                     { label: '操作', width: 52 },
-                  ]}
+                  ] }}
                 >
-                  {fields.map((field, index) => (
+                  {(field, index) => (
                     <RowReference
                       key={field.key}
                       field={field}
@@ -593,8 +586,8 @@ export default function ProductionOrderEditor({
                           : undefined
                       }
                     />
-                  ))}
-                </BusinessCompactFieldTable>
+                  )}
+                </BusinessGroupedLineItems>
                 {!readOnly ? (
                   <BusinessLineItemsFooter
                     addLabel="添加生产明细"
@@ -633,7 +626,7 @@ export default function ProductionOrderEditor({
           >
             <BusinessTextArea
               disabled={readOnly}
-              maxLength={255}
+              maxLength={BusinessTextPolicy.noteMaxCharacters}
               minRows={2}
               showCount={!readOnly}
             />

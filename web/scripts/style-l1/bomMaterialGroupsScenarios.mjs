@@ -1,3 +1,4 @@
+import { expect as expectLocator } from 'playwright/test'
 import {
   assertBusinessFormPage,
   closeBusinessFormPage,
@@ -413,9 +414,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
 
         const product = editor.locator('input#product_id')
         await chooseImportedReference(page, product, 'PROD-STYLE-L1', '样式产品')
-        await editor
-          .getByLabel('BOM 版本', { exact: true })
-          .fill('V-PARTS-FIRST')
+        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
         for (const input of await editor
           .getByRole('textbox', { name: /^单位用量 / })
           .all()) {
@@ -536,6 +535,8 @@ export function createBOMMaterialGroupsScenarios(deps) {
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         const review = editor.locator('.erp-bom-import-review')
         await review.waitFor()
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click({ trial: true })
+        await editor.getByLabel('单位用量 3', { exact: true }).fill('0')
         assert.equal(await review.getAttribute('data-bom-import-issue-count'), '4')
         assert.ok(
           (await review.innerText()).includes(
@@ -590,7 +591,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         )
         assert.equal(saves.length, 0)
         await editor.getByLabel('单位用量 3', { exact: true }).fill('0.25')
-        await editor.getByLabel('BOM 版本', { exact: true }).fill('V-REVIEW')
+        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
         await editor.locator('[data-bom-import-issue-count="0"]').waitFor()
         await review.scrollIntoViewIfNeeded()
         await page.screenshot({
@@ -604,6 +605,55 @@ export function createBOMMaterialGroupsScenarios(deps) {
         assert.equal(saves[0].items.length, 4)
         assert.ok(saves[0].items.every((item) => item.material_id === 1 && item.unit_id === 1))
         assert.equal(saves[0].items[2].quantity, '0.25')
+      },
+    },
+    {
+      name: 'bom-import-compact-issue-hints',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: deps.customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        await page.getByRole('button', { name: '更多新建方式', exact: true }).click()
+        const chooserPromise = page.waitForEvent('filechooser')
+        await page.getByRole('menuitem', { name: /从 Excel 新建/u }).click()
+        await (await chooserPromise).setFiles({ name: 'BOM-HINTS-SYNTHETIC.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: createBOMImportWorkbookFixture() })
+        const preview = page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true })
+        const popup = () => page.locator('.erp-bom-import-issues-popover:visible')
+        const previewIssue = preview.getByRole('button', { name: /缺材料，查看完整缺项/u })
+        await previewIssue.hover()
+        await expectLocator(popup()).toContainText('请选择现有材料')
+        await page.keyboard.press('Escape')
+        await expectLocator(popup()).toHaveCount(0)
+        await preview.getByRole('button', { name: '带入并核对', exact: true }).click()
+        const editor = page.locator('.erp-bom-editor:visible')
+        await editor.getByText('分区编辑', { exact: true }).click()
+        await editor.getByRole('button', { name: '材料分析明细表', exact: true }).click()
+        const row = editor.locator('tr[data-bom-part-index="1"]')
+        await expectLocator(row.locator('.erp-bom-import-line-status__source')).toHaveText('Excel 第 7 行')
+        const unit = row.getByRole('combobox', { name: '单位 2', exact: true }).locator('xpath=ancestor::div[contains(concat(" ",normalize-space(@class)," ")," ant-select ")][1]')
+        await unit.hover()
+        await unit.locator('.ant-select-clear').click()
+        await row.getByLabel('单位用量 2', { exact: true }).fill('')
+        await row.getByLabel('损耗 % 2', { exact: true }).fill('-1')
+        const trigger = row.getByRole('button', { name: /4 项待处理，查看完整缺项/u })
+        await expectLocator(trigger).toHaveText('4 项待处理')
+        deps.assert.equal((await row.locator('[data-bom-import-row-status]').innerText()).includes('有效正数'), false)
+        const height = await row.evaluate((node) => node.getBoundingClientRect().height)
+        await trigger.click()
+        await expectLocator(popup().locator('li')).toHaveText(['请选择现有材料', '请选择现有单位', '材料用量必须为有效正数', '损耗率必须为有效非负数'])
+        deps.assert.equal(await row.evaluate((node) => node.getBoundingClientRect().height), height, '查看完整缺项不改变行高')
+        await page.screenshot({ path: `${deps.outputDir}/bom-compact-issue-details.png`, fullPage: true })
+        await trigger.press('Escape')
+        await expectLocator(popup()).toHaveCount(0)
+        await row.getByLabel('部位 2', { exact: true }).focus()
+        await trigger.focus()
+        await expectLocator(popup()).toHaveCount(1)
+        await trigger.press('Escape')
+        await expectLocator(popup()).toHaveCount(0)
+        await deps.assertNoHorizontalOverflow(page)
+        await closeBusinessFormPage(page, editor)
       },
     },
     {
@@ -637,6 +687,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         const unresolved = groups.nth(1)
         const parts = unresolved.locator('tr[data-bom-part-index]')
         assert.equal(await parts.count(), 2)
+        await editor.getByRole('button', { name: '展开尚未建档材料', exact: true }).first().click()
         assert.equal(
           await unresolved
             .getByRole('combobox', { name: /^物料名称 / })
@@ -660,11 +711,11 @@ export function createBOMMaterialGroupsScenarios(deps) {
         )
         assert.equal(
           await parts.nth(1).locator('.erp-bom-number-cell').innerText(),
-          '—'
+          '13.58024679'
         )
         assert.ok(
           (await unresolved.innerText()).includes(
-            '总用量：填写生产数量和用量后计算'
+            '总用量：113.58024679'
           )
         )
         await unresolved.getByLabel('单位用量 3', { exact: true }).fill('0.25')
@@ -707,7 +758,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
             contained:
               node.clientWidth <=
               node.closest('.erp-business-form-page').clientWidth,
-            rowSpan: node.querySelectorAll('tbody')[1].querySelector('td')
+            rowSpan: node.querySelectorAll('.erp-bom-material-group')[1].querySelector('td')
               .rowSpan,
             overflowX: getComputedStyle(node).overflowX,
           }))
@@ -863,6 +914,8 @@ export function createBOMMaterialGroupsScenarios(deps) {
             })
           )
         })
+        await editor.getByLabel('部位 200', { exact: true }).waitFor({ state: 'attached' })
+        await editor.getByRole('button', { name: '全部展开', exact: true }).click()
         await editor.getByLabel('部位 200', { exact: true }).waitFor()
         await editor.evaluate((node) => {
           window.__BOM_INPUT_PERFORMANCE__ = { samples: [] }
@@ -986,6 +1039,9 @@ export function createBOMMaterialGroupsScenarios(deps) {
             })
           )
         })
+        await editor.getByLabel('部位 200', { exact: true }).waitFor({ state: 'attached' })
+        deps.assert.equal(await editor.getByLabel('部位 200', { exact: true }).isVisible(), false, '收起组保留已挂载的第 200 个部位')
+        await editor.getByRole('button', { name: '全部展开', exact: true }).click()
         await editor.getByLabel('部位 200', { exact: true }).waitFor()
         deps.assert.equal(
           await editor.locator('tr[data-bom-part-index]').count(),

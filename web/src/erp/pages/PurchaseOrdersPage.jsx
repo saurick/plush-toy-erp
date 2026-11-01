@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { Form } from 'antd'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
@@ -69,6 +70,7 @@ import {
 } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 import usePurchaseFollowups from '../hooks/usePurchaseFollowups.js'
 import { purchaseFollowupParams } from '../utils/purchaseFollowup.mjs'
+import { withoutBlankPurchaseOrderDraftLines } from '../utils/businessLineItems.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   BUSINESS_ROUTE_PATHS,
@@ -201,6 +203,7 @@ export default function PurchaseOrdersPage() {
   const [statusCounts, setStatusCounts] = useState(null)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [editorRevision, setEditorRevision] = useState(0)
+  const [materialImportUndo, setMaterialImportUndo] = useState(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
   const lifecycleInFlightRef = useRef(false)
@@ -622,6 +625,7 @@ export default function PurchaseOrdersPage() {
     sourceDocumentOpenEditController.invalidate()
     orderAttachmentRef.current?.clearPendingAttachments()
     setEditingOrder(null)
+    setMaterialImportUndo(null)
     form.resetFields()
     form.setFieldsValue({
       purchase_order_no: buildSequentialDraftCode(orders, {
@@ -686,6 +690,7 @@ export default function PurchaseOrdersPage() {
             )
             orderAttachmentRef.current?.clearPendingAttachments()
             setEditingOrder(record)
+            setMaterialImportUndo(null)
             form.resetFields()
             form.setFieldsValue({
               purchase_order_no: record.purchase_order_no || '',
@@ -797,7 +802,7 @@ export default function PurchaseOrdersPage() {
 
   const handleSupplierChange = (supplierID) => {
     const supplier = suppliers.find((item) => item.id === supplierID)
-    form.setFields([{ name: 'supplier_snapshot', value: buildSupplierSnapshot(supplier) }])
+    form.setFieldsValue({ supplier_snapshot: buildSupplierSnapshot(supplier) })
     if (!editingOrder?.id) {
       form.setFieldsValue(buildPurchaseOrderSupplierDefaults(supplier))
     }
@@ -808,7 +813,7 @@ export default function PurchaseOrdersPage() {
       ) {
         return
       }
-      form.setFields([{ name: 'supplier_snapshot', value: snapshot }])
+      form.setFieldsValue({ supplier_snapshot: snapshot })
     })
   }
 
@@ -845,6 +850,16 @@ export default function PurchaseOrdersPage() {
     try {
       let params
       try {
+        const currentItems = form.getFieldValue('items') || []
+        const items = withoutBlankPurchaseOrderDraftLines(currentItems)
+        if (items.length === 0) {
+          message.warning('请至少填写一条采购明细')
+          return
+        }
+        if (items.length !== currentItems.length) {
+          // 先卸载被移除的明细字段，避免校验读回旧行位置。
+          flushSync(() => form.setFieldsValue({ items }))
+        }
         const values = await form.validateFields()
         const supplier = suppliers.find(
           (item) => item.id === values.supplier_id
@@ -876,6 +891,7 @@ export default function PurchaseOrdersPage() {
           return result.purchase_order
         },
         bindSaved: (savedOrder) => {
+          setMaterialImportUndo(null)
           setEditingOrder(savedOrder)
           setSelectedOrder(savedOrder)
           applySelectedRowKeys([savedOrder.id])
@@ -888,6 +904,7 @@ export default function PurchaseOrdersPage() {
             '该单据已被其他人更新，本次内容没有覆盖最新数据。请核对最新单据后再保存。'
           )
         } else if (isMutationResultUnknown(saveError)) {
+          setMaterialImportUndo(null)
           message.warning(
             '保存结果尚未确认，请先核对该单据的最新状态，不要连续重复提交。'
           )
@@ -1612,6 +1629,8 @@ export default function PurchaseOrdersPage() {
       <PurchaseOrderTermsModal key="terms" order={termsOrder} customerKey={activeCustomerKey} unitOptions={unitOptions} onClose={() => setTermsOrder(null)} onChanged={refreshPageData} />
       <PurchaseOrderEditor
         baselineKey={editorRevision}
+        importUndo={materialImportUndo}
+        onImportUndoChange={setMaterialImportUndo}
         open={modalOpen}
         form={form}
         editingOrder={editingOrder}
@@ -1628,6 +1647,7 @@ export default function PurchaseOrdersPage() {
         onCancel={() => {
           sourceDocumentOpenEditController.invalidate()
           orderAttachmentRef.current?.clearPendingAttachments()
+          setMaterialImportUndo(null)
           setModalOpen(false)
         }}
         onSupplierChange={handleSupplierChange}

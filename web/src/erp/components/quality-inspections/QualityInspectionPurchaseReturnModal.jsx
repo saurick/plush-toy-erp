@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
@@ -164,7 +166,7 @@ export default function QualityInspectionPurchaseReturnModal({
           <Input maxLength={255} />
         </Form.Item>
         <Form.Item name="note" label="备注">
-          <Input.TextArea rows={3} maxLength={255} showCount />
+          <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
         </Form.Item>
       </Form>
     </BusinessModal>

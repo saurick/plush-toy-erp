@@ -20,7 +20,6 @@ import {
 } from '../../components/workflow/WorkflowTaskCopy.jsx'
 import {
   getWorkflowTaskProcessContext,
-  listWorkflowTaskEvents,
 } from '../../api/workflowApi.mjs'
 import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
 import {
@@ -39,6 +38,7 @@ import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
 import WorkflowTaskHandlingChain from '../../components/workflow/WorkflowTaskHandlingChain.jsx'
 import WorkflowTaskEventTrail from '../../components/workflow/WorkflowTaskEventTrail.jsx'
+import useWorkflowTaskEventRecords from '../../hooks/useWorkflowTaskEventRecords.js'
 import { resolveMobileProductionArrangementContext } from '../utils/mobileProductionArrangement.mjs'
 import EngineeringMaterialTaskSummaryEntry from '../../components/sales-orders/EngineeringMaterialTaskSummaryEntry.jsx'
 import {
@@ -84,9 +84,8 @@ export default function MobileTaskDetailScreen({
     !processingComplete &&
     canProcessEngineeringMaterialTask(adminProfile, selectedTask)
   const approvalTask = isWorkflowApprovalTask(selectedTask)
-  const [taskEvents, setTaskEvents] = React.useState([])
-  const [taskEventsTruncated, setTaskEventsTruncated] = React.useState(false)
-  const [taskEventsState, setTaskEventsState] = React.useState('idle')
+  const taskEventRecords = useWorkflowTaskEventRecords({ task: selectedTask, profile: adminProfile })
+  const { items: taskEvents, truncated: taskEventsTruncated, status: taskEventsState } = taskEventRecords.task
   const [processContext, setProcessContext] = React.useState(null)
   const [processContextState, setProcessContextState] = React.useState('idle')
   const [processContextReloadKey, setProcessContextReloadKey] =
@@ -121,36 +120,6 @@ export default function MobileTaskDetailScreen({
       setProductionArrangementOpen(false)
     }
   }, [canOpenProductionArrangement, selectedTask?.id])
-
-  React.useEffect(() => {
-    if (!selectedTask?.id) {
-      setTaskEvents([])
-      setTaskEventsTruncated(false)
-      setTaskEventsState('idle')
-      return undefined
-    }
-    const controller = new AbortController()
-    setTaskEvents([])
-    setTaskEventsTruncated(false)
-    setTaskEventsState('loading')
-    listWorkflowTaskEvents(selectedTask.id, {
-      limit: 100,
-      signal: controller.signal,
-    })
-      .then(({ items, truncated }) => {
-        if (controller.signal.aborted) return
-        setTaskEvents(items)
-        setTaskEventsTruncated(truncated)
-        setTaskEventsState('ready')
-      })
-      .catch(() => {
-        if (controller.signal.aborted) return
-        setTaskEvents([])
-        setTaskEventsTruncated(false)
-        setTaskEventsState('error')
-      })
-    return () => controller.abort()
-  }, [selectedTask?.id, selectedTask?.version])
 
   React.useEffect(() => {
     if (!selectedTask?.id || !selectedTask?.process_instance_id) {
@@ -333,6 +302,7 @@ export default function MobileTaskDetailScreen({
         {taskDeviceNotice(selectedTask) ? <p>{taskDeviceNotice(selectedTask)}</p> : null}
 
         <WorkflowTaskEventTrail
+          records={taskEventRecords}
           className="mobile-detail-section workflow-task-info-card workflow-task-info-card--records"
           approvalTask={approvalTask}
           errorMessage="本任务处理记录加载失败，请刷新后重试。"

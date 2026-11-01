@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Button, Form, Input, Space } from 'antd'
 import { MinusCircleOutlined } from '@ant-design/icons'
+import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.jsx'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
@@ -9,7 +11,6 @@ import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
-  BusinessOptionalField,
 } from '../business-list/BusinessCompactFieldTable.jsx'
 
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
@@ -95,6 +96,7 @@ export default function PurchaseReceiptExceptionModal({
 
   return (
     <BusinessModal
+      form={form}
       title={isReturn ? '从入库单生成采购退货' : '登记采购入库调整'}
       open={open}
       size="lineItems"
@@ -133,12 +135,12 @@ export default function PurchaseReceiptExceptionModal({
                 name="reason"
                 label="调整原因"
                 rules={[
-                { required: true, whitespace: true, message: '请填写调整原因' },
-              ]}
+                  { required: true, whitespace: true, message: '请填写调整原因' },
+                ]}
               >
                 <BusinessTextArea maxLength={255} />
               </Form.Item>
-          ) : null}
+            ) : null}
           </Space>
         </BusinessFormSection>
         <BusinessFormSection title={detailTitle} showHeading={false} layout="content">
@@ -146,197 +148,207 @@ export default function PurchaseReceiptExceptionModal({
             {(fields, { add, remove }) => (
               <>
                 <BusinessLineItemsHeader title={detailTitle} />
-                <BusinessCompactFieldTable
-                  label={detailTitle}
-                  showSequence
-                  columns={[
-                  { label: '来源明细', required: true },
-                  ...(!isReturn
-                    ? [{ label: '调整方式', required: true, width: 144 }]
-                    : []),
-                  {
-                    label: isReturn ? '退货数量' : '调整数量',
-                    required: true,
-                    width: 180,
-                  },
-                  ...(!isReturn ? [{ label: '调整目标' }] : []),
-                  { label: '操作', width: 52 },
-                ]}
-                >
-                  {fields.map(({ key, ...field }, index) => (
-                    <BusinessCompactFieldRow
-                      key={key}
-                      rowRef={(node) => registerLineItemRow(index, node)}
-                      className="erp-purchase-receipt-exception-row"
-                      label={`${isReturn ? '退货' : '调整'}明细 ${index + 1}`}
-                      sequence={index + 1}
-                      cells={[
-                        <Form.Item
-                          {...field}
-                          name={[field.name, 'purchase_receipt_item_id']}
-                          label={`来源明细 ${index + 1}`}
-                          rules={[{ required: true, message: '请选择入库明细' }]}
-                        >
-                          <Select
-                            placeholder="请选择入库明细"
-                            showSearch
-                            optionFilterProp="label"
-                            options={itemOptions}
-                          />
-                        </Form.Item>,
-                      !isReturn ? (
-                        <Form.Item
-                          {...field}
-                          name={[field.name, 'adjust_type']}
-                          label="调整方式"
-                          rules={[
-                            { required: true, message: '请选择调整方式' },
-                          ]}
-                        >
-                          <Select
-                            placeholder="请选择调整方式"
-                            options={PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS}
-                          />
-                        </Form.Item>
-                      ) : null,
-                        <Form.Item
-                          {...field}
-                          name={[field.name, 'quantity']}
-                          dependencies={[
-                          ['items', field.name, 'purchase_receipt_item_id'],
-                        ]}
-                          label={isReturn ? '退货数量' : '调整数量'}
-                          rules={[
-                          unitQuantityRuleFromOptions(
-                            quantityUnitOptions,
-                            () =>
-                              receipt?.items?.find(
-                                (item) =>
-                                  Number(item.id) ===
-                                  Number(
-                                    form.getFieldValue([
-                                      'items',
-                                      field.name,
-                                      'purchase_receipt_item_id',
-                                    ])
-                                  )
-                              )?.unit_id
-                          ),
-
-                          { required: true, message: '请填写数量' },
-                          {
-                            validator: (_, value) =>
-                              isPositiveNumeric20Scale6Units(
-                                numeric20Scale6Units(value)
-                              )
-                                ? Promise.resolve()
-                                : Promise.reject(new Error('数量必须大于 0')),
-                          },
-                        ]}
-                        >
-                          <Input inputMode="decimal" />
-                        </Form.Item>,
-                      !isReturn ? (
-                        <Form.Item noStyle shouldUpdate>
-                          {({ getFieldValue }) => {
-                            const adjustType = getFieldValue([
-                              'items',
-                              field.name,
-                              'adjust_type',
-                            ])
-                            if (adjustType === 'LOT_CORRECTION') {
-                              return (
-                                <Form.Item
-                                  name={[field.name, 'lot_id']}
-                                  label="目标批次"
-                                  rules={[
-                                    {
-                                      required: true,
-                                      message: '请选择目标批次',
-                                    },
-                                  ]}
-                                >
-                                  <Select
-                                    placeholder="请选择目标批次"
-                                    showSearch
-                                    optionFilterProp="label"
-                                    options={lotOptions}
-                                  />
-                                </Form.Item>
-                              )
-                            }
-                            if (adjustType === 'WAREHOUSE_CORRECTION') {
-                              return (
-                                <Form.Item
-                                  name={[field.name, 'warehouse_id']}
-                                  label="目标仓库"
-                                  rules={[
-                                    {
-                                      required: true,
-                                      message: '请选择目标仓库',
-                                    },
-                                  ]}
-                                >
-                                  <Select
-                                    placeholder="请选择目标仓库"
-                                    showSearch
-                                    optionFilterProp="label"
-                                    options={warehouseOptions}
-                                  />
-                                </Form.Item>
-                              )
-                            }
-                            return null
-                          }}
-                        </Form.Item>
-                      ) : null,
-                    ].filter(Boolean)}
-                      actions={
-                      fields.length > 1 ? (
-                        <Button
-                          type="text"
-                          danger
-                          aria-label={`移除明细 ${index + 1}`}
-                          icon={<MinusCircleOutlined />}
-                          onClick={() => remove(field.name)}
-                        />
-                      ) : null
+                <BusinessGroupedLineItems
+                  fields={fields}
+                  form={form}
+                  table={BusinessCompactFieldTable}
+                  getGroup={(item) => {
+                    const source = receipt?.items?.find((entry) => Number(entry.id) === Number(item.purchase_receipt_item_id))
+                    const label = source ? receiptItemLabel(source, materialOptions) : '待选择入库明细'
+                    return {
+                      key: source?.material_id && source?.unit_id ? `${source.material_id}:${source.unit_id}` : item.purchase_receipt_item_id || undefined,
+                      label,
                     }
-                    >
-                      <BusinessOptionalField
-                        name={['items', field.name, 'note']}
-                        label="明细备注"
+                  }}
+                  tableProps={{
+                    label: detailTitle,
+                    showSequence: true,
+                    columns: [
+                    { label: '来源明细', required: true },
+                    ...(!isReturn
+                      ? [{ label: '调整方式', required: true, width: 144 }]
+                      : []),
+                    {
+                      label: isReturn ? '退货数量' : '调整数量',
+                      required: true,
+                      width: 180,
+                    },
+                    ...(!isReturn ? [{ label: '调整目标' }] : []),
+                    { label: '操作', width: 52 },
+                  ] }}
+                >
+                  {(listField, index) => {
+                    const { key, ...field } = listField
+                    return (
+                      <BusinessCompactFieldRow
+                        key={key}
+                        rowRef={(node) => registerLineItemRow(index, node)}
+                        className="erp-purchase-receipt-exception-row"
+                        label={`${isReturn ? '退货' : '调整'}明细 ${index + 1}`}
+                        sequence={index + 1}
+                        cells={[
+                          <Form.Item
+                            {...field}
+                            name={[field.name, 'purchase_receipt_item_id']}
+                            label={`来源明细 ${index + 1}`}
+                            rules={[{ required: true, message: '请选择入库明细' }]}
+                          >
+                            <Select
+                              placeholder="请选择入库明细"
+                              showSearch
+                              optionFilterProp="label"
+                              options={itemOptions}
+                            />
+                          </Form.Item>,
+                        !isReturn ? (
+                          <Form.Item
+                            {...field}
+                            name={[field.name, 'adjust_type']}
+                            label="调整方式"
+                            rules={[
+                              { required: true, message: '请选择调整方式' },
+                            ]}
+                          >
+                            <Select
+                              placeholder="请选择调整方式"
+                              options={PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS}
+                            />
+                          </Form.Item>
+                        ) : null,
+                          <Form.Item
+                            {...field}
+                            name={[field.name, 'quantity']}
+                            dependencies={[
+                            ['items', field.name, 'purchase_receipt_item_id'],
+                          ]}
+                            label={isReturn ? '退货数量' : '调整数量'}
+                            rules={[
+                            unitQuantityRuleFromOptions(
+                              quantityUnitOptions,
+                              () =>
+                                receipt?.items?.find(
+                                  (item) =>
+                                    Number(item.id) ===
+                                    Number(
+                                      form.getFieldValue([
+                                        'items',
+                                        field.name,
+                                        'purchase_receipt_item_id',
+                                      ])
+                                    )
+                                )?.unit_id
+                            ),
+
+                            { required: true, message: '请填写数量' },
+                            {
+                              validator: (_, value) =>
+                                isPositiveNumeric20Scale6Units(
+                                  numeric20Scale6Units(value)
+                                )
+                                  ? Promise.resolve()
+                                  : Promise.reject(new Error('数量必须大于 0')),
+                            },
+                          ]}
+                          >
+                            <Input inputMode="decimal" />
+                          </Form.Item>,
+                        !isReturn ? (
+                          <Form.Item noStyle shouldUpdate>
+                            {({ getFieldValue }) => {
+                              const adjustType = getFieldValue([
+                                'items',
+                                field.name,
+                                'adjust_type',
+                              ])
+                              if (adjustType === 'LOT_CORRECTION') {
+                                return (
+                                  <Form.Item
+                                    name={[field.name, 'lot_id']}
+                                    label="目标批次"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: '请选择目标批次',
+                                      },
+                                    ]}
+                                  >
+                                    <Select
+                                      placeholder="请选择目标批次"
+                                      showSearch
+                                      optionFilterProp="label"
+                                      options={lotOptions}
+                                    />
+                                  </Form.Item>
+                                )
+                              }
+                              if (adjustType === 'WAREHOUSE_CORRECTION') {
+                                return (
+                                  <Form.Item
+                                    name={[field.name, 'warehouse_id']}
+                                    label="目标仓库"
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: '请选择目标仓库',
+                                      },
+                                    ]}
+                                  >
+                                    <Select
+                                      placeholder="请选择目标仓库"
+                                      showSearch
+                                      optionFilterProp="label"
+                                      options={warehouseOptions}
+                                    />
+                                  </Form.Item>
+                                )
+                              }
+                              return null
+                            }}
+                          </Form.Item>
+                        ) : null,
+                      ].filter(Boolean)}
+                        actions={
+                        fields.length > 1 ? (
+                          <Button
+                            type="text"
+                            danger
+                            aria-label={`移除明细 ${index + 1}`}
+                            icon={<MinusCircleOutlined />}
+                            onClick={() => remove(field.name)}
+                          />
+                        ) : null
+                      }
                       >
                         <Form.Item
                           {...field}
                           name={[field.name, 'note']}
                           label="明细备注"
                         >
-                          <BusinessTextArea maxLength={255} />
+                          <BusinessTextArea maxLength={BusinessTextPolicy.noteMaxCharacters} />
                         </Form.Item>
-                      </BusinessOptionalField>
-                    </BusinessCompactFieldRow>
-                ))}
-                </BusinessCompactFieldTable>
+                      </BusinessCompactFieldRow>
+                    )
+                  }}
+                </BusinessGroupedLineItems>
                 <BusinessLineItemsFooter
                   addLabel={`添加${detailTitle}`}
                   onAdd={() => appendExceptionLine(add, fields.length)}
                   stats={[
-                  {
-                    key: 'count',
-                    label: '已录入',
-                    value: fields.length,
-                    suffix: '条',
-                  },
-                ]}
+                    {
+                      key: 'count',
+                      label: '已录入',
+                      value: fields.length,
+                      suffix: '条',
+                    },
+                  ]}
                 />
               </>
-          )}
+            )}
           </Form.List>
         </BusinessFormSection>
         <BusinessFormSection title="整单备注">
           <Form.Item name="note" label="备注说明">
-            <BusinessTextArea minRows={3} maxLength={255} showCount />
+            <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
           </Form.Item>
         </BusinessFormSection>
       </Form>

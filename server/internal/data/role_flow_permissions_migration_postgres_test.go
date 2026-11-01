@@ -77,7 +77,7 @@ func TestAdminManagePostgresRoleFlowPermissionMigration(t *testing.T) {
 				sourceID := 710000001 + i
 				payload, _ := json.Marshal(map[string]any{"source_record_id": sourceID, "source_task_intent_hash": strings.Repeat("a", 64), "source_task_contract": biz.WorkflowSourceTaskContractV1, "source_task_producer": producer})
 				var id int
-				err = tx.QueryRowContext(ctx, `INSERT INTO workflow_tasks(task_code,task_group,task_name,source_type,source_id,task_status_key,owner_role_key,owner_pool_key,required_capability_key,assignee_id,version,payload,created_at,updated_at) VALUES($1,'handoff_outsourcing_contract','补价并确认加工合同','outsourcing_order',$2,$3,'finance','finance','outsourcing.order.confirm',17,10,$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id`, fmt.Sprintf("source-handoff-outsourcing-contract-%d", sourceID), sourceID, status, string(payload)).Scan(&id)
+				err = tx.QueryRowContext(ctx, `INSERT INTO workflow_tasks(task_no,task_code,task_group,task_name,source_type,source_id,task_status_key,owner_role_key,owner_pool_key,required_capability_key,assignee_id,version,payload,created_at,updated_at) VALUES($5,$1,'handoff_outsourcing_contract','补价并确认加工合同','outsourcing_order',$2,$3,'finance','finance','outsourcing.order.confirm',17,10,$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id`, fmt.Sprintf("source-handoff-outsourcing-contract-%d", sourceID), sourceID, status, string(payload), workflowTaskFixtureNumber(t, tx)).Scan(&id)
 				if err != nil {
 					t.Fatal(err)
 				}

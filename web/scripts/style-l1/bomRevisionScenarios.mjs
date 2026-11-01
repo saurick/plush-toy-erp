@@ -2,9 +2,9 @@ import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSession, assertNoHorizontalOverflow, outputDir, path }) {
-  const scenarios = ['create', 'multiple-mobile', 'read-failure', 'lost-response', 'no-create', 'resume-no-create', 'detail', 'detail-existing'].map((mode) => {
-    const mobile = mode === 'multiple-mobile'
-    const existingDraft = mobile || ['resume-no-create', 'detail-existing'].includes(mode)
+  const scenarios = ['create', 'multiple-narrow', 'read-failure', 'lost-response', 'no-create', 'resume-no-create', 'detail', 'detail-existing'].map((mode) => {
+    const narrow = mode === 'multiple-narrow'
+    const existingDraft = narrow || ['resume-no-create', 'detail-existing'].includes(mode)
     const permissions = [
       'bom.read', 'bom.update', 'mobile.engineering.access',
       ...(mode === 'resume-no-create' ? [] : ['bom.activate']),
@@ -26,9 +26,9 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
     }
     return {
       name: `bom-revision-${mode}`,
-      path: mobile ? '/m/engineering/handle/purchase/material-bom' : '/erp/purchase/material-bom',
+      path: '/erp/purchase/material-bom',
       auth: 'admin',
-      viewport: mobile ? { width: 390, height: 844 } : { width: 1920, height: 1080 },
+      viewport: narrow ? { width: 390, height: 844 } : { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       adminProfile: {
         is_super_admin: false,
@@ -39,8 +39,8 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
       effectiveSession: { ...customerRuntimeEffectiveSession, pages: ['material-bom'], actions: permissions },
       beforeNavigate: async (page) => {
         records = [structuredClone(original), { ...structuredClone(original), id: 9, version: 'V9', status: 'ARCHIVED' }]
-        if (mobile) records.push(...[2, 3].map((id) => ({ ...structuredClone(original), id, version: `V${id}`, status: 'DRAFT' })))
-        if (existingDraft && !mobile) records.push({ ...structuredClone(original), id: 3, version: 'V3', status: 'DRAFT' })
+        if (narrow) records.push(...[2, 3].map((id) => ({ ...structuredClone(original), id, version: `V${id}`, status: 'DRAFT' })))
+        if (existingDraft && !narrow) records.push({ ...structuredClone(original), id: 3, version: 'V3', status: 'DRAFT' })
         writes = []
         failReads = mode === 'read-failure'
         await page.route('**/rpc/bom', async (route) => {
@@ -59,11 +59,11 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
           if (method === 'copy_bom_version') {
             writes.push({ method, params })
             assert.equal(params.source_id, 1)
-            assert.equal(params.version, 'V10', '自动版本号须包括当前页以外的历史版本')
+            assert.equal(Object.hasOwn(params, 'version'), false, '版本号只由后端分配')
             assert.equal(records.some((record) => record.status === 'DRAFT'), false, '已有草稿时不重复创建')
-            const draft = { ...structuredClone(original), id: 10, version: params.version, status: 'DRAFT', items: original.items.map((item) => ({ ...item, id: 101, bom_header_id: 10 })) }
+            const draft = { ...structuredClone(original), id: 10, version: 'V10', status: 'DRAFT', items: original.items.map((item) => ({ ...item, id: 101, bom_header_id: 10 })) }
             records.push(draft)
-            if (mode === 'lost-response') return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 500, message: '请求未取得结果' } } })
+            if (mode === 'lost-response') return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 50000, message: '请求未取得结果' } } })
             return reply({ bom_version: draft })
           }
           if (method === 'save_bom_with_items') {
@@ -97,7 +97,7 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
         }
         const action = page.locator('button[data-business-action-key="revise-bom"]:visible')
         await action.waitFor({ state: 'visible' })
-        await action.filter({ hasText: existingDraft ? `查看草稿（${mobile ? 2 : 1}）` : mode === 'read-failure' ? '查看草稿' : '创建修订草稿' }).waitFor()
+        await action.filter({ hasText: existingDraft ? `查看草稿（${narrow ? 2 : 1}）` : mode === 'read-failure' ? '查看草稿' : '创建修订草稿' }).waitFor()
         if (mode.startsWith('detail')) await page.screenshot({ path: path.join(outputDir, `bom-revision-${mode}-4k.png`), animations: 'disabled' })
         await action.click()
         const dialog = page.getByRole('dialog')
@@ -123,10 +123,10 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
           assert.equal(writes.length, 0)
           return
         }
-        if (mobile) {
+        if (narrow) {
           assert.equal(await dialog.getByRole('button', { name: '编辑所选草稿', exact: true }).isDisabled(), true)
           await dialog.getByRole('radio', { name: 'V3 · 草稿', exact: true }).check()
-          await page.screenshot({ path: path.join(outputDir, 'bom-revision-mobile-choose.png'), animations: 'disabled' })
+          await page.screenshot({ path: path.join(outputDir, 'bom-revision-narrow-choose.png'), animations: 'disabled' })
         } else if (existingDraft) {
           assert.equal(await dialog.getByRole('radio', { name: 'V3 · 草稿', exact: true }).isChecked(), true)
         } else {
@@ -149,19 +149,13 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
         const editor = page.locator('.erp-business-form-page:visible')
         await editor.waitFor()
         await editor.getByRole('heading', { name: '编辑 BOM 草稿 · 未生效', exact: true }).waitFor()
-        await editor.getByText('正在修改草稿，尚未生效。保存后需启用，已有订单仍使用原 BOM。', { exact: true }).waitFor()
+        assert.equal(await editor.locator('#version').isDisabled(), true)
         assert.equal(await editor.locator('#version').inputValue(), existingDraft ? 'V3' : 'V10')
         assert.equal(await editor.locator('.erp-bom-material-group').count(), 1)
         assert.deepEqual(records[0], original, '编辑新版本不能修改原 BOM')
         assert.equal(writes.filter((item) => item.method === 'copy_bom_version').length, existingDraft ? 0 : 1)
         await assertNoHorizontalOverflow(page)
         if (mode === 'create') {
-          const noteGeometry = await editor.locator('.erp-business-inline-note').evaluate((node) => ({
-            width: node.getBoundingClientRect().width,
-            parentWidth: node.parentElement.clientWidth,
-            gridColumn: getComputedStyle(node).gridColumn,
-          }))
-          assert(noteGeometry.width >= noteGeometry.parentWidth * 0.9, `草稿状态说明应横跨表单，当前布局：${JSON.stringify(noteGeometry)}`)
           await page.screenshot({ path: path.join(outputDir, 'bom-revision-editor-4k.png'), animations: 'disabled' })
           await editor.getByRole('button', { name: '返回列表', exact: true }).click()
           const draftRow = page.locator('tr[data-row-key="10"]')
@@ -236,7 +230,7 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
       await edit.click()
       assert.equal(await readSelectValue(dialog.locator('#business-draft')), 'bom-1', '只有一个草稿时预选该版本')
       await confirm()
-      await frame.locator('[data-form-field="bom-version"]').fill('V9')
+      assert.equal(await frame.locator('[data-form-field="bom-version"]').getAttribute('readonly'), '')
       await frame.locator('[data-form-field="usage-0"]').fill('2.5')
       await save()
       await enable()
@@ -245,7 +239,7 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
       await dialog.getByText(/自动填写版本号/u).waitFor()
       await page.screenshot({ path: path.join(outputDir, 'bom-revision-prototype-4k.png'), animations: 'disabled' })
       await confirm()
-      assert.equal(await frame.locator('[data-form-field="bom-version"]').inputValue(), 'V10')
+      assert.equal(await frame.locator('[data-form-field="bom-version"]').inputValue(), 'V4')
       assert.equal(await frame.locator('[data-form-field="usage-0"]').inputValue(), '2.5', '新版本带入原材料用量')
       await frame.locator('[data-form-field="usage-0"]').fill('3.25')
       await save()
@@ -254,7 +248,7 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
       await select('bom-1')
       await edit.click()
       await confirm()
-      assert.equal(await frame.locator('[data-form-field="bom-version"]').inputValue(), 'V10')
+      assert.equal(await frame.locator('[data-form-field="bom-version"]').inputValue(), 'V4')
       assert.equal(await frame.locator('[data-form-field="usage-0"]').inputValue(), '3.25', '再次修改继续已有草稿')
       await save()
       await enable()

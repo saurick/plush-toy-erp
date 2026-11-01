@@ -966,7 +966,7 @@ function buildBOMVersions(prefix, count, products, materials, anchorDate) {
       );
       versions.push({
         productRef: product.code,
-        version: `${prefix}-BOM-${pad(productOffset + 1, 3)}-${statusOffset + 1}`,
+        version: `V${statusOffset + 1}`,
         source_order_no: `${prefix}-XD-${pad(productOffset + 1, 3)}`,
         quantity_text: String(500 + productOffset * 50),
         spare_text: productOffset % 2 === 0 ? "含 3% 备品" : "按订单数量备料",
@@ -4058,17 +4058,10 @@ export function planBOMItemReconciliation({
 }
 
 async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
-  const existing = mapBy(
-    await listAll({
-      plan,
-      token: tokens.engineering,
-      domain: "bom",
-      method: "list_bom_versions",
-      listKey: "bom_versions",
-      fetchImpl,
-    }),
-    "version",
-  );
+  const existing = new Map((await listAll({
+    plan, token: tokens.engineering, domain: "bom", method: "list_bom_versions",
+    listKey: "bom_versions", fetchImpl, params: { lifecycle_scope: "all" },
+  })).map((record) => [`${record.product_id}:${record.version}`, record]));
   const materialIds = new Map(
     [...refs.materials].map(([code, item]) => [code, item.id]),
   );
@@ -4077,7 +4070,9 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
   );
   const details = new Map();
   for (const record of plan.records.bomVersions) {
-    let bom = existing.get(record.version);
+    const productID = refs.products.get(record.productRef).id;
+    const key = `${productID}:${record.version}`;
+    let bom = existing.get(key);
     let headerAction = "reuse";
     if (!bom) {
       const data = await rpcCall({
@@ -4086,6 +4081,7 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
         method: "save_bom_with_items",
         params: {
           ...record,
+          version: undefined,
           product_id: refs.products.get(record.productRef).id,
           productRef: undefined,
           targetStatus: undefined,
@@ -4104,7 +4100,7 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
         throw new CliError(
           `save_bom_with_items response missing id for ${record.version}`,
         );
-      existing.set(record.version, bom);
+      existing.set(key, bom);
       headerAction = "create";
     }
     const detailData = await rpcCall({
@@ -4165,6 +4161,7 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
         method: "save_bom_with_items",
         params: {
           ...record,
+          version: undefined,
           id: bom.id,
           expected_version: detail.edit_version,
           product_id: refs.products.get(record.productRef).id,
@@ -4218,7 +4215,7 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
     }
     report.steps.push({
       target: "bom_version",
-      key: record.version,
+      key: `${record.productRef}:${record.version}`,
       action: headerAction,
       id: bom.id,
       items: record.items.length,
@@ -4244,7 +4241,7 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
       resultKey: "bom_version",
     });
     detail.status = finalStatus;
-    details.set(record.version, detail);
+    details.set(`${record.productRef}:${record.version}`, detail);
   }
   return details;
 }
@@ -4308,7 +4305,7 @@ export function buildSourceDrivenFactReferences({
       };
       salesCandidates.push({ order: salesOrder, item });
       const bomPlan = activeBOMPlans.get(plannedLine.productRef);
-      const bom = bomPlan ? bomVersions.get(bomPlan.version) : undefined;
+      const bom = bomPlan ? bomVersions.get(`${bomPlan.productRef}:${bomPlan.version}`) : undefined;
       if (
         !bom?.id ||
         String(bom.status || "").toUpperCase() !== "ACTIVE" ||
@@ -4969,7 +4966,7 @@ export async function applyManualAcceptanceSourceData(
         };
       }),
     bomVersions: plan.records.bomVersions.map((record) => {
-      const bom = bomVersions.get(record.version);
+      const bom = bomVersions.get(`${record.productRef}:${record.version}`);
       return {
         id: bom.id,
         version: record.version,
@@ -5192,10 +5189,14 @@ export async function verifyManualAcceptanceSourceData(
       method,
       listKey,
       fetchImpl,
+      params: key === "bom_versions" ? { lifecycle_scope: "all" } : {},
     });
-    const items = allItems.filter((item) =>
-      String(item?.[identifierKey] || "").startsWith(`${plan.prefix}-`),
-    );
+    const productRows = key === "bom_versions" ? await listAll({ plan, token: tokens.engineering, domain: "masterdata", method: "list_products", listKey: "products", fetchImpl }) : [];
+    const productIDs = new Map(productRows.filter((item) => item.code.startsWith(`${plan.prefix}-`)).map((item) => [item.code, item.id]));
+    const plannedProducts = new Set(plan.records.bomVersions.map((item) => productIDs.get(item.productRef)));
+    const items = allItems.filter((item) => key === "bom_versions"
+      ? plannedProducts.has(item.product_id)
+      : String(item?.[identifierKey] || "").startsWith(`${plan.prefix}-`));
     const counts = statusCounts(items, statusKey);
     const missingStatuses = expectedStatuses.filter(
       (status) => !counts[status],
@@ -5203,7 +5204,7 @@ export async function verifyManualAcceptanceSourceData(
     const detailErrors = [];
     if (key === "bom_versions") {
       const plannedByVersion = new Map(
-        plan.records.bomVersions.map((item) => [item.version, item]),
+        plan.records.bomVersions.map((item) => [`${productIDs.get(item.productRef)}:${item.version}`, item]),
       );
       const materialIds = new Map(
         plan.records.materials.map((item) => [item.code, undefined]),
@@ -5233,7 +5234,7 @@ export async function verifyManualAcceptanceSourceData(
         ]),
       );
       for (const header of items) {
-        const planned = plannedByVersion.get(header.version);
+        const planned = plannedByVersion.get(`${header.product_id}:${header.version}`);
         try {
           if (!planned) throw new CliError(`${header.version} is not planned`);
           const data = await rpcCall({

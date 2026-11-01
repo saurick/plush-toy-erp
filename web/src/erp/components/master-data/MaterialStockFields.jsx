@@ -3,6 +3,7 @@ import { Button, Form } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import { listAllMaterialWarehouses } from '../../api/masterDataOrderApi.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { warehouseOptionFromRecord } from '../../utils/referenceSelectOptions.mjs'
 import {
   MATERIAL_STOCK_CATEGORY_OPTIONS,
   materialWarehouseOptions,
@@ -38,6 +39,7 @@ export default function MaterialStockFields({ form }) {
   }).map((item) => ({
     value: item.id,
     label: `${item.name}（${warehouseTypeLabel(item.type)}）`,
+    identity: warehouseOptionFromRecord(item).identity,
   }))
   return (
     <>

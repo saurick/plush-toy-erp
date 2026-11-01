@@ -11,8 +11,10 @@ import {
   InputNumber,
   Space,
 } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
+import { customerOption, productSKUOption } from '../../utils/referenceSelectOptions.mjs'
 import {
   formatUnitQuantitySummary,
   calculateSalesOrderAmounts,
@@ -67,9 +69,10 @@ import {
   formatNumeric20Scale6Summary,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
-import BusinessLineItemsTable, {
+import {
   BusinessLineItemRow,
 } from '../business-list/BusinessLineItemsTable.jsx'
+import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import {
   optionalMoneyRule,
@@ -94,14 +97,6 @@ const SALES_ORDER_COLUMNS = [
   },
   { label: '计划交付日期', width: 160 },
 ]
-
-function skuLabel(sku = {}) {
-  return (
-    [sku.sku_code, sku.sku_name || sku.customer_sku || sku.barcode]
-      .filter(Boolean)
-      .join(' ') || '规格已关联'
-  )
-}
 
 function contactOptionLabel(contact = {}) {
   return (
@@ -296,16 +291,7 @@ export function SalesOrderFormFields({
             allowClear
             showSearch
             optionFilterProp="label"
-            options={customers.map((customer) => {
-              const customerCode = String(customer.code || '').trim()
-              const customerName = String(customer.name || '').trim()
-              return {
-                label: customerCode
-                  ? `${customerCode} - ${customerName || '未命名客户'}`
-                  : customerName || '客户已关联',
-                value: customer.id,
-              }
-            })}
+            options={customers.map(customerOption)}
             onChange={onCustomerChange}
           />
         </Form.Item>
@@ -442,7 +428,7 @@ export function SalesOrderFormFields({
         </Form.Item>
         <DeliveryAddressFields
           form={form}
-          extra="从客户档案带出后可按本单调整；保存后固定为本单收货信息。"
+          description="从客户档案带出后可按本单调整；保存后固定为本单收货信息。"
         />
       </BusinessFormSection>
       <BusinessFormSection title="结算与报价">
@@ -581,9 +567,10 @@ export function SalesOrderFormFields({
           name="price_condition_note"
         >
           <BusinessTextArea
+            minRows={2}
             allowClear
             showCount
-            maxLength={255}
+            maxLength={BusinessTextPolicy.noteMaxCharacters}
             placeholder="账期影响报价时记录核对结论"
           />
         </Form.Item>
@@ -594,7 +581,7 @@ export function SalesOrderFormFields({
           label="备注"
           name="note"
         >
-          <BusinessTextArea allowClear showCount maxLength={300} />
+          <BusinessTextArea minRows={2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
         </Form.Item>
         {attachmentPanel}
       </BusinessFormSection>
@@ -663,7 +650,7 @@ export function SalesOrderItemsFormSection({
     }
   }, [defaultUnitID, form])
   const skuOptions = productSKUs.map((sku) => ({
-    label: skuLabel(sku),
+    ...productSKUOption(sku),
     value: sku.id,
     sku,
   }))
@@ -688,11 +675,13 @@ export function SalesOrderItemsFormSection({
                 暂无订货明细，可先保存订单草稿
               </BusinessLineItemsEmpty>
             ) : (
-              <BusinessLineItemsTable
-                columns={SALES_ORDER_COLUMNS}
-                label="订货明细"
+              <BusinessGroupedLineItems
+                fields={fields}
+                form={form}
+                getGroup={(item) => ({ key: item.product_id || undefined, label: salesOrderRequirementName(item) || '待填写订货产品' })}
+                tableProps={{ columns: SALES_ORDER_COLUMNS, label: '订货明细' }}
               >
-                {fields.map((field, index) => {
+                {(field, index) => {
                   const lineId = form.getFieldValue(['items', field.name, 'id'])
                   const isExistingLine = Boolean(lineId)
                   const canEditLine = isExistingLine
@@ -718,17 +707,7 @@ export function SalesOrderItemsFormSection({
                           />
                         </Form.Item>
                       }
-                      name={['items', field.name]}
                       detailsLabel="规格、船头版与补充说明"
-                      summaryFields={[
-                        {
-                          key: 'product_sku_id',
-                          label: '规格',
-                          options: skuOptions,
-                        },
-                        { key: 'process_requirement', label: '工艺' },
-                        { key: 'note', label: '备注' },
-                      ]}
                       actions={
                         <Space
                           className="erp-sales-order-lines-form__row-actions"
@@ -826,6 +805,7 @@ export function SalesOrderItemsFormSection({
                             ]}
                           >
                             <BusinessTextArea
+                              minRows={1}
                               disabled={!canEditLine}
                               maxLength={255}
                               placeholder={
@@ -1182,6 +1162,7 @@ export function SalesOrderItemsFormSection({
                           name={[field.name, 'process_requirement']}
                         >
                           <BusinessTextArea
+                            minRows={1}
                             disabled={!canEditLine}
                             maxLength={255}
                             placeholder="客户要求或工艺说明"
@@ -1195,15 +1176,15 @@ export function SalesOrderItemsFormSection({
                           <BusinessTextArea
                             allowClear
                             showCount
-                            maxLength={255}
+                            maxLength={BusinessTextPolicy.noteMaxCharacters}
                             disabled={!canEditLine}
                           />
                         </Form.Item>
                       </div>
                     </BusinessLineItemRow>
                   )
-                })}
-              </BusinessLineItemsTable>
+                }}
+              </BusinessGroupedLineItems>
             )}
             <BusinessLineItemsFooter
               addLabel="添加订货明细"

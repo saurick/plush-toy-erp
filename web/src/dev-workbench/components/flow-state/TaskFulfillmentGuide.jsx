@@ -24,6 +24,7 @@ import FulfillmentSubflow from './FulfillmentSubflow.jsx'
 import FulfillmentChainCanvas from './FulfillmentChainCanvas.jsx'
 import FulfillmentExceptionDetails from './FulfillmentExceptionDetails.jsx'
 import './taskFulfillmentGuide.css'
+import { ChainCapabilityLinks, ChainEvidenceLinks } from '../DevProductCoreRelations.jsx'
 
 const exceptionKeys = [
   queryKeys.exception,
@@ -44,6 +45,7 @@ export default function TaskFulfillmentGuide({
   scoped = false,
   showViewSwitch = false,
   onOpenView,
+  onOpenTopics,
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
@@ -90,6 +92,8 @@ export default function TaskFulfillmentGuide({
     ? `${(scoped ? steps : catalog.fulfillment_flow).findIndex((step) => step.stage === current.stage) + 1} · ${getFulfillmentStageCopy(current).label}`
     : null
   const canReturn = Boolean(selection && current)
+  const relatedChainKey = selection?.guide ? selection.guide.business_chain : current?.business_chain
+  const relatedChainKnown = businessCatalog?.businessChains.some((chain) => chain.key === relatedChainKey)
   const detailStep = selection
     ? steps.find((step) => step.stage === selection.origin?.stage) ||
       selection.origin
@@ -442,7 +446,16 @@ export default function TaskFulfillmentGuide({
             selectedKey={searchParams.get(queryKeys.relationAction)}
             onSelect={(key) => update((next) => next.set(queryKeys.relationAction, key))}
           /> : null}
-
+          {!scoped && !selection?.invalid && relatedChainKnown ? (
+            <>
+              {onOpenTopics ? <Button onClick={() => onOpenTopics(relatedChainKey)}>查看相关专题</Button> : null}
+              <ChainCapabilityLinks chainKey={relatedChainKey} fromLabel="业务链路" />
+              <details className="erp-dev-disclosure">
+                <summary>数据与验证</summary>
+                <ChainEvidenceLinks chainKey={relatedChainKey} fromLabel="业务链路" />
+              </details>
+            </>
+          ) : null}
         </section>
       ) : null}
       <p className="erp-dev-fulfillment-guide__boundary">

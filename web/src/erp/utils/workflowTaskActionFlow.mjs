@@ -6,9 +6,9 @@ export const WORKFLOW_TASK_ACTION_STEP_KEYS = Object.freeze([
 
 export const WORKFLOW_TASK_COLLABORATION_ACTIONS = Object.freeze({
   block: { label: '标记任务受阻', condition: '任务尚未结束，当前责任人有受阻操作权限时显示；点选原因即可标记，补充说明选填。' },
-  resume: { label: '解除任务阻塞', condition: '任务处于受阻状态且获准恢复时显示；填写解除说明后恢复待处理。' },
-  assign: { label: '转交任务', condition: '后端允许改派且有转交权限时显示；仅调整办理人。' },
-  urge: { label: '催办任务', condition: '可催办但不能代为办理时显示；提醒责任人，不改变业务结果。' },
+  resume: { label: '解除任务阻塞', condition: '任务处于受阻状态且获准恢复时显示；处理说明选填，提交后恢复待处理。' },
+  assign: { label: '转交任务', condition: '后端允许改派且有转交权限时显示；去向和原因必填，仅调整办理人。' },
+  urge: { label: '催办任务', condition: '可催办但不能代为办理时显示；催办说明选填，提醒责任人，不改变业务结果。' },
 })
 
 export function workflowTaskPrimaryModes(actions = []) {

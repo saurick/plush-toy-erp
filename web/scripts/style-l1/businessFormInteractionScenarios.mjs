@@ -7,7 +7,9 @@ import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { assertImportUndoPlacement } from './importUndoAssertions.mjs'
 
 export function createBusinessFormInteractionScenarios({
   customerRuntimeEffectiveSession,
@@ -512,6 +514,199 @@ export function createBusinessFormInteractionScenarios({
       },
     },
     {
+      name: 'purchase-material-import-undo-desktop',
+      path: '/erp/purchase/accessories',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const writes = []
+        page.on('request', (request) => {
+          if (!request.url().includes('/rpc/purchase_order') || request.method() !== 'POST') return
+          const body = request.postDataJSON()
+          if (body?.method === 'save_purchase_order_with_items') writes.push(body)
+        })
+        const create = page.getByRole('button', { name: '新建采购订单' })
+        await create.click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.getByRole('heading', { name: '新建采购订单', exact: true }).waitFor()
+        const source = editor.getByRole('button', { name: '从材料库添加', exact: true })
+        const undo = editor.getByRole('button', { name: '撤销本次导入', exact: true })
+        const rows = editor.locator('.erp-sales-order-lines-form__row')
+        const enteredCount = editor.locator('.erp-line-items-form__stat').filter({ hasText: '已录入' }).locator('strong')
+        assert.equal(await undo.count(), 0)
+        assert.equal(await enteredCount.innerText(), '0', '默认空白行不计入已录入')
+        assert.equal(await source.isDisabled(), true, '尚未选择供应商时不导入材料')
+        const paymentHelp = editor.getByRole('button', { name: '查看付款周期（天）说明', exact: true })
+        assert.equal(await editor.locator('.ant-form-item').filter({ has: paymentHelp }).locator('.ant-form-item-extra').count(), 0, '静态说明不占用字段下方空间')
+        await paymentHelp.click()
+        await page.getByText('保存后冻结为本单付款条件，不随供应商档案后续调整。', { exact: true }).waitFor()
+        await page.keyboard.press('Escape')
+        await paymentHelp.focus()
+        await page.keyboard.press('Enter')
+        await page.getByText('保存后冻结为本单付款条件，不随供应商档案后续调整。', { exact: true }).waitFor()
+        await page.keyboard.press('Escape')
+        await editor.getByLabel('供应商', { exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '样式供应商' }).first().click()
+        const importMaterials = async (indexes) => {
+          await source.click()
+          const picker = page.locator('.erp-source-import-picker-modal.ant-modal:visible').last()
+          const options = picker.locator('.ant-table-row')
+          await options.first().waitFor()
+          for (const index of indexes) await options.nth(index).getByRole('checkbox').check()
+          await picker.getByRole('button', { name: /添加到采购明细/u }).click()
+          await picker.waitFor({ state: 'hidden' })
+        }
+        const waitReady = () => page.waitForFunction(() => [...document.querySelectorAll('.erp-business-import-actions button')].some((button) => button.textContent.includes('撤销本次导入') && !button.disabled))
+        const originalCount = await rows.count()
+        await importMaterials([0, 1])
+        await waitReady()
+        assert.equal(await rows.count(), 2, '材料替换默认空白行')
+        assert.equal(await enteredCount.innerText(), '2')
+        await assertImportUndoPlacement(editor)
+        await page.screenshot({ path: path.resolve(outputDir, 'purchase-import-undo-ready.png'), animations: 'disabled' })
+        await editor.locator('#note').fill('材料导入后填写的订单备注')
+        await undo.click()
+        assert.equal(await rows.count(), originalCount)
+        assert.equal(await enteredCount.innerText(), '0', '撤销后恢复空白占位行及统计')
+        assert.equal(await editor.locator('#note').inputValue(), '材料导入后填写的订单备注')
+        assert.equal(await source.evaluate((button) => button === document.activeElement), true)
+        await importMaterials([0])
+        await waitReady()
+        await importMaterials([0])
+        await waitReady()
+        assert.equal(await rows.count(), 2, '同一材料可拆成多行')
+        await undo.click()
+        assert.equal(await rows.count(), 1, '只撤销最后一批，保留之前导入')
+        await importMaterials([1])
+        await waitReady()
+        const quantity = editor.getByLabel('采购数量', { exact: true }).last()
+        const previous = await quantity.inputValue()
+        await quantity.fill('8')
+        assert.equal(await editor.getByText('来源或明细已修改，不能快速撤销；可逐行移除。', { exact: true }).count(), 0, '失效撤销不再占用独立说明行')
+        assert.equal(await undo.isDisabled(), true)
+        await quantity.fill(previous)
+        assert.equal(await undo.isDisabled(), true, '改回原值不重新启用旧快照')
+        await editor.locator('.erp-business-import-actions').scrollIntoViewIfNeeded()
+        await page.screenshot({ path: path.resolve(outputDir, 'purchase-import-undo-disabled.png'), animations: 'disabled' })
+        for (const width of [1024, 390]) {
+          await page.setViewportSize({ width, height: 900 })
+          await assertImportUndoPlacement(editor, { narrow: true })
+          await assertNoHorizontalOverflow(page, `purchase-import-undo-${width}`)
+        }
+        await page.setViewportSize({ width: 1440, height: 900 })
+        for (const input of await editor.getByLabel('采购数量', { exact: true }).all()) await input.fill('2')
+        await editor.getByRole('button', { name: '添加采购明细', exact: true }).click()
+        assert.equal(await rows.count(), 3)
+        assert.equal(await enteredCount.innerText(), '2', '手工新增的纯空白行不增加已录入数')
+        await editor.getByLabel('付款周期（天）', { exact: true }).fill('0')
+        assert.equal(writes.length, 0, '导入、编辑和撤销不提前写入业务')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        await editor.waitFor({ state: 'hidden' })
+        assert.equal(writes.length, 1)
+        assert.equal(writes[0].params.items.length, 2)
+        assert.equal(writes[0].params.items.every((item) => item.material_id && item.unit_id && item.purchased_quantity === '2'), true, '保存只提交已填写明细')
+        await create.click()
+        await editor.waitFor({ state: 'visible' })
+        assert.equal(await undo.count(), 0, '保存并重开不会保留旧导入记录')
+        assert.equal(await editor.locator('#note').inputValue(), '')
+        await closeBusinessFormModal(page, editor)
+      },
+    },
+    {
+      name: 'purchase-material-blank-row-preservation-desktop',
+      path: '/erp/purchase/accessories',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const writes = []
+        page.on('request', (request) => {
+          if (!request.url().includes('/rpc/purchase_order') || request.method() !== 'POST') return
+          const body = request.postDataJSON()
+          if (body?.method === 'save_purchase_order_with_items') writes.push(body)
+        })
+        await page.getByRole('button', { name: '新建采购订单' }).click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.getByRole('heading', { name: '新建采购订单', exact: true }).waitFor()
+        const rows = editor.locator('.erp-sales-order-lines-form__row')
+        const enteredCount = editor.locator('.erp-line-items-form__stat').filter({ hasText: '已录入' }).locator('strong')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        await page.getByText('请至少填写一条采购明细', { exact: true }).waitFor()
+        assert.equal(writes.length, 0, '全空明细不能写入业务')
+        assert.equal(await rows.count(), 1, '全空保存保留手工录入入口')
+        await editor.getByLabel('供应商', { exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '样式供应商' }).first().click()
+        await rows.first().getByLabel('备注', { exact: true }).fill('保留只有备注的草稿行')
+        const add = editor.getByRole('button', { name: '添加采购明细', exact: true })
+        await add.click()
+        await add.click()
+        await rows.nth(2).getByLabel('采购数量', { exact: true }).fill('0')
+        await add.click()
+        await rows.nth(3).getByLabel('产品订单编号', { exact: true }).fill('SO-INPUT-ONLY')
+        assert.equal(await enteredCount.innerText(), '3')
+        const source = editor.getByRole('button', { name: '从材料库添加', exact: true })
+        const picker = page.locator('.erp-source-import-picker-modal.ant-modal:visible').last()
+        await source.click()
+        await picker.locator('.ant-table-row').first().waitFor()
+        await picker.locator('.ant-table-row').first().getByRole('checkbox').check()
+        await picker.getByRole('button', { name: '取消', exact: true }).click()
+        await picker.waitFor({ state: 'hidden' })
+        assert.equal(await rows.count(), 4, '取消选材不清理原行')
+        assert.equal(await enteredCount.innerText(), '3')
+        await source.click()
+        await picker.locator('.ant-table-row').first().waitFor()
+        await picker.locator('.ant-table-row').first().getByRole('checkbox').check()
+        await picker.getByRole('button', { name: /添加到采购明细/u }).click()
+        await picker.waitFor({ state: 'hidden' })
+        assert.equal(await rows.count(), 4, '仅移除一条纯空行，保留三条部分填写行后追加材料')
+        assert.equal(await enteredCount.innerText(), '4')
+        assert.equal(await rows.nth(0).getByLabel('备注', { exact: true }).inputValue(), '保留只有备注的草稿行')
+        assert.equal(await rows.nth(1).getByLabel('采购数量', { exact: true }).inputValue(), '0')
+        assert.equal(await rows.nth(2).getByLabel('产品订单编号', { exact: true }).inputValue(), 'SO-INPUT-ONLY')
+        assert.equal(await rows.nth(3).locator('.ant-select-selection-item').count(), 2, '末行带入材料和单位')
+        await editor.getByLabel('付款周期（天）', { exact: true }).fill('0')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        await editor.getByText('请选择材料', { exact: true }).first().waitFor()
+        assert.equal(writes.length, 0, '部分填写行继续校验，不能被过滤后提交')
+        assert.equal(await rows.count(), 4)
+        const undo = editor.getByRole('button', { name: '撤销本次导入', exact: true })
+        await undo.click()
+        assert.equal(await rows.count(), 4, '撤销还原原始空行位置和全部草稿')
+        assert.equal(await rows.nth(1).getByLabel('采购数量', { exact: true }).inputValue(), '')
+        assert.equal(await rows.nth(2).getByLabel('采购数量', { exact: true }).inputValue(), '0')
+        assert.equal(await rows.nth(3).getByLabel('产品订单编号', { exact: true }).inputValue(), 'SO-INPUT-ONLY')
+        assert.equal(await enteredCount.innerText(), '3')
+        await page.screenshot({ path: path.resolve(outputDir, 'purchase-blank-row-preservation.png'), animations: 'disabled' })
+        await closeBusinessFormModal(page, editor)
+        await page.locator('.ant-table-row').filter({ hasText: 'PO-STYLE-L1' }).first().click()
+        await page.locator('button[data-business-action-key="purchase-edit"]').click()
+        await editor.getByRole('heading', { name: '编辑采购订单', exact: true }).waitFor()
+        const savedID = await editor.locator('#items_0_id').inputValue()
+        const savedQuantity = await rows.first().getByLabel('采购数量', { exact: true }).inputValue()
+        await add.click()
+        await source.click()
+        await picker.locator('.ant-table-row').first().waitFor()
+        await picker.locator('.ant-table-row').first().getByRole('checkbox').check()
+        await picker.getByRole('button', { name: /添加到采购明细/u }).click()
+        await picker.waitFor({ state: 'hidden' })
+        assert.equal(await rows.count(), 2, '编辑时保留已保存行，清理空白新行后追加材料')
+        assert.equal(await editor.locator('#items_0_id').inputValue(), savedID)
+        assert.equal(await rows.first().getByLabel('采购数量', { exact: true }).inputValue(), savedQuantity)
+        await undo.click()
+        assert.equal(await rows.count(), 2, '撤销恢复已保存行和手工新增的空白行')
+        await editor.getByLabel('付款周期（天）', { exact: true }).fill('0')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        await editor.waitFor({ state: 'hidden' })
+        assert.equal(writes.length, 1)
+        assert.equal(writes[0].params.items.length, 1)
+        assert.equal(String(writes[0].params.items[0].id), savedID)
+        assert.equal(writes[0].params.items[0].purchased_quantity, savedQuantity)
+      },
+    },
+    {
       name: 'purchase-order-date-filter-desktop',
       path: '/erp/purchase/accessories',
       auth: 'admin',
@@ -716,7 +911,7 @@ export function createBusinessFormInteractionScenarios({
         assert.equal(
           purchaseOrderUnitReferenceCounts.empty,
           1,
-          '成功返回空材料集合应完成参考资料加载，不能被误判为请求失败'
+          '成功返回空单位集合应完成参考资料加载，不能被误判为请求失败'
         )
 
         purchaseOrderUnitReferenceMode = 'full'
@@ -732,7 +927,7 @@ export function createBusinessFormInteractionScenarios({
         assert(
           purchaseOrderUnitReferenceCounts.full >= 1 &&
             purchaseOrderUnitReferenceAttempts >= 4,
-          '再次刷新应恢复完整材料参考资料，供来源导入继续使用'
+          '再次刷新应恢复完整单位参考资料，供采购录入继续使用'
         )
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
@@ -783,7 +978,7 @@ export function createBusinessFormInteractionScenarios({
               triggerButton: '从材料库添加',
               titleText: '从材料库添加',
               expectedTexts: ['材料编码', '材料名称', 'MAT-STYLE-L1'],
-              emptyDescriptionText: '暂无可选材料',
+              emptyDescriptionText: '没有符合条件的可选资料',
               collapseSelectTexts: [
                 'MAT-STYLE-L1',
                 'MAT-STYLE-L2',
@@ -796,6 +991,7 @@ export function createBusinessFormInteractionScenarios({
               selectedNoun: '材料',
               scenarioName: 'purchase-order-source-import-picker',
             })
+            await modal.getByRole('button', { name: '复制第 1 行', exact: true }).click()
             await assertLineItemsUnifiedHorizontalScroll(modal, {
               scenarioName: 'business-formal-purchase-order-form-modal',
               minRows: 2,
@@ -1036,10 +1232,6 @@ export function createBusinessFormInteractionScenarios({
             const productSKUInput = modal
               .locator('input[id$="_product_sku_id"]')
               .first()
-            await modal
-              .locator('.erp-line-item-details > summary')
-              .first()
-              .click()
             await productSKUInput.click()
             await productSKUInput.fill('SKU-OUTSOURCE-CATALOG-L1')
             const secondPageSKUOption = page
@@ -1544,9 +1736,6 @@ export function createBusinessFormInteractionScenarios({
           expectContactItemsLayout: true,
           beforeMeasure: async (modal) => {
             await modal
-              .getByRole('button', { name: '展开联系人备注 1', exact: true })
-              .click()
-            await modal
               .locator('.erp-contact-editor__note-editor textarea')
               .first()
               .fill('123123123123123123123123123123123123123123123123')
@@ -1570,7 +1759,7 @@ export function createBusinessFormInteractionScenarios({
       },
       viewport: { width: 1600, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '库存台账')
+        await page.getByRole('tab', { name: '库存余额', exact: true, selected: true }).waitFor()
         await page.locator('.ant-table-row').first().click()
         const cycleCountButton = page
           .locator('button:visible')
@@ -1582,12 +1771,12 @@ export function createBusinessFormInteractionScenarios({
           .getByRole('dialog')
           .getByText('登记库存盘点', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
-        await expectText(page, '保存和过账时都会重新核对账面数量')
-        await expectText(page, '盘点期间库存变化时')
+        await expectText(page, '范围为本次选中的库存行。盘点须由另一人复核后过账；零差异也留存记录。库存变化会阻止过账，须重新盘点。')
         await assertBusinessModalViewport(page, page.getByRole('dialog'), {
           label: 'inventory-local-form-dark',
           maxWidth: 860,
         })
+        await assertBusinessNoteTextAreas(page.getByRole('dialog'))
         await page.screenshot({
           path: path.join(
             outputDir,
@@ -1606,11 +1795,9 @@ export function createBusinessFormInteractionScenarios({
         )
         const dialog = page.getByRole('dialog')
         await dialog.getByLabel('实盘数量', { exact: true }).fill('12')
-        const note = dialog.locator('.erp-optional-field')
-        await note.locator('summary').click()
-        await note.getByRole('textbox').fill('核对后保留的说明')
-        await note.locator('summary').click()
-        assert.match(await note.locator('summary').innerText(), /核对后保留/)
+        const note = dialog.getByLabel('明细备注', { exact: true })
+        await note.fill('核对后保留的说明')
+        assert.match(await note.inputValue(), /核对后保留/)
         for (const [type, title, field, value] of [
           ['transfer', '登记库存调拨', '调拨数量', '5'],
           [
@@ -1639,8 +1826,8 @@ export function createBusinessFormInteractionScenarios({
             type === 'transfer' ? 1 : 0
           )
           assert.equal(
-            await dialog.locator('.erp-optional-field__summary').count(),
-            0
+            await dialog.getByLabel('明细备注', { exact: true }).inputValue(),
+            ''
           )
           await page.setViewportSize({ width: 390, height: 844 })
           await assertNoHorizontalOverflow(page, `inventory-${type}-narrow`)

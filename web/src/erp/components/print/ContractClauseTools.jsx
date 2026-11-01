@@ -119,7 +119,6 @@ export default function ContractClauseTools({
     <PrintWorkspaceToolSection
       title="条款编辑"
       tool="clauses"
-      collapsible
       feedback={feedback?.area === 'clauses' ? feedback : null}
     >
       {contractLabel ? (

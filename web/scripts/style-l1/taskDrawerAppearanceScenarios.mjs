@@ -121,7 +121,7 @@ export function createTaskDrawerAppearanceScenarios({
           .click()
         await appearance.waitFor({ state: 'hidden' })
         await openDrawer()
-        await drawer.getByRole('region', { name: '本任务处理记录' }).waitFor()
+        await drawer.getByRole('region', { name: '流程处理记录' }).waitFor()
         await waitForDrawer()
         const geometry = await drawer.evaluate((root) => {
           const rect = (selector) =>

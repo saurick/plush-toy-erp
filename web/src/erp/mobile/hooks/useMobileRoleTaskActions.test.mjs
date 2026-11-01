@@ -349,42 +349,32 @@ test('useMobileRoleTaskActions: backend action projection is the local execution
   assert.deepEqual(messages.warnings, ['当前岗位不能处理该任务'])
 })
 
-test('useMobileRoleTaskActions: resume requires an explanation and uses the resume action', async () => {
-  const messages = { errors: [], successes: [], warnings: [] }
-  const submitted = []
-  const harness = createHookHarness({
-    allowedActionModes: ['resume'],
-    detailAction: 'resume',
-    messages,
-    resumeWorkflowTaskAction: async (params) => submitted.push(params),
-    selectedTask: {
-      id: 42,
-      owner_role_key: 'warehouse',
-      task_status_key: 'blocked',
-      version: 5,
-    },
-  })
-
-  let view = harness.render()
-  assert.equal(view.selectedCanResume, true)
-  await view.submitDetailAction()
-  assert.deepEqual(submitted, [])
-  assert.deepEqual(messages.warnings, ['请先填写阻塞解除说明'])
-
-  view.updateDetailReason('资料已补齐，可以继续处理')
-  view = harness.render()
-  await view.submitDetailAction()
-
-  assert.equal(submitted.length, 1)
-  assert.equal(submitted[0].task_id, 42)
-  assert.equal(submitted[0].expected_version, 5)
-  assert.equal(submitted[0].action_key, 'resume')
-  assert.equal(submitted[0].reason, '资料已补齐，可以继续处理')
-  assert.match(submitted[0].idempotency_key, /^wf:42:resume:/u)
-  assert.deepEqual(submitted[0].payload, {
-    surface_key: 'mobile_role_tasks',
-  })
-  assert.deepEqual(harness.loadCalls, [42])
+test('useMobileRoleTaskActions: resume accepts optional explanation and keeps versioned intent', async () => {
+  for (const reason of ['', '资料已补齐，可以继续处理']) {
+    const messages = { errors: [], successes: [], warnings: [] }
+    const submitted = []
+    const harness = createHookHarness({
+      allowedActionModes: ['resume'],
+      detailAction: 'resume',
+      messages,
+      resumeWorkflowTaskAction: async (params) => submitted.push(params),
+      selectedTask: { id: 42, owner_role_key: 'warehouse', task_status_key: 'blocked', version: 5 },
+    })
+    let view = harness.render()
+    view.updateDetailReason(reason)
+    view = harness.render()
+    assert.equal(view.selectedCanResume, true)
+    await view.submitDetailAction()
+    assert.equal(submitted.length, 1)
+    assert.equal(submitted[0].task_id, 42)
+    assert.equal(submitted[0].expected_version, 5)
+    assert.equal(submitted[0].action_key, 'resume')
+    assert.equal(submitted[0].reason || '', reason)
+    assert.match(submitted[0].idempotency_key, /^wf:42:resume:/u)
+    assert.deepEqual(submitted[0].payload, { surface_key: 'mobile_role_tasks' })
+    assert.deepEqual(messages.warnings, [])
+    assert.deepEqual(harness.loadCalls, [42])
+  }
 })
 
 test('useMobileRoleTaskActions: confirmed response exposes the canonical task receipt', async () => {

@@ -15,12 +15,6 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { currentBusinessDate } from '../../utils/businessDate.mjs'
 import {
-  materialLabel,
-  productLabel,
-  processLabel,
-  supplierLabel,
-} from './OutsourcingOrderForm.jsx'
-import {
   listAllOutsourcingOrderItems,
   listAllMaterials,
   listAllProcesses,
@@ -62,6 +56,7 @@ import {
 import { PROCESSING_CONTRACT_TEMPLATE_KEY } from '../../utils/printWorkspace.js'
 import { getEffectivePrintTemplateDefaults } from '../../utils/adminProfileSync.mjs'
 import { canEditOutsourcingOrder } from './outsourcingOrderPageConfig.mjs'
+import { materialOption, productOption, processOption, supplierOption } from '../../utils/referenceSelectOptions.mjs'
 
 export function useOutsourcingOrderEditor({
   beginLatestRequest,
@@ -120,8 +115,8 @@ export function useOutsourcingOrderEditor({
   const supplierOptions = useMemo(
     () =>
       suppliers.map((item) => ({
+        ...supplierOption(item),
         value: item.id,
-        label: supplierLabel(item),
         item,
       })),
     [suppliers]
@@ -130,8 +125,8 @@ export function useOutsourcingOrderEditor({
   const productOptions = useMemo(
     () =>
       products.map((item) => ({
+        ...productOption(item),
         value: item.id,
-        label: productLabel(item),
         searchText: [item.code, item.style_no, item.name]
           .filter(Boolean)
           .join(' '),
@@ -143,8 +138,8 @@ export function useOutsourcingOrderEditor({
   const materialOptions = useMemo(
     () =>
       materials.map((item) => ({
+        ...materialOption(item),
         value: item.id,
-        label: materialLabel(item),
         item,
       })),
     [materials]
@@ -156,7 +151,8 @@ export function useOutsourcingOrderEditor({
         .filter((item) => item.outsourcing_enabled === true)
         .map((item) => ({
           value: item.id,
-          label: processLabel(item),
+          identity: processOption(item)?.identity,
+          label: processOption(item)?.label,
           searchText: [item.code, item.name, item.category]
             .filter(Boolean)
             .join(' '),

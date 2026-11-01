@@ -158,8 +158,8 @@ body
     .ant-input-number,
     .ant-input-number-affix-wrapper,
     .ant-picker,
-    .ant-select-single,
-    .ant-select-single .ant-select-selector,
+    .ant-select-single:not(.app-select--reference),
+    .ant-select-single:not(.app-select--reference) .ant-select-selector,
     input.ant-input:not(:where(.ant-input-affix-wrapper > input)):not(
         [type='hidden']
       )
@@ -171,8 +171,8 @@ body
     .ant-input-number,
     .ant-input-number-affix-wrapper,
     .ant-picker,
-    .ant-select-single,
-    .ant-select-single .ant-select-selector,
+    .ant-select-single:not(.app-select--reference),
+    .ant-select-single:not(.app-select--reference) .ant-select-selector,
     input.ant-input:not(:where(.ant-input-affix-wrapper > input)):not(
         [type='hidden']
       )
@@ -224,7 +224,7 @@ body
 body
   :is(.ant-modal, .erp-task-action-drawer)
   :is(.erp-business-form, .erp-business-action-form)
-  .ant-select-single
+  .ant-select-single:not(.app-select--reference)
   .ant-select-selector
   :is(
     .ant-select-selection-item,
@@ -234,7 +234,7 @@ body
   ),
 #root
   :is(.erp-business-form, .erp-business-action-form)
-  .ant-select-single
+  .ant-select-single:not(.app-select--reference)
   .ant-select-selector
   :is(
     .ant-select-selection-item,
@@ -486,10 +486,12 @@ body :is(.ant-modal, .erp-task-action-drawer) .erp-business-form textarea.ant-in
   line-height: 1.45;
 }
 
-.erp-business-textarea:where(textarea),
-.erp-business-textarea textarea {
+:is(#root, .ant-modal, .ant-drawer) .erp-business-textarea,
+:is(#root, .ant-modal, .ant-drawer) .erp-business-textarea :where(textarea) {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+  /* 自动高度应使用当前字号和尺寸，避免按动画中间值测量。 */
+  transition-property: color, background-color, border-color, box-shadow;
 }
 
 .erp-task-line-card .ant-select-single .ant-select-selector {
@@ -507,4 +509,39 @@ body
   > .ant-input-number {
   height: calc(var(--erp-control-height, 36px) - 2px);
   min-height: 0;
+}
+
+:where(#root, .ant-modal, .ant-drawer, .ant-popover) .app-select--reference.ant-select-single {
+  --erp-control-height: max(var(--erp-form-control-height, 36px), var(--erp-touch-target, 0px));
+
+  height: auto;
+  min-height: var(--erp-control-height);
+}
+
+:where(#root, .ant-modal, .ant-drawer, .ant-popover) .app-select--reference.ant-select-single .ant-select-selector {
+  height: auto;
+  min-height: var(--erp-control-height);
+  padding-block: calc((var(--erp-control-height) - 2px - 1.4em) / 2);
+}
+
+:where(#root, .ant-modal, .ant-drawer, .ant-popover) .app-select--reference.ant-select-single
+  :is(.ant-select-selection-item, .ant-select-selection-placeholder) {
+  height: auto;
+  line-height: 1.4;
+}
+
+:where(#root, .ant-modal, .ant-drawer, .ant-popover) .app-select--reference.ant-select-single
+  :is(.ant-select-selector, .ant-select-selection-wrap)::after {
+  line-height: 1.4;
+}
+
+:where(#root, .ant-modal, .ant-drawer, .ant-popover) .app-select--reference.ant-select-single
+  :is(.ant-select-selection-search, .ant-select-selection-search-input) {
+  height: calc(var(--erp-control-height) - 2px);
+  line-height: calc(var(--erp-control-height) - 2px);
+}
+
+:where(#root, .ant-modal, .ant-drawer, .ant-popover) .app-select--reference.ant-select-single .ant-select-selection-search {
+  top: 50%;
+  transform: translateY(-50%);
 }

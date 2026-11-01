@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   ERP_ACCENTS,
+  ERP_FORM_DISPLAY_OPTIONS,
   normalizeERPAppearance,
   readERPAppearance,
 } from './erpAppearance.mjs'
@@ -11,6 +12,14 @@ import appearanceContract from '../../../../server/internal/biz/admin_erp_appear
 test('appearance palette covers every allowed account accent', () => {
   assert.deepEqual(Object.keys(ERP_ACCENTS), appearanceContract.accents)
   assert.equal(appearanceContract.defaults.accent, 'blue')
+})
+
+test('long form display uses the shared allowed values and defaults to all', () => {
+  assert.deepEqual(ERP_FORM_DISPLAY_OPTIONS.map(({ value }) => value), appearanceContract.form_displays)
+  for (const formDisplay of [undefined, null, '', 'tabs', ' section ']) {
+    assert.equal(normalizeERPAppearance({ formDisplay }).formDisplay, 'all')
+  }
+  assert.equal(normalizeERPAppearance({ formDisplay: 'section' }).formDisplay, 'section')
 })
 
 test('appearance recovers from stale or unavailable storage without losing valid preferences', () => {
@@ -24,6 +33,7 @@ test('appearance recovers from stale or unavailable storage without losing valid
       accent: 'blue',
       density: 'compact',
       tableLines: 'grid',
+      formDisplay: 'all',
     })
   }
   for (const storage of [
@@ -39,31 +49,32 @@ test('appearance recovers from stale or unavailable storage without losing valid
       accent: 'blue',
       density: 'compact',
       tableLines: 'grid',
+      formDisplay: 'all',
     })
   }
   assert.deepEqual(
     readERPAppearance({
       getItem: () => '{"accent":"purple","density":"compact"}',
     }),
-    { accent: 'purple', density: 'compact', tableLines: 'grid' }
+    { accent: 'purple', density: 'compact', tableLines: 'grid', formDisplay: 'all' }
   )
   assert.deepEqual(
     readERPAppearance({
       getItem: () =>
         '{"accent":"pink","density":"compact","tableLines":"grid"}',
     }),
-    { accent: 'pink', density: 'compact', tableLines: 'grid' }
+    { accent: 'pink', density: 'compact', tableLines: 'grid', formDisplay: 'all' }
   )
   assert.deepEqual(
     normalizeERPAppearance({ accent: 'green', tableLines: false }),
-    { accent: 'green', density: 'compact', tableLines: 'grid' }
+    { accent: 'green', density: 'compact', tableLines: 'grid', formDisplay: 'all' }
   )
 })
 
 test('appearance keeps saved density and line choices when product defaults change', () => {
   for (const density of ['standard', 'compact']) {
     for (const tableLines of ['simple', 'grid']) {
-      const saved = { accent: 'purple', density, tableLines }
+      const saved = { accent: 'purple', density, tableLines, formDisplay: 'all' }
       assert.deepEqual(normalizeERPAppearance(saved), saved)
       assert.deepEqual(
         readERPAppearance({ getItem: () => JSON.stringify(saved) }),
@@ -75,6 +86,7 @@ test('appearance keeps saved density and line choices when product defaults chan
     accent: 'blue',
     density: 'standard',
     tableLines: 'grid',
+    formDisplay: 'all',
   })
 })
 

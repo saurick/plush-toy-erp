@@ -273,6 +273,7 @@ export function usePermissionRoleSettings({
         .map((warehouse) => ({
           value: Number(warehouse?.id),
           label: [warehouse?.code, warehouse?.name].filter(Boolean).join(' · '),
+          identity: { name: warehouse?.name || '', code: warehouse?.code || '' },
         }))
         .filter((option) => option.value > 0),
     [warehouseScopeOptions]

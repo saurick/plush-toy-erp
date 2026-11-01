@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"server/internal/core/qualitycheck"
+	corevalue "server/internal/core/value"
 	"time"
 
 	"entgo.io/ent"
@@ -236,7 +237,7 @@ func (QualityInspection) Fields() []ent.Field {
 		field.String("decision_note").
 			Optional().
 			Nillable().
-			MaxLen(255),
+			Validate(corevalue.ValidateBusinessNote),
 		field.Time("created_at").
 			Default(time.Now).
 			Immutable(),

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { UploadOutlined } from '@ant-design/icons'
 import { Space, Typography } from 'antd'
 import Select from '@/common/components/select/AppSelect'
+import { customerOption } from '../../utils/referenceSelectOptions.mjs'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import Table from '@/common/components/table/AppTable'
 import SalesOrderBatchImportEditor from './SalesOrderBatchImportEditor.jsx'
@@ -104,6 +105,7 @@ export default function SalesOrderExcelImport({
   units,
   unitOptions,
   disabled,
+  disabledReason = '',
   onSaved,
   loadReferenceData,
   productSKUs = [],
@@ -231,10 +233,7 @@ export default function SalesOrderExcelImport({
             placeholder="请选择对应客户"
             options={customers
               .filter((customer) => customer.is_active !== false)
-              .map((customer) => ({
-                value: customer.id,
-                label: `${customer.code} - ${customer.name}`,
-              }))}
+              .map(customerOption)}
             onChange={(id) =>
               setCustomerMappings((current) => ({
                 ...current,
@@ -258,6 +257,9 @@ export default function SalesOrderExcelImport({
         onChange={readFile}
         data-sales-order-import-input
       />
+      {disabled && disabledReason ? (
+        <Typography.Text type="secondary" role="status">{disabledReason}</Typography.Text>
+      ) : null}
       <ToolbarButton
         aria-label="导入 Excel"
         icon={<UploadOutlined />}
@@ -311,6 +313,8 @@ export default function SalesOrderExcelImport({
         }
         searchPlaceholder="搜索订单编号、客户或产品名称"
         rows={previewOrders}
+        emptyDescription="文件中没有可核对的订单"
+        filteredEmptyDescription={reviewOnly ? '当前范围没有待核对订单' : '没有符合条件的订单'}
         filterResetKey={JSON.stringify([sourceCustomer, reviewOnly])}
         filterRow={(order) => (sourceCustomer === undefined || order.customer === sourceCustomer) && (!reviewOnly || order.reviewIssues.length > 0)}
         renderFilters={() => [
@@ -357,6 +361,7 @@ export default function SalesOrderExcelImport({
         }
         importText="核对所选订单"
         importDisabled={disabled}
+        importDisabledReason={disabledReason}
         onImport={importOrders}
         onCancel={() => setWorkbook(null)}
       />

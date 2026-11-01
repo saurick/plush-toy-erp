@@ -380,7 +380,6 @@ export default function MaterialPurchaseContractBatchWorkbench({
       onClearFeedback={clearFeedback}
       tools={[]}
       draftTitle="本次采购合同"
-      draftDefaultOpen
       persistenceStatus={persistenceStatus}
       onRetrySave={flushDraft}
       workspaceClassName="erp-material-contract-batch-workbench"

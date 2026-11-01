@@ -16,7 +16,7 @@ DEV 工作台沿用 `docs/product/自动化测试策略.md` 的浅色桌面 smok
 ## Implement with the existing design system.
    - 样式修改先按[共享控件样式边界](../../../../docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)定位全局基线、属性维护文件、模块布局和 portal 根。按属性检索所有写入位置，核对实际命中规则；删除竞争声明后修改唯一维护位置，不把“新增覆盖且截图正常”当作治理完成。
    - 修改共用控件时区分外框、真实输入、选中值、浮层选项与多行组件。只读/禁用、表格位置和导入长值属于状态组合，不能成为跳过高度/溢出断言的理由；模块尺寸差异使用已有组件规格或共享层消费的变量。全局治理才扩大到全仓扫描，普通修复按影响面处理。
-   - 下拉已选值或多列明细显示不全时，按[长值与多列合同](../../../../docs/product/ui-design/交互设计说明.md#select-overflow)复用 `AppSelect` 的完整值入口和共享明细滚动，不另做页内 tooltip 或复制表单。核对可编辑及锁定长值、键盘读取、清空/替换残值、窄区域与列增长；工作台 `control=select-overflow` 和 `selectValueDisclosureScenarios.mjs` 是当前组件演示与回归入口。
+   - 下拉已选值或多列明细显示不全时，按[长值与多列合同](../../../../docs/product/ui-design/交互设计说明.md#select-overflow)区分名称与必要业务编号，复用 `AppSelect` 的结构化名称展示和共享明细滚动。选中后以名称为主，详细识别信息保留在候选项，不另加编码行、页内 tooltip 或复制表单。核对普通字段、筛选与多选、可编辑及锁定长值、清空／替换残值、窄区域和列增长；工作台 `control=select-overflow` 与 `selectOverflowScenarios.mjs` 是当前演示与回归入口。
    - Reuse current page shells, shared business-page components, theme tokens, CSS variables, and existing interaction patterns before adding new abstractions.
    - Keep the themes actually supported by the changed page readable. Printing/PDF previews remain fixed light unless a separate design explicitly changes screen preview behavior.
    - 新增或调整页面、表格及自定义组件时，按[全局外观合同](../../../../docs/engineering/前端实现与交互约定.md#主题模式--theme-mode)核对本次涉及的主题、密度、表格线条等偏好在组件及实际调用页面生效；专用版式的例外沿用正式合同，并按影响验证切换、恢复和响应式行为。

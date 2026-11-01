@@ -22,7 +22,7 @@ export function createInventoryPresentationScenarios(deps) {
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       verify: async (page) => {
-        await expectHeading(page, '库存台账')
+        await expectHeading(page, '库存查询')
         const command = page.locator('.erp-inventory-ledger-page .erp-business-operation-panel__command')
         await command.getByRole('tab', { name: '库存余额' }).waitFor()
         for (const width of [1920, 1440, 1366, 820, 390]) {
@@ -90,7 +90,8 @@ export function createInventoryPresentationScenarios(deps) {
         await page.getByRole('region', { name: '仓库库存分布', exact: true }).waitFor()
         await verifySlidingMotion(page, assert, '.erp-inventory-ledger-view-bar .erp-sliding-segmented', 0, true)
         await command.getByRole('button', { name: '库存作业', exact: true }).click()
-        await page.getByRole('dialog', { name: /库存作业记录/u }).waitFor()
+        await page.waitForURL('**/erp/warehouse/inventory?workspace=operations')
+        await expectHeading(page, '库存作业')
       },
     },
     {

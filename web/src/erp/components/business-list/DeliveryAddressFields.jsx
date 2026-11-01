@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Cascader, Form, Input } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import BusinessTextArea from './BusinessTextArea.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { optionalContactPhoneRule } from '../../utils/contactValidation.mjs'
 import {
   DELIVERY_COUNTRY_OPTIONS,
@@ -14,7 +15,7 @@ import {
 } from '../../utils/deliveryAddress.mjs'
 import './delivery-address.css'
 
-function DeliveryAddressInput({ value = '', onChange, country, disabled, id }) {
+function DeliveryAddressInput({ value = '', onChange, country, disabled, id, description }) {
   const text = String(value ?? '')
   const [draft, setDraft] = useState(() => ({
     text,
@@ -65,7 +66,7 @@ function DeliveryAddressInput({ value = '', onChange, country, disabled, id }) {
         </Form.Item>
       ) : null}
       <Form.Item
-        label={mainland && draft.path.length ? '详细地址' : '完整地址'}
+        label={<BusinessHelpLabel label={mainland && draft.path.length ? '详细地址' : '完整地址'} description={description} />}
         htmlFor={id}
         className="erp-delivery-address__part"
       >
@@ -94,7 +95,7 @@ export default function DeliveryAddressFields({
   form,
   customer = false,
   disabled,
-  extra,
+  description,
 }) {
   const countryField = customer ? 'country_region' : 'delivery_country_region'
   const recipientField = customer
@@ -171,9 +172,8 @@ export default function DeliveryAddressFields({
         name={addressField}
         dependencies={[countryField]}
         rules={[deliveryAddressRule(country)]}
-        extra={extra}
       >
-        <DeliveryAddressInput country={country} disabled={disabled} />
+        <DeliveryAddressInput country={country} disabled={disabled} description={description} />
       </Form.Item>
     </>
   )

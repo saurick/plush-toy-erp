@@ -1,5 +1,7 @@
 import React from 'react'
 import { Form, Input, InputNumber, Radio } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { IncomingCheckItemsForm } from './IncomingCheckItems.jsx'
@@ -120,7 +122,7 @@ export function QualityInspectionCreateForm({
         label="备注"
         name="decision_note"
       >
-        <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+        <BusinessTextArea maxLength={BusinessTextPolicy.noteMaxCharacters} showCount minRows={2} />
       </Form.Item>
     </Form>
   )
@@ -237,7 +239,7 @@ export function QualityInspectionDecisionForm({
         extra={reasonRequired ? '不合格或让步接收须填写原因。' : undefined}
         rules={reasonRequired ? [{ required: true, whitespace: true, message: '请填写异常或让步理由' }] : []}
       >
-        <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+        <BusinessTextArea maxLength={BusinessTextPolicy.noteMaxCharacters} showCount minRows={2} />
       </Form.Item>
     </Form>
   )

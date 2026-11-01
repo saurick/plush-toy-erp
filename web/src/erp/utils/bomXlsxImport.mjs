@@ -1,5 +1,6 @@
 import { unitRecordMatchesLabel } from './unitQuantity.mjs'
 import { BOMLossSource } from '../../common/consts/statuses.generated.mjs'
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import { normalizeBOMSourceNumber, parseBOMSourceNumber, bomNumbersDiffer, inferBOMSourceLossRate } from './bomSourceValues.mjs'
 import {
   groupBOMMaterials,
@@ -38,6 +39,14 @@ const HEADER_ALIASES = {
 
 function fail(message, code) {
   throw new BOMXlsxImportError(message, code)
+}
+
+function boundedNote(value, location) {
+  const note = normalizeText(value)
+  if ([...note].length > BusinessTextPolicy.noteMaxCharacters) {
+    fail(`${location}备注不能超过 ${BusinessTextPolicy.noteMaxCharacters} 个字符`)
+  }
+  return note
 }
 
 function normalizedFileName(value) {
@@ -541,7 +550,7 @@ function extractBOMRows(sheet, header, context) {
       rawTotalUsage: totalQuantity,
       processBase: truncateText(processBase, 255),
       processMethod: truncateText(processMethod, 255),
-      note: truncateText(note, 300),
+      note: boundedNote(note, `第 ${row.rowNumber} 行`),
       sourceSnapshot: {
         row_number: row.rowNumber,
         sheet_name: sheet.name,
@@ -736,9 +745,9 @@ function matchUnit(sourceUnit, units) {
 function buildSourceNote(parsed) {
   const source = `Excel 导入来源：${parsed.fileName}（${parsed.sheetName}）`
   const originalNote = normalizeText(parsed.context?.sourceNote)
-  return truncateText(
+  return boundedNote(
     originalNote ? `${source}；原表备注：${originalNote}` : source,
-    300
+    '整单'
   )
 }
 
@@ -920,6 +929,17 @@ export function getBOMImportLineIssues(line = {}) {
     })
   }
   return issues
+}
+
+export function describeBOMImportLineStatus(issues = []) {
+  if (issues.length === 0) return '已匹配'
+  if (issues.length > 1) return `${issues.length} 项待处理`
+  return {
+    material_id: '缺材料',
+    unit_id: '缺单位',
+    quantity: '用量有误',
+    loss_rate: '损耗有误',
+  }[issues[0].field] || '1 项待处理'
 }
 
 export function getBOMImportDraftIssues(values = {}) {

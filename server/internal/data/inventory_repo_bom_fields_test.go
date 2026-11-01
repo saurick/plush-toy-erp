@@ -19,7 +19,7 @@ func TestBOMHeaderOptionalFieldsReplaceAndClearThroughAggregateSave(t *testing.T
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	created, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{
 		ProductID:       fixtures.productID,
-		BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "V1"},
+		BOMHeaderUpdate: biz.BOMHeaderUpdate{},
 	}, []*biz.BOMItemSaveMutation{{BOMItemUpdate: biz.BOMItemUpdate{
 		MaterialID: fixtures.materialID,
 		UnitID:     fixtures.unitID,
@@ -34,7 +34,6 @@ func TestBOMHeaderOptionalFieldsReplaceAndClearThroughAggregateSave(t *testing.T
 	to := from.AddDate(0, 1, 0)
 	printed := from.AddDate(0, 0, 2)
 	filled := biz.BOMHeaderUpdate{
-		Version:       "V2",
 		EffectiveFrom: &from,
 		EffectiveTo:   &to,
 		PrintDate:     &printed,
@@ -48,7 +47,7 @@ func TestBOMHeaderOptionalFieldsReplaceAndClearThroughAggregateSave(t *testing.T
 		Note:          stringPtr("note"),
 	}
 	fields := []string{"EffectiveFrom", "EffectiveTo", "PrintDate", "SourceOrderNo", "QuantityText", "SpareText", "Designer", "Maker", "Auditor", "HairDirection", "Note"}
-	for _, input := range []biz.BOMHeaderUpdate{filled, {Version: "V3"}} {
+	for _, input := range []biz.BOMHeaderUpdate{filled, {}} {
 		detail, saveErr := uc.SaveBOMWithItems(ctx, header.ID, &biz.BOMVersionMutation{
 			ExpectedVersion: header.EditVersion,
 			ProductID:       fixtures.productID,

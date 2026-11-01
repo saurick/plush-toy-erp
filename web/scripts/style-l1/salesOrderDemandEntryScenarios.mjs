@@ -238,15 +238,12 @@ export function createSalesOrderDemandEntryVerifier(deps) {
         const demandRow = modal
           .locator('.erp-sales-order-lines-form__row')
           .first()
-        const details = demandRow.locator('.erp-line-item-details')
-        assert.equal(await details.evaluate((node) => node.open), false)
-        await details.locator('summary').click()
+        assert.ok(await demandRow.getByLabel('备注', { exact: true }).isVisible())
         await demandRow.getByLabel('备注', { exact: true }).fill('分两批交货')
         const sampleQuantity = demandRow.getByLabel('船头版数量', {
           exact: true,
         })
         await sampleQuantity.fill('-1')
-        await details.locator('summary').click()
         await modal.getByLabel('客户', { exact: true }).click()
         await page.getByText('CUS-STYLE-L1 - 暗色客户', { exact: true }).click()
         await modal
@@ -254,9 +251,9 @@ export function createSalesOrderDemandEntryVerifier(deps) {
           .click()
         await demandRow.getByText('请填写非负数量', { exact: true }).waitFor()
         assert.equal(
-          await details.evaluate((node) => node.open),
+          await sampleQuantity.isVisible(),
           true,
-          '校验应自动展开含错误的补充信息'
+          '校验错误字段持续可见'
         )
         assert.equal(
           await sampleQuantity.evaluate(
@@ -266,7 +263,6 @@ export function createSalesOrderDemandEntryVerifier(deps) {
           '校验应聚焦出错字段'
         )
         await sampleQuantity.fill('0')
-        await details.locator('summary').click()
         assert.equal(
           await demandRow.getByLabel('备注', { exact: true }).inputValue(),
           '分两批交货'
@@ -302,7 +298,6 @@ export function createSalesOrderDemandEntryVerifier(deps) {
         const linkedRow = modal
           .locator('.erp-sales-order-lines-form__row')
           .first()
-        await linkedRow.locator('.erp-line-item-details > summary').click()
         const skuSelect = linkedRow.getByLabel('已有规格（选填）', {
           exact: true,
         })
@@ -465,10 +460,6 @@ export function createSalesOrderDemandEntryVerifier(deps) {
           )
           .first()
         await editedRow.getByText('已保存', { exact: true }).waitFor()
-        const editedDetails = editedRow.locator('.erp-line-item-details')
-        if (!(await editedDetails.evaluate((node) => node.open))) {
-          await editedDetails.locator('summary').click()
-        }
         await editedRow
           .getByLabel('已有规格（选填）', { exact: true })
           .scrollIntoViewIfNeeded()

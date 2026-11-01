@@ -1,7 +1,8 @@
 import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 
 const MAX_FACT_NO_LENGTH = 64
-const MAX_NOTE_LENGTH = 255
+const MAX_NOTE_LENGTH = BusinessTextPolicy.noteMaxCharacters
 
 export const FINANCE_BUSINESS_SOURCE_ACTIONS = Object.freeze({
   PURCHASE_RECEIPT_PAYABLE: 'purchase-receipt-payable',

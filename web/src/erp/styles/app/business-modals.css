@@ -331,14 +331,16 @@
 }
 
 .erp-sales-order-lines-form__head {
-  display: flex;
-  align-items: flex-start;
+  --erp-form-heading-padding-block: 0px;
+
   justify-content: space-between;
 }
 
 .erp-sales-order-lines-form__head > div {
-  display: grid;
-  gap: 3px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
   min-width: 0;
 }
 
@@ -495,6 +497,10 @@
 
 .erp-source-import-picker__pagination {
   min-width: 0;
+}
+
+.erp-source-import-picker .ant-table-row:not(.erp-source-import-picker__row--disabled) {
+  cursor: pointer;
 }
 
 .erp-source-import-picker__row--disabled {
@@ -822,6 +828,8 @@
 
 /* 明细随编辑页纵向展开，宽表只在整块明细区横向滚动。 */
 .erp-sales-order-lines-form__list {
+  --erp-line-item-sequence-width: 44px;
+
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -842,7 +850,7 @@
 .erp-line-item-table td {
   padding: 8px 6px;
   text-align: left;
-  vertical-align: middle;
+  vertical-align: top;
   overflow-wrap: anywhere;
 }
 
@@ -876,17 +884,6 @@
   text-align: right;
 }
 
-.erp-sales-order-lines-form__row {
-  background: var(--erp-business-action-modal-bg, #fff);
-}
-
-.erp-sales-order-lines-form__row
-  + .erp-sales-order-lines-form__row
-  > tr:first-child
-  > td {
-  border-top: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
-}
-
 .erp-line-item-table__cell .ant-form-item {
   position: relative;
   width: 100%;
@@ -917,6 +914,9 @@
 }
 
 .erp-line-item-table .erp-line-item-table__index {
+  position: sticky;
+  left: 0;
+  z-index: 2;
   color: var(--erp-text-muted, #64748b);
   text-align: center;
 }
@@ -925,7 +925,7 @@
   position: sticky;
   right: 0;
   z-index: 1;
-  background: var(--erp-business-action-modal-bg, #fff);
+  background: var(--erp-line-group-bg, var(--erp-surface-bg));
   border-left: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
 }
 
@@ -941,46 +941,25 @@
 
 .erp-line-item-supplement {
   position: sticky;
-  left: 12px;
-  width: calc(100cqi - 24px);
+  left: calc(var(--erp-line-item-sequence-width) + 12px);
+  width: calc(100cqi - var(--erp-line-item-sequence-width) - 24px);
   max-width: 100%;
 }
 
-.erp-line-item-details > summary {
+.erp-line-item-details__heading {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  cursor: pointer;
-  color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-caption);
+  color: var(--erp-text);
+  font-size: var(--erp-font-body);
+  font-weight: 600;
   line-height: 24px;
-}
-
-.erp-line-item-details > summary::before {
-  content: '▸';
-  flex: none;
-}
-
-.erp-line-item-details[open] > summary::before {
-  content: '▾';
-}
-
-.erp-line-item-details > :where(summary:focus-visible) {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: 2px;
 }
 
 .erp-line-item-details__label,
 .erp-line-item-details__status {
   flex: none;
-}
-
-.erp-line-item-details__summary {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .erp-line-item-details__status {
@@ -1024,8 +1003,8 @@
   --erp-textarea-rows: 1;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
-  gap: 12px 16px;
-  padding: 12px 0 4px;
+  gap: var(--erp-form-field-gap, 10px 12px);
+  padding: 6px 0 0;
 }
 
 .erp-line-item-details__fields .ant-form-item {
@@ -1141,30 +1120,12 @@
   overflow-wrap: anywhere;
 }
 
-.erp-bom-line-row-title,
-.erp-bom-import-line-status {
+.erp-bom-line-row-title {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;
-}
-
-.erp-bom-import-line-status {
-  color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-caption);
-  font-weight: 500;
-}
-
-.erp-bom-import-line-status__source {
-  max-width: 520px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.erp-bom-import-line-status .ant-tag {
-  margin-inline-end: 0;
 }
 
 .erp-purchase-receipt-inline-item-editor {
@@ -1179,8 +1140,8 @@
 }
 
 .erp-purchase-receipt-inline-item-editor__head {
-  --erp-form-heading-padding-block: 0px;
-
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   min-width: 0;

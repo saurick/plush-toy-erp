@@ -19,7 +19,7 @@ const permissionSurfaces = new Set([
   'pages/DevPermissionRelationshipsPage.jsx',
   'components/DevRoleResponsibilityGraph.jsx',
 ])
-const navigationCallbacks = /\b(?:onOpenView|onOpenTopics|onExploreStage|onExploreNode|onOpenRules|onOpenRecords|openRoleSettings|openChain|openDutyChain|onOpenRole|onOpenChain)\b/u
+const navigationCallbacks = /\b(?:onOpenView|onOpenTopics|onExploreChain|onExploreStage|onExploreNode|onOpenRules|onOpenRecords|openRoleSettings|openChain|openDutyChain|onOpenRole|onOpenChain)\b/u
 const permissionCallbacks = /\b(?:openRoleSettings|openChain|openDutyChain|onOpenRole|onOpenChain)\b/u
 
 function permissionDestination(target) {
@@ -51,7 +51,7 @@ function staticTarget(attribute) {
   return ''
 }
 
-test('工作台内容区不重复提供跨页入口，权限页保留岗位配置和业务链路关联', () => {
+test('工作台内容区只保留受控对象关联和岗位配置，不重复提供通用跨页入口', () => {
   const violations = []
   for (const file of sourceFiles(root)) {
     const relative = path.relative(root, file)
@@ -82,13 +82,18 @@ test('工作台内容区不重复提供跨页入口，权限页保留岗位配�
       const destination = attributes.find((item) => ['to', 'href'].includes(item.name.name))
       const samePageExample = relative === 'components/DevSharedComponentGuide.jsx' && staticTarget(destination || {}).startsWith('/__dev/ui-design?')
       const permissionLink = permissionSurfaces.has(relative) && permissionDestination(staticTarget(destination || {}))
-      if (routerLinks.has(node.name.name) && !samePageExample && !permissionLink) violations.push(`${relative}:${node.loc.start.line} 内容区路由链接`)
+      const controlledReadingLink = relative === 'components/DevReadingNavigation.jsx' &&
+        destination?.value?.expression?.type === 'Identifier' && destination.value.expression.name === 'to' &&
+        source.includes('if (!isProductCoreReadingDestination(to)) return')
+      if (routerLinks.has(node.name.name) && !samePageExample && !permissionLink && !controlledReadingLink) violations.push(`${relative}:${node.loc.start.line} 内容区路由链接`)
       if ((['Button', 'a'].includes(node.name.name) || routerLinks.has(node.name.name)) && destination && !attributes.some((item) => item.name.name === 'download') && /^\/(?:__dev|erp)(?:\/|\?|$)/u.test(staticTarget(destination)) && !samePageExample && !permissionLink) violations.push(`${relative}:${node.loc.start.line} 内容区跨页地址`)
       const click = attributes.find((item) => item.name.name === 'onClick')
       const clickSource = click ? source.slice(click.range[0], click.range[1]) : ''
       const permissionAction = permissionSurfaces.has(relative) && permissionCallbacks.test(clickSource)
       const contextualRuleAction = relative === 'components/flow-state/BusinessActionRelations.jsx' && /onOpenRules\(action\)/u.test(clickSource)
-      if (node.name.name === 'Button' && click && navigationCallbacks.test(clickSource) && !permissionAction && !contextualRuleAction) violations.push(`${relative}:${node.loc.start.line} 关联跳转回调`)
+      const contextualTopicAction = relative === 'components/flow-state/TaskFulfillmentGuide.jsx' && /onOpenTopics\(relatedChainKey\)/u.test(clickSource)
+      const contextualNodeRuleAction = relative === 'components/flow-state/BusinessTopicDetails.jsx' && /onExploreChain\(topic.key, node.key\)/u.test(clickSource)
+      if (node.name.name === 'Button' && click && navigationCallbacks.test(clickSource) && !permissionAction && !contextualRuleAction && !contextualTopicAction && !contextualNodeRuleAction) violations.push(`${relative}:${node.loc.start.line} 关联跳转回调`)
     })
   }
   assert.deepEqual(violations, [])

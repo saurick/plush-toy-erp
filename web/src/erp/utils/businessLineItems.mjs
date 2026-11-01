@@ -65,6 +65,21 @@ export function createDuplicatedDraftLineItem(item = {}) {
   return nextItem
 }
 
+export function isBlankPurchaseOrderDraftLine(item = {}) {
+  // 自动行号不代表业务输入；主键及其他非空字段均需保留。
+  return Object.entries(item).every(
+    ([key, value]) =>
+      key === 'line_no' ||
+      value === undefined ||
+      value === null ||
+      (typeof value === 'string' && value.trim() === '')
+  )
+}
+
+export function withoutBlankPurchaseOrderDraftLines(lines = []) {
+  return lines.filter((line) => !isBlankPurchaseOrderDraftLine(line))
+}
+
 export function buildShipmentItemParams(values = {}) {
   return compactParams({
     sales_order_item_id: positiveInt(values.sales_order_item_id),

@@ -248,7 +248,7 @@ migrate_set:
 .PHONY: ent_generate
 # 用 ent generate 生成 ent 代码
 ent_generate:
-	go run -mod=mod entgo.io/ent/cmd/ent generate --target ./internal/data/model/ent ./internal/data/model/schema
+	go run -mod=mod entgo.io/ent/cmd/ent generate --feature sql/execquery --target ./internal/data/model/ent ./internal/data/model/schema
 
 .PHONY: data
 # 最推荐流程：只生成 diff，不自动 apply

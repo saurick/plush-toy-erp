@@ -16,13 +16,65 @@ import {
   filterShipmentInventoryLotOptions,
   filterShipmentProductSKUOptions,
   formatQuantity,
+  isBlankPurchaseOrderDraftLine,
   isBlankShipmentItem,
+  withoutBlankPurchaseOrderDraftLines,
 } from './businessLineItems.mjs'
 
 const stylesRoot = fileURLToPath(new URL('../styles', import.meta.url))
 const shipmentModalPath = fileURLToPath(
   new URL('../components/shipments/ShipmentEditor.jsx', import.meta.url)
 )
+
+test('purchase draft lines: only untouched new rows are blank, ignoring automatic line numbers', () => {
+  assert.equal(isBlankPurchaseOrderDraftLine({}), true)
+  assert.equal(isBlankPurchaseOrderDraftLine({
+    line_no: 7,
+    material_id: undefined,
+    unit_id: null,
+    purchased_quantity: '',
+    unit_price: '',
+    note: ' \n\t ',
+  }), true)
+  assert.equal(isBlankPurchaseOrderDraftLine({ id: 21, line_no: 1 }), false)
+  assert.equal(isBlankPurchaseOrderDraftLine({ line_status: 'open' }), false)
+  assert.equal(isBlankPurchaseOrderDraftLine({ future_business_field: '保留' }), false)
+})
+
+test('purchase draft lines: every purchase field protects partial input including numeric zero', () => {
+  const values = {
+    material_id: 3,
+    unit_id: 4,
+    material_code_snapshot: 'MAT-1',
+    material_name_snapshot: '布料',
+    color_snapshot: '蓝色',
+    product_order_no_snapshot: 'SO-1',
+    product_no_snapshot: 'PRODUCT-1',
+    product_name_snapshot: '玩具',
+    purchased_quantity: '0',
+    unit_price: 0,
+    amount: '0.00',
+    expected_arrival_date: '2026-11-02',
+    note: '待核对单位',
+  }
+  for (const [key, value] of Object.entries(values)) {
+    assert.equal(isBlankPurchaseOrderDraftLine({ line_no: 1, [key]: value }), false, key)
+  }
+})
+
+test('purchase draft lines: cleanup preserves row order, identities and the original undo snapshot', () => {
+  const saved = { id: 21, line_no: 8 }
+  const partial = { line_no: 9, purchased_quantity: '2', note: '尚未选料' }
+  const selected = { material_id: 3, unit_id: 4, material_name_snapshot: '布料' }
+  const lines = [{ line_no: 1 }, saved, { line_no: 2, note: '' }, partial, selected]
+  const original = structuredClone(lines)
+  const retained = withoutBlankPurchaseOrderDraftLines(lines)
+  assert.deepEqual(retained, [saved, partial, selected])
+  assert.equal(retained[0] === saved, true)
+  assert.equal(retained[1] === partial, true)
+  assert.deepEqual(lines, original)
+  assert.deepEqual(withoutBlankPurchaseOrderDraftLines([{ line_no: 1 }]), [])
+})
 
 function listCSSFiles(directory) {
   return readdirSync(directory).flatMap((entry) => {

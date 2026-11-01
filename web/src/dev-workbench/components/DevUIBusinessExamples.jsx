@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Alert, Button, Form, Input, InputNumber } from 'antd'
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import BusinessFormPage from '@/erp/components/business-list/BusinessFormPage.jsx'
 import BusinessFormSection from '@/erp/components/business-list/BusinessFormSection.jsx'
@@ -116,6 +117,7 @@ function BusinessFormExample() {
               showHeading={false}
             >
               <BusinessLineItemsSection
+                grouping={{ form, getGroup: (item) => ({ label: item.name || '待填写材料' }) }}
                 title="材料明细"
                 columns={LINE_COLUMNS}
                 emptyDescription="暂无演示明细，可添加一条继续操作"
@@ -147,6 +149,7 @@ function BusinessFormExample() {
                         ]}
                       >
                         <BusinessTextArea
+                          minRows={1}
                           aria-label={`第 ${index + 1} 条材料名称`}
                         />
                       </Form.Item>,
@@ -176,14 +179,25 @@ function BusinessFormExample() {
                         移除
                       </Button>
                     }
-                    summaryFields={[{ key: 'note', label: '备注' }]}
                   >
                     <Form.Item name={[field.name, 'note']} label="明细备注">
-                      <BusinessTextArea aria-label={`第 ${index + 1} 条备注`} />
+                      <BusinessTextArea
+                        aria-label={`第 ${index + 1} 条备注`}
+                        maxLength={BusinessTextPolicy.noteMaxCharacters}
+                      />
                     </Form.Item>
                   </BusinessLineItemRow>
                 )}
               />
+            </BusinessFormSection>
+            <BusinessFormSection title="备注">
+              <Form.Item
+                name="note"
+                label="整单备注"
+                className="erp-business-action-form__field--full"
+              >
+                <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount allowClear />
+              </Form.Item>
             </BusinessFormSection>
           </Form>
         </BusinessFormPage>
@@ -239,6 +253,7 @@ function SourcePickerExample() {
         pageSize={5}
         loading={state === 'loading'}
         importDisabled={state === 'error'}
+        importDisabledReason="资料加载失败，请重新加载"
         importText="添加到演示结果"
         searchPlaceholder="搜索演示材料"
         getSelectedLabel={(row) => row.name}

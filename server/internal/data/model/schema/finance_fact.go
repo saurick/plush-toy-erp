@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/index"
 	"github.com/shopspring/decimal"
 
+	corevalue "server/internal/core/value"
 	"server/internal/data/model/factguard"
 )
 
@@ -176,7 +177,7 @@ func (FinanceFact) Fields() []ent.Field {
 		field.Time("cancelled_at").Optional().Nillable(),
 		field.Int("cancelled_by").Optional().Nillable().Positive(),
 		field.String("cancel_reason").Optional().Nillable().MaxLen(255),
-		field.String("note").Optional().Nillable().MaxLen(255),
+		field.String("note").Optional().Nillable().Validate(corevalue.ValidateBusinessNote),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
 	}

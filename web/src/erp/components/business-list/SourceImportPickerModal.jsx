@@ -103,9 +103,12 @@ export default function SourceImportPickerModal({
   loading = false,
   importText = '导入',
   importDisabled = false,
+  importDisabledReason = '当前暂不可导入',
   cancelText = '取消',
   selectedNoun = '来源',
   emptyDescription = '暂无可导入记录',
+  filteredEmptyDescription = '没有符合条件的记录',
+  loadError,
   getSearchText,
   getSelectedLabel,
   isRowDisabled,
@@ -229,9 +232,19 @@ export default function SourceImportPickerModal({
     !importDisabled &&
     selectedRows.length > 0 &&
     !hasInvalidSelectedRows
-  const selectionHint = selectingAll
+  const importHint = selectingAll
     ? '正在选择筛选结果，请稍候'
-    : selectAllError || (multiple && !onlySelected && (serverPagination ? serverTotal : filteredRows.length) > 0 ? bulkSelectionHint : '')
+    : loading
+    ? '正在加载，请稍候'
+    : importDisabled
+      ? importDisabledReason
+      : hasInvalidSelectedRows
+        ? '所选来源已不可导入，请清空后重选'
+        : selectAllError || (multiple && !onlySelected && (serverPagination ? serverTotal : filteredRows.length) > 0 ? bulkSelectionHint : '') || (selectedRows.length === 0
+          ? (serverPagination ? serverTotal : filteredRows.length) > 0
+            ? `请先选择${selectedNoun}`
+            : `当前没有可选${selectedNoun}`
+          : '')
 
   useEffect(() => {
     if (loading) return
@@ -310,9 +323,12 @@ export default function SourceImportPickerModal({
   }
 
   const clearFilters = () => {
-    handleKeywordChange('')
+    cancelSelectAll()
+    setKeyword('')
+    setCurrentPage(1)
     setOnlySelected(false)
-    onClearFilters?.()
+    if (onClearFilters) onClearFilters()
+    else onSearchChange?.('')
   }
 
   const handlePageChange = (page) => {
@@ -457,9 +473,9 @@ export default function SourceImportPickerModal({
       }
       footer={
         <div className="erp-source-import-picker__footer">
-          {selectionHint ? (
-            <Text type={selectAllError ? 'danger' : 'secondary'} role="status">
-              {selectionHint}
+          {importHint ? (
+            <Text type={hasInvalidSelectedRows || selectAllError ? 'danger' : 'secondary'} role="status">
+              {importHint}
             </Text>
           ) : null}
           <div className="erp-source-import-picker__footer-actions">
@@ -565,12 +581,9 @@ export default function SourceImportPickerModal({
                       </Tag>
                     </Popover>
                   ) : null}
-                  {hasInvalidSelectedRows ? (
-                    <Text type="danger">所选来源已不可导入，请清空后重选</Text>
-                  ) : null}
                 </>
               ) : (
-                <Text type="secondary" id={selectionSummaryId}>未选择{selectedNoun}</Text>
+                <Text type="secondary" id={selectionSummaryId}>已选 <strong>0</strong> 条</Text>
               )}
             </div>
             {selectedSummaryItems.length > 0 ? (
@@ -596,7 +609,10 @@ export default function SourceImportPickerModal({
           expandable={expandable}
           pagination={false}
           locale={{
-            emptyText: <Empty description={emptyDescription} />,
+            emptyText: <Empty description={loadError || (onlySelected
+              ? `尚未选择${selectedNoun}`
+              : keyword.trim() || hasActiveFilters ? filteredEmptyDescription : emptyDescription)}
+            />,
           }}
           rowSelection={{
             type: multiple ? 'checkbox' : 'radio',

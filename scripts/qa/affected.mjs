@@ -688,7 +688,7 @@ function isDevPageGovernancePath(file) {
     /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
       file,
     ) ||
-    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageHeader|PageNav|PipelineTimingPanel|PressurePanel|PressureDataset|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FinanceWorkbench|FlowState|BusinessChainCustomerReview|Hub|Integration|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
+    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageHeader|PageNav|PipelineTimingPanel|PressurePanel|PressureDataset|ProductCoreRelations|ReadingNavigation|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FinanceWorkbench|FlowState|BusinessChainCustomerReview|Hub|Integration|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
       file,
     ) ||
     /^web\/scripts\/style-l1\/(?:scenarios|dev[A-Z][^/]*)\.mjs$/u.test(file)
@@ -723,6 +723,7 @@ function devBrowserScenarioNames(file) {
     ? ["dev-business-rules-navigation-desktop", "dev-business-rules-context-return-desktop", "dev-business-rules-selection-recovery-desktop"]
     : [];
   const mappings = [
+    [/ProductCoreRelations|ReadingNavigation|dev-reading-navigation/u, ["dev-page-product-core-desktop-light", "dev-business-topics-navigation-desktop", "dev-page-business-chain-audit-desktop-light", "dev-version-center-tabs-pagination-desktop"]],
     [/DevPageHeader|styles\/dev-workbench-(?:density|layout)\.css/u, ["dev-workbench-action-placement-desktop-light", "dev-workbench-density-desktop-light", "dev-workbench-patterns-desktop-light", "dev-ui-design-workbench-navigation-sync", "dev-version-center-tabs-pagination-desktop", "dev-version-center-plan-lifecycle-desktop"]],
     [/DevSourceReferences|dev-source-references/u, ["dev-workbench-content-desktop-light", "dev-workbench-patterns-desktop-light", "dev-flow-rules-complete", "dev-page-integration-desktop-light", "dev-project-skills-guidance-desktop-light"]],
     [/TaskHandling|taskHandlingMatrix|devTaskHandling/u, ["dev-page-task-handling-desktop-light"]],
@@ -896,13 +897,13 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
     if (
       /^web\/src\/common\/components\/select\//u.test(file) ||
-      /(?:DevSelectValueExample|devSelectValueExample|DevControlStandards|selectValueDisclosureScenarios)/u.test(file)
+      /(?:DevSelectValueExample|devSelectValueExample|DevControlStandards|selectOverflowScenarios|Business(?:LineItems|CompactField)Table|referenceSelectOptions)/u.test(file)
     ) {
       addFollowUp(
         state,
         "browser-regression",
         "T5",
-        "运行 STYLE_L1_SCENARIOS=dev-ui-select-overflow,business-select-values-sales,business-select-values-purchase,business-select-values-outsourcing,business-select-values-bom,business-select-values-shipment,business-select-values-arrival pnpm --dir web style:l1，核对完整值读取、锁定字段、清空替换、窄列与多列滚动，保留业务读取和授权合同。",
+        "运行 STYLE_L1_SCENARIOS=dev-ui-select-overflow,business-select-values-sales,business-select-values-purchase,business-select-values-outsourcing,business-select-values-bom,business-select-values-shipment,business-select-values-arrival pnpm --dir web style:l1，核对标准框高与框外独立编码、完整值读取、锁定字段、清空替换、窄列与多列滚动，保留业务读取和授权合同。",
         file,
       );
     }

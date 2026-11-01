@@ -3,6 +3,24 @@ import test from 'node:test'
 import { createElement as h } from 'react'
 import { businessFormHarness } from '../../../../scripts/test/businessFormHarness.mjs'
 
+test('空的选填说明省略，历史必填缺失如实显示未记录', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: Receipt } = await import('../../components/workflow/WorkflowTaskReceipt.jsx')
+  const task = { task_name: '核对资料', task_status_key: 'ready' }
+  await harness.render(h(Receipt, { task, receipt: { actionTitle: '任务已恢复待处理', reason: '  ', additionalReason: '  ', actorLabel: '模拟办理人', timeLabel: '2026/10/31 00:10' } }))
+  assert.match(document.querySelector('.workflow-task-receipt').textContent, /任务已恢复待处理.*模拟办理人/su)
+  assert.deepEqual([...document.querySelectorAll('.workflow-task-receipt dt')].map((item) => item.textContent), ['办理人', '办理时间'])
+  assert.doesNotMatch(document.querySelector('.workflow-task-receipt').textContent, /未填写|问题已解决|未补充说明/u)
+  await harness.render(h(Receipt, { task: { ...task, task_status_key: 'rejected' }, events: [{ id: 1, event_type: 'status_changed', from_status_key: 'ready', to_status_key: 'rejected', reason: '' }] }))
+  const fields = [...document.querySelectorAll('.workflow-task-receipt dl > div')]
+  assert(fields.some((item) => item.textContent === '退回原因未记录'))
+  const { default: Trail } = await import('../../components/workflow/WorkflowTaskEventTrail.jsx')
+  await harness.render(h(Trail, { task, events: [{ id: 2, event_type: 'urge_task', reason: '', actor_display_name: '模拟办理人', created_at: 1793370000 }] }))
+  assert.doesNotMatch(document.querySelector('.workflow-task-event-trail__list').textContent, /未补充说明/u)
+  await harness.click(document.querySelector('[aria-label="查看已催办任务记录详情"]'))
+  assert.match(document.querySelector('.workflow-task-event-trail__audit').textContent, /催办说明未补充说明/u)
+})
+
 test('手机业务资料保留所有有值字段、数值零和否，缺值可展开，字段权限沿用共享映射', async (t) => {
   const harness = await businessFormHarness(t)
   const { default: Details } = await import('../../components/business-list/BusinessRecordDetails.jsx')

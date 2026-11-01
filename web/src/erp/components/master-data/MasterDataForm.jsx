@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { AutoComplete, Form, Input, InputNumber, Switch } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
@@ -510,7 +511,7 @@ export function MasterDataFormFields({
             label="备注"
             name="note"
           >
-            <BusinessTextArea allowClear showCount maxLength={300} />
+            <BusinessTextArea minRows={2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
           </Form.Item>
         </BusinessFormSection>
       </>
@@ -576,6 +577,7 @@ export function MasterDataFormFields({
               name="address"
             >
               <BusinessTextArea
+                minRows={1}
                 allowClear
                 maxLength={512}
                 placeholder="填写合同中需要带出的加工厂或供应商地址"
@@ -725,7 +727,7 @@ export function MasterDataFormFields({
             <DeliveryAddressFields
               form={form}
               customer
-              extra="新建销售订单时带出，可在订单中单独修改。"
+              description="新建销售订单时带出，可在订单中单独修改。"
             />
           </BusinessFormSection>
           <BusinessFormSection title="结算方式">
@@ -800,7 +802,7 @@ export function MasterDataFormFields({
           label="备注"
           name="note"
         >
-          <BusinessTextArea allowClear showCount maxLength={300} />
+          <BusinessTextArea minRows={2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
         </Form.Item>
       </BusinessFormSection>
     </>

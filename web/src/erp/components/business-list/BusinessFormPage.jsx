@@ -9,6 +9,7 @@ import { Button, Form, Grid, Spin } from 'antd'
 import { FullscreenExitOutlined, FullscreenOutlined } from '@ant-design/icons'
 import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, } from 'react-router-dom'
+import { revealBusinessLineItemErrors } from './businessLineItemDisclosure.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { message, modal } from '@/common/utils/antdApp'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
@@ -18,6 +19,9 @@ import { useBusinessEditorGroup } from './BusinessEditorGroup.jsx'
 import { businessFormReadOnly } from './businessFormReadOnly.mjs'
 import useWorkflowTaskBusinessBusy from '../../hooks/useWorkflowTaskBusinessBusy.js'
 import ERPPageActions from '../ERPPageActions.jsx'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
+import { useERPTheme } from '@/common/theme/erpThemeContext.jsx'
+import { ERP_FORM_DISPLAY_OPTIONS } from '@/common/theme/erpAppearance.mjs'
 import '../../styles/app/business-form-page.css'
 
 function captureFormScroll(page, previous) {
@@ -92,6 +96,7 @@ export default function BusinessFormPage({
   readOnly: sourceReadOnly = false,
   initialDirty = false,
   hasChanges = false,
+  validateOnSave = true,
   okText = '保存',
   okButtonProps = {},
   secondaryAction = null,
@@ -107,6 +112,9 @@ export default function BusinessFormPage({
   children,
 }) {
   const outletContext = useBusinessPageContext()
+  const { appearance, setAppearance, appearanceSaveError, retryAppearanceSave } = useERPTheme()
+  const [hasSectionNavigation, setHasSectionNavigation] = useState(false)
+  const formBodyRef = useRef(null)
   const pane = React.useContext(BusinessEditorPaneContext)
   const visible = open && pane?.active !== false
   const editorGroup = useBusinessEditorGroup()
@@ -217,7 +225,7 @@ export default function BusinessFormPage({
     const capturePopupEscape = (event) => {
       if (
         event.key === 'Escape' && (
-          pageRef.current?.querySelector('[aria-expanded="true"]') ||
+          pageRef.current?.querySelector('input[aria-expanded="true"], [role="combobox"][aria-expanded="true"], [aria-haspopup][aria-expanded="true"]') ||
           Array.from(document.querySelectorAll(
             '.ant-select-dropdown:not(.ant-select-dropdown-hidden), .ant-picker-dropdown:not(.ant-picker-dropdown-hidden)'
           )).some((node) => node.getClientRects().length > 0)
@@ -406,6 +414,7 @@ export default function BusinessFormPage({
     submittingRef.current = true
     let validationErrors = []
     try {
+      if (validateOnSave) await form?.validateFields()
       await onOk?.()
       validationErrors = (form?.getFieldsError() || []).filter(
         (field) => field.errors.length > 0
@@ -415,15 +424,10 @@ export default function BusinessFormPage({
       validationErrors = error.errorFields
     } finally {
       if (validationErrors.length > 0) {
-        // 页面保存器可能自行处理校验异常；仍需展开错误所在明细并定位。
+        revealBusinessLineItemErrors(form, validationErrors)
+        formBodyRef.current?.revealValidationErrors()
+        // 页面保存器可能自行处理校验异常；仍需等待错误显示后定位。
         await new Promise((resolve) => window.requestAnimationFrame(resolve))
-        pageRef.current
-          ?.querySelectorAll('.erp-line-item-details')
-          .forEach((details) => {
-            if (details.querySelector('.ant-form-item-has-error')) {
-              details.open = true
-            }
-          })
         form?.scrollToField(validationErrors[0].name, {
           focus: true,
           block: 'nearest',
@@ -480,6 +484,13 @@ export default function BusinessFormPage({
     ? <footer className={taskFocused ? 'mobile-task-business-form-footer' : 'erp-business-form-page__footer'}>{providedFooter}</footer>
     : defaultFooter
 
+  const displayControl = hasSectionNavigation ? (
+    <div className="erp-business-form-page__display-control">
+      <Segmented aria-label="编辑页显示" value={appearance.formDisplay} options={ERP_FORM_DISPLAY_OPTIONS} disabled={busy || loading} onChange={(formDisplay) => setAppearance({ formDisplay })} />
+      {appearanceSaveError ? <span className="erp-business-form-page__display-error" role="alert">{appearanceSaveError} <Button size="small" onClick={retryAppearanceSave}>重试</Button></span> : null}
+    </div>
+  ) : null
+
   const editor = (
     <section
       ref={pageRef}
@@ -511,11 +522,13 @@ export default function BusinessFormPage({
         <header className="erp-business-form-page__header">
           <h2 tabIndex={-1}>{title}</h2>
           {headerActions}
+          {displayControl}
         </header>
       ) : (
         <header className="erp-business-form-page__header">
           <h1 tabIndex={-1}>{title}</h1>
           {headerActions}
+          {displayControl}
           {open ? <ERPPageActions showRefresh={false} /> : null}
           {canFullscreen ? (
             <Button
@@ -531,7 +544,7 @@ export default function BusinessFormPage({
           ) : null}
         </header>
       )}
-      <BusinessFormBody open={open} active={pane?.active !== false} loading={loading} busy={busy || initializing}>
+      <BusinessFormBody ref={formBodyRef} open={open} active={pane?.active !== false} loading={loading} busy={busy || initializing} formDisplay={appearance.formDisplay} onNavigationChange={setHasSectionNavigation}>
         <Spin spinning={loading}>
           <BusinessFormPendingAttachmentsContext.Provider
             value={reportPendingAttachments}

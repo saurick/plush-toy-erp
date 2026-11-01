@@ -173,6 +173,7 @@ function BusinessChainOverviewView({
   taskId,
   selectedTask,
   onOpenView,
+  onOpenTopics,
   topics = false,
   actions,
 }) {
@@ -191,6 +192,7 @@ function BusinessChainOverviewView({
       /> : <TaskFulfillmentGuide
         businessCatalog={catalog}
         onOpenView={onOpenView}
+        onOpenTopics={onOpenTopics}
         showViewSwitch
       />}
       {taskId ? (

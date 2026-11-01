@@ -1,3 +1,4 @@
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import { InventoryLotStatus, OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   numeric20Scale6QuantityUnits,
@@ -414,7 +415,7 @@ export function normalizeProductionCompletionCreateRequest(params = {}) {
   const source = requirePlainObject(params)
   requireAllowedKeys(source, CREATE_REQUEST_KEYS)
   const customerKey = optionalText(source.customer_key, 64)
-  const note = optionalText(source.note)
+  const note = optionalText(source.note, BusinessTextPolicy.noteMaxCharacters)
   const occurredAt = optionalOccurredAt(source.occurred_at)
   const quantity = normalizedQuantity(source.quantity)
   if (!quantity) throw invalidContract()

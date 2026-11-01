@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"server/internal/biz"
+	corevalue "server/internal/core/value"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/adminuserrole"
@@ -40,6 +41,7 @@ type workflowTaskMutationResultEnvelopeV1 struct {
 
 type workflowTaskMutationResultTaskV1 struct {
 	ID                    int            `json:"id"`
+	TaskNo                string         `json:"task_no,omitempty"`
 	TaskCode              string         `json:"task_code"`
 	TaskGroup             string         `json:"task_group"`
 	TaskName              string         `json:"task_name"`
@@ -239,7 +241,7 @@ func (r *workflowRepo) ResolveWorkflowTaskMutation(
 		}
 		return nil, false, err
 	}
-	return workflowTaskMutationReceiptResult(event, intentHash, commandKey, actorID)
+	return workflowTaskReceiptWithNumber(ctx, r.data.postgres, event, intentHash, commandKey, actorID)
 }
 
 func (r *workflowRepo) workflowTaskListQuery(filter biz.WorkflowTaskFilter) *ent.WorkflowTaskQuery {
@@ -470,7 +472,7 @@ func resolveWorkflowTaskCreateInTx(
 	if err != nil {
 		return nil, false, err
 	}
-	return workflowTaskMutationReceiptResult(event, intentHash, "create_task", actorID)
+	return workflowTaskReceiptWithNumber(ctx, tx.Client(), event, intentHash, "create_task", actorID)
 }
 
 func (r *workflowRepo) resolveWorkflowTaskCreate(
@@ -499,7 +501,7 @@ func (r *workflowRepo) resolveWorkflowTaskCreate(
 	if err != nil {
 		return nil, false, err
 	}
-	return workflowTaskMutationReceiptResult(event, intentHash, "create_task", actorID)
+	return workflowTaskReceiptWithNumber(ctx, r.data.postgres, event, intentHash, "create_task", actorID)
 }
 
 func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.WorkflowTaskStatusUpdate, actorID int, actorRoleKey string) (*biz.WorkflowTask, error) {
@@ -533,7 +535,7 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 	if !biz.CanTransitionWorkflowTaskStatus(current.TaskStatusKey, in.TaskStatusKey) {
 		return nil, biz.ErrBadParam
 	}
-	if (in.TaskStatusKey == "ready" || in.TaskStatusKey == "blocked" || in.TaskStatusKey == "rejected") && strings.TrimSpace(in.Reason) == "" {
+	if (in.TaskStatusKey == "blocked" || in.TaskStatusKey == "rejected") && strings.TrimSpace(in.Reason) == "" {
 		return nil, biz.ErrBadParam
 	}
 	resumePreservesBusinessProjection := current.TaskStatusKey == "blocked" && in.TaskStatusKey == "ready"
@@ -1175,7 +1177,25 @@ func resolveWorkflowTaskMutationInTx(
 		}
 		return nil, false, err
 	}
-	return workflowTaskMutationReceiptResult(event, intentHash, commandKey, actorID)
+	return workflowTaskReceiptWithNumber(ctx, tx.Client(), event, intentHash, commandKey, actorID)
+}
+
+// Receipts created before task numbering keep their frozen business result.
+// Only the immutable public identity is read from the migrated task record.
+func workflowTaskReceiptWithNumber(ctx context.Context, client *ent.Client, event *ent.WorkflowTaskEvent, intentHash, commandKey string, actorID int) (*biz.WorkflowTask, bool, error) {
+	task, found, err := workflowTaskMutationReceiptResult(event, intentHash, commandKey, actorID)
+	if err != nil || !found || task.TaskNo != "" {
+		return task, found, err
+	}
+	number, err := client.WorkflowTask.Query().Where(workflowtask.IDEQ(task.ID)).Select(workflowtask.FieldTaskNo).String(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	task.TaskNo = number
+	if err := corevalue.ValidateWorkflowTaskNumber(number); err != nil {
+		return nil, false, err
+	}
+	return task, true, nil
 }
 
 func workflowTaskMutationReceiptResult(event *ent.WorkflowTaskEvent, intentHash string, commandKey string, actorID int) (*biz.WorkflowTask, bool, error) {
@@ -1291,6 +1311,7 @@ func workflowTaskMutationResultTaskV1FromBiz(task *biz.WorkflowTask) *workflowTa
 	}
 	return &workflowTaskMutationResultTaskV1{
 		ID:                    task.ID,
+		TaskNo:                task.TaskNo,
 		TaskCode:              task.TaskCode,
 		TaskGroup:             task.TaskGroup,
 		TaskName:              task.TaskName,
@@ -1327,6 +1348,11 @@ func workflowTaskMutationResultTaskV1FromBiz(task *biz.WorkflowTask) *workflowTa
 }
 
 func (task workflowTaskMutationResultTaskV1) toBiz() (*biz.WorkflowTask, error) {
+	if task.TaskNo != "" {
+		if err := corevalue.ValidateWorkflowTaskNumber(task.TaskNo); err != nil {
+			return nil, err
+		}
+	}
 	taskStatusKey := strings.TrimSpace(task.TaskStatusKey)
 	if task.ID <= 0 || task.Version <= 0 || task.SourceID < 0 ||
 		((strings.TrimSpace(task.SourceType) == "") != (task.SourceID == 0)) ||
@@ -1351,6 +1377,7 @@ func (task workflowTaskMutationResultTaskV1) toBiz() (*biz.WorkflowTask, error) 
 	}
 	return &biz.WorkflowTask{
 		ID:                    task.ID,
+		TaskNo:                task.TaskNo,
 		TaskCode:              task.TaskCode,
 		TaskGroup:             task.TaskGroup,
 		TaskName:              task.TaskName,
@@ -1725,6 +1752,7 @@ func entWorkflowTaskToBiz(row *ent.WorkflowTask) *biz.WorkflowTask {
 	}
 	return &biz.WorkflowTask{
 		ID:                    row.ID,
+		TaskNo:                row.TaskNo,
 		TaskCode:              row.TaskCode,
 		TaskGroup:             row.TaskGroup,
 		TaskName:              row.TaskName,

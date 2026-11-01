@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react'
-import { Button, Form, Input, Space } from 'antd'
+import { Form, Input } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { parseBOMSourceNumber } from '../../utils/bomSourceValues.mjs'
@@ -33,7 +34,6 @@ export function buildHeaderParams(values = {}, extra = {}) {
   return {
     ...extra,
     product_id: Number(values.product_id || extra.product_id || 0),
-    version: String(values.version || '').trim(),
     effective_from: dateInputToParam(values.effective_from),
     effective_to: dateInputToParam(values.effective_to),
     source_order_no: values.source_order_no
@@ -91,9 +91,6 @@ export function BOMHeaderFormFields({
   productDisabled = false,
   productOptions = [],
   productActions,
-  versionSuggestion = '',
-  versionSuggestionLoading = false,
-  onUseVersionSuggestion,
 }) {
   const productID = Form.useWatch('product_id', form)
   const version = Form.useWatch('version', form)
@@ -117,30 +114,6 @@ export function BOMHeaderFormFields({
       }),
     [effectiveFrom]
   )
-  let versionHint = null
-  if (!disabled && !productDisabled) {
-    if (versionSuggestionLoading) {
-      versionHint = '正在读取同产品已有 BOM 版本...'
-    } else if (versionSuggestion) {
-      const suggestionApplied = version === versionSuggestion
-      versionHint = (
-        <Space size={8} wrap>
-          <span>建议版本</span>
-          <Button
-            size="small"
-            disabled={suggestionApplied}
-            onClick={onUseVersionSuggestion}
-          >
-            {suggestionApplied ? '已使用' : '使用'} {versionSuggestion}
-          </Button>
-          <span>也可手动填写</span>
-        </Space>
-      )
-    } else {
-      versionHint =
-        '先选择产品，系统会建议下一个版本号；也可手动填写打样版 A 等自定义版本。'
-    }
-  }
 
   return (
     <>
@@ -181,21 +154,19 @@ export function BOMHeaderFormFields({
         <Form.Item
           className="erp-business-action-form__field"
           label="BOM 版本"
-          extra={versionHint}
           name="version"
-          rules={[{ required: true, message: '请填写 BOM 版本' }]}
         >
           <Input
-            allowClear
+            className="erp-bom-version"
             autoComplete="off"
-            disabled={disabled}
+            disabled
             suffix={
               <BusinessCopyButton
                 label="BOM 版本"
-                value={disabled ? version : ''}
+                value={version}
               />
             }
-            placeholder="例如 V1、V2、打样版 A"
+            placeholder="保存后自动生成"
           />
         </Form.Item>
         <Form.Item
@@ -215,9 +186,8 @@ export function BOMHeaderFormFields({
       <BusinessFormSection title="订单与制表资料">
         <Form.Item
           className="erp-business-action-form__field"
-          label="参考适用开始"
+          label={<BusinessHelpLabel label="参考适用开始" description="仅供人工查阅；BOM 是否可选仍由启用状态决定，不会按日期自动启用或停用。" />}
           name="effective_from"
-          extra="仅供人工查阅；BOM 是否可选仍由启用状态决定，不会按日期自动启用或停用。"
           rules={[
             dateInputNotAfterRule({
               getEndValue: () => form.getFieldValue('effective_to'),
@@ -320,7 +290,7 @@ export function BOMHeaderFormFields({
           label="备注"
           name="note"
         >
-          <BusinessTextArea allowClear disabled={disabled} maxLength={300} />
+          <BusinessTextArea showCount minRows={2} allowClear disabled={disabled} maxLength={BusinessTextPolicy.noteMaxCharacters} />
         </Form.Item>
         {attachmentPanel}
       </BusinessFormSection>
@@ -391,7 +361,7 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
         label="部位"
         name="position"
       >
-        <BusinessTextArea allowClear autoComplete="off" />
+        <BusinessTextArea minRows={1} allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -412,21 +382,21 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
         label="加工基础"
         name="process_base"
       >
-        <BusinessTextArea allowClear autoComplete="off" />
+        <BusinessTextArea minRows={1} allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
         label="加工方式"
         name="process_method"
       >
-        <BusinessTextArea allowClear autoComplete="off" />
+        <BusinessTextArea minRows={1} allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="备注"
         name="note"
       >
-        <BusinessTextArea allowClear showCount maxLength={300} />
+        <BusinessTextArea minRows={2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
       </Form.Item>
     </>
   )

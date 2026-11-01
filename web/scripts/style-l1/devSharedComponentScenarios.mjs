@@ -1,8 +1,9 @@
+import { BusinessTextPolicy } from '../../src/common/consts/policies.generated.mjs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { assertControlPreviewThemeIsolation } from './controlThemeAssertions.mjs'
 import { createDevPaginationScenarios } from './devPaginationScenarios.mjs'
 import { createDevBusinessComponentScenarios } from './devBusinessComponentScenarios.mjs'
-import { createSelectValueDisclosureScenarios } from './selectValueDisclosureScenarios.mjs'
+import { createSelectOverflowScenarios } from './selectOverflowScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { isAcceptedFocusBorder } from './colorAssertions.mjs'
 import {
@@ -82,7 +83,7 @@ export function createDevSharedComponentScenarios({
         await writeFile(`${outputDir}/control-preview-theme.json`, JSON.stringify(evidence, null, 2))
       },
     },
-    ...createSelectValueDisclosureScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createSelectOverflowScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevPaginationScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevBusinessComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
     {
@@ -238,9 +239,39 @@ export function createDevSharedComponentScenarios({
       name: 'dev-ui-shared-basic-inputs',
       path: '/__dev/ui-design?page=controls&control=inputs',
       viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
       verify: async (page) => {
         const stage = page.locator('.erp-control-library-stage')
         const name = stage.getByLabel('产品名称', { exact: true })
+        const note = stage.getByLabel('备注', { exact: true })
+        const count = stage.locator('.ant-input-data-count')
+        await note.waitFor()
+        const initialNoteHeight = (await note.boundingBox()).height
+        assert.equal(await count.innerText(), `0 / ${BusinessTextPolicy.noteMaxCharacters}`)
+        const noteMetrics = await note.evaluate((node) => {
+          const style = getComputedStyle(node)
+          return { height: node.clientHeight, lineHeight: parseFloat(style.lineHeight), padding: parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) }
+        })
+        assert(noteMetrics.height - noteMetrics.padding >= noteMetrics.lineHeight * 2 - 1, '备注初始显示至少两行')
+        const multiline = '分批交付\n'.repeat(6)
+        await note.fill(multiline)
+        await page.waitForFunction((height) => document.getElementById('control-remark').clientHeight > height, initialNoteHeight)
+        assert.equal(await count.innerText(), `${multiline.length} / ${BusinessTextPolicy.noteMaxCharacters}`)
+        await note.locator('..').locator('.ant-input-clear-icon').click()
+        assert.equal(await note.inputValue(), '')
+        await page.waitForFunction((height) => Math.abs(document.getElementById('control-remark').getBoundingClientRect().height - height) <= 1, initialNoteHeight)
+        assert.equal(await count.innerText(), `0 / ${BusinessTextPolicy.noteMaxCharacters}`)
+        await note.fill('字'.repeat(BusinessTextPolicy.noteMaxCharacters))
+        await note.press('End')
+        await note.press('x')
+        assert.equal((await note.inputValue()).length, BusinessTextPolicy.noteMaxCharacters, '输入到上限后不继续写入')
+        const emojiNote = '😀'.repeat(BusinessTextPolicy.noteMaxCharacters)
+        await note.fill(emojiNote)
+        assert.equal(await count.innerText(), `${BusinessTextPolicy.noteMaxCharacters} / ${BusinessTextPolicy.noteMaxCharacters}`)
+        await note.press('End')
+        await note.press('x')
+        assert.equal(await note.inputValue(), emojiNote, '补充字符按一个字符计数并守住输入上限')
+        await note.fill('保留备注')
         await name.fill('包装挂件')
         await stage.locator('.ant-select-selector').click()
         await page
@@ -263,6 +294,9 @@ export function createDevSharedComponentScenarios({
         assert(await name.isDisabled())
         assert(await stage.getByRole('combobox', { name: '产品类别', exact: true }).isDisabled())
         assert.equal(await name.inputValue(), '包装挂件')
+        assert(await note.isDisabled())
+        assert.equal(await count.count(), 0, '禁用查看不显示字数')
+        assert.equal(await note.inputValue(), '保留备注')
         await stage
           .getByRole('radio', { name: '错误', exact: true })
           .locator('..')
@@ -272,14 +306,17 @@ export function createDevSharedComponentScenarios({
           await stage
             .locator('.ant-input-status-error, .ant-select-status-error')
             .count(),
-          2
+          3
         )
+        assert.equal(await count.innerText(), `4 / ${BusinessTextPolicy.noteMaxCharacters}`)
         await stage
           .getByRole('button', { name: '恢复初始内容', exact: true })
           .click()
         assert.equal(await name.inputValue(), '布偶熊')
         assert.equal(await stage.getByLabel('基础输入结果').innerText(), '布偶熊 · 毛绒玩具')
         assert.equal(await stage.getByRole('alert').count(), 0)
+        assert.equal(await note.inputValue(), '')
+        assert.equal(await count.innerText(), `0 / ${BusinessTextPolicy.noteMaxCharacters}`)
         await page
           .getByRole('button', { name: /重置演示/u })
           .click()

@@ -36,7 +36,7 @@ test('source import picker fails closed while a remote page is loading or invali
 test('source import picker resets filters and selections independently', () => {
   assert.match(
     source,
-    /const clearFilters = \(\) => \{\s*handleKeywordChange\(''\)/u
+    /const clearFilters = \(\) => \{\s*cancelSelectAll\(\)\s*setKeyword\(''\)/u
   )
   assert.match(
     source,
@@ -71,29 +71,25 @@ test('picker retains cross-page selections, restores results, and confirms sourc
   const [{ createRoot }, { default: Picker }, { registerAntdAppApis }] = await Promise.all([
     import('react-dom/client'), import('./SourceImportPickerModal.jsx'), import('../../../common/utils/antdApp.js'),
   ])
-  let confirm
-  let imported
-  let reloadPage
-  let pageCalls = 0
+  let confirm; let imported; let reloadPage; let
+pageCalls = 0
   registerAntdAppApis({ modal: { confirm: (config) => { confirm = config } } })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   t.after(async () => { await act(async () => root.unmount()); container.remove(); dom.restore() })
-  const base = {
-    open: true,
-    title: '来源测试',
-    columns: [{ dataIndex: 'name', title: '名称', width: 180 }],
+  const base = { open: true,
+title: '来源测试',
+columns: [{ dataIndex: 'name', title: '名称', width: 180 }],
     serverPagination: true,
-    total: 3,
-    pageSize: 1,
-    getSelectionGroup: (row) => row.order,
+total: 3,
+pageSize: 1,
+getSelectionGroup: (row) => row.order,
     onPageChange: () => { pageCalls++ },
-    onImport: (rows) => { imported = rows.map((row) => row.id) },
+onImport: (rows) => { imported = rows.map((row) => row.id) },
     onReload: (_, page) => { reloadPage = page },
     isRowDisabled: (row) => Boolean(row.disabled),
-    getSelectedLabel: (row) => row.name,
-  }
+getSelectedLabel: (row) => row.name }
   const render = async (row, current) => { await act(async () => root.render(createElement(Picker, { ...base, rows: [row], current }))) }
   const click = async (node) => { assert.equal(Boolean(node), true); await act(async () => node.click()) }
   const button = (text) => [...document.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === text || node.textContent.replace(/\s/g, '') === text)
@@ -122,8 +118,40 @@ test('picker retains cross-page selections, restores results, and confirms sourc
   await render({ id: 3, name: '订单乙第一行', order: 2, disabled: true }, 3)
   assert.equal(button('导入').disabled, true, 'refreshed ineligible selection cannot import')
   await click(button('清空已选'))
-  assert.equal(document.querySelectorAll('.erp-source-import-picker__selection-tag').length, 0)
-  assert.equal(button('导入').disabled, true, 'clearing selection leaves no importable snapshot')
+  assert.match(document.body.textContent, /已选 0 条/u)
+})
+
+test('empty results distinguish base, filtered, selected and failed states, and reset the parent query once', async (t) => {
+  const { createElement } = await import('react')
+  const { createReactTestHarness } = await import('../../../../scripts/test/reactRuntime.mjs')
+  const view = await createReactTestHarness(t)
+  const { default: Picker } = await import('./SourceImportPickerModal.jsx')
+  let clears = 0; let searches = 0
+  const base = {
+    open: true,
+    title: '导入空状态',
+    rows: [],
+    columns: [],
+    selectedNoun: '订单',
+    emptyDescription: '文件中没有订单',
+    filteredEmptyDescription: '当前范围没有待核对订单',
+    onClearFilters: () => { clears++ },
+    onSearchChange: () => { searches++ },
+  }
+  const render = (props) => view.render(createElement(Picker, { ...base, ...props }))
+  const empty = () => document.querySelector('.ant-empty-description').textContent
+  await render({})
+  assert.equal(empty(), '文件中没有订单')
+  await render({ hasActiveFilters: true })
+  assert.equal(empty(), '当前范围没有待核对订单')
+  const selected = [...document.querySelectorAll('label')].find((node) => node.textContent.includes('仅看已选')).querySelector('input')
+  await view.act(async () => selected.click())
+  assert.equal(empty(), '尚未选择订单')
+  await render({ hasActiveFilters: true, loadError: '资料加载失败，请重新加载' })
+  assert.equal(empty(), '资料加载失败，请重新加载')
+  await view.act(async () => [...document.querySelectorAll('button')].find((node) => node.textContent.replace(/\s/gu, '') === '清空筛选').click())
+  assert.equal(clears, 1)
+  assert.equal(searches, 0, 'reset must not first issue a stale-filter keyword request')
 })
 
 test('page selection and filtered selection keep their scopes, skip disabled rows and update the import count', async (t) => {

@@ -659,6 +659,9 @@ func collectCatalog(root string, review bool) (catalog, error) {
 		path, export string
 		names        map[string]string
 	}{
+		{"core/value/text.go", "BusinessTextPolicy", map[string]string{
+			"BusinessNoteMaxCharacters": "noteMaxCharacters",
+		}},
 		{"biz/business_pagination.go", "BusinessPaginationPolicy", map[string]string{
 			"BusinessListDefaultLimit": "defaultPageSize", "BusinessListMaxLimit": "maxPageSize",
 		}},

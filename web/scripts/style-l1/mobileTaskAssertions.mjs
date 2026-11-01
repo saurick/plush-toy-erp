@@ -434,7 +434,7 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 不保留独立状态统计卡`
     )
     await page
-      .getByRole('searchbox', { name: '搜索订单、产品、物料或款号' })
+      .getByRole('searchbox', { name: '搜索任务编号、订单、产品、物料或款号' })
       .waitFor({ state: 'visible' })
     const range = await page.getByTestId('mobile-task-list-range').innerText()
     assert(

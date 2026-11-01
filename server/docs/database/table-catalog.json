@@ -199,7 +199,13 @@
       "purpose": "保存产品 BOM 的版本、有效期、状态及工程资料头信息。",
       "boundary": "BOM 是产品结构和用量真源，不是采购、库存、生产领料或成本事实。",
       "lifecycle": "DRAFT 可编辑；DRAFT 可转 ACTIVE 或 ARCHIVED；ACTIVE 可归档；ARCHIVED 可重新激活；正式版本不直接删除。",
-      "writeBoundary": "InventoryUsecase 的 BOM 聚合保存、复制、激活和归档动作写入。"
+      "writeBoundary": "InventoryUsecase 的 BOM 聚合保存、复制、激活和归档动作写入。",
+      "fieldNotes": [
+        {
+          "name": "version",
+          "note": "产品内的 BOM 业务版号；新建和复制由后端分配 V1、V2 等，编辑保持原值。并发控制另用由 updated_at 派生的 edit_version。"
+        }
+      ]
     },
     {
       "name": "bom_items",
@@ -994,6 +1000,16 @@
       "lifecycle": "业务语义为只追加；状态变更和催办产生新事件，不改写历史。",
       "writeBoundary": "WorkflowRepo 在任务创建、状态 CAS、催办和升级事务内写入。",
       "notes": "当前 schema 没有像多张 Fact 表那样显式 reject update/delete hook；这里只声明业务语义只追加，不宣称数据库层已全面强制不可变。"
+    },
+    {
+      "name": "workflow_task_number_counters",
+      "title": "任务编号每日流水",
+      "domain": "workflow-runtime",
+      "kind": "Workflow",
+      "purpose": "按上海创建日期原子分配任务公开编号，独立于任务主键和内部来源识别码。",
+      "boundary": "只保存每日已分配流水，不表示任务数量、办理状态或业务事实；不提供前端编辑入口。",
+      "lifecycle": "每个创建日期一行，与任务创建事务一同递增；历史编号始终保留，不因任务结束而重置。",
+      "writeBoundary": "Go 数据层任务创建 hook 在所属事务内原子递增，版本化迁移回填历史基线。"
     },
     {
       "name": "workflow_tasks",

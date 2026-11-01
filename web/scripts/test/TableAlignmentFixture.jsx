@@ -280,6 +280,22 @@ function Fixture() {
               >
                 <p>补充信息中的长说明保持易读。</p>
               </BusinessLineItemRow>
+              <BusinessLineItemRow
+                index={1}
+                cells={[
+                  <Form.Item key="name" name="secondName" initialValue="第二条明细的长名称毛绒材料">
+                    <Input aria-label="第二条编辑品名" />
+                  </Form.Item>,
+                  <Form.Item key="number" name="secondQuantity" initialValue="28">
+                    <Input aria-label="第二条编辑数量" inputMode="decimal" />
+                  </Form.Item>,
+                ]}
+                actions={<Button>移除</Button>}
+              >
+                <Form.Item name="secondNote" label="第二条备注">
+                  <Input.TextArea aria-label="第二条明细备注" />
+                </Form.Item>
+              </BusinessLineItemRow>
             </BusinessLineItemsTable>
           </Form>
         </section>
@@ -304,6 +320,22 @@ function Fixture() {
                 actions={<Button>移除</Button>}
               >
                 <p>跨列说明只保留真实边界。</p>
+              </BusinessCompactFieldRow>
+              <BusinessCompactFieldRow
+                sequence={2}
+                cells={[
+                  <Form.Item key="name" name="secondCompactName" initialValue="第二条紧凑明细">
+                    <Input aria-label="第二条紧凑品名" />
+                  </Form.Item>,
+                  <Form.Item key="quantity" name="secondCompactQuantity" initialValue="200">
+                    <Input aria-label="第二条紧凑数量" inputMode="decimal" />
+                  </Form.Item>,
+                ]}
+                actions={<Button>移除</Button>}
+              >
+                <Form.Item name="secondCompactNote" label="第二条补充备注">
+                  <Input.TextArea aria-label="第二条紧凑备注" />
+                </Form.Item>
               </BusinessCompactFieldRow>
             </BusinessCompactFieldTable>
           </Form>

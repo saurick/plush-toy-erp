@@ -46,7 +46,7 @@ func TestBOMActivationRechecksDisabledReferences(t *testing.T) {
 			data, client := openInventoryRepoTestData(t, "review_bom_"+subject)
 			f := createInventoryTestFixtures(t, ctx, client)
 			uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
-			draft, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{ProductID: f.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "review"}}, []*biz.BOMItemSaveMutation{{BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: decimal.NewFromInt(1)}}})
+			draft, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{ProductID: f.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{}}, []*biz.BOMItemSaveMutation{{BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: decimal.NewFromInt(1)}}})
 			if err != nil {
 				t.Fatal(err)
 			}

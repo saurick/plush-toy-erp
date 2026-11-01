@@ -43,6 +43,7 @@ export function formatWorkflowTaskCopy(task = {}, { assigneeLabel = '' } = {}) {
   const responsibility = [role || '负责岗位未提供', text(assigneeLabel) || getWorkflowTaskAssigneeLabel(task)].join(' · ')
   return [
     `任务：${getWorkflowTaskDisplayName(task)}`,
+    text(task.task_no) && `任务编号：${text(task.task_no)}`,
     identity.available && identity.items.length ? formatWorkflowProductCopy(identity.items) : `关联内容：${identity.available ? '未关联产品／物料' : '关联内容不可用'}`,
     `关联单据：${formatWorkflowTaskSource(task)}`,
     task.task_group === 'business_followup' && text(task.payload?.description) && `任务要求：${text(task.payload.description)}`,

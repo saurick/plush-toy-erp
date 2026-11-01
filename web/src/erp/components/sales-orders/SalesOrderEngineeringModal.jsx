@@ -4,6 +4,7 @@ import { applyBusinessFormReadback } from '../../utils/businessFormReadback.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import Select from '@/common/components/select/AppSelect'
+import { productOption, productSKUOption } from '../../utils/referenceSelectOptions.mjs'
 import { SalesOrderItemStatus, SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import BusinessEditorGroup, { useBusinessEditorGroup } from '../business-list/BusinessEditorGroup.jsx'
 import BusinessEditorWorkspace, { BusinessEditorPane } from '../business-list/BusinessEditorWorkspace.jsx'
@@ -84,10 +85,7 @@ function EngineeringRow({ field, form, context, readOnly, referenceActions, onOp
                 placeholder="选择工程建立的产品"
                 listItemHeight={48}
                 optionRender={renderProductOption}
-                options={(context?.products || []).map((product) => ({
-                  value: product.id,
-                  label: `${product.code} ${product.name}`,
-                }))}
+                options={(context?.products || []).map(productOption)}
                 onChange={() => {
                   form.setFieldValue(
                     ['items', field.name, 'product_sku_id'],
@@ -111,10 +109,7 @@ function EngineeringRow({ field, form, context, readOnly, referenceActions, onOp
               disabled={readOnly || !productID}
               options={(context?.skus || [])
                 .filter((sku) => sku.product_id === productID)
-                .map((sku) => ({
-                  value: sku.id,
-                  label: [sku.sku_code, sku.sku_name].filter(Boolean).join(' '),
-                }))}
+                .map(productSKUOption)}
             />
           </Form.Item>
           {referenceEntry('sku')}

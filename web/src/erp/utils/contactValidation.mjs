@@ -45,26 +45,30 @@ export function isValidMainlandMobilePhone(value) {
   return /^1[3-9]\d{9}$/.test(normalizeMainlandMobilePhone(value))
 }
 
-export function optionalContactEmailRule(message = '请输入有效邮箱') {
+export function optionalContactEmailError(value, message = '请输入有效邮箱') {
+  const text = normalizeOptionalContactText(value)
+  return text && !isValidContactEmail(text) ? message : null
+}
+
+export function optionalContactPhoneError(value, message = '请输入有效联系电话') {
+  const text = normalizeOptionalContactText(value)
+  return text && !isValidContactPhone(text) ? message : null
+}
+
+export function optionalContactEmailRule(message) {
   return {
     validator: async (_, value) => {
-      const text = normalizeOptionalContactText(value)
-      if (!text || isValidContactEmail(text)) {
-        return
-      }
-      throw new Error(message)
+      const error = optionalContactEmailError(value, message)
+      if (error !== null) throw new Error(error)
     },
   }
 }
 
-export function optionalContactPhoneRule(message = '请输入有效联系电话') {
+export function optionalContactPhoneRule(message) {
   return {
     validator: async (_, value) => {
-      const text = normalizeOptionalContactText(value)
-      if (!text || isValidContactPhone(text)) {
-        return
-      }
-      throw new Error(message)
+      const error = optionalContactPhoneError(value, message)
+      if (error !== null) throw new Error(error)
     },
   }
 }

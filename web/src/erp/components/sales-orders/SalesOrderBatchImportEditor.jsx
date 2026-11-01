@@ -252,8 +252,7 @@ export default function SalesOrderBatchImportEditor({
       if (invalid >= 0) {
         setIndex(invalid)
         setSaving(false)
-        // Load and unlock the selected order before the shared form page opens
-        // collapsed details and focuses its ordered field errors.
+        // Load and unlock the selected order before focusing its field errors.
         await new Promise((resolve) => window.requestAnimationFrame(resolve))
         form.setFields(next[invalid].issues)
         message.warning(
@@ -300,6 +299,7 @@ export default function SalesOrderBatchImportEditor({
       container={container}
       open
       form={form}
+      validateOnSave={false}
       title="批量导入销售订单"
       confirmLoading={saving}
       hasChanges={completed < entries.length}

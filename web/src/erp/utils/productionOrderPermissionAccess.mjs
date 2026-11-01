@@ -18,7 +18,7 @@ export function productionReferenceSnapshotOptions(items = []) {
   const seenByType = new Map(
     Object.keys(groups).map((type) => [type, new Set()])
   )
-  const add = (type, value, label) => {
+  const add = (type, value, label, identity) => {
     const id = Number(value || 0)
     if (!Number.isSafeInteger(id) || id <= 0 || seenByType.get(type).has(id)) {
       return
@@ -27,6 +27,7 @@ export function productionReferenceSnapshotOptions(items = []) {
     groups[type].push({
       value: id,
       label: String(label || '').trim() || '既有关联',
+      ...(identity ? { identity } : {}),
       selectable: false,
       reason: '当前账号仅可保留订单中的既有关联',
     })
@@ -38,7 +39,8 @@ export function productionReferenceSnapshotOptions(items = []) {
       snapshotLabel(
         [item?.product_code_snapshot, item?.product_name_snapshot],
         '产品已关联'
-      )
+      ),
+      { name: item?.product_name_snapshot || item?.product_code_snapshot || '产品已关联' }
     )
     add(
       'product_sku',

@@ -1,4 +1,5 @@
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import { WORKFLOW_TASK_COLLABORATION_ACTIONS } from '../../erp/utils/workflowTaskActionFlow.mjs'
 
 // Read-only explanations of domain actions. These rows never decide whether a live action is allowed.
 const DATA = 'server/internal/data/'
@@ -32,6 +33,66 @@ export const DEV_FLOW_ACTION_RULES = {
     },
   ],
   'workflow.task': [
+    {
+      key: 'complete',
+      label: '完成任务或审批通过',
+      states: ['ready'],
+      permission: [PermissionCode.WORKFLOW_TASK_COMPLETE, PermissionCode.WORKFLOW_TASK_APPROVE],
+      authority: '按本次任务的办理能力、责任岗位和指定办理人校验；来源业务任务使用所属业务动作。',
+      condition: '普通完成和普通审批通过的说明选填；协调跟进的处理结果、收付款／库存调整／生产异常的审批意见必填。',
+      blocked: '无本次办理权限、任务已结束或受阻、版本过期、缺少必要处理结果或审批意见。',
+      effect: '记录真实处理结果及操作者，按既有流程推进；任务完成本身不等于库存、出货或财务事实生效。',
+      recovery: '失败保留本次输入；结果未确认时按同一操作重试，刷新后核对真实回执。选填说明留空时不生成替代原因。',
+      sourceRefs: [`${BIZ}workflow.go`, `${BIZ}process_runtime_workflow.go`, `${SERVICE}jsonrpc_workflow_task_action.go`],
+    },
+    {
+      key: 'block',
+      label: WORKFLOW_TASK_COLLABORATION_ACTIONS.block.label,
+      states: ['ready'],
+      permission: [PermissionCode.WORKFLOW_TASK_UPDATE],
+      authority: '当前任务责任人须有受阻操作权限。',
+      condition: WORKFLOW_TASK_COLLABORATION_ACTIONS.block.condition,
+      blocked: '尚未选择受阻原因、任务已受阻或结束、无权限或版本过期。',
+      effect: '任务转为已阻塞，保留受阻原因及操作者；不替代业务退回。',
+      recovery: '具备恢复权限后正式解除任务阻塞；原受阻记录继续保留。',
+      sourceRefs: [`${BIZ}workflow.go`, `${DATA}workflow_repo.go`, `${SERVICE}jsonrpc_workflow_task.go`],
+    },
+    {
+      key: 'resume',
+      label: WORKFLOW_TASK_COLLABORATION_ACTIONS.resume.label,
+      states: ['blocked'],
+      permission: [PermissionCode.WORKFLOW_TASK_UPDATE],
+      authority: '须有当前任务的恢复权限，校验责任范围、版本和幂等回执。',
+      condition: WORKFLOW_TASK_COLLABORATION_ACTIONS.resume.condition,
+      blocked: '任务并非已阻塞、任务已结束、无恢复权限或版本过期。',
+      effect: '任务恢复待处理并清除当前阻塞原因，历史记录保留；不自动完成来源业务或确认问题已解决。',
+      recovery: '同一次操作重试读取原回执；说明留空时只显示实际恢复动作，不沿用原阻塞原因。',
+      sourceRefs: [`${BIZ}workflow_idempotency.go`, `${DATA}workflow_repo.go`, `${SERVICE}jsonrpc_workflow_task.go`],
+    },
+    {
+      key: 'reject',
+      label: '退回／驳回任务',
+      states: ['ready'],
+      permission: [PermissionCode.WORKFLOW_TASK_REJECT],
+      authority: '须有当前任务退回权限；来源业务的审批退回由所属业务动作办理。',
+      condition: '退回原因必填，说明退回依据和需要补充的内容。',
+      blocked: '未填写原因、无权限、任务已受阻或结束、版本过期。',
+      effect: '记录退回结果和原因，按既有退回分支流转；不撤销已发生的业务事实。',
+      recovery: '接手岗位按退回原因补充；已结束任务不通过解除阻塞重开。',
+      sourceRefs: [`${BIZ}workflow.go`, `${DATA}workflow_repo.go`, `${SERVICE}jsonrpc_workflow_task.go`],
+    },
+    {
+      key: 'urge',
+      label: WORKFLOW_TASK_COLLABORATION_ACTIONS.urge.label,
+      states: ['ready', 'blocked'],
+      permission: [PermissionCode.WORKFLOW_TASK_UPDATE],
+      authority: '须有当前任务跟进权限；不能代替责任人办理。',
+      condition: WORKFLOW_TASK_COLLABORATION_ACTIONS.urge.condition,
+      blocked: '任务已结束、无跟进权限、目标岗位不匹配或版本过期。',
+      effect: '记录催办事件、办理人和时间；任务主状态不变，不产生业务事实。',
+      recovery: '同一次催办重试读取原回执；本次未补充说明时不沿用上次催办说明。',
+      sourceRefs: [`${BIZ}workflow_idempotency.go`, `${DATA}workflow_repo.go`, `${SERVICE}jsonrpc_workflow_task.go`],
+    },
     {
       key: 'reassign',
       label: '指定或改派办理人',

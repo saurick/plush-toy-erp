@@ -25,7 +25,6 @@ import {
 } from './WorkflowTaskCopy.jsx'
 import {
   getWorkflowTaskProcessContext,
-  listWorkflowTaskEvents,
 } from '../../api/workflowApi.mjs'
 import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import { workflowTaskBusinessContract } from '../../utils/workflowTaskBusinessContract.mjs'
@@ -56,6 +55,7 @@ import {
 import {
   isWorkflowApprovalTask,
   isWorkflowProcessDecisionTask,
+  workflowTaskActionInput,
   workflowTaskActionRequiresReason,
 } from '../../utils/workflowTaskActionContract.mjs'
 import {
@@ -79,6 +79,7 @@ import WorkflowTaskHandlingChain from './WorkflowTaskHandlingChain.jsx'
 import { TASK_ACTION_META, getWorkflowTaskActionMeta } from '../../utils/workflowTaskActionPresentation.mjs'
 import WorkflowTaskSecondaryActions, { WorkflowTaskActionGroup } from './WorkflowTaskSecondaryActions.jsx'
 import WorkflowTaskEventTrail from './WorkflowTaskEventTrail.jsx'
+import useWorkflowTaskEventRecords from '../../hooks/useWorkflowTaskEventRecords.js'
 import WorkflowTaskBlockReason from './WorkflowTaskBlockReason.jsx'
 import { isWorkflowTaskBlockReasonReady } from '../../utils/workflowTaskBlockReason.mjs'
 
@@ -120,10 +121,10 @@ export function getTaskActionDescription(actionMode = '') {
     return '请写清退回依据、需补齐事项和需要哪个岗位补充；退回不会撤销已经完成的业务处理。'
   }
   if (actionMode === 'resume') {
-    return '请说明阻塞如何解除；确认后任务恢复为可办理，不会自动产生库存、出货或财务记录。'
+    return '处理说明选填；提交后任务恢复待处理，业务结果以实际办理记录为准。'
   }
   if (actionMode === 'urge') {
-    return '请写清催办接收人和需要补齐的事项，便于对方了解原因。'
+    return '催办说明选填；可补充需要跟进的事项或期望完成时间。'
   }
   if (actionMode === 'assign') {
     return '请选择同岗位的接收人，或选择由岗位人员处理。转交只调整任务由谁处理，不会完成任务或办理对应业务。'
@@ -195,6 +196,7 @@ export default function WorkflowTaskActionDrawer({
   const sourceReadback = useWorkflowTaskBusinessReadback({ task, profile, enabled: !actionReceipt })
   const hasActionReceipt = Boolean(actionReceipt && task)
   const actionMeta = getWorkflowTaskActionMeta(task, actionMode)
+  const actionInput = workflowTaskActionInput(task, actionMode)
   const approvalTask = isWorkflowApprovalTask(task)
   const statusMeta = task ? getWorkflowTaskStatusMeta(task) : null
   const isTerminal = task ? isTerminalWorkflowTask(task) : false
@@ -269,10 +271,9 @@ roleKey: task.owner_role_key,
   const showTaskContext = activeStepKey === 'context'
   const [sourceFooter, setSourceFooter] = React.useState(null)
   const [reviewedInventoryID, setReviewedInventoryID] = React.useState(0)
-  const [taskEvents, setTaskEvents] = React.useState([])
-  const [taskEventsTruncated, setTaskEventsTruncated] = React.useState(false)
-  const [taskEventsState, setTaskEventsState] = React.useState('idle')
-  const [taskEventsError, setTaskEventsError] = React.useState('')
+  const taskEventRecords = useWorkflowTaskEventRecords({ task, profile })
+  const { items: taskEvents, truncated: taskEventsTruncated, status: taskEventsState } = taskEventRecords.task
+  const taskEventsError = '本任务处理记录加载失败，请刷新后重试。'
   const [processContext, setProcessContext] = React.useState(null)
   const [processContextState, setProcessContextState] = React.useState('idle')
   const [processContextReloadKey, setProcessContextReloadKey] =
@@ -281,6 +282,7 @@ roleKey: task.owner_role_key,
   const previousTaskIdentityRef = React.useRef('')
   const directEntryRef = React.useRef('')
   const navigationRef = React.useRef(null)
+  const stepScrollRef = React.useRef({ taskIdentity: '', positions: new Map() })
   const contextActionRef = React.useRef(null)
   const stepButtonRefs = React.useRef(new Map())
   const actionOptionRefs = React.useRef(new Map())
@@ -377,38 +379,6 @@ roleKey: task.owner_role_key,
   }, [hasActionReceipt, taskIdentity, task?.version])
 
   React.useEffect(() => {
-    if (!task?.id) {
-      setTaskEvents([])
-      setTaskEventsTruncated(false)
-      setTaskEventsState('idle')
-      setTaskEventsError('')
-      return undefined
-    }
-    const controller = new AbortController()
-    setTaskEvents([])
-    setTaskEventsTruncated(false)
-    setTaskEventsState('loading')
-    setTaskEventsError('')
-    listWorkflowTaskEvents(task.id, { limit: 100, signal: controller.signal })
-      .then(({ items, truncated }) => {
-        if (controller.signal.aborted) return
-        setTaskEvents(items)
-        setTaskEventsTruncated(truncated)
-        setTaskEventsState('ready')
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) return
-        setTaskEvents([])
-        setTaskEventsTruncated(false)
-        setTaskEventsState('error')
-        setTaskEventsError(
-          getActionErrorMessage(error, '加载本任务处理记录失败')
-        )
-      })
-    return () => controller.abort()
-  }, [task?.id, task?.version])
-
-  React.useEffect(() => {
     if (!task?.id || !task?.process_instance_id) {
       setProcessContext(null)
       setProcessContextState('idle')
@@ -449,7 +419,34 @@ roleKey: task.owner_role_key,
 
   React.useLayoutEffect(() => {
     const scrollContainer = navigationRef.current?.parentElement
-    if (scrollContainer) scrollContainer.scrollTop = 0
+    if (!scrollContainer) return undefined
+    if (stepScrollRef.current.taskIdentity !== taskIdentity) {
+      stepScrollRef.current = { taskIdentity, positions: new Map() }
+    }
+    const { positions } = stepScrollRef.current
+    const top = positions.get(activeStepKey) || 0
+    const wrapper = scrollContainer.closest('.ant-drawer-content-wrapper')
+    let disposed = false
+    let restoring = true
+    scrollContainer.scrollTop = top
+    const savePosition = () => {
+      if (!restoring) positions.set(activeStepKey, scrollContainer.scrollTop)
+    }
+    scrollContainer.addEventListener('scroll', savePosition, { passive: true })
+    const frame = requestAnimationFrame(async () => {
+      const widthAnimations = (wrapper?.getAnimations?.() || [])
+        .filter((animation) => animation.transitionProperty === 'width')
+      await Promise.allSettled(widthAnimations.map((animation) => animation.finished))
+      if (disposed) return
+      // 收窄会重新换行，等宽度稳定后恢复，避免短内容把原位置提前截断。
+      scrollContainer.scrollTop = top
+      restoring = false
+    })
+    return () => {
+      disposed = true
+      cancelAnimationFrame(frame)
+      scrollContainer.removeEventListener('scroll', savePosition)
+    }
   }, [activeStepKey, taskIdentity])
 
   const selectAction = (nextMode, nextReason = '') => {
@@ -667,15 +664,8 @@ roleKey: task.owner_role_key,
           {actionMode !== 'block' ? (
             <div className="erp-task-action-drawer__action-head">
               <div>
-                <BusinessHelpLabel label={actionMeta.title} description={`${TASK_ACTION_DESCRIPTIONS[actionMode]} ${getTaskActionDescription(actionMode)}`} />
+                <BusinessHelpLabel label={actionInput.fieldLabel} description={`${TASK_ACTION_DESCRIPTIONS[actionMode]} ${getTaskActionDescription(actionMode)}`} />
               </div>
-              <Tag color={actionMeta.requireReason ? 'orange' : 'green'}>
-                {actionMeta.requireReason
-                  ? approvalTask && actionMode === 'complete'
-                    ? '必须填写审批意见'
-                    : '必须填写原因'
-                  : '确认即可'}
-              </Tag>
             </div>
           ) : null}
           {actionMode === 'assign' ? (
@@ -757,33 +747,20 @@ roleKey: task.owner_role_key,
               onChange={onActionReasonChange}
               disabled={actionSaving || !canSubmitAction}
             />
-          ) : actionMeta.requireReason ? (
+          ) : (
             <TextArea
+              aria-label={actionInput.fieldLabel}
+              required={actionInput.required}
               value={actionReason}
               autoSize={{ minRows: 4, maxRows: 6 }}
               maxLength={180}
               showCount
               disabled={actionSaving || !canSubmitAction}
-              placeholder={
-                          task?.task_group === 'business_followup' && actionMode === 'complete'
-                            ? '填写处理结果和需要发起人了解的情况'
-                            : approvalTask && actionMode === 'complete'
-                            ? '填写审批意见和判断依据'
-                            : actionMode === 'assign'
-                              ? '填写请假、人员调整等转交原因'
-                              : '填写原因、影响范围、需要谁协助'
-                        }
+              placeholder={actionInput.placeholder}
               onChange={(event) =>
                           onActionReasonChange?.(event.target.value)
                         }
             />
-                    ) : (
-                      <div className="erp-task-action-drawer__confirm-copy">
-                        <CheckCircleOutlined aria-hidden="true" />
-                        <span>
-                          提交后关闭当前任务，业务结果以实际办理记录为准。
-                        </span>
-                      </div>
                     )}
           {approvedQuantityAllowed ? (
             <div className="erp-task-action-drawer__assignment">
@@ -829,9 +806,9 @@ roleKey: task.owner_role_key,
           <dt>处理方式</dt>
           <dd>{actionMeta.title}</dd>
         </div>
-        {actionMeta.requireReason ? (
+        {actionReason.trim() ? (
           <div>
-            <dt>处理原因</dt>
+            <dt>{actionInput.label}</dt>
             <dd>{actionReason.trim()}</dd>
           </div>
                   ) : null}
@@ -900,8 +877,8 @@ roleKey: task.owner_role_key,
       footer={(
         <>
           <Button disabled={actionSaving} onClick={closeCollaboration}>关闭</Button>
-          {!hasActionReceipt && reviewing && actionMode !== 'block' ? <Button disabled={actionSaving} onClick={() => setReviewing(false)}>返回修改</Button> : null}
-          {!hasActionReceipt ? <Button type="primary" danger={actionMode === 'reject'} loading={actionSaving} disabled={actionSaving || !canSubmitAction || !canConfirm} onClick={actionMode === 'block' || reviewing ? submitAction : () => setReviewing(true)}>{actionMode === 'block' || reviewing ? actionMeta?.buttonLabel || '确认提交' : '核对并确认'}</Button> : null}
+          {!hasActionReceipt && reviewing && !['block', 'resume', 'urge'].includes(actionMode) ? <Button disabled={actionSaving} onClick={() => setReviewing(false)}>返回修改</Button> : null}
+          {!hasActionReceipt ? <Button type="primary" danger={actionMode === 'reject'} loading={actionSaving} disabled={actionSaving || !canSubmitAction || !canConfirm} onClick={['block', 'resume', 'urge'].includes(actionMode) || reviewing ? submitAction : () => setReviewing(true)}>{['block', 'resume', 'urge'].includes(actionMode) || reviewing ? actionMeta?.buttonLabel || '确认提交' : '核对并确认'}</Button> : null}
         </>
       )}
     >
@@ -924,7 +901,9 @@ roleKey: task.owner_role_key,
           </div>
       }
         extra={task ? <WorkflowTaskCopySummary task={taskWithSource} assigneeLabel={hasActionReceipt ? '' : currentAssigneeLabel} compact disabled={actionSaving} /> : null}
-        width={hasBusinessPage ? 'calc(100vw - 24px)' : 'min(720px, calc(100vw - 24px))'}
+        width={hasBusinessPage && activeStepKey === 'action' ? 'calc(100vw - 24px)' : 720}
+        styles={{ wrapper: { maxWidth: 'calc(100vw - 24px)' } }}
+        rootClassName="erp-task-action-drawer-root"
         open={Boolean(task)}
         forceRender
         closeIcon={<LeftOutlined aria-hidden />}
@@ -1145,6 +1124,7 @@ roleKey: task.owner_role_key,
               className="erp-task-action-drawer__step-panel"
             >
               <WorkflowTaskEventTrail
+                records={taskEventRecords}
                 className="workflow-task-info-card workflow-task-info-card--records"
                 approvalTask={approvalTask}
                 errorMessage={taskEventsError}
@@ -1189,7 +1169,7 @@ roleKey: task.owner_role_key,
                 <>
                   <WorkflowTaskReceipt task={task} events={taskEvents} state={taskEventsState} receipt={actionReceipt} sourceReadback={sourceReadback} />
                   {task.process_instance_id ? <WorkflowTaskHandlingChain task={task} profile={profile} focused processContext={processContext} processContextState={processContextState} onOpenTask={onOpenRelatedTask} onRetryProcess={() => setProcessContextReloadKey((current) => current + 1)} /> : null}
-                  <WorkflowTaskEventTrail className="workflow-task-info-card" task={task} events={taskEvents} state={taskEventsState} errorMessage={taskEventsError} truncated={taskEventsTruncated} approvalTask={approvalTask} showResponsibility={false} compact />
+                  <WorkflowTaskEventTrail records={taskEventRecords} className="workflow-task-info-card" task={task} events={taskEvents} state={taskEventsState} errorMessage={taskEventsError} truncated={taskEventsTruncated} approvalTask={approvalTask} showResponsibility={false} compact />
                 </>
             ) : actionMeta ? (
               reviewPanel

@@ -192,11 +192,11 @@ test('mobile task action screen validates and focuses the first missing field', 
   )
   assert.match(
     actionScreenSource,
-    /if \(action === 'done'\) return approvalTask \? '审批意见' : '完成反馈'/u
+    /workflowTaskActionInput\(task, action\)\.label/u
   )
   assert.match(actionScreenSource, /isWorkflowApprovalTask\(task\)/u)
   assert.match(actionScreenSource, /resolveMobileActionLabel\(key, task\)/u)
-  assert.match(actionScreenSource, /说明通过依据、核对结果和需要交接的信息/u)
+  assert.match(actionScreenSource, /placeholder=\{actionInput\.placeholder\}/u)
   assert.match(actionScreenSource, /actionChoiceRef\.current\?\.focus\(\)/u)
   assert.match(actionScreenSource, /reasonRef\.current\?\.focus\(\)/u)
   assert.doesNotMatch(actionScreenSource, /现场证据|onEvidenceChange/u)
@@ -274,7 +274,7 @@ test('mobile task overview, list heading and loaded counts stay concise', () => 
     /renderLoadedTaskOverview|mobile-role-total-count|当前岗位任务状态/u
   )
   assert.match(listScreenSource, /data-testid="mobile-task-list-range"/u)
-  assert.match(listScreenSource, /搜索订单、产品、物料或款号/u)
+  assert.match(listScreenSource, /搜索任务编号、订单、产品、物料或款号/u)
   const donePanelSource = listScreenSource.slice(
     listScreenSource.indexOf('const renderDonePanel'),
     listScreenSource.indexOf('const renderRiskFilters')
@@ -395,10 +395,10 @@ test('mobile task detail loads formal process position without QA-only banners',
 })
 
 test('mobile task detail loads current-task records for every task and keeps the reading order', () => {
-  assert.match(detailScreenSource, /listWorkflowTaskEvents\(selectedTask\.id/u)
+  assert.match(detailScreenSource, /useWorkflowTaskEventRecords\(\{ task: selectedTask, profile: adminProfile \}\)/u)
   assert.match(detailScreenSource, /WorkflowTaskEventTrail/u)
   assert.match(detailScreenSource, /showResponsibility=\{false\}/u)
-  assert.match(taskEventTrailSource, /本任务处理记录/u)
+  assert.match(taskEventTrailSource, /流程处理记录/u)
   assert.match(taskEventTrailSource, /workflow-task-event-trail__actor-name/u)
   assert.match(taskEventTrailSource, /workflow-task-event-trail__actor-role/u)
   assert.match(taskEventTrailSource, /workflow-task-event-trail__meta-time/u)

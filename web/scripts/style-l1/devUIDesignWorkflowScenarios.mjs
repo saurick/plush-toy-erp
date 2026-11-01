@@ -1,3 +1,4 @@
+import { BusinessTextPolicy } from '../../src/common/consts/policies.generated.mjs'
 import { openUIDesignAppearance, openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
 import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { readFile } from 'node:fs/promises'
@@ -416,8 +417,8 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         const confirm = () => frame.locator('[data-action="business-record-confirm"]').click()
         const back = () => frame.getByRole('button', { name: '返回原视图', exact: true }).click()
         await frame.locator('.nav-item[data-page="engineering-hub"]').click()
-        await frame.locator('.record-row--placeholder').waitFor({ state: 'visible' })
-        assert.equal(await toolbar.count(), 0, '未选记录时仅显示常驻引导')
+        await toolbar.waitFor({ state: 'visible' })
+        assert.equal(await action('edit').isDisabled(), true, '未选记录时不能编辑 BOM')
         await select('bom-1')
         await toolbar.locator('[data-action="open-related-tasks"]').click()
         const relatedTasks = frame.getByRole('dialog', { name: '相关任务', exact: true })
@@ -448,12 +449,25 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         await frame.locator('.table-wrap [data-action="select-row"][data-id="bom-1"]').uncheck()
         await select('bom-5')
         await action('copy-version').click()
-        await frame.locator('[data-form-field="bom-version"]').fill('量产修订稿 B')
+        assert.equal(await frame.locator('[data-form-field="bom-version"]').getAttribute('readonly'), '')
+        const remark = frame.locator('textarea[data-form-field="remark"]')
+        const remarkCount = frame.locator('.remark-count:visible')
+        assert.equal(await remark.getAttribute('rows'), '2')
+        assert.equal(await remark.getAttribute('maxlength'), null)
+        const initialRemarkHeight = (await remark.boundingBox()).height
+        const remarkText = '包装要求与分批安排\n'.repeat(6)
+        await remark.fill(remarkText)
+        assert.equal(await remarkCount.innerText(), `${remarkText.length} / ${BusinessTextPolicy.noteMaxCharacters}`)
+        assert((await remark.boundingBox()).height > initialRemarkHeight, '原型备注随多行内容增高')
+        await remark.fill('')
+        assert.equal(await remarkCount.innerText(), `0 / ${BusinessTextPolicy.noteMaxCharacters}`)
+        assert(Math.abs((await remark.boundingBox()).height - initialRemarkHeight) <= 1, '原型备注清空后恢复两行')
+        const copiedVersion = await frame.locator('[data-form-field="bom-version"]').inputValue()
         await frame.locator('[data-form-field="usage-0"]').fill('1.26')
         await frame.locator('[data-action="save-form"]').click()
         await frame.locator('[data-action="back-list"]').click()
         await action('copy-version').click()
-        assert.equal(await frame.locator('[data-form-field="bom-version"]').inputValue(), '量产修订稿 B 副本')
+        assert.equal(await frame.locator('[data-form-field="bom-version"]').inputValue(), `V${Number(copiedVersion.slice(1)) + 1}`)
         assert.equal(await frame.locator('[data-form-field="usage-0"]').inputValue(), '1.26')
         await frame.locator('[data-form-field="usage-0"]').fill('2.5')
         await frame.locator('[data-action="save-form"]').click()

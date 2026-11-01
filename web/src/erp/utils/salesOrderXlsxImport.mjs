@@ -10,6 +10,7 @@ import {
   numeric20Scale6TextFromUnits,
 } from './numeric20Scale6.mjs'
 import { salesOrderProductionQuantity } from './salesOrderRequirements.mjs'
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 
 const HEADER_ALIASES = {
   order_no: ['订单编号', '订单号', '销售订单号'],
@@ -335,7 +336,7 @@ export async function parseSalesOrderXlsx(
           location,
           '工艺'
         ),
-        note: boundedText(text('note'), 255, location, '备注'),
+        note: boundedText(text('note'), BusinessTextPolicy.noteMaxCharacters, location, '备注'),
       }
       const imageCell = cell('image')
       const imageID = (imageCell.formula || imageCell.value).match(

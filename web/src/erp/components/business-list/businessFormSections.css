@@ -7,7 +7,7 @@
   gap: 8px;
   padding: var(--erp-form-heading-padding-block, 4px) 12px;
   border-radius: 2px;
-  background: var(--erp-form-heading-bg, color-mix(in srgb, var(--erp-primary) 14%, var(--erp-surface-bg)));
+  background: color-mix(in srgb, var(--erp-primary) 14%, var(--erp-surface-bg));
   color: var(--erp-primary-strong);
   font-size: var(--erp-font-emphasis, 15px);
   font-weight: 650;
@@ -41,7 +41,6 @@
 }
 
 .erp-business-form-section {
-  --erp-form-heading-bg: color-mix(in srgb, var(--erp-primary) 14%, var(--erp-surface-bg));
   --erp-line-items-section-border-width: 0px;
   --erp-line-items-section-padding: 0;
   --erp-sales-order-lines-bg: transparent;
@@ -55,15 +54,21 @@
 }
 
 .erp-business-form-section[data-current-form-section='true'] {
-  --erp-form-heading-bg: color-mix(in srgb, var(--erp-primary) 30%, var(--erp-surface-bg));
-
   border-color: color-mix(in srgb, var(--erp-primary) 48%, var(--erp-border));
   background: color-mix(in srgb, var(--erp-primary) 5%, var(--erp-surface-bg));
 }
 
-.erp-business-form-section > .erp-business-form-heading {
+.erp-business-form-section > .erp-business-form-heading,
+.erp-business-form-section[data-heading='inline'] .erp-business-form-heading {
+  /* 6px 外圆角减去 1px 边框，让标题色带沿边框内沿绘制。 */
+  border-start-start-radius: 5px;
+  border-start-end-radius: 5px;
   border-end-start-radius: 0;
   border-end-end-radius: 0;
+}
+
+.erp-business-form-section[data-current-form-section='true'] .erp-business-form-heading {
+  background: color-mix(in srgb, var(--erp-primary) 30%, var(--erp-surface-bg));
 }
 
 .erp-business-form-section__fields {
@@ -123,4 +128,7 @@
   .erp-business-form-section__fields {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+.erp-business-form-section[hidden] {
+  display: none;
 }

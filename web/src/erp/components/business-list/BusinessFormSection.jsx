@@ -22,6 +22,7 @@ export default function BusinessFormSection({
     'aria-labelledby': showHeading ? `${id}-title` : undefined,
     'aria-label': showHeading ? undefined : title,
     tabIndex: -1,
+    hidden: navigation?.sectionMode && navigation.activeSectionID !== id,
     'data-form-section': title,
     'data-heading': showHeading ? 'default' : 'inline',
     'data-current-form-section': navigation?.activeSectionID === id ? 'true' : undefined,

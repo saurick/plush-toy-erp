@@ -2,6 +2,7 @@ import React from 'react'
 import { Button } from 'antd'
 import { describeDevBusinessChainResponsibility } from '../../config/devBusinessChainProjection.mjs'
 import './businessTopicDetails.css'
+import { ChainEvidenceLinks } from '../DevProductCoreRelations.jsx'
 
 const evidenceLabels = {
   dataset: '模拟数据',
@@ -13,6 +14,7 @@ export default function BusinessTopicDetails({
   topic,
   node,
   onSelect,
+  onExploreChain,
   selectedStepKey,
   onInspectStep,
   visibleStepKeys,
@@ -77,7 +79,9 @@ export default function BusinessTopicDetails({
           )
         })}
       </ul>
-
+      {node.machineKeys?.length && onExploreChain ? (
+        <Button onClick={() => onExploreChain(topic.key, node.key)}>查看规则</Button>
+      ) : null}
     </aside>
   )
 }
@@ -87,6 +91,7 @@ export function BusinessTopicVerification({ topic }) {
     <details className="erp-dev-disclosure erp-dev-chain-topics__verification">
       <summary>数据与验证（{topic.acceptanceScenarios.length} 类场景）</summary>
       <p>本专题的登记范围；实际执行结果见链路实测报告。</p>
+      <ChainEvidenceLinks chainKey={topic.key} />
       <table data-table-lines="appearance">
         <thead>
           <tr><th scope="col">场景</th><th scope="col">验证方式</th></tr>

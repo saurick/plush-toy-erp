@@ -10,6 +10,44 @@ import {
 
 export const SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE = 20
 
+export function validateShipmentSourceOrderOptions(orders) {
+  if (!Array.isArray(orders)) throw invalidCandidateResponse()
+  const ids = new Set()
+  for (const order of orders) {
+    if (!isPositiveSafeInteger(order?.sales_order_id) || !isPositiveSafeInteger(order?.customer_id) ||
+      typeof order.order_no !== 'string' || !order.order_no.trim() ||
+      typeof order.customer_code !== 'string' || !order.customer_code.trim() ||
+      typeof order.customer_name !== 'string' || !order.customer_name.trim() ||
+      typeof order.customer_name_snapshot !== 'string' || ids.has(order.sales_order_id)) throw invalidCandidateResponse()
+    ids.add(order.sales_order_id)
+  }
+  return orders
+}
+
+function retainCurrentScope(options, value, existingOptions) {
+  if (!value || options.some((option) => option.value === value)) return options
+  const current = existingOptions.find((option) => option.value === value)
+  return current ? [...options, { ...current, disabled: true }] : options
+}
+
+export function shipmentSourceFilterOptions(sourceOrders, {
+  customerID, salesOrderID, customerOptions = [], salesOrderOptions = [],
+} = {}) {
+  const customers = [...new Map(sourceOrders.map((order) => [order.customer_id, {
+    value: order.customer_id,
+    label: `${order.customer_code} · ${order.customer_name}`,
+    identity: { name: order.customer_name, code: order.customer_code },
+  }])).values()]
+  const orders = sourceOrders.filter((order) => !customerID || order.customer_id === customerID).map((order) => ({
+    value: order.sales_order_id,
+    label: `${order.order_no} · ${order.customer_name_snapshot || order.customer_name}`,
+  }))
+  return {
+    customers: retainCurrentScope(customers, customerID, customerOptions),
+    orders: retainCurrentScope(orders, salesOrderID, salesOrderOptions),
+  }
+}
+
 const DISABLED_REASON_TEXT = Object.freeze({
   line_not_open: '来源行已关闭',
   fully_shipped: '已全部确认出货',

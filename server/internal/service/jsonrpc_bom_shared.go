@@ -17,6 +17,9 @@ func unknownBOMResult(method string) *v1.JsonrpcResult {
 }
 
 func bomHeaderCreateFromParams(pm map[string]any) (*biz.BOMHeaderCreate, bool) {
+	if _, supplied := pm["version"]; supplied {
+		return nil, false
+	}
 	effectiveFrom, ok := getOptionalJSONRPCTime(pm, "effective_from")
 	if !ok {
 		return nil, false
@@ -31,7 +34,6 @@ func bomHeaderCreateFromParams(pm map[string]any) (*biz.BOMHeaderCreate, bool) {
 	}
 	return &biz.BOMHeaderCreate{
 		ProductID:     getInt(pm, "product_id", 0),
-		Version:       getString(pm, "version"),
 		Status:        biz.BOMStatusDraft,
 		EffectiveFrom: effectiveFrom,
 		EffectiveTo:   effectiveTo,
@@ -48,6 +50,9 @@ func bomHeaderCreateFromParams(pm map[string]any) (*biz.BOMHeaderCreate, bool) {
 }
 
 func bomHeaderUpdateFromParams(pm map[string]any) (*biz.BOMHeaderUpdate, bool) {
+	if _, supplied := pm["version"]; supplied {
+		return nil, false
+	}
 	effectiveFrom, ok := getOptionalJSONRPCTime(pm, "effective_from")
 	if !ok {
 		return nil, false
@@ -61,7 +66,6 @@ func bomHeaderUpdateFromParams(pm map[string]any) (*biz.BOMHeaderUpdate, bool) {
 		return nil, false
 	}
 	return &biz.BOMHeaderUpdate{
-		Version:       getString(pm, "version"),
 		EffectiveFrom: effectiveFrom,
 		EffectiveTo:   effectiveTo,
 		SourceOrderNo: getWorkflowStringPtr(pm, "source_order_no"),

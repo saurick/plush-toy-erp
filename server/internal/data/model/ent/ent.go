@@ -83,6 +83,7 @@ import (
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
+	"server/internal/data/model/ent/workflowtasknumbercounter"
 	"server/internal/data/model/ent/workpool"
 	"server/internal/data/model/ent/workpoolmembership"
 	"sync"
@@ -228,6 +229,7 @@ func checkColumn(t, c string) error {
 			workflowbusinessstate.Table:              workflowbusinessstate.ValidColumn,
 			workflowtask.Table:                       workflowtask.ValidColumn,
 			workflowtaskevent.Table:                  workflowtaskevent.ValidColumn,
+			workflowtasknumbercounter.Table:          workflowtasknumbercounter.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

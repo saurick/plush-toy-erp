@@ -34,9 +34,9 @@ async function harness(t, handler) {
   return {
     ...view,
     calls,
-    hint: () => document.querySelector('.erp-source-import-picker__footer [role="status"]')?.textContent || '',
     accepted,
     button,
+    hint: () => document.querySelector('.erp-source-import-picker__footer [role="status"]')?.textContent || '',
     renderPicker: (props, profile) => view.render(createElement(
       ReferenceRecordsContext.Provider,
       { value: { adminProfile: profile, materials: (rows) => accepted.push(...rows) } },
@@ -62,14 +62,17 @@ test('failed pages keep the displayed page and selections, block import, and ret
     return materialPage(params)
   })
   await view.renderPicker({ onImport: (rows) => imported.push(rows) })
+  assert.equal(view.hint(), '请先选择来源')
   await view.select(1)
   assert.equal(view.button('加入明细').disabled, false)
+  assert.equal(view.hint(), '')
   await view.nextPage()
   await view.flush()
   assert.deepEqual(view.calls.map(({ params }) => params.offset), [0, 50], 'failure must not silently fetch the first page')
   assert.equal(document.querySelector('.ant-pagination-item-active').textContent, '1')
   assert.ok(document.querySelector('tr[data-row-key="1"]'))
   assert.equal(view.button('加入明细').disabled, true)
+  assert.equal(view.hint(), '资料加载失败，请重新加载')
   await view.act(async () => view.button('加入明细').click())
   assert.deepEqual(imported, [])
 
@@ -77,9 +80,13 @@ test('failed pages keep the displayed page and selections, block import, and ret
   await view.act(async () => view.button('重新加载').click())
   assert.deepEqual(view.calls.map(({ params }) => params.offset), [0, 50, 50])
   assert.equal(document.querySelector('.ant-pagination-item-active').textContent, '2')
+  assert.equal(view.hint(), '')
   await view.select(51)
   await view.act(async () => view.button('加入明细').click())
   assert.deepEqual(imported.map((rows) => rows.map((row) => row.id)), [[1, 51]])
+  await view.act(async () => view.button('清空已选').click())
+  assert.equal(view.hint(), '请先选择来源')
+  assert.equal(view.button('加入明细').disabled, true)
 })
 
 test('a changed account scope starts from the first page and clears earlier selections', async (t) => {
@@ -96,6 +103,7 @@ test('a changed account scope starts from the first page and clears earlier sele
   assert.equal(document.querySelector('.ant-pagination-item-active').textContent, '1')
   assert.equal(view.button('加入明细').disabled, true)
   assert.doesNotMatch(document.body.textContent, /原账号材料/u)
+  assert.equal(view.hint(), '请先选择来源')
 })
 
 test('candidate filters reset pagination and selections without refetching on equivalent renders', async (t) => {
@@ -112,6 +120,7 @@ test('candidate filters reset pagination and selections without refetching on eq
   ])
   assert.equal(view.button('加入明细').disabled, true)
   assert.doesNotMatch(document.body.textContent, /面料/u)
+  assert.equal(view.hint(), '请先选择来源')
 })
 
 test('revoking read access cancels an in-flight page and rejects its late response', async (t) => {
@@ -121,8 +130,10 @@ test('revoking read access cancels an in-flight page and rejects its late respon
   }))
   await view.renderPicker()
   assert.equal(view.calls.length, 1)
+  assert.equal(view.hint(), '正在加载，请稍候')
   await view.renderPicker({}, { id: 1, permissions: [], effective_session: { actions: [] } })
   assert.equal(view.calls[0].request.init.signal.aborted, true)
+  assert.equal(view.hint(), '当前账号无权查看可选资料')
   await view.act(async () => complete())
   assert.deepEqual(view.accepted, [])
   assert.doesNotMatch(document.body.textContent, /旧权限材料/u)
@@ -148,6 +159,21 @@ test('clearing a candidate filter restores the prompt and removes the query cond
   assert.equal(view.button('清空筛选').disabled, true)
   assert.equal(control.querySelector('.ant-select-selection-placeholder').textContent, '按库存分类筛选')
 })
+
+test('an empty failed material page exposes failure rather than claiming that no material exists', async (t) => {
+  let failed = true
+  const view = await harness(t, () => {
+    if (failed) throw new Error('模拟读取失败')
+    return { materials: [], total: 0, limit: 50, offset: 0 }
+  })
+  await view.renderPicker({ emptyDescription: '暂无可选材料' })
+  assert.equal(document.querySelector('.ant-empty-description').textContent, '资料加载失败，请重新加载')
+  assert.equal(view.button('加入明细').disabled, true)
+  failed = false
+  await view.act(async () => view.button('重新加载').click())
+  assert.equal(document.querySelector('.ant-empty-description').textContent, '暂无可选材料')
+})
+
 function completeMaterialPage(params, count = 251) {
   return {
     materials: Array.from({ length: Math.min(params.limit, Math.max(0, count - params.offset)) }, (_, index) => ({
@@ -225,14 +251,14 @@ test('clearing or closing during filtered selection aborts the batch and ignores
   await view.act(async () => view.button('清空已选').click())
   assert.equal(pending[0].request.init.signal.aborted, true)
   await view.act(async () => pending[0].resolve())
-  assert.match(view.button('加入明细').textContent, /（0 条）/u)
+  assert.match(document.body.textContent, /已选 0 条/u)
   assert.equal(view.accepted.length, 50, 'late batches cannot enter the shared reference cache')
   await view.act(async () => allFilteredButton().click())
   await view.renderPicker({ open: false })
   assert.equal(pending[1].request.init.signal.aborted, true)
   await view.act(async () => pending[1].resolve())
   await view.renderPicker({ open: true })
-  assert.match(view.button('加入明细').textContent, /（0 条）/u)
+  assert.match(document.body.textContent, /已选 0 条/u)
 })
 
 test('changing category during filtered selection aborts the old query while retaining earlier selections', async (t) => {
@@ -269,5 +295,5 @@ test('revoking permission during filtered selection discards the batch and its c
   assert.equal(view.accepted.length, 50)
   assert.equal(view.button('加入明细').disabled, true)
   assert.equal(Boolean(allFilteredButton()), false)
-  assert.equal(document.querySelectorAll('.ant-table-row').length, 0)
+  assert.equal(view.hint(), '当前账号无权查看可选资料')
 })

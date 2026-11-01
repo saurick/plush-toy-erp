@@ -219,7 +219,7 @@ function isMigrationSql(file) {
 }
 
 function isSchemaFile(file) {
-  return /^server\/internal\/data\/model\/schema\//u.test(file);
+  return /^server\/internal\/data\/model\/schema\/.*\.go$/u.test(file) && !file.endsWith("_test.go");
 }
 
 function isGeneratedEntFile(file) {
@@ -242,9 +242,41 @@ function schemaDiffText(root, file, range, untrackedFiles, unified = 0) {
 }
 
 function schemaDiffRequiresMigration(root, file, range, untrackedFiles) {
+  if (!untrackedFiles.has(file) && existsSync(path.join(root, file))) {
+    let before;
+    try {
+      before = baselineSource(root, file, range);
+    } catch {
+      // A newly tracked schema has no baseline and still needs ordinary proof.
+      return STRUCTURAL_SCHEMA_CHANGE.test(schemaDiffText(root, file, range, untrackedFiles));
+    }
+    const after = readFileSync(path.join(root, file), "utf8");
+    if (postgresSchemaWithoutStringValidation(before) === postgresSchemaWithoutStringValidation(after)) {
+      return false;
+    }
+  }
   return STRUCTURAL_SCHEMA_CHANGE.test(
     schemaDiffText(root, file, range, untrackedFiles),
   );
+}
+
+function postgresSchemaWithoutStringValidation(source) {
+  let normalized = source.replace(/^\s*corevalue\s+"server\/internal\/core\/value"[^\S\r\n]*$/gmu, "");
+  const builders = [...normalized.matchAll(/\bfield\.String\(\s*"[a-z0-9_]+"/gu)];
+  for (const match of builders.reverse()) {
+    const expression = fieldBuilderExpression(normalized, match.index);
+    let chain = normalizeGoBuilderChain(expression);
+    // Ent's PostgreSQL varchar mapping has no physical length limit. Keep text
+    // thresholds and explicit database types conservative; see schema-doc.
+    if (!/\.(?:SchemaType|GoType)\(/u.test(chain)) {
+      chain = chain.replace(/\.MaxLen\((\d+)\)/gu, (modifier, size) =>
+        Number(size) > 0 && Number(size) <= 10485760 ? "" : modifier,
+      );
+    }
+    chain = chain.replace(/\.Validate\([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\)/gu, "");
+    normalized = normalized.slice(0, match.index) + chain + normalized.slice(match.index + expression.length);
+  }
+  return normalizeGoBuilderChain(normalized);
 }
 
 function isEntRuntimeMetadataOnlyChange(root, file, range, untrackedFiles) {

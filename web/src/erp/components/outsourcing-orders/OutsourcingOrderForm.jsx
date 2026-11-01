@@ -12,6 +12,7 @@ import {
   InputNumber,
   Space,
 } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
@@ -52,6 +53,7 @@ import {
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
 import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx'
+import { productSKUOption, referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 
 const OUTSOURCING_ORDER_COLUMNS = [
   { label: '产品订单编号', width: 155 },
@@ -142,6 +144,7 @@ export function productSKULabel(productSKU = {}) {
   return (
     [
       productSKU.sku_code,
+      productSKU.sku_name,
       productSKU.color,
       productSKU.size,
       productSKU.customer_sku,
@@ -252,9 +255,8 @@ export default function OutsourcingOrderForm({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          extra="保存后固定为本单付款条件，不随加工厂档案调整。"
           name="payment_term_days"
-          label="付款周期（天）"
+          label={<BusinessHelpLabel label="付款周期（天）" description="保存后固定为本单付款条件，不随加工厂档案调整。" />}
           rules={[
             { required: true, message: '请填写付款周期' },
             {
@@ -312,6 +314,19 @@ export default function OutsourcingOrderForm({
         layout="content"
       >
         <BusinessLineItemsSection
+          grouping={{
+            form,
+            getGroup: (item) => {
+              const material = item.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+              const subjectID = material ? item.material_id : item.product_id
+              const label = referenceLabel(material ? materialOptions : productOptions, subjectID, material ? '待选择材料' : item.product_name_snapshot || '待选择产品')
+              return {
+                key: subjectID && item.process_id ? `${item.subject_type}:${subjectID}:${item.process_id}` : undefined,
+                label,
+                title: `${label} · ${referenceLabel(processOptions, item.process_id, '待选择工序')}`,
+              }
+            },
+          }}
           columns={OUTSOURCING_ORDER_COLUMNS}
           title="加工明细"
           description="加工项目填写部位或内容（如脸*1、耳*2），工序选择电绣、激光等加工方式。"
@@ -321,12 +336,7 @@ export default function OutsourcingOrderForm({
               key={field.key}
               index={index}
               rowRef={(node) => registerLineItemRow(index, node)}
-              name={['items', field.name]}
               detailsLabel="规格与行备注"
-              summaryFields={[
-                { key: 'sku_code_snapshot', label: '规格' },
-                { key: 'note', label: '备注' },
-              ]}
               actions={
                 <Space
                   className="erp-sales-order-lines-form__row-actions"
@@ -534,6 +544,7 @@ export default function OutsourcingOrderForm({
                   tooltip="提交前必填"
                 >
                   <BusinessTextArea
+                    minRows={1}
                     allowClear
                     maxLength={255}
                     placeholder="如 脸*1"
@@ -712,6 +723,7 @@ export default function OutsourcingOrderForm({
                       )
                       .map((item) => ({
                         value: item.id,
+                        ...productSKUOption(item),
                         label: productSKULabel(item),
                         disabled:
                           item.is_active === false ||
@@ -756,7 +768,7 @@ export default function OutsourcingOrderForm({
                   name={[field.name, 'note']}
                   label="行备注"
                 >
-                  <BusinessTextArea allowClear showCount maxLength={255} />
+                  <BusinessTextArea allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
                 </Form.Item>
               </div>
             </BusinessLineItemRow>
@@ -938,7 +950,7 @@ export default function OutsourcingOrderForm({
           name="note"
           label="备注"
         >
-          <BusinessTextArea allowClear showCount maxLength={255} />
+          <BusinessTextArea minRows={2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
         </Form.Item>
         {attachmentPanel}
       </BusinessFormSection>

@@ -24,9 +24,9 @@ func terminalRecoveryFixture(t *testing.T, db *sql.DB, target bool) *sql.Tx {
 	}
 	_, err = tx.ExecContext(ctx, `CREATE TEMP TABLE admin_users(id bigint,username text) ON COMMIT DROP;
 INSERT INTO admin_users VALUES(17,'original_assignee');
-INSERT INTO workflow_tasks(id,task_code,task_group,task_name,source_type,source_id,task_status_key,owner_role_key,version,assignee_id,payload,created_at,updated_at)
-VALUES(1,'recovery-one','handoff_purchase_arrival','arrival','purchase_order',10,'done','quality',2,17,'{"source_task_intent_hash":"original-one"}','2026-10-01','2026-10-02'),
-(2,'recovery-two','handoff_production_completion','completion','production_wip_batch',20,'done','production',2,NULL,'{"source_task_intent_hash":"original-two"}','2026-10-01','2026-10-02');
+INSERT INTO workflow_tasks(id,task_no,task_code,task_group,task_name,source_type,source_id,task_status_key,owner_role_key,version,assignee_id,payload,created_at,updated_at)
+VALUES(1,'RW20261001-0001','recovery-one','handoff_purchase_arrival','arrival','purchase_order',10,'done','quality',2,17,'{"source_task_intent_hash":"original-one"}','2026-10-01','2026-10-02'),
+(2,'RW20261001-0002','recovery-two','handoff_production_completion','completion','production_wip_batch',20,'done','production',2,NULL,'{"source_task_intent_hash":"original-two"}','2026-10-01','2026-10-02');
 INSERT INTO workflow_task_events(id,task_id,task_version,event_type,from_status_key,to_status_key,actor_id,payload,created_at)
 VALUES(1,1,2,'status_changed','ready','done',99,'{"source_action":"purchase_receipt"}','2026-10-02'),
 (2,2,2,'status_changed','ready','done',99,'{"source_action":"production_completion"}','2026-10-02');

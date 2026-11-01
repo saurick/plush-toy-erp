@@ -35,10 +35,17 @@ test('BOM edit fails closed until complete line details are loaded', () => {
   assert.match(bomEditor, /disabled:[^\n]*!referencesReady/u)
 })
 
-test('BOM create edit and view share visible fields while immutable identity stays locked', () => {
+test('BOM create edit copy and view share fields while immutable identity stays locked', () => {
   assert.match(bomEditor, /<BOMHeaderFormFields/u)
   assert.match(bomForm, /includeProduct = true/u)
-  assert.match(bomEditor, /productDisabled=\{editorMode === 'edit'/u)
+  assert.ok(
+    /productDisabled=\{\['edit', 'copy'\]\.includes\(editorMode\) \|\| \(inWorkspace && Boolean\(initialValues\?\.product_id\)\)\}/u.test(bomEditor),
+    'editing, copying and a product-bound workspace must lock the BOM product'
+  )
+  assert.ok(
+    /<BOMHeaderFormFields[^>]*disabled=\{!writable\}/u.test(bomEditor),
+    'read-only BOMs must keep all header fields locked'
+  )
   assert.match(bomForm, /disabled=\{disabled \|\| productDisabled\}/u)
   assert.match(bomEditor, /canWithdraw=\{writable && canUpdate\}/u)
 })

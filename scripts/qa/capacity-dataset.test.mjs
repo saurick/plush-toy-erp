@@ -28,7 +28,12 @@ test("capacity SQL stays simulated, fixed-size, and leaves Fact rows draft", () 
   assert.doesNotMatch(sql, /simulated_only|real_customer_data|trial_task/u);
   assert.match(sql, /'DRAFT'/u);
   assert.match(sql, /'production_ready'/u);
-  assert.doesNotMatch(sql, /\bUPDATE\b|\bDELETE\b|INSERT INTO business_attachments/u);
+  assert.deepEqual([...sql.matchAll(/\bUPDATE\s+([^\n;]+)/gu)].map((match) => match[1]), [
+    'SET last_value = workflow_task_number_counters.last_value + EXCLUDED.last_value',
+  ]);
+  assert.doesNotMatch(sql, /\bDELETE\b|INSERT INTO business_attachments/u);
+  assert.match(sql, /INSERT INTO workflow_tasks \(\s*task_no,/u);
+  assert.match(sql, /RETURNING last_value - task_number_count INTO task_number_base/u);
   for (const minimum of Object.values(CAPACITY_DATASET_TARGETS).filter((value) => value !== CAPACITY_DATASET_TARGETS.attachments)) {
     assert.match(sql, new RegExp(String(minimum), "u"));
   }

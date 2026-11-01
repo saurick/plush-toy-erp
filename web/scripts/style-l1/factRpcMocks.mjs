@@ -16,7 +16,7 @@ import {
   requireWorkflowTaskMutationParams,
   workflowTaskMutationSignature,
 } from '../../src/erp/utils/workflowTaskMutation.mjs'
-import { buildWorkflowTaskBoardMock } from '../../src/mocks/workflowTaskBoardMock.mjs'
+import { buildWorkflowTaskBoardMock, workflowTaskMockNumberKeyword } from '../../src/mocks/workflowTaskBoardMock.mjs'
 import { purchaseReceiptMutationSignature } from '../../src/erp/utils/purchaseReceiptMutation.mjs'
 import {
   stylePaginatedRpcData,
@@ -212,6 +212,14 @@ export function mockShipmentSourceCandidates(params = {}, candidates = []) {
   })
   return {
     shipment_source_candidates: filtered.slice(offset, offset + limit),
+    source_orders: [...new Map(candidates.filter((candidate) => params.selectable === undefined || candidate.selectable === params.selectable).map((candidate) => [candidate.sales_order_id, {
+      sales_order_id: candidate.sales_order_id,
+      order_no: candidate.order_no,
+      customer_id: candidate.customer_id,
+      customer_code: candidate.customer_snapshot?.code || 'CUS-STYLE-L1',
+      customer_name: candidate.customer_name,
+      customer_name_snapshot: candidate.customer_snapshot?.name || '',
+    }])).values()],
     total: filtered.length,
     limit,
     offset,
@@ -2382,6 +2390,7 @@ export async function installFactRpcMocks(page, context) {
             {
               id: taskID * 10,
               task_id: taskID,
+              ...(params.scope === 'flow' ? { task: { id: task.id, task_name: task.task_name, task_group: task.task_group, owner_role_key: task.owner_role_key, required_capability_key: task.required_capability_key || null, source_type: task.source_type, source_id: task.source_id } } : {}),
               event_type: 'created',
               from_status_key: '',
               to_status_key: task.task_status_key,
@@ -2666,6 +2675,11 @@ export async function installFactRpcMocks(page, context) {
             { return false }
           if (
             keyword &&
+            workflowTaskMockNumberKeyword(keyword) &&
+            String(task.task_no || '').toUpperCase() !== workflowTaskMockNumberKeyword(keyword)
+          ) return false
+          if (
+            keyword && !workflowTaskMockNumberKeyword(keyword) &&
             ![
               task.task_name,
               task.source_no,

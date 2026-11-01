@@ -63,7 +63,7 @@ func TestEngineeringWorkspaceFromCustomerDemandToMaterialSubmission(t *testing.T
 	}
 	date := time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC)
 	end := date.AddDate(0, 0, 1)
-	header := &biz.BOMVersionMutation{ProductID: product.ID, BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "WORKSPACE-BOM", EffectiveFrom: &date, EffectiveTo: &end, SourceOrderNo: str("WORKSPACE-SO"), QuantityText: str("102"), SpareText: str("2"), PrintDate: &date, Designer: str("工程甲"), Maker: str("制表乙"), Auditor: str("审核丙"), HairDirection: str("向下"), Note: str("按确认样")}}
+	header := &biz.BOMVersionMutation{ProductID: product.ID, BOMHeaderUpdate: biz.BOMHeaderUpdate{EffectiveFrom: &date, EffectiveTo: &end, SourceOrderNo: str("WORKSPACE-SO"), QuantityText: str("102"), SpareText: str("2"), PrintDate: &date, Designer: str("工程甲"), Maker: str("制表乙"), Auditor: str("审核丙"), HairDirection: str("向下"), Note: str("按确认样")}}
 	bom, err := inventory.SaveBOMWithItems(ctx, 0, header, nil)
 	if err != nil {
 		t.Fatal(err)

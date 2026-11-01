@@ -25,6 +25,7 @@
 .workflow-task-event-trail__head p,
 .workflow-task-event-trail__state,
 .workflow-task-event-trail__meta,
+.workflow-task-event-trail__source,
 .workflow-task-event-trail__transition,
 .workflow-task-event-trail__reason {
   margin: 0;
@@ -165,11 +166,21 @@
 }
 
 .workflow-task-event-trail__meta,
+.workflow-task-event-trail__source,
 .workflow-task-event-trail__transition {
   margin-top: 3px;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
   line-height: 1.5;
+}
+
+.workflow-task-event-trail__scope {
+  justify-self: start;
+  max-width: 100%;
+}
+
+.workflow-task-event-trail__source {
+  overflow-wrap: anywhere;
 }
 
 .workflow-task-event-trail__meta {

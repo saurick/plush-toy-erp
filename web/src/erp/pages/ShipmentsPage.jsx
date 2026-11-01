@@ -37,7 +37,6 @@ import { shipmentApprovalPath } from '../utils/shipmentApproval.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import {
   ShipmentStatus,
-  SalesOrderStatus,
   SalesOrderItemStatus,
   ShipmentFinanceReleaseStatus,
   OperationalFactStatus,
@@ -100,6 +99,11 @@ import ShipmentEditor, {
 } from '../components/shipments/ShipmentEditor.jsx'
 import ShipmentTaskItems from '../components/shipments/ShipmentTaskItems.jsx'
 import { submitShipmentDraft } from '../components/shipments/submitShipmentDraft.mjs'
+import {
+  canUndoShipmentSourceImport,
+  createShipmentSourceImportUndo,
+  shipmentSourceImportSnapshot,
+} from '../utils/shipmentSourceImportUndo.mjs'
 import ShipmentFinanceSourceModal from '../components/shipments/ShipmentFinanceSourceModal.jsx'
 import ShipmentQualityInspectionModal from '../components/quality-inspections/ShipmentQualityInspectionModal.jsx'
 import ProductIdentity, { ProductThumbnail } from '../components/master-data/ProductIdentity.jsx'
@@ -195,6 +199,7 @@ import {
   normalizeShipmentSourceCandidate,
   loadShipmentSourceSelection,
   shipmentSourceCandidateListParams,
+  shipmentSourceFilterOptions,
   shipmentSourceOrderFromCandidate,
 } from '../utils/shipmentSourceCandidate.mjs'
 
@@ -359,6 +364,18 @@ export default function ShipmentsPage() {
   const [sourceLoading, setSourceLoading] = useState(false)
   const [salesOrderImportOpen, setSalesOrderImportOpen] = useState(false)
   const [shipmentForm] = Form.useForm()
+  const [sourceImportUndo, setSourceImportUndo] = useState(null)
+  const sourceImportSnapshot = Form.useWatch(shipmentSourceImportSnapshot, {
+    form: shipmentForm,
+    preserve: true,
+  })
+  useEffect(() => {
+    setSourceImportUndo((current) => {
+      if (!current || current.invalidated ||
+        canUndoShipmentSourceImport(current, shipmentForm.getFieldsValue(true))) return current
+      return { ...current, invalidated: true }
+    })
+  }, [shipmentForm, sourceImportSnapshot])
   const shipmentAttachmentRef = useRef(null)
   const financeSourceAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
@@ -367,6 +384,7 @@ export default function ShipmentsPage() {
   const qualitySourceInFlightRef = useRef(false)
   const salesOrderSourceQueryRef = useRef({ keyword: '', page: 1 })
   const [salesOrderSourceFilters, setSalesOrderSourceFilters] = useState({ selectable: true })
+  const [salesOrderSourceOrders, setSalesOrderSourceOrders] = useState([])
   const selectedSalesOrderID = Form.useWatch('sales_order_id', shipmentForm)
   const routeSalesOrderID = searchParamPositiveInt(
     searchParams,
@@ -600,6 +618,12 @@ export default function ShipmentsPage() {
     () => uniqueReferenceOptions(salesOrders, salesOrderOption),
     [salesOrders]
   )
+  const salesOrderSourceFilterOptions = useMemo(() => shipmentSourceFilterOptions(salesOrderSourceOrders, {
+    customerID: salesOrderSourceFilters.customerID,
+    salesOrderID: salesOrderSourceFilters.salesOrderID,
+    customerOptions,
+    salesOrderOptions,
+  }), [salesOrderSourceOrders, salesOrderSourceFilters, customerOptions, salesOrderOptions])
   const salesOrdersByID = useMemo(
     () =>
       new Map(
@@ -911,7 +935,7 @@ export default function ShipmentsPage() {
           pageSize: SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE,
           salesOrderID: shipmentForm.getFieldValue('sales_order_id') || filters.salesOrderID,
           customerID: filters.customerID,
-          selectable: filters.selectable,
+          selectable: filters.selectable !== false,
         })
         const data = await listShipmentSourceCandidates(params, {
           signal: request.signal,
@@ -920,6 +944,7 @@ export default function ShipmentsPage() {
         const nextSourceRows = data.shipment_source_candidates.map(
           normalizeShipmentSourceCandidate
         )
+        setSalesOrderSourceOrders(data.source_orders)
         setSalesOrderSources(nextSourceRows)
         setSalesOrderSourceTotal(data.total)
         acceptSalesOrderSourceRows(nextSourceRows)
@@ -949,7 +974,7 @@ export default function ShipmentsPage() {
         keyword,
         salesOrderID: shipmentForm.getFieldValue('sales_order_id') || filters.salesOrderID,
         customerID: filters.customerID,
-        selectable: filters.selectable,
+        selectable: filters.selectable !== false,
       })
       const rows = await loadShipmentSourceSelection(listShipmentSourceCandidates, params, { signal, expectedTotal })
       if (!signal.aborted) acceptSalesOrderSourceRows(rows)
@@ -996,6 +1021,7 @@ export default function ShipmentsPage() {
     }
     setSalesOrderSources([])
     setSalesOrderSourceItems([])
+    setSalesOrderSourceOrders([])
     setShipmentSourceRows([])
     setSalesOrderSourceTotal(0)
     setSalesOrderSourceCurrent(1)
@@ -1008,6 +1034,8 @@ export default function ShipmentsPage() {
   }
 
   const importSalesOrderToShipment = async (sourceItems = []) => {
+    if (!canImportSalesOrderSource || saving || taskDraftSavingRef.current ||
+      !(isCreateModal ? canCreate : isEditModal && canUpdate)) return
     const importableItems = sourceItems.filter(
       (item) =>
         item.selectable === true &&
@@ -1037,6 +1065,18 @@ export default function ShipmentsPage() {
     }
     const sourceOrder = salesOrdersByID.get(sourceOrderID)
     if (!sourceOrder?.id) return
+    const before = shipmentForm.getFieldsValue(true)
+    const currentItems = (before.items || []).filter((item) => !isBlankShipmentItem(item))
+    const currentSourceItemIDs = new Set(
+      currentItems.map((item) => positiveInt(item?.sales_order_item_id)).filter(Boolean)
+    )
+    const newSourceItems = importableItems.filter(
+      (item) => !currentSourceItemIDs.has(positiveInt(item.id))
+    )
+    if (newSourceItems.length === 0) {
+      message.warning('所选销售订单来源行已在当前出货明细中')
+      return
+    }
     try {
       setSourceLoading(true)
       const sameOrderItems = salesOrderSourceItems.filter(
@@ -1050,23 +1090,8 @@ export default function ShipmentsPage() {
         ...(currentSourceOrderID
           ? {}
           : deliverySnapshotFormValues(sourceOrder.delivery_snapshot)),
-      })
-      const currentItems = (shipmentForm.getFieldValue('items') || []).filter(
-        (item) => !isBlankShipmentItem(item)
-      )
-      const currentSourceItemIDs = new Set(
-        currentItems
-          .map((item) => positiveInt(item?.sales_order_item_id))
-          .filter(Boolean)
-      )
-      const newSourceItems = importableItems.filter(
-        (item) => !currentSourceItemIDs.has(positiveInt(item.id))
-      )
-      if (newSourceItems.length === 0) {
-        message.warning('所选销售订单来源行已在当前出货明细中')
-        return
-      }
-      shipmentForm.setFieldsValue({
+        total_net_weight_g: undefined,
+        total_net_weight_items_signature: undefined,
         items: [
           ...currentItems,
           ...newSourceItems.map((item) =>
@@ -1076,6 +1101,13 @@ export default function ShipmentsPage() {
           ),
         ],
       })
+      setSourceImportUndo({
+        ...createShipmentSourceImportUndo(before, shipmentForm.getFieldsValue(true)),
+        salesOrderItems: structuredClone(salesOrderItems),
+      })
+      if (String(before.total_net_weight_g ?? '').trim()) {
+        message.warning('出货明细已变更，旧人工总净重已清空；撤销本次导入可恢复')
+      }
       message.success('已导入销售订单来源行和剩余可出货数量')
       setSalesOrderImportOpen(false)
     } catch (error) {
@@ -1085,7 +1117,28 @@ export default function ShipmentsPage() {
     }
   }
 
+  const undoSourceImport = () => {
+    if (saving || sourceLoading || taskDraftSavingRef.current || !canImportSalesOrderSource ||
+      !(isCreateModal ? canCreate : isEditModal && canUpdate)) return false
+    if (!canUndoShipmentSourceImport(sourceImportUndo, shipmentForm.getFieldsValue(true))) {
+      setSourceImportUndo((current) => current ? { ...current, invalidated: true } : null)
+      return false
+    }
+    shipmentForm.setFieldsValue(structuredClone(sourceImportUndo.values))
+    setSalesOrderItems(sourceImportUndo.salesOrderItems)
+    setSourceImportUndo(null)
+    message.success('已撤销本次导入，原有明细和无关填写已保留')
+    return true
+  }
+
+  useEffect(() => {
+    if (!canImportSalesOrderSource || !(isCreateModal ? canCreate : isEditModal && canUpdate)) {
+      setSourceImportUndo(null)
+    }
+  }, [canImportSalesOrderSource, canCreate, canUpdate, isCreateModal, isEditModal])
+
   const resetShipmentSourceSelectionState = useCallback(() => {
+    setSourceImportUndo(null)
     setSalesOrderItems([])
     setSalesOrderSources([])
     setSalesOrderSourceItems([])
@@ -1222,6 +1275,7 @@ export default function ShipmentsPage() {
     setSaving,
     saveShipmentDraft,
     createShipmentWithItems,
+    invalidateSourceImportUndo: () => setSourceImportUndo(null),
     shipmentAttachmentRef,
     getShipment,
     shipmentFormValues,
@@ -2066,6 +2120,8 @@ export default function ShipmentsPage() {
         customerOptions={customerOptions}
         form={shipmentForm}
         importSalesOrderToShipment={importSalesOrderToShipment}
+        sourceImportUndoState={sourceImportUndo ? sourceImportUndo.invalidated ? 'changed' : 'ready' : ''}
+        onUndoSourceImport={undoSourceImport}
         inventoryLots={inventoryLots}
         inventoryLotOptions={inventoryLotOptions}
         isCreateModal={isCreateModal}
@@ -2085,18 +2141,17 @@ export default function ShipmentsPage() {
         salesOrderItemOptions={salesOrderItemOptions}
         salesOrderOptions={salesOrderOptions}
         salesOrderSourceFilters={salesOrderSourceFilters}
-        salesOrderSourceOrderOptions={salesOrders.filter((order) => order.lifecycle_status === SalesOrderStatus.ACTIVE &&
-          (!salesOrderSourceFilters.customerID || order.customer_id === salesOrderSourceFilters.customerID)).map(salesOrderOption).filter(Boolean)}
-        onSalesOrderSourceFiltersChange={(filters) => {
+        salesOrderSourceOrderOptions={salesOrderSourceFilterOptions.orders}
+        salesOrderSourceCustomerOptions={salesOrderSourceFilterOptions.customers}
+        onSalesOrderSourceFiltersChange={(filters, { keyword = salesOrderSourceQueryRef.current.keyword } = {}) => {
           setSalesOrderSourceFilters(filters)
-          loadSalesOrderSources({ ...salesOrderSourceQueryRef.current, page: 1, filters })
+          loadSalesOrderSources({ keyword, page: 1, filters })
         }}
         salesOrderSourceCurrent={salesOrderSourceCurrent}
         salesOrderSourceEmptyDescription={
-          salesOrderSourceLoadFailed
-            ? '加载失败，请重新搜索或关闭后重试'
-            : '暂无可导入销售订单行'
+          salesOrderSourceFilters.selectable === false ? '当前范围没有不可导入明细' : '暂无可导入销售订单行'
         }
+        salesOrderSourceLoadError={salesOrderSourceLoadFailed ? '销售订单来源加载失败，请重新加载' : undefined}
         salesOrderSourceImportDisabled={salesOrderSourceLoadFailed}
         salesOrderSourcePageSize={SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE}
         salesOrderSourceTotal={salesOrderSourceTotal}

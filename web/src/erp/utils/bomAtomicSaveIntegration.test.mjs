@@ -22,7 +22,7 @@ test('BOM form saves header and authoritative items through one aggregate RPC', 
   assert.match(editorSource, /saveBOMWithItems\(\{/u)
   assert.match(
     editorSource,
-    /expected_version:\s*detail\.edit_version/u
+    /expected_version:\s*saved\.edit_version/u
   )
   assert.match(editorSource, /items:[^\n]*values\.items/u)
 })
@@ -44,6 +44,7 @@ test('BOM form is mounted before open handlers initialize its form instance', as
   assert.match(pageSource, /<BOMEditor[\s\S]*open=\{headerModalOpen\}/u)
   assert.match(editorSource, /<Form[^>]*form=\{form\}/u)
   const ui = await createReactTestHarness(t)
+  const { ERPThemeProvider } = await import('../../common/theme/erpTheme.jsx')
   const [{ Form, Input }, { createMemoryRouter, RouterProvider }, { default: Page }] = await Promise.all([
     import('antd'), import('react-router-dom'), import('../components/business-list/BusinessFormPage.jsx'),
   ])
@@ -58,7 +59,7 @@ test('BOM form is mounted before open handlers initialize its form instance', as
   }
   const router = createMemoryRouter([{ path: '*', element: h(Editor) }])
   t.after(() => router.dispose())
-  await ui.render(h(RouterProvider, { router, future: { v7_startTransition: true } }))
+  await ui.render(h(ERPThemeProvider, null, h(RouterProvider, { router, future: { v7_startTransition: true } })))
   const field = ui.container.querySelector('input[aria-label="BOM 版本"]')
   assert.equal(Boolean(field), true, 'the actual form field is mounted while its page is closed')
   await ui.act(async () => { form.setFieldsValue({ version: 'BOM-初始化验证' }); openEditor(true) })
@@ -71,7 +72,6 @@ test('BOM form is mounted before open handlers initialize its form instance', as
 
 test('BOM copy and catalog source choices are not truncated by fixed page limits', () => {
   for (const completeReader of [
-    'listAllBOMVersions',
     'listAllMaterials',
     'listAllProducts',
     'listAllUnits',

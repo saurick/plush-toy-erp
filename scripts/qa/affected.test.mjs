@@ -41,12 +41,16 @@ test("preview themes select development and built-entry isolation checks", () =>
 test("select overflow changes retain the shared sample and real form follow-ups", () => {
   for (const file of [
     "web/src/common/components/select/AppSelect.jsx",
-    "web/src/common/components/select/SelectValueDisclosure.jsx",
+    "web/src/common/components/select/useSelectPopupWidth.mjs",
+    "web/src/common/components/select/SelectPresentationContext.jsx",
+    "web/src/erp/utils/referenceSelectOptions.mjs",
+    "web/src/erp/components/business-list/BusinessLineItemsTable.jsx",
+    "web/src/erp/components/business-list/BusinessCompactFieldTable.jsx",
     "web/src/common/components/select/app-select.css",
     "web/src/dev-workbench/components/DevSelectValueExample.jsx",
     "web/src/dev-workbench/components/devSelectValueExample.css",
     "web/src/dev-workbench/components/DevControlStandards.jsx",
-    "web/scripts/style-l1/selectValueDisclosureScenarios.mjs",
+    "web/scripts/style-l1/selectOverflowScenarios.mjs",
   ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const text = plan.followUps.find((item) => item.id === "browser-regression")?.text || "";

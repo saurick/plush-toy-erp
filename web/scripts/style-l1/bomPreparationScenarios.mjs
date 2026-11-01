@@ -90,7 +90,7 @@ export function createBOMPreparationScenarios(deps) {
           }
           if (method === 'save_bom_with_items') {
             writes.push({ method, params })
-            const record = { ...structuredClone(original), ...params, id: params.id || 4, edit_version: original.edit_version + 1, status: 'DRAFT' }
+            const record = { ...structuredClone(original), ...params, id: params.id || 4, version: params.id ? records.find((bom) => bom.id === params.id).version : 'V1', edit_version: original.edit_version + 1, status: 'DRAFT' }
             records = [...records.filter((bom) => bom.id !== record.id), record]
             return reply(route, id, { bom_version: record })
           }
@@ -153,7 +153,7 @@ export function createBOMPreparationScenarios(deps) {
           if (mode === 'create') {
             deps.assert.equal(await editor.getByLabel('来源订单号', { exact: true }).inputValue(), orderNo)
             deps.assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '102')
-            await editor.getByLabel('BOM 版本', { exact: true }).fill('V1')
+            deps.assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
           } else {
             deps.assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), mode === 'multiple' ? 'V3' : 'V2')
           }

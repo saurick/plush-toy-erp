@@ -27,8 +27,8 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	adminCtx := workflowJSONRPCAdminContext()
 
 	_, invalidDateRes, err := j.handleBOM(adminCtx, "save_bom_with_items", "invalid-date", mustJSONRPCStruct(t, map[string]any{
-		"product_id":     float64(fixtures.productID),
-		"version":        "BAD-DATE",
+		"product_id": float64(fixtures.productID),
+
 		"effective_from": "2026-06-17",
 		"effective_to":   "2026-06-02",
 	}))
@@ -40,8 +40,8 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	}
 
 	_, draftRes, err := j.handleBOM(adminCtx, "save_bom_with_items", "1", mustJSONRPCStruct(t, map[string]any{
-		"product_id":      float64(fixtures.productID),
-		"version":         "V1",
+		"product_id": float64(fixtures.productID),
+
 		"source_order_no": "WL260102",
 		"quantity_text":   "3030",
 		"spare_text":      "备品 30",
@@ -108,8 +108,8 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 		"id":               float64(headerID),
 		"expected_version": active["edit_version"],
 		"product_id":       float64(fixtures.productID),
-		"version":          "V1",
-		"items":            []any{},
+
+		"items": []any{},
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -121,12 +121,14 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	_, copyRes, err := j.handleBOM(adminCtx, "copy_bom_version", "5", mustJSONRPCStruct(t, map[string]any{
 		"source_id":  float64(headerID),
 		"product_id": float64(fixtures.productID),
-		"version":    "V2",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	copyVersion := jsonRPCNestedMap(t, copyRes, "bom_version")
+	if copyVersion["version"] != "V2" || draft["version"] != "V1" {
+		t.Fatalf("expected automatic V1 then V2: %v %v", draft["version"], copyVersion["version"])
+	}
 	copyID := jsonRPCInt(t, copyVersion, "id")
 	if status := copyVersion["status"]; status != biz.BOMStatusDraft {
 		t.Fatalf("expected copied version draft, got %#v", status)
@@ -180,7 +182,6 @@ func TestJsonrpcDispatcher_BOMAPIRequiresDedicatedPermissions(t *testing.T) {
 
 	_, createRes, err := j.handleBOM(workflowJSONRPCAdminContext(), "save_bom_with_items", "1", mustJSONRPCStruct(t, map[string]any{
 		"product_id": float64(1),
-		"version":    "V1",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -209,8 +210,8 @@ func TestJsonrpcDispatcher_BOMAggregateSaveRequiresExpectedVersionAndMapsConflic
 	))
 	adminCtx := workflowJSONRPCAdminContext()
 	baseParams := map[string]any{
-		"product_id":    float64(fixtures.productID),
-		"version":       "CAS-V1",
+		"product_id": float64(fixtures.productID),
+
 		"quantity_text": "100",
 		"items": []any{map[string]any{
 			"material_id":          float64(fixtures.materialID),
@@ -256,13 +257,16 @@ func TestJsonrpcDispatcher_BOMAggregateSaveRequiresExpectedVersionAndMapsConflic
 	}
 	updateParams["id"] = float64(headerID)
 	updateParams["expected_version"] = expectedVersion
-	updateParams["version"] = "CAS-V2"
+
 	_, updateResult, err := j.handleBOM(adminCtx, "save_bom_with_items", "update", mustJSONRPCStruct(t, updateParams))
 	if err != nil || updateResult == nil || updateResult.Code != errcode.OK.Code {
 		t.Fatalf("update aggregate BOM result=%#v err=%v", updateResult, err)
 	}
 
-	updateParams["version"] = "CAS-STALE"
+	if version := jsonRPCNestedMap(t, updateResult, "bom_version")["version"]; version != created["version"] {
+		t.Fatalf("draft update changed version: %v", version)
+	}
+
 	_, staleResult, err := j.handleBOM(adminCtx, "save_bom_with_items", "stale", mustJSONRPCStruct(t, updateParams))
 	if err != nil || staleResult == nil || staleResult.Code != errcode.ResourceVersionConflict.Code || staleResult.Message != errcode.ResourceVersionConflict.Message {
 		t.Fatalf("stale aggregate BOM result=%#v err=%v", staleResult, err)
@@ -277,6 +281,17 @@ func TestBOMPrecisionTransportRequiresExactDecimalStrings(t *testing.T) {
 		item, ok := bomItemUpdateFromParams(map[string]any{"quantity": tc.quantity, "loss_rate": "0.0000001234567890123456789"})
 		if ok != tc.valid || ok && item.LossRate.String() != "0.0000001234567890123456789" {
 			t.Fatalf("BOM transport %v accepted=%v, want %v", tc.quantity, ok, tc.valid)
+		}
+	}
+}
+
+func TestBOMVersionInputIsRejected(t *testing.T) {
+	for _, value := range []any{"V99", "", nil, 7} {
+		if _, ok := bomHeaderCreateFromParams(map[string]any{"version": value}); ok {
+			t.Fatalf("copy must reject client version %v", value)
+		}
+		if _, ok := bomVersionMutationFromParams(map[string]any{"version": value}); ok {
+			t.Fatalf("save must reject client version %v", value)
 		}
 	}
 }
@@ -296,7 +311,6 @@ func TestJsonrpcDispatcher_BOMAPIRequiresEnabledModule(t *testing.T) {
 	adminCtx := workflowJSONRPCAdminContext()
 	createParams := mustJSONRPCStruct(t, map[string]any{
 		"product_id": float64(fixtures.productID),
-		"version":    "MODULE-GATE-V1",
 	})
 
 	readOnlyConfig := customerConfigPublishParamsWithRevisionAndModuleState(
@@ -335,7 +349,7 @@ func TestJsonrpcDispatcher_BOMAPIRequiresEnabledModule(t *testing.T) {
 	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
 	enabledCreateParams := map[string]any{
 		"product_id": float64(fixtures.productID),
-		"version":    "MODULE-GATE-V1",
+
 		"items": []any{map[string]any{
 			"material_id": float64(fixtures.materialID),
 			"quantity":    "2",

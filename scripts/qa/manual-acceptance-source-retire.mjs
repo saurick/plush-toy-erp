@@ -376,7 +376,7 @@ function retirementIdentityAllowlists(plan) {
     outsourcingOrders: (records.outsourcingOrders || []).map(
       (item) => item.outsourcing_order_no,
     ),
-    bomVersions: (records.bomVersions || []).map((item) => item.version),
+    bomVersions: (records.bomVersions || []).map((item) => `${item.productRef}:${item.version}`),
     productSkus: (records.products || []).flatMap((product) =>
       (product.skus || []).map((item) => item.sku_code),
     ),
@@ -405,8 +405,10 @@ function retirementIdentityAllowlists(plan) {
   );
 }
 
-function assertExactRetirementSnapshot(datasetKey, items, allowlist) {
-  const identities = items.map((item) => itemIdentity(item));
+function assertExactRetirementSnapshot(datasetKey, items, allowlist, productCodes) {
+  const identities = items.map((item) => datasetKey === "bomVersions"
+    ? `${productCodes.get(Number(item.product_id))}:${item.version}`
+    : itemIdentity(item));
   const actual = new Set(identities);
   const duplicate = identities.find(
     (identity, index) => identities.indexOf(identity) !== index,
@@ -481,21 +483,17 @@ async function loadSnapshot({ plan, tokens, fetchImpl }) {
         backendURL: plan.backendURL,
         domain: spec.domain,
         method: spec.method,
-        params: { keyword: plan.prefix, active_only: false, limit: 200 },
+        params: { keyword: plan.prefix, active_only: false, limit: 200, ...(spec.key === "bomVersions" ? { lifecycle_scope: "all" } : {}) },
         token: tokens[spec.role],
         fetchImpl,
       });
-      return [
-        spec.key,
-        assertExactRetirementSnapshot(
-          spec.key,
-          data[spec.listKey] || [],
-          allowlists[spec.key],
-        ),
-      ];
+      return [spec.key, data[spec.listKey] || []];
     }),
   );
-  return Object.fromEntries(entries);
+  const snapshot = Object.fromEntries(entries);
+  const productCodes = new Map(snapshot.products.map((item) => [Number(item.id), item.code]));
+  for (const [key, items] of entries) assertExactRetirementSnapshot(key, items, allowlists[key], productCodes);
+  return snapshot;
 }
 
 function summarize(snapshot, actions) {

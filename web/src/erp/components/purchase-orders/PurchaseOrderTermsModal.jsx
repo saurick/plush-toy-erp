@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Form, InputNumber, Spin } from 'antd'
-import Table from '@/common/components/table/AppTable.jsx'
+import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.jsx'
+import BusinessCompactFieldTable, { BusinessCompactFieldRow } from '../business-list/BusinessCompactFieldTable.jsx'
 import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessModal from '../business-list/BusinessModal.jsx'
 import {
@@ -178,68 +179,49 @@ export default function PurchaseOrderTermsModal({
               <DateInput disabled={closed} />
             </Form.Item>
           </div>
-          <Table
-            rowKey="id"
-            size="small"
-            pagination={false}
-            dataSource={context?.items || []}
-            columns={[
-              {
-                title: '物料',
-                key: 'material',
-                render: (_, item) =>
-                  [item.material_code_snapshot, item.material_name_snapshot]
-                    .filter(Boolean)
-                    .join(' ') || '采购物料',
-              },
-              {
-                title: '采购数量',
-                key: 'quantity',
-                width: 130,
-                render: (_, item) =>
-                  `${item.purchased_quantity} ${referenceLabel(unitOptions, item.unit_id, '单位')}`,
-              },
-              ...(!deliveryOnly ? [{
-                title: context?.order.currency
-                  ? `单价（${context.order.currency}）`
-                  : '单价',
-                key: 'price',
-                width: 170,
-                render: (_, item, index) => (
-                  <Form.Item
-                    name={['items', index, 'unit_price']}
-                    rules={[{ required: true, message: '请填写单价' }]}
-                    style={{ marginBottom: 0 }}
-                  >
-                    <InputNumber
-                      aria-label={`第${index + 1}行单价`}
-                      min="0"
-                      stringMode
-                      disabled={item.unit_price != null}
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                ),
-              }] : []),
-              {
-                title: '明细预计到货',
-                key: 'arrival',
-                width: 170,
-                render: (_, item, index) => (
-                  <Form.Item
-                    name={['items', index, 'expected_arrival_date']}
-                    style={{ marginBottom: 0 }}
-                  >
-                    <DateInput
-                      aria-label={`第${index + 1}行预计到货日期`}
-                      disabled={closed}
-                    />
-                  </Form.Item>
-                ),
-              },
-            ]}
-            scroll={{ x: 680 }}
-          />
+          <BusinessGroupedLineItems
+            fields={(context?.items || []).map((item, index) => ({ key: item.id, name: index }))}
+            form={form}
+            table={BusinessCompactFieldTable}
+            getGroup={(value, field) => {
+              const item = context.items[field.name]
+              const label = [item.material_code_snapshot, item.material_name_snapshot].filter(Boolean).join(' ') || '采购物料'
+              return { key: item.material_id && item.unit_id ? `${item.material_id}:${item.unit_id}` : undefined, label }
+            }}
+            tableProps={{
+              label: '采购价格与交期明细',
+              showSequence: true,
+              columns: [
+                { label: '物料' },
+                { label: '采购数量', width: 130 },
+                ...(!deliveryOnly ? [{ label: context?.order.currency ? `单价（${context.order.currency}）` : '单价', width: 170 }] : []),
+                { label: '明细预计到货', width: 170 },
+              ],
+            }}
+          >
+            {(field) => {
+              const item = context.items[field.name]
+              const index = field.name
+              return (
+                <BusinessCompactFieldRow
+                  sequence={index + 1}
+                  label={`采购明细 ${index + 1}`}
+                  cells={[
+                    [item.material_code_snapshot, item.material_name_snapshot].filter(Boolean).join(' ') || '采购物料',
+                    `${item.purchased_quantity} ${referenceLabel(unitOptions, item.unit_id, '单位')}`,
+                    ...(!deliveryOnly ? [
+                      <Form.Item key="price" name={['items', index, 'unit_price']} rules={[{ required: true, message: '请填写单价' }]}>
+                        <InputNumber aria-label={`第${index + 1}行单价`} min="0" stringMode disabled={item.unit_price != null} />
+                      </Form.Item>,
+                    ] : []),
+                    <Form.Item key="arrival" name={['items', index, 'expected_arrival_date']}>
+                      <DateInput aria-label={`第${index + 1}行预计到货日期`} disabled={closed} />
+                    </Form.Item>,
+                  ]}
+                />
+              )
+            }}
+          </BusinessGroupedLineItems>
         </Form>
       </Spin>
     </BusinessModal>

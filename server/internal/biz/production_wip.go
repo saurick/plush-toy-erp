@@ -9,6 +9,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
+
+	corevalue "server/internal/core/value"
 
 	"github.com/shopspring/decimal"
 )
@@ -522,7 +525,7 @@ func normalizeProductionWIPAction(in ProductionWIPAction) (ProductionWIPAction, 
 	if in.ProductionOrderID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 || in.IdempotencyKey == "" || len(in.IdempotencyKey) > 128 ||
 		(in.Reason != nil && len(*in.Reason) > 255) ||
 		(in.PackagingVersionSnapshot != nil && len(*in.PackagingVersionSnapshot) > 128) ||
-		(in.Note != nil && len(*in.Note) > 255) {
+		(in.Note != nil && utf8.RuneCountInString(*in.Note) > corevalue.BusinessNoteMaxCharacters) {
 		return ProductionWIPAction{}, ErrBadParam
 	}
 	if in.Action == ProductionWIPActionConfirmPackagingMaterial {

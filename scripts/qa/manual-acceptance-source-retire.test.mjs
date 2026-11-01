@@ -53,6 +53,7 @@ function exactRetirementSnapshot(plan, { firstCustomerActive = false } = {}) {
     })),
     bom_versions: plan.records.bomVersions.map((item, index) => ({
       id: 4000 + index,
+      product_id: 8000 + plan.records.products.findIndex((product) => product.code === item.productRef),
       version: item.version,
       status: "ARCHIVED",
     })),

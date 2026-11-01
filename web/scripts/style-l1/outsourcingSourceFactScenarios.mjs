@@ -1,5 +1,6 @@
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { assertBusinessSectionInteractions } from './businessFormSectionAssertions.mjs'
+import { assertBusinessFormCorners } from './businessFormCornerAssertions.mjs'
 
 export function createOutsourcingSourceFactScenarios(deps) {
   const {
@@ -343,6 +344,7 @@ export function createOutsourcingSourceFactScenarios(deps) {
           )
         }
         await assertBusinessSectionInteractions(page, modal)
+        await assertBusinessFormCorners(page, modal)
         const modalText = String((await modal.innerText()) || '').replace(
           /\s+/gu,
           ' '

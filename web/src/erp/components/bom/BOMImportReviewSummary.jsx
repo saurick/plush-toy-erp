@@ -56,7 +56,7 @@ export default function BOMImportReviewSummary({ form, review, productOptions })
           </span>
           <span>
             {review.detailsOnly
-              ? '保存前可撤销本次导入；原文件不会自动上传，也不创建主数据。'
+              ? '原文件不会自动上传，也不创建主数据。'
               : '文件仅在当前浏览器解析；保存时只创建 BOM 草稿，并把来源文件名写入备注，不会自动上传原文件或创建主数据。'}
           </span>
         </div>

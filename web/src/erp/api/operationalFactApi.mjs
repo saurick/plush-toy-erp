@@ -39,7 +39,7 @@ import {
   validateOutsourcingSourceFactResult,
 } from '../utils/outsourcingOrderFactAction.mjs'
 import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
-import { validateShipmentSourceCandidatePage } from '../utils/shipmentSourceCandidate.mjs'
+import { validateShipmentSourceCandidatePage, validateShipmentSourceOrderOptions } from '../utils/shipmentSourceCandidate.mjs'
 import {
   normalizeOperationalFactLifecycleRequest,
   validateOperationalFactLifecycleResult,
@@ -446,7 +446,9 @@ export async function listShipmentSourceCandidates(params = {}, options = {}) {
     request,
     options
   )
-  return validateShipmentSourceCandidatePage(dataOf(result), request)
+  const data = validateShipmentSourceCandidatePage(dataOf(result), request)
+  validateShipmentSourceOrderOptions(data.source_orders)
+  return data
 }
 
 export async function createShipmentWithItems(params = {}) {

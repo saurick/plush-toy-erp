@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
@@ -288,7 +289,7 @@ export default function ProductionMaterialIssueModal({
           label="备注"
           className="erp-business-action-form__field--full"
         >
-          <BusinessTextArea maxLength={255} showCount />
+          <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
         </Form.Item>
       </Form>
     </Editor>

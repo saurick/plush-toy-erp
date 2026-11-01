@@ -11,6 +11,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	corevalue "server/internal/core/value"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -502,7 +504,7 @@ func normalizeProductionOrderCommand(draft ProductionOrderDraft, actorID int, ra
 	draft.Note = normalizeOptionalProductionOrderText(draft.Note)
 	draft.PlannedStartAt = normalizeProductionOrderTime(draft.PlannedStartAt)
 	draft.PlannedEndAt = normalizeProductionOrderTime(draft.PlannedEndAt)
-	if actorID <= 0 || key == "" || utf8.RuneCountInString(key) > 128 || draft.OrderNo == "" || utf8.RuneCountInString(draft.OrderNo) > 64 || (draft.Note != nil && utf8.RuneCountInString(*draft.Note) > 255) || len(draft.Items) == 0 {
+	if actorID <= 0 || key == "" || utf8.RuneCountInString(key) > 128 || draft.OrderNo == "" || utf8.RuneCountInString(draft.OrderNo) > 64 || (draft.Note != nil && utf8.RuneCountInString(*draft.Note) > corevalue.BusinessNoteMaxCharacters) || len(draft.Items) == 0 {
 		return ProductionOrderDraft{}, "", ErrBadParam
 	}
 	if draft.PlannedStartAt != nil && draft.PlannedEndAt != nil && draft.PlannedEndAt.Before(*draft.PlannedStartAt) {
@@ -514,7 +516,7 @@ func normalizeProductionOrderCommand(draft ProductionOrderDraft, actorID int, ra
 		item := &items[i]
 		item.Note = normalizeOptionalProductionOrderText(item.Note)
 		item.RouteCode = normalizeOptionalProductionOrderText(item.RouteCode)
-		if item.LineNo <= 0 || item.ProductID <= 0 || item.UnitID <= 0 || !item.PlannedQuantity.GreaterThan(decimal.Zero) || (item.Note != nil && utf8.RuneCountInString(*item.Note) > 255) {
+		if item.LineNo <= 0 || item.ProductID <= 0 || item.UnitID <= 0 || !item.PlannedQuantity.GreaterThan(decimal.Zero) || (item.Note != nil && utf8.RuneCountInString(*item.Note) > corevalue.BusinessNoteMaxCharacters) {
 			return ProductionOrderDraft{}, "", ErrBadParam
 		}
 		if _, ok := seen[item.LineNo]; ok {

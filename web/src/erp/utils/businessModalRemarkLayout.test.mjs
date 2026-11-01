@@ -86,6 +86,6 @@ test('line item remarks keep the item-row layout contract', () => {
 test('purchase arrival keeps its optional note with receipt information', () => {
   const source = sourceFor('../components/purchase-orders/PurchaseOrderInboundDraftModal.jsx')
   const receipt = source.match(/<section[^>]*aria-label="收货信息"[\s\S]*?<\/section>/u)?.[0] || ''
-  assert.match(receipt, /<Form\.Item name="note" label="到货备注">\s*<BusinessTextArea[\s\S]*?maxLength=\{255\}/u)
+  assert.match(receipt, /<Form\.Item name="note" label="到货备注">\s*<BusinessTextArea[\s\S]*?maxLength=\{BusinessTextPolicy\.noteMaxCharacters\}/u)
   assert.doesNotMatch(receipt, /<TextArea|rows=|maxRows/u)
 })

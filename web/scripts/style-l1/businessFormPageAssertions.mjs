@@ -31,6 +31,8 @@ export function isBusinessFormPageTitle(title) {
 }
 
 export async function assertBusinessFormPage(page, editor) {
+  await assertFormInputsExposed(editor)
+  await assertBusinessNoteTextAreas(editor)
   assert.equal(await editor.getByRole('button', { name: '刷新当前页', exact: true }).count(), 0, '整页表单不提供会丢弃编辑内容的常驻刷新')
   const fullscreen = editor.getByRole('button', { name: /^(全屏编辑|全屏查看|退出全屏)$/u })
   const desktop = page.viewportSize().width >= 768 && !new URL(page.url()).pathname.startsWith('/m/')
@@ -115,6 +117,34 @@ export async function assertBusinessFormPage(page, editor) {
   await editor.getByRole('button', { name: inTask ? '返回办理' : '返回列表', exact: true }).waitFor()
 }
 
+export async function assertBusinessNoteTextAreas(root) {
+  const notes = await root.locator('input, textarea').evaluateAll((nodes) => nodes
+    .filter((node) => node.getClientRects().length > 0 && node.clientWidth > 0)
+    .filter((node) => /备注/u.test([
+      node.getAttribute('aria-label'),
+      ...[...(node.labels || [])].map((label) => label.textContent),
+      node.closest('.field')?.querySelector('label')?.textContent,
+    ].join(' ')) || /(?:^|_)(?:note|decision_note|price_condition_note)$/u.test(node.id))
+    .map((node) => {
+      const style = getComputedStyle(node)
+      return {
+        label: node.getAttribute('aria-label') || node.id,
+        tag: node.tagName,
+        height: node.clientHeight,
+        padding: parseFloat(style.paddingTop) + parseFloat(style.paddingBottom),
+        lineHeight: parseFloat(style.lineHeight),
+        overflow: node.scrollHeight - node.clientHeight,
+        fontSize: style.fontSize,
+        inline: node.getAttribute('style'),
+      }
+    }))
+  for (const note of notes) {
+    assert.equal(note.tag, 'TEXTAREA', `备注使用多行文本域：${JSON.stringify(note)}`)
+    assert.ok(note.height - note.padding >= note.lineHeight * 2 - 1, `所有备注至少两行：${JSON.stringify(note)}`)
+    assert.ok(note.overflow <= 1, `备注随内容增高：${JSON.stringify(note)}`)
+  }
+}
+
 export async function closeBusinessFormPage(page, editor) {
   const root = await editor.elementHandle()
   const inTask = /^\/m\/[a-z_]+\/tasks$/u.test(new URL(page.url()).pathname)
@@ -130,4 +160,21 @@ export async function closeBusinessFormPage(page, editor) {
   }
   await root.dispose()
   await editor.waitFor({ state: 'hidden' })
+}
+
+export async function assertFormInputsExposed(editor) {
+  const hiddenByDisclosure = await editor.evaluate((root) =>
+    [...root.querySelectorAll('details input, details textarea, details select')]
+      .filter((input) => input.type !== 'hidden' && !input.closest('.ant-form-item-hidden'))
+      .map((input) => input.id || input.getAttribute('aria-label') || input.tagName)
+  )
+  assert.deepEqual(hiddenByDisclosure, [], '业务输入不能放在可折叠区域')
+  for (const field of await editor.locator('.erp-line-item-details__fields .ant-form-item:not(.ant-form-item-hidden), .erp-contact-editor__note-editor textarea, .erp-production-order-line__supplement .ant-form-item').all()) {
+    assert.ok(await field.isVisible(), '明细、联系人备注及生产路线默认可见')
+  }
+  for (const panel of await editor.locator('.business-attachment-panel').all()) {
+    assert.ok(await panel.locator('.business-attachment-panel__content').isVisible(), '空附件与已有附件均直接显示')
+    const upload = panel.getByRole('button', { name: '选择附件', exact: true })
+    if (await upload.count()) assert.ok(await upload.isVisible(), '有上传权限时入口直接可见')
+  }
 }

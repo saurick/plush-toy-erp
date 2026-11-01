@@ -566,20 +566,21 @@ export async function listWorkflowTaskEvents(taskId, options = {}) {
   if (!Number.isSafeInteger(normalizedTaskId) || normalizedTaskId <= 0) {
     throw new Error('任务轨迹参数无效')
   }
-  const { limit = 100, beforeEventId = 0, ...requestOptions } = options
+  const { limit = 100, beforeEventId = 0, scope = 'task', ...requestOptions } = options
   const normalizedLimit = Number(limit)
   const normalizedCursor = Number(beforeEventId)
   if (
     !Number.isSafeInteger(normalizedLimit) ||
     normalizedLimit < 1 ||
     normalizedLimit > 100 ||
-    !Number.isSafeInteger(normalizedCursor) || normalizedCursor < 0
+    !Number.isSafeInteger(normalizedCursor) || normalizedCursor < 0 ||
+    !['task', 'flow'].includes(scope)
   ) {
     throw new Error('任务轨迹参数无效')
   }
   const result = await workflowRpc.call(
     RpcMethod.workflow.LIST_TASK_EVENTS,
-    { task_id: normalizedTaskId, limit: normalizedLimit, ...(normalizedCursor ? { before_event_id: normalizedCursor } : {}) },
+    { task_id: normalizedTaskId, limit: normalizedLimit, ...(scope === 'flow' ? { scope } : {}), ...(normalizedCursor ? { before_event_id: normalizedCursor } : {}) },
     requestOptions
   )
   const data = dataOf(result)
@@ -592,6 +593,15 @@ export async function listWorkflowTaskEvents(taskId, options = {}) {
       throw new Error('本任务处理记录返回格式无效')
     }
     previousId = item.id
+    if (scope === 'flow' && (
+      !Number.isSafeInteger(item.task_id) || item.task_id <= 0 ||
+      item.task?.id !== item.task_id ||
+      typeof item.task?.task_name !== 'string' || !item.task.task_name.trim() ||
+      typeof item.task?.task_group !== 'string' ||
+      typeof item.task?.owner_role_key !== 'string'
+    )) {
+      throw new Error('流程处理记录返回格式无效')
+    }
   }
   if (data.items.length > normalizedLimit || (data.truncated && data.items.length === 0)) {
     throw new Error('本任务处理记录返回格式无效')

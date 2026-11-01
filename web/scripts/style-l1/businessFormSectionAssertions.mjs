@@ -24,21 +24,21 @@ export async function assertBusinessSectionTitleBands(editor) {
     }
     return {
       headings: [...root.querySelectorAll('.erp-business-form-heading')].filter((node) => node.getClientRects().length).map((node) => {
-    const style = getComputedStyle(node)
+        const style = getComputedStyle(node)
         const label = node.querySelector('.erp-business-action-form__section-title-text, h2, strong[role="heading"]')
         const marker = getComputedStyle(label, '::before')
-    return {
-      text: (label || node).textContent.trim().slice(0, 80),
-      height: node.getBoundingClientRect().height,
-      minimumHeight: style.minHeight,
-      background: style.backgroundColor,
+        return {
+          text: (label || node).textContent.trim().slice(0, 80),
+          height: node.getBoundingClientRect().height,
+          minimumHeight: style.minHeight,
+          background: style.backgroundColor,
           foreground: style.color,
           marker: { content: marker.content, width: marker.width, height: marker.height, background: marker.backgroundColor },
           labelLeft: label.getBoundingClientRect().left - node.getBoundingClientRect().left,
           labelTop: label.getBoundingClientRect().top - node.getBoundingClientRect().top,
-      divider: getComputedStyle(node, '::after').content,
+          divider: getComputedStyle(node, '::after').content,
           singleLineLabel: node.classList.contains('erp-business-action-form__section-title') && label.getBoundingClientRect().height <= 24,
-    }
+        }
       }),
       surfaces: [...root.querySelectorAll('th, input:disabled, textarea:disabled, input[readonly]')].filter((node) => node.getClientRects().length).slice(0, 12).map(backgroundLayers),
     }
@@ -158,7 +158,168 @@ export async function assertBusinessSectionInteractions(page, editor) {
     await assertCurrentBusinessSection(page, editor, title)
     await assertBusinessSectionSpacing(editor, layout)
   }
+  await assertBusinessFormScrollTracking(page, editor)
   return titles
+}
+
+export async function assertBusinessFormScrollTracking(page, editor) {
+  await page.waitForFunction((root) => root.getAttribute('aria-busy') !== 'true', await editor.elementHandle())
+  if (page.viewportSize().width <= 767) {
+    // 视口尺寸先更新，AntD 的手机主题随后提交；先等字号合同生效再固定滚动范围。
+    await page.waitForFunction((root) => [...root.querySelectorAll('.ant-select-selector')]
+      .filter((node) => node.getClientRects().length)
+      .every((node) => Number.parseFloat(getComputedStyle(node).fontSize) >= 16), await editor.elementHandle())
+  }
+  await waitForFiniteAnimations(page)
+  const result = await editor.evaluate(async (root) => {
+    const body = root.querySelector('.erp-business-form-page__body')
+    const nav = body?.parentElement.querySelector(':scope > nav')
+    if (!nav) return null
+    const owner = body.closest('[data-business-form-page]')
+    const sections = [...body.querySelectorAll('[data-form-section]')].filter((node) =>
+      node.getClientRects().length && node.closest('[data-business-form-page]') === owner
+    )
+    sections[0].focus({ preventScroll: true })
+    await new Promise(requestAnimationFrame)
+    await new Promise(requestAnimationFrame)
+    let scroller = body
+    while (scroller.parentElement && !/(auto|scroll)/u.test(getComputedStyle(scroller).overflowY)) {
+      scroller = scroller.parentElement
+    }
+    const controls = [...body.querySelectorAll('textarea,.ant-select')]
+    let previousBounds = ''
+    let stableFrames = 0
+    for (let frame = 0; frame < 60 && stableFrames < 3; frame += 1) {
+      await new Promise(requestAnimationFrame)
+      const bounds = JSON.stringify([scroller.scrollHeight, ...sections.map((node) => [node.offsetTop, node.offsetHeight]), ...controls.map((node) => [node.offsetWidth, node.offsetHeight])])
+      stableFrames = bounds === previousBounds ? stableFrames + 1 : 0
+      previousBounds = bounds
+    }
+    if (stableFrames < 3) throw new Error('Responsive form layout did not settle before scroll sampling')
+    const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight)
+    if (max <= 2) return { titles: sections.map((node) => node.dataset.formSection), max, scrollable: false }
+    const fields = [...body.querySelectorAll('input,textarea,select')]
+    const values = fields.map((node) => [node.value, node.checked])
+    const identities = fields.map((node) => node.getAttribute('aria-label') || node.id || node.name || node.tagName)
+    const geometry = () => sections.map((node) => [node.offsetTop, node.offsetHeight, node.offsetWidth])
+    const before = JSON.stringify(geometry())
+    const measured = [...body.querySelectorAll('tr,td,textarea,.ant-select,.ant-select-selector,.ant-form-item')].map((node) => ({
+      node,
+      className: node.className,
+      height: node.getBoundingClientRect().height,
+      cssHeight: getComputedStyle(node).height,
+      borderTop: getComputedStyle(node).borderTopWidth,
+      borderBottom: getComputedStyle(node).borderBottomWidth,
+      fontSize: getComputedStyle(node).fontSize,
+      lineHeight: getComputedStyle(node).lineHeight,
+      padding: getComputedStyle(node).padding,
+    }))
+    const positions = new Set([0, max])
+    for (let step = 0; step <= 16; step += 1) positions.add(max * step / 16)
+    for (let top = Math.max(0, max - scroller.clientHeight); top < max; top += 8) positions.add(top)
+    for (const section of sections) {
+      const top = section.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
+      for (const offset of [-40, 0, 40]) positions.add(Math.min(max, Math.max(0, top + offset)))
+    }
+    const sorted = [...positions].sort((a, b) => a - b)
+    // 每个采样跨两次 rAF，间隔用于定位停顿，不代表单帧绘制时间。
+    const intervals = []
+    const errors = []
+    const checkpoints = []
+    const sweep = async (tops) => {
+      const visited = []
+      let previous
+      for (const top of tops) {
+        scroller.scrollTo({ top, behavior: 'instant' })
+        await new Promise(requestAnimationFrame)
+        const now = await new Promise(requestAnimationFrame)
+        if (previous !== undefined) intervals.push(now - previous)
+        previous = now
+        const active = sections.filter((node) => node.dataset.currentFormSection === 'true')
+        const current = active[0]
+        const title = current?.dataset.formSection
+        const link = nav.querySelector('button[aria-current="location"]')
+        const picker = nav.querySelector('.ant-select')
+        if (active.length !== 1 || link?.getAttribute('aria-controls') !== current?.id || picker?.dataset.value !== current?.id) {
+          if (errors.length < 8) errors.push({ top: scroller.scrollTop, active: active.map((node) => node.dataset.formSection), directory: link?.textContent })
+        }
+        if (visited.at(-1) !== title) {
+          visited.push(title)
+          checkpoints.push(scroller.scrollTop)
+        }
+      }
+      return visited
+    }
+    const forward = await sweep(sorted)
+    const reversePositions = [max, ...checkpoints.toReversed(), 0]
+    const backward = await sweep(reversePositions)
+    const afterFields = [...body.querySelectorAll('input,textarea,select')]
+    intervals.sort((a, b) => a - b)
+    return {
+      titles: sections.map((node) => node.dataset.formSection),
+      max,
+      scrollable: true,
+      shared: scroller !== body,
+      forward,
+      backward,
+      errors,
+      geometryStable: before === JSON.stringify(geometry()),
+      geometryBefore: JSON.parse(before),
+      geometryAfter: geometry(),
+      changedHeights: measured.flatMap(({ node, ...initial }) => {
+        const after = { className: node.className, height: node.getBoundingClientRect().height, cssHeight: getComputedStyle(node).height, borderTop: getComputedStyle(node).borderTopWidth, borderBottom: getComputedStyle(node).borderBottomWidth, fontSize: getComputedStyle(node).fontSize, lineHeight: getComputedStyle(node).lineHeight, padding: getComputedStyle(node).padding }
+        return Math.abs(initial.height - after.height) < 0.1 ? [] : [{ tag: node.tagName, label: node.getAttribute('aria-label') || node.className, initial, after }]
+      }).slice(0, 8),
+      inputsStable: fields.length === afterFields.length && fields.every((node, index) => node === afterFields[index]),
+      valuesStable: JSON.stringify(values) === JSON.stringify(afterFields.map((node) => [node.value, node.checked])),
+      changedFields: afterFields.flatMap((node, index) => node === fields[index] ? [] : [{ index, before: identities[index], after: node.getAttribute('aria-label') || node.id || node.name || node.tagName }]).slice(0, 8),
+      samples: sorted.length + reversePositions.length,
+      frameIntervalP95: intervals[Math.floor(intervals.length * 0.95)],
+      frameIntervalMax: intervals.at(-1),
+    }
+  })
+  if (!result) return null
+  if (result.scrollable) {
+    const detail = JSON.stringify(result)
+    assert.deepEqual(result.forward, result.titles, `scrolling down reaches every section: ${detail}`)
+    assert.deepEqual(result.backward, result.titles.toReversed(), `scrolling up restores every section: ${detail}`)
+    assert.deepEqual(result.errors, [], `directory and highlight stay exclusive and aligned: ${detail}`)
+    assert.equal(result.geometryStable, true, `section switches preserve layout: ${detail}`)
+    assert.equal(result.inputsStable && result.valuesStable, true, `scrolling preserves mounted fields and draft values: ${detail}`)
+  }
+  const client = page.context().browser().browserType().name() === 'chromium'
+    ? await page.context().newCDPSession(page) : null
+  try {
+    await client?.send('Performance.enable')
+    const before = await client?.send('Performance.getMetrics')
+    const switches = await editor.evaluate(async (root) => {
+      const sections = [...root.querySelectorAll('[data-form-section]')].filter((node) => node.getClientRects().length)
+      const largest = sections.toSorted((a, b) => b.querySelectorAll('*').length - a.querySelectorAll('*').length)[0]
+      const other = sections.find((node) => node !== largest)
+      const targets = document.activeElement === largest ? [other, largest] : [largest, other]
+      const intervals = []
+      for (let index = 0; index < 10; index += 1) {
+        const started = await new Promise(requestAnimationFrame)
+        const section = targets[index % 2]
+        section.focus({ preventScroll: true })
+        await new Promise(requestAnimationFrame)
+        const ended = await new Promise(requestAnimationFrame)
+        intervals.push(ended - started)
+      }
+      sections[0].focus({ preventScroll: true })
+      return { count: intervals.length, maxInterval: Math.max(...intervals), totalInterval: intervals.reduce((a, b) => a + b, 0), largestSectionElements: largest.querySelectorAll('*').length }
+    })
+    const after = await client?.send('Performance.getMetrics')
+    if (client) {
+      const start = Object.fromEntries(before.metrics.map(({ name, value }) => [name, value]))
+      switches.styleRecalculationMs = (after.metrics.find(({ name }) => name === 'RecalcStyleDuration').value - start.RecalcStyleDuration) * 1000
+    }
+    const evidence = { url: page.url(), title: await editor.getAttribute('aria-label'), viewport: page.viewportSize(), fullscreen: await editor.getAttribute('data-fullscreen'), ...result, switches }
+    if (process.env.STYLE_L1_OUTPUT_DIR) await appendFile(`${process.env.STYLE_L1_OUTPUT_DIR}/section-scroll.jsonl`, `${JSON.stringify(evidence)}\n`)
+    return evidence
+  } finally {
+    await client?.detach()
+  }
 }
 
 export async function assertBusinessFormNavigationSurface(page, editor) {
@@ -225,43 +386,21 @@ const expectedSections = {
   sales: ['订单与客户', '订货明细', '联系与交付', '结算与报价', '备注与附件'],
 }
 
-async function assertAttachmentSummary(page, attachment) {
-  const summary = attachment.getByRole('button', { name: /(展开|收起)附件$/u })
+async function assertInlineAttachmentPanel(attachment) {
+  const header = attachment.locator('.business-attachment-panel__compact-header')
   const content = attachment.locator('.business-attachment-panel__content')
-  await summary.scrollIntoViewIfNeeded()
-  assert.equal(await summary.getAttribute('aria-expanded'), 'false')
-  assert.equal(await summary.locator('button').count(), 0)
-  const metrics = await summary.evaluate((node) => ({
+  assert.ok(await header.isVisible())
+  assert.ok(await content.isVisible(), '附件内容直接展示')
+  assert.ok(await attachment.getByRole('button', { name: '选择附件', exact: true }).isVisible(), '空附件区也保留上传入口')
+  assert.equal(await attachment.getByRole('button', { name: /(展开|收起)附件$/u }).count(), 0)
+  const metrics = await header.evaluate((node) => ({
     width: node.getBoundingClientRect().width,
-    height: node.getBoundingClientRect().height,
     panelWidth: node.parentElement.clientWidth,
     overflow: node.parentElement.scrollWidth - node.parentElement.clientWidth,
-    controls: node.getAttribute('aria-controls'),
-    contentId: node.nextElementSibling.id,
+    fontSize: getComputedStyle(node).fontSize,
   }))
-  assert(
-    Math.abs(metrics.width - metrics.panelWidth) <= 1 &&
-      metrics.height >= 44 &&
-      metrics.overflow <= 1 &&
-      metrics.controls === metrics.contentId,
-    `附件摘要应覆盖整条卡片并关联展开内容: ${JSON.stringify(metrics)}`
-  )
-  await summary.click({ position: { x: metrics.width / 2, y: metrics.height / 2 } })
-  await content.waitFor({ state: 'visible' })
-  assert.equal(await summary.getAttribute('aria-expanded'), 'true')
-  await summary.locator('.business-attachment-panel__compact-copy').click()
-  await content.waitFor({ state: 'hidden' })
-  await summary.focus()
-  await page.keyboard.press('Space')
-  await content.waitFor({ state: 'visible' })
-  await page.keyboard.press('Enter')
-  await content.waitFor({ state: 'hidden' })
-  const action = summary.locator('.business-attachment-panel__compact-action')
-  await action.click()
-  await content.waitFor({ state: 'visible' })
-  await action.click()
-  await content.waitFor({ state: 'hidden' })
-  assert.equal(await summary.getAttribute('aria-expanded'), 'false')
+  assert.ok(Math.abs(metrics.width - metrics.panelWidth) <= 1 && metrics.overflow <= 1, JSON.stringify(metrics))
+  assert.ok(Number.parseFloat(metrics.fontSize) >= 14, `附件分组使用可读的正文字号: ${JSON.stringify(metrics)}`)
 }
 
 export async function assertBusinessFormSections(page, editor, key) {
@@ -302,6 +441,7 @@ export async function assertBusinessFormSections(page, editor, key) {
       `${key}: details must start in the first screen`
     )
   }
+  await assertBusinessFormScrollTracking(page, editor)
   const lastLink = nav.getByRole('button', { name: titles.at(-1), exact: true })
   await lastLink.focus()
   await page.keyboard.press('Enter')
@@ -323,13 +463,7 @@ export async function assertBusinessFormSections(page, editor, key) {
   )
   const attachment = editor.locator('.business-attachment-panel')
   if (await attachment.count()) {
-    assert.equal(
-      await attachment
-        .getByRole('button', { name: '选择附件', exact: true })
-        .isVisible(),
-      false
-    )
-    await assertAttachmentSummary(page, attachment)
+    await assertInlineAttachmentPanel(attachment)
   }
   // Native scrolling, without clicking the directory, must also update its position.
   if (await body.evaluate((node) => node.scrollTop > 0)) {
@@ -383,8 +517,9 @@ export async function assertBusinessFormSections(page, editor, key) {
     await assertCurrentBusinessSection(page, editor, titles[1])
     assert.equal(await readSelectValue(picker), target)
     if (width === 390 && (await attachment.count())) {
-      await assertAttachmentSummary(page, attachment)
+      await assertInlineAttachmentPanel(attachment)
     }
+    await assertBusinessFormScrollTracking(page, editor)
   }
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.emulateMedia({ reducedMotion: 'reduce' })

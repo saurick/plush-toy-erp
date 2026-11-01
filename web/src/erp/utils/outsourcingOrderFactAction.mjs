@@ -1,3 +1,4 @@
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import {
   InventoryLotStatus,
   OperationalFactStatus,
@@ -308,7 +309,7 @@ export function normalizeOutsourcingSourceFactCreateRequest(
   }
   const customerKey = optionalText(params.customer_key, 64)
   const occurredAt = optionalOccurredAt(params.occurred_at)
-  const note = optionalText(params.note)
+  const note = optionalText(params.note, BusinessTextPolicy.noteMaxCharacters)
   const quantity = normalizePositiveNumeric20Scale6(params.quantity)
   if (!quantity) throw invalidContract()
   return {

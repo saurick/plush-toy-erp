@@ -3,8 +3,12 @@ package biz
 import (
 	"context"
 	"errors"
-	"github.com/shopspring/decimal"
 	"time"
+	"unicode/utf8"
+
+	corevalue "server/internal/core/value"
+
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -128,7 +132,7 @@ func (uc *SalesOrderUsecase) ReviewEngineeringMaterialRequest(ctx context.Contex
 	}
 	copy := *in
 	copy.Note = normalizeOptionalString(in.Note)
-	if copy.Note != nil && len(*copy.Note) > 255 {
+	if copy.Note != nil && utf8.RuneCountInString(*copy.Note) > corevalue.BusinessNoteMaxCharacters {
 		return nil, ErrBadParam
 	}
 	if copy.Action == "REJECT" {

@@ -1,7 +1,9 @@
 import React from 'react'
 import { HistoryOutlined } from '@ant-design/icons'
 import { Button, Empty, Popover } from 'antd'
+import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { buildWorkflowTaskEventTrailModel } from '../../utils/workflowTaskEventPresentation.mjs'
+import { buildWorkflowTaskFlowEventItems } from '../../utils/workflowTaskFlowEventPresentation.mjs'
 import './workflowTaskEventTrail.css'
 
 function WorkflowEventAuditDetails({ item }) {
@@ -22,8 +24,10 @@ function WorkflowEventAuditDetails({ item }) {
       onOpenChange={setOpen}
       content={(
         <dl className="workflow-task-event-trail__audit">
+          {item.taskName ? <><dt>所属任务</dt><dd>{item.taskName}</dd></> : null}
           <dt>记录分类</dt><dd>{item.categoryLabel}</dd>
           <dt>精确时间</dt><dd>{item.timeLabel}</dd>
+          <dt>{item.reasonLabel || '办理说明'}</dt><dd>{item.reasonDetail || item.reason || '未补充说明'}</dd>
           {item.versionLabel ? <><dt>任务版本</dt><dd>{item.versionLabel}</dd></> : null}
         </dl>
       )}
@@ -33,11 +37,11 @@ function WorkflowEventAuditDetails({ item }) {
   )
 }
 
-export function WorkflowTaskEventEntries({ items, variant = 'desktop' }) {
+export function WorkflowTaskEventEntries({ items, variant = 'desktop', label = '本任务处理记录' }) {
   return (
     <ol
       className={`workflow-task-event-trail__list workflow-task-event-trail__list--${variant}`}
-      aria-label="本任务处理记录，最近在前，按时间倒序"
+      aria-label={`${label}，最近在前，按时间倒序`}
     >
       {items.map((item) => (
         <li
@@ -53,6 +57,7 @@ export function WorkflowTaskEventEntries({ items, variant = 'desktop' }) {
               <strong>{item.label}</strong>
               <WorkflowEventAuditDetails item={item} />
             </div>
+            {item.sourceLabel ? <p className="workflow-task-event-trail__source">{item.sourceLabel}</p> : null}
             <p className="workflow-task-event-trail__meta">
               {item.actorName ? (
                 <>
@@ -81,9 +86,9 @@ export function WorkflowTaskEventEntries({ items, variant = 'desktop' }) {
                 {item.transitionLabel}
               </p>
             ) : null}
-            {item.reason ? (
+            {item.reason || item.reasonMissing ? (
               <p className="workflow-task-event-trail__reason">
-                意见：{item.reason}
+                {item.reasonLabel || '办理说明'}：{item.reason || '未记录'}
               </p>
             ) : null}
           </div>
@@ -104,15 +109,19 @@ export default function WorkflowTaskEventTrail({
   variant = 'desktop',
   showResponsibility = true,
   compact = false,
+  records = null,
 }) {
   const model = buildWorkflowTaskEventTrailModel({
     approvalTask,
     events,
     task,
   })
-  const loading = state === 'idle' || state === 'loading'
-  const summaryText = loading ? '读取中' : state === 'error' ? '读取失败' : model.items.length
-    ? `${truncated ? '最近 ' : ''}${model.items.length} 条` : '暂无记录'
+  const page = records ? records[records.scope] : { items: events, status: state, truncated }
+  const title = records ? '流程处理记录' : '本任务处理记录'
+  const items = records ? buildWorkflowTaskFlowEventItems({ events: page.items, task, scope: records.scope }) : model.items
+  const loading = page.status === 'idle' || page.status === 'loading'
+  const summaryText = loading ? '读取中' : page.status === 'error' ? '读取失败' : items.length
+    ? `${page.truncated ? '最近 ' : ''}${items.length} 条` : '暂无记录'
   const summary = <span className="workflow-task-event-trail__count">{summaryText}</span>
 
   return (
@@ -133,12 +142,14 @@ export default function WorkflowTaskEventTrail({
           <div className={compact ? 'workflow-task-event-trail__heading-label' : undefined}>
             {compact ? <HistoryOutlined aria-hidden="true" /> : null}
             <h3 id={`workflow-task-event-trail-title-${task.id || 'current'}`}>
-              本任务处理记录
+              {title}
             </h3>
             {compact ? summary : null}
           </div>
           {!compact ? summary : null}
         </div>
+
+        {records ? <SlidingSegmented className="workflow-task-event-trail__scope" hierarchy="secondary" size="small" aria-label="处理记录范围" options={[{ label: '本次流程', value: 'flow' }, { label: '仅本任务', value: 'task' }]} value={records.scope} onChange={records.changeScope} /> : null}
 
         {showResponsibility ? (
           <dl
@@ -156,30 +167,31 @@ export default function WorkflowTaskEventTrail({
 
         {loading ? (
           <p className="workflow-task-event-trail__state" role="status">
-            正在加载本任务处理记录…
+            正在加载{title}…
           </p>
-      ) : state === 'error' ? (
+      ) : page.status === 'error' ? (
         <p
           className="workflow-task-event-trail__state workflow-task-event-trail__state--error"
           role="alert"
         >
-          {errorMessage || '本任务处理记录加载失败，请刷新后重试。'}
+          {records ? <>{title}加载失败。<Button type="link" size="small" onClick={records.retry}>重新读取</Button></> : errorMessage || '本任务处理记录加载失败，请刷新后重试。'}
         </p>
-      ) : model.items.length > 0 ? (
+      ) : items.length > 0 ? (
         <>
-          <WorkflowTaskEventEntries items={model.items} variant={variant} />
-          {truncated ? (
+          <WorkflowTaskEventEntries items={items} variant={variant} label={title} />
+          {page.truncated ? (
             <p
               className="workflow-task-event-trail__state"
               data-testid="workflow-task-event-trail-truncated"
               role="status"
             >
-              仅显示最近 {model.items.length} 条，更早记录未加载。
+              仅显示最近 {items.length} 条，更早记录未加载。
+              {records ? <Button size="small" loading={page.loadingMore} onClick={records.loadOlder}>{page.pageError ? '重试加载更早记录' : '加载更早记录'}</Button> : null}
             </p>
           ) : null}
         </>
       ) : (
-        <Empty description="暂无本任务处理记录" />
+        <Empty description={`暂无${title}`} />
       )}
       </div>
     </section>

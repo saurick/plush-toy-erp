@@ -226,7 +226,7 @@ func TestBOMPostgresConstraints(t *testing.T) {
 		log.NewStdLogger(io.Discard),
 	))
 
-	detail := saveBOMDraftFixture(t, ctx, uc, fixtures.productID, "V1", &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{
+	detail := saveBOMDraftFixture(t, ctx, uc, fixtures.productID, &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{
 		MaterialID: fixtures.materialID, UnitID: fixtures.unitID, Quantity: mustDecimal(t, "1.25"), LossRate: mustDecimal(t, "0.10"),
 	}})
 	header, item := detail.Header, detail.Items[0]
@@ -242,7 +242,7 @@ func TestBOMPostgresConstraints(t *testing.T) {
 		Save(ctx); !ent.IsConstraintError(err) {
 		t.Fatalf("expected postgres one ACTIVE BOM per product constraint, got %v", err)
 	}
-	if _, err := uc.SaveBOMWithItems(ctx, header.ID, &biz.BOMVersionMutation{ExpectedVersion: header.EditVersion, ProductID: fixtures.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "V1"}}, nil); !errors.Is(err, biz.ErrBOMActiveImmutable) {
+	if _, err := uc.SaveBOMWithItems(ctx, header.ID, &biz.BOMVersionMutation{ExpectedVersion: header.EditVersion, ProductID: fixtures.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{}}, nil); !errors.Is(err, biz.ErrBOMActiveImmutable) {
 		t.Fatalf("active BOM aggregate mutation: %v", err)
 	}
 
@@ -280,9 +280,9 @@ func TestBOMPostgresCoefficientsHaveNoFixedStorageScale(t *testing.T) {
 	client.Use(unitQuantityGuard)
 	f := createInventoryLotPostgresFixtures(t, ctx, client)
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
-	for index, raw := range []string{"0.12345678901234567890123456789", "0.00000049", "1e-324"} {
+	for _, raw := range []string{"0.12345678901234567890123456789", "0.00000049", "1e-324"} {
 		quantity, loss := decimal.RequireFromString(raw), decimal.RequireFromString("0.0000001234567890123456789")
-		draft := saveBOMDraftFixture(t, ctx, uc, f.productID, fmt.Sprintf("FULL-PRECISION-%d-%s", index, f.suffix), &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: quantity, LossRate: loss}})
+		draft := saveBOMDraftFixture(t, ctx, uc, f.productID, &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: quantity, LossRate: loss}})
 		read, err := uc.GetBOMVersion(ctx, draft.Header.ID)
 		if err != nil || len(read.Items) != 1 || !read.Items[0].Quantity.Equal(quantity) || !read.Items[0].LossRate.Equal(loss) {
 			t.Fatalf("PostgreSQL rounded BOM coefficients %s: %v, %#v", raw, err, read)
@@ -297,8 +297,8 @@ func TestBOMPostgresConcurrentActivateKeepsSingleActive(t *testing.T) {
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 
 	headers := make([]*biz.BOMHeader, 0, 2)
-	for _, version := range []string{"CONCURRENT-A", "CONCURRENT-B"} {
-		detail := saveBOMDraftFixture(t, ctx, uc, fixtures.productID, version, &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{
+	for range 2 {
+		detail := saveBOMDraftFixture(t, ctx, uc, fixtures.productID, &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{
 			MaterialID: fixtures.materialID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
 		}})
 		header := detail.Header

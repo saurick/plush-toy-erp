@@ -325,18 +325,14 @@ export default function useMobileRoleTaskActions({
         !processDecisionRequired && requiresMobileActionFeedback(taskStatusKey)
       const completionFeedback = completionFeedbackRequired ? actionInput : ''
       const actionReason = completionFeedbackRequired ? '' : actionInput
-      const reasonRequired = ['blocked', 'rejected', 'resume'].includes(
-        taskStatusKey
-      )
+      const reasonRequired = !completionFeedbackRequired && workflowTaskActionRequiresReason(task, taskStatusKey)
       if (completionFeedbackRequired && workflowTaskActionRequiresReason(task, taskStatusKey) && !actionInput) {
         message.warning('请先填写完成反馈')
         return false
       }
       if (reasonRequired && !actionReason) {
         message.warning(
-          taskStatusKey === 'resume'
-            ? '请先填写阻塞解除说明'
-            : '请先填写阻塞或退回原因'
+          '请先填写阻塞或退回原因'
         )
         return false
       }
@@ -519,10 +515,6 @@ export default function useMobileRoleTaskActions({
         task.id
       )
       const reason = String(urgeReasonByTaskID[scopedTaskKey] || '').trim()
-      if (!reason) {
-        message.warning('请先填写催办原因')
-        return false
-      }
       const mobileActionPayload = buildMobileTaskActionPayload()
       const scope = `${normalizedReceiptScopeKey}::${task.id}:urge`
       const operation = 'urge'

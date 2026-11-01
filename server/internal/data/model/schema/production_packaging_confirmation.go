@@ -3,6 +3,8 @@ package schema
 import (
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -71,7 +73,7 @@ func (ProductionPackagingConfirmation) Fields() []ent.Field {
 		field.Time("confirmed_at").Optional().Nillable(),
 		field.String("confirmation_idempotency_key").Optional().Nillable().MaxLen(128),
 		field.String("confirmation_intent_hash").Optional().Nillable().MinLen(64).MaxLen(64),
-		field.String("note").Optional().Nillable().MaxLen(255),
+		field.String("note").Optional().Nillable().Validate(corevalue.ValidateBusinessNote),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
 	}

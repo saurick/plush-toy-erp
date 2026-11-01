@@ -11,6 +11,10 @@ import {
   Tag,
 } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import { lineItemFieldIndex } from '../business-list/businessLineItemDisclosure.mjs'
+import BusinessLineItemGroupControls, { BusinessLineItemGroupErrorCount } from '../business-list/BusinessLineItemGroupControls.jsx'
+import useBusinessLineItemGroups from '../business-list/useBusinessLineItemGroups.js'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
@@ -19,7 +23,6 @@ import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
-  BusinessOptionalField,
 } from '../business-list/BusinessCompactFieldTable.jsx'
 import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import { formatQuantity } from '../../utils/businessLineItems.mjs'
@@ -75,6 +78,7 @@ function ArrivalRecord({
     <BusinessCompactFieldRow
       className="erp-purchase-arrival__record"
       label={`第${number}条到货记录`}
+      lineItemIndex={field.name}
       actions={
         <Popconfirm
           title="移除这条到货记录？"
@@ -172,18 +176,13 @@ function ArrivalRecord({
         </span>,
       ]}
     >
-      <BusinessOptionalField
-        name={['arrival_items', field.name, 'note']}
-        label="补充说明"
-      >
-        <Form.Item name={[field.name, 'note']}>
-          <BusinessTextArea
-            maxLength={255}
-            aria-label={`第${number}条说明`}
-            placeholder="记录异常情况或数量计算依据"
-          />
-        </Form.Item>
-      </BusinessOptionalField>
+      <Form.Item name={[field.name, 'note']} label="补充说明">
+        <BusinessTextArea
+          maxLength={BusinessTextPolicy.noteMaxCharacters}
+          aria-label={`第${number}条说明`}
+          placeholder="记录异常情况或数量计算依据"
+        />
+      </Form.Item>
     </BusinessCompactFieldRow>
   )
 }
@@ -204,6 +203,12 @@ export default function PurchaseOrderInboundDraftModal({
   onRetry,
 }) {
   const values = Form.useWatch('arrival_items', form) || []
+  const disclosureGroups = (rows || []).map((row) => ({
+    id: String(row.key),
+    indexes: values.flatMap((item, index) => Number(item?.purchase_order_item_id) === Number(row.key) ? [index] : []),
+  })).filter((group) => group.indexes.length > 0)
+  const disclosure = useBusinessLineItemGroups({ form, groups: disclosureGroups, name: 'arrival_items' })
+  const revealArrivalIndex = disclosure.revealIndex
   const [dirty, setDirty] = useState(false)
   const quantityUnitOptions = useQuantityUnits(open)
   const [emptyError, setEmptyError] = useState(false)
@@ -228,15 +233,17 @@ export default function PurchaseOrderInboundDraftModal({
     const timer = window.setTimeout(() => {
       if (initialFocusRef.current) return
       initialFocusRef.current = true
-      form.scrollToField(['arrival_items', 0, 'quantity'], {
+      revealArrivalIndex(0)
+      window.requestAnimationFrame(() => form.scrollToField(['arrival_items', 0, 'quantity'], {
         block: 'nearest',
         focus: true,
-      })
+      }))
     }, 200)
     return () => window.clearTimeout(timer)
-  }, [disabled, form, open, values.length])
+  }, [disabled, form, open, revealArrivalIndex, values.length])
 
   const focusQuantity = (index, { highlight = false } = {}) => {
+    disclosure.revealIndex(index)
     window.requestAnimationFrame(() => {
       if (index < 0) {
         materialPickerRef.current?.focus()
@@ -290,14 +297,26 @@ export default function PurchaseOrderInboundDraftModal({
       },
     })
   }
-  const handleSave = () => {
+  const handleSave = async () => {
     if (disabled || !hasRemaining) return
     if (!enteredCount) {
       setEmptyError(true)
       focusQuantity(values.length ? 0 : -1)
       return
     }
-    onOk()
+    let errors
+    try {
+      await onOk()
+      errors = form.getFieldsError().filter((field) => field.errors.length > 0)
+    } catch (error) {
+      if (!Array.isArray(error?.errorFields)) throw error
+      errors = error.errorFields
+    }
+    if (errors?.length) {
+      revealArrivalIndex(lineItemFieldIndex(errors[0].name, 'arrival_items'))
+      await new Promise((resolve) => window.requestAnimationFrame(resolve))
+      form.scrollToField(errors[0].name, { block: 'nearest', focus: true })
+    }
   }
 
   return (
@@ -380,7 +399,9 @@ export default function PurchaseOrderInboundDraftModal({
           </Form.Item>
           <Form.Item name="note" label="到货备注">
             <BusinessTextArea
-              maxLength={255}
+              showCount
+              minRows={2}
+              maxLength={BusinessTextPolicy.noteMaxCharacters}
               placeholder="选填本次送货的补充信息"
             />
           </Form.Item>
@@ -440,7 +461,8 @@ export default function PurchaseOrderInboundDraftModal({
                     focusQuantity(index, { highlight: true })
                   }
                   return (
-                    <div className="erp-purchase-arrival__materials">
+                    <div className="erp-purchase-arrival__materials" ref={disclosure.rootRef} onFocusCapture={disclosure.onFocusCapture}>
+                      {disclosureGroups.length > 1 ? <BusinessLineItemGroupControls controller={disclosure} form={form} label="采购到货清点明细" groupCount={disclosureGroups.length} /> : null}
                       {groups
                         .filter((group) => group.fields.length)
                         .map(({ row, fields: materialFields }) => {
@@ -458,6 +480,18 @@ export default function PurchaseOrderInboundDraftModal({
                               aria-label={row.material}
                             >
                               <div className="erp-purchase-arrival__material-head">
+                                {disclosureGroups.length > 1 ? (
+                                  <Button
+                                    size="small"
+                                    disabled={false}
+                                    aria-expanded={!disclosure.isCollapsed(String(row.key))}
+                                    aria-label={`${disclosure.isCollapsed(String(row.key)) ? '展开' : '收起'}${row.material}`}
+                                    onClick={() => disclosure.toggle(String(row.key))}
+                                  >
+                                    {disclosure.isCollapsed(String(row.key)) ? '展开' : '收起'} · {materialFields.length} 条记录
+                                    <BusinessLineItemGroupErrorCount controller={disclosure} groupId={String(row.key)} />
+                                  </Button>
+                                ) : null}
                                 <div className="erp-purchase-arrival__material-name">
                                   <span>采购第 {row.lineNo} 行</span>
                                   <strong>{row.material}</strong>
@@ -482,10 +516,11 @@ export default function PurchaseOrderInboundDraftModal({
                                   </strong>
                                 </div>
                               </div>
-                              <BusinessCompactFieldTable
-                                label={`${row.material}到货记录`}
-                                className="erp-purchase-arrival__table"
-                                columns={[
+                              <div className="erp-line-item-disclosure-body" hidden={disclosureGroups.length > 1 && disclosure.isCollapsed(String(row.key))} data-line-item-collapsed={disclosureGroups.length > 1 && disclosure.isCollapsed(String(row.key)) ? 'true' : undefined}>
+                                <BusinessCompactFieldTable
+                                  label={`${row.material}到货记录`}
+                                  className="erp-purchase-arrival__table"
+                                  columns={[
                                   { label: '序号', width: 40 },
                                   {
                                     label: `实点数量（${row.unit}）`,
@@ -500,41 +535,42 @@ export default function PurchaseOrderInboundDraftModal({
                                   { label: '差异', width: 112 },
                                   { label: '操作', width: 52 },
                                 ]}
-                              >
-                                {materialFields.map((field) => (
-                                  <ArrivalRecord
-                                    key={field.key}
-                                    field={field}
-                                    item={values[field.name] || {}}
-                                    row={row}
-                                    quantityUnitOptions={quantityUnitOptions}
-                                    form={form}
-                                    disabled={disabled}
-                                    onRemove={() => {
+                                >
+                                  {materialFields.map((field) => (
+                                    <ArrivalRecord
+                                      key={field.key}
+                                      field={field}
+                                      item={values[field.name] || {}}
+                                      row={row}
+                                      quantityUnitOptions={quantityUnitOptions}
+                                      form={form}
+                                      disabled={disabled}
+                                      onRemove={() => {
                                       remove(field.name)
                                       markChanged()
                                       focusQuantity(
                                         Math.min(field.name, fields.length - 2)
                                       )
                                     }}
-                                  />
+                                    />
                                 ))}
-                              </BusinessCompactFieldTable>
-                              <div className="erp-purchase-arrival__add-record">
-                                <Button
-                                  className="erp-line-items-form__add-button"
-                                  icon={<PlusOutlined />}
-                                  disabled={disabled || fields.length >= 200}
-                                  onClick={() =>
+                                </BusinessCompactFieldTable>
+                                <div className="erp-purchase-arrival__add-record">
+                                  <Button
+                                    className="erp-line-items-form__add-button"
+                                    icon={<PlusOutlined />}
+                                    disabled={disabled || fields.length >= 200}
+                                    onClick={() =>
                                     addRecord(
                                       row,
                                       values[lastField.name]?.warehouse_id,
                                       lastField.name + 1
                                     )
                                   }
-                                >
-                                  增加一卷 / 包
-                                </Button>
+                                  >
+                                    增加一卷 / 包
+                                  </Button>
+                                </div>
                               </div>
                             </section>
                           )

@@ -14,6 +14,7 @@ import BusinessChainStepVerification from './BusinessChainStepVerification.jsx'
 import FinanceRelationshipsView from './FinanceRelationshipsView.jsx'
 import { FINANCE_RELATIONS_TOPIC_KEY } from '../../config/devFinanceWorkbench.mjs'
 import './businessChainTopics.css'
+import { ChainCapabilityLinks } from '../DevProductCoreRelations.jsx'
 
 export default function BusinessChainTopics({
   catalog,
@@ -272,7 +273,12 @@ export default function BusinessChainTopics({
               />
             )}
           </div>
-          {!mapOpen ? <BusinessTopicVerification topic={topic} /> : null}
+          {!mapOpen ? (
+            <>
+              <ChainCapabilityLinks chainKey={topic.key} />
+              <BusinessTopicVerification topic={topic} />
+            </>
+          ) : null}
 
         </section>
       ) : (

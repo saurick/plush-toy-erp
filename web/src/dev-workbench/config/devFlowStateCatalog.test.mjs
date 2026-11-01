@@ -1061,10 +1061,17 @@ test('devFlowStateCatalog: 动作规则不能脱离真实对象、权限与合�
     }
   }
   const task = flows.find((flow) => flow.key === 'workflow.task')
-  for (const rule of task.actionRules) {
+  for (const rule of task.actionRules.filter((item) => ['reassign', 'return_to_pool'].includes(item.key))) {
     assert.deepEqual([...rule.states].sort(), task.states.filter((state) => !task.terminalStates.includes(state.key)).map((state) => state.key).sort())
     assert.deepEqual(rule.permission, [PermissionCode.WORKFLOW_TASK_ASSIGN])
   }
+  for (const [key, states] of [['complete', ['ready']], ['block', ['ready']], ['reject', ['ready']], ['resume', ['blocked']], ['urge', ['ready', 'blocked']]]) {
+    const rule = task.actionRules.find((item) => item.key === key)
+    assert(rule, `missing task action ${key}`)
+    assert.deepEqual(rule.states, states)
+  }
+  assert.match(task.actionRules.find((rule) => rule.key === 'resume').condition, /选填/u)
+  assert.match(task.actionRules.find((rule) => rule.key === 'urge').condition, /选填/u)
   assert.throws(() => getDevFlowActionRules({ ...task, states: [] }), /unknown states/u)
 })
 

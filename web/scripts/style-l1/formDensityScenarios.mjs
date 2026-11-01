@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { assertFormInputsExposed } from './businessFormPageAssertions.mjs'
 import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { openUIDesignAppearance } from './devUIDesignNavigation.mjs'
 import { prepareUIDesignSandboxSource } from '../../src/dev-workbench/config/devUIDesign.mjs'
@@ -111,6 +112,7 @@ export function createFormDensityScenarios({ outputDir }) {
           .locator('[role="dialog"]')
           .filter({ has: frame.locator('.compact-action-form') })
         await modal.waitFor()
+        await assertFormInputsExposed(modal)
         const table = modal.locator('.compact-form-table')
         await assertCompactBounds(table, size === 'narrow')
         if (kind === 'quality') {
@@ -129,23 +131,20 @@ export function createFormDensityScenarios({ outputDir }) {
             '克重'
           )
         } else {
-          const note = modal.locator('.compact-optional').first()
-          await note.locator('summary').click()
-          await note.locator('textarea').fill('保存后仍须保留的补充说明')
-          await note.locator('summary').click()
-          assert.match(
-            await note.locator('summary').innerText(),
-            /保存后仍须保留/
-          )
+          if (kind !== 'engineering') {
+            const note = modal.locator('.compact-optional').first()
+            assert.ok(await note.locator('textarea').isVisible())
+            await note.locator('textarea').fill('保存后仍须保留的补充说明')
+          }
           if (kind === 'engineering') {
             await chooseSelectOption(modal.getByLabel('工程产品 1', { exact: true }), '节庆毛绒礼盒')
-            await chooseSelectOption(modal.getByLabel('打样 BOM 1', { exact: true }), 'V1')
+            await chooseSelectOption(modal.getByLabel('工程 BOM 1', { exact: true }), 'V1')
             assert.equal(
               await modal.getByLabel('设计师 1', { exact: true }).inputValue(),
               '周敏'
             )
             await chooseSelectOption(modal.getByLabel('工程产品 1', { exact: true }), '毛绒挂件')
-            assert.equal(await readSelectValue(modal.getByLabel('打样 BOM 1', { exact: true })), '')
+            assert.equal(await readSelectValue(modal.getByLabel('工程 BOM 1', { exact: true })), '')
             assert.equal(await modal.getByLabel('设计师 1', { exact: true }).inputValue(), '')
           } else if (kind === 'arrival') {
             await modal.getByLabel('实点数量 1', { exact: true }).fill('25.6')
@@ -193,14 +192,8 @@ export function createFormDensityScenarios({ outputDir }) {
             await modal.getByLabel('检查项目 1', { exact: true }).inputValue(),
             '克重'
           )
-        } else {
-          assert.match(
-            await modal
-              .locator('.compact-optional summary')
-              .first()
-              .innerText(),
-            /保存后仍须保留/
-          )
+        } else if (kind !== 'engineering') {
+          assert.equal(await modal.locator('.compact-optional textarea').first().inputValue(), '保存后仍须保留的补充说明')
         }
         await modal.getByRole('button', { name: '取消', exact: true }).click()
       }
@@ -208,9 +201,9 @@ export function createFormDensityScenarios({ outputDir }) {
       await frame.locator('[data-action="new-record"]').click()
       const production = frame.locator('.compact-form-table')
       await production.waitFor()
+      await assertFormInputsExposed(production)
       await chooseSelectOption(frame
         .getByLabel('产品 1', { exact: true }), '节庆毛绒礼盒')
-      await production.locator('.compact-optional > summary').click()
       const expanded = await production
         .locator('.production-line-fields')
         .evaluate((node) => ({
@@ -230,18 +223,12 @@ export function createFormDensityScenarios({ outputDir }) {
         path: `${outputDir}/form-density-production-expanded-${size}.png`,
       })
       await frame.getByLabel('明细备注 1', { exact: true }).fill('生产首行备注')
-      await production.locator('.compact-optional > summary').click()
       await frame
         .getByRole('button', { name: '添加生产明细', exact: true })
         .click()
       assert.equal(await production.locator('tbody').count(), 2)
-      assert.match(
-        await production
-          .locator('.compact-optional > summary')
-          .first()
-          .innerText(),
-        /生产首行备注/
-      )
+      assert.equal(await frame.getByLabel('明细备注 1', { exact: true }).inputValue(), '生产首行备注')
+      assert.ok(await frame.getByLabel('明细备注 2', { exact: true }).isVisible())
       await production
         .locator('tbody')
         .last()
@@ -249,10 +236,7 @@ export function createFormDensityScenarios({ outputDir }) {
         .click()
       await frame.getByRole('button', { name: '保存草稿', exact: true }).click()
       assert.equal(await production.locator('tbody').count(), 1)
-      assert.match(
-        await production.locator('.compact-optional > summary').innerText(),
-        /生产首行备注/
-      )
+      assert.equal(await frame.getByLabel('明细备注 1', { exact: true }).inputValue(), '生产首行备注')
       await assertCompactBounds(production, size === 'narrow')
       await production.screenshot({
         path: `${outputDir}/form-density-design-production-${size}.png`,
@@ -322,15 +306,10 @@ export function createFormDensityScenarios({ outputDir }) {
         }
         const row = table.locator('[data-form-row]').first()
         const details = row.locator('.document-line-details')
-        assert.equal(await details.getAttribute('open'), null)
-        await details.locator('summary').click()
+        await assertFormInputsExposed(table)
         const note = details.locator('[data-form-field="note-0"]')
         await note.fill('第一行的独立备注')
-        await details.locator('summary').click()
-        assert.match(
-          await details.locator('summary').innerText(),
-          /第一行的独立备注/
-        )
+        assert.ok(await note.isVisible())
         if (key !== 'shipments') {
           await row.locator('[data-action="copy-line"]').click()
           const copied = table.locator('[data-form-row]').nth(1)
@@ -338,21 +317,17 @@ export function createFormDensityScenarios({ outputDir }) {
             await copied.locator('[data-form-field="note-1"]').inputValue(),
             '第一行的独立备注'
           )
-          await copied.locator('summary').click()
           await copied
             .locator('[data-form-field="note-1"]')
             .fill('第二行修改后的备注')
-          await copied.locator('summary').click()
           assert.equal(await note.inputValue(), '第一行的独立备注')
           await copied.locator('[data-action="remove-line"]').click()
         }
         await frame
           .getByRole('button', { name: addLabel, exact: true })
           .click()
-        assert.match(
-          await details.locator('summary').innerText(),
-          /第一行的独立备注/
-        )
+        assert.equal(await note.inputValue(), '第一行的独立备注')
+        await assertFormInputsExposed(table)
         await table.screenshot({
           path: `${outputDir}/form-density-design-${key}-${size}.png`,
         })
@@ -375,15 +350,11 @@ export function createFormDensityScenarios({ outputDir }) {
       await frame.locator('[data-action="new-record"]').click()
       await frame.getByLabel('操作原因').fill('核对盘点差异')
       await frame.getByLabel('作业数量').fill('1200')
-      await frame.locator('.compact-optional summary').click()
       await frame.getByLabel('明细备注 1', { exact: true }).fill('盘点补充说明')
-      await frame.locator('.compact-optional summary').click()
       await frame.getByRole('button', { name: '保存草稿', exact: true }).click()
       assert.equal(await frame.getByLabel('作业数量').inputValue(), '1200')
-      assert.match(
-        await frame.locator('.compact-optional summary').innerText(),
-        /盘点补充说明/
-      )
+      assert.equal(await frame.getByLabel('明细备注 1', { exact: true }).inputValue(), '盘点补充说明')
+      await assertFormInputsExposed(frame.locator('.form-view'))
       await chooseSelectOption(frame.getByLabel('操作类型', { exact: true }), '调拨')
       assert.equal(await frame.getByLabel('作业数量').inputValue(), '')
       await frame.getByLabel('作业数量').fill('20')

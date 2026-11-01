@@ -207,7 +207,7 @@ export function createMobileTaskScenarios({
           '目标任务不在最初加载的 50 项内'
         )
         const search = page.getByRole('searchbox', {
-          name: '搜索订单、产品、物料或款号',
+          name: '搜索任务编号、订单、产品、物料或款号',
         })
         const assertSearchFocus = async (name) => {
           await search.focus()

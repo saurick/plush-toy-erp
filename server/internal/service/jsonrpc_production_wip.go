@@ -7,6 +7,7 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
+	corevalue "server/internal/core/value"
 	"server/internal/errcode"
 
 	"google.golang.org/protobuf/types/known/structpb"
@@ -145,7 +146,7 @@ func productionWIPActionFromParams(pm map[string]any, action string, actorID int
 	if action == biz.ProductionWIPActionConfirmPackagingMaterial {
 		itemID, ok4 := productionOrderRequiredPositiveInt(pm, "production_order_item_id")
 		packagingVersion, ok5 := productionOrderOptionalString(pm, "packaging_version_snapshot", 128)
-		note, ok6 := productionOrderOptionalString(pm, "note", 255)
+		note, ok6 := productionOrderOptionalString(pm, "note", corevalue.BusinessNoteMaxCharacters)
 		if !ok4 || !ok5 || !ok6 || packagingVersion == nil {
 			return nil, false
 		}

@@ -50,8 +50,8 @@ VALUES ($1, $1, 'purchase', 'read', 'receipt', CURRENT_TIMESTAMP, CURRENT_TIMEST
 					producer = "custom"
 				}
 				payload, _ := json.Marshal(map[string]any{"source_record_id": sourceID, "source_task_intent_hash": strings.Repeat("a", 64), "source_task_contract": "workflow.source-task/v1", "source_task_producer": producer})
-				err := tx.QueryRowContext(ctx, `INSERT INTO workflow_tasks (task_code, task_group, task_name, source_type, source_id, task_status_key, owner_role_key, owner_pool_key, required_capability_key, assignee_id, version, payload, created_at, updated_at)
-VALUES ($1, 'handoff_purchase_arrival', '模拟来料登记', 'purchase_order', $2, $3, 'warehouse', 'warehouse', 'purchase.receipt.create', 17, 10, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id`, fmt.Sprintf("source-handoff-purchase-arrival-%d", sourceID), sourceID, status, string(payload)).Scan(&ids[i])
+				err := tx.QueryRowContext(ctx, `INSERT INTO workflow_tasks (task_no, task_code, task_group, task_name, source_type, source_id, task_status_key, owner_role_key, owner_pool_key, required_capability_key, assignee_id, version, payload, created_at, updated_at)
+VALUES ($5, $1, 'handoff_purchase_arrival', '模拟来料登记', 'purchase_order', $2, $3, 'warehouse', 'warehouse', 'purchase.receipt.create', 17, 10, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id`, fmt.Sprintf("source-handoff-purchase-arrival-%d", sourceID), sourceID, status, string(payload), workflowTaskFixtureNumber(t, tx)).Scan(&ids[i])
 				if err != nil {
 					t.Fatal(err)
 				}

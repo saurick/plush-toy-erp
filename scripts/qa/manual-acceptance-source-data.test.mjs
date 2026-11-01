@@ -588,7 +588,7 @@ test("current V8 plans use short yoyoosun-style visible business numbers", () =>
     plan.records.outsourcingOrders[0].outsourcing_order_no,
     "YS8-WW-001",
   );
-  assert.match(plan.records.bomVersions[0].version, /^YS8-BOM-/u);
+  assert.equal(plan.records.bomVersions[0].version, "V1");
 });
 
 test("V8 source apply retires and replaces only the exact registered V7 route holders", async () => {
@@ -2491,7 +2491,7 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
   };
   const bomVersions = new Map([
     [
-      bomPlan.version,
+      `${bomPlan.productRef}:${bomPlan.version}`,
       {
         id: 3001,
         status: "ACTIVE",

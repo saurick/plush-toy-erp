@@ -10,6 +10,7 @@ import {
   buildOrderContactSnapshot,
 } from './sourcePartySnapshots.mjs'
 import { isMutationResultUnknown } from './sourceDocumentMutation.mjs'
+import { optionalContactEmailError, optionalContactPhoneError } from './contactValidation.mjs'
 import {
   salesOrderCommercialIssues,
   optionalMoneyError,
@@ -42,6 +43,12 @@ export function salesOrderImportIssues(
     add(['order_date'], '请填写下单日期')
   }
   if (!values.items?.length) add(['items'], '至少保留一条订货明细')
+  for (const [field, error] of [
+    ['contact_phone', optionalContactPhoneError(values.contact_phone)],
+    ['contact_email', optionalContactEmailError(values.contact_email)],
+  ]) {
+    if (error !== null) add([field], error)
+  }
   for (const issue of salesOrderCommercialIssues(values)) {
     add(issue.name, issue.errors[0])
   }

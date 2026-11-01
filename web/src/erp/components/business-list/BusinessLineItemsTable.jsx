@@ -1,33 +1,19 @@
 import React from 'react'
-import { Form } from 'antd'
+import { Button } from 'antd'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import './businessLineItemCards.css'
+import './businessLineItemGroups.css'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
+import SelectPresentationContext from '@/common/components/select/SelectPresentationContext.jsx'
+import { useBusinessLineItemDisclosure } from './BusinessLineItemDisclosureContext.js'
+import { useBusinessLineItemGroupErrors } from './useBusinessLineItemGroups.js'
 
 const LineItemCardsContext = React.createContext(null)
 
-function LineItemSummary({ name, fields }) {
-  const form = Form.useFormInstance()
-  const values = Form.useWatch(name[0], { form, preserve: true })
-  const row = name.slice(1).reduce((value, key) => value?.[key], values)
-  const text = fields
-    .map(({ key, label, options }) => {
-      const value = row?.[key]
-      const display = options
-        ? options.find((option) => String(option.value) === String(value))
-            ?.label
-        : value
-      return String(display ?? '').trim() ? `${label}：${display}` : ''
-    })
-    .filter(Boolean)
-    .join('；')
-  return text ? (
-    <span className="erp-line-item-details__summary">{text}</span>
-  ) : null
-}
-
 export default function BusinessLineItemsTable({
   columns,
+  desktopColumns = columns,
+  actionsWidth = 160,
   children,
   label = '单据明细',
 }) {
@@ -44,26 +30,26 @@ export default function BusinessLineItemsTable({
         className="erp-line-item-table"
         data-table-lines="appearance"
         style={{
-          minWidth: columns.reduce(
+          minWidth: desktopColumns.reduce(
             (total, column) => total + column.width,
-            200
+            44 + actionsWidth
           ),
         }}
       >
         <colgroup>
-          <col style={{ width: 40 }} />
-          {columns.map((column, index) => (
+          <col style={{ width: 'var(--erp-line-item-sequence-width)' }} />
+          {desktopColumns.map((column, index) => (
             <col
               key={index}
               style={column.flexible ? undefined : { width: column.width }}
             />
           ))}
-          <col style={{ width: 160 }} />
+          <col style={{ width: actionsWidth }} />
         </colgroup>
         <thead>
           <tr>
-            <th scope="col">序号</th>
-            {columns.map((column, index) => (
+            <th scope="col" className="erp-line-item-table__index">序号</th>
+            {desktopColumns.map((column, index) => (
               <th scope="col" key={index} title={column.hint}>
                 {column.required ? (
                   <span
@@ -87,6 +73,36 @@ export default function BusinessLineItemsTable({
   )
 }
 
+export function BusinessLineItemGroupHeading({ children, columnCount, collapsed, onToggle, label, count, countLabel = '条明细', controller, groupId }) {
+  const cardColumns = React.useContext(LineItemCardsContext)
+  const errors = useBusinessLineItemGroupErrors(controller).get(groupId) || 0
+  if (onToggle) {
+    const content = (
+      <div className={`erp-line-item-disclosure-heading${cardColumns ? '' : ' erp-line-item-identity-group__content'}`}>
+        <Button size="small" disabled={false} aria-expanded={!collapsed} aria-label={`${collapsed ? '展开' : '收起'}${label}`} onClick={onToggle}>
+          {collapsed ? '展开' : '收起'}
+        </Button>
+        <div className="erp-line-item-disclosure-heading__title">{children}</div>
+        <span className="erp-line-item-identity-group__count">{count} {countLabel}</span>
+        {errors ? <span className="erp-line-item-disclosure-heading__errors">{errors} 项待修改</span> : null}
+      </div>
+    )
+    return cardColumns
+      ? <div className="erp-line-item-identity-group">{content}</div>
+      : <tbody className="erp-line-item-identity-group"><tr><td colSpan={columnCount}>{content}</td></tr></tbody>
+  }
+  if (cardColumns) return null
+  return (
+    <tbody className="erp-line-item-identity-group">
+      <tr>
+        <td colSpan={columnCount}>
+          <div className="erp-line-item-identity-group__content">{children}</div>
+        </td>
+      </tr>
+    </tbody>
+  )
+}
+
 export function BusinessLineItemRow({
   index,
   cells,
@@ -95,66 +111,81 @@ export function BusinessLineItemRow({
   children,
   rowRef,
   status,
-  detailsOpen = false,
   detailsLabel = '补充信息',
-  name = ['items', index],
-  summaryFields = [],
+  showDetailsHeading = true,
   evidence,
 }) {
   const cardColumns = React.useContext(LineItemCardsContext)
+  const disclosure = useBusinessLineItemDisclosure()
+  const [active, setActive] = React.useState(false)
+  // React focus events include this row's portals without changing section navigation.
+  const focusProps = {
+    'data-line-active': active ? 'true' : undefined,
+    onFocusCapture: () => { setActive(true); disclosure?.onFocus() },
+    onBlurCapture: (event) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) setActive(false)
+    },
+  }
   if (cardColumns) { return (
-    <details className="erp-task-line-card erp-line-item-details" open={index === 0 || detailsOpen || undefined} ref={rowRef}>
-      <summary><strong>第 {index + 1} 条明细</strong>{summaryFields.length ? <LineItemSummary name={name} fields={summaryFields} /> : null}{status}</summary>
+    <section className="erp-task-line-card erp-editable-line-group" aria-label={`第 ${index + 1} 条明细`} ref={rowRef} hidden={disclosure?.hidden} data-line-item-collapsed={disclosure?.hidden ? 'true' : undefined} data-line-item-index={disclosure?.index} {...focusProps}>
+      <div className="erp-task-line-card__heading"><strong>第 <span className="erp-editable-line-group__number">{index + 1}</span> 条明细</strong>{status}</div>
       <div className="erp-task-line-card__fields">
         {hiddenFields}
         {cells.map((cell, cellIndex) => <div className="erp-task-line-card__field" key={cellIndex}><div className="erp-task-line-card__label">{cardColumns[cellIndex]?.label}{cardColumns[cellIndex]?.required ? <span aria-label="必填"> *</span> : null}</div>{cell}</div>)}
-        {children ? <details className="erp-line-item-details" open={detailsOpen || undefined}><summary>{detailsLabel}</summary><div className="erp-line-item-details__fields">{children}</div></details> : null}
+        {children ? <section className="erp-line-item-details" aria-label={detailsLabel}><div className="erp-line-item-details__heading">{detailsLabel}</div><div className="erp-line-item-details__fields">{children}</div></section> : null}
         {evidence}
         {actions ? <div className="erp-task-line-card__actions">{actions}</div> : null}
       </div>
-    </details>
+    </section>
   ) }
   return (
     <tbody
-      className="erp-sales-order-lines-form__row"
+      className="erp-sales-order-lines-form__row erp-editable-line-group"
       ref={rowRef}
       aria-label={`第 ${index + 1} 条明细`}
+      data-line-parity={index % 2 ? 'even' : 'odd'}
+      hidden={disclosure?.hidden}
+      data-line-item-collapsed={disclosure?.hidden ? 'true' : undefined}
+      data-line-item-index={disclosure?.index}
+      {...focusProps}
     >
       <tr className="erp-line-item-table__main-row">
-        <td className="erp-line-item-table__index">
-          {index + 1}
+        <td
+          className="erp-line-item-table__index erp-editable-line-group__sequence"
+          rowSpan={children ? 2 : 1}
+        >
+          <span className="erp-editable-line-group__number">{index + 1}</span>
           {hiddenFields}
         </td>
         {cells.map((cell, cellIndex) => (
           <td className="erp-line-item-table__cell" key={cellIndex}>
-            {cell}
+            <SelectPresentationContext.Provider value="reference">{cell}</SelectPresentationContext.Provider>
           </td>
         ))}
         <td className="erp-line-item-table__actions">{actions}</td>
       </tr>
       {children ? (
         <tr>
-          <td colSpan={cells.length + 2} className="erp-line-item-table__more">
+          <td colSpan={cells.length + 1} className="erp-line-item-table__more">
             <div className="erp-line-item-supplement">
-              <details
+              <section
                 className="erp-line-item-details"
-                open={detailsOpen || undefined}
+                aria-label={detailsLabel}
               >
-                <summary>
-                  <span className="erp-line-item-details__label">
-                    {detailsLabel}
-                  </span>
-                  {summaryFields.length ? (
-                    <LineItemSummary name={name} fields={summaryFields} />
-                  ) : null}
-                  {status ? (
-                    <span className="erp-line-item-details__status">
-                      {status}
+                {showDetailsHeading || status ? (
+                  <div className="erp-line-item-details__heading">
+                    <span className="erp-line-item-details__label">
+                      {detailsLabel}
                     </span>
-                  ) : null}
-                </summary>
+                    {status ? (
+                      <span className="erp-line-item-details__status">
+                        {status}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="erp-line-item-details__fields">{children}</div>
-              </details>
+              </section>
               {evidence}
             </div>
           </td>

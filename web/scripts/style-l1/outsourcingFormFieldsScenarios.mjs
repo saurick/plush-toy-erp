@@ -149,7 +149,6 @@ export function createOutsourcingFormFieldsScenarios({
         await quantity.fill('12')
         const unit = editor.locator('input#outsourcing-order-editor_items_0_unit_id')
         assert.equal(await unit.isDisabled(), true)
-        await editor.locator('.erp-line-item-details summary').first().click()
         await editor
           .getByLabel('行备注', { exact: true })
           .fill('保留的逐行备注')
@@ -250,14 +249,7 @@ export function createOutsourcingFormFieldsScenarios({
           ''
         )
         await editor.locator('input#outsourcing-order-editor_payment_term_days').fill('45')
-        const lineDetails = editor.locator('.erp-line-item-details').first()
-        await lineDetails
-          .getByText('规格与行备注', { exact: true })
-          .click()
-        assert.equal(await lineDetails.evaluate((details) => details.open), false)
-        await lineDetails
-          .getByText('备注：保留的逐行备注', { exact: true })
-          .waitFor()
+        assert.equal(await editor.locator('.erp-line-item-details').first().getByLabel('行备注', { exact: true }).inputValue(), '保留的逐行备注')
         await assertNoHorizontalOverflow(page)
         await page.screenshot({
           path: path.join(outputDir, `${name}-editor.png`),

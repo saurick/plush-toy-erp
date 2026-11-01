@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"golang.org/x/image/draw"
 	"golang.org/x/image/webp"
 )
@@ -543,7 +545,7 @@ func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (B
 		if note == "" {
 			in.Note = nil
 		} else {
-			if len([]rune(note)) > 255 {
+			if len([]rune(note)) > corevalue.BusinessNoteMaxCharacters {
 				return in, ErrBadParam
 			}
 			in.Note = &note

@@ -3,9 +3,11 @@ import { DownOutlined } from '@ant-design/icons'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
 import WorkflowTaskClassification from './WorkflowTaskClassification.jsx'
+import { TaskCopyField } from './WorkflowTaskCopy.jsx'
 import './workflowTaskInfoCard.css'
 
 export default function WorkflowTaskInfoCard({ task, title, status, source, summary, resources, events = [], businessInfo, showDetails = true, className = '', titleClassName = '' }) {
+  const taskNumber = typeof task?.task_no === 'string' ? task.task_no.trim() : ''
   return (
     <>
       <section className={`workflow-task-info-card ${className}`} aria-label="任务信息">
@@ -15,6 +17,10 @@ export default function WorkflowTaskInfoCard({ task, title, status, source, summ
         {showDetails ? (
           <details key={task.id} className="workflow-task-info-card__details">
             <summary><span>任务信息</span><DownOutlined aria-hidden="true" /></summary>
+            <dl className="workflow-task-info-card__number">
+              <dt>任务编号</dt>
+              <dd><TaskCopyField value={taskNumber} label="任务编号">{taskNumber || '未记录'}</TaskCopyField></dd>
+            </dl>
             <WorkflowTaskClassification task={task} />
             <WorkflowTaskTiming task={task} events={events} detail includeKeys={['arrived', 'blocked', 'ended']} />
           </details>

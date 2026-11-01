@@ -3,13 +3,15 @@ import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import {
   assertBusinessFormPage,
+  assertFormInputsExposed,
   closeBusinessFormPage,
 } from './businessFormPageAssertions.mjs'
 import { createBusinessFormPageDraftScenarios } from './businessFormPageDraftScenarios.mjs'
 import { createBusinessFormModeScenarios } from './businessFormModeScenarios.mjs'
+import { createBusinessFormCornerScenarios } from './businessFormCornerScenarios.mjs'
 import { createBusinessFormFullscreenScenarios } from './businessFormFullscreenScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
-import { assertBusinessFormSections } from './businessFormSectionAssertions.mjs'
+import { assertBusinessFormSections, assertCurrentBusinessSection, assertBusinessFormScrollTracking } from './businessFormSectionAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
 
 export function createBusinessFormPagesScenarios(deps) {
@@ -104,6 +106,7 @@ export function createBusinessFormPagesScenarios(deps) {
           Math.abs(full.height - viewport.height) <= 1,
           `${key}: fullscreen fills the browser workspace ${JSON.stringify(full)}`
         )
+        await assertBusinessFormScrollTracking(page, editor)
         await editor.getByRole('button', { name: '退出全屏', exact: true }).click()
         const restored = await editor.boundingBox()
         for (const dimension of ['x', 'y', 'width', 'height']) {
@@ -274,11 +277,99 @@ export function createBusinessFormPagesScenarios(deps) {
       await editor.waitFor({ state: 'hidden' })
     },
   }))
+  const modeScenarios = createBusinessFormModeScenarios(deps, documents)
   return [
     ...createBusinessFormFullscreenScenarios(deps, scenarios),
     ...createBusinessFormPageDraftScenarios(deps),
     ...scenarios,
-    ...createBusinessFormModeScenarios(deps, documents),
+    ...modeScenarios,
+    ...createBusinessFormCornerScenarios(deps, documents, modeScenarios),
+    ...['customers', 'suppliers', 'sales', 'purchase', 'outsourcing', 'shipment', 'production'].map((key) => ({
+      ...scenarios.find((scenario) => scenario.name === `business-form-page-${key}-desktop`),
+      name: `business-form-scroll-long-${key}`,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        await page.getByRole('button', { name: documents.find(([name]) => name === key)[2] }).click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await page.waitForFunction((root) => root.getAttribute('aria-busy') !== 'true', await editor.elementHandle())
+        const contacts = ['customers', 'suppliers'].includes(key)
+        const rows = editor.locator(contacts ? '.erp-master-contact-list__row' : key === 'production' ? '.erp-production-order-line' : '.erp-sales-order-lines-form__row')
+        const addNames = { sales: '添加订货明细', purchase: '添加采购明细', outsourcing: '添加加工明细', shipment: '添加出货明细', production: '添加生产明细' }
+        const add = editor.getByRole('button', { name: contacts ? '添加联系人' : addNames[key], exact: true })
+        while (await rows.count() < 10) {
+          const before = await rows.count()
+          await add.click()
+          await rows.nth(before).locator('input:focus,textarea:focus,select:focus').waitFor({ state: 'visible' })
+        }
+        await assertBusinessFormScrollTracking(page, editor)
+        await page.screenshot({ path: `${deps.outputDir}/business-form-scroll-long-${key}-editor.png`, fullPage: true })
+        await page.setViewportSize({ width: 390, height: 844 })
+        await assertBusinessFormScrollTracking(page, editor)
+        deps.assert.equal(await rows.count(), 10, 'section browsing preserves every added row')
+        await closeBusinessFormPage(page, editor)
+      },
+    })),
+    {
+      ...scenarios.find((scenario) => scenario.name === 'business-form-page-bom-desktop'),
+      name: 'business-form-page-bom-scroll-tracking',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        await page.getByRole('button', { name: '新建 BOM' }).click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        const body = editor.locator('.erp-business-form-page__body')
+        await editor.getByRole('button', { name: '添加物料', exact: true }).click()
+        const firstPart = editor.getByLabel('部位 1', { exact: true })
+        await firstPart.evaluate((input) => {
+          const data = new DataTransfer()
+          data.setData('text/plain', Array.from({ length: 34 }, (_, index) =>
+            `滚动验证部位${index + 1}\t1\t0.125\t10\t裁剪\t车缝\t模拟资料`
+          ).join('\n'))
+          input.dispatchEvent(new ClipboardEvent('paste', {
+            clipboardData: data, bubbles: true, cancelable: true,
+          }))
+        })
+        await editor.getByLabel('部位 34', { exact: true }).waitFor()
+        const titles = ['版本信息', '材料分析明细表', '订单与制表资料', '备注与附件']
+        const scrollSections = (reverse) => body.evaluate(async (node, backwards) => {
+          if (!backwards) node.querySelector('[data-form-section]').focus({ preventScroll: true })
+          const max = node.scrollHeight - node.clientHeight
+          const visited = []
+          for (let step = 0; step <= 120; step += 1) {
+            node.scrollTo({ top: max * (backwards ? 120 - step : step) / 120, behavior: 'instant' })
+            await new Promise(requestAnimationFrame)
+            await new Promise(requestAnimationFrame)
+            const current = node.parentElement.querySelector('nav button[aria-current="location"]')?.textContent
+            if (visited.at(-1) !== current) visited.push(current)
+          }
+          return visited
+        }, reverse)
+        for (const fullscreen of [false, true]) {
+          if (fullscreen) await editor.getByRole('button', { name: '全屏编辑', exact: true }).click()
+          deps.assert.deepEqual(await scrollSections(false), titles, 'native scrolling visits short trailing sections in order')
+          deps.assert.deepEqual(await scrollSections(true), titles.toReversed(), 'scrolling back restores each preceding section')
+        }
+        await editor.getByRole('button', { name: '退出全屏', exact: true }).click()
+        await assertBusinessFormScrollTracking(page, editor)
+        const geometry = () => editor.locator('[data-form-section]').evaluateAll((nodes) =>
+          nodes.map((node) => [node.offsetTop, node.offsetHeight, node.offsetWidth])
+        )
+        const before = await geometry()
+        const nav = editor.getByRole('navigation', { name: '表单分区' })
+        for (const title of titles) {
+          await nav.getByRole('button', { name: title, exact: true }).click()
+          await assertCurrentBusinessSection(page, editor, title)
+        }
+        await editor.getByLabel('来源订单号', { exact: true }).focus()
+        await assertCurrentBusinessSection(page, editor, '订单与制表资料')
+        deps.assert.deepEqual(await geometry(), before, 'highlight changes retain section geometry')
+        deps.assert.equal(await firstPart.inputValue(), '滚动验证部位1')
+        deps.assert.equal(await editor.locator('tr[data-bom-part-index]').count(), 34)
+        await page.screenshot({ path: `${deps.outputDir}/business-form-bom-scroll-tracking.png`, fullPage: true })
+        await closeBusinessFormPage(page, editor)
+      },
+    },
     ...['create', 'edit'].map((mode) => {
       const requests = []
       let quotaRejected = false
@@ -688,10 +779,6 @@ export function createBusinessFormPagesScenarios(deps) {
             const rows = list.locator('.erp-sales-order-lines-form__row')
             const count = await rows.count()
             const nameLabel = key === 'sales' ? '订货产品名称' : '产品名称'
-            if (key === 'purchase') {
-              await rows.nth(0).locator('summary').click()
-              await rows.nth(1).locator('summary').click()
-            }
             if (key !== 'outsourcing') {
               await rows
                 .first()
@@ -719,9 +806,6 @@ export function createBusinessFormPagesScenarios(deps) {
                   .inputValue()
               deps.assert.equal(await valueAt(1), '尚未保存的明细甲')
               deps.assert.equal(await valueAt(2), '相邻明细乙')
-              if (key === 'purchase') {
-                await rows.nth(1).locator('summary').click()
-              }
               await rows
                 .nth(1)
                 .getByLabel(nameLabel, { exact: true })
@@ -797,9 +881,6 @@ export function createBusinessFormPagesScenarios(deps) {
             })
             if (!contacts) {
               const details = list.locator('.erp-line-item-details').first()
-              if (!(await details.evaluate((node) => node.open))) {
-                await details.locator('summary').click()
-              }
               const note = details.locator('textarea[id$="_note"]').first()
               const previousNote = await note.inputValue()
               await note.fill(
@@ -808,7 +889,7 @@ export function createBusinessFormPagesScenarios(deps) {
               await page.waitForFunction(() =>
                 [
                   ...document.querySelectorAll(
-                    '.erp-line-item-details[open] textarea'
+                    '.erp-line-item-details__fields textarea'
                   ),
                 ].some(
                   (input) =>
@@ -831,10 +912,11 @@ export function createBusinessFormPagesScenarios(deps) {
                 deps.assert.equal(paired.length, 2, `${name}: 两个关联字段同组`)
                 deps.assert(
                   Math.abs(paired[0] - paired[1]) < 2,
-                  `${name}: 展开区关联字段应并排`
+                  `${name}: 补充字段应并排`
                 )
               }
             }
+            await assertFormInputsExposed(editor)
             const flow = await list.evaluate((node) => {
               const body = node.closest('.erp-business-form-page__body')
               return {
@@ -846,7 +928,7 @@ export function createBusinessFormPagesScenarios(deps) {
             })
             deps.assert(
               flow.contentHeight <= flow.listHeight + 2,
-              `${name}-${variant}: 展开补充信息后仍不应出现明细区纵向滚动 ${JSON.stringify(flow)}`
+              `${name}-${variant}: 补充字段常显时不应出现明细区纵向滚动 ${JSON.stringify(flow)}`
             )
             deps.assert(
               flow.contentWidth <= flow.bodyWidth + 1,
@@ -883,8 +965,6 @@ export function createBusinessFormPagesScenarios(deps) {
         ]) {
           await page.setViewportSize(viewport)
           const first = editor.locator('.erp-production-order-line').first()
-          const details = first.locator('details')
-          await details.locator('summary').click()
           const layout = await first
             .locator('.erp-production-order-line__supplement')
             .evaluate((node) => ({
@@ -896,7 +976,7 @@ export function createBusinessFormPagesScenarios(deps) {
           if (viewport.width > 720) {
             deps.assert(
               layout.height < 200,
-              `生产展开区应紧凑：${JSON.stringify(layout)}`
+              `生产补充区应紧凑：${JSON.stringify(layout)}`
             )
             deps.assert(
               Math.abs(layout.top[0] - layout.top[1]) < 2,
@@ -923,7 +1003,6 @@ export function createBusinessFormPagesScenarios(deps) {
           await page.screenshot({
             path: `${deps.outputDir}/production-expanded-density-${viewport.width}.png`,
           })
-          await details.locator('summary').click()
           for (let count = 0; count < 3; count += 1) {
             const rows = editor.locator('.erp-production-order-line')
             const before = await rows.count()
@@ -960,19 +1039,16 @@ export function createBusinessFormPagesScenarios(deps) {
         await page.setViewportSize({ width: 1440, height: 900 })
         const rows = editor.locator('.erp-production-order-line')
         for (const [index, note] of ['待移除说明', '保留生产说明'].entries()) {
-          await rows.nth(index).locator('summary').click()
           await rows
             .nth(index)
             .getByLabel('明细备注', { exact: true })
             .fill(note)
-          await rows.nth(index).locator('summary').click()
         }
         await rows.first().getByRole('button', { name: '移除明细 1' }).click()
         deps.assert.match(
-          await rows.first().locator('summary').innerText(),
+          await rows.first().getByLabel('明细备注', { exact: true }).inputValue(),
           /保留生产说明/u
         )
-        await rows.first().locator('summary').click()
         deps.assert.equal(
           await rows
             .first()
@@ -982,7 +1058,7 @@ export function createBusinessFormPagesScenarios(deps) {
         )
         await rows.first().getByLabel('明细备注', { exact: true }).fill('')
         deps.assert.doesNotMatch(
-          await rows.first().locator('summary').innerText(),
+          await rows.first().getByLabel('明细备注', { exact: true }).inputValue(),
           /保留生产说明/u
         )
         await closeBusinessFormPage(page, editor)

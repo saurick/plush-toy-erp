@@ -1,5 +1,6 @@
 import React from 'react'
 import { Form, Input } from 'antd'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import Select from '@/common/components/select/AppSelect'
 
 import { FinancePaymentKind } from '../../../common/consts/statuses.generated.mjs'
@@ -71,33 +72,33 @@ export function FinancePaymentEditor({
               {refundSource.available_amount} {refundSource.currency}
               。实际退款须保留独立凭据。
             </p>
-        ) : null}
+          ) : null}
           <Form.Item name="kind" label="款项用途" rules={[{ required: true }]}>
             <Select
               placeholder="请选择款项用途"
               disabled={Boolean(refundSource || sourceContext)}
               options={
-              refundSource
-                ? [{ value: FinancePaymentKind.REFUND, label: '实际退款' }]
-                : [
-                    {
-                      value: FinancePaymentKind.SETTLEMENT,
-                      label: '应收应付结算',
-                    },
-                    {
-                      value: FinancePaymentKind.ADVANCE,
-                      label: '订单预收 / 预付（首款、分期款、发货前尾款）',
-                    },
-                  ]
-            }
+                refundSource
+                  ? [{ value: FinancePaymentKind.REFUND, label: '实际退款' }]
+                  : [
+                      {
+                        value: FinancePaymentKind.SETTLEMENT,
+                        label: '应收应付结算',
+                      },
+                      {
+                        value: FinancePaymentKind.ADVANCE,
+                        label: '订单预收 / 预付（首款、分期款、发货前尾款）',
+                      },
+                    ]
+              }
               onChange={() =>
-              paymentForm.setFieldsValue({
-                source_type: undefined,
-                source_id: undefined,
-                currency: undefined,
-                purpose_note: undefined,
-              })
-            }
+                paymentForm.setFieldsValue({
+                  source_type: undefined,
+                  source_id: undefined,
+                  currency: undefined,
+                  purpose_note: undefined,
+                })
+              }
             />
           </Form.Item>
           <Form.Item
@@ -108,18 +109,18 @@ export function FinancePaymentEditor({
             <Select
               placeholder="请选择收付款方向"
               options={[
-              { value: 'RECEIPT', label: '收款' },
-              { value: 'DISBURSEMENT', label: '付款' },
-            ]}
+                { value: 'RECEIPT', label: '收款' },
+                { value: 'DISBURSEMENT', label: '付款' },
+              ]}
               disabled={Boolean(refundSource || sourceContext)}
               onChange={() =>
-              paymentForm.setFieldsValue({
-                counterparty_id: undefined,
-                source_type: undefined,
-                source_id: undefined,
-                currency: undefined,
-              })
-            }
+                paymentForm.setFieldsValue({
+                  counterparty_id: undefined,
+                  source_type: undefined,
+                  source_id: undefined,
+                  currency: undefined,
+                })
+              }
             />
           </Form.Item>
           <Form.Item
@@ -135,11 +136,11 @@ export function FinancePaymentEditor({
               loading={referenceLoading}
               disabled={Boolean(refundSource || sourceContext)}
               onChange={() =>
-              paymentForm.setFieldsValue({
-                source_id: undefined,
-                currency: undefined,
-              })
-            }
+                paymentForm.setFieldsValue({
+                  source_id: undefined,
+                  currency: undefined,
+                })
+              }
               options={partyOptions}
             />
           </Form.Item>
@@ -153,24 +154,26 @@ export function FinancePaymentEditor({
             name="purpose_note"
             label={refundSource ? '退款原因' : '款项说明'}
             rules={
-            refundSource
-              ? [
-                  {
-                    required: true,
-                    whitespace: true,
-                    message: '请填写退款原因',
-                  },
-                ]
-              : []
-          }
+              refundSource
+                ? [
+                    {
+                      required: true,
+                      whitespace: true,
+                      message: '请填写退款原因',
+                    },
+                  ]
+                : []
+            }
           >
-            <Input
+            <BusinessTextArea
+              showCount
+              minRows={2}
               maxLength={255}
               placeholder={
-              refundSource
-                ? '说明取消、退货或多收多付的原因'
-                : '例如：订单首款、第二期款或发货前尾款'
-            }
+                refundSource
+                  ? '说明取消、退货或多收多付的原因'
+                  : '例如：订单首款、第二期款或发货前尾款'
+              }
             />
           </Form.Item>
           <Form.Item
@@ -184,20 +187,20 @@ export function FinancePaymentEditor({
             name="amount"
             label="实收 / 实付金额"
             rules={[
-            { required: true, message: '请填写金额' },
-            {
-              validator: (_, value) =>
-                !isPositiveNumeric20Scale6Units(numeric20Scale6Units(value))
-                  ? Promise.reject(new Error('金额必须大于 0，最多六位小数'))
-                  : refundSource &&
-                      compareNumeric20Scale6Units(
-                        numeric20Scale6Units(value),
-                        numeric20Scale6Units(refundSource.available_amount)
-                      ) === 1
-                    ? Promise.reject(new Error('退款金额不能超过原款可用余额'))
-                    : Promise.resolve(),
-            },
-          ]}
+              { required: true, message: '请填写金额' },
+              {
+                validator: (_, value) =>
+                  !isPositiveNumeric20Scale6Units(numeric20Scale6Units(value))
+                    ? Promise.reject(new Error('金额必须大于 0，最多六位小数'))
+                    : refundSource &&
+                        compareNumeric20Scale6Units(
+                          numeric20Scale6Units(value),
+                          numeric20Scale6Units(refundSource.available_amount)
+                        ) === 1
+                      ? Promise.reject(new Error('退款金额不能超过原款可用余额'))
+                      : Promise.resolve(),
+              },
+            ]}
           >
             <Input inputMode="decimal" />
           </Form.Item>

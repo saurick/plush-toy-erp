@@ -1,6 +1,7 @@
 package schema
 
 import (
+	corevalue "server/internal/core/value"
 	"time"
 
 	"entgo.io/ent"
@@ -52,7 +53,7 @@ func (WorkflowBusinessState) Fields() []ent.Field {
 		field.String("blocked_reason").
 			Optional().
 			Nillable().
-			MaxLen(255),
+			Validate(corevalue.ValidateBusinessNote),
 		field.Time("status_changed_at").
 			Default(time.Now),
 		// Payload preserves workflow context only; fact tables remain the source of posted business truth.

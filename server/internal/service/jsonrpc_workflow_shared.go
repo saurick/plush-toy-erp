@@ -108,6 +108,7 @@ func workflowTaskToMap(task *biz.WorkflowTask) map[string]any {
 	}
 	return map[string]any{
 		"id":                       task.ID,
+		"task_no":                  task.TaskNo,
 		"task_code":                task.TaskCode,
 		"task_group":               task.TaskGroup,
 		"task_name":                task.TaskName,

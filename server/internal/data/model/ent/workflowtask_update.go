@@ -696,7 +696,9 @@ func (_u *WorkflowTaskUpdate) ClearProcessNodeInstance() *WorkflowTaskUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (_u *WorkflowTaskUpdate) Save(ctx context.Context) (int, error) {
-	_u.defaults()
+	if err := _u.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
@@ -723,11 +725,15 @@ func (_u *WorkflowTaskUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_u *WorkflowTaskUpdate) defaults() {
+func (_u *WorkflowTaskUpdate) defaults() error {
 	if _, ok := _u.mutation.UpdatedAt(); !ok {
+		if workflowtask.UpdateDefaultUpdatedAt == nil {
+			return fmt.Errorf("ent: uninitialized workflowtask.UpdateDefaultUpdatedAt (forgotten import ent/runtime?)")
+		}
 		v := workflowtask.UpdateDefaultUpdatedAt()
 		_u.mutation.SetUpdatedAt(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -1837,7 +1843,9 @@ func (_u *WorkflowTaskUpdateOne) Select(field string, fields ...string) *Workflo
 
 // Save executes the query and returns the updated WorkflowTask entity.
 func (_u *WorkflowTaskUpdateOne) Save(ctx context.Context) (*WorkflowTask, error) {
-	_u.defaults()
+	if err := _u.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
@@ -1864,11 +1872,15 @@ func (_u *WorkflowTaskUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_u *WorkflowTaskUpdateOne) defaults() {
+func (_u *WorkflowTaskUpdateOne) defaults() error {
 	if _, ok := _u.mutation.UpdatedAt(); !ok {
+		if workflowtask.UpdateDefaultUpdatedAt == nil {
+			return fmt.Errorf("ent: uninitialized workflowtask.UpdateDefaultUpdatedAt (forgotten import ent/runtime?)")
+		}
 		v := workflowtask.UpdateDefaultUpdatedAt()
 		_u.mutation.SetUpdatedAt(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

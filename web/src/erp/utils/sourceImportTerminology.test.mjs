@@ -42,8 +42,8 @@ test('主数据选择器使用具体档案名称，不冒充来源单据', () =>
 })
 
 test('来源选择器空态与浏览器验证使用具体档案名', () => {
-  assert.match(sourceImportPicker, /未选择\{selectedNoun\}/u)
-  assert.match(styleL1, /未选择\$\{selectedNoun\}/u)
+  assert.match(sourceImportPicker, /尚未选择\$\{selectedNoun\}/u)
+  assert.match(styleL1, /请先选择\$\{selectedNoun\}/u)
   assert.match(businessFormInteractionScenarios, /selectedNoun: '材料'/u)
 })
 

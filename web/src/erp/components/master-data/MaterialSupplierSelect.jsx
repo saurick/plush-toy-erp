@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Button, Space } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import { listAllSuppliers } from '../../api/masterDataOrderApi.mjs'
+import { supplierOption } from '../../utils/referenceSelectOptions.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
 export default function MaterialSupplierSelect({
@@ -28,8 +29,7 @@ export default function MaterialSupplierSelect({
                 ['outsourcing', 'mixed'].includes(item.supplier_type)
             )
             .map((item) => ({
-              value: item.id,
-              label: `${item.code} ${item.name}`,
+              ...supplierOption(item),
               disabled: !item.is_active,
             }))
         )

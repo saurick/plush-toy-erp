@@ -1,7 +1,5 @@
 import React, {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -32,6 +30,9 @@ import {
   readERPAppearance,
 } from './erpAppearance.mjs'
 import { ERP_DARK_PALETTE } from './erpThemePalette.mjs'
+import { ERPThemeContext } from './erpThemeContext.jsx'
+
+export { useERPTheme } from './erpThemeContext.jsx'
 
 export {
   ERP_THEME_MODE,
@@ -39,8 +40,6 @@ export {
   normalizeERPThemeMode,
   resolveEffectiveERPTheme,
 }
-
-const ERPThemeContext = createContext(null)
 
 function getBrowserStorage() {
   try {
@@ -439,12 +438,4 @@ function ERPThemeState({ children, browserStorageKey }) {
       {children}
     </ERPThemeContext.Provider>
   )
-}
-
-export function useERPTheme() {
-  const value = useContext(ERPThemeContext)
-  if (!value) {
-    throw new Error('ERPThemeProvider is missing')
-  }
-  return value
 }

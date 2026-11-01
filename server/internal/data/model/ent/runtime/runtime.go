@@ -79,6 +79,7 @@ import (
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
+	"server/internal/data/model/ent/workflowtasknumbercounter"
 	"server/internal/data/model/ent/workpool"
 	"server/internal/data/model/ent/workpoolmembership"
 	"server/internal/data/model/schema"
@@ -7957,10 +7958,31 @@ func init() {
 	workflowbusinessstate.DefaultUpdatedAt = workflowbusinessstateDescUpdatedAt.Default.(func() time.Time)
 	// workflowbusinessstate.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	workflowbusinessstate.UpdateDefaultUpdatedAt = workflowbusinessstateDescUpdatedAt.UpdateDefault.(func() time.Time)
+	workflowtaskHooks := schema.WorkflowTask{}.Hooks()
+	workflowtask.Hooks[0] = workflowtaskHooks[0]
 	workflowtaskFields := schema.WorkflowTask{}.Fields()
 	_ = workflowtaskFields
+	// workflowtaskDescTaskNo is the schema descriptor for task_no field.
+	workflowtaskDescTaskNo := workflowtaskFields[0].Descriptor()
+	// workflowtask.TaskNoValidator is a validator for the "task_no" field. It is called by the builders before save.
+	workflowtask.TaskNoValidator = func() func(string) error {
+		validators := workflowtaskDescTaskNo.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+			validators[2].(func(string) error),
+		}
+		return func(task_no string) error {
+			for _, fn := range fns {
+				if err := fn(task_no); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// workflowtaskDescTaskCode is the schema descriptor for task_code field.
-	workflowtaskDescTaskCode := workflowtaskFields[0].Descriptor()
+	workflowtaskDescTaskCode := workflowtaskFields[1].Descriptor()
 	// workflowtask.TaskCodeValidator is a validator for the "task_code" field. It is called by the builders before save.
 	workflowtask.TaskCodeValidator = func() func(string) error {
 		validators := workflowtaskDescTaskCode.Validators
@@ -7978,7 +8000,7 @@ func init() {
 		}
 	}()
 	// workflowtaskDescTaskGroup is the schema descriptor for task_group field.
-	workflowtaskDescTaskGroup := workflowtaskFields[1].Descriptor()
+	workflowtaskDescTaskGroup := workflowtaskFields[2].Descriptor()
 	// workflowtask.TaskGroupValidator is a validator for the "task_group" field. It is called by the builders before save.
 	workflowtask.TaskGroupValidator = func() func(string) error {
 		validators := workflowtaskDescTaskGroup.Validators
@@ -7996,7 +8018,7 @@ func init() {
 		}
 	}()
 	// workflowtaskDescTaskName is the schema descriptor for task_name field.
-	workflowtaskDescTaskName := workflowtaskFields[2].Descriptor()
+	workflowtaskDescTaskName := workflowtaskFields[3].Descriptor()
 	// workflowtask.TaskNameValidator is a validator for the "task_name" field. It is called by the builders before save.
 	workflowtask.TaskNameValidator = func() func(string) error {
 		validators := workflowtaskDescTaskName.Validators
@@ -8014,7 +8036,7 @@ func init() {
 		}
 	}()
 	// workflowtaskDescSourceType is the schema descriptor for source_type field.
-	workflowtaskDescSourceType := workflowtaskFields[3].Descriptor()
+	workflowtaskDescSourceType := workflowtaskFields[4].Descriptor()
 	// workflowtask.SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
 	workflowtask.SourceTypeValidator = func() func(string) error {
 		validators := workflowtaskDescSourceType.Validators
@@ -8032,19 +8054,19 @@ func init() {
 		}
 	}()
 	// workflowtaskDescSourceID is the schema descriptor for source_id field.
-	workflowtaskDescSourceID := workflowtaskFields[4].Descriptor()
+	workflowtaskDescSourceID := workflowtaskFields[5].Descriptor()
 	// workflowtask.SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
 	workflowtask.SourceIDValidator = workflowtaskDescSourceID.Validators[0].(func(int) error)
 	// workflowtaskDescSourceNo is the schema descriptor for source_no field.
-	workflowtaskDescSourceNo := workflowtaskFields[5].Descriptor()
+	workflowtaskDescSourceNo := workflowtaskFields[6].Descriptor()
 	// workflowtask.SourceNoValidator is a validator for the "source_no" field. It is called by the builders before save.
 	workflowtask.SourceNoValidator = workflowtaskDescSourceNo.Validators[0].(func(string) error)
 	// workflowtaskDescBusinessStatusKey is the schema descriptor for business_status_key field.
-	workflowtaskDescBusinessStatusKey := workflowtaskFields[6].Descriptor()
+	workflowtaskDescBusinessStatusKey := workflowtaskFields[7].Descriptor()
 	// workflowtask.BusinessStatusKeyValidator is a validator for the "business_status_key" field. It is called by the builders before save.
 	workflowtask.BusinessStatusKeyValidator = workflowtaskDescBusinessStatusKey.Validators[0].(func(string) error)
 	// workflowtaskDescTaskStatusKey is the schema descriptor for task_status_key field.
-	workflowtaskDescTaskStatusKey := workflowtaskFields[7].Descriptor()
+	workflowtaskDescTaskStatusKey := workflowtaskFields[8].Descriptor()
 	// workflowtask.TaskStatusKeyValidator is a validator for the "task_status_key" field. It is called by the builders before save.
 	workflowtask.TaskStatusKeyValidator = func() func(string) error {
 		validators := workflowtaskDescTaskStatusKey.Validators
@@ -8062,7 +8084,7 @@ func init() {
 		}
 	}()
 	// workflowtaskDescOwnerRoleKey is the schema descriptor for owner_role_key field.
-	workflowtaskDescOwnerRoleKey := workflowtaskFields[8].Descriptor()
+	workflowtaskDescOwnerRoleKey := workflowtaskFields[9].Descriptor()
 	// workflowtask.OwnerRoleKeyValidator is a validator for the "owner_role_key" field. It is called by the builders before save.
 	workflowtask.OwnerRoleKeyValidator = func() func(string) error {
 		validators := workflowtaskDescOwnerRoleKey.Validators
@@ -8080,75 +8102,75 @@ func init() {
 		}
 	}()
 	// workflowtaskDescOwnerPoolKey is the schema descriptor for owner_pool_key field.
-	workflowtaskDescOwnerPoolKey := workflowtaskFields[9].Descriptor()
+	workflowtaskDescOwnerPoolKey := workflowtaskFields[10].Descriptor()
 	// workflowtask.OwnerPoolKeyValidator is a validator for the "owner_pool_key" field. It is called by the builders before save.
 	workflowtask.OwnerPoolKeyValidator = workflowtaskDescOwnerPoolKey.Validators[0].(func(string) error)
 	// workflowtaskDescRequiredCapabilityKey is the schema descriptor for required_capability_key field.
-	workflowtaskDescRequiredCapabilityKey := workflowtaskFields[10].Descriptor()
+	workflowtaskDescRequiredCapabilityKey := workflowtaskFields[11].Descriptor()
 	// workflowtask.RequiredCapabilityKeyValidator is a validator for the "required_capability_key" field. It is called by the builders before save.
 	workflowtask.RequiredCapabilityKeyValidator = workflowtaskDescRequiredCapabilityKey.Validators[0].(func(string) error)
 	// workflowtaskDescConfigRevision is the schema descriptor for config_revision field.
-	workflowtaskDescConfigRevision := workflowtaskFields[11].Descriptor()
+	workflowtaskDescConfigRevision := workflowtaskFields[12].Descriptor()
 	// workflowtask.ConfigRevisionValidator is a validator for the "config_revision" field. It is called by the builders before save.
 	workflowtask.ConfigRevisionValidator = workflowtaskDescConfigRevision.Validators[0].(func(string) error)
 	// workflowtaskDescProcessInstanceID is the schema descriptor for process_instance_id field.
-	workflowtaskDescProcessInstanceID := workflowtaskFields[12].Descriptor()
+	workflowtaskDescProcessInstanceID := workflowtaskFields[13].Descriptor()
 	// workflowtask.ProcessInstanceIDValidator is a validator for the "process_instance_id" field. It is called by the builders before save.
 	workflowtask.ProcessInstanceIDValidator = workflowtaskDescProcessInstanceID.Validators[0].(func(int) error)
 	// workflowtaskDescProcessNodeInstanceID is the schema descriptor for process_node_instance_id field.
-	workflowtaskDescProcessNodeInstanceID := workflowtaskFields[13].Descriptor()
+	workflowtaskDescProcessNodeInstanceID := workflowtaskFields[14].Descriptor()
 	// workflowtask.ProcessNodeInstanceIDValidator is a validator for the "process_node_instance_id" field. It is called by the builders before save.
 	workflowtask.ProcessNodeInstanceIDValidator = workflowtaskDescProcessNodeInstanceID.Validators[0].(func(int) error)
 	// workflowtaskDescAssigneeID is the schema descriptor for assignee_id field.
-	workflowtaskDescAssigneeID := workflowtaskFields[14].Descriptor()
+	workflowtaskDescAssigneeID := workflowtaskFields[15].Descriptor()
 	// workflowtask.AssigneeIDValidator is a validator for the "assignee_id" field. It is called by the builders before save.
 	workflowtask.AssigneeIDValidator = workflowtaskDescAssigneeID.Validators[0].(func(int) error)
 	// workflowtaskDescPriority is the schema descriptor for priority field.
-	workflowtaskDescPriority := workflowtaskFields[15].Descriptor()
+	workflowtaskDescPriority := workflowtaskFields[16].Descriptor()
 	// workflowtask.DefaultPriority holds the default value on creation for the priority field.
 	workflowtask.DefaultPriority = workflowtaskDescPriority.Default.(int16)
 	// workflowtaskDescBlockedReason is the schema descriptor for blocked_reason field.
-	workflowtaskDescBlockedReason := workflowtaskFields[16].Descriptor()
+	workflowtaskDescBlockedReason := workflowtaskFields[17].Descriptor()
 	// workflowtask.BlockedReasonValidator is a validator for the "blocked_reason" field. It is called by the builders before save.
 	workflowtask.BlockedReasonValidator = workflowtaskDescBlockedReason.Validators[0].(func(string) error)
 	// workflowtaskDescCriticalPath is the schema descriptor for critical_path field.
-	workflowtaskDescCriticalPath := workflowtaskFields[19].Descriptor()
+	workflowtaskDescCriticalPath := workflowtaskFields[20].Descriptor()
 	// workflowtask.DefaultCriticalPath holds the default value on creation for the critical_path field.
 	workflowtask.DefaultCriticalPath = workflowtaskDescCriticalPath.Default.(bool)
 	// workflowtaskDescUrgeCount is the schema descriptor for urge_count field.
-	workflowtaskDescUrgeCount := workflowtaskFields[20].Descriptor()
+	workflowtaskDescUrgeCount := workflowtaskFields[21].Descriptor()
 	// workflowtask.DefaultUrgeCount holds the default value on creation for the urge_count field.
 	workflowtask.DefaultUrgeCount = workflowtaskDescUrgeCount.Default.(int)
 	// workflowtask.UrgeCountValidator is a validator for the "urge_count" field. It is called by the builders before save.
 	workflowtask.UrgeCountValidator = workflowtaskDescUrgeCount.Validators[0].(func(int) error)
 	// workflowtaskDescLastUrgedBy is the schema descriptor for last_urged_by field.
-	workflowtaskDescLastUrgedBy := workflowtaskFields[22].Descriptor()
+	workflowtaskDescLastUrgedBy := workflowtaskFields[23].Descriptor()
 	// workflowtask.LastUrgedByValidator is a validator for the "last_urged_by" field. It is called by the builders before save.
 	workflowtask.LastUrgedByValidator = workflowtaskDescLastUrgedBy.Validators[0].(func(int) error)
 	// workflowtaskDescLastUrgedByRoleKey is the schema descriptor for last_urged_by_role_key field.
-	workflowtaskDescLastUrgedByRoleKey := workflowtaskFields[23].Descriptor()
+	workflowtaskDescLastUrgedByRoleKey := workflowtaskFields[24].Descriptor()
 	// workflowtask.LastUrgedByRoleKeyValidator is a validator for the "last_urged_by_role_key" field. It is called by the builders before save.
 	workflowtask.LastUrgedByRoleKeyValidator = workflowtaskDescLastUrgedByRoleKey.Validators[0].(func(string) error)
 	// workflowtaskDescEscalateTargetRoleKey is the schema descriptor for escalate_target_role_key field.
-	workflowtaskDescEscalateTargetRoleKey := workflowtaskFields[25].Descriptor()
+	workflowtaskDescEscalateTargetRoleKey := workflowtaskFields[26].Descriptor()
 	// workflowtask.EscalateTargetRoleKeyValidator is a validator for the "escalate_target_role_key" field. It is called by the builders before save.
 	workflowtask.EscalateTargetRoleKeyValidator = workflowtaskDescEscalateTargetRoleKey.Validators[0].(func(string) error)
 	// workflowtaskDescVersion is the schema descriptor for version field.
-	workflowtaskDescVersion := workflowtaskFields[27].Descriptor()
+	workflowtaskDescVersion := workflowtaskFields[28].Descriptor()
 	// workflowtask.DefaultVersion holds the default value on creation for the version field.
 	workflowtask.DefaultVersion = workflowtaskDescVersion.Default.(int)
 	// workflowtask.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	workflowtask.VersionValidator = workflowtaskDescVersion.Validators[0].(func(int) error)
 	// workflowtaskDescCreatedBy is the schema descriptor for created_by field.
-	workflowtaskDescCreatedBy := workflowtaskFields[28].Descriptor()
+	workflowtaskDescCreatedBy := workflowtaskFields[29].Descriptor()
 	// workflowtask.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	workflowtask.CreatedByValidator = workflowtaskDescCreatedBy.Validators[0].(func(int) error)
 	// workflowtaskDescCreateIdempotencyKey is the schema descriptor for create_idempotency_key field.
-	workflowtaskDescCreateIdempotencyKey := workflowtaskFields[29].Descriptor()
+	workflowtaskDescCreateIdempotencyKey := workflowtaskFields[30].Descriptor()
 	// workflowtask.CreateIdempotencyKeyValidator is a validator for the "create_idempotency_key" field. It is called by the builders before save.
 	workflowtask.CreateIdempotencyKeyValidator = workflowtaskDescCreateIdempotencyKey.Validators[0].(func(string) error)
 	// workflowtaskDescCreateIntentHash is the schema descriptor for create_intent_hash field.
-	workflowtaskDescCreateIntentHash := workflowtaskFields[30].Descriptor()
+	workflowtaskDescCreateIntentHash := workflowtaskFields[31].Descriptor()
 	// workflowtask.CreateIntentHashValidator is a validator for the "create_intent_hash" field. It is called by the builders before save.
 	workflowtask.CreateIntentHashValidator = func() func(string) error {
 		validators := workflowtaskDescCreateIntentHash.Validators
@@ -8166,15 +8188,15 @@ func init() {
 		}
 	}()
 	// workflowtaskDescUpdatedBy is the schema descriptor for updated_by field.
-	workflowtaskDescUpdatedBy := workflowtaskFields[31].Descriptor()
+	workflowtaskDescUpdatedBy := workflowtaskFields[32].Descriptor()
 	// workflowtask.UpdatedByValidator is a validator for the "updated_by" field. It is called by the builders before save.
 	workflowtask.UpdatedByValidator = workflowtaskDescUpdatedBy.Validators[0].(func(int) error)
 	// workflowtaskDescCreatedAt is the schema descriptor for created_at field.
-	workflowtaskDescCreatedAt := workflowtaskFields[32].Descriptor()
+	workflowtaskDescCreatedAt := workflowtaskFields[33].Descriptor()
 	// workflowtask.DefaultCreatedAt holds the default value on creation for the created_at field.
 	workflowtask.DefaultCreatedAt = workflowtaskDescCreatedAt.Default.(func() time.Time)
 	// workflowtaskDescUpdatedAt is the schema descriptor for updated_at field.
-	workflowtaskDescUpdatedAt := workflowtaskFields[33].Descriptor()
+	workflowtaskDescUpdatedAt := workflowtaskFields[34].Descriptor()
 	// workflowtask.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	workflowtask.DefaultUpdatedAt = workflowtaskDescUpdatedAt.Default.(func() time.Time)
 	// workflowtask.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -8259,6 +8281,30 @@ func init() {
 	workflowtaskeventDescCreatedAt := workflowtaskeventFields[13].Descriptor()
 	// workflowtaskevent.DefaultCreatedAt holds the default value on creation for the created_at field.
 	workflowtaskevent.DefaultCreatedAt = workflowtaskeventDescCreatedAt.Default.(func() time.Time)
+	workflowtasknumbercounterFields := schema.WorkflowTaskNumberCounter{}.Fields()
+	_ = workflowtasknumbercounterFields
+	// workflowtasknumbercounterDescLastValue is the schema descriptor for last_value field.
+	workflowtasknumbercounterDescLastValue := workflowtasknumbercounterFields[1].Descriptor()
+	// workflowtasknumbercounter.LastValueValidator is a validator for the "last_value" field. It is called by the builders before save.
+	workflowtasknumbercounter.LastValueValidator = workflowtasknumbercounterDescLastValue.Validators[0].(func(int64) error)
+	// workflowtasknumbercounterDescID is the schema descriptor for id field.
+	workflowtasknumbercounterDescID := workflowtasknumbercounterFields[0].Descriptor()
+	// workflowtasknumbercounter.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	workflowtasknumbercounter.IDValidator = func() func(string) error {
+		validators := workflowtasknumbercounterDescID.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(id string) error {
+			for _, fn := range fns {
+				if err := fn(id); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 }
 
 const (

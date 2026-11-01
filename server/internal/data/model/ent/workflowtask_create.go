@@ -23,6 +23,12 @@ type WorkflowTaskCreate struct {
 	hooks    []Hook
 }
 
+// SetTaskNo sets the "task_no" field.
+func (_c *WorkflowTaskCreate) SetTaskNo(v string) *WorkflowTaskCreate {
+	_c.mutation.SetTaskNo(v)
+	return _c
+}
+
 // SetTaskCode sets the "task_code" field.
 func (_c *WorkflowTaskCreate) SetTaskCode(v string) *WorkflowTaskCreate {
 	_c.mutation.SetTaskCode(v)
@@ -483,7 +489,9 @@ func (_c *WorkflowTaskCreate) Mutation() *WorkflowTaskMutation {
 
 // Save creates the WorkflowTask in the database.
 func (_c *WorkflowTaskCreate) Save(ctx context.Context) (*WorkflowTask, error) {
-	_c.defaults()
+	if err := _c.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -510,7 +518,7 @@ func (_c *WorkflowTaskCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_c *WorkflowTaskCreate) defaults() {
+func (_c *WorkflowTaskCreate) defaults() error {
 	if _, ok := _c.mutation.Priority(); !ok {
 		v := workflowtask.DefaultPriority
 		_c.mutation.SetPriority(v)
@@ -528,17 +536,32 @@ func (_c *WorkflowTaskCreate) defaults() {
 		_c.mutation.SetVersion(v)
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
+		if workflowtask.DefaultCreatedAt == nil {
+			return fmt.Errorf("ent: uninitialized workflowtask.DefaultCreatedAt (forgotten import ent/runtime?)")
+		}
 		v := workflowtask.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
 	}
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
+		if workflowtask.DefaultUpdatedAt == nil {
+			return fmt.Errorf("ent: uninitialized workflowtask.DefaultUpdatedAt (forgotten import ent/runtime?)")
+		}
 		v := workflowtask.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *WorkflowTaskCreate) check() error {
+	if _, ok := _c.mutation.TaskNo(); !ok {
+		return &ValidationError{Name: "task_no", err: errors.New(`ent: missing required field "WorkflowTask.task_no"`)}
+	}
+	if v, ok := _c.mutation.TaskNo(); ok {
+		if err := workflowtask.TaskNoValidator(v); err != nil {
+			return &ValidationError{Name: "task_no", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.task_no": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.TaskCode(); !ok {
 		return &ValidationError{Name: "task_code", err: errors.New(`ent: missing required field "WorkflowTask.task_code"`)}
 	}
@@ -723,6 +746,10 @@ func (_c *WorkflowTaskCreate) createSpec() (*WorkflowTask, *sqlgraph.CreateSpec)
 		_node = &WorkflowTask{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(workflowtask.Table, sqlgraph.NewFieldSpec(workflowtask.FieldID, field.TypeInt))
 	)
+	if value, ok := _c.mutation.TaskNo(); ok {
+		_spec.SetField(workflowtask.FieldTaskNo, field.TypeString, value)
+		_node.TaskNo = value
+	}
 	if value, ok := _c.mutation.TaskCode(); ok {
 		_spec.SetField(workflowtask.FieldTaskCode, field.TypeString, value)
 		_node.TaskCode = value

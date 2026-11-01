@@ -5,6 +5,7 @@ import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mj
 
 test('a task keeps all business drafts protected when a sibling editor closes, saves or becomes busy', async (t) => {
   const ui = await createReactTestHarness(t)
+  const { ERPThemeProvider } = await import('../../../common/theme/erpTheme.jsx')
   const [{ App, Form, Input }, { createMemoryRouter, RouterProvider }, { default: Group, useBusinessEditorGroup }, { default: Page }, { BusinessPageContext }, { default: EditorWorkspace, BusinessEditorPane }] = await Promise.all([
     import('antd'), import('react-router-dom'), import('./BusinessEditorGroup.jsx'), import('./BusinessFormPage.jsx'), import('../../hooks/useBusinessPageContext.js'), import('./BusinessEditorWorkspace.jsx'),
   ])
@@ -39,7 +40,7 @@ test('a task keeps all business drafts protected when a sibling editor closes, s
   }
   const router = createMemoryRouter([{ path: '*', element: h(Workspace) }])
   t.after(() => router.dispose())
-  await ui.render(h(RouterProvider, { router, future: { v7_startTransition: true } }))
+  await ui.render(h(ERPThemeProvider, null, h(RouterProvider, { router, future: { v7_startTransition: true } })))
   await ui.act(() => new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))))
   assert.equal(editing.at(-1), true)
   assert.equal(ui.container.querySelectorAll('[role="tablist"]').length, 0, 'the editor host adds no cross-object tab navigation')

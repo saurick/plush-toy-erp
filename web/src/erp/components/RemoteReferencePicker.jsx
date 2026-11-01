@@ -124,7 +124,14 @@ function RemoteReferencePickerContent({
       hasActiveFilters={Object.values(query.filters).some((value) => value !== undefined)}
       onClearFilters={() => setQuery((current) => ({ ...current, page: 1, keyword: '', filters: {} }))}
       open={open}
+      loadError={!canRead ? '当前账号无权查看可选资料' : data.failed ? '资料加载失败，请重新加载' : undefined}
+      filteredEmptyDescription="没有符合条件的可选资料"
       importDisabled={props.importDisabled || !canRead || data.failed}
+      importDisabledReason={!canRead
+        ? '当前账号无权查看可选资料'
+        : data.failed
+          ? '资料加载失败，请重新加载'
+          : props.importDisabledReason}
       serverPagination
       pageSize={50}
       rows={data.rows}

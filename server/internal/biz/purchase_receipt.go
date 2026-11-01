@@ -337,7 +337,7 @@ func normalizePurchaseReceiptFromPurchaseOrderCreate(in PurchaseReceiptFromPurch
 		}
 		line.LotNo = normalizeOptionalString(line.LotNo)
 		line.Note = normalizeOptionalString(line.Note)
-		if (line.LotNo != nil && utf8.RuneCountInString(*line.LotNo) > 64) || (line.Note != nil && utf8.RuneCountInString(*line.Note) > 255) {
+		if (line.LotNo != nil && utf8.RuneCountInString(*line.LotNo) > 64) || (line.Note != nil && utf8.RuneCountInString(*line.Note) > value.BusinessNoteMaxCharacters) {
 			return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
 		}
 	}

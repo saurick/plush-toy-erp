@@ -15,6 +15,7 @@ export async function submitShipmentDraft({
   setSaving,
   saveShipmentDraft,
   createShipmentWithItems,
+  invalidateSourceImportUndo = () => {},
   shipmentAttachmentRef,
   getShipment,
   shipmentFormValues,
@@ -70,6 +71,7 @@ export async function submitShipmentDraft({
     } else {
       savedShipment = await createShipmentWithItems(params)
     }
+    invalidateSourceImportUndo()
     if (submitForApproval) {
       savedBeforeApproval = true
       setSelectedRow(savedShipment)
@@ -114,6 +116,7 @@ export async function submitShipmentDraft({
     if (error?.errorFields) {
       return
     }
+    if (isSourceBusinessActionResultUnknown(error)) invalidateSourceImportUndo()
     if (approvalSubmitted) {
       message.error('审批已提交，任务列表读取失败，请刷新列表')
     } else if (savedBeforeApproval) {

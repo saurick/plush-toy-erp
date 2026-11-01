@@ -7,7 +7,11 @@ import React, {
   useState,
 } from 'react'
 import { Button, Form, Input, Space } from 'antd'
-import { BOMQuantityInput, BOMSourceValueInfo } from './BOMSourceValue.jsx'
+import useBusinessLineItemGroups from '../business-list/useBusinessLineItemGroups.js'
+import BusinessLineItemGroupControls from '../business-list/BusinessLineItemGroupControls.jsx'
+import { BusinessLineItemGroupHeading } from '../business-list/BusinessLineItemsTable.jsx'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import { BOMQuantityInput } from './BOMSourceValue.jsx'
 import { bomSourceColumnLabel, formatBOMSourceNumber, sumBOMSourceNumbers, parseBOMSourceNumber } from '../../utils/bomSourceValues.mjs'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
@@ -17,19 +21,20 @@ import { message } from '@/common/utils/antdApp'
 import BOMMaterialCreateModal from './BOMMaterialCreateModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
+import '../business-list/businessLineItemGroups.css'
 import '../business-list/businessFormSections.css'
 import {
   BOM_PART_FIELDS,
   groupBOMMaterials,
   bindBOMMaterialReference,
   getBOMUsage,
-  calculateBOMUsage,
   bomLossRateToPercent,
   bomPercentToLossRate,
   parseBOMPartsPaste,
 } from '../../utils/bomMaterialGroups.mjs'
-import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
+import { materialOption, referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 import { getBOMImportLineIssues } from '../../utils/bomXlsxImport.mjs'
+import BOMImportLineStatus from './BOMImportLineStatus.jsx'
 import '../../styles/app/bom-editor.css'
 
 const MAX_PARTS = 200
@@ -54,6 +59,12 @@ const blankPart = (source = {}) => ({
   process_method: '',
   note: '',
 })
+
+// 已选值只显示名称，其他辨认信息保留在下拉候选标签中。
+function bomMaterialOption(material) {
+  const option = materialOption(material)
+  return option ? { ...option, identity: { name: material.name || '物料名称未填写' } } : option
+}
 
 function BOMMaterialSelect({ canCreateMaterial, onCreateMaterial, ...props }) {
   const [open, setOpen] = useState(false)
@@ -98,6 +109,7 @@ function BOMMaterialSelect({ canCreateMaterial, onCreateMaterial, ...props }) {
       referenceType="materials"
       params={{ active_only: false }}
       presentation="reference"
+      mapOption={bomMaterialOption}
       {...props}
       ref={selectRef}
       open={open}
@@ -118,7 +130,7 @@ function BOMMaterialSelect({ canCreateMaterial, onCreateMaterial, ...props }) {
   )
 }
 
-function LossRateInput({ value, onChange, source, index, ...props }) {
+function LossRateInput({ value, onChange, ...props }) {
   const [text, setText] = useState(() => bomLossRateToPercent(value))
   const emitted = useRef()
   useEffect(() => {
@@ -135,7 +147,6 @@ function LossRateInput({ value, onChange, source, index, ...props }) {
           emitted.current = rate ?? `invalid:${raw}`
           onChange(emitted.current)
         }}
-      suffix={<BOMSourceValueInfo source={source} kind="loss" value={text} index={index} />}
     />
   )
 }
@@ -162,8 +173,7 @@ function BOMUsageCell({ index }) {
         {({ getFieldValue }) => {
           const item = getFieldValue(['items', index]) || {}
           const usage = getBOMUsage(item, getFieldValue('quantity_text'))
-          const calculated = calculateBOMUsage(item.quantity, item.loss_rate, getFieldValue('quantity_text'))
-          return <span className="erp-bom-source-value"><span>{formatBOMSourceNumber(usage, item.source_snapshot?.total_format) || '—'}</span><BOMSourceValueInfo source={item.source_snapshot} kind="total" value={usage} calculatedValue={calculated} index={index} /></span>
+          return <span>{formatBOMSourceNumber(usage, item.source_snapshot?.total_format) || '—'}</span>
         }}
       </Form.Item>
     </td>
@@ -217,10 +227,9 @@ function BOMImportRowStatus({ index }) {
             data-bom-import-row-status={
               issues.length ? 'unresolved' : 'matched'
             }
-            title={issues.map((issue) => issue.message).join('；')}
           >
-            原表第 {item?._import_source?.rowNumber} 行 ·{' '}
-            {issues.length ? '待补全' : '已匹配'}
+            <span className="erp-bom-import-line-status__source">Excel 第 {item?._import_source?.rowNumber} 行</span>
+            <BOMImportLineStatus issues={issues} rowNumber={item?._import_source?.rowNumber} />
           </small>
         )
       }}
@@ -239,6 +248,7 @@ export default function BOMMaterialGroupsForm({
   registerLineItemRow,
   requestLineItemScroll,
   actions,
+  notice,
   onItemsChange,
 }) {
   // Group structure changes on material/unit selection or row insertion/removal.
@@ -253,7 +263,12 @@ export default function BOMMaterialGroupsForm({
   )
   const items = form.getFieldValue('items') || []
   const groups = groupBOMMaterials(items)
+  const disclosure = useBusinessLineItemGroups({ form, groups: groups.map((group) => ({ id: group.key, indexes: group.indexes })) })
   const materials = useMemo(() => [...materialByID.values()], [materialByID])
+  const displayMaterialOptions = useMemo(() => materialOptions.map((option) => {
+    const material = materialByID.get(Number(option.value))
+    return material ? { ...option, ...bomMaterialOption(material) } : option
+  }), [materialOptions, materialByID])
   const [creatingFor, setCreatingFor] = useState(null)
   const [focusRequest, setFocusRequest] = useState(null)
   const rowRefs = useRef(new Map())
@@ -327,11 +342,13 @@ export default function BOMMaterialGroupsForm({
   }
 
   return (
-    <section className="erp-bom-material-groups" aria-label="材料分析明细表">
+    <section className="erp-bom-material-groups" aria-label="材料分析明细表" ref={disclosure.rootRef} onFocusCapture={disclosure.onFocusCapture}>
       <div className="erp-business-form-heading erp-bom-material-groups__heading">
         <h2>材料分析明细表</h2>
         {actions || (canEdit ? <span>Tab 换格 · 支持粘贴部位数据</span> : null)}
       </div>
+      {notice}
+      {groups.length > 1 ? <BusinessLineItemGroupControls controller={disclosure} form={form} label="材料分析明细表" groupCount={groups.length} /> : null}
       <Form.List name="items">
         {(fields, { add, remove }) => (
           <>
@@ -403,19 +420,39 @@ export default function BOMMaterialGroupsForm({
                       '单位'
                     )
                     const rowSpan = group.indexes.length + 1
+                    const collapsed = groups.length > 1 && disclosure.isCollapsed(group.key)
+                    const materialName = material?.name || importSource?.materialName || '待选物料'
                     return (
-                      <tbody
-                        key={field.key}
-                        className="erp-bom-material-group"
-                        aria-label={`${material?.name || importSource?.materialName || '待选物料'}的部位`}
-                      >
-                        {group.indexes.map((itemIndex, partIndex) => {
+                      <React.Fragment key={field.key}>
+                        {groups.length > 1 ? (
+                          <BusinessLineItemGroupHeading
+                            columnCount={canEdit ? 13 : 12}
+                            collapsed={collapsed}
+                            onToggle={() => disclosure.toggle(group.key)}
+                            label={materialName}
+                            count={group.indexes.length}
+                            countLabel="个部位"
+                            controller={disclosure}
+                            groupId={group.key}
+                          >
+                            {materialName} · {unit}
+                          </BusinessLineItemGroupHeading>
+                      ) : null}
+                        <tbody
+                          key="parts"
+                          hidden={collapsed}
+                          data-line-item-collapsed={collapsed ? 'true' : undefined}
+                          className="erp-bom-material-group erp-editable-line-group"
+                          aria-label={`${material?.name || importSource?.materialName || '待选物料'}的部位`}
+                        >
+                          {group.indexes.map((itemIndex, partIndex) => {
                           const partField = fields[itemIndex]
                           const source = items[itemIndex]?._import_source
                           return (
                             <tr
                               key={partField.key}
                               data-bom-part-index={itemIndex}
+                              data-line-item-index={itemIndex}
                               ref={(node) => {
                                 if (node) rowRefs.current.set(itemIndex, node)
                                 else rowRefs.current.delete(itemIndex)
@@ -455,11 +492,7 @@ export default function BOMMaterialGroupsForm({
                                         showSearch
                                         allowClear
                                         optionFilterProp="label"
-                                        options={materialOptions}
-                                        labelRender={({ value }) =>
-                                          materialByID.get(Number(value))
-                                            ?.name || '材料已关联'
-                                        }
+                                        options={displayMaterialOptions}
                                         placeholder={
                                           importSource && !material
                                             ? '选择对应材料档案'
@@ -473,17 +506,6 @@ export default function BOMMaterialGroupsForm({
                                         }
                                       />
                                     </Form.Item>
-                                    {material?.supplier_name ||
-                                    material?.color ? (
-                                      <span className="erp-bom-material-cell__context">
-                                        {[
-                                          material.supplier_name,
-                                          material.color,
-                                        ]
-                                          .filter(Boolean)
-                                          .join(' · ')}
-                                      </span>
-                                    ) : null}
                                     {!material && importSource ? (
                                       <span className="erp-bom-material-cell__context">
                                         原表物料 · 待匹配
@@ -592,8 +614,6 @@ export default function BOMMaterialGroupsForm({
                                     >
                                       {key === 'loss_rate' ? (
                                         <LossRateInput
-                                          source={items[itemIndex]?.source_snapshot}
-                                          index={itemIndex}
                                           disabled={!canEdit}
                                           aria-label={`${PART_LABELS[column]} ${
                                             itemIndex + 1
@@ -611,7 +631,6 @@ export default function BOMMaterialGroupsForm({
                                       ) : key === 'quantity' ? (
                                         <BOMQuantityInput
                                           source={items[itemIndex]?.source_snapshot}
-                                          index={itemIndex}
                                           disabled={!canEdit}
                                           aria-label={`${PART_LABELS[column]} ${itemIndex + 1}`}
                                           inputMode="decimal"
@@ -619,9 +638,10 @@ export default function BOMMaterialGroupsForm({
                                         />
                                       ) : key === 'position' || column >= 4 ? (
                                         <BusinessTextArea
+                                          minRows={key === 'note' ? 2 : 1}
                                           disabled={!canEdit}
                                           aria-label={`${PART_LABELS[column]} ${itemIndex + 1}`}
-                                          maxLength={key === 'note' ? 255 : 128}
+                                          maxLength={key === 'note' ? BusinessTextPolicy.noteMaxCharacters : 128}
                                           onPaste={(event) =>
                                             pasteParts(
                                               event,
@@ -725,16 +745,16 @@ export default function BOMMaterialGroupsForm({
                             </tr>
                           )
                         })}
-                        <tr className="erp-bom-material-group__summary">
-                          <td colSpan={canEdit ? 9 : 8}>
-                            <div className="erp-bom-material-group__footer">
-                              {canEdit ? (
-                                <Space size={8}>
-                                  <Button
-                                    size="small"
-                                    className="erp-line-items-form__add-button"
-                                    disabled={fields.length >= MAX_PARTS}
-                                    onClick={() => {
+                          <tr className="erp-bom-material-group__summary">
+                            <td colSpan={canEdit ? 9 : 8}>
+                              <div className="erp-bom-material-group__footer">
+                                {canEdit ? (
+                                  <Space size={8}>
+                                    <Button
+                                      size="small"
+                                      className="erp-line-items-form__add-button"
+                                      disabled={fields.length >= MAX_PARTS}
+                                      onClick={() => {
                                       const nextIndex = group.indexes.at(-1) + 1
                                       const source = updateMaterialGroup(
                                         group.indexes
@@ -742,27 +762,28 @@ export default function BOMMaterialGroupsForm({
                                       add(blankPart(source), nextIndex)
                                       setFocusRequest({ index: nextIndex })
                                     }}
-                                  >
-                                    ＋ 添加部位
-                                  </Button>
-                                  <Button
-                                    type="text"
-                                    size="small"
-                                    danger
-                                    onClick={() => remove(group.indexes)}
-                                  >
-                                    移除物料
-                                  </Button>
-                                </Space>
+                                    >
+                                      ＋ 添加部位
+                                    </Button>
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      danger
+                                      onClick={() => remove(group.indexes)}
+                                    >
+                                      移除物料
+                                    </Button>
+                                  </Space>
                               ) : null}
-                              <BOMMaterialTotals
-                                indexes={group.indexes}
-                                unit={unit}
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
+                                <BOMMaterialTotals
+                                  indexes={group.indexes}
+                                  unit={unit}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </React.Fragment>
                     )
                   })}
                 </table>

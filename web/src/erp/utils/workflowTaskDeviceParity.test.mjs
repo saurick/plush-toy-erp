@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { canHandleWorkflowTaskBusiness } from './workflowTaskBusinessAccess.mjs'
 import { workflowTaskRecordedResult } from './workflowTaskReceipt.mjs'
-import { workflowTaskActionRequiresReason } from './workflowTaskActionContract.mjs'
+import { workflowTaskActionInput, workflowTaskActionRequiresReason } from './workflowTaskActionContract.mjs'
 
 const task = { id: 7, source_type: 'shipment', source_id: 31, task_status_key: 'ready', owner_role_key: 'business' }
 const access = { source: 'backend', sourceAccess: { allowed: true }, byAction: { complete: { actionMode: 'complete', allowed: true } } }
@@ -67,7 +68,16 @@ test('审批与普通办理的必填意见在两端保持一致', () => {
   for (const action of ['complete', 'done']) {
     assert.equal(workflowTaskActionRequiresReason(task, action), false)
     assert.equal(workflowTaskActionRequiresReason({ ...task, task_group: 'business_followup' }, action), true)
-    assert.equal(workflowTaskActionRequiresReason({ ...task, required_capability_key: 'workflow.task.approve' }, action), true)
+    for (const key of [PermissionCode.WORKFLOW_TASK_APPROVE, PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE, PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE]) {
+      assert.equal(workflowTaskActionRequiresReason({ ...task, required_capability_key: key }, action), false)
+    }
+    for (const key of [PermissionCode.FINANCE_PAYMENT_APPROVE, PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE, PermissionCode.PRODUCTION_EXCEPTION_APPROVE]) {
+      assert.equal(workflowTaskActionRequiresReason({ ...task, required_capability_key: key }, action), true)
+    }
   }
-  for (const action of ['blocked', 'block', 'rejected', 'reject', 'resume', 'urge', 'assign']) assert.equal(workflowTaskActionRequiresReason(task, action), true)
+  for (const action of ['blocked', 'block', 'rejected', 'reject', 'assign']) assert.equal(workflowTaskActionRequiresReason(task, action), true)
+  for (const action of ['resume', 'urge']) {
+    assert.equal(workflowTaskActionRequiresReason(task, action), false)
+    assert.match(workflowTaskActionInput(task, action).fieldLabel, /（选填）$/u)
+  }
 })

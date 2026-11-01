@@ -150,13 +150,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	if payloadRes != nil {
 		return id, payloadRes, nil
 	}
-	reason := ""
-	if rawReason, exists := pm["reason"]; exists {
-		value, ok := rawReason.(string)
-		if !ok {
-			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "原因必须是文本"}, nil
-		}
-		reason = strings.TrimSpace(value)
+	reason, reasonResult := getOptionalWorkflowString(pm, "reason")
+	if reasonResult != nil {
+		return id, reasonResult, nil
 	}
 	if contract.RequireReason && reason == "" {
 		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "原因不能为空"}, nil
@@ -428,6 +424,18 @@ func getRequiredWorkflowPositiveInteger(pm map[string]any, key, message string) 
 		return 0, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: message}
 	}
 	return value, nil
+}
+
+func getOptionalWorkflowString(pm map[string]any, key string) (string, *v1.JsonrpcResult) {
+	raw, exists := pm[key]
+	if !exists {
+		return "", nil
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "原因必须是文本"}
+	}
+	return strings.TrimSpace(value), nil
 }
 
 func getRequiredWorkflowString(pm map[string]any, key, message string) (string, *v1.JsonrpcResult) {

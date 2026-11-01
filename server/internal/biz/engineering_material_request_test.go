@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	corevalue "server/internal/core/value"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -38,10 +40,10 @@ func TestEngineeringMaterialNotesMatchStorageLimit(t *testing.T) {
 		name, note string
 		valid      bool
 	}{
-		{"Chinese boundary", strings.Repeat("注", 85), true},
-		{"Chinese overflow", strings.Repeat("注", 86), false},
-		{"ASCII boundary", strings.Repeat("a", 255), true},
-		{"ASCII overflow", strings.Repeat("a", 256), false},
+		{"Chinese boundary", strings.Repeat("注", corevalue.BusinessNoteMaxCharacters), true},
+		{"Chinese overflow", strings.Repeat("注", corevalue.BusinessNoteMaxCharacters+1), false},
+		{"ASCII boundary", strings.Repeat("a", corevalue.BusinessNoteMaxCharacters), true},
+		{"ASCII overflow", strings.Repeat("a", corevalue.BusinessNoteMaxCharacters+1), false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			in := &EngineeringMaterialReview{ID: 1, ExpectedVersion: 1, ActorID: 2, Action: "BOSS_APPROVE", Note: &tc.note}

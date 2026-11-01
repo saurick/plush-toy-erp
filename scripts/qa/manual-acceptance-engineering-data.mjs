@@ -35,8 +35,8 @@ export async function prepareManualAcceptanceEngineering({ plan, sourceReport, r
     } else {
       // Keep the existing 45 BOM lifecycle specimens; additional ordered products
       // need their own small engineering BOM before the whole order can be approved.
-      const version = `${product.code}-ENG`;
-      const result = await call("engineering", "bom", "list_bom_versions", { product_id: productID, limit: 200, offset: 0 });
+      const version = "V1";
+      const result = await call("engineering", "bom", "list_bom_versions", { product_id: productID, lifecycle_scope: "all", limit: 200, offset: 0 });
       requireValue(Number(result.total || 0) <= (result.bom_versions || []).length, `${product.code} BOM listing is incomplete`);
       const matches = (result.bom_versions || []).filter((item) => item.version === version);
       requireValue(matches.length <= 1, `${version} is ambiguous`);
@@ -45,11 +45,11 @@ export async function prepareManualAcceptanceEngineering({ plan, sourceReport, r
       if (matches[0]) bom = await getBOM(matches[0].id);
       else if (apply) {
         bom = (await call("engineering", "bom", "save_bom_with_items", {
-          product_id: productID, version, note: ENGINEERING_NOTE,
+          product_id: productID, note: ENGINEERING_NOTE,
           items: [{ material_id: material.id, unit_id: material.unitId, quantity: "0.2", loss_rate: "0", position: "面料", note: ENGINEERING_NOTE }],
         })).bom_version;
       }
-      requireValue(bom?.id && Number(bom.product_id) === productID && bom.note === ENGINEERING_NOTE && bom.items?.length === 1 && Number(bom.items[0].material_id) === Number(material.id) && Number(bom.items[0].unit_id) === Number(material.unitId) && Number(bom.items[0].quantity) === 0.2 && Number(bom.items[0].loss_rate) === 0, `${version} engineering BOM is missing or has been edited`);
+      requireValue(bom?.id && bom.version === version && Number(bom.product_id) === productID && bom.note === ENGINEERING_NOTE && bom.items?.length === 1 && Number(bom.items[0].material_id) === Number(material.id) && Number(bom.items[0].unit_id) === Number(material.unitId) && Number(bom.items[0].quantity) === 0.2 && Number(bom.items[0].loss_rate) === 0, `${version} engineering BOM is missing or has been edited`);
       if (bom.status === "DRAFT" && apply) bom = (await call("engineering", "bom", "activate_bom_version", { id: bom.id })).bom_version;
       supplementalBOMs.push({ id: bom.id, version, productId: productID });
     }

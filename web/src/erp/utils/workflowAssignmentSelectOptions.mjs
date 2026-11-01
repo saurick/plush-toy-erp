@@ -1,4 +1,4 @@
-import { formatAdminIdentity } from './adminIdentity.mjs'
+import { formatAdminIdentity, getAdminDisplayName } from './adminIdentity.mjs'
 
 export function buildWorkflowAssignmentSelectOptions({
   canReturnToPool = false,
@@ -18,6 +18,7 @@ export function buildWorkflowAssignmentSelectOptions({
   const candidateOptions = (Array.isArray(candidates) ? candidates : []).map(
     (candidate) => ({
       value: candidate.admin_id,
+      identity: { name: getAdminDisplayName(candidate), code: candidate.username || '' },
       label: `${formatAdminIdentity(candidate)} · ${candidate.role_label || ownerRoleLabel}`,
     })
   )

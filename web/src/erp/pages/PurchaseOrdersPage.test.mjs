@@ -146,10 +146,11 @@ test('purchase refresh reports failure and open forms remain disabled until thei
     businessModal,
     /okButtonProps=\{\{ disabled: !referenceDataReady \}\}/u
   )
-  assert.match(form, /disabled=\{taskReadOnly \|\| !referenceDataReady\}/u)
+  assert.match(form, /const canEdit = writable && !taskReadOnly/u)
+  assert.match(form, /disabled=\{!canEdit \|\| !referenceDataReady \|\| saving\}/u)
   assert.match(
     form,
-    /if \(!referenceDataReady\) setMaterialImportOpen\(false\)/u
+    /if \(!canEdit \|\| !canReadMaterials \|\| !referenceDataReady\) \{\s*setMaterialImportOpen\(false\)/u
   )
 })
 

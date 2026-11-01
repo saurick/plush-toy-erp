@@ -19,7 +19,8 @@ export default function WorkflowTaskReceipt({ task: sourceTask, events = [], sta
   const result = receipt ? null : workflowTaskRecordedResult(task, events)
   const status = getWorkflowTaskStatusMeta(task)
   const title = receipt?.actionTitle || result?.label
-  const reason = receipt?.reason || result?.reason
+  const reason = String(receipt?.reason || result?.reason || '').trim()
+  const additionalReason = String(receipt?.additionalReason || '').trim()
   const taskReadPending = receipt?.taskReadState && receipt.taskReadState !== 'ready'
   const actorLabel = receipt?.actorLabel || result?.actorLabel
   const timeLabel = receipt?.timeLabel || result?.timeLabel
@@ -36,8 +37,8 @@ export default function WorkflowTaskReceipt({ task: sourceTask, events = [], sta
           {timeLabel ? <div><dt>办理时间</dt><dd>{timeLabel}</dd></div> : null}
           {receipt?.recordNo ? <div><dt>业务单号</dt><dd>{receipt.recordNo}</dd></div> : null}
           {receipt?.successMessage && receipt.successMessage !== title ? <div><dt>办理结果</dt><dd>{receipt.successMessage}</dd></div> : null}
-          {reason ? <div><dt>{receipt?.reasonLabel || '办理说明'}</dt><dd>{reason}</dd></div> : null}
-          {receipt?.additionalReason && receipt.additionalReason !== reason ? <div><dt>补充说明</dt><dd>{receipt.additionalReason}</dd></div> : null}
+          {reason || result?.reasonMissing ? <div><dt>{receipt?.reasonLabel || result?.reasonLabel || '办理说明'}</dt><dd>{reason || '未记录'}</dd></div> : null}
+          {additionalReason && additionalReason !== reason ? <div><dt>补充说明</dt><dd>{additionalReason}</dd></div> : null}
           {fields.map((field) => <div key={field.label}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
         </dl>
       ) : state === 'ready' ? <p>尚未记录本任务的办理结果。</p> : null}

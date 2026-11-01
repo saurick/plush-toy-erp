@@ -40,7 +40,9 @@ export function chainStepRuleRows(step, evidence = {}) {
 }
 
 export function chainStepAuditURL(chainKey, stepKey) {
-  return `${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?${new URLSearchParams({ chain: chainKey, step: stepKey })}`
+  const query = new URLSearchParams({ chain: chainKey })
+  if (stepKey) query.set('step', stepKey)
+  return `${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?${query}`
 }
 
 export function chainRuleTestingURL(ruleId) {

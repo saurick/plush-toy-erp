@@ -1,9 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import {
-  InboxOutlined,
-  PictureOutlined,
-  ReloadOutlined,
-} from '@ant-design/icons'
+import { ReloadOutlined } from '@ant-design/icons'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
@@ -14,6 +10,7 @@ import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTask
 import { createTaskProductImageLoader } from '../../utils/taskProductImage.mjs'
 import WorkflowTaskImagePreview from './WorkflowTaskImagePreview.jsx'
 import { isUsableImageDimensions } from '../../utils/imageDisplay.mjs'
+import WorkflowTaskImagePlaceholder, { ImagePlaceholder } from './WorkflowTaskImagePlaceholder.jsx'
 
 // A profile's cache becomes unreachable on logout; permission changes use a new loader.
 const profileLoaders = new WeakMap()
@@ -23,41 +20,6 @@ function profileLoader(profile, accessKey) {
   const load = createTaskProductImageLoader(downloadBusinessAttachment)
   profileLoaders.set(profile, { accessKey, load })
   return load
-}
-
-function ImagePlaceholder({ item, state = 'empty' }) {
-  const material = item.kind === 'material'
-  const Icon = material ? InboxOutlined : PictureOutlined
-  const label =
-    state === 'denied'
-      ? '无权限'
-      : state === 'failed'
-      ? '加载失败'
-      : state === 'loading'
-        ? '加载中'
-        : material
-          ? '物料'
-          : '暂无图'
-  const description = `${item.name || (material ? '物料' : '产品')}：${
-    state === 'denied'
-      ? '无图片读取权限'
-      : state === 'failed'
-      ? '图片暂不可用'
-      : state === 'loading'
-        ? '图片加载中'
-        : '暂无可显示的图片'
-  }`
-  return (
-    <span
-      className="erp-task-product-image__placeholder"
-      role="img"
-      aria-label={description}
-      title={description}
-    >
-      <Icon aria-hidden="true" />
-      <span aria-hidden="true">{label}</span>
-    </span>
-  )
 }
 
 function ProductImage({ item, load, preview }) {
@@ -196,12 +158,7 @@ export default function WorkflowTaskProductImage({
     !hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
   ) {
     return (
-      <span
-        className="erp-task-product-image erp-task-product-image--placeholder"
-        data-image-state={denied ? 'denied' : state}
-      >
-        <ImagePlaceholder item={item} state={denied ? 'denied' : state} />
-      </span>
+      <WorkflowTaskImagePlaceholder item={item} state={denied ? 'denied' : state} />
     )
   }
   const accessKey = workflowTaskAdminAccessRequestIdentity(adminProfile)

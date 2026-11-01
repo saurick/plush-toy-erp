@@ -326,8 +326,16 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
 		}
-		if res := rejectUnknownWorkflowTaskParams(pm, method, "task_id", "limit", "before_event_id"); res != nil {
+		if res := rejectUnknownWorkflowTaskParams(pm, method, "task_id", "limit", "before_event_id", "scope"); res != nil {
 			return id, res, nil
+		}
+		eventScope := "task"
+		if raw, exists := pm["scope"]; exists {
+			value, ok := raw.(string)
+			if !ok || (value != "task" && value != "flow") {
+				return id, invalidParamResult(), nil
+			}
+			eventScope = value
 		}
 		taskID := getInt(pm, "task_id", 0)
 		limit := getInt(pm, "limit", 50)
@@ -349,6 +357,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		}
 		if !biz.WorkflowTaskVisibilityScopeIncludesTask(visibilityScope, task) {
 			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+		}
+		if eventScope == "flow" {
+			return id, d.workflowTaskFlowEventResult(ctx, taskID, limit, beforeEventID, visibilityScope), nil
 		}
 		events, err := d.workflowUC.ListTaskEvents(ctx, taskID, limit+1, beforeEventID)
 		if err != nil {
@@ -508,7 +519,6 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			AllowedActions:   []string{"resume"},
 			SuccessMessage:   "任务已解除阻塞，可继续处理",
 			InvalidActionMsg: "resume_task_action 仅支持解除阻塞动作",
-			RequireReason:    true,
 		})
 	case "urge_task":
 		if res := validateWorkflowTaskWritePublicParams(method, pm); res != nil {
@@ -531,7 +541,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if !actionExists || !actionIsString || action != strings.TrimSpace(action) || !biz.IsValidWorkflowTaskUrgeAction(action) {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "action 必须是明确的催办动作"}, nil
 		}
-		reason, reasonResult := getRequiredWorkflowString(pm, "reason", "催办原因不能为空")
+		reason, reasonResult := getOptionalWorkflowString(pm, "reason")
 		if reasonResult != nil {
 			return id, reasonResult, nil
 		}

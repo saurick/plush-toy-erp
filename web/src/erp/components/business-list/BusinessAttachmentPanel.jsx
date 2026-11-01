@@ -3,7 +3,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useId,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -23,13 +22,11 @@ import {
 import {
   CameraOutlined,
   DeleteOutlined,
-  DownOutlined,
   DownloadOutlined,
   EyeOutlined,
   PaperClipOutlined,
   RedoOutlined,
   StopOutlined,
-  UpOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
 import { AttachmentPolicy } from '../../../common/consts/attachments.generated.mjs'
@@ -266,7 +263,6 @@ const BusinessAttachmentPanel = forwardRef(
     },
     ref
   ) => {
-    const contentId = useId()
     const inputRef = useRef(null)
     const photoInputRef = useRef(null)
     const cameraInputRef = useRef(null)
@@ -293,11 +289,6 @@ const BusinessAttachmentPanel = forwardRef(
     const [uploading, setUploading] = useState(false)
     const [preparing, setPreparing] = useState(false)
     const [loadError, setLoadError] = useState('')
-    const [expanded, setExpanded] = useState(false)
-    useEffect(() => setExpanded(false), [scope])
-    useEffect(() => {
-      if (loadError || pendingAttachments.length > 0) setExpanded(true)
-    }, [loadError, pendingAttachments.length])
     const [category, setCategory] = useState('all')
     const [expandedNames, setExpandedNames] = useState(new Set())
     const [dragging, setDragging] = useState(false)
@@ -1244,27 +1235,41 @@ const BusinessAttachmentPanel = forwardRef(
       )
     }
 
-    const panelExpanded =
-      expanded || pendingAttachments.length > 0 || Boolean(loadError)
+    const toolbar = (
+      <div className="business-attachment-panel__toolbar">
+        <SlidingSegmented
+          aria-label="附件分类"
+          options={categoryOptions}
+          value={category}
+          onChange={setCategory}
+        />
+        {compact && (!missingOwner || canQueuePending) ? <BusinessHelpLabel iconOnly label={title} description={panelDescription} /> : null}
+        {!missingOwner ? (
+          <Button
+            type="text"
+            className="business-attachment-panel__refresh"
+            aria-label="刷新列表"
+            icon={<RedoOutlined aria-hidden="true" />}
+            loading={loading}
+            disabled={uploading || preparing}
+            onClick={() => reload()}
+          >
+            刷新
+          </Button>
+        ) : null}
+      </div>
+    )
+    const showFooter = Boolean(
+      uploadProgress ||
+      (missingOwner && canQueuePending && pendingAttachments.length > 0) ||
+      onClose ||
+      (canUpload && (retryablePendingAttachments.length > 1 || (!missingOwner && queuedAttachments.length > 0)))
+    )
 
     return (
       <section className={containerClassName} aria-label={title}>
         {compact ? (
-          <button
-            type="button"
-            className="business-attachment-panel__compact-summary"
-            aria-expanded={panelExpanded}
-            aria-controls={contentId}
-            aria-label={`${title} · ${loading ? '正在读取' : loadError ? '读取失败' : `${attachments.length} 个已上传`}${pendingAttachments.length ? ` · ${pendingAttachments.length} 个待处理` : ''} ${panelExpanded ? '收起附件' : '展开附件'}`}
-            onClick={() => setExpanded((value) => !value)}
-            disabled={
-              pendingAttachments.length > 0 ||
-              preparing ||
-              uploading ||
-              withdrawing ||
-              Boolean(loadError)
-            }
-          >
+          <div className="business-attachment-panel__compact-header">
             <span className="business-attachment-panel__compact-copy">
               <PaperClipOutlined aria-hidden="true" /> {title}{' '}
               {loading
@@ -1276,21 +1281,11 @@ const BusinessAttachmentPanel = forwardRef(
                 ? ` · ${pendingAttachments.length} 个待处理`
                 : ''}
             </span>
-            <span className="business-attachment-panel__compact-action">
-              {panelExpanded ? (
-                <UpOutlined aria-hidden="true" />
-              ) : (
-                <DownOutlined aria-hidden="true" />
-              )}
-            </span>
-          </button>
+            {toolbar}
+          </div>
         ) : null}
-        <div
-          id={contentId}
-          className="business-attachment-panel__content"
-          hidden={compact && !panelExpanded}
-        >
-          {!compact || missingOwner ? (
+        <div className="business-attachment-panel__content">
+          {!compact || (missingOwner && !canQueuePending) ? (
             <div className="business-attachment-panel__header">
               {!compact && variant !== 'manager' ? (
                 <BusinessHelpLabel label={title} description={!missingOwner ? panelDescription : undefined} />
@@ -1302,28 +1297,7 @@ const BusinessAttachmentPanel = forwardRef(
               ) : null}
             </div>
           ) : null}
-          <div className="business-attachment-panel__toolbar">
-            <SlidingSegmented
-              aria-label="附件分类"
-              options={categoryOptions}
-              value={category}
-              onChange={setCategory}
-            />
-            {compact && !missingOwner ? <BusinessHelpLabel iconOnly label={title} description={panelDescription} /> : null}
-            {!missingOwner ? (
-              <Button
-                type="text"
-                className="business-attachment-panel__refresh"
-                aria-label="刷新列表"
-                icon={<RedoOutlined aria-hidden="true" />}
-                loading={loading}
-                disabled={uploading || preparing}
-                onClick={() => reload()}
-              >
-                刷新
-              </Button>
-            ) : null}
-          </div>
+          {!compact ? toolbar : null}
           {canUpload ? (
             <>
               <div
@@ -1383,9 +1357,10 @@ const BusinessAttachmentPanel = forwardRef(
                     </Button>
                   ) : null}
                 </div>
-                <span className="business-attachment-panel__drop-hint">
-                  或将文件拖拽到此处
-                </span>
+                {compact && missingOwner && canQueuePending ? (
+                  <span className="business-attachment-panel__queue-hint">保存业务记录时上传</span>
+                ) : null}
+                <span className="business-attachment-panel__drop-hint">或将文件拖拽到此处</span>
                 <span className="business-attachment-panel__upload-limit">
                   支持图片、PDF、Office、WPS、邮件、文本与压缩包；单个文件不超过
                   {' '}{MAX_ATTACHMENT_SIZE_LABEL}
@@ -1458,15 +1433,15 @@ const BusinessAttachmentPanel = forwardRef(
                 visibleItems.map(renderAttachmentRow)
               ) : !loadError ? (
                 <div className="business-attachment-panel__empty">
-                  <PaperClipOutlined aria-hidden="true" />
+                  {!compact ? <PaperClipOutlined aria-hidden="true" /> : null}
                   <strong>
                     {loading
                       ? '正在加载附件…'
                       : category === 'all'
-                        ? emptyDescription
+                        ? compact && missingOwner && canQueuePending ? '暂无附件' : emptyDescription
                         : '当前分类没有附件'}
                   </strong>
-                  {!loading && canUpload && !uploadDisabled ? (
+                  {!compact && !loading && canUpload && !uploadDisabled ? (
                     <span>
                       {missingOwner
                         ? '选择文件后，保存业务记录时上传'
@@ -1477,50 +1452,52 @@ const BusinessAttachmentPanel = forwardRef(
               ) : null}
             </div>
           </Spin>
-          <div className="business-attachment-panel__footer">
-            <span className="business-attachment-panel__status" role="status">
-              {uploadProgress ? (
-                <>
-                  <Spin size="small" /> 上传中（{uploadProgress.completed}/
-                  {uploadProgress.total}）
-                </>
-              ) : missingOwner && canQueuePending ? (
-                '待上传附件将在保存业务记录后绑定'
-              ) : null}
-            </span>
-            <div className="business-attachment-panel__footer-actions">
-              {onClose ? (
-                <Button
-                  disabled={uploading || preparing || withdrawing}
-                  onClick={onClose}
-                >
-                  关闭
-                </Button>
-              ) : null}
-              {canUpload && retryablePendingAttachments.length > 1 ? (
-                <Button
-                  icon={<RedoOutlined aria-hidden="true" />}
-                  disabled={uploading || preparing}
-                  onClick={() =>
-                    handleRetryPendingAttachments(retryablePendingAttachments)
-                  }
-                >
-                  重试失败项（{retryablePendingAttachments.length}）
-                </Button>
-              ) : null}
-              {canUpload && !missingOwner && queuedAttachments.length > 0 ? (
-                <Button
-                  type="primary"
-                  icon={<UploadOutlined aria-hidden="true" />}
-                  loading={uploading}
-                  disabled={preparing || uploading}
-                  onClick={() => handleUploadQueuedAttachments()}
-                >
-                  上传 {queuedAttachments.length} 个文件
-                </Button>
-              ) : null}
+          {showFooter ? (
+            <div className="business-attachment-panel__footer">
+              <span className="business-attachment-panel__status" role="status">
+                {uploadProgress ? (
+                  <>
+                    <Spin size="small" /> 上传中（{uploadProgress.completed}/
+                    {uploadProgress.total}）
+                  </>
+                ) : missingOwner && canQueuePending ? (
+                  '待上传附件将在保存业务记录后绑定'
+                ) : null}
+              </span>
+              <div className="business-attachment-panel__footer-actions">
+                {onClose ? (
+                  <Button
+                    disabled={uploading || preparing || withdrawing}
+                    onClick={onClose}
+                  >
+                    关闭
+                  </Button>
+                ) : null}
+                {canUpload && retryablePendingAttachments.length > 1 ? (
+                  <Button
+                    icon={<RedoOutlined aria-hidden="true" />}
+                    disabled={uploading || preparing}
+                    onClick={() =>
+                      handleRetryPendingAttachments(retryablePendingAttachments)
+                    }
+                  >
+                    重试失败项（{retryablePendingAttachments.length}）
+                  </Button>
+                ) : null}
+                {canUpload && !missingOwner && queuedAttachments.length > 0 ? (
+                  <Button
+                    type="primary"
+                    icon={<UploadOutlined aria-hidden="true" />}
+                    loading={uploading}
+                    disabled={preparing || uploading}
+                    onClick={() => handleUploadQueuedAttachments()}
+                  >
+                    上传 {queuedAttachments.length} 个文件
+                  </Button>
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
         <BusinessModal
           size="confirm"

@@ -11,10 +11,11 @@ import {
 } from '../WorkbenchPattern.jsx'
 import { WORKFLOW_TASK_COLLABORATION_ACTIONS } from '../../../erp/utils/workflowTaskActionFlow.mjs'
 import { TASK_HANDLING_KINDS } from '../../../erp/utils/taskHandlingPolicy.mjs'
+import { workflowTaskActionInput } from '../../../erp/utils/workflowTaskActionContract.mjs'
 import { getRoleDisplayName } from '../../../erp/utils/roleKeys.mjs'
 import BusinessActionRelations from './BusinessActionRelations.jsx'
 
-import { PermissionLabel } from '../../../common/consts/permissions.generated.mjs'
+import { PermissionCode, PermissionLabel } from '../../../common/consts/permissions.generated.mjs'
 import {
   MOBILE_HANDLING_LABELS,
   TASK_HANDLING_ROWS,
@@ -24,6 +25,18 @@ import {
   taskHandlingActions,
 } from '../../config/devTaskHandling.mjs'
 import './taskHandlingMatrix.css'
+
+const INPUT_RULE_ROWS = [
+  { key: 'complete', label: '普通任务完成', task: {} },
+  { key: 'approval', mode: 'complete', label: '普通审批通过、用料审核通过', task: { required_capability_key: PermissionCode.WORKFLOW_TASK_APPROVE } },
+  { key: 'decision', mode: 'complete', label: '收付款、库存调整和生产异常审批通过', task: { required_capability_key: PermissionCode.PRODUCTION_EXCEPTION_APPROVE } },
+  { key: 'followup', mode: 'complete', label: '完成协调跟进', task: { task_group: 'business_followup' } },
+  { key: 'block', label: '标记任务受阻', task: {} },
+  { key: 'reject', label: '退回／驳回', task: {} },
+  { key: 'assign', label: '转交任务', task: {} },
+  { key: 'resume', label: '解除任务阻塞', task: {} },
+  { key: 'urge', label: '催办任务', task: {} },
+].map((row) => ({ ...row, input: workflowTaskActionInput(row.task, row.mode || row.key) }))
 
 export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
   const [params, setParams] = useSearchParams()
@@ -204,6 +217,7 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
         按本项办理责任筛选；可配置审批列示流程默认岗位，实际以生效配置和任务分派为准。
       </p>
       <Table
+        className="erp-dev-task-catalog"
         size="small"
         rowKey="key"
         dataSource={filtered}
@@ -281,6 +295,20 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
           ))}
         </dl>
         <p>审批通过、审批退回、退回工程、实际发货、入库过账等属于本项业务。标记任务受阻只记录协作卡点，解除任务阻塞只恢复任务办理；两者都不能替代业务退回、冲正或过账。</p>
+      </WorkbenchSection>
+      <WorkbenchSection title="必填与选填">
+        <Table
+          aria-label="任务处理填写规则"
+          rowKey="key"
+          pagination={false}
+          size="small"
+          dataSource={INPUT_RULE_ROWS}
+          columns={[
+            { title: '处理动作', dataIndex: 'label', key: 'label' },
+            { title: '填写要求', key: 'required', render: (_, row) => row.key === 'block' ? '必选一项原因；补充说明选填' : row.key === 'assign' ? '去向与原因必填' : row.input.required ? `${row.input.label}必填` : `${row.input.label}选填` },
+          ]}
+        />
+        <p>选填说明留空时，仍记录实际动作、办理人和时间，回执与处理记录省略空说明行；记录详情显示“未补充说明”。历史必填内容缺失时标为“未记录”，不补造原因。数量、结论等业务必填字段继续由原业务表单校验。</p>
       </WorkbenchSection>
     </section>
   )

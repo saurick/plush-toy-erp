@@ -4,7 +4,7 @@ import { Alert, Button } from 'antd'
 import Modal from '@/common/components/modal/AppModal'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { ERP_THEME_MODE, useERPTheme } from '@/common/theme/erpTheme'
-import { ERP_ACCENTS } from '@/common/theme/erpAppearance.mjs'
+import { ERP_ACCENTS, ERP_FORM_DISPLAY_OPTIONS } from '@/common/theme/erpAppearance.mjs'
 
 const themeOptions = [
   {
@@ -160,6 +160,16 @@ export default function ERPThemeToggle({
                 { value: 'grid', label: '网格' },
               ]}
               onChange={(tableLines) => setAppearance({ tableLines })}
+            />
+          </fieldset>
+          <fieldset>
+            <legend>编辑页显示</legend>
+            <Segmented
+              block
+              aria-label="编辑页显示"
+              value={appearance.formDisplay}
+              options={ERP_FORM_DISPLAY_OPTIONS}
+              onChange={(formDisplay) => setAppearance({ formDisplay })}
             />
           </fieldset>
         </>

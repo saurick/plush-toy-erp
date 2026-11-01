@@ -11,6 +11,7 @@ import {
 
 const task = {
   id: 42,
+  task_no: 'RW20261018-0029',
   task_code: 'TASK-INTERNAL-42',
   task_name: '确认样品尺寸',
   task_status_key: 'ready',
@@ -39,6 +40,7 @@ test('task copy uses the current product and document projection and includes ev
   const result = formatWorkflowTaskCopy(task, { assigneeLabel: '小陈' })
   for (const expected of [
     '任务：确认样品尺寸',
+    '任务编号：RW20261018-0029',
     '产品：长耳兔抱枕',
     '内部款号：RB-018',
     '产品编号：P-018',

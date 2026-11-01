@@ -15,6 +15,7 @@ import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import { DevReadingReturn } from '../components/DevReadingNavigation.jsx'
 
 import {
   DEV_DELIVERY_TARGETS,
@@ -129,6 +130,7 @@ export default function DevVersionCenterPage() {
   return (
     <div ref={workspaceRef} className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page erp-dev-version-page erp-dev-delivery-workspace">
       <DevPageNav />
+      <DevReadingReturn ready={customerReady && !refreshBusy} />
       <DevPageHeader
         className="erp-dev-hub-header"
         title={

@@ -1,15 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CopyOutlined,
   DeleteOutlined,
   FolderOpenOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Input, InputNumber, Space } from 'antd'
+import { Button, Form, Input, InputNumber, Space, Typography } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import RemoteReferencePicker from '../RemoteReferencePicker.jsx'
 import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../../utils/warehouseClassification.mjs'
 import Select from '@/common/components/select/AppSelect'
+import { referenceLabel, supplierOption } from '../../utils/referenceSelectOptions.mjs'
 import {
   formatUnitQuantitySummary,
   summarizePurchaseOrderLines,
@@ -24,6 +26,7 @@ import FieldWithUnitSuffix, {
 } from '../business-list/FieldWithUnitSuffix.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
+import BusinessImportActions from '../business-list/BusinessImportActions.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
@@ -39,7 +42,10 @@ import {
   unixToDateInputValue,
 } from '../../utils/masterDataOrderView.mjs'
 import { buildPurchaseOrderItemSourceValuesFromMaterial } from '../../utils/sourceOrderLineValues.mjs'
-import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
+import {
+  createDuplicatedDraftLineItem,
+  withoutBlankPurchaseOrderDraftLines,
+} from '../../utils/businessLineItems.mjs'
 import {
   CATALOG_FILL_DUPLICATE_POLICIES,
   CATALOG_FILL_MODES,
@@ -50,6 +56,8 @@ import { optionalMoneyRule } from '../../utils/sourceOrderValidation.mjs'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx'
 import { purchaseMaterialMatchesSupplier, purchaseMaterialOption } from '../../utils/purchaseMaterialSupplier.mjs'
+import { canReadReference } from '../../utils/remoteReferences.mjs'
+import { canUndoPurchaseMaterialImport, createPurchaseMaterialImportUndo, purchaseMaterialImportSnapshot } from '../../utils/purchaseMaterialImportUndo.mjs'
 
 const PURCHASE_ORDER_COLUMNS = [
   { label: '材料名称', width: 240, flexible: true, required: true },
@@ -75,12 +83,6 @@ function getNextLineNo(lines = []) {
     return Number.isFinite(lineNo) ? Math.max(maxValue, lineNo) : maxValue
   }, 0)
   return maxLineNo + 1
-}
-
-function supplierLabel(supplier = {}) {
-  return (
-    [supplier.code, supplier.name].filter(Boolean).join(' ') || '供应商已关联'
-  )
 }
 
 function materialLabel(material = {}) {
@@ -168,17 +170,39 @@ export function PurchaseOrderFormFields({
   materials,
   unitOptions,
   referenceDataReady = true,
+  writable = true,
+  saving = false,
+  importUndo,
+  onImportUndoChange,
   attachmentPanel,
   onSupplierChange,
   onMaterialChange,
 }) {
-  const taskReadOnly = useBusinessPageContext()?.taskBusiness?.readOnly === true
+  const context = useBusinessPageContext()
+  const taskReadOnly = context?.taskBusiness?.readOnly === true
+  const canReadMaterials = canReadReference(context?.adminProfile, 'materials')
+  const canEdit = writable && !taskReadOnly
   const [materialImportOpen, setMaterialImportOpen] = useState(false)
+  const materialImportButton = useRef(null)
   const supplierID = Form.useWatch('supplier_id', form)
+  const importSnapshot = Form.useWatch(purchaseMaterialImportSnapshot, { form, preserve: true })
+  const undoState = !importUndo ? '' : importUndo.invalidated || importSnapshot !== importUndo.appliedSnapshot ? 'changed' : 'ready'
+  const materialImportHint = !canEdit
+    ? '当前采购单只读，不能添加材料'
+    : !canReadMaterials
+      ? '当前账号无权查看材料，不能从材料库添加'
+    : !referenceDataReady
+      ? '采购基础资料加载完成后可选择材料'
+      : !supplierID ? '请先选择供应商' : ''
   const materialParams = useMemo(() => supplierID ? { purchase_supplier_id: supplierID } : {}, [supplierID])
   useEffect(() => {
-    if (!referenceDataReady) setMaterialImportOpen(false)
-  }, [referenceDataReady])
+    if (!canEdit || !canReadMaterials || !referenceDataReady) {
+      setMaterialImportOpen(false)
+      onImportUndoChange?.(null)
+    } else if (importUndo && !importUndo.invalidated && importSnapshot !== importUndo.appliedSnapshot) {
+      onImportUndoChange?.((current) => current ? { ...current, invalidated: true } : null)
+    }
+  }, [canEdit, canReadMaterials, referenceDataReady, importUndo, importSnapshot, onImportUndoChange])
   const purchaseDate = Form.useWatch('purchase_date', form)
   const expectedArrivalDate = Form.useWatch('expected_arrival_date', form)
   const supplierConfirmedArrivalDate = Form.useWatch(
@@ -201,8 +225,7 @@ export function PurchaseOrderFormFields({
   const supplierOptions = useMemo(
     () =>
       suppliers.map((item) => ({
-        value: item.id,
-        label: supplierLabel(item),
+        ...supplierOption(item),
         item,
       })),
     [suppliers]
@@ -246,7 +269,7 @@ export function PurchaseOrderFormFields({
     <Form
       form={form}
       layout="vertical"
-      disabled={taskReadOnly || !referenceDataReady}
+      disabled={!canEdit || !referenceDataReady || saving}
       className="erp-business-action-form"
     >
       <Form.Item name="supplier_snapshot" hidden>
@@ -339,21 +362,45 @@ export function PurchaseOrderFormFields({
       </BusinessFormSection>
       <BusinessFormSection title="采购明细" showHeading={false}>
         <BusinessLineItemsSection
+          grouping={{
+            form,
+            getGroup: (item) => ({
+              key: item.material_id && item.unit_id ? `${item.material_id}:${item.unit_id}` : undefined,
+              label: referenceLabel(materialOptions, item.material_id, '待选择材料'),
+              title: `${referenceLabel(materialOptions, item.material_id, '待选择材料')} · ${referenceLabel(unitOptions, item.unit_id, '待选择单位')}`,
+            }),
+          }}
           columns={PURCHASE_ORDER_COLUMNS}
           title="采购明细"
           emptyDescription="暂无采购明细"
           headerActions={(
-            <Button
-              icon={<FolderOpenOutlined aria-hidden="true" />}
-              className="erp-line-items-form__import-button erp-action-button"
-              disabled={taskReadOnly || !referenceDataReady || !supplierID}
-              title={!supplierID ? '请先选择供应商' : !referenceDataReady ? '采购基础资料加载完成后可选择材料' : undefined}
-              onClick={() => setMaterialImportOpen(true)}
-            >
-              从材料库添加
-            </Button>
+            <>
+              {materialImportHint ? (
+                <Typography.Text type="secondary" role="status">{materialImportHint}</Typography.Text>
+              ) : null}
+              <BusinessImportActions
+                undoState={undoState}
+                disabled={!canEdit || !canReadMaterials || !referenceDataReady || saving}
+                onUndo={() => {
+                  if (!canEdit || !canReadMaterials || !referenceDataReady || saving || !canUndoPurchaseMaterialImport(importUndo, form.getFieldsValue(true))) return
+                  form.setFieldsValue({ items: structuredClone(importUndo.items) })
+                  onImportUndoChange?.(null)
+                  materialImportButton.current?.focus()
+                }}
+              >
+                <Button
+                  ref={materialImportButton}
+                  icon={<FolderOpenOutlined aria-hidden="true" />}
+                  className="erp-line-items-form__import-button erp-action-button"
+                  disabled={!canEdit || !canReadMaterials || !referenceDataReady || !supplierID || saving}
+                  onClick={() => setMaterialImportOpen(true)}
+                >
+                  从材料库添加
+                </Button>
+              </BusinessImportActions>
+            </>
           )}
-          renderBeforeHeader={({ add }) => (
+          renderBeforeHeader={() => (
             <RemoteReferencePicker
               referenceType="materials"
               params={materialParams}
@@ -370,7 +417,11 @@ export function PurchaseOrderFormFields({
               emptyDescription="暂无可选材料"
               onCancel={() => setMaterialImportOpen(false)}
               onImport={(selectedMaterials) => {
-                  const currentLines = form.getFieldValue('items') || []
+                  if (!canEdit || !canReadMaterials || !referenceDataReady || saving || !form.getFieldValue('supplier_id')) return
+                  const before = form.getFieldsValue(true)
+                  const currentLines = withoutBlankPurchaseOrderDraftLines(
+                    form.getFieldValue('items') || []
+                  )
                   const nextLineNo = getNextLineNo(currentLines)
                   const startIndex = currentLines.length
                   const { rowsToAdd: importedLines } = buildCatalogFillRowsPlan(
@@ -389,20 +440,11 @@ export function PurchaseOrderFormFields({
                         ),
                     }
                   )
-                  importedLines.forEach(() => {
-                    add()
-                  })
+                  if (!importedLines.length) return
+                  const items = [...currentLines, ...importedLines]
+                  onImportUndoChange?.(createPurchaseMaterialImportUndo(before, { ...before, items }))
+                  form.setFieldsValue({ items })
                   requestLineItemScroll(startIndex)
-                  window.setTimeout(() => {
-                    form.setFields(
-                      importedLines.flatMap((line, index) =>
-                        Object.entries(line).map(([key, value]) => ({
-                          name: ['items', startIndex + index, key],
-                          value,
-                        }))
-                      )
-                    )
-                  })
                   setMaterialImportOpen(false)
                 }}
             />
@@ -411,16 +453,7 @@ export function PurchaseOrderFormFields({
             <BusinessLineItemRow
               key={field.key}
               index={index}
-              name={['items', field.name]}
               detailsLabel="来源、下单资料与备注"
-              summaryFields={[
-                { key: 'product_order_no_snapshot', label: '订单' },
-                { key: 'product_no_snapshot', label: '产品编号' },
-                { key: 'product_name_snapshot', label: '产品' },
-                { key: 'material_code_snapshot', label: '材料编码' },
-                { key: 'color_snapshot', label: '颜色' },
-                { key: 'note', label: '备注' },
-              ]}
               rowRef={(node) => registerLineItemRow(index, node)}
               actions={
                 <Space
@@ -446,7 +479,7 @@ export function PurchaseOrderFormFields({
                     danger
                     type="text"
                     icon={<DeleteOutlined />}
-                    disabled={taskReadOnly || fields.length <= 1}
+                    disabled={!canEdit || !referenceDataReady || saving || fields.length <= 1}
                     onClick={() => remove(field.name)}
                   >
                     移除行
@@ -478,7 +511,7 @@ export function PurchaseOrderFormFields({
                   <RemoteReferenceSelect
                     referenceType="materials"
                     params={materialParams}
-                    disabled={taskReadOnly || !supplierID}
+                    disabled={!canEdit || !referenceDataReady || saving || !supplierID}
                     mapOption={(material) => purchaseMaterialOption(material, supplierID)}
                     placeholder="请选择材料名称"
                     allowClear
@@ -598,7 +631,7 @@ export function PurchaseOrderFormFields({
                 name={[field.name, 'product_name_snapshot']}
                 label="产品名称"
               >
-                <BusinessTextArea maxLength={255} />
+                <BusinessTextArea minRows={1} maxLength={255} />
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--snapshot-code"
@@ -612,7 +645,7 @@ export function PurchaseOrderFormFields({
                 name={[field.name, 'material_name_snapshot']}
                 label="下单材料名称"
               >
-                <BusinessTextArea maxLength={255} />
+                <BusinessTextArea minRows={1} maxLength={255} />
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--snapshot-small"
@@ -626,12 +659,13 @@ export function PurchaseOrderFormFields({
                 name={[field.name, 'note']}
                 label="备注"
               >
-                <BusinessTextArea allowClear showCount maxLength={255} />
+                <BusinessTextArea allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
               </Form.Item>
             </BusinessLineItemRow>
           )}
-          footerProps={({ add, fields }) => ({
+          footerProps={({ add }) => ({
             addLabel: '添加采购明细',
+            addDisabled: !canEdit || !referenceDataReady || saving,
             onAdd: () => {
               const currentLines = form.getFieldValue('items') || []
               add(createBlankPurchaseLine(getNextLineNo(currentLines)))
@@ -641,7 +675,12 @@ export function PurchaseOrderFormFields({
               {
                 key: 'count',
                 label: '已录入',
-                value: fields.length,
+                value: (
+                  <BusinessLineItemsSummaryValue
+                    summarize={withoutBlankPurchaseOrderDraftLines}
+                    select={(lines) => lines.length}
+                  />
+                ),
                 suffix: '条',
               },
               {
@@ -702,21 +741,19 @@ export function PurchaseOrderFormFields({
           label="收货地址"
           name="delivery_address"
         >
-          <BusinessTextArea allowClear maxLength={512} showCount />
+          <BusinessTextArea minRows={1} allowClear maxLength={512} showCount />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          extra="从供应商档案带出后可按本单调整。"
           name="payment_method"
-          label="付款方式"
+          label={<BusinessHelpLabel label="付款方式" description="从供应商档案带出后可按本单调整。" />}
         >
           <Input allowClear maxLength={128} placeholder="如银行转账、月结" />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          extra="保存后冻结为本单付款条件，不随供应商档案后续调整。"
           name="payment_term_days"
-          label="付款周期（天）"
+          label={<BusinessHelpLabel label="付款周期（天）" description="保存后冻结为本单付款条件，不随供应商档案后续调整。" />}
           rules={[
             { required: true, message: '请填写付款周期' },
             {
@@ -758,7 +795,7 @@ export function PurchaseOrderFormFields({
         >
           <Select
             allowClear
-            disabled={taskReadOnly || invoiceRequired !== true}
+            disabled={!canEdit || !referenceDataReady || saving || invoiceRequired !== true}
             options={PURCHASE_INVOICE_CATEGORY_OPTIONS}
             placeholder={invoiceRequired === true ? '选择发票类别' : '请先选择需要发票'}
           />
@@ -807,7 +844,7 @@ export function PurchaseOrderFormFields({
           name="note"
           label="备注"
         >
-          <BusinessTextArea allowClear showCount maxLength={255} />
+          <BusinessTextArea minRows={2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
         </Form.Item>
         {attachmentPanel}
       </BusinessFormSection>

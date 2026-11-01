@@ -3,6 +3,8 @@ package schema
 import (
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -42,7 +44,7 @@ func (InventoryOperationItem) Fields() []ent.Field {
 		optionalDecimalField("expected_quantity"),
 		optionalDecimalField("counted_quantity"),
 		immutableDecimalQuantityField("adjustment_quantity"),
-		field.String("note").Optional().Nillable().MaxLen(255).Immutable(),
+		field.String("note").Optional().Nillable().Validate(corevalue.ValidateBusinessNote).Immutable(),
 		field.Time("created_at").Default(time.Now).Immutable(),
 	}
 }

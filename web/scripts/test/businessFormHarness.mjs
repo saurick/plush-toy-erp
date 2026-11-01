@@ -11,10 +11,11 @@ export async function businessFormHarness(t, { rpc } = {}) {
     registerJSXTestLoader()
     loaderRegistered = true
   }
-  const [{ createRoot }, { ConfigProvider }, { JsonRpc }] = await Promise.all([
+  const [{ createRoot }, { ConfigProvider }, { JsonRpc }, { ERPThemeProvider }] = await Promise.all([
     import('react-dom/client'),
     import('antd'),
     import('../../src/common/utils/jsonRpc.js'),
+    import('../../src/common/theme/erpTheme.jsx'),
   ])
   const originalCall = JsonRpc.prototype.call
   JsonRpc.prototype.call = async function call(method, params, options) {
@@ -54,7 +55,7 @@ export async function businessFormHarness(t, { rpc } = {}) {
     async render(element) {
       await act(async () => {
         root.render(
-          createElement(ConfigProvider, { theme: { token: { motion: false } } }, element)
+          createElement(ERPThemeProvider, null, createElement(ConfigProvider, { theme: { token: { motion: false } } }, element))
         )
       })
       await flush()

@@ -46,18 +46,18 @@ test('task action drawer exposes the shared task attachment action with task res
   assert.doesNotMatch(source, /不会改变库存/u)
 })
 
-test('task action drawer separates business trajectory from current-task processing records', () => {
-  assert.match(source, /listWorkflowTaskEvents\(task\.id/u)
+test('task action drawer separates business trajectory from permission-scoped processing records', () => {
+  assert.match(source, /useWorkflowTaskEventRecords\(\{ task, profile \}\)/u)
   assert.match(source, /WorkflowTaskEventTrail/u)
-  assert.match(taskEventTrailSource, /本任务处理记录/u)
+  assert.match(taskEventTrailSource, /流程处理记录/u)
   assert.doesNotMatch(taskEventTrailSource, /完整审批链/u)
   assert.doesNotMatch(source, /!task\?\.id \|\| !approvalTask/u)
-  assert.match(source, /limit: 100/u)
+  assert.match(source, /records=\{taskEventRecords\}/u)
   assert.match(source, /taskEventsTruncated/u)
   assert.match(source, /truncated=\{taskEventsTruncated\}/u)
   assert.match(taskEventTrailSource, /仅显示最近/u)
   assert.match(taskEventTrailSource, /更早记录未加载/u)
-  assert.match(source, /加载本任务处理记录失败/u)
+  assert.match(source, /本任务处理记录加载失败/u)
   assert.match(source, /approvalTask=\{approvalTask\}/u)
   assert.match(source, /activeStepKey === 'context'/u)
   assert.match(source, /getWorkflowTaskActionMeta\(task, actionMode\)/u)
@@ -408,7 +408,7 @@ test('blocking requires a selected reason and disables submission while saving o
   assert.equal(ui.button('标记受阻').disabled, false)
   await ui.update({ actionSaving: true })
   assert.equal(ui.button('标记受阻').disabled, true)
-  assert.equal(document.querySelector('input[type="radio"]').disabled, true)
+  assert.equal(document.querySelector('input[type="radio"][value="等材料到货"]').disabled, true)
   await ui.click(ui.button('标记受阻'))
   assert.equal(ui.submissions.length, 0)
   await ui.update({
@@ -508,7 +508,22 @@ test('approval and recovery keep distinct groups while urge-only access keeps fo
   assert.equal(ui.menu('解除任务阻塞'), undefined)
   await ui.click(ui.menu('催办任务'))
   assert.match(document.querySelector('.erp-task-collaboration-modal').textContent, /催办任务/u)
-  assert.equal(ui.button('核对并确认').disabled, true)
+  assert.equal(ui.button('提交催办').disabled, false)
+  assert.equal(document.querySelector('.erp-task-collaboration-modal textarea').getAttribute('aria-label'), '催办说明（选填）')
+})
+
+test('resume and urge accept an empty optional explanation without a redundant review step', async (t) => {
+  const ui = await mountDrawer(t, { actionMode: 'resume', allowedActionModes: ['resume'], task: { id: 52, task_status_key: 'blocked' } })
+  const input = () => document.querySelector('.erp-task-collaboration-modal textarea')
+  assert.equal(input().getAttribute('aria-label'), '处理说明（选填）')
+  assert.equal(input().required, false)
+  assert.equal(ui.button('解除阻塞').disabled, false)
+  assert.equal(ui.button('核对并确认'), undefined)
+  await ui.click(ui.button('解除阻塞'))
+  assert.equal(ui.submissions.length, 1)
+  await ui.update({ actionMode: 'urge', allowedActionModes: ['urge'] })
+  assert.equal(input().getAttribute('aria-label'), '催办说明（选填）')
+  assert.equal(ui.button('提交催办').disabled, false)
 })
 
 test('a direct coordination entry opens its scoped form and returns to handling without submitting', async (t) => {
@@ -575,13 +590,15 @@ test('drawer renders authorized related-document entry and explains access loadi
 
 test('drawer reads events for the selected task and cancels the previous request on task switch', async (t) => {
   const ui = await mountDrawer(t)
-  assert.equal(ui.calls.length, 1)
+  assert.equal(ui.calls.length, 2)
   assert.deepEqual(ui.calls[0].params, { task_id: 42, limit: 100 })
-  const previous = ui.calls[0]
+  assert.deepEqual(ui.calls[1].params, { task_id: 42, limit: 100, scope: 'flow' })
+  const previous = ui.calls.slice()
   await ui.update({ task: { ...ui.task, id: 43, version: 2 } })
-  assert.equal(previous.options.signal.aborted, true)
-  assert.deepEqual(ui.calls[1].params, { task_id: 43, limit: 100 })
-  assert.match(document.body.textContent, /本任务处理记录/)
+  assert.equal(previous.every((call) => call.options.signal.aborted), true)
+  assert.deepEqual(ui.calls[2].params, { task_id: 43, limit: 100 })
+  assert.deepEqual(ui.calls[3].params, { task_id: 43, limit: 100, scope: 'flow' })
+  assert.match(document.body.textContent, /流程处理记录/)
 })
 
 for (const status of ['done', 'rejected', 'withdrawn']) {

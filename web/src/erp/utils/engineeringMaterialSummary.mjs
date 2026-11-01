@@ -1,3 +1,4 @@
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import {
   numeric20Scale6Units,
   numeric20Scale6TextFromUnits,
@@ -83,5 +84,5 @@ export function materialStockQuantity(reference, item) {
 }
 
 export function materialNoteFits(value) {
-  return new TextEncoder().encode(String(value || '').trim()).length <= 255
+  return [...String(value || '').trim()].length <= BusinessTextPolicy.noteMaxCharacters
 }

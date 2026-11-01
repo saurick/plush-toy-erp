@@ -159,7 +159,7 @@ async function verifyArrival(page, { outputDir }) {
     name: '第2条到货记录',
     exact: true,
   })
-  await second.locator('summary').click()
+  assert.ok(await second.getByRole('textbox', { name: '第2条说明' }).isVisible(), '每条到货记录直接展示补充说明')
   await second
     .getByRole('textbox', { name: '第2条说明' })
     .fill('模拟卷包说明，需要逐卷核对数量。'.repeat(12))

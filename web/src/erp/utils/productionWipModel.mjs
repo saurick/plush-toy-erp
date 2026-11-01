@@ -1,4 +1,5 @@
 import { NumericContract } from '../../common/consts/numeric.generated.mjs'
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import { isBOMDecimalText } from './bomSourceValues.mjs'
 import { OperationalFactStatus, OutsourcingOrderItemStatus, OutsourcingOrderStatus, ProductionOrderStatus, ProductionPackagingConfirmationStatus, ProductionWIPStatus, QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
 import {
@@ -498,7 +499,7 @@ function validatePackagingConfirmation(value, productionOrderID) {
     (value.packaging_version_snapshot != null &&
       [...value.packaging_version_snapshot.trim()].length > 128) ||
     !optionalText(value.note) ||
-    (value.note != null && [...value.note.trim()].length > MAX_REASON_LENGTH) ||
+    (value.note != null && [...value.note.trim()].length > BusinessTextPolicy.noteMaxCharacters) ||
     !optionalPositiveInteger(value.confirmed_by) ||
     !optionalPositiveInteger(value.confirmed_at) ||
     !positiveSafeInteger(value.created_at) ||
@@ -1024,7 +1025,7 @@ export function buildProductionWipActionParams(action, values = {}) {
         params.note = requireActionText(
           values.note,
           '确认说明',
-          MAX_REASON_LENGTH
+          BusinessTextPolicy.noteMaxCharacters
         )
       }
       break

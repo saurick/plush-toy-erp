@@ -62,7 +62,7 @@ function fixture({
     if (method === "get_bom_version") return { bom_version: bom };
     if (method === "list_bom_versions") return { total: 0, bom_versions: [] };
     if (method === "save_bom_with_items") {
-      bom = { ...bom, ...params, status: "DRAFT" };
+      bom = { ...bom, ...params, version: "V1", status: "DRAFT" };
       return { bom_version: bom };
     }
     if (method === "activate_bom_version") {
@@ -131,7 +131,7 @@ test("each uncovered ordered product gets its own engineering BOM without modify
   assert.equal(result.supplementalBOMs[0].productId, 1);
   assert.equal(
     f.calls.find((x) => x.method === "save_bom_with_items").params.version,
-    "YS8-CP-001-ENG",
+    undefined,
   );
 });
 

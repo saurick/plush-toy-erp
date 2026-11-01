@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -81,7 +83,7 @@ func (StockReservation) Fields() []ent.Field {
 		field.Bool("reserved_at_specified").Default(false),
 		field.Time("released_at").Optional().Nillable(),
 		field.Time("consumed_at").Optional().Nillable(),
-		field.String("note").Optional().Nillable().MaxLen(255),
+		field.String("note").Optional().Nillable().Validate(corevalue.ValidateBusinessNote),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
 	}

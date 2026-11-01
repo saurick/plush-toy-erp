@@ -391,6 +391,25 @@ test('workflowApi: task events require an explicit bounded projection', async ()
   )
 })
 
+test('workflowApi: flow scope validates the originating task and bounded cursor', async () => {
+  const calls = []
+  const task = { id: 43, task_name: '老板用料审核', task_group: 'engineering_material_boss_review', owner_role_key: 'boss' }
+  const items = [{ id: 7, task_id: 43, event_type: 'status_changed', task }]
+  const api = await loadWorkflowApi(async (method, params, options) => {
+    calls.push({ method, params, signal: options?.signal })
+    return { data: { items, truncated: false } }
+  })
+  const controller = new AbortController()
+  assert.deepEqual(await api.listWorkflowTaskEvents(42, { scope: 'flow', beforeEventId: 8, signal: controller.signal }), { items, truncated: false })
+  assert.deepEqual(calls[0].params, { task_id: 42, limit: 100, scope: 'flow', before_event_id: 8 })
+  assert.equal(calls[0].signal === controller.signal, true)
+  await assert.rejects(api.listWorkflowTaskEvents(42, { scope: 'order' }), /任务轨迹参数无效/u)
+  for (const taskContext of [undefined, { ...task, id: 44 }, { ...task, task_name: '' }]) {
+    const invalid = await loadWorkflowApi(async () => ({ data: { items: [{ ...items[0], task: taskContext }], truncated: false } }))
+    await assert.rejects(invalid.listWorkflowTaskEvents(42, { scope: 'flow' }), /流程处理记录返回格式无效/u)
+  }
+})
+
 const mutationCases = [
   {
     exportName: 'completeWorkflowTaskAction',

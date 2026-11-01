@@ -11,7 +11,7 @@ import {
   UnorderedListOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Popconfirm, Space } from 'antd'
+import { Button, Dropdown, Popconfirm, Space, Typography } from 'antd'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
@@ -593,6 +593,7 @@ export default function BOMVersionsPage() {
     if (!record?.id || !canUpdate || !canEditBOM(record)) return
     const detail = prepared ? record : await loadDetail(record.id)
     if (!detail?.id || !canEditBOM(detail)) return
+    if (revision && prepared) await loadVersions()
     applySelectedRowKeys([detail.id])
     setSelectedVersion(detail)
     setRevisionEditing(revision)
@@ -802,7 +803,14 @@ export default function BOMVersionsPage() {
                 trigger={['click']}
                 menu={{ items: [{
                   key: 'import-bom-xlsx',
-                  label: '从 Excel 新建',
+                  label: (
+                    <Space wrap>
+                      <span>从 Excel 新建</span>
+                      {!referenceOptionsState.loaded ? (
+                        <Typography.Text type="secondary">{referenceOptionsState.loading ? '基础资料加载中，请稍候' : '资料加载失败，请先刷新页面'}</Typography.Text>
+                      ) : null}
+                    </Space>
+                  ),
                   icon: <UploadOutlined aria-hidden="true" />,
                   disabled: importing || !referenceOptionsState.loaded,
                   onClick: () => chooseImportFile('new'),
@@ -1198,7 +1206,7 @@ export default function BOMVersionsPage() {
           setSelectedVersion(saved)
           applySelectedRowKeys([saved.id])
           reportBusinessResult('BOM 草稿已保存', saved)
-          if (headerMode === 'edit' && revisionEditing) setSavedRevision(saved)
+          if (headerMode === 'view' || (headerMode === 'edit' && revisionEditing)) setSavedRevision(saved)
           if (isCreatingVersion) {
             resetBusinessPaginationCurrent(setPagination)
           } else {

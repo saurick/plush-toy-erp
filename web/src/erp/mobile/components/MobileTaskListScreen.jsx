@@ -980,9 +980,9 @@ export default function MobileTaskListScreen({
                   size="large"
                   enterKeyHint="search"
                   autoComplete="off"
-                  aria-label="搜索订单、产品、物料或款号"
-                  placeholder="订单/产品"
-                  title="搜索订单、产品、物料或款号"
+                  aria-label="搜索任务编号、订单、产品、物料或款号"
+                  placeholder="任务编号/订单/产品"
+                  title="搜索任务编号、订单、产品、物料或款号"
                   maxLength={100}
                   value={taskKeyword || ''}
                   resetKey={activeMainTabKey}

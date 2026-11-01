@@ -1,5 +1,5 @@
 // 由 `node scripts/gen-public-contracts.mjs` 生成；请勿手改。
-// 真源：server/internal/biz/business_pagination.go、server/internal/biz/work_center_pagination.go、server/internal/biz/admin_password.go、server/internal/biz/bom_source_snapshot.go、server/internal/biz/help_content.go、server/internal/biz/sales_order_export.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go。
+// 真源：server/internal/core/value/text.go、server/internal/biz/business_pagination.go、server/internal/biz/work_center_pagination.go、server/internal/biz/admin_password.go、server/internal/biz/bom_source_snapshot.go、server/internal/biz/help_content.go、server/internal/biz/sales_order_export.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go。
 export const AdminPasswordPolicy = Object.freeze({
   maxBytes: 72,
   maxCharacters: 20,
@@ -17,6 +17,10 @@ export const BOMSourcePolicy = Object.freeze({
 export const BusinessPaginationPolicy = Object.freeze({
   defaultPageSize: 50,
   maxPageSize: 500,
+})
+
+export const BusinessTextPolicy = Object.freeze({
+  noteMaxCharacters: 2000,
 })
 
 export const HelpContentPolicy = Object.freeze({

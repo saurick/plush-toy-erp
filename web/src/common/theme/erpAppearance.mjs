@@ -4,6 +4,11 @@ import { normalizeERPThemeMode } from './erpThemeMode.mjs'
 export const ERP_APPEARANCE_STORAGE_KEY = 'plush_erp_appearance'
 export const WORKBENCH_APPEARANCE_STORAGE_KEY = 'plush_workbench_appearance'
 
+export const ERP_FORM_DISPLAY_OPTIONS = Object.freeze([
+  { value: 'all', label: '查看全部' },
+  { value: 'section', label: '分区编辑' },
+])
+
 export const ERP_ACCENTS = Object.freeze({
   blue: {
     label: '蓝色',
@@ -90,6 +95,9 @@ export function normalizeERPAppearance(value) {
     tableLines: appearanceContract.table_lines.includes(value?.tableLines)
       ? value.tableLines
       : appearanceContract.defaults.tableLines,
+    formDisplay: appearanceContract.form_displays.includes(value?.formDisplay)
+      ? value.formDisplay
+      : appearanceContract.defaults.formDisplay,
   }
 }
 
@@ -106,7 +114,8 @@ export function isERPAccountAppearance(value) {
     appearanceContract.theme_modes.includes(value.theme_mode) &&
     appearanceContract.accents.includes(value.accent) &&
     appearanceContract.densities.includes(value.density) &&
-    appearanceContract.table_lines.includes(value.tableLines)
+    appearanceContract.table_lines.includes(value.tableLines) &&
+    appearanceContract.form_displays.includes(value.formDisplay)
   )
 }
 

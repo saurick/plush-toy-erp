@@ -1326,7 +1326,7 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'workflow_only',
       }),
       transition('blocked', 'ready', {
-        guard: '必须提供新的解除说明并清理旧阻塞原因。',
+        guard: '处理说明选填；校验责任权限、version 和幂等键，清理当前阻塞原因并保留历史记录；仅恢复任务待处理。',
         action: 'resume_task_action',
         permission: [PermissionCode.WORKFLOW_TASK_UPDATE],
         factBoundary: 'workflow_only',

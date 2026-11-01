@@ -14,6 +14,7 @@ import {
 import Select from '@/common/components/select/AppSelect'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import BusinessFormModal from '@/erp/components/business-list/BusinessFormModal'
+import BusinessTextArea from '@/erp/components/business-list/BusinessTextArea.jsx'
 import BusinessModal from '@/erp/components/business-list/BusinessModal'
 import AlertDialog from '@/common/components/modal/AlertDialog'
 import AppModal from '@/common/components/modal/AppModal'
@@ -225,9 +226,9 @@ function EditorExample({ size = 'localAction' }) {
             />
           </Form.Item>
           <Form.Item name="note" label="补充内容">
-            <Input.TextArea
-              rows={4}
-              placeholder="可输入长内容，检查内部滚动和保留输入"
+            <BusinessTextArea
+              minRows={4}
+              placeholder="可输入长内容，检查自动增高和保留输入"
             />
           </Form.Item>
         </Form>

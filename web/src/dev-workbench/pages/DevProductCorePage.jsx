@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react'
 import { AppstoreOutlined, CloseOutlined } from '@ant-design/icons'
 import { Alert, Button, Empty, Tag, Typography } from 'antd'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_PRODUCT_CORE_ROUTE } from '../config/devRoutes.mjs'
 import SearchInput from '@/common/components/SearchInput'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -9,6 +9,8 @@ import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import { WorkbenchReading } from '../components/WorkbenchPattern.jsx'
+import DevProductCoreRelations from '../components/DevProductCoreRelations.jsx'
+import { DevReadingReturn } from '../components/DevReadingNavigation.jsx'
 import {
   DEV_PRODUCT_CORE_MEMBERSHIP_ALL,
   DEV_PRODUCT_CORE_MEMBERSHIP_ORDER,
@@ -57,6 +59,7 @@ function getProductCoreSource() {
 }
 
 export default function DevProductCorePage() {
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const source = useMemo(() => getProductCoreSource(), [])
   const capabilities = useMemo(
@@ -106,8 +109,8 @@ export default function DevProductCorePage() {
     const nextParams = new URLSearchParams(searchParams)
     if (invalidMembership) nextParams.delete('status')
     if (invalidCapability) nextParams.delete('capability')
-    setSearchParams(nextParams, { replace: true })
-  }, [membership, requestedMembership, requestedCapability, selectedCapability, searchParams, setSearchParams])
+    setSearchParams(nextParams, { replace: true, state: location.state })
+  }, [membership, requestedMembership, requestedCapability, selectedCapability, searchParams, setSearchParams, location.state])
 
   const handleMembershipChange = (nextMembership) => {
     const nextParams = new URLSearchParams(searchParams)
@@ -116,7 +119,7 @@ export default function DevProductCorePage() {
     } else {
       nextParams.set('status', nextMembership)
     }
-    setSearchParams(nextParams)
+    setSearchParams(nextParams, { state: location.state })
   }
 
   const handleKeywordSearch = (nextKeyword) => {
@@ -126,11 +129,11 @@ export default function DevProductCorePage() {
     } else {
       nextParams.delete('q')
     }
-    setSearchParams(nextParams, { replace: true })
+    setSearchParams(nextParams, { replace: true, state: location.state })
   }
 
   const handleReset = () => {
-    setSearchParams(new URLSearchParams())
+    setSearchParams(new URLSearchParams(), { state: location.state })
   }
 
   const selectCapability = (item, event) => {
@@ -138,13 +141,13 @@ export default function DevProductCorePage() {
     detailOpener.current = event.currentTarget
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set('capability', item.capability)
-    setSearchParams(nextParams)
+    setSearchParams(nextParams, { state: location.state })
   }
 
   const closeCapability = () => {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.delete('capability')
-    setSearchParams(nextParams, { replace: true })
+    setSearchParams(nextParams, { replace: true, state: location.state })
     requestAnimationFrame(() => {
       const target = detailOpener.current?.isConnected
         ? detailOpener.current : document.querySelector('input[aria-label="搜索产品能力"]')
@@ -158,6 +161,7 @@ export default function DevProductCorePage() {
   return (
     <div className="erp-dev-product-core-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav />
+      <DevReadingReturn />
 
       <DevPageHeader
         className="erp-dev-product-core-header"
@@ -285,6 +289,7 @@ export default function DevProductCorePage() {
                   <Title level={3}>当前边界</Title>
                   <p>{selectedCapability.boundary}</p>
                 </section>
+                <DevProductCoreRelations capability={selectedCapability.capability} capabilities={capabilities} />
               </div>
             ) : null}
           </WorkbenchReading>

@@ -57,6 +57,7 @@ export function materialOption(material = {}) {
   if (!value) return null
   return {
     value,
+    identity: { name: compactParts([material.name]), code: material.code || '' },
     label: compactParts([
       material.code || '材料已关联',
       material.name,
@@ -73,6 +74,7 @@ export function productOption(product = {}) {
   if (!value) return null
   return {
     value,
+    identity: { name: compactParts([product.name]), code: product.code || '' },
     label: compactParts([
       product.code || '产品已关联',
       product.name,
@@ -86,9 +88,10 @@ export function productSKUOption(sku = {}) {
   if (!value) return null
   return {
     value,
+    identity: { name: compactParts([sku.sku_name || sku.customer_sku || sku.barcode]), code: sku.sku_code || '' },
     label: compactParts([
       sku.sku_code || 'SKU已关联',
-      sku.sku_name,
+      sku.sku_name || sku.customer_sku || sku.barcode,
       sku.color,
       sku.size,
     ]),
@@ -129,6 +132,7 @@ function partyOption(party, fallbackLabel) {
   const shortName = String(party.short_name ?? '').trim()
   return {
     value,
+    identity: { name: name || shortName, code: party.code || '' },
     label: compactParts([
       party.code || `${fallbackLabel}已关联`,
       name,
@@ -150,6 +154,7 @@ export function processOption(process = {}) {
   if (!value) return null
   return {
     value,
+    identity: { name: compactParts([process.name]), code: process.code || '' },
     label: compactParts([
       process.code || '工序已关联',
       process.name,
@@ -243,6 +248,7 @@ export function inventoryLotOption(lot = {}) {
   if (!value) return null
   return {
     value,
+    identity: { name: lot.lot_no || '批次已关联', code: compactParts([lot.supplier_lot_no, inventoryLotStatusLabel(lot.status)]) },
     label: compactParts([
       lot.lot_no || '批次已关联',
       lot.supplier_lot_no,
@@ -258,6 +264,7 @@ export function warehouseOptionFromRecord(record = {}) {
   const warehouseCode = record.warehouse_code || record.code
   return {
     value,
+    identity: { name: warehouseName || '', code: warehouseCode || '' },
     ...(record.type || record.warehouse_type
       ? { type: record.type || record.warehouse_type }
       : {}),
@@ -269,4 +276,18 @@ export function warehouseOptionFromRecord(record = {}) {
         ? compactParts([warehouseName, warehouseCode])
         : '仓库已关联',
   }
+}
+
+export function productionReferenceIdentity(type, option = {}) {
+  if (option.identity) return option.identity
+  const names = {
+    product: option.name || option.code,
+    product_sku: option.sku_name || option.sku_code,
+    unit: option.unit_name || option.unit_code,
+    active_bom: option.bom_version,
+    sales_order_item: option.sales_order_no
+      ? compactParts([option.sales_order_no, option.sales_line_no ? `第 ${option.sales_line_no} 行` : ''])
+      : '',
+  }
+  return names[type] ? { name: names[type] } : undefined
 }

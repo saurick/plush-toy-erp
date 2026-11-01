@@ -25,7 +25,8 @@ test('task form uses the existing form inline, portals its footer and disables w
   }
   const router = createMemoryRouter([{ path: '/', element: h(Editor) }], { future: { v7_relativeSplatPath: true } })
   t.after(() => router.dispose())
-  await ui.render(h(RouterProvider, { router, future: { v7_startTransition: true } }))
+  const { ERPThemeProvider } = await import('../../../common/theme/erpTheme.jsx')
+  await ui.render(h(ERPThemeProvider, null, h(RouterProvider, { router, future: { v7_startTransition: true } })))
   assert.equal(editing, true)
   assert.equal(document.querySelector('.ant-modal'), null)
   assert.ok(ui.container.querySelector('[data-business-form-page]'))

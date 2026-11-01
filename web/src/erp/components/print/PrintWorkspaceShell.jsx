@@ -153,17 +153,7 @@ export function PrintWorkspaceToolSection({
       data-print-tool={tool}
     >
       {collapsible ? (
-        <details
-          open={defaultOpen}
-          onToggle={(event) => {
-            if (
-              !event.currentTarget.open &&
-              event.currentTarget.querySelector('[data-print-edit-mode]')
-            ) {
-              selection.onReturn?.()
-            }
-          }}
-        >
+        <details open={defaultOpen}>
           <summary>
             <span>{title}</span>
             {count !== undefined ? (
@@ -174,7 +164,7 @@ export function PrintWorkspaceToolSection({
         </details>
       ) : (
         <>
-          <h3>{title}</h3>
+          <h3>{title}{count !== undefined ? <span className="erp-print-shell__tool-count">{count}</span> : null}</h3>
           {content}
         </>
       )}
@@ -199,7 +189,6 @@ export default function PrintWorkspaceShell({
   clauseActions = null,
   draftActions = null,
   draftTitle = '模板内容',
-  draftDefaultOpen = false,
   formatActions = null,
   selectionMode = '',
   selectionCount = 0,
@@ -554,8 +543,6 @@ export default function PrintWorkspaceShell({
               ) ? (
                 <PrintWorkspaceToolSection
                   title="表格操作"
-                  collapsible
-                  defaultOpen
                 >
                   {editorActions}
                 </PrintWorkspaceToolSection>
@@ -580,7 +567,6 @@ export default function PrintWorkspaceShell({
               {appendixActions && tools.includes('images') ? (
                 <PrintWorkspaceToolSection
                   title="末尾附图"
-                  collapsible
                   count={appendixCount}
                   feedback={
                     feedback?.area === 'appendix'
@@ -610,8 +596,6 @@ export default function PrintWorkspaceShell({
               {draftActions ? (
                 <PrintWorkspaceToolSection
                   title={draftTitle}
-                  collapsible
-                  defaultOpen={draftDefaultOpen}
                   feedback={feedback?.area === 'draft' ? feedback : null}
                 >
                   {draftActions}

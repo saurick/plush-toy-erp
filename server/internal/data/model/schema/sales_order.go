@@ -3,6 +3,8 @@ package schema
 import (
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -73,7 +75,7 @@ func (SalesOrder) Fields() []ent.Field {
 		field.String("price_condition_note").
 			Optional().
 			Nillable().
-			MaxLen(255),
+			Validate(corevalue.ValidateBusinessNote),
 		field.String("tax_mode").Optional().Nillable().MaxLen(32),
 		optionalDecimalField("tax_rate"),
 		field.String("freight_terms").Optional().Nillable().MaxLen(32),
@@ -100,7 +102,7 @@ func (SalesOrder) Fields() []ent.Field {
 		field.String("note").
 			Optional().
 			Nillable().
-			MaxLen(255),
+			Validate(corevalue.ValidateBusinessNote),
 		field.Time("created_at").
 			Default(time.Now).
 			Immutable(),

@@ -12,6 +12,11 @@ import { WORKBENCH_APPEARANCE_STORAGE_KEY } from './erpAppearance.mjs'
 registerJSXTestLoader()
 const dom = installTestDOM()
 const { ERPThemeProvider, useERPTheme } = await import('./erpTheme.jsx')
+const { useERPTheme: usePresentationTheme } = await import('./erpThemeContext.jsx')
+
+test('presentation consumers and the public theme entry share one context hook', () => {
+  assert.equal(useERPTheme === usePresentationTheme, true)
+})
 const {
   persistAuth,
   persistAuthMeta,
@@ -33,6 +38,7 @@ const savedAppearance = {
   accent: 'blue',
   density: 'standard',
   tableLines: 'simple',
+  formDisplay: 'all',
 }
 const profile = (id, appearance = savedAppearance) => ({
   user_id: id,
@@ -84,7 +90,7 @@ async function mount({ browserStorageKey = '' } = {}) {
   document.body.append(container)
   const root = createRoot(container)
   function Probe() {
-    theme = useERPTheme()
+    theme = usePresentationTheme()
     return null
   }
   const render = async (key) => act(async () =>
@@ -116,6 +122,40 @@ const settle = async (fn) =>
     await new Promise((resolve) => setTimeout(resolve, 0))
   })
 
+test('form display saves only the selected account preference and restores across browser sessions', async () => {
+  localStorage.clear()
+  signIn(1, {})
+  let runtime = await mount()
+  try {
+    assert.equal(runtime.theme.appearance.formDisplay, 'all')
+    assert.equal(runtime.requests.length, 0)
+    await settle(() => runtime.theme.setAppearance({ formDisplay: 'section' }))
+    assert.equal(runtime.theme.appearance.formDisplay, 'section')
+    assert.deepEqual(runtime.requests[0].params, { formDisplay: 'section' })
+    await settle(() => runtime.requests[0].fail(new TypeError('offline')))
+    assert.match(runtime.theme.appearanceSaveError, /未保存到账号/u)
+    assert.equal(runtime.theme.appearance.formDisplay, 'section')
+    await settle(() => runtime.theme.retryAppearanceSave())
+    assert.deepEqual(runtime.requests[1].params, { formDisplay: 'section' })
+    const saved = { ...savedAppearance, formDisplay: 'section' }
+    await settle(() => runtime.requests[1].reply(saved))
+    assert.equal(runtime.theme.appearanceSaveError, '')
+    assert.equal(getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences').appearance.formDisplay, 'section')
+    await runtime.close()
+    localStorage.clear()
+    signIn(1, saved)
+    runtime = await mount()
+    assert.equal(runtime.theme.appearance.formDisplay, 'section')
+    assert.equal(runtime.requests.length, 0)
+    await settle(() => signIn(2, {}))
+    assert.equal(runtime.theme.appearance.formDisplay, 'all')
+    await settle(() => signIn(1, saved))
+    assert.equal(runtime.theme.appearance.formDisplay, 'section')
+  } finally {
+    await runtime.close()
+  }
+})
+
 test('appearance: unsaved accounts use compact grid and saved accounts retain standard simple', async () => {
   localStorage.clear()
   const runtime = await mount()
@@ -124,6 +164,7 @@ test('appearance: unsaved accounts use compact grid and saved accounts retain st
       accent: 'blue',
       density: 'compact',
       tableLines: 'grid',
+      formDisplay: 'all',
     }
     assert.deepEqual(runtime.theme.appearance, newDefault)
     await settle(() => signIn(1, {}))
@@ -135,6 +176,7 @@ test('appearance: unsaved accounts use compact grid and saved accounts retain st
       accent: 'blue',
       density: 'standard',
       tableLines: 'simple',
+      formDisplay: 'all',
     })
     assert.equal(document.documentElement.dataset.erpDensity, 'standard')
     assert.equal(document.documentElement.dataset.erpTableLines, 'simple')
@@ -153,15 +195,15 @@ test('appearance: unsaved accounts use compact grid and saved accounts retain st
 test('appearance: workbench preferences never inherit or update ERP guest and account preferences', async () => {
   localStorage.clear()
   localStorage.setItem('plush_erp_theme_mode', 'dark')
-  const guest = JSON.stringify({ accent: 'orange', density: 'standard', tableLines: 'simple' })
+  const guest = JSON.stringify({ accent: 'orange', density: 'standard', tableLines: 'simple', formDisplay: 'all' })
   localStorage.setItem('plush_erp_appearance', guest)
   signIn(1, { ...savedAppearance, accent: 'pink' })
   const accountBefore = getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences')
   const runtime = await mount({ browserStorageKey: WORKBENCH_APPEARANCE_STORAGE_KEY })
-  const chosen = { theme_mode: 'light', accent: 'teal', density: 'standard', tableLines: 'simple' }
+  const chosen = { theme_mode: 'light', accent: 'teal', density: 'standard', tableLines: 'simple', formDisplay: 'all' }
   try {
     assert.equal(runtime.theme.themeMode, 'system')
-    assert.deepEqual(runtime.theme.appearance, { accent: 'blue', density: 'compact', tableLines: 'grid' })
+    assert.deepEqual(runtime.theme.appearance, { accent: 'blue', density: 'compact', tableLines: 'grid', formDisplay: 'all' })
     await settle(() => runtime.theme.setThemeMode(chosen.theme_mode))
     await settle(() => runtime.theme.setAppearance(chosen))
     assert.deepEqual(JSON.parse(localStorage.getItem(WORKBENCH_APPEARANCE_STORAGE_KEY)), chosen)
@@ -182,7 +224,7 @@ test('appearance: workbench preferences never inherit or update ERP guest and ac
   const restored = await mount({ browserStorageKey: WORKBENCH_APPEARANCE_STORAGE_KEY })
   try {
     assert.equal(restored.theme.themeMode, chosen.theme_mode)
-    assert.deepEqual(restored.theme.appearance, { accent: 'teal', density: 'standard', tableLines: 'simple' })
+    assert.deepEqual(restored.theme.appearance, { accent: 'teal', density: 'standard', tableLines: 'simple', formDisplay: 'all' })
     assert.equal(restored.requests.length, 0)
   } finally {
     await restored.close()
@@ -193,7 +235,7 @@ test('appearance: workbench storage synchronization accepts only its own namespa
   localStorage.clear()
   signIn(1)
   const runtime = await mount({ browserStorageKey: WORKBENCH_APPEARANCE_STORAGE_KEY })
-  const chosen = { theme_mode: 'dark', accent: 'purple', density: 'standard', tableLines: 'simple' }
+  const chosen = { theme_mode: 'dark', accent: 'purple', density: 'standard', tableLines: 'simple', formDisplay: 'all' }
   const storageEvent = (key) => window.dispatchEvent(new window.StorageEvent('storage', { key }))
   try {
     localStorage.setItem(WORKBENCH_APPEARANCE_STORAGE_KEY, JSON.stringify(chosen))
@@ -206,7 +248,7 @@ test('appearance: workbench storage synchronization accepts only its own namespa
     localStorage.removeItem(WORKBENCH_APPEARANCE_STORAGE_KEY)
     await settle(() => storageEvent(WORKBENCH_APPEARANCE_STORAGE_KEY))
     assert.equal(runtime.theme.themeMode, 'system')
-    assert.deepEqual(runtime.theme.appearance, { accent: 'blue', density: 'compact', tableLines: 'grid' })
+    assert.deepEqual(runtime.theme.appearance, { accent: 'blue', density: 'compact', tableLines: 'grid', formDisplay: 'all' })
     assert.equal(runtime.requests.length, 0)
   } finally {
     await runtime.close()
@@ -220,7 +262,7 @@ test('appearance: invalid workbench storage uses defaults without reading the ER
   const runtime = await mount({ browserStorageKey: WORKBENCH_APPEARANCE_STORAGE_KEY })
   try {
     assert.equal(runtime.theme.themeMode, 'system')
-    assert.deepEqual(runtime.theme.appearance, { accent: 'blue', density: 'compact', tableLines: 'grid' })
+    assert.deepEqual(runtime.theme.appearance, { accent: 'blue', density: 'compact', tableLines: 'grid', formDisplay: 'all' })
     assert.equal(runtime.requests.length, 0)
   } finally {
     await runtime.close()
@@ -263,7 +305,7 @@ test('appearance: failed local saves retain the selection and recover through th
 test('appearance: switching to browser preferences isolates pending ERP responses and restores each scope', async () => {
   localStorage.clear()
   signIn(1, { ...savedAppearance, accent: 'pink' })
-  const chosen = { theme_mode: 'dark', accent: 'teal', density: 'compact', tableLines: 'grid' }
+  const chosen = { theme_mode: 'dark', accent: 'teal', density: 'compact', tableLines: 'grid', formDisplay: 'all' }
   localStorage.setItem(WORKBENCH_APPEARANCE_STORAGE_KEY, JSON.stringify(chosen))
   const runtime = await mount()
   try {
@@ -296,6 +338,7 @@ test('appearance: logout retains the last theme locally and login restores each 
         accent: 'orange',
         density: 'compact',
         tableLines: 'grid',
+        formDisplay: 'all',
       })
     )
     assert.equal(runtime.requests.length, 0)
@@ -304,6 +347,7 @@ test('appearance: logout retains the last theme locally and login restores each 
       accent: 'purple',
       density: 'standard',
       tableLines: 'simple',
+      formDisplay: 'all',
     })
     assert.equal(runtime.theme.themeMode, 'dark')
     await settle(() => logout())
@@ -311,6 +355,7 @@ test('appearance: logout retains the last theme locally and login restores each 
       accent: 'purple',
       density: 'compact',
       tableLines: 'grid',
+      formDisplay: 'all',
     })
     assert.equal(runtime.theme.themeMode, 'dark')
     assert.equal(getToken(AUTH_SCOPE.ADMIN), '')
@@ -320,6 +365,7 @@ test('appearance: logout retains the last theme locally and login restores each 
       accent: 'purple',
       density: 'compact',
       tableLines: 'grid',
+      formDisplay: 'all',
     })
     await runtime.close()
     runtime = await mount()
@@ -333,6 +379,7 @@ test('appearance: logout retains the last theme locally and login restores each 
       accent: 'blue',
       density: 'standard',
       tableLines: 'simple',
+      formDisplay: 'all',
     })
     assert.equal(runtime.theme.themeMode, 'system')
     await settle(() => logout())
@@ -432,6 +479,7 @@ test('appearance: rapid edits serialize changed fields and preserve independentl
         accent: 'green',
         density: 'compact',
         tableLines: 'grid',
+        formDisplay: 'all',
       })
     )
     const saved = getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences')
@@ -542,6 +590,7 @@ test('appearance: a fresh browser cache restores server defaults and saved choic
       accent: 'teal',
       density: 'standard',
       tableLines: 'grid',
+      formDisplay: 'all',
     })
     assert.equal(
       document.documentElement.style.getPropertyValue('--erp-accent'),

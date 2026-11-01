@@ -1,3 +1,4 @@
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   numeric20Scale6Units,
@@ -134,7 +135,7 @@ export function normalizeProductionFactDraftSaveRequest(action, params = {}) {
   } catch {
     throw invalidContract('请选择有效批次')
   }
-  const note = optionalText(params.note)
+  const note = optionalText(params.note, BusinessTextPolicy.noteMaxCharacters)
   return {
     ...request,
     warehouse_id: warehouseID,

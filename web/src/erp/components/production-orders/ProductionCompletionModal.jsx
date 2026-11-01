@@ -7,6 +7,7 @@ import {
   Radio,
   Typography,
 } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { ProductionOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
@@ -443,7 +444,7 @@ export default function ProductionCompletionModal({
             name="note"
             label="备注"
           >
-            <BusinessTextArea maxLength={255} showCount />
+            <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
           </Form.Item>
         </BusinessFormSection>
       </Form>

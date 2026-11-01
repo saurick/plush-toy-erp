@@ -7,5 +7,5 @@ const RESULT_EVENTS = new Set(['status_changed', 'reassigned', 'unassigned', 'ur
 export function workflowTaskRecordedResult(task, events = []) {
   const event = events.filter((item) => RESULT_EVENTS.has(item?.event_type))
     .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0]
-  return event ? presentWorkflowTaskEvent(event, { approvalTask: isWorkflowApprovalTask(task) }) : null
+  return event ? presentWorkflowTaskEvent(event, { approvalTask: isWorkflowApprovalTask(task), task }) : null
 }

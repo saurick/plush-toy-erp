@@ -209,6 +209,10 @@ export function createTransactionClient(options) {
 }
 
 export async function prepareTransactionSalesOrder(client, options, fixture) {
+  const orderedQuantity = fixture.orderedQuantity ?? 10;
+  assert.ok(Number.isSafeInteger(orderedQuantity) && orderedQuantity > 0);
+  const amountTenths = BigInt(orderedQuantity) * 35n;
+  const amount = `${amountTenths / 10n}.${amountTenths % 10n}`;
   const { products } = await client.rpc(
     "admin",
     "masterdata",
@@ -258,9 +262,9 @@ export async function prepareTransactionSalesOrder(client, options, fixture) {
           product_code_snapshot: product.code,
           product_name_snapshot: product.name,
           color_snapshot: sku.color,
-          ordered_quantity: "10",
+          ordered_quantity: String(orderedQuantity),
           unit_price: "3.5",
-          amount: "35",
+          amount,
         },
       ],
     },
@@ -735,7 +739,6 @@ export async function prepareTransactionProductionSource(
   let bom = (
     await client.rpc("admin", "bom", "save_bom_with_items", {
       product_id: item.product_id,
-      version: `${prefix}-BOM`,
       items: [
         {
           material_id: fixture.material.id,

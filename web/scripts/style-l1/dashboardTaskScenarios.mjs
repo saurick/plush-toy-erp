@@ -2067,9 +2067,9 @@ export function createDashboardTaskScenarios({
             emptySearchFocusMetrics.placeholder ===
               '订单 / 产品 / 物料 / 款号' &&
             emptySearchFocusMetrics.ariaLabel ===
-              '可搜索：任务、单号、产品、款号、物料、处理原因' &&
+              '可搜索：任务编号、任务、单号、产品、款号、物料、处理原因' &&
             emptySearchFocusMetrics.title ===
-              '可搜索：任务、单号、产品、款号、物料、处理原因' &&
+              '可搜索：任务编号、任务、单号、产品、款号、物料、处理原因' &&
             ['none', 'normal', ''].includes(
               emptySearchFocusMetrics.afterContent
             ) &&

@@ -11,11 +11,12 @@ import (
 var adminERPAppearanceContractJSON []byte
 
 type adminERPAppearanceOptions struct {
-	ThemeModes []string           `json:"theme_modes"`
-	Accents    []string           `json:"accents"`
-	Densities  []string           `json:"densities"`
-	TableLines []string           `json:"table_lines"`
-	Defaults   AdminERPAppearance `json:"defaults"`
+	ThemeModes   []string           `json:"theme_modes"`
+	Accents      []string           `json:"accents"`
+	Densities    []string           `json:"densities"`
+	TableLines   []string           `json:"table_lines"`
+	FormDisplays []string           `json:"form_displays"`
+	Defaults     AdminERPAppearance `json:"defaults"`
 }
 
 var adminERPAppearanceContract = func() adminERPAppearanceOptions {
@@ -27,27 +28,30 @@ var adminERPAppearanceContract = func() adminERPAppearanceOptions {
 }()
 
 type AdminERPAppearance struct {
-	ThemeMode  string `json:"theme_mode"`
-	Accent     string `json:"accent"`
-	Density    string `json:"density"`
-	TableLines string `json:"tableLines"`
+	ThemeMode   string `json:"theme_mode"`
+	Accent      string `json:"accent"`
+	Density     string `json:"density"`
+	TableLines  string `json:"tableLines"`
+	FormDisplay string `json:"formDisplay"`
 }
 
 type AdminERPAppearancePatch struct {
-	ThemeMode  *string
-	Accent     *string
-	Density    *string
-	TableLines *string
+	ThemeMode   *string
+	Accent      *string
+	Density     *string
+	TableLines  *string
+	FormDisplay *string
 }
 
 func (patch AdminERPAppearancePatch) Validate() error {
-	if patch.ThemeMode == nil && patch.Accent == nil && patch.Density == nil && patch.TableLines == nil {
+	if patch.ThemeMode == nil && patch.Accent == nil && patch.Density == nil && patch.TableLines == nil && patch.FormDisplay == nil {
 		return ErrBadParam
 	}
 	if patch.ThemeMode != nil && !slices.Contains(adminERPAppearanceContract.ThemeModes, *patch.ThemeMode) ||
 		patch.Accent != nil && !slices.Contains(adminERPAppearanceContract.Accents, *patch.Accent) ||
 		patch.Density != nil && !slices.Contains(adminERPAppearanceContract.Densities, *patch.Density) ||
-		patch.TableLines != nil && !slices.Contains(adminERPAppearanceContract.TableLines, *patch.TableLines) {
+		patch.TableLines != nil && !slices.Contains(adminERPAppearanceContract.TableLines, *patch.TableLines) ||
+		patch.FormDisplay != nil && !slices.Contains(adminERPAppearanceContract.FormDisplays, *patch.FormDisplay) {
 		return ErrBadParam
 	}
 	return nil
@@ -66,6 +70,9 @@ func (patch AdminERPAppearancePatch) Apply(current AdminERPAppearance) AdminERPA
 	if patch.TableLines != nil {
 		current.TableLines = *patch.TableLines
 	}
+	if patch.FormDisplay != nil {
+		current.FormDisplay = *patch.FormDisplay
+	}
 	return NormalizeAdminERPAppearance(current)
 }
 
@@ -82,6 +89,9 @@ func NormalizeAdminERPAppearance(input AdminERPAppearance) AdminERPAppearance {
 	}
 	if !slices.Contains(adminERPAppearanceContract.TableLines, input.TableLines) {
 		input.TableLines = defaults.TableLines
+	}
+	if !slices.Contains(adminERPAppearanceContract.FormDisplays, input.FormDisplay) {
+		input.FormDisplay = defaults.FormDisplay
 	}
 	return input
 }

@@ -22,7 +22,7 @@ async function setTextFields(editor, values, excluded = []) {
 async function prepareBOM(page) {
   const bomEditor = page.locator('.erp-bom-editor:visible')
   await assertBusinessFormNavigationSurface(page, bomEditor)
-  await bomEditor.getByLabel('BOM 版本', { exact: true }).fill('NEW-WORKSPACE-BOM')
+  if (!(await bomEditor.getByLabel('BOM 版本', { exact: true }).isDisabled())) throw new Error('BOM 版本应由系统生成')
   for (const [label, value] of Object.entries({ 备品: '2', 设计师: '工程甲', 制表人: '制表乙', 审核人: '审核丙', 毛向: '向下' })) await bomEditor.getByLabel(label, { exact: true }).fill(value)
   const importWorkbook = async () => {
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), bomEditor.getByRole('button', { name: '从 Excel 导入', exact: true }).click()])
@@ -98,11 +98,11 @@ menus: [
           if (method === 'get_bom_version') { assert.equal(params.id, 73); return reply(route, id, { bom_version: bom, bom_items: bom.items }) }
           if (method === 'save_bom_with_items') {
             assert.equal(params.product_id, 71); assert.equal(params.source_order_no, order.order_no)
-            assert.equal(params.quantity_text, '102'); assert.equal(params.version, 'NEW-WORKSPACE-BOM')
+            assert.equal(params.quantity_text, '102'); assert.equal(Object.hasOwn(params, 'version'), false)
             assert.equal(params.designer, '工程甲'); assert.equal(params.maker, '制表乙'); assert.equal(params.auditor, '审核丙'); assert.equal(params.hair_direction, '向下'); assert.equal(params.spare_text, '2')
             assert.equal(params.items.length, 2); assert.ok(params.items.every((item) => item.material_id > 0 && item.unit_id > 0 && Number(item.quantity) > 0))
             calls.push({ method, params })
-            bom = { ...params, id: 73, status: 'DRAFT', edit_version: (bom?.edit_version || 2000000000000) + 1, item_count: params.items.length, items: params.items.map((item, index) => ({ ...item, id: 730 + index })) }
+            bom = { ...params, version: bom?.version || 'V1', id: 73, status: 'DRAFT', edit_version: (bom?.edit_version || 2000000000000) + 1, item_count: params.items.length, items: params.items.map((item, index) => ({ ...item, id: 730 + index })) }
             return reply(route, id, { bom_version: bom })
           }
           if (method === 'activate_bom_version') { assert.equal(params.id, 73); calls.push({ method, params }); bom = { ...bom, status: 'ACTIVE', edit_version: bom.edit_version + 1 }; return reply(route, id, { bom_version: bom }) }
@@ -245,7 +245,7 @@ menus: [
         await page.getByTestId('workflow-task-action-receipt').getByText('工程资料已完成，用料已自动送审', { exact: false }).first().waitFor()
         await steps.getByRole('tab').nth(1).click()
         await bomEditor.getByRole('heading', { name: /查看 BOM 版本.*已启用/u }).waitFor()
-        assert.equal(await bomEditor.getByLabel('BOM 版本', { exact: true }).inputValue(), 'NEW-WORKSPACE-BOM', 'automatic review and step changes must preserve the saved editor')
+        assert.equal(await bomEditor.getByLabel('BOM 版本', { exact: true }).inputValue(), 'V1', 'automatic review and step changes must preserve the saved editor')
         assert.equal(await bomEditor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
         await assertNoHorizontalOverflow(page, `chain-${definition.key}`)
         await page.screenshot({ path: path.join(outputDir, `engineering-workspace-chain-${definition.key}.png`) })

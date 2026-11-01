@@ -128,8 +128,7 @@ reads
         await quantity.fill('21')
         const panel = editor.locator('.business-attachment-panel').first()
         if (await panel.count()) {
-          const expand = panel.getByRole('button', { name: /展开附件$/u })
-          if (await expand.count()) await expand.click()
+          assert.ok(await panel.getByRole('button', { name: '选择附件', exact: true }).isVisible(), '办理页附件入口默认可见')
           const [chooser] = await Promise.all([page.waitForEvent('filechooser'), panel.getByRole('button', { name: '选择附件', exact: true }).click()])
           await chooser.setFiles({ name: '本次办理依据.txt', mimeType: 'text/plain', buffer: Buffer.from('task source evidence') })
         }

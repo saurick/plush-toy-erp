@@ -17,7 +17,7 @@ const pickerLayoutSelectors = [
 export async function readImportPickerLayout(picker) {
   return picker.evaluate((root, selectors) => Object.fromEntries(selectors.map(([name, selector]) => {
     const box = root.querySelector(selector).getBoundingClientRect()
-    let { width } = box
+    let width = box.width
     if (name === 'header') {
       // Compare the complete column lane, including native scrollbar space.
       const body = root.querySelector('.ant-table-body')
@@ -48,7 +48,7 @@ export async function assertImportPickerStableDuring(picker, label, action) {
       probe.frames += 1
       for (const [name, selector] of selectors) {
         const box = root.querySelector(selector).getBoundingClientRect()
-        let { width } = box
+        let width = box.width
         if (name === 'header') {
           const body = root.querySelector('.ant-table-body')
           const reserved = root.querySelector('.ant-table-header .ant-table-cell-scrollbar')?.getBoundingClientRect().width || 0
@@ -123,8 +123,7 @@ export async function assertImportToolbarLayout(page, picker, label) {
       controls: [...toolbar.querySelectorAll('.ant-select'), search, clear].map(box),
       selection: root.querySelector('.erp-source-import-picker__selection') ? box(root.querySelector('.erp-source-import-picker__selection')) : null,
       selectionGroups: [...root.querySelectorAll('.erp-source-import-picker__selection-actions, .erp-source-import-picker__selection-summary')].map((node) => ({
-        box: box(node),
-        overflow: node.scrollWidth > node.clientWidth + 1,
+        box: box(node), overflow: node.scrollWidth > node.clientWidth + 1,
         controls: [...node.children].map(box),
       })),
       footerActions: root.querySelector('.erp-source-import-picker__footer-actions') ? {

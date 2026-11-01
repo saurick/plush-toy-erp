@@ -386,7 +386,7 @@ func TestAdminManageRepoERPColumnOrdersPreserveOtherModules(t *testing.T) {
 
 func TestAdminManageRepoERPAppearanceDefaultsAndSavedChoices(t *testing.T) {
 	fx := newAdminManageAtomicFixture(t)
-	wantDefault := biz.AdminERPAppearance{ThemeMode: "system", Accent: "blue", Density: "compact", TableLines: "grid"}
+	wantDefault := biz.AdminERPAppearance{ThemeMode: "system", Accent: "blue", Density: "compact", TableLines: "grid", FormDisplay: "all"}
 	created, err := fx.repo.CreateAdminWithAudit(fx.ctx, &biz.AdminCreateCommand{
 		OperatorID: fx.operator.ID,
 		Admin: &biz.AdminCreate{
@@ -404,10 +404,11 @@ func TestAdminManageRepoERPAppearanceDefaultsAndSavedChoices(t *testing.T) {
 	}
 	for _, appearance := range []biz.AdminERPAppearance{
 		wantDefault,
-		{ThemeMode: "system", Accent: "blue", Density: "standard", TableLines: "simple"},
+		{ThemeMode: "dark", Accent: "teal", Density: "compact", TableLines: "grid", FormDisplay: "section"},
+		{ThemeMode: "system", Accent: "blue", Density: "standard", TableLines: "simple", FormDisplay: "all"},
 	} {
 		patch := biz.AdminERPAppearancePatch{
-			ThemeMode: &appearance.ThemeMode, Accent: &appearance.Accent, Density: &appearance.Density, TableLines: &appearance.TableLines,
+			ThemeMode: &appearance.ThemeMode, Accent: &appearance.Accent, Density: &appearance.Density, TableLines: &appearance.TableLines, FormDisplay: &appearance.FormDisplay,
 		}
 		if err := fx.repo.UpdateAdminERPAppearance(fx.ctx, fx.target.ID, patch); err != nil {
 			t.Fatal(err)
@@ -449,7 +450,7 @@ func TestAdminManageRepoERPAppearancePreservesColumnsAndAccountIsolation(t *test
 		t.Fatal(err)
 	}
 	stored := decodeAdminERPPreferences(fx.client.AdminUser.GetX(fx.ctx, fx.target.ID).ErpPreferences)
-	if stored.Appearance != (biz.AdminERPAppearance{ThemeMode: "dark", Accent: "green", Density: "compact", TableLines: "grid"}) ||
+	if stored.Appearance != (biz.AdminERPAppearance{ThemeMode: "dark", Accent: "green", Density: "compact", TableLines: "grid", FormDisplay: "all"}) ||
 		len(stored.ColumnOrders["customers"]) != 2 || len(stored.HiddenColumns["customers"]) != 1 ||
 		len(stored.ColumnOrders["suppliers"]) != 1 {
 		t.Fatalf("preference groups overwrote each other: %+v", stored)
@@ -501,7 +502,7 @@ func TestAdminManagePostgresERPPreferencesConcurrentGroups(t *testing.T) {
 		}
 	}
 	stored := decodeAdminERPPreferences(client.AdminUser.GetX(ctx, account.ID).ErpPreferences)
-	if stored.Appearance != (biz.AdminERPAppearance{ThemeMode: "system", Accent: "purple", Density: "compact", TableLines: "grid"}) ||
+	if stored.Appearance != (biz.AdminERPAppearance{ThemeMode: "system", Accent: "purple", Density: "compact", TableLines: "grid", FormDisplay: "all"}) ||
 		len(stored.ColumnOrders["customers"]) != 1 || len(stored.ColumnOrders["suppliers"]) != 1 ||
 		len(stored.HiddenColumns["customers"]) != 1 || len(stored.HiddenColumns["suppliers"]) != 1 {
 		t.Fatalf("concurrent preference writes lost a group or field: %+v", stored)

@@ -1,5 +1,7 @@
+import { BusinessTextPolicy } from '../../src/common/consts/policies.generated.mjs'
 import {
   assertBusinessFormPage,
+  assertBusinessNoteTextAreas,
   closeBusinessFormPage,
 } from './businessFormPageAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
@@ -20,10 +22,15 @@ async function textMetrics(control) {
     scrollWidth: node.scrollWidth,
     scrollHeight: node.scrollHeight,
     lineHeight: Number.parseFloat(getComputedStyle(node).lineHeight),
+    fontSize: getComputedStyle(node).fontSize,
+    padding: getComputedStyle(node).padding,
+    boxSizing: getComputedStyle(node).boxSizing,
+    transition: getComputedStyle(node).transition,
   }))
 }
 
 async function assertReadable(control, assert) {
+  await control.scrollIntoViewIfNeeded()
   await control
     .page()
     .waitForFunction(
@@ -33,7 +40,9 @@ async function assertReadable(control, assert) {
         node.scrollWidth <= node.clientWidth + 1 &&
         node.scrollHeight <= node.clientHeight + 1,
       await control.elementHandle()
-    )
+    ).catch(async (error) => {
+      throw new Error(`长文本未完整显示：${JSON.stringify(await textMetrics(control))}`, { cause: error })
+    })
   const metrics = await textMetrics(control)
   assert.equal(metrics.tag, 'TEXTAREA', JSON.stringify(metrics))
   return metrics
@@ -178,6 +187,28 @@ export function createBusinessCellTextScenarios(deps) {
       }
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       await editor.waitFor({ state: 'visible' })
+      await page.waitForFunction(() => document.querySelector('.erp-business-form-page:not([hidden])')?.getAttribute('aria-busy') === 'false')
+      const headerNote = editor.locator('[data-form-section="备注与附件"] textarea')
+      await headerNote.scrollIntoViewIfNeeded()
+      const headerCount = headerNote.locator('..').locator('.ant-input-data-count')
+      const initialHeader = await textMetrics(headerNote)
+      deps.assert.equal(initialHeader.tag, 'TEXTAREA')
+      deps.assert.ok(initialHeader.height >= initialHeader.lineHeight * 2, `整单备注两行起步：${JSON.stringify(initialHeader)}`)
+      deps.assert.equal(await headerNote.getAttribute('maxlength'), null)
+      if (config.readonly) {
+        deps.assert.equal(await headerCount.count(), 0, '只读备注不显示字数')
+      } else {
+        await headerNote.fill(multilineNote)
+        const expanded = await assertReadable(headerNote, deps.assert)
+        deps.assert.ok(expanded.height > initialHeader.height)
+        deps.assert.equal(await headerCount.innerText(), `${multilineNote.length} / ${BusinessTextPolicy.noteMaxCharacters}`)
+        await headerNote.locator('..').locator('.ant-input-clear-icon').click()
+        deps.assert.equal(await headerNote.inputValue(), '')
+        await page.waitForFunction(({ node, height }) => node.clientHeight <= height + 1, {
+          node: await headerNote.elementHandle(), height: initialHeader.height,
+        })
+        deps.assert.equal(await headerCount.innerText(), `0 / ${BusinessTextPolicy.noteMaxCharacters}`)
+      }
       if (config.add) {
         await editor
           .getByRole('button', { name: config.add, exact: true })
@@ -187,14 +218,16 @@ export function createBusinessCellTextScenarios(deps) {
         ? editor.locator('.erp-bom-material-group').first()
         : editor.locator('.erp-sales-order-lines-form__row').first()
       await line.waitFor({ state: 'visible' })
+      await assertBusinessNoteTextAreas(line)
       if (config.key.startsWith('bom')) {
         const selected = line.locator('.ant-select-selection-item').first()
         const metrics = await selected.evaluate((node) => ({
           text: node.textContent,
-          title: node.getAttribute('title'),
+          width: node.clientWidth,
+          scrollWidth: node.scrollWidth,
         }))
         deps.assert.equal(metrics.text, longText)
-        deps.assert.equal(metrics.title, longText, '长材料名称保留完整标题')
+        deps.assert.ok(metrics.scrollWidth <= metrics.width + 1, '长材料名称在框内完整换行')
         await assertSingleSelectValues(line, `business-cell-text-${config.key}`)
       }
       const details = line.locator('details')
@@ -247,19 +280,14 @@ export function createBusinessCellTextScenarios(deps) {
         await assertReadable(note, deps.assert)
       }
       if (!config.key.startsWith('bom')) {
-        const expanded = await line.boundingBox()
-        await details.locator('summary').click()
-        const collapsed = await line.boundingBox()
-        deps.assert.ok(collapsed.height < expanded.height - 100)
-        deps.assert.match(await details.locator('summary').innerText(), /第1项/)
-        await details.locator('summary').click()
+        deps.assert.equal(await details.count(), 0, '明细补充字段直接展示，不再折叠备注')
+        deps.assert.equal(await note.isVisible(), true)
         deps.assert.equal(await note.inputValue(), multilineNote)
         await note.fill('')
-        deps.assert.doesNotMatch(
-          await details.locator('summary').innerText(),
-          /第1项/
-        )
+        deps.assert.equal(await note.inputValue(), '')
+        await assertBusinessNoteTextAreas(line)
         await note.fill(multilineNote)
+        await assertReadable(note, deps.assert)
       }
       await assertBusinessFormPage(page, editor)
       await page.setViewportSize({ width: 1920, height: 1200 })
@@ -271,12 +299,18 @@ export function createBusinessCellTextScenarios(deps) {
       await table.screenshot({
         path: `${deps.outputDir}/business-cell-text-${config.key}-expanded.png`,
       })
+      const noteBeforeResize = await note.inputValue()
+      if (!config.readonly) await note.focus()
       await page.setViewportSize({ width: 720, height: 1000 })
       for (const label of config.fields) {
         await assertReadable(
           line.getByLabel(label, { exact: true }),
           deps.assert
         )
+      }
+      deps.assert.equal(await note.inputValue(), noteBeforeResize)
+      if (!config.readonly) {
+        deps.assert.equal(await note.evaluate((node) => node === document.activeElement), true, '切换宽度保留备注焦点')
       }
       await assertBusinessFormPage(page, editor)
       await closeBusinessFormPage(page, editor)

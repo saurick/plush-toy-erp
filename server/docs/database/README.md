@@ -22,12 +22,12 @@ go run ./cmd/schema-doc --write
 
 | 项目 | 数量 |
 | --- | ---: |
-| 应用表 | 79 |
-| 字段 | 1324 |
+| 应用表 | 80 |
+| 字段 | 1327 |
 | 外键 | 162 |
-| 显式索引 | 352 |
+| 显式索引 | 353 |
 | 其中 partial index | 33 |
-| 命名 / 表级 CHECK | 320 |
+| 命名 / 表级 CHECK | 323 |
 
 ## 分域入口
 
@@ -39,7 +39,7 @@ go run ./cmd/schema-doc --write
 | [库存与质检](库存与质检.md) | 15 | 采购收退货、库存作业、批次、余额、流水、预留与质量判定。 |
 | [生产与委外](生产与委外.md) | 15 | 生产订单、冻结需求与路线、WIP、生产事实、委外合同和委外事实。 |
 | [出货与财务](出货与财务.md) | 6 | 销售出货、财务事实、收付款、核销和红冲。 |
-| [流程运行时、协同与审计](流程运行时.md) | 8 | ProcessRuntime、Workflow task、协同状态、运行标记、审计和跨业务附件证据。 |
+| [流程运行时、协同与审计](流程运行时.md) | 9 | ProcessRuntime、Workflow task、协同状态、运行标记、审计和跨业务附件证据。 |
 
 ## 全表索引
 
@@ -155,6 +155,7 @@ go run ./cmd/schema-doc --write
 | [`runtime_markers`](流程运行时.md#table-runtime-markers) | 运行时一次性标记 | Fact / 事实 | 记录受控初始化或一次性运行动作已经执行的稳定 marker。 |
 | [`workflow_business_states`](流程运行时.md#table-workflow-business-states) | 业务协同进度投影 | Derived / 派生投影 | 保存业务来源对象当前对岗位展示的协同阶段。 |
 | [`workflow_task_events`](流程运行时.md#table-workflow-task-events) | 协同任务事件 | Workflow / 流程运行时 | 保存任务创建、状态动作、催办、升级、转交、版本和幂等 replay receipt。 |
+| [`workflow_task_number_counters`](流程运行时.md#table-workflow-task-number-counters) | 任务编号每日流水 | Workflow / 流程运行时 | 按上海创建日期原子分配任务公开编号，独立于任务主键和内部来源识别码。 |
 | [`workflow_tasks`](流程运行时.md#table-workflow-tasks) | 协同任务 | Workflow / 流程运行时 | 保存岗位任务箱、责任池、角色、处理人、状态、截止时间和来源引用。 |
 
 ## 非应用表

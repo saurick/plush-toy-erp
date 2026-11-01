@@ -386,6 +386,7 @@ export default function PurchaseReceiptsPage() {
         seen.add(value)
         return {
           label: [supplier.code, value].filter(Boolean).join(' '),
+          identity: { name: value, code: supplier.code || '' },
           value,
         }
       })

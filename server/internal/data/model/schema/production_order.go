@@ -3,6 +3,8 @@ package schema
 import (
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -85,7 +87,7 @@ func (ProductionOrder) Fields() []ent.Field {
 		field.String("note").
 			Optional().
 			Nillable().
-			MaxLen(255),
+			Validate(corevalue.ValidateBusinessNote),
 		field.Int("created_by").
 			Positive().
 			Immutable(),

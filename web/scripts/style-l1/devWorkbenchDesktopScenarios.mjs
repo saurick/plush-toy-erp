@@ -31,7 +31,7 @@ import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMo
 import { assertDevDocsDirectorySpace, createDevDocsReadingFixture, verifyDevDocsReadingNavigation } from './devDocsLayoutAssertions.mjs'
 import { verifyTestingOverview } from './devTestingOverviewAssertions.mjs'
 import { openTestingDetails, closeTestingDetails } from './devTestingDetailsActions.mjs'
-import { verifyProductCoreLayout } from './devProductCoreAssertions.mjs'
+import { verifyProductCoreLayout, verifyProductCoreRelations } from './devProductCoreAssertions.mjs'
 
 const SPECIALIZED_ROUTES = new Set([
   DEV_BUSINESS_USABILITY_ROUTE,
@@ -113,6 +113,10 @@ export function createDevWorkbenchDesktopScenarios({
         const common = page.locator('[aria-label="通用任务协作条件"]')
         assert.deepEqual(await common.locator('dt').allTextContents(), ['标记任务受阻', '解除任务阻塞', '转交任务', '催办任务'])
         assert.equal(await common.getByRole('button').count(), 0, 'the workbench describes conditions without granting task actions')
+        const inputs = page.getByRole('region', { name: '必填与选填', exact: true })
+        assert.match(await inputs.innerText(), /解除任务阻塞.*处理说明选填/su)
+        assert.match(await inputs.innerText(), /收付款、库存调整和生产异常审批通过.*审批意见必填/su)
+        assert.match(await inputs.innerText(), /未补充说明.*未记录/su)
         const approvalRow = page.locator('[data-row-key="process/sales_order_acceptance/order_approval"]')
         assert.match(await approvalRow.innerText(), /审批通过 \/ 审批退回/u)
         const header = page.locator('.erp-dev-task-handling__header')
@@ -121,23 +125,23 @@ export function createDevWorkbenchDesktopScenarios({
           .filter({ has: page.getByRole('combobox', { name, exact: true }) })
           .locator('.ant-select-selector')
         assert.equal(await page.getByRole('tab').count(), 0)
-        assert.deepEqual(await page.locator('.erp-dev-task-matrix').getByRole('columnheader').allTextContents(),
+        assert.deepEqual(await page.locator('.erp-dev-task-catalog').getByRole('columnheader').allTextContents(),
           ['办理事项', '办理岗位', '办理类型', '本次办理', '审批与交接', '电脑', '手机'])
         for (const [key, label] of Object.entries(ROLE_DISPLAY_NAMES)) {
           await filterControl('办理岗位').click()
           await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: new RegExp(`^${label}$`, 'u') }).click()
           await page.waitForFunction(({ roleKey, roleLabel }) => {
-            const rows = [...document.querySelectorAll('.erp-dev-task-matrix .ant-table-row')]
+            const rows = [...document.querySelectorAll('.erp-dev-task-catalog .ant-table-row')]
             return new URL(window.location.href).searchParams.get('role') === roleKey &&
               rows.length > 0 && rows.every((row) => row.children[1]?.textContent.startsWith(roleLabel))
           }, { roleKey: key, roleLabel: label })
-          const keys = await page.locator('.erp-dev-task-matrix .ant-table-row').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-row-key')))
+          const keys = await page.locator('.erp-dev-task-catalog .ant-table-row').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-row-key')))
           assert.deepEqual(keys, TASK_HANDLING_ROWS.filter((row) => row.roleKeys.includes(key)).map((row) => row.key), `${label} 办理事项缺失或混入其他岗位`)
           await assertNoHorizontalOverflow(page)
           if (key === 'engineering') {
             assert.equal(keys.length, 2)
             const text = await page.locator('.erp-dev-task-matrix').innerText()
-            assert.match(text, /工程用料提交与修订/u)
+            assert.match(text, /工程资料修订与自动送审/u)
             assert.match(text, /老板审核.*另一位财务复核/u)
             assert.doesNotMatch(text, /销售订单编制与提交|订单审批/u)
           }
@@ -152,7 +156,7 @@ export function createDevWorkbenchDesktopScenarios({
         assert.equal(new URL(page.url()).searchParams.has('role'), false)
         await filterControl('办理类型').click()
         await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: /^审核决策$/u }).click()
-        const rows = page.locator('.ant-table-row')
+        const rows = page.locator('.erp-dev-task-catalog .ant-table-row')
         for (const role of ['老板', 'PMC', '财务']) assert((await rows.allTextContents()).some((text) => text.includes(role)), `审核清单缺少 ${role}`)
         await filterControl('办理岗位').click()
         await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: /^PMC$/u }).click()
@@ -398,7 +402,7 @@ export function createDevWorkbenchDesktopScenarios({
             new URL(route.request().url()).pathname.endsWith('/report') ? data : { batches }
           ),
         }))
-        await page.reload()
+        await page.goto(new URL('/__dev/business-chain-audit', page.url()).href)
         await page.getByText('尚未采集链路实测报告。', { exact: true }).waitFor()
         await assertSelectedMenu('测试执行')
         assert.equal(await page.locator('.erp-dev-workspace-nav').getByRole('link', { name: '链路实测报告', exact: true }).count(), 0)
@@ -444,9 +448,18 @@ export function createDevWorkbenchDesktopScenarios({
         await page.getByRole('button', { name: '采购测试链', exact: true }).click()
         await page.getByText('1. 采购步骤', { exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.get('chain'), 'purchase_to_inventory')
-        const stepTable = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: '实际操作与读回', exact: true }) })
+        const stepTable = reportRoot.locator('.erp-dev-chain-audit__steps').getByRole('table')
         assert.deepEqual(await stepTable.getByRole('columnheader').allTextContents(), ['', '环节', '结果', '实际操作与读回'])
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 1)
+        assert.equal(new URL(page.url()).searchParams.get('batch'), batch, '默认读取的实际批次写入 URL，关联返回不漂移到另一批次')
+        const capabilityLink = reportRoot.getByRole('link', { name: '采购订单、收货、质检、退货与调整', exact: true })
+        await capabilityLink.click()
+        await page.getByRole('region', { name: '当前能力详情', exact: true }).getByRole('heading', { name: '采购订单、收货、质检、退货与调整', exact: true }).waitFor()
+        await page.getByRole('button', { name: '返回 链路实测报告', exact: true }).click()
+        await stepTable.waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('batch'), batch)
+        assert.equal(new URL(page.url()).searchParams.get('chain'), 'purchase_to_inventory')
+        await page.waitForFunction(() => document.activeElement?.textContent === '采购订单、收货、质检、退货与调整')
         await stepTable.getByRole('button', { name: '展开行', exact: true }).click()
         await stepTable.getByText('测试岗位', { exact: true }).waitFor()
         await stepTable.getByText('页面夹具', { exact: true }).waitFor()
@@ -543,6 +556,7 @@ export function createDevWorkbenchDesktopScenarios({
         await page.getByRole('button', { name: '取消交接定位', exact: true }).click()
         await stepTable.getByText('1. 采购步骤', { exact: true }).waitFor()
         await page.getByRole('button', { name: '收起步骤', exact: true }).click()
+        await stepTable.waitFor({ state: 'hidden' })
         await page.getByRole('button', { name: '查看全部步骤', exact: true }).waitFor()
         assert.deepEqual(await reportRoot.getByRole('columnheader').allTextContents(), ['链路', '结果', '首个未通过环节'])
         await assertNoHorizontalOverflow(page, '极简链路结果与批次恢复')
@@ -1205,6 +1219,7 @@ export function createDevWorkbenchDesktopScenarios({
         assert.equal(new URL(page.url()).searchParams.has('capability'), false)
         const catalogFits = await page.locator('.erp-dev-product-core-groups').evaluate((element) => element.scrollWidth <= element.clientWidth + 1)
         assert(catalogFits, '能力目录不依赖横向滚动')
+        await verifyProductCoreRelations(page, { assertNoHorizontalOverflow })
       }
       if ([DEV_PRODUCT_ENGINEERING_ROUTE, DEV_DEVELOPMENT_RESOURCES_ROUTE].includes(item.route)) {
         const areaKey = item.route === DEV_PRODUCT_ENGINEERING_ROUTE ? 'product-engineering' : 'development-resources'
@@ -1318,7 +1333,28 @@ export function createDevWorkbenchDesktopScenarios({
       await assertNoHorizontalOverflow(page, item.route)
     },
   }))
-  return [...scenarios, createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow })]
+  return [...scenarios, {
+    name: 'dev-task-input-rules-desktop-light',
+    path: DEV_TASK_HANDLING_ROUTE,
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
+    verify: async (page) => {
+      const section = page.getByRole('region', { name: '必填与选填', exact: true })
+      await section.waitFor()
+      const rows = section.locator('.ant-table-row')
+      assert.equal(await rows.count(), 9)
+      for (const [action, input] of [
+        ['解除任务阻塞', '处理说明选填'], ['催办任务', '催办说明选填'],
+        ['普通审批通过、用料审核通过', '审批意见选填'],
+        ['收付款、库存调整和生产异常审批通过', '审批意见必填'],
+        ['退回／驳回', '退回原因必填'], ['完成协调跟进', '处理结果必填'],
+      ]) assert.match(await rows.filter({ hasText: action }).innerText(), new RegExp(input, 'u'))
+      assert.match(await section.innerText(), /未补充说明.*未记录/su)
+      assert.equal(await section.getByRole('button').count(), 0)
+      await section.scrollIntoViewIfNeeded()
+      await assertNoHorizontalOverflow(page, 'task-input-rules')
+    },
+  }, createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow })]
 }
 
 function createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow }) {

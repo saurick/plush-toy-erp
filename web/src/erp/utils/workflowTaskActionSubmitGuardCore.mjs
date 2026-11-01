@@ -7,23 +7,10 @@ import {
   normalizeWorkflowActionMode,
   normalizeWorkflowTaskSourceAccess,
 } from './workflowTaskActionAccess.mjs'
+import { workflowTaskActionInput } from './workflowTaskActionContract.mjs'
 
 const DEFAULT_DENIED_FALLBACK = '当前账号不能提交这项操作'
 const DEFAULT_ERROR_FALLBACK = '暂时无法确认这项操作是否可用，请稍后重试'
-const REASON_REQUIRED_ACTION_MODES = new Set([
-  'block',
-  'reject',
-  'resume',
-  'urge',
-])
-
-const REASON_REQUIRED_MESSAGES = Object.freeze({
-  block: '请先填写阻塞原因',
-  reject: '请先填写退回原因',
-  resume: '请先填写阻塞解除说明',
-  urge: '请先填写催办原因',
-})
-
 function getPositiveTaskID(task) {
   const taskID = Number(task?.id ?? 0)
   return Number.isFinite(taskID) && taskID > 0 ? taskID : 0
@@ -48,13 +35,13 @@ export function bindWorkflowActionSubmitGuard({ explain } = {}) {
       onWarning?.('当前操作暂时无法提交，请刷新后重试')
       return false
     }
+    const input = workflowTaskActionInput(task, normalizedActionKey)
+    // Completion feedback belongs to its form and domain command.
     if (
-      REASON_REQUIRED_ACTION_MODES.has(normalizedActionKey) &&
+      normalizedActionKey !== 'complete' && input.required &&
       !String(reason || '').trim()
     ) {
-      onWarning?.(
-        REASON_REQUIRED_MESSAGES[normalizedActionKey] || '请先填写处理原因'
-      )
+      onWarning?.(`请先填写${input.label}`)
       return false
     }
 

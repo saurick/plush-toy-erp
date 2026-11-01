@@ -1665,6 +1665,9 @@ export default function SalesOrdersPage() {
                   units={units}
                   unitOptions={unitOptions}
                   disabled={referencesLoading || saving || orderModalOpen}
+                  disabledReason={referencesLoading
+                    ? '基础资料加载中，请稍候'
+                    : saving ? '正在保存，请稍候' : '请先完成当前订单编辑'}
                   productSKUs={productSKUs}
                   salesOwnerOptions={salesOwnerOptions}
                   customerKey={activeCustomerKey}

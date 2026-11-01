@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
@@ -119,7 +121,7 @@ func (InventoryTxn) Fields() []ent.Field {
 		field.String("note").
 			Optional().
 			Nillable().
-			MaxLen(255).
+			Validate(corevalue.ValidateBusinessNote).
 			Immutable(),
 	}
 }

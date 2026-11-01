@@ -147,7 +147,7 @@ export function createMobileAdminReviewScenarios({
       )
       const rows = page.locator('.erp-mobile-list-item')
       const search = page.getByRole('searchbox', {
-        name: '搜索订单、产品、物料或款号',
+        name: '搜索任务编号、订单、产品、物料或款号',
       })
       await search.fill('仓库全局查看')
       await search.press('Enter')

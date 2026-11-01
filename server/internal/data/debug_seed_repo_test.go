@@ -140,7 +140,7 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 		log.NewStdLogger(io.Discard),
 	))
 	fixtures := createInventoryTestFixtures(t, ctx, client)
-	detail := saveBOMDraftFixture(t, ctx, inventoryUC, fixtures.productID, "debug-clear-v1", &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{
+	detail := saveBOMDraftFixture(t, ctx, inventoryUC, fixtures.productID, &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{
 		MaterialID: fixtures.materialID, UnitID: fixtures.unitID, Quantity: mustDecimal(t, "1.5"), LossRate: mustDecimal(t, "0.02"),
 	}})
 	header := detail.Header

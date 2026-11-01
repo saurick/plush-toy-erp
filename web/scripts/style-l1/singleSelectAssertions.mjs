@@ -27,7 +27,8 @@ export async function assertSingleSelectValues(scope, label, minimum = 1) {
           }
         }
         const style = getComputedStyle(item)
-        const reader = control.querySelector('.app-select__inspect')
+        const name = item.querySelector('.app-select__reference-name')
+        const code = control.parentElement?.querySelector('.app-select__reference-code')
         return [
           {
             text: item.textContent.trim(),
@@ -42,8 +43,10 @@ export async function assertSingleSelectValues(scope, label, minimum = 1) {
             control: box(control),
             selector: box(selector),
             item: box(item),
-            appSelect: control.classList.contains('app-select'),
-            reader: reader ? { ...box(reader), hidden: !!reader.closest('[aria-hidden="true"]'), label: reader.getAttribute('aria-label') } : null,
+            reference: name ? {
+              name: { ...box(name), height: name.clientHeight, scroll: name.scrollHeight, client: name.clientWidth, scrollWidth: name.scrollWidth, lineHeight: parseFloat(getComputedStyle(name).lineHeight), whiteSpace: getComputedStyle(name).whiteSpace, text: name.textContent },
+              code: code ? { ...box(code), text: code.textContent, client: code.clientWidth, scroll: code.scrollWidth, clientHeight: code.clientHeight, scrollHeight: code.scrollHeight } : null,
+            } : null,
           },
         ]
       })
@@ -82,16 +85,18 @@ export async function assertSingleSelectValues(scope, label, minimum = 1) {
       ) <= 1.5,
       context
     )
-    if (entry.scrollWidth > entry.clientWidth + 1) {
+    if (entry.reference) {
+      const { name, code } = entry.reference
+      assert.equal(name.whiteSpace, 'normal', `${context}: 业务名称允许换行`)
+      assert.ok(name.height >= name.lineHeight - 1 && name.scroll <= name.height + 1 && name.scrollWidth <= name.client + 1, `${context}: 名称完整显示，不截断或撑出列宽`)
+      assert.ok(name.top >= entry.selector.top - 1 && name.bottom <= entry.selector.bottom + 1, `${context}: 名称在控件内`)
+      assert.equal(code, null, `${context}: 详细编码保留在候选项，不在选中名称下重复`)
+    } else if (entry.scrollWidth > entry.clientWidth + 1) {
       assert.equal(
         entry.title,
         entry.text,
         `${label}: 省略时仍可读取完整选中值`
       )
-      if (entry.appSelect) {
-        assert.ok(entry.reader && !entry.reader.hidden && entry.reader.label, `${context}: 省略值有可访问的完整值入口`)
-        assert.ok(entry.reader.left >= entry.control.left && entry.reader.right <= entry.control.right + 1 && entry.reader.top >= entry.control.top - 1 && entry.reader.bottom <= entry.control.bottom + 1, `${context}: 阅读入口不越出控件`)
-      }
     }
   }
   return metrics

@@ -87,6 +87,7 @@ import (
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
+	"server/internal/data/model/ent/workflowtasknumbercounter"
 	"server/internal/data/model/ent/workpool"
 	"server/internal/data/model/ent/workpoolmembership"
 
@@ -94,6 +95,8 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+
+	stdsql "database/sql"
 )
 
 // Client is the client that holds all ent builders.
@@ -257,6 +260,8 @@ type Client struct {
 	WorkflowTask *WorkflowTaskClient
 	// WorkflowTaskEvent is the client for interacting with the WorkflowTaskEvent builders.
 	WorkflowTaskEvent *WorkflowTaskEventClient
+	// WorkflowTaskNumberCounter is the client for interacting with the WorkflowTaskNumberCounter builders.
+	WorkflowTaskNumberCounter *WorkflowTaskNumberCounterClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -346,6 +351,7 @@ func (c *Client) init() {
 	c.WorkflowBusinessState = NewWorkflowBusinessStateClient(c.config)
 	c.WorkflowTask = NewWorkflowTaskClient(c.config)
 	c.WorkflowTaskEvent = NewWorkflowTaskEventClient(c.config)
+	c.WorkflowTaskNumberCounter = NewWorkflowTaskNumberCounterClient(c.config)
 }
 
 type (
@@ -516,6 +522,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		WorkflowBusinessState:              NewWorkflowBusinessStateClient(cfg),
 		WorkflowTask:                       NewWorkflowTaskClient(cfg),
 		WorkflowTaskEvent:                  NewWorkflowTaskEventClient(cfg),
+		WorkflowTaskNumberCounter:          NewWorkflowTaskNumberCounterClient(cfg),
 	}, nil
 }
 
@@ -613,6 +620,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		WorkflowBusinessState:              NewWorkflowBusinessStateClient(cfg),
 		WorkflowTask:                       NewWorkflowTaskClient(cfg),
 		WorkflowTaskEvent:                  NewWorkflowTaskEventClient(cfg),
+		WorkflowTaskNumberCounter:          NewWorkflowTaskNumberCounterClient(cfg),
 	}, nil
 }
 
@@ -665,6 +673,7 @@ func (c *Client) Use(hooks ...Hook) {
 		c.Shipment, c.ShipmentItem, c.SourceOrderLifecycleEvent, c.StockReservation,
 		c.Supplier, c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership,
 		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.WorkflowTaskNumberCounter,
 	} {
 		n.Use(hooks...)
 	}
@@ -697,6 +706,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.Shipment, c.ShipmentItem, c.SourceOrderLifecycleEvent, c.StockReservation,
 		c.Supplier, c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership,
 		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.WorkflowTaskNumberCounter,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -861,6 +871,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.WorkflowTask.mutate(ctx, m)
 	case *WorkflowTaskEventMutation:
 		return c.WorkflowTaskEvent.mutate(ctx, m)
+	case *WorkflowTaskNumberCounterMutation:
+		return c.WorkflowTaskNumberCounter.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -15662,7 +15674,8 @@ func (c *WorkflowTaskClient) QueryProcessNodeInstance(_m *WorkflowTask) *Process
 
 // Hooks returns the client hooks.
 func (c *WorkflowTaskClient) Hooks() []Hook {
-	return c.hooks.WorkflowTask
+	hooks := c.hooks.WorkflowTask
+	return append(hooks[:len(hooks):len(hooks)], workflowtask.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -15835,6 +15848,139 @@ func (c *WorkflowTaskEventClient) mutate(ctx context.Context, m *WorkflowTaskEve
 	}
 }
 
+// WorkflowTaskNumberCounterClient is a client for the WorkflowTaskNumberCounter schema.
+type WorkflowTaskNumberCounterClient struct {
+	config
+}
+
+// NewWorkflowTaskNumberCounterClient returns a client for the WorkflowTaskNumberCounter from the given config.
+func NewWorkflowTaskNumberCounterClient(c config) *WorkflowTaskNumberCounterClient {
+	return &WorkflowTaskNumberCounterClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workflowtasknumbercounter.Hooks(f(g(h())))`.
+func (c *WorkflowTaskNumberCounterClient) Use(hooks ...Hook) {
+	c.hooks.WorkflowTaskNumberCounter = append(c.hooks.WorkflowTaskNumberCounter, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workflowtasknumbercounter.Intercept(f(g(h())))`.
+func (c *WorkflowTaskNumberCounterClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WorkflowTaskNumberCounter = append(c.inters.WorkflowTaskNumberCounter, interceptors...)
+}
+
+// Create returns a builder for creating a WorkflowTaskNumberCounter entity.
+func (c *WorkflowTaskNumberCounterClient) Create() *WorkflowTaskNumberCounterCreate {
+	mutation := newWorkflowTaskNumberCounterMutation(c.config, OpCreate)
+	return &WorkflowTaskNumberCounterCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WorkflowTaskNumberCounter entities.
+func (c *WorkflowTaskNumberCounterClient) CreateBulk(builders ...*WorkflowTaskNumberCounterCreate) *WorkflowTaskNumberCounterCreateBulk {
+	return &WorkflowTaskNumberCounterCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkflowTaskNumberCounterClient) MapCreateBulk(slice any, setFunc func(*WorkflowTaskNumberCounterCreate, int)) *WorkflowTaskNumberCounterCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkflowTaskNumberCounterCreateBulk{err: fmt.Errorf("calling to WorkflowTaskNumberCounterClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkflowTaskNumberCounterCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkflowTaskNumberCounterCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WorkflowTaskNumberCounter.
+func (c *WorkflowTaskNumberCounterClient) Update() *WorkflowTaskNumberCounterUpdate {
+	mutation := newWorkflowTaskNumberCounterMutation(c.config, OpUpdate)
+	return &WorkflowTaskNumberCounterUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkflowTaskNumberCounterClient) UpdateOne(_m *WorkflowTaskNumberCounter) *WorkflowTaskNumberCounterUpdateOne {
+	mutation := newWorkflowTaskNumberCounterMutation(c.config, OpUpdateOne, withWorkflowTaskNumberCounter(_m))
+	return &WorkflowTaskNumberCounterUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkflowTaskNumberCounterClient) UpdateOneID(id string) *WorkflowTaskNumberCounterUpdateOne {
+	mutation := newWorkflowTaskNumberCounterMutation(c.config, OpUpdateOne, withWorkflowTaskNumberCounterID(id))
+	return &WorkflowTaskNumberCounterUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WorkflowTaskNumberCounter.
+func (c *WorkflowTaskNumberCounterClient) Delete() *WorkflowTaskNumberCounterDelete {
+	mutation := newWorkflowTaskNumberCounterMutation(c.config, OpDelete)
+	return &WorkflowTaskNumberCounterDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkflowTaskNumberCounterClient) DeleteOne(_m *WorkflowTaskNumberCounter) *WorkflowTaskNumberCounterDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkflowTaskNumberCounterClient) DeleteOneID(id string) *WorkflowTaskNumberCounterDeleteOne {
+	builder := c.Delete().Where(workflowtasknumbercounter.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkflowTaskNumberCounterDeleteOne{builder}
+}
+
+// Query returns a query builder for WorkflowTaskNumberCounter.
+func (c *WorkflowTaskNumberCounterClient) Query() *WorkflowTaskNumberCounterQuery {
+	return &WorkflowTaskNumberCounterQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkflowTaskNumberCounter},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WorkflowTaskNumberCounter entity by its id.
+func (c *WorkflowTaskNumberCounterClient) Get(ctx context.Context, id string) (*WorkflowTaskNumberCounter, error) {
+	return c.Query().Where(workflowtasknumbercounter.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkflowTaskNumberCounterClient) GetX(ctx context.Context, id string) *WorkflowTaskNumberCounter {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *WorkflowTaskNumberCounterClient) Hooks() []Hook {
+	return c.hooks.WorkflowTaskNumberCounter
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkflowTaskNumberCounterClient) Interceptors() []Interceptor {
+	return c.inters.WorkflowTaskNumberCounter
+}
+
+func (c *WorkflowTaskNumberCounterClient) mutate(ctx context.Context, m *WorkflowTaskNumberCounterMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkflowTaskNumberCounterCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkflowTaskNumberCounterUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkflowTaskNumberCounterUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkflowTaskNumberCounterDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WorkflowTaskNumberCounter mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
@@ -15859,7 +16005,7 @@ type (
 		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
 		ShipmentItem, SourceOrderLifecycleEvent, StockReservation, Supplier, Unit,
 		Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
-		WorkflowTaskEvent []ent.Hook
+		WorkflowTaskEvent, WorkflowTaskNumberCounter []ent.Hook
 	}
 	inters struct {
 		AccessEntitlement, AdminSession, AdminUser, AdminUserRole, BOMHeader, BOMItem,
@@ -15883,6 +16029,30 @@ type (
 		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
 		ShipmentItem, SourceOrderLifecycleEvent, StockReservation, Supplier, Unit,
 		Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
-		WorkflowTaskEvent []ent.Interceptor
+		WorkflowTaskEvent, WorkflowTaskNumberCounter []ent.Interceptor
 	}
 )
+
+// ExecContext allows calling the underlying ExecContext method of the driver if it is supported by it.
+// See, database/sql#DB.ExecContext for more information.
+func (c *config) ExecContext(ctx context.Context, query string, args ...any) (stdsql.Result, error) {
+	ex, ok := c.driver.(interface {
+		ExecContext(context.Context, string, ...any) (stdsql.Result, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("Driver.ExecContext is not supported")
+	}
+	return ex.ExecContext(ctx, query, args...)
+}
+
+// QueryContext allows calling the underlying QueryContext method of the driver if it is supported by it.
+// See, database/sql#DB.QueryContext for more information.
+func (c *config) QueryContext(ctx context.Context, query string, args ...any) (*stdsql.Rows, error) {
+	q, ok := c.driver.(interface {
+		QueryContext(context.Context, string, ...any) (*stdsql.Rows, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("Driver.QueryContext is not supported")
+	}
+	return q.QueryContext(ctx, query, args...)
+}

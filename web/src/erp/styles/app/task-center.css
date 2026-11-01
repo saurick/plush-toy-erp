@@ -235,6 +235,12 @@
   margin: 0;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .erp-task-action-drawer-root > .ant-drawer-content-wrapper {
+    transition: none;
+  }
+}
+
 .erp-task-action-drawer .ant-drawer-header {
   position: relative;
   min-height: 56px;

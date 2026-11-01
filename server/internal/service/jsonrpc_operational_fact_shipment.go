@@ -38,8 +38,13 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
+		orders, err := d.operationalFactUC.ListShipmentSourceOrderOptions(ctx, filter.Selectable)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
 		return id, okData(map[string]any{
 			"shipment_source_candidates": shipmentSourceCandidatesToAny(items),
+			"source_orders":              shipmentSourceOrderOptionsToAny(orders),
 			"total":                      total,
 			"limit":                      filter.Limit,
 			"offset":                     filter.Offset,
@@ -645,6 +650,18 @@ func shipmentSourceCandidatesToAny(items []*biz.ShipmentSourceCandidate) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
 		out = append(out, shipmentSourceCandidateToAny(item))
+	}
+	return out
+}
+
+func shipmentSourceOrderOptionsToAny(orders []*biz.ShipmentSourceOrderOption) []any {
+	out := make([]any, 0, len(orders))
+	for _, order := range orders {
+		out = append(out, map[string]any{
+			"sales_order_id": order.SalesOrderID, "order_no": order.OrderNo,
+			"customer_id": order.CustomerID, "customer_code": order.CustomerCode,
+			"customer_name": order.CustomerName, "customer_name_snapshot": order.CustomerNameSnapshot,
+		})
 	}
 	return out
 }

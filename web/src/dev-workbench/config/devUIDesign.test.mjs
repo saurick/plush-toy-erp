@@ -4,6 +4,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { runInNewContext, Script } from 'node:vm'
 import standardUnits from '../../../../server/internal/unitpolicy/units.json' with { type: 'json' }
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import { getBusinessUsabilityEntry } from '../../erp/config/businessUsabilityCatalog.mjs'
 import { getRoleHelpScenarios } from '../../erp/config/helpScenarios.mjs'
 import { ROLE_HELP_GUIDES } from '../../erp/config/roleHelpContent.mjs'
@@ -32,6 +33,22 @@ import {
 const root = path.resolve(import.meta.dirname, '../../../..')
 const read = (file) => readFileSync(path.join(root, file), 'utf8')
 
+test('compact prototype note fields render multiline textareas with two initial rows', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const control = html.match(/function compactActionControl\([\s\S]*?\n {4}\}/u)?.[0]
+  assert.ok(control)
+  const note = '核对说明\n分批交付'
+  const output = runInNewContext(`(${control})(0, 'note', '明细备注')`, {
+    compactAction: { rows: [{ note }] },
+    escapeHTML: (value) => value,
+  })
+  assert.match(output, /^<textarea\b/u)
+  assert.match(output, /rows="2"/u)
+  assert.ok(output.includes(note))
+  assert.doesNotMatch(html, /<textarea[^>]*aria-label="明细备注[^>]*rows="1"|<textarea rows="1"[^>]*aria-label="明细备注/u)
+  assert.doesNotMatch(html, /<input\b[^>]*data-form-field="(?:note-|price-note)/u)
+})
+
 test('boundary preview uses legal field extremes and every standalone script parses', () => {
   const html = read(UI_DESIGN_ASSET.path)
   const definition = html.match(/const UI_BOUNDARY_LIMITS = Object\.freeze\((\{[\s\S]*?\})\);/u)
@@ -47,6 +64,12 @@ test('boundary preview uses legal field extremes and every standalone script par
   ]
   for (const [key, schema, field] of fields) {
     const source = read(`server/internal/data/model/schema/${schema}.go`)
+    if (key === 'note') {
+      const noteField = source.split('field.String("note")')[1]?.split('field.')[0] || ''
+      assert.match(noteField, /Validate\(corevalue\.ValidateBusinessNote\)/u)
+      assert.equal(limits.note, BusinessTextPolicy.noteMaxCharacters, '备注压力档位使用正式字符上限')
+      continue
+    }
     const constraint = source.match(new RegExp(`field\\.String\\("${field}"\\)[\\s\\S]*?MaxLen\\((\\d+)\\)`))
     assert(constraint, `${schema}.${field} 缺少正式长度约束`)
     assert.equal(limits[key], Number(constraint[1]), `${key} 使用正式字段上限`)

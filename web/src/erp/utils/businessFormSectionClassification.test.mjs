@@ -67,7 +67,7 @@ test('all governed long forms use the shared section-title component', () => {
   }
 })
 
-test('business form sections stay visible without collapse state', () => {
+test('business form sections do not add independent collapse state', () => {
   const componentSource = source(
     '../components/business-list/BusinessFormSection.jsx'
   )

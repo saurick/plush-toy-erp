@@ -60,6 +60,8 @@ pnpm preview:yoyoosun
 
 `STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归；`STYLE_L1_SCENARIO_MAX_ATTEMPTS` 只接受 `1` 或 `2`，CI 固定为一次；`STYLE_L1_OUTPUT_DIR` 只接受仓库 `output/` 下的受管目录。
 
+`business-form-corners-<module>-desktop|mobile|dark|mobile-dark` 沿用现有编辑或只读入口，逐个选择分区并检查四角、边框、标题内圆角与祖先裁切，同时保留背景、输入焦点和草稿状态。桌面使用 1920×1080、DPR 2，手机使用 390×844、DPR 2；截图与分区几何证据保存到同一受管输出目录。完整模块和场景名以 `businessFormCornerScenarios.mjs` 与现有表单注册为准，平铺短表单不会为检查强行增加分区。
+
 默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
 
 `STYLE_L1_BROWSER=chromium|webkit` 选择浏览器引擎，默认 `chromium`，结果 JSON 标记实际引擎。宽度不超过 600px 的场景默认启用移动设备和触摸模拟，可由场景显式覆盖。WebKit 首次运行前执行 `pnpm exec playwright install webkit`；剪贴板场景使用既有受控探针，不能据此确认 iPhone 系统剪贴板权限。

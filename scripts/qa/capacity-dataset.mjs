@@ -17,7 +17,7 @@ import { pressureDataScale } from "../../web/src/dev-workbench/config/devPressur
 import { pressureLogicFingerprint } from "./pressure-runtime.mjs";
 
 export function capacityDatasetLogicFingerprint() {
-  return pressureLogicFingerprint(["scripts/qa/capacity-dataset.mjs", "web/src/dev-workbench/config/devPressureData.mjs", "server/cmd/seed-capacity-attachments/main.go", "server/internal/data/model/schema/finance_fact.go", "server/internal/data/model/schema/production_fact.go"]);
+  return pressureLogicFingerprint(["scripts/qa/capacity-dataset.mjs", "web/src/dev-workbench/config/devPressureData.mjs", "server/cmd/seed-capacity-attachments/main.go", "server/internal/data/model/schema/finance_fact.go", "server/internal/data/model/schema/production_fact.go", "server/internal/data/model/schema/workflow_task.go", "server/internal/data/model/schema/workflow_task_number_counter.go", "server/internal/core/value/workflow_task_number.go"]);
 }
 
 export const CAPACITY_DATASET_SCHEMA = "plush-capacity-dataset/v1";
@@ -103,6 +103,10 @@ DECLARE
   production_product_id bigint;
   production_unit_id bigint;
   production_warehouse_id bigint;
+  task_number_created_at timestamptz := clock_timestamp();
+  task_number_day text;
+  task_number_count bigint;
+  task_number_base bigint := 0;
 BEGIN
   SELECT count(*) INTO existing_fixture
   FROM workflow_tasks
@@ -139,7 +143,17 @@ BEGIN
     RAISE EXCEPTION 'capacity dataset requires an active simulated warehouse';
   END IF;
 
+  task_number_day := to_char(task_number_created_at AT TIME ZONE 'Asia/Shanghai', 'YYYYMMDD');
+  task_number_count := GREATEST(0, ${targets.workflowTasks} - (SELECT count(*) FROM workflow_tasks));
+  IF task_number_count > 0 THEN
+    INSERT INTO workflow_task_number_counters (id, last_value)
+    VALUES (task_number_day, task_number_count)
+    ON CONFLICT (id) DO UPDATE SET last_value = workflow_task_number_counters.last_value + EXCLUDED.last_value
+    RETURNING last_value - task_number_count INTO task_number_base;
+  END IF;
+
   INSERT INTO workflow_tasks (
+    task_no,
     task_code,
     task_group,
     task_name,
@@ -162,6 +176,7 @@ BEGIN
     updated_at
   )
   SELECT
+    'RW' || task_number_day || '-' || lpad((task_number_base + series.value)::text, GREATEST(4, length((task_number_base + series.value)::text)), '0'),
     'SIM-CAP-V1-' || lpad(series.value::text, 6, '0'),
     'trial_pmc_work',
     '核对生产进度 ' || series.value,
@@ -183,11 +198,11 @@ BEGIN
     1,
     actor_id,
     actor_id,
-    clock_timestamp(),
-    clock_timestamp()
+    task_number_created_at,
+    task_number_created_at
   FROM generate_series(
     1,
-    GREATEST(0, ${targets.workflowTasks} - (SELECT count(*) FROM workflow_tasks))
+    task_number_count
   ) AS series(value);
 
   INSERT INTO production_facts (

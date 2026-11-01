@@ -294,7 +294,7 @@ export function createUnifiedInteractionScenarios({
           assert.equal(saves.length, 0, `${label}无效时不得发出保存请求`)
           await input.fill(original)
         }
-        await firstLine.locator('summary').click()
+        assert.ok(await firstLine.getByLabel('产品名称', { exact: true }).isVisible())
         await firstLine
           .getByLabel('产品名称', { exact: true })
           .fill('保存前原始行')
@@ -302,7 +302,7 @@ export function createUnifiedInteractionScenarios({
           .getByRole('button', { name: '复制第 1 行', exact: true })
           .click()
         const copiedLine = lines.nth(1)
-        await copiedLine.locator('summary').click()
+        assert.ok(await copiedLine.getByLabel('产品名称', { exact: true }).isVisible())
         await copiedLine
           .getByLabel('产品名称', { exact: true })
           .fill('复制后的追加行')

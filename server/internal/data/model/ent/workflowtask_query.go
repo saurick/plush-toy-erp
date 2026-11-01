@@ -371,12 +371,12 @@ func (_q *WorkflowTaskQuery) WithProcessNodeInstance(opts ...func(*ProcessNodeIn
 // Example:
 //
 //	var v []struct {
-//		TaskCode string `json:"task_code,omitempty"`
+//		TaskNo string `json:"task_no,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.WorkflowTask.Query().
-//		GroupBy(workflowtask.FieldTaskCode).
+//		GroupBy(workflowtask.FieldTaskNo).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *WorkflowTaskQuery) GroupBy(field string, fields ...string) *WorkflowTaskGroupBy {
@@ -394,11 +394,11 @@ func (_q *WorkflowTaskQuery) GroupBy(field string, fields ...string) *WorkflowTa
 // Example:
 //
 //	var v []struct {
-//		TaskCode string `json:"task_code,omitempty"`
+//		TaskNo string `json:"task_no,omitempty"`
 //	}
 //
 //	client.WorkflowTask.Query().
-//		Select(workflowtask.FieldTaskCode).
+//		Select(workflowtask.FieldTaskNo).
 //		Scan(ctx, &v)
 func (_q *WorkflowTaskQuery) Select(fields ...string) *WorkflowTaskSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)

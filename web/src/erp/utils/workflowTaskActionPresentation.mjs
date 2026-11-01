@@ -1,4 +1,4 @@
-import { isWorkflowApprovalTask } from './workflowTaskActionContract.mjs'
+import { isWorkflowApprovalTask, workflowTaskActionRequiresReason } from './workflowTaskActionContract.mjs'
 import { WORKFLOW_TASK_COLLABORATION_ACTIONS } from './workflowTaskActionFlow.mjs'
 
 export const TASK_ACTION_META = Object.freeze({
@@ -22,15 +22,15 @@ export const TASK_ACTION_META = Object.freeze({
   },
   resume: {
     title: WORKFLOW_TASK_COLLABORATION_ACTIONS.resume.label,
-    buttonLabel: '确认恢复待处理',
+    buttonLabel: '解除阻塞',
     successMessage: '任务已解除阻塞',
-    requireReason: true,
+    requireReason: false,
   },
   urge: {
     title: WORKFLOW_TASK_COLLABORATION_ACTIONS.urge.label,
     buttonLabel: '提交催办',
     successMessage: '催办已记录',
-    requireReason: true,
+    requireReason: false,
   },
   assign: {
     title: WORKFLOW_TASK_COLLABORATION_ACTIONS.assign.label,
@@ -75,7 +75,7 @@ export function getWorkflowTaskActionMeta(task = {}, actionMode = '') {
       successMessage: processLinked
         ? '审批已通过，系统已按结果自动流转'
         : '审批已通过',
-      requireReason: true,
+      requireReason: workflowTaskActionRequiresReason(task, actionMode),
     }
   }
   if (actionMode === 'reject') {

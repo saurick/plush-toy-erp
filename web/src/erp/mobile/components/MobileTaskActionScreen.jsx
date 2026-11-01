@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import {
+  DesktopOutlined,
   ExclamationCircleFilled,
   LoadingOutlined,
   ReloadOutlined,
@@ -16,6 +17,7 @@ import {
   getWorkflowProcessDecisionApprovalProfile,
   isWorkflowApprovalTask,
   isWorkflowProcessDecisionTask,
+  workflowTaskActionInput,
   workflowTaskActionRequiresReason,
 } from '../../utils/workflowTaskActionContract.mjs'
 import { getWorkflowTaskProcessContext, listWorkflowTaskEvents } from '../../api/workflowApi.mjs'
@@ -28,7 +30,7 @@ import {
 import { getWorkflowTaskActionOutcomeHint } from '../../utils/workflowTaskProcessingHint.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
 import MobileTaskContextCard from './MobileTaskContextCard.jsx'
-import { taskDeviceNotice, taskNeedsDesktop } from '../../utils/taskHandlingPolicy.mjs'
+import { taskDeviceNotice, taskNeedsDesktop, taskReadOnlyNotice } from '../../utils/taskHandlingPolicy.mjs'
 import MobileTaskAttachments from './MobileTaskAttachments.jsx'
 import { WorkflowTaskCopySummary } from '../../components/workflow/WorkflowTaskCopy.jsx'
 import WorkflowTaskSecondaryActions, { WorkflowTaskActionGroup } from '../../components/workflow/WorkflowTaskSecondaryActions.jsx'
@@ -81,31 +83,9 @@ function resolveAccessCopy(accessState, accessMessage) {
   return ''
 }
 
-function resolveReasonLabel(action, approvalTask = false) {
-  if (action === 'done') return approvalTask ? '审批意见' : '完成反馈'
-  if (action === 'blocked') return '阻塞原因'
-  if (action === 'rejected') return '退回原因'
-  if (action === 'resume') return '阻塞解除说明'
-  if (action === 'urge') return '催办原因'
-  return '处理原因'
-}
-
-function resolveReasonPlaceholder(action, approvalTask = false) {
-  if (action === 'done') {
-    return approvalTask
-      ? '说明通过依据、核对结果和需要交接的信息'
-      : '说明已完成什么、核对结果和需要交接的信息'
-  }
-  if (action === 'blocked') return '说明当前卡点、影响和需要的支持'
-  if (action === 'rejected') return '说明退回依据和需要补充的内容'
-  if (action === 'resume') return '说明阻塞已如何解除，以及下一步安排'
-  if (action === 'urge') return '说明催办原因和期望完成时间'
-  return '请填写处理原因'
-}
-
 function validationErrorsFor({
   action,
-  approvalTask = false,
+  task,
   approvedQuantity = '',
   approvedQuantityAllowed = false,
   processDecisionRequired = false,
@@ -117,7 +97,7 @@ function validationErrorsFor({
     action: action ? '' : '请选择本次处理方式',
     reason:
       requireReason && !normalizedReason
-        ? `${resolveReasonLabel(action, approvalTask)}为必填项`
+        ? `${workflowTaskActionInput(task, action).label}为必填项`
         : processDecisionRequired && [...normalizedReason].length > 255
           ? '审批意见不能超过 255 个字符'
           : '',
@@ -232,6 +212,7 @@ function MobileWorkflowTaskActionScreen({
     processApprovalForm?.approved_quantity?.precision === 20 &&
     processApprovalForm?.approved_quantity?.scale === 6
   const reasonRequired = workflowTaskActionRequiresReason(task, effectiveAction)
+  const actionInput = workflowTaskActionInput(task, effectiveAction)
   const showReasonHelp = Boolean(
     validationErrors.reason ||
     String(reason || '').length >= (processDecisionRequired ? 205 : 450)
@@ -350,7 +331,7 @@ function MobileWorkflowTaskActionScreen({
     if (!canSubmit || busy) return
     const errors = validationErrorsFor({
       action: effectiveAction,
-      approvalTask,
+      task,
       approvedQuantity,
       approvedQuantityAllowed,
       processDecisionRequired,
@@ -577,7 +558,7 @@ function MobileWorkflowTaskActionScreen({
               {effectiveAction ? (
                 <div className="mobile-task-action-field">
                   <label htmlFor={`${fieldID}-reason`}>
-                    <BusinessHelpLabel label={resolveReasonLabel(effectiveAction, approvalTask)} description={approvalTask && effectiveAction === 'done' ? '核对后确认通过，记录审批意见。' : visibleActions.find((option) => option.key === effectiveAction)?.description} />
+                    <BusinessHelpLabel label={actionInput.fieldLabel} description={visibleActions.find((option) => option.key === effectiveAction)?.description} />
                     {reasonRequired ? (
                       <span
                         className="mobile-task-action-required"
@@ -591,7 +572,7 @@ function MobileWorkflowTaskActionScreen({
                   <textarea
                     ref={reasonRef}
                     id={`${fieldID}-reason`}
-                    aria-label={resolveReasonLabel(effectiveAction, approvalTask)}
+                    aria-label={actionInput.fieldLabel}
                     className="mobile-task-action-input"
                     aria-describedby={
                       validationErrors.reason
@@ -601,10 +582,7 @@ function MobileWorkflowTaskActionScreen({
                     aria-invalid={Boolean(validationErrors.reason)}
                     disabled={busy}
                     maxLength={processDecisionRequired ? 255 : 500}
-                    placeholder={resolveReasonPlaceholder(
-                      effectiveAction,
-                      approvalTask
-                    )}
+                    placeholder={actionInput.placeholder}
                     required={reasonRequired}
                     value={reason}
                     onChange={(event) => {
@@ -725,6 +703,7 @@ function MobileWorkflowTaskActionScreen({
 
 export default function MobileTaskActionScreen(props) {
   const { busy = false, collaborationActions = [], renderSourceAction, taskBusinessForm = false, onBack, task, selectedAction, canManageAttachments, canViewReceipt: canViewTaskReceipt, onViewReceipt: onViewTaskReceipt } = props
+  const readOnlyNotice = taskReadOnlyNotice(task)
   if (taskNeedsDesktop(task) && selectedAction !== 'urge' && !taskBusinessForm && !renderSourceAction) {
     return (
       <div className="mobile-role-tasks-page mobile-role-tasks-page--detail mobile-task-screen" data-testid="mobile-task-desktop-review">
@@ -779,13 +758,18 @@ export default function MobileTaskActionScreen(props) {
         <MobileBackToTop enabled={!taskForm || !taskNeedsDesktop(task)} />
       </main>
       <div className="mobile-role-action-bar mobile-task-action-footer">
+        {taskForm && readOnlyNotice ? (
+          <div className="mobile-task-device-scope" role="note" aria-label="编辑方式">
+            <DesktopOutlined className="mobile-task-device-scope__icon" aria-hidden="true" />
+            <span>{readOnlyNotice}，<strong>请在电脑端编辑。</strong></span>
+          </div>
+        ) : null}
         <MobileTaskAttachments task={task} canManage={canManageAttachments} busy={saving} />
         <WorkflowTaskSecondaryActions actions={collaborationActions} disabled={busy || saving} />
         <WorkflowTaskActionGroup label="业务办理" className="erp-task-operation-group--primary">
           <div className="mobile-task-business-action-host" ref={actionHostRef} />
           {taskForm && footer ? <div className="mobile-task-business-result-footer">{footer}</div> : footer}
         </WorkflowTaskActionGroup>
-        {taskForm && taskNeedsDesktop(task) && taskDeviceNotice(task) ? <span className="mobile-task-device-scope">电脑编制 · 手机查看</span> : null}
       </div>
     </div>
   ))

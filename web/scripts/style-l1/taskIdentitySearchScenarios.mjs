@@ -3,6 +3,7 @@ import { assertNoHorizontalOverflow } from './pageAssertions.mjs'
 export function createTaskIdentitySearchScenarios({ assert }) {
   const task = {
     id: 97201,
+    task_no: 'RW20261018-0029',
     version: 1,
     task_code: 'STYLE-L1-MATCH-IDENTITY',
     task_name: '核对产品资料',
@@ -131,7 +132,7 @@ export function createTaskIdentitySearchScenarios({ assert }) {
       await page.setViewportSize(mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 })
       const search = mobile
         ? page.getByRole('searchbox', {
-            name: '搜索订单、产品、物料或款号',
+            name: '搜索任务编号、订单、产品、物料或款号',
             exact: true,
           })
         : page.getByPlaceholder('订单 / 产品 / 物料 / 款号')
@@ -176,6 +177,25 @@ export function createTaskIdentitySearchScenarios({ assert }) {
       await row
         .getByText('饼干小熊命中 2 款，共 3 款', { exact: true })
         .waitFor()
+      await submit(task.task_no.toLowerCase())
+      await row.waitFor()
+      assert.equal(await row.getByText(task.task_no, { exact: true }).count(), 0, '列表不常驻显示任务编号')
+      await row.getByRole('button', { name: '查看核对产品资料详情', exact: true }).click()
+      const info = page.locator('.workflow-task-info-card__details')
+      await info.waitFor()
+      assert.equal(await info.evaluate((node) => node.open), false)
+      await info.locator('summary').click()
+      const field = info.locator('.workflow-task-info-card__number')
+      assert.equal(await field.locator('dt').textContent(), '任务编号')
+      assert.equal(await field.locator('.erp-task-copy-field__value').textContent(), task.task_no)
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+      await field.getByRole('button', { name: '复制任务编号', exact: true }).click()
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), task.task_no)
+      await assertNoHorizontalOverflow(page)
+      if (mobile) await page.locator('.mobile-task-flow-back').click()
+      else await page.locator('.ant-drawer-close').click()
+      await row.waitFor()
+      assert.equal(await search.inputValue(), task.task_no.toLowerCase(), '返回保留编号搜索条件')
       if (mobile) {
         await page.setViewportSize({ width: 320, height: 700 })
         await assertNoHorizontalOverflow(page)

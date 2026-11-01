@@ -5,6 +5,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { listProductionOrderReferenceOptions } from '../../api/productionOrderApi.mjs'
+import { productionReferenceIdentity } from '../../utils/referenceSelectOptions.mjs'
 import {
   PRODUCTION_ORDER_REFERENCE_PAGE_SIZE,
   createProductionOrderReferenceRequestGate,
@@ -210,11 +211,12 @@ export default function ProductionOrderReferenceSelect({
     return [...merged.values()].map((option) => ({
       value: option.value,
       label: option.label,
+      identity: productionReferenceIdentity(referenceType, option),
       disabled: option.selectable === false,
       title: option.reason || option.label,
       raw: option,
     }))
-  }, [initialOptions, options, value])
+  }, [initialOptions, options, value, referenceType])
 
   // Sales-source names and capacity wrap; paged options need their actual row height.
   const salesReference = referenceType === 'sales_order_item'

@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Form, Popconfirm, Space } from 'antd'
+import { Alert, Button, Form, Popconfirm, Space, Typography } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 import { applyBusinessFormReadback } from '../../utils/businessFormReadback.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
@@ -12,19 +12,19 @@ import { ReferenceRecordsProvider } from '../RemoteReferenceSelect.jsx'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { canReadReference, loadReferenceIDs, mergeReferenceRecords } from '../../utils/remoteReferences.mjs'
-import { getBOMVersion, saveBOMWithItems, copyBOMVersion, activateBOMVersion, listAllBOMVersions } from '../../api/bomApi.mjs'
+import { getBOMVersion, saveBOMWithItems, copyBOMVersion, activateBOMVersion } from '../../api/bomApi.mjs'
 import { listAllProducts, listAllMaterials, listAllUnits } from '../../api/masterDataOrderApi.mjs'
 import { productOption, materialOption, unitOption, uniqueReferenceOptions } from '../../utils/referenceSelectOptions.mjs'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
-import { suggestNextBOMVersion } from '../../utils/bomVersionSuggestion.mjs'
+import { isMutationResultUnknown } from '../../utils/sourceDocumentMutation.mjs'
 import { invalidateBOMUsageSnapshots } from '../../utils/bomMaterialGroups.mjs'
 import { MAX_BOM_XLSX_FILE_BYTES, parseBOMXlsx, buildBOMImportDraft, getBOMImportDraftIssues, describeBOMImportIssues, mergeBOMImportedValues } from '../../utils/bomXlsxImport.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { message } from '@/common/utils/antdApp'
 import { BOMHeaderFormFields, buildHeaderParams, buildItemParams, unixToDateInputValue } from './BOMVersionForms.jsx'
 import BOMMaterialGroupsForm from './BOMMaterialGroupsForm.jsx'
-import BOMExcelImportPreview, { BOMImportUndoAction, bomImportItemsSnapshot } from './BOMExcelImportPreview.jsx'
+import BOMExcelImportPreview, { bomImportItemsSnapshot } from './BOMExcelImportPreview.jsx'
+import BusinessImportActions from '../business-list/BusinessImportActions.jsx'
 import BOMExcelImportFormat from './BOMExcelImportFormat.jsx'
 import BOMImportReviewSummary from './BOMImportReviewSummary.jsx'
 import BOMRevisionAction from './BOMRevisionAction.jsx'
@@ -51,6 +51,15 @@ function formValues(record = {}) {
   }
 }
 
+// 仅撤销可用时订阅完整快照，避免每次输入重绘整张材料表。
+function BOMImportUndoWatcher({ form, snapshot, onInvalidated }) {
+  const current = Form.useWatch(bomImportItemsSnapshot, { form, preserve: true })
+  useEffect(() => {
+    if (current !== undefined && current !== snapshot) onInvalidated()
+  }, [current, snapshot, onInvalidated])
+  return null
+}
+
 // The business list and engineering task use this complete editor and write path.
 export default function BOMEditor({ open, mode = 'view', record, initialValues, importDraft, onSaved, onComplete, onClose, continuous = false, actions, readOnly = false, renderProductActions }) {
   const context = useBusinessPageContext()
@@ -66,12 +75,12 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
   const [editorRevision, setEditorRevision] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [creationUnknown, setCreationUnknown] = useState(false)
   const [pendingResult, setPendingResult] = useState(null)
   const [products, setProducts] = useState([])
   const [materials, setMaterials] = useState([])
   const [units, setUnits] = useState([])
   const [referencesReady, setReferencesReady] = useState(false)
-  const [candidates, setCandidates] = useState([])
   const [review, setReview] = useState(null)
   const [pendingImport, setPendingImport] = useState(null)
   const [undo, setUndo] = useState(null)
@@ -80,7 +89,9 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
   const [retry, setRetry] = useState(0)
   const attachment = useRef(null)
   const importInput = useRef(null)
+  const importButton = useRef(null)
   const savedSnapshot = useRef(null)
+  const pendingReadback = useRef(null)
   const active = useRef(false)
   const busy = useRef(false)
   const importingRef = useRef(null)
@@ -91,13 +102,17 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
   const canCreate = !taskReadOnly && hasActionPermission(profile, PermissionCode.BOM_CREATE)
   const canUpdate = !taskReadOnly && hasActionPermission(profile, PermissionCode.BOM_UPDATE)
   const writable = editorMode !== 'view' && !taskReadOnly && (editorMode === 'edit' ? canUpdate && canEditBOM(detail) : canCreate)
+  const undoState = !undo ? '' : undo.invalidated ? 'changed' : 'ready'
+  useEffect(() => {
+    if (!open || !writable || !canReadMaterials || !canReadProducts) {
+      setUndo(null)
+    }
+  }, [open, writable, canReadMaterials, canReadProducts])
   const canActivate = !taskReadOnly && hasActionPermission(profile, PermissionCode.BOM_ACTIVATE)
-  const productID = Form.useWatch('product_id', { form, preserve: true })
   const productOptions = useMemo(() => uniqueReferenceOptions(products, productOption), [products])
   const materialOptions = useMemo(() => uniqueReferenceOptions(materials, materialOption), [materials])
   const unitOptions = useMemo(() => uniqueReferenceOptions(units, unitOption), [units])
   const materialByID = useMemo(() => new Map(materials.map((item) => [item.id, item])), [materials])
-  const suggestion = suggestNextBOMVersion(candidates, productID)
   const initial = useRef(initialValues)
   initial.current = initialValues
   const imported = useRef(importDraft)
@@ -111,11 +126,13 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
     if (!open) { setReadyScope(''); return () => controller.abort() }
     setLoading(true)
     setError('')
+    setCreationUnknown(false)
     setPendingResult(null)
     setReferencesReady(false)
     setPendingImport(null)
     setUndo(null)
     savedSnapshot.current = null
+    pendingReadback.current = null
     attachment.current?.clearPendingAttachments()
     const read = async () => {
       if (!canRead) throw new Error('当前账号没有查看 BOM 的权限')
@@ -124,6 +141,7 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
       const values = next
         ? formValues(next)
         : { ...formValues(initial.current || {}), ...imported.current?.values }
+      if (!next) values.version = ''
       if (mode === 'copy') Object.assign(values, { version: '', effective_from: '', effective_to: '', note: '', items: [] })
       const [unitData, productData, materialData] = await Promise.all([
         listAllUnits({}, { signal: controller.signal }),
@@ -144,50 +162,67 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
     read().catch((err) => { if (!controller.signal.aborted) { setError(getActionErrorMessage(err, '读取 BOM 编辑资料')); setReadyScope(readScope) } }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => { active.current = false; controller.abort(); importingRef.current?.abort() }
   }, [open, recordID, mode, profile.id, canRead, canReadProducts, canReadMaterials, form, retry, readScope])
-  useEffect(() => {
-    const controller = new AbortController()
-    if (open && productID && !['edit', 'view'].includes(editorMode)) {
-      listAllBOMVersions({ product_id: productID }, { signal: controller.signal }).then((data) => {
-        if (controller.signal.aborted) return
-        setCandidates(data.bom_versions || [])
-        if (editorMode === 'copy' && !String(form.getFieldValue('version') || '').trim()) applyBusinessFormReadback(form, { version: suggestNextBOMVersion(data.bom_versions || [], productID) })
-      }).catch((err) => { if (!controller.signal.aborted && !isRpcAbortError(err)) message.warning(getActionErrorMessage(err, '读取 BOM 版本建议')) })
-    }
-    return () => controller.abort()
-  }, [open, productID, editorMode, form])
-
   const save = async ({ completing = false } = {}) => {
-    if (!writable || loading || busy.current || importing || pendingImport) return false
+    if (!writable || loading || busy.current || importing || pendingImport || creationUnknown) return false
     const issues = review ? getBOMImportDraftIssues(form.getFieldsValue(true)) : []
     if (issues.length) {
       form.setFields(issues.map((issue) => ({ name: issue.scope === 'item' ? ['items', issue.itemIndex, issue.field] : [issue.field], errors: [issue.message] })))
+      const first = issues[0]
+      form.scrollToField(first.scope === 'item' ? ['items', first.itemIndex, first.field] : [first.field], { focus: true, block: 'nearest' })
       message.warning(`暂未保存：请先${describeBOMImportIssues(issues)}`)
       return false
     }
-    const values = await form.validateFields()
     busy.current = true
-    setSaving(true)
     setError('')
+    let creating = false
     try {
+      const values = await form.validateFields()
+      setSaving(true)
       const snapshot = businessFormSnapshot(values)
       let saved = detail
-      if (savedSnapshot.current !== snapshot || !saved?.id) {
-        saved = editorMode === 'copy'
-          ? await copyBOMVersion(buildHeaderParams(values, { source_id: detail?.id }))
-          : await saveBOMWithItems({
-            ...buildHeaderParams(values, detail?.id && editorMode === 'edit' ? { id: detail.id, product_id: detail.product_id, expected_version: detail.edit_version } : {}),
-            items: (values.items || []).map((item) => ({ ...buildItemParams(item), ...(editorMode === 'edit' && item.id ? { id: item.id } : {}) })),
-          })
-        saved = await getBOMVersion({ id: saved.id })
+      if (pendingReadback.current) {
+        saved = await getBOMVersion({ id: pendingReadback.current.id })
+        if (!saved?.id || !Array.isArray(saved.items)) throw new Error('BOM 草稿尚未完整读回')
         if (!active.current) return false
         setDetail(saved)
-        setEditorMode('edit')
-        if (businessFormSnapshot((values.items || []).map((item) => item.source_snapshot || null)) !== businessFormSnapshot((saved.items || []).map((item) => item.source_snapshot || null))) {
+        const sourceMatches = pendingReadback.current.sources === businessFormSnapshot(saved.items.map((item) => item.source_snapshot || null))
+        pendingReadback.current = null
+        if (!sourceMatches) {
           savedSnapshot.current = null
           setError('草稿已保存，但原表数据尚未完整读回，请保留当前内容并重试。')
           return false
         }
-        savedSnapshot.current = snapshot
+      }
+      if (savedSnapshot.current !== snapshot || !saved?.id) {
+        creating = editorMode === 'copy' || !saved?.id
+        saved = editorMode === 'copy'
+          ? await copyBOMVersion(buildHeaderParams(values, { source_id: detail?.id }))
+          : await saveBOMWithItems({
+            ...buildHeaderParams(values, saved?.id && editorMode === 'edit' ? { id: saved.id, product_id: saved.product_id, expected_version: saved.edit_version } : {}),
+            items: (values.items || []).map((item) => ({ ...buildItemParams(item), ...(editorMode === 'edit' && item.id ? { id: item.id } : {}) })),
+          })
+        setUndo(null)
+        if (!saved?.id || !saved.version || !Array.isArray(saved.items)) throw Object.assign(new Error('BOM 保存结果不完整'), { isInvalidResponse: true })
+        creating = false
+        if (!active.current) return false
+        const sources = businessFormSnapshot((editorMode === 'copy' ? saved.items : values.items || []).map((item) => item.source_snapshot || null))
+        pendingReadback.current = { id: saved.id, sources }
+        if (editorMode === 'copy') applyBusinessFormReadback(form, formValues(saved))
+        else applyBusinessFormReadback(form, { version: saved.version })
+        savedSnapshot.current = businessFormSnapshot(form.getFieldsValue(true))
+        setDetail(saved)
+        setEditorMode('edit')
+        saved = await getBOMVersion({ id: saved.id })
+        if (!saved?.id || !Array.isArray(saved.items)) throw new Error('BOM 草稿尚未完整读回')
+        pendingReadback.current = null
+        if (!active.current) return false
+        setDetail(saved)
+        setEditorMode('edit')
+        if (sources !== businessFormSnapshot(saved.items.map((item) => item.source_snapshot || null))) {
+          savedSnapshot.current = null
+          setError('草稿已保存，但原表数据尚未完整读回，请保留当前内容并重试。')
+          return false
+        }
       }
       const attachmentsSaved = (await attachment.current?.flushPendingAttachments(saved.id)) !== false
       if (!attachmentsSaved) {
@@ -208,6 +243,16 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
       if (!completing) message.success('BOM 草稿已保存，尚未启用')
       return saved
     } catch (err) {
+      if (Array.isArray(err?.errorFields)) {
+        if (err.errorFields[0]) form.scrollToField(err.errorFields[0].name, { focus: true, block: 'nearest' })
+        return false
+      }
+      if (isMutationResultUnknown(err)) setUndo(null)
+      if (creating && isMutationResultUnknown(err)) {
+        setCreationUnknown(true)
+        setError('新建结果尚未确认，请返回列表核对是否已有草稿，再继续编辑。')
+        return false
+      }
       if (active.current) setError(getActionErrorMessage(err, '保存 BOM 草稿'))
       return false
     } finally { busy.current = false; if (active.current) setSaving(false) }
@@ -294,7 +339,7 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
   }
   const changeValues = (changed) => {
     if (!changed.items && !Object.hasOwn(changed, 'quantity_text')) return
-    setUndo(null)
+    setUndo((current) => current ? { ...current, invalidated: true } : null)
     // Material/unit changes are handled for every grouped part by their own controls.
     if (!Object.hasOwn(changed, 'quantity_text') && !(changed.items || []).some((item) => item && (Object.hasOwn(item, 'quantity') || Object.hasOwn(item, 'loss_rate')))) return
     const items = form.getFieldValue('items') || []
@@ -303,17 +348,30 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
   const title = editorMode === 'view' || (!writable && !loading) ? `查看 BOM 版本 · ${bomStatusText(detail?.status)} · 只读` : editorMode === 'edit' ? '编辑 BOM 草稿 · 未生效' : editorMode === 'copy' ? '复制 BOM 新版本' : mode === 'import' ? '检查并保存导入草稿' : '新建 BOM 草稿'
   const importActions = writable && editorMode !== 'copy' ? (
     <Space wrap>
-      <BOMImportUndoAction form={form} undo={undo} disabled={saving || importing} onUndo={() => { if (undo && bomImportItemsSnapshot(form.getFieldsValue(true)) === undo.appliedSnapshot) { form.setFieldsValue(undo.values); setReview(undo.review); setUndo(null) } }} />
-      <Button aria-label="从 Excel 导入" icon={<UploadOutlined aria-hidden="true" />} disabled={saving || !referencesReady} loading={importing} onClick={() => importInput.current?.click()}>从 Excel 导入</Button>
+      {!referencesReady ? <Typography.Text type="secondary" role="status">{error ? '资料加载失败，请先重新读取' : '基础资料加载中，请稍候'}</Typography.Text> : saving ? <Typography.Text type="secondary" role="status">正在保存，请稍候</Typography.Text> : null}
+      <BusinessImportActions
+        undoState={undoState}
+        disabled={saving || importing || !referencesReady}
+        onUndo={() => {
+          if (!undo || undo.invalidated || !writable || saving || importing || !referencesReady || bomImportItemsSnapshot(form.getFieldsValue(true)) !== undo.appliedSnapshot) return
+          form.setFieldsValue(undo.values)
+          setReview(undo.review)
+          setUndo(null)
+          importButton.current?.focus()
+        }}
+      >
+        <Button ref={importButton} aria-label="从 Excel 导入" icon={<UploadOutlined aria-hidden="true" />} disabled={saving || !referencesReady} loading={importing} onClick={() => importInput.current?.click()}>从 Excel 导入</Button>
+      </BusinessImportActions>
       <Button type="link" size="small" disabled={saving} onClick={() => setFormatOpen(true)}>查看 Excel 格式</Button>
     </Space>
   ) : null
   return (
     <ReferenceRecordsProvider component={React.Fragment} adminProfile={profile} handlers={{ products: (rows) => setProducts((current) => mergeReferenceRecords(current, rows)), materials: (rows) => setMaterials((current) => mergeReferenceRecords(current, rows)) }}>
-      <BusinessFormPage open={open} form={form} baselineKey={`${readyScope}:${editorRevision}`} className="erp-bom-editor" title={title} readOnly={!writable} initialDirty={mode === 'import'} hasChanges={Boolean(pendingResult)} loading={loading} confirmLoading={saving} processing={importing} onOk={onComplete && canActivate ? complete : save} okText={onComplete && canActivate ? '完成工程资料' : '保存草稿'} okButtonProps={{ disabled: Boolean(pendingImport) || !referencesReady }} onCancel={onClose} headerActions={<Space wrap>{actions}{editorMode === 'view' && canUpdate ? <BOMRevisionAction record={detail} canCreate={canCreate} disabled={saving} onEdit={(next) => { setDetail(next); setEditorMode('edit'); applyBusinessFormReadback(form, formValues(next)); savedSnapshot.current = null; setEditorRevision((value) => value + 1) }} /> : null}</Space>} secondaryAction={onComplete ? (writable && canActivate ? <Button disabled={saving || importing || Boolean(pendingImport) || !referencesReady} onClick={() => save()}>保存草稿</Button> : !writable && canActivate ? <Button type="primary" loading={saving} disabled={importing || loading} onClick={complete}>完成工程资料</Button> : null) : !pendingResult && continuous && canActivate && detail?.status === 'DRAFT' ? <Popconfirm title="确认启用此 BOM 版本？" onConfirm={activate} disabled={saving}><Button disabled={saving || importing}>启用 BOM</Button></Popconfirm> : null}>
+      <BusinessFormPage open={open} form={form} baselineKey={`${readyScope}:${editorRevision}`} className="erp-bom-editor" title={title} readOnly={!writable} initialDirty={mode === 'import'} hasChanges={Boolean(pendingResult)} loading={loading} confirmLoading={saving} processing={importing} onOk={onComplete && canActivate ? complete : save} okText={onComplete && canActivate ? '完成工程资料' : '保存草稿'} okButtonProps={{ disabled: creationUnknown || Boolean(pendingImport) || !referencesReady }} onCancel={onClose} headerActions={<Space wrap>{actions}{editorMode === 'view' && canUpdate ? <BOMRevisionAction record={detail} canCreate={canCreate} disabled={saving} onEdit={(next) => { setDetail(next); setEditorMode('edit'); applyBusinessFormReadback(form, formValues(next)); savedSnapshot.current = null; setEditorRevision((value) => value + 1) }} /> : null}</Space>} secondaryAction={onComplete ? (writable && canActivate ? <Button disabled={saving || importing || creationUnknown || Boolean(pendingImport) || !referencesReady} onClick={() => save()}>保存草稿</Button> : !writable && canActivate ? <Button type="primary" loading={saving} disabled={importing || loading} onClick={complete}>完成工程资料</Button> : null) : !pendingResult && continuous && canActivate && detail?.status === 'DRAFT' ? <Popconfirm title="确认启用此 BOM 版本？" onConfirm={activate} disabled={saving}><Button disabled={saving || importing}>启用 BOM</Button></Popconfirm> : null}>
         {error ? <Alert type="warning" showIcon message={error} action={pendingResult ? <Button loading={saving} onClick={retrySavedResult}>重试保存</Button> : !referencesReady ? <Button onClick={() => setRetry((value) => value + 1)}>重新读取</Button> : undefined} /> : null}
         <Form name={inWorkspace ? `bom-${formID}` : undefined} form={form} layout="vertical" className="erp-business-action-form" disabled={!writable || saving} onValuesChange={changeValues}>
-          <BOMHeaderFormFields form={form} disabled={!writable} productDisabled={editorMode === 'edit' || (inWorkspace && Boolean(initialValues?.product_id))} productActions={writable && editorMode !== 'edit' ? renderProductActions?.({ onSelect: (product) => { setProducts((current) => mergeReferenceRecords(current, [product])); form.setFieldValue('product_id', product.id) } }) : null} productOptions={productOptions} versionSuggestion={suggestion} onUseVersionSuggestion={() => form.setFieldValue('version', suggestion)} attachmentPanel={<BusinessAttachmentPanel ref={attachment} ownerType="bom_header" ownerId={detail?.id} title="BOM 附件" description="色卡、工艺图、作业说明和原始材料清单" canUpload={writable} canWithdraw={writable && canUpdate} variant="inline" compact />}>
+          {undo && !undo.invalidated ? <BOMImportUndoWatcher form={form} snapshot={undo.appliedSnapshot} onInvalidated={() => setUndo((current) => current ? { ...current, invalidated: true } : null)} /> : null}
+          <BOMHeaderFormFields form={form} disabled={!writable} productDisabled={['edit', 'copy'].includes(editorMode) || (inWorkspace && Boolean(initialValues?.product_id))} productActions={writable && !['edit', 'copy'].includes(editorMode) ? renderProductActions?.({ onSelect: (product) => { setProducts((current) => mergeReferenceRecords(current, [product])); applyBusinessFormReadback(form, { product_id: product.id }) } }) : null} productOptions={productOptions} attachmentPanel={<BusinessAttachmentPanel ref={attachment} ownerType="bom_header" ownerId={detail?.id} title="BOM 附件" description="色卡、工艺图、作业说明和原始材料清单" canUpload={writable} canWithdraw={writable && canUpdate} variant="inline" compact />}>
             {review ? <BOMImportReviewSummary form={form} review={review} productOptions={productOptions} /> : null}
             <BusinessFormSection title="材料分析明细表" showHeading={editorMode === 'copy'}>
               {editorMode === 'copy' ? <p>保存后会复制原版本的全部材料和部位，可在新草稿继续编辑。</p> : (
@@ -325,7 +383,7 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
                   unitOptions={unitOptions}
                   canCreateMaterial={writable && hasActionPermission(profile, PermissionCode.MATERIAL_CREATE)}
                   onMaterialCreated={(item) => setMaterials((current) => [item, ...current])}
-                  onItemsChange={() => setUndo(null)}
+                  onItemsChange={() => setUndo((current) => current ? { ...current, invalidated: true } : null)}
                   registerLineItemRow={registerLineItemRow}
                   requestLineItemScroll={requestLineItemScroll}
                   selectedVersionID={detail?.id}

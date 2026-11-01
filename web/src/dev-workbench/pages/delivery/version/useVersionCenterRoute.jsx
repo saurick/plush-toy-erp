@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import useDevCustomerScope from '../../../hooks/useDevCustomerScope.mjs'
 import { buildDevCustomerSnapshotKey } from '../../../config/devCustomerScope.mjs'
 import {
@@ -14,7 +14,12 @@ import {
 } from '../../../config/devDelivery.mjs'
 
 export function useVersionCenterRoute({ setHistoryPage }) {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const [searchParams, setSearchParamsBase] = useSearchParams()
+  const setSearchParams = useCallback((next, options) => setSearchParamsBase(next, {
+    ...options,
+    state: location.state,
+  }), [location.state, setSearchParamsBase])
   const customerScope = useDevCustomerScope({
     searchParams,
     setSearchParams,

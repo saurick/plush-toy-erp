@@ -6,6 +6,25 @@ import { closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 const MASTER_DATA = new Set(['customers', 'suppliers', 'materials', 'products', 'product-skus', 'processes'])
 const IMMUTABLE_FACTS = new Set(['quality', 'payment'])
 
+export async function openBusinessFormModeEditor(page, key, mode) {
+  const rows = page.locator('.erp-business-data-table-card .ant-table-tbody > tr.ant-table-row')
+  const row = key === 'bom' && mode !== 'view' ? rows.filter({ hasText: '草稿' }).first() : rows.first()
+  await row.waitFor()
+  await row.locator('input[type="radio"], input[type="checkbox"]').first().check()
+  const selector = mode === 'copy' ? '[data-business-action-key="copy"]' : `[data-business-action-role="${mode}"]`
+  let action = page.locator(`${selector}:visible`).first()
+  if (!(await action.count())) {
+    await page.getByRole('button', { name: /^更多操作(?:，共 \d+ 项)?$/u }).click()
+    action = page.locator(`${selector}:visible`).first()
+  }
+  await action.click()
+  const editor = page.locator('.erp-business-form-page:not([hidden]), .ant-modal:visible').last()
+  await editor.waitFor()
+  await editor.locator('.ant-spin-spinning').first().waitFor({ state: 'hidden' })
+  await editor.locator('.erp-business-detail-items__loading').waitFor({ state: 'hidden' })
+  return editor
+}
+
 export function createBusinessFormModeScenarios(deps, documents) {
   const cases = []
   for (const [key, route] of documents) {
@@ -27,21 +46,10 @@ export function createBusinessFormModeScenarios(deps, documents) {
         ...(readOnlyMaster ? { adminProfile: { is_super_admin: false, permissions: readActions } } : {}),
         viewport: { width: 1440, height: 900 },
         verify: async (page) => {
-          const rows = page.locator('.erp-business-data-table-card .ant-table-tbody > tr.ant-table-row')
-          const row = key === 'bom' && mode !== 'view' ? rows.filter({ hasText: '草稿' }).first() : rows.first()
-          await row.waitFor()
-          await row.locator('input[type="radio"], input[type="checkbox"]').first().check()
-          const selector = mode === 'copy' ? '[data-business-action-key="copy"]' : `[data-business-action-role="${mode}"]`
-          let action = page.locator(`${selector}:visible`).first()
-          if (!(await action.count())) {
-            await page.getByRole('button', { name: /^更多操作(?:，共 \d+ 项)?$/u }).click()
-            action = page.locator(`${selector}:visible`).first()
+          const editor = await openBusinessFormModeEditor(page, key, mode)
+          if (key === 'bom') {
+            deps.assert.equal(await editor.getByRole('combobox', { name: /产品/u }).isDisabled(), true, `BOM ${mode} must preserve its product identity`)
           }
-          await action.click()
-          const editor = page.locator('.erp-business-form-page:not([hidden]), .ant-modal:visible').last()
-          await editor.waitFor()
-          await editor.locator('.ant-spin-spinning').first().waitFor({ state: 'hidden' })
-          await editor.locator('.erp-business-detail-items__loading').waitFor({ state: 'hidden' })
           await waitForFiniteAnimations(page)
           const initialUnsaved = await editor.getAttribute('data-unsaved')
           const sections = await assertBusinessSectionInteractions(page, editor)

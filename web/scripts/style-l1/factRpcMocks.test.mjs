@@ -459,6 +459,7 @@ test('style-l1 shipment source candidates enforce remote query and paging params
   const candidate = {
     sales_order_id: 7,
     order_no: 'SO-007',
+    customer_id: 8,
     customer_snapshot: { code: 'C-008', name: '示例客户' },
     customer_name: '示例客户',
     sales_order_item_id: 31,
@@ -473,6 +474,7 @@ test('style-l1 shipment source candidates enforce remote query and paging params
     ]),
     {
       shipment_source_candidates: [candidate],
+      source_orders: [{ sales_order_id: 7, order_no: 'SO-007', customer_id: 8, customer_code: 'C-008', customer_name: '示例客户', customer_name_snapshot: '示例客户' }],
       total: 1,
       limit: 20,
       offset: 0,

@@ -18,6 +18,8 @@ macOS 原生启动器的编译、退出、凭据清理和信号转发用例仅�
 
 终态来源任务办理人的前向修复使用 [terminal-task-assignee-preflight.sql](terminal-task-assignee-preflight.sql) 核查旧职责迁移与原始回执。没有可证明的原始分派记录时阻断升级，必须核对升级前备份；事件操作人不能替代任务办理人。
 
+任务独立编号迁移使用 [workflow-task-number-preflight.sql](workflow-task-number-preflight.sql) 只读核查创建日期；迁移按上海日期回填每日流水并建立计数器，不修改原任务事件或冻结回执。
+
 职责迁移尚未执行的演示目标可通过受控 Go 维护命令保全当前原始快照；已经执行的登记开发目标则从原备份恢复。两类入口及 dry-run / apply 边界见 [服务端开发说明](../../server/README.md)，对应 PostgreSQL 回归覆盖真实分派、原本未分派、备份不匹配拒绝与重复执行。
 
 ## 按任务阅读

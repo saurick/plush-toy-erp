@@ -5,6 +5,7 @@ package workflowtask
 import (
 	"time"
 
+	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 )
@@ -14,6 +15,8 @@ const (
 	Label = "workflow_task"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldTaskNo holds the string denoting the task_no field in the database.
+	FieldTaskNo = "task_no"
 	// FieldTaskCode holds the string denoting the task_code field in the database.
 	FieldTaskCode = "task_code"
 	// FieldTaskGroup holds the string denoting the task_group field in the database.
@@ -116,6 +119,7 @@ const (
 // Columns holds all SQL columns for workflowtask fields.
 var Columns = []string{
 	FieldID,
+	FieldTaskNo,
 	FieldTaskCode,
 	FieldTaskGroup,
 	FieldTaskName,
@@ -162,7 +166,15 @@ func ValidColumn(column string) bool {
 	return false
 }
 
+// Note that the variables below are initialized by the runtime
+// package on the initialization of the application. Therefore,
+// it should be imported in the main as follows:
+//
+//	import _ "server/internal/data/model/ent/runtime"
 var (
+	Hooks [1]ent.Hook
+	// TaskNoValidator is a validator for the "task_no" field. It is called by the builders before save.
+	TaskNoValidator func(string) error
 	// TaskCodeValidator is a validator for the "task_code" field. It is called by the builders before save.
 	TaskCodeValidator func(string) error
 	// TaskGroupValidator is a validator for the "task_group" field. It is called by the builders before save.
@@ -235,6 +247,11 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByTaskNo orders the results by the task_no field.
+func ByTaskNo(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTaskNo, opts...).ToFunc()
 }
 
 // ByTaskCode orders the results by the task_code field.

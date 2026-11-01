@@ -137,6 +137,11 @@ const groupKinds = Object.freeze({
   business_followup: 'coordination',
 })
 
+const desktopReadOnlyNotices = Object.freeze({
+  engineering_data: 'BOM 仅供查看',
+  engineering_material_revision: 'BOM 仅供查看',
+})
+
 export function taskHandlingPolicy(task) {
   if (!task) return null
   const stage = catalog.stages.find(
@@ -164,6 +169,11 @@ export function taskDeviceNotice(task) {
   return policy?.mobile === 'desktop'
     ? '请在电脑办理，手机可查看资料和结果。'
     : policy?.scope || ''
+}
+
+export function taskReadOnlyNotice(task) {
+  if (isTerminalWorkflowTask(task) || !taskNeedsDesktop(task)) return ''
+  return desktopReadOnlyNotices[task.task_group] || '业务资料仅供查看'
 }
 
 export function taskHandlingMatrix() {

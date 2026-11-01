@@ -27,7 +27,7 @@ func TestInventoryRepo_BOMEditorFieldsPersistAndClear(t *testing.T) {
 	end := start.AddDate(0, 1, 0)
 	printed := start.AddDate(0, 0, 26)
 	in := &biz.BOMVersionMutation{ProductID: f.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{
-		Version: "编辑器完整字段", EffectiveFrom: &start, EffectiveTo: &end, PrintDate: &printed,
+		EffectiveFrom: &start, EffectiveTo: &end, PrintDate: &printed,
 		SourceOrderNo: stringPtr("SO-EDITOR-1"), QuantityText: stringPtr("100"), SpareText: stringPtr("5"),
 		Designer: stringPtr("工程设计员"), Maker: stringPtr("工程制表员"), Auditor: stringPtr("工程审核员"),
 		HairDirection: stringPtr("单方向"), Note: stringPtr("待清空表头"),
@@ -58,7 +58,7 @@ func TestInventoryRepo_BOMEditorFieldsPersistAndClear(t *testing.T) {
 	}
 	assertDecimalEqual(t, read.Items[0].Quantity, "1.25")
 	assertDecimalEqual(t, read.Items[0].LossRate, "0.1")
-	_, err = uc.SaveBOMWithItems(ctx, read.Header.ID, &biz.BOMVersionMutation{ProductID: f.productID, ExpectedVersion: read.Header.EditVersion, BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: in.Version}}, []*biz.BOMItemSaveMutation{{ID: read.Items[0].ID, BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: decimal.NewFromInt(2)}}})
+	_, err = uc.SaveBOMWithItems(ctx, read.Header.ID, &biz.BOMVersionMutation{ProductID: f.productID, ExpectedVersion: read.Header.EditVersion, BOMHeaderUpdate: biz.BOMHeaderUpdate{}}, []*biz.BOMItemSaveMutation{{ID: read.Items[0].ID, BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: decimal.NewFromInt(2)}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func assertBOMSourceValuesRoundTrip(t *testing.T, uc *biz.InventoryUsecase, prod
 		"total_value": "1.358024679135795", "total_label": "总用量 含损耗10%", "total_format": "0.00",
 		"loss_source": biz.BOMLossSourceHeader, "loss_rate": "0.1", "order_quantity": "100"}
 	part := biz.BOMItemUpdate{MaterialID: materialID, UnitID: unitID, Quantity: decimal.RequireFromString("0.0123456789012345"), LossRate: decimal.RequireFromString("0.1"), TotalUsageSnapshot: stringPtr("1.358024679135795"), SourceSnapshot: source}
-	header := biz.BOMHeaderUpdate{Version: "来源精度", QuantityText: stringPtr("100")}
+	header := biz.BOMHeaderUpdate{QuantityText: stringPtr("100")}
 	created, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{ProductID: productID, BOMHeaderUpdate: header}, []*biz.BOMItemSaveMutation{{BOMItemUpdate: part}})
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +102,7 @@ func assertBOMSourceValuesRoundTrip(t *testing.T, uc *biz.InventoryUsecase, prod
 		t.Fatalf("source values did not persist: %v", err)
 	}
 	assertDecimalEqual(t, read.Items[0].Quantity, "0.0123456789012345")
-	copied, err := uc.CopyBOMVersion(ctx, created.Header.ID, &biz.BOMHeaderCreate{ProductID: productID, Version: "来源复制"})
+	copied, err := uc.CopyBOMVersion(ctx, created.Header.ID, &biz.BOMHeaderCreate{ProductID: productID})
 	if err != nil || len(copied.Items) != 1 || copied.Items[0].SourceSnapshot["total_value"] != source["total_value"] {
 		t.Fatalf("source values were not copied: %v", err)
 	}
@@ -128,8 +128,7 @@ func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	created, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{
 		ProductID: fixtures.productID,
 		BOMHeaderUpdate: biz.BOMHeaderUpdate{
-			Version: "V1",
-			Note:    stringPtr("initial"),
+			Note: stringPtr("initial"),
 		},
 	}, []*biz.BOMItemSaveMutation{{
 		BOMItemUpdate: biz.BOMItemUpdate{
@@ -163,7 +162,7 @@ func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	updated, err := uc.SaveBOMWithItems(ctx, created.Header.ID, &biz.BOMVersionMutation{
 		ExpectedVersion: legacy.Header.EditVersion,
 		ProductID:       fixtures.productID,
-		BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "V2"},
+		BOMHeaderUpdate: biz.BOMHeaderUpdate{},
 	}, []*biz.BOMItemSaveMutation{
 		{
 			ID: created.Items[0].ID,
@@ -191,7 +190,7 @@ func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	_, err = uc.SaveBOMWithItems(ctx, created.Header.ID, &biz.BOMVersionMutation{
 		ExpectedVersion: legacy.Header.EditVersion,
 		ProductID:       fixtures.productID,
-		BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "STALE"},
+		BOMHeaderUpdate: biz.BOMHeaderUpdate{},
 	}, []*biz.BOMItemSaveMutation{{
 		ID: updated.Items[0].ID,
 		BOMItemUpdate: biz.BOMItemUpdate{
@@ -204,7 +203,7 @@ func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	if !errors.Is(err, biz.ErrBOMVersionConflict) {
 		t.Fatalf("stale aggregate save error = %v, want version conflict", err)
 	}
-	assertStoredBOMSaveState(t, ctx, client, created.Header.ID, "V2", updated.Header.EditVersion, 2)
+	assertStoredBOMSaveState(t, ctx, client, created.Header.ID, "V1", updated.Header.EditVersion, 2)
 
 	if _, err := client.Material.UpdateOneID(fixtures.materialID).SetIsActive(false).Save(ctx); err != nil {
 		t.Fatalf("disable referenced material: %v", err)
@@ -212,7 +211,7 @@ func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	_, err = repo.SaveBOMWithItems(ctx, created.Header.ID, &biz.BOMVersionMutation{
 		ExpectedVersion: updated.Header.EditVersion,
 		ProductID:       fixtures.productID,
-		BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "INACTIVE-REF"},
+		BOMHeaderUpdate: biz.BOMHeaderUpdate{},
 	}, []*biz.BOMItemSaveMutation{{
 		ID: updated.Items[0].ID,
 		BOMItemUpdate: biz.BOMItemUpdate{
@@ -225,7 +224,7 @@ func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	if !errors.Is(err, biz.ErrMaterialInactive) {
 		t.Fatalf("inactive reference save error = %v, want material inactive", err)
 	}
-	assertStoredBOMSaveState(t, ctx, client, created.Header.ID, "V2", updated.Header.EditVersion, 2)
+	assertStoredBOMSaveState(t, ctx, client, created.Header.ID, "V1", updated.Header.EditVersion, 2)
 	if _, err := client.Material.UpdateOneID(fixtures.materialID).SetIsActive(true).Save(ctx); err != nil {
 		t.Fatalf("restore referenced material: %v", err)
 	}
@@ -233,7 +232,7 @@ func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	_, err = repo.SaveBOMWithItems(ctx, created.Header.ID, &biz.BOMVersionMutation{
 		ExpectedVersion: updated.Header.EditVersion,
 		ProductID:       fixtures.productID,
-		BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "ROLLBACK"},
+		BOMHeaderUpdate: biz.BOMHeaderUpdate{},
 	}, []*biz.BOMItemSaveMutation{{
 		ID: updated.Items[0].ID,
 		BOMItemUpdate: biz.BOMItemUpdate{
@@ -246,7 +245,7 @@ func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected item constraint failure after header CAS")
 	}
-	assertStoredBOMSaveState(t, ctx, client, created.Header.ID, "V2", updated.Header.EditVersion, 2)
+	assertStoredBOMSaveState(t, ctx, client, created.Header.ID, "V1", updated.Header.EditVersion, 2)
 
 	activated, err := uc.ActivateBOMVersion(ctx, created.Header.ID)
 	if err != nil {
@@ -255,7 +254,7 @@ func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	_, err = uc.SaveBOMWithItems(ctx, created.Header.ID, &biz.BOMVersionMutation{
 		ExpectedVersion: activated.Header.EditVersion,
 		ProductID:       fixtures.productID,
-		BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "ACTIVE-EDIT"},
+		BOMHeaderUpdate: biz.BOMHeaderUpdate{},
 	}, []*biz.BOMItemSaveMutation{})
 	if !errors.Is(err, biz.ErrBOMActiveImmutable) {
 		t.Fatalf("active aggregate save error = %v, want immutable", err)

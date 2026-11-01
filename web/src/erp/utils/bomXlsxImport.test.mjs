@@ -4,6 +4,7 @@ import test from 'node:test'
 import { deflateRawSync } from 'node:zlib'
 import { groupBOMMaterials, getBOMUsage } from './bomMaterialGroups.mjs'
 import { readXlsxWorkbook } from './xlsxWorkbook.mjs'
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 
 import {
   BOMXlsxImportError,
@@ -985,4 +986,21 @@ test('parsing budgets skip unrelated sheets and media while still bounding selec
   await assert.rejects(readXlsxWorkbook(file), (error) => error.code === 'xlsx_too_large', '读取大工作表时仍须执行单项解析预算')
   const oversizedDetail = createWorkbook(sheets.slice(0, 1), undefined, { 'xl/worksheets/sheet1.xml': largeXML })
   await assert.rejects(parseBOMXlsx(oversizedDetail), (error) => error.code === 'xlsx_too_large')
+})
+
+test('BOM import preserves long remarks and rejects oversized text without truncation', async () => {
+  const note = '注'.repeat(BusinessTextPolicy.noteMaxCharacters)
+  const workbook = (remark) => createWorkbook([{ name: '材料分析明细表',
+rows: [
+    ['物料名称', '单位', '组装部位', '单位用量', '备注'],
+    ['测试布料', '码', '身体', '1', remark],
+  ] }])
+  const parsed = await parseBOMXlsx(workbook(note), { fileName: '备注.xlsx' })
+  assert.equal(parsed.rows[0].note, note)
+  const draft = buildBOMImportDraft(parsed)
+  assert.equal(draft.values.items[0].note, note)
+  await assert.rejects(parseBOMXlsx(workbook(`${note}溢`)), /备注不能超过 2000/u)
+  const sourceNote = '原'.repeat(1000)
+  assert.ok(buildBOMImportDraft({ ...parsed, context: { ...parsed.context, sourceNote } }).values.note.endsWith(sourceNote))
+  assert.throws(() => buildBOMImportDraft({ ...parsed, context: { ...parsed.context, sourceNote: note } }), /整单备注不能超过 2000/u)
 })

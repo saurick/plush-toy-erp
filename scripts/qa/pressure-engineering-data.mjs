@@ -107,7 +107,7 @@ export async function prepareEngineeringPressureData({
       product_id: product.id, sku_code: product.code + "-SKU", sku_name: "模拟规格",
     } })).product_sku;
     let bom = (await rpc({ actor: "engineering", domain: "bom", method: "save_bom_with_items", params: {
-      product_id: product.id, version: product.code + "-BOM", note: "隔离压测模拟数据",
+      product_id: product.id, note: "隔离压测模拟数据",
       items: recipe.parts.map((part, index) => ({ material_id: refs.materials[part.material].id, unit_id: materialUnit.id,
         quantity: part.quantity, loss_rate: part.loss_rate, position: "模拟部位" + (index + 1) })),
     } })).bom_version;

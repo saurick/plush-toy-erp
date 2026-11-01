@@ -1,5 +1,6 @@
 import { InventoryLotStatus, QualityInspectionStatus, ShipmentStatus } from '../../common/consts/statuses.generated.mjs'
 import { normalizeShipmentQuantity } from './shipmentWeight.mjs'
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 
 const FINISHED_GOODS_SOURCE_TYPE = 'SHIPMENT'
 const FINISHED_GOODS_INSPECTION_TYPE = 'FINISHED_GOODS'
@@ -277,8 +278,8 @@ export function buildShipmentQualityInspectionPayload(
   const inspectionNo = requiredText(values?.inspection_no, '请填写检验单号', 64)
   const decisionNote = optionalText(
     values?.note,
-    255,
-    '送检备注不能超过 255 个字符'
+    BusinessTextPolicy.noteMaxCharacters,
+    `送检备注不能超过 ${BusinessTextPolicy.noteMaxCharacters} 个字符`
   )
   const normalizedCustomerKey = trimmedText(customerKey)
 

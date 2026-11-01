@@ -256,10 +256,11 @@ func adminERPPreferencesToMap(input biz.AdminERPPreferences) map[string]any {
 		"column_orders":  toAnyMapStringSlice(preferences.ColumnOrders),
 		"hidden_columns": toAnyMapStringSlice(preferences.HiddenColumns),
 		"appearance": map[string]any{
-			"theme_mode": preferences.Appearance.ThemeMode,
-			"accent":     preferences.Appearance.Accent,
-			"density":    preferences.Appearance.Density,
-			"tableLines": preferences.Appearance.TableLines,
+			"theme_mode":  preferences.Appearance.ThemeMode,
+			"accent":      preferences.Appearance.Accent,
+			"density":     preferences.Appearance.Density,
+			"tableLines":  preferences.Appearance.TableLines,
+			"formDisplay": preferences.Appearance.FormDisplay,
 		},
 	}
 }

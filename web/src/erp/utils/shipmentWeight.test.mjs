@@ -404,10 +404,10 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
     shipmentModalSource,
     /出货明细已变更，旧人工总净重已清空，请重新填写/u
   )
-  assert.match(
-    shipmentModalSource,
-    /onImport=\{\(sourceItems\) => \{[\s\S]*clearStaleManualWeight\(\)/u
-  )
+  assert.match(shipmentModalSource, /onImport=\{importSalesOrderToShipment\}/u)
+  const importSource = readERPSource('../pages/ShipmentsPage.jsx')
+  assert.match(importSource, /if \(newSourceItems\.length === 0\) \{[\s\S]*?return\s*\}[\s\S]*?total_net_weight_g: undefined/u)
+  assert.match(importSource, /createShipmentSourceImportUndo\(before, shipmentForm\.getFieldsValue\(true\)\)/u)
 
   assert.match(shipmentColumnsSource, /dataIndex: 'total_net_weight_g'/u)
   assert.match(shipmentColumnsSource, /exportTitle: '总净重（克）'/u)

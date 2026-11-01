@@ -332,3 +332,15 @@ test('rejects invalid formats, damaged archives, excessive input and ambiguous h
     (error) => error.code === 'too_many_order_lines'
   )
 })
+
+test('sales Excel import shares the long remark boundary without truncation', async () => {
+  const note = '注'.repeat(2000)
+  const rows = salesOrderFixtureRows()
+  const column = rows[1].indexOf('备注')
+  assert.ok(column >= 0)
+  rows[2][column] = note
+  const parsed = await parseRows(rows)
+  assert.equal(parsed.orders[0].lines[0].item.note, note)
+  rows[2][column] = `${note}溢`
+  await assert.rejects(parseRows(rows), /备注.*2000/u)
+})

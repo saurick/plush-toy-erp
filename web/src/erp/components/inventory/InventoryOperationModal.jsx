@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo } from 'react'
 import { Form, Input } from 'antd'
+import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.jsx'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import { inventoryOperationRequiresApproval } from '../../utils/inventoryOperationTransition.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
@@ -9,7 +11,6 @@ import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
-  BusinessOptionalField,
 } from '../business-list/BusinessCompactFieldTable.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { warehouseAcceptsSubject } from '../../utils/warehouseClassification.mjs'
@@ -123,6 +124,7 @@ export default function InventoryOperationModal({
 
   return (
     <BusinessFormModal
+      form={form}
       className="erp-inventory-operation-modal"
       title={isEdit ? meta.editTitle : <BusinessHelpLabel label={meta.createTitle} description="从当前选中的库存余额生成可核对、可恢复的作业草稿。" />}
       description={
@@ -176,10 +178,23 @@ export default function InventoryOperationModal({
         </div>
         <Form.List name="items">
           {(fields) => (
-            <BusinessCompactFieldTable
-              label="库存作业明细"
-              showSequence
-              columns={[
+            <BusinessGroupedLineItems
+              fields={fields}
+              form={form}
+              table={BusinessCompactFieldTable}
+              getGroup={(item, field) => {
+                const source = sourceRows[field.name] || {}
+                const labels = resolveSourceLabels?.(source, field.name) || sourceLabels || {}
+                return {
+                  key: source.subject_id && source.unit_id ? `${source.subject_type}:${source.subject_id}:${source.unit_id}` : undefined,
+                  label: labels.subject || '存货已关联',
+                  title: [labels.subject || '存货已关联', labels.unit].filter(Boolean).join(' · '),
+                }
+              }}
+              tableProps={{
+                    label: '库存作业明细',
+                    showSequence: true,
+                    columns: [
                 {
                   label: '来源库存',
                 },
@@ -196,9 +211,10 @@ export default function InventoryOperationModal({
                 ...(effectiveType === 'TRANSFER'
                   ? [{ label: '目标仓库', width: '25%', required: true }]
                   : []),
-              ]}
+              ] }}
             >
-              {fields.map(({ key, name }, index) => {
+              {(field, index) => {
+                const { key, name } = field
                 const source = sourceRows[index] || {}
                 const labels = resolveSourceLabels?.(source, index) || sourceLabels || {}
                 const fromWarehouseID =
@@ -330,18 +346,13 @@ export default function InventoryOperationModal({
                       ) : null,
                     ].filter(Boolean)}
                   >
-                    <BusinessOptionalField
-                      name={['items', name, 'note']}
-                      label="明细备注"
-                    >
-                      <Form.Item name={[name, 'note']} label="明细备注">
-                        <BusinessTextArea maxLength={255} />
-                      </Form.Item>
-                    </BusinessOptionalField>
+                    <Form.Item name={[name, 'note']} label="明细备注">
+                      <BusinessTextArea maxLength={BusinessTextPolicy.noteMaxCharacters} />
+                    </Form.Item>
                   </BusinessCompactFieldRow>
                 )
-              })}
-            </BusinessCompactFieldTable>
+              }}
+            </BusinessGroupedLineItems>
           )}
         </Form.List>
       </Form>

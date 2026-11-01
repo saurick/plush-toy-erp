@@ -20,6 +20,14 @@ type shipmentSourceCandidateJSONRPCRepo struct {
 	candidateCalls int
 	createCalls    int
 	filter         biz.ShipmentSourceCandidateFilter
+	optionCalls    int
+	optionScope    *bool
+}
+
+func (r *shipmentSourceCandidateJSONRPCRepo) ListShipmentSourceOrderOptions(_ context.Context, selectable *bool) ([]*biz.ShipmentSourceOrderOption, error) {
+	r.optionCalls++
+	r.optionScope = selectable
+	return []*biz.ShipmentSourceOrderOption{{SalesOrderID: 1, OrderNo: "SO-001", CustomerID: 2, CustomerCode: "CUS-002", CustomerName: "当前客户", CustomerNameSnapshot: "订单客户"}}, nil
 }
 
 func TestJSONRPCListShipmentSourceCandidatesFilterParams(t *testing.T) {
@@ -156,6 +164,13 @@ func TestJSONRPCListShipmentSourceCandidatesContract(t *testing.T) {
 		t.Fatalf("candidate filter/calls=%#v/%d", repo.filter, repo.candidateCalls)
 	}
 	data := result.Data.AsMap()
+	if repo.optionCalls != 1 || repo.optionScope != nil {
+		t.Fatalf("order options must share eligibility without keyword/page scope: calls=%d scope=%v", repo.optionCalls, repo.optionScope)
+	}
+	options, ok := data["source_orders"].([]any)
+	if !ok || len(options) != 1 || options[0].(map[string]any)["customer_code"] != "CUS-002" {
+		t.Fatalf("missing complete filter options: %#v", data["source_orders"])
+	}
 	if data["total"] != float64(1) || data["limit"] != float64(200) || data["offset"] != float64(50) {
 		t.Fatalf("candidate page metadata=%#v", data)
 	}

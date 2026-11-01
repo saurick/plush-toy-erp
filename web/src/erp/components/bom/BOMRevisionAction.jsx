@@ -5,8 +5,8 @@ import BusinessModal from '../business-list/BusinessModal.jsx'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { copyBOMVersion, getBOMVersion, listAllBOMVersions } from '../../api/bomApi.mjs'
-import { suggestNextBOMVersion } from '../../utils/bomVersionSuggestion.mjs'
 import { canEditBOM } from './bomLifecycle.mjs'
+import { isMutationResultUnknown } from '../../utils/sourceDocumentMutation.mjs'
 
 function productDrafts(records, productID) {
   return records.filter((item) =>
@@ -21,8 +21,8 @@ export default function BOMRevisionAction({ record, canCreate, disabled, onEdit 
   const [busy, setBusy] = useState(false)
   const [selectedID, setSelectedID] = useState()
   const [error, setError] = useState('')
+  const [creationUnknown, setCreationUnknown] = useState(false)
   const operationRef = useRef(false)
-  const attemptedVersion = useRef('')
   const key = `${record?.id}:${record?.product_id}:${record?.status}`
   const currentKey = useRef(key)
   currentKey.current = key
@@ -41,7 +41,7 @@ export default function BOMRevisionAction({ record, canCreate, disabled, onEdit 
     setOpen(false)
     setBusy(false)
     setError('')
-    attemptedVersion.current = ''
+    setCreationUnknown(false)
     if (active && productID) {
       listAllBOMVersions({ product_id: productID, lifecycle_scope: 'all' }, { signal: controller.signal })
         .then((data) => {
@@ -93,6 +93,7 @@ export default function BOMRevisionAction({ record, canCreate, disabled, onEdit 
     operationRef.current = true
     setBusy(true)
     setError('')
+    let creating = false
     try {
       // Recheck before creating, including drafts created in another window.
       const records = await readVersions()
@@ -106,6 +107,10 @@ export default function BOMRevisionAction({ record, canCreate, disabled, onEdit 
         }
         detail = await getBOMVersion({ id: selectedID })
       } else {
+        if (creationUnknown) {
+          setError('新建结果尚未确认，请重新读取草稿核对后再继续。')
+          return
+        }
         if (!canCreate) {
           setError('当前账号没有新建 BOM 版本的权限，请联系有权限的同事。')
           return
@@ -121,14 +126,13 @@ export default function BOMRevisionAction({ record, canCreate, disabled, onEdit 
           setError('当前版本已不再启用，请返回列表刷新后选择正在使用的版本。')
           return
         }
-        // Retain the proposed number after an uncertain response; never create
-        // another version merely because the first response was lost.
-        attemptedVersion.current ||= suggestNextBOMVersion(records, productID)
+        creating = true
         detail = await copyBOMVersion({
           source_id: sourceID,
           product_id: productID,
-          version: attemptedVersion.current,
         })
+        if (!detail?.id || !detail.version || !Array.isArray(detail.items)) throw Object.assign(new Error('BOM 保存结果不完整'), { isInvalidResponse: true })
+        creating = false
       }
       if (currentKey.current !== key) return
       if (!detail?.id || !canEditBOM(detail) || Number(detail.product_id) !== Number(productID) || !Array.isArray(detail.items)) {
@@ -140,6 +144,7 @@ export default function BOMRevisionAction({ record, canCreate, disabled, onEdit 
     } catch (err) {
       if (currentKey.current === key) {
         setError(`${getActionErrorMessage(err, '准备 BOM 修改草稿')}。请重新读取草稿，确认是否已经创建。`)
+        if (creating && isMutationResultUnknown(err)) setCreationUnknown(true)
       }
     } finally {
       operationRef.current = false
@@ -180,7 +185,7 @@ export default function BOMRevisionAction({ record, canCreate, disabled, onEdit 
               aria-label={drafts.length ? '编辑所选草稿' : '创建并编辑草稿'}
               aria-busy={busy}
               loading={busy}
-              disabled={!current || current.failed || (drafts.length ? !selectedID : !canCreate)}
+              disabled={!current || current.failed || (drafts.length ? !selectedID : !canCreate || creationUnknown)}
               onClick={startEditing}
             >
               {drafts.length ? '编辑所选草稿' : '创建并编辑草稿'}

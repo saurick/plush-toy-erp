@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createElement as h, useState } from 'react'
+import { createElement as h, createRef, useState } from 'react'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 
 test('section focus follows fields and their portals without remounting draft values', async (t) => {
@@ -55,4 +55,49 @@ test('section focus follows fields and their portals without remounting draft va
   await ui.act(async () => quantity.focus())
   assert.deepEqual(current(), ['生产明细'])
   assert.equal(draft.value, '已经填写的草稿')
+})
+
+test('section display preserves all registered fields, reveals errors and leaves short forms expanded', async (t) => {
+  const ui = await createReactTestHarness(t)
+  const [{ default: Body }, { default: Section }, { Form, Input }] = await Promise.all([
+    import('./BusinessFormBody.jsx'), import('./BusinessFormSection.jsx'), import('antd'),
+  ])
+  const bodyRef = createRef()
+  let update
+  let form
+  function Harness() {
+    const [settings, setSettings] = useState({ formDisplay: 'all', count: 3, open: true })
+    update = (patch) => setSettings((current) => ({ ...current, ...patch }))
+    ;[form] = Form.useForm()
+    return h('section', { 'data-business-form-page': true }, h(Body, { ...settings, ref: bodyRef }, h(Form, { form }, ['基本资料', '明细内容', '备注附件'].slice(0, settings.count).map((title, index) => h(Section, { key: title, title }, h(Form.Item, { name: `field${index}`, label: title, rules: [{ required: true, message: `请填写${title}` }] }, h(Input, { 'aria-label': title })))))))
+  }
+  await ui.render(h(Harness))
+  const frame = () => ui.act(() => new Promise((resolve) => window.requestAnimationFrame(resolve)))
+  const visible = () => [...ui.container.querySelectorAll('[data-form-section]')].filter((node) => !node.hidden).map((node) => node.dataset.formSection)
+  assert.deepEqual(visible(), ['基本资料', '明细内容', '备注附件'])
+  const input = ui.container.querySelector('[aria-label="基本资料"]')
+  await ui.act(() => form.setFieldsValue({ field0: '已填写的基本资料', field1: '已填写的明细' }))
+  await ui.act(() => update({ formDisplay: 'section' }))
+  await frame()
+  assert.equal(visible().length, 1)
+  const lastSectionButton = [...ui.container.querySelectorAll('nav button')].find((node) => node.textContent === '备注附件')
+  await ui.act(() => lastSectionButton.click())
+  await frame()
+  assert.deepEqual(visible(), ['备注附件'])
+  assert.equal(ui.container.querySelector('[aria-label="基本资料"]') === input, true)
+  assert.equal(form.getFieldValue('field0'), '已填写的基本资料')
+  await ui.act(() => form.setFieldsValue({ field0: '', field2: '待保存的附件备注' }))
+  let failure
+  await ui.act(async () => { try { await form.validateFields() } catch (error) { failure = error } })
+  assert.deepEqual(failure.errorFields.map(({ name }) => name), [['field0']])
+  await ui.act(() => bodyRef.current.revealValidationErrors())
+  await frame()
+  assert.deepEqual(visible(), ['基本资料'])
+  await ui.act(() => update({ formDisplay: 'all' }))
+  assert.equal(visible().length, 3)
+  assert.equal(form.getFieldValue('field2'), '待保存的附件备注')
+  await ui.act(() => update({ formDisplay: 'section', count: 2 }))
+  await frame()
+  assert.deepEqual(visible(), ['基本资料', '明细内容'], 'short forms ignore the long-form display preference')
+  assert.equal(ui.container.querySelector('nav'), null)
 })

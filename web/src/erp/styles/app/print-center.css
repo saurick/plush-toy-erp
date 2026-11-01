@@ -636,9 +636,13 @@
 }
 
 .erp-print-shell__tool-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 0 8px;
   color: var(--erp-text);
-  font-size: var(--erp-font-caption);
+  font-size: var(--erp-font-body);
+  font-weight: 600;
   line-height: 20px;
 }
 
@@ -1130,11 +1134,6 @@
 
 .erp-print-image-tool__actions button:last-child {
   color: var(--erp-text-subtle);
-}
-
-.erp-print-shell__record-panel > .erp-print-shell__tool-section > h3 {
-  font-size: var(--erp-font-body);
-  font-weight: 600;
 }
 
 .erp-print-shell__record-panel button:disabled {

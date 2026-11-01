@@ -20,6 +20,8 @@ type WorkflowTask struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// TaskNo holds the value of the "task_no" field.
+	TaskNo string `json:"task_no,omitempty"`
 	// TaskCode holds the value of the "task_code" field.
 	TaskCode string `json:"task_code,omitempty"`
 	// TaskGroup holds the value of the "task_group" field.
@@ -149,7 +151,7 @@ func (*WorkflowTask) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case workflowtask.FieldID, workflowtask.FieldSourceID, workflowtask.FieldProcessInstanceID, workflowtask.FieldProcessNodeInstanceID, workflowtask.FieldAssigneeID, workflowtask.FieldPriority, workflowtask.FieldUrgeCount, workflowtask.FieldLastUrgedBy, workflowtask.FieldVersion, workflowtask.FieldCreatedBy, workflowtask.FieldUpdatedBy:
 			values[i] = new(sql.NullInt64)
-		case workflowtask.FieldTaskCode, workflowtask.FieldTaskGroup, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceNo, workflowtask.FieldBusinessStatusKey, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldOwnerPoolKey, workflowtask.FieldRequiredCapabilityKey, workflowtask.FieldConfigRevision, workflowtask.FieldBlockedReason, workflowtask.FieldLastUrgedByRoleKey, workflowtask.FieldEscalateTargetRoleKey, workflowtask.FieldCreateIdempotencyKey, workflowtask.FieldCreateIntentHash:
+		case workflowtask.FieldTaskNo, workflowtask.FieldTaskCode, workflowtask.FieldTaskGroup, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceNo, workflowtask.FieldBusinessStatusKey, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldOwnerPoolKey, workflowtask.FieldRequiredCapabilityKey, workflowtask.FieldConfigRevision, workflowtask.FieldBlockedReason, workflowtask.FieldLastUrgedByRoleKey, workflowtask.FieldEscalateTargetRoleKey, workflowtask.FieldCreateIdempotencyKey, workflowtask.FieldCreateIntentHash:
 			values[i] = new(sql.NullString)
 		case workflowtask.FieldDueAt, workflowtask.FieldCompletedAt, workflowtask.FieldLastUrgedAt, workflowtask.FieldEscalatedAt, workflowtask.FieldCreatedAt, workflowtask.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -174,6 +176,12 @@ func (_m *WorkflowTask) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int(value.Int64)
+		case workflowtask.FieldTaskNo:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field task_no", values[i])
+			} else if value.Valid {
+				_m.TaskNo = value.String
+			}
 		case workflowtask.FieldTaskCode:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field task_code", values[i])
@@ -451,6 +459,9 @@ func (_m *WorkflowTask) String() string {
 	var builder strings.Builder
 	builder.WriteString("WorkflowTask(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	builder.WriteString("task_no=")
+	builder.WriteString(_m.TaskNo)
+	builder.WriteString(", ")
 	builder.WriteString("task_code=")
 	builder.WriteString(_m.TaskCode)
 	builder.WriteString(", ")

@@ -3,7 +3,8 @@ import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { describeVisibleEditor } from './businessEditorWorkspaceTools.mjs'
-import { assertBusinessFormNavigationSurface } from './businessFormSectionAssertions.mjs'
+import { assertBusinessFormNavigationSurface, assertBusinessFormScrollTracking } from './businessFormSectionAssertions.mjs'
+import { ERP_FORM_DISPLAY_OPTIONS } from '../../src/common/theme/erpAppearance.mjs'
 
 const HEADERS = {
   version: 'BOM-完整编辑验证',
@@ -21,6 +22,43 @@ const FIELD_LABELS = ['产品', 'BOM 版本', '订单数量', '参考适用开�
 const DATES = { effective_from: '2026-10-01', effective_to: '2026-11-01', print_date: '2026-10-27' }
 const READONLY_BOM_PERMISSIONS = ['workflow.task.read', 'workflow.task.update', 'workflow.task.complete', 'sales_order.read', 'sales_order.item.read', 'sales_order.engineering.update', 'product.read', 'product_sku.read', 'material.read', 'unit.read', 'bom.read']
 const XLSX = { name: '任务材料明细.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: createBOMImportWorkbookFixture() }
+
+async function assertTaskStepWidth(page, assert, step) {
+  await waitForFiniteAnimations(page)
+  const result = await page.locator('.erp-task-action-drawer-root').evaluate(async (root, nextStep) => {
+    const wrapper = root.querySelector('.ant-drawer-content-wrapper')
+    const strip = root.querySelector('[aria-label="任务处理步骤"]')
+    const target = strip.querySelectorAll('[role="tab"]')[nextStep]
+    const read = () => {
+      const box = wrapper.getBoundingClientRect()
+      return { width: box.width, right: box.right, mounted: strip.isConnected && wrapper.isConnected }
+    }
+    const before = read()
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+    target.click()
+    const start = performance.now()
+    const frames = []
+    await new Promise((resolve) => {
+      const sample = () => {
+        frames.push(read())
+        if (performance.now() - start < 600) requestAnimationFrame(sample)
+        else resolve()
+      }
+      requestAnimationFrame(sample)
+    })
+    return { before, frames, reduced, expected: nextStep === 1 ? innerWidth - 24 : Math.min(720, innerWidth - 24), selected: target.getAttribute('aria-selected') }
+  }, step)
+  assert.equal(result.selected, 'true')
+  assert.ok(result.frames.every((frame) => frame.mounted && Math.abs(frame.right - result.before.right) <= 1), 'resizing retains the drawer and navigation with a fixed right edge')
+  assert.ok(Math.abs(result.frames.at(-1).width - result.expected) <= 1, `step ${step + 1} uses its intended width: ${JSON.stringify(result)}`)
+  const low = Math.min(result.before.width, result.expected)
+  const high = Math.max(result.before.width, result.expected)
+  if (high - low > 2) {
+    const intermediate = result.frames.some((frame) => frame.width > low + 1 && frame.width < high - 1)
+    assert.equal(intermediate, !result.reduced, 'width animates between steps and respects reduced motion')
+  }
+  return result
+}
 
 async function assertEditorFooter(page, name, assert, path, outputDir) {
   await waitForFiniteAnimations(page)
@@ -48,7 +86,10 @@ async function openEditor(page, { entry, task }, assert) {
   } else {
     if (entry === 'mobile') await page.getByTestId('mobile-role-nav-tasks').click()
     await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
-    await page.getByRole('tablist', { name: '任务处理步骤', exact: true }).getByRole('tab').nth(1).click()
+    if (entry === 'task') {
+      await assertTaskStepWidth(page, assert, 0)
+      await assertTaskStepWidth(page, assert, 1)
+    } else await page.getByRole('tablist', { name: '任务处理步骤', exact: true }).getByRole('tab').nth(1).click()
     const workspace = page.locator('[data-business-editor-workspace]:visible')
     await workspace.locator('.erp-bom-editor:visible').getByLabel('BOM 版本', { exact: true }).waitFor()
     assert.equal(await workspace.getByRole('tablist').count(), 0, 'related business objects are not a permanent second tab strip')
@@ -56,7 +97,6 @@ async function openEditor(page, { entry, task }, assert) {
     assert.equal(await workspace.locator('[data-business-editor-pane="product"], [data-business-editor-pane="sku"]').count(), 0, 'related product editors remain on demand')
     assert.equal(await workspace.locator('.erp-sales-order-engineering-form:visible').count(), 0, 'the association and sampling supplement does not replace BOM authoring')
     assert.equal(await workspace.getByRole('button', { name: /^订单关联与打样|整理用料汇总/u }).count(), 0)
-
   }
   const editor = page.locator('.erp-bom-editor:visible')
   await editor.getByLabel('BOM 版本', { exact: true }).waitFor()
@@ -75,10 +115,9 @@ async function chooseImport(page, editor) {
   return preview
 }
 
-async function expandAttachments(editor) {
+async function visibleAttachments(editor) {
   const panel = editor.locator('.business-attachment-panel')
-  const toggle = panel.getByRole('button', { name: /展开附件$/u })
-  if (await toggle.count()) await toggle.click()
+  await panel.locator('.business-attachment-panel__content').waitFor({ state: 'visible' })
   return panel
 }
 
@@ -89,6 +128,7 @@ export function createTaskEditorCompletenessScenarios(deps, taskScenarios) {
     { key: 'task', entry: 'task' },
     { key: 'task-dark', entry: 'task', themeMode: 'dark' },
     { key: 'mobile', entry: 'mobile', readonly: true },
+    { key: 'mobile-dark', entry: 'mobile', readonly: true, themeMode: 'dark' },
     { key: 'mobile-owner', entry: 'mobile', readonly: true, ownerComplete: true },
     { key: 'no-bom-update', entry: 'task', readonly: true, denyUpdate: true },
     { key: 'attachment-retry', entry: 'task', retryUpload: true },
@@ -166,6 +206,7 @@ menus: [
       verify: async (page) => {
         let editor = await openEditor(page, { ...definition, task }, assert)
         await assertBusinessFormNavigationSurface(page, editor)
+        await assertBusinessFormScrollTracking(page, editor)
         const fieldset = await editor.locator('.ant-form-item-label label').evaluateAll((nodes) => nodes.map((node) => node.textContent.trim()))
         for (const label of FIELD_LABELS) assert.ok(fieldset.includes(label), `complete BOM header includes ${label}`)
         for (const [field, value] of Object.entries(HEADERS)) assert.equal(await editor.getByLabel(FIELD_BY_KEY[field], { exact: true }).inputValue(), value, field)
@@ -208,8 +249,22 @@ menus: [
           await writeFile(path.join(outputDir, `task-editor-bom-${definition.key}-section-navigation.json`), JSON.stringify(position, null, 2))
           await assertBusinessFormNavigationSurface(page, editor)
           const steps = page.getByRole('tablist', { name: '任务处理步骤', exact: true })
-          await steps.getByRole('tab').nth(0).click()
-          await steps.getByRole('tab').nth(1).click()
+          if (definition.entry === 'task') {
+            const compact = await assertTaskStepWidth(page, assert, 0)
+            const expanded = await assertTaskStepWidth(page, assert, 1)
+            const restoredScroll = await page.locator('.erp-task-action-drawer .ant-drawer-body').evaluate((node) => node.scrollTop)
+            assert.ok(Math.abs(restoredScroll - position.scrollTop) <= 1, 'returning to the full editor restores its section position')
+            await writeFile(path.join(outputDir, `task-editor-bom-${definition.key}-width-motion.json`), JSON.stringify({ compact, expanded, restoredScroll }, null, 2))
+            if (definition.key === 'task') {
+              await page.emulateMedia({ reducedMotion: 'reduce' })
+              await assertTaskStepWidth(page, assert, 0)
+              await assertTaskStepWidth(page, assert, 1)
+              await page.emulateMedia({ reducedMotion: 'no-preference' })
+            }
+          } else {
+            await steps.getByRole('tab').nth(0).click()
+            await steps.getByRole('tab').nth(1).click()
+          }
           assert.equal(await editor.evaluate((node, previous) => node === previous, instance), true, 'task steps preserve the complete editor instance')
           assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), HEADERS.version)
           if (definition.entry === 'task') await navigation.getByRole('button', { name: '版本信息', exact: true }).click()
@@ -223,10 +278,15 @@ menus: [
           assert.equal(await editor.getByRole('button', { name: '从 Excel 导入', exact: true }).count(), 0)
           assert.equal(await page.getByRole('button', { name: '保存草稿', exact: true }).filter({ visible: true }).count(), 0)
           assert.equal(await editor.locator('.ant-form .ant-select:not(.ant-select-disabled) [role="combobox"]').filter({ visible: true }).count(), 0, 'all source form selectors are read-only')
-          const editable = await editor.locator('input,textarea').evaluateAll((nodes) => nodes.filter((node) => node.getClientRects().length && !node.disabled && !node.readOnly && !node.closest('.ant-select-disabled')).map((node) => ({ id: node.id, type: node.type, label: node.getAttribute('aria-label'), placeholder: node.getAttribute('placeholder'), formField: Boolean(node.closest('.ant-form-item')), classes: node.className })))
+          const editable = await editor.locator('input,textarea').evaluateAll((nodes) => nodes.filter((node) => node.getClientRects().length && !node.disabled && !node.readOnly && !node.closest('.ant-select-disabled')).map((node) => ({ id: node.id, type: node.type, label: node.getAttribute('aria-label'), placeholder: node.getAttribute('placeholder'), formField: Boolean(node.closest('.ant-form-item')), attachmentFilter: Boolean(node.closest('.business-attachment-panel__toolbar')), displayNavigation: Boolean(node.closest('.ant-segmented[aria-label="编辑页显示"]')), displayLabel: node.closest('.ant-segmented-item')?.querySelector('.ant-segmented-item-label')?.textContent.trim(), classes: node.className })))
           assert.deepEqual(editable.filter((field) => field.formField), [])
-          assert.ok(editable.every((field) => field.type === 'range' && field.label === '横向滚动位置'), 'only the viewer scroll control remains interactive')
-          const attachments = await expandAttachments(editor)
+          const unexpected = editable.filter((field) => !(
+            (field.type === 'range' && field.label === '横向滚动位置') ||
+            (field.type === 'radio' && field.attachmentFilter) ||
+            (field.type === 'radio' && field.displayNavigation && ERP_FORM_DISPLAY_OPTIONS.some((option) => option.label === field.displayLabel))
+          ))
+          assert.equal(unexpected.length, 0, `只读页只保留滚动、附件分类和显示导航，业务字段仍不可编辑：${JSON.stringify(unexpected.slice(0, 8))}`)
+          const attachments = await visibleAttachments(editor)
           assert.equal(await attachments.getByRole('button', { name: '选择附件', exact: true }).count(), 0)
           assert.deepEqual(calls, [])
           assert.equal(uploads, 0)
@@ -235,12 +295,15 @@ menus: [
             await waitForFiniteAnimations(page)
             await page.getByRole('button', { name: '保存草稿', exact: true }).filter({ visible: true }).click()
           }
-          await editor.getByLabel('BOM 版本', { exact: true }).fill('')
+          assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+          const originalUsage = await editor.getByLabel('单位用量 1', { exact: true }).inputValue()
+          await editor.getByLabel('单位用量 1', { exact: true }).fill('')
           if (definition.entry === 'task') await assertEditorFooter(page, `task-editor-bom-${definition.key}-dirty`, assert, path, outputDir)
           await save()
-          await editor.getByText('请填写 BOM 版本', { exact: true }).waitFor()
+          await editor.getByText('填写正数用量', { exact: true }).waitFor()
+          assert.equal(await editor.getByLabel('单位用量 1', { exact: true }).evaluate((node) => node === document.activeElement), true, 'failed draft validation focuses the invalid field')
           assert.equal(calls.length, 0, 'missing required fields cannot reach persistence')
-          await editor.getByLabel('BOM 版本', { exact: true }).fill(HEADERS.version)
+          await editor.getByLabel('单位用量 1', { exact: true }).fill(originalUsage)
           let preview = await chooseImport(page, editor)
           await preview.getByRole('button', { name: '取消', exact: true }).click()
           assert.equal(await editor.locator('tr[data-bom-part-index]').count(), 1)
@@ -261,7 +324,7 @@ menus: [
           await material.fill('样式材料')
           await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '样式材料' }).first().click()
           await editor.getByLabel('备注', { exact: true }).fill('')
-          const attachments = await expandAttachments(editor)
+          const attachments = await visibleAttachments(editor)
           const [chooser] = await Promise.all([page.waitForEvent('filechooser'), attachments.getByRole('button', { name: '选择附件', exact: true }).click()])
           await chooser.setFiles({ name: 'BOM-工艺依据.txt', mimeType: 'text/plain', buffer: Buffer.from('BOM evidence retained for the current record') })
           if (definition.retrySave) {
@@ -289,7 +352,9 @@ menus: [
           assert.equal(record.edit_version, 2000000000001, 'one aggregate update advances the stored version once')
           assert.equal(uploads, definition.retryUpload ? 2 : 1)
           const saved = calls[0].params
-          for (const [field, value] of Object.entries(HEADERS)) if (field !== 'note') assert.equal(saved[field], value, `persisted ${field}`)
+          assert.equal(Object.hasOwn(saved, 'version'), false)
+          assert.equal(record.version, HEADERS.version, '编辑保留已有版号')
+          for (const [field, value] of Object.entries(HEADERS)) if (!['note', 'version'].includes(field)) assert.equal(saved[field], value, `persisted ${field}`)
           for (const [field, value] of Object.entries(DATES)) assert.equal(saved[field], value, `persisted ${field}`)
           assert.equal(saved.note, undefined, 'clearing a header does not retain its old value')
           assert.equal(saved.items.length, 2)
@@ -310,6 +375,7 @@ menus: [
             await steps.getByRole('tab').nth(2).click()
             const receipt = page.getByTestId('workflow-task-action-receipt').filter({ visible: true })
             await receipt.getByText('BOM 草稿已保存', { exact: false }).first().waitFor()
+            await assertTaskStepWidth(page, assert, 2)
             assert.match(await receipt.innerText(), new RegExp(HEADERS.version, 'u'))
             assert.doesNotMatch(await receipt.innerText(), /任务已完成|已入账|已发货/u)
             await steps.getByRole('tab').nth(1).click()
@@ -323,7 +389,7 @@ menus: [
           for (const [field, value] of Object.entries(DATES)) assert.equal(await editor.getByLabel(FIELD_BY_KEY[field], { exact: true }).inputValue(), value.replaceAll('-', '/'), `readback ${field}`)
           assert.equal(await editor.getByLabel('备注', { exact: true }).inputValue(), '')
           assert.equal(await editor.locator('tr[data-bom-part-index]').count(), 2)
-          await (await expandAttachments(editor)).getByText('BOM-工艺依据.txt', { exact: true }).waitFor()
+          await (await visibleAttachments(editor)).getByText('BOM-工艺依据.txt', { exact: true }).waitFor()
           assert.equal(calls.length, definition.retrySave ? 2 : 1, 'readback never repeats the business save')
         }
         await assertNoHorizontalOverflow(page, `task-editor-bom-${definition.key}`)
@@ -339,11 +405,35 @@ menus: [
           await page.waitForFunction(() => document.querySelector('.erp-bom-editor:not([hidden]) .erp-business-form-page__section-picker .ant-select-selection-item')?.textContent.trim() === '备注与附件')
           assert.equal(await page.getByTestId('mobile-back-to-top').count(), 0, 'the full source editor uses its own section navigation without a floating action over the attachment tools')
           const footer = page.getByTestId('mobile-task-action-screen').locator(':scope > .mobile-role-action-bar')
-          const sizes = await footer.getByRole('button').evaluateAll((nodes) => nodes.map((node) => ({ label: node.textContent, width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height, bottom: node.getBoundingClientRect().bottom })))
+          const sizes = await footer.getByRole('button').evaluateAll((nodes) => nodes.map((node) => ({ label: node.textContent, width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height, top: node.getBoundingClientRect().top, bottom: node.getBoundingClientRect().bottom })))
           assert.ok(sizes.every((item) => item.height >= 44 && item.height <= 54), 'phone footer actions retain their touch size without narrow text columns')
           const caption = await footer.locator('.mobile-task-device-scope').boundingBox()
-          assert.ok(caption.y >= Math.max(...sizes.map((item) => item.bottom)) - 1, 'the device scope has its own row instead of shrinking actions')
-          await writeFile(path.join(outputDir, `task-editor-bom-${definition.key}-footer-geometry.json`), JSON.stringify({ sizes, caption }, null, 2))
+          assert.equal(await footer.getByRole('note', { name: '编辑方式', exact: true }).innerText(), 'BOM 仅供查看，请在电脑端编辑。')
+          assert.ok(caption.y + caption.height <= Math.min(...sizes.map((item) => item.top)) + 1, 'the device scope stays above the actions in its own row')
+          assert.ok(await footer.locator('.mobile-task-device-scope').evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize) >= 14), 'the editing restriction uses readable body text')
+          const noticeAlignment = await footer.locator('.mobile-task-device-scope').evaluate((node) => {
+            const read = () => ({
+              icon: node.querySelector('.mobile-task-device-scope__icon svg').getBoundingClientRect().toJSON(),
+              text: node.lastElementChild.getBoundingClientRect().toJSON(),
+              lineHeight: Number.parseFloat(getComputedStyle(node).lineHeight),
+              alignItems: getComputedStyle(node).alignItems,
+              iconMarginTop: getComputedStyle(node.firstElementChild).marginTop,
+            })
+            const normal = read()
+            const originalFontSize = node.style.fontSize
+            try {
+              node.style.fontSize = `${Number.parseFloat(getComputedStyle(node).fontSize) * 1.5}px`
+              return { normal, enlargedText: read() }
+            } finally {
+              node.style.fontSize = originalFontSize
+            }
+          })
+          await writeFile(path.join(outputDir, `task-editor-bom-${definition.key}-footer-geometry.json`), JSON.stringify({ sizes, caption, noticeAlignment }, null, 2))
+          assert.ok(noticeAlignment.enlargedText.text.height > noticeAlignment.enlargedText.lineHeight, 'enlarged notice text exercises wrapping')
+          for (const [state, { icon, text }] of Object.entries(noticeAlignment)) {
+            assert.ok(Math.abs(icon.y + icon.height / 2 - text.y - text.height / 2) <= 1, `the notice icon stays vertically centered with ${state} text: ${JSON.stringify({ icon, text })}`)
+          }
+          if (definition.themeMode === 'dark') await deps.assertDarkThemeContrast(page, { scenarioName: `task-editor-bom-${definition.key}-device-notice`, selector: '.mobile-task-device-scope' })
         }
         await writeFile(path.join(outputDir, `task-editor-bom-${definition.key}-data.json`), JSON.stringify({ entry: definition.entry, readonly: Boolean(definition.readonly), fields: fieldset, record, saves: calls, uploads, attachments: files.map((file) => ({ id: file.id, owner_type: file.owner_type, owner_id: file.owner_id, file_name: file.file_name, file_size: file.file_size, sha256: file.sha256 })) }, null, 2))
         await waitForFiniteAnimations(page)

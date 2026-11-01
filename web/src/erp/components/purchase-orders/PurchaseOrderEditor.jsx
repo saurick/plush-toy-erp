@@ -11,6 +11,8 @@ export default function PurchaseOrderEditor({
   editingOrder,
   baselineKey,
   saving,
+  importUndo,
+  onImportUndoChange,
   itemsLoading,
   referenceDataReady,
   orderAttachmentRef,
@@ -38,6 +40,7 @@ export default function PurchaseOrderEditor({
       confirmLoading={saving}
       loading={itemsLoading || !referenceDataReady}
       okButtonProps={{ disabled: !referenceDataReady }}
+      validateOnSave={false}
       onOk={onOk}
       onCancel={onCancel}
     >
@@ -47,6 +50,10 @@ export default function PurchaseOrderEditor({
         materials={materials}
         unitOptions={unitOptions}
         referenceDataReady={referenceDataReady}
+        writable={editingOrder ? canUpdate : canCreate}
+        saving={saving}
+        importUndo={importUndo}
+        onImportUndoChange={onImportUndoChange}
         onSupplierChange={onSupplierChange}
         onMaterialChange={onMaterialChange}
         attachmentPanel={

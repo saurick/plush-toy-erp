@@ -412,8 +412,8 @@
 
 .erp-business-operation-panel__search {
   display: flex;
-  min-width: 180px;
-  flex: 1 1 240px;
+  min-width: min(100%, 268px);
+  flex: 1 1 268px;
 }
 
 .erp-business-operation-panel__quick {
@@ -1237,7 +1237,6 @@
   align-self: center;
   align-items: center;
 }
-
 
 .erp-business-filter-control:where(:not(.ant-select-disabled)) :where(.ant-select-selector),
 .erp-business-filter-control:where(:not(.ant-select-disabled)) :where(.ant-select-selection-search-input) {

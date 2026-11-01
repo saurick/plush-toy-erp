@@ -5,8 +5,8 @@ import { prepareUIDesignSandboxSource } from '../../src/dev-workbench/config/dev
 import { createSalesOrderWorkbook } from './salesOrderImportWorkbookFixture.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { assertImportPickerGeometry, assertImportToolbarLayout, assertImportFilterPrompt, readImportPickerLayout, assertImportPickerStableLayout, assertImportPickerStableDuring } from './importPickerAssertions.mjs'
-import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { chooseSelectOption } from './selectControlActions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 async function choose(page, scope, label, text) {
@@ -27,15 +27,15 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
   return [
     {
       ...base,
-      name: 'import-filter-sales-excel',
-      path: '/erp/sales/project-orders/sales-orders',
+name: 'import-filter-sales-excel',
+path: '/erp/sales/project-orders/sales-orders',
       verify: async (page) => {
         await page.getByRole('button', { name: '导入 Excel', exact: true }).waitFor()
         await page.waitForFunction(() => !document.querySelector('button[aria-label="导入 Excel"]').disabled)
         await page.locator('[data-sales-order-import-input]').setInputFiles({ name: '筛选模拟订单.xlsx',
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           buffer: createSalesOrderWorkbook({ sheets: [{ name: '订单表',
-          rows: [
+rows: [
             ['订单编号', '客户', '下单日期', '产品名称', '订单数量', '单位', '币种'],
             ['SO-FILTER-A', '', '2026-09-01', '模拟产品甲', 2, '个', 'CNY'],
             ['SO-FILTER-B', '暗色客户', '2026-09-01', '模拟产品乙', 3, '个', 'CNY'],
@@ -68,7 +68,7 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
         await assertImportFilterPrompt(page, picker, '订单核对筛选', '按核对状态筛选', ['全部订单'])
         await choose(page, picker, '订单核对筛选', '待核对（1）')
         await choose(page, picker, '订单 SO-FILTER-A 的客户', 'CUS-STYLE-L1')
-        await picker.getByText('暂无可导入记录', { exact: true }).waitFor()
+        await picker.getByText('当前范围没有待核对订单', { exact: true }).waitFor()
         await assertImportPickerStableLayout(picker, layout, 'sales-excel-empty-review')
         assert.equal(await picker.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '订单核对筛选', exact: true }) }).locator('.ant-select-selection-item').innerText(), '待核对（0）')
         await assertImportToolbarLayout(page, picker, 'sales-excel-empty-review')
@@ -89,10 +89,8 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
         await page.getByRole('button', { name: '导入 Excel', exact: true }).waitFor()
         await page.waitForFunction(() => !document.querySelector('button[aria-label="导入 Excel"]').disabled)
         await page.locator('[data-sales-order-import-input]').setInputFiles({
-          name: '跨页核对订单.xlsx',
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          buffer: createSalesOrderWorkbook({ sheets: [{ name: '订单表',
-          rows: [
+          name: '跨页核对订单.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          buffer: createSalesOrderWorkbook({ sheets: [{ name: '订单表', rows: [
             ['订单编号', '客户', '下单日期', '产品名称', '订单数量', '单位', '币种'],
             ...Array.from({ length: 10 }, (_, index) => [`SO-BULK-${String(index + 1).padStart(2, '0')}`, index ? '暗色客户' : '', '2026-09-01', `模拟产品${index + 1}`, 2, '个', 'CNY']),
           ] }] }),
@@ -140,8 +138,8 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
     },
     {
       ...base,
-      name: 'import-filter-bom-excel',
-      path: '/erp/purchase/material-bom',
+name: 'import-filter-bom-excel',
+path: '/erp/purchase/material-bom',
       verify: async (page) => {
         await page.getByRole('button', { name: '更多新建方式', exact: true }).click()
         const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('menuitem', { name: /从 Excel 新建/u }).click()])
@@ -161,6 +159,7 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
         const search = picker.getByRole('textbox', { name: '搜索 BOM 导入明细', exact: true })
         await search.fill('不存在的材料'); await search.press('Enter')
         assert.equal(await picker.locator('.ant-table-row').count(), 0)
+        await picker.getByText('没有符合条件的部位', { exact: true }).waitFor()
         await assertImportToolbarLayout(page, picker, 'bom-excel-empty-search')
         await picker.getByRole('button', { name: '清空筛选', exact: true }).click()
         assert.equal(await picker.locator('.ant-table-row').count(), before)
@@ -180,7 +179,7 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
         assert.match(await detailPicker.getByRole('status').innerText(), /确认后带入全部/u)
         const detailSearch = detailPicker.getByRole('textbox', { name: '搜索 BOM 导入明细', exact: true })
         await detailSearch.fill('不存在的部位'); await detailSearch.press('Enter')
-        await expectLocator(detailPicker.locator('.ant-table-row')).toHaveCount(0)
+        await detailPicker.getByText('没有符合条件的部位', { exact: true }).waitFor()
         const append = detailPicker.getByRole('button', { name: `追加 ${before} 个部位`, exact: true })
         await expectLocator(append).toBeEnabled()
         await append.click()
@@ -194,8 +193,8 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
     },
     {
       ...base,
-      name: 'import-filter-purchase-materials',
-      path: '/erp/purchase/accessories',
+name: 'import-filter-purchase-materials',
+path: '/erp/purchase/accessories',
       verify: async (page) => {
         const requests = []
         page.on('request', (request) => { if (request.url().includes('/rpc/masterdata') && request.method() === 'POST') { const body = request.postDataJSON(); if (body.method === 'list_materials') requests.push(body.params) } })
@@ -226,7 +225,7 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
         await picker.locator('.ant-table-row input[type="checkbox"]').first().check()
         await assertImportPickerStableDuring(picker, 'purchase-material-empty-category', async () => {
           await choose(page, picker, '库存分类', '辅料')
-          await picker.getByText('暂无可选材料', { exact: true }).waitFor()
+          await picker.getByText('没有符合条件的可选资料', { exact: true }).waitFor()
         })
         await assertImportPickerStableLayout(picker, layout, 'purchase-material-filtered')
         await assertImportToolbarLayout(page, picker, 'purchase-material-empty-category')
@@ -243,8 +242,7 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
         await assertImportPickerStableLayout(picker, layout, 'purchase-material-cleared')
         await capture(page, 'purchase-material-import')
         await picker.getByRole('button', { name: '添加到采购明细', exact: true }).click()
-        await picker.waitFor({ state: 'hidden' })
-        assert.match(await editor.innerText(), /样式材料/u)
+        await editor.getByRole('button', { name: '撤销本次导入', exact: true }).waitFor()
       },
     },
     {
@@ -254,27 +252,20 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
       verify: async (page) => {
         const requests = []
         const materials = Array.from({ length: 251 }, (_, index) => ({
-          id: index + 1,
-          code: `MAT-SELECT-${index + 1}`,
+          id: index + 1, code: `MAT-SELECT-${index + 1}`,
           name: `批量选择材料${index + 1}——用于核对超长名称、跨页与分类范围`,
-          default_unit_id: 1,
-          is_active: true,
-          stock_category: index < 151 ? 'MAIN' : 'AUXILIARY',
-          category: index < 151 ? '面料' : '洗水标',
-          spec: '60 英寸',
-          color: '米白',
+          default_unit_id: 1, is_active: true, stock_category: index < 151 ? 'MAIN' : 'AUXILIARY',
+          category: index < 151 ? '面料' : '洗水标', spec: '60 英寸', color: '米白',
         }))
         await page.route('**/rpc/masterdata', async (route) => {
           const body = route.request().postDataJSON()
           if (body?.method !== 'list_materials') return route.fallback()
-          const { params } = body
+          const params = body.params
           requests.push(params)
           const filtered = materials.filter((row) => (!params.stock_category || row.stock_category === params.stock_category) &&
             (!params.keyword || `${row.code} ${row.name}`.includes(params.keyword)))
-          return route.fulfill({ contentType: 'application/json',
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: body.id,
+          return route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+            jsonrpc: '2.0', id: body.id,
             result: styleRpcResult(stylePaginatedRpcData(filtered, 'materials', params, 50)),
           }) })
         })
@@ -316,7 +307,7 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
         await picker.getByRole('checkbox', { name: '仅看已选', exact: true }).check()
         assert.equal(await picker.getByRole('button', { name: /全选筛选结果/u }).count(), 0)
         await picker.getByRole('button', { name: '清空已选', exact: true }).click()
-        await expectLocator(confirm).toContainText('（0 条）')
+        await expectLocator(count).toContainText('已选 0 条')
         await expectLocator(confirm).toBeDisabled()
         await picker.getByRole('checkbox', { name: '仅看已选', exact: true }).uncheck()
         const search = picker.getByRole('textbox', { name: /可搜索：材料编码/u })
@@ -328,7 +319,7 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
         await expectLocator(count).toContainText('已选 251 条')
         assert.deepEqual(requests.filter((params) => params.limit === 200 && !params.stock_category).map((params) => params.offset), [0, 200])
         await confirm.click()
-        await expectLocator(editor.locator('.erp-sales-order-lines-form__row')).toHaveCount(252)
+        await expectLocator(editor.locator('.erp-sales-order-lines-form__row')).toHaveCount(251)
       },
     },
     {
@@ -479,8 +470,15 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
             await pageSelection.check()
             assert.match(await dialog.locator('.import-review-selection-summary').innerText(), /已选 5 条/u)
           }
-          const label = kind === 'purchase' ? '库存分类' : kind === 'bom' ? '核对结果' : '可导入状态'
-          assert.equal(await dialog.locator('[data-import-review-filter] .design-select-value').innerText(), `按${label}筛选`)
+          if (kind === 'shipment') {
+            await dialog.getByRole('button', { name: '查看不可导入原因', exact: true }).click()
+            assert.equal(await dialog.locator('tbody tr').count(), 1)
+            await dialog.getByRole('button', { name: '返回可导入明细', exact: true }).click()
+            assert.equal(await dialog.locator('tbody tr').count(), before)
+          } else {
+            const label = kind === 'purchase' ? '库存分类' : '核对结果'
+            assert.equal(await dialog.locator('[data-import-review-filter] .design-select-value').innerText(), `按${label}筛选`)
+          }
           for (const width of [1440, 390]) {
             await page.setViewportSize({ width, height: 900 })
             const metrics = await dialog.locator('.import-review-toolbar').evaluate((node) => {
@@ -496,7 +494,8 @@ export function createImportPickerScenarios({ customerRuntimeEffectiveSession, o
           }
           const search = dialog.getByRole('searchbox', { name: '搜索导入记录', exact: true })
           await search.fill('不存在的模拟来源')
-          await search.press('Enter')
+          if (kind === 'purchase') await dialog.getByRole('button', { name: '搜索', exact: true }).click()
+          else await search.press('Enter')
           assert.equal(await dialog.locator('tbody tr').count(), 0)
           await dialog.getByRole('button', { name: '清空筛选', exact: true }).click()
           assert.equal(await dialog.locator('tbody tr').count(), before)

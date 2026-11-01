@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Descriptions, Form, Input, Typography } from 'antd'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
@@ -292,7 +294,7 @@ export default function SalesOrderReservationModal({
           <DateTimeInput />
         </Form.Item>
         <Form.Item name="note" label="备注">
-          <Input.TextArea rows={3} maxLength={255} showCount />
+          <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
         </Form.Item>
       </Form>
     </BusinessModal>

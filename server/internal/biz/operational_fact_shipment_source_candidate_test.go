@@ -13,6 +13,10 @@ type shipmentSourceCandidateRepoStub struct {
 	calls  int
 }
 
+func (r *shipmentSourceCandidateRepoStub) ListShipmentSourceOrderOptions(context.Context, *bool) ([]*ShipmentSourceOrderOption, error) {
+	return []*ShipmentSourceOrderOption{}, nil
+}
+
 func (r *shipmentSourceCandidateRepoStub) ListShipmentSourceCandidates(
 	_ context.Context,
 	filter ShipmentSourceCandidateFilter,

@@ -1,4 +1,5 @@
 import { ShipmentStatus } from '../../common/consts/statuses.generated.mjs'
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 
 const ACTIONS = Object.freeze({
   receivable: Object.freeze({
@@ -81,7 +82,9 @@ export function buildShipmentFinanceSourcePayload(
   }
 
   const note = String(values.note || '').trim()
-  if ([...note].length > 255) throw new Error('备注不能超过 255 个字符')
+  if ([...note].length > BusinessTextPolicy.noteMaxCharacters) {
+    throw new Error(`备注不能超过 ${BusinessTextPolicy.noteMaxCharacters} 个字符`)
+  }
 
   const invoiceCategory = String(values.invoice_category || '')
     .trim()

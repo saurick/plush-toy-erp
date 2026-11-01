@@ -176,7 +176,6 @@ export function createSalesOrderSkuGrainScenarios(deps) {
         const secondLineSKUSelect = lineRows
           .nth(1)
           .locator('.erp-line-item-field--source .ant-select-selector')
-        await lineRows.nth(1).locator('.erp-line-item-details > summary').click()
         await secondLineSKUSelect.click()
         const explicitOption = page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')

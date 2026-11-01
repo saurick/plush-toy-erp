@@ -521,7 +521,7 @@ export async function installOrderRpcMocks(page, context) {
     const bomDraft = {
       ...bomVersion,
       id: 2,
-      version: params.version || 'BOM-STYLE-DRAFT',
+      version: 'BOM-STYLE-DRAFT',
       status: 'DRAFT',
       note: params.note || '',
     }
@@ -580,16 +580,18 @@ export async function installOrderRpcMocks(page, context) {
         break
       case 'save_bom_with_items':
       case 'copy_bom_version':
+        if (Object.hasOwn(params, 'version')) throw new Error('BOM version is server-owned')
         data = {
           bom_version: {
             ...bomDraft,
             ...params,
+            version: params.id ? (savedBOMVersions.get(params.id)?.version || bomDraft.version) : 'V1',
             edit_version: Number(params.expected_version || bomDraft.edit_version) + 1,
             items: Array.isArray(params.items) ? params.items : bomItems,
           },
           bom_items: bomItems,
         }
-        if (method === 'save_bom_with_items') savedBOMVersions.set(data.bom_version.id, data.bom_version)
+        savedBOMVersions.set(data.bom_version.id, data.bom_version)
         break
       case 'activate_bom_version':
         data = {

@@ -409,7 +409,8 @@ test('workflow task mutation keys and urge actions fail closed', () => {
     { ...base, action: ' urge_task ' },
     { ...base, action: '' },
     { ...base, action: 'urge_task', action_key: 'urge' },
-    { ...base, action: 'urge_task', reason: '   ' },
+    { ...base, action: 'urge_task', reason: null },
+    { ...base, action: 'urge_task', reason: 42 },
   ]) {
     assert.throws(
       () =>
@@ -483,7 +484,7 @@ test('workflow task assignment requires an explicit person or pool target', () =
   )
 })
 
-test('workflow task resume requires the versioned action contract and an unblock reason', () => {
+test('workflow task resume keeps the versioned contract with optional trimmed explanation', () => {
   const base = {
     task_id: 42,
     expected_version: 7,
@@ -498,15 +499,10 @@ test('workflow task resume requires the versioned action contract and an unblock
   assert.equal(normalized.reason, '物料已补齐')
   assert.equal(normalized.action_key, 'resume')
 
-  assert.throws(
-    () =>
-      requireWorkflowTaskMutationParams(
-        'resume',
-        { ...base, reason: '   ' },
-        { requireIdempotencyKey: true }
-      ),
-    /页面已更新/u
-  )
+  const blank = requireWorkflowTaskMutationParams('resume', { ...base, reason: '   ' }, { requireIdempotencyKey: true })
+  assert.equal(Object.hasOwn(blank, 'reason'), false)
+  assert.equal(blank.expected_version, 7)
+  assert.throws(() => requireWorkflowTaskMutationParams('resume', { ...base, reason: null }), /页面已更新/u)
 })
 
 test('workflow task mutation attempt rejects invalid identity before creating a key or calling mutate', async () => {

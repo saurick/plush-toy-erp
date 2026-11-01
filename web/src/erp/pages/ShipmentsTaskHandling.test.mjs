@@ -149,3 +149,34 @@ test('readonly tasks and accounts without submission capability cannot submit ap
     assert.equal(ui.calls.some(([name]) => ['save', 'approve', 'receipt'].includes(name)), false)
   }
 })
+
+test('successful draft write clears import undo even if attachments or later readback fails', async () => {
+  for (const failingStage of ['attachment', 'readback']) {
+    let invalidated = false
+    const ui = setup({
+      invalidateSourceImportUndo: () => { invalidated = true },
+      ...(failingStage === 'attachment'
+        ? { shipmentAttachmentRef: { current: { flushPendingAttachments: async () => {
+          assert.equal(invalidated, true)
+          throw new Error('attachment unavailable')
+        } } } }
+        : { getShipment: async () => { assert.equal(invalidated, true); throw new Error('readback unavailable') } }),
+    })
+    await ui.submit()
+    assert.equal(invalidated, true)
+    assert.equal(ui.calls.filter(([name]) => name === 'save').length, 1)
+  }
+})
+
+test('an unknown draft result clears import undo while known rejection keeps the unsaved undo', async () => {
+  for (const unknown of [false, true]) {
+    let invalidated = false
+    const ui = setup({
+      invalidateSourceImportUndo: () => { invalidated = true },
+      saveShipmentDraft: async () => { throw new Error('save failed') },
+      isSourceBusinessActionResultUnknown: () => unknown,
+    })
+    await ui.submit()
+    assert.equal(invalidated, unknown)
+  }
+})

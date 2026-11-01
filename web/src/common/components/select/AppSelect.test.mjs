@@ -93,7 +93,7 @@ test('排序清空恢复声明的默认排序，界面显示用途提示', async
   assert.equal(document.querySelector('.ant-select-selection-placeholder').textContent, '排序方式')
 })
 
-test('完整值阅读包装保留公开 ref、非受控默认值和自定义字段映射', async (t) => {
+test('共享选择框保留公开 ref、非受控默认值和自定义字段映射', async (t) => {
   const harness = await businessFormHarness(t)
   const { default: AppSelect } = await import('./AppSelect.jsx')
   const ref = React.createRef()
@@ -122,8 +122,110 @@ test('完整值阅读包装保留公开 ref、非受控默认值和自定义字�
   assert.ok(ref.current.nativeElement === root, '选择后不重建选择框根节点')
 })
 
+test('业务引用自动显示名称且保留表单清空、重选与资料替换', async (t) => {
+  const harness = await businessFormHarness(t)
+  const [{ default: AppSelect }, { default: Context }, { Form }] = await Promise.all([
+    import('./AppSelect.jsx'), import('./SelectPresentationContext.jsx'), import('antd'),
+  ])
+  let form
+  let replaceOptions
+  const initial = [
+    { value: 1, label: 'WH-1 一号仓', identity: { name: '一号仓', code: 'WH-1' } },
+    { value: 2, label: 'WH-2 二号仓', identity: { name: '二号仓', code: 'WH-2' } },
+  ]
+  function Example() {
+    [form] = Form.useForm()
+    const [options, setOptions] = React.useState(initial)
+    replaceOptions = setOptions
+    return h(Form, { form, initialValues: { warehouse: 1 } }, h(Context.Provider, { value: 'reference' }, h(Form.Item, { name: 'warehouse', rules: [{ required: true }] }, h(AppSelect, { options, showSearch: true, optionFilterProp: 'label' })), h(AppSelect, { disabled: true, value: 1, options }), h(AppSelect, { value: 'EA', options: [{ value: 'EA', label: '个' }] })), h(AppSelect, { value: 1, options }))
+  }
+  await harness.render(h(Example))
+  const [editable, locked, unit, filter] = document.querySelectorAll('.app-select')
+  assert.equal(editable.querySelector('.app-select__reference-name').textContent, '一号仓')
+  assert.equal(editable.querySelector('.app-select__reference-code'), null)
+  assert.equal(locked.querySelector('[role="combobox"]').disabled, true)
+  assert.equal(locked.querySelector('.ant-select-clear'), null)
+  assert.equal(locked.querySelector('.ant-select-arrow'), null)
+  assert.equal(unit.classList.contains('app-select--reference'), false)
+  assert.equal(filter.classList.contains('app-select--reference'), true, '普通业务字段自动使用名称展示')
+  await act(() => editable.querySelector('.ant-select-clear').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await harness.flush()
+  assert.equal(form.getFieldValue('warehouse'), undefined)
+  assert.equal(editable.querySelector('.app-select__reference-value'), null)
+  await act(async () => { await assert.rejects(form.validateFields()) })
+  await act(() => editable.querySelector('input').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await harness.flush()
+  await harness.click([...document.querySelectorAll('.ant-select-item-option')].find((node) => node.textContent === 'WH-2 二号仓'))
+  assert.equal(form.getFieldValue('warehouse'), 2)
+  assert.equal(editable.querySelector('.app-select__reference-name').textContent, '二号仓')
+  await act(() => replaceOptions([{ value: 2, label: 'WH-2 更新名称', identity: { name: '更新名称', code: 'WH-2' } }]))
+  assert.equal(editable.querySelector('.app-select__reference-name').textContent, '更新名称')
+  assert.equal(editable.textContent.includes('一号仓'), false)
+  await act(() => replaceOptions([initial[0], { value: 2, label: '当前单据已有名称' }]))
+  assert.equal(editable.querySelector('.app-select__reference-name').textContent, '当前单据已有名称', '缺少结构化身份时保留现有标签，不拆出猜测编码')
+  assert.equal(editable.querySelector('.app-select__reference-code'), null)
+  const input = editable.querySelector('input')
+  await act(() => input.focus())
+  await act(() => replaceOptions([{ value: 2, label: '资料重载后的当前名称' }]))
+  assert.ok(document.activeElement === input, '结构化资料暂缺时保留输入节点及焦点')
+  assert.equal(editable.querySelector('.ant-select-selection-item').textContent, '资料重载后的当前名称')
+})
+
+test('引用资料缺失时不显示内部 ID，加载后恢复真实名称与编码', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: AppSelect } = await import('./AppSelect.jsx')
+  let loadSelected
+  function Example() {
+    const [options, setOptions] = React.useState([
+      { value: 1, label: '甲仓 WH-A', identity: { name: '甲仓', code: 'WH-A' } },
+    ])
+    loadSelected = () => setOptions([
+      { value: 2, label: '乙仓 WH-B', identity: { name: '乙仓', code: 'WH-B' } },
+    ])
+    return h(AppSelect, { presentation: 'reference', value: 2, options })
+  }
+  await harness.render(h(Example))
+  const field = document.querySelector('.app-select')
+  const input = field.querySelector('input')
+  assert.equal(field.querySelector('.app-select__reference-name').textContent, '资料已关联')
+  assert.equal(field.querySelector('.app-select__reference-code'), null)
+  await act(() => loadSelected())
+  assert.equal(field.querySelector('.app-select__reference-name').textContent, '乙仓')
+  assert.equal(field.querySelector('.app-select__reference-name').textContent, '乙仓')
+  assert.equal(field.querySelector('.app-select__reference-code'), null)
+  assert.ok(field.querySelector('input') === input, '资料补齐不重建选择输入')
+})
+
+test('非受控引用名称随默认值、重选和清空更新，公开 ref 仍指向 Select', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: AppSelect } = await import('./AppSelect.jsx')
+  const ref = React.createRef()
+  await harness.render(h(AppSelect, {
+    ref,
+    presentation: 'reference',
+    defaultValue: 1,
+    options: [
+      { value: 1, label: '甲仓 WH-A', identity: { name: '甲仓', code: 'WH-A' } },
+      { value: 2, label: '乙仓 WH-B', identity: { name: '乙仓', code: 'WH-B' } },
+    ],
+  }))
+  const root = document.querySelector('.app-select')
+  const field = root
+  assert.equal(field.querySelector('.app-select__reference-name').textContent, '甲仓')
+  assert.equal(field.querySelector('.app-select__reference-code'), null)
+  assert.ok(ref.current.nativeElement === root)
+  await act(() => root.querySelector('input').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await harness.flush()
+  await harness.click([...document.querySelectorAll('.ant-select-item-option')].find((node) => node.textContent === '乙仓 WH-B'))
+  assert.equal(field.querySelector('.app-select__reference-name').textContent, '乙仓')
+  assert.equal(field.querySelector('.app-select__reference-code'), null)
+  await act(() => root.querySelector('.ant-select-clear').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await harness.flush()
+  assert.equal(field.querySelector('.app-select__reference-code'), null)
+})
+
 for (const mode of ['multiple', 'tags']) {
-  test(`${mode} 保留多值选择与清空，不测量单选完整值`, async (t) => {
+  test(`${mode} 保留多值选择与清空`, async (t) => {
     const harness = await businessFormHarness(t)
     const { default: AppSelect } = await import('./AppSelect.jsx')
     const changes = []
@@ -217,4 +319,62 @@ test('显式空值不回选默认值，非受控默认值及零、false、业务
   assert.equal(controls[0].querySelector('.ant-select-selection-item').textContent, '默认对象')
   assert.equal(controls[1].querySelector('.ant-select-selection-placeholder').textContent, '选择对象')
   assert.deepEqual(controls.slice(2).map((control) => control.querySelector('.ant-select-selection-item').textContent), ['零', '否', '未填写客户'])
+})
+
+for (const variant of ['business', 'filter', 'multiple']) {
+  test(`结构化选项 ${variant} 选中名称与候选详细标签分离`, async (t) => {
+    const harness = await businessFormHarness(t)
+    const { default: AppSelect } = await import('./AppSelect.jsx')
+    const { default: FilterSelect } = await import('./FilterSelect.jsx')
+    const Control = variant === 'filter' ? FilterSelect : AppSelect
+    const changes = []
+    const inputProps = {
+      options: [
+        { value: 1, label: 'WH-1 一号仓 甲区', identity: { name: '一号仓', code: 'WH-1' } },
+        { value: 2, label: 'WH-2 二号仓 乙区', identity: { name: '二号仓', code: 'WH-2' } },
+      ],
+      onChange: (next) => changes.push(next),
+    }
+    function Example() {
+      const [value, setValue] = React.useState(variant === 'multiple' ? [1] : 1)
+      return h(Control, { ...inputProps, value, ...(variant === 'multiple' ? { mode: 'multiple' } : {}), onChange: (next) => { changes.push(next); setValue(next) } })
+    }
+    await harness.render(h(Example))
+    const root = document.querySelector('.app-select')
+    assert.equal(root.querySelector('.ant-select-selection-item').textContent.trim(), '一号仓')
+    assert.equal(root.classList.contains('app-select--reference'), variant === 'business')
+    await act(() => root.querySelector('input').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+    await harness.flush()
+    const candidate = [...document.querySelectorAll('.ant-select-item-option')].find((node) => node.textContent === 'WH-2 二号仓 乙区')
+    assert.ok(Boolean(candidate), '候选标签保留编码和附加识别信息')
+    await harness.click(candidate)
+    assert.deepEqual(changes.at(-1), variant === 'multiple' ? [1, 2] : 2)
+    const text = [...root.querySelectorAll('.ant-select-selection-item')].map((node) => node.textContent.trim())
+    assert.deepEqual(text, variant === 'multiple' ? ['一号仓', '二号仓'] : ['二号仓'])
+    assert.equal(root.querySelector('.app-select__reference-code'), null)
+  })
+}
+
+test('远程选项首次出现时保留输入根节点、焦点和展开状态', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: AppSelect } = await import('./AppSelect.jsx')
+  const ref = React.createRef()
+  let receive
+  function Example() {
+    const [options, setOptions] = React.useState([])
+    receive = setOptions
+    return h(AppSelect, { ref, showSearch: true, options })
+  }
+  await harness.render(h(Example))
+  const root = ref.current.nativeElement
+  const input = root.querySelector('input')
+  await act(() => input.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await harness.flush()
+  await act(() => input.focus())
+  await act(() => receive([{ value: 7, label: 'CUS-7 晴空品牌 晴空', identity: { name: '晴空品牌', code: 'CUS-7' } }]))
+  await harness.flush()
+  assert.ok(ref.current.nativeElement === root, '选项到达不重建 Select 根节点')
+  assert.ok(document.activeElement === input, '键盘焦点仍在原输入框')
+  assert.equal(root.classList.contains('ant-select-open'), true, '选项加载后仍可继续选择')
+  assert.equal(document.querySelector('.ant-select-item-option-content').textContent, 'CUS-7 晴空品牌 晴空')
 })

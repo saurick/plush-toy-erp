@@ -9,6 +9,7 @@ import {
 
 test('task form owns its footer without duplicate page actions or focus jumps, and closed sibling forms do not clear editing', async (t) => {
   const ui = await createReactTestHarness(t)
+  const { ERPThemeProvider } = await import('../../../common/theme/erpTheme.jsx')
   const [{ createMemoryRouter, RouterProvider }, { default: Page }, { BusinessPageContext }] = await Promise.all([
     import('react-router-dom'), import('./BusinessFormPage.jsx'), import('../../hooks/useBusinessPageContext.js'),
   ])
@@ -26,7 +27,7 @@ test('task form owns its footer without duplicate page actions or focus jumps, a
   }
   const router = createMemoryRouter([{ path: '*', element: createElement(Forms) }])
   t.after(() => router.dispose())
-  await ui.render(createElement(RouterProvider, { router, future: { v7_startTransition: true } }))
+  await ui.render(createElement(ERPThemeProvider, null, createElement(RouterProvider, { router, future: { v7_startTransition: true } })))
   await ui.flush()
   assert.deepEqual(changes, [true])
   assert.equal(document.activeElement === trigger, true)
@@ -36,9 +37,61 @@ test('task form owns its footer without duplicate page actions or focus jumps, a
   assert.deepEqual(changes, [true, false])
 })
 
+test('batch save can validate another draft before the current invalid form and still focus its error', async (t) => {
+  const ui = await createReactTestHarness(t)
+  const { ERPThemeProvider } = await import('../../../common/theme/erpTheme.jsx')
+  const [{ createMemoryRouter, RouterProvider }, { default: Page }, { Form, Input }] = await Promise.all([
+    import('react-router-dom'), import('./BusinessFormPage.jsx'), import('antd'),
+  ])
+  let delegate
+  let calls = 0
+  const focusRequests = []
+  function Harness() {
+    const [form] = Form.useForm()
+    // DOM 单测记录焦点委派；原生滚动的几何与定位由浏览器回归核对。
+    form.scrollToField = (name, options) => {
+      focusRequests.push({ name, focus: options.focus })
+      if (options.focus) document.getElementById(name.join('_'))?.focus()
+    }
+    const [batch, setBatch] = useState(false)
+    delegate = () => setBatch(true)
+    const current = createElement(Form.Item, { name: 'current', rules: [{ required: true, message: '当前单缺客户' }] }, createElement(Input))
+    const previous = createElement(Form.Item, { name: 'previous' }, createElement(Input))
+    return createElement(Page, {
+      open: true,
+      title: '批量复核',
+      form,
+      validateOnSave: !batch,
+      onOk: async () => {
+        calls += 1
+        const errorFields = [{ name: ['previous'], errors: ['请核对前一单邮箱'] }]
+        form.setFields(errorFields)
+        throw Object.assign(new Error('前一单有误'), { errorFields })
+      },
+    }, createElement(Form, { form }, current, previous))
+  }
+  const router = createMemoryRouter([{ path: '*', element: createElement(Harness) }])
+  t.after(() => router.dispose())
+  await ui.render(createElement(ERPThemeProvider, null, createElement(RouterProvider, { router, future: { v7_startTransition: true } })))
+  const frames = () => ui.act(() => new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))))
+  await frames()
+  const save = () => ui.container.querySelector('button[aria-label="保存"]')
+  await ui.act(async () => save().click())
+  await frames()
+  assert.equal(calls, 0, 'ordinary forms still block saving their invalid current fields')
+  await ui.act(async () => delegate())
+  await ui.act(async () => save().click())
+  await frames()
+  assert.equal(calls, 1, 'the batch controller receives the save action before current-form validation')
+  assert.deepEqual(focusRequests.at(-1), { name: ['previous'], focus: true })
+  assert.equal(document.activeElement?.id, 'previous', 'delegated validation keeps shared error focus')
+  assert.equal(ui.container.querySelector('#current').value, '')
+})
+
 test('deferred form autofocus preserves a field chosen before initialization finishes', async (t) => {
   const dom = installTestDOM()
   registerJSXTestLoader()
+  const { ERPThemeProvider } = await import('../../../common/theme/erpTheme.jsx')
   const [
     { createRoot },
     { createMemoryRouter, RouterProvider },
@@ -92,10 +145,10 @@ test('deferred form autofocus preserves a field chosen before initialization fin
   })
   await act(async () =>
     root.render(
-      createElement(RouterProvider, {
+      createElement(ERPThemeProvider, null, createElement(RouterProvider, {
         router,
         future: { v7_startTransition: true },
-      })
+      }))
     )
   )
   for (const input of container.querySelectorAll('input')) {

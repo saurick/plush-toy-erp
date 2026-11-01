@@ -2,6 +2,7 @@ import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from './roleKeys.mjs'
 import { BUSINESS_STATUS_OPTIONS } from '../config/workflowStatus.mjs'
 import { isApprovalWorkflowTask } from './workflowDashboardStats.mjs'
+import { workflowTaskActionInput } from './workflowTaskActionContract.mjs'
 
 const BUSINESS_STATUS_LABELS = new Map(BUSINESS_STATUS_OPTIONS.map(({ key, label }) => [key, label]))
 
@@ -207,9 +208,18 @@ function eventTransitionLabel(event) {
 
 export function presentWorkflowTaskEvent(
   event = {},
-  { approvalTask = false, index = 0 } = {}
+  { approvalTask = false, index = 0, task = {} } = {}
 ) {
   const presentation = eventPresentation(event, approvalTask)
+  const action = event.event_type === 'status_changed'
+    ? ({ done: 'complete', blocked: 'block', rejected: 'reject', ready: 'resume' })[event.to_status_key]
+    : ['reassigned', 'unassigned'].includes(event.event_type) ? 'assign'
+      : /^(urge_|escalate_to_)/u.test(event.event_type || '') ? 'urge' : ''
+  const input = workflowTaskActionInput(task, action)
+  const reason = normalizedText(event.reason) || (
+    event.event_type === 'status_changed' && event.to_status_key === 'done'
+      ? normalizedText(event.payload?.feedback) : ''
+  )
   const taskVersion = positiveInteger(event.task_version)
   const actorRoleKey = normalizedText(event.actor_role_key)
   const actorRoleLabel = ROLE_DISPLAY_NAMES[actorRoleKey] || ''
@@ -230,7 +240,10 @@ export function presentWorkflowTaskEvent(
     actorName,
     actorRoleLabel,
     actorRoleKey,
-    reason: normalizedText(event.reason),
+    reason,
+    reasonLabel: input.label,
+    reasonMissing: !reason && input.required,
+    reasonDetail: reason || (input.required ? '未记录' : '未补充说明'),
     timeLabel: formatWorkflowTaskEventTime(event.created_at),
     transitionLabel: eventTransitionLabel(event),
     versionLabel: taskVersion ? `版本 ${taskVersion}` : '',
@@ -311,7 +324,7 @@ export function buildWorkflowTaskEventTrailModel({
   const normalizedEvents = Array.isArray(events) ? events.filter(Boolean) : []
   return {
     items: normalizedEvents.map((event, index) =>
-      presentWorkflowTaskEvent(event, { approvalTask, index })
+      presentWorkflowTaskEvent(event, { approvalTask, index, task })
     ),
     responsibilityItems: buildWorkflowTaskResponsibilityItems(task),
     summaryLabel: normalizedEvents.length

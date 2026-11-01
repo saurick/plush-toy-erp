@@ -1,6 +1,7 @@
 import { UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../../src/dev-workbench/config/devUIDesign.mjs'
 import { chooseSelectOption } from './selectControlActions.mjs'
 import { chooseUIDesignState } from './devUIDesignNavigation.mjs'
+import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
 
 const frameSelector = 'iframe[title="ERP 最新可交互设计"]'
 
@@ -31,6 +32,33 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
     if (value === 'workbench') await page.getByText('整体交互预览', { exact: true }).click()
   }
   return [
+    {
+      name: 'dev-ui-design-note-textareas',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const frame = await waitReady(page)
+        await frame.getByRole('button', { name: '销售管理', exact: true }).click()
+        await frame.getByRole('button', { name: '新建订单', exact: true }).click()
+        await frame.getByRole('button', { name: '添加订货明细', exact: true }).click()
+        const editor = frame.locator('.form-view')
+        const note = editor.locator('textarea[data-form-field="note-0"]')
+        await note.waitFor()
+        await assertBusinessNoteTextAreas(editor)
+        for (const width of [1920, 390]) {
+          await page.setViewportSize({ width, height: 1080 })
+          await assertBusinessNoteTextAreas(editor)
+          const height = (await note.boundingBox()).height
+          await note.fill('分批交付要求与包装说明\n'.repeat(12))
+          assert((await note.boundingBox()).height > height, '原型明细备注随输入增高')
+          await assertBusinessNoteTextAreas(editor)
+          await note.fill('')
+          assert(Math.abs((await note.boundingBox()).height - height) <= 1, `清空原型备注恢复两行起步：${JSON.stringify({ width, initial: height, current: (await note.boundingBox()).height })}`)
+        }
+        await page.screenshot({ path: path.join(outputDir, 'prototype-note-two-rows.png') })
+      },
+    },
     {
       name: 'dev-ui-design-order-identifiers',
       path: '/__dev/ui-design',
