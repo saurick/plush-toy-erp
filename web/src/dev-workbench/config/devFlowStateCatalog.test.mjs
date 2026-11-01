@@ -1117,7 +1117,9 @@ test('devFlowStateCatalog: 分页说明不退回接口尚未实现的旧边界',
   const doc = readFileSync(resolve(repoRoot, 'docs/architecture/业务链与运行轨迹边界.md'), 'utf8')
   assert.doesNotMatch(doc, /继续翻页的 cursor(?: 合同)?尚未实现/u)
   assert.match(doc, /before_event_id/u)
-  assert.match(doc, /消费者.*最近记录/u)
+  assert.match(doc, /桌面任务动作 Drawer 与移动任务详情均已接入“加载更早记录”/u)
+  assert.match(doc, /每页最多 100 条/u)
+  assert.match(doc, /来源任务及办理人来自同一读取快照/u)
 })
 
 test('devFlowStateCatalog: 搜索和筛选返回新对象且不改原目录', () => {

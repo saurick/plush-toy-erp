@@ -145,6 +145,8 @@ const horizontalLayoutContracts = [
   },
   {
     className: '.erp-sales-order-lines-form__row',
+    // tbody 使用原生表格布局，不需要空的 CSS 基线。
+    baseRuleCount: 0,
     expected: {},
     forbiddenInBase: ['width', 'min-width', 'max-width', 'height', 'max-height', 'overflow', 'overflow-x', 'overflow-y'],
     protectedProperties: [
@@ -244,26 +246,27 @@ test('businessLineItems: shared table owns horizontal geometry without a second 
 
     assert.equal(
       baseRules.length,
-      1,
-      `${contract.className} 必须只有一条共享基线规则，当前为 ${JSON.stringify(
+      contract.baseRuleCount ?? 1,
+      `${contract.className} 的共享基线规则数量必须为 ${contract.baseRuleCount ?? 1}，当前为 ${JSON.stringify(
         baseRules.map((rule) => rule.filePath)
       )}`
     )
 
-    const [baseRule] = baseRules
-    for (const [property, expectedValue] of Object.entries(contract.expected)) {
-      assert.equal(
-        baseRule.declarations.get(property),
-        expectedValue,
-        `${contract.className} 的 ${property} 必须由共享基线保持为 ${expectedValue}`
-      )
-    }
-    for (const property of contract.forbiddenInBase) {
-      assert.equal(
-        baseRule.declarations.has(property),
-        false,
-        `${contract.className} 的共享基线不应声明 ${property}`
-      )
+    for (const baseRule of baseRules) {
+      for (const [property, expectedValue] of Object.entries(contract.expected)) {
+        assert.equal(
+          baseRule.declarations.get(property),
+          expectedValue,
+          `${contract.className} 的 ${property} 必须由共享基线保持为 ${expectedValue}`
+        )
+      }
+      for (const property of contract.forbiddenInBase) {
+        assert.equal(
+          baseRule.declarations.has(property),
+          false,
+          `${contract.className} 的共享基线不应声明 ${property}`
+        )
+      }
     }
 
     const pageLevelOverrides = findPageLevelOverrides(rules, contract)

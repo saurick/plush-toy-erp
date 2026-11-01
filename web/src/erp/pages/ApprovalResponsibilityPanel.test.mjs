@@ -22,7 +22,10 @@ test('approval responsibility panel reuses permission-center accounts and roles'
   assert.match(source, /岗位已停用/)
   assert.match(source, /未开启审批功能/)
   assert.match(source, /岗位已不存在，请重新选择/)
-  assert.match(source, /不可用账号会标明原因/)
+  assert.match(source, /账号不存在或已离职/)
+  assert.match(source, /账号已停用/)
+  assert.match(source, /label: reason \? `\$\{displayLabel\}（\$\{reason\}）` : displayLabel/)
+  assert.match(source, /disabled: Boolean\(reason\)/)
   assert.doesNotMatch(
     source,
     /role\.name \|\| role\.display_name \|\| '已配置岗位'/

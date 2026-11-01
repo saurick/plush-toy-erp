@@ -4,6 +4,7 @@ import { createElement as h } from 'react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCatalog.mjs'
+import { DEV_BUSINESS_CHAIN_AUDIT_ROUTE, DEV_VERSION_CENTER_ROUTE } from '../../config/devRoutes.mjs'
 
 const router = (body) => h(MemoryRouter, {
   future: { v7_startTransition: true, v7_relativeSplatPath: true },
@@ -35,8 +36,11 @@ test('专题详情逐条保留关联条件和岗位，点选关联对象不执�
   await harness.act(() => material.click())
   assert.deepEqual(selected, ['material_request'])
   assert.deepEqual(explored, [])
-  assert(!harness.container.textContent.includes('查看规则'))
-  assert.deepEqual(explored, [])
+  const rules = [...harness.container.querySelectorAll('button')]
+    .find((button) => button.textContent === '查看规则')
+  assert.ok(rules)
+  await harness.act(() => rules.click())
+  assert.deepEqual(explored, [[topic.key, node.key]])
 })
 
 test('拒绝与报废终点仅展示真实关联，不拼接正常出货或生产结果', async (t) => {
@@ -57,7 +61,7 @@ test('拒绝与报废终点仅展示真实关联，不拼接正常出货或生�
   }
 })
 
-test('数据与验证保留本专题登记场景和证据边界，不重复提供跨页入口', async (t) => {
+test('数据与验证保留本专题登记场景，并关联同链实测与发布证据', async (t) => {
   const harness = await createReactTestHarness(t)
   const { BusinessTopicVerification } = await import('./BusinessTopicDetails.jsx')
   const topic = catalog.businessChains.find((item) => item.key === 'finance_payment_and_reversal')
@@ -70,8 +74,15 @@ test('数据与验证保留本专题登记场景和证据边界，不重复提�
   })
   assert.match(harness.container.textContent, /规则测试/u)
   assert.match(harness.container.textContent, /浏览器验证/u)
-  assert.equal(harness.container.querySelectorAll('a').length, 0)
+  assert.deepEqual(
+    [...harness.container.querySelectorAll('a')].map((link) => [link.textContent, link.getAttribute('href')]),
+    [
+      ['链路实测报告', `${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?chain=${topic.key}`],
+      ['版本发布记录', `${DEV_VERSION_CENTER_ROUTE}?view=history`],
+    ]
+  )
   assert.match(harness.container.textContent, /登记范围.*实际执行结果/u)
+  assert.match(harness.container.textContent, /二者都不代表客户验收/u)
 })
 
 test('图中与相邻详情选取对象共用 URL，当前专题和对象不会被额外跳转替换', async (t) => {
@@ -106,7 +117,7 @@ test('图中与相邻详情选取对象共用 URL，当前专题和对象不会�
   assert.equal(params.get('flow_topic'), 'sales_to_production')
   assert.equal(params.get('flow_topic_node'), 'material_request')
   assert(root.querySelector('[data-graph-node="material_request"][aria-pressed="true"]'))
-  assert(!root.querySelector('aside').textContent.includes('查看规则'))
+  assert.equal([...root.querySelectorAll('aside button')].filter((button) => button.textContent === '查看规则').length, 1)
   assert.deepEqual(explored, [])
   const map = [...root.querySelectorAll('button')]
     .find((button) => button.textContent === '系统衔接图')

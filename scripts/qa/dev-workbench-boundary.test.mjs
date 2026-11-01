@@ -264,10 +264,17 @@ const businessSamplePresentationImports = new Set([
 const businessSampleFormStateDependencies = [
   "components/business-list/BusinessEditorGroup.jsx",
   "components/business-list/businessFormReadOnly.mjs",
+  "components/business-list/businessLineItemDisclosure.mjs",
+  "components/business-list/BusinessLineItemDisclosureContext.js",
+  "components/business-list/useBusinessLineItemGroups.js",
+  "components/business-list/BusinessGroupedLineItems.jsx",
+  "components/business-list/BusinessLineItemGroupControls.jsx",
+  "utils/adjacentLineItemRuns.mjs",
   "hooks/useWorkflowTaskBusinessBusy.js",
 ];
 const selectValueSamplePresentationImports = new Set([
   "components/business-list/BusinessLineItemsTable.jsx",
+  "components/business-list/BusinessTextArea.jsx",
   "components/workflow/WorkflowTaskImagePlaceholder.jsx",
   "components/master-data/productIdentity.css",
   "utils/referenceSelectOptions.mjs",
@@ -404,6 +411,7 @@ const allowedERPImportsByFile = new Map([
   [
     "web/src/dev-workbench/components/DevUIFeedbackExamples.jsx",
     new Set([
+      "components/business-list/BusinessTextArea.jsx",
       "components/business-list/BusinessFormModal",
       "components/business-list/BusinessModal",
       "utils/modalSizes.mjs",
@@ -749,6 +757,7 @@ test("business form presentation dependencies reject business I/O and persistenc
 test("feedback sample modal dependencies remain presentation-only", () => {
   const allowed = new Set([
     "react",
+    "react-dom",
     "react-router-dom",
     "antd",
     "../../utils/modalSizes.mjs",
@@ -756,6 +765,7 @@ test("feedback sample modal dependencies remain presentation-only", () => {
     "./BusinessFormPage.jsx",
     "./BusinessFormSectionScope.jsx",
     "./BusinessFormSectionContext.js",
+    "./businessLineItemDisclosure.mjs",
     "../../hooks/useBusinessPageContext.js",
     "../../common/utils/feedbackConfig.mjs",
     "@/common/components/modal/AppModal",
@@ -771,6 +781,7 @@ test("feedback sample modal dependencies remain presentation-only", () => {
     "web/src/erp/hooks/useBusinessPageContext.js",
     "web/src/erp/components/business-list/BusinessFormSectionScope.jsx",
     "web/src/erp/components/business-list/BusinessFormSectionContext.js",
+    "web/src/erp/components/business-list/businessLineItemDisclosure.mjs",
   ]) {
     const source = read(file);
     for (const match of source.matchAll(
