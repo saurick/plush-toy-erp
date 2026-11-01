@@ -493,7 +493,7 @@ test("exception-flow task search follows the current page placeholder contract",
   assert.match(dashboardSource, /placeholder="订单 \/ 产品 \/ 物料 \/ 款号"/u);
   assert.match(
     dashboardSource,
-    /searchHint="可搜索：任务、单号、产品、款号、物料、处理原因"/u,
+    /searchHint="可搜索：任务编号、任务、单号、产品、款号、物料、处理原因"/u,
   );
   assert.match(
     runnerSource,
