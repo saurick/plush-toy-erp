@@ -1352,6 +1352,7 @@ SKU 使用 `create_product_sku / update_product_sku / get_product_sku / list_pro
 | 来源快照字段 | 用途与边界 |
 | --- | --- |
 | `file_name / sheet_name / row_number` | 文件、工作表和原始行号；仅为核对线索，不证明文件真实性 |
+| `material_code / material_name / supplier_item_no / material_spec / color / unit` | 导入时的材料识别信息，各项最多 255 字符；关联、清空和更换档案均不覆盖原表。历史快照缺值保持未知，不从当前材料档案反填 |
 | `quantity_value / quantity_format / quantity_label` | 原表单位用量、Excel 数字格式和列名；保存用量仍以 `quantity` 为准 |
 | `total_value / total_format / total_label / total_formula` | 原表总用量及计算依据；保留小数原值，不把显示位数当成计算位数 |
 | `loss_value / loss_format / loss_label / loss_rate / loss_source` | 区分原表损耗列、总用量表头、逐行反算和无法确认；跨层取值来自领域生成合同 |
@@ -9458,16 +9459,21 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "material_id": 1,
         "quantity": "1.000000000001",
         "source_snapshot": {
+          "color": "黑色",
           "file_name": "教学材料.xlsx",
           "loss_rate": "0",
           "loss_source": "explicit",
           "loss_value": "0",
+          "material_code": "MAT-EXAMPLE",
+          "material_name": "原表短毛绒",
+          "material_spec": "51\"",
           "order_quantity": "100",
           "quantity_format": "0.000",
           "quantity_label": "单位用量",
           "quantity_value": "1.000000000001",
           "row_number": 6,
           "sheet_name": "材料分析明细表",
+          "supplier_item_no": "客供",
           "total_format": "0.00",
           "total_label": "总用量",
           "total_value": "100.0000000001"
@@ -9579,16 +9585,21 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
             "process_method": null,
             "quantity": "1.000000000001",
             "source_snapshot": {
+              "color": "黑色",
               "file_name": "教学材料.xlsx",
               "loss_rate": "0",
               "loss_source": "explicit",
               "loss_value": "0",
+              "material_code": "MAT-EXAMPLE",
+              "material_name": "原表短毛绒",
+              "material_spec": "51\"",
               "order_quantity": "100",
               "quantity_format": "0.000",
               "quantity_label": "单位用量",
               "quantity_value": "1.000000000001",
               "row_number": 6,
               "sheet_name": "材料分析明细表",
+              "supplier_item_no": "客供",
               "total_format": "0.00",
               "total_label": "总用量",
               "total_value": "100.0000000001"

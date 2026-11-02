@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Form } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -13,21 +13,29 @@ export default function BOMMaterialCreateModal({
   open,
   materials,
   unitOptions,
+  initialValues,
+  validateMaterial,
   onCancel,
   onCreated,
 }) {
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const wasOpen = useRef(false)
+  const values = Form.useWatch((current) => current, form)
+  const conflict = open ? validateMaterial?.(values || {}) : ''
   useEffect(() => {
-    if (!open) return
+    const initialize = open && !wasOpen.current
+    wasOpen.current = open
+    if (!initialize) return
     form.resetFields()
-    form.setFieldsValue({ code: buildMaterialDraftCode(materials) })
+    form.setFieldsValue({ ...initialValues, code: initialValues?.code || buildMaterialDraftCode(materials) })
     setDirty(false)
-  }, [open, form, materials])
+  }, [open, form, materials, initialValues])
   const save = async () => {
     if (saving) return
     const values = await form.validateFields()
+    if (validateMaterial?.(values)) return
     setSaving(true)
     try {
       const material = await createMaterial(buildMasterDataParams(values))
@@ -49,13 +57,16 @@ export default function BOMMaterialCreateModal({
       form={form}
       dirty={dirty}
       title="新建物料并使用"
+      className="erp-bom-material-create-modal"
       description="厂商、料号、色号、规格和单位在这里维护一次，部位和用量在材料明细表填写。"
       onOk={save}
       okText="新建并使用"
       onCancel={saving ? undefined : onCancel}
       confirmLoading={saving}
+      okButtonProps={{ disabled: Boolean(conflict) }}
       maskClosable={!saving}
     >
+      {conflict ? <p className="erp-bom-material-create-conflict" role="alert">{conflict}，请先核对物料和用量。</p> : null}
       <Form
         form={form}
         layout="vertical"

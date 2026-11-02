@@ -126,7 +126,7 @@ status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
 | `position` | `varchar` | `string` | 可空 | — | — |
 | `piece_count` | `varchar` | `string` | 可空 | — | — |
 | `total_usage_snapshot` | `varchar` | `string` | 可空 | — | 保留原表长小数总量，在订单数量及计算输入未变时使用；显示位数不改变原始数值精度。 |
-| `source_snapshot` | `jsonb` | `json.RawMessage` | 可空 | 敏感 | Excel 来源数值、显示格式、行号和损耗依据，仅供核对；业务用量仍取 quantity。 |
+| `source_snapshot` | `jsonb` | `json.RawMessage` | 可空 | 敏感 | Excel 原表材料识别信息、单位、数值、显示格式、行号和损耗依据，仅供核对；材料关联和业务用量仍取正式字段。 |
 | `process_base` | `varchar` | `string` | 可空 | — | — |
 | `process_method` | `varchar` | `string` | 可空 | — | — |
 | `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |

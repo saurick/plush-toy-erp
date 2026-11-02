@@ -63,7 +63,7 @@ export default function BOMExcelImportPreview({
           <span>
             {item.material_id
               ? referenceLabel(materialOptions, item.material_id, '材料')
-              : item._import_source?.materialName || '待选择材料'}
+              : item._import_source?.materialName || '待选择物料'}
           </span>
           <Typography.Text type="secondary">
             Excel 第 {item._import_source?.rowNumber} 行 ·{' '}
@@ -84,7 +84,7 @@ export default function BOMExcelImportPreview({
           : item._import_source?.unit || '待选择',
     },
     {
-      title: '校对',
+      title: '待处理',
       key: 'review',
       width: 140,
       render: (_, item) =>
@@ -116,11 +116,11 @@ export default function BOMExcelImportPreview({
           ? `替换并带入 ${rows.length} 个部位`
           : detailsOnly && existingCount
             ? `追加 ${rows.length} 个部位`
-            : `带入并核对（${rows.length} 个部位）`
+            : `带入编辑（${rows.length} 个部位）`
       }
       okButtonProps={{
         disabled: appendExceedsLimit || rows.length === 0,
-        'aria-label': replacing ? `替换并带入 ${rows.length} 个部位` : detailsOnly && existingCount ? `追加 ${rows.length} 个部位` : '带入并核对',
+        'aria-label': replacing ? `替换并带入 ${rows.length} 个部位` : detailsOnly && existingCount ? `追加 ${rows.length} 个部位` : '带入编辑',
         'aria-describedby': importScopeId,
       }}
       cancelText="取消"
@@ -133,7 +133,7 @@ export default function BOMExcelImportPreview({
         <Typography.Text type="secondary">
           {detailsOnly
             ? '带入材料明细，产品、版本和其他表头保持当前草稿内容。'
-            : '带入编辑页核对，点击“保存草稿”后才新建 BOM。'}
+            : '带入编辑页，补齐后点击“保存草稿”新建 BOM。'}
           {draft?.review.productCode || draft?.review.productName
             ? ` 原表产品：${draft.review.productCode || draft.review.productName}。`
             : ''}
@@ -142,12 +142,12 @@ export default function BOMExcelImportPreview({
         <div className="erp-source-import-picker__toolbar" role="group" aria-label="导入筛选与搜索">
           <div className="erp-source-import-picker__filters">
             <FilterSelect
-              label="核对结果"
-              placeholder="按核对结果筛选"
-              aria-label="BOM 核对筛选"
+              label="待处理项"
+              placeholder="筛选待处理项"
+              aria-label="BOM 待处理筛选"
               value={reviewFilter}
               onChange={(value) => { setReviewFilter(value || ''); setPage(1) }}
-              options={[{ value: 'issues', label: '全部待补全' }, { value: 'material_id', label: '待选择材料' }, { value: 'unit_id', label: '待选择单位' }]}
+              options={[{ value: 'issues', label: '全部待处理' }, { value: 'material_id', label: '待选择物料' }, { value: 'unit_id', label: '待选择单位' }]}
             />
           </div>
           <div className="erp-source-import-picker__search-actions">
@@ -162,7 +162,7 @@ export default function BOMExcelImportPreview({
           </div>
           <div data-table-scroll-toolbar />
         </div>
-        <Typography.Text type="secondary" role="status" id={importScopeId}>整份文件导入；筛选结果 {visibleRows.length} / {rows.length} 个部位。筛选仅用于核对，确认后带入全部 {rows.length} 个部位。</Typography.Text>
+        <Typography.Text type="secondary" role="status" id={importScopeId}>整份文件导入；筛选结果 {visibleRows.length} / {rows.length} 个部位。筛选仅用于查看，确认后带入全部 {rows.length} 个部位。</Typography.Text>
         <Table
           scrollToolbar
           scrollControlsOnEmpty
@@ -172,9 +172,9 @@ export default function BOMExcelImportPreview({
           dataSource={visibleRows}
           locale={{ emptyText: <Empty description={keyword.trim()
             ? '没有符合条件的部位'
-            : reviewFilter === 'material_id' ? '当前没有待选择材料的部位'
+            : reviewFilter === 'material_id' ? '当前没有待选择物料的部位'
               : reviewFilter === 'unit_id' ? '当前没有待选择单位的部位'
-                : reviewFilter ? '当前没有待补全的部位' : '文件中没有可导入的部位'}
+                : reviewFilter ? '当前没有待处理的部位' : '文件中没有可导入的部位'}
           /> }}
           scroll={{ x: Math.max(580, columns.length * 140) }}
           pagination={{

@@ -221,6 +221,7 @@ func TestJsonrpcDispatcher_BOMAggregateSaveRequiresExpectedVersionAndMapsConflic
 			"total_usage_snapshot": "100.0000000001",
 			"source_snapshot": map[string]any{
 				"file_name": "教学材料.xlsx", "sheet_name": "材料分析明细表", "row_number": 6,
+				"material_code": "MAT-EXAMPLE", "material_name": "原表短毛绒", "supplier_item_no": "客供", "material_spec": "51\"", "color": "黑色",
 				"quantity_value": "1.000000000001", "quantity_label": "单位用量", "quantity_format": "0.000",
 				"total_value": "100.0000000001", "total_label": "总用量", "total_format": "0.00",
 				"loss_source": biz.BOMLossSourceExplicit, "loss_value": "0", "loss_rate": "0", "order_quantity": "100",
@@ -237,6 +238,9 @@ func TestJsonrpcDispatcher_BOMAggregateSaveRequiresExpectedVersionAndMapsConflic
 	createdSource, ok := createdItem["source_snapshot"].(map[string]any)
 	if !ok || createdSource["quantity_value"] != "1.000000000001" || createdSource["quantity_format"] != "0.000" || createdItem["quantity"] != "1.000000000001" || createdItem["total_usage_snapshot"] != "100.0000000001" {
 		t.Fatal("BOM RPC lost source precision, format or the canonical saved quantity")
+	}
+	if createdSource["material_name"] != "原表短毛绒" || createdSource["supplier_item_no"] != "客供" || createdSource["material_spec"] != "51\"" || createdSource["color"] != "黑色" {
+		t.Fatal("BOM RPC lost the original material identity")
 	}
 	headerID := jsonRPCInt(t, created, "id")
 	expectedVersion := created["edit_version"]

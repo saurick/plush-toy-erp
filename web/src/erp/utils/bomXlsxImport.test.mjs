@@ -749,7 +749,7 @@ test('import review counts shared selectors once and keeps each invalid part act
   assert.deepEqual(issues[1], {
     scope: 'item',
     field: 'material_id',
-    message: '请选择现有材料',
+    message: '请选择对应物料档案',
     itemIndex: 0,
     itemIndexes: [0, 1],
     rowNumber: 6,

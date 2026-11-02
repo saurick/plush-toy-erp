@@ -2466,6 +2466,11 @@
             "quantity": "1.000000000001",
             "source_snapshot": {
               "file_name": "教学材料.xlsx",
+              "material_code": "MAT-EXAMPLE",
+              "material_name": "原表短毛绒",
+              "supplier_item_no": "客供",
+              "material_spec": "51\"",
+              "color": "黑色",
               "loss_rate": "0",
               "loss_source": "explicit",
               "loss_value": "0",
@@ -2505,6 +2510,11 @@
           "quantity": "1.000000000001",
           "source_snapshot": {
             "file_name": "教学材料.xlsx",
+              "material_code": "MAT-EXAMPLE",
+              "material_name": "原表短毛绒",
+              "supplier_item_no": "客供",
+              "material_spec": "51\"",
+              "color": "黑色",
             "loss_rate": "0",
             "loss_source": "explicit",
             "loss_value": "0",

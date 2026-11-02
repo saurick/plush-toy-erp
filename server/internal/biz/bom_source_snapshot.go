@@ -45,6 +45,8 @@ func normalizeBOMSourceSnapshot(source map[string]any) (map[string]any, error) {
 	}
 	textFields := map[string]int{
 		"file_name": BOMSourceMaxTextCharacters, "sheet_name": BOMSourceMaxTextCharacters,
+		"material_code": BOMSourceMaxTextCharacters, "material_name": BOMSourceMaxTextCharacters,
+		"supplier_item_no": BOMSourceMaxTextCharacters, "material_spec": BOMSourceMaxTextCharacters, "color": BOMSourceMaxTextCharacters,
 		"quantity_label": BOMSourceMaxTextCharacters, "quantity_format": BOMSourceMaxTextCharacters,
 		"total_label": BOMSourceMaxTextCharacters, "total_format": BOMSourceMaxTextCharacters,
 		"loss_label": BOMSourceMaxTextCharacters, "loss_format": BOMSourceMaxTextCharacters,

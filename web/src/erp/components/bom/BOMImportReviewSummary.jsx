@@ -28,7 +28,7 @@ export default function BOMImportReviewSummary({ form, review, productOptions })
       ? `请先${describeBOMImportIssues(issues)}${
           affectedRows > 0 ? `（涉及 ${affectedRows} 个部位）` : ''
         }`
-      : '明细已全部关联，可继续核对并保存'
+      : '明细已全部关联，可保存草稿'
 
   return (
     <Alert
@@ -49,7 +49,7 @@ export default function BOMImportReviewSummary({ form, review, productOptions })
           </span>
           {quantityNotice ? <span>{quantityNotice}</span> : null}
           <span>
-            原表名称用于核对，保存需关联产品、材料和单位档案；同种物料选择一次即可应用到全部部位。
+            自动匹配已有档案；未匹配的物料可选择或新建，同种物料只需处理一次。
           </span>
           <span>
             损耗来源：{Object.values(BOMLossSource).filter((kind) => Number(lossEvidence[kind]) > 0).map((kind) => `${bomLossSourceLabel(kind)} ${lossEvidence[kind]} 行`).join('；')}

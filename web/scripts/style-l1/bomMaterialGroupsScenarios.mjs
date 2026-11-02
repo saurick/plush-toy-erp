@@ -7,6 +7,7 @@ import { styleRpcResult } from './rpcMockResult.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { exerciseTableScrollControls } from './tableScrollControlAssertions.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
+import { createBOMMaterialMatchingScenarios } from './bomMaterialMatchingScenarios.mjs'
 import { createBOMMaterialDropdownStabilityScenarios } from './bomMaterialDropdownStabilityScenarios.mjs'
 import { createBOMImportPreviewScenarios } from './bomImportPreviewScenarios.mjs'
 
@@ -147,6 +148,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
   let saveAttempts = 0
   let createdMaterialUnitID = null
   const scenarios = [
+    ...createBOMMaterialMatchingScenarios(deps),
     {
       name: 'bom-material-groups-desktop',
       path: '/erp/purchase/material-bom',
@@ -458,7 +460,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           buffer: createBOMImportWorkbookFixture({ mergedNotes: true }),
         })
-        await page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true }).getByRole('button', { name: '带入并核对', exact: true }).click()
+        await page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true }).getByRole('button', { name: '带入编辑', exact: true }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.waitFor({ state: 'visible' })
         deps.assert.equal(
@@ -533,7 +535,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
             unmatchedProduct: true,
           }),
         })
-        await page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true }).getByRole('button', { name: '带入并核对', exact: true }).click()
+        await page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true }).getByRole('button', { name: '带入编辑', exact: true }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         const review = editor.locator('.erp-bom-import-review')
         await review.waitFor()
@@ -623,12 +625,12 @@ export function createBOMMaterialGroupsScenarios(deps) {
         await (await chooserPromise).setFiles({ name: 'BOM-HINTS-SYNTHETIC.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: createBOMImportWorkbookFixture() })
         const preview = page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true })
         const popup = () => page.locator('.erp-bom-import-issues-popover:visible')
-        const previewIssue = preview.getByRole('button', { name: /缺材料，查看完整缺项/u })
+        const previewIssue = preview.getByRole('button', { name: /待选择物料，查看完整缺项/u })
         await previewIssue.hover()
-        await expectLocator(popup()).toContainText('请选择现有材料')
+        await expectLocator(popup()).toContainText('请选择对应物料档案')
         await page.keyboard.press('Escape')
         await expectLocator(popup()).toHaveCount(0)
-        await preview.getByRole('button', { name: '带入并核对', exact: true }).click()
+        await preview.getByRole('button', { name: '带入编辑', exact: true }).click()
         const editor = page.locator('.erp-bom-editor:visible')
         await editor.getByText('分区编辑', { exact: true }).click()
         await editor.getByRole('button', { name: '材料分析明细表', exact: true }).click()
@@ -644,7 +646,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         deps.assert.equal((await row.locator('[data-bom-import-row-status]').innerText()).includes('有效正数'), false)
         const height = await row.evaluate((node) => node.getBoundingClientRect().height)
         await trigger.click()
-        await expectLocator(popup().locator('li')).toHaveText(['请选择现有材料', '请选择现有单位', '材料用量必须为有效正数', '损耗率必须为有效非负数'])
+        await expectLocator(popup().locator('li')).toHaveText(['请选择对应物料档案', '请选择现有单位', '材料用量必须为有效正数', '损耗率必须为有效非负数'])
         deps.assert.equal(await row.evaluate((node) => node.getBoundingClientRect().height), height, '查看完整缺项不改变行高')
         await page.screenshot({ path: `${deps.outputDir}/bom-compact-issue-details.png`, fullPage: true })
         await trigger.press('Escape')
@@ -678,7 +680,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           buffer: createBOMImportWorkbookFixture({ grouped: true }),
         })
-        await page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true }).getByRole('button', { name: '带入并核对', exact: true }).click()
+        await page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true }).getByRole('button', { name: '带入编辑', exact: true }).click()
         const editor = page
           .locator('.erp-business-form-page:not([hidden])')
           .last()

@@ -81,7 +81,7 @@ export function createBOMImportPreviewScenarios(deps) {
       await expect.poll(() => scroller.evaluate((node) => node.scrollLeft)).toBeLessThanOrEqual(1)
       await modal.getByRole('button', { name: '下一页', exact: true }).click()
       await expect(rows).toHaveCount(7)
-      await expect(modal.getByRole('button', { name: '带入并核对', exact: true })).toHaveText('带入并核对（17 个部位）')
+      await expect(modal.getByRole('button', { name: '带入编辑', exact: true })).toHaveText('带入编辑（17 个部位）')
 
       const search = modal.getByRole('textbox', { name: '搜索 BOM 导入明细', exact: true })
       await search.fill('预览部位17')

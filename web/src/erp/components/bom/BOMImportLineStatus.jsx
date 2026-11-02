@@ -52,5 +52,5 @@ function BOMImportIssueDetails({ issues, rowNumber }) {
 export default function BOMImportLineStatus({ issues = [], rowNumber }) {
   return issues.length
     ? <BOMImportIssueDetails issues={issues} rowNumber={rowNumber} />
-    : <span>已匹配</span>
+    : <span aria-label="无需处理">—</span>
 }

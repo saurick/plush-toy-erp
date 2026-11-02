@@ -28,12 +28,12 @@ test('BOM 缺项使用短标签，点击列出当前完整原因并支持 Escape
   await view.flush()
   assert.equal(view.button().getAttribute('aria-expanded'), 'true')
   assert.deepEqual([...view.details().querySelectorAll('li')].map((node) => node.textContent), [
-    '请选择现有材料', '请选择现有单位', '材料用量必须为有效正数', '损耗率必须为有效非负数',
+    '请选择对应物料档案', '请选择现有单位', '材料用量必须为有效正数', '损耗率必须为有效非负数',
   ])
   await view.show({ ...complete, material_id: undefined })
-  assert.equal(view.button().textContent.trim(), '缺材料')
+  assert.equal(view.button().textContent.trim(), '待选择物料')
   assert.equal(view.details().querySelectorAll('li').length, 1)
-  assert.equal(view.details().textContent, '请选择现有材料')
+  assert.equal(view.details().textContent, '请选择对应物料档案')
   await view.act(async () => document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
   assert.equal(view.button().getAttribute('aria-expanded'), 'false')
 })
@@ -41,13 +41,14 @@ test('BOM 缺项使用短标签，点击列出当前完整原因并支持 Escape
 test('BOM 补齐后移除缺项入口，再次清空不残留旧浮层或旧原因', async (t) => {
   const view = await harness(t)
   await view.show({ ...complete, unit_id: undefined })
-  assert.equal(view.button().textContent.trim(), '缺单位')
+  assert.equal(view.button().textContent.trim(), '待选择单位')
   await view.act(async () => view.button().click())
   await view.flush()
   assert.equal(view.button().getAttribute('aria-expanded'), 'true')
   await view.show(complete)
   assert.equal(view.button(), null)
-  assert.equal(view.container.textContent, '已匹配')
+  assert.equal(view.container.textContent, '—')
+  assert.equal(view.container.querySelector('[aria-label="无需处理"]') !== null, true)
   assert.equal(view.details(), null)
   await view.show({ ...complete, quantity: '0' })
   assert.equal(view.button().textContent.trim(), '用量有误')

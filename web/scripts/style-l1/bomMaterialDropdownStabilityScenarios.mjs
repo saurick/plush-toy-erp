@@ -25,7 +25,7 @@ export function createBOMMaterialDropdownStabilityScenarios(deps) {
         mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         buffer: createBOMImportWorkbookFixture(),
       })
-      await page.getByRole('button', { name: '带入并核对', exact: true }).click()
+      await page.getByRole('button', { name: '带入编辑', exact: true }).click()
       const editor = page.locator('.erp-bom-editor:visible')
       const material = editor.getByRole('combobox', { name: '物料名称 1', exact: true })
       const materialSelect = material.locator('xpath=ancestor::div[contains(concat(" ",normalize-space(@class)," ")," ant-select ")][1]')

@@ -222,7 +222,7 @@
       "fieldNotes": [
         {
           "name": "source_snapshot",
-          "note": "Excel 来源数值、显示格式、行号和损耗依据，仅供核对；业务用量仍取 quantity。"
+          "note": "Excel 原表材料识别信息、单位、数值、显示格式、行号和损耗依据，仅供核对；材料关联和业务用量仍取正式字段。"
         },
         {
           "name": "total_usage_snapshot",

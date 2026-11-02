@@ -1,4 +1,5 @@
 import { unitRecordMatchesLabel } from './unitQuantity.mjs'
+import { bomMaterialConflictText } from './bomMaterialMatching.mjs'
 import { BOMLossSource } from '../../common/consts/statuses.generated.mjs'
 import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import { normalizeBOMSourceNumber, parseBOMSourceNumber, bomNumbersDiffer, inferBOMSourceLossRate } from './bomSourceValues.mjs'
@@ -752,6 +753,7 @@ function buildSourceNote(parsed) {
 }
 
 function matchStatusLabel(match) {
+  if (match.status === 'conflict') return match.label
   if (match.status === 'matched') return `已按${match.by}唯一匹配`
   if (match.status === 'ambiguous') return `${match.by || '资料'}存在多个匹配项`
   return '未匹配到现有资料'
@@ -766,7 +768,12 @@ export function buildBOMImportDraft(
   }
   const productMatch = matchProduct(parsed.context || {}, products)
   const items = parsed.rows.map((row) => {
-    const materialMatch = matchMaterial(row, materials)
+    for (const [key, label] of [['materialCode', '材料编号'], ['materialName', '物料名称'], ['supplierItemNo', '厂商料号'], ['materialSpec', '规格'], ['color', '颜色']]) {
+      if ([...String(row[key] || '')].length > 255) fail(`原表第 ${row.rowNumber} 行${label}不能超过 255 个字符`)
+    }
+    let materialMatch = matchMaterial(row, materials)
+    const conflict = bomMaterialConflictText({ _import_source: row }, materialMatch.record, units)
+    if (conflict) materialMatch = { status: 'conflict', record: null, label: conflict }
     const unitMatch = matchUnit(row.unit, units)
     return {
       _material_group_key:
@@ -789,12 +796,21 @@ export function buildBOMImportDraft(
       position: row.position,
       piece_count: row.pieceCount,
       total_usage_snapshot: row.totalUsageSnapshot,
-      source_snapshot: row.sourceSnapshot ? { ...row.sourceSnapshot, file_name: parsed.fileName } : undefined,
+      source_snapshot: row.sourceSnapshot ? {
+        ...row.sourceSnapshot,
+        file_name: parsed.fileName,
+        material_code: row.materialCode || '',
+        material_name: row.materialName || '',
+        supplier_item_no: row.supplierItemNo || '',
+        material_spec: row.materialSpec || '',
+        color: row.color || '',
+      } : undefined,
       process_base: row.processBase,
       process_method: row.processMethod,
       note: row.note,
       _import_source: {
         rowNumber: row.rowNumber,
+        materialCode: row.materialCode,
         materialName: row.materialName,
         supplierItemNo: row.supplierItemNo,
         materialSpec: row.materialSpec,
@@ -906,7 +922,7 @@ export function mergeBOMImportedValues(currentValues, draft, mode = 'append') {
 export function getBOMImportLineIssues(line = {}) {
   const issues = []
   if (!positiveID(line.material_id)) {
-    issues.push({ field: 'material_id', message: '请选择现有材料' })
+    issues.push({ field: 'material_id', message: '请选择对应物料档案' })
   }
   if (!positiveID(line.unit_id)) {
     issues.push({ field: 'unit_id', message: '请选择现有单位' })
@@ -935,8 +951,8 @@ export function describeBOMImportLineStatus(issues = []) {
   if (issues.length === 0) return '已匹配'
   if (issues.length > 1) return `${issues.length} 项待处理`
   return {
-    material_id: '缺材料',
-    unit_id: '缺单位',
+    material_id: '待选择物料',
+    unit_id: '待选择单位',
     quantity: '用量有误',
     loss_rate: '损耗有误',
   }[issues[0].field] || '1 项待处理'

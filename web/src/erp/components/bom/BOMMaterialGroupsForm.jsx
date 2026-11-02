@@ -1,5 +1,4 @@
 import React, {
-  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -13,12 +12,13 @@ import { BusinessLineItemGroupHeading } from '../business-list/BusinessLineItems
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import { BOMQuantityInput } from './BOMSourceValue.jsx'
 import { bomSourceColumnLabel, formatBOMSourceNumber, sumBOMSourceNumbers, parseBOMSourceNumber } from '../../utils/bomSourceValues.mjs'
-import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTable.jsx'
 import { message } from '@/common/utils/antdApp'
 import BOMMaterialCreateModal from './BOMMaterialCreateModal.jsx'
+import BOMMaterialSelect from './BOMMaterialSelect.jsx'
+import { bomMaterialConflictText, buildBOMMaterialCreateDefaults, readBOMMaterialSource } from '../../utils/bomMaterialMatching.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import '../business-list/businessLineItemGroups.css'
@@ -32,7 +32,7 @@ import {
   bomPercentToLossRate,
   parseBOMPartsPaste,
 } from '../../utils/bomMaterialGroups.mjs'
-import { materialOption, referenceLabel } from '../../utils/referenceSelectOptions.mjs'
+import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 import { getBOMImportLineIssues } from '../../utils/bomXlsxImport.mjs'
 import BOMImportLineStatus from './BOMImportLineStatus.jsx'
 import '../../styles/app/bom-editor.css'
@@ -59,76 +59,6 @@ const blankPart = (source = {}) => ({
   process_method: '',
   note: '',
 })
-
-// 已选值只显示名称，其他辨认信息保留在下拉候选标签中。
-function bomMaterialOption(material) {
-  const option = materialOption(material)
-  return option ? { ...option, identity: { name: material.name || '物料名称未填写' } } : option
-}
-
-function BOMMaterialSelect({ canCreateMaterial, onCreateMaterial, ...props }) {
-  const [open, setOpen] = useState(false)
-  const selectRef = useRef(null)
-  const createRef = useRef(null)
-  const renderPopup = useCallback(
-    (menu) => (
-      <>
-        {menu}
-        {canCreateMaterial ? (
-          <Button
-            ref={createRef}
-            type="link"
-            block
-            onMouseDown={(event) => event.preventDefault()}
-            onKeyDown={(event) => {
-              event.stopPropagation()
-              if (
-                event.key === 'Escape' ||
-                (event.key === 'Tab' && event.shiftKey)
-              ) {
-                event.preventDefault()
-                selectRef.current?.focus()
-                if (event.key === 'Escape') setOpen(false)
-              }
-            }}
-            onClick={() => {
-              selectRef.current?.focus()
-              setOpen(false)
-              onCreateMaterial()
-            }}
-          >
-            新建物料并使用
-          </Button>
-        ) : null}
-      </>
-    ),
-    [canCreateMaterial, onCreateMaterial]
-  )
-  return (
-    <RemoteReferenceSelect
-      referenceType="materials"
-      params={{ active_only: false }}
-      presentation="reference"
-      mapOption={bomMaterialOption}
-      {...props}
-      ref={selectRef}
-      open={open}
-      onOpenChange={setOpen}
-      onInputKeyDown={(event) => {
-        if (
-          open &&
-          canCreateMaterial &&
-          event.key === 'Tab' &&
-          !event.shiftKey
-        ) {
-          event.preventDefault()
-          createRef.current?.focus()
-        }
-      }}
-      popupRender={renderPopup}
-    />
-  )
-}
 
 function LossRateInput({ value, onChange, ...props }) {
   const [text, setText] = useState(() => bomLossRateToPercent(value))
@@ -265,10 +195,6 @@ export default function BOMMaterialGroupsForm({
   const groups = groupBOMMaterials(items)
   const disclosure = useBusinessLineItemGroups({ form, groups: groups.map((group) => ({ id: group.key, indexes: group.indexes })) })
   const materials = useMemo(() => [...materialByID.values()], [materialByID])
-  const displayMaterialOptions = useMemo(() => materialOptions.map((option) => {
-    const material = materialByID.get(Number(option.value))
-    return material ? { ...option, ...bomMaterialOption(material) } : option
-  }), [materialOptions, materialByID])
   const [creatingFor, setCreatingFor] = useState(null)
   const [focusRequest, setFocusRequest] = useState(null)
   const rowRefs = useRef(new Map())
@@ -294,7 +220,7 @@ export default function BOMMaterialGroupsForm({
     indexes.forEach((index) => {
       next[index] = {
         ...next[index],
-        ...changes,
+        ...(typeof changes === 'function' ? changes(next[index]) : changes),
         _material_group_key: next[index]?._material_group_key || groupKey,
       }
     })
@@ -302,12 +228,18 @@ export default function BOMMaterialGroupsForm({
     return next
   }
 
+  const materialConflict = (indexes, material) => indexes
+    .map((index) => bomMaterialConflictText(form.getFieldValue(['items', index]), material, unitOptions))
+    .find(Boolean) || ''
+
   const changeMaterial = (indexes, material) => {
-    onItemsChange?.()
-    const all = form.getFieldValue('items') || []
-    indexes.forEach((index) => {
-      form.setFieldValue(['items', index], bindBOMMaterialReference(all[index], material))
-    })
+    const conflict = materialConflict(indexes, material)
+    if (conflict) {
+      message.warning(`${conflict}，请先核对物料和用量。`)
+      return
+    }
+    updateMaterialGroup(indexes, (item) => bindBOMMaterialReference(item, material))
+    setFocusRequest({ index: indexes[0], material: true })
   }
 
   const pasteParts = (event, index, column, add) => {
@@ -412,7 +344,7 @@ export default function BOMMaterialGroupsForm({
                     if (!field) return null
                     const material = materialByID.get(Number(group.materialID))
                     const importSource = group.indexes
-                      .map((itemIndex) => items[itemIndex]?._import_source)
+                      .map((itemIndex) => readBOMMaterialSource(items[itemIndex]))
                       .find(Boolean)
                     const unit = referenceLabel(
                       unitOptions,
@@ -492,16 +424,19 @@ export default function BOMMaterialGroupsForm({
                                         showSearch
                                         allowClear
                                         optionFilterProp="label"
-                                        options={displayMaterialOptions}
+                                        options={materialOptions}
+                                        materialByID={materialByID}
+                                        sourceItem={items[index]}
+                                        unitOptions={unitOptions}
                                         placeholder={
                                           importSource && !material
                                             ? '选择对应材料档案'
                                             : '搜索并选择物料'
                                         }
-                                        onChange={(id) =>
+                                        onChange={(id, option) =>
                                           changeMaterial(
                                             group.indexes,
-                                            materialByID.get(Number(id))
+                                            option?.record || materialByID.get(Number(id))
                                           )
                                         }
                                       />
@@ -812,6 +747,8 @@ export default function BOMMaterialGroupsForm({
         open={creatingFor !== null}
         materials={materials}
         unitOptions={unitOptions}
+        initialValues={buildBOMMaterialCreateDefaults(creatingFor ? items[creatingFor[0]] : undefined, unitOptions)}
+        validateMaterial={(material) => creatingFor ? materialConflict(creatingFor, material) : ''}
         onCancel={() => setCreatingFor(null)}
         onCreated={(material) => {
           onMaterialCreated(material)

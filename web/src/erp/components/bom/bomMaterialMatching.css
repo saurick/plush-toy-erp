@@ -1,0 +1,27 @@
+.erp-bom-material-popup .erp-bom-material-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-bom-material-option__identity {
+  flex: 1;
+  min-width: 0;
+}
+
+.erp-bom-material-option__identity > span,
+.erp-bom-material-option__identity > small {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.erp-bom-material-option__identity > small {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-bom-material-option__identity > .erp-bom-material-option__conflict,
+.erp-bom-material-create-modal .erp-bom-material-create-conflict {
+  color: var(--erp-visual-danger-text);
+}

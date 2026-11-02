@@ -10,6 +10,7 @@ import (
 func syntheticBOMSourceSnapshot() map[string]any {
 	return map[string]any{
 		"file_name": "教学材料.xlsx", "sheet_name": "材料分析明细表", "row_number": 6,
+		"material_code": "MAT-EXAMPLE", "material_name": "原表短毛绒", "supplier_item_no": "客供", "material_spec": "51\"", "color": "黑色",
 		"quantity_value": "0.0123456789012345", "quantity_label": "单位用量", "quantity_format": "0.000",
 		"total_value": "1.358024679135795", "total_label": "总用量 含损耗10%", "total_format": "0.00",
 		"total_formula": "F6*G3*1.1", "loss_source": BOMLossSourceHeader, "loss_rate": "0.1", "loss_value": "", "order_quantity": "100",
@@ -21,6 +22,13 @@ func TestBOMSourceSnapshotRetainsOriginalValuesAndCopiesInput(t *testing.T) {
 	got, err := normalizeBOMSourceSnapshot(source)
 	if err != nil || got["quantity_value"] != "0.0123456789012345" || got["total_value"] != "1.358024679135795" {
 		t.Fatalf("source values were not retained: %v", err)
+	}
+	if got["material_name"] != "原表短毛绒" || got["supplier_item_no"] != "客供" || got["material_spec"] != "51\"" || got["color"] != "黑色" {
+		t.Fatal("original material identity was not retained")
+	}
+	source["material_name"] = "覆盖后的名称"
+	if got["material_name"] != "原表短毛绒" {
+		t.Fatal("material evidence aliases the caller")
 	}
 	source["quantity_value"] = "9"
 	if got["quantity_value"] != "0.0123456789012345" {
@@ -47,6 +55,9 @@ func TestBOMSourceSnapshotBoundsEvidenceAndRejectsInvalidShapes(t *testing.T) {
 		func(v map[string]any) { v["row_number"] = 0 },
 		func(v map[string]any) { v["row_number"] = 1.2 },
 		func(v map[string]any) { v["extra"] = "unregistered" },
+		func(v map[string]any) { v["material_name"] = strings.Repeat("料", BOMSourceMaxTextCharacters+1) },
+		func(v map[string]any) { v["material_spec"] = 51 },
+		func(v map[string]any) { v["color"] = "黑\x00色" },
 		func(v map[string]any) { v["quantity_value"] = strings.Repeat("1", BOMSourceMaxNumberCharacters+1) },
 		func(v map[string]any) { v["loss_source"] = "unregistered" },
 		func(v map[string]any) { v["total_value"] = map[string]any{} },
