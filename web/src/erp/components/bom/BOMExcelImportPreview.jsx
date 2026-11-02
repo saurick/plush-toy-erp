@@ -159,8 +159,8 @@ export default function BOMExcelImportPreview({
               onSearch={(value) => { setKeyword(value); setPage(1) }}
             />
             <Button className="erp-source-import-picker__clear-filter" disabled={!keyword && !reviewFilter} onClick={() => { setKeyword(''); setReviewFilter(''); setPage(1) }}>清空筛选</Button>
-            <div data-table-scroll-toolbar />
           </div>
+          <div data-table-scroll-toolbar />
         </div>
         <Typography.Text type="secondary" role="status" id={importScopeId}>整份文件导入；筛选结果 {visibleRows.length} / {rows.length} 个部位。筛选仅用于核对，确认后带入全部 {rows.length} 个部位。</Typography.Text>
         <Table

@@ -1,6 +1,7 @@
 import { expect } from 'playwright/test'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { assertImportPickerGeometry } from './importPickerAssertions.mjs'
 
 export function createBOMImportPreviewScenarios(deps) {
   return [
@@ -93,6 +94,9 @@ export function createBOMImportPreviewScenarios(deps) {
       await expect(right).toBeVisible()
       await toolbar.getByRole('button', { name: '清空筛选', exact: true }).click()
       await expect(rows).toHaveCount(10)
+      if (scenario.name === 'bom-import-preview-desktop') {
+        await assertImportPickerGeometry(page, modal, scenario.name)
+      }
       await modal.getByRole('button', { name: '取消', exact: true }).click()
       await expect(modal).toBeHidden()
       if (scenario.detailsOnly) {
