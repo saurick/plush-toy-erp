@@ -31,7 +31,7 @@ export default function BusinessLineItemsTable({
         data-table-lines="appearance"
         style={{
           minWidth: desktopColumns.reduce(
-            (total, column) => total + column.width,
+            (total, column) => total + (column.width ?? 0),
             44 + actionsWidth
           ),
         }}
