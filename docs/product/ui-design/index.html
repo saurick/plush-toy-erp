@@ -953,6 +953,11 @@
     .detail-grid { display: grid; grid-template-columns: 110px 1fr 110px 1fr; gap: 11px 12px; }
     .detail-grid dt { color: var(--text-3); }
     .detail-grid dd { margin: 0; min-width: 0; }
+    .detail-line-disclosure { border:1px solid var(--line); border-radius:8px; margin-top:8px; background:var(--surface); }
+    .detail-line-disclosure > summary { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; min-height:44px; padding:9px 12px; cursor:pointer; overflow-wrap:anywhere; }
+    .detail-line-disclosure > summary span { color:var(--text-2); }
+    .detail-line-disclosure > .detail-line-table { padding:0 12px 12px; }
+    .detail-line-group-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
     .timeline { display: grid; gap: 0; }
     .timeline-item { position: relative; padding: 0 0 16px 23px; }
     .timeline-item::before { content: ""; position: absolute; left: 6px; top: 5px; bottom: -5px; width: 1px; background: var(--line); }
@@ -18554,13 +18559,19 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(480px,100%)"><header class="modal-head"><strong>放弃未保存修改？</strong></header><div class="modal-body"><p style="margin:0;line-height:1.7;color:var(--text-2)">返回列表后，本次录入内容不会保留。</p></div><footer class="modal-foot"><button class="btn" data-action="close-overlay">继续编辑</button><button class="btn danger" data-action="confirm-nav">放弃并返回</button></footer></section></div>`;
     }
 
+    function renderDetailLineCollection(row,config,page) {
+      const table=items=>`<div class="detail-line-table"><table aria-label="${config.item}明细"><thead><tr><th>序号</th><th>${config.item}</th><th>规格 / 来源</th><th>数量</th><th>单位</th><th>${config.metricLabel}</th><th>状态</th></tr></thead><tbody>${items.map(item=>`<tr data-detail-line="${item.id}"><td>${item.no}</td><td>${escapeHTML(item.item)}</td><td>${escapeHTML(item.source)}</td><td>${item.quantity}</td><td>${escapeHTML(item.unit)}</td><td>${escapeHTML(item.metric)}</td><td><span class="badge ${badgeClass(row)}">${escapeHTML(item.status)}</span></td></tr>`).join('')||'<tr><td colspan="7"><div class="empty">没有符合条件的明细</div></td></tr>'}</tbody></table></div>`;
+      if(!['sales','purchase','outsourcing'].includes(config.key)||page.rows.length<=1)return table(page.rows);
+      return `<div class="detail-line-group-actions" role="group" aria-label="本页明细分组"><button class="btn" data-action="detail-groups-expand">全部展开</button><button class="btn" data-action="detail-groups-collapse">全部收起</button></div>${page.rows.map((item,index)=>`<details class="detail-line-disclosure" data-detail-line-group ${index===0?'open':''}><summary><strong>${escapeHTML(item.item)}</strong><span>1 条</span></summary>${table([item])}</details>`).join('')}`;
+    }
+
     function renderDetailModal(row) {
       const config = listConfig[state.drawer.page] || listConfig.sales;
       const tabs = [['basic','基本信息'],['lines','明细'],...(config.key==='products'?[['media','图片与附件']]:[]),['related','关联单据'],['history','操作记录']];
       let body = '';
       if (state.detailTab === 'lines') {
         const items=recordDetailItems(row,config),page=collectionSlice('lines',row.id,items);
-        body=`<section class="detail-section"><h3 class="section-title">${config.item}明细 · ${items.length} 条</h3>${items.length>50||page.query.query?collectionControls('lines',row.id,page,'明细'):''}<div class="detail-line-table"><table aria-label="${config.item}明细"><thead><tr><th>序号</th><th>${config.item}</th><th>规格 / 来源</th><th>数量</th><th>单位</th><th>${config.metricLabel}</th><th>状态</th></tr></thead><tbody>${page.rows.map(item=>`<tr data-detail-line="${item.id}"><td>${item.no}</td><td>${escapeHTML(item.item)}</td><td>${escapeHTML(item.source)}</td><td>${item.quantity}</td><td>${escapeHTML(item.unit)}</td><td>${escapeHTML(item.metric)}</td><td><span class="badge ${badgeClass(row)}">${escapeHTML(item.status)}</span></td></tr>`).join('')||'<tr><td colspan="7"><div class="empty">没有符合条件的明细</div></td></tr>'}</tbody></table></div></section>`;
+        body=`<section class="detail-section"><h3 class="section-title">${config.item}明细 · ${items.length} 条</h3>${items.length>50||page.query.query?collectionControls('lines',row.id,page,'明细'):''}${renderDetailLineCollection(row,config,page)}</section>`;
       } else if (state.detailTab === 'media') {
         body = `<section class="detail-section"><div class="product-detail-hero"><div class="product-main-image">${renderProductArt(Math.max(0,['正面图','侧面图','包装图','细节图'].indexOf(state.productMediaPrimary)),rowParty(row,config))}</div><div><span class="badge success">主图 · ${state.productMediaPrimary}</span><h3 style="margin:9px 0 5px">${rowParty(row,config)}</h3><p class="data-note" style="line-height:1.65">图片用于产品识别、订单选款和打印资料；原图与业务附件分开保留上传人、时间和替换记录。</p><button class="btn primary" style="margin-top:10px" data-action="open-attachments" data-context="product" data-owner="${row.no}">${icon('paperclip')}管理图片与附件</button></div></div></section><section class="detail-section"><h3>图片资料</h3><div class="media-gallery">${state.productMediaOrder.map(label=>{const index=['正面图','侧面图','包装图','细节图'].indexOf(label);return `<article class="media-card"><div class="media-card-visual">${renderProductArt(index,rowParty(row,config)+' '+label)}</div><div class="media-card-meta"><span>${label}</span>${state.productMediaPrimary===label?'<span class="badge success">主图</span>':'<button class="text-btn" data-action="media-set-main" data-value="'+label+'">设为主图</button>'}</div></article>`}).join('')}</div></section>`;
       } else if (state.detailTab === 'related') {
@@ -18825,6 +18836,9 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
       if(action==='collection-page'){
         const query=collectionQuery(target.dataset.collection,target.dataset.owner);query.page=Math.max(1,query.page+Number(target.dataset.value));renderFloating();return;
+      }
+      if(action==='detail-groups-expand'||action==='detail-groups-collapse'){
+        target.closest('.detail-section')?.querySelectorAll('[data-detail-line-group]').forEach(group=>{group.open=action==='detail-groups-expand';});return;
       }
       if(action==='inspect-record'){
         const config=listPreviewConfig(listConfig[target.dataset.page]),row=config?.rows.find(item=>item.id===target.dataset.id);if(!row)return;

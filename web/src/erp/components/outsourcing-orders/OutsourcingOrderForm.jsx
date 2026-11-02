@@ -13,6 +13,7 @@ import {
   Space,
 } from 'antd'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import { outsourcingOrderLineGroupKey } from '../../utils/sourceDocumentLineGroupKeys.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
@@ -321,7 +322,7 @@ export default function OutsourcingOrderForm({
               const subjectID = material ? item.material_id : item.product_id
               const label = referenceLabel(material ? materialOptions : productOptions, subjectID, material ? '待选择材料' : item.product_name_snapshot || '待选择产品')
               return {
-                key: subjectID && item.process_id ? `${item.subject_type}:${subjectID}:${item.process_id}` : undefined,
+                key: outsourcingOrderLineGroupKey(item),
                 label,
                 title: `${label} · ${referenceLabel(processOptions, item.process_id, '待选择工序')}`,
               }

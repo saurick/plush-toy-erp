@@ -13,6 +13,7 @@ import BusinessDetailsPagination, {
 import BusinessRowItemCards from './BusinessRowItemCards.jsx'
 import BusinessRecordDetails from './BusinessRecordDetails.jsx'
 import BusinessFormSection from './BusinessFormSection.jsx'
+import BusinessDetailItemGroups from './BusinessDetailItemGroups.jsx'
 
 const EMPTY_LINE_ITEMS = Object.freeze([])
 
@@ -31,10 +32,12 @@ function useBusinessLineItems(config, open, record) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(BUSINESS_DETAILS_PAGE_SIZE)
   const [retryKey, setRetryKey] = useState(0)
+  const [expandedPages, setExpandedPages] = useState({})
 
   useEffect(() => {
     setPage(1)
     setPageSize(BUSINESS_DETAILS_PAGE_SIZE)
+    setExpandedPages({})
     if (!open || !record) {
       setLoadState({ status: 'idle', items: EMPTY_LINE_ITEMS })
       return undefined
@@ -79,6 +82,11 @@ function useBusinessLineItems(config, open, record) {
     },
     pageStart,
     pageItems,
+    expandedGroups: expandedPages[`${pageSize}:${page}`],
+    changeExpandedGroups: (groups) => setExpandedPages((previous) => ({
+      ...previous,
+      [`${pageSize}:${page}`]: groups,
+    })),
     retry: () => setRetryKey((value) => value + 1),
   }
 }
@@ -93,12 +101,15 @@ function BusinessLineItems({ config, record, state, contentRef }) {
     title = '完整明细',
   } = config
   const { loadState, pageItems, pageStart, retry } = state
+  const grouped = typeof config.getItemGroup === 'function' && loadState.items.length > 1
+  const sectionTitle = loadState.status === 'success' && loadState.items.length > 0
+    ? `${title}（共 ${loadState.items.length} 条）`
+    : title
   return (
     <div ref={contentRef}>
       <BusinessFormSection
-        title={loadState.status === 'success' && loadState.items.length > 0
-          ? `${title}（共 ${loadState.items.length} 条）`
-          : title}
+        title={sectionTitle}
+        showHeading={!grouped}
         layout="content"
       >
         {loadState.status === 'success' && loadState.items.length === 0 ? (
@@ -128,17 +139,30 @@ function BusinessLineItems({ config, record, state, contentRef }) {
           />
         ) : null}
         {loadState.status === 'success' && pageItems.length > 0 ? (
-          <div className="erp-business-detail-items__items">
-            <BusinessRowItemCards
-              getItemFields={getItemFields}
-              getItemKey={getItemKey}
-              getItemLabel={getItemLabel}
-              getItemSummary={getItemSummary}
+          grouped ? (
+            <BusinessDetailItemGroups
+              config={config}
               items={pageItems}
               record={record}
               startIndex={pageStart}
+              title={sectionTitle}
+              total={loadState.items.length}
+              expandedGroups={state.expandedGroups}
+              onExpandedGroupsChange={state.changeExpandedGroups}
             />
-          </div>
+          ) : (
+            <div className="erp-business-detail-items__items">
+              <BusinessRowItemCards
+                getItemFields={getItemFields}
+                getItemKey={getItemKey}
+                getItemLabel={getItemLabel}
+                getItemSummary={getItemSummary}
+                items={pageItems}
+                record={record}
+                startIndex={pageStart}
+              />
+            </div>
+          )
         ) : null}
       </BusinessFormSection>
     </div>

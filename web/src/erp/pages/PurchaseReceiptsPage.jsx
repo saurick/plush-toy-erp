@@ -63,6 +63,7 @@ import {
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import { purchaseMaterialLineGroupKey } from '../utils/sourceDocumentLineGroupKeys.mjs'
 import PurchaseReceiptExceptionModal from '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx'
 import PurchaseReceiptExceptionRecordsModal from '../components/purchase-receipts/PurchaseReceiptExceptionRecordsModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
@@ -1648,6 +1649,10 @@ export default function PurchaseReceiptsPage() {
         lineItems={{
           emptyDescription: '当前采购入库单暂无明细',
           getItemFields: getPurchaseReceiptItemFields,
+          getItemGroup: (item) => ({
+            key: purchaseMaterialLineGroupKey(item),
+            label: referenceLabel(materialOptions, item?.material_id, '材料'),
+          }),
           getItemKey: (item) => item?.id,
           getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
           items: detailReceipt?.items,

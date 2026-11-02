@@ -60,6 +60,44 @@ export function createBusinessDetailsScenarios(deps) {
     })
   }
 
+  async function assertCollapsedDetailGroups(modal) {
+    const metrics = await modal.locator('.erp-business-detail-group').evaluateAll((groups) => groups.map((group) => ({
+      height: group.getBoundingClientRect().height,
+      headingHeight: group.querySelector('.erp-business-detail-group__toggle').getBoundingClientRect().height,
+      visibleFields: [...group.querySelectorAll('dt, dd')].filter((field) => field.checkVisibility()).length,
+    })))
+    assert(metrics.length > 0)
+    assert(metrics.every((group) => group.visibleFields === 0 && Math.abs(group.height - group.headingHeight) <= 2.1), `收起后仅标题与条数占空间，普通字段全部隐藏: ${JSON.stringify(metrics)}`)
+  }
+
+  async function assertDetailGroupInteractions(modal, onCollapsed) {
+    const toggles = modal.locator('.erp-business-detail-group__toggle')
+    const count = await toggles.count()
+    assert(count > 0, '多条单据详情必须接入业务分组')
+    assert.equal(await toggles.first().getAttribute('aria-expanded'), 'true')
+    for (let index = 1; index < count; index += 1) {
+      assert.equal(await toggles.nth(index).getAttribute('aria-expanded'), 'false', '默认只展开首组')
+    }
+    const fields = modal.locator('.erp-business-row-item-card').first()
+    await fields.evaluate((node) => { node.dataset.detailGroupProbe = 'retained' })
+    await modal.getByRole('button', { name: '全部收起', exact: true }).click()
+    assert.equal(await modal.locator('.erp-business-detail-group__toggle[aria-expanded="true"]').count(), 0)
+    await assertCollapsedDetailGroups(modal)
+    await onCollapsed?.()
+    await toggles.first().focus()
+    await toggles.first().press('Enter')
+    assert.equal(await toggles.first().getAttribute('aria-expanded'), 'true')
+    if (count > 1) {
+      await toggles.nth(1).focus()
+      await toggles.nth(1).press('Space')
+      assert.equal(await toggles.nth(1).getAttribute('aria-expanded'), 'true')
+      assert.equal(await toggles.first().getAttribute('aria-expanded'), 'true', '允许同时展开多组核对')
+    }
+    await modal.getByRole('button', { name: '全部展开', exact: true }).click()
+    assert.equal(await modal.locator('.erp-business-detail-group__toggle[aria-expanded="true"]').count(), count)
+    assert.equal(await fields.getAttribute('data-detail-group-probe'), 'retained', '收起与展开不重建完整字段和图片入口')
+  }
+
   async function assertFixedDetailPagination(page, modal) {
     await waitForDetailsMotion(modal)
     const footer = modal.locator('.ant-modal-footer')
@@ -272,6 +310,32 @@ export function createBusinessDetailsScenarios(deps) {
   }
 
   return [
+    {
+      name: 'business-details-design-html',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        await frame.locator('.nav-item').filter({ hasText: '销售' }).first().click()
+        await frame.locator('#list-search').fill('SO-20260925-001')
+        await frame.getByRole('button', { name: 'SO-20260925-001', exact: true }).click()
+        const modal = frame.locator('.business-detail-modal')
+        await modal.locator('[data-action="detail-tab"][data-value="lines"]').click()
+        const groups = modal.locator('[data-detail-line-group]')
+        assert((await groups.count()) > 1, '正式交互稿的长明细提供分组示例')
+        assert.equal(await modal.locator('[data-detail-line-group][open]').count(), 1)
+        await modal.getByRole('button', { name: '全部展开', exact: true }).click()
+        assert.equal(await modal.locator('[data-detail-line-group][open]').count(), await groups.count())
+        await modal.getByRole('button', { name: '全部收起', exact: true }).click()
+        assert.equal(await modal.locator('[data-detail-line-group][open]').count(), 0)
+        assert.deepEqual(await groups.first().locator('summary span').allTextContents(), ['1 条'], '正式交互稿收起后同样只保留业务标题与条数')
+        await groups.first().locator('summary').focus()
+        await groups.first().locator('summary').press('Enter')
+        assert.equal(await modal.locator('[data-detail-line-group][open]').count(), 1)
+        await page.screenshot({ path: path.join(outputDir, 'business-details-design-html-4k.png') })
+      },
+    },
     ...[
       {
         domain: 'sales_order',
@@ -308,7 +372,8 @@ export function createBusinessDetailsScenarios(deps) {
         path: config.path,
         auth: 'admin',
         effectiveSession: customerRuntimeEffectiveSession,
-        viewport: { width: 1440, height: 1000 },
+        viewport: { width: retryFailure ? 1920 : 1440, height: retryFailure ? 1080 : 1000 },
+        deviceScaleFactor: retryFailure ? 2 : 1,
         beforeNavigate: async (page) => {
           fullReads = 0
           const items = Array.from({ length: 22 }, (_, index) => ({
@@ -316,7 +381,7 @@ export function createBusinessDetailsScenarios(deps) {
             [`${config.domain}_id`]: 1,
             line_no: index + 1,
             subject_type: 'PRODUCT',
-            product_id: 1,
+            product_id: index < 2 ? 1 : index + 1,
             product_name_snapshot:
               index === 1
                 ? '长名称产品用于验证多字段明细'.repeat(4)
@@ -457,6 +522,14 @@ export function createBusinessDetailsScenarios(deps) {
             10
           )
           assert.equal(fullReads, isReceipt ? 0 : retryFailure ? 2 : 1)
+          if (retryFailure) {
+            await waitForDetailsMotion(modal)
+            await page.screenshot({ path: path.join(outputDir, 'business-details-sales-grouped-default-4k.png') })
+          }
+          await assertDetailGroupInteractions(modal, retryFailure ? async () => {
+            await page.locator('.ant-message-notice').last().waitFor({ state: 'hidden' })
+            await page.screenshot({ path: path.join(outputDir, 'business-details-title-only-4k.png') })
+          } : undefined)
           const metrics = await assertWideDetailsModal(page, modal)
           assert.equal(metrics.columns, 6)
           assert.equal(metrics.fullFieldGaps.length, retryFailure ? 20 : 10)
@@ -720,6 +793,7 @@ export function createBusinessDetailsScenarios(deps) {
           10
         )
         await assertFixedDetailPagination(page, modal)
+        await assertDetailGroupInteractions(modal)
         const fieldRows = await modal
           .locator('.erp-business-row-item-card')
           .first()
@@ -765,6 +839,11 @@ export function createBusinessDetailsScenarios(deps) {
         )
         for (const width of [1920, 1440, 2560, 1000, 680, 390]) {
           await page.setViewportSize({ width, height: 1000 })
+          if (width < 768) {
+            await modal.getByRole('button', { name: '全部收起', exact: true }).click()
+            await assertCollapsedDetailGroups(modal)
+            await modal.getByRole('button', { name: '全部展开', exact: true }).click()
+          }
           const metrics = await assertWideDetailsModal(page, modal)
           if (width >= 1440) {
             assert(

@@ -47,6 +47,7 @@ import {
 import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import { salesOrderLineGroupKey } from '../utils/sourceDocumentLineGroupKeys.mjs'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
@@ -1970,6 +1971,10 @@ export default function SalesOrdersPage() {
             ? {
                 emptyDescription: '当前销售订单暂无明细',
                 getItemFields: getSalesOrderItemFields,
+                getItemGroup: (item) => ({
+                  key: salesOrderLineGroupKey(item),
+                  label: [salesOrderRequirementName(item), item?.product_code_snapshot].filter(Boolean).join(' · '),
+                }),
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
                 load: loadSalesOrderDetailsItems,

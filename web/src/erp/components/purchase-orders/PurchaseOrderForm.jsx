@@ -6,6 +6,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Space, Typography } from 'antd'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import { purchaseMaterialLineGroupKey } from '../../utils/sourceDocumentLineGroupKeys.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import RemoteReferencePicker from '../RemoteReferencePicker.jsx'
@@ -365,7 +366,7 @@ export function PurchaseOrderFormFields({
           grouping={{
             form,
             getGroup: (item) => ({
-              key: item.material_id && item.unit_id ? `${item.material_id}:${item.unit_id}` : undefined,
+              key: purchaseMaterialLineGroupKey(item),
               label: referenceLabel(materialOptions, item.material_id, '待选择材料'),
               title: `${referenceLabel(materialOptions, item.material_id, '待选择材料')} · ${referenceLabel(unitOptions, item.unit_id, '待选择单位')}`,
             }),

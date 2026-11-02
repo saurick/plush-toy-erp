@@ -73,6 +73,7 @@ import {
   BusinessLineItemRow,
 } from '../business-list/BusinessLineItemsTable.jsx'
 import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.jsx'
+import { salesOrderLineGroupKey } from '../../utils/sourceDocumentLineGroupKeys.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import {
   optionalMoneyRule,
@@ -678,7 +679,7 @@ export function SalesOrderItemsFormSection({
               <BusinessGroupedLineItems
                 fields={fields}
                 form={form}
-                getGroup={(item) => ({ key: item.product_id || undefined, label: salesOrderRequirementName(item) || '待填写订货产品' })}
+                getGroup={(item) => ({ key: salesOrderLineGroupKey(item), label: salesOrderRequirementName(item) || '待填写订货产品' })}
                 tableProps={{ columns: SALES_ORDER_COLUMNS, label: '订货明细' }}
               >
                 {(field, index) => {

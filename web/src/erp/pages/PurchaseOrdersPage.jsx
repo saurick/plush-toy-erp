@@ -30,6 +30,7 @@ import {
 } from '../components/business-list/BusinessListLayout.jsx'
 import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import { purchaseMaterialLineGroupKey } from '../utils/sourceDocumentLineGroupKeys.mjs'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import {
   createBlankPurchaseLine,
@@ -1590,6 +1591,10 @@ export default function PurchaseOrdersPage() {
             ? {
                 emptyDescription: '当前采购订单暂无明细',
                 getItemFields: getPurchaseOrderItemFields,
+                getItemGroup: (item) => ({
+                  key: purchaseMaterialLineGroupKey(item),
+                  label: [item?.material_name_snapshot, item?.material_code_snapshot].filter(Boolean).join(' · '),
+                }),
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
                 load: loadPurchaseOrderDetailsItems,

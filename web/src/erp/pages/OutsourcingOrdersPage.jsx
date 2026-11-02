@@ -51,6 +51,7 @@ import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessFormSection from '../components/business-list/BusinessFormSection.jsx'
 import BusinessRecordDetails from '../components/business-list/BusinessRecordDetails.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import { outsourcingOrderLineGroupKey } from '../utils/sourceDocumentLineGroupKeys.mjs'
 
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
@@ -1107,6 +1108,10 @@ export default function OutsourcingOrdersPage() {
             ? {
                 emptyDescription: '当前加工合同暂无明细',
                 getItemFields: getOutsourcingOrderItemFields,
+                getItemGroup: (item) => ({
+                  key: outsourcingOrderLineGroupKey(item),
+                  label: [item?.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL ? item?.material_name_snapshot : item?.product_name_snapshot, item?.process_name_snapshot].filter(Boolean).join(' · '),
+                }),
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
                 load: loadOutsourcingOrderDetailsItems,
