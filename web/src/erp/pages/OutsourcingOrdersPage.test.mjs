@@ -151,6 +151,12 @@ test('outsourcing order source actions stay on the matching confirmed open line'
     source,
     /<BusinessDetailsModal[\s\S]*getItemFields: getOutsourcingOrderItemFields/u
   )
+  assert.match(source, /<OutsourcingOrderHandlingItems[\s\S]*getItemFields=\{getOutsourcingHandlingItemFields\}/u)
+  const readonlyFields = sourceFactActions.slice(
+    sourceFactActions.indexOf('const getOutsourcingOrderItemFields'),
+    sourceFactActions.indexOf('const getOutsourcingHandlingItemFields')
+  )
+  assert.doesNotMatch(readonlyFields, /renderOutsourcingSourceFactAction|业务操作/u)
 })
 
 test('outsourcing page keeps follow-up boundaries at the action context', () => {

@@ -577,7 +577,7 @@
     "id": "processing-contracts",
     "book": "business",
     "title": "委外订单怎么用",
-    "source_hash": "8ac1a55d2b1bb068e93bce5896c4be837cc59697fce6c6ae4fb9cc0e5ceef547",
+    "source_hash": "338d6fdeb25f3598a4af4cff2cd595f9f579a9e8ace7d6123c956a947ada4870",
     "path": "/erp/purchase/processing-contracts",
     "roles": [
       "production"
@@ -588,7 +588,7 @@
     "id": "processing-contracts:confirmed-outsourcing-contract",
     "book": "business",
     "title": "合同确认为什么不等于已经发料或回货",
-    "source_hash": "24f26a4a17d0dc6633bfbf77604aced8d471521f4b7e3695d36be129425e2022",
+    "source_hash": "45580aa2f6014b4cd223303ecbcc1334e2d55f59806737f79dcae08356192ecd",
     "path": "/erp/purchase/processing-contracts",
     "roles": [
       "production"
@@ -599,7 +599,7 @@
     "id": "processing-contracts:outsourcing-line-amount",
     "book": "business",
     "title": "加工金额怎么算",
-    "source_hash": "ae114b0dd83ab306353b7cca32f9d58aa6b4649c258eff7d694000835b1c3245",
+    "source_hash": "36d43116f4f2f2f5bd8e1f28c63fe8578c245819832f6e484622f4216c249830",
     "path": "/erp/purchase/processing-contracts",
     "roles": [
       "production"
@@ -610,7 +610,7 @@
     "id": "processing-contracts:outsourcing-master-data-source",
     "book": "business",
     "title": "加工厂、产品和工序从哪里来",
-    "source_hash": "19f7c3b911ab53b49866816e9136df307ea3acd0519ae43187ea4c1c54efd1e6",
+    "source_hash": "d0e459e57ef2cbe95beef70ec86d208b92387ba417610d0625ba869b15ffe254",
     "path": "/erp/purchase/processing-contracts",
     "roles": [
       "production"
@@ -621,7 +621,7 @@
     "id": "processing-contracts:outsourcing-action-disabled",
     "book": "business",
     "title": "为什么不能确认、发料或回货",
-    "source_hash": "55f234eaa1d38bbfb764cafd3f7615ced576da72f6df704b97185351749d6a6c",
+    "source_hash": "66556aeb810a5b02829811ef4ae7bd7ab1062dbcf711d8c3859dd05d2486150b",
     "path": "/erp/purchase/processing-contracts",
     "roles": [
       "production"
@@ -1475,7 +1475,7 @@
     "id": "guide:processing-contracts",
     "book": "business",
     "title": "跟进委外订单",
-    "source_hash": "379b97989578654179552af0b9c461f63b1d9c1f4e95ea0d2e48aadcf15b3bb1",
+    "source_hash": "16065d658e6fbaca87c9bc56ca2ae6511017da3149912eec8253254f17124a8a",
     "path": "/erp/purchase/processing-contracts",
     "roles": [
       "production"

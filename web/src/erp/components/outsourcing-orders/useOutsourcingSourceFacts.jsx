@@ -795,10 +795,9 @@ export function useOutsourcingSourceFacts({
   }, [canCreateMaterialIssue, canCreateReturnReceipt, canCreateStagePayable, canReadWIP, canViewPayable, taskBusiness, taskScope, navigate, openOutsourcingOrderPayable, openOutsourcingSourceFact, sourceFactLoading])
 
   const getOutsourcingOrderItemFields = useCallback(
-    (item, { record }) => {
+    (item) => {
       const isMaterial =
         item?.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
-      const sourceAction = renderOutsourcingSourceFactAction(record, item)
       return [
         {
           label: '加工品类',
@@ -866,12 +865,22 @@ export function useOutsourcingSourceFacts({
           ),
         },
         { label: '备注', value: item?.note, fullWidth: true },
+      ]
+    },
+    [unitOptions]
+  )
+
+  const getOutsourcingHandlingItemFields = useCallback(
+    (item, { record }) => {
+      const sourceAction = renderOutsourcingSourceFactAction(record, item)
+      return [
+        ...getOutsourcingOrderItemFields(item),
         ...(sourceAction
           ? [{ label: '业务操作', value: sourceAction, fullWidth: true, taskSummary: true }]
           : []),
       ]
     },
-    [renderOutsourcingSourceFactAction, unitOptions]
+    [getOutsourcingOrderItemFields, renderOutsourcingSourceFactAction]
   )
 
   const loadOutsourcingOrderDetailsItems = useCallback(
@@ -1117,6 +1126,7 @@ export function useOutsourcingSourceFacts({
     openOutsourcingFactDraftEditor,
     closeOutsourcingSourceFact,
     getOutsourcingOrderItemFields,
+    getOutsourcingHandlingItemFields,
     loadOutsourcingOrderDetailsItems,
     submitOutsourcingSourceFact,
   }

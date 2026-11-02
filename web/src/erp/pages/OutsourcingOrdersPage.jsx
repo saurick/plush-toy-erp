@@ -48,6 +48,8 @@ import { BusinessListToolbarActions, useBusinessColumnOrder } from '../component
 import { createBusinessTablePagination } from '../utils/businessPagination.mjs'
 
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
+import BusinessFormSection from '../components/business-list/BusinessFormSection.jsx'
+import BusinessRecordDetails from '../components/business-list/BusinessRecordDetails.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
@@ -56,6 +58,7 @@ import OutsourcingOrderForm, {
 } from '../components/outsourcing-orders/OutsourcingOrderForm.jsx'
 import OutsourcingOrderSourceFactModal from '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx'
 import OutsourcingOrderSummaryPanel from '../components/outsourcing-orders/OutsourcingOrderSummaryPanel.jsx'
+import OutsourcingOrderHandlingItems from '../components/outsourcing-orders/OutsourcingOrderHandlingItems.jsx'
 import OutsourcingReturnRecordsModal from '../components/outsourcing-orders/OutsourcingReturnRecordsModal.jsx'
 import OutsourcingReturnQualityInspectionModal from '../components/quality-inspections/OutsourcingReturnQualityInspectionModal.jsx'
 import OutsourcingReturnDispositionModal from '../components/quality-inspections/OutsourcingReturnDispositionModal.jsx'
@@ -247,6 +250,7 @@ export default function OutsourcingOrdersPage() {
   useTaskBusinessEditor({ record: selectedRow, enabled: canUpdate && canEditOutsourcingOrder(selectedRow) && outletContext?.taskBusiness?.contract?.actionKeys.includes('outsourcing-edit'), open: openEdit })
 
   const [printingAction, setPrintingAction] = useState('')
+  const [handlingOpen, setHandlingOpen] = useState(false)
   const summaryRef = useRef(null)
 
   const canPostOutsourcingFact = hasActionPermission(
@@ -351,6 +355,7 @@ export default function OutsourcingOrdersPage() {
     openOutsourcingFactDraftEditor,
     closeOutsourcingSourceFact,
     getOutsourcingOrderItemFields,
+    getOutsourcingHandlingItemFields,
     loadOutsourcingOrderDetailsItems,
     submitOutsourcingSourceFact,
   } = useOutsourcingSourceFacts({
@@ -676,6 +681,8 @@ export default function OutsourcingOrdersPage() {
   const canHandleOutsourcingRecords = canPostOutsourcingFact ||
     canCancelOutsourcingFact || canCreateMaterialIssue || canCreateReturnReceipt ||
     canCreateQualityInspection || canCreatePayable
+  const canHandleOutsourcingLines = canRead && (canCreateMaterialIssue ||
+    canCreateReturnReceipt || canReadWIP || canCreateStagePayable || canViewPayable)
   const relatedOutsourcingFactsAvailability =
     resolveContextualBusinessActionAvailability({
       authorized: canReadOutsourcingFacts,
@@ -936,6 +943,26 @@ export default function OutsourcingOrdersPage() {
                   查看详情
                 </Button>
               </BusinessActionTooltip>
+              {canHandleOutsourcingLines && !outletContext?.taskBusiness ? (
+                <BusinessActionTooltip
+                  disabled={!selectedRow || saving || itemsLoading}
+                  disabledReason={!selectedRow ? '请先选择一条加工合同' : '合同资料处理完成后可办理'}
+                >
+                  <Button
+                    data-business-action-key="outsourcing-handle-items"
+                    data-business-action-role="action"
+                    size="small"
+                    disabled={!selectedRow || saving || itemsLoading}
+                    onClick={(event) => {
+                      // 鼠标点击不自动聚焦的浏览器也须保留返回入口。
+                      event.currentTarget.focus({ preventScroll: true })
+                      setHandlingOpen(true)
+                    }}
+                  >
+                    办理明细
+                  </Button>
+                </BusinessActionTooltip>
+              ) : null}
               {relatedOutsourcingFactsAvailability.visible ? (
                 <BusinessActionTooltip
                   disabled={relatedOutsourcingFactsAvailability.disabled}
@@ -1042,8 +1069,35 @@ export default function OutsourcingOrdersPage() {
       )}
 
       {outletContext?.taskBusiness ? (
-        <MobileOutsourcingTaskActions record={selectedRow} load={loadOutsourcingOrderDetailsItems} getItemFields={getOutsourcingOrderItemFields} refreshKey={outletContext.workflowTaskNavigation?.businessReceipt} />
+        <MobileOutsourcingTaskActions record={selectedRow} load={loadOutsourcingOrderDetailsItems} getItemFields={getOutsourcingHandlingItemFields} refreshKey={outletContext.workflowTaskNavigation?.businessReceipt} />
       ) : null}
+      <BusinessFormPage
+        open={handlingOpen && Boolean(selectedRow) && canHandleOutsourcingLines}
+        title={`办理明细 · ${getOutsourcingOrderDisplayNo(selectedRow)}`}
+        className="erp-outsourcing-handling-page"
+        processing={sourceFactLoading || financeSourceLoading}
+        onCancel={() => setHandlingOpen(false)}
+        footer={(
+          <div className="erp-business-form-page__actions">
+            <Button disabled={sourceFactLoading || financeSourceLoading} onClick={() => setHandlingOpen(false)}>返回列表</Button>
+          </div>
+        )}
+      >
+        {handlingOpen && selectedRow && canHandleOutsourcingLines ? (
+          <>
+            <BusinessFormSection title="合同信息" layout="content">
+              <BusinessRecordDetails columns={detailColumns} record={selectedRow} />
+            </BusinessFormSection>
+            <BusinessFormSection title="办理明细" layout="content">
+              <OutsourcingOrderHandlingItems
+                record={selectedRow}
+                load={loadOutsourcingOrderDetailsItems}
+                getItemFields={getOutsourcingHandlingItemFields}
+              />
+            </BusinessFormSection>
+          </>
+        ) : null}
+      </BusinessFormPage>
       <BusinessDetailsModal
         descriptionInHelp
         columns={detailColumns}
