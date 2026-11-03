@@ -1,6 +1,6 @@
 import '../mobileMine.css'
 import React, { useId, useRef, useState } from 'react'
-import { Button, Empty, Tag } from 'antd'
+import { Button, Tag } from 'antd'
 import {
   BarChartOutlined,
   CalendarOutlined,
@@ -16,6 +16,7 @@ import {
   SwapOutlined,
   UserOutlined,
 } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { taskNeedsDesktop } from '../../utils/taskHandlingPolicy.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'

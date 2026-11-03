@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Empty, Tag, Typography } from 'antd'
+import { Alert, Button, Tag, Typography } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import { MermaidDiagram } from '@/common/components/markdown'
@@ -210,7 +211,6 @@ export default function DevBusinessRulesPanel({ report, reportCurrent, onRunCons
         locale={{
           emptyText: (
             <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="没有匹配的关键规则"
             />
           ),

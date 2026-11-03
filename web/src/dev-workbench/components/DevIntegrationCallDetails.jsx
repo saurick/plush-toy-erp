@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CopyOutlined } from '@ant-design/icons'
-import { Button, Empty, Tag, Tooltip } from 'antd'
+import { Button, Tag, Tooltip } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { Markdown } from '@/common/components/markdown'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { RpcTransport } from '@/common/consts/rpcMethods.generated.mjs'
@@ -111,7 +112,6 @@ export default function DevIntegrationCallDetails({ entry, view, format, onForma
         <div className="erp-dev-integration__note"><Markdown source={part.notesSource} /></div>
       ) : !fields?.length && !emptyShape ? (
         <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={view === 'request' ? '字段合同待补齐' : '返回合同待补齐'}
         >
           <p className="erp-dev-integration__note">尚未逐项登记{label}，请核对已有正式文档。</p>

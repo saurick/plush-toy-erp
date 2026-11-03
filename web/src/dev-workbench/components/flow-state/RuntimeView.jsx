@@ -4,7 +4,8 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Empty, Spin, Tag } from 'antd'
+import { Alert, Button, Spin, Tag } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { WorkbenchEmpty, WorkbenchFacts, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import Select from '@/common/components/select/AppSelect'
 import {
@@ -217,7 +218,7 @@ function RuntimeView({
                 optionRender={renderDefinitionSelectOption}
                 onChange={onSelectDefinition}
               />
-            ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前业务没有登记流程定义，可查看状态与流转规则或事实定义。" />}
+            ) : <Empty description="当前业务没有登记流程定义，可查看状态与流转规则或事实定义。" />}
             {ruleTools}
           </WorkbenchToolbar>
           {definition ? <ProcessDefinitionCard key={definition.key} definition={definition} /> : definitions.length > 0 ? <WorkbenchEmpty title="请选择流程定义" /> : null}
@@ -259,7 +260,7 @@ function RuntimeView({
               </li>
             ))}
           </ol>
-          {stageModel.items.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚无已发生的流程步骤" /> : null}
+          {stageModel.items.length === 0 ? <Empty description="尚无已发生的流程步骤" /> : null}
           {stageModel.hasUndecidedRoute ? <p>尚有待确定的后续路径；未激活分支不列为已发生步骤。</p> : null}
           <Text type="secondary">流程节点完成不代表库存、出货或财务结果已生效。</Text>
           <EvidenceDisclosure label="运行依据与责任核对">

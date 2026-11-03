@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef } from 'react'
 import { AppstoreOutlined, CloseOutlined } from '@ant-design/icons'
-import { Alert, Button, Empty, Tag, Typography } from 'antd'
+import { Alert, Button, Tag, Typography } from 'antd'
 import { useLocation, useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_PRODUCT_CORE_ROUTE } from '../config/devRoutes.mjs'
 import SearchInput from '@/common/components/SearchInput'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -261,7 +262,6 @@ export default function DevProductCorePage() {
             ) : (
               <div className="erp-dev-product-core-empty">
                 <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description="没有匹配的产品能力"
                 />
               </div>

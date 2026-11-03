@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom'
 import {
   Alert,
   Button,
-  Empty,
   Spin,
   Tag,
 } from 'antd'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Pagination from '@/common/components/pagination/AppPagination'
 import { WorkflowTaskStatus } from '@/common/consts/statuses.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -334,7 +334,6 @@ export default function WorkflowExceptionPanel({
               ) : (
                 <Empty
                   description="当前条件下没有待处理关联任务"
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
                 />
               )
             ) : view === 'orders' ? (
@@ -347,7 +346,6 @@ export default function WorkflowExceptionPanel({
               ) : (
                 <Empty
                   description="当前条件下没有可见的关联订单"
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
                 />
               )
             ) : current.data.items.length ? (
@@ -405,7 +403,6 @@ export default function WorkflowExceptionPanel({
             ) : (
               <Empty
                 description={trackingRef ? '本流程暂无可见异常' : '当前条件下没有可跟踪的异常'}
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
             )}
             {compact ? (

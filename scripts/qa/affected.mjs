@@ -886,6 +886,15 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
+    if (/common\/components\/empty\/|DevUIEmptyExamples|devUIEmptyExamples|emptyFeedbackScenarios|RemoteReference(?:Picker|Select)\.jsx$/u.test(file)) {
+      addFollowUp(
+        state,
+        "empty-feedback-browser",
+        "T5",
+        "运行 STYLE_L1_SCENARIOS=empty-feedback-standards-desktop,empty-feedback-business-forms,empty-feedback-reference-picker,empty-feedback-reference-dropdown,empty-states-mobile-light,empty-states-mobile-dark,empty-states-desktop pnpm --dir web style:l1，核对三种空提示规格、加载与失败分离、权限反馈、搜索清空、草稿保留及真实消费者。",
+        file,
+      );
+    }
     if (/(?:DevControlStandards|ERPThemeScope|erpAntdTheme|erpThemePalette|controlThemeAssertions)/u.test(file)) {
       addFollowUp(
         state,

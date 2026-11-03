@@ -23,8 +23,9 @@ test('source import picker keeps client mode and adds opt-in remote pagination',
 test('source import picker fails closed while a remote page is loading or invalid', () => {
   assert.match(
     source,
-    /const canImport =[\s\S]*?!loading[\s\S]*?!importDisabled[\s\S]*?selectedRows\.length > 0[\s\S]*?!hasInvalidSelectedRows/u
+    /const canImport =[\s\S]*?!selectionBlocked[\s\S]*?!importDisabled[\s\S]*?selectedRows\.length > 0[\s\S]*?!hasInvalidSelectedRows/u
   )
+  assert.match(source, /const selectionBlocked = loading \|\| readDenied \|\| Boolean\(loadError\) \|\| selectingAll/u)
   assert.match(source, /if \(!canImport\) return/u)
   assert.match(source, /disabled=\{!canImport\}/u)
   assert.match(source, /onPageChange\?\.\(totalPages, pageSize, keyword\)/u)
@@ -43,7 +44,7 @@ test('source import picker resets filters and selections independently', () => {
     /const clearSelection = \(\) => \{\s*cancelSelectAll\(\)\s*setSelectedRowKeys\(\[\]\)\s*setSelectedRowSnapshotsByKey\(new Map\(\)\)\s*\}/u
   )
   assert.match(source, />\s*清空筛选\s*</u)
-  assert.match(source, /disabled=\{keyword\.length === 0 && !hasActiveFilters && !onlySelected\}/u)
+  assert.match(source, /disabled=\{readDenied \|\| \(keyword\.length === 0 && !hasActiveFilters && !onlySelected\)\}/u)
   assert.match(source, />\s*清空已选\s*</u)
   assert.match(source, /aria-live="polite"/u)
 })
@@ -299,4 +300,44 @@ test('bulk reads replace stale visible snapshots and a later page reload refresh
   await view.act(async () => confirm().click())
   assert.equal(imported[0].remaining, '8')
   assert.equal(imported[1].remaining, '5', 'off-page selections retain their latest completed read')
+})
+
+test('来源读取失败保留已选快照，恢复前不能导入', async (t) => {
+  const { createElement } = await import('react')
+  const { createReactTestHarness } = await import('../../../../scripts/test/reactRuntime.mjs')
+  const view = await createReactTestHarness(t)
+  const { default: Picker } = await import('./SourceImportPickerModal.jsx')
+  let reloads = 0
+  const base = { open: true, title: '来源读取恢复', rows: [{ id: 1, name: '材料样例' }], columns: [{ dataIndex: 'name', title: '材料' }], importText: '加入明细', onReload: () => { reloads++ } }
+  await view.render(createElement(Picker, base))
+  await view.act(async () => document.querySelector('tr.ant-table-row input[type="checkbox"]').click())
+  const importButton = () => [...document.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === '加入明细')
+  assert.equal(importButton().disabled, false)
+  await view.render(createElement(Picker, { ...base, loadError: '资料读取失败，请重试' }))
+  assert.equal(importButton().disabled, true)
+  assert.equal(Boolean(document.querySelector('[role="alert"]')), true)
+  assert.equal(document.querySelector('tr.ant-table-row input[type="checkbox"]').checked, true)
+  const retry = [...document.querySelectorAll('[role="alert"] button')].find((node) => node.textContent.trim() === '重新加载')
+  await view.act(async () => retry.click())
+  assert.equal(reloads, 1)
+  await view.render(createElement(Picker, base))
+  assert.equal(importButton().disabled, false)
+  assert.equal(document.querySelector('tr.ant-table-row input[type="checkbox"]').checked, true)
+})
+
+test('无权限和读取失败不把未知分页归零或自动重新读取', async (t) => {
+  const { createElement } = await import('react')
+  const { createReactTestHarness } = await import('../../../../scripts/test/reactRuntime.mjs')
+  const view = await createReactTestHarness(t)
+  const { default: Picker } = await import('./SourceImportPickerModal.jsx')
+  const pages = []
+  const base = { open: true, title: '权限反馈', rows: [], columns: [], serverPagination: true, current: 2, total: 0, onPageChange: (value) => pages.push(value) }
+  await view.render(createElement(Picker, { ...base, loadError: '资料读取失败' }))
+  assert.deepEqual(pages, [])
+  assert.equal(Boolean(document.querySelector('[data-empty-state="error"]')), true)
+  await view.render(createElement(Picker, { ...base, readDenied: true, rows: [{ id: 1, name: '不可见来源' }], columns: [{ dataIndex: 'name', title: '名称' }], total: 100 }))
+  assert.deepEqual(pages, [])
+  assert.equal(Boolean(document.querySelector('[data-empty-state="denied"]')), true)
+  assert.doesNotMatch(document.body.textContent, /不可见来源/u)
+  assert.equal(document.querySelectorAll('tr.ant-table-row').length, 0)
 })

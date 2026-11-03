@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
-import { Alert, Button, Empty, Spin, Tag } from 'antd'
+import { Alert, Button, Spin, Tag } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 
 import { AUTH_SESSION_CHANGED_EVENT } from '@/common/auth/auth'
@@ -108,7 +109,7 @@ export default function WorkflowSourceProgressButton({ sourceType, sourceID, sou
                 </ul>
                 {data.total > 20 ? <WorkflowTaskPagination total={data.total} current={page} pageSize={20} pageSizeOptions={[20]} recordLabel="关联流程" onChange={(value) => { setPage(value); setSelection(null) }} /> : null}
               </>
-            ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前单据暂无可见流程" />}
+            ) : <Empty description="当前单据暂无可见流程" />}
           </div>
         }
       />

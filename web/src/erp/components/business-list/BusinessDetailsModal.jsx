@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { RedoOutlined } from '@ant-design/icons'
 import { Alert, Button, Spin } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -113,7 +114,7 @@ function BusinessLineItems({ config, record, state, contentRef }) {
         layout="content"
       >
         {loadState.status === 'success' && loadState.items.length === 0 ? (
-          <p className="erp-business-inline-note">{emptyDescription}</p>
+          <Empty description={emptyDescription} />
         ) : null}
         {loadState.status === 'loading' || loadState.status === 'idle' ? (
           <div className="erp-business-detail-items__loading">

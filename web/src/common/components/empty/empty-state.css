@@ -1,21 +1,28 @@
 .erp-empty.ant-empty {
+  --erp-empty-image-height: 40px;
+
   box-sizing: border-box;
   min-width: 0;
   margin: 0;
   padding: 24px 16px;
-  color: var(--erp-text-muted);
+  color: var(--erp-empty-text-color, var(--erp-text-muted));
   font-size: 0.875rem;
   line-height: 22px;
   text-align: center;
 }
 
 .erp-empty.ant-empty .ant-empty-image {
-  height: 40px;
+  height: var(--erp-empty-image-height);
   margin-bottom: 10px;
 }
 
+.erp-empty.ant-empty .ant-empty-image > .anticon {
+  font-size: var(--erp-empty-image-height);
+  line-height: 1;
+}
+
 .erp-empty.ant-empty .ant-empty-description {
-  color: var(--erp-text-muted);
+  color: inherit;
   overflow-wrap: anywhere;
 }
 
@@ -23,12 +30,76 @@
   margin-top: 12px;
 }
 
-/* Dropdown results use the same language at the scale of their control. */
-.erp-empty.ant-empty-small {
+.erp-empty:is(.ant-empty-small, .erp-empty--compact) {
+  --erp-empty-image-height: 28px;
+
   padding: 12px;
+  font-size: 0.8125rem;
 }
 
-.erp-empty.ant-empty-small .ant-empty-image {
-  height: 28px;
+.erp-empty:is(.ant-empty-small, .erp-empty--compact) .ant-empty-image {
   margin-bottom: 8px;
+}
+
+.erp-empty--inline {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: var(--erp-empty-inline-padding-block, 10px) var(--erp-empty-inline-padding-inline, 12px);
+  color: var(--erp-empty-text-color, var(--erp-text-muted));
+  font-size: 0.875rem;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.erp-empty__copy {
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+.erp-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-empty__detail {
+  margin-top: 4px;
+  font-size: 0.8125rem;
+}
+
+.erp-content-loading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  color: var(--erp-text-muted);
+  font-size: 0.875rem;
+  line-height: 22px;
+}
+
+.erp-content-loading--compact {
+  padding: 12px;
+  font-size: 0.8125rem;
+}
+
+.erp-content-loading--inline {
+  justify-content: flex-start;
+  padding: var(--erp-empty-inline-padding-block, 10px) var(--erp-empty-inline-padding-inline, 12px);
+}
+
+.erp-empty--error {
+  --erp-empty-text-color: var(--erp-visual-danger-text);
+
+  background: color-mix(in srgb, var(--erp-visual-danger-text) 6%, var(--erp-surface-bg));
+}
+
+[data-erp-theme='dark'] .erp-empty.ant-empty[data-empty-state='empty'] .ant-empty-image,
+[data-erp-theme='dark'] .erp-empty.ant-empty:not([data-empty-state]) .ant-empty-image {
+  opacity: 0.78;
+  filter: brightness(0.82) saturate(0.7);
 }

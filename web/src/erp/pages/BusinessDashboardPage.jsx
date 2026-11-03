@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Empty, Popover, Spin, Tag } from 'antd'
+import { Alert, Button, Popover, Spin, Tag } from 'antd'
 import {
   ArrowRightOutlined,
   FilterOutlined,
@@ -11,6 +11,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -536,7 +537,6 @@ export default function BusinessDashboardPage() {
                   </div>
                 ) : (
                   <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
                     description={
                       hasFilters ? '没有符合条件的记录' : '当前范围暂无记录'
                     }

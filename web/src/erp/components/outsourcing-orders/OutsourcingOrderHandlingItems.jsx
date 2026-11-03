@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Alert, Button, Empty, Spin } from 'antd'
+import { Alert, Button, Spin } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { createRequestScopeAbortReason, RequestScopeOwner, RequestScopeCancellationCause } from '../../../common/utils/requestScopeCancellation.mjs'
 import BusinessRowItemCards from '../business-list/BusinessRowItemCards.jsx'

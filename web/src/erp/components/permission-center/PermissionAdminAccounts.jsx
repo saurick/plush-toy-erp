@@ -5,7 +5,6 @@ import {
   Alert,
   Button,
   Card,
-  Empty,
   Form,
   Input,
   Space,
@@ -21,6 +20,7 @@ import React, {
   useState,
 } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import SearchInput from '@/common/components/SearchInput.jsx'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -916,7 +916,7 @@ export default function PermissionAdminAccounts({
   ]
 
   const emptyText = !canReadUsers ? (
-    <Empty description="无权查看员工账号" />
+    <Empty state="denied" description="无权查看员工账号" detail="请联系管理员核对权限。" />
   ) : loading ? (
     <Empty description="加载中..." />
   ) : hasAdminFilter ? (

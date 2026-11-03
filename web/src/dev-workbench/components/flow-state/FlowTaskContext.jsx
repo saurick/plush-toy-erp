@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Alert, Button, Empty, Space, Spin, Tag } from 'antd'
+import { Alert, Button, Space, Spin, Tag } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { Text, cleanText } from './FlowStateShared.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -75,7 +76,6 @@ function TaskLookupResults({ lookup, onSelectTask, onRetry }) {
   if (lookup.candidates.length === 0) {
     return (
       <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
         description="没有找到名称、任务编号或来源单号相符的可见任务"
       />
     )

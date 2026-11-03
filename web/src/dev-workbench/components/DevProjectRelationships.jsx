@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react'
-import { Checkbox, Empty, Tag } from 'antd'
+import { Checkbox, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import DevProjectGraphView from './DevProjectGraphView.jsx'

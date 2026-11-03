@@ -1,6 +1,7 @@
 import React from 'react'
 import { HistoryOutlined } from '@ant-design/icons'
-import { Button, Empty, Popover } from 'antd'
+import { Button, Popover } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { buildWorkflowTaskEventTrailModel } from '../../utils/workflowTaskEventPresentation.mjs'
 import { buildWorkflowTaskFlowEventItems } from '../../utils/workflowTaskFlowEventPresentation.mjs'

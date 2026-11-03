@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react'
 import { useLocation, } from 'react-router-dom'
-import { Button, Empty } from 'antd'
+import { Button } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Pagination from '@/common/components/pagination/AppPagination'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'

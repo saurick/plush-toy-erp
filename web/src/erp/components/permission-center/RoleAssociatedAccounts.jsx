@@ -1,6 +1,7 @@
-import { Typography, Alert, Button, Empty, Space, Tag } from 'antd'
+import { Typography, Alert, Button, Space, Tag } from 'antd'
 
 import React from 'react'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Table from '@/common/components/table/AppTable'
 import {
   getPermissionCenterRoleKey as getRoleKey,
@@ -209,7 +210,6 @@ function RoleAssociatedAccounts({
         locale={{
           emptyText: (
             <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="当前岗位暂无关联账号"
             />
           ),

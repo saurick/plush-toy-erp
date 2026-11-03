@@ -5,6 +5,7 @@ import {
   TableOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
@@ -370,7 +371,7 @@ export default function EngineeringMaterialSummarySheet({
       {mobile && mobileView === 'cards' ? (
         <div className="erp-material-cards">
           {!rows.length ? (
-            <p>暂无材料明细，请先补齐订单工程资料与 BOM</p>
+            <Empty description="暂无材料明细，请先补齐订单工程资料与 BOM" />
           ) : null}
           {rows.map((item) => (
             <article key={materialRowKey(item)} className="erp-material-card">

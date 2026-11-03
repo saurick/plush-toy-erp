@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Empty, Popover, Tag, Tooltip } from 'antd'
+import { Alert, Button, Popover, Tag, Tooltip } from 'antd'
 import { ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -920,7 +921,7 @@ export default function useBusinessStatistics({
         </div>
         <div className="erp-statistics-body" ref={bodyRef} aria-busy={loading}>
           {!allowed ? (
-            <Empty description="当前账号没有此统计的来源查看权限" />
+            <Empty state="denied" description="当前账号没有此统计的来源查看权限" detail="请联系管理员核对权限。" />
           ) : error ? (
             <Alert
               type="error"

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
-import { Button, Empty, Space, Spin, Tag, Typography } from 'antd'
+import { Button, Space, Spin, Tag, Typography } from 'antd'
 import { BranchesOutlined } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { OperationalFactStatus, ProductionWIPStatus } from '../../../common/consts/statuses.generated.mjs'
 import Table from '@/common/components/table/AppTable'
 
@@ -326,7 +327,6 @@ export default function ProductionReworkProgressModal({
         </div>
       ) : progressItems.length === 0 ? (
         <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
           description="当前生产订单暂无成品返工进度"
         />
       ) : (

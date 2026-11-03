@@ -29,6 +29,7 @@ import {
   StopOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { AttachmentPolicy } from '../../../common/consts/attachments.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
@@ -1423,7 +1424,7 @@ const BusinessAttachmentPanel = forwardRef(
               }
             />
           ) : null}
-          <Spin spinning={loading}>
+          <Spin spinning={loading && visibleItems.length > 0}>
             <div
               className="business-attachment-panel__list"
               aria-label="附件列表"
@@ -1432,23 +1433,18 @@ const BusinessAttachmentPanel = forwardRef(
               {visibleItems.length ? (
                 visibleItems.map(renderAttachmentRow)
               ) : !loadError ? (
-                <div className="business-attachment-panel__empty">
-                  {!compact ? <PaperClipOutlined aria-hidden="true" /> : null}
-                  <strong>
-                    {loading
-                      ? '正在加载附件…'
-                      : category === 'all'
-                        ? compact && missingOwner && canQueuePending ? '暂无附件' : emptyDescription
-                        : '当前分类没有附件'}
-                  </strong>
-                  {!compact && !loading && canUpload && !uploadDisabled ? (
-                    <span>
-                      {missingOwner
-                        ? '选择文件后，保存业务记录时上传'
-                        : '选择文件后先核对，再点击上传'}
-                    </span>
-                  ) : null}
-                </div>
+                <Empty
+                  className="business-attachment-panel__empty"
+                  variant={compact ? 'inline' : 'default'}
+                  state={loading ? 'loading' : 'empty'}
+                  image={<PaperClipOutlined aria-hidden="true" />}
+                  description={loading ? '正在加载附件…' : category === 'all'
+                    ? compact && missingOwner && canQueuePending ? '暂无附件' : emptyDescription
+                    : '当前分类没有附件'}
+                  detail={!compact && !loading && canUpload && !uploadDisabled
+                    ? missingOwner ? '选择文件后，保存业务记录时上传' : '选择文件后先核对，再点击上传'
+                    : undefined}
+                />
               ) : null}
             </div>
           </Spin>

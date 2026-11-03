@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Empty, Space, Spin, Tag } from 'antd'
+import { Alert, Button, Space, Spin, Tag } from 'antd'
 import { useLocation, useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
 import Select from '@/common/components/select/AppSelect'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -77,7 +78,6 @@ export default function BusinessChainInstanceView({
   if (!taskId) {
     return (
       <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
         description={referenceStage ? `当前参考：${referenceStage.label}。输入单号或任务，查询实际记录。` : '输入单号或任务，查看实际进度与异常'}
       />
     )
@@ -298,7 +298,6 @@ export default function BusinessChainInstanceView({
       ) : null}
       {!main.length && !exceptions.length ? (
         <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
           description="当前条件下没有关联任务"
         />
       ) : null}

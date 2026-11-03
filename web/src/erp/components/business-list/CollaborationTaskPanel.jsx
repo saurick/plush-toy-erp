@@ -5,7 +5,8 @@ import {
   DownOutlined,
   UpOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
+import { Button, Card, Space, Tag, Typography } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'

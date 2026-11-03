@@ -11,13 +11,13 @@ import {
   Button,
   Drawer,
   Dropdown,
-  Empty,
   Popover,
   Space,
   Spin,
   Tag,
 } from 'antd'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { message } from '@/common/utils/antdApp'
 import Modal from '@/common/components/modal/AppModal'
 import { StateRulesView } from '../components/flow-state/StateRulesView.jsx'
@@ -452,7 +452,6 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
             </div>
           ) : (
             <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="没有匹配定义；具体任务请使用“去查真实任务”"
             />
           )}

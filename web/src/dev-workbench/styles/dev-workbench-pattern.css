@@ -138,8 +138,7 @@
 
 .erp-workbench-section__description,
 .erp-workbench-section__footer,
-.erp-workbench-facts dt,
-.erp-workbench-empty > div {
+.erp-workbench-facts dt {
   color: var(--erp-text-muted);
 }
 
@@ -247,17 +246,6 @@
   display: grid;
   gap: 4px;
   padding-block: 4px;
-}
-
-.erp-workbench-empty {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 6px 12px;
-  min-width: 0;
-  padding: 18px 12px;
-  overflow-wrap: anywhere;
 }
 
 @media (max-width: 1100px) {

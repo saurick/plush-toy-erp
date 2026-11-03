@@ -1,6 +1,7 @@
 import { chooseSelectOption } from './selectControlActions.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { createEmptyFeedbackScenarios } from './emptyFeedbackScenarios.mjs'
 
 export function createEmptyStateScenarios({
   assert,
@@ -52,6 +53,7 @@ export function createEmptyStateScenarios({
     return actual
   }
   return [
+    ...createEmptyFeedbackScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession, outputDir, path }),
     ...['light', 'dark'].map((themeMode) => ({
       name: `empty-states-mobile-${themeMode}`,
       path: '/m/boss/tasks',

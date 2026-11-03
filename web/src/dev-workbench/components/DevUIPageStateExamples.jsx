@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
-import { Alert, Button, Empty, Tag } from 'antd'
+import { Alert, Button, Tag } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { Loading } from '@/common/components/loading'
+import DevUIEmptyExamples from './DevUIEmptyExamples.jsx'
 import AppSelect from '@/common/components/select/AppSelect'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabs from '@/common/components/navigation/SlidingTabs'
@@ -48,16 +50,15 @@ const STATE_HELP = {
 }
 
 function EmptyOrError({ state, recover }) {
-  if (state === 'error' || state === 'refresh-error') {
+  if (state === 'error') {
+    return <Empty state="error" description="本次读取失败，条件已保留"><Button onClick={recover}>重试读取</Button></Empty>
+  }
+  if (state === 'refresh-error') {
     return (
       <Alert
         type="error"
         showIcon
-        message={
-          state === 'refresh-error'
-            ? '刷新失败，仍显示上次结果'
-            : '本次读取失败，条件已保留'
-        }
+        message="刷新失败，仍显示上次结果"
         action={<Button onClick={recover}>重试读取</Button>}
       />
     )
@@ -231,32 +232,34 @@ export default function DevUIPageStateExamples() {
   const [attentionOnly, setAttentionOnly] = useState(false)
   const states = device === 'mobile' ? UI_DESIGN_MOBILE_STATES : DESKTOP_STATES
   return (
-    <div className="erp-control-example-stack erp-page-state-examples">
-      <div className="erp-control-example-row">
-        <SlidingSegmented
-          aria-label="页面状态设备"
-          value={device}
-          onChange={(value) => {
+    <>
+      <div className="erp-control-example-stack erp-page-state-examples">
+        <div className="erp-control-example-row">
+          <SlidingSegmented
+            aria-label="页面状态设备"
+            value={device}
+            onChange={(value) => {
             setDevice(value)
             setState(value === 'mobile' ? 'loading' : 'route-loading')
           }}
-          options={[
+            options={[
             { value: 'mobile', label: '手机任务' },
             { value: 'desktop', label: '电脑切页' },
+            { value: 'specifications', label: '空提示规格' },
           ]}
-        />
-        <AppSelect
-          label="页面状态"
-          placeholder="页面状态"
-          aria-label="页面状态"
-          value={state}
-          onChange={(value) => {
+          />
+          {device !== 'specifications' ? <AppSelect
+            label="页面状态"
+            placeholder="页面状态"
+            aria-label="页面状态"
+            value={state}
+            onChange={(value) => {
             setState(value)
             if (value === 'filtered') setAttentionOnly(true)
           }}
-          options={states.map(({ key, label }) => ({ value: key, label }))}
-        />
-        {device === 'mobile' && (
+            options={states.map(({ key, label }) => ({ value: key, label }))}
+          /> : null}
+          {device === 'mobile' && (
           <SlidingSegmented
             aria-label="手机样例宽度"
             value={width}
@@ -267,13 +270,13 @@ export default function DevUIPageStateExamples() {
             ]}
           />
         )}
-        {['loading', 'switching', 'refreshing', 'route-loading'].includes(
+          {device !== 'specifications' && ['loading', 'switching', 'refreshing', 'route-loading'].includes(
           state
         ) && <Button onClick={() => setState('data')}>完成读取</Button>}
-      </div>
-      {state && <p className="erp-page-state-hint">{STATE_HELP[state]}</p>}
-      {!state ? (
-        <Empty description="请选择页面状态" />
+        </div>
+        {device !== 'specifications' && state && <p className="erp-page-state-hint">{STATE_HELP[state]}</p>}
+        {device === 'specifications' ? null : !state ? (
+          <Empty description="请选择页面状态" />
       ) : device === 'mobile' ? (
         <MobileExample
           state={state}
@@ -285,6 +288,8 @@ export default function DevUIPageStateExamples() {
       ) : (
         <DesktopExample state={state} setState={setState} />
       )}
-    </div>
+      </div>
+      <div hidden={device !== 'specifications'}><DevUIEmptyExamples /></div>
+    </>
   )
 }

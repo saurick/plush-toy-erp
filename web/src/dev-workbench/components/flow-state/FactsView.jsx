@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
-import { Button, Empty } from 'antd'
+import { Button } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { WorkbenchFacts, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { DEFINITION_SELECT_CLASS_NAMES, useDefinitionSelectSearch, renderDefinitionSelectOption } from './FlowStateShared.jsx'

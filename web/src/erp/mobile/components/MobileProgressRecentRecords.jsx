@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Empty } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
+
 import { WorkflowTaskEventEntries } from '../../components/workflow/WorkflowTaskEventTrail.jsx'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { listWorkflowTaskEvents } from '../../api/workflowApi.mjs'

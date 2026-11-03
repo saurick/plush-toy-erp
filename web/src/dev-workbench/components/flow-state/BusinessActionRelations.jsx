@@ -1,5 +1,6 @@
 import React from 'react'
 import { Button } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import AppSelect from '@/common/components/select/AppSelect'
 import { PermissionLabel } from '../../../common/consts/permissions.generated.mjs'
 import { WorkbenchFacts, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
@@ -16,9 +17,7 @@ export default function BusinessActionRelations({
   const action = actions.find((item) => item.key === selectedKey) || actions[0]
   if (!action) {
     return (
-      <p className="erp-dev-relation-empty" role="status">
-        当前范围没有匹配的关联动作。移除筛选条件可恢复查看。
-      </p>
+      <Empty description="当前范围没有匹配的关联动作" detail="移除筛选条件可恢复查看。" />
     )
   }
   const stateLabel = (flow, key) =>

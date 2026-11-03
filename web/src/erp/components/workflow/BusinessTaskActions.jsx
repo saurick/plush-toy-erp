@@ -1,7 +1,8 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { CalendarOutlined, LeftOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import { Alert, Button, Drawer, Empty, Form, Grid, Input, Space, Spin, Tag, Typography } from 'antd'
+import { Alert, Button, Drawer, Form, Grid, Input, Space, Spin, Tag, Typography } from 'antd'
 import { useLocation, } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import useWorkflowTaskAssignmentAccess from '../../hooks/useWorkflowTaskAssignmentAccess.js'
@@ -411,11 +412,11 @@ export default function BusinessTaskActions({ collaborationTask = null, collabor
                     <WorkflowTaskTiming task={item} includeKeys={['due', 'ended']} />
                   </article>
                 ))}
-                {!visibleTasks.length && !listLoading && !error ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={sourceID ? '当前单据暂无可见任务' : sourceEmptyText} /> : null}
+                {!visibleTasks.length && !listLoading && !error ? <Empty description={sourceID ? '当前单据暂无可见任务' : sourceEmptyText} /> : null}
                 {visibleTasks.length < total ? <div ref={moreTasksRef} className="business-task-panel__more" role="status">{error ? <><span>{error}</span><Button size="small" onClick={loadTasks}>重新读取</Button></> : '继续下滑加载任务'}</div> : null}
               </div>
             </Spin>
-          ) : <Table size="small" rowKey="id" loading={listLoading} dataSource={visibleTasks} columns={taskColumns} pagination={{ current: page, pageSize: 10, total, hideOnSinglePage: true, showSizeChanger: false, onChange: setPage }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={sourceID ? '当前单据暂无可见任务' : sourceEmptyText} /> }} /> : null}
+          ) : <Table size="small" rowKey="id" loading={listLoading} dataSource={visibleTasks} columns={taskColumns} pagination={{ current: page, pageSize: 10, total, hideOnSinglePage: true, showSizeChanger: false, onChange: setPage }} locale={{ emptyText: <Empty description={sourceID ? '当前单据暂无可见任务' : sourceEmptyText} /> }} /> : null}
         </div>
       </Panel>
       {taskDialog}

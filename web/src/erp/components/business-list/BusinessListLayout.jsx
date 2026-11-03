@@ -18,7 +18,6 @@ import {
   Card,
   ConfigProvider,
   Dropdown,
-  Empty,
   Popconfirm,
   Popover,
   Space,
@@ -28,6 +27,7 @@ import {
   Typography,
   theme,
 } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import useBusinessPageContext, { BusinessPageContext } from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import FilterSelect from '@/common/components/select/FilterSelect'
@@ -1755,10 +1755,10 @@ export function BusinessDataTable({
     const selected = (dataSource || []).find((row) => selectedKeys.includes(typeof rowKey === 'function' ? rowKey(row) : row[rowKey || 'id']))
     const sourceDetails = (
       <section className="mobile-task-business-source" data-testid="mobile-task-business-source" data-record-id={selected?.id} aria-busy={busy}>
-        <Spin spinning={busy}>
+        <Spin spinning={busy && Boolean(selected)}>
           {selected ? (
             <><BusinessRecordDetails columns={columns} record={selected} presentation="mobile-task" title={isTerminalWorkflowTask(taskBusiness.task) ? '来源业务当前资料' : '本次业务资料'} />{taskSourceDetails}</>
-          ) : <Empty description={busy ? '正在读取任务业务资料' : '未读取到任务对应单据，请返回任务后重新读取。'} />}
+          ) : <Empty state={busy ? 'loading' : 'empty'} description={busy ? '正在读取任务业务资料' : '未读取到任务对应单据，请返回任务后重新读取。'} />}
         </Spin>
       </section>
     )

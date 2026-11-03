@@ -54,7 +54,7 @@ test('purchase line items precede grouped commercial fields and attachments', ()
   ]) {
     assert.match(form, new RegExp(copy, 'u'))
   }
-  const fieldsIndex = form.indexOf('<BusinessFormSection title="订单与供应商"')
+  const fieldsIndex = form.search(/<BusinessFormSection\b[^>]*title="订单与供应商"/u)
   const attachmentsIndex = form.indexOf('{attachmentPanel}')
   const itemsIndex = form.indexOf('<BusinessLineItemsSection')
   assert(fieldsIndex >= 0)

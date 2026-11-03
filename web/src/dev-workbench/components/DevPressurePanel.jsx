@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import {
   Alert,
   Button,
-  Empty,
   Progress,
   Skeleton,
   Space,
@@ -14,6 +13,7 @@ import {
   PlayCircleOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import DevTestingDetails from './DevTestingDetails.jsx'
 import DevTimestamp from './DevTimestamp.jsx'
@@ -351,7 +351,6 @@ function PressureReportDetails({ report, reports }) {
         <StageChart levels={report.engineering.levels} />
       ) : (
         <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
           description="该次尚无业务负载读数"
         />
       )}

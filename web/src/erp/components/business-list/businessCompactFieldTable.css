@@ -68,12 +68,6 @@
   padding-block: 6px;
 }
 
-.erp-line-items-empty {
-  min-width: 0;
-  padding: 10px 0;
-  color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-small);
-}
 
 .erp-inventory-operation-fields {
   display: grid;

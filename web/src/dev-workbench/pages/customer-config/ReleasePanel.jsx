@@ -1,5 +1,6 @@
 import { Alert, Button, Typography } from 'antd'
 import { CopyOutlined } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
 import { ReleaseApplySummary } from './ReleaseApplySummary.jsx'
@@ -69,11 +70,9 @@ export function ReleasePanel({
           />
         ) : null}
         {releaseBatchesState.status === 'success' && batches.length === 0 ? (
-          <div className="erp-dev-customer-empty-batches" role="status">
-            <strong>还没有登记发布证据批次</strong>
-            <span>先按客户配置发布流程生成证据，再刷新本页。</span>
+          <Empty description="还没有登记发布证据批次" detail="先按客户配置发布流程生成证据，再刷新本页。">
             <Button onClick={onRetryRead}>刷新批次</Button>
-          </div>
+          </Empty>
         ) : null}
         <ReleaseApplySummary
           releaseState={releaseState}

@@ -1,4 +1,4 @@
-import { Typography, Button, Checkbox, Empty, Popover, Switch } from 'antd'
+import { Typography, Button, Checkbox, Popover, Switch } from 'antd'
 
 import React, { useEffect, useMemo, useState } from 'react'
 import {
@@ -8,6 +8,7 @@ import {
   ShrinkOutlined,
   ClearOutlined,
 } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import SearchInput from '@/common/components/SearchInput.jsx'
 import {
@@ -526,7 +527,6 @@ function PermissionChecklist({
       </TableScrollRegion>
       {visibleGroups.length === 0 ? (
         <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
             searchKeyword.trim()
               ? '没有匹配的功能，请调整搜索或关闭只看已选'

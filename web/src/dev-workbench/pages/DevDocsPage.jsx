@@ -11,8 +11,9 @@ import {
   RightOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Space, Spin, Tag, Tooltip, Typography } from 'antd'
+import { Button, Space, Spin, Tag, Tooltip, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_DOCS_ROUTE } from '../config/devRoutes.mjs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
@@ -1150,7 +1151,6 @@ export default function DevDocsPage() {
                   ))
                 ) : (
                   <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
                     description={
                       fullTextSearchPending
                         ? '正在检索完整正文'
@@ -1309,7 +1309,6 @@ export default function DevDocsPage() {
           ) : selectedDoc && selectedSourceLoadState?.status === 'error' ? (
             <div className="erp-dev-docs-markdown erp-dev-docs-reader-state">
               <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={selectedSourceLoadState.message}
               >
                 <Button onClick={retrySelectedSource}>重新加载</Button>
@@ -1327,7 +1326,6 @@ export default function DevDocsPage() {
           ) : (
             <div className="erp-dev-docs-markdown">
               <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description="没有匹配的文档，阅读操作已隐藏"
               />
             </div>

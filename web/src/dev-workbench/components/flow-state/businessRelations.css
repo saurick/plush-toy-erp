@@ -14,5 +14,4 @@
 .erp-dev-action-relations__conditions > span { flex-shrink: 0; }
 .erp-dev-action-relations__conditions ul { margin: 0; padding-left: 18px; }
 .erp-dev-action-relations code { display: inline-block; margin: 0 8px 4px 0; overflow-wrap: anywhere; }
-.erp-dev-relation-empty { margin: 0; padding-block: 8px; color: var(--erp-text-muted); }
 [data-flow-print-current] .erp-dev-relation-filters { display: none; }

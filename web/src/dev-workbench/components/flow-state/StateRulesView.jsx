@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { InfoCircleOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Empty, Tag } from 'antd'
+import { Button, Dropdown, Tag } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { PermissionLabel } from '@/common/consts/permissions.generated.mjs'
 import { WorkbenchFacts, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import Select from '@/common/components/select/AppSelect'
@@ -219,7 +220,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
 
   const renderTransitions = (items) => items.length ? (
     <ol>{items.map((transition) => <StateTransitionCard key={transition.key} flow={flow} index={transitionOrder.get(transition.key) || 0} selectedStateKey={state?.key || ''} stateByKey={stateByKey} transition={transition} />)}</ol>
-  ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前筛选没有登记的转换" />
+  ) : <Empty description="当前筛选没有登记的转换" />
 
   return (
     <WorkbenchSection flat className="erp-dev-flow-state-rule" data-selected-flow={flow.key} data-record-reference={recordRelationship ? 'true' : undefined} aria-label={flow.label}>
@@ -247,7 +248,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
           </div>
           {visibleTransitions.length > 0 || state ? (
             <BusinessFlowDiagram relationships legend="实线：状态转换 · 虚线：分支或纠正 · 点选状态查看条件。" flow={graph} label={`${flow.label}状态转换图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} />
-          ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前筛选没有登记的转换" />}
+          ) : <Empty description="当前筛选没有登记的转换" />}
         </>
       ) : flow.lifecycleRules.length === 0 ? <WorkbenchFacts items={flow.states.map((item) => ({ label: item.label, value: item.summary || '由对象专属规则约束' }))} /> : null}
         </div>

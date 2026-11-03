@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   Descriptions,
-  Empty,
   Form,
   Input,
   Radio,
@@ -17,6 +16,7 @@ import {
 } from 'antd'
 
 import { BranchesOutlined, ReloadOutlined } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
@@ -1524,7 +1524,6 @@ onCancel: () => resolve(false),
               ? '当前生产订单的工序路线不完整'
               : '当前生产订单未启用标准工序路线'
           }
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
         >
           {aggregate.items.some(
             (item) => item.route_code === PRODUCTION_WIP_ROUTE_CODE
@@ -1537,7 +1536,6 @@ onCancel: () => resolve(false),
       ) : scopedBatchMissing ? (
         <Empty
           description="未找到与当前返工任务一致的在制批次"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
         >
           <Text type="secondary">
             请返回任务详情刷新后重试；仍无法办理时，到电脑端生产订单核对返工进度。

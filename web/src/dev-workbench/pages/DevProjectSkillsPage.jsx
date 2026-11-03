@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Empty, Space, Spin, Tag, Typography } from 'antd'
+import { Alert, Button, Space, Spin, Tag, Typography } from 'antd'
 import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_PROJECT_SKILLS_ROUTE } from '../config/devRoutes.mjs'
 import SearchInput from '@/common/components/SearchInput'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
@@ -203,7 +204,6 @@ export default function DevProjectSkillsPage() {
               </div>
               {!filtered.length ? (
                 <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description={
                     skills.length
                       ? '没有匹配的 Skill'
@@ -250,7 +250,6 @@ export default function DevProjectSkillsPage() {
                 </>
               ) : filtered.length ? (
                 <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description="所选 Skill 已不存在或不符合当前搜索"
                 >
                   <Button onClick={() => updateQuery({ skill: '' })}>

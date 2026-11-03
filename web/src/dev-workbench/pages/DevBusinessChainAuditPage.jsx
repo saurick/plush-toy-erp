@@ -3,7 +3,6 @@ import {
   Alert,
   Button,
   Drawer,
-  Empty,
   Space,
   Spin,
   Tag,
@@ -11,6 +10,7 @@ import {
 } from 'antd'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { LeftOutlined, ReloadOutlined } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { WorkbenchFacts } from '../components/WorkbenchPattern.jsx'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_BUSINESS_CHAIN_AUDIT_ROUTE } from '../config/devRoutes.mjs'
 import Select from '@/common/components/select/AppSelect'

@@ -1,5 +1,6 @@
 import React, { useContext, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { Select } from 'antd'
+import Empty from '../empty/AppEmpty.jsx'
 import { useSelectPopupWidth } from './useSelectPopupWidth.mjs'
 import SelectPresentationContext from './SelectPresentationContext.jsx'
 import './app-select.css'
@@ -56,6 +57,7 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
   )
   const controlled = Object.hasOwn(inputProps, 'value')
   const [uncontrolledValue, setUncontrolledValue] = useState(props.defaultValue)
+  const [searchKeyword, setSearchKeyword] = useState('')
   const currentValue = controlled ? value : uncontrolledValue
   const selectRef = useRef(null)
   useImperativeHandle(ref, () => selectRef.current)
@@ -64,6 +66,21 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
   const select = (
     <Select
       {...props}
+      notFoundContent={props.loading ? (
+        <Empty variant="compact" state="loading" description="正在读取候选…" />
+      ) : typeof props.notFoundContent === 'string' ? (
+        <Empty variant="compact" description={props.notFoundContent} />
+      ) : props.notFoundContent === undefined ? (
+        <Empty variant="compact" description={String(props.searchValue ?? searchKeyword).trim() ? '没有匹配的选项' : '暂无可选项'} />
+      ) : props.notFoundContent}
+      onSearch={(props.showSearch ?? Boolean(props.mode)) ? (keyword) => {
+        setSearchKeyword(keyword)
+        props.onSearch?.(keyword)
+      } : undefined}
+      onOpenChange={(open) => {
+        if (!open) setSearchKeyword('')
+        props.onOpenChange?.(open)
+      }}
       options={displayOptions}
       optionLabelProp={props.optionLabelProp ?? (identities.size ? 'selectedLabel' : undefined)}
       ref={selectRef}

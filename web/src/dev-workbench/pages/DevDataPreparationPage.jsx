@@ -12,7 +12,6 @@ import {
   Card,
   Collapse,
   Descriptions,
-  Empty,
   Input,
   List,
   Radio,
@@ -22,6 +21,7 @@ import {
   theme,
   Typography,
 } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Modal from '@/common/components/modal/AppModal'
 import { MermaidDiagram } from '@/common/components/markdown'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
@@ -196,7 +196,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
             </div>
             <Collapse accordion items={stepItems} />
           </section>
-      ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚无业务链范围" />}
+      ) : <Empty description="尚无业务链范围" />}
       </WorkbenchReading>
       <details className="erp-dev-disclosure erp-dev-data-reuse-rules" onToggle={(event) => setReuseRulesOpen(event.currentTarget.open)}>
         <summary>代码变化后，旧数据怎么处理</summary>
@@ -649,7 +649,6 @@ function OperationReadback({ operation, acceptancePlan }) {
   if (!readback) {
     return (
       <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
         description="终态读回尚未生成"
       />
     )

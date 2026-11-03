@@ -1,5 +1,6 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { RpcErrorCode } from '@/common/consts/errorCodes.js'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import SourceImportPickerModal from './business-list/SourceImportPickerModal.jsx'
 import { ReferenceRecordsContext } from './RemoteReferenceSelect.jsx'
@@ -99,7 +100,7 @@ function RemoteReferencePickerContent({
       })
       .catch((error) => {
         if (abort.signal.aborted || isRpcAbortError(error)) return
-        setData((current) => ({ ...current, loading: false, failed: true }))
+        setData((current) => ({ ...current, loading: false, failed: true, denied: error?.code === RpcErrorCode.PERMISSION_DENIED }))
         showPageLoadError(error, '加载可选资料')
       })
     return () => abort.abort()
@@ -124,7 +125,8 @@ function RemoteReferencePickerContent({
       hasActiveFilters={Object.values(query.filters).some((value) => value !== undefined)}
       onClearFilters={() => setQuery((current) => ({ ...current, page: 1, keyword: '', filters: {} }))}
       open={open}
-      loadError={!canRead ? '当前账号无权查看可选资料' : data.failed ? '资料加载失败，请重新加载' : undefined}
+      readDenied={!canRead || data.denied === true}
+      loadError={data.failed ? '资料加载失败，请重新加载' : undefined}
       filteredEmptyDescription="没有符合条件的可选资料"
       importDisabled={props.importDisabled || !canRead || data.failed}
       importDisabledReason={!canRead
@@ -141,9 +143,9 @@ function RemoteReferencePickerContent({
       onPageChange={(page) => setQuery((current) => ({ ...current, page }))}
       onSearchChange={handleSearchChange}
       onSelectAllFiltered={canRead ? loadFilteredRows : undefined}
-      onReload={() =>
+      onReload={canRead ? () =>
         setQuery((current) => ({ ...current, retry: current.retry + 1 }))
-      }
+        : undefined}
     />
   )
 }

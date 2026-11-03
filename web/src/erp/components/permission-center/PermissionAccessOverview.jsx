@@ -2,13 +2,13 @@ import {
   Typography,
   Alert,
   Button,
-  Empty,
   Popover,
   Space,
   Tag,
 } from 'antd'
 import React, { useState } from 'react'
 import { QuestionCircleOutlined } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import Table from '@/common/components/table/AppTable'

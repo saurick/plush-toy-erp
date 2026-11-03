@@ -7,6 +7,7 @@ import {
   SendOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Drawer, Input, Tag, Typography } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { resolveMobileTaskBusinessEntry } from '../../mobile/utils/mobileTaskBusiness.mjs'
 import WorkflowTaskReceipt from './WorkflowTaskReceipt.jsx'
 import BusinessModal from '../business-list/BusinessModal.jsx'
@@ -690,11 +691,15 @@ roleKey: task.owner_role_key,
                               : '选择接收人，或由岗位人员处理'
                           }
                 notFoundContent={
-                            assignmentAccess.stale
+                  <Empty
+                    variant="compact"
+                    state={assignmentAccess.stale || assignmentAccess.failed ? 'error' : 'empty'}
+                    description={assignmentAccess.stale
                               ? '任务信息已更新，请刷新任务列表'
                               : assignmentAccess.failed
                                 ? '转交信息加载失败，请关闭后重试'
-                                : '当前没有符合条件的接收人'
+                                : '当前没有符合条件的接收人'}
+                  />
                           }
                 onChange={(value) =>
                             onAssignmentTargetChange?.(value)

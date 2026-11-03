@@ -1,4 +1,4 @@
-import { Typography, Alert, Button, Card, Empty, Popover, Tag } from 'antd'
+import { Typography, Alert, Button, Card, Popover, Tag } from 'antd'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   QuestionCircleOutlined,
@@ -10,6 +10,7 @@ import {
   FullscreenOutlined,
   FullscreenExitOutlined,
 } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import BusinessModal from '../business-list/BusinessModal.jsx'
 import {
@@ -716,7 +717,6 @@ export function usePermissionRoleSettings({
         <aside className="erp-role-center-sidebar" aria-label="岗位列表">
           {roles.length === 0 ? (
             <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="暂无岗位"
             />
           ) : (
@@ -1006,7 +1006,6 @@ export function usePermissionRoleSettings({
             </>
           ) : (
             <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="请选择一个岗位"
             />
           )}

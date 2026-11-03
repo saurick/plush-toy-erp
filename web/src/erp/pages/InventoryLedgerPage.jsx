@@ -15,12 +15,12 @@ import {
   Button,
   Card,
   Dropdown,
-  Empty,
   Input,
   Popconfirm,
   Space,
   Tag,
 } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 

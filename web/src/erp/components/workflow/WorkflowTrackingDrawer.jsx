@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { LeftOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Drawer, Empty, Space, Spin, Tag, Timeline } from 'antd'
+import { Alert, Button, Drawer, Space, Spin, Tag, Timeline } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -230,7 +231,7 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
           ) : null}
           <section aria-label="整条流程处理记录">
             <div className="erp-workflow-tracking-history-heading"><h3 ref={historyHeading} tabIndex={-1}>{summary.kind === 'process' ? '全部节点处理记录' : '处理记录'}</h3><span>最近在前</span></div>
-            {eventItems.length ? <Timeline items={eventItems} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={summary.kind === 'process' ? '暂无人工任务处理记录' : '暂无处理记录'} />}
+            {eventItems.length ? <Timeline items={eventItems} /> : <Empty description={summary.kind === 'process' ? '暂无人工任务处理记录' : '暂无处理记录'} />}
             {moreError ? <p role="alert">更早记录读取失败，已加载记录仍保留。</p> : null}
             {data.events_truncated ? <Space><Button onClick={loadMore} loading={loadingMore} aria-label={moreError ? '重新读取更早记录' : '加载更早记录'}>{moreError ? '重新读取更早记录' : '加载更早记录'}</Button></Space> : null}
           </section>

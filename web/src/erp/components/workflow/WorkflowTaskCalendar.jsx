@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Alert, Button, Empty, Spin } from 'antd'
+import { Alert, Button, Spin } from 'antd'
 import { LeftOutlined, RightOutlined, ReloadOutlined } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import { message } from '@/common/utils/antdApp'
@@ -317,7 +318,6 @@ export default function WorkflowTaskCalendar({
           <div className="workflow-task-calendar__results">
             {calendar && !items.length && !error ? (
               <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description="当前筛选下暂无待办"
               />
             ) : null}

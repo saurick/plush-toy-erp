@@ -9,7 +9,6 @@ import {
   Alert,
   Button,
   Card,
-  Empty,
   Form,
   InputNumber,
   Radio,
@@ -20,6 +19,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -933,7 +933,7 @@ export default function ApprovalResponsibilityPanel({
         className="erp-permission-section erp-permission-section--approvals"
         variant="borderless"
       >
-        <Empty description="无权查看审批责任" />
+        <Empty state="denied" description="无权查看审批责任" detail="请联系管理员核对权限。" />
       </Card>
     )
   }

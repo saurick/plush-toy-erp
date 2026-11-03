@@ -4,6 +4,9 @@
 }
 
 .erp-print-appendix-manager {
+  --erp-empty-inline-padding-block: 0px;
+  --erp-empty-inline-padding-inline: 0px;
+
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -21,7 +24,6 @@
 }
 
 .erp-print-appendix-manager__heading > span,
-.erp-print-appendix-manager__empty,
 .erp-print-appendix-manager__item-copy > span {
   color: var(--erp-text-muted);
   font-size: 12px;

@@ -1,11 +1,12 @@
 import React, { Suspense, useLayoutEffect, useRef, useState } from 'react'
-import { Button, Empty, Popover } from 'antd'
+import { Button, Popover } from 'antd'
 import {
   DownOutlined,
   FilterOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
@@ -262,8 +263,8 @@ const TOPICS = [
   {
     key: 'empty',
     title: '页面状态',
-    summary: '加载、空白、失败与恢复',
-    description: '操作手机任务和电脑切页样例，核对等待期间保留什么，以及完成读取或失败后的恢复。',
+    summary: '空提示规格、加载与恢复',
+    description: '比较列表、表单和下拉的空提示，操作手机任务与电脑切页样例，核对读取、失败与权限反馈。',
     rules: [
       ['手机首次读取', '卡片骨架', '复用任务卡片布局，保留页签与筛选；未知数量不显示为零。'],
       ['栏目首次读取', '列表区等待', '不混入其他栏目的记录；页签保持挂载。'],
@@ -272,13 +273,16 @@ const TOPICS = [
       ['尚无记录', '中性空状态', '没有风险，不显示黄色警告框。'],
       ['筛选未命中', '保留条件 + 清除入口', '让用户理解当前范围，继续调整。'],
       ['读取失败', '错误 + 重试', '不能伪装成空记录，也不能丢失查询上下文。'],
+      ['列表与独立内容区', 'AppEmpty 默认规格', '居中图标和场景文案；仅在有真实恢复能力时提供清除或新建。'],
+      ['表单内部', 'AppEmpty inline', '左对齐文字，默认左右 12px，与明细操作区对齐。'],
+      ['下拉候选', 'AppEmpty compact', '保留搜索与选择，失败提供重新读取，无权限单独说明。'],
     ],
     checks: [
       '切换首次加载、栏目读取和刷新，完成读取后比较卡片与页签的位置。',
       '选择一张卡片后刷新并模拟失败；核对选择保留、重试和清除条件。',
       '选择电脑切页，在等待期间点击另一导航；手机样例可切换宽度和外观。',
     ],
-    source: 'MobileTaskListContent · MobileTaskListSkeleton · WorkflowTaskCard · Loading · Ant Design Empty / Alert',
+    source: 'AppEmpty · AppTable · AppSelect · MobileTaskListContent · MobileTaskListSkeleton · WorkflowTaskCard · Loading / Alert',
     consumer: { ...TASK_PAGE, task: '切换任务范围并刷新，核对内容区等待与恢复；手机组件另在岗位任务端核对。' },
   },
   {

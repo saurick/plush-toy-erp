@@ -367,16 +367,9 @@
   background: rgb(15 23 42 / 0.56);
 }
 
-[data-erp-theme='dark'] .ant-table-wrapper .ant-table-placeholder > td,
-[data-erp-theme='dark'] .ant-empty,
-[data-erp-theme='dark'] .ant-empty-normal {
+[data-erp-theme='dark'] .ant-table-wrapper .ant-table-placeholder > td {
   background: transparent;
   color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .ant-empty .ant-empty-image {
-  opacity: 0.78;
-  filter: brightness(0.82) saturate(0.7);
 }
 
 [data-erp-theme='dark'] .ant-alert {
@@ -536,7 +529,6 @@
   background: transparent;
 }
 
-[data-erp-theme='dark'] .ant-empty-description,
 [data-erp-theme='dark'] textarea:not(.ant-input)::placeholder {
   color: var(--erp-text-subtle);
 }

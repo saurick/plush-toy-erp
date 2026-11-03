@@ -1,10 +1,11 @@
 import React from 'react'
-import { Button, Empty, Tooltip } from 'antd'
+import { Button, Tooltip } from 'antd'
 import {
   PushpinFilled,
   PushpinOutlined,
 } from '@ant-design/icons'
 import { Link } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import {
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_WORKSPACE_NAV_ITEMS,
@@ -22,7 +23,6 @@ export default function DevToolTable({
   if (!items.length) {
     return (
       <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
         description={emptyDescription}
       >
         {onReset ? <Button onClick={onReset}>清除筛选</Button> : null}

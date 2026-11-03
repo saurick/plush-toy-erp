@@ -6,6 +6,7 @@ import {
   InfoCircleOutlined,
   LoadingOutlined,
 } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import '../styles/dev-workbench-pattern.css'
 
 // The catalogue stays mounted while its reader changes, so peers remain directly reachable.
@@ -158,10 +159,8 @@ export function WorkbenchNotice({
 
 export function WorkbenchEmpty({ title, description, action, className = '' }) {
   return (
-    <div className={`erp-workbench-empty ${className}`} role="status">
-      <strong>{title}</strong>
-      {description ? <div>{description}</div> : null}
+    <Empty className={`erp-workbench-empty ${className}`.trim()} description={title} detail={description}>
       {action || null}
-    </div>
+    </Empty>
   )
 }

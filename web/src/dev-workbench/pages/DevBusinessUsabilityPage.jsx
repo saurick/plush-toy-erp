@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo } from 'react'
 import { CheckCircleOutlined } from '@ant-design/icons'
-import { Card, Empty, Space, Tag, Typography } from 'antd'
+import { Card, Space, Tag, Typography } from 'antd'
 import { useLocation, useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import {
@@ -247,7 +248,6 @@ export default function DevBusinessUsabilityPage() {
             locale={{
               emptyText: (
                 <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description="没有符合当前条件的页面"
                 />
               ),

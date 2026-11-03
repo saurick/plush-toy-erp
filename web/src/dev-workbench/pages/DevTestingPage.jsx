@@ -14,7 +14,6 @@ import {
   Alert,
   Button,
   Checkbox,
-  Empty,
   Progress,
   Skeleton,
   Space,
@@ -22,6 +21,7 @@ import {
   Typography,
 } from 'antd'
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { Loading } from '@/common/components/loading'
 import Pagination from '@/common/components/pagination/AppPagination'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
@@ -1925,7 +1925,6 @@ export default function DevTestingPage() {
                 ) : (
                   <div className="erp-dev-testing-empty">
                     <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
                       description="当前筛选没有命令块 / No command blocks"
                     />
                   </div>
@@ -2070,7 +2069,7 @@ export default function DevTestingPage() {
                         <Button onClick={() => selectView(VIEW_COMMANDS)}>查专项命令</Button>
                       </div>
                       <div className="erp-dev-testing-presets" aria-label="常用测试命令预设">{matchingPresets.map((preset) => <QuickPreset key={preset.key} preset={preset} />)}</div>
-                      {matchingPresets.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的常用检查" /> : null}
+                      {matchingPresets.length === 0 ? <Empty description="没有匹配的常用检查" /> : null}
                     </section>
                   )}
               </WorkbenchReading>

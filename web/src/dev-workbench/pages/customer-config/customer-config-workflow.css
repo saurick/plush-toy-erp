@@ -157,16 +157,6 @@
   max-width: 520px;
 }
 
-.erp-dev-customer-empty-batches {
-  display: grid;
-  justify-items: start;
-  gap: 8px;
-  padding: 16px;
-  border: 1px dashed var(--erp-border);
-  border-radius: 6px;
-  color: var(--erp-text-muted);
-}
-
 .erp-dev-customer-handoff-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

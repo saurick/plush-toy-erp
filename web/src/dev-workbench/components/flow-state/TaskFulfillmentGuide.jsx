@@ -2,6 +2,7 @@ import React from 'react'
 import { Button, Drawer } from 'antd'
 import { CloseOutlined, LeftOutlined } from '@ant-design/icons'
 import { useLocation, useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingSegmented from '../../../common/components/navigation/SlidingSegmented.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters, patchDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
@@ -282,9 +283,7 @@ export default function TaskFulfillmentGuide({
             />
           ) : null}
           {!selection ? (
-            <p className="erp-dev-fulfillment-guide__empty">
-              选择异常类型，查看处理分支及回接位置。
-            </p>
+            <Empty description="选择异常类型，查看处理分支及回接位置。" />
           ) : null}
         </section>
       )}

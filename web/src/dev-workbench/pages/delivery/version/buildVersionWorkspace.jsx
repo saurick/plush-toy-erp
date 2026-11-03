@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Empty, Space, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Space, Tag, Typography } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import {
   OPEN_OPERATION_STATUSES,

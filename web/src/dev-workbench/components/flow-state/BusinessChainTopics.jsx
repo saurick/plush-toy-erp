@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Button, Empty } from 'antd'
+import { Button } from 'antd'
 import { LeftOutlined } from '@ant-design/icons'
 import { useLocation, useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { normalizeFulfillmentRole } from '@/erp/utils/workflowFulfillment.mjs'
 import { buildDevBusinessChainTopics } from '../../config/devBusinessChainProjection.mjs'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
@@ -283,7 +284,6 @@ export default function BusinessChainTopics({
         </section>
       ) : (
         <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
             available.length ? '请选择业务专题' : filtered ? '没有同时满足条件的专题，移除筛选可恢复查看' : '该岗位暂无关联专题'
           }

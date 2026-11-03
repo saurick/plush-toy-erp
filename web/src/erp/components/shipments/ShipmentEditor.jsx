@@ -4,7 +4,6 @@ import {
   Alert,
   AutoComplete,
   Button,
-  Empty,
   Form,
   Input,
   InputNumber,
@@ -12,6 +11,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import TaskSourceFacts from '../business-list/TaskSourceFacts.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Button, Descriptions, Empty, Space, Tag, Typography } from 'antd'
+import { Button, Descriptions, Space, Tag, Typography } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { MermaidDiagram } from '@/common/components/markdown'
 import DevTimestamp from '../DevTimestamp.jsx'
 import {
@@ -254,7 +255,7 @@ export function GateExecutionFlow({ summary, operation, profile, standalone = fa
   const groups = flowGroups(summary, profile, stages)
   const longestId = longestStageId(stages)
 
-  if (stages.length === 0) return <Empty description="正在读取正式门禁阶段" />
+  if (stages.length === 0) return <Empty state="loading" description="正在读取正式门禁阶段" />
 
   return (
     <section className="erp-dev-quality-flow" aria-label={trackLabel}>

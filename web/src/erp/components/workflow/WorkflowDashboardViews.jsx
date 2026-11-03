@@ -1,6 +1,7 @@
 import React from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
-import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
+import { Button, Card, Space, Tag, Typography } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import { buildWorkflowTaskResponsibilityItems } from '../../utils/workflowTaskEventPresentation.mjs'
 import Table from '@/common/components/table/AppTable'
@@ -334,7 +335,6 @@ export function TaskLane({ lane, keyword = '', loading = false, onOpenTask }) {
         locale={{
           emptyText: (
             <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={
                 lane.key === 'all'
                   ? '当前范围暂无匹配任务'
@@ -359,7 +359,7 @@ export function WorkbenchQueueEmpty({
 
   return (
     <div className="erp-workbench-queue-empty">
-      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={description} />
+      <Empty description={description} />
       {fallbackOption ? (
         <Button size="small" onClick={() => onSwitchQueue(fallbackOption.key)}>
           查看{fallbackOption.label}

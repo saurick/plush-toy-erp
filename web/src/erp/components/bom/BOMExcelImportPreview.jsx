@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useState } from 'react'
-import { Alert, Button, Empty, Radio, Space, Typography } from 'antd'
+import { Alert, Button, Radio, Space, Typography } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import SearchInput from '@/common/components/SearchInput'
 import Table from '@/common/components/table/AppTable'

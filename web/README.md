@@ -30,6 +30,8 @@ pnpm install
 
 组件选型、复用顺序与底层使用边界见[组件复用与使用入口](../docs/engineering/前端实现与交互约定.md#组件复用与使用入口--shared-component-entrypoints)，领域实现按 [ERP 组件入口](src/erp/components/README.md)定位。
 
+列表、表单、下拉及工作台的空提示统一使用 [`AppEmpty`](src/common/components/empty/AppEmpty.jsx)，规格、读取反馈与恢复边界见[空提示约定](../docs/product/ui-design/交互设计说明.md#empty-states)。
+
 业务页负责权限、当前选择和领域组件的编排，查询、提交及表单按实际职责放在对应领域目录。收付款实现集中在 `src/erp/components/finance/`，各动作复用页面级防重尝试记录与忙碌状态；事实和状态仍取后端及生成契约。
 
 质检的列表和导出请求共用 [`qualityInspectionQueries.mjs`](src/erp/components/quality-inspections/qualityInspectionQueries.mjs)，按检验类型选择正式读取接口并保留相同筛选语义。

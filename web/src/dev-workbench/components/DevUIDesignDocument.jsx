@@ -5,8 +5,9 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
 } from '@ant-design/icons'
-import { Button, Empty } from 'antd'
+import { Button } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import { Markdown } from '@/common/components/markdown'
@@ -223,7 +224,6 @@ export default function DevUIDesignDocument({ source, specification, view }) {
             ))}
             {!filtered.length ? (
               <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description="没有匹配的主题或章节"
               >
                 <Button onClick={() => updateLocation({ q: '' }, true)}>

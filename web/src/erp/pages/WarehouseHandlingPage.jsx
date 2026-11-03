@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
-import { Empty } from 'antd'
 import { useOutletContext } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
+
 import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'

@@ -1,5 +1,6 @@
 import React, { useImperativeHandle, useMemo, useRef } from 'react'
-import { Empty, Table } from 'antd'
+import { Table } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { normalizeTableColumns, tableColumnsMinimumWidth } from './tableColumns.mjs'
 import TableScrollControls from './TableScrollControls.jsx'
 import { useAppPagination } from '../pagination/AppPagination'
@@ -19,6 +20,7 @@ const AppTable = React.forwardRef(
     ref
   ) => {
     const tableRef = useRef(null)
+    const loading = typeof props.loading === 'object' ? props.loading?.spinning === true : Boolean(props.loading)
     const pagination = useAppPagination(props.pagination)
     const hasRowSelection = Boolean(rowSelection)
     useImperativeHandle(ref, () => tableRef.current)
@@ -69,14 +71,12 @@ const AppTable = React.forwardRef(
           scroll={scroll}
           style={{ ...style, '--app-table-selection-column-width': `${TABLE_SELECTION_COLUMN_WIDTH}px` }}
           components={tableComponents}
-          locale={
-            typeof locale?.emptyText === 'string'
-              ? {
-                  ...locale,
-                  emptyText: <Empty description={locale.emptyText} />,
-                }
-              : locale
-          }
+          locale={{
+            ...locale,
+            emptyText: loading ? null : typeof locale?.emptyText === 'string'
+              ? <Empty description={locale.emptyText} />
+              : locale?.emptyText === undefined ? <Empty /> : locale.emptyText,
+          }}
         />
         <TableScrollControls
           tableRef={tableRef}

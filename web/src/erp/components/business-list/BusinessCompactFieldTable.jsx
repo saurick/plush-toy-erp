@@ -1,4 +1,5 @@
 import React from 'react'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import SelectPresentationContext from '@/common/components/select/SelectPresentationContext.jsx'
 import './businessCompactFieldTable.css'
@@ -108,8 +109,6 @@ export function BusinessCompactFieldRow({
 
 export function BusinessLineItemsEmpty({ children }) {
   return (
-    <div className="erp-line-items-empty">
-      {children || '暂无明细，请添加一行'}
-    </div>
+    <Empty variant="inline" className="erp-line-items-empty" description={children ?? '暂无明细，请添加一行'} />
   )
 }

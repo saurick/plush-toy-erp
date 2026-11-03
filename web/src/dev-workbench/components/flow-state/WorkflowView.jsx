@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Button, Empty, Spin, Tag } from 'antd'
+import { Alert, Button, Spin, Tag } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { WorkbenchEmpty, WorkbenchFacts, WorkbenchSection } from '../WorkbenchPattern.jsx'
 import {
   getProcessOwnerPoolLabel,
@@ -147,7 +148,7 @@ function WorkflowView({
                   </li>
                 ))}
               </ol>
-            ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该任务暂无可见协同事件" />}
+            ) : <Empty description="该任务暂无可见协同事件" />}
             {events.moreError ? <Alert showIcon type="error" message="更早记录读取失败" description={events.moreError} /> : null}
             {events.truncated ? (
               <Button loading={events.loadingMore} onClick={events.loadMore}>

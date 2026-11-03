@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Alert, Button, Empty, Spin, Tag } from 'antd'
+import { Alert, Button, Spin, Tag } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
 import BusinessStatusFilter from '../../components/business-list/BusinessStatusFilter.jsx'
@@ -537,7 +538,6 @@ function MobileTrackingContent({
           </div>
           {!current.items.length && (
             <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={
                 Object.values(query).some(Boolean)
                   ? '当前筛选下没有匹配记录'

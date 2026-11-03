@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CloseOutlined } from '@ant-design/icons'
-import { Button, Empty, Space, Tag, Typography } from 'antd'
+import { Button, Space, Tag, Typography } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import Table from '@/common/components/table/AppTable'
@@ -438,7 +439,7 @@ export default function DevIntegrationPage() {
                     onChange: (nextPage) => updateQuery({ page: nextPage === 1 && !query.rpc ? '' : nextPage }),
                   }}
                         locale={{
-                    emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的接口，请调整或清除筛选" />,
+                    emptyText: <Empty description="没有匹配的接口，请调整或清除筛选" />,
                   }}
                       />
                       <div className="erp-dev-integration__source erp-dev-integration__permission-source" aria-label="权限来源">

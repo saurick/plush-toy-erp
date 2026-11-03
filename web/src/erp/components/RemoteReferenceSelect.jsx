@@ -8,7 +8,11 @@ import React, {
   useRef,
   useState,
 } from 'react'
+import { Alert, Button } from 'antd'
 import Select from '@/common/components/select/AppSelect'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
+import { RpcErrorCode } from '@/common/consts/errorCodes.js'
+import { getPageLoadErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { showPageLoadError } from './PageLoadFeedback.jsx'
 import {
@@ -58,6 +62,8 @@ const RemoteReferenceSelect = forwardRef(
       mapOption,
       listHeight = 256,
       popupRender,
+      emptyDescription = '暂无可选资料',
+      filteredEmptyDescription = '没有符合条件的可选资料',
       ...props
     },
     ref
@@ -70,11 +76,14 @@ const RemoteReferenceSelect = forwardRef(
     const [options, setOptions] = useState([])
     const [selectedOptions, setSelectedOptions] = useState([])
     const [loading, setLoading] = useState(false)
+    const [candidateError, setCandidateError] = useState(null)
+    const [searchKeyword, setSearchKeyword] = useState('')
     const state = useRef({
       gate: createProductionOrderReferenceRequestGate(),
       nextOffset: null,
       loading: false,
       keyword: '',
+      inputKeyword: '',
     })
     const controller = useRef(null)
     const timer = useRef(null)
@@ -101,6 +110,7 @@ const RemoteReferenceSelect = forwardRef(
       async (keyword, offset, generation) => {
         state.current.loading = true
         setLoading(true)
+        setCandidateError(null)
         const abort = new AbortController()
         controller.current = abort
         try {
@@ -144,7 +154,7 @@ const RemoteReferenceSelect = forwardRef(
             !isRpcAbortError(error) &&
             state.current.gate.isCurrent(generation)
           ) {
-            showPageLoadError(error, '加载可选资料')
+            setCandidateError(error)
           }
         } finally {
           if (state.current.gate.isCurrent(generation)) {
@@ -162,6 +172,9 @@ const RemoteReferenceSelect = forwardRef(
         const generation = state.current.gate.next()
         state.current.keyword = keyword
         state.current.nextOffset = null
+        state.current.loading = true
+        setLoading(true)
+        setCandidateError(null)
         setOptions([])
         timer.current = setTimeout(
           () => load(keyword, 0, generation),
@@ -177,6 +190,9 @@ const RemoteReferenceSelect = forwardRef(
       clearTimeout(timer.current)
       requestState.loading = false
       setLoading(false)
+      setCandidateError(null)
+      setSearchKeyword('')
+      requestState.inputKeyword = ''
       setOptions([])
       return () => {
         requestState.gate.next()
@@ -220,11 +236,41 @@ const RemoteReferenceSelect = forwardRef(
         ),
       ]
     }, [options, selectedOptions, initialOptions, selectedID])
+    const candidateDenied = candidateError?.code === RpcErrorCode.PERMISSION_DENIED
+    const retryCandidates = useCallback(() => search(state.current.inputKeyword), [search])
+    const clearCandidateSearch = () => {
+      state.current.inputKeyword = ''
+      setSearchKeyword('')
+      search('')
+      onSearch?.('')
+    }
+    const readFeedback = useMemo(() => candidateError ? (
+      <Empty
+        variant="compact"
+        state={candidateDenied ? 'denied' : 'error'}
+        description={getPageLoadErrorMessage(candidateError, '加载可选资料')}
+        detail={candidateDenied ? '请联系管理员核对权限。' : undefined}
+      >
+        {!candidateDenied ? <Button onMouseDown={(event) => event.preventDefault()} onClick={retryCandidates}>重试读取</Button> : null}
+      </Empty>
+    ) : null, [candidateError, candidateDenied, retryCandidates])
+    const hasCandidateOptions = displayOptions.length > 0
     const renderPopup = useCallback((menu) => {
       // 加载、搜索和空结果沿用候选列表高度，避免浮层重新选择展开方向。
-      const content = <div style={{ minHeight: listHeight }}>{menu}</div>
+      const content = (
+        <div style={{ minHeight: listHeight }}>
+          {candidateDenied ? readFeedback : (
+            <>
+              {candidateError && hasCandidateOptions ? (
+                <Alert type="error" showIcon message="可选资料读取失败" description="已保留原有候选和当前输入。" action={<Button onMouseDown={(event) => event.preventDefault()} onClick={retryCandidates}>重试读取</Button>} />
+              ) : null}
+              {menu}
+            </>
+          )}
+        </div>
+      )
       return popupRender ? popupRender(content) : content
-    }, [listHeight, popupRender])
+    }, [listHeight, popupRender, candidateDenied, readFeedback, candidateError, hasCandidateOptions, retryCandidates])
     return (
       <Component
         {...props}
@@ -235,13 +281,26 @@ const RemoteReferenceSelect = forwardRef(
         listHeight={listHeight}
         popupRender={renderPopup}
         loading={loading}
+        searchValue={searchKeyword}
+        notFoundContent={loading ? <Empty variant="compact" state="loading" description="正在读取可选资料…" /> : readFeedback || props.notFoundContent || (
+          <Empty variant="compact" description={searchKeyword.trim() ? filteredEmptyDescription : emptyDescription}>
+            {searchKeyword.trim() ? <Button onMouseDown={(event) => event.preventDefault()} onClick={clearCandidateSearch}>清除搜索</Button> : null}
+          </Empty>
+        )}
         showSearch
         filterOption={false}
         onOpenChange={(open) => {
-          if (open && !disabled) search('')
+          // 输入可先于展开事件到达，展开不能覆盖刚输入的搜索词。
+          if (open && !disabled) search(state.current.inputKeyword)
+          if (!open) {
+            state.current.inputKeyword = ''
+            setSearchKeyword('')
+          }
           onOpenChange?.(open)
         }}
         onSearch={(keyword) => {
+          state.current.inputKeyword = keyword
+          setSearchKeyword(keyword)
           search(keyword)
           onSearch?.(keyword)
         }}

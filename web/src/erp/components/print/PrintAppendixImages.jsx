@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { PrintToolButton } from './PrintWorkspaceTools.jsx'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -302,7 +303,7 @@ export default function PrintAppendixImageManager({
           })}
         </ol>
       ) : (
-        <div className="erp-print-appendix-manager__empty">还没有末尾图片</div>
+        <Empty variant="inline" description="还没有末尾图片" />
       )}
     </section>
   )

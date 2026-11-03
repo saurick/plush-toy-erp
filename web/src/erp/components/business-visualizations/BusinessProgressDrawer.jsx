@@ -6,12 +6,13 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Alert, Button, Drawer, Empty, Spin, Tag } from 'antd'
+import { Alert, Button, Drawer, Spin, Tag } from 'antd'
 import {
   ArrowRightOutlined,
   DownOutlined,
   RightOutlined,
 } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -285,7 +286,6 @@ export default function BusinessProgressDrawer({
         )}
         {records.length === 0 ? (
           <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
               section === 'production' ? '暂无关联生产单' : '暂无可见记录'
             }

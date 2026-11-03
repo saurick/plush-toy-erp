@@ -5,7 +5,8 @@ import {
   SafetyCertificateOutlined,
   ArrowRightOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Drawer, Empty, Tag, Typography } from 'antd'
+import { Alert, Button, Drawer, Tag, Typography } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'

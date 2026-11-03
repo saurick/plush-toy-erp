@@ -6,8 +6,9 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Alert, Button, Empty, Spin } from 'antd'
+import { Alert, Button, Spin } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -522,7 +523,6 @@ export default function MobileProgressPanel({
                 description={
                   filtered ? '没有符合条件的记录' : '当前范围暂无记录'
                 }
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
             )}
           </div>

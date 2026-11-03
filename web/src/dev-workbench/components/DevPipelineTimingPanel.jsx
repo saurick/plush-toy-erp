@@ -1,4 +1,5 @@
-import { Card, Empty, Space, Tag, Typography } from 'antd'
+import { Card, Space, Tag, Typography } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 
 import DevTimestamp from './DevTimestamp.jsx'
 import { formatDevTimestamp, isDevTimestamp } from '../config/devTimestamp.mjs'
@@ -52,7 +53,7 @@ export function DevTimingBars({
   const visibleStages = stages.slice(0, limit)
   if (visibleStages.length === 0) {
     return (
-      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无环节耗时" />
+      <Empty description="暂无环节耗时" />
     )
   }
   const denominator = Math.max(
@@ -265,7 +266,6 @@ export default function DevPipelineTimingPanel({ timings }) {
   return (
     <Card className="erp-dev-pipeline-timing" variant="borderless">
       <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
         description={latestRun ? '历史流水线的任务与日志在原始平台查看' : '尚无 GitLab 流水线记录'}
       >
         {latestRun?.url ? (

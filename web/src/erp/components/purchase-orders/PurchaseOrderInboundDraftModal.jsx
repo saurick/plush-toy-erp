@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Button,
-  Empty,
   Form,
   Input,
   InputNumber,
@@ -11,6 +10,7 @@ import {
   Tag,
 } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { lineItemFieldIndex } from '../business-list/businessLineItemDisclosure.mjs'
 import BusinessLineItemGroupControls, { BusinessLineItemGroupErrorCount } from '../business-list/BusinessLineItemGroupControls.jsx'
 import useBusinessLineItemGroups from '../business-list/useBusinessLineItemGroups.js'
@@ -431,7 +431,6 @@ export default function PurchaseOrderInboundDraftModal({
             />
           ) : !loading && !hasRemaining ? (
             <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
               description="当前订单没有可登记的剩余材料"
             />
           ) : (
@@ -577,7 +576,6 @@ export default function PurchaseOrderInboundDraftModal({
                         })}
                       {!loading && !fields.length && (
                         <Empty
-                          image={Empty.PRESENTED_IMAGE_SIMPLE}
                           description="选择本次到货的材料后开始清点"
                         />
                       )}

@@ -13,7 +13,7 @@
 }
 .erp-dev-fulfillment-guide__role { display: flex; align-items: center; gap: 10px; }
 .erp-dev-fulfillment-guide__role .ant-select { width: 160px; }
-.erp-dev-fulfillment-guide__scope-bar, .erp-dev-fulfillment-guide__hint, .erp-dev-fulfillment-guide__empty { color: var(--erp-text-muted); font-size: var(--erp-font-small); }
+.erp-dev-fulfillment-guide__scope-bar, .erp-dev-fulfillment-guide__hint { color: var(--erp-text-muted); font-size: var(--erp-font-small); }
 .erp-dev-fulfillment-guide__stage-picker, .erp-dev-fulfillment-guide__choices { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .erp-dev-exception-directory > .ant-select,
 .erp-dev-fulfillment-guide__choices > .ant-select { width: 260px; max-width: 100%; }

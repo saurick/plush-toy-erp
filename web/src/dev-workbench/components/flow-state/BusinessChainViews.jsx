@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Empty, Space, Spin, Tag } from 'antd'
+import { Alert, Button, Space, Spin, Tag } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/FilterSelect'
 import {
   buildDevBusinessChainProjection,
@@ -577,7 +578,6 @@ function BusinessChainView({
                 </ul>
               ) : (
                 <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description="当前节点没有直接关系"
                 />
               )}

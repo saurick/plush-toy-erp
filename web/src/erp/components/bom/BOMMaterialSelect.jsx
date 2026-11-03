@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react'
-import { Button, Empty } from 'antd'
+import { Button } from 'antd'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import { materialOption } from '../../utils/referenceSelectOptions.mjs'
 import { bomMaterialConflictText } from '../../utils/bomMaterialMatching.mjs'
@@ -147,7 +147,8 @@ export default function BOMMaterialSelect({
       }}
       optionRender={renderOption}
       popupRender={renderPopup}
-      notFoundContent={<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未找到对应物料" />}
+      emptyDescription="暂无可选物料"
+      filteredEmptyDescription="未找到对应物料"
     />
   )
 }

@@ -4,6 +4,8 @@
 
 新增或调整组件时，先按[组件复用与使用入口](../../../../docs/engineering/前端实现与交互约定.md#组件复用与使用入口--shared-component-entrypoints)核对当前任务的正式入口、已有封装与允许底层使用的边界，再阅读本目录职责与对应实现。
 
+空提示使用通用层的 [`AppEmpty`](../../common/components/empty/AppEmpty.jsx)；业务明细通过 `BusinessLineItemsEmpty` 选用文本规格，详情、来源选择与工作台沿用同一呈现入口。规格见[空提示与读取反馈](../../../../docs/product/ui-design/交互设计说明.md#empty-states)。
+
 ## 目录职责
 
 `web/src/erp/components/` 放 ERP 桌面后台的共享壳层、业务列表组件、领域表单 / 列配置、打印工作台和 Workflow 动作抽屉。组件负责展示、收集输入、调用既有 action 或 hook；不在前端补造库存、出货、质检、财务或 Workflow 事实。

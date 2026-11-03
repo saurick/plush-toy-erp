@@ -1,5 +1,6 @@
 import { HistoryOutlined } from '@ant-design/icons'
-import { Card, Empty } from 'antd'
+import { Card } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Table from '@/common/components/table/AppTable'
 import { DEV_PAGINATION } from '../../../config/devPagination.mjs'
 

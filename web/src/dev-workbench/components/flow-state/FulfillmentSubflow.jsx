@@ -1,6 +1,7 @@
 import React from 'react'
 import { useLocation } from 'react-router-dom'
 import { Button } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 import { buildFulfillmentSubflow } from '../../config/devFulfillmentSubflow.mjs'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
@@ -95,7 +96,7 @@ export default function FulfillmentSubflow({
               </details>
         ) : null}
           </div>
-      ) : <p role="status" className="erp-dev-relation-empty">本环节没有同时满足条件的动作。结构图保留上下游位置，移除筛选可恢复查看。</p>}
+      ) : <Empty description="本环节没有同时满足条件的动作" detail="结构图保留上下游位置，移除筛选可恢复查看。" />}
         {relation && selected ? (
         actions.some((action) => action.substepKey === selected.key) ? <BusinessActionRelations
           actions={actions.filter((action) => action.substepKey === selected.key)}
