@@ -100,7 +100,7 @@ test('incoming checks retain unchecked status until the operator records evidenc
   assert.equal(removeButton().closest('fieldset').disabled, true)
   await ui.click(removeButton())
   assert.equal(ui.values().check_items.length, 1)
-  await ui.click(document.querySelector('input[aria-label="选择第 1 行"]'))
+  await ui.click(document.querySelector('tbody[aria-label="检查项目 1"] td[aria-label="第 1 条"]'))
   assert.equal(removeButton().closest('fieldset').disabled, false)
   await ui.click(removeButton())
   assert.deepEqual(ui.values().check_items, [])
