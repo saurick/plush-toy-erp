@@ -19,8 +19,9 @@ export default function BusinessFormSection({
   const props = {
     id,
     className: `erp-business-form-section ${className}`.trim(),
-    'aria-labelledby': showHeading ? `${id}-title` : undefined,
-    'aria-label': showHeading ? undefined : title,
+    role: navigation?.sectionMode ? 'tabpanel' : undefined,
+    'aria-labelledby': navigation?.sectionMode ? `${id}-tab` : showHeading ? `${id}-title` : undefined,
+    'aria-label': navigation?.sectionMode || showHeading ? undefined : title,
     tabIndex: -1,
     hidden: navigation?.sectionMode && navigation.activeSectionID !== id,
     'data-form-section': title,

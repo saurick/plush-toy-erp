@@ -1,6 +1,7 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Select from '@/common/components/select/AppSelect'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { activeFormSectionIndex } from '../../utils/businessFormSections.mjs'
 import { BusinessFormSectionContext } from './BusinessFormSectionContext.js'
 
@@ -65,6 +66,24 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
 
   const positionKey = sectionMode ? active : 'all'
   useLayoutEffect(() => {
+    if (!sectionMode || !presented) return
+    const tabs = bodyRef.current?.parentElement.querySelector('.erp-business-form-page__section-tabs')
+    const tab = tabs?.querySelector('[aria-selected="true"]')
+    if (!tab) return
+    const reveal = () => {
+      if (tab.offsetLeft < tabs.scrollLeft) tabs.scrollLeft = tab.offsetLeft
+      else if (tab.offsetLeft + tab.offsetWidth > tabs.scrollLeft + tabs.clientWidth) {
+        tabs.scrollLeft = tab.offsetLeft + tab.offsetWidth - tabs.clientWidth
+      }
+    }
+    const resize = new ResizeObserver(reveal)
+    resize.observe(tabs)
+    resize.observe(tab)
+    reveal()
+    return () => resize.disconnect()
+  }, [active, presented, sectionMode])
+
+  useLayoutEffect(() => {
     if (!open || !presented || !bodyRef.current) return
     const scroller = formSectionScroller(bodyRef.current)
     positionKeyRef.current = positionKey
@@ -91,6 +110,10 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
       const top = (scroller.querySelector('.erp-task-action-drawer__navigation')?.offsetHeight || 0) + (scroller !== body ? workspaceNavigation?.offsetHeight || 0 : 0)
       const height = Math.max(0, scroller.clientHeight - top)
       const shared = scroller !== body
+      const sectionNavigation = body.parentElement.querySelector(':scope > .erp-business-form-page__navigation')
+      const horizontalNavigation = sectionModeRef.current || sectionNavigation?.querySelector('.erp-business-form-page__section-picker')?.getClientRects().length
+      const navigationHeight = shared && horizontalNavigation ? sectionNavigation?.offsetHeight || 0 : 0
+      const readingInset = shared ? top + navigationHeight : 0
       setScrollArea((previous) => previous.shared === shared && previous.top === top && previous.height === height ? previous : { shared, top, height })
       const nodes = [...body.querySelectorAll('[data-form-section]')].filter((node) =>
         node.closest('[data-business-form-page]') === page
@@ -114,17 +137,14 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
         return
       }
       const scrollerTop = scroller.getBoundingClientRect().top
-      const sectionNavigation = body.parentElement.querySelector(':scope > .erp-business-form-page__navigation')
-      const picker = sectionNavigation?.querySelector('.erp-business-form-page__section-picker')
-      const pickerHeight = shared && picker?.getClientRects().length ? sectionNavigation.offsetHeight : 0
-      const readingInset = shared ? top + pickerHeight : 0
       const index = activeFormSectionIndex(
         nodes.map(
           (node) => node.getBoundingClientRect().top - scrollerTop + scroller.scrollTop
         ),
-        scroller.scrollTop + readingInset,
-        Math.max(0, scroller.clientHeight - readingInset),
-        scroller.scrollHeight
+        scroller.scrollTop,
+        scroller.clientHeight,
+        scroller.scrollHeight,
+        readingInset
       )
       const anchor = navigationAnchor.current
       if (anchor && Math.abs(scroller.scrollTop - anchor.top) <= 2) {
@@ -152,6 +172,8 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
     const resize = new ResizeObserver(schedule)
     resize.observe(body)
     if (scroller !== body) resize.observe(scroller)
+    const sectionNavigation = body.parentElement.querySelector(':scope > .erp-business-form-page__navigation')
+    if (sectionNavigation) resize.observe(sectionNavigation)
     if (body.firstElementChild) resize.observe(body.firstElementChild)
     scroller.addEventListener('scroll', onScroll, { passive: true })
     navigationAnchor.current = { id: activeRef.current, top: rememberedScroll.current }
@@ -165,7 +187,7 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
     }
   }, [loading, open, presented, navigation, formDisplay, rememberPosition])
 
-  const navigate = (id) => {
+  const navigate = (id, focusHeading = true) => {
     const body = bodyRef.current
     const scroller = formSectionScroller(body)
     const section = [...body.querySelectorAll('[data-form-section]')].find(
@@ -176,8 +198,10 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
     window.requestAnimationFrame(() => {
       if (!section.isConnected) return
       if (sectionModeRef.current) {
-        const heading = section.querySelector('[role="heading"][tabindex]') || section
-        heading.focus({ preventScroll: true })
+        if (focusHeading) {
+          const heading = section.querySelector('[role="heading"][tabindex]') || section
+          heading.focus({ preventScroll: true })
+        }
         return
       }
       const navigation = scroller.querySelector('.erp-task-action-drawer__navigation')
@@ -222,7 +246,28 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
           inert={busy ? '' : undefined}
         >
           <div className="erp-business-form-page__navigation-content">
-            <div className="erp-business-form-page__section-links">
+            <SlidingTabList
+              className="erp-navigation-tabs erp-business-form-page__section-tabs"
+              aria-label="表单页签"
+              hidden={!sectionMode}
+            >
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  id={`${section.id}-tab`}
+                  type="button"
+                  role="tab"
+                  aria-selected={section.id === active}
+                  aria-controls={section.id}
+                  disabled={busy}
+                  onClick={() => navigate(section.id, false)}
+                >
+                  {section.title}
+                  {section.errors > 0 ? <span className="erp-business-form-page__section-errors">{section.errors} 项待修改</span> : null}
+                </button>
+              ))}
+            </SlidingTabList>
+            <div className="erp-business-form-page__section-links" hidden={sectionMode}>
               {sections.map((section) => (
                 <button
                   key={section.id}
@@ -236,12 +281,12 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
                 </button>
               ))}
             </div>
-            <label className="erp-business-form-page__section-picker">
-              {sectionMode ? '当前分区' : '跳转到'}
+            <label className="erp-business-form-page__section-picker" hidden={sectionMode}>
+              跳转到
               <Select
                 allowClear={false /* 不可清空：此值反映当前滚动位置，文档分区始终存在，清空不会改变当前位置。 */}
-                placeholder={sectionMode ? '选择分区' : '跳转到'}
-                aria-label={sectionMode ? '当前分区' : '跳转到'}
+                placeholder="跳转到"
+                aria-label="跳转到"
                 disabled={busy}
                 virtual={false}
                 data-value={active}

@@ -2,6 +2,7 @@ import { UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../../src/dev-workbench/config/dev
 import { chooseSelectOption } from './selectControlActions.mjs'
 import { chooseUIDesignState } from './devUIDesignNavigation.mjs'
 import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const frameSelector = 'iframe[title="ERP 最新可交互设计"]'
 
@@ -32,6 +33,44 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
     if (value === 'workbench') await page.getByText('整体交互预览', { exact: true }).click()
   }
   return [
+    {
+      name: 'dev-ui-design-form-navigation',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const frame = await waitReady(page)
+        await frame.getByRole('button', { name: '销售管理', exact: true }).click()
+        await frame.getByRole('button', { name: '新建订单', exact: true }).click()
+        const editor = frame.locator('.form-view')
+        const control = editor.locator('.form-head [aria-label="编辑页显示"]')
+        const note = editor.locator('textarea[data-form-field="remark"]')
+        await note.fill('目录与页签切换后保留的原型草稿\n'.repeat(30))
+        const identity = await note.elementHandle()
+        await control.getByRole('button', { name: '页签', exact: true }).click()
+        const tabs = editor.getByRole('tablist', { name: '表单页签', exact: true })
+        for (const width of [1920, 390]) {
+          await page.setViewportSize({ width, height: 1080 })
+          await tabs.getByRole('tab').first().press('End')
+          await waitForFiniteAnimations(page)
+          const before = await tabs.boundingBox()
+          const body = editor.locator('.form-scroll')
+          await body.evaluate((node) => { node.scrollTop = node.scrollHeight })
+          const after = await tabs.boundingBox()
+          assert.ok(Math.abs(after.y - before.y) <= 1, `长表单滚动时原型页签保持可见：${JSON.stringify({ width, before, after })}`)
+          assert.equal(await tabs.getByRole('tab').last().getAttribute('aria-selected'), 'true')
+          const selected = await tabs.getByRole('tab').last().boundingBox()
+          assert.ok(selected.x >= before.x - 1 && selected.x + selected.width <= before.x + before.width + 1, '窄屏当前页签完整可见')
+          await tabs.getByRole('tab').first().click()
+          await tabs.getByRole('tab').last().click()
+          assert.equal(await identity.evaluate((node) => node.isConnected), true)
+          assert.equal(await note.inputValue(), '目录与页签切换后保留的原型草稿\n'.repeat(30))
+        }
+        await control.getByRole('button', { name: '目录', exact: true }).click()
+        assert.equal(await editor.locator('.form-section:visible').count(), 5)
+        assert.equal(await identity.evaluate((node) => node.isConnected), true)
+      },
+    },
     {
       name: 'dev-ui-design-note-textareas',
       path: '/__dev/ui-design',

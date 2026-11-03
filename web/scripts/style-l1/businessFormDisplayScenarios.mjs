@@ -4,17 +4,11 @@ import { openERPAppearance } from './themeAssertions.mjs'
 import { closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
-import { chooseSelectOption } from './selectControlActions.mjs'
 
 const visibleSections = (editor) => editor.locator('[data-form-section]:visible').evaluateAll((nodes) => nodes.map((node) => node.dataset.formSection))
 
 async function chooseSection(page, editor, title) {
-  const button = editor.locator('.erp-business-form-page__section-links button').filter({ hasText: title })
-  if (await button.isVisible()) await button.click()
-  else {
-    const id = await editor.locator(`[data-form-section=${JSON.stringify(title)}]`).getAttribute('id')
-    await chooseSelectOption(editor.getByRole('combobox', { name: '当前分区', exact: true }), id)
-  }
+  await editor.getByRole('tab').filter({ hasText: title }).click()
   await page.waitForFunction(({ root, title }) => [...root.querySelectorAll('[data-form-section]')].filter((node) => !node.hidden).every((node) => node.dataset.formSection === title), { root: await editor.elementHandle(), title })
 }
 
@@ -51,9 +45,13 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
         await note.fill('切换区域与全屏后仍保留的草稿')
         const noteHandle = await note.elementHandle()
         if (themeMode === 'light') await verifyMobileNavigationMotion(page, assert, '.erp-business-form-page:not([hidden]) .erp-business-form-page__display-control .ant-segmented', 1)
-        else await control.getByText('分区编辑', { exact: true }).click()
+        else await control.getByText('页签', { exact: true }).click()
         await waitForDisplay(page, 'section')
         assert.deepEqual(await visibleSections(editor), ['备注'])
+        if (themeMode === 'light') {
+          await verifyMobileNavigationMotion(page, assert, '.erp-business-form-page:not([hidden]) .erp-business-form-page__section-tabs', 0)
+          await verifyMobileNavigationMotion(page, assert, '.erp-business-form-page:not([hidden]) .erp-business-form-page__section-tabs', 2, true)
+        }
         await chooseSection(page, editor, '生产计划')
         await chooseSection(page, editor, '备注')
         assert.equal(await noteHandle.evaluate((node) => node.isConnected), true)
@@ -72,13 +70,13 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
         await page.waitForFunction((node) => !!node.querySelector('.erp-business-form-page__section-errors'), await editor.elementHandle())
 
         if (themeMode === 'light') await verifyMobileNavigationMotion(page, assert, '.erp-business-form-page:not([hidden]) .erp-business-form-page__display-control .ant-segmented', 0, true)
-        else await control.getByText('查看全部', { exact: true }).click()
+        else await control.getByText('目录', { exact: true }).click()
         await waitForDisplay(page, 'all')
         assert.deepEqual(await visibleSections(editor), all)
         assert.equal(await note.inputValue(), '切换区域与全屏后仍保留的草稿')
         await openERPAppearance(page)
         const dialog = page.getByRole('dialog', { name: '外观与密度', exact: true })
-        await dialog.locator('[aria-label="编辑页显示"]').getByText('分区编辑', { exact: true }).click()
+        await dialog.locator('[aria-label="编辑页显示"]').getByText('页签', { exact: true }).click()
         await waitForDisplay(page, 'section')
         await dialog.getByRole('button', { name: '关闭', exact: true }).click()
         await dialog.waitFor({ state: 'hidden' })
@@ -105,11 +103,12 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
     ...[
       ['bom', '/erp/purchase/material-bom', '新建 BOM'],
       ['sales', '/erp/sales/project-orders/sales-orders', '新建订单'],
+      ['sales-mobile', '/erp/sales/project-orders/sales-orders', '新建订单'],
     ].map(([key, path, trigger]) => ({
       ...common,
       name: `business-form-display-${key}`,
       path,
-      viewport: key === 'bom' ? { width: 1920, height: 1080 } : { width: 1440, height: 900 },
+      viewport: key === 'bom' ? { width: 1920, height: 1080 } : key === 'sales-mobile' ? { width: 390, height: 844 } : { width: 1440, height: 900 },
       deviceScaleFactor: key === 'bom' ? 2 : 1,
       adminProfile: { erp_preferences: { appearance: { formDisplay: 'section' } } },
       verify: async (page) => {
@@ -118,15 +117,36 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
         const control = editor.locator('.erp-business-form-page__display-control .ant-segmented')
         await control.waitFor()
         assert.equal((await visibleSections(editor)).length, 1)
+        const tabs = editor.getByRole('tablist', { name: '表单页签', exact: true })
+        await tabs.waitFor()
+        const firstTab = tabs.getByRole('tab').first()
+        const lastTab = tabs.getByRole('tab').last()
+        await firstTab.focus()
+        await firstTab.press('End')
+        await page.waitForFunction((root) => [...root.querySelectorAll('[role="tab"]')].at(-1)?.getAttribute('aria-selected') === 'true', await tabs.elementHandle())
+        const navigation = await tabs.boundingBox()
+        const selected = await lastTab.boundingBox()
+        assert.ok(selected.x >= navigation.x - 1 && selected.x + selected.width <= navigation.x + navigation.width + 1, '键盘选择会将当前页签横向滚入视野')
+        assert.equal(await tabs.evaluate((root) => root.scrollWidth > root.clientWidth), key === 'sales-mobile', '窄屏使用页签条自身横向滚动')
+        if (key === 'sales') {
+          await page.setViewportSize({ width: 390, height: 844 })
+          await page.waitForFunction((root) => {
+            const selected = root.querySelector('[aria-selected="true"]').getBoundingClientRect()
+            const bounds = root.getBoundingClientRect()
+            return selected.left >= bounds.left - 1 && selected.right <= bounds.right + 1
+          }, await tabs.elementHandle())
+          await page.setViewportSize({ width: 1440, height: 900 })
+        }
         const count = await editor.locator('[data-form-section]').count()
-        await control.getByText('查看全部', { exact: true }).click()
+        await control.getByText('目录', { exact: true }).click()
         await waitForDisplay(page, 'all')
         assert.equal((await visibleSections(editor)).length, count)
         assert.equal(await editor.getAttribute('data-unsaved'), 'false')
         if (key === 'bom') {
-          await control.getByText('分区编辑', { exact: true }).click()
+          await control.getByText('页签', { exact: true }).click()
           await waitForDisplay(page, 'section')
           await chooseSection(page, editor, '订单与制表资料')
+          await waitForFiniteAnimations(page)
           await page.screenshot({ path: `${outputDir}/form-display-bom-4k.png`, fullPage: true })
         }
         await closeBusinessFormPage(page, editor)
@@ -150,7 +170,7 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
         await page.getByRole('button', { name: '新建 BOM' }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         const control = editor.locator('.erp-business-form-page__display-control')
-        await control.getByText('分区编辑', { exact: true }).click()
+        await control.getByText('页签', { exact: true }).click()
         const error = control.getByRole('alert')
         await error.waitFor()
         assert.match(await error.innerText(), /外观设置未保存到账号，请重试。/u)

@@ -36,6 +36,7 @@
 - 菜单主列表的整页编辑复用 `business-list/BusinessFormPage.jsx`，统一管理保存、离开保护及桌面可选全屏。默认保存前校验当前表单；采购需先清理纯空白新行、批量导入需预检全部草稿时，使用 `validateOnSave={false}` 交给保存器整理后校验，仍须调用所属 form 的 `validateFields`；校验失败通过 `errorFields` 复用分区展开和字段聚焦。容器与恢复合同见[桌面业务编辑](../../../../docs/engineering/前端实现与交互约定.md#桌面业务编辑与弹窗约定)。
 - 局部弹窗由 `BusinessFormSectionScope` 提供独立聚焦范围；整页表单仍由 `BusinessFormBody` 提供目录、阅读位置及焦点，已有字段和浮层不重建。已有分组使用 `BusinessFormSection`，普通子标题继续使用 `BusinessFormSectionTitle`；查看、复制、导入及加载 / 空态 / 错误分支均保留标题。
 - 分区定位与聚焦复用 `BusinessFormBody`、`BusinessFormSection`；普通分区、明细及 BOM 标题共用 `business-list/businessFormSections.css` 的 32px 紧凑标题带，以短竖线、主题文字和淡主题色底区分表头及只读框，当前分区底色加深。外观与当前分区不派生业务状态，不改变输入、明细行组或整单保存语义。
+- `BusinessFormBody` 共用“目录 / 页签”导航：目录连续展示整单，页签用 `SlidingTabList` 保持横向导航可见，任务共用滚动区时吸顶；窄屏横滑页签。切换保留字段挂载、阅读位置与整单校验，显示方式沿用账号偏好。
 - `BusinessLineItemsTable` 保持同一表头与滚动区域；出货页用 `BusinessLineItemGroupHeading` 归组相邻产品身份，`BusinessLineItemRow` 仍逐条维护字段、序号与浮层焦点，不改变 `Form.List` 的顺序和 key。业务归组适用范围见[编辑页归组](../../../../docs/product/ui-design/交互设计说明.md#editor-line-grouping)。
 - 桌面账号同步首次失败时不挂载业务页；已验证页面遇到临时断连时，由 `SessionRecoveryDialog` 保留本页内存中的编辑内容并隔离交互，JSON-RPC 暂停新的认证业务请求，不排队或重放写操作。恢复必须重新读取账号和有效业务配置；访问范围变化时重建业务页，登录失效或账号切换时清除旧页面。刷新、关闭或离开页面不属于内存保留范围；真实授权始终由后端校验。
 - 业务列表、弹窗明细与研发工作台的 Ant Design 表格共用 [`AppTable`](../../common/components/table/AppTable.jsx)；列对齐和序号规则见[表格对齐](../../../../docs/engineering/前端实现与交互约定.md#表格对齐--table-alignment)。

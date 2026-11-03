@@ -121,11 +121,45 @@ async function visibleAttachments(editor) {
   return panel
 }
 
+async function assertTaskFormTabNavigation(page, editor, outputDir, path, assert) {
+  const note = editor.getByLabel('备注', { exact: true })
+  const original = await note.inputValue()
+  await note.fill('任务内长备注的阅读与恢复\n'.repeat(60))
+  const control = editor.locator('.erp-business-form-page__display-control')
+  await control.getByText('页签', { exact: true }).click()
+  const tabs = editor.getByRole('tablist', { name: '表单页签', exact: true })
+  await tabs.getByRole('tab', { name: '备注与附件', exact: true }).click()
+  const identity = await tabs.elementHandle()
+  const scroller = page.locator('.erp-task-action-drawer .ant-drawer-body')
+  await scroller.evaluate((node) => { node.scrollTop = 0 })
+  const area = await scroller.boundingBox()
+  await page.mouse.move(area.x + area.width / 2, area.y + area.height / 2)
+  await page.mouse.wheel(0, 600)
+  await page.waitForFunction((node) => node.scrollTop > 300, await scroller.elementHandle())
+  const geometry = await tabs.evaluate((node) => {
+    const page = node.closest('[data-business-form-page]')
+    const scroller = page.closest('.ant-drawer-body')
+    const taskNavigation = scroller.querySelector('.erp-task-action-drawer__navigation')
+    const workspaceNavigation = page.closest('[data-business-editor-workspace]').querySelector('[data-business-editor-navigation]')
+    return { top: node.getBoundingClientRect().top, fixedBottom: Math.max(taskNavigation.getBoundingClientRect().bottom, workspaceNavigation.getBoundingClientRect().bottom), scrollTop: scroller.scrollTop }
+  })
+  assert.ok(Math.abs(geometry.top - geometry.fixedBottom) <= 1, `表单页签接在任务与工作区导航下吸顶：${JSON.stringify(geometry)}`)
+  await tabs.getByRole('tab', { name: '版本信息', exact: true }).click()
+  await tabs.getByRole('tab', { name: '备注与附件', exact: true }).click()
+  await page.waitForFunction(({ node, top }) => Math.abs(node.scrollTop - top) <= 1, { node: await scroller.elementHandle(), top: geometry.scrollTop })
+  assert.equal(await identity.evaluate((node) => node.isConnected), true)
+  assert.equal(await note.inputValue(), '任务内长备注的阅读与恢复\n'.repeat(60))
+  await page.screenshot({ path: path.join(outputDir, 'task-editor-form-tabs-sticky.png') })
+  await note.fill(original)
+  await control.getByText('目录', { exact: true }).click()
+}
+
 export function createTaskEditorCompletenessScenarios(deps, taskScenarios) {
   const { assert, path, outputDir, assertNoHorizontalOverflow } = deps
   return [
     { key: 'business', entry: 'business' },
     { key: 'task', entry: 'task' },
+    { key: 'tabs', entry: 'task', navigationOnly: true },
     { key: 'task-dark', entry: 'task', themeMode: 'dark' },
     { key: 'mobile', entry: 'mobile', readonly: true },
     { key: 'mobile-dark', entry: 'mobile', readonly: true, themeMode: 'dark' },
@@ -205,6 +239,11 @@ menus: [
       },
       verify: async (page) => {
         let editor = await openEditor(page, { ...definition, task }, assert)
+        if (definition.navigationOnly) {
+          await assertTaskFormTabNavigation(page, editor, outputDir, path, assert)
+          await assertNoHorizontalOverflow(page, 'task-editor-bom-tabs')
+          return
+        }
         await assertBusinessFormNavigationSurface(page, editor)
         await assertBusinessFormScrollTracking(page, editor)
         const fieldset = await editor.locator('.ant-form-item-label label').evaluateAll((nodes) => nodes.map((node) => node.textContent.trim()))

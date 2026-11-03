@@ -5,8 +5,8 @@ export const ERP_APPEARANCE_STORAGE_KEY = 'plush_erp_appearance'
 export const WORKBENCH_APPEARANCE_STORAGE_KEY = 'plush_workbench_appearance'
 
 export const ERP_FORM_DISPLAY_OPTIONS = Object.freeze([
-  { value: 'all', label: '查看全部' },
-  { value: 'section', label: '分区编辑' },
+  { value: 'all', label: '目录' },
+  { value: 'section', label: '页签' },
 ])
 
 export const ERP_ACCENTS = Object.freeze({

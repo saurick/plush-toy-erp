@@ -39,3 +39,23 @@ test('a tall final section follows the normal reading line without a bottom adju
   assert.equal(activeFormSectionIndex(tops, 730, 600, 2400), 1)
   assert.equal(activeFormSectionIndex(tops, 735, 600, 2400), 2)
 })
+
+test('shared fixed navigation keeps the first section active at the real scroll origin', () => {
+  const tops = [140, 266, 563, 765]
+  const clientHeight = 886
+  const scrollHeight = 1000
+  const readingInset = 120
+  const positions = Array.from({ length: scrollHeight - clientHeight + 1 }, (_, top) => top)
+  const visited = (values) => [...new Set(values.map((top) =>
+    activeFormSectionIndex(tops, top, clientHeight, scrollHeight, readingInset)
+  ))]
+  assert.deepEqual(visited(positions), [0, 1, 2, 3])
+  assert.deepEqual(visited(positions.toReversed()), [3, 2, 1, 0])
+})
+
+test('a shared reading inset preserves normal long-form tracking', () => {
+  const tops = [140, 366, 886]
+  assert.equal(activeFormSectionIndex(tops, 200, 720, 2520, 120), 0)
+  assert.equal(activeFormSectionIndex(tops, 220, 720, 2520, 120), 1)
+  assert.equal(activeFormSectionIndex(tops, 745, 720, 2520, 120), 2)
+})

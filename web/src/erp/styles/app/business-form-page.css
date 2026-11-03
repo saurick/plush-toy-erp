@@ -267,8 +267,12 @@
 
 
 
-.erp-business-form-page__main[data-section-navigation='true'] {
+.erp-business-form-page__main[data-section-navigation='true'][data-form-display='all'] {
   grid-template-columns: 164px minmax(0, 1fr);
+}
+
+.erp-business-form-page__main[data-section-navigation='true'][data-form-display='section'] {
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .erp-business-form-page__navigation {
@@ -282,16 +286,49 @@
   padding: 12px 8px;
 }
 
+.erp-business-form-page__main[data-form-display='section'] .erp-business-form-page__navigation-content {
+  min-width: 0;
+  padding: 0 12px;
+}
+
 .erp-business-form-page__main[data-shared-scroll='true'] > .erp-business-form-page__navigation {
   overflow: visible;
 }
 
-.erp-business-form-page__main[data-shared-scroll='true'] .erp-business-form-page__navigation-content {
+.erp-business-form-page__main[data-shared-scroll='true'][data-form-display='all'] .erp-business-form-page__navigation-content {
   position: sticky;
   top: var(--erp-form-section-top);
   z-index: 2;
   max-height: var(--erp-form-section-height);
   overflow: auto;
+}
+
+.erp-business-form-page__main[data-form-display='section'] > .erp-business-form-page__navigation {
+  border-right: 0;
+  border-bottom: 1px solid var(--erp-border);
+}
+
+.erp-business-form-page__main[data-shared-scroll='true'][data-form-display='section'] > .erp-business-form-page__navigation {
+  position: sticky;
+  top: var(--erp-form-section-top);
+  z-index: 2;
+  align-self: start;
+}
+
+.erp-business-form-page__section-tabs {
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.erp-business-form-page__section-tabs > [role='tab'] {
+  flex: none;
+}
+
+.erp-business-form-page__section-tabs[hidden],
+.erp-business-form-page__section-links[hidden],
+.erp-business-form-page__section-picker[hidden] {
+  display: none;
 }
 
 .erp-business-form-page__section-links {
@@ -342,7 +379,7 @@
 }
 
 @container business-editor (max-width: 1080px) {
-  .erp-business-form-page__main[data-section-navigation='true'] {
+  .erp-business-form-page__main[data-section-navigation='true'][data-form-display='all'] {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
   }
@@ -363,7 +400,7 @@
     align-self: start;
   }
 
-  .erp-business-form-page__main[data-shared-scroll='true'] .erp-business-form-page__navigation-content {
+  .erp-business-form-page__main[data-shared-scroll='true'][data-form-display='all'] .erp-business-form-page__navigation-content {
     position: static;
   }
 
