@@ -31,23 +31,33 @@ export default function BOMImportReviewSummary({ form, review, productOptions })
       : '明细已全部关联，可保存草稿'
 
   return (
-    <Alert
-      className="erp-business-source-summary erp-bom-import-review"
+    <div
+      className="erp-bom-import-review"
       data-bom-import-issue-count={issues.length}
       data-bom-import-product-status={productID ? 'matched' : 'unresolved'}
-      description={
-        <div className="erp-bom-import-review__details">
+    >
+      {issues.length > 0 ? (
+        <Alert message={issueText} showIcon type="warning" />
+      ) : (
+        <span role="status">{issueText}</span>
+      )}
+      {quantityNotice ? <span>{quantityNotice}</span> : null}
+      <details>
+        <summary className="erp-bom-import-review__context">
+          <span className="erp-bom-import-review__toggle">导入详情</span>
           <span>
-            来源：{review.fileName} / {review.sheetName}
-          </span>
-          <span>
-            原表产品：{review.productCode || review.productName || '原表未填写'}
+            已读取 {review.rowCount} 条 BOM 明细 · 原表产品：
+            {review.productCode || review.productName || '原表未填写'}
             ；
             {review.detailsOnly ? '产品与版本沿用当前草稿' : productID
               ? `已关联：${referenceLabel(productOptions, productID, '产品')}`
               : '尚未关联，请在上方选择对应产品档案'}
           </span>
-          {quantityNotice ? <span>{quantityNotice}</span> : null}
+        </summary>
+        <div className="erp-bom-import-review__details">
+          <span>
+            来源：{review.fileName} / {review.sheetName}
+          </span>
           <span>
             自动匹配已有档案；未匹配的物料可选择或新建，同种物料只需处理一次。
           </span>
@@ -60,10 +70,7 @@ export default function BOMImportReviewSummary({ form, review, productOptions })
               : '文件仅在当前浏览器解析；保存时只创建 BOM 草稿，并把来源文件名写入备注，不会自动上传原文件或创建主数据。'}
           </span>
         </div>
-      }
-      message={`已读取 ${review.rowCount} 条 BOM 明细；${issueText}`}
-      showIcon
-      type={issues.length > 0 ? 'warning' : 'success'}
-    />
+      </details>
+    </div>
   )
 }

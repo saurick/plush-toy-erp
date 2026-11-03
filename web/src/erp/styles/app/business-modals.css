@@ -1110,13 +1110,28 @@
 }
 
 .erp-bom-import-review {
+  display: grid;
+  gap: 6px;
   grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.erp-bom-import-review__context {
+  min-height: var(--erp-touch-field-height, 0px);
+  color: var(--erp-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.erp-bom-import-review__toggle {
+  margin-inline-end: 12px;
+  color: var(--erp-primary);
 }
 
 .erp-bom-import-review__details {
   display: grid;
   gap: 4px;
   min-width: 0;
+  padding: 6px 0 0 16px;
   overflow-wrap: anywhere;
 }
 

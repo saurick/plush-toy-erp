@@ -1,6 +1,7 @@
 import { expect as expectLocator } from 'playwright/test'
 import { readFile, writeFile } from 'node:fs/promises'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
+import { installBOMMaterialMatchingMocks } from './bomMaterialMatchingScenarios.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { BOM_IMPORT_EXAMPLE_CONTEXT, BOM_IMPORT_EXAMPLE_FILENAME, BOM_IMPORT_EXAMPLE_MATERIALS, BOM_IMPORT_EXAMPLE_ROWS } from '../../src/erp/data/bomImportFormat.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
@@ -256,6 +257,7 @@ export function createMasterDataFieldScenarios(deps) {
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
+      beforeNavigate: installBOMMaterialMatchingMocks,
       verify: async (page) => {
         const rpcMutations = []
         page.on('request', (request) => {
@@ -363,7 +365,13 @@ export function createMasterDataFieldScenarios(deps) {
 
         assert.equal(await modal.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
         await modal.getByRole('button', { name: '保存草稿' }).click()
-        await expectText(page, '暂未保存：请先关联 1 种物料')
+        await expectLocator(
+          modal.locator('.ant-form-item-explain-error')
+            .getByText('请选择或新建物料', { exact: true })
+        ).toBeVisible()
+        await expectLocator(
+          modal.getByRole('combobox', { name: '物料名称 2', exact: true })
+        ).toBeFocused()
         assert.equal(
           rpcMutations.filter((item) => item.method === 'save_bom_with_items')
             .length,
@@ -379,19 +387,28 @@ export function createMasterDataFieldScenarios(deps) {
           .first()
         await materialSelect.click()
         await materialSelect.locator('input').fill('MAT-STYLE-L1')
-        await page.locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '样式材料' }).first().click()
+        await expectLocator(
+          page.locator('.ant-select-dropdown:visible .ant-select-item-option')
+            .filter({ hasText: '样式材料' })
+        ).toHaveClass(/ant-select-item-option-disabled/u)
+        await materialSelect.locator('input').fill('MAT-MATCH')
+        const matchingMaterial = page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '对应测试材料' })
+        await expectLocator(matchingMaterial)
+          .not.toHaveClass(/ant-select-item-option-disabled/u)
+        await matchingMaterial.click()
         await modal
           .locator('.erp-bom-material-group')
-          .first()
+          .nth(1)
           .locator('.erp-bom-material-cell .ant-select-selection-item')
-          .filter({ hasText: '样式材料' })
+          .filter({ hasText: '对应测试材料' })
           .waitFor({ state: 'visible' })
         await modal.locator('.erp-bom-import-review[data-bom-import-issue-count="0"]').waitFor({ state: 'visible' })
         assert.equal(
           await modal.locator('.erp-bom-material-group').count(),
-          1,
-          '同一物料和单位在补全后应合并身份栏'
+          2,
+          '不同规格的材料补全后应保留各自的物料组'
         )
         await modal
           .locator('.erp-bom-import-review[data-bom-import-issue-count="0"]')
@@ -446,7 +463,7 @@ export function createMasterDataFieldScenarios(deps) {
               totalUsage: '55',
             },
             {
-              materialID: 1,
+              materialID: 77,
               unitID: 1,
               quantity: '1',
               lossRate: '0',
@@ -455,6 +472,8 @@ export function createMasterDataFieldScenarios(deps) {
           ],
           '导入保存必须使用现有主数据 ID、单位用量和逐行核对后的损耗率'
         )
+        assert.equal(saveBody.params.items[1].source_snapshot.material_spec, '测试规格')
+        assert.equal(saveBody.params.items[1].source_snapshot.supplier_item_no, 'SUP-MISSING')
         assert.equal(
           JSON.stringify(saveBody.params).includes('_import_source'),
           false,
@@ -478,6 +497,7 @@ export function createMasterDataFieldScenarios(deps) {
       viewport: { width: 1440, height: 900 },
       deviceScaleFactor: 2,
       beforeNavigate: async (page) => {
+        await installBOMMaterialMatchingMocks(page)
         let saved
         await page.route('**/rpc/bom', async (route) => {
           const body = route.request().postDataJSON()
@@ -551,8 +571,8 @@ export function createMasterDataFieldScenarios(deps) {
         await editor.getByRole('button', { name: '撤销本次导入', exact: true }).waitFor()
         const material = parts.nth(1).locator('.erp-bom-material-cell .ant-select').first()
         await material.click()
-        await material.locator('input').fill('MAT-STYLE-L1')
-        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '样式材料' }).first().click()
+        await material.locator('input').fill('MAT-MATCH')
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '对应测试材料' }).click()
         await editor.locator('.erp-bom-import-review[data-bom-import-issue-count="0"]').waitFor()
         assert.equal(await editor.getByRole('button', { name: '撤销本次导入', exact: true }).isDisabled(), true, '人工改动后保留禁用入口，不能用旧快照覆盖新修改')
         assert.equal(await editor.getByText('来源或明细已修改，不能快速撤销；可逐行移除。', { exact: true }).count(), 0)
@@ -571,6 +591,9 @@ export function createMasterDataFieldScenarios(deps) {
         assert.equal(saved.source_order_no, 'KEEP-ORDER-50')
         assert.equal(saved.maker, '保留制表人')
         assert.equal(saved.items.length, 2)
+        assert.deepEqual(saved.items.map((item) => item.material_id), [1, 77])
+        assert.equal(saved.items[1].source_snapshot.material_spec, '测试规格')
+        assert.equal(saved.items[1].source_snapshot.supplier_item_no, 'SUP-MISSING')
         assert(saved.items.every((item) => !item.id && !item._import_source), '新导入行不能继承旧行身份或提交页面校对元数据')
         assert(saved.items.every((item) => !item.total_usage_snapshot), '不同订单数量不能保留原表总用量快照')
         assert.deepEqual(writes.map((write) => write.method), ['save_bom_with_items'])
