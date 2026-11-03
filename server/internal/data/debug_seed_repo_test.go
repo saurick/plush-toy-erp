@@ -116,6 +116,8 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 	helpDraft := client.HelpSupplement.Create().SetDocumentID("scenario:purchase-arrival").SetVersion(1).SetPublishedVersion(1).SetDraftMarkdown("模拟企业收货说明").SaveX(ctx)
 	helpRevision := client.HelpSupplementRevision.Create().SetDocumentID(helpDraft.DocumentID).SetVersion(1).SetAction("publish").SetMarkdown(helpDraft.DraftMarkdown).SetSourceHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").SetSummary("模拟发布记录").SetActorID(7).SetActorName("模拟维护员").SaveX(ctx)
 	helpFeedback := client.HelpFeedback.Create().SetDocumentID(helpDraft.DocumentID).SetDocumentTitle("模拟收货手册").SetSourceHash(helpRevision.SourceHash).SetPublishedVersion(1).SetMessage("模拟纠错记录").SetRequestKey("SIM-CLEAR-HELP-FEEDBACK").SetActorID(7).SetActorName("模拟收货员").SaveX(ctx)
+	paymentMethod := client.PaymentMethodPreference.Create().
+		SetMethod("模拟结算方式").SetIsRecommended(false).SetHasBeenUsed(true).SaveX(ctx)
 
 	repo := NewDebugSeedRepo(
 		data,
@@ -210,6 +212,9 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 	if actual := client.HelpFeedback.GetX(ctx, helpFeedback.ID); actual.Message != helpFeedback.Message || actual.ActorID != helpFeedback.ActorID || actual.SourceHash != helpFeedback.SourceHash {
 		t.Fatalf("business cleanup changed help correction evidence: %#v", actual)
 	}
+	if actual := client.PaymentMethodPreference.GetX(ctx, paymentMethod.ID); actual.Method != paymentMethod.Method || actual.IsRecommended || !actual.HasBeenUsed {
+		t.Fatalf("business cleanup changed payment method configuration: %#v", actual)
+	}
 }
 
 func TestDebugBusinessDataClearIncludesProcessRuntimeBeforeSourceDocuments(t *testing.T) {
@@ -233,7 +238,7 @@ func TestDebugBusinessDataClearClassifiesEveryGeneratedTableAndKeepsForeignKeyOr
 	preserved := map[string]struct{}{
 		"access_entitlements": {}, "admin_sessions": {}, "admin_users": {}, "admin_user_roles": {},
 		"customer_config_revisions": {}, "deployment_module_states": {}, "permissions": {},
-		"help_feedbacks": {}, "help_supplement_revisions": {}, "help_supplements": {},
+		"help_feedbacks": {}, "help_supplement_revisions": {}, "help_supplements": {}, "payment_method_preferences": {},
 		"roles": {}, "role_data_scopes": {}, "role_permissions": {}, "role_profiles": {},
 		"runtime_audit_events": {}, "runtime_markers": {}, "work_pools": {}, "work_pool_memberships": {},
 		"workflow_task_number_counters": {},

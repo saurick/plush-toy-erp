@@ -502,7 +502,7 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 		WithArgs("SIM-TEST-FG", "成品仓", "FINISHED_GOODS").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(41))
 	mock.ExpectQuery("INSERT INTO processes").
-		WithArgs("SIM-TEST-PROC-SEWING", "车缝", sqlmock.AnyArg(), sqlmock.AnyArg(), true, false, false, 10, sqlmock.AnyArg()).
+		WithArgs("SIM-TEST-PROC-SEWING", "车缝", "车缝", nil, true, false, 10, nil).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(45))
 	mock.ExpectQuery("INSERT INTO bom_headers").
 		WithArgs(31, "SIM-TEST-BOM-V1", "ACTIVE", sqlmock.AnyArg()).
