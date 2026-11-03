@@ -1859,6 +1859,10 @@ test("yoyoosun contract print source pages expose every business-owned print fie
     "web/src/erp/components/purchase-orders/PurchaseOrderForm.jsx",
     "utf8",
   );
+  const purchaseMaterialSnapshots = readFileSync(
+    "web/src/erp/components/purchase-orders/PurchaseMaterialSnapshotFields.jsx",
+    "utf8",
+  );
   const purchaseOperationPanel = readFileSync(
     "web/src/erp/components/purchase-orders/PurchaseOrderOperationPanel.jsx",
     "utf8",
@@ -1883,8 +1887,8 @@ test("yoyoosun contract print source pages expose every business-owned print fie
       "name={['contract_party_snapshot', 'buyerPhone']}",
       "name={['contract_party_snapshot', 'buyerAddress']}",
       "name={['contract_party_snapshot', 'buyerSigner']}",
-      "name={[field.name, 'material_code_snapshot']}",
-      "name={[field.name, 'material_name_snapshot']}",
+      "import PurchaseMaterialSnapshotFields from './PurchaseMaterialSnapshotFields.jsx'",
+      "<PurchaseMaterialSnapshotFields fieldName={field.name}",
       "name={[field.name, 'product_order_no_snapshot']}",
       "name={[field.name, 'product_no_snapshot']}",
       "name={[field.name, 'product_name_snapshot']}",
@@ -1895,6 +1899,15 @@ test("yoyoosun contract print source pages expose every business-owned print fie
       "name={[field.name, 'note']}",
     ],
     "purchase order form",
+  );
+  assertSourceContainsAll(
+    purchaseMaterialSnapshots,
+    [
+      "name: 'material_code_snapshot'",
+      "name: 'material_name_snapshot'",
+      "name={[fieldName, field.name]}",
+    ],
+    "purchase order material snapshot fields",
   );
   assert.ok(
     purchaseOperationPanel.includes("打印合同") &&
