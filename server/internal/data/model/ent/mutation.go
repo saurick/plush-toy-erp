@@ -47023,6 +47023,7 @@ type PaymentMethodPreferenceMutation struct {
 	id             *int
 	method         *string
 	is_recommended *bool
+	has_been_used  *bool
 	version        *int
 	addversion     *int
 	created_at     *time.Time
@@ -47203,6 +47204,42 @@ func (m *PaymentMethodPreferenceMutation) ResetIsRecommended() {
 	m.is_recommended = nil
 }
 
+// SetHasBeenUsed sets the "has_been_used" field.
+func (m *PaymentMethodPreferenceMutation) SetHasBeenUsed(b bool) {
+	m.has_been_used = &b
+}
+
+// HasBeenUsed returns the value of the "has_been_used" field in the mutation.
+func (m *PaymentMethodPreferenceMutation) HasBeenUsed() (r bool, exists bool) {
+	v := m.has_been_used
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHasBeenUsed returns the old "has_been_used" field's value of the PaymentMethodPreference entity.
+// If the PaymentMethodPreference object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentMethodPreferenceMutation) OldHasBeenUsed(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHasBeenUsed is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHasBeenUsed requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHasBeenUsed: %w", err)
+	}
+	return oldValue.HasBeenUsed, nil
+}
+
+// ResetHasBeenUsed resets all changes to the "has_been_used" field.
+func (m *PaymentMethodPreferenceMutation) ResetHasBeenUsed() {
+	m.has_been_used = nil
+}
+
 // SetVersion sets the "version" field.
 func (m *PaymentMethodPreferenceMutation) SetVersion(i int) {
 	m.version = &i
@@ -47365,12 +47402,15 @@ func (m *PaymentMethodPreferenceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PaymentMethodPreferenceMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.method != nil {
 		fields = append(fields, paymentmethodpreference.FieldMethod)
 	}
 	if m.is_recommended != nil {
 		fields = append(fields, paymentmethodpreference.FieldIsRecommended)
+	}
+	if m.has_been_used != nil {
+		fields = append(fields, paymentmethodpreference.FieldHasBeenUsed)
 	}
 	if m.version != nil {
 		fields = append(fields, paymentmethodpreference.FieldVersion)
@@ -47393,6 +47433,8 @@ func (m *PaymentMethodPreferenceMutation) Field(name string) (ent.Value, bool) {
 		return m.Method()
 	case paymentmethodpreference.FieldIsRecommended:
 		return m.IsRecommended()
+	case paymentmethodpreference.FieldHasBeenUsed:
+		return m.HasBeenUsed()
 	case paymentmethodpreference.FieldVersion:
 		return m.Version()
 	case paymentmethodpreference.FieldCreatedAt:
@@ -47412,6 +47454,8 @@ func (m *PaymentMethodPreferenceMutation) OldField(ctx context.Context, name str
 		return m.OldMethod(ctx)
 	case paymentmethodpreference.FieldIsRecommended:
 		return m.OldIsRecommended(ctx)
+	case paymentmethodpreference.FieldHasBeenUsed:
+		return m.OldHasBeenUsed(ctx)
 	case paymentmethodpreference.FieldVersion:
 		return m.OldVersion(ctx)
 	case paymentmethodpreference.FieldCreatedAt:
@@ -47440,6 +47484,13 @@ func (m *PaymentMethodPreferenceMutation) SetField(name string, value ent.Value)
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIsRecommended(v)
+		return nil
+	case paymentmethodpreference.FieldHasBeenUsed:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHasBeenUsed(v)
 		return nil
 	case paymentmethodpreference.FieldVersion:
 		v, ok := value.(int)
@@ -47531,6 +47582,9 @@ func (m *PaymentMethodPreferenceMutation) ResetField(name string) error {
 		return nil
 	case paymentmethodpreference.FieldIsRecommended:
 		m.ResetIsRecommended()
+		return nil
+	case paymentmethodpreference.FieldHasBeenUsed:
+		m.ResetHasBeenUsed()
 		return nil
 	case paymentmethodpreference.FieldVersion:
 		m.ResetVersion()

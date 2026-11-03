@@ -1253,9 +1253,11 @@ PMC / 老板 / super admin 的催办能力不等于附件写权。其它 owner �
 | `get_supplier` | 查看供应商 | 读取供应商详情，供业务核对。 |
 | `list_contacts_by_owner` | 查询归属对象联系人 | 读取归属对象联系人，供列表查询、引用和追溯。 |
 | `list_customers` | 查询客户 | 读取客户，供列表查询、引用和追溯。 |
-| `list_payment_methods` | 查询付款方式候选 | 查询常用方式及当前账号有权来源中的已保存名称，过滤不再推荐的方式，供选择或自由录入。 |
-| `list_payment_method_recommendations` | 查询付款方式推荐状态 | 按可选或不再推荐查询公司共用候选，支持关键词与分批读取。 |
-| `set_payment_method_recommendation` | 调整付款方式推荐 | 停止或恢复推荐；用版本检查保护撤销和并发变更，不修改档案或订单原值。 |
+| `list_payment_methods` | 查询付款方式候选 | 查询公司共用目录中的启用项，供选择或自由录入。 |
+| `list_payment_method_options` | 查询付款方式目录 | 按启用或停用查询公司共用选项，支持搜索与分批读取。 |
+| `create_payment_method` | 新增付款方式 | 明确新增公司共用选项，同名检查，不从临时输入自动创建。 |
+| `update_payment_method` | 修改付款方式 | 改名或启停，使用版本检查，不改写档案和订单快照。 |
+| `delete_payment_method` | 删除未使用付款方式 | 同事务核对版本、使用保护和审计，仅删除未使用项。 |
 | `list_suppliers` | 查询供应商 | 读取供应商，供列表查询、引用和追溯。 |
 | `save_customer_with_contacts` | 保存客户与联系人 | 保存客户与联系人的当前编辑内容，由正式入口检查业务约束。 |
 | `save_supplier_with_contacts` | 保存供应商与联系人 | 保存供应商与联系人的当前编辑内容，由正式入口检查业务约束。 |
@@ -1308,13 +1310,11 @@ PMC / 老板 / super admin 的催办能力不等于附件写权。其它 owner �
 
 `list_units` 返回单位 `id / code / name / precision / is_active`，`precision` 为 0–6。单位是数量输入的共享只读参考：具备材料、产品、销售、采购、委外、生产计划、WIP、库存、出货、质检、收货或生产 / 委外事实读取能力之一即可读取，仍受当前角色与客户配置投影约束。
 
-`list_payment_methods` 需要客户、供应商、销售订单或采购订单读取权限之一；每种历史来源分别核对当前有效权限，只返回付款方式文字，不返回单位身份或订单内容。服务端统一提供银行转账、现金和银行承兑等常用方式，以及维护者曾显式恢复的公司共用名称；它们与有权来源中的历史名称一起去除首尾空格、去重，并在最多 50 项的限制前过滤不再推荐的名称。可选 `keyword` 最长 128 字，按文字包含搜索；`has_more` 为真时应缩小关键词。`keyword_not_recommended` 只说明本次完整关键词是否已被停止推荐，供直接输入时提示。`can_manage` 由当前服务端的有效维护权限检查返回，作为共用控件管理入口的依据；不从旧客户会话快照推断新管理能力，管理写入仍逐次鉴权。新方式随原档案或订单成功保存后才可复用；不从方式文字或同名历史值推断付款周期。
+`list_payment_methods` 需要客户、供应商、销售或采购读取权限之一，或 `payment_method.manage`。只返回公司共用目录中的启用名称，不再从档案或订单实时汇总。可选 `keyword` 最长 128 字，最多返回 50 项；`has_more` 为真时应缩小关键词。`keyword_exists / keyword_inactive` 指示完整关键词是否已有选项及是否停用。`can_manage` 由服务端实际权限返回，维护写入仍逐次鉴权。普通手输仅保存当前记录，不自动发布为共用选项，也不推断付款周期。
 
-`list_payment_method_recommendations` 和 `set_payment_method_recommendation` 需要独立的 `payment_method.manage` 有效权限，普通录入权限不包含该管理能力。管理查询覆盖公司共用候选名称，包括已停止推荐且原来源已变更的名称，不授权读取原单据。查询必填布尔值 `is_recommended`，可选 `keyword`、`limit`（最多 50）和非负 `offset`；返回 `items`（`method / is_recommended / version`）及 `has_more`。界面保留各视图搜索，并允许继续读取更多候选。
+`list_payment_method_options`、`create_payment_method`、`update_payment_method`、`delete_payment_method` 需要独立的 `payment_method.manage` 权限。目录查询必填布尔 `is_active`，支持 `keyword / limit / offset`；结果包含 `id / method / is_active / has_been_used / version`。新增必填 `method`，去首尾空格并检查 1–128 字及不区分大小写的重名。修改必填正整数 `id / expected_version`、`method` 与布尔 `is_active`；删除必填正整数 `id / expected_version`。过期版本返回 `ResourceVersionConflict`，同名返回 `ResourceConflict`，已使用项删除返回 `BusinessRuleViolation`。状态、名称与控制面审计同事务提交；撤销使用最近返回版本执行反向修改，不能覆盖其他维护者的新版本。
 
-推荐状态由 `payment_method_preferences` 按去除首尾空格后的精确名称保存；没有偏好记录时默认为可推荐、版本为 0，大小写不同的名称不自动合并。维护只接受服务端常用名称、已保存历史名称或已有偏好中的名称。调整必填 `method`、布尔值 `is_recommended` 和非负 `expected_version`；成功变更递增版本，状态与控制面审计在同一事务写入；相同版本的无变化请求不重复记审计。撤销使用最近一次变更返回的版本执行反向操作，过期版本返回 `ResourceVersionConflict`，必须刷新核对，不能自动覆盖。
-
-停止推荐不清除当前输入，也不改动客户、供应商、订单、付款周期、报价备注或打印快照。直接输入已停止推荐的名称仍可保存到当前记录，保存不会恢复推荐；恢复只通过受控管理动作完成，即使原来源已纠正或清空，该名称仍可作为维护者确认的公司共用候选使用。读取失败仍允许手工录入，但前端不重新补入可能已停止推荐的常用候选。
+现有 `payment_method_preferences` 扩为唯一共用目录，保留原物理表及启用列；一次性 Atlas migration 转入原有常用和历史名称，并保留停用状态。`has_been_used` 是单向使用保护：客户、供应商、销售、采购及工程生成采购在业务保存事务内标记，改名、清空或来源变化均不重置。目录维护与业务保存共享事务锁，删除还复核现有业务引用。改名不回写历史文本，已使用项只能停用；未保存草稿仅在用户明确采用新名时改变。读取失败仍允许手工录入，不在前端补造共用选项。
 
 输入数量的服务端校验从已选或来源派生的单位读取精度，不接受客户端覆盖；超精度返回 `InvalidParam` 与“当前单位只允许整数数量 / 当前单位最多允许 N 位小数”。更新数量、更换单位和来源带入走同一规则，BOM 单件耗用系数与损耗使用下文完整十进制精度合同，不按单位的小数位提前舍入。
 
@@ -5904,19 +5904,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.warehouse_scope_options` | array &#124; null | 依据：`server/internal/service/jsonrpc_dispatch_admin.go:148`。 |
-| `result.data.warehouse_scope_options[]` | object | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:175`。 |
+| `result.data.warehouse_scope_options[]` | object | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:179`。 |
 
 **`warehouse_scope_options[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.warehouse_scope_options[].code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:179`。 |
-| `result.data.warehouse_scope_options[].created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:183`。 |
-| `result.data.warehouse_scope_options[].id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:178`。 |
-| `result.data.warehouse_scope_options[].is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:182`。 |
-| `result.data.warehouse_scope_options[].name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:180`。 |
-| `result.data.warehouse_scope_options[].type` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:181`。 |
-| `result.data.warehouse_scope_options[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:184`。 |
+| `result.data.warehouse_scope_options[].code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:183`。 |
+| `result.data.warehouse_scope_options[].created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:187`。 |
+| `result.data.warehouse_scope_options[].id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:182`。 |
+| `result.data.warehouse_scope_options[].is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:186`。 |
+| `result.data.warehouse_scope_options[].name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:184`。 |
+| `result.data.warehouse_scope_options[].type` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:185`。 |
+| `result.data.warehouse_scope_options[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:188`。 |
 
 ```json
 {
@@ -33257,6 +33257,75 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 样例依据：[TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit](../internal/service/jsonrpc_masterdata_order_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
+#### 新增付款方式 `masterdata.create_payment_method`
+
+##### 请求参数
+
+**顶层字段**
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `method` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "method")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_payment_method.go:59`。 |
+
+对象引用、权限、状态和并发版本由后端校验。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "create_payment_method",
+  "params": {
+    "method": "aa"
+  },
+  "id": "rpc-demo-masterdata.create_payment_method"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 成功为 0；错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的返回内容。 |
+
+**顶层字段**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.item` | object | 依据：`server/internal/service/jsonrpc_payment_method.go:87`。 |
+
+**`item`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.item.has_been_used` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.item.id` | integer | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.item.is_active` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.item.method` | string | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.item.version` | integer | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-masterdata.create_payment_method",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "item": {
+        "has_been_used": false,
+        "id": 1,
+        "is_active": true,
+        "method": "aa",
+        "version": 1
+      }
+    }
+  }
+}
+```
+
+样例依据：[TestJSONRPCPaymentMethodManagementPermissionAndContract](../internal/service/jsonrpc_payment_method_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+
 #### 创建加工环节 `masterdata.create_process`
 
 ##### 请求参数
@@ -33740,13 +33809,13 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.warehouse.code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:179`。 |
-| `result.data.warehouse.created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:183`。 |
-| `result.data.warehouse.id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:178`。 |
-| `result.data.warehouse.is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:182`。 |
-| `result.data.warehouse.name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:180`。 |
-| `result.data.warehouse.type` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:181`。 |
-| `result.data.warehouse.updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:184`。 |
+| `result.data.warehouse.code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:183`。 |
+| `result.data.warehouse.created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:187`。 |
+| `result.data.warehouse.id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:182`。 |
+| `result.data.warehouse.is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:186`。 |
+| `result.data.warehouse.name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:184`。 |
+| `result.data.warehouse.type` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:185`。 |
+| `result.data.warehouse.updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:188`。 |
 
 ```json
 {
@@ -33771,6 +33840,61 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 ```
 
 样例依据：[TestWarehouseMasterDataPermissionsAndMaterialReferenceBoundary](../internal/service/jsonrpc_warehouse_masterdata_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+
+#### 删除未使用付款方式 `masterdata.delete_payment_method`
+
+##### 请求参数
+
+**顶层字段**
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "expected_version")`。 拒绝条件：“!valid &#124;&#124; version <= 0”。 依据：`server/internal/service/jsonrpc_payment_method.go:65`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "id")`。 拒绝条件：“!valid &#124;&#124; optionID <= 0”。 依据：`server/internal/service/jsonrpc_payment_method.go:61`。 |
+
+对象引用、权限、状态和并发版本由后端校验。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "delete_payment_method",
+  "params": {
+    "expected_version": 1,
+    "id": 1
+  },
+  "id": "rpc-demo-masterdata.delete_payment_method"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 成功为 0；错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的返回内容。 |
+
+**顶层字段**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.deleted_id` | number | 依据：`server/internal/service/jsonrpc_payment_method.go:74`。 |
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-masterdata.delete_payment_method",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "deleted_id": 1
+    }
+  }
+}
+```
+
+样例依据：[TestJSONRPCPaymentMethodManagementPermissionAndContract](../internal/service/jsonrpc_payment_method_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
 #### 停用联系人 `masterdata.disable_contact`
 
@@ -34771,19 +34895,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_warehouse_masterdata.go:28`。 |
 | `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_warehouse_masterdata.go:28`。 |
 | `result.data.warehouses` | array | 依据：`server/internal/service/jsonrpc_warehouse_masterdata.go:28`。 |
-| `result.data.warehouses[]` | object | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:175`。 |
+| `result.data.warehouses[]` | object | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:179`。 |
 
 **`warehouses[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.warehouses[].code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:179`。 |
-| `result.data.warehouses[].created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:183`。 |
-| `result.data.warehouses[].id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:178`。 |
-| `result.data.warehouses[].is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:182`。 |
-| `result.data.warehouses[].name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:180`。 |
-| `result.data.warehouses[].type` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:181`。 |
-| `result.data.warehouses[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:184`。 |
+| `result.data.warehouses[].code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:183`。 |
+| `result.data.warehouses[].created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:187`。 |
+| `result.data.warehouses[].id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:182`。 |
+| `result.data.warehouses[].is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:186`。 |
+| `result.data.warehouses[].name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:184`。 |
+| `result.data.warehouses[].type` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:185`。 |
+| `result.data.warehouses[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:188`。 |
 
 ```json
 {
@@ -34930,7 +35054,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 样例依据：[TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules](../internal/service/jsonrpc_masterdata_order_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
-#### 查询付款方式推荐状态 `masterdata.list_payment_method_recommendations`
+#### 查询付款方式目录 `masterdata.list_payment_method_options`
 
 ##### 请求参数
 
@@ -34938,24 +35062,24 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `is_recommended` | boolean | 必填 | 解析器 `getRequiredJSONRPCBool`；调用 `getRequiredJSONRPCBool(pm, "is_recommended")`。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_payment_method.go:51`。 |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_payment_method.go:59`。 |
-| `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.PaymentMethodSuggestionLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_payment_method.go:59`。 |
-| `offset` | integer &#124; null | 可选 | 解析器 `getOptionalJSONRPCNonNegativeInt`；调用 `getOptionalJSONRPCNonNegativeInt(pm, "offset")`。 依据：`server/internal/service/jsonrpc_payment_method.go:55`。 |
+| `is_active` | boolean | 必填 | 解析器 `getRequiredJSONRPCBool`；调用 `getRequiredJSONRPCBool(pm, "is_active")`。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_payment_method.go:29`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_payment_method.go:37`。 |
+| `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.PaymentMethodSuggestionLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_payment_method.go:37`。 |
+| `offset` | integer &#124; null | 可选 | 解析器 `getOptionalJSONRPCNonNegativeInt`；调用 `getOptionalJSONRPCNonNegativeInt(pm, "offset")`。 依据：`server/internal/service/jsonrpc_payment_method.go:33`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "list_payment_method_recommendations",
+  "method": "list_payment_method_options",
   "params": {
-    "is_recommended": false,
+    "is_active": true,
     "keyword": "aa",
     "limit": 50,
     "offset": 0
   },
-  "id": "rpc-demo-masterdata.list_payment_method_recommendations"
+  "id": "rpc-demo-masterdata.list_payment_method_options"
 }
 ```
 
@@ -34971,22 +35095,24 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.has_more` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:71`。 |
-| `result.data.items` | array | 依据：`server/internal/service/jsonrpc_payment_method.go:71`。 |
-| `result.data.items[]` | object | 依据：`server/internal/service/jsonrpc_payment_method.go:99`。 |
+| `result.data.has_more` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:49`。 |
+| `result.data.items` | array | 依据：`server/internal/service/jsonrpc_payment_method.go:49`。 |
+| `result.data.items[]` | object | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
 
 **`items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.items[].is_recommended` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:99`。 |
-| `result.data.items[].method` | string | 依据：`server/internal/service/jsonrpc_payment_method.go:99`。 |
-| `result.data.items[].version` | integer | 依据：`server/internal/service/jsonrpc_payment_method.go:99`。 |
+| `result.data.items[].has_been_used` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.items[].id` | integer | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.items[].is_active` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.items[].method` | string | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.items[].version` | integer | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
 
 ```json
 {
   "jsonrpc": "2.0",
-  "id": "rpc-demo-masterdata.list_payment_method_recommendations",
+  "id": "rpc-demo-masterdata.list_payment_method_options",
   "result": {
     "code": 0,
     "message": "OK",
@@ -34994,7 +35120,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
       "has_more": false,
       "items": [
         {
-          "is_recommended": false,
+          "has_been_used": false,
+          "id": 1,
+          "is_active": true,
           "method": "aa",
           "version": 1
         }
@@ -35014,7 +35142,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_payment_method.go:17`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_payment_method.go:15`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -35041,11 +35169,12 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.can_manage` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:45`。 |
-| `result.data.has_more` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:43`。 |
-| `result.data.keyword_not_recommended` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:44`。 |
-| `result.data.methods` | array | 依据：`server/internal/service/jsonrpc_payment_method.go:42`。 |
-| `result.data.methods[]` | string | 依据：`server/internal/service/jsonrpc_payment_method.go:42`。 |
+| `result.data.can_manage` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:23`。 |
+| `result.data.has_more` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:23`。 |
+| `result.data.keyword_exists` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:23`。 |
+| `result.data.keyword_inactive` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:23`。 |
+| `result.data.methods` | array | 依据：`server/internal/service/jsonrpc_payment_method.go:23`。 |
+| `result.data.methods[]` | string | 依据：`server/internal/service/jsonrpc_payment_method.go:23`。 |
 
 ```json
 {
@@ -35057,7 +35186,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "data": {
       "can_manage": false,
       "has_more": false,
-      "keyword_not_recommended": false,
+      "keyword_exists": false,
+      "keyword_inactive": false,
       "methods": [
         "银行转账"
       ]
@@ -35066,7 +35196,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 }
 ```
 
-样例依据：[TestJSONRPCPaymentMethodSuggestions](../internal/service/jsonrpc_payment_method_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+样例依据：[TestJSONRPCPaymentMethodSuggestionsReturnsAuthoritativeManagementAccess](../internal/service/jsonrpc_payment_method_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
 #### 查询加工环节 `masterdata.list_processes`
 
@@ -35574,19 +35704,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:44`。 |
 | `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:42`。 |
 | `result.data.units` | array | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:41`。 |
-| `result.data.units[]` | object | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:152`。 |
+| `result.data.units[]` | object | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:156`。 |
 
 **`units[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.units[].code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:156`。 |
-| `result.data.units[].created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:160`。 |
-| `result.data.units[].id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:155`。 |
-| `result.data.units[].is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:159`。 |
-| `result.data.units[].name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:157`。 |
-| `result.data.units[].precision` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:158`。 |
-| `result.data.units[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:161`。 |
+| `result.data.units[].code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:160`。 |
+| `result.data.units[].created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:164`。 |
+| `result.data.units[].id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:159`。 |
+| `result.data.units[].is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:163`。 |
+| `result.data.units[].name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:161`。 |
+| `result.data.units[].precision` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:162`。 |
+| `result.data.units[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:165`。 |
 
 ```json
 {
@@ -35664,19 +35794,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:66`。 |
 | `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:64`。 |
 | `result.data.warehouses` | array | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:63`。 |
-| `result.data.warehouses[]` | object | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:175`。 |
+| `result.data.warehouses[]` | object | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:179`。 |
 
 **`warehouses[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.warehouses[].code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:179`。 |
-| `result.data.warehouses[].created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:183`。 |
-| `result.data.warehouses[].id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:178`。 |
-| `result.data.warehouses[].is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:182`。 |
-| `result.data.warehouses[].name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:180`。 |
-| `result.data.warehouses[].type` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:181`。 |
-| `result.data.warehouses[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:184`。 |
+| `result.data.warehouses[].code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:183`。 |
+| `result.data.warehouses[].created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:187`。 |
+| `result.data.warehouses[].id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:182`。 |
+| `result.data.warehouses[].is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:186`。 |
+| `result.data.warehouses[].name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:184`。 |
+| `result.data.warehouses[].type` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:185`。 |
+| `result.data.warehouses[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:188`。 |
 
 ```json
 {
@@ -36273,75 +36403,6 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 ```
 
 样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
-
-#### 调整付款方式推荐 `masterdata.set_payment_method_recommendation`
-
-##### 请求参数
-
-**顶层字段**
-
-| 字段 | 类型 | 必填条件 | 说明 |
-| --- | --- | --- | --- |
-| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "expected_version")`。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_payment_method.go:80`。 |
-| `is_recommended` | boolean | 必填 | 解析器 `getRequiredJSONRPCBool`；调用 `getRequiredJSONRPCBool(pm, "is_recommended")`。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_payment_method.go:76`。 |
-| `method` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "method")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_payment_method.go:88`。 |
-
-对象引用、权限、状态和并发版本由后端校验。
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "set_payment_method_recommendation",
-  "params": {
-    "expected_version": 0,
-    "is_recommended": false,
-    "method": "aa"
-  },
-  "id": "rpc-demo-masterdata.set_payment_method_recommendation"
-}
-```
-
-##### 返回结果
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `result.code` | integer | 成功为 0；错误复用正式码表。 |
-| `result.message` | string | 业务结果提示。 |
-| `result.data` | object / null | 当前方法的返回内容。 |
-
-**顶层字段**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `result.data.item` | object | 依据：`server/internal/service/jsonrpc_payment_method.go:92`。 |
-
-**`item`**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `result.data.item.is_recommended` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:99`。 |
-| `result.data.item.method` | string | 依据：`server/internal/service/jsonrpc_payment_method.go:99`。 |
-| `result.data.item.version` | integer | 依据：`server/internal/service/jsonrpc_payment_method.go:99`。 |
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "rpc-demo-masterdata.set_payment_method_recommendation",
-  "result": {
-    "code": 0,
-    "message": "OK",
-    "data": {
-      "item": {
-        "is_recommended": false,
-        "method": "aa",
-        "version": 1
-      }
-    }
-  }
-}
-```
-
-样例依据：[TestJSONRPCPaymentMethodManagementPermissionAndContract](../internal/service/jsonrpc_payment_method_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
 #### 设置首选联系人 `masterdata.set_primary_contact`
 
@@ -37124,6 +37185,81 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
 
+#### 修改付款方式 `masterdata.update_payment_method`
+
+##### 请求参数
+
+**顶层字段**
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "expected_version")`。 拒绝条件：“!valid &#124;&#124; version <= 0”。 依据：`server/internal/service/jsonrpc_payment_method.go:65`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "id")`。 拒绝条件：“!valid &#124;&#124; optionID <= 0”。 依据：`server/internal/service/jsonrpc_payment_method.go:61`。 |
+| `is_active` | boolean | 必填 | 解析器 `getRequiredJSONRPCBool`；调用 `getRequiredJSONRPCBool(pm, "is_active")`。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_payment_method.go:76`。 |
+| `method` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "method")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_payment_method.go:80`。 |
+
+对象引用、权限、状态和并发版本由后端校验。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "update_payment_method",
+  "params": {
+    "expected_version": 1,
+    "id": 1,
+    "is_active": false,
+    "method": "aa"
+  },
+  "id": "rpc-demo-masterdata.update_payment_method"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 成功为 0；错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的返回内容。 |
+
+**顶层字段**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.item` | object | 依据：`server/internal/service/jsonrpc_payment_method.go:87`。 |
+
+**`item`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.item.has_been_used` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.item.id` | integer | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.item.is_active` | boolean | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.item.method` | string | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+| `result.data.item.version` | integer | 依据：`server/internal/service/jsonrpc_payment_method.go:91`。 |
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-masterdata.update_payment_method",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "item": {
+        "has_been_used": false,
+        "id": 1,
+        "is_active": false,
+        "method": "aa",
+        "version": 2
+      }
+    }
+  }
+}
+```
+
+样例依据：[TestJSONRPCPaymentMethodManagementPermissionAndContract](../internal/service/jsonrpc_payment_method_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+
 #### 修改加工环节 `masterdata.update_process`
 
 ##### 请求参数
@@ -37611,13 +37747,13 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.warehouse.code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:179`。 |
-| `result.data.warehouse.created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:183`。 |
-| `result.data.warehouse.id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:178`。 |
-| `result.data.warehouse.is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:182`。 |
-| `result.data.warehouse.name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:180`。 |
-| `result.data.warehouse.type` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:181`。 |
-| `result.data.warehouse.updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:184`。 |
+| `result.data.warehouse.code` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:183`。 |
+| `result.data.warehouse.created_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:187`。 |
+| `result.data.warehouse.id` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:182`。 |
+| `result.data.warehouse.is_active` | boolean | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:186`。 |
+| `result.data.warehouse.name` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:184`。 |
+| `result.data.warehouse.type` | string | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:185`。 |
+| `result.data.warehouse.updated_at` | integer | 依据：`server/internal/service/jsonrpc_masterdata_shared.go:188`。 |
 
 ```json
 {

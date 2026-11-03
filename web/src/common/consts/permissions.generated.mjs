@@ -267,7 +267,7 @@ export const PermissionLabel = Object.freeze({
   'outsourcing.order.submit': '提交委外合同',
   'outsourcing.order.update': '更新委外合同',
   'outsourcing.return_receipt.create': '登记委外回货',
-  'payment_method.manage': '管理付款方式推荐',
+  'payment_method.manage': '维护付款方式',
   'pmc.plan.create': '创建生产计划',
   'pmc.plan.read': '查看生产计划',
   'pmc.plan.update': '更新生产计划',

@@ -35,18 +35,36 @@ var _ biz.MasterDataRepo = (*masterDataRepo)(nil)
 var _ biz.WarehouseAccessRepo = (*masterDataRepo)(nil)
 
 func (r *masterDataRepo) CreateCustomer(ctx context.Context, in *biz.CustomerMutation) (*biz.Customer, error) {
-	row, err := createCustomerWithClient(ctx, r.data.postgres, in)
+	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	row, err := createCustomerWithClient(ctx, tx.Client(), r.data.sqlDialect, in)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entCustomerToBiz(row), nil
 }
 
 func (r *masterDataRepo) UpdateCustomer(ctx context.Context, id int, in *biz.CustomerMutation) (*biz.Customer, error) {
-	row, err := updateCustomerWithClient(ctx, r.data.postgres, id, in)
+	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	row, err := updateCustomerWithClient(ctx, tx.Client(), r.data.sqlDialect, id, in)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entCustomerToBiz(row), nil
 }
 
@@ -59,9 +77,9 @@ func (r *masterDataRepo) SaveCustomerWithContacts(ctx context.Context, id int, i
 
 	var customerRow *ent.Customer
 	if id > 0 {
-		customerRow, err = updateCustomerWithClient(ctx, tx.Client(), id, in)
+		customerRow, err = updateCustomerWithClient(ctx, tx.Client(), r.data.sqlDialect, id, in)
 	} else {
-		customerRow, err = createCustomerWithClient(ctx, tx.Client(), in)
+		customerRow, err = createCustomerWithClient(ctx, tx.Client(), r.data.sqlDialect, in)
 	}
 	if err != nil {
 		return nil, err
@@ -138,26 +156,46 @@ func (r *masterDataRepo) CustomerExists(ctx context.Context, id int) (bool, erro
 }
 
 func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMutation) (*biz.Supplier, error) {
-	row, err := createSupplierWithClient(ctx, r.data.postgres, in)
+	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	row, err = r.data.postgres.Supplier.Query().Where(supplier.ID(row.ID)).WithProcessCapabilities().Only(ctx)
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	row, err := createSupplierWithClient(ctx, tx.Client(), r.data.sqlDialect, in)
 	if err != nil {
 		return nil, err
 	}
+
+	row, err = tx.Supplier.Query().Where(supplier.ID(row.ID)).WithProcessCapabilities().Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entSupplierToBiz(row), nil
 }
 
 func (r *masterDataRepo) UpdateSupplier(ctx context.Context, id int, in *biz.SupplierMutation) (*biz.Supplier, error) {
-	row, err := updateSupplierWithClient(ctx, r.data.postgres, id, in)
+	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	row, err = r.data.postgres.Supplier.Query().Where(supplier.ID(row.ID)).WithProcessCapabilities().Only(ctx)
+	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	row, err := updateSupplierWithClient(ctx, tx.Client(), r.data.sqlDialect, id, in)
 	if err != nil {
 		return nil, err
 	}
+
+	row, err = tx.Supplier.Query().Where(supplier.ID(row.ID)).WithProcessCapabilities().Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entSupplierToBiz(row), nil
 }
 
@@ -170,9 +208,9 @@ func (r *masterDataRepo) SaveSupplierWithContacts(ctx context.Context, id int, i
 
 	var supplierRow *ent.Supplier
 	if id > 0 {
-		supplierRow, err = updateSupplierWithClient(ctx, tx.Client(), id, in)
+		supplierRow, err = updateSupplierWithClient(ctx, tx.Client(), r.data.sqlDialect, id, in)
 	} else {
-		supplierRow, err = createSupplierWithClient(ctx, tx.Client(), in)
+		supplierRow, err = createSupplierWithClient(ctx, tx.Client(), r.data.sqlDialect, in)
 	}
 	if err != nil {
 		return nil, err
@@ -1107,7 +1145,11 @@ func (r *masterDataRepo) DisableContact(ctx context.Context, id int) (*biz.Conta
 	return entContactToBiz(row), nil
 }
 
-func createCustomerWithClient(ctx context.Context, client *ent.Client, in *biz.CustomerMutation) (*ent.Customer, error) {
+func createCustomerWithClient(ctx context.Context, client *ent.Client, sqlDialect string, in *biz.CustomerMutation) (*ent.Customer, error) {
+	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod); err != nil {
+		return nil, err
+	}
+
 	return client.Customer.Create().
 		SetCode(in.Code).
 		SetName(in.Name).
@@ -1123,7 +1165,11 @@ func createCustomerWithClient(ctx context.Context, client *ent.Client, in *biz.C
 		Save(ctx)
 }
 
-func updateCustomerWithClient(ctx context.Context, client *ent.Client, id int, in *biz.CustomerMutation) (*ent.Customer, error) {
+func updateCustomerWithClient(ctx context.Context, client *ent.Client, sqlDialect string, id int, in *biz.CustomerMutation) (*ent.Customer, error) {
+	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod); err != nil {
+		return nil, err
+	}
+
 	update := client.Customer.UpdateOneID(id).
 		SetCode(in.Code).
 		SetName(in.Name)
@@ -1182,7 +1228,11 @@ func updateCustomerWithClient(ctx context.Context, client *ent.Client, id int, i
 	return row, nil
 }
 
-func createSupplierWithClient(ctx context.Context, client *ent.Client, in *biz.SupplierMutation) (*ent.Supplier, error) {
+func createSupplierWithClient(ctx context.Context, client *ent.Client, sqlDialect string, in *biz.SupplierMutation) (*ent.Supplier, error) {
+	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod); err != nil {
+		return nil, err
+	}
+
 	create := client.Supplier.Create().
 		SetCode(in.Code).
 		SetName(in.Name).
@@ -1201,7 +1251,11 @@ func createSupplierWithClient(ctx context.Context, client *ent.Client, in *biz.S
 	return create.Save(ctx)
 }
 
-func updateSupplierWithClient(ctx context.Context, client *ent.Client, id int, in *biz.SupplierMutation) (*ent.Supplier, error) {
+func updateSupplierWithClient(ctx context.Context, client *ent.Client, sqlDialect string, id int, in *biz.SupplierMutation) (*ent.Supplier, error) {
+	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod); err != nil {
+		return nil, err
+	}
+
 	update := client.Supplier.UpdateOneID(id).
 		SetCode(in.Code).
 		SetName(in.Name).

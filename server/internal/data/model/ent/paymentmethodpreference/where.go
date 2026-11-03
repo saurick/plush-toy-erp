@@ -64,6 +64,11 @@ func IsRecommended(v bool) predicate.PaymentMethodPreference {
 	return predicate.PaymentMethodPreference(sql.FieldEQ(FieldIsRecommended, v))
 }
 
+// HasBeenUsed applies equality check predicate on the "has_been_used" field. It's identical to HasBeenUsedEQ.
+func HasBeenUsed(v bool) predicate.PaymentMethodPreference {
+	return predicate.PaymentMethodPreference(sql.FieldEQ(FieldHasBeenUsed, v))
+}
+
 // Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
 func Version(v int) predicate.PaymentMethodPreference {
 	return predicate.PaymentMethodPreference(sql.FieldEQ(FieldVersion, v))
@@ -152,6 +157,16 @@ func IsRecommendedEQ(v bool) predicate.PaymentMethodPreference {
 // IsRecommendedNEQ applies the NEQ predicate on the "is_recommended" field.
 func IsRecommendedNEQ(v bool) predicate.PaymentMethodPreference {
 	return predicate.PaymentMethodPreference(sql.FieldNEQ(FieldIsRecommended, v))
+}
+
+// HasBeenUsedEQ applies the EQ predicate on the "has_been_used" field.
+func HasBeenUsedEQ(v bool) predicate.PaymentMethodPreference {
+	return predicate.PaymentMethodPreference(sql.FieldEQ(FieldHasBeenUsed, v))
+}
+
+// HasBeenUsedNEQ applies the NEQ predicate on the "has_been_used" field.
+func HasBeenUsedNEQ(v bool) predicate.PaymentMethodPreference {
+	return predicate.PaymentMethodPreference(sql.FieldNEQ(FieldHasBeenUsed, v))
 }
 
 // VersionEQ applies the EQ predicate on the "version" field.

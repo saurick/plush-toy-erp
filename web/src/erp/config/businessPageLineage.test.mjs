@@ -86,7 +86,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_inventory_lots',
   'list_inventory_txns',
   'list_materials',
-  'list_payment_method_recommendations',
+  'list_payment_method_options',
   'list_payment_methods',
   'list_outsourcing_facts',
   'list_outsourcing_return_dispositions',
@@ -118,17 +118,18 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
 ])
 
 const NON_LINEAGE_PAGE_LOCAL_CRUD_ACTIONS = Object.freeze([
-  // These methods mutate the object already owned by the same page. They do
+  // These methods maintain page-owned objects or shared master-data choices. They do
   // not copy a source document, generate a Fact, post/cancel/release a Fact,
   // or provide a source-specific read model.
   'create_contact',
+  'create_payment_method',
+  'delete_payment_method',
   'disable_contact',
   'save_customer_with_contacts',
   'save_production_order',
   'save_supplier_with_contacts',
   'set_customer_active',
   'set_material_active',
-  'set_payment_method_recommendation',
   'set_primary_contact',
   'set_process_active',
   'set_product_active',
@@ -137,6 +138,7 @@ const NON_LINEAGE_PAGE_LOCAL_CRUD_ACTIONS = Object.freeze([
   'update_contact',
   'update_customer',
   'update_material',
+  'update_payment_method',
   'create_warehouse',
   'update_warehouse',
   'update_process',

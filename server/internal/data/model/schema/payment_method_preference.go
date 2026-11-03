@@ -9,7 +9,7 @@ import (
 	"entgo.io/ent/schema/field"
 )
 
-// PaymentMethodPreference controls recommendations without changing document values.
+// PaymentMethodPreference owns shared choices; document fields remain snapshots.
 type PaymentMethodPreference struct{ ent.Schema }
 
 func (PaymentMethodPreference) Annotations() []entschema.Annotation {
@@ -21,8 +21,10 @@ func (PaymentMethodPreference) Annotations() []entschema.Annotation {
 
 func (PaymentMethodPreference) Fields() []ent.Field {
 	return []ent.Field{
-		field.String("method").NotEmpty().MaxRuneLen(128).Unique().Immutable(),
+		field.String("method").NotEmpty().MaxRuneLen(128).Unique(),
 		field.Bool("is_recommended").Default(true),
+		// The lifetime guard stays true after rename or removal from source records.
+		field.Bool("has_been_used").Default(false),
 		field.Int("version").Default(1).Positive(),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),

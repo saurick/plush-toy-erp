@@ -21,7 +21,7 @@ import {
   summarizePurchaseOrderLines,
 } from '../../utils/sourceOrderAmounts.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
-import PaymentMethodInput from '../PaymentMethodInput.jsx'
+import { PaymentMethodField } from '../PaymentMethodInput.jsx'
 
 import { DateInput, InheritedDateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
@@ -722,13 +722,11 @@ export function PurchaseOrderFormFields({
         >
           <BusinessTextArea minRows={1} allowClear maxLength={512} showCount />
         </Form.Item>
-        <Form.Item
+        <PaymentMethodField
           className="erp-business-action-form__field"
           name="payment_method"
           label={<BusinessHelpLabel label="付款方式" description="从供应商档案带出后可按本单调整。" />}
-        >
-          <PaymentMethodInput />
-        </Form.Item>
+        />
         <Form.Item
           className="erp-business-action-form__field erp-business-action-form__field--short"
           name="payment_term_days"

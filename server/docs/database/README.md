@@ -23,7 +23,7 @@ go run ./cmd/schema-doc --write
 | 项目 | 数量 |
 | --- | ---: |
 | 应用表 | 81 |
-| 字段 | 1330 |
+| 字段 | 1331 |
 | 外键 | 162 |
 | 显式索引 | 353 |
 | 其中 partial index | 33 |
@@ -73,7 +73,7 @@ go run ./cmd/schema-doc --write
 | [`contacts`](主数据与BOM.md#table-contacts) | 联系人 | MasterData / 主数据 | 保存客户或供应商联系人、联系方式、主联系人标记和启用状态。 |
 | [`customers`](主数据与BOM.md#table-customers) | 客户 | MasterData / 主数据 | 保存销售、出货和应收等业务引用的客户主档。 |
 | [`materials`](主数据与BOM.md#table-materials) | 物料 | MasterData / 主数据 | 保存可复用材料名称、厂商、厂商料号、色号、规格、默认单位、库存类别和默认入库仓。 |
-| [`payment_method_preferences`](主数据与BOM.md#table-payment-method-preferences) | 付款方式推荐设置 | Config / 配置 | 保存公司共用付款方式名称的推荐状态和并发版本。 |
+| [`payment_method_preferences`](主数据与BOM.md#table-payment-method-preferences) | 付款方式共用目录 | Config / 配置 | 维护公司共用付款方式选项、启用状态、单向使用保护和并发版本。 |
 | [`processes`](主数据与BOM.md#table-processes) | 生产工序 | MasterData / 主数据 | 保存可复用生产工序、路线位置绑定、内制或委外能力和质检要求。 |
 | [`product_skus`](主数据与BOM.md#table-product-skus) | 产品规格（SKU） | MasterData / 主数据 | 保存产品下的规格、颜色、尺码、条码和客户 SKU 等显式库存粒度。 |
 | [`products`](主数据与BOM.md#table-products) | 产品 | MasterData / 主数据 | 保存产品或款号主档，供 SKU、BOM、订单、生产、库存和出货引用。 |

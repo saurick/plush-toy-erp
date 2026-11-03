@@ -336,7 +336,7 @@ var builtinPermissions = withBuiltinPermissionMetadata([]PermissionDefinition{
 	{Key: PermissionSupplierCreate, Name: "创建供应商主数据", Module: "masterdata", Action: "create", Resource: "supplier", Builtin: true},
 	{Key: PermissionSupplierUpdate, Name: "更新供应商主数据", Module: "masterdata", Action: "update", Resource: "supplier", Builtin: true},
 	{Key: PermissionSupplierDisable, Name: "启停供应商主数据", Module: "masterdata", Action: "disable", Resource: "supplier", Builtin: true},
-	{Key: PermissionPaymentMethodManage, Name: "管理付款方式推荐", Description: "查看公司付款方式候选，并停止或恢复推荐；不修改客户、供应商和订单原值。", Module: "masterdata", Action: "manage", Resource: "payment_method", Builtin: true},
+	{Key: PermissionPaymentMethodManage, Name: "维护付款方式", Description: "新增、改名、启停公司共用付款方式，删除未使用项；不修改档案和订单快照。", Module: "masterdata", Action: "manage", Resource: "payment_method", Builtin: true},
 	{Key: PermissionMaterialRead, Name: "查看材料主数据", Module: "masterdata", Action: "read", Resource: "material", Builtin: true},
 	{Key: PermissionMaterialCreate, Name: "创建材料主数据", Module: "masterdata", Action: "create", Resource: "material", Builtin: true},
 	{Key: PermissionMaterialUpdate, Name: "更新材料主数据", Module: "masterdata", Action: "update", Resource: "material", Builtin: true},

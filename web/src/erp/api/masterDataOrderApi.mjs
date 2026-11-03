@@ -114,28 +114,36 @@ export async function listCustomers(params = {}, options = {}) {
 
 export async function listPaymentMethods(params = {}, options = {}) {
   const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.LIST_PAYMENT_METHODS, params, options))
-  if (!Array.isArray(data?.methods) || data.methods.some((method) => typeof method !== 'string') || typeof data.has_more !== 'boolean' || typeof data.keyword_not_recommended !== 'boolean' || typeof data.can_manage !== 'boolean') {
-    throw new Error('付款方式候选读取失败，请重试')
+  if (!Array.isArray(data?.methods) || data.methods.some((method) => typeof method !== 'string') || typeof data.has_more !== 'boolean' || typeof data.keyword_exists !== 'boolean' || typeof data.keyword_inactive !== 'boolean' || typeof data.can_manage !== 'boolean') {
+    throw new Error('付款方式读取失败，请重试')
   }
   return data
 }
 
-const validPaymentMethodRecommendation = (item) => item && typeof item.method === 'string' && item.method.trim() !== '' && typeof item.is_recommended === 'boolean' && Number.isSafeInteger(item.version) && item.version >= 0
+const validPaymentMethodOption = (item) => item && Number.isSafeInteger(item.id) && item.id > 0 && typeof item.method === 'string' && item.method.trim() !== '' && typeof item.is_active === 'boolean' && typeof item.has_been_used === 'boolean' && Number.isSafeInteger(item.version) && item.version > 0
 
-export async function listPaymentMethodRecommendations(params, options = {}) {
-  const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.LIST_PAYMENT_METHOD_RECOMMENDATIONS, params, options))
-  if (!Array.isArray(data?.items) || !data.items.every(validPaymentMethodRecommendation) || typeof data.has_more !== 'boolean') {
-    throw new Error('付款方式候选读取失败，请重试')
-  }
+export async function listPaymentMethodOptions(params, options = {}) {
+  const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.LIST_PAYMENT_METHOD_OPTIONS, params, options))
+  if (!Array.isArray(data?.items) || !data.items.every(validPaymentMethodOption) || typeof data.has_more !== 'boolean') throw new Error('付款方式读取失败，请重试')
   return data
 }
 
-export async function setPaymentMethodRecommendation(params) {
-  const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.SET_PAYMENT_METHOD_RECOMMENDATION, params))
-  if (!validPaymentMethodRecommendation(data?.item) || data.item.method !== params.method || data.item.is_recommended !== params.is_recommended) {
-    throw new Error('付款方式推荐结果未确认，请刷新后核对')
-  }
+export async function createPaymentMethod(params) {
+  const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.CREATE_PAYMENT_METHOD, params))
+  if (!validPaymentMethodOption(data?.item) || data.item.method !== params.method.trim() || !data.item.is_active) throw new Error('新增结果未确认，请刷新后核对')
   return data.item
+}
+
+export async function updatePaymentMethod(params) {
+  const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.UPDATE_PAYMENT_METHOD, params))
+  if (!validPaymentMethodOption(data?.item) || data.item.id !== params.id || data.item.method !== params.method.trim() || data.item.is_active !== params.is_active) throw new Error('修改结果未确认，请刷新后核对')
+  return data.item
+}
+
+export async function deletePaymentMethod(params) {
+  const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.DELETE_PAYMENT_METHOD, params))
+  if (data?.deleted_id !== params.id) throw new Error('删除结果未确认，请刷新后核对')
+  return data
 }
 
 export async function listAllCustomers(params = {}, options = {}) {

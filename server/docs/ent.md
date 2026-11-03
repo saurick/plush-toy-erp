@@ -108,7 +108,8 @@ CHECK/UNIQUE/FK 约束。
    ```bash
    atlas migrate new <name> --dir file://internal/data/model/migrate
    ```
-   该 migration 只允许承载已评审的一次性 `UPDATE` / `DELETE` 数据转换，
+   该 migration 只允许承载已评审的一次性 `UPDATE` / `DELETE` 数据转换、
+   已有受控选项目录的 `INSERT ... SELECT` 初始化（须去重、保留原状态并验证重放），
    或精确退出冻结历史对象的 `DROP`；不得在这里手写 `CREATE TABLE` /
    `ALTER TABLE` 来替代 Ent，也不得新增 Function、Procedure、Trigger 或
    `EXECUTE FUNCTION/PROCEDURE`。冻结历史 migration

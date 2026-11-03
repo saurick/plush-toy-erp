@@ -17,6 +17,8 @@ const (
 	FieldMethod = "method"
 	// FieldIsRecommended holds the string denoting the is_recommended field in the database.
 	FieldIsRecommended = "is_recommended"
+	// FieldHasBeenUsed holds the string denoting the has_been_used field in the database.
+	FieldHasBeenUsed = "has_been_used"
 	// FieldVersion holds the string denoting the version field in the database.
 	FieldVersion = "version"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -32,6 +34,7 @@ var Columns = []string{
 	FieldID,
 	FieldMethod,
 	FieldIsRecommended,
+	FieldHasBeenUsed,
 	FieldVersion,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -52,6 +55,8 @@ var (
 	MethodValidator func(string) error
 	// DefaultIsRecommended holds the default value on creation for the "is_recommended" field.
 	DefaultIsRecommended bool
+	// DefaultHasBeenUsed holds the default value on creation for the "has_been_used" field.
+	DefaultHasBeenUsed bool
 	// DefaultVersion holds the default value on creation for the "version" field.
 	DefaultVersion int
 	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
@@ -80,6 +85,11 @@ func ByMethod(opts ...sql.OrderTermOption) OrderOption {
 // ByIsRecommended orders the results by the is_recommended field.
 func ByIsRecommended(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIsRecommended, opts...).ToFunc()
+}
+
+// ByHasBeenUsed orders the results by the has_been_used field.
+func ByHasBeenUsed(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHasBeenUsed, opts...).ToFunc()
 }
 
 // ByVersion orders the results by the version field.

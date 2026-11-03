@@ -525,6 +525,12 @@ func runtimeAuditActionLabelAndRisk(eventKey string) (string, string) {
 		return "隐私与使用规则知悉", "normal"
 	}
 	switch strings.TrimSpace(eventKey) {
+	case "payment_method.create":
+		return "新增付款方式", "normal"
+	case "payment_method.update":
+		return "修改付款方式", "normal"
+	case "payment_method.delete":
+		return "删除未使用付款方式", "warning"
 	case "payment_method.recommendation.set":
 		return "付款方式推荐变更", "normal"
 	case "admin_user.create":
@@ -583,6 +589,12 @@ func runtimeAuditSummary(event RuntimeAuditEvent) string {
 		return actor + " 确认已阅读并知悉规则版本 " + target
 	}
 	switch event.EventKey {
+	case "payment_method.create":
+		return actor + " 新增付款方式 " + target
+	case "payment_method.update":
+		return actor + " 修改付款方式 " + target
+	case "payment_method.delete":
+		return actor + " 删除未使用付款方式 " + target
 	case "payment_method.recommendation.set":
 		if boolValue(after["is_recommended"]) {
 			return actor + " 恢复推荐付款方式 " + target

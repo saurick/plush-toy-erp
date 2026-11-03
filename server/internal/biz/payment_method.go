@@ -10,64 +10,56 @@ import (
 const PaymentMethodSuggestionLimit = 50
 
 var (
-	ErrPaymentMethodNotFound        = errors.New("payment method candidate not found")
-	ErrPaymentMethodVersionConflict = errors.New("payment method recommendation version conflict")
+	ErrPaymentMethodNotFound        = errors.New("payment method not found")
+	ErrPaymentMethodVersionConflict = errors.New("payment method version conflict")
+	ErrPaymentMethodExists          = errors.New("payment method already exists")
+	ErrPaymentMethodInUse           = errors.New("payment method has been used")
 )
 
-// Defaults share the same recommendation policy as names saved on source records.
-func DefaultPaymentMethods() []string {
-	return []string{"银行转账", "现金", "银行承兑"}
-}
-
 type PaymentMethodSuggestions struct {
-	Methods               []string
-	HasMore               bool
-	KeywordNotRecommended bool
+	Methods         []string
+	HasMore         bool
+	KeywordExists   bool
+	KeywordInactive bool
 }
 
-type PaymentMethodRecommendation struct {
-	Method        string
-	IsRecommended bool
-	Version       int
+type PaymentMethodFilter struct{ Keyword string }
+
+type PaymentMethodOption struct {
+	ID          int
+	Method      string
+	IsActive    bool
+	HasBeenUsed bool
+	Version     int
 }
 
-type PaymentMethodRecommendationFilter struct {
-	Keyword       string
-	IsRecommended bool
-	Limit         int
-	Offset        int
+type PaymentMethodOptionFilter struct {
+	Keyword  string
+	IsActive bool
+	Limit    int
+	Offset   int
 }
 
-type PaymentMethodRecommendationChange struct {
+type PaymentMethodOptionChange struct {
+	ID              int
 	Method          string
-	IsRecommended   bool
+	IsActive        bool
 	ExpectedVersion int
 }
 
-// Sources are supplied by the service after checking effective read permissions.
-type PaymentMethodFilter struct {
-	Keyword        string
-	Customers      bool
-	Suppliers      bool
-	SalesOrders    bool
-	PurchaseOrders bool
+func validPaymentMethodName(method string) bool {
+	return method != "" && utf8.RuneCountInString(method) <= 128
 }
 
 func (uc *MasterDataUsecase) ListPaymentMethods(ctx context.Context, filter PaymentMethodFilter) (PaymentMethodSuggestions, error) {
-	if uc == nil || uc.repo == nil {
-		return PaymentMethodSuggestions{}, ErrBadParam
-	}
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
-	if utf8.RuneCountInString(filter.Keyword) > 128 {
+	if uc == nil || uc.repo == nil || utf8.RuneCountInString(filter.Keyword) > 128 {
 		return PaymentMethodSuggestions{}, ErrBadParam
-	}
-	if !filter.Customers && !filter.Suppliers && !filter.SalesOrders && !filter.PurchaseOrders {
-		return PaymentMethodSuggestions{}, ErrDataScopeForbidden
 	}
 	return uc.repo.ListPaymentMethods(ctx, filter)
 }
 
-func (uc *MasterDataUsecase) ListPaymentMethodRecommendations(ctx context.Context, filter PaymentMethodRecommendationFilter) ([]PaymentMethodRecommendation, bool, error) {
+func (uc *MasterDataUsecase) ListPaymentMethodOptions(ctx context.Context, filter PaymentMethodOptionFilter) ([]PaymentMethodOption, bool, error) {
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	if uc == nil || uc.repo == nil || utf8.RuneCountInString(filter.Keyword) > 128 || filter.Offset < 0 {
 		return nil, false, ErrBadParam
@@ -75,17 +67,11 @@ func (uc *MasterDataUsecase) ListPaymentMethodRecommendations(ctx context.Contex
 	if filter.Limit <= 0 || filter.Limit > PaymentMethodSuggestionLimit {
 		filter.Limit = PaymentMethodSuggestionLimit
 	}
-	return uc.repo.ListPaymentMethodRecommendations(ctx, filter)
+	return uc.repo.ListPaymentMethodOptions(ctx, filter)
 }
 
-func (uc *MasterDataUsecase) SetPaymentMethodRecommendation(ctx context.Context, operator *AdminUser, change PaymentMethodRecommendationChange) (*PaymentMethodRecommendation, error) {
-	change.Method = strings.TrimSpace(change.Method)
-	if uc == nil || uc.repo == nil || change.Method == "" || utf8.RuneCountInString(change.Method) > 128 || change.ExpectedVersion < 0 {
-		return nil, ErrBadParam
-	}
-	before := map[string]any{"is_recommended": !change.IsRecommended, "version": change.ExpectedVersion}
-	after := map[string]any{"is_recommended": change.IsRecommended, "version": change.ExpectedVersion + 1}
-	audit, err := BuildAdminControlAuditEvent(operator, "payment_method.recommendation.set", "payment_method", 0, change.Method, before, after)
+func paymentMethodAudit(operator *AdminUser, action string, id int, method string) (*RuntimeAuditEventCreate, error) {
+	audit, err := BuildAdminControlAuditEvent(operator, action, "payment_method", id, method, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -95,5 +81,40 @@ func (uc *MasterDataUsecase) SetPaymentMethodRecommendation(ctx context.Context,
 		roleKeys = append(roleKeys, role.Key)
 	}
 	audit.Payload["actor"].(map[string]any)["role_keys"] = roleKeys
-	return uc.repo.SetPaymentMethodRecommendation(ctx, change, audit)
+	return audit, nil
+}
+
+func (uc *MasterDataUsecase) CreatePaymentMethod(ctx context.Context, operator *AdminUser, method string) (*PaymentMethodOption, error) {
+	method = strings.TrimSpace(method)
+	if uc == nil || uc.repo == nil || !validPaymentMethodName(method) {
+		return nil, ErrBadParam
+	}
+	audit, err := paymentMethodAudit(operator, "payment_method.create", 0, method)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.CreatePaymentMethod(ctx, method, audit)
+}
+
+func (uc *MasterDataUsecase) UpdatePaymentMethod(ctx context.Context, operator *AdminUser, change PaymentMethodOptionChange) (*PaymentMethodOption, error) {
+	change.Method = strings.TrimSpace(change.Method)
+	if uc == nil || uc.repo == nil || !validPaymentMethodName(change.Method) || change.ID <= 0 || change.ExpectedVersion <= 0 {
+		return nil, ErrBadParam
+	}
+	audit, err := paymentMethodAudit(operator, "payment_method.update", change.ID, change.Method)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.UpdatePaymentMethod(ctx, change, audit)
+}
+
+func (uc *MasterDataUsecase) DeletePaymentMethod(ctx context.Context, operator *AdminUser, id, version int) error {
+	if uc == nil || uc.repo == nil || id <= 0 || version <= 0 {
+		return ErrBadParam
+	}
+	audit, err := paymentMethodAudit(operator, "payment_method.delete", id, "")
+	if err != nil {
+		return err
+	}
+	return uc.repo.DeletePaymentMethod(ctx, id, version, audit)
 }

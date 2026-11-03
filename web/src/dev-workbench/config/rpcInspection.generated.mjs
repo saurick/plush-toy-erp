@@ -9253,6 +9253,35 @@ export const RpcInspection = Object.freeze({
         type: '待核对',
       })]),
     }),
+    create_payment_method: Object.freeze({
+      emptyData: false,
+      emptyParameters: false,
+      entry: Object.freeze({
+        line: 30,
+        path: 'server/internal/service/jsonrpc_masterdata.go',
+      }),
+      parameters: Object.freeze([Object.freeze({
+        description: '解析器 `getString`；调用 `getString(pm, "method")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。',
+        expression: 'getString(pm, "method")',
+        name: 'method',
+        nullable: true,
+        required: '按业务条件',
+        source: Object.freeze({
+          line: 59,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: 'string',
+      })]),
+      response: Object.freeze([Object.freeze({
+        expression: '"item": paymentMethodOptionToAny(*item)',
+        name: 'result.data.item',
+        source: Object.freeze({
+          line: 87,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: '待核对',
+      })]),
+    }),
     create_process: Object.freeze({
       emptyData: false,
       emptyParameters: false,
@@ -9852,6 +9881,44 @@ export const RpcInspection = Object.freeze({
         type: 'string',
       })]),
       response: Object.freeze([]),
+    }),
+    delete_payment_method: Object.freeze({
+      emptyData: false,
+      emptyParameters: false,
+      entry: Object.freeze({
+        line: 30,
+        path: 'server/internal/service/jsonrpc_masterdata.go',
+      }),
+      parameters: Object.freeze([Object.freeze({
+        description: '解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "expected_version")`。 拒绝条件：“!valid || version <= 0”。',
+        expression: 'getRequiredJSONRPCNonNegativeInt(pm, "expected_version")',
+        name: 'expected_version',
+        required: '必填',
+        source: Object.freeze({
+          line: 65,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: 'integer',
+      }), Object.freeze({
+        description: '解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "id")`。 拒绝条件：“!valid || optionID <= 0”。',
+        expression: 'getRequiredJSONRPCNonNegativeInt(pm, "id")',
+        name: 'id',
+        required: '必填',
+        source: Object.freeze({
+          line: 61,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: 'integer',
+      })]),
+      response: Object.freeze([Object.freeze({
+        expression: '"deleted_id": optionID',
+        name: 'result.data.deleted_id',
+        source: Object.freeze({
+          line: 74,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: '待核对',
+      })]),
     }),
     disable_contact: Object.freeze({
       emptyData: false,
@@ -10670,7 +10737,7 @@ export const RpcInspection = Object.freeze({
         type: '待核对',
       })]),
     }),
-    list_payment_method_recommendations: Object.freeze({
+    list_payment_method_options: Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
@@ -10678,12 +10745,12 @@ export const RpcInspection = Object.freeze({
         path: 'server/internal/service/jsonrpc_masterdata.go',
       }),
       parameters: Object.freeze([Object.freeze({
-        description: '解析器 `getRequiredJSONRPCBool`；调用 `getRequiredJSONRPCBool(pm, "is_recommended")`。 拒绝条件：“!valid”。',
-        expression: 'getRequiredJSONRPCBool(pm, "is_recommended")',
-        name: 'is_recommended',
+        description: '解析器 `getRequiredJSONRPCBool`；调用 `getRequiredJSONRPCBool(pm, "is_active")`。 拒绝条件：“!valid”。',
+        expression: 'getRequiredJSONRPCBool(pm, "is_active")',
+        name: 'is_active',
         required: '必填',
         source: Object.freeze({
-          line: 51,
+          line: 29,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'boolean',
@@ -10694,7 +10761,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 59,
+          line: 37,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'string',
@@ -10705,7 +10772,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 59,
+          line: 37,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'integer',
@@ -10716,7 +10783,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 55,
+          line: 33,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'integer',
@@ -10725,7 +10792,7 @@ export const RpcInspection = Object.freeze({
         expression: '"has_more": more',
         name: 'result.data.has_more',
         source: Object.freeze({
-          line: 71,
+          line: 49,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
@@ -10733,7 +10800,7 @@ export const RpcInspection = Object.freeze({
         expression: '"items": values',
         name: 'result.data.items',
         source: Object.freeze({
-          line: 71,
+          line: 49,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
@@ -10753,7 +10820,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 17,
+          line: 15,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'string',
@@ -10762,7 +10829,7 @@ export const RpcInspection = Object.freeze({
         expression: '"can_manage": canManage',
         name: 'result.data.can_manage',
         source: Object.freeze({
-          line: 45,
+          line: 23,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
@@ -10770,15 +10837,23 @@ export const RpcInspection = Object.freeze({
         expression: '"has_more": result.HasMore',
         name: 'result.data.has_more',
         source: Object.freeze({
-          line: 43,
+          line: 23,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
       }), Object.freeze({
-        expression: '"keyword_not_recommended": result.KeywordNotRecommended',
-        name: 'result.data.keyword_not_recommended',
+        expression: '"keyword_exists": result.KeywordExists',
+        name: 'result.data.keyword_exists',
         source: Object.freeze({
-          line: 44,
+          line: 23,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: '待核对',
+      }), Object.freeze({
+        expression: '"keyword_inactive": result.KeywordInactive',
+        name: 'result.data.keyword_inactive',
+        source: Object.freeze({
+          line: 23,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
@@ -10786,7 +10861,7 @@ export const RpcInspection = Object.freeze({
         expression: '"methods": toAnySliceString(result.Methods)',
         name: 'result.data.methods',
         source: Object.freeze({
-          line: 42,
+          line: 23,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
@@ -12468,55 +12543,6 @@ export const RpcInspection = Object.freeze({
         type: '待核对',
       })]),
     }),
-    set_payment_method_recommendation: Object.freeze({
-      emptyData: false,
-      emptyParameters: false,
-      entry: Object.freeze({
-        line: 30,
-        path: 'server/internal/service/jsonrpc_masterdata.go',
-      }),
-      parameters: Object.freeze([Object.freeze({
-        description: '解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "expected_version")`。 拒绝条件：“!valid”。',
-        expression: 'getRequiredJSONRPCNonNegativeInt(pm, "expected_version")',
-        name: 'expected_version',
-        required: '必填',
-        source: Object.freeze({
-          line: 80,
-          path: 'server/internal/service/jsonrpc_payment_method.go',
-        }),
-        type: 'integer',
-      }), Object.freeze({
-        description: '解析器 `getRequiredJSONRPCBool`；调用 `getRequiredJSONRPCBool(pm, "is_recommended")`。 拒绝条件：“!valid”。',
-        expression: 'getRequiredJSONRPCBool(pm, "is_recommended")',
-        name: 'is_recommended',
-        required: '必填',
-        source: Object.freeze({
-          line: 76,
-          path: 'server/internal/service/jsonrpc_payment_method.go',
-        }),
-        type: 'boolean',
-      }), Object.freeze({
-        description: '解析器 `getString`；调用 `getString(pm, "method")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。',
-        expression: 'getString(pm, "method")',
-        name: 'method',
-        nullable: true,
-        required: '按业务条件',
-        source: Object.freeze({
-          line: 88,
-          path: 'server/internal/service/jsonrpc_payment_method.go',
-        }),
-        type: 'string',
-      })]),
-      response: Object.freeze([Object.freeze({
-        expression: '"item": paymentMethodRecommendationToAny(*item)',
-        name: 'result.data.item',
-        source: Object.freeze({
-          line: 92,
-          path: 'server/internal/service/jsonrpc_payment_method.go',
-        }),
-        type: '待核对',
-      })]),
-    }),
     set_primary_contact: Object.freeze({
       emptyData: false,
       emptyParameters: false,
@@ -13206,6 +13232,65 @@ export const RpcInspection = Object.freeze({
         source: Object.freeze({
           line: 109,
           path: 'server/internal/service/jsonrpc_masterdata_material.go',
+        }),
+        type: '待核对',
+      })]),
+    }),
+    update_payment_method: Object.freeze({
+      emptyData: false,
+      emptyParameters: false,
+      entry: Object.freeze({
+        line: 30,
+        path: 'server/internal/service/jsonrpc_masterdata.go',
+      }),
+      parameters: Object.freeze([Object.freeze({
+        description: '解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "expected_version")`。 拒绝条件：“!valid || version <= 0”。',
+        expression: 'getRequiredJSONRPCNonNegativeInt(pm, "expected_version")',
+        name: 'expected_version',
+        required: '必填',
+        source: Object.freeze({
+          line: 65,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: 'integer',
+      }), Object.freeze({
+        description: '解析器 `getRequiredJSONRPCNonNegativeInt`；调用 `getRequiredJSONRPCNonNegativeInt(pm, "id")`。 拒绝条件：“!valid || optionID <= 0”。',
+        expression: 'getRequiredJSONRPCNonNegativeInt(pm, "id")',
+        name: 'id',
+        required: '必填',
+        source: Object.freeze({
+          line: 61,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: 'integer',
+      }), Object.freeze({
+        description: '解析器 `getRequiredJSONRPCBool`；调用 `getRequiredJSONRPCBool(pm, "is_active")`。 拒绝条件：“!valid”。',
+        expression: 'getRequiredJSONRPCBool(pm, "is_active")',
+        name: 'is_active',
+        required: '必填',
+        source: Object.freeze({
+          line: 76,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: 'boolean',
+      }), Object.freeze({
+        description: '解析器 `getString`；调用 `getString(pm, "method")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。',
+        expression: 'getString(pm, "method")',
+        name: 'method',
+        nullable: true,
+        required: '按业务条件',
+        source: Object.freeze({
+          line: 80,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: 'string',
+      })]),
+      response: Object.freeze([Object.freeze({
+        expression: '"item": paymentMethodOptionToAny(*item)',
+        name: 'result.data.item',
+        source: Object.freeze({
+          line: 87,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
       })]),

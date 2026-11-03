@@ -371,16 +371,16 @@ stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')
 
 <a id="table-payment-method-preferences"></a>
 
-## `payment_method_preferences` — 付款方式推荐设置
+## `payment_method_preferences` — 付款方式共用目录
 
 | 项目 | 说明 |
 | --- | --- |
 | Schema | `public` |
 | 分类 | Config / 配置 |
-| 用途 | 保存公司共用付款方式名称的推荐状态和并发版本。 |
-| 明确不负责 | 不替代客户、供应商与订单的付款方式字段，不保存付款周期；停止推荐不改写历史记录或打印快照。 |
-| 生命周期 / 删除语义 | 有维护权限时停止推荐或恢复；撤销同样核对最近版本，不提供业务记录删除。 |
-| 写入边界 | MasterDataUsecase.SetPaymentMethodRecommendation 校验维护权限，推荐状态与控制面审计同事务保存。 |
+| 用途 | 维护公司共用付款方式选项、启用状态、单向使用保护和并发版本。 |
+| 明确不负责 | 不替代客户、供应商或订单的付款条件快照，不保存付款周期；手输不自动发布为共用选项，目录改名与启停不改写已保存原文。 |
+| 生命周期 / 删除语义 | 新增、改名、启停和按版本撤销；仅未使用项可物理删除，已使用项保留并可停用。 |
+| 写入边界 | JSON-RPC 逐次校验 payment_method.manage；MasterDataUsecase/Repo 同事务保存目录修改与审计。客户、供应商、销售、采购及工程生成采购的受控保存事务标记使用；目录维护与首次使用串行化，删除复核业务引用。 |
 
 ### 字段
 
@@ -389,9 +389,10 @@ stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| `method` | `varchar` | `string` | 非空 | 列级唯一 | 去除首尾空格的付款方式名称，长度为 1 至 128 字符，唯一；不作为订单字段的强制枚举。 |
-| `is_recommended` | `boolean` | `bool` | 非空 | `true` | 候选推荐状态；false 时不进入推荐候选，普通录入仍可按本单输入文字。 |
-| `version` | `bigint` | `int` | 非空 | `1` | 正整数并发版本；维护和撤销均校验 expected_version。 |
+| `method` | `varchar` | `string` | 非空 | 列级唯一 | 去除首尾空格，1–128 字符；目录写入不区分大小写检查重名，数据库保持精确唯一。不是单据字段的强制枚举。 |
+| `is_recommended` | `boolean` | `bool` | 非空 | `true` | 保留原物理列，表示目录项是否启用；false 不进入候选，当前记录仍可自由输入，保存不会重新启用。 |
+| `has_been_used` | `boolean` | `bool` | 非空 | `false` | 单向使用保护，来源清空或目录改名不复位；不是当前引用数量。已使用项不可物理删除。 |
+| `version` | `bigint` | `int` | 非空 | `1` | 正整数并发版本；改名、启停、删除和撤销均校验 expected_version。 |
 | `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 

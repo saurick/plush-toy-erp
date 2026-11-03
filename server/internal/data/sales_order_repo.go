@@ -53,6 +53,9 @@ func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrde
 		return nil, err
 	}
 	defer tx.rollback(ctx, r.log)
+	if err := recordPaymentMethodUse(ctx, tx.Client, r.data.sqlDialect, in.PaymentMethod); err != nil {
+		return nil, err
+	}
 	goodsAmount, taxAmount, orderTotal, err := biz.CalculateSalesOrderAmounts(
 		in.TaxMode,
 		in.TaxRate,
@@ -109,6 +112,9 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 		return nil, err
 	}
 	defer tx.rollback(ctx, r.log)
+	if err := recordPaymentMethodUse(ctx, tx.Client, r.data.sqlDialect, in.PaymentMethod); err != nil {
+		return nil, err
+	}
 	amounts, err := salesOrderOpenItemAmounts(ctx, tx.Client, id)
 	if err != nil {
 		return nil, err
@@ -1171,6 +1177,9 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			tx.rollback(ctx, r.log)
 		}
 	}()
+	if err := recordPaymentMethodUse(ctx, tx.Client, r.data.sqlDialect, in.PaymentMethod); err != nil {
+		return nil, err
+	}
 
 	var orderRow *ent.SalesOrder
 	if id > 0 {

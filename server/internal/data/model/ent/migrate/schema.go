@@ -1854,6 +1854,7 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "method", Type: field.TypeString, Unique: true, Size: 128},
 		{Name: "is_recommended", Type: field.TypeBool, Default: true},
+		{Name: "has_been_used", Type: field.TypeBool, Default: false},
 		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},

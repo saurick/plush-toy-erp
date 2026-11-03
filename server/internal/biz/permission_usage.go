@@ -276,7 +276,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	// Master data. Method names are explicit; no permission suffix inference is used.
 	paymentMethodSurfaces := make([]PermissionUsageSurface, 0, 4)
 	for _, menuKey := range []string{"customers", "suppliers", "sales-orders", "accessories-purchase"} {
-		paymentMethodSurfaces = append(paymentMethodSurfaces, menuPermissionSurface(menuKey, "payment-conditions", "付款条件", "manage-payment-methods", "管理付款方式", permissionControlButton, "允许停止推荐、恢复和撤销推荐变更", permissionMethods("masterdata", "list_payment_method_recommendations", "set_payment_method_recommendation"), []string{"公司共用候选；只调整推荐状态，不修改业务记录或付款周期"}))
+		paymentMethodSurfaces = append(paymentMethodSurfaces, menuPermissionSurface(menuKey, "payment-conditions", "付款条件", "manage-payment-methods", "维护付款方式", permissionControlButton, "允许新增、改名、启停和删除未使用项", permissionMethods("masterdata", "list_payment_method_options", "create_payment_method", "update_payment_method", "delete_payment_method"), []string{"公司共用选项；不修改档案、订单快照或付款周期，已使用项只能停用"}))
 	}
 	add(PermissionPaymentMethodManage, paymentMethodSurfaces...)
 	addCRUD(PermissionCustomerRead, PermissionCustomerCreate, PermissionCustomerUpdate, PermissionCustomerDisable, "customers", "customers", "客户档案", "客户", "masterdata", []string{"get_customer", "list_customers"}, []string{"create_customer", "save_customer_with_contacts"}, []string{"update_customer", "save_customer_with_contacts"}, []string{"set_customer_active"})

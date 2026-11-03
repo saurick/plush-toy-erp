@@ -40,6 +40,20 @@ func (_c *PaymentMethodPreferenceCreate) SetNillableIsRecommended(v *bool) *Paym
 	return _c
 }
 
+// SetHasBeenUsed sets the "has_been_used" field.
+func (_c *PaymentMethodPreferenceCreate) SetHasBeenUsed(v bool) *PaymentMethodPreferenceCreate {
+	_c.mutation.SetHasBeenUsed(v)
+	return _c
+}
+
+// SetNillableHasBeenUsed sets the "has_been_used" field if the given value is not nil.
+func (_c *PaymentMethodPreferenceCreate) SetNillableHasBeenUsed(v *bool) *PaymentMethodPreferenceCreate {
+	if v != nil {
+		_c.SetHasBeenUsed(*v)
+	}
+	return _c
+}
+
 // SetVersion sets the "version" field.
 func (_c *PaymentMethodPreferenceCreate) SetVersion(v int) *PaymentMethodPreferenceCreate {
 	_c.mutation.SetVersion(v)
@@ -121,6 +135,10 @@ func (_c *PaymentMethodPreferenceCreate) defaults() {
 		v := paymentmethodpreference.DefaultIsRecommended
 		_c.mutation.SetIsRecommended(v)
 	}
+	if _, ok := _c.mutation.HasBeenUsed(); !ok {
+		v := paymentmethodpreference.DefaultHasBeenUsed
+		_c.mutation.SetHasBeenUsed(v)
+	}
 	if _, ok := _c.mutation.Version(); !ok {
 		v := paymentmethodpreference.DefaultVersion
 		_c.mutation.SetVersion(v)
@@ -147,6 +165,9 @@ func (_c *PaymentMethodPreferenceCreate) check() error {
 	}
 	if _, ok := _c.mutation.IsRecommended(); !ok {
 		return &ValidationError{Name: "is_recommended", err: errors.New(`ent: missing required field "PaymentMethodPreference.is_recommended"`)}
+	}
+	if _, ok := _c.mutation.HasBeenUsed(); !ok {
+		return &ValidationError{Name: "has_been_used", err: errors.New(`ent: missing required field "PaymentMethodPreference.has_been_used"`)}
 	}
 	if _, ok := _c.mutation.Version(); !ok {
 		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "PaymentMethodPreference.version"`)}
@@ -195,6 +216,10 @@ func (_c *PaymentMethodPreferenceCreate) createSpec() (*PaymentMethodPreference,
 	if value, ok := _c.mutation.IsRecommended(); ok {
 		_spec.SetField(paymentmethodpreference.FieldIsRecommended, field.TypeBool, value)
 		_node.IsRecommended = value
+	}
+	if value, ok := _c.mutation.HasBeenUsed(); ok {
+		_spec.SetField(paymentmethodpreference.FieldHasBeenUsed, field.TypeBool, value)
+		_node.HasBeenUsed = value
 	}
 	if value, ok := _c.mutation.Version(); ok {
 		_spec.SetField(paymentmethodpreference.FieldVersion, field.TypeInt, value)

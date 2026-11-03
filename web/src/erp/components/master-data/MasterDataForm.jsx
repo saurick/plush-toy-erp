@@ -4,7 +4,7 @@ import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mj
 import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
-import PaymentMethodInput from '../PaymentMethodInput.jsx'
+import { PaymentMethodField } from '../PaymentMethodInput.jsx'
 import DeliveryAddressFields from '../business-list/DeliveryAddressFields.jsx'
 import { renderProductOption } from './ProductIdentity.jsx'
 import MaterialStockFields from './MaterialStockFields.jsx'
@@ -629,13 +629,11 @@ export function MasterDataFormFields({
             <Form.Item className="erp-business-action-form__field erp-business-action-form__field--full">
               <span>付款默认值仅用于新建订单；已保存订单的付款条件保持不变。</span>
             </Form.Item>
-            <Form.Item
+            <PaymentMethodField
               className="erp-business-action-form__field"
               label={<BusinessHelpLabel label="默认付款方式" description="仅作为新建采购订单的默认值，订单保存后不再随档案变化。" />}
               name="default_payment_method"
-            >
-              <PaymentMethodInput />
-            </Form.Item>
+            />
             <Form.Item
               className="erp-business-action-form__field erp-business-action-form__field--short"
               label={<BusinessHelpLabel label="默认付款周期（天）" description="仅作为新建采购或委外订单的默认值；订单保存后不会随供应商档案变化。" />}
@@ -716,7 +714,7 @@ export function MasterDataFormFields({
             />
           </BusinessFormSection>
           <BusinessFormSection fieldLayout="adaptive" title="结算方式">
-            <Form.Item
+            <PaymentMethodField
               className="erp-business-action-form__field"
               dependencies={['default_payment_term_days']}
               label="付款方式"
@@ -729,11 +727,8 @@ export function MasterDataFormFields({
                   field: 'method',
                 }),
               ]}
-            >
-              <PaymentMethodInput
-                className="erp-customer-payment-method-suggested-input"
-              />
-            </Form.Item>
+              inputProps={{ className: 'erp-customer-payment-method-suggested-input' }}
+            />
             <Form.Item
               className="erp-business-action-form__field erp-business-action-form__field--short"
               dependencies={['default_payment_method']}

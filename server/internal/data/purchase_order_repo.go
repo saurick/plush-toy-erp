@@ -41,7 +41,16 @@ var _ biz.PurchaseOrderRejectProcessCommandRepo = (*purchaseOrderRepo)(nil)
 var _ biz.PurchaseOrderLifecycleActionRepo = (*purchaseOrderRepo)(nil)
 
 func (r *purchaseOrderRepo) CreatePurchaseOrder(ctx context.Context, in *biz.PurchaseOrderMutation) (*biz.PurchaseOrder, error) {
-	row, err := r.data.postgres.PurchaseOrder.Create().
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	if err := recordPaymentMethodUse(ctx, tx.Client(), r.data.sqlDialect, in.PaymentMethod); err != nil {
+		return nil, err
+	}
+
+	row, err := tx.PurchaseOrder.Create().
 		SetPurchaseOrderNo(in.PurchaseOrderNo).
 		SetSupplierID(in.SupplierID).
 		SetCurrency(in.Currency).
@@ -62,6 +71,10 @@ func (r *purchaseOrderRepo) CreatePurchaseOrder(ctx context.Context, in *biz.Pur
 	if err != nil {
 		return nil, err
 	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entPurchaseOrderToBiz(row), nil
 }
 
@@ -71,6 +84,9 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrder(ctx context.Context, id int, in 
 		return nil, err
 	}
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	if err := recordPaymentMethodUse(ctx, tx.Client(), r.data.sqlDialect, in.PaymentMethod); err != nil {
+		return nil, err
+	}
 	update := tx.PurchaseOrder.UpdateOneID(id).
 		SetPurchaseOrderNo(in.PurchaseOrderNo).
 		SetSupplierID(in.SupplierID).
@@ -992,6 +1008,9 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			rollbackEntTx(ctx, tx, r.log)
 		}
 	}()
+	if err := recordPaymentMethodUse(ctx, tx.Client(), r.data.sqlDialect, in.PaymentMethod); err != nil {
+		return nil, err
+	}
 
 	var orderRow *ent.PurchaseOrder
 	if id > 0 {

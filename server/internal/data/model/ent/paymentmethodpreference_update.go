@@ -28,6 +28,20 @@ func (_u *PaymentMethodPreferenceUpdate) Where(ps ...predicate.PaymentMethodPref
 	return _u
 }
 
+// SetMethod sets the "method" field.
+func (_u *PaymentMethodPreferenceUpdate) SetMethod(v string) *PaymentMethodPreferenceUpdate {
+	_u.mutation.SetMethod(v)
+	return _u
+}
+
+// SetNillableMethod sets the "method" field if the given value is not nil.
+func (_u *PaymentMethodPreferenceUpdate) SetNillableMethod(v *string) *PaymentMethodPreferenceUpdate {
+	if v != nil {
+		_u.SetMethod(*v)
+	}
+	return _u
+}
+
 // SetIsRecommended sets the "is_recommended" field.
 func (_u *PaymentMethodPreferenceUpdate) SetIsRecommended(v bool) *PaymentMethodPreferenceUpdate {
 	_u.mutation.SetIsRecommended(v)
@@ -38,6 +52,20 @@ func (_u *PaymentMethodPreferenceUpdate) SetIsRecommended(v bool) *PaymentMethod
 func (_u *PaymentMethodPreferenceUpdate) SetNillableIsRecommended(v *bool) *PaymentMethodPreferenceUpdate {
 	if v != nil {
 		_u.SetIsRecommended(*v)
+	}
+	return _u
+}
+
+// SetHasBeenUsed sets the "has_been_used" field.
+func (_u *PaymentMethodPreferenceUpdate) SetHasBeenUsed(v bool) *PaymentMethodPreferenceUpdate {
+	_u.mutation.SetHasBeenUsed(v)
+	return _u
+}
+
+// SetNillableHasBeenUsed sets the "has_been_used" field if the given value is not nil.
+func (_u *PaymentMethodPreferenceUpdate) SetNillableHasBeenUsed(v *bool) *PaymentMethodPreferenceUpdate {
+	if v != nil {
+		_u.SetHasBeenUsed(*v)
 	}
 	return _u
 }
@@ -112,6 +140,11 @@ func (_u *PaymentMethodPreferenceUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *PaymentMethodPreferenceUpdate) check() error {
+	if v, ok := _u.mutation.Method(); ok {
+		if err := paymentmethodpreference.MethodValidator(v); err != nil {
+			return &ValidationError{Name: "method", err: fmt.Errorf(`ent: validator failed for field "PaymentMethodPreference.method": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Version(); ok {
 		if err := paymentmethodpreference.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "PaymentMethodPreference.version": %w`, err)}
@@ -132,8 +165,14 @@ func (_u *PaymentMethodPreferenceUpdate) sqlSave(ctx context.Context) (_node int
 			}
 		}
 	}
+	if value, ok := _u.mutation.Method(); ok {
+		_spec.SetField(paymentmethodpreference.FieldMethod, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.IsRecommended(); ok {
 		_spec.SetField(paymentmethodpreference.FieldIsRecommended, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.HasBeenUsed(); ok {
+		_spec.SetField(paymentmethodpreference.FieldHasBeenUsed, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Version(); ok {
 		_spec.SetField(paymentmethodpreference.FieldVersion, field.TypeInt, value)
@@ -164,6 +203,20 @@ type PaymentMethodPreferenceUpdateOne struct {
 	mutation *PaymentMethodPreferenceMutation
 }
 
+// SetMethod sets the "method" field.
+func (_u *PaymentMethodPreferenceUpdateOne) SetMethod(v string) *PaymentMethodPreferenceUpdateOne {
+	_u.mutation.SetMethod(v)
+	return _u
+}
+
+// SetNillableMethod sets the "method" field if the given value is not nil.
+func (_u *PaymentMethodPreferenceUpdateOne) SetNillableMethod(v *string) *PaymentMethodPreferenceUpdateOne {
+	if v != nil {
+		_u.SetMethod(*v)
+	}
+	return _u
+}
+
 // SetIsRecommended sets the "is_recommended" field.
 func (_u *PaymentMethodPreferenceUpdateOne) SetIsRecommended(v bool) *PaymentMethodPreferenceUpdateOne {
 	_u.mutation.SetIsRecommended(v)
@@ -174,6 +227,20 @@ func (_u *PaymentMethodPreferenceUpdateOne) SetIsRecommended(v bool) *PaymentMet
 func (_u *PaymentMethodPreferenceUpdateOne) SetNillableIsRecommended(v *bool) *PaymentMethodPreferenceUpdateOne {
 	if v != nil {
 		_u.SetIsRecommended(*v)
+	}
+	return _u
+}
+
+// SetHasBeenUsed sets the "has_been_used" field.
+func (_u *PaymentMethodPreferenceUpdateOne) SetHasBeenUsed(v bool) *PaymentMethodPreferenceUpdateOne {
+	_u.mutation.SetHasBeenUsed(v)
+	return _u
+}
+
+// SetNillableHasBeenUsed sets the "has_been_used" field if the given value is not nil.
+func (_u *PaymentMethodPreferenceUpdateOne) SetNillableHasBeenUsed(v *bool) *PaymentMethodPreferenceUpdateOne {
+	if v != nil {
+		_u.SetHasBeenUsed(*v)
 	}
 	return _u
 }
@@ -261,6 +328,11 @@ func (_u *PaymentMethodPreferenceUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *PaymentMethodPreferenceUpdateOne) check() error {
+	if v, ok := _u.mutation.Method(); ok {
+		if err := paymentmethodpreference.MethodValidator(v); err != nil {
+			return &ValidationError{Name: "method", err: fmt.Errorf(`ent: validator failed for field "PaymentMethodPreference.method": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Version(); ok {
 		if err := paymentmethodpreference.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "PaymentMethodPreference.version": %w`, err)}
@@ -298,8 +370,14 @@ func (_u *PaymentMethodPreferenceUpdateOne) sqlSave(ctx context.Context) (_node 
 			}
 		}
 	}
+	if value, ok := _u.mutation.Method(); ok {
+		_spec.SetField(paymentmethodpreference.FieldMethod, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.IsRecommended(); ok {
 		_spec.SetField(paymentmethodpreference.FieldIsRecommended, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.HasBeenUsed(); ok {
+		_spec.SetField(paymentmethodpreference.FieldHasBeenUsed, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Version(); ok {
 		_spec.SetField(paymentmethodpreference.FieldVersion, field.TypeInt, value)

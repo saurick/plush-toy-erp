@@ -208,7 +208,7 @@ export async function installMasterDataRpcMocks(page, context) {
     let data = {}
     switch (method) {
       case 'list_payment_methods':
-        data = { methods: ['银行转账', '现金', '银行承兑'].filter((value) => value.includes(String(params.keyword || '').trim())), has_more: false, keyword_not_recommended: false, can_manage: false }
+        data = { methods: ['银行转账', '现金', '银行承兑'].filter((value) => value.includes(String(params.keyword || '').trim())), has_more: false, keyword_exists: false, keyword_inactive: false, can_manage: false }
         break
       case 'list_customers':
         data = stylePaginatedMasterData([customer], 'customers', params)

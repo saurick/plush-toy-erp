@@ -27,7 +27,7 @@ func (d *jsonrpcDispatcher) handleMasterData(
 	}
 
 	switch method {
-	case "list_payment_methods", "list_payment_method_recommendations", "set_payment_method_recommendation":
+	case "list_payment_methods", "list_payment_method_options", "create_payment_method", "update_payment_method", "delete_payment_method":
 		return d.handlePaymentMethodSuggestions(ctx, method, id, pm)
 	case "save_customer_with_contacts",
 		"create_customer",

@@ -103,8 +103,12 @@ func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *
 	}
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrPaymentMethodExists):
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "已有同名付款方式，请选用已有项目"}
+	case errors.Is(err, biz.ErrPaymentMethodInUse):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该付款方式已被使用，可以停用，不能删除"}
 	case errors.Is(err, biz.ErrPaymentMethodVersionConflict):
-		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "付款方式推荐状态已变化，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "付款方式已被其他操作更新，请刷新后重试"}
 	case errors.Is(err, biz.ErrPaymentMethodNotFound):
 		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "付款方式候选不存在，请刷新后重试"}
 	case errors.Is(err, biz.ErrDataScopeForbidden):

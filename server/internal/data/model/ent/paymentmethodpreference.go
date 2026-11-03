@@ -21,6 +21,8 @@ type PaymentMethodPreference struct {
 	Method string `json:"method,omitempty"`
 	// IsRecommended holds the value of the "is_recommended" field.
 	IsRecommended bool `json:"is_recommended,omitempty"`
+	// HasBeenUsed holds the value of the "has_been_used" field.
+	HasBeenUsed bool `json:"has_been_used,omitempty"`
 	// Version holds the value of the "version" field.
 	Version int `json:"version,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -35,7 +37,7 @@ func (*PaymentMethodPreference) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case paymentmethodpreference.FieldIsRecommended:
+		case paymentmethodpreference.FieldIsRecommended, paymentmethodpreference.FieldHasBeenUsed:
 			values[i] = new(sql.NullBool)
 		case paymentmethodpreference.FieldID, paymentmethodpreference.FieldVersion:
 			values[i] = new(sql.NullInt64)
@@ -75,6 +77,12 @@ func (_m *PaymentMethodPreference) assignValues(columns []string, values []any) 
 				return fmt.Errorf("unexpected type %T for field is_recommended", values[i])
 			} else if value.Valid {
 				_m.IsRecommended = value.Bool
+			}
+		case paymentmethodpreference.FieldHasBeenUsed:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field has_been_used", values[i])
+			} else if value.Valid {
+				_m.HasBeenUsed = value.Bool
 			}
 		case paymentmethodpreference.FieldVersion:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -135,6 +143,9 @@ func (_m *PaymentMethodPreference) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("is_recommended=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsRecommended))
+	builder.WriteString(", ")
+	builder.WriteString("has_been_used=")
+	builder.WriteString(fmt.Sprintf("%v", _m.HasBeenUsed))
 	builder.WriteString(", ")
 	builder.WriteString("version=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Version))

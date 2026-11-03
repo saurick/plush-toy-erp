@@ -21,7 +21,7 @@ import {
   deriveSalesOrderItemAmount,
 } from '../../utils/sourceOrderAmounts.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
-import PaymentMethodInput from '../PaymentMethodInput.jsx'
+import { PaymentMethodField } from '../PaymentMethodInput.jsx'
 import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTable.jsx'
 import SalesOrderSourceEvidence from './SalesOrderSourceEvidence.jsx'
 import SalesOrderSourcePaymentSection from './SalesOrderSourcePaymentSection.jsx'
@@ -431,7 +431,7 @@ export function SalesOrderFormFields({
         />
       </BusinessFormSection>
       <BusinessFormSection fieldLayout="adaptive" title="结算与报价">
-        <Form.Item
+        <PaymentMethodField
           className="erp-business-action-form__field"
           dependencies={['payment_term_days']}
           label="付款方式"
@@ -444,9 +444,8 @@ export function SalesOrderFormFields({
               field: 'method',
             }),
           ]}
-        >
-          <PaymentMethodInput onBlur={onPaymentConditionBlur} />
-        </Form.Item>
+          inputProps={{ onBlur: onPaymentConditionBlur }}
+        />
         <Form.Item
           className="erp-business-action-form__field erp-business-action-form__field--short"
           dependencies={['payment_method']}

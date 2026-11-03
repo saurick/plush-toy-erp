@@ -310,8 +310,10 @@ type ProductSKUFilter struct {
 
 type MasterDataRepo interface {
 	ListPaymentMethods(ctx context.Context, filter PaymentMethodFilter) (PaymentMethodSuggestions, error)
-	ListPaymentMethodRecommendations(ctx context.Context, filter PaymentMethodRecommendationFilter) ([]PaymentMethodRecommendation, bool, error)
-	SetPaymentMethodRecommendation(ctx context.Context, change PaymentMethodRecommendationChange, audit *RuntimeAuditEventCreate) (*PaymentMethodRecommendation, error)
+	ListPaymentMethodOptions(ctx context.Context, filter PaymentMethodOptionFilter) ([]PaymentMethodOption, bool, error)
+	CreatePaymentMethod(ctx context.Context, method string, audit *RuntimeAuditEventCreate) (*PaymentMethodOption, error)
+	UpdatePaymentMethod(ctx context.Context, change PaymentMethodOptionChange, audit *RuntimeAuditEventCreate) (*PaymentMethodOption, error)
+	DeletePaymentMethod(ctx context.Context, id, version int, audit *RuntimeAuditEventCreate) error
 	CreateCustomer(ctx context.Context, in *CustomerMutation) (*Customer, error)
 	UpdateCustomer(ctx context.Context, id int, in *CustomerMutation) (*Customer, error)
 	SaveCustomerWithContacts(ctx context.Context, id int, in *CustomerMutation, contacts []*ContactSaveMutation) (*CustomerWithContacts, error)

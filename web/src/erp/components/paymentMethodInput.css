@@ -1,13 +1,47 @@
+.erp-payment-method-field__label {
+  width: 100%;
+  margin-bottom: var(--erp-form-label-gap, 5px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-payment-method-field__label > span,
+.erp-payment-method-manager__identity,
+.erp-payment-method-manager__notice > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-payment-method-manager__notice > .ant-btn {
+  flex: none;
+}
+
+/* Keep the label's text baseline while retaining the standard button hit box. */
+.erp-payment-method-field__action {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 0;
+}
+
+@media (pointer: coarse) {
+  .erp-payment-method-field__action {
+    min-height: 44px;
+  }
+}
+
 .erp-payment-method-input {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
   width: 100%;
   min-width: 0;
 }
 
 .erp-payment-method-input__control {
-  flex: 1;
+  width: 100%;
   min-width: 0;
 }
 
@@ -18,9 +52,29 @@
   overflow-wrap: anywhere;
 }
 
-.erp-payment-method-manager__search,
+.erp-payment-method-input__feedback,
+.erp-payment-method-input__popup-actions {
+  display: flex;
+  padding: 8px 12px;
+}
+
+.erp-payment-method-input__popup-actions .ant-btn {
+  white-space: normal;
+  height: auto;
+  overflow-wrap: anywhere;
+}
+
+.erp-payment-method-input__error,
+.erp-payment-method-input__rename {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .erp-payment-method-manager__notice,
-.erp-payment-method-manager__row {
+.erp-payment-method-manager__row,
+.erp-payment-method-manager__identity,
+.erp-payment-method-manager__footer,
+.erp-payment-method-quick-create__label {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -29,32 +83,38 @@
 
 .erp-payment-method-manager__search,
 .erp-payment-method-manager__notice {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
-.erp-payment-method-manager__search > .ant-input-affix-wrapper {
+.erp-payment-method-manager__editor-field {
   flex: 1;
   min-width: 0;
 }
 
-.erp-payment-method-manager__list {
-  max-height: min(50dvh, 440px);
-  overflow-y: auto;
+.erp-payment-method-manager__row > .ant-space,
+.erp-payment-method-manager__pager,
+.erp-payment-method-manager__page,
+.erp-payment-method-manager__usage {
+  flex: none;
 }
 
-.erp-payment-method-manager__row {
-  padding-block: 8px;
+.erp-payment-method-manager__identity {
+  justify-content: flex-start;
+  gap: 8px;
 }
 
-.erp-payment-method-manager__name,
-.erp-payment-method-manager__notice > span {
+.erp-payment-method-manager__name {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.erp-payment-method-manager__row > .ant-btn,
-.erp-payment-method-manager__notice > .ant-btn {
-  flex: none;
+.erp-payment-method-manager__row {
+  padding-block: 8px;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.erp-payment-method-manager__row--editing {
+  padding-bottom: 12px;
 }
 
 .erp-payment-method-manager__loading {
@@ -63,18 +123,36 @@
   padding: 16px;
 }
 
-@media (max-width: 640px) {
-  .erp-payment-method-input__control {
-    flex-basis: 180px;
+.erp-payment-method-manager__footer {
+  flex-wrap: wrap;
+  text-align: start;
+  gap: 8px;
+}
+
+.erp-payment-method-manager__hint {
+  flex: 1 1 200px;
+}
+
+.erp-payment-method-manager__pager {
+  margin-inline-end: auto;
+}
+
+.erp-payment-method-quick-create__label {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 520px) {
+  .erp-payment-method-manager__row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
-}
 
-.erp-payment-method-input__feedback {
-  display: flex;
-  padding: 8px 12px;
-}
+  .erp-payment-method-manager__row > .ant-space {
+    align-self: flex-end;
+  }
 
-.erp-payment-method-input__error {
-  display: flex;
-  flex-basis: 100%;
+  .erp-payment-method-manager__editor-field {
+    width: 100%;
+  }
 }

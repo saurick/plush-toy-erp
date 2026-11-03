@@ -50,6 +50,7 @@ import {
   normalizeContactRows,
 } from '../components/master-data/MasterDataForm.jsx'
 import ProductRecordEditor from '../components/master-data/ProductRecordEditor.jsx'
+import { PaymentMethodEntry } from '../components/PaymentMethodInput.jsx'
 import {
   listContactsByOwner,
   listAllProcesses,
@@ -976,6 +977,7 @@ export default function MasterDataPage({ type }) {
         }
         actions={
           <Space wrap>
+            {['customers', 'suppliers'].includes(effectiveType) ? <PaymentMethodEntry /> : null}
             <BusinessListToolbarActions
               onExport={exportRecords}
               exportDisabled={loading || exporting || total === 0}

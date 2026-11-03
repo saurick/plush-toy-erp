@@ -22,6 +22,7 @@
 | 产品图片图集 | `business-list/BusinessProductGallery.jsx`、`BusinessDocumentProductGallery.jsx` | 单据列表以主图缩略图和去重款数打开全部关联产品；单品身份共用主图 / 辅图切换、缩放、失败重试和关闭恢复。批量摘要仅支持正式关联，物料和未关联需求不借图 |
 | 业务日期输入和范围筛选 | [`business-list/BusinessDateInputs.jsx`](business-list/BusinessDateInputs.jsx) | `DateInput`、`DateTimeInput`、`DateRangeFilter` 共用格式与范围约束；`InheritedDateInput` 供销售、采购、委外明细显示整单交期，单独改期后保存行值，清空恢复沿用。采购优先沿用供应商确认日期 |
 | 主数据和源单据   | `master-data/*`、`sales-orders/*`、`purchase-orders/*`、`outsourcing-orders/*` | 领域列配置、表单、业务动作面板和来源生成入口                   |
+| 付款方式录入与目录维护 | [`PaymentMethodInput.jsx`](PaymentMethodInput.jsx)、[`PaymentMethodManager.jsx`](PaymentMethodManager.jsx) | `PaymentMethodField` 供四类表单选择、手输及标签行维护入口；`PaymentMethodEntry` 供基础资料列表集中维护。下拉快捷新增使用小窗口并直接返回；维护窗口行内新增 / 改名，按状态保留搜索与页码，每页只挂载 20 项，固定底部翻页与返回。支持启停、撤销及删除未使用项，返回保留草稿；历史快照和付款周期独立 |
 | 委外明细办理 | [`outsourcing-orders/OutsourcingOrderHandlingItems.jsx`](outsourcing-orders/OutsourcingOrderHandlingItems.jsx) | 合同的整页“办理明细”和手机任务共用明细读取、完整性检查、取消及重试；详情字段只展示信息，办理字段按原权限和状态追加动作 |
 | 事实和质量       | `operational-facts/*`、`quality-inspections/*`、`shipments/*`                  | Operational Fact、质检、出货相关展示和表单入口                 |
 | 库存台账 | `inventory/inventoryLedgerPresentation.jsx`、`useInventoryReferences.js` | 列配置和只读显示规则、按有效权限读取参考资料；页面管理筛选、选择和业务动作 |

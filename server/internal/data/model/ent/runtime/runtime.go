@@ -3434,18 +3434,22 @@ func init() {
 	paymentmethodpreferenceDescIsRecommended := paymentmethodpreferenceFields[1].Descriptor()
 	// paymentmethodpreference.DefaultIsRecommended holds the default value on creation for the is_recommended field.
 	paymentmethodpreference.DefaultIsRecommended = paymentmethodpreferenceDescIsRecommended.Default.(bool)
+	// paymentmethodpreferenceDescHasBeenUsed is the schema descriptor for has_been_used field.
+	paymentmethodpreferenceDescHasBeenUsed := paymentmethodpreferenceFields[2].Descriptor()
+	// paymentmethodpreference.DefaultHasBeenUsed holds the default value on creation for the has_been_used field.
+	paymentmethodpreference.DefaultHasBeenUsed = paymentmethodpreferenceDescHasBeenUsed.Default.(bool)
 	// paymentmethodpreferenceDescVersion is the schema descriptor for version field.
-	paymentmethodpreferenceDescVersion := paymentmethodpreferenceFields[2].Descriptor()
+	paymentmethodpreferenceDescVersion := paymentmethodpreferenceFields[3].Descriptor()
 	// paymentmethodpreference.DefaultVersion holds the default value on creation for the version field.
 	paymentmethodpreference.DefaultVersion = paymentmethodpreferenceDescVersion.Default.(int)
 	// paymentmethodpreference.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	paymentmethodpreference.VersionValidator = paymentmethodpreferenceDescVersion.Validators[0].(func(int) error)
 	// paymentmethodpreferenceDescCreatedAt is the schema descriptor for created_at field.
-	paymentmethodpreferenceDescCreatedAt := paymentmethodpreferenceFields[3].Descriptor()
+	paymentmethodpreferenceDescCreatedAt := paymentmethodpreferenceFields[4].Descriptor()
 	// paymentmethodpreference.DefaultCreatedAt holds the default value on creation for the created_at field.
 	paymentmethodpreference.DefaultCreatedAt = paymentmethodpreferenceDescCreatedAt.Default.(func() time.Time)
 	// paymentmethodpreferenceDescUpdatedAt is the schema descriptor for updated_at field.
-	paymentmethodpreferenceDescUpdatedAt := paymentmethodpreferenceFields[4].Descriptor()
+	paymentmethodpreferenceDescUpdatedAt := paymentmethodpreferenceFields[5].Descriptor()
 	// paymentmethodpreference.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	paymentmethodpreference.DefaultUpdatedAt = paymentmethodpreferenceDescUpdatedAt.Default.(func() time.Time)
 	// paymentmethodpreference.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

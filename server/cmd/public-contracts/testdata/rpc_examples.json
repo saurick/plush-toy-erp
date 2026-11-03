@@ -13807,6 +13807,23 @@
     },
     "test": "TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit"
   },
+  "masterdata.create_payment_method": {
+    "basis": "handler-fixture",
+    "data": {
+      "item": {
+        "has_been_used": false,
+        "id": 1,
+        "is_active": true,
+        "method": "aa",
+        "version": 1
+      }
+    },
+    "message": "OK",
+    "params": {
+      "method": "aa"
+    },
+    "test": "TestJSONRPCPaymentMethodManagementPermissionAndContract"
+  },
   "masterdata.create_process": {
     "basis": "handler-fixture",
     "data": {
@@ -13956,6 +13973,18 @@
       "type": "MAIN_MATERIAL"
     },
     "test": "TestWarehouseMasterDataPermissionsAndMaterialReferenceBoundary"
+  },
+  "masterdata.delete_payment_method": {
+    "basis": "handler-fixture",
+    "data": {
+      "deleted_id": 1
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "id": 1
+    },
+    "test": "TestJSONRPCPaymentMethodManagementPermissionAndContract"
   },
   "masterdata.disable_contact": {
     "basis": "backend-wire-shape",
@@ -14285,13 +14314,15 @@
     },
     "test": "TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules"
   },
-  "masterdata.list_payment_method_recommendations": {
+  "masterdata.list_payment_method_options": {
     "basis": "handler-fixture",
     "data": {
       "has_more": false,
       "items": [
         {
-          "is_recommended": false,
+          "has_been_used": false,
+          "id": 1,
+          "is_active": true,
           "method": "aa",
           "version": 1
         }
@@ -14299,7 +14330,7 @@
     },
     "message": "OK",
     "params": {
-      "is_recommended": false,
+      "is_active": true,
       "keyword": "aa",
       "limit": 50,
       "offset": 0
@@ -14311,7 +14342,8 @@
     "data": {
       "can_manage": false,
       "has_more": false,
-      "keyword_not_recommended": false,
+      "keyword_exists": false,
+      "keyword_inactive": false,
       "methods": [
         "银行转账"
       ]
@@ -14320,7 +14352,7 @@
     "params": {
       "keyword": ""
     },
-    "test": "TestJSONRPCPaymentMethodSuggestions"
+    "test": "TestJSONRPCPaymentMethodSuggestionsReturnsAuthoritativeManagementAccess"
   },
   "masterdata.list_processes": {
     "basis": "handler-fixture",
@@ -14650,23 +14682,6 @@
       "id": 2
     }
   },
-  "masterdata.set_payment_method_recommendation": {
-    "basis": "handler-fixture",
-    "data": {
-      "item": {
-        "is_recommended": false,
-        "method": "aa",
-        "version": 1
-      }
-    },
-    "message": "OK",
-    "params": {
-      "expected_version": 0,
-      "is_recommended": false,
-      "method": "aa"
-    },
-    "test": "TestJSONRPCPaymentMethodManagementPermissionAndContract"
-  },
   "masterdata.set_primary_contact": {
     "basis": "backend-wire-shape",
     "data": {
@@ -14880,6 +14895,26 @@
       "id": 2,
       "name": "示例名称"
     }
+  },
+  "masterdata.update_payment_method": {
+    "basis": "handler-fixture",
+    "data": {
+      "item": {
+        "has_been_used": false,
+        "id": 1,
+        "is_active": false,
+        "method": "aa",
+        "version": 2
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "id": 1,
+      "is_active": false,
+      "method": "aa"
+    },
+    "test": "TestJSONRPCPaymentMethodManagementPermissionAndContract"
   },
   "masterdata.update_process": {
     "basis": "handler-fixture",
