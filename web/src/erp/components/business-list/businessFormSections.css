@@ -41,6 +41,7 @@
 }
 
 .erp-business-form-section {
+  --erp-form-section-radius: 6px;
   --erp-line-items-section-border-width: 0px;
   --erp-line-items-section-padding: 0;
   --erp-sales-order-lines-bg: transparent;
@@ -49,7 +50,7 @@
   min-width: 0;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--erp-form-section-radius);
   scroll-margin-top: 12px;
 }
 
@@ -59,10 +60,10 @@
 }
 
 .erp-business-form-section > .erp-business-form-heading,
-.erp-business-form-section[data-heading='inline'] .erp-business-form-heading {
-  /* 6px 外圆角减去 1px 边框，让标题色带沿边框内沿绘制。 */
-  border-start-start-radius: 5px;
-  border-start-end-radius: 5px;
+.erp-business-form-section[data-heading='inline'] :is(.erp-business-form-heading, .erp-line-editor__heading) {
+  /* 贴边标题沿分区边框内沿绘制，保留正文溢出供字段焦点和吸顶工具栏使用。 */
+  border-start-start-radius: calc(var(--erp-form-section-radius) - 1px);
+  border-start-end-radius: calc(var(--erp-form-section-radius) - 1px);
   border-end-start-radius: 0;
   border-end-end-radius: 0;
 }

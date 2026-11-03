@@ -4,22 +4,26 @@ import { chooseSelectOption } from './selectControlActions.mjs'
 import { assertCurrentBusinessSection } from './businessFormSectionAssertions.mjs'
 import { parseRgb } from './colorAssertions.mjs'
 
+const sectionHeading = '.erp-business-form-heading, .erp-line-editor__heading[data-line-items-title="true"]'
+
 async function inspectSectionEdge(section, edge) {
   await section.evaluate((node, side) => node.scrollIntoView({ block: side, inline: 'nearest', behavior: 'instant' }), edge)
   await waitForFiniteAnimations(section.page())
   // 滚动会按阅读位置切换分区；重新聚焦被检查的分区，且不改变边缘位置。
   await section.evaluate((node) => { node.blur(); node.focus({ preventScroll: true }) })
   await section.page().waitForFunction((node) => node.dataset.currentFormSection === 'true', await section.elementHandle())
-  return section.evaluate((node, side) => {
+  return section.evaluate((node, { side, headingSelector }) => {
     const rect = node.getBoundingClientRect()
     const style = getComputedStyle(node)
-    const heading = node.querySelector('.erp-business-form-heading')
+    const heading = node.querySelector(headingSelector)
     const headingStyle = heading && getComputedStyle(heading)
     const headingRect = heading?.getBoundingClientRect()
     const clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight }
     for (let parent = node.parentElement; parent; parent = parent.parentElement) {
       const bounds = parent.getBoundingClientRect()
       const parentStyle = getComputedStyle(parent)
+      // display: contents 不生成裁剪盒，不能把它的零尺寸当作可视边界。
+      if (parentStyle.display === 'contents') continue
       if (/(auto|scroll|hidden|clip)/u.test(parentStyle.overflowX)) {
         clip.left = Math.max(clip.left, bounds.left + parent.clientLeft)
         clip.right = Math.min(clip.right, bounds.left + parent.clientLeft + parent.clientWidth)
@@ -32,9 +36,11 @@ async function inspectSectionEdge(section, edge) {
     const inset = 1.25
     const y = side === 'start' ? rect.top + inset : rect.bottom - inset
     const corners = [rect.left + inset, rect.right - inset].map((x) => {
-      const hit = document.elementFromPoint(x, y)
+      const hits = document.elementsFromPoint(x, y)
+      const hit = hits[0]
       const paintedLayers = []
-      for (let layer = hit; layer && layer !== node && node.contains(layer); layer = layer.parentElement) {
+      // 透明后代可以溢出圆角；只检查实际命中的背景层，不把未覆盖采样点的祖先计入。
+      for (const layer of hits.filter((candidate) => candidate !== node && node.contains(candidate))) {
         const paint = getComputedStyle(layer)
         if (!['transparent', 'rgba(0, 0, 0, 0)'].includes(paint.backgroundColor) || paint.backgroundImage !== 'none') {
           paintedLayers.push({ className: layer.className, background: paint.backgroundColor, image: paint.backgroundImage })
@@ -55,6 +61,7 @@ async function inspectSectionEdge(section, edge) {
       radii: [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomRightRadius, style.borderBottomLeftRadius],
       background: style.backgroundColor,
       heading: headingRect ? {
+        className: heading.className,
         topInset: headingRect.top - rect.top,
         leftInset: headingRect.left - rect.left,
         rightInset: rect.right - headingRect.right,
@@ -62,7 +69,7 @@ async function inspectSectionEdge(section, edge) {
         background: headingStyle.backgroundColor,
       } : null,
     }
-  }, edge)
+  }, { side: edge, headingSelector: sectionHeading })
 }
 
 export async function assertBusinessFormCorners(page, editor) {
@@ -74,11 +81,11 @@ export async function assertBusinessFormCorners(page, editor) {
     const section = editor.locator(`[id=${JSON.stringify(id)}]`)
     const nav = editor.getByRole('navigation', { name: '表单分区' })
     if (!(await section.isVisible())) {
-      const button = nav.locator(`button[aria-controls=${JSON.stringify(id)}]`)
+      const button = nav.locator(`button[aria-controls=${JSON.stringify(id)}]`).filter({ visible: true })
       if (await button.isVisible()) await button.click()
       else await chooseSelectOption(nav.getByRole('combobox'), id)
     }
-    await section.locator('.erp-business-form-heading').first()
+    await section.locator(sectionHeading).first()
       .locator('.erp-business-action-form__section-title-text, h2, strong[role="heading"]').first()
       .click()
     await assertCurrentBusinessSection(page, editor, title)

@@ -10,21 +10,38 @@ const views = [
 ]
 
 export function createBusinessFormCornerScenarios(deps, documents, modeScenarios) {
-  return documents.flatMap(([key]) => {
+  return documents.flatMap(([key, , triggerName]) => {
     const mode = modeScenarios.some((entry) => entry.name === `business-form-mode-${key}-edit`) ? 'edit' : 'view'
     const source = modeScenarios.find((entry) => entry.name === `business-form-mode-${key}-${mode}`)
-    return views.map(({ suffix, ...appearance }) => ({
-      ...source,
-      ...appearance,
-      name: `business-form-corners-${key}-${suffix}`,
-      verify: async (page) => {
-        const editor = await openBusinessFormModeEditor(page, key, mode)
-        const evidence = await assertBusinessFormCorners(page, editor)
-        const name = `business-form-corners-${key}-${suffix}`
-        await deps.assertNoHorizontalOverflow(page, name)
-        await writeFile(`${deps.outputDir}/${name}.json`, JSON.stringify({ key, mode, ...appearance, ...evidence }, null, 2))
-        await page.screenshot({ path: `${deps.outputDir}/${name}.png`, fullPage: true })
-      },
+    const modes = ['sales', 'purchase', 'outsourcing', 'shipment'].includes(key) ? [mode, 'create'] : [mode]
+    return modes.flatMap((editorMode) => views.map(({ suffix, ...appearance }) => {
+      const name = `business-form-corners-${key}${editorMode === 'create' ? '-create' : ''}-${suffix}`
+      return {
+        ...source,
+        ...appearance,
+        name,
+        verify: async (page) => {
+          let editor
+          if (editorMode === 'create') {
+            await page.getByRole('button', { name: triggerName }).click()
+            editor = page.locator('.erp-business-form-page:not([hidden])')
+            await editor.waitFor()
+          } else {
+            editor = await openBusinessFormModeEditor(page, key, mode)
+          }
+          const evidence = await assertBusinessFormCorners(page, editor)
+          if (editorMode === 'create') {
+            await editor.getByRole('radio', { name: '页签', exact: true }).locator('..').click()
+            await editor.getByRole('tablist', { name: '表单页签', exact: true }).waitFor()
+            evidence.tabbed = await assertBusinessFormCorners(page, editor)
+            const detail = evidence.sections.find(({ edges }) => edges[0]?.mode === 'inline')
+            if (detail) await editor.getByRole('tab', { name: detail.title, exact: true }).click()
+          }
+          await deps.assertNoHorizontalOverflow(page, name)
+          await writeFile(`${deps.outputDir}/${name}.json`, JSON.stringify({ key, mode: editorMode, ...appearance, ...evidence }, null, 2))
+          await page.screenshot({ path: `${deps.outputDir}/${name}.png`, fullPage: true })
+        },
+      }
     }))
   })
 }

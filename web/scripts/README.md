@@ -60,7 +60,7 @@ pnpm preview:yoyoosun
 
 `STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归；`STYLE_L1_SCENARIO_MAX_ATTEMPTS` 只接受 `1` 或 `2`，CI 固定为一次；`STYLE_L1_OUTPUT_DIR` 只接受仓库 `output/` 下的受管目录。
 
-`business-form-corners-<module>-desktop|mobile|dark|mobile-dark` 沿用现有编辑或只读入口，逐个选择分区并检查四角、边框、标题内圆角与祖先裁切，同时保留背景、输入焦点和草稿状态。桌面使用 1920×1080、DPR 2，手机使用 390×844、DPR 2；截图与分区几何证据保存到同一受管输出目录。完整模块和场景名以 `businessFormCornerScenarios.mjs` 与现有表单注册为准，平铺短表单不会为检查强行增加分区。
+`business-form-corners-<module>-desktop|mobile|dark|mobile-dark` 沿用现有编辑或只读入口，逐个选择分区并检查四角、边框、标题内圆角与祖先裁切，同时保留背景、输入焦点和草稿状态。销售、采购、加工合同与出货另有 `business-form-corners-<module>-create-<appearance>`，覆盖新建空明细及目录 / 页签两种显示；普通标题带与明细编辑器标题均参与实际叠层检查，`display: contents` 因不生成布局盒不计作祖先裁切。桌面使用 1920×1080、DPR 2，手机使用 390×844、DPR 2；截图与分区几何证据保存到同一受管输出目录。完整模块和场景名以 `businessFormCornerScenarios.mjs` 与现有表单注册为准，平铺短表单不会为检查强行增加分区。
 
 默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
 
