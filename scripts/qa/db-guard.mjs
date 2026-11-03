@@ -961,17 +961,26 @@ function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
     );
   }
   const requirements = [];
-  const allPhysicalTokens = [
-    ...new Set([...tokenOperations.values()].map(({ token }) => token)),
-  ].sort();
-
   if (newlyAdded) {
     requirements.push({
       operation: "create-table",
       kind: "table",
-      tokens: [table, ...allPhysicalTokens],
+      tokens: [table],
       detail: "new Ent schema",
     });
+    // An uncommitted schema may already have a versioned CREATE followed by
+    // additive migrations. Prove each field/check independently across that
+    // chain; a table CREATE is still mandatory and data statements prove none.
+    for (const { token, kind } of [...tokenOperations.values()].sort((a, b) =>
+      a.token.localeCompare(b.token),
+    )) {
+      requirements.push({
+        operation: "create-or-add",
+        kind,
+        tokens: [table, token],
+        detail: `new schema ${kind} ${token}`,
+      });
+    }
     return requirements;
   }
   if (deleted) {
@@ -1302,6 +1311,9 @@ function containsSqlIdentifier(source, identifier) {
 }
 
 function matchesDdlOperation(statement, { operation, kind }) {
+  if (operation === "create-or-add")
+    return matchesDdlOperation(statement, { operation: "create-table", kind }) ||
+      matchesDdlOperation(statement, { operation: "add", kind });
   if (operation === "create-table")
     return /\bcreate\s+table\b/u.test(statement);
   if (operation === "drop-table") return /\bdrop\s+table\b/u.test(statement);

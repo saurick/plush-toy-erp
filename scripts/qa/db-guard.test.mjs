@@ -1399,3 +1399,37 @@ test("db guard retains new composite index proof without treating adjacent uncha
     assert(changed.proofs[0].missingTokens.includes("name"), "a real uniqueness change still requires DDL");
   });
 });
+
+test("db guard proves an uncommitted new schema across CREATE and additive migrations without accepting missing DDL", async () => {
+  await withRepository(async (root) => {
+    await write(root, "server/internal/data/model/schema/payment_choice.go", [
+      "package schema",
+      "type PaymentChoice struct { ent.Schema }",
+      'func (PaymentChoice) Fields() []ent.Field { return []ent.Field{field.String("name"),field.String("label")} }',
+      "",
+    ].join("\n"));
+    const createPath = "server/internal/data/model/migrate/20260102000000_choices.sql";
+    const alterPath = "server/internal/data/model/migrate/20260103000000_choice_label.sql";
+    await write(root, createPath, "CREATE TABLE payment_choices (id bigint, name text);\n");
+    await write(root, alterPath, "ALTER TABLE payment_choices ADD COLUMN label text;\n");
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+    const valid = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(valid.ok, true, JSON.stringify(valid));
+    for (const sql of [
+      "UPDATE payment_choices SET label = name;\n",
+      "ALTER TABLE other_choices ADD COLUMN label text;\n",
+      "-- ALTER TABLE payment_choices ADD COLUMN label text;\n",
+    ]) {
+      await write(root, alterPath, sql);
+      const invalid = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+      assert.equal(invalid.ok, false, sql);
+      assert.equal(invalid.reason, "schema-migration-proof-missing");
+      assert.equal(invalid.proofs.some((proof) => proof.missingTokens.includes("label")), true);
+    }
+    await write(root, createPath, "ALTER TABLE payment_choices ADD COLUMN name text;\n");
+    await write(root, alterPath, "ALTER TABLE payment_choices ADD COLUMN label text;\n");
+    const missingCreate = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(missingCreate.ok, false);
+    assert.equal(missingCreate.reason, "schema-migration-proof-missing");
+  });
+});

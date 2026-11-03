@@ -119,7 +119,7 @@ CHECK/UNIQUE/FK 约束。
    make data
    GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff -- internal/data/model/ent internal/data/model/migrate
    ```
-   再次 `make data` 后比较本轮生成物，确认没有继续变化，并运行 `bash ../scripts/qa/db-guard.sh`。补 fresh、upgrade、失败数据 fail-closed 与数据库负向测试。Atlas OSS
+   再次 `make data` 后比较本轮生成物，确认没有继续变化，并运行 `bash ../scripts/qa/db-guard.sh`。新增 schema 尚未提交但已有 CREATE 与后续 ALTER 时，静态守卫仍须逐项找到建表及每列 / 约束的 DDL，不能要求改写旧建表 SQL；数据语句或错表不能提供结构证明。补 fresh、upgrade、失败数据 fail-closed 与数据库负向测试。Atlas OSS
    schema inspect 不覆盖 Function / Trigger，因此零结构漂移之外还必须通过
    `db-guard` 静态门禁和目标库目录读回：
    `non-system-schema function=0 / procedure=0 / non-internal-trigger=0`。PostgreSQL 为
