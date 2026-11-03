@@ -683,6 +683,11 @@ function resolveServerCiRequirement(pushPlan, allowServerCi) {
   });
 }
 
+export function localNodeCheckDeadlineMs(fileCount) {
+  // Large source changes can select many tests, which macOS executes serially.
+  return Math.max(120_000, Math.min(300_000, fileCount * 2_000));
+}
+
 export function resolvePrePushGateDecision(
   root,
   pushPlan,
@@ -711,7 +716,7 @@ export function resolvePrePushGateDecision(
         contract: LOCAL_NODE_CHECKS_CONTRACT,
         tests: Object.freeze([...affectedPlan.prePushNodeTests]),
         concurrency: 4,
-        timeoutMs: 120_000,
+        timeoutMs: localNodeCheckDeadlineMs(affectedPlan.prePushNodeTests.length),
       })
     : null;
   const selectedGate = serverCiRequired

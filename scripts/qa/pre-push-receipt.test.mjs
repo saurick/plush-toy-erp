@@ -27,6 +27,7 @@ import {
   PRE_PUSH_RECEIPT_TTL_MS,
   REMOTE_REF_QUERY_TIMEOUT_MS,
   environmentFingerprint,
+  localNodeCheckDeadlineMs,
   resolveReceiptState,
   runRemoteRefQueryWithRetry,
 } from "./pre-push-receipt.mjs";
@@ -591,6 +592,12 @@ test("local push candidate", { skip: process.env.LOCAL_SKIP === "1" }, () => {
   assert.notEqual(process.env.LOCAL_FAIL, "1", "candidate failed");
 });
 `;
+
+test("local Node check deadline preserves the small batch budget and bounds large batches", () => {
+  assert.equal(localNodeCheckDeadlineMs(1), 120_000);
+  assert.equal(localNodeCheckDeadlineMs(149), 298_000);
+  assert.equal(localNodeCheckDeadlineMs(500), 300_000);
+});
 
 test("canonical prepare runs real local tests once and signs their selection", () => {
   const fixture = createFixture({
