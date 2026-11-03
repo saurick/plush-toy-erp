@@ -478,6 +478,41 @@ test("index transition still requires DDL for real schema changes beside a publi
   });
 });
 
+test("db guard distinguishes Ent field immutability from adjacent PostgreSQL changes", async () => {
+  await withRepository(async (root) => {
+    const schemaPath = "server/internal/data/model/schema/item.go";
+    const migration = "server/internal/data/model/migrate/20260102000000_migrate.sql";
+    const before = [
+      "package schema",
+      "func (Item) Fields() []ent.Field {",
+      "  return []ent.Field{",
+      '    field.String("name").Default("original.Immutable()").Immutable(),',
+      "  }",
+      "}",
+      "",
+    ].join("\n");
+    const editable = before.replace(".Immutable(),", ",");
+    await write(root, schemaPath, before);
+    commitAll(root, "immutable item name");
+    const options = { root, range: "HEAD...HEAD", indexTransition: true };
+
+    await write(root, schemaPath, editable);
+    assert.equal(evaluateDbGuard(options).ok, true);
+
+    const newColumn = editable.replace("  }\n", '    field.Bool("in_use").Default(false),\n  }\n');
+    await write(root, schemaPath, newColumn);
+    assert.equal(evaluateDbGuard(options).reason, "missing-new-migration");
+    await write(root, migration, "ALTER TABLE items ADD COLUMN in_use boolean NOT NULL DEFAULT false;\n");
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+    assert.equal(evaluateDbGuard(options).ok, true);
+
+    await write(root, schemaPath, newColumn.replace("original.Immutable()", "original"));
+    const result = evaluateDbGuard(options);
+    assert.equal(result.reason, "schema-migration-proof-missing");
+    assert(result.proofs[0].missingTokens.includes("name"));
+  });
+});
+
 test("db guard accepts a new migration only when atlas.sum also changes", async () => {
   await withRepository(async (root) => {
     await write(

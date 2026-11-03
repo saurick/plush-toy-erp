@@ -251,7 +251,7 @@ function schemaDiffRequiresMigration(root, file, range, untrackedFiles) {
       return STRUCTURAL_SCHEMA_CHANGE.test(schemaDiffText(root, file, range, untrackedFiles));
     }
     const after = readFileSync(path.join(root, file), "utf8");
-    if (postgresSchemaWithoutStringValidation(before) === postgresSchemaWithoutStringValidation(after)) {
+    if (postgresSchemaWithoutApplicationValidation(before) === postgresSchemaWithoutApplicationValidation(after)) {
       return false;
     }
   }
@@ -260,20 +260,22 @@ function schemaDiffRequiresMigration(root, file, range, untrackedFiles) {
   );
 }
 
-function postgresSchemaWithoutStringValidation(source) {
+function postgresSchemaWithoutApplicationValidation(source) {
   let normalized = source.replace(/^\s*corevalue\s+"server\/internal\/core\/value"[^\S\r\n]*$/gmu, "");
-  const builders = [...normalized.matchAll(/\bfield\.String\(\s*"[a-z0-9_]+"/gu)];
+  const builders = [...normalized.matchAll(/\bfield\.([A-Za-z][A-Za-z0-9]*)\(\s*"[a-z0-9_]+"/gu)];
   for (const match of builders.reverse()) {
     const expression = fieldBuilderExpression(normalized, match.index);
-    let chain = normalizeGoBuilderChain(expression);
-    // Ent's PostgreSQL varchar mapping has no physical length limit. Keep text
-    // thresholds and explicit database types conservative; see schema-doc.
-    if (!/\.(?:SchemaType|GoType)\(/u.test(chain)) {
-      chain = chain.replace(/\.MaxLen\((\d+)\)/gu, (modifier, size) =>
-        Number(size) > 0 && Number(size) <= 10485760 ? "" : modifier,
-      );
+    let chain = normalizeGoBuilderChain(expression, { omitFieldImmutability: true });
+    if (match[1] === "String") {
+      // Ent's PostgreSQL varchar mapping has no physical length limit. Keep text
+      // thresholds and explicit database types conservative; see schema-doc.
+      if (!/\.(?:SchemaType|GoType)\(/u.test(chain)) {
+        chain = chain.replace(/\.MaxLen\((\d+)\)/gu, (modifier, size) =>
+          Number(size) > 0 && Number(size) <= 10485760 ? "" : modifier,
+        );
+      }
+      chain = chain.replace(/\.Validate\([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\)/gu, "");
     }
-    chain = chain.replace(/\.Validate\([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\)/gu, "");
     normalized = normalized.slice(0, match.index) + chain + normalized.slice(match.index + expression.length);
   }
   return normalizeGoBuilderChain(normalized);
@@ -414,10 +416,11 @@ function fieldBuilderExpression(source, start) {
   return source.slice(start);
 }
 
-function normalizeGoBuilderChain(source) {
+function normalizeGoBuilderChain(source, { omitFieldImmutability = false } = {}) {
   let normalized = "";
   let index = 0;
   let state = "code";
+  let depth = 0;
 
   while (index < source.length) {
     const char = source[index];
@@ -470,6 +473,16 @@ function normalizeGoBuilderChain(source) {
     else if (char === "'") state = "single-quote";
     else if (char === "`") state = "raw-quote";
 
+    // Ent's field modifier affects generated update setters, not PostgreSQL DDL.
+    if (omitFieldImmutability && depth === 0 && char === ".") {
+      const modifier = /^\.\s*Immutable\s*\(\s*\)/u.exec(source.slice(index));
+      if (modifier) {
+        index += modifier[0].length;
+        continue;
+      }
+    }
+    if (char === "(") depth += 1;
+    else if (char === ")") depth -= 1;
     if (!/\s/u.test(char)) normalized += char;
     index += 1;
   }
@@ -483,7 +496,9 @@ function fieldBuilderChains(source) {
   )) {
     chains.set(
       match[1],
-      normalizeGoBuilderChain(fieldBuilderExpression(source, match.index)),
+      normalizeGoBuilderChain(fieldBuilderExpression(source, match.index), {
+        omitFieldImmutability: true,
+      }),
     );
   }
   return chains;

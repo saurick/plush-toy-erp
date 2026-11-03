@@ -26,7 +26,8 @@ CHECK/UNIQUE/FK 约束。
     普通备注使用 `core/value.ValidateBusinessNote` 按 Unicode 字符计数；Ent
     `MaxLen` 按字节校验，不能表达“2000 个中文或英文字符”。PostgreSQL 中无显式
     `SchemaType` 的常规 String 长度校验不产生物理列长度；此类纯校验调整仍运行
-    `make data` 留零结构差异证据，数据库门禁不要求制造空 migration。可空、列名、
+    `make data` 留零结构差异证据。字段的 `Immutable()` 只控制 Ent 更新 API，
+    不要求单独的 migration；同次真正变更的列仍须提供 DDL。可空、列名、
     实际类型、索引及约束变化继续要求正式 migration；schema 测试文件不算结构定义。
 
     生成后必须审查新增 SQL。命中 `DROP TABLE` / `DROP COLUMN`、类型变更、
