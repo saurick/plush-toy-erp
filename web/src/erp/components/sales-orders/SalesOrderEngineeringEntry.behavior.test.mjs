@@ -1,19 +1,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createElement as h } from 'react'
-import { register } from 'node:module'
+import { registerHooks } from 'node:module'
 import { MemoryRouter } from 'react-router-dom'
 import { businessFormHarness } from '../../../../scripts/test/businessFormHarness.mjs'
 
 test('任务工程编辑器仅在选定订单后读取，关闭后不遗留内容或查询空订单', async (t) => {
   // Vite permits this generated JSON import without Node's JSON attribute.
-  register(`data:text/javascript,${encodeURIComponent(`
-    export async function load(url, context, nextLoad) {
+  const jsonLoader = registerHooks({
+    load(url, context, nextLoad) {
       return nextLoad(url, url.endsWith('/bomImportExamplePreview.generated.json')
         ? { ...context, importAttributes: { ...context.importAttributes, type: 'json' } }
         : context)
-    }
-  `)}`, import.meta.url)
+    },
+  })
+  t.after(() => jsonLoader.deregister())
   const reads = []
   const ui = await businessFormHarness(t, { rpc: async (method, params) => {
     reads.push({ method, params })
