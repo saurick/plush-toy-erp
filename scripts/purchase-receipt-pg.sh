@@ -561,6 +561,41 @@ test-populated-upgrade)
   apply_populated_upgrade_to 20260908172207
   populated_psql -q -v plush_warehouse_classification_seed=1 -f "$populated_contract_file"
 
+  apply_populated_upgrade_to 20261031165809
+  bom_before_reference_dates_removal="$(populated_psql -Atq -c \
+    "SELECT (to_jsonb(header) - 'effective_from' - 'effective_to')::text FROM bom_headers AS header WHERE id = 910001")"
+
+  apply_populated_upgrade_to 20261102122123
+  bom_after_reference_dates_removal="$(populated_psql -Atq -c \
+    "SELECT to_jsonb(header)::text FROM bom_headers AS header WHERE id = 910001")"
+  if [[ -z "$bom_before_reference_dates_removal" || "$bom_before_reference_dates_removal" != "$bom_after_reference_dates_removal" ]]; then
+    echo "ERROR: reference date removal changed the remaining BOM header fields" >&2
+    exit 1
+  fi
+  bom_reference_date_columns="$(populated_psql -Atq -c \
+    "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bom_headers' AND column_name IN ('effective_from', 'effective_to')")"
+  if [[ "$bom_reference_date_columns" != '0' ]]; then
+    echo "ERROR: unused BOM reference dates remain after upgrade" >&2
+    exit 1
+  fi
+
+  populated_psql -q -v plush_process_reference_seed=1 -f "$populated_contract_file"
+  process_before_reference_removal="$(populated_psql -Atq -c \
+    "SELECT jsonb_agg(to_jsonb(process) - 'quality_required' ORDER BY id)::text FROM processes AS process WHERE id IN (910101, 910102)")"
+  apply_populated_upgrade_to 20261102140149
+  process_after_reference_removal="$(populated_psql -Atq -c \
+    "SELECT jsonb_agg(to_jsonb(process) ORDER BY id)::text FROM processes AS process WHERE id IN (910101, 910102)")"
+  if [[ -z "$process_before_reference_removal" || "$process_before_reference_removal" != "$process_after_reference_removal" ]]; then
+    echo "ERROR: quality reference removal changed the remaining process fields" >&2
+    exit 1
+  fi
+  process_reference_columns="$(populated_psql -Atq -c \
+    "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'processes' AND column_name = 'quality_required'")"
+  if [[ "$process_reference_columns" != '0' ]]; then
+    echo "ERROR: unused process quality reference remains after upgrade" >&2
+    exit 1
+  fi
+
   atlas migrate apply \
     --dir "file://${migration_dir}" \
     --url "$POPULATED_UPGRADE_DB_URL"

@@ -28,7 +28,11 @@ export function useBusinessLineItemGroupErrors(controller) {
   return useSyncExternalStore(controller?.errors.subscribe || emptySubscribe, controller?.errors.getSnapshot || emptySnapshot, emptySnapshot)
 }
 
-export default function useBusinessLineItemGroups({ form, groups, name = 'items' }) {
+export function useBusinessLineItemErrorCount(store, index) {
+  return useSyncExternalStore(store?.subscribe || emptySubscribe, () => store?.getSnapshot().get(index) || 0, () => 0)
+}
+
+export default function useBusinessLineItemGroups({ form, groups, name = 'items', defaultExpanded = false }) {
   const rootRef = useRef(null)
   const [root, setRoot] = useState(null)
   const attachRoot = useCallback((node) => { rootRef.current = node; setRoot(node) }, [])
@@ -38,8 +42,10 @@ export default function useBusinessLineItemGroups({ form, groups, name = 'items'
   const signature = groups.map((group) => `${group.id}:${group.indexes.join(',')}`).join('|')
   const previousSignature = useRef(signature)
   const initialized = useRef(groups.length > 0)
-  const [collapsed, setCollapsed] = useState(() => new Set(groups.slice(1).map((group) => group.id)))
+  const [collapsed, setCollapsed] = useState(() => new Set(defaultExpanded ? [] : groups.slice(1).map((group) => group.id)))
   const [errors] = useState(createErrorCounts)
+  const [lineErrors] = useState(createErrorCounts)
+  const [validationRevision, setValidationRevision] = useState(0)
   const changingGroup = previousSignature.current !== signature && rootRef.current?.contains(document.activeElement)
     ? groups.find((group) => group.indexes.includes(activeIndex.current))?.id
     : undefined
@@ -50,7 +56,7 @@ export default function useBusinessLineItemGroups({ form, groups, name = 'items'
       setCollapsed((previous) => previous.size ? new Set() : previous)
     } else if (!initialized.current) {
       initialized.current = true
-      setCollapsed(new Set(groups.slice(1).map((group) => group.id)))
+      setCollapsed(new Set(defaultExpanded ? [] : groups.slice(1).map((group) => group.id)))
     } else if (previousSignature.current !== signature) {
       const ids = new Set(groups.map((group) => group.id))
       setCollapsed((previous) => {
@@ -59,7 +65,7 @@ export default function useBusinessLineItemGroups({ form, groups, name = 'items'
       })
     }
     previousSignature.current = signature
-  }, [changingGroup, groups, signature])
+  }, [changingGroup, defaultExpanded, groups, signature])
 
   const revealIndex = useCallback((index) => {
     const group = current.current.groups.find((entry) => entry.indexes.includes(index))
@@ -81,6 +87,7 @@ export default function useBusinessLineItemGroups({ form, groups, name = 'items'
       queued = false
       if (disposed) return
       const counts = new Map()
+      const rowCounts = new Map()
       const indexGroups = new Map()
       for (const group of current.current.groups) {
         for (const index of group.indexes) indexGroups.set(index, group.id)
@@ -89,9 +96,11 @@ export default function useBusinessLineItemGroups({ form, groups, name = 'items'
         if (!field.errors.length) continue
         const index = lineItemFieldIndex(field.name, current.current.name)
         const id = indexGroups.get(index)
+        if (index !== null) rowCounts.set(index, (rowCounts.get(index) || 0) + 1)
         if (id !== undefined) counts.set(id, (counts.get(id) || 0) + 1)
       }
       errors.update(counts)
+      lineErrors.update(rowCounts)
     }
     const schedule = () => {
       if (queued) return
@@ -101,8 +110,11 @@ export default function useBusinessLineItemGroups({ form, groups, name = 'items'
     const revealErrors = (event) => {
       if (event.detail?.form !== form) return
       const first = event.detail.errorFields.find((field) => lineItemFieldIndex(field.name, current.current.name) !== null)
-      if (first) revealIndex(lineItemFieldIndex(first.name, current.current.name))
-      schedule()
+      if (first) {
+        revealIndex(lineItemFieldIndex(first.name, current.current.name))
+        setValidationRevision((revision) => revision + 1)
+      }
+      update()
     }
     const revealRow = (event) => revealIndex(event.detail?.index)
     const observer = new MutationObserver(schedule)
@@ -116,12 +128,14 @@ export default function useBusinessLineItemGroups({ form, groups, name = 'items'
       document.removeEventListener(REVEAL_LINE_ITEM_ERRORS, revealErrors)
       root.removeEventListener(REVEAL_LINE_ITEM, revealRow)
     }
-  }, [errors, form, revealIndex, root, signature])
+  }, [errors, form, lineErrors, revealIndex, root, signature])
 
   return {
     rootRef: attachRoot,
     fieldName: name,
     errors,
+    lineErrors,
+    validationRevision,
     isCollapsed: (id) => collapsed.has(id) && id !== changingGroup,
     onRowFocus,
     onFocusCapture: (event) => {

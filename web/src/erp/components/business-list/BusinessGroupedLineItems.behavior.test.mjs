@@ -4,7 +4,7 @@ import React, { createElement as h } from 'react'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 import { revealBusinessLineItemElement, revealBusinessLineItemErrors } from './businessLineItemDisclosure.mjs'
 
-async function editor(t, { mobile = false } = {}) {
+async function editor(t, { mobile = false, toolbar = false } = {}) {
   const ui = await createReactTestHarness(t)
   const [{ Form, Input }, { default: Groups }, { BusinessLineItemRow }, { BusinessPageContext }] = await Promise.all([
     import('antd'), import('./BusinessGroupedLineItems.jsx'), import('./BusinessLineItemsTable.jsx'), import('../../hooks/useBusinessPageContext.js'),
@@ -26,8 +26,11 @@ async function editor(t, { mobile = false } = {}) {
     return h(BusinessPageContext.Provider, { value: React.useMemo(() => ({ taskBusiness: { device } }), [device]) }, h(Form, { form, initialValues: { items: initial } }, h(Form.List, { name: 'items' }, (fields, actions) => {
           operations = actions
           return h(Groups, {
+            title: toolbar ? '订货明细' : undefined,
+            headerActions: toolbar ? h('button', { type: 'button', 'data-import': true }, '导入明细') : undefined,
             fields,
             form,
+            defaultExpanded: false,
             getGroup: (item) => ({ key: item.product_id, label: `产品 ${item.product_id}` }),
             tableProps: { columns: [{ label: '数量', width: 120 }], label: '明细' },
           }, (field, index) => h(BusinessLineItemRow, {
@@ -39,8 +42,34 @@ async function editor(t, { mobile = false } = {}) {
   }
   await ui.render(h(Editor))
   await ui.flush()
+  if (!mobile) {
+    const group = [...ui.container.querySelectorAll('button')].find((button) => button.textContent === '分组显示')
+    await ui.act(async () => group.click())
+  }
   return { ui, form, initial, operations, setDevice, rows: () => [...ui.container.querySelectorAll('.erp-editable-line-group')] }
 }
+
+test('标题、组数和操作共用工具栏，重算分组与折叠不重建输入和导入入口', async (t) => {
+  const { ui, form, rows } = await editor(t, { toolbar: true })
+  const heading = ui.container.querySelector('.erp-sales-order-lines-form__head')
+  const controls = ui.container.querySelector('.erp-line-item-group-controls')
+  const importer = ui.container.querySelector('[data-import]')
+  const input = ui.container.querySelector('input[aria-label="数量 2"]')
+  assert.equal(ui.container.querySelectorAll('.erp-sales-order-lines-form__head').length, 1)
+  assert.equal(heading.contains(controls), true)
+  assert.equal(heading.contains(importer), true)
+  assert.equal(heading.querySelector('.erp-line-items-form__group-count').textContent, '2 组')
+  assert.equal(heading.querySelectorAll('[data-table-scroll-toolbar]').length, 1)
+  assert.equal(ui.container.querySelectorAll('.app-table-scroll-top').length, 0, '明细滚动入口不再独占一行')
+  await ui.act(async () => form.setFieldValue(['items', 3, 'product_id'], 1))
+  assert.equal(heading.querySelector('.erp-line-items-form__group-count').textContent, '3 组')
+  assert.equal(ui.container.querySelector('[data-import]') === importer, true)
+  assert.equal(ui.container.querySelector('input[aria-label="数量 2"]') === input, true)
+  const collapse = [...controls.querySelectorAll('button')].find((button) => button.textContent === '全部收起')
+  await ui.act(async () => collapse.click())
+  assert.equal(rows().every((row) => row.hidden), true)
+  assert.equal(form.getFieldValue(['items', 1, 'quantity']), '20')
+})
 
 test('折叠保留全部字段、来源和输入，保存仍校验隐藏明细并展开对应组', async (t) => {
   const { ui, form, initial, rows } = await editor(t)

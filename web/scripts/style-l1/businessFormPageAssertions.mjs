@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { assertLineItemGroupHeaderInteraction } from './businessLineItemDisclosureAssertions.mjs'
 
 const pageTitles = new Set([
   '新建客户档案', '编辑客户',
@@ -33,6 +34,7 @@ export function isBusinessFormPageTitle(title) {
 export async function assertBusinessFormPage(page, editor) {
   await assertFormInputsExposed(editor)
   await assertBusinessNoteTextAreas(editor)
+  await assertEditorTableHeadersCentered(editor)
   assert.equal(await editor.getByRole('button', { name: '刷新当前页', exact: true }).count(), 0, '整页表单不提供会丢弃编辑内容的常驻刷新')
   const fullscreen = editor.getByRole('button', { name: /^(全屏编辑|全屏查看|退出全屏)$/u })
   const desktop = page.viewportSize().width >= 768 && !new URL(page.url()).pathname.startsWith('/m/')
@@ -115,6 +117,37 @@ export async function assertBusinessFormPage(page, editor) {
   )
   const inTask = /^\/m\/[a-z_]+\/tasks$/u.test(new URL(page.url()).pathname)
   await editor.getByRole('button', { name: inTask ? '返回办理' : '返回列表', exact: true }).waitFor()
+  await assertLineItemGroupHeaderInteraction(page, editor)
+}
+
+export async function assertEditorTableHeadersCentered(editor) {
+  const headers = await editor.evaluate((root) => {
+    const tables = root.querySelectorAll('.erp-line-item-table, .erp-compact-field-table > table, .erp-bom-parts-table, .erp-contact-editor__table')
+    return [...tables].flatMap((table) => [...table.querySelectorAll('thead th')].flatMap((cell) => {
+      const style = getComputedStyle(cell)
+      const box = cell.getBoundingClientRect()
+      if (style.display !== 'table-cell' || !box.width || !box.height) return []
+      const range = document.createRange()
+      range.selectNodeContents(cell)
+      const content = range.getBoundingClientRect()
+      return [{
+        table: table.className || table.getAttribute('aria-label'),
+        text: cell.textContent.trim(),
+        textAlign: style.textAlign,
+        verticalAlign: style.verticalAlign,
+        horizontalOffset: content.left + content.width / 2 - box.left - box.width / 2,
+        verticalOffset: content.top + content.height / 2 - box.top - box.height / 2,
+      }]
+    }))
+  })
+  for (const header of headers) {
+    const detail = JSON.stringify(header)
+    assert.equal(header.textAlign, 'center', `编辑表头水平居中：${detail}`)
+    assert.equal(header.verticalAlign, 'middle', `编辑表头上下居中：${detail}`)
+    assert.ok(Math.abs(header.horizontalOffset) <= 2, `列名、必填标记和帮助入口整体水平居中：${detail}`)
+    assert.ok(Math.abs(header.verticalOffset) <= 2, `列名、必填标记和帮助入口整体上下居中：${detail}`)
+  }
+  if (headers.length) console.log(`[style:l1] editor-table-headers=${JSON.stringify({ columns: headers.length, tables: [...new Set(headers.map((header) => header.table))], maxHorizontalOffset: Math.max(...headers.map((header) => Math.abs(header.horizontalOffset))), maxVerticalOffset: Math.max(...headers.map((header) => Math.abs(header.verticalOffset))) })}`)
 }
 
 export async function assertBusinessNoteTextAreas(root) {
@@ -170,7 +203,18 @@ export async function assertFormInputsExposed(editor) {
   )
   assert.deepEqual(hiddenByDisclosure, [], '业务输入不能放在可折叠区域')
   for (const field of await editor.locator('.erp-line-item-details__fields .ant-form-item:not(.ant-form-item-hidden), .erp-contact-editor__note-editor textarea, .erp-production-order-line__supplement .ant-form-item').all()) {
-    assert.ok(await field.isVisible(), '明细、联系人备注及生产路线默认可见')
+    if (await field.isVisible()) continue
+    const panelID = await field.evaluate((node) => node.closest('.erp-line-item-table__details-row[hidden], .erp-contact-editor__note-editor[hidden]')?.id || '')
+    assert.ok(panelID, '办理字段直接可见，补充资料必须有明确的逐行展开入口')
+    const toggle = editor.locator(`button[aria-controls=${JSON.stringify(panelID)}]`)
+    assert.equal(await toggle.getAttribute('aria-expanded'), 'false')
+    assert.ok(await toggle.isVisible(), '收起资料的入口可发现')
+    const node = await field.elementHandle()
+    await toggle.click()
+    assert.ok(await field.isVisible(), '逐行展开后字段可实际编辑')
+    await toggle.click()
+    assert.equal(await node.evaluate((element) => element.isConnected), true, '收起不卸载字段')
+    await node.dispose()
   }
   for (const panel of await editor.locator('.business-attachment-panel').all()) {
     assert.ok(await panel.locator('.business-attachment-panel__content').isVisible(), '空附件与已有附件均直接显示')

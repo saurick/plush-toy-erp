@@ -7,6 +7,7 @@ DECLARE
   blockers text[] := ARRAY[]::text[];
   invalid_count bigint := 0;
   column_count integer := 0;
+  bom_reference_dates_removed boolean := false;
   workflow_task_version_migration_pending boolean := false;
   shipment_status_normalization_pending boolean := false;
   process_node_withdrawal_applied boolean := false;
@@ -29,6 +30,13 @@ BEGIN
       )
     $sql$ INTO shipment_status_normalization_pending;
 
+    EXECUTE $sql$
+      SELECT EXISTS (
+        SELECT 1 FROM atlas_schema_revisions.atlas_schema_revisions
+         WHERE version = '20261102122123' AND applied = total AND NULLIF(error, '') IS NULL
+      )
+    $sql$ INTO bom_reference_dates_removed;
+
     -- Later state-machine migrations extend the legal states. Only completed
     -- revisions enable them; earlier upgrade checkpoints still reject them.
     EXECUTE $sql$
@@ -49,19 +57,27 @@ BEGIN
      WHERE table_schema = 'public'
        AND table_name = 'bom_headers'
        AND column_name IN ('status', 'effective_from', 'effective_to');
-    IF column_count <> 3 THEN
+    IF (bom_reference_dates_removed AND column_count <> 1)
+       OR (NOT bom_reference_dates_removed AND column_count <> 3) THEN
       blockers := array_append(blockers, 'bom_headers core columns are incomplete');
     ELSE
-      EXECUTE $sql$
-        SELECT count(*)
-          FROM public.bom_headers
-         WHERE status::text NOT IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
-            OR (
-              effective_from IS NOT NULL
-              AND effective_to IS NOT NULL
-              AND effective_to <= effective_from
-            )
-      $sql$ INTO invalid_count;
+      IF bom_reference_dates_removed THEN
+        EXECUTE $sql$
+          SELECT count(*) FROM public.bom_headers
+           WHERE status::text NOT IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
+        $sql$ INTO invalid_count;
+      ELSE
+        EXECUTE $sql$
+          SELECT count(*)
+            FROM public.bom_headers
+           WHERE status::text NOT IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
+              OR (
+                effective_from IS NOT NULL
+                AND effective_to IS NOT NULL
+                AND effective_to <= effective_from
+              )
+        $sql$ INTO invalid_count;
+      END IF;
       IF invalid_count > 0 THEN
         blockers := array_append(
           blockers,

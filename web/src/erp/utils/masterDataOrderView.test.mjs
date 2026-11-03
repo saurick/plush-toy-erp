@@ -64,10 +64,8 @@ import {
   SUPPLIER_CONTACT_OWNER_TYPE,
 } from './sourcePartySnapshots.mjs'
 import {
-  buildPaymentConditionOptions,
   formatPaymentCondition,
   paymentConditionCompleteness,
-  resolvePaymentTermDays,
 } from './paymentConditions.mjs'
 import {
   calculateSalesOrderAmounts,
@@ -341,7 +339,6 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       production_route_operation_code: ' SEWING ',
       outsourcing_enabled: true,
       inhouse_enabled: false,
-      quality_required: true,
       note: ' ',
     }),
     {
@@ -351,7 +348,6 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       production_route_operation_code: 'SEWING',
       outsourcing_enabled: true,
       inhouse_enabled: false,
-      quality_required: true,
     }
   )
 
@@ -651,16 +647,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
   )
 })
 
-test('masterDataOrderView: payment condition options keep zero-day defaults and saved values', () => {
-  const options = buildPaymentConditionOptions([
-    {
-      default_payment_method: ' 月结 45 天 ',
-      default_payment_term_days: '45',
-    },
-  ])
-
-  assert.equal(resolvePaymentTermDays('发生即到期', options), 0)
-  assert.equal(resolvePaymentTermDays('月结 45 天', options), 45)
+test('masterDataOrderView: payment condition display preserves saved zero-day and month-end terms', () => {
   assert.equal(formatPaymentCondition({ payment_term_days: 0 }), '发生即到期')
   assert.equal(
     formatPaymentCondition({

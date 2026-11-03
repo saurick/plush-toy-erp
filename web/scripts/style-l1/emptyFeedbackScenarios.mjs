@@ -286,6 +286,7 @@ export function createEmptyFeedbackScenarios({
               await editor
                 .getByRole('button', { name: '添加订货明细', exact: true })
                 .click()
+              await editor.locator('.erp-sales-order-lines-form__row').last().locator('input[type="radio"]').check()
               await editor.getByRole('button', { name: /移除行/ }).click()
               await empty.waitFor()
               await page.setViewportSize({ width: 390, height: 844 })

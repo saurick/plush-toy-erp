@@ -4,6 +4,9 @@ import { createElement as h } from 'react'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
+import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRuntime.mjs'
+
+registerMermaidTestRenderer()
 
 async function mount(t, url = '/__dev/status-flows?view=chain&chain=all', props = {}) {
   const harness = await createReactTestHarness(t)
@@ -12,7 +15,7 @@ async function mount(t, url = '/__dev/status-flows?view=chain&chain=all', props 
   function Probe() { Object.assign(navigation, { location: useLocation(), navigate: useNavigate() }); return h(Guide, { showViewSwitch: true, ...props }) }
   await harness.render(h(MemoryRouter, { initialEntries: [url], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, h(Probe)))
   const root = harness.container
-  const click = async (selector) => { const el = typeof selector === 'string' ? root.querySelector(selector) : selector; assert(el, selector); await harness.act(() => { el.focus(); el.click() }); await harness.flush() }
+  const click = async (selector) => { const el = typeof selector === 'string' ? root.querySelector(selector) : selector; assert(el, selector); await harness.act(() => { el.focus(); el.dispatchEvent(new harness.runtimeWindow.MouseEvent('click', { bubbles: true })) }); await harness.flush() }
   const choose = async (name, label) => {
     const control = root.querySelector(`[aria-label="${name}"][role="combobox"]`).closest('.ant-select')
     await harness.act(() => control.querySelector('.ant-select-selector').dispatchEvent(new harness.runtimeWindow.MouseEvent('mousedown', { bubbles: true })))
@@ -34,7 +37,7 @@ test('总图只展示已登记的专项分支，普通受阻说明不生成异�
     assert.deepEqual(branches.map((item) => item.dataset.stageGuide), step.handling.guides)
     assert(branches.every((item) => item.textContent !== '异常'))
   }
-  await click('[data-chain-stage="handwork_execute"] [data-stage-card]')
+  await click('[data-chain-stage="handwork_execute"]')
   assert(root.querySelector('[data-stage-normal="handwork_execute"] [data-business-flow]'))
   assert.equal(params().get('flow_stage'), 'handwork_execute')
   assert.equal(root.querySelector('[aria-label="环节办理方式"]'), null)
@@ -83,7 +86,7 @@ test('异常链接刷新后仍可返回，改选主环节清理旧异常与子�
   await click('[data-stage-exception="cutting_quality"]')
   assert.equal(params().get('flow_stage'), 'cutting_quality')
   assert.equal(params().has('flow_substep'), false)
-  await click('[data-chain-stage="supplier_advance"] [data-stage-card]')
+  await click('[data-chain-stage="supplier_advance"]')
   assert(root.querySelector('[data-stage-normal="supplier_advance"]'))
   assert.equal(params().has('flow_exception'), false)
   assert.equal(params().has('flow_exception_origin'), false)

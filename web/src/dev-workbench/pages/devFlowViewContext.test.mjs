@@ -7,6 +7,29 @@ import {
   restoreDevFlowPrimaryContext,
 } from './devFlowViewContext.mjs'
 
+test('核验页签和报告随阅读上下文恢复，不改变同一业务对象的规则选择', () => {
+  const previous = new URLSearchParams({
+    view: 'states',
+flow: 'fact.production',
+    flow_topic: 'production_exception',
+flow_topic_step: 'same-step',
+    flow_topic_panel: 'rules',
+flow_topic_batch: 'history',
+  })
+  const current = new URLSearchParams(previous)
+  current.set('flow_topic_panel', 'evidence')
+  current.set('flow_topic_batch', 'new-report')
+  const restored = restoreDevFlowPrimaryContext(previous, current)
+  assert.equal(restored.changed, false)
+  assert.equal(restored.searchParams.get('flow'), 'fact.production')
+  assert.equal(restored.searchParams.get('flow_topic_panel'), 'evidence')
+  assert.equal(restored.searchParams.get('flow_topic_batch'), 'new-report')
+  current.set('flow_topic_step', 'another-step')
+  const changed = restoreDevFlowPrimaryContext(previous, current)
+  assert.equal(changed.changed, true)
+  assert.equal(changed.searchParams.has('flow'), false)
+})
+
 test('规则分类保留各自对象与动作，财务口径选择不改变另一分类的业务范围', () => {
   const previous = 'view=states&flow=fact.shipment&rule_action=cancel&flow_role=warehouse'
   const current = new URLSearchParams('view=finance_rules&finance_rule=terms&flow_role=warehouse')

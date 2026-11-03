@@ -207,7 +207,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
   ]
   const graph = useMemo(() => ({
     entryNodeKeys: flow.initialStates,
-    nodes: flow.states.filter((item) => transitionFilter === DEV_FLOW_STATE_TRANSITION_FILTERS.all || item.key === state?.key || visibleTransitions.some((edge) => edge.from === item.key || edge.to === item.key)).map((item) => ({ ...item, kind: flow.terminalStates.includes(item.key) ? 'terminal' : 'state' })),
+    nodes: flow.states.filter((item) => !flow.transitions.length || transitionFilter === DEV_FLOW_STATE_TRANSITION_FILTERS.all || item.key === state?.key || visibleTransitions.some((edge) => edge.from === item.key || edge.to === item.key)).map((item) => ({ ...item, kind: flow.terminalStates.includes(item.key) ? 'terminal' : 'state' })),
     edges: visibleTransitions.map((item) => { const { group } = getDevFlowStateTransitionPresentation(flow, item); return { ...item, label: getDevFlowStateTransitionDiagramLabel(item), condition: item.guard, stroke: group.diagramStroke, dasharray: group.diagramStrokeDasharray } }),
   }), [flow, visibleTransitions, state?.key, transitionFilter])
   const focusedTransitions = state ? visibleTransitions.filter((item) => item.from === state.key || item.to === state.key) : []
@@ -234,7 +234,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
         ) : null}
       </div>
       <p>{recordRelationship ? '纠正时另建反向记录，原记录保持不变。' : flow.guard}</p>
-      <div className="erp-dev-rule-layout" data-split={flow.transitions.length > 0 || recordRelationship ? 'true' : undefined}>
+      <div className="erp-dev-rule-layout" data-split={flow.lifecycleRules.length === 0 || recordRelationship ? 'true' : undefined}>
         <div className="erp-dev-rule-graph">
           {recordRelationship ? (
             <BusinessFlowDiagram relationships flow={recordRelationship} label={`${flow.label}记录引用关系图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} legend="箭头表示记录引用；两条记录分别保留。" />
@@ -250,7 +250,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
             <BusinessFlowDiagram relationships legend="实线：状态转换 · 虚线：分支或纠正 · 点选状态查看条件。" flow={graph} label={`${flow.label}状态转换图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} />
           ) : <Empty description="当前筛选没有登记的转换" />}
         </>
-      ) : flow.lifecycleRules.length === 0 ? <WorkbenchFacts items={flow.states.map((item) => ({ label: item.label, value: item.summary || '由对象专属规则约束' }))} /> : null}
+      ) : flow.lifecycleRules.length === 0 ? <BusinessFlowDiagram relationships flow={graph} label={`${flow.label}分类图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} legend="节点仅表示已登记分类，不表示执行顺序或允许转换。" /> : null}
         </div>
         <div className="erp-dev-rule-inspection">
           {recordRelationship ? (

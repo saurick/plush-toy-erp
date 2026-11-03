@@ -80,6 +80,7 @@ import {
 } from '../../utils/productionWipModel.mjs'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import { buildProductionWipFormPayload } from '../../utils/productionWipFormPayload.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const { Text, Title } = Typography
 
@@ -895,7 +896,7 @@ onCancel: () => resolve(false),
           : ACTION_TITLE[activeAction]
       }
     >
-      <Form form={actionForm} layout="vertical" disabled={saving} onValuesChange={() => setDirty(true)}>
+      <BusinessForm form={actionForm} layout="vertical" disabled={saving} onValuesChange={() => setDirty(true)}>
         {activeAction === PRODUCTION_WIP_ACTION.SPLIT_BATCH ? (
           <Form.Item
             name="quantity"
@@ -1371,7 +1372,7 @@ onCancel: () => resolve(false),
             </Button>
           </Space>
         ) : null}
-      </Form>
+      </BusinessForm>
     </Card>
   ) : null
 

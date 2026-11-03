@@ -951,6 +951,36 @@
       "writeBoundary": "MasterDataUsecase 创建、修改和启停。"
     },
     {
+      "name": "payment_method_preferences",
+      "title": "付款方式推荐设置",
+      "domain": "master-data-bom",
+      "kind": "Config",
+      "purpose": "保存公司共用付款方式名称的推荐状态和并发版本。",
+      "boundary": "不替代客户、供应商与订单的付款方式字段，不保存付款周期；停止推荐不改写历史记录或打印快照。",
+      "lifecycle": "有维护权限时停止推荐或恢复；撤销同样核对最近版本，不提供业务记录删除。",
+      "writeBoundary": "MasterDataUsecase.SetPaymentMethodRecommendation 校验维护权限，推荐状态与控制面审计同事务保存。",
+      "fieldNotes": [
+        {
+          "name": "method",
+          "note": "去除首尾空格的付款方式名称，长度为 1 至 128 字符，唯一；不作为订单字段的强制枚举。"
+        },
+        {
+          "name": "is_recommended",
+          "note": "候选推荐状态；false 时不进入推荐候选，普通录入仍可按本单输入文字。"
+        },
+        {
+          "name": "version",
+          "note": "正整数并发版本；维护和撤销均校验 expected_version。"
+        }
+      ],
+      "schemaSources": [
+        "server/internal/data/model/schema/payment_method_preference.go"
+      ],
+      "references": [
+        "docs/architecture/客户供应商主数据评审.md"
+      ]
+    },
+    {
       "name": "warehouses",
       "title": "仓库",
       "domain": "master-data-bom",

@@ -10,7 +10,8 @@
   min-height: 0;
 }
 
-.erp-admin-content[data-business-form-editing='true'] .erp-business-module-header .erp-page-actions {
+.erp-admin-content[data-business-form-editing='true'] .erp-business-module-header .erp-page-actions,
+.erp-split-pane[data-business-form-editing='true'] .erp-business-module-header .erp-page-actions {
   display: none;
 }
 

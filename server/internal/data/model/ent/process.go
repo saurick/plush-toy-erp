@@ -29,8 +29,6 @@ type Process struct {
 	OutsourcingEnabled bool `json:"outsourcing_enabled,omitempty"`
 	// InhouseEnabled holds the value of the "inhouse_enabled" field.
 	InhouseEnabled bool `json:"inhouse_enabled,omitempty"`
-	// QualityRequired holds the value of the "quality_required" field.
-	QualityRequired bool `json:"quality_required,omitempty"`
 	// SortOrder holds the value of the "sort_order" field.
 	SortOrder int `json:"sort_order,omitempty"`
 	// Note holds the value of the "note" field.
@@ -81,7 +79,7 @@ func (*Process) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case process.FieldOutsourcingEnabled, process.FieldInhouseEnabled, process.FieldQualityRequired, process.FieldIsActive:
+		case process.FieldOutsourcingEnabled, process.FieldInhouseEnabled, process.FieldIsActive:
 			values[i] = new(sql.NullBool)
 		case process.FieldID, process.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
@@ -147,12 +145,6 @@ func (_m *Process) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field inhouse_enabled", values[i])
 			} else if value.Valid {
 				_m.InhouseEnabled = value.Bool
-			}
-		case process.FieldQualityRequired:
-			if value, ok := values[i].(*sql.NullBool); !ok {
-				return fmt.Errorf("unexpected type %T for field quality_required", values[i])
-			} else if value.Valid {
-				_m.QualityRequired = value.Bool
 			}
 		case process.FieldSortOrder:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -252,9 +244,6 @@ func (_m *Process) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("inhouse_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.InhouseEnabled))
-	builder.WriteString(", ")
-	builder.WriteString("quality_required=")
-	builder.WriteString(fmt.Sprintf("%v", _m.QualityRequired))
 	builder.WriteString(", ")
 	builder.WriteString("sort_order=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SortOrder))

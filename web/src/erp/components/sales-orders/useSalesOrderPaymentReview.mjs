@@ -1,34 +1,16 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 
 import { modal } from '@/common/utils/antdApp'
-import {
-  buildPaymentConditionOptions,
-  mergePaymentConditionOptions,
-  resolvePaymentTermDays,
-} from '../../utils/paymentConditions.mjs'
 import { normalizeOptionalNonNegativeInteger } from '../../utils/sourceDocumentValues.mjs'
 
 export function useSalesOrderPaymentReview({
   customers = [],
   form,
-  orders = [],
 }) {
   const paymentConditionSnapshotRef = useRef({
     method: '',
     termDays: undefined,
   })
-
-  const paymentConditionOptions = useMemo(
-    () =>
-      mergePaymentConditionOptions(
-        buildPaymentConditionOptions(customers),
-        buildPaymentConditionOptions(orders, {
-          methodField: 'payment_method',
-          termDaysField: 'payment_term_days',
-        })
-      ),
-    [customers, orders]
-  )
 
   const readPaymentCondition = useCallback(() => {
     const values = form.getFieldsValue(['payment_method', 'payment_term_days'])
@@ -91,16 +73,6 @@ export function useSalesOrderPaymentReview({
     })
   }, [clearOrderLinePrices, hasPricedOrderLines, readPaymentCondition])
 
-  const applyPaymentMethodTermDays = useCallback(
-    (method) => {
-      const termDays = resolvePaymentTermDays(method, paymentConditionOptions)
-      if (termDays !== undefined) {
-        form.setFieldValue('payment_term_days', termDays)
-      }
-    },
-    [form, paymentConditionOptions]
-  )
-
   const applyCustomerPaymentDefaults = useCallback(
     (customerID) => {
       const customer = customers.find((item) => item.id === customerID)
@@ -118,8 +90,6 @@ export function useSalesOrderPaymentReview({
 
   return {
     applyCustomerPaymentDefaults,
-    applyPaymentMethodTermDays,
-    paymentConditionOptions,
     rememberPaymentCondition,
     requestPaymentConditionPriceReview,
   }

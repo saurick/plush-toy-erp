@@ -35,6 +35,7 @@ import {
   uploadBusinessAttachment,
 } from '../../api/attachmentApi.mjs'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const statusLabels = {
   pending: '待保存',
@@ -370,7 +371,7 @@ export default function SalesOrderBatchImportEditor({
           style={{ marginBottom: 16 }}
         />
       ) : null}
-      <Form
+      <BusinessForm
         name="sales-order-import"
         form={form}
         layout="vertical"
@@ -405,7 +406,7 @@ export default function SalesOrderBatchImportEditor({
           onPaymentMethodChange={payment.applyPaymentMethodTermDays}
           onPaymentConditionBlur={payment.requestPaymentConditionPriceReview}
         />
-      </Form>
+      </BusinessForm>
     </BusinessFormPage>
   )
 }

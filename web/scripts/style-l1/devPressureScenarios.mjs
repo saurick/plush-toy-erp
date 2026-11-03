@@ -3,7 +3,7 @@ import {
   DEV_PRESSURE_CHECKS,
   DEV_PRESSURE_FINGERPRINTS,
 } from '../../src/dev-workbench/config/devPressure.mjs'
-import { DEV_TESTING_FIXED_ACTIONS, DEV_TESTING_GIT_HOOK_CHECKS } from '../../src/dev-workbench/config/devTestingOperation.mjs'
+import { DEV_TESTING_AVAILABLE_ACTIONS, DEV_TESTING_GIT_HOOK_CHECKS } from '../../src/dev-workbench/config/devTestingOperation.mjs'
 
 const ID = '123e4567-e89b-42d3-a456-426614174000'
 function pressureFixture() {
@@ -248,7 +248,7 @@ export function createDevPressureScenarios({
               })),
             },
             operations: {
-              ...Object.fromEntries(DEV_TESTING_FIXED_ACTIONS.map(({ key }) => [key, null])),
+              ...Object.fromEntries(DEV_TESTING_AVAILABLE_ACTIONS.map(({ key }) => [key, null])),
               'pressure-quick': operation,
               'pressure-capacity': null,
             },

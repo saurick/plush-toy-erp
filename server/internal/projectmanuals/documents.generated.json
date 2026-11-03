@@ -316,7 +316,7 @@
     "id": "processes",
     "book": "business",
     "title": "加工环节怎么用",
-    "source_hash": "7e7aaba5e89dff981249c37c7ea616ca401619feb08677638d6bf0605247136e",
+    "source_hash": "ac71d4a6333c715dc8cd5fa95b4385af88003d8a912d471d788eccb62e6d1335",
     "path": "/erp/engineering/processes",
     "roles": [
       "pmc"
@@ -324,21 +324,10 @@
     "supplement": true
   },
   {
-    "id": "processes:process-reference",
-    "book": "business",
-    "title": "质检参考会自动发起检验吗",
-    "source_hash": "b7649c8e06e1464e054bd5976323d9c6a4ea149ee6d4b4f1e0b819f8e3acc4e0",
-    "path": "/erp/engineering/processes",
-    "roles": [
-      "pmc"
-    ],
-    "supplement": false
-  },
-  {
     "id": "processes:process-order",
     "book": "business",
     "title": "列表排序就是加工顺序吗",
-    "source_hash": "53ecc31ff50575ea5311901d0973c343a2e74ef69733f043dc6ba8ea788b9c29",
+    "source_hash": "ef95b4ad921b2d8c5a35e39efa9fab44a21b10efad706d47520777e8aafedbb2",
     "path": "/erp/engineering/processes",
     "roles": [
       "pmc"
@@ -349,7 +338,7 @@
     "id": "processes:process-blocked",
     "book": "business",
     "title": "什么情况要先核实",
-    "source_hash": "ec22e9ab3a92cd69fc0c70506982696fddf9482d7dc8c6eef43a71fd346174e1",
+    "source_hash": "a1e5fb5c27c4aa76e6f6b2ff17b817d97c4ae70be18911d05e7075140c51d0aa",
     "path": "/erp/engineering/processes",
     "roles": [
       "pmc"
@@ -1563,7 +1552,7 @@
     "id": "guide:processes",
     "book": "business",
     "title": "维护加工环节",
-    "source_hash": "2da347db9fdac8a8910a5abaa8cbe9a04484c7798f754ec2fc74b2cd7bcead3b",
+    "source_hash": "156196706bac42d3fc767e8ac893a87d9fa436bec226eae4410197bbb765650d",
     "path": "/erp/engineering/processes",
     "roles": [
       "pmc"

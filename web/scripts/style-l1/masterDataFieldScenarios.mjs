@@ -1,6 +1,8 @@
 import { expect as expectLocator } from 'playwright/test'
 import { readFile, writeFile } from 'node:fs/promises'
+import { isBOMVersionReadOnly, readBOMVersion } from './bomEditorDensityAssertions.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
+import { createPaymentMethodScenarios } from './paymentMethodScenarios.mjs'
 import { installBOMMaterialMatchingMocks } from './bomMaterialMatchingScenarios.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { BOM_IMPORT_EXAMPLE_CONTEXT, BOM_IMPORT_EXAMPLE_FILENAME, BOM_IMPORT_EXAMPLE_MATERIALS, BOM_IMPORT_EXAMPLE_ROWS } from '../../src/erp/data/bomImportFormat.mjs'
@@ -19,6 +21,7 @@ export function createMasterDataFieldScenarios(deps) {
     customerRuntimeEffectiveSession,
   } = deps
   return [
+    ...createPaymentMethodScenarios(deps),
     {
       name: 'product-net-weight-unit-suffix-desktop',
       path: '/erp/master/products',
@@ -363,7 +366,7 @@ export function createMasterDataFieldScenarios(deps) {
           path: path.join(outputDir, 'bom-xlsx-import-unresolved.png'),
         })
 
-        assert.equal(await modal.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+        assert.equal(await isBOMVersionReadOnly(modal), true)
         await modal.getByRole('button', { name: '保存草稿' }).click()
         await expectLocator(
           modal.locator('.ant-form-item-explain-error')
@@ -521,7 +524,7 @@ export function createMasterDataFieldScenarios(deps) {
         await page.locator('button[data-business-action-key="edit"]').click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.getByRole('heading', { name: '编辑 BOM 草稿 · 未生效', exact: true }).waitFor()
-        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+        assert.equal(await isBOMVersionReadOnly(editor), true)
         await editor.getByLabel('订单数量', { exact: true }).fill('50')
         await editor.getByLabel('来源订单号', { exact: true }).fill('KEEP-ORDER-50')
         await editor.getByLabel('制表人', { exact: true }).fill('保留制表人')
@@ -557,7 +560,7 @@ export function createMasterDataFieldScenarios(deps) {
         assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '50')
         await editor.getByText('保留当前订单数量 50（原表 100），总用量按当前数量计算。', { exact: true }).waitFor()
         assert.equal(await editor.getByLabel('来源订单号', { exact: true }).inputValue(), 'KEEP-ORDER-50')
-        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), 'BOM-STYLE-DRAFT')
+        assert.equal(await readBOMVersion(editor), 'BOM-STYLE-DRAFT')
         assert.equal(await editor.getByLabel('制表人', { exact: true }).inputValue(), '保留制表人')
         assert.equal(writes.length, 0, '预览和带入不得提前保存')
         await assertImportUndoPlacement(editor)
@@ -651,7 +654,7 @@ export function createMasterDataFieldScenarios(deps) {
         await preview.getByRole('button', { name: '带入编辑', exact: true }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click({ trial: true })
-        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+        assert.equal(await isBOMVersionReadOnly(editor), true)
         await editor.getByText(/原表总用量表头 2 行/u).waitFor()
         const quantity = editor.getByLabel('单位用量 1', { exact: true })
         assert.equal(await quantity.inputValue(), '0.012')
@@ -666,7 +669,7 @@ export function createMasterDataFieldScenarios(deps) {
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
         assert.equal((await firstSave).postDataJSON().params.id, undefined)
         await editor.getByText('草稿已保存，但原表数据尚未完整读回，请保留当前内容并重试。', { exact: true }).waitFor()
-        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), 'V1')
+        assert.equal(await readBOMVersion(editor), 'V1')
         const retrySave = page.waitForRequest((request) => request.url().endsWith('/rpc/bom') && request.postDataJSON()?.method === 'save_bom_with_items')
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
         const { params } = (await retrySave).postDataJSON()
@@ -732,7 +735,7 @@ export function createMasterDataFieldScenarios(deps) {
         await page.getByRole('button', { name: '新建 BOM' }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click({ trial: true })
-        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+        assert.equal(await isBOMVersionReadOnly(editor), true)
         assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '')
         const product = editor.locator('input#product_id')
         await product.click()
@@ -789,7 +792,7 @@ export function createMasterDataFieldScenarios(deps) {
         await format.press('Escape')
         await format.waitFor({ state: 'hidden' })
         await page.waitForFunction(() => document.activeElement?.textContent.includes('查看 Excel 格式'))
-        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), '')
+        assert.equal(await readBOMVersion(editor), '保存后自动生成')
         const preview = page.getByRole('dialog', { name: '导入材料明细', exact: true })
         const openDownloadedPreview = async () => {
           const [chooser] = await Promise.all([page.waitForEvent('filechooser'), editor.getByRole('button', { name: '从 Excel 导入', exact: true }).click()])
@@ -810,7 +813,7 @@ export function createMasterDataFieldScenarios(deps) {
         await editor.getByRole('button', { name: '撤销本次导入', exact: true }).click()
         assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '')
         assert.equal(await editor.locator('tr[data-bom-part-index]').count(), 0)
-        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), '')
+        assert.equal(await readBOMVersion(editor), '保存后自动生成')
         await openDownloadedPreview()
         await preview.getByRole('button', { name: '带入编辑', exact: true }).click()
         await editor.getByLabel('订单数量', { exact: true }).fill('')
@@ -1037,7 +1040,6 @@ export function createSupplierProcessingScenarios(deps) {
           category,
           outsourcing_enabled: true,
           inhouse_enabled: true,
-          quality_required: false,
           is_active: true,
         }))
 

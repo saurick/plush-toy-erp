@@ -20,6 +20,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const { Text } = Typography
 
@@ -205,7 +206,7 @@ export default function SalesOrderReservationModal({
             : []),
         ]}
       />
-      <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+      <BusinessForm form={form} layout="vertical" preserve={false} disabled={loading}>
         <Form.Item
           name="sales_order_item_id"
           label="销售订单明细"
@@ -296,7 +297,7 @@ export default function SalesOrderReservationModal({
         <Form.Item name="note" label="备注">
           <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

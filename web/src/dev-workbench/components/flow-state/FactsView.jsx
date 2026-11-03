@@ -6,6 +6,8 @@ import Select from '@/common/components/select/AppSelect'
 import { DEFINITION_SELECT_CLASS_NAMES, useDefinitionSelectSearch, renderDefinitionSelectOption } from './FlowStateShared.jsx'
 import { createDevFlowDefinitionOptionFilter } from '../../pages/devFlowDefinitionSearch.mjs'
 import { buildFactDefinitionSelectOptions } from '../../pages/devFlowDefinitionSelectOptions.mjs'
+import { buildFactRuleGraph } from '../../config/devBusinessRuleGraphs.mjs'
+import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 
 function FactsView({
   catalog,
@@ -62,6 +64,7 @@ function FactsView({
           aria-label={fact.label}
         >
           <h2 className="erp-dev-flow-print-title">{fact.label}</h2>
+          <BusinessFlowDiagram key={fact.factKey} relationships flow={buildFactRuleGraph(fact)} label={`${fact.label}来源与纠正规则图`} legend="连线说明来源、生效条件与结果；图中没有实际执行状态，纠正须按所属事实规则办理。" />
           <WorkbenchFacts items={[
             { label: '何时生效', value: fact.occurrenceCondition },
             { label: '业务影响', value: fact.businessImpact },

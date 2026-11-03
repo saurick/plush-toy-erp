@@ -73,46 +73,6 @@ func (_u *BOMHeaderUpdate) SetNillableStatus(v *string) *BOMHeaderUpdate {
 	return _u
 }
 
-// SetEffectiveFrom sets the "effective_from" field.
-func (_u *BOMHeaderUpdate) SetEffectiveFrom(v time.Time) *BOMHeaderUpdate {
-	_u.mutation.SetEffectiveFrom(v)
-	return _u
-}
-
-// SetNillableEffectiveFrom sets the "effective_from" field if the given value is not nil.
-func (_u *BOMHeaderUpdate) SetNillableEffectiveFrom(v *time.Time) *BOMHeaderUpdate {
-	if v != nil {
-		_u.SetEffectiveFrom(*v)
-	}
-	return _u
-}
-
-// ClearEffectiveFrom clears the value of the "effective_from" field.
-func (_u *BOMHeaderUpdate) ClearEffectiveFrom() *BOMHeaderUpdate {
-	_u.mutation.ClearEffectiveFrom()
-	return _u
-}
-
-// SetEffectiveTo sets the "effective_to" field.
-func (_u *BOMHeaderUpdate) SetEffectiveTo(v time.Time) *BOMHeaderUpdate {
-	_u.mutation.SetEffectiveTo(v)
-	return _u
-}
-
-// SetNillableEffectiveTo sets the "effective_to" field if the given value is not nil.
-func (_u *BOMHeaderUpdate) SetNillableEffectiveTo(v *time.Time) *BOMHeaderUpdate {
-	if v != nil {
-		_u.SetEffectiveTo(*v)
-	}
-	return _u
-}
-
-// ClearEffectiveTo clears the value of the "effective_to" field.
-func (_u *BOMHeaderUpdate) ClearEffectiveTo() *BOMHeaderUpdate {
-	_u.mutation.ClearEffectiveTo()
-	return _u
-}
-
 // SetSourceOrderNo sets the "source_order_no" field.
 func (_u *BOMHeaderUpdate) SetSourceOrderNo(v string) *BOMHeaderUpdate {
 	_u.mutation.SetSourceOrderNo(v)
@@ -504,18 +464,6 @@ func (_u *BOMHeaderUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(bomheader.FieldStatus, field.TypeString, value)
 	}
-	if value, ok := _u.mutation.EffectiveFrom(); ok {
-		_spec.SetField(bomheader.FieldEffectiveFrom, field.TypeTime, value)
-	}
-	if _u.mutation.EffectiveFromCleared() {
-		_spec.ClearField(bomheader.FieldEffectiveFrom, field.TypeTime)
-	}
-	if value, ok := _u.mutation.EffectiveTo(); ok {
-		_spec.SetField(bomheader.FieldEffectiveTo, field.TypeTime, value)
-	}
-	if _u.mutation.EffectiveToCleared() {
-		_spec.ClearField(bomheader.FieldEffectiveTo, field.TypeTime)
-	}
 	if value, ok := _u.mutation.SourceOrderNo(); ok {
 		_spec.SetField(bomheader.FieldSourceOrderNo, field.TypeString, value)
 	}
@@ -751,46 +699,6 @@ func (_u *BOMHeaderUpdateOne) SetNillableStatus(v *string) *BOMHeaderUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
 	}
-	return _u
-}
-
-// SetEffectiveFrom sets the "effective_from" field.
-func (_u *BOMHeaderUpdateOne) SetEffectiveFrom(v time.Time) *BOMHeaderUpdateOne {
-	_u.mutation.SetEffectiveFrom(v)
-	return _u
-}
-
-// SetNillableEffectiveFrom sets the "effective_from" field if the given value is not nil.
-func (_u *BOMHeaderUpdateOne) SetNillableEffectiveFrom(v *time.Time) *BOMHeaderUpdateOne {
-	if v != nil {
-		_u.SetEffectiveFrom(*v)
-	}
-	return _u
-}
-
-// ClearEffectiveFrom clears the value of the "effective_from" field.
-func (_u *BOMHeaderUpdateOne) ClearEffectiveFrom() *BOMHeaderUpdateOne {
-	_u.mutation.ClearEffectiveFrom()
-	return _u
-}
-
-// SetEffectiveTo sets the "effective_to" field.
-func (_u *BOMHeaderUpdateOne) SetEffectiveTo(v time.Time) *BOMHeaderUpdateOne {
-	_u.mutation.SetEffectiveTo(v)
-	return _u
-}
-
-// SetNillableEffectiveTo sets the "effective_to" field if the given value is not nil.
-func (_u *BOMHeaderUpdateOne) SetNillableEffectiveTo(v *time.Time) *BOMHeaderUpdateOne {
-	if v != nil {
-		_u.SetEffectiveTo(*v)
-	}
-	return _u
-}
-
-// ClearEffectiveTo clears the value of the "effective_to" field.
-func (_u *BOMHeaderUpdateOne) ClearEffectiveTo() *BOMHeaderUpdateOne {
-	_u.mutation.ClearEffectiveTo()
 	return _u
 }
 
@@ -1214,18 +1122,6 @@ func (_u *BOMHeaderUpdateOne) sqlSave(ctx context.Context) (_node *BOMHeader, er
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(bomheader.FieldStatus, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.EffectiveFrom(); ok {
-		_spec.SetField(bomheader.FieldEffectiveFrom, field.TypeTime, value)
-	}
-	if _u.mutation.EffectiveFromCleared() {
-		_spec.ClearField(bomheader.FieldEffectiveFrom, field.TypeTime)
-	}
-	if value, ok := _u.mutation.EffectiveTo(); ok {
-		_spec.SetField(bomheader.FieldEffectiveTo, field.TypeTime, value)
-	}
-	if _u.mutation.EffectiveToCleared() {
-		_spec.ClearField(bomheader.FieldEffectiveTo, field.TypeTime)
 	}
 	if value, ok := _u.mutation.SourceOrderNo(); ok {
 		_spec.SetField(bomheader.FieldSourceOrderNo, field.TypeString, value)

@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { loadConfigFromFile } from 'vite'
+import { planChainRuleCheck, buildChainRuleCheckReport } from '../../scripts/qa/business-chain-rule-check.mjs'
 
 import {
   acquireDevQaExecutionLock,
   releaseDevQaExecutionLock,
 } from '../../scripts/qa/dev-qa-execution-lock.mjs'
 import { DEV_TESTING_ACTIONS, resolveDevTestingOperationStore } from '../../scripts/qa/dev-testing-operation-store.mjs'
-import { DEV_PRESSURE_ACTIONS, DEV_TESTING_FIXED_ACTIONS, normalizeDevTestingPlan, normalizeDevTestingSummary } from '../src/dev-workbench/config/devTestingOperation.mjs'
+import { DEV_PRESSURE_ACTIONS, DEV_TESTING_FIXED_ACTIONS, DEV_TESTING_AVAILABLE_ACTIONS, normalizeDevTestingPlan, normalizeDevTestingSummary } from '../src/dev-workbench/config/devTestingOperation.mjs'
 import {
   buildDevQaTestingCommand,
   DEV_QA_PRESSURE_REPORTS_API_PATH,
@@ -24,9 +26,22 @@ import {
 
 const ID = '123e4567-e89b-42d3-a456-426614174000'
 test('testing action keys stay aligned between the authoritative store and frontend consumers', () => {
-  assert.deepEqual([...DEV_TESTING_FIXED_ACTIONS, ...DEV_PRESSURE_ACTIONS].map((action) => action.key).sort(), [...DEV_TESTING_ACTIONS].sort())
+  assert.deepEqual(DEV_TESTING_AVAILABLE_ACTIONS.map((action) => action.key).sort(), [...DEV_TESTING_ACTIONS].sort())
 })
 const ID_TWO = '123e4567-e89b-42d3-a456-426614174001'
+test('chain checks accept only registered chain scope and a fixed script with an operation-bound batch', () => {
+  const payload = { idempotencyKey: 'testing:chain-rules:' + ID, chainKey: 'production_exception' }
+  assert.equal(validateDevQaTestingAction({ action: 'chain-rules', payload }).payload.chainKey, payload.chainKey)
+  for (const invalid of [
+    { ...payload, chainKey: 'unknown' },
+    { ...payload, chainKey: '../shell' },
+    { ...payload, command: 'true' },
+    { ...payload, projectRoot: '/other' },
+  ]) assert.throws(() => validateDevQaTestingAction({ action: 'chain-rules', payload: invalid }))
+  const command = buildDevQaTestingCommand({ action: 'chain-rules', chainKey: payload.chainKey, operationId: ID, nodeRuntime: '/runtime/node', projectRoot: '/project' })
+  assert.deepEqual(command.args, ['scripts/qa/business-chain-rule-check.mjs', '--chain', payload.chainKey, '--batch', 'rules-' + ID, '--run'])
+  assert.equal(command.env.GIT_OPTIONAL_LOCKS, '0')
+})
 const REPOSITORY = Object.freeze({
   commit: 'a'.repeat(40),
   dirty: true,
@@ -35,6 +50,55 @@ const REPOSITORY = Object.freeze({
 const CHANGED_REPOSITORY = Object.freeze({
   ...REPOSITORY,
   fingerprint: 'c'.repeat(64),
+})
+
+test('chain operation completion needs a readable manifest, exact counts and matching scope', async (t) => {
+  for (const mode of ['valid', 'missing', 'tampered']) {
+    const root = await project(t)
+    const completion = deferred()
+    const service = createDevQaTestingService({
+      projectRoot: root, randomOperationId: () => ID,
+      readRepositoryState: async () => REPOSITORY,
+      resolveNodeRuntime: () => '/pinned/node',
+      launchProcess: () => ({ pid: 321, completion: completion.promise }),
+    })
+    const payload = { idempotencyKey: 'testing:chain-rules:' + ID, chainKey: 'production_exception' }
+    await service.act({ action: 'chain-rules', payload })
+    await assert.rejects(() => service.act({ action: 'chain-rules', payload: { ...payload, chainKey: 'purchase_to_inventory' } }), /intent mismatch/u)
+    if (mode !== 'missing') {
+      const plan = planChainRuleCheck(payload.chainKey)
+      const runs = plan.commands.map((command) => ({
+        ...command, status: 0,
+        stdout: plan.tests.filter((test) => test.gate === 'server' && command.args.includes('./' + test.package.slice('server/'.length)))
+          .flatMap((test) => ['run', 'pass'].map((Action) => JSON.stringify({ Package: test.package, Test: test.name, Action }))).join('\n'),
+      }))
+      const value = buildChainRuleCheckReport({
+        plan, runs, repositoryBefore: REPOSITORY, repositoryAfter: REPOSITORY,
+        generatedAt: '2026-11-03T00:00:00.000Z',
+      })
+      const directory = path.join(root, 'output/qa/business-chain-audit', 'rules-' + ID)
+      await mkdir(directory, { recursive: true })
+      const files = {
+        'report.json': JSON.stringify(value.report),
+        'test-results.json': JSON.stringify(value.results),
+        'go-test.json': runs.map((run) => run.stdout).join('\n'),
+        'commands.json': JSON.stringify(plan.commands),
+      }
+      for (const [name, contents] of Object.entries(files)) await writeFile(path.join(directory, name), contents)
+      await writeFile(path.join(directory, 'artifact-manifest.json'), JSON.stringify({ files: Object.entries(files).map(([name, contents]) => ({
+        path: name, bytes: Buffer.byteLength(contents), sha256: createHash('sha256').update(contents).digest('hex'),
+      })) }))
+      if (mode === 'tampered') await writeFile(path.join(directory, 'test-results.json'), '{}')
+    }
+    completion.resolve({ code: 0 })
+    let operation
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      operation = service.readOperation(ID)
+      if (!['queued', 'running'].includes(operation.status)) break
+    }
+    assert.equal(operation.status, mode === 'valid' ? 'completed' : 'failed', mode)
+  }
 })
 
 async function project(t) {
@@ -438,6 +502,7 @@ test('testing middleware is loopback-only and plugin is serve-only', async () =>
           'field-linkage': null,
           'business-consistency': null,
           'rpc-examples': null,
+      'chain-rules': null,
           'pressure-quick': null,
           'pressure-capacity': null,
         },

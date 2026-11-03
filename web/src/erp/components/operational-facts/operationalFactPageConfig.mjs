@@ -28,13 +28,11 @@ import {
 } from '../../utils/masterDataOrderView.mjs'
 import { financeCancelAuditText as buildFinanceCancelAuditText } from '../../utils/financeCancellation.mjs'
 import {
-  financeCollectionTypeText,
   financeInvoiceCategoryText,
   financePaymentTermText,
 } from '../../utils/financeFactDisplay.mjs'
 import {
   ACTION_PERMISSIONS,
-  FINANCE_COLLECTION_TYPE_LABELS,
   FINANCE_INVOICE_CATEGORY_LABELS,
   FINANCE_PAYMENT_TERM_LABELS,
   formatQuantity,
@@ -125,7 +123,6 @@ const FINANCE_COLUMN_KEYS_BY_FACT_TYPE = Object.freeze({
     'amount',
     'fee_amount',
     'currency',
-    'collection_type',
     'payment_term',
     'due_at',
   ]),
@@ -546,17 +543,6 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       dataIndex: 'currency',
       width: 90,
       sortType: 'text',
-    },
-    collection_type: {
-      defaultHidden: true,
-      title: '收款分类',
-      dataIndex: 'collection_type',
-      width: 130,
-      sortType: 'text',
-      render: (value) =>
-        financeCollectionTypeText(value, FINANCE_COLLECTION_TYPE_LABELS),
-      exportValue: (record) =>
-        financeCollectionTypeText(record?.collection_type, FINANCE_COLLECTION_TYPE_LABELS, { emptyText: '' }),
     },
     payment_term: {
       defaultHidden: true,

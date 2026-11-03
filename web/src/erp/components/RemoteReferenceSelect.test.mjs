@@ -88,3 +88,17 @@ test('late search responses and permission changes cannot overwrite current choi
   await view.wait()
   assert.equal(view.calls.length, count)
 })
+
+test('typing before popup opening retains the query; reopening after close starts a fresh search', async (t) => {
+  const view = await harness(t, page)
+  await view.renderSelect()
+  await view.act(async () => view.current.onSearch('刚输入的材料'))
+  await view.act(async () => view.current.onOpenChange(true))
+  await view.wait(250)
+  assert.equal(view.calls.length, 1)
+  assert.equal(view.calls[0].params.keyword, '刚输入的材料')
+  await view.act(async () => view.current.onOpenChange(false))
+  await view.act(async () => view.current.onOpenChange(true))
+  await view.wait()
+  assert.equal(view.calls.at(-1).params.keyword, '')
+})

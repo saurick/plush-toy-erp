@@ -138,7 +138,6 @@ export async function installMasterDataRpcMocks(page, context) {
       category: '委外车缝',
       outsourcing_enabled: true,
       inhouse_enabled: true,
-      quality_required: true,
       is_active: true,
       note: '',
       created_at: nowUnix(),
@@ -151,7 +150,6 @@ export async function installMasterDataRpcMocks(page, context) {
         code: 'PROC-CHECKING-L1',
         name: '查货',
         category: '查货',
-        quality_required: true,
       },
       {
         ...process,
@@ -159,7 +157,6 @@ export async function installMasterDataRpcMocks(page, context) {
         code: 'PROC-SEWING-L1',
         name: '车缝',
         category: '车缝',
-        quality_required: false,
       },
       {
         ...process,
@@ -167,7 +164,6 @@ export async function installMasterDataRpcMocks(page, context) {
         code: 'PROC-HANDWORK-L1',
         name: '手工',
         category: '手工',
-        quality_required: false,
       },
       {
         ...process,
@@ -175,7 +171,6 @@ export async function installMasterDataRpcMocks(page, context) {
         code: 'PROC-PACKAGING-L1',
         name: '包装',
         category: '包装',
-        quality_required: false,
       },
     ]
     const unit = {
@@ -212,6 +207,9 @@ export async function installMasterDataRpcMocks(page, context) {
 
     let data = {}
     switch (method) {
+      case 'list_payment_methods':
+        data = { methods: ['银行转账', '现金', '银行承兑'].filter((value) => value.includes(String(params.keyword || '').trim())), has_more: false, keyword_not_recommended: false, can_manage: false }
+        break
       case 'list_customers':
         data = stylePaginatedMasterData([customer], 'customers', params)
         break

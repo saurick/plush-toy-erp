@@ -70,16 +70,6 @@ func Status(v string) predicate.BOMHeader {
 	return predicate.BOMHeader(sql.FieldEQ(FieldStatus, v))
 }
 
-// EffectiveFrom applies equality check predicate on the "effective_from" field. It's identical to EffectiveFromEQ.
-func EffectiveFrom(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldEQ(FieldEffectiveFrom, v))
-}
-
-// EffectiveTo applies equality check predicate on the "effective_to" field. It's identical to EffectiveToEQ.
-func EffectiveTo(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldEQ(FieldEffectiveTo, v))
-}
-
 // SourceOrderNo applies equality check predicate on the "source_order_no" field. It's identical to SourceOrderNoEQ.
 func SourceOrderNo(v string) predicate.BOMHeader {
 	return predicate.BOMHeader(sql.FieldEQ(FieldSourceOrderNo, v))
@@ -283,106 +273,6 @@ func StatusEqualFold(v string) predicate.BOMHeader {
 // StatusContainsFold applies the ContainsFold predicate on the "status" field.
 func StatusContainsFold(v string) predicate.BOMHeader {
 	return predicate.BOMHeader(sql.FieldContainsFold(FieldStatus, v))
-}
-
-// EffectiveFromEQ applies the EQ predicate on the "effective_from" field.
-func EffectiveFromEQ(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldEQ(FieldEffectiveFrom, v))
-}
-
-// EffectiveFromNEQ applies the NEQ predicate on the "effective_from" field.
-func EffectiveFromNEQ(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldNEQ(FieldEffectiveFrom, v))
-}
-
-// EffectiveFromIn applies the In predicate on the "effective_from" field.
-func EffectiveFromIn(vs ...time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldIn(FieldEffectiveFrom, vs...))
-}
-
-// EffectiveFromNotIn applies the NotIn predicate on the "effective_from" field.
-func EffectiveFromNotIn(vs ...time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldNotIn(FieldEffectiveFrom, vs...))
-}
-
-// EffectiveFromGT applies the GT predicate on the "effective_from" field.
-func EffectiveFromGT(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldGT(FieldEffectiveFrom, v))
-}
-
-// EffectiveFromGTE applies the GTE predicate on the "effective_from" field.
-func EffectiveFromGTE(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldGTE(FieldEffectiveFrom, v))
-}
-
-// EffectiveFromLT applies the LT predicate on the "effective_from" field.
-func EffectiveFromLT(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldLT(FieldEffectiveFrom, v))
-}
-
-// EffectiveFromLTE applies the LTE predicate on the "effective_from" field.
-func EffectiveFromLTE(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldLTE(FieldEffectiveFrom, v))
-}
-
-// EffectiveFromIsNil applies the IsNil predicate on the "effective_from" field.
-func EffectiveFromIsNil() predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldIsNull(FieldEffectiveFrom))
-}
-
-// EffectiveFromNotNil applies the NotNil predicate on the "effective_from" field.
-func EffectiveFromNotNil() predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldNotNull(FieldEffectiveFrom))
-}
-
-// EffectiveToEQ applies the EQ predicate on the "effective_to" field.
-func EffectiveToEQ(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldEQ(FieldEffectiveTo, v))
-}
-
-// EffectiveToNEQ applies the NEQ predicate on the "effective_to" field.
-func EffectiveToNEQ(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldNEQ(FieldEffectiveTo, v))
-}
-
-// EffectiveToIn applies the In predicate on the "effective_to" field.
-func EffectiveToIn(vs ...time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldIn(FieldEffectiveTo, vs...))
-}
-
-// EffectiveToNotIn applies the NotIn predicate on the "effective_to" field.
-func EffectiveToNotIn(vs ...time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldNotIn(FieldEffectiveTo, vs...))
-}
-
-// EffectiveToGT applies the GT predicate on the "effective_to" field.
-func EffectiveToGT(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldGT(FieldEffectiveTo, v))
-}
-
-// EffectiveToGTE applies the GTE predicate on the "effective_to" field.
-func EffectiveToGTE(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldGTE(FieldEffectiveTo, v))
-}
-
-// EffectiveToLT applies the LT predicate on the "effective_to" field.
-func EffectiveToLT(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldLT(FieldEffectiveTo, v))
-}
-
-// EffectiveToLTE applies the LTE predicate on the "effective_to" field.
-func EffectiveToLTE(v time.Time) predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldLTE(FieldEffectiveTo, v))
-}
-
-// EffectiveToIsNil applies the IsNil predicate on the "effective_to" field.
-func EffectiveToIsNil() predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldIsNull(FieldEffectiveTo))
-}
-
-// EffectiveToNotNil applies the NotNil predicate on the "effective_to" field.
-func EffectiveToNotNil() predicate.BOMHeader {
-	return predicate.BOMHeader(sql.FieldNotNull(FieldEffectiveTo))
 }
 
 // SourceOrderNoEQ applies the EQ predicate on the "source_order_no" field.

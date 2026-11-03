@@ -18,9 +18,7 @@ import BusinessCompactFieldTable, {
 import { ProductThumbnail } from '../master-data/ProductIdentity.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
-import BusinessLineItemsFooter, {
-  BusinessLineItemsHeader,
-} from '../business-list/BusinessLineItemsFooter.jsx'
+import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import ProductionOrderReferenceSelect from './ProductionOrderReferenceSelect.jsx'
@@ -30,6 +28,7 @@ import {
   PRODUCTION_ORDER_STATUS,
 } from '../../utils/productionOrderModel.mjs'
 import { PRODUCTION_WIP_ROUTE_CODE } from '../../utils/productionWipModel.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function materialRequirementLabel(requirement = {}) {
   return (
@@ -310,29 +309,12 @@ function RowReference({
             }}
           />
         </Form.Item>,
-        <Form.Item
-          name={[field.name, 'unit_id']}
-          label="单位"
-          rules={[{ required: true, message: '请选择单位' }]}
-        >
-          <ProductionOrderReferenceSelect
-            referenceType="unit"
-            disabled={readOnly || referenceAccess.unit !== true}
-            initialOptions={optionsByType.unit}
-            placeholder="搜索单位"
-            onChange={(value) =>
-              setRow({
-                unit_id: value || null,
-                sales_order_item_id: null,
-              })
-            }
-          />
-        </Form.Item>,
-        <Form.Item
-          name={[field.name, 'planned_quantity']}
-          dependencies={[['items', field.name, 'unit_id']]}
-          label="计划数量"
-          rules={[
+        <div className="erp-line-editor__quantity">
+          <Form.Item
+            name={[field.name, 'planned_quantity']}
+            dependencies={[['items', field.name, 'unit_id']]}
+            label="计划数量"
+            rules={[
             unitQuantityRuleFromOptions(quantityUnitOptions, unitID),
             { required: true, message: '请输入计划数量' },
             {
@@ -340,9 +322,28 @@ function RowReference({
               message: '计划数量必须大于 0',
             },
           ]}
-        >
-          <Input disabled={readOnly} inputMode="decimal" maxLength={40} />
-        </Form.Item>,
+          >
+            <Input disabled={readOnly} inputMode="decimal" maxLength={40} />
+          </Form.Item>
+          <Form.Item
+            name={[field.name, 'unit_id']}
+            label="单位"
+            rules={[{ required: true, message: '请选择单位' }]}
+          >
+            <ProductionOrderReferenceSelect
+              referenceType="unit"
+              disabled={readOnly || referenceAccess.unit !== true}
+              initialOptions={optionsByType.unit}
+              placeholder="搜索单位"
+              onChange={(value) =>
+              setRow({
+                unit_id: value || null,
+                sales_order_item_id: null,
+              })
+            }
+            />
+          </Form.Item>
+        </div>,
         <Form.Item
           name={[field.name, 'bom_header_id']}
           label="BOM 版本（可选）"
@@ -356,8 +357,8 @@ function RowReference({
             filters={productID ? { product_id: productID } : {}}
             placeholder={productID ? '搜索当前生效 BOM' : '请先选择产品'}
           />
-        </Form.Item>,
-      ]}
+        </Form.Item>
+]}
       actions={
         onRemove ? (
           <Button
@@ -366,7 +367,9 @@ function RowReference({
             icon={<DeleteOutlined />}
             aria-label={`移除明细 ${index + 1}`}
             onClick={onRemove}
-          />
+          >
+            移除行
+          </Button>
         ) : null
       }
     >
@@ -497,13 +500,13 @@ export default function ProductionOrderEditor({
       onOk={readOnly ? undefined : () => form.submit()}
       savedRecordActions={savedRecordActions}
     >
-      <Form
+      <BusinessForm
         form={form}
         layout="vertical"
         className="erp-business-action-form"
         onFinish={onSubmit}
       >
-        <BusinessFormSection title="生产计划">
+        <BusinessFormSection fieldLayout="adaptive" title="生产计划">
           <Form.Item
             name="order_no"
             label="生产单号"
@@ -522,10 +525,10 @@ export default function ProductionOrderEditor({
               }
             />
           </Form.Item>
-          <Form.Item name="planned_start_at" label="计划开始">
+          <Form.Item className="erp-business-action-form__field--short" name="planned_start_at" label="计划开始">
             <DateInput disabled={readOnly} />
           </Form.Item>
-          <Form.Item name="planned_end_at" label="计划结束">
+          <Form.Item className="erp-business-action-form__field--short" name="planned_end_at" label="计划结束">
             <DateInput disabled={readOnly} />
           </Form.Item>
         </BusinessFormSection>
@@ -541,8 +544,8 @@ export default function ProductionOrderEditor({
                 size="middle"
                 style={{ width: '100%' }}
               >
-                <BusinessLineItemsHeader title="生产明细" />
                 <BusinessGroupedLineItems
+                  title="生产明细"
                   fields={fields}
                   form={form}
                   table={BusinessCompactFieldTable}
@@ -554,14 +557,13 @@ export default function ProductionOrderEditor({
                     label: '生产明细',
                     showSequence: true,
                     columns: [
-                    { label: '销售订单行' },
-                    { label: '产品', required: true, width: '28%' },
-                    { label: '规格' },
-                    { label: '单位', required: true, width: 100 },
-                    { label: '计划数量', required: true, width: 180 },
-                    { label: 'BOM 版本' },
-                    { label: '操作', width: 52 },
-                  ] }}
+{ label: '销售订单行' },
+{ label: '产品', required: true, width: '28%' },
+{ label: '规格' },
+{ label: '计划数量 / 单位', required: true, width: 200 },
+{ label: 'BOM 版本' },
+{ actions: true, label: '操作', width: 52 }
+] }}
                 >
                   {(field, index) => (
                     <RowReference
@@ -632,7 +634,7 @@ export default function ProductionOrderEditor({
             />
           </Form.Item>
         </BusinessFormSection>
-      </Form>
+      </BusinessForm>
     </BusinessFormPage>
   )
 }

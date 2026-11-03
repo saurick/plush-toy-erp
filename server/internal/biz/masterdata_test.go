@@ -95,7 +95,7 @@ func (s *masterDataRepoStub) UnitIsActive(_ context.Context, id int) (bool, erro
 func (s *masterDataRepoStub) CreateProcess(_ context.Context, in *ProcessMutation) (*Process, error) {
 	cp := *in
 	s.createdProcess = &cp
-	return &Process{ID: 1, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, Note: in.Note, IsActive: true}, nil
+	return &Process{ID: 1, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, Note: in.Note, IsActive: true}, nil
 }
 func (s *masterDataRepoStub) UpdateProcess(context.Context, int, *ProcessMutation) (*Process, error) {
 	return nil, nil

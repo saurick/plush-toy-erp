@@ -3,6 +3,49 @@
   flex: 0 0 auto;
 }
 
+[data-table-sticky-toolbar='true'] {
+  position: sticky;
+  top: var(--app-table-sticky-offset, 0px);
+  z-index: 7;
+}
+
+.app-table-sticky-region {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.app-table-sticky-region > div {
+  grid-area: 1 / 1;
+}
+
+.app-table-sticky-header {
+  position: sticky;
+  top: calc(var(--app-table-sticky-offset, 0px) + var(--app-table-toolbar-height, 0px));
+  z-index: 6;
+  box-sizing: border-box;
+  align-self: start;
+  height: var(--app-table-header-height, 0px);
+  overflow: hidden;
+}
+
+.app-table-sticky-header[hidden] {
+  display: none;
+}
+
+.app-table-sticky-header__viewport {
+  height: 100%;
+  overflow: hidden;
+}
+
+.app-table-sticky-header__table {
+  table-layout: fixed;
+}
+
+.app-table-sticky-region :where([data-line-item-index], [data-bom-part-index], input, textarea, select, button, [tabindex]) {
+  scroll-margin-block-start: calc(var(--app-table-sticky-offset, 0px) + var(--app-table-toolbar-height, 0px) + var(--app-table-header-height, 0px) + 12px);
+}
+
 .app-table-scroll-buttons {
   vertical-align: middle;
   white-space: nowrap;
@@ -127,7 +170,7 @@
   margin-inline-end: var(--app-table-header-scroll-gap, 0px);
 }
 
-@media (hover: none), (pointer: coarse) {
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
   .app-table-scroll-buttons .ant-btn {
     width: 44px;
     min-width: 44px;

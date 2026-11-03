@@ -13,6 +13,30 @@ const operation = (status = 'running') => ({
   status,
   message: '隔离样例执行结果',
 })
+
+test('a chain request with an unknown outcome keeps its original scope and retry key', async (t) => {
+  const starts = []
+  let fail = true
+  const view = await mount(t, {
+    summary: async () => summary(),
+    start: async (...args) => {
+      starts.push(args)
+      if (fail) throw new Error('response lost')
+      return { ...operation('completed'), action: 'chain-rules', chainKey: 'production_exception' }
+    },
+  })
+  await view.act(async () => view.state().runTestingAction('chain-rules', undefined, 'production_exception'))
+  await view.act(async () => view.state().reloadTestingSummary())
+  await view.act(async () => view.state().runTestingAction('chain-rules', undefined, 'purchase_to_inventory'))
+  assert.equal(starts.length, 1)
+  assert.match(view.state().testingSummaryError, /上一条业务链/u)
+  await view.act(async () => view.state().reloadTestingSummary())
+  fail = false
+  await view.act(async () => view.state().runTestingAction('chain-rules', undefined, 'production_exception'))
+  assert.equal(starts.length, 2)
+  assert.equal(starts[0][1], starts[1][1])
+  assert.equal(starts[1][2].chainKey, 'production_exception')
+})
 function deferred() {
   let resolve
   let reject

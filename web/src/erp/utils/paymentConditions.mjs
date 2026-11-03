@@ -3,78 +3,19 @@ import {
   normalizeOptionalNonNegativeInteger,
 } from './sourceDocumentValues.mjs'
 
-const DEFAULT_PAYMENT_CONDITIONS = Object.freeze([
-  Object.freeze({ method: '发生即到期', termDays: 0 }),
-  Object.freeze({ method: '月结 30 天', termDays: 30 }),
-  Object.freeze({ method: '月结 60 天', termDays: 60 }),
-])
-
-function buildPaymentConditionOptions(
-  records = [],
-  {
-    methodField = 'default_payment_method',
-    termDaysField = 'default_payment_term_days',
-  } = {}
-) {
-  const byMethod = new Map()
-  const addOption = (method, termDays) => {
-    const value = trimOptional(method)
-    if (!value || byMethod.has(value)) {
-      return
-    }
-    const normalizedDays = normalizeOptionalNonNegativeInteger(termDays)
-    byMethod.set(value, {
-      value,
-      label: formatPaymentCondition({
-        payment_method: value,
-        payment_term_days: normalizedDays,
-      }),
-      payment_term_days: normalizedDays,
-    })
+function buildPaymentMethodOptions(methods = [], keyword = '') {
+  const query = String(keyword || '').trim()
+  const values = [...new Set(methods
+    .filter((value) => typeof value === 'string')
+    .map((value) => value.trim())
+    .filter(Boolean))]
+  const options = values
+    .filter((value) => value.toLowerCase().includes(query.toLowerCase()))
+    .map((value) => ({ value, label: value }))
+  if (query && !values.includes(query)) {
+    options.push({ value: query, isNew: true })
   }
-
-  DEFAULT_PAYMENT_CONDITIONS.forEach((condition) =>
-    addOption(condition.method, condition.termDays)
-  )
-  ;(Array.isArray(records) ? records : []).forEach((record) =>
-    addOption(record?.[methodField], record?.[termDaysField])
-  )
-  return [...byMethod.values()]
-}
-
-function mergePaymentConditionOptions(...optionGroups) {
-  const byMethod = new Map()
-  optionGroups.flat().forEach((option) => {
-    const value = trimOptional(option?.value)
-    if (!value || byMethod.has(value)) {
-      return
-    }
-    const normalizedDays = normalizeOptionalNonNegativeInteger(
-      option?.payment_term_days
-    )
-    byMethod.set(value, {
-      ...option,
-      value,
-      label:
-        option?.label ||
-        (normalizedDays === undefined
-          ? value
-          : `${value} ${normalizedDays}天`),
-      payment_term_days: normalizedDays,
-    })
-  })
-  return [...byMethod.values()]
-}
-
-function resolvePaymentTermDays(method, options = []) {
-  const value = trimOptional(method)
-  if (!value) {
-    return undefined
-  }
-  const matched = (Array.isArray(options) ? options : []).find(
-    (option) => trimOptional(option?.value) === value
-  )
-  return normalizeOptionalNonNegativeInteger(matched?.payment_term_days)
+  return options
 }
 
 function paymentConditionCompleteness({ method, termDays } = {}) {
@@ -118,10 +59,7 @@ function formatPaymentCondition(record = {}, { emptyText = '-' } = {}) {
 }
 
 export {
-  DEFAULT_PAYMENT_CONDITIONS,
-  buildPaymentConditionOptions,
-  mergePaymentConditionOptions,
-  resolvePaymentTermDays,
+  buildPaymentMethodOptions,
   paymentConditionCompleteness,
   formatPaymentCondition,
 }

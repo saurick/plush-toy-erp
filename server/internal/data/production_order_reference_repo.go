@@ -281,7 +281,7 @@ func (r *productionOrderRepo) listProductionOrderBOMOptions(ctx context.Context,
 	options := make([]*biz.ProductionOrderReferenceOption, 0, len(rows))
 	for _, row := range rows {
 		productRow := row.Edges.Product
-		option := &biz.ProductionOrderReferenceOption{ReferenceType: filter.ReferenceType, Value: row.ID, Selectable: row.Status == biz.BOMStatusActive && productRow != nil && productRow.IsActive, ProductValue: productionOrderIntPtr(row.ProductID), BOMVersion: productionOrderStringPtr(row.Version), EffectiveFrom: row.EffectiveFrom, EffectiveTo: row.EffectiveTo}
+		option := &biz.ProductionOrderReferenceOption{ReferenceType: filter.ReferenceType, Value: row.ID, Selectable: row.Status == biz.BOMStatusActive && productRow != nil && productRow.IsActive, ProductValue: productionOrderIntPtr(row.ProductID), BOMVersion: productionOrderStringPtr(row.Version)}
 		if productRow != nil {
 			option.Code, option.Name = productionOrderStringPtr(productRow.Code), productionOrderStringPtr(productRow.Name)
 		}

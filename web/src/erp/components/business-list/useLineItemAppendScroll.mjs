@@ -8,6 +8,7 @@ function canFocusLineInput(input) {
     (!input.readOnly || input.getAttribute('role') === 'combobox') &&
     input.tabIndex >= 0 &&
     !input.closest('[inert], [aria-hidden="true"], [aria-disabled="true"]') &&
+    !input.closest('.erp-line-editor__row-marker') &&
     rect.width > 0 &&
     rect.height > 0 &&
     window.getComputedStyle(input).visibility === 'visible'
@@ -63,7 +64,7 @@ export function useLineItemAppendScroll(itemCount, { initialFocusSelector } = {}
       target.querySelectorAll('input:not([type="hidden"]), textarea, select')
     ).filter(canFocusLineInput)
     const initialInput = initialFocusSelector ? target.querySelector(initialFocusSelector) : null
-    // 保留表单已指定的焦点；身份入口移至操作列时仍从该入口录入。
+    // 新增与复制后进入业务输入，保留表单已指定的合法字段焦点。
     const focusTarget = inputs.includes(document.activeElement)
       ? document.activeElement
       : inputs.includes(initialInput) ? initialInput : inputs[0]

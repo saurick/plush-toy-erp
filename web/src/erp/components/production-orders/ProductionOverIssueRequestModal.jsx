@@ -24,6 +24,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function requirementLabel(requirement) {
   return (
@@ -178,7 +179,7 @@ export default function ProductionOverIssueRequestModal({
           },
         ]}
       />
-      <Form
+      <BusinessForm
         form={form}
         layout="vertical"
         disabled={loading}
@@ -222,7 +223,7 @@ export default function ProductionOverIssueRequestModal({
         >
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

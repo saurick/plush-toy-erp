@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Form } from 'antd'
+import { Alert, Button } from 'antd'
 import { SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import { getActionErrorMessage } from '../../../common/utils/errorMessage.js'
 import { listBusinessAttachments } from '../../api/attachmentApi.mjs'
@@ -11,6 +11,7 @@ import {
   SalesOrderFormFields,
   SalesOrderItemsFormSection,
 } from './SalesOrderForm.jsx'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function SalesOrderEditor({
   open,
@@ -84,7 +85,7 @@ export default function SalesOrderEditor({
       confirmLoading={saving}
       loading={itemLoading || referencesLoading}
     >
-      <Form form={form} layout="vertical" className="erp-business-action-form">
+      <BusinessForm form={form} layout="vertical" className="erp-business-action-form">
         <SalesOrderFormFields
           orderID={editingOrder?.id}
           itemsSection={
@@ -145,7 +146,7 @@ export default function SalesOrderEditor({
           onPaymentMethodChange={onPaymentMethodChange}
           onPaymentConditionBlur={onPaymentConditionBlur}
         />
-      </Form>
+      </BusinessForm>
     </BusinessFormPage>
   )
 }

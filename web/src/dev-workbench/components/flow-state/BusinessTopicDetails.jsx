@@ -15,12 +15,9 @@ export default function BusinessTopicDetails({
   node,
   onSelect,
   onExploreChain,
-  selectedStepKey,
   onInspectStep,
   visibleStepKeys,
-  stepDetails,
 }) {
-  const detailsId = React.useId()
   const nodes = new Map(topic.nodes.map((item) => [item.key, item]))
   const steps = new Map(topic.steps.map((item) => [item.key, item]))
   const relations = topic.edges.filter(
@@ -36,7 +33,7 @@ export default function BusinessTopicDetails({
         {node.summary ? <p>{node.summary}</p> : null}
       </div>
       <ul className="erp-dev-chain-topics__relations" aria-label="当前对象的关联条件">
-        {relations.map((edge, index) => {
+        {relations.map((edge) => {
           const outgoing = edge.from === node.key
           const related = nodes.get(outgoing ? edge.to : edge.from)
           const step = steps.get(edge.key)
@@ -63,18 +60,15 @@ export default function BusinessTopicDetails({
                   {responsibility}
                 </p>
               ) : null}
-              {step?.verificationRuleIds?.length && onInspectStep ? (
+              {step && onInspectStep ? (
                 <Button
                   type="link"
-                  aria-label={`${selectedStepKey === step.key ? '收起' : '查看'}${edge.label}的规则与验证`}
-                  aria-expanded={selectedStepKey === step.key}
-                  aria-controls={`${detailsId}-${index}`}
-                  onClick={(event) => onInspectStep(selectedStepKey === step.key ? null : step.key, event.currentTarget)}
+                  aria-label={`查看${edge.label}的规则与验证`}
+                  onClick={(event) => onInspectStep(step.key, event.currentTarget)}
                 >
-                  {selectedStepKey === step.key ? '收起规则与验证' : '规则与验证'}
+                  规则与验证
                 </Button>
               ) : null}
-              {step && selectedStepKey === step.key ? <div id={`${detailsId}-${index}`}>{stepDetails}</div> : null}
             </li>
           )
         })}

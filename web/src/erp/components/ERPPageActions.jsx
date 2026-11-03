@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react'
-import { MenuOutlined, ReloadOutlined } from '@ant-design/icons'
+import { LayoutOutlined, MenuOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button } from 'antd'
 
 export const ERPPageActionsContext = createContext(null)
@@ -25,6 +25,16 @@ export default function ERPPageActions({ showRefresh = true }) {
           aria-label="刷新当前页"
         >
           刷新
+        </Button>
+      ) : null}
+      {actions.onSplit ? (
+        <Button
+          icon={<LayoutOutlined />}
+          onClick={actions.onSplit}
+          aria-pressed={actions.splitOpen}
+          aria-label={actions.splitOpen ? '收起分栏' : '分栏编辑'}
+        >
+          {actions.splitOpen ? '收起分栏' : '分栏编辑'}
         </Button>
       ) : null}
     </div>

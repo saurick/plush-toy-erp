@@ -65,7 +65,7 @@ test('HelpCenterPage: 通用帮助由登录壳追加且不依赖业务权限项'
   )
   assert.match(
     layoutSource,
-    /currentEntry\?\.sidebarParentPath \|\| currentNavigationEntry\.menuPath/u
+    /sidebarNavigationEntry\.entry\?\.sidebarParentPath \|\| sidebarNavigationEntry\.menuPath/u
   )
   assert.match(layoutSource, /\?\s*\[currentSidebarPath\]\s*:\s*\[\]/u)
   assert.doesNotMatch(layoutSource, /defaultOpenKeys=/u)

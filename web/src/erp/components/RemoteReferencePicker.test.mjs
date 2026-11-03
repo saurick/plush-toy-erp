@@ -4,6 +4,7 @@ import { createElement } from 'react'
 import { createReactTestHarness } from '../../../scripts/test/reactRuntime.mjs'
 import { installRpcCallHarness } from '../../../scripts/test/rpcApiTestHarness.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import { notifyReferenceRecordsChanged } from '../utils/referenceRecordChanges.mjs'
 
 function materialPage(params, prefix = '材料') {
   return {
@@ -298,4 +299,33 @@ test('revoking permission during filtered selection discards the batch and its c
   assert.equal(Boolean(document.querySelector('[data-empty-state="denied"]')), true)
   assert.equal(Boolean(allFilteredButton()), false)
   assert.equal(view.hint(), '当前账号无权查看可选资料')
+})
+
+test('material updates refresh an open picker without losing its page, filters or selections; closed and forbidden pickers do not read', async (t) => {
+  let prefix = '更新前材料'
+  const view = await harness(t, (params) => materialPage(params, prefix))
+  const props = { params: { purchase_supplier_id: 9 }, filters: [{ key: 'stock_category', label: '库存分类', options: [{ value: 'MAIN', label: '主料' }] }] }
+  await view.renderPicker(props)
+  await view.select(1)
+  const filter = document.querySelector('input[aria-label="库存分类"]')
+  await view.act(async () => filter.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await view.act(async () => document.querySelector('.ant-select-item-option').click())
+  await view.nextPage()
+  const before = view.calls.length
+  prefix = '更新后材料'
+  await view.act(async () => notifyReferenceRecordsChanged('materials', 51))
+  assert.equal(view.calls.length, before + 1)
+  assert.equal(view.calls.at(-1).params.offset, 50)
+  assert.equal(view.calls.at(-1).params.stock_category, 'MAIN')
+  assert.equal(view.calls.at(-1).params.purchase_supplier_id, 9)
+  assert.equal(document.querySelector('.ant-pagination-item-active').textContent, '2')
+  assert.match(document.body.textContent, /已选 1 条/u)
+  assert.match(document.querySelector('tr[data-row-key="51"]').textContent, /更新后材料51/u)
+  await view.renderPicker({ ...props, open: false })
+  const closed = view.calls.length
+  await view.act(async () => notifyReferenceRecordsChanged('materials', 51))
+  assert.equal(view.calls.length, closed)
+  await view.renderPicker(props, { effective_session: { actions: [] } })
+  await view.act(async () => notifyReferenceRecordsChanged('materials', 51))
+  assert.equal(view.calls.length, closed)
 })

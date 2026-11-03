@@ -6,16 +6,6 @@ import (
 )
 
 func applyBOMHeaderOptionalFields(update *ent.BOMHeaderMutation, in *biz.BOMHeaderUpdate) {
-	if in.EffectiveFrom == nil {
-		update.ClearEffectiveFrom()
-	} else {
-		update.SetEffectiveFrom(*in.EffectiveFrom)
-	}
-	if in.EffectiveTo == nil {
-		update.ClearEffectiveTo()
-	} else {
-		update.SetEffectiveTo(*in.EffectiveTo)
-	}
 	if in.SourceOrderNo == nil {
 		update.ClearSourceOrderNo()
 	} else {

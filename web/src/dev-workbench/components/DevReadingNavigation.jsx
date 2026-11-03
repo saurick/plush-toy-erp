@@ -73,6 +73,9 @@ export function DevReadingReturn({ ready = true }) {
     }
     function restore() {
       if (disposed) return
+      const pending = [...document.querySelectorAll('[data-mermaid-status="loading"], [data-graph-status="loading"]')]
+        .some((element) => element.getClientRects().length)
+      if (pending) return
       window.scrollTo({ top: frame.scroll, behavior: 'instant' })
       if (Math.abs(window.scrollY - frame.scroll) > 1) return
       const target = [...document.querySelectorAll('button,a')].find((element) =>
@@ -83,7 +86,7 @@ export function DevReadingReturn({ ready = true }) {
       stop()
     }
     observer.observe(document.body)
-    contentObserver.observe(document.body, { childList: true, subtree: true })
+    contentObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-mermaid-status', 'data-graph-status'] })
     inputs.forEach((event) => window.addEventListener(event, stop, true))
     restore()
     return dispose

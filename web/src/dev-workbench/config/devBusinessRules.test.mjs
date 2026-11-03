@@ -13,6 +13,23 @@ import {
 } from '../../../../scripts/qa/lib/business-consistency-evidence.mjs'
 import { businessTestKey } from '../../../../scripts/qa/lib/business-rule-catalog.mjs'
 
+test('历史数据库报告保留原登记范围，缺项不冒充当前验证', () => {
+  const historical = {
+    current: false,
+    ruleTests: [{ id: 'server/internal/data:TestHistoricalLedgerRule',
+status: 'passed',
+      counts: { executed: 1, passed: 1, failed: 0, skipped: 0 } }],
+  }
+  assert.equal(normalizeBusinessRuleEvidence(historical), historical)
+  const rows = buildBusinessRuleRows({ evidence: historical })
+  assert(rows.every((row) => row.tests.filter((test) => test.gate === 'postgres').every((test) => test.status !== 'passed')))
+  assert.throws(() => normalizeBusinessRuleEvidence({ ...historical, current: true }))
+  assert.throws(() => normalizeBusinessRuleEvidence({ ...historical, ruleTests: [...historical.ruleTests, ...historical.ruleTests] }))
+  const emptyExecution = structuredClone(historical)
+  emptyExecution.ruleTests[0].counts.executed = 0
+  assert.throws(() => normalizeBusinessRuleEvidence(emptyExecution))
+})
+
 const unit = BUSINESS_RULES.find((entry) => entry.id === 'unit-quantity')
   .tests[0]
 const database = BUSINESS_RULES.find(

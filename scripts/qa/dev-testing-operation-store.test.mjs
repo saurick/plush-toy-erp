@@ -20,6 +20,19 @@ const REPOSITORY = Object.freeze({
   fingerprint: "b".repeat(64),
 });
 
+test("chain rule operations bind a single chain and never replay another scope", async (t) => {
+  const target = await store(t);
+  const intent = { action: "chain-rules", chainKey: "production_exception",
+    idempotencyKey: "testing:chain-rules:" + ID, repository: REPOSITORY, operationId: ID };
+  const created = createOrReuseDevTestingOperation(target, intent);
+  assert.equal(created.operation.chainKey, intent.chainKey);
+  assert.equal(readDevTestingOperation(target, ID).chainKey, intent.chainKey);
+  assert.equal(createOrReuseDevTestingOperation(target, intent).reused, true);
+  assert.throws(() => createOrReuseDevTestingOperation(target, { ...intent, chainKey: "purchase_to_inventory" }), /intent mismatch/u);
+  assert.throws(() => createOrReuseDevTestingOperation(target, { ...intent, chainKey: "../shell" }), /scope/u);
+  assert.throws(() => createOrReuseDevTestingOperation(target, { ...intent, action: "fast", idempotencyKey: KEY }), /chain scope/u);
+});
+
 async function store(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "plush-testing-store-"));
   t.after(() => rm(root, { recursive: true, force: true }));

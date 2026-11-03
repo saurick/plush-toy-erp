@@ -90,20 +90,6 @@ func (_c *ProcessCreate) SetNillableInhouseEnabled(v *bool) *ProcessCreate {
 	return _c
 }
 
-// SetQualityRequired sets the "quality_required" field.
-func (_c *ProcessCreate) SetQualityRequired(v bool) *ProcessCreate {
-	_c.mutation.SetQualityRequired(v)
-	return _c
-}
-
-// SetNillableQualityRequired sets the "quality_required" field if the given value is not nil.
-func (_c *ProcessCreate) SetNillableQualityRequired(v *bool) *ProcessCreate {
-	if v != nil {
-		_c.SetQualityRequired(*v)
-	}
-	return _c
-}
-
 // SetSortOrder sets the "sort_order" field.
 func (_c *ProcessCreate) SetSortOrder(v int) *ProcessCreate {
 	_c.mutation.SetSortOrder(v)
@@ -247,10 +233,6 @@ func (_c *ProcessCreate) defaults() {
 		v := process.DefaultInhouseEnabled
 		_c.mutation.SetInhouseEnabled(v)
 	}
-	if _, ok := _c.mutation.QualityRequired(); !ok {
-		v := process.DefaultQualityRequired
-		_c.mutation.SetQualityRequired(v)
-	}
 	if _, ok := _c.mutation.SortOrder(); !ok {
 		v := process.DefaultSortOrder
 		_c.mutation.SetSortOrder(v)
@@ -302,9 +284,6 @@ func (_c *ProcessCreate) check() error {
 	}
 	if _, ok := _c.mutation.InhouseEnabled(); !ok {
 		return &ValidationError{Name: "inhouse_enabled", err: errors.New(`ent: missing required field "Process.inhouse_enabled"`)}
-	}
-	if _, ok := _c.mutation.QualityRequired(); !ok {
-		return &ValidationError{Name: "quality_required", err: errors.New(`ent: missing required field "Process.quality_required"`)}
 	}
 	if _, ok := _c.mutation.SortOrder(); !ok {
 		return &ValidationError{Name: "sort_order", err: errors.New(`ent: missing required field "Process.sort_order"`)}
@@ -377,10 +356,6 @@ func (_c *ProcessCreate) createSpec() (*Process, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.InhouseEnabled(); ok {
 		_spec.SetField(process.FieldInhouseEnabled, field.TypeBool, value)
 		_node.InhouseEnabled = value
-	}
-	if value, ok := _c.mutation.QualityRequired(); ok {
-		_spec.SetField(process.FieldQualityRequired, field.TypeBool, value)
-		_node.QualityRequired = value
 	}
 	if value, ok := _c.mutation.SortOrder(); ok {
 		_spec.SetField(process.FieldSortOrder, field.TypeInt, value)

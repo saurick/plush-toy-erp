@@ -8,6 +8,7 @@ import { MasterDataFormFields } from '../master-data/MasterDataForm.jsx'
 import { createMaterial } from '../../api/masterDataOrderApi.mjs'
 import { buildMaterialDraftCode } from '../../utils/masterDataOrderView.mjs'
 import { buildMasterDataParams } from '../../utils/masterDataParams.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function BOMMaterialCreateModal({
   open,
@@ -67,7 +68,7 @@ export default function BOMMaterialCreateModal({
       maskClosable={!saving}
     >
       {conflict ? <p className="erp-bom-material-create-conflict" role="alert">{conflict}，请先核对物料和用量。</p> : null}
-      <Form
+      <BusinessForm
         form={form}
         layout="vertical"
         disabled={saving}
@@ -79,7 +80,7 @@ export default function BOMMaterialCreateModal({
           type="materials"
           unitOptions={unitOptions}
         />
-      </Form>
+      </BusinessForm>
     </BusinessFormModal>
   )
 }

@@ -1,5 +1,7 @@
 import { writeFile } from 'node:fs/promises'
+import { isBOMVersionReadOnly, readBOMVersion } from './bomEditorDensityAssertions.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
+import { installBOMMaterialMatchingMocks } from './bomMaterialMatchingScenarios.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { describeVisibleEditor } from './businessEditorWorkspaceTools.mjs'
@@ -17,11 +19,17 @@ const HEADERS = {
   hair_direction: '单方向',
   note: '需要验证清空的原备注',
 }
-const FIELD_BY_KEY = { version: 'BOM 版本', quantity_text: '订单数量', source_order_no: '来源订单号', spare_text: '备品', designer: '设计师', maker: '制表人', auditor: '审核人', hair_direction: '毛向', note: '备注', effective_from: '参考适用开始', effective_to: '参考适用结束', print_date: '制表日期' }
-const FIELD_LABELS = ['产品', 'BOM 版本', '订单数量', '参考适用开始', '参考适用结束', '来源订单号', '备品', '制表日期', '设计师', '制表人', '审核人', '毛向', '备注']
-const DATES = { effective_from: '2026-10-01', effective_to: '2026-11-01', print_date: '2026-10-27' }
+const FIELD_BY_KEY = { version: 'BOM 版本', quantity_text: '订单数量', source_order_no: '来源订单号', spare_text: '备品', designer: '设计师', maker: '制表人', auditor: '审核人', hair_direction: '毛向', note: '备注', print_date: '制表日期' }
+const FIELD_LABELS = ['产品', 'BOM 版本', '订单数量', '来源订单号', '备品', '制表日期', '设计师', '制表人', '审核人', '毛向', '备注']
+const DATES = { print_date: '2026-10-27' }
 const READONLY_BOM_PERMISSIONS = ['workflow.task.read', 'workflow.task.update', 'workflow.task.complete', 'sales_order.read', 'sales_order.item.read', 'sales_order.engineering.update', 'product.read', 'product_sku.read', 'material.read', 'unit.read', 'bom.read']
 const XLSX = { name: '任务材料明细.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: createBOMImportWorkbookFixture() }
+
+async function readHeaderValue(editor, field) {
+  return field === 'version'
+    ? readBOMVersion(editor)
+    : editor.getByLabel(FIELD_BY_KEY[field], { exact: true }).inputValue()
+}
 
 async function assertTaskStepWidth(page, assert, step) {
   await waitForFiniteAnimations(page)
@@ -193,12 +201,13 @@ menus: [
       } : {}),
       beforeNavigate: async (page) => {
         await base.beforeNavigate(page)
+        await installBOMMaterialMatchingMocks(page)
         if (definition.ownerComplete) { await page.route('**/rpc/workflow', async (route) => {
           const { id, method } = route.request().postDataJSON()
           if (method !== 'explain_action_access') return route.fallback()
           return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: { source_access: { applicable: true, resolved: true, allowed: true }, actions: [{ action_key: 'complete', allowed: true, owner_role_matched: true, required_permission: 'sales_order.engineering.update' }] } } } })
         }) }
-        record = { id: 2, product_id: 1, status: 'DRAFT', edit_version: 2000000000000, ...HEADERS, effective_from: 1790784000, effective_to: 1793462400, print_date: 1793030400, item_count: 1, items: [{ id: 11, bom_header_id: 2, material_id: 1, unit_id: 1, quantity: '0.125', loss_rate: '0.03', position: '身体', piece_count: '2', process_base: '贴衬', process_method: '车缝', note: '原材料明细' }] }
+        record = { id: 2, product_id: 1, status: 'DRAFT', edit_version: 2000000000000, ...HEADERS, print_date: 1793030400, item_count: 1, items: [{ id: 11, bom_header_id: 2, material_id: 1, unit_id: 1, quantity: '0.125', loss_rate: '0.03', position: '身体', piece_count: '2', process_base: '贴衬', process_method: '车缝', note: '原材料明细' }] }
         files = []
         calls = []
         uploads = 0
@@ -246,10 +255,11 @@ menus: [
         }
         await assertBusinessFormNavigationSurface(page, editor)
         await assertBusinessFormScrollTracking(page, editor)
-        const fieldset = await editor.locator('.ant-form-item-label label').evaluateAll((nodes) => nodes.map((node) => node.textContent.trim()))
+        const fieldset = await editor.locator('.ant-form-item-label label, .erp-bom-version-summary[aria-label]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label') || node.textContent.trim()))
+        assert.equal(await editor.getByLabel(/参考适用开始|参考适用结束/).count(), 0, 'BOM editors do not expose unused reference dates')
         for (const label of FIELD_LABELS) assert.ok(fieldset.includes(label), `complete BOM header includes ${label}`)
-        for (const [field, value] of Object.entries(HEADERS)) assert.equal(await editor.getByLabel(FIELD_BY_KEY[field], { exact: true }).inputValue(), value, field)
-        for (const [field, value] of Object.entries(DATES)) assert.equal(await editor.getByLabel(FIELD_BY_KEY[field], { exact: true }).inputValue(), value.replaceAll('-', '/'), field)
+        for (const [field, value] of Object.entries(HEADERS)) assert.equal(await readHeaderValue(editor, field), value, field)
+        for (const [field, value] of Object.entries(DATES)) assert.equal(await readHeaderValue(editor, field), value.replaceAll('-', '/'), field)
         for (const [label, value] of Object.entries({ '部位 1': '身体', '片数 1': '2', '单位用量 1': '0.125', '损耗 % 1': '3', '加工基础 1': '贴衬', '加工方式 1': '车缝', '备注 1': '原材料明细' })) assert.equal(await editor.getByLabel(label, { exact: true }).inputValue(), value, label)
         if (definition.themeMode === 'dark') await deps.assertDarkThemeContrast(page, { scenarioName: 'task-editor-bom-task-dark', selector: '.erp-bom-editor:not([hidden])' })
         if (definition.entry === 'task') await assertEditorFooter(page, `task-editor-bom-${definition.key}-pristine`, assert, path, outputDir)
@@ -275,7 +285,7 @@ menus: [
             await page.getByRole('option', { name: '订单与制表资料', exact: true }).click()
           }
           await waitForFiniteAnimations(page)
-          const position = await editor.getByLabel('参考适用开始', { exact: true }).evaluate((node) => {
+          const position = await editor.getByLabel('备品', { exact: true }).evaluate((node) => {
             const scroller = node.closest('.mobile-role-tasks-page__detail-main, .ant-drawer-body')
             const workspaceNavigation = node.closest('[data-business-editor-workspace]').querySelector('[data-business-editor-navigation]')
             const picker = node.closest('[data-business-form-page]').querySelector('.erp-business-form-page__section-picker')
@@ -305,7 +315,7 @@ menus: [
             await steps.getByRole('tab').nth(1).click()
           }
           assert.equal(await editor.evaluate((node, previous) => node === previous, instance), true, 'task steps preserve the complete editor instance')
-          assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), HEADERS.version)
+          assert.equal(await readBOMVersion(editor), HEADERS.version)
           if (definition.entry === 'task') await navigation.getByRole('button', { name: '版本信息', exact: true }).click()
           else {
             await navigation.locator('.erp-business-form-page__section-picker .ant-select-selector').click()
@@ -334,12 +344,13 @@ menus: [
             await waitForFiniteAnimations(page)
             await page.getByRole('button', { name: '保存草稿', exact: true }).filter({ visible: true }).click()
           }
-          assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+          assert.equal(await isBOMVersionReadOnly(editor), true)
           const originalUsage = await editor.getByLabel('单位用量 1', { exact: true }).inputValue()
           await editor.getByLabel('单位用量 1', { exact: true }).fill('')
           if (definition.entry === 'task') await assertEditorFooter(page, `task-editor-bom-${definition.key}-dirty`, assert, path, outputDir)
           await save()
           await editor.getByText('填写正数用量', { exact: true }).waitFor()
+          await page.waitForFunction((node) => node === document.activeElement, await editor.getByLabel('单位用量 1', { exact: true }).elementHandle(), { timeout: 5000 })
           assert.equal(await editor.getByLabel('单位用量 1', { exact: true }).evaluate((node) => node === document.activeElement), true, 'failed draft validation focuses the invalid field')
           assert.equal(calls.length, 0, 'missing required fields cannot reach persistence')
           await editor.getByLabel('单位用量 1', { exact: true }).fill(originalUsage)
@@ -355,13 +366,13 @@ menus: [
           await preview.getByRole('radio', { name: '替换现有 1 个部位', exact: true }).check()
           await preview.getByRole('button', { name: '替换并带入 2 个部位', exact: true }).click()
           assert.equal(await editor.locator('tr[data-bom-part-index]').count(), 2)
-          for (const [field, value] of Object.entries(HEADERS)) assert.equal(await editor.getByLabel(FIELD_BY_KEY[field], { exact: true }).inputValue(), value, `item import preserves ${field}`)
+          for (const [field, value] of Object.entries(HEADERS)) assert.equal(await readHeaderValue(editor, field), value, `item import preserves ${field}`)
           await save()
           assert.equal(calls.length, 0, 'unresolved imported references cannot be silently saved')
           const material = editor.getByRole('combobox', { name: '物料名称 2', exact: true })
           await material.click()
-          await material.fill('样式材料')
-          await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '样式材料' }).first().click()
+          await material.fill('对应测试材料')
+          await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '对应测试材料' }).first().click()
           await editor.getByLabel('备注', { exact: true }).fill('')
           const attachments = await visibleAttachments(editor)
           const [chooser] = await Promise.all([page.waitForEvent('filechooser'), attachments.getByRole('button', { name: '选择附件', exact: true }).click()])
@@ -400,7 +411,8 @@ menus: [
           assert.equal(saved.items[0].material_id, 1)
           assert.equal(saved.items[0].quantity, '0.5')
           assert.equal(saved.items[0].loss_rate, '0.1')
-          assert.ok(saved.items.every((item) => item.material_id === 1 && item.unit_id === 1))
+          assert.deepEqual(saved.items.map((item) => item.material_id), [1, 77], '原表不同规格关联各自匹配的材料档案')
+          assert.ok(saved.items.every((item) => item.unit_id === 1))
           assert.equal(saved.items[0].process_base, '贴衬')
           assert.equal(saved.items[0].process_method, '激光')
           assert.equal(files.length, 1)
@@ -424,8 +436,8 @@ menus: [
           }
           editor = page.locator('.erp-bom-editor:visible')
           await editor.getByLabel('BOM 版本', { exact: true }).waitFor()
-          for (const [field, value] of Object.entries(HEADERS)) if (field !== 'note') assert.equal(await editor.getByLabel(FIELD_BY_KEY[field], { exact: true }).inputValue(), value, `readback ${field}`)
-          for (const [field, value] of Object.entries(DATES)) assert.equal(await editor.getByLabel(FIELD_BY_KEY[field], { exact: true }).inputValue(), value.replaceAll('-', '/'), `readback ${field}`)
+          for (const [field, value] of Object.entries(HEADERS)) if (field !== 'note') assert.equal(await readHeaderValue(editor, field), value, `readback ${field}`)
+          for (const [field, value] of Object.entries(DATES)) assert.equal(await readHeaderValue(editor, field), value.replaceAll('-', '/'), `readback ${field}`)
           assert.equal(await editor.getByLabel('备注', { exact: true }).inputValue(), '')
           assert.equal(await editor.locator('tr[data-bom-part-index]').count(), 2)
           await (await visibleAttachments(editor)).getByText('BOM-工艺依据.txt', { exact: true }).waitFor()

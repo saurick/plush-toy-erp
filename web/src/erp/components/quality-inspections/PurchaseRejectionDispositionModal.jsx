@@ -38,6 +38,7 @@ import {
   sourceBusinessActionNo,
   sourceBusinessActionUUID,
 } from '../../utils/sourceBusinessAction.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const STATUS_META = Object.freeze({
   [PurchaseRejectionStatus.DRAFT]: { label: '草稿', color: 'blue' },
@@ -520,7 +521,7 @@ export default function PurchaseRejectionDispositionModal({
             : []),
         ]}
       />
-      <Form form={form} name="purchase-rejection-disposition" layout="vertical" preserve={false} disabled={loading}>
+      <BusinessForm form={form} name="purchase-rejection-disposition" layout="vertical" preserve={false} disabled={loading}>
         <Form.Item
           name="disposition_no"
           label="处置单号"
@@ -608,7 +609,7 @@ export default function PurchaseRejectionDispositionModal({
             <Input.TextArea rows={2} maxLength={255} showCount />
           </Form.Item>
         ) : null}
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

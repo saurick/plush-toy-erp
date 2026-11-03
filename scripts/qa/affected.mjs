@@ -688,7 +688,7 @@ function isDevPageGovernancePath(file) {
     /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
       file,
     ) ||
-    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageHeader|PageNav|PipelineTimingPanel|PressurePanel|PressureDataset|ProductCoreRelations|ReadingNavigation|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FinanceWorkbench|FlowState|BusinessChainCustomerReview|Hub|Integration|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
+    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageHeader|PageNav|PipelineTimingPanel|PressurePanel|PressureDataset|ProductCoreRelations|ReadingNavigation|TaskNav)\.jsx|components\/flow-state\/FlowRuleTables\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FinanceWorkbench|FlowActionRules|FlowState|BusinessChainCustomerReview|Hub|Integration|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
       file,
     ) ||
     /^web\/scripts\/style-l1\/(?:scenarios|dev[A-Z][^/]*)\.mjs$/u.test(file)
@@ -716,7 +716,7 @@ function devBrowserScenarioNames(file) {
   const relations = /devFulfillmentRelations|BusinessRelationFilters|BusinessActionRelations|businessRelations|devFlowViewContext|devFlowStateQuery|DevFlowStateObservatoryPage|BusinessChainInstanceView|FulfillmentSubflow|TaskFulfillmentGuide/u.test(file)
     ? ["dev-business-relations-desktop", "dev-finished-quality-responsibility"]
     : [];
-  const topics = /BusinessTopics|BusinessChainTopics|TaskFulfillmentGuide|devFlowViewContext|devFlowStateQuery|DevFlowStateObservatoryPage/u.test(file)
+  const topics = /BusinessTopics|BusinessChainTopics|BusinessTopicDetails|BusinessChainStepVerification|TaskFulfillmentGuide|devFlowViewContext|devFlowStateQuery|DevFlowStateObservatoryPage/u.test(file)
     ? ["dev-business-topics-navigation-desktop"]
     : [];
   const rules = /BusinessRules|business-rules|stateRules\.css|StateRulesView|FlowRuleTables|devFlowViewContext|devFlowState(?:Query|RulePresentation)|DevFlowStateObservatoryPage|devRoutes|devHub|DevWorkbenchRoutes|devRelationshipPerspectives|BusinessActionRelations|TaskFulfillmentGuide|BusinessChainViews/u.test(file)
@@ -752,7 +752,7 @@ function devBrowserScenarioNames(file) {
     [/DevProjectSkills|devProjectSkills|dev-project-skills/u, ["dev-project-skills-guidance-desktop-light"]],
     [/DevDataPreparationPage|devDataPreparation|useDataPreparation/u, ["dev-data-preparation-workflow-desktop", "dev-data-preparation-4k"]],
     [/flow-state\/(?:FactsView|RuntimeView|WorkflowView|StateRulesView)/u, ["dev-flow-state-details-desktop-light", "dev-flow-state-observatory-instance", "dev-flow-rules-complete"]],
-    [/devFlowActionRules|flow-state\/FlowRuleTables/u, ["dev-flow-rules-complete", "dev-flow-action-rules-desktop-light"]],
+    [/devFlowActionRules|flow-state\/FlowRuleTables/u, ["dev-flow-rules-complete", "dev-flow-action-rules-desktop-light", "dev-material-lifecycle-bom-references-desktop", "dev-business-rules-selection-recovery-desktop"]],
     [/QualityGate|quality-gates/u, ["dev-quality-gates-desktop-light"]],
     [
       /VersionCenter|version-center|pages\/delivery\/version|devDelivery(?:BridgePlugin|PlanLifecycle)|delivery-plan-lifecycle/u,
@@ -886,6 +886,16 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
+    if (file === "scripts/qa/lib/business-chain-rule-contract.mjs") {
+      addNodeTests(state, [
+        "scripts/qa/business-chain-rule-check.test.mjs",
+        "scripts/qa/dev-testing-operation-store.test.mjs",
+        "scripts/qa/dev-qa-execution-lock.test.mjs",
+        "web/dev-server/devQaTestingPlugin.test.mjs",
+        "web/src/dev-workbench/config/devBusinessChainVerification.test.mjs",
+        "web/src/dev-workbench/config/devTestingOperation.test.mjs",
+      ], file, "T3");
+    }
     if (/common\/components\/empty\/|DevUIEmptyExamples|devUIEmptyExamples|emptyFeedbackScenarios|RemoteReference(?:Picker|Select)\.jsx$/u.test(file)) {
       addFollowUp(
         state,

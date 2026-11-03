@@ -133,7 +133,6 @@ const PROCESS_ROUTE_FIELDS = Object.freeze([
   "category",
   "outsourcing_enabled",
   "inhouse_enabled",
-  "quality_required",
   "note",
 ]);
 const SOURCE_LIST_PAGE_SIZE = 200;
@@ -670,7 +669,6 @@ function buildProcesses(prefix, count) {
         "外观检查",
       ].includes(name),
       inhouse_enabled: true,
-      quality_required: name.includes("检") || name.includes("确认"),
       note: name.includes("检") ? "做完后记录检查结果" : "按生产安排办理",
       isActive: index <= count - 3,
     };
@@ -1720,7 +1718,6 @@ function processMutationFromReadback(record, routeCode) {
     production_route_operation_code: routeCode,
     outsourcing_enabled: record.outsourcing_enabled === true,
     inhouse_enabled: record.inhouse_enabled === true,
-    quality_required: record.quality_required === true,
     note: record.note ?? null,
   };
 }
@@ -2492,7 +2489,6 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
           "production_route_operation_code",
           "outsourcing_enabled",
           "inhouse_enabled",
-          "quality_required",
           "note",
         ],
       });
@@ -2517,7 +2513,6 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
         "production_route_operation_code",
         "outsourcing_enabled",
         "inhouse_enabled",
-        "quality_required",
         "note",
       ],
     });

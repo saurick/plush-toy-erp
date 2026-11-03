@@ -22,19 +22,19 @@ go run ./cmd/schema-doc --write
 
 | 项目 | 数量 |
 | --- | ---: |
-| 应用表 | 80 |
-| 字段 | 1327 |
+| 应用表 | 81 |
+| 字段 | 1330 |
 | 外键 | 162 |
 | 显式索引 | 353 |
 | 其中 partial index | 33 |
-| 命名 / 表级 CHECK | 323 |
+| 命名 / 表级 CHECK | 324 |
 
 ## 分域入口
 
 | 文档 | 表数 | 职责 |
 | --- | ---: | --- |
 | [账号、权限与配置](账号权限与配置.md) | 16 | 后台账号、RBAC、客户配置版本及其运行时投影。 |
-| [主数据与 BOM](主数据与BOM.md) | 12 | 客户、供应商、产品、物料、工序、仓库、单位和 BOM 等复用主数据。 |
+| [主数据与 BOM](主数据与BOM.md) | 13 | 客户、供应商、产品、物料、工序、仓库、单位和 BOM 等复用主数据。 |
 | [销售与采购](销售与采购.md) | 7 | 销售订单与采购订单的来源单据聚合及其行项目。 |
 | [库存与质检](库存与质检.md) | 15 | 采购收退货、库存作业、批次、余额、流水、预留与质量判定。 |
 | [生产与委外](生产与委外.md) | 15 | 生产订单、冻结需求与路线、WIP、生产事实、委外合同和委外事实。 |
@@ -73,6 +73,7 @@ go run ./cmd/schema-doc --write
 | [`contacts`](主数据与BOM.md#table-contacts) | 联系人 | MasterData / 主数据 | 保存客户或供应商联系人、联系方式、主联系人标记和启用状态。 |
 | [`customers`](主数据与BOM.md#table-customers) | 客户 | MasterData / 主数据 | 保存销售、出货和应收等业务引用的客户主档。 |
 | [`materials`](主数据与BOM.md#table-materials) | 物料 | MasterData / 主数据 | 保存可复用材料名称、厂商、厂商料号、色号、规格、默认单位、库存类别和默认入库仓。 |
+| [`payment_method_preferences`](主数据与BOM.md#table-payment-method-preferences) | 付款方式推荐设置 | Config / 配置 | 保存公司共用付款方式名称的推荐状态和并发版本。 |
 | [`processes`](主数据与BOM.md#table-processes) | 生产工序 | MasterData / 主数据 | 保存可复用生产工序、路线位置绑定、内制或委外能力和质检要求。 |
 | [`product_skus`](主数据与BOM.md#table-product-skus) | 产品规格（SKU） | MasterData / 主数据 | 保存产品下的规格、颜色、尺码、条码和客户 SKU 等显式库存粒度。 |
 | [`products`](主数据与BOM.md#table-products) | 产品 | MasterData / 主数据 | 保存产品或款号主档，供 SKU、BOM、订单、生产、库存和出货引用。 |

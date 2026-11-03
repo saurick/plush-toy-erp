@@ -78,6 +78,52 @@
   gap: var(--erp-form-field-gap, 12px 16px);
 }
 
+.erp-business-form-section__fields[data-field-layout='adaptive'] {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.erp-business-form-section__fields[data-field-layout='adaptive'] > .ant-form-item {
+  flex: 1 1 220px;
+  min-width: min(100%, 220px);
+  max-width: min(100%, 420px);
+}
+
+.erp-business-form-section__fields[data-field-layout='adaptive'] > .ant-form-item.erp-business-action-form__field--short {
+  flex: 0 1 180px;
+  min-width: min(100%, 160px);
+  max-width: min(100%, 240px);
+}
+
+.erp-business-form-section__fields[data-field-layout='adaptive'] > .ant-form-item.erp-business-action-form__field--wide {
+  flex: 2 1 280px;
+  min-width: min(100%, 260px);
+  max-width: min(100%, 680px);
+}
+
+.erp-business-form-section__fields[data-field-layout='adaptive'] > :is(.erp-business-action-form__field--full, .erp-business-action-form__section-title, .erp-business-inline-note, .mobile-task-facts__grid) {
+  flex: 0 0 100%;
+  max-width: 100%;
+}
+
+.erp-business-form-section__fields[data-field-layout='support'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.erp-business-form-section__fields[data-field-layout='support'] > .ant-form-item:only-child {
+  grid-column: 1 / -1;
+}
+
+.erp-business-form-section__attachments {
+  min-width: 0;
+}
+
+.erp-business-form-section__attachments > .business-attachment-panel--inline {
+  margin-block-start: 0;
+}
+
 .erp-business-form-section__fields,
 .erp-business-form-section__content {
   min-width: 0;
@@ -127,6 +173,18 @@
 
 @container business-form-fields (max-width: 520px) {
   .erp-business-form-section__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .erp-business-form-section__fields[data-field-layout='adaptive'] > :is(.ant-form-item, .ant-form-item.erp-business-action-form__field--short, .ant-form-item.erp-business-action-form__field--wide) {
+    flex-basis: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@container business-form-fields (max-width: 720px) {
+  .erp-business-form-section__fields[data-field-layout='support'] {
     grid-template-columns: minmax(0, 1fr);
   }
 }

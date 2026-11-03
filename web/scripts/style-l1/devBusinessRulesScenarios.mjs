@@ -10,6 +10,54 @@ async function choose(page, label, text) {
 
 export function createDevBusinessRulesScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }) {
   return [{
+    name: 'dev-material-lifecycle-bom-references-desktop',
+    path: '/__dev/business-rules?flow=master.lifecycle&rule_action=material',
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
+    auth: 'admin',
+    mockAdminRpc: true,
+    beforeNavigate: async (page) => {
+      await page.route('**/__dev/api/qa/coverage{,/snapshot}', (route) => route.fulfill({ json: { status: 'missing', report: null } }))
+    },
+    verify: async (page) => {
+      const origin = new URL(page.url()).origin
+      await page.goto(`${origin}/__dev/ui-design?page=workbench`)
+      await expect(page.getByRole('heading', { name: '交互设计', exact: true })).toBeVisible()
+      await page.goto(`${origin}/__dev/business-rules?flow=master.lifecycle&rule_action=material`)
+      const reader = page.locator('[data-master-lifecycle-rules]')
+      await expect(reader).toContainText('原有单据引用与冻结快照保留')
+      const guide = reader.getByRole('link', { name: 'BOM 物料选择与关联', exact: true })
+      await guide.click()
+      await expect(page.locator('[id="bom-material-selection"][data-markdown-anchor]')).toBeAttached()
+      const paragraph = page.locator('.erp-dev-docs-markdown p').filter({ hasText: 'BOM 材料下拉直接搜索并选择启用的材料档案' })
+      await expect(paragraph).toBeInViewport()
+      await expect(paragraph).toContainText('清空或替换后不再作为候选出现')
+      await page.getByRole('link', { name: 'BOM 物料选择与历史关联测试', exact: true }).click()
+      await expect.poll(() => new URL(page.url()).searchParams.get('rule')).toBe('bom-material-selection')
+      const tests = page.getByRole('region', { name: 'BOM 物料选择与历史关联详情', exact: true })
+      await expect(tests).toBeVisible()
+      await expect(tests.getByRole('table', { name: 'BOM 物料选择与历史关联验证范围', exact: true })).toContainText('5 项')
+      await expect(tests).not.toContainText('用例通过')
+      await page.goBack()
+      await expect(page.locator('[id="bom-material-selection"][data-markdown-anchor]')).toBeAttached()
+      await expect(paragraph).toBeInViewport()
+      await page.goBack()
+      await expect(guide).toBeVisible()
+      assert.equal(new URL(page.url()).searchParams.get('rule_action'), 'material')
+      await choose(page, '主数据对象', '供应商')
+      await expect(reader.getByRole('link', { name: 'BOM 物料选择与关联', exact: true })).toHaveCount(0)
+      await choose(page, '主数据对象', '材料')
+      await expect(guide).toBeVisible()
+      await page.reload()
+      await expect(guide).toBeVisible()
+      await reader.getByRole('link', { name: 'BOM 物料选择与历史关联测试', exact: true }).click()
+      await expect(tests).toBeVisible()
+      await page.goBack()
+      await expect(guide).toBeVisible()
+      await assertNoHorizontalOverflow(page, '材料启停关联说明与测试')
+      await page.screenshot({ path: path.join(outputDir, 'material-lifecycle-bom-references-4k.png'), fullPage: false })
+    },
+  }, {
     name: 'dev-business-rules-navigation-desktop',
     path: '/__dev/status-flows',
     viewport: { width: 1920, height: 1080 },

@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useBlocker } from 'react-router-dom'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import { useBusinessSplit } from './BusinessSplitContext.jsx'
 
 const BusinessEditorGroupContext = createContext(null)
 
@@ -26,6 +27,7 @@ export function useBusinessEditorGroup() {
 // Several independent business objects share one task leave boundary.
 export default function BusinessEditorGroup({ children }) {
   const context = useBusinessPageContext()
+  const split = useBusinessSplit()
   const guards = useRef(new Map())
   const editing = useRef(new Set())
   const states = useRef(new Map())
@@ -58,5 +60,5 @@ export default function BusinessEditorGroup({ children }) {
   useEffect(() => hasEditors ? registerHostGuard?.(confirmLeave) : undefined, [confirmLeave, registerHostGuard, hasEditors])
   useEffect(() => () => reportEditing?.(false), [reportEditing])
   const value = useMemo(() => ({ registerGuard, setEditing, confirmLeave, updateState, pending, busy }), [registerGuard, setEditing, confirmLeave, updateState, pending, busy])
-  return <BusinessEditorGroupContext.Provider value={value}>{protectedState ? <GroupNavigationGuard confirmLeave={confirmLeave} /> : null}{children}</BusinessEditorGroupContext.Provider>
+  return <BusinessEditorGroupContext.Provider value={value}>{protectedState && !split?.handlingNavigation ? <GroupNavigationGuard confirmLeave={confirmLeave} /> : null}{children}</BusinessEditorGroupContext.Provider>
 }

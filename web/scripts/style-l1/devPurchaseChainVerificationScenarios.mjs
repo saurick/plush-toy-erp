@@ -36,26 +36,20 @@ export function createDevPurchaseChainVerificationScenarios({
           name: '查看IQC 确认本行检验通过的规则与验证',
           exact: true,
         })
-        const before = await page.evaluate(() => ({ scroll: scrollY, top: document.querySelector('[data-graph-node="purchase_quality"]').getBoundingClientRect().top }))
         await opener.click()
         const detail = page.getByRole('region', { name: '交接规则与验证' })
+        const actions = page.getByRole('navigation', { name: '本链关联动作' })
         await expect(detail).toBeVisible()
+        await expect(actions).toBeVisible()
         await expect(detail).toHaveAttribute('aria-busy', 'false')
-        const after = await page.evaluate(() => ({ scroll: scrollY, top: document.querySelector('[data-graph-node="purchase_quality"]').getBoundingClientRect().top }))
-        assert(Math.abs(after.scroll - before.scroll) <= 1 && Math.abs(after.top - before.top) <= 1, '展开规则不自动滚离原图或当前对象')
-        assert.equal(await detail.evaluate((element) => Boolean(element.closest('[data-topic-relation]'))), true, '规则在所属交接中查看')
-        await expect(detail).toContainText('库存由仓库另行入账')
-        await expect(detail).toContainText('未采集')
-        assert(
-          new URL(page.url()).searchParams.get('flow_topic_step') ===
-            'purchase_quality:posts_fact:purchase_accepted'
-        )
-        await detail
-          .locator('[data-step-rule="purchase-quality-handoff"] summary')
-          .click()
-        await expect(
-          detail.getByRole('table', { name: '逐行检验与待入库交接的验证结果' })
-        ).toBeVisible()
+        await expect(detail.getByRole('table', { name: '当前动作的分层验证证据' })).toBeVisible()
+        assert.equal(new URL(page.url()).searchParams.get('flow_topic_step'), 'purchase_quality:posts_fact:purchase_accepted')
+        await detail.getByRole('tab', { name: '办理规则', exact: true }).click()
+        await expect(detail).toContainText('品质')
+        await expect(detail).toContainText('检验')
+        await detail.getByRole('tab', { name: '验证证据', exact: true }).click()
+        await detail.getByText('具名检查项与执行结果', { exact: true }).click()
+        await expect(detail.locator('[data-step-rule="purchase-quality-handoff"]')).toBeVisible()
         await assertNoHorizontalOverflow(page)
         await detail.scrollIntoViewIfNeeded()
         await page.screenshot({
@@ -64,19 +58,21 @@ export function createDevPurchaseChainVerificationScenarios({
         })
         await page.reload()
         await expect(detail).toBeVisible()
-        await topic.getByRole('button', { name: '收起IQC 确认本行检验通过的规则与验证', exact: true }).click()
+        await detail.getByRole('button', { name: '返回关系图', exact: true }).click()
         await expect(detail).toHaveCount(0)
         await topic.locator('[data-graph-node="purchase_accepted"]').click()
-        await topic
-          .getByRole('button', {
-            name: '查看仓库确认本次合格行入库的规则与验证',
-            exact: true,
-          })
-          .click()
+        await topic.getByRole('button', {
+          name: '查看仓库确认本次合格行入库的规则与验证',
+          exact: true,
+        }).click()
+        await detail.getByRole('tab', { name: '办理规则', exact: true }).click()
         await expect(detail).toContainText('待检与不合格行保留后续处理')
-        assert.equal(await detail.getByRole('link').count(), 0, '规则与证据在原位查看，不恢复已经移除的通用报告跳转')
+        await detail.getByRole('tab', { name: '验证证据', exact: true }).click()
+        const reportLink = detail.getByRole('link', { name: '查看所选动作的链路实测报告', exact: true })
+        await expect(reportLink).toHaveAttribute('href', /chain=purchase_to_inventory&step=/u)
         await page.setViewportSize({ width: 1280, height: 900 })
         await assertNoHorizontalOverflow(page)
+        await detail.getByRole('button', { name: '返回关系图', exact: true }).click()
         await topic
           .locator('[data-graph-node="purchase_payable_draft"]')
           .click()
@@ -87,6 +83,7 @@ export function createDevPurchaseChainVerificationScenarios({
             exact: true,
           })
           .click()
+        await detail.getByRole('tab', { name: '办理规则', exact: true }).click()
         await expect(detail).toContainText('采购应付来源、计价与过账')
         await page.setViewportSize({ width: 1024, height: 900 })
         await assertNoHorizontalOverflow(page)

@@ -59,3 +59,10 @@ test('a shared reading inset preserves normal long-form tracking', () => {
   assert.equal(activeFormSectionIndex(tops, 220, 720, 2520, 120), 1)
   assert.equal(activeFormSectionIndex(tops, 745, 720, 2520, 120), 2)
 })
+
+test('a nearly fitting form does not compress every section into a few scroll pixels', () => {
+  const tops = [12, 208, 334, 510]
+  for (const top of [0, 1, 2, 3, 2, 1, 0]) {
+    assert.equal(activeFormSectionIndex(tops, top, 708, 711), 0)
+  }
+})

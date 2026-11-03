@@ -3,8 +3,11 @@ import test from 'node:test'
 import { createElement as h } from 'react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
+import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRuntime.mjs'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { DEV_FLOW_STATE_CATALOG as businessCatalog } from '../../config/devFlowStateCatalog.mjs'
+
+registerMermaidTestRenderer()
 
 test('所有环节保留办理规则和受阻处理，关联岗位路径只读显示', async (t) => {
   const harness = await createReactTestHarness(t)

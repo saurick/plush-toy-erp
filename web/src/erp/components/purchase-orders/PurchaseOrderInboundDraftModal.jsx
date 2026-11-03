@@ -12,7 +12,8 @@ import {
 import { PlusOutlined } from '@ant-design/icons'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { lineItemFieldIndex } from '../business-list/businessLineItemDisclosure.mjs'
-import BusinessLineItemGroupControls, { BusinessLineItemGroupErrorCount } from '../business-list/BusinessLineItemGroupControls.jsx'
+import BusinessLineItemGroupControls from '../business-list/BusinessLineItemGroupControls.jsx'
+import { BusinessLineItemGroupHeading } from '../business-list/BusinessLineItemsTable.jsx'
 import useBusinessLineItemGroups from '../business-list/useBusinessLineItemGroups.js'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
@@ -21,6 +22,7 @@ import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { modal } from '@/common/utils/antdApp'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import { BusinessLineItemsHeader } from '../business-list/BusinessLineItemsFooter.jsx'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
 } from '../business-list/BusinessCompactFieldTable.jsx'
@@ -37,6 +39,8 @@ import {
   sumNumeric20Scale6Values,
 } from '../../utils/numeric20Scale6.mjs'
 import './purchaseOrderArrival.css'
+import BusinessForm from '../business-list/BusinessForm.jsx'
+import BusinessLineEditor from '../business-list/BusinessLineEditor.jsx'
 
 function ArrivalRecord({
   field,
@@ -45,6 +49,7 @@ function ArrivalRecord({
   form,
   disabled,
   onRemove,
+  hidden,
   quantityUnitOptions,
 }) {
   const number = field.name + 1
@@ -78,7 +83,10 @@ function ArrivalRecord({
     <BusinessCompactFieldRow
       className="erp-purchase-arrival__record"
       label={`第${number}条到货记录`}
+      sequence={number}
+      identity={row.material}
       lineItemIndex={field.name}
+      hidden={hidden}
       actions={
         <Popconfirm
           title="移除这条到货记录？"
@@ -104,8 +112,6 @@ function ArrivalRecord({
         </Popconfirm>
       }
       cells={[
-        <span>{number}</span>,
-
         <Form.Item
           name={[field.name, 'quantity']}
           label={`实点数量（${row.unit}）`}
@@ -216,6 +222,7 @@ export default function PurchaseOrderInboundDraftModal({
   const initialFocusRef = useRef(false)
   const materialPickerRef = useRef(null)
   const disabled = loading || !!loadError || !referenceDataReady || submitting
+  const showGroupControls = !loading && !loadError && hasRemaining && disclosureGroups.length > 1
   const enteredCount = values.filter(arrivalItemHasInput).length
 
   useEffect(() => {
@@ -366,7 +373,7 @@ export default function PurchaseOrderInboundDraftModal({
         <strong>{order?.purchase_order_no || '采购订单'}</strong>
         <span>{resolveSupplierName(order)}</span>
       </div>
-      <Form
+      <BusinessForm
         name="purchase-arrival"
         form={form}
         layout="vertical"
@@ -406,14 +413,19 @@ export default function PurchaseOrderInboundDraftModal({
             />
           </Form.Item>
         </section>
-        <section
+        <BusinessLineEditor
+          as="section"
           className="erp-purchase-arrival__items"
           aria-label="采购到货清点明细"
+          data-table-scroll-scope
         >
-          <div className="erp-purchase-arrival__section-head">
-            <h3>清点明细</h3>
-            <span>按采购单位填写，空白记录不保存</span>
-          </div>
+          <BusinessLineItemsHeader
+            title="清点明细"
+            description="按采购单位填写，空白记录不保存"
+            groupCount={showGroupControls ? disclosureGroups.length : undefined}
+            groupActions={showGroupControls ? <BusinessLineItemGroupControls controller={disclosure} form={form} label="采购到货清点明细" /> : null}
+            scrollControls
+          />
           {loadError ? (
             <Alert
               type="error"
@@ -461,7 +473,6 @@ export default function PurchaseOrderInboundDraftModal({
                   }
                   return (
                     <div className="erp-purchase-arrival__materials" ref={disclosure.rootRef} onFocusCapture={disclosure.onFocusCapture}>
-                      {disclosureGroups.length > 1 ? <BusinessLineItemGroupControls controller={disclosure} form={form} label="采购到货清点明细" groupCount={disclosureGroups.length} /> : null}
                       {groups
                         .filter((group) => group.fields.length)
                         .map(({ row, fields: materialFields }) => {
@@ -478,49 +489,50 @@ export default function PurchaseOrderInboundDraftModal({
                               key={row.key}
                               aria-label={row.material}
                             >
-                              <div className="erp-purchase-arrival__material-head">
-                                {disclosureGroups.length > 1 ? (
-                                  <Button
-                                    size="small"
-                                    disabled={false}
-                                    aria-expanded={!disclosure.isCollapsed(String(row.key))}
-                                    aria-label={`${disclosure.isCollapsed(String(row.key)) ? '展开' : '收起'}${row.material}`}
-                                    onClick={() => disclosure.toggle(String(row.key))}
-                                  >
-                                    {disclosure.isCollapsed(String(row.key)) ? '展开' : '收起'} · {materialFields.length} 条记录
-                                    <BusinessLineItemGroupErrorCount controller={disclosure} groupId={String(row.key)} />
-                                  </Button>
-                                ) : null}
-                                <div className="erp-purchase-arrival__material-name">
-                                  <span>采购第 {row.lineNo} 行</span>
-                                  <strong>{row.material}</strong>
-                                </div>
-                                <div className="erp-purchase-arrival__material-quantity">
-                                  <span>
-                                    可登记{' '}
-                                    {formatQuantity(
-                                      row.remainingGeneratableQuantity
-                                    )}{' '}
-                                    {row.unit}
-                                  </span>
-                                  <strong>
-                                    本次实点{' '}
-                                    {materialFields.some((field) =>
-                                      normalizePositiveNumeric20Scale6(
-                                        values[field.name]?.quantity
+                              <BusinessLineItemGroupHeading
+                                standalone
+                                collapsed={disclosure.isCollapsed(String(row.key))}
+                                onToggle={disclosureGroups.length > 1 ? () => disclosure.toggle(String(row.key)) : undefined}
+                                label={row.material}
+                                count={materialFields.length}
+                                countLabel="条记录"
+                                controller={disclosure}
+                                groupId={String(row.key)}
+                              >
+                                <div className="erp-purchase-arrival__material-head">
+                                  <div className="erp-purchase-arrival__material-name">
+                                    <span>采购第 {row.lineNo} 行</span>
+                                    <strong>{row.material}</strong>
+                                  </div>
+                                  <div className="erp-purchase-arrival__material-quantity">
+                                    <span>
+                                      可登记{' '}
+                                      {formatQuantity(
+                                        row.remainingGeneratableQuantity
+                                      )}{' '}
+                                      {row.unit}
+                                    </span>
+                                    <strong>
+                                      本次实点{' '}
+                                      {materialFields.some((field) =>
+                                        normalizePositiveNumeric20Scale6(
+                                          values[field.name]?.quantity
+                                        )
                                       )
-                                    )
-                                      ? `${formatNumeric20Scale6Summary(total)} ${row.unit}`
-                                      : '待填写'}
-                                  </strong>
+                                        ? `${formatNumeric20Scale6Summary(total)} ${row.unit}`
+                                        : '待填写'}
+                                    </strong>
+                                  </div>
                                 </div>
-                              </div>
+                              </BusinessLineItemGroupHeading>
                               <div className="erp-line-item-disclosure-body" hidden={disclosureGroups.length > 1 && disclosure.isCollapsed(String(row.key))} data-line-item-collapsed={disclosureGroups.length > 1 && disclosure.isCollapsed(String(row.key)) ? 'true' : undefined}>
                                 <BusinessCompactFieldTable
+                                  scrollControlsInToolbar
+                                  stickyHeader={false}
+                                  showSequence
                                   label={`${row.material}到货记录`}
                                   className="erp-purchase-arrival__table"
                                   columns={[
-                                  { label: '序号', width: 40 },
                                   {
                                     label: `实点数量（${row.unit}）`,
                                     width: 144,
@@ -532,7 +544,7 @@ export default function PurchaseOrderInboundDraftModal({
                                   { label: '入库仓库' },
                                   { label: '批次 / 卷包编号' },
                                   { label: '差异', width: 112 },
-                                  { label: '操作', width: 52 },
+                                  { actions: true, label: '操作', width: 52 },
                                 ]}
                                 >
                                   {materialFields.map((field) => (
@@ -544,6 +556,7 @@ export default function PurchaseOrderInboundDraftModal({
                                       quantityUnitOptions={quantityUnitOptions}
                                       form={form}
                                       disabled={disabled}
+                                      hidden={disclosureGroups.length > 1 && disclosure.isCollapsed(String(row.key))}
                                       onRemove={() => {
                                       remove(field.name)
                                       markChanged()
@@ -611,8 +624,8 @@ export default function PurchaseOrderInboundDraftModal({
               请至少填写一条实点数量；未到货的材料可留空。
             </p>
           )}
-        </section>
-      </Form>
+        </BusinessLineEditor>
+      </BusinessForm>
       <p className="erp-purchase-arrival__help">
         数量差异只比较本次送货标示与实点；保存后送检，仓库确认入库后才增加库存。
       </p>

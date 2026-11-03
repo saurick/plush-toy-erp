@@ -34,6 +34,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/outsourcingreturndisposition"
+	"server/internal/data/model/ent/paymentmethodpreference"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/processinstance"
@@ -403,43 +404,43 @@ func init() {
 		}
 	}()
 	// bomheaderDescSourceOrderNo is the schema descriptor for source_order_no field.
-	bomheaderDescSourceOrderNo := bomheaderFields[5].Descriptor()
+	bomheaderDescSourceOrderNo := bomheaderFields[3].Descriptor()
 	// bomheader.SourceOrderNoValidator is a validator for the "source_order_no" field. It is called by the builders before save.
 	bomheader.SourceOrderNoValidator = bomheaderDescSourceOrderNo.Validators[0].(func(string) error)
 	// bomheaderDescQuantityText is the schema descriptor for quantity_text field.
-	bomheaderDescQuantityText := bomheaderFields[6].Descriptor()
+	bomheaderDescQuantityText := bomheaderFields[4].Descriptor()
 	// bomheader.QuantityTextValidator is a validator for the "quantity_text" field. It is called by the builders before save.
 	bomheader.QuantityTextValidator = bomheaderDescQuantityText.Validators[0].(func(string) error)
 	// bomheaderDescSpareText is the schema descriptor for spare_text field.
-	bomheaderDescSpareText := bomheaderFields[7].Descriptor()
+	bomheaderDescSpareText := bomheaderFields[5].Descriptor()
 	// bomheader.SpareTextValidator is a validator for the "spare_text" field. It is called by the builders before save.
 	bomheader.SpareTextValidator = bomheaderDescSpareText.Validators[0].(func(string) error)
 	// bomheaderDescDesigner is the schema descriptor for designer field.
-	bomheaderDescDesigner := bomheaderFields[9].Descriptor()
+	bomheaderDescDesigner := bomheaderFields[7].Descriptor()
 	// bomheader.DesignerValidator is a validator for the "designer" field. It is called by the builders before save.
 	bomheader.DesignerValidator = bomheaderDescDesigner.Validators[0].(func(string) error)
 	// bomheaderDescMaker is the schema descriptor for maker field.
-	bomheaderDescMaker := bomheaderFields[10].Descriptor()
+	bomheaderDescMaker := bomheaderFields[8].Descriptor()
 	// bomheader.MakerValidator is a validator for the "maker" field. It is called by the builders before save.
 	bomheader.MakerValidator = bomheaderDescMaker.Validators[0].(func(string) error)
 	// bomheaderDescAuditor is the schema descriptor for auditor field.
-	bomheaderDescAuditor := bomheaderFields[11].Descriptor()
+	bomheaderDescAuditor := bomheaderFields[9].Descriptor()
 	// bomheader.AuditorValidator is a validator for the "auditor" field. It is called by the builders before save.
 	bomheader.AuditorValidator = bomheaderDescAuditor.Validators[0].(func(string) error)
 	// bomheaderDescHairDirection is the schema descriptor for hair_direction field.
-	bomheaderDescHairDirection := bomheaderFields[12].Descriptor()
+	bomheaderDescHairDirection := bomheaderFields[10].Descriptor()
 	// bomheader.HairDirectionValidator is a validator for the "hair_direction" field. It is called by the builders before save.
 	bomheader.HairDirectionValidator = bomheaderDescHairDirection.Validators[0].(func(string) error)
 	// bomheaderDescNote is the schema descriptor for note field.
-	bomheaderDescNote := bomheaderFields[13].Descriptor()
+	bomheaderDescNote := bomheaderFields[11].Descriptor()
 	// bomheader.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	bomheader.NoteValidator = bomheaderDescNote.Validators[0].(func(string) error)
 	// bomheaderDescCreatedAt is the schema descriptor for created_at field.
-	bomheaderDescCreatedAt := bomheaderFields[14].Descriptor()
+	bomheaderDescCreatedAt := bomheaderFields[12].Descriptor()
 	// bomheader.DefaultCreatedAt holds the default value on creation for the created_at field.
 	bomheader.DefaultCreatedAt = bomheaderDescCreatedAt.Default.(func() time.Time)
 	// bomheaderDescUpdatedAt is the schema descriptor for updated_at field.
-	bomheaderDescUpdatedAt := bomheaderFields[15].Descriptor()
+	bomheaderDescUpdatedAt := bomheaderFields[13].Descriptor()
 	// bomheader.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	bomheader.DefaultUpdatedAt = bomheaderDescUpdatedAt.Default.(func() time.Time)
 	// bomheader.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -3409,6 +3410,46 @@ func init() {
 	outsourcingreturndispositionDescCreatedAt := outsourcingreturndispositionFields[18].Descriptor()
 	// outsourcingreturndisposition.DefaultCreatedAt holds the default value on creation for the created_at field.
 	outsourcingreturndisposition.DefaultCreatedAt = outsourcingreturndispositionDescCreatedAt.Default.(func() time.Time)
+	paymentmethodpreferenceFields := schema.PaymentMethodPreference{}.Fields()
+	_ = paymentmethodpreferenceFields
+	// paymentmethodpreferenceDescMethod is the schema descriptor for method field.
+	paymentmethodpreferenceDescMethod := paymentmethodpreferenceFields[0].Descriptor()
+	// paymentmethodpreference.MethodValidator is a validator for the "method" field. It is called by the builders before save.
+	paymentmethodpreference.MethodValidator = func() func(string) error {
+		validators := paymentmethodpreferenceDescMethod.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(method string) error {
+			for _, fn := range fns {
+				if err := fn(method); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// paymentmethodpreferenceDescIsRecommended is the schema descriptor for is_recommended field.
+	paymentmethodpreferenceDescIsRecommended := paymentmethodpreferenceFields[1].Descriptor()
+	// paymentmethodpreference.DefaultIsRecommended holds the default value on creation for the is_recommended field.
+	paymentmethodpreference.DefaultIsRecommended = paymentmethodpreferenceDescIsRecommended.Default.(bool)
+	// paymentmethodpreferenceDescVersion is the schema descriptor for version field.
+	paymentmethodpreferenceDescVersion := paymentmethodpreferenceFields[2].Descriptor()
+	// paymentmethodpreference.DefaultVersion holds the default value on creation for the version field.
+	paymentmethodpreference.DefaultVersion = paymentmethodpreferenceDescVersion.Default.(int)
+	// paymentmethodpreference.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	paymentmethodpreference.VersionValidator = paymentmethodpreferenceDescVersion.Validators[0].(func(int) error)
+	// paymentmethodpreferenceDescCreatedAt is the schema descriptor for created_at field.
+	paymentmethodpreferenceDescCreatedAt := paymentmethodpreferenceFields[3].Descriptor()
+	// paymentmethodpreference.DefaultCreatedAt holds the default value on creation for the created_at field.
+	paymentmethodpreference.DefaultCreatedAt = paymentmethodpreferenceDescCreatedAt.Default.(func() time.Time)
+	// paymentmethodpreferenceDescUpdatedAt is the schema descriptor for updated_at field.
+	paymentmethodpreferenceDescUpdatedAt := paymentmethodpreferenceFields[4].Descriptor()
+	// paymentmethodpreference.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	paymentmethodpreference.DefaultUpdatedAt = paymentmethodpreferenceDescUpdatedAt.Default.(func() time.Time)
+	// paymentmethodpreference.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	paymentmethodpreference.UpdateDefaultUpdatedAt = paymentmethodpreferenceDescUpdatedAt.UpdateDefault.(func() time.Time)
 	permissionFields := schema.Permission{}.Fields()
 	_ = permissionFields
 	// permissionDescPermissionKey is the schema descriptor for permission_key field.
@@ -3563,30 +3604,26 @@ func init() {
 	processDescInhouseEnabled := processFields[5].Descriptor()
 	// process.DefaultInhouseEnabled holds the default value on creation for the inhouse_enabled field.
 	process.DefaultInhouseEnabled = processDescInhouseEnabled.Default.(bool)
-	// processDescQualityRequired is the schema descriptor for quality_required field.
-	processDescQualityRequired := processFields[6].Descriptor()
-	// process.DefaultQualityRequired holds the default value on creation for the quality_required field.
-	process.DefaultQualityRequired = processDescQualityRequired.Default.(bool)
 	// processDescSortOrder is the schema descriptor for sort_order field.
-	processDescSortOrder := processFields[7].Descriptor()
+	processDescSortOrder := processFields[6].Descriptor()
 	// process.DefaultSortOrder holds the default value on creation for the sort_order field.
 	process.DefaultSortOrder = processDescSortOrder.Default.(int)
 	// process.SortOrderValidator is a validator for the "sort_order" field. It is called by the builders before save.
 	process.SortOrderValidator = processDescSortOrder.Validators[0].(func(int) error)
 	// processDescNote is the schema descriptor for note field.
-	processDescNote := processFields[8].Descriptor()
+	processDescNote := processFields[7].Descriptor()
 	// process.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	process.NoteValidator = processDescNote.Validators[0].(func(string) error)
 	// processDescIsActive is the schema descriptor for is_active field.
-	processDescIsActive := processFields[9].Descriptor()
+	processDescIsActive := processFields[8].Descriptor()
 	// process.DefaultIsActive holds the default value on creation for the is_active field.
 	process.DefaultIsActive = processDescIsActive.Default.(bool)
 	// processDescCreatedAt is the schema descriptor for created_at field.
-	processDescCreatedAt := processFields[10].Descriptor()
+	processDescCreatedAt := processFields[9].Descriptor()
 	// process.DefaultCreatedAt holds the default value on creation for the created_at field.
 	process.DefaultCreatedAt = processDescCreatedAt.Default.(func() time.Time)
 	// processDescUpdatedAt is the schema descriptor for updated_at field.
-	processDescUpdatedAt := processFields[11].Descriptor()
+	processDescUpdatedAt := processFields[10].Descriptor()
 	// process.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	process.DefaultUpdatedAt = processDescUpdatedAt.Default.(func() time.Time)
 	// process.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

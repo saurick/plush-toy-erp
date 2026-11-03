@@ -74,9 +74,11 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     await goto(page, '/erp/engineering/processes')
     await page.getByRole('button', { name: /新建加工环节$/u }).click()
     const form = page.locator('.erp-business-form-page:visible')
-    await form.getByText('质检参考', { exact: true }).waitFor()
+    await form.getByLabel('备注', { exact: true }).waitFor()
+    assert.equal(await form.getByText('质检参考', { exact: true }).count(), 0)
+    assert.equal(await form.getByRole('switch').count(), 2)
     await capture(page, 'process-form', form)
-    for (const [label, expected] of [['标准生产路线位置', '不能根据名称'], ['可委外', '能力'], ['质检参考', '检验']]) {
+    for (const [label, expected] of [['标准生产路线位置', '不能根据名称'], ['可委外', '能力']]) {
       const field = form.locator('.ant-form-item').filter({ has: page.getByText(label, { exact: true }) }).first()
       await field.scrollIntoViewIfNeeded()
       await capture(page, `process-${label}`, field)
@@ -86,8 +88,84 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     assert(await internal.count() >= 1)
   })
 
+  for (const [key, route, trigger, label] of [
+    ['sales', '/erp/sales/project-orders/sales-orders', /新建订单$/u, '计划交付日期'],
+    ['purchase', '/erp/purchase/accessories', /新建采购订单$/u, '预计到货日期'],
+    ['outsourcing', '/erp/purchase/processing-contracts', /新建加工合同$/u, '预计回货日期'],
+  ]) add(business, `line-date-${key}`, async page => {
+    await goto(page, route)
+    await page.getByRole('button', { name: trigger }).click()
+    const form = page.locator('.erp-business-form-page:visible')
+    const all = form.getByRole('radio', { name: '查看全部', exact: true })
+    if (await all.count()) await all.check()
+    const inheritedControls = form.getByRole('button', { name: new RegExp(`${label}：.*沿用`) })
+    if (!(await inheritedControls.count())) await form.getByRole('button', { name: { sales: '添加订货明细', purchase: '添加采购明细', outsourcing: '添加加工明细' }[key], exact: true }).last().click()
+    await inheritedControls.first().waitFor()
+    await form.getByLabel(label, { exact: true }).filter({ visible: true }).first().click()
+    let popup = page.locator('.ant-picker-dropdown:visible').last()
+    const day = popup.locator('.ant-picker-cell-in-view:not(.ant-picker-cell-disabled)').nth(4)
+    let inherited = await day.getAttribute('title')
+    await day.click()
+    if (key === 'purchase') {
+      await form.getByLabel('供应商确认到货日期', { exact: true }).click()
+      popup = page.locator('.ant-picker-dropdown:visible').last()
+      const confirmed = popup.locator('.ant-picker-cell-in-view:not(.ant-picker-cell-disabled)').nth(6)
+      inherited = await confirmed.getAttribute('title')
+      await confirmed.click()
+    }
+    const inheritedControl = form.getByRole('button', { name: new RegExp(`${label}：.*沿用`) }).first()
+    await inheritedControl.waitFor()
+    assert.ok((await inheritedControl.innerText()).includes(inherited.replaceAll('-', '/')))
+    await inheritedControl.click()
+    popup = page.locator('.ant-picker-dropdown:visible').last()
+    const override = popup.locator('.ant-picker-cell-in-view:not(.ant-picker-cell-disabled)').last()
+    const overrideDate = await override.getAttribute('title')
+    await override.click()
+    const input = form.getByLabel(label, { exact: true }).filter({ visible: true }).last()
+    assert.equal(await input.inputValue(), overrideDate.replaceAll('-', '/'))
+    const picker = input.locator('..').locator('..')
+    await picker.hover()
+    await picker.locator('.ant-picker-clear').click()
+    await form.getByRole('button', { name: new RegExp(`${label}：.*沿用`) }).first().waitFor()
+    await capture(page, `line-date-${key}`, form)
+    if (key !== 'purchase') return
+    const choose = async (name) => {
+      const control = form.getByLabel(name, { exact: true })
+      await control.click()
+      const listID = await control.getAttribute('aria-controls')
+      const overlay = page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id=${JSON.stringify(listID)}]`) })
+      const option = overlay.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)').first()
+      await option.locator('.ant-select-item-option-content').waitFor()
+      await option.click()
+      await overlay.waitFor({ state: 'hidden' })
+    }
+    await choose('供应商')
+    await choose('材料名称')
+    const reveal = form.getByRole('button', { name: '展开第 1 行下单资料', exact: true })
+    if (await reveal.count()) await reveal.click()
+    assert.equal(await form.getByLabel('下单材料名称', { exact: true }).isVisible(), true)
+    await form.getByLabel('下单材料名称', { exact: true }).fill('本单专用材料名称')
+    await form.getByRole('button', { name: '收起第 1 行下单资料', exact: true }).click()
+    await form.getByText('下单：本单专用材料名称', { exact: false }).waitFor()
+    await form.getByLabel('采购数量', { exact: true }).fill('2')
+    await form.getByLabel('单价', { exact: true }).fill('1.25')
+    await form.getByLabel('付款周期（天）', { exact: true }).fill('30')
+    const save = page.waitForRequest(request => request.url().includes('/rpc/purchase_order') && request.postDataJSON()?.method === 'save_purchase_order_with_items')
+    await page.getByRole('button', { name: /^(创建|保存)草稿$/u }).filter({ visible: true }).last().click()
+    const params = (await save).postDataJSON().params
+    assert.equal(params.items[0].material_name_snapshot, '本单专用材料名称', '收起原单资料后仍保存用户确认的名称')
+    assert.equal(Boolean(params.items[0].expected_arrival_date), false, '沿用日期不复制成重复的行日期')
+  })
+
+  const salesDateScenario = results.find(item => item.name === 'global-density-line-date-sales')
+  add({ ...business, themeMode: 'dark' }, 'line-date-sales-dark-mobile', async page => {
+    await salesDateScenario.verify(page)
+    await page.setViewportSize({ width: 393, height: 852 })
+    await capture(page, 'line-date-sales-dark-mobile', page.locator('.erp-business-form-page:visible'))
+  })
+
   for (const [key, route, record, hiddenLabels] of [
-    ['finance-columns', '/erp/finance/receivables', 'AR-STYLE-L1', ['收款分类', '账期', '备注']],
+    ['finance-columns', '/erp/finance/receivables', 'AR-STYLE-L1', ['账期', '备注']],
     ['supplier-columns', '/erp/master/partners/suppliers', 'SUP-STYLE-L1', ['简称', '默认发票要求']],
   ]) add(business, key, async page => {
     await goto(page, route)
@@ -100,6 +178,7 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     const dialog = page.getByRole('dialog', { name: /^列设置/u })
     await dialog.waitFor()
     await capture(page, `${key}-settings`, dialog)
+    if (key === 'finance-columns') assert.equal(await dialog.getByText('收款分类', { exact: true }).count(), 0)
     if (!baseline) for (const label of hiddenLabels) assert(await dialog.getByText(label, { exact: true }).count() > 0, `${label} 应可在列设置找回`)
     await dialog.press('Escape')
     await dialog.waitFor({ state: 'hidden' })

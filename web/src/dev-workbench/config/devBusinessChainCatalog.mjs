@@ -2132,6 +2132,9 @@ function normalizeStepContract({
     if (!PurchaseSourceActions[key]) throw new Error(`未知采购来源权限合同：${key}`)
   }
   const verificationRuleIds = uniqueStrings(rawStep.verificationRuleIds || [])
+  if (!verificationRuleIds.length) {
+    throw new Error(`business chain step has no named verification rules: ${chainDefinition.key}/${edge.key}`)
+  }
   for (const id of verificationRuleIds) {
     if (!BUSINESS_RULES.some((rule) => rule.id === id)) {
       throw new Error(`${chainDefinition.key}/${edge.key} references unknown verification rule: ${id}`)

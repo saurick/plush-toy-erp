@@ -12,6 +12,7 @@ import AppSelect from '@/common/components/select/AppSelect'
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 import BusinessTopicDetails, { BusinessTopicVerification } from './BusinessTopicDetails.jsx'
 import BusinessChainStepVerification from './BusinessChainStepVerification.jsx'
+import { WorkbenchReading } from '../WorkbenchPattern.jsx'
 import FinanceRelationshipsView from './FinanceRelationshipsView.jsx'
 import { FINANCE_RELATIONS_TOPIC_KEY } from '../../config/devFinanceWorkbench.mjs'
 import './businessChainTopics.css'
@@ -135,8 +136,7 @@ export default function BusinessChainTopics({
   }
   const selectedStep = !mapOpen && topic?.steps.find((step) =>
     step.key === searchParams.get(queryKeys.roleTopicStep) &&
-    step.verificationRuleIds.length > 0 &&
-    (step.fromNodeKey === node?.key || step.toNodeKey === node?.key)
+    (!filtered || matchingActions.some((action) => action.step.key === step.key))
   )
   const selectNode = (key) => updateReading(
     mapOpen
@@ -222,58 +222,86 @@ export default function BusinessChainTopics({
           ) : (
             <p className="erp-dev-chain-topics__summary">{topic.summary}</p>
           )}
-          <div className="erp-dev-chain-topics__reading">
-            <BusinessFlowDiagram
-              key={mapOpen ? `system:${focus.key}` : topic.key}
-              flow={graph}
-              label={mapOpen ? '系统衔接图' : `${topic.label}关系图`}
-              selectedKey={node?.key}
-              onSelect={selectNode}
-              role={role}
-              matchingKeys={matchingNodes}
-              relationships
-              runtimeKey={mapOpen ? currentChainKey : undefined}
-            />
-            {mapOpen ? (
-              <div className="erp-dev-fulfillment-guide__focus" aria-live="polite">
-                <strong>{node.label}</strong>
-                <p>
-                  {node.summary ||
+          {selectedStep ? (
+            <WorkbenchReading
+              className="erp-dev-chain-topics__step-reading"
+              label="本链关联动作"
+              detailLabel="所选动作的规则与验证"
+              value={selectedStep.key}
+              items={topic.steps
+                .filter((step) => !filtered || matchingActions.some((action) => action.step.key === step.key))
+                .map((step) => ({
+                  value: step.key,
+                  label: (
+                    <>
+                      <span>{step.label}</span>
+                      <small>
+                        {topic.nodes.find((item) => item.key === step.fromNodeKey).label}
+                        {' → '}
+                        {topic.nodes.find((item) => item.key === step.toNodeKey).label}
+                      </small>
+                    </>
+                  ),
+                }))}
+              onChange={(key) => updateReading({
+                [queryKeys.roleTopicStep]: key,
+                [queryKeys.roleTopicNode]: topic.steps.find((step) => step.key === key).fromNodeKey,
+              })}
+            >
+              <BusinessChainStepVerification
+                catalog={catalog}
+                topic={topic}
+                step={selectedStep}
+                onClose={() => updateReading({ [queryKeys.roleTopicStep]: null })}
+              />
+            </WorkbenchReading>
+          ) : (
+            <div className="erp-dev-chain-topics__reading">
+              <BusinessFlowDiagram
+                key={mapOpen ? `system:${focus.key}` : topic.key}
+                flow={graph}
+                label={mapOpen ? '系统衔接图' : `${topic.label}关系图`}
+                selectedKey={node?.key}
+                onSelect={selectNode}
+                role={role}
+                matchingKeys={matchingNodes}
+                relationships
+                runtimeKey={mapOpen ? currentChainKey : undefined}
+              />
+              {mapOpen ? (
+                <div className="erp-dev-fulfillment-guide__focus" aria-live="polite">
+                  <strong>{node.label}</strong>
+                  <p>
+                    {node.summary ||
                     topic?.edges
                       .filter((edge) => edge.from === node.key)
                       .map((edge) => edge.condition || edge.label)
                       .join('；') ||
                     '本分支结果'}
-                </p>
-                {node.key !== topic?.key ? (
-                  <Button
-                    type="link"
-                    onClick={() => {
+                  </p>
+                  {node.key !== topic?.key ? (
+                    <Button
+                      type="link"
+                      onClick={() => {
                       onSelectChain(node.key)
                     }}
-                  >
-                    查看此专题
-                  </Button>
+                    >
+                      查看此专题
+                    </Button>
                 ) : null}
-              </div>
+                </div>
             ) : (
               <BusinessTopicDetails
                 topic={topic}
                 node={node}
                 onSelect={selectNode}
                 onExploreChain={onExploreChain}
-                selectedStepKey={selectedStep?.key}
                 visibleStepKeys={filtered ? new Set(matchingActions.map((action) => action.step.key)) : null}
                 onInspectStep={(key) => updateReading({ [queryKeys.roleTopicStep]: key })}
-                stepDetails={selectedStep ? <BusinessChainStepVerification
-                  key={selectedStep.key}
-                  catalog={catalog}
-                  topic={topic}
-                  step={selectedStep}
-                /> : null}
               />
             )}
-          </div>
+            </div>
+          )}
           {!mapOpen ? (
             <>
               <ChainCapabilityLinks chainKey={topic.key} />

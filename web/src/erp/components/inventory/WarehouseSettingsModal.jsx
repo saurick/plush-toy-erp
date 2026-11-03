@@ -14,6 +14,7 @@ import {
   WAREHOUSE_TYPE_OPTIONS,
   warehouseTypeLabel,
 } from '../../utils/warehouseClassification.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function WarehouseSettingsModal({ open, onCancel, onSaved }) {
   const [form] = Form.useForm()
@@ -134,7 +135,7 @@ export default function WarehouseSettingsModal({ open, onCancel, onSaved }) {
       >
         新建仓库
       </Button>
-      <Form
+      <BusinessForm
         form={form}
         layout="vertical"
         className="erp-business-action-form"
@@ -183,7 +184,7 @@ export default function WarehouseSettingsModal({ open, onCancel, onSaved }) {
         <Form.Item label="启用" name="is_active" valuePropName="checked">
           <Switch />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessFormModal>
   )
 }

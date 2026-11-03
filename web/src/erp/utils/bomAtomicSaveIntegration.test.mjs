@@ -42,11 +42,11 @@ test('BOM form no longer orchestrates split header and item writes', () => {
 
 test('BOM form is mounted before open handlers initialize its form instance', async (t) => {
   assert.match(pageSource, /<BOMEditor[\s\S]*open=\{headerModalOpen\}/u)
-  assert.match(editorSource, /<Form[^>]*form=\{form\}/u)
+  assert.match(editorSource, /<BusinessForm[^>]*form=\{form\}/u)
   const ui = await createReactTestHarness(t)
   const { ERPThemeProvider } = await import('../../common/theme/erpTheme.jsx')
-  const [{ Form, Input }, { createMemoryRouter, RouterProvider }, { default: Page }] = await Promise.all([
-    import('antd'), import('react-router-dom'), import('../components/business-list/BusinessFormPage.jsx'),
+  const [{ Form, Input }, { createMemoryRouter, RouterProvider }, { default: Page }, { default: BusinessForm }] = await Promise.all([
+    import('antd'), import('react-router-dom'), import('../components/business-list/BusinessFormPage.jsx'), import('../components/business-list/BusinessForm.jsx'),
   ])
   let form
   let openEditor
@@ -55,7 +55,7 @@ test('BOM form is mounted before open handlers initialize its form instance', as
     openEditor = setOpen
     const [instance] = Form.useForm()
     form = instance
-    return h(Page, { open, form, title: 'BOM 草稿' }, h(Form, { form }, h(Form.Item, { name: 'version', label: 'BOM 版本' }, h(Input, { 'aria-label': 'BOM 版本' }))))
+    return h(Page, { open, form, title: 'BOM 草稿' }, h(BusinessForm, { form }, h(Form.Item, { name: 'version', label: 'BOM 版本' }, h(Input, { 'aria-label': 'BOM 版本' }))))
   }
   const router = createMemoryRouter([{ path: '*', element: h(Editor) }])
   t.after(() => router.dispose())

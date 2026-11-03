@@ -8,6 +8,7 @@ import { correctQualityInspectionResult } from '../../api/qualityApi.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message, modal } from '@/common/utils/antdApp'
 import { isSourceBusinessActionResultUnknown, sourceBusinessActionNo, sourceBusinessActionUUID } from '../../utils/sourceBusinessAction.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function QualityInspectionCorrectionModal({ inspection, customerKey, onClose, onCreated }) {
   const [form] = Form.useForm()
@@ -81,10 +82,10 @@ export default function QualityInspectionCorrectionModal({ inspection, customerK
       <p>原质检单：{inspection?.inspection_no}</p>
       <p>原判定或依据有误时保留原证据并生成待检单；已有生效下游业务时不能纠正，正常不合格按原处置流程办理。</p>
       {pending ? <Alert type="warning" showIcon message="结果暂时无法确认，已保留原内容；请重试确认，避免重复发起。" /> : null}
-      <Form form={form} name="quality-correction" layout="vertical" disabled={loading || Boolean(pending)} onValuesChange={() => { stateRef.current.dirty = true }}>
+      <BusinessForm form={form} name="quality-correction" layout="vertical" disabled={loading || Boolean(pending)} onValuesChange={() => { stateRef.current.dirty = true }}>
         <Form.Item name="correction_inspection_no" label="复检单号" rules={[{ required: true, whitespace: true, message: '请填写复检单号' }]}><Input maxLength={64} /></Form.Item>
         <Form.Item name="reason" label="纠正原因" rules={[{ required: true, whitespace: true, message: '请填写纠正原因' }, { max: 255, message: '纠正原因不能超过 255 个字符' }]}><BusinessTextArea maxLength={255} minRows={3} /></Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

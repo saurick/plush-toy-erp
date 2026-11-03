@@ -14,7 +14,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       const panel = guide.locator('[aria-label="流程详情"]')
       assert.equal(await guide.locator('[data-stage-exception]').count(), catalog.fulfillment_flow.reduce((count, step) => count + step.handling.guides.length, 0))
       for (const step of catalog.fulfillment_flow) {
-        await guide.locator(`[data-chain-stage="${step.stage}"] [data-stage-card]`).click()
+        await guide.locator(`[data-chain-stage="${step.stage}"]`).click()
         const normal = guide.locator('[data-stage-normal]')
         if (step.subflow) {
           await normal.locator('[data-mermaid-status="rendered"]').waitFor()

@@ -49,34 +49,6 @@ func (_c *BOMHeaderCreate) SetNillableStatus(v *string) *BOMHeaderCreate {
 	return _c
 }
 
-// SetEffectiveFrom sets the "effective_from" field.
-func (_c *BOMHeaderCreate) SetEffectiveFrom(v time.Time) *BOMHeaderCreate {
-	_c.mutation.SetEffectiveFrom(v)
-	return _c
-}
-
-// SetNillableEffectiveFrom sets the "effective_from" field if the given value is not nil.
-func (_c *BOMHeaderCreate) SetNillableEffectiveFrom(v *time.Time) *BOMHeaderCreate {
-	if v != nil {
-		_c.SetEffectiveFrom(*v)
-	}
-	return _c
-}
-
-// SetEffectiveTo sets the "effective_to" field.
-func (_c *BOMHeaderCreate) SetEffectiveTo(v time.Time) *BOMHeaderCreate {
-	_c.mutation.SetEffectiveTo(v)
-	return _c
-}
-
-// SetNillableEffectiveTo sets the "effective_to" field if the given value is not nil.
-func (_c *BOMHeaderCreate) SetNillableEffectiveTo(v *time.Time) *BOMHeaderCreate {
-	if v != nil {
-		_c.SetEffectiveTo(*v)
-	}
-	return _c
-}
-
 // SetSourceOrderNo sets the "source_order_no" field.
 func (_c *BOMHeaderCreate) SetSourceOrderNo(v string) *BOMHeaderCreate {
 	_c.mutation.SetSourceOrderNo(v)
@@ -423,14 +395,6 @@ func (_c *BOMHeaderCreate) createSpec() (*BOMHeader, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(bomheader.FieldStatus, field.TypeString, value)
 		_node.Status = value
-	}
-	if value, ok := _c.mutation.EffectiveFrom(); ok {
-		_spec.SetField(bomheader.FieldEffectiveFrom, field.TypeTime, value)
-		_node.EffectiveFrom = &value
-	}
-	if value, ok := _c.mutation.EffectiveTo(); ok {
-		_spec.SetField(bomheader.FieldEffectiveTo, field.TypeTime, value)
-		_node.EffectiveTo = &value
 	}
 	if value, ok := _c.mutation.SourceOrderNo(); ok {
 		_spec.SetField(bomheader.FieldSourceOrderNo, field.TypeString, value)

@@ -22,6 +22,19 @@ function ids(plan) {
   return plan.commands.map((item) => item.id);
 }
 
+test("material lifecycle references retain document, test and selection recovery follow-ups", () => {
+  for (const file of [
+    "web/src/dev-workbench/config/devFlowActionRules.mjs",
+    "web/src/dev-workbench/components/flow-state/FlowRuleTables.jsx",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const text = plan.followUps.find((item) => item.id === "browser-regression")?.text || "";
+    assert.match(text, /dev-material-lifecycle-bom-references-desktop/u, file);
+    assert.match(text, /dev-business-rules-selection-recovery-desktop/u, file);
+    assert(!ids(plan).includes("full"), file);
+  }
+});
+
 test("preview themes select development and built-entry isolation checks", () => {
   for (const file of [
     "web/src/dev-workbench/components/DevControlStandards.jsx",

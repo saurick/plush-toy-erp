@@ -95,6 +95,11 @@ func getOptionalJSONRPCBool(pm map[string]any, key string) (*bool, bool) {
 	return &value, true
 }
 
+func getRequiredJSONRPCBool(pm map[string]any, key string) (bool, bool) {
+	value, valid := pm[key].(bool)
+	return value, valid
+}
+
 func getRequiredJSONRPCPositiveInt(pm map[string]any, key string) (int, bool) {
 	const maxJSONSafeInteger = float64(9007199254740991)
 	raw, ok := pm[key]

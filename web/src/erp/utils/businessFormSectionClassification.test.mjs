@@ -135,9 +135,10 @@ test('operational long forms expose the audited semantic sections', () => {
     purchaseReceiptExceptionSource,
     /const detailTitle = isReturn \? '退货明细' : '调整明细'/u
   )
+  assert.match(purchaseReceiptExceptionSource, /<BusinessGroupedLineItems[^>]*title=\{detailTitle\}/u)
   assertOrdered(purchaseReceiptExceptionSource, [
     '整单信息',
-    '<BusinessLineItemsHeader',
+    '<BusinessGroupedLineItems',
     '整单备注',
   ])
 

@@ -42,6 +42,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/outsourcingreturndisposition"
+	"server/internal/data/model/ent/paymentmethodpreference"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/processinstance"
@@ -166,6 +167,8 @@ type Client struct {
 	OutsourcingOrderItem *OutsourcingOrderItemClient
 	// OutsourcingReturnDisposition is the client for interacting with the OutsourcingReturnDisposition builders.
 	OutsourcingReturnDisposition *OutsourcingReturnDispositionClient
+	// PaymentMethodPreference is the client for interacting with the PaymentMethodPreference builders.
+	PaymentMethodPreference *PaymentMethodPreferenceClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
 	// Process is the client for interacting with the Process builders.
@@ -304,6 +307,7 @@ func (c *Client) init() {
 	c.OutsourcingOrder = NewOutsourcingOrderClient(c.config)
 	c.OutsourcingOrderItem = NewOutsourcingOrderItemClient(c.config)
 	c.OutsourcingReturnDisposition = NewOutsourcingReturnDispositionClient(c.config)
+	c.PaymentMethodPreference = NewPaymentMethodPreferenceClient(c.config)
 	c.Permission = NewPermissionClient(c.config)
 	c.Process = NewProcessClient(c.config)
 	c.ProcessInstance = NewProcessInstanceClient(c.config)
@@ -475,6 +479,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		OutsourcingOrder:                   NewOutsourcingOrderClient(cfg),
 		OutsourcingOrderItem:               NewOutsourcingOrderItemClient(cfg),
 		OutsourcingReturnDisposition:       NewOutsourcingReturnDispositionClient(cfg),
+		PaymentMethodPreference:            NewPaymentMethodPreferenceClient(cfg),
 		Permission:                         NewPermissionClient(cfg),
 		Process:                            NewProcessClient(cfg),
 		ProcessInstance:                    NewProcessInstanceClient(cfg),
@@ -573,6 +578,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		OutsourcingOrder:                   NewOutsourcingOrderClient(cfg),
 		OutsourcingOrderItem:               NewOutsourcingOrderItemClient(cfg),
 		OutsourcingReturnDisposition:       NewOutsourcingReturnDispositionClient(cfg),
+		PaymentMethodPreference:            NewPaymentMethodPreferenceClient(cfg),
 		Permission:                         NewPermissionClient(cfg),
 		Process:                            NewProcessClient(cfg),
 		ProcessInstance:                    NewProcessInstanceClient(cfg),
@@ -659,11 +665,12 @@ func (c *Client) Use(hooks ...Hook) {
 		c.InventoryLot, c.InventoryLotStatusEvent, c.InventoryOperation,
 		c.InventoryOperationItem, c.InventoryTxn, c.Material, c.OutsourcingFact,
 		c.OutsourcingOrder, c.OutsourcingOrderItem, c.OutsourcingReturnDisposition,
-		c.Permission, c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product,
-		c.ProductSKU, c.ProductionExceptionDecision, c.ProductionFact,
-		c.ProductionOrder, c.ProductionOrderEvent, c.ProductionOrderItem,
-		c.ProductionOrderMaterialRequirement, c.ProductionOrderOperation,
-		c.ProductionPackagingConfirmation, c.ProductionWIPBatch, c.ProductionWIPEvent,
+		c.PaymentMethodPreference, c.Permission, c.Process, c.ProcessInstance,
+		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionExceptionDecision,
+		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
+		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
+		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
+		c.ProductionWIPBatch, c.ProductionWIPEvent,
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
@@ -692,11 +699,12 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.InventoryLot, c.InventoryLotStatusEvent, c.InventoryOperation,
 		c.InventoryOperationItem, c.InventoryTxn, c.Material, c.OutsourcingFact,
 		c.OutsourcingOrder, c.OutsourcingOrderItem, c.OutsourcingReturnDisposition,
-		c.Permission, c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product,
-		c.ProductSKU, c.ProductionExceptionDecision, c.ProductionFact,
-		c.ProductionOrder, c.ProductionOrderEvent, c.ProductionOrderItem,
-		c.ProductionOrderMaterialRequirement, c.ProductionOrderOperation,
-		c.ProductionPackagingConfirmation, c.ProductionWIPBatch, c.ProductionWIPEvent,
+		c.PaymentMethodPreference, c.Permission, c.Process, c.ProcessInstance,
+		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionExceptionDecision,
+		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
+		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
+		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
+		c.ProductionWIPBatch, c.ProductionWIPEvent,
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
@@ -777,6 +785,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.OutsourcingOrderItem.mutate(ctx, m)
 	case *OutsourcingReturnDispositionMutation:
 		return c.OutsourcingReturnDisposition.mutate(ctx, m)
+	case *PaymentMethodPreferenceMutation:
+		return c.PaymentMethodPreference.mutate(ctx, m)
 	case *PermissionMutation:
 		return c.Permission.mutate(ctx, m)
 	case *ProcessMutation:
@@ -6369,6 +6379,139 @@ func (c *OutsourcingReturnDispositionClient) mutate(ctx context.Context, m *Outs
 		return (&OutsourcingReturnDispositionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown OutsourcingReturnDisposition mutation op: %q", m.Op())
+	}
+}
+
+// PaymentMethodPreferenceClient is a client for the PaymentMethodPreference schema.
+type PaymentMethodPreferenceClient struct {
+	config
+}
+
+// NewPaymentMethodPreferenceClient returns a client for the PaymentMethodPreference from the given config.
+func NewPaymentMethodPreferenceClient(c config) *PaymentMethodPreferenceClient {
+	return &PaymentMethodPreferenceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `paymentmethodpreference.Hooks(f(g(h())))`.
+func (c *PaymentMethodPreferenceClient) Use(hooks ...Hook) {
+	c.hooks.PaymentMethodPreference = append(c.hooks.PaymentMethodPreference, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `paymentmethodpreference.Intercept(f(g(h())))`.
+func (c *PaymentMethodPreferenceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PaymentMethodPreference = append(c.inters.PaymentMethodPreference, interceptors...)
+}
+
+// Create returns a builder for creating a PaymentMethodPreference entity.
+func (c *PaymentMethodPreferenceClient) Create() *PaymentMethodPreferenceCreate {
+	mutation := newPaymentMethodPreferenceMutation(c.config, OpCreate)
+	return &PaymentMethodPreferenceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PaymentMethodPreference entities.
+func (c *PaymentMethodPreferenceClient) CreateBulk(builders ...*PaymentMethodPreferenceCreate) *PaymentMethodPreferenceCreateBulk {
+	return &PaymentMethodPreferenceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PaymentMethodPreferenceClient) MapCreateBulk(slice any, setFunc func(*PaymentMethodPreferenceCreate, int)) *PaymentMethodPreferenceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PaymentMethodPreferenceCreateBulk{err: fmt.Errorf("calling to PaymentMethodPreferenceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PaymentMethodPreferenceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PaymentMethodPreferenceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PaymentMethodPreference.
+func (c *PaymentMethodPreferenceClient) Update() *PaymentMethodPreferenceUpdate {
+	mutation := newPaymentMethodPreferenceMutation(c.config, OpUpdate)
+	return &PaymentMethodPreferenceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PaymentMethodPreferenceClient) UpdateOne(_m *PaymentMethodPreference) *PaymentMethodPreferenceUpdateOne {
+	mutation := newPaymentMethodPreferenceMutation(c.config, OpUpdateOne, withPaymentMethodPreference(_m))
+	return &PaymentMethodPreferenceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PaymentMethodPreferenceClient) UpdateOneID(id int) *PaymentMethodPreferenceUpdateOne {
+	mutation := newPaymentMethodPreferenceMutation(c.config, OpUpdateOne, withPaymentMethodPreferenceID(id))
+	return &PaymentMethodPreferenceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PaymentMethodPreference.
+func (c *PaymentMethodPreferenceClient) Delete() *PaymentMethodPreferenceDelete {
+	mutation := newPaymentMethodPreferenceMutation(c.config, OpDelete)
+	return &PaymentMethodPreferenceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PaymentMethodPreferenceClient) DeleteOne(_m *PaymentMethodPreference) *PaymentMethodPreferenceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PaymentMethodPreferenceClient) DeleteOneID(id int) *PaymentMethodPreferenceDeleteOne {
+	builder := c.Delete().Where(paymentmethodpreference.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PaymentMethodPreferenceDeleteOne{builder}
+}
+
+// Query returns a query builder for PaymentMethodPreference.
+func (c *PaymentMethodPreferenceClient) Query() *PaymentMethodPreferenceQuery {
+	return &PaymentMethodPreferenceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePaymentMethodPreference},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PaymentMethodPreference entity by its id.
+func (c *PaymentMethodPreferenceClient) Get(ctx context.Context, id int) (*PaymentMethodPreference, error) {
+	return c.Query().Where(paymentmethodpreference.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PaymentMethodPreferenceClient) GetX(ctx context.Context, id int) *PaymentMethodPreference {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PaymentMethodPreferenceClient) Hooks() []Hook {
+	return c.hooks.PaymentMethodPreference
+}
+
+// Interceptors returns the client interceptors.
+func (c *PaymentMethodPreferenceClient) Interceptors() []Interceptor {
+	return c.inters.PaymentMethodPreference
+}
+
+func (c *PaymentMethodPreferenceClient) mutate(ctx context.Context, m *PaymentMethodPreferenceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PaymentMethodPreferenceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PaymentMethodPreferenceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PaymentMethodPreferenceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PaymentMethodPreferenceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PaymentMethodPreference mutation op: %q", m.Op())
 	}
 }
 
@@ -15992,8 +16135,8 @@ type (
 		HelpSupplementRevision, InventoryBalance, InventoryLot,
 		InventoryLotStatusEvent, InventoryOperation, InventoryOperationItem,
 		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
-		OutsourcingOrderItem, OutsourcingReturnDisposition, Permission, Process,
-		ProcessInstance, ProcessNodeInstance, Product, ProductSKU,
+		OutsourcingOrderItem, OutsourcingReturnDisposition, PaymentMethodPreference,
+		Permission, Process, ProcessInstance, ProcessNodeInstance, Product, ProductSKU,
 		ProductionExceptionDecision, ProductionFact, ProductionOrder,
 		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
 		ProductionOrderOperation, ProductionPackagingConfirmation, ProductionWIPBatch,
@@ -16016,8 +16159,8 @@ type (
 		HelpSupplementRevision, InventoryBalance, InventoryLot,
 		InventoryLotStatusEvent, InventoryOperation, InventoryOperationItem,
 		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
-		OutsourcingOrderItem, OutsourcingReturnDisposition, Permission, Process,
-		ProcessInstance, ProcessNodeInstance, Product, ProductSKU,
+		OutsourcingOrderItem, OutsourcingReturnDisposition, PaymentMethodPreference,
+		Permission, Process, ProcessInstance, ProcessNodeInstance, Product, ProductSKU,
 		ProductionExceptionDecision, ProductionFact, ProductionOrder,
 		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
 		ProductionOrderOperation, ProductionPackagingConfirmation, ProductionWIPBatch,

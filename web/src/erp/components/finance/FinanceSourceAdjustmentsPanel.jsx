@@ -8,6 +8,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
 import { compareNumeric20Scale6Units, numeric20Scale6Units, isPositiveNumeric20Scale6Units } from '../../utils/numeric20Scale6.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function FinanceSourceAdjustmentsPanel({ customerKey, canCreate, attemptsRef, onChanged }) {
   const [rows, setRows] = useState([])
@@ -75,10 +76,10 @@ export default function FinanceSourceAdjustmentsPanel({ customerKey, canCreate, 
       <BusinessFormModal open={Boolean(selected)} title="确认采购应付差额" onCancel={() => !saving && setSelected(null)} onOk={save} confirmLoading={saving} okText="确认调整" cancelText="取消" maskClosable={!saving} keyboard={!saving}>
         <p>{selected?.source_no}：{selected?.balance_direction === FinanceAdjustmentDirection.INCREASE ? '增加' : '减少'}应付 {selected?.amount} {selected?.currency}</p>
         {retryPending ? <Alert type="warning" showIcon message="上次结果尚未确认，请重试原内容。确认结果后才能发起新的调整。" /> : null}
-        <Form form={form} layout="vertical" disabled={saving || retryPending}>
+        <BusinessForm form={form} layout="vertical" disabled={saving || retryPending}>
           <Form.Item name="credit_note_no" label="调整单号" rules={[{ required: true, whitespace: true, message: '请填写调整单号' }]}><Input maxLength={64} /></Form.Item>
           <Form.Item name="reason" label="调整原因" rules={[{ required: true, whitespace: true, message: '请填写调整原因' }]}><Input.TextArea maxLength={255} rows={3} /></Form.Item>
-        </Form>
+        </BusinessForm>
       </BusinessFormModal>
     </>
   )

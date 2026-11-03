@@ -1590,8 +1590,6 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 		SetVersion(version).
 		SetStatus(biz.BOMStatusDraft).
 		SetUpdatedAt(nextBOMEditTime(0)).
-		SetNillableEffectiveFrom(in.EffectiveFrom).
-		SetNillableEffectiveTo(in.EffectiveTo).
 		SetNillableSourceOrderNo(sourceOrderNo).
 		SetNillableQuantityText(quantityText).
 		SetNillableSpareText(spareText).
@@ -1878,8 +1876,6 @@ func entBOMHeaderToBiz(row *ent.BOMHeader) *biz.BOMHeader {
 		ProductID:     row.ProductID,
 		Version:       row.Version,
 		Status:        row.Status,
-		EffectiveFrom: row.EffectiveFrom,
-		EffectiveTo:   row.EffectiveTo,
 		SourceOrderNo: row.SourceOrderNo,
 		QuantityText:  row.QuantityText,
 		SpareText:     row.SpareText,

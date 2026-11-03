@@ -171,8 +171,6 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "version", Type: field.TypeString, Size: 64},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
-		{Name: "effective_from", Type: field.TypeTime, Nullable: true},
-		{Name: "effective_to", Type: field.TypeTime, Nullable: true},
 		{Name: "source_order_no", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "quantity_text", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "spare_text", Type: field.TypeString, Nullable: true, Size: 64},
@@ -194,7 +192,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "bom_headers_products_bom_headers",
-				Columns:    []*schema.Column{BomHeadersColumns[16]},
+				Columns:    []*schema.Column{BomHeadersColumns[14]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -203,12 +201,12 @@ var (
 			{
 				Name:    "bomheader_product_id_version",
 				Unique:  true,
-				Columns: []*schema.Column{BomHeadersColumns[16], BomHeadersColumns[1]},
+				Columns: []*schema.Column{BomHeadersColumns[14], BomHeadersColumns[1]},
 			},
 			{
 				Name:    "bomheader_product_id",
 				Unique:  true,
-				Columns: []*schema.Column{BomHeadersColumns[16]},
+				Columns: []*schema.Column{BomHeadersColumns[14]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "status = 'ACTIVE'",
 				},
@@ -216,7 +214,7 @@ var (
 			{
 				Name:    "bomheader_product_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{BomHeadersColumns[16], BomHeadersColumns[2]},
+				Columns: []*schema.Column{BomHeadersColumns[14], BomHeadersColumns[2]},
 			},
 		},
 	}
@@ -1851,6 +1849,21 @@ var (
 			},
 		},
 	}
+	// PaymentMethodPreferencesColumns holds the columns for the "payment_method_preferences" table.
+	PaymentMethodPreferencesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "method", Type: field.TypeString, Unique: true, Size: 128},
+		{Name: "is_recommended", Type: field.TypeBool, Default: true},
+		{Name: "version", Type: field.TypeInt, Default: 1},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// PaymentMethodPreferencesTable holds the schema information for the "payment_method_preferences" table.
+	PaymentMethodPreferencesTable = &schema.Table{
+		Name:       "payment_method_preferences",
+		Columns:    PaymentMethodPreferencesColumns,
+		PrimaryKey: []*schema.Column{PaymentMethodPreferencesColumns[0]},
+	}
 	// PermissionsColumns holds the columns for the "permissions" table.
 	PermissionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1896,7 +1909,6 @@ var (
 		{Name: "production_route_operation_code", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "outsourcing_enabled", Type: field.TypeBool, Default: false},
 		{Name: "inhouse_enabled", Type: field.TypeBool, Default: true},
-		{Name: "quality_required", Type: field.TypeBool, Default: false},
 		{Name: "sort_order", Type: field.TypeInt, Default: 0},
 		{Name: "note", Type: field.TypeString, Nullable: true},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
@@ -1940,12 +1952,12 @@ var (
 			{
 				Name:    "process_is_active",
 				Unique:  false,
-				Columns: []*schema.Column{ProcessesColumns[10]},
+				Columns: []*schema.Column{ProcessesColumns[9]},
 			},
 			{
 				Name:    "process_sort_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProcessesColumns[8], ProcessesColumns[0]},
+				Columns: []*schema.Column{ProcessesColumns[7], ProcessesColumns[0]},
 			},
 		},
 	}
@@ -5181,6 +5193,7 @@ var (
 		OutsourcingOrdersTable,
 		OutsourcingOrderItemsTable,
 		OutsourcingReturnDispositionsTable,
+		PaymentMethodPreferencesTable,
 		PermissionsTable,
 		ProcessesTable,
 		ProcessInstancesTable,
@@ -5246,8 +5259,7 @@ func init() {
 	BomHeadersTable.ForeignKeys[0].RefTable = ProductsTable
 	BomHeadersTable.Annotation = &entsql.Annotation{}
 	BomHeadersTable.Annotation.Checks = map[string]string{
-		"bom_headers_effective_dates_ordered": "effective_from IS NULL OR effective_to IS NULL OR effective_to > effective_from",
-		"bom_headers_status_allowed":          "status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')",
+		"bom_headers_status_allowed": "status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')",
 	}
 	BomItemsTable.ForeignKeys[0].RefTable = BomHeadersTable
 	BomItemsTable.ForeignKeys[1].RefTable = MaterialsTable
@@ -5473,6 +5485,11 @@ func init() {
 		"outsourcing_return_dispositions_type_allowed":      "disposition_type IN ('RETURN_TO_VENDOR', 'REWORK')",
 		"outsourcing_return_dispositions_version_positive":  "version > 0",
 		"outsourcing_return_dispositions_wip_source":        "disposition_type = 'RETURN_TO_VENDOR' OR production_wip_batch_id IS NOT NULL",
+	}
+	PaymentMethodPreferencesTable.Annotation = &entsql.Annotation{}
+	PaymentMethodPreferencesTable.Annotation.Checks = map[string]string{
+		"payment_method_preferences_method_valid":     "method = TRIM(method) AND LENGTH(method) BETWEEN 1 AND 128",
+		"payment_method_preferences_version_positive": "version > 0",
 	}
 	ProcessesTable.Annotation = &entsql.Annotation{}
 	ProcessesTable.Annotation.Checks = map[string]string{

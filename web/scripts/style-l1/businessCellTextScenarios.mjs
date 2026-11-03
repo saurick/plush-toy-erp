@@ -1,3 +1,5 @@
+import { writeFile } from 'node:fs/promises'
+import { revealLineItemDetails } from './lineEditorActions.mjs'
 import { BusinessTextPolicy } from '../../src/common/consts/policies.generated.mjs'
 import {
   assertBusinessFormPage,
@@ -6,6 +8,8 @@ import {
 } from './businessFormPageAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertSingleSelectValues } from './singleSelectAssertions.mjs'
+import { assertVisibleBusinessFormControlHeight } from './inputControlAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const longText = '布底贴12g衬，衣片与披肩按尺寸配套，腰带两端留孔。'.repeat(4)
 const multilineNote = Array.from(
@@ -66,6 +70,17 @@ async function exerciseText(control, assert, value = longText) {
       height: expanded.height,
     })
   await assertReadable(control, assert)
+  await assertVisibleBusinessFormControlHeight(control.page(), '长文本回缩为单行')
+  await control.fill('')
+  await control.page().waitForFunction((node) => {
+    const style = getComputedStyle(node)
+    if (Number(style.getPropertyValue('--erp-textarea-rows')) !== 1 || node.closest('.ant-input-textarea-show-count')) return true
+    const owner = node.closest('.ant-input-textarea-affix-wrapper') || node
+    return Math.abs(owner.offsetHeight - parseFloat(style.getPropertyValue('--erp-control-height'))) <= 1
+  }, await control.elementHandle()).catch(async (error) => {
+    throw new Error(`清空文本域未回缩：${JSON.stringify(await textMetrics(control))}`, { cause: error })
+  })
+  await assertVisibleBusinessFormControlHeight(control.page(), '清空文本域恢复基线')
   await control.fill(value)
   await assertReadable(control, assert)
 }
@@ -94,7 +109,7 @@ export function createBusinessCellTextScenarios(deps) {
       key: 'purchase',
       path: '/erp/purchase/accessories',
       open: '新建采购订单',
-      fields: ['下单材料名称', '备注'],
+      fields: ['产品名称', '下单材料名称', '备注'],
     },
     {
       key: 'outsourcing',
@@ -114,7 +129,10 @@ export function createBusinessCellTextScenarios(deps) {
     path: config.path,
     auth: 'admin',
     effectiveSession: deps.customerRuntimeEffectiveSession,
-    viewport: { width: 1440, height: 1000 },
+    viewport: config.key === 'purchase'
+      ? { width: 1920, height: 1080 }
+      : { width: 1440, height: 1000 },
+    deviceScaleFactor: config.key === 'purchase' ? 2 : 1,
     beforeNavigate: async (page) => {
       if (!config.key.startsWith('bom')) return
       await page.route('**/rpc/masterdata', async (route) => {
@@ -188,6 +206,7 @@ export function createBusinessCellTextScenarios(deps) {
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       await editor.waitFor({ state: 'visible' })
       await page.waitForFunction(() => document.querySelector('.erp-business-form-page:not([hidden])')?.getAttribute('aria-busy') === 'false')
+      await editor.getByRole('radio', { name: '目录', exact: true }).check()
       const headerNote = editor.locator('[data-form-section="备注与附件"] textarea')
       await headerNote.scrollIntoViewIfNeeded()
       const headerCount = headerNote.locator('..').locator('.ant-input-data-count')
@@ -214,10 +233,13 @@ export function createBusinessCellTextScenarios(deps) {
           .getByRole('button', { name: config.add, exact: true })
           .click()
       }
+      const expandAll = editor.getByRole('button', { name: '全部展开', exact: true })
+      if (await expandAll.count()) await expandAll.click()
       const line = config.key.startsWith('bom')
         ? editor.locator('.erp-bom-material-group').first()
-        : editor.locator('.erp-sales-order-lines-form__row').first()
+        : editor.locator('.erp-editable-line-group:visible').first()
       await line.waitFor({ state: 'visible' })
+      if (!config.key.startsWith('bom')) await revealLineItemDetails(line)
       await assertBusinessNoteTextAreas(line)
       if (config.key.startsWith('bom')) {
         const selected = line.locator('.ant-select-selection-item').first()
@@ -234,6 +256,25 @@ export function createBusinessCellTextScenarios(deps) {
       if (await details.count()) {
         deps.assert.equal(await details.getAttribute('open'), null)
         await details.locator('summary').click()
+      }
+      await assertVisibleBusinessFormControlHeight(page, `business-cell-text-${config.key}-initial`)
+      if (config.key === 'purchase') {
+        await line.getByLabel('产品订单编号', { exact: true }).focus()
+        await line.locator('.erp-line-item-details__fields').evaluate((node) => node.scrollIntoView({ block: 'center' }))
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: `${deps.outputDir}/purchase-input-height-empty-4k.png` })
+        await line.locator('.erp-line-item-details__fields').screenshot({
+          path: `${deps.outputDir}/purchase-input-height-fields.png`,
+        })
+        const metrics = await line.locator('.erp-line-item-details__fields').evaluate((root) => ({
+          viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },
+          fields: [...root.querySelectorAll('input, textarea')].filter((node) => node.getClientRects().length && node.type !== 'hidden').map((node) => ({
+            label: node.labels?.[0]?.textContent,
+            tag: node.tagName,
+            height: (node.closest('.ant-input-textarea-affix-wrapper') || node).getBoundingClientRect().height,
+          })),
+        }))
+        await writeFile(`${deps.outputDir}/purchase-input-height.json`, JSON.stringify(metrics, null, 2))
       }
       for (const label of config.fields) {
         if (config.readonly) {
@@ -302,12 +343,23 @@ export function createBusinessCellTextScenarios(deps) {
       const noteBeforeResize = await note.inputValue()
       if (!config.readonly) await note.focus()
       await page.setViewportSize({ width: 720, height: 1000 })
+      await waitForFiniteAnimations(page)
+      if (!config.key.startsWith('bom')) await revealLineItemDetails(line)
       for (const label of config.fields) {
+        const control = line.getByLabel(label, { exact: true })
         await assertReadable(
-          line.getByLabel(label, { exact: true }),
+          control,
           deps.assert
         )
+        if (!config.readonly) {
+          await exerciseText(
+            control,
+            deps.assert,
+            await control.inputValue()
+          )
+        }
       }
+      await assertVisibleBusinessFormControlHeight(page, `business-cell-text-${config.key}-narrow`)
       deps.assert.equal(await note.inputValue(), noteBeforeResize)
       if (!config.readonly) {
         deps.assert.equal(await note.evaluate((node) => node === document.activeElement), true, '切换宽度保留备注焦点')

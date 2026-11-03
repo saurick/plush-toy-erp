@@ -1,3 +1,12 @@
+\if :{?plush_process_reference_seed}
+INSERT INTO processes (
+  id, code, name, category, outsourcing_enabled, inhouse_enabled,
+  quality_required, sort_order, note, is_active, created_at, updated_at
+) VALUES
+  (910101, '__qa_populated_process_ref_true__', '模拟工序一', '加工', true, true, true, 910101, '保留的工序说明', true, '2026-11-01+08', '2026-11-01+08'),
+  (910102, '__qa_populated_process_ref_false__', '模拟工序二', NULL, false, true, false, 910102, NULL, false, '2026-11-01+08', '2026-11-01+08');
+\endif
+
 \if :{?plush_latest_withdrawn}
 BEGIN;
 INSERT INTO process_instances (

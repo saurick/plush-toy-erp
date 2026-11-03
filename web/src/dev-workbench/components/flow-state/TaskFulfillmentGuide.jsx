@@ -110,7 +110,7 @@ export default function TaskFulfillmentGuide({
 
   const update = (change, reveal = false) => {
     if (reveal) {
-      openerRef.current = document.activeElement?.closest('button')
+      openerRef.current = document.activeElement?.closest('button, [role="button"]')
       revealRef.current = true
     }
     setSearchParams(
@@ -205,6 +205,8 @@ export default function TaskFulfillmentGuide({
                 else next.set(queryKeys.role, value)
                 next.delete(queryKeys.roleTopicNode)
                 next.delete(queryKeys.roleTopicStep)
+                next.delete(queryKeys.roleTopicPanel)
+                next.delete(queryKeys.roleTopicBatch)
               })
             }
               virtual={false}

@@ -3,8 +3,11 @@ import test from 'node:test'
 import { createElement as h } from 'react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
+import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRuntime.mjs'
 import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCatalog.mjs'
 import { DEV_BUSINESS_CHAIN_AUDIT_ROUTE, DEV_VERSION_CENTER_ROUTE } from '../../config/devRoutes.mjs'
+
+registerMermaidTestRenderer()
 
 const router = (body) => h(MemoryRouter, {
   future: { v7_startTransition: true, v7_relativeSplatPath: true },
@@ -103,7 +106,7 @@ test('图中与相邻详情选取对象共用 URL，当前专题和对象不会�
     future: { v7_startTransition: true, v7_relativeSplatPath: true },
   }, h(Page)))
   const root = harness.container
-  await harness.act(() => root.querySelector('[data-graph-node="effective_bom"]').click())
+  await harness.act(() => root.querySelector('[data-graph-node="effective_bom"]').dispatchEvent(new harness.runtimeWindow.MouseEvent('click', { bubbles: true })))
   await harness.flush()
   assert.equal(new URLSearchParams(location.search).get('flow_topic_node'), 'effective_bom')
   assert.match(root.querySelector('aside').textContent, /老板.*财务/u)
@@ -125,7 +128,7 @@ test('图中与相邻详情选取对象共用 URL，当前专题和对象不会�
   await harness.flush()
   assert(root.querySelector('[data-business-chain-system]'))
   assert.equal([...root.querySelectorAll('button')].filter((button) => button.textContent === '查看此专题').length, 0)
-  await harness.act(() => root.querySelector('[data-business-chain-system] [data-graph-node][aria-pressed="false"]').click())
+  await harness.act(() => root.querySelector('[data-business-chain-system] [data-graph-node][aria-pressed="false"]').dispatchEvent(new harness.runtimeWindow.MouseEvent('click', { bubbles: true })))
   await harness.flush()
   assert.equal([...root.querySelectorAll('button')].filter((button) => button.textContent === '查看此专题').length, 1)
   const back = [...root.querySelectorAll('button')]
@@ -136,7 +139,7 @@ test('图中与相邻详情选取对象共用 URL，当前专题和对象不会�
   assert.equal(document.activeElement.textContent, '系统衔接图')
 })
 
-test('规则正文在所属交接下展开，收起和选择其他对象都不替换关联目录', async (t) => {
+test('关联动作直接打开核验，选择相关对象仍保留明确来源', async (t) => {
   const harness = await createReactTestHarness(t)
   const { default: Details } = await import('./BusinessTopicDetails.jsx')
   const topic = catalog.businessChains.find((item) => item.key === 'purchase_to_inventory')
@@ -146,16 +149,11 @@ test('规则正文在所属交接下展开，收起和选择其他对象都不�
   const selected = []
   const props = { topic, node, onSelect: (key) => selected.push(key), onInspectStep: (key) => requested.push(key) }
   await harness.render(h(Details, props))
-  const trigger = harness.container.querySelector(`[data-topic-relation="${step.key}"] [aria-expanded]`)
+  const trigger = harness.container.querySelector(`[data-topic-relation="${step.key}"] button[aria-label]`)
   await harness.act(() => trigger.click())
   assert.deepEqual(requested, [step.key])
-  await harness.render(h(Details, { ...props, selectedStepKey: step.key, stepDetails: h('p', { 'data-rule-body': true }, '完整规则与验证结果') }))
-  const expanded = harness.container.querySelector(`[data-topic-relation="${step.key}"]`)
-  assert.equal(Boolean(expanded.querySelector('[data-rule-body]')), true)
-  assert.equal(harness.container.querySelector('[aria-expanded="true"]') === trigger, true)
-  await harness.act(() => trigger.click())
-  assert.deepEqual(requested, [step.key, null])
-  const peer = expanded.querySelector('.erp-dev-chain-topics__relation-heading button')
+  const relation = harness.container.querySelector(`[data-topic-relation="${step.key}"]`)
+  const peer = relation.querySelector('.erp-dev-chain-topics__relation-heading button')
   await harness.act(() => peer.click())
   assert.equal(selected.length, 1)
 })

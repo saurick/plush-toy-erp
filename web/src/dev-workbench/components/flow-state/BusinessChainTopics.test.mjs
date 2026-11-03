@@ -3,7 +3,10 @@ import test from 'node:test'
 import { createElement as h } from 'react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
+import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRuntime.mjs'
 import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCatalog.mjs'
+
+registerMermaidTestRenderer()
 
 test('专题默认选择、主动清空和刷新恢复使用同一 URL 真源', async (t) => {
   const harness = await createReactTestHarness(t)

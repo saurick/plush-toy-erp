@@ -3,6 +3,7 @@ import {
   getBusinessModule,
 } from './businessModules.mjs'
 import { getCommandCenterView } from './commandCenter.mjs'
+import { navigationItemRegistry } from './seedData.mjs'
 import { getBusinessPageLineage } from './businessPageLineage.mjs'
 import { ROLE_HELP_GUIDES } from './roleHelpContent.mjs'
 import { ENGINEERING_MATERIAL_HELP } from './engineeringMaterialHelp.mjs'
@@ -225,16 +226,10 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     ],
     flowSteps: [
       '先搜索环节名称和编号，确认是否已有可用资料。',
-      '核对内制、委外适用范围及对应生产环节，填写必要质检参考。',
+      '核对内制、委外适用范围及对应生产环节。',
       '保存后在生产路线或委外合同中核对引用结果。',
     ],
     items: [
-      helpItem(
-        BUSINESS_HELP_TYPES.TERM,
-        'process-reference',
-        '质检参考会自动发起检验吗',
-        '不会。这里的质检参考供人工查看，实际检验仍在质检页面办理。'
-      ),
       helpItem(
         BUSINESS_HELP_TYPES.TERM,
         'process-order',
@@ -1207,7 +1202,9 @@ export function getBusinessPagePresentation(pageKey = '') {
   if (businessPage) {
     return Object.freeze({ title: businessPage.title, path: businessPage.path })
   }
-  const workEntry = getCommandCenterView(key)
+  const workEntry = getCommandCenterView(key) || (
+    Object.hasOwn(navigationItemRegistry, key) ? navigationItemRegistry[key] : null
+  )
   return workEntry
     ? Object.freeze({ title: workEntry.label, path: workEntry.path })
     : null

@@ -14,15 +14,14 @@ import BusinessCompactFieldTable, {
 } from '../business-list/BusinessCompactFieldTable.jsx'
 
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
-import BusinessLineItemsFooter, {
-  BusinessLineItemsHeader,
-} from '../business-list/BusinessLineItemsFooter.jsx'
+import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import { PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS } from '../../utils/purchaseReceiptExceptionAction.mjs'
 import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function receiptItemLabel(item, materialOptions = []) {
   const material = materialOptions.find(
@@ -121,7 +120,7 @@ export default function PurchaseReceiptExceptionModal({
             : '调整会保留原入库记录并生成差额调整记录，不会改写原入库明细。'
         }
       />
-      <Form form={form} className="erp-business-action-form" layout="vertical" preserve={false} disabled={loading}>
+      <BusinessForm form={form} className="erp-business-action-form" layout="vertical" preserve={false} disabled={loading}>
         <BusinessFormSection title="整单信息" layout="content">
           <Space size={16} style={{ width: '100%' }} align="start">
             <Form.Item
@@ -147,8 +146,8 @@ export default function PurchaseReceiptExceptionModal({
           <Form.List name="items">
             {(fields, { add, remove }) => (
               <>
-                <BusinessLineItemsHeader title={detailTitle} />
                 <BusinessGroupedLineItems
+                  title={detailTitle}
                   fields={fields}
                   form={form}
                   table={BusinessCompactFieldTable}
@@ -174,7 +173,7 @@ export default function PurchaseReceiptExceptionModal({
                       width: 180,
                     },
                     ...(!isReturn ? [{ label: '调整目标' }] : []),
-                    { label: '操作', width: 52 },
+                    { actions: true, label: '操作', width: 52 },
                   ] }}
                 >
                   {(listField, index) => {
@@ -315,7 +314,9 @@ export default function PurchaseReceiptExceptionModal({
                             aria-label={`移除明细 ${index + 1}`}
                             icon={<MinusCircleOutlined />}
                             onClick={() => remove(field.name)}
-                          />
+                          >
+                            移除行
+                          </Button>
                         ) : null
                       }
                       >
@@ -351,7 +352,7 @@ export default function PurchaseReceiptExceptionModal({
             <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
           </Form.Item>
         </BusinessFormSection>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

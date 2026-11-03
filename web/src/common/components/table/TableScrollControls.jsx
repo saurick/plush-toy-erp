@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import { Button, Space } from 'antd'
 import './table-scroll-controls.css'
+import { findTableScrollToolbar } from './tableScrollToolbar.mjs'
 
 export default function TableScrollControls({
   tableRef,
@@ -33,9 +34,7 @@ export default function TableScrollControls({
         ).find((node) => node.closest('.ant-table-wrapper') === wrapper)
       : wrapper
     const table = scroller?.querySelector('table')
-    const scope = wrapper?.closest('[data-table-scroll-scope]')
-    const toolbar =
-      useToolbar && scope?.querySelector('[data-table-scroll-toolbar]')
+    const toolbar = useToolbar ? findTableScrollToolbar(wrapper) : null
     const binding = bindingRef.current
     if (
       binding &&
@@ -56,8 +55,7 @@ export default function TableScrollControls({
       return
     }
 
-    // Only primary tables opt into the surrounding page toolbar. Nested tables
-    // and editors keep their controls next to their own table.
+    // 显式接入的表格只使用所属工具栏，嵌套表格不能借用外层或其他明细的入口。
     const topHost = toolbar || document.createElement('div')
     if (!toolbar) {
       topHost.className = 'app-table-scroll-top'

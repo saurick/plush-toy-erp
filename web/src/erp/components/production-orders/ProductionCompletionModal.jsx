@@ -29,6 +29,7 @@ import {
   SOURCE_INBOUND_LOT_SELECTION,
   sourceInboundLotSelectionForOptions,
 } from '../../utils/sourceInboundLotSelection.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const { Text } = Typography
 
@@ -239,7 +240,7 @@ export default function ProductionCompletionModal({
           },
         ]}
       />
-      <Form
+      <BusinessForm
         form={form}
         className="erp-business-action-form"
         layout="vertical"
@@ -447,7 +448,7 @@ export default function ProductionCompletionModal({
             <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
           </Form.Item>
         </BusinessFormSection>
-      </Form>
+      </BusinessForm>
     </Editor>
   )
 }

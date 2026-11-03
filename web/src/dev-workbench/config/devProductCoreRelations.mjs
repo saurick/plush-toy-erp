@@ -5,6 +5,8 @@ import {
   DEV_VERSION_CENTER_ROUTE,
 } from './devRoutes.mjs'
 import { chainStepAuditURL } from './devBusinessChainVerification.mjs'
+import { CHAIN_AUDIT_BATCH_PATTERN } from './devBusinessChainAudit.mjs'
+import { DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS } from './devBusinessChainStepContracts.mjs'
 
 // References join the capability ledger to existing chains; they carry no status or rules.
 export const PRODUCT_CORE_CHAIN_REFERENCES = Object.freeze([
@@ -43,7 +45,9 @@ export function isProductCoreReadingDestination(value) {
     return onlyKeys(['view', 'chain', 'flow_topic']) && query.get('view') === 'chain' && query.get('chain') === 'all' && knownChain(query.get('flow_topic'))
   }
   if (url.pathname === DEV_BUSINESS_CHAIN_AUDIT_ROUTE) {
-    return onlyKeys(['chain']) && knownChain(query.get('chain'))
+    return onlyKeys(['chain', 'step', 'batch']) && knownChain(query.get('chain')) &&
+      (!query.has('batch') || CHAIN_AUDIT_BATCH_PATTERN.test(query.get('batch'))) &&
+      (!query.has('step') || Object.hasOwn(DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS[query.get('chain')].steps, query.get('step')))
   }
   return url.pathname === DEV_VERSION_CENTER_ROUTE && onlyKeys(['view']) && query.get('view') === 'history'
 }

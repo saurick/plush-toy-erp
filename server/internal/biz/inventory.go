@@ -304,8 +304,6 @@ type BOMHeader struct {
 	Version       string
 	Status        string
 	ItemCount     *int // List-only projection; nil when the count was not loaded.
-	EffectiveFrom *time.Time
-	EffectiveTo   *time.Time
 	SourceOrderNo *string
 	QuantityText  *string
 	SpareText     *string
@@ -343,8 +341,6 @@ type BOMItem struct {
 type BOMHeaderCreate struct {
 	ProductID     int
 	Status        string
-	EffectiveFrom *time.Time
-	EffectiveTo   *time.Time
 	SourceOrderNo *string
 	QuantityText  *string
 	SpareText     *string
@@ -357,8 +353,6 @@ type BOMHeaderCreate struct {
 }
 
 type BOMHeaderUpdate struct {
-	EffectiveFrom *time.Time
-	EffectiveTo   *time.Time
 	SourceOrderNo *string
 	QuantityText  *string
 	SpareText     *string
@@ -799,10 +793,7 @@ func (uc *InventoryUsecase) SaveBOMWithItems(ctx context.Context, id int, in *BO
 		return nil, ErrBadParam
 	}
 
-	normalizedHeader, err := normalizeBOMHeaderUpdate(in.BOMHeaderUpdate)
-	if err != nil {
-		return nil, err
-	}
+	normalizedHeader := normalizeBOMHeaderUpdate(in.BOMHeaderUpdate)
 	normalized := &BOMVersionMutation{
 		ExpectedVersion: in.ExpectedVersion,
 		ProductID:       in.ProductID,
@@ -1218,13 +1209,10 @@ func normalizeBOMHeaderCreate(in BOMHeaderCreate) (BOMHeaderCreate, error) {
 		!IsCreatableBOMStatus(in.Status) {
 		return BOMHeaderCreate{}, ErrBadParam
 	}
-	if in.EffectiveFrom != nil && in.EffectiveTo != nil && !in.EffectiveFrom.Before(*in.EffectiveTo) {
-		return BOMHeaderCreate{}, ErrBadParam
-	}
 	return in, nil
 }
 
-func normalizeBOMHeaderUpdate(in BOMHeaderUpdate) (BOMHeaderUpdate, error) {
+func normalizeBOMHeaderUpdate(in BOMHeaderUpdate) BOMHeaderUpdate {
 	in.Note = normalizeOptionalString(in.Note)
 	in.SourceOrderNo = normalizeOptionalString(in.SourceOrderNo)
 	in.QuantityText = normalizeOptionalString(in.QuantityText)
@@ -1233,10 +1221,7 @@ func normalizeBOMHeaderUpdate(in BOMHeaderUpdate) (BOMHeaderUpdate, error) {
 	in.Maker = normalizeOptionalString(in.Maker)
 	in.Auditor = normalizeOptionalString(in.Auditor)
 	in.HairDirection = normalizeOptionalString(in.HairDirection)
-	if in.EffectiveFrom != nil && in.EffectiveTo != nil && !in.EffectiveFrom.Before(*in.EffectiveTo) {
-		return BOMHeaderUpdate{}, ErrBadParam
-	}
-	return in, nil
+	return in
 }
 
 func normalizeBOMItemUpdate(in BOMItemUpdate) (BOMItemUpdate, error) {

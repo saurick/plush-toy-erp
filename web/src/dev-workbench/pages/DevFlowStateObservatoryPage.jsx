@@ -22,6 +22,7 @@ import { message } from '@/common/utils/antdApp'
 import Modal from '@/common/components/modal/AppModal'
 import { StateRulesView } from '../components/flow-state/StateRulesView.jsx'
 import { FactsView } from '../components/flow-state/FactsView.jsx'
+import { FlowDiagramPrintContext } from '../components/flow-state/FlowDiagramPrintContext.mjs'
 import { RuntimeView } from '../components/flow-state/RuntimeView.jsx'
 import { WorkflowView } from '../components/flow-state/WorkflowView.jsx'
 import BusinessChainInstanceView from '../components/flow-state/BusinessChainInstanceView.jsx'
@@ -979,12 +980,19 @@ export default function DevFlowStateObservatoryPage() {
     readingRestoreRef.current = null
     // Async task reads and diagrams can grow after navigation has rendered.
     const observer = new ResizeObserver(restore)
+    const contentObserver = new MutationObserver(restore)
+    const expiry = window.setTimeout(stop, 5000)
     const inputs = ['wheel', 'pointerdown', 'keydown']
     function stop() {
       observer.disconnect()
+      contentObserver.disconnect()
+      window.clearTimeout(expiry)
       inputs.forEach((event) => window.removeEventListener(event, stop, true))
     }
     function restore() {
+      const pending = [...pageRef.current.querySelectorAll('[data-mermaid-status="loading"], [data-graph-status="loading"]')]
+        .some((element) => element.getClientRects().length)
+      if (pending) return
       window.scrollTo({ top: frame.scroll, behavior: 'instant' })
       if (Math.abs(window.scrollY - frame.scroll) > 1) return
       ;[...document.querySelectorAll('button,a')]
@@ -994,6 +1002,7 @@ export default function DevFlowStateObservatoryPage() {
       stop()
     }
     observer.observe(pageRef.current)
+    contentObserver.observe(pageRef.current, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-mermaid-status', 'data-graph-status'] })
     inputs.forEach((event) => window.addEventListener(event, stop, true))
     restore()
     return stop
@@ -1173,6 +1182,16 @@ export default function DevFlowStateObservatoryPage() {
     }
   }, [searchParams])
 
+  const waitForDiagramStatus = (readStatus, request) => new Promise((resolve) => {
+    const startedAt = window.performance.now()
+    const check = () => {
+      const status = readStatus()
+      if (request !== printRequestRef.current || status !== 'pending' || window.performance.now() - startedAt >= 15_000) resolve(status)
+      else window.requestAnimationFrame(check)
+    }
+    check()
+  })
+
   const printCurrentView = async () => {
     const request = ++printRequestRef.current
     setCustomerReviewPrintSnapshot(null)
@@ -1181,10 +1200,13 @@ export default function DevFlowStateObservatoryPage() {
       window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))
     )
     if (request !== printRequestRef.current) return
-    const pending = document.querySelector(
-      '.erp-dev-flow-main .erp-dev-flow-loading, .erp-dev-flow-main .erp-markdown-mermaid:not([data-mermaid-status="rendered"]), .erp-dev-flow-main [data-business-flow]:not([data-graph-status="rendered"])'
-    )
-    if (pending) {
+    const currentStatus = () => {
+      if (document.querySelector('.erp-dev-flow-main .erp-markdown-mermaid[data-mermaid-status="error"]')) return 'error'
+      return document.querySelector('.erp-dev-flow-main .erp-dev-flow-loading, .erp-dev-flow-main .erp-markdown-mermaid:not([data-mermaid-status="rendered"]), .erp-dev-flow-main [data-business-flow]:not([data-graph-status="rendered"])') ? 'pending' : 'rendered'
+    }
+    await waitForDiagramStatus(currentStatus, request)
+    if (request !== printRequestRef.current) return
+    if (currentStatus() !== 'rendered') {
       setPrintingCurrent(false)
       message.info('页面内容尚未加载完成，请稍后导出')
       return
@@ -1229,23 +1251,7 @@ export default function DevFlowStateObservatoryPage() {
         ? 'rendered'
         : 'pending'
     }
-    await new Promise((resolve) => {
-      const startedAt = window.performance.now()
-      const checkDiagram = () => {
-        const status = diagramStatus()
-        if (
-          request !== printRequestRef.current ||
-          status === 'rendered' ||
-          status === 'error' ||
-          window.performance.now() - startedAt >= 15_000
-        ) {
-          resolve()
-          return
-        }
-        window.requestAnimationFrame(checkDiagram)
-      }
-      checkDiagram()
-    })
+    await waitForDiagramStatus(diagramStatus, request)
     if (request !== printRequestRef.current) return
     if (diagramStatus() !== 'rendered') {
       setPrintingCustomer(false)
@@ -1680,7 +1686,7 @@ export default function DevFlowStateObservatoryPage() {
           />
         ) : null}
         {catalogState.status === 'ready' && catalog && valid
-          ? renderView()
+          ? <FlowDiagramPrintContext.Provider value={printingCurrent}>{renderView()}</FlowDiagramPrintContext.Provider>
           : null}
       </main>
       <DevBusinessChainCustomerReviewPrint review={customerReviewPrint} />

@@ -15,6 +15,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export function FinanceAllocationEditor({
   currentPayment,
@@ -67,7 +68,7 @@ export function FinanceAllocationEditor({
           message="当前没有可核销的应收或应付记录"
         />
       ) : null}
-      <Form
+      <BusinessForm
         form={allocationForm}
         name="finance-payment-allocation"
         className="erp-business-action-form"
@@ -140,7 +141,7 @@ export function FinanceAllocationEditor({
             </BusinessCompactFieldTable>
           )}
         </Form.List>
-      </Form>
+      </BusinessForm>
     </BusinessFormModal>
   )
 }

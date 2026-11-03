@@ -505,6 +505,14 @@ const masterObjects = [
     PermissionCode.MATERIAL_DISABLE,
     '采购、BOM 和手工事实的新引用检查材料启用状态；原有单据引用与冻结快照保留。',
     [`${BIZ}purchase_order.go`, `${BIZ}inventory.go`],
+    {
+      documents: [{
+        label: 'BOM 物料选择与关联',
+        path: 'docs/product/ui-design/交互设计说明.md',
+        headingId: 'bom-material-selection',
+      }],
+      verificationRuleIds: ['bom-material-selection'],
+    },
   ],
   [
     'product',
@@ -535,7 +543,7 @@ const masterObjects = [
 
 export const DEV_FLOW_MASTER_LIFECYCLE_RULES = Object.freeze(
   [
-    ...masterObjects.map(([key, label, permission, effect, refs]) => ({
+    ...masterObjects.map(([key, label, permission, effect, refs, references = {}]) => ({
       key,
       label,
       field: 'is_active',
@@ -547,6 +555,8 @@ export const DEV_FLOW_MASTER_LIFECYCLE_RULES = Object.freeze(
       blocked:
         '无权限、模块不可写或对象不存在。启停动作本身不以“已有历史引用”作为统一禁止条件。',
       effect,
+      relatedDocuments: references.documents || [],
+      verificationRuleIds: references.verificationRuleIds || [],
       recovery:
         '通过同一动作重新启用。历史纠正按所属单据／事实规则办理，不自动作废旧单、不删除引用。',
       sourceRefs: [
@@ -585,6 +595,8 @@ export const DEV_FLOW_MASTER_LIFECYCLE_RULES = Object.freeze(
       states: Object.freeze(rule.states),
       permission: Object.freeze(rule.permission),
       sourceRefs: Object.freeze(rule.sourceRefs),
+      relatedDocuments: Object.freeze((rule.relatedDocuments || []).map((document) => Object.freeze(document))),
+      verificationRuleIds: Object.freeze(rule.verificationRuleIds || []),
     })
   )
 )

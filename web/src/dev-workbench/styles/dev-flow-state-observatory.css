@@ -2414,7 +2414,7 @@
   }
 }
 
-/* Prepare the same geometry before window.print so measured diagrams stay aligned. */
+/* Prepare the current paper scope before invoking the browser print dialog. */
 html:has([data-flow-print-current]),
 body:has([data-flow-print-current]) {
   page: flow-observation;
@@ -2423,14 +2423,14 @@ body:has([data-flow-print-current]) {
   background: white;
 }
 
-body:has([data-flow-print-current]) > :not(#root) {
-  display: none;
+@media print {
+  body:has([data-flow-print-current]) > :not(#root) { display: none; }
 }
 
 [data-flow-print-current].erp-dev-workspace-page {
   page: flow-observation;
   display: block;
-  /* Match A4 landscape minus page margins before measuring diagram connectors. */
+  /* A4 landscape content width after the registered page margins. */
   width: 277mm;
   min-height: 0;
   height: auto;
@@ -2444,7 +2444,6 @@ body:has([data-flow-print-current]) > :not(#root) {
 }
 
 [data-flow-print-current] .erp-dev-flow-instance-stage button,
-[data-flow-print-current] .erp-dev-business-flow__nodes > button,
 [data-flow-print-current] .erp-dev-chain-topics__group button {
   display: grid;
 }
@@ -2471,22 +2470,6 @@ body:has([data-flow-print-current]) > :not(#root) {
   padding: 0;
   margin: 0;
   border: 0;
-}
-
-[data-flow-print-current] .erp-markdown-mermaid__viewport {
-  height: auto;
-  max-height: none;
-  overflow: visible;
-}
-
-[data-flow-print-current] .erp-markdown-mermaid__canvas,
-[data-flow-print-current] .erp-markdown-mermaid[data-mermaid-native-size] .erp-markdown-mermaid__canvas {
-  width: 100%;
-  min-height: 0;
-}
-
-[data-flow-print-current] .erp-markdown-mermaid__canvas > svg {
-  max-height: 125mm;
 }
 
 [data-flow-print-current] .erp-dev-flow-node-detail {

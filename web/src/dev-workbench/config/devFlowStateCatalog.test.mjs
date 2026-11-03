@@ -10,6 +10,8 @@ import {
 } from '../../../../config/customers/index.mjs'
 import { DEV_STATUS_FLOWS_ROUTE } from './devRoutes.mjs'
 import { DEV_FLOW_ACTION_RULES, getDevFlowActionRules } from './devFlowActionRules.mjs'
+import { BUSINESS_RULES } from './devBusinessRules.mjs'
+import { extractMarkdownAnchorIds } from '../../common/components/markdown/anchors.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import {
   DEV_FLOW_PATH_KINDS,
@@ -1110,6 +1112,29 @@ test('devFlowStateCatalog: 主数据启停逐项绑定布尔字段和后端实�
     const actionCase = rule.key === 'warehouse' ? service : service.split(`case "${rule.action}":`)[1].split('default:')[0]
     assert(actionCase.includes(goPermission), `${rule.key} permission must match the actual action`)
     assert(rule.effect && rule.recovery && rule.blocked)
+  }
+})
+
+test('devFlowStateCatalog: 主数据说明与验证只关联现有文档锚点和具名测试', () => {
+  const master = DEV_FLOW_STATE_CATALOG.flows.find((flow) => flow.key === 'master.lifecycle')
+  const material = master.lifecycleRules.find((rule) => rule.key === 'material')
+  assert(material.relatedDocuments.length > 0)
+  assert.deepEqual(material.verificationRuleIds, ['bom-material-selection'])
+  for (const rule of master.lifecycleRules) {
+    for (const document of rule.relatedDocuments) {
+      const source = readFileSync(resolve(repoRoot, document.path), 'utf8')
+      assert(document.label)
+      assert(extractMarkdownAnchorIds(source).has(document.headingId), `${rule.key}: missing readable anchor`)
+    }
+    for (const id of rule.verificationRuleIds) {
+      const verification = BUSINESS_RULES.find((entry) => entry.id === id)
+      assert(verification, `${rule.key}: unknown rule ${id}`)
+      assert(verification.tests.length > 0)
+      for (const target of verification.tests) {
+        assert.equal(target.gate, 'web')
+        assert(readFileSync(resolve(repoRoot, target.file), 'utf8').includes(`test('${target.name}'`))
+      }
+    }
   }
 })
 

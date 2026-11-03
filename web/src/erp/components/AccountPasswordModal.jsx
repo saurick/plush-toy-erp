@@ -11,6 +11,7 @@ import { JsonRpc } from '@/common/utils/jsonRpc'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { adminPasswordPolicyRule } from '../utils/adminPasswordPolicy.mjs'
 import { mobileBusinessRole } from '../utils/businessTaskRoute.mjs'
+import BusinessForm from './business-list/BusinessForm.jsx'
 
 const accountRpc = new JsonRpc({ url: RpcDomain.ADMIN, basePath: ADMIN_BASE_PATH })
 
@@ -89,7 +90,7 @@ export default function AccountPasswordModal({ onClose }) {
     >
       <p>修改后，所有设备上的当前登录都会失效。</p>
       {failure ? <Alert type="error" showIcon message={failure} /> : null}
-      <Form
+      <BusinessForm
         form={form}
         name="account-password"
         layout="vertical"
@@ -139,7 +140,7 @@ export default function AccountPasswordModal({ onClose }) {
         >
           <Input.Password autoComplete="new-password" />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

@@ -18,6 +18,7 @@ import {
   productionReworkQuantitySummary,
   suggestedProductionReworkNo,
 } from '../../utils/productionReworkAction.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function ProductionReworkModal({
   open,
@@ -137,7 +138,7 @@ export default function ProductionReworkModal({
           },
         ]}
       />
-      <Form
+      <BusinessForm
         className={editing ? 'erp-business-action-form' : undefined}
         form={form}
         name={editing ? 'production_rework_edit' : 'production_rework_create'}
@@ -207,7 +208,7 @@ export default function ProductionReworkModal({
             placeholder="请说明不合格现象、返工要求或处理依据"
           />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </Editor>
   )
 }

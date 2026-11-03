@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises'
 import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
 import { assertImportUndoPlacement } from './importUndoAssertions.mjs'
 import { assertImportPickerGeometry, assertImportFilterPrompt, readImportPickerLayout, assertImportPickerStableLayout, assertImportPickerStableDuring } from './importPickerAssertions.mjs'
@@ -174,6 +175,16 @@ export function createShipmentSourceCandidateAssertions(deps) {
       'USD',
       '出货单币种应由销售订单带出并保持只读'
     )
+    assert.equal(await modal.getByLabel('币种（跟随销售订单）').isVisible(), false, '来源币种只显示于销售来源摘要')
+    assert.equal(await modal.getByLabel('单据客户名称', { exact: true }).isVisible(), false, '冻结客户名称保留数据，避免重复输入')
+    const sourceFacts = modal.locator('dl[aria-label="销售来源"]')
+    await sourceFacts.waitFor()
+    assert.ok((await sourceFacts.innerText()).includes('USD'))
+    await sourceFacts.scrollIntoViewIfNeeded()
+    const sourceBoxes = await sourceFacts.locator(':scope > .mobile-task-facts__field').evaluateAll((nodes) => nodes.map((node) => { const r = node.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height } }))
+    await writeFile(path.join(outputDir, 'shipment-source-summary.json'), JSON.stringify(sourceBoxes, null, 2))
+    assert.ok(Math.max(...sourceBoxes.map((box) => box.y)) - Math.min(...sourceBoxes.map((box) => box.y)) <= 1, '电脑来源摘要同排展示')
+    await sourceFacts.screenshot({ path: path.join(outputDir, 'shipment-source-summary.png') })
     assert.equal(
       await modal.getByRole('combobox', { name: '实际运费币种' }).count(),
       0,
@@ -195,10 +206,14 @@ export function createShipmentSourceCandidateAssertions(deps) {
       false,
       '自动带出的实际运费币种不可编辑'
     )
-    await expectText(page, '币种：USD')
+    assert.equal(await sourceFacts.locator('dt').filter({ hasText: '币种' }).count(), 1, '单据来源币种只展示一次')
     await modal.screenshot({
       path: path.join(outputDir, 'shipment-source-one-currency-modal.png'),
     })
+    for (const line of [1, 2]) {
+      await modal.getByRole('button', { name: `展开第 ${line} 行补充资料`, exact: true }).click()
+      await modal.getByLabel('销售订单行追溯', { exact: true }).nth(line - 1).waitFor({ state: 'visible' })
+    }
     await expectText(page, '销售订单行追溯')
     assert.equal(
       await modal.getByText('销售订单行追溯', { exact: true }).count(),
@@ -504,27 +519,47 @@ export function createShipmentSourceCandidateScenarios(deps) {
         const requests = []
         let failBulk = true
         const records = Array.from({ length: 205 }, (_, index) => ({
-          sales_order_id: 1, order_no: 'SO-BULK-A', order_status: 'active', order_version: 2,
-          currency: 'USD', customer_id: 1, customer_name: '批量选择模拟客户',
+          sales_order_id: 1,
+order_no: 'SO-BULK-A',
+order_status: 'active',
+order_version: 2,
+          currency: 'USD',
+customer_id: 1,
+customer_name: '批量选择模拟客户',
           customer_snapshot: { code: 'CUS-STYLE-L1', name: '批量选择模拟客户' },
-          sales_order_item_id: index + 1, line_no: index + 1, line_status: 'open',
-          product_id: 1, product_code: 'PROD-STYLE-L1-01', product_name: `模拟出货产品${index + 1}`,
-          product_code_snapshot: 'PROD-STYLE-L1-01', product_name_snapshot: `模拟出货产品${index + 1}`,
-          product_sku_id: 1, sku_code: 'SKU-STYLE-L1-01', sku_name: '米白',
-          unit_id: 1, unit_code: 'PCS', unit_name: '个',
-          ordered_quantity: '12', shipped_quantity: '0', remaining_quantity: '12', selectable: true, disabled_reason: '',
+          sales_order_item_id: index + 1,
+line_no: index + 1,
+line_status: 'open',
+          product_id: 1,
+product_code: 'PROD-STYLE-L1-01',
+product_name: `模拟出货产品${index + 1}`,
+          product_code_snapshot: 'PROD-STYLE-L1-01',
+product_name_snapshot: `模拟出货产品${index + 1}`,
+          product_sku_id: 1,
+sku_code: 'SKU-STYLE-L1-01',
+sku_name: '米白',
+          unit_id: 1,
+unit_code: 'PCS',
+unit_name: '个',
+          ordered_quantity: '12',
+shipped_quantity: '0',
+remaining_quantity: '12',
+selectable: true,
+disabled_reason: '',
         }))
         const otherOrder = { ...records[0], sales_order_id: 2, order_no: 'SO-BULK-B', sales_order_item_id: 300 }
         const candidates = [...records.slice(0, 10), otherOrder, ...records.slice(10)]
         await page.route('**/rpc/operational_fact', async (route) => {
           const body = route.request().postDataJSON() || {}
           if (body.method !== 'list_shipment_source_candidates') return route.fallback()
-          const params = body.params
+          const { params } = body
           requests.push(params)
           const failed = failBulk && params.limit === 200 && params.offset === 200
           if (failed) failBulk = false
-          await route.fulfill({ contentType: 'application/json', body: JSON.stringify({
-            jsonrpc: '2.0', id: body.id,
+          await route.fulfill({ contentType: 'application/json',
+body: JSON.stringify({
+            jsonrpc: '2.0',
+id: body.id,
             result: failed ? { code: 50000, message: '模拟来源读取失败', data: {} }
               : { code: 0, message: 'OK', data: mockShipmentSourceCandidates(params, candidates) },
           }) })

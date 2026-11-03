@@ -1,10 +1,39 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import fs from 'node:fs/promises'
+import { clickLineItemAction } from './lineEditorActions.mjs'
+import { assertLineItemGroupHeaderInteraction } from './businessLineItemDisclosureAssertions.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertNoHorizontalOverflow } from './pageAssertions.mjs'
 import { clickERPThemeOption } from './themeAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+
+export async function verifyPurchaseArrivalGroupHeaders(page, { outputDir }) {
+  await page.locator('.erp-business-data-table-card .ant-table-tbody tr').filter({ hasText: 'PO-STYLE-L1' }).first().click()
+  await page.locator('[data-business-action-key="generate-inbound"]').click()
+  const dialog = page.getByRole('dialog', { name: '登记采购到货', exact: true })
+  await dialog.locator('.erp-line-item-disclosure-heading__toggle').first().waitFor()
+  assert.equal(await dialog.locator('.erp-line-item-disclosure-heading__toggle').count(), 2, '两个可登记来源保留独立材料分组')
+  await assertLineItemGroupHeaderInteraction(page, dialog)
+  await dialog.getByRole('button', { name: '全部展开', exact: true }).click()
+  const quantity = (number) => dialog.getByRole('spinbutton', { name: `第${number}条实点数量`, exact: true })
+  await quantity(1).fill('2')
+  await quantity(2).fill('4')
+  await dialog.getByRole('button', { name: '全部收起', exact: true }).click()
+  assert.equal(await quantity(1).isVisible(), false)
+  assert.equal(await quantity(2).isVisible(), false)
+  await dialog.getByRole('button', { name: '全部展开', exact: true }).click()
+  assert.equal(await quantity(1).inputValue(), '2')
+  assert.equal(await quantity(2).inputValue(), '4')
+  await page.screenshot({ path: path.join(outputDir, 'purchase-arrival-group-headers-desktop.png') })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await assertLineItemGroupHeaderInteraction(page, dialog)
+  await assertArrivalModalViewport(page, dialog, { label: 'purchase-arrival-group-headers-mobile', scrollable: true })
+  await page.screenshot({ path: path.join(outputDir, 'purchase-arrival-group-headers-mobile.png') })
+  await dialog.getByRole('button', { name: /^关\s*闭$/u }).click()
+  await page.getByRole('button', { name: '放弃登记', exact: true }).click()
+  await dialog.waitFor({ state: 'hidden' })
+}
 
 async function assertArrivalModalViewport(page, dialog, options) {
   const metrics = await assertBusinessModalViewport(page, dialog, {
@@ -91,6 +120,7 @@ async function verifyArrival(page, { outputDir }) {
   await page.waitForFunction(
     () => document.activeElement?.getAttribute('aria-label') === '第1条实点数量'
   )
+  await assertLineItemGroupHeaderInteraction(page, dialog)
 
   for (const viewport of [
     { width: 1920, height: 1080 },
@@ -131,7 +161,10 @@ async function verifyArrival(page, { outputDir }) {
     .getByRole('alert')
     .filter({ hasText: '请至少填写一条实点数量' })
     .waitFor()
+  await page.waitForFunction((node) => document.activeElement === node, await quantity(1).elementHandle())
   await declared(1).fill('10')
+  assert.equal(await quantity(1).inputValue(), '', '填写送货标示不会改写实点数量')
+  assert.equal(await declared(1).inputValue(), '10')
   await save.click()
   await dialog
     .getByText('请输入大于 0 的实点数量，最多六位小数', { exact: true })
@@ -168,7 +201,7 @@ async function verifyArrival(page, { outputDir }) {
     fullPage: true,
   })
 
-  await dialog.getByRole('button', { name: '移除第1条到货记录' }).click()
+  await clickLineItemAction(dialog.locator('.erp-purchase-arrival__record').first(), '移除第1条到货记录')
   await page.getByRole('button', { name: /^保\s*留$/u }).click()
   assert.equal(await quantity(1).inputValue(), '8')
   await close()
@@ -183,7 +216,7 @@ async function verifyArrival(page, { outputDir }) {
   await quantity(1).waitFor()
   assert.equal(await dialog.locator('.erp-purchase-arrival__record').count(), 1)
   assert.equal(await quantity(1).inputValue(), '', '重新打开不残留上次实点')
-  await dialog.getByRole('button', { name: '移除第1条到货记录' }).click()
+  await clickLineItemAction(dialog.locator('.erp-purchase-arrival__record').first(), '移除第1条到货记录')
   await dialog
     .getByText('选择本次到货的材料后开始清点', { exact: true })
     .waitFor()

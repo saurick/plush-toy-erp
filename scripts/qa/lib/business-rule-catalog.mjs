@@ -24,15 +24,203 @@ const rule = (id, label, category, domain, standard, tests) =>
     standard,
     tests: Object.freeze(tests),
   });
-const web = (file, name) =>
-  Object.freeze({
-    file: `web/src/erp/utils/${file}`,
-    package: `web/src/erp/utils/${file}`,
+const web = (file, name, directory = "utils") => {
+  const testPath = `web/src/erp/${directory}/${file}`;
+  return Object.freeze({
+    file: testPath,
+    package: testPath,
     name,
     gate: "web",
   });
+};
 
 export const BUSINESS_RULES = Object.freeze([
+  rule(
+    "bom-material-selection",
+    "BOM 物料选择与历史关联",
+    "consistency",
+    "masterdata",
+    "BOM 新关联只选择启用物料；历史停用关联保留名称和提示，清空或替换后不再作为候选。原表关键属性冲突时禁止关联；新建必须显式操作并核对建档权限。",
+    [
+      web("BOMMaterialSelect.test.mjs", "下拉直接选择且无逐项核对入口，冲突仍禁用；新建必须显式点击", "components/bom"),
+      web("BOMMaterialSelect.test.mjs", "找不到对应物料时仍可直接新建，不自动建档或关联其他候选", "components/bom"),
+      web("BOMMaterialSelect.test.mjs", "没有建档权限仍可选择现有物料，隐藏新建入口且不暴露核对按钮", "components/bom"),
+      web("BOMMaterialSelect.test.mjs", "历史停用关联保留名称和提示，清空或换选后不再成为候选", "components/bom"),
+      web("BOMMaterialSelect.test.mjs", "未预载的历史停用档案按 ID 回显，搜索候选仍仅查询启用项", "components/bom"),
+    ],
+  ),
+  rule(
+    "sales-acceptance", "销售提交、受理与拒绝", "boundary", "source-documents",
+    "提交建立受理与岗位任务；批准、拒绝和取消按正式分支办理，不代写生产或出货事实。",
+    [
+      source("biz/sales_order_test.go", "TestSalesOrderProcessDomainCommandSubmitBindsUsecase", "server"),
+      source("biz/sales_order_test.go", "TestSalesOrderAcceptanceProcessSubmitCreatesBossApprovalAndPmcReview", "server"),
+      source("biz/sales_order_test.go", "TestSalesOrderUsecaseLifecycleGuards", "server"),
+      source("biz/process_runtime_test.go", "TestProcessRuntimeUsecaseStandardApprovalRejectionCompletesTerminalBranch", "server"),
+      source("data/process_runtime_source_order_postgres_test.go", "TestProcessRuntimePostgresSalesApprovalRejectionTerminatesSourceAndProcess"),
+    ],
+  ),
+  rule(
+    "engineering-readiness", "工程准备、用料审批与采购交接", "transaction", "source-documents",
+    "工程完成须满足正式资料条件；用料两级审核保留任务和版本，财务审核失败不得留下采购单。",
+    [
+      source("data/engineering_material_auto_test.go", "TestEngineeringMaterialAutoSubmitOnEngineeringCompletion", "server"),
+      source("data/engineering_material_auto_test.go", "TestEngineeringMaterialAutoSubmitWaitsForReadySources", "server"),
+      source("data/engineering_material_workflow_test.go", "TestEngineeringMaterialWorkflowApprovalHandoffAndReplay", "server"),
+      source("data/engineering_material_workflow_test.go", "TestEngineeringMaterialWorkflowFinanceAuditFailureRollsBackPurchaseOrders", "server"),
+      source("data/engineering_material_auto_test.go", "TestSourceDocumentPostgresEngineeringMaterialAutomaticHandoff"),
+    ],
+  ),
+  rule(
+    "production-order-readiness", "生产发布、来源与冻结路线", "boundary", "fact-production",
+    "生产单发布复核来源和数量并冻结路线；来源归属错误或准备失败须回滚，不能用任务完成替代发布。",
+    [
+      source("data/production_order_repo_test.go", "TestProductionOrderRepoAggregateLifecycleCASAndExactReplay", "server"),
+      source("data/production_order_repo_test.go", "TestProductionOrderRepoReferenceOwnershipAndTransactionRollback", "server"),
+      source("data/production_order_repo_test.go", "TestProductionOrderSalesSourceEligibilityIsRecheckedForCreateSaveRelease", "server"),
+      source("data/production_wip_repo_test.go", "TestProductionWIPReleaseFreezesExactRouteAndRollsBackInvalidResolution", "server"),
+      source("data/production_order_postgres_concurrency_test.go", "TestProductionOrderPostgresSalesEligibilityLocksAndRollsBack"),
+    ],
+  ),
+  rule(
+    "stock-reservation-source", "销售预留来源、可用量与重放", "quantity", "fact-inventory",
+    "成品预留由正式销售来源显式建立并复核可用量；无效来源拒绝，相同意图重放不重复预留。",
+    [
+      source("data/operational_fact_reservation_source_test.go", "TestOperationalFactRepoCreateStockReservationFromSalesOrderDerivesSourceAndReplaysIntent", "server"),
+      source("data/operational_fact_reservation_source_test.go", "TestOperationalFactRepoCreateStockReservationFromSalesOrderRejectsInvalidSourceState", "server"),
+      source("data/operational_fact_repo_test.go", "TestOperationalFactRepo_StockReservationChecksAvailableQuantity", "server"),
+    ],
+  ),
+  rule(
+    "production-completion", "在制、入库、质检与包装分工", "boundary", "fact-production",
+    "完工绑定正式来源；成品入库、质量关口与包装分别满足条件，在制数量和转序保持守恒。",
+    [
+      source("data/production_order_fact_linkage_test.go", "TestProductionCompletionFromOrderDerivesSourceAndReplays", "server"),
+      source("data/production_order_fact_linkage_test.go", "TestProductionOrderFactLinkageQuantityReversalAndCancellation", "server"),
+      source("data/production_wip_quality_inspection_repo_test.go", "TestProductionWIPQualityInspectionSequentialPassAndProjection", "server"),
+      source("data/production_wip_repo_test.go", "TestProductionWIPSplitTransferReworkPackagingAndCompletionGate", "server"),
+      source("biz/production_wip_test.go", "TestProductionWIPPackagingConfirmationIsIndependentAndRequiredOnlyAtStart", "server"),
+      source("data/production_order_fact_postgres_concurrency_test.go", "TestProductionOrderPostgresConcurrentFactReplayAndQuantityWinner"),
+      source("data/production_wip_quality_inspection_repo_test.go", "TestProductionWIPQualityInspectionPostgresConcurrentDecision"),
+    ],
+  ),
+  rule(
+    "outsourcing-source-handoff", "委外发料、回货与合同应付", "quantity", "fact-outsourcing",
+    "发料和回货复核订单来源、行类型和累计数量；工序验收按合同结清并独立生成应付。",
+    [
+      source("data/operational_fact_outsourcing_source_test.go", "TestOutsourcingFactFromOrderDerivesSourceAndRestrictsLineTypes", "server"),
+      source("data/operational_fact_outsourcing_source_test.go", "TestOutsourcingFactFromOrderEnforcesPostedQuantityAndAllowsClosedSourceReversal", "server"),
+      source("data/outsourcing_closure_regression_test.go", "TestOutsourcingStageNormalCloseAndPayable", "server"),
+      source("data/operational_fact_finance_business_source_test.go", "TestOutsourcingReturnPayableAmountUsesStoredPrecision", "server"),
+      source("data/outsourcing_closure_regression_test.go", "TestOutsourcingNormalClosePostgresStagePayable"),
+    ],
+  ),
+  rule(
+    "shipment-release", "财务放行、实际出货与取消", "transaction", "fact-shipment",
+    "财务批准或拒绝写入正式放行结果；实际出货另行扣库，取消时按来源恢复库存并保留流水。",
+    [
+      source("biz/shipment_process_command_test.go", "TestShipmentProcessDomainCommandFinanceReleaseBindsUsecase", "server"),
+      source("biz/shipment_process_command_test.go", "TestShipmentProcessDomainCommandFinanceRejectRecordsReasonAndCompletesBranch", "server"),
+      source("data/operational_fact_repo_test.go", "TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal", "server"),
+      source("data/operational_fact_repo_test.go", "TestOperationalFactRepo_ShipmentFinanceReleaseProcessCommandUsesExistingTransaction", "server"),
+    ],
+  ),
+  rule(
+    "finance-source-posting", "应收应付来源与独立过账", "boundary", "fact-finance",
+    "应收及发票以实际出货为前提，应付读取正式采购或委外来源；草稿生成与财务过账分开。",
+    [
+      source("data/operational_fact_repo_test.go", "TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment", "server"),
+      source("data/operational_fact_finance_business_source_test.go", "TestFinanceBusinessSourcesSQLite", "server"),
+      source("data/operational_fact_finance_business_source_test.go", "TestFinanceBusinessSourcesPostgres"),
+    ],
+  ),
+  rule(
+    "finance-payment-flow", "首款、退款、核销与冲销", "transaction", "fact-finance",
+    "收付款按方向、往来方与来源办理；首款抵扣、退款、核销和冲销分别保留原款、余额与关联。",
+    [
+      source("biz/exception_process_command_test.go", "TestFinancePaymentProcessCommandHandlersCanonicalizeAndExecute", "server"),
+      source("biz/finance_payment_usecase_behavior_test.go", "TestFinancePaymentUsecaseCancellationAndReversalKeepAuditBoundary", "server"),
+      source("data/finance_payment_balance_repo_test.go", "TestFinanceAdvanceBeforeShipmentRefundAndReversal", "server"),
+      source("data/finance_payment_balance_repo_test.go", "TestFinanceAdvanceAllocationOrderScopeAndRecovery", "server"),
+      source("data/operational_fact_finance_payment_repo_test.go", "TestFinancePaymentMultiAllocationAndReversal", "server"),
+      source("data/operational_fact_finance_payment_repo_test.go", "TestFinancePaymentRejectsCrossCounterpartyAndOverAllocation", "server"),
+      source("data/finance_payment_balance_repo_test.go", "TestOperationalFactRepoFinanceAdvanceBeforeShipmentRefundAndReversalPostgres"),
+    ],
+  ),
+  rule(
+    "finance-credit-correction", "红冲、反向红冲与未结余额", "transaction", "fact-finance",
+    "账款纠正保留原记录，红冲和反向红冲重算未结余额；余额归零才结清，有依赖时拒绝取消。",
+    [
+      source("data/operational_fact_finance_payment_repo_test.go", "TestFinanceCreditNoteAndReversalPreserveOriginal", "server"),
+      source("data/operational_fact_finance_payment_repo_test.go", "TestFinanceCreditNoteRejectsAdjustmentAfterSettlement", "server"),
+      source("data/operational_fact_finance_payment_repo_test.go", "TestFinanceFactCancellationRequiresPaymentAndCreditReversal", "server"),
+    ],
+  ),
+  rule(
+    "inventory-operation-flow", "盘点复核、调拨与库存纠正", "transaction", "fact-inventory",
+    "盘点及人工调整经受控复核后过账，调拨独立办理；冲正保留原流水，零差异与混合行保留审计。",
+    [
+      source("biz/exception_process_command_test.go", "TestInventoryAdjustmentProcessCommandHandlersEnforceOwnerAndState", "server"),
+      source("data/inventory_operation_repo_test.go", "TestInventoryOperationTransferPostCancelAndReplay", "server"),
+      source("data/inventory_operation_repo_test.go", "TestInventoryOperationCycleCountStaleAndManualAdjustmentGuard", "server"),
+      source("data/inventory_operation_repo_test.go", "TestInventoryOperationCountZeroAndMixedLinesRetainAudit", "server"),
+    ],
+  ),
+  rule(
+    "production-exception-flow", "异常决定、显式执行与批次恢复", "boundary", "fact-production",
+    "异常按正式方案审批并显式执行；返工、换厂、重做、报废与让步分别保留原批及来源，撤销后重新决定须留痕。",
+    [
+      source("biz/production_exception_decision_test.go", "TestProductionExceptionSubmitRequiresExplicitDecision", "server"),
+      source("biz/exception_process_command_test.go", "TestProductionExceptionProcessCommandHandlersRouteExactDecision", "server"),
+      source("data/production_exception_execution_test.go", "TestProductionExceptionBranchesKeepStockAndSupplierHistory", "server"),
+      source("data/production_exception_execution_test.go", "TestProductionExceptionOriginalSupplierExecutesNewContract", "server"),
+      source("data/production_exception_redecision_test.go", "TestProductionExceptionRedecision", "server"),
+      source("data/production_wip_quality_concession_test.go", "TestProductionWIPConcessionContinuesFrozenGates", "server"),
+      source("data/production_wip_variants_postgres_test.go", "TestProductionOrderPostgresShellDispositionRollbackReplayAndReversal"),
+    ],
+  ),
+  rule(
+    "purchase-rejection-flow", "首次拒收退厂与补换交接", "boundary", "fact-purchase",
+    "未入库拒收退厂不扣库存，补换实点生成新待收和逐行检验；原收货与每轮补换分别留痕。",
+    [
+      source("data/purchase_rejection_disposition_repo_test.go", "TestPurchaseRejectionDispositionPostsWithoutInventoryAndKeepsDraftReceipt", "server"),
+      source("data/purchase_rejection_disposition_repo_test.go", "TestPurchaseRejectionDispositionRejectsPostedReceiptSource", "server"),
+      source("data/purchase_rejection_disposition_repo_test.go", "TestPurchaseRejectionDispositionAccumulatesAndCreatesReplacementReceipt", "server"),
+      source("data/purchase_rejection_disposition_repo_test.go", "TestPurchaseReceiptPostgresReplacementCountHandoff"),
+    ],
+  ),
+  rule(
+    "outsourcing-quality-flow", "委外检验、隔离与不合格处置", "boundary", "fact-quality",
+    "委外回货质检和库存处置分别办理；返厂、返工及撤销校验应付与批次依赖，冲正保留原记录。",
+    [
+      source("data/outsourcing_return_disposition_repo_test.go", "TestOutsourcingReturnToVendorPostsOutAndCancelsWithReversal", "server"),
+      source("data/outsourcing_return_disposition_repo_test.go", "TestOutsourcingReturnToVendorBlockedByActivePayable", "server"),
+      source("data/outsourcing_return_disposition_repo_test.go", "TestOutsourcingRejectedReturnReworkRequiresApproval", "server"),
+      source("data/quality_inspection_outsourcing_source_test.go", "TestQualityInspectionFromOutsourcingReturnDerivesSourceAndGuardsCancellation", "server"),
+      source("data/quality_inspection_outsourcing_source_test.go", "TestQualityInspectionFromOutsourcingReturnReusesLifecycle", "server"),
+      source("data/outsourcing_return_disposition_repo_test.go", "TestQualityInspectionFromOutsourcingReturnPostgresDispositionClosure"),
+    ],
+  ),
+  rule(
+    "purchase-adjustment-flow", "入库调整、来源数量与冲正", "transaction", "fact-purchase",
+    "数量、批次与仓库修正保留原入库；累计退货和调整量受有效来源约束，冲正恢复原影响。",
+    [
+      source("data/inventory_repo_purchase_receipt_adjustment_test.go", "TestInventoryRepo_PurchaseReceiptAdjustmentQuantityLifecycleAndProtection", "server"),
+      source("data/inventory_repo_purchase_receipt_adjustment_test.go", "TestInventoryRepo_PurchaseReceiptAdjustmentEffectiveQuantityAndReturnLimit", "server"),
+      source("data/inventory_repo_purchase_receipt_adjustment_test.go", "TestInventoryRepo_PurchaseReceiptAdjustmentCorrectionGuardsAndLotIsolation", "server"),
+    ],
+  ),
+  rule(
+    "purchase-return-flow", "采购退货、批次隔离与库存冲正", "transaction", "fact-purchase",
+    "已入库退货绑定来源行与批次并校验累计数量；过账和冲正分别扣回库存，原单及原流水保留。",
+    [
+      source("data/inventory_repo_purchase_return_test.go", "TestInventoryRepo_PurchaseReturnLifecycle", "server"),
+      source("data/inventory_repo_purchase_return_test.go", "TestInventoryRepo_PurchaseReturnLotIsolationAndReceiptItemValidation", "server"),
+      source("data/inventory_repo_purchase_return_test.go", "TestInventoryRepo_PurchaseReturnReceiptItemCumulativeLimit", "server"),
+      source("data/inventory_repo_purchase_return_test.go", "TestInventoryRepo_ReversalIgnoresCurrentLotStatus", "server"),
+      source("data/inventory_postgres_purchase_return_test.go", "TestPurchaseReturnPostgresFlow"),
+    ],
+  ),
   rule(
     "purchase-source-permissions", "采购来源读取与岗位权限", "boundary", "fact-purchase",
     "按岗位授予来源只读和本岗办理权限；不附带上游编辑、审批权。仓库与品质无采购价格权限仍可带入数量和来源关联；缺少来源权限时提示，撤权后清理窗口，后端再次校验且禁止越权写入。",
@@ -484,6 +672,8 @@ export const BUSINESS_RULES = Object.freeze([
     "fact-quality",
     "更正、关联事实与审计保持原子性；完成后重试按原意图恢复。",
     [
+      source("data/quality_inspection_correction_repo_test.go", "TestQualityInspectionCorrectionSupersedesResultAndReopensHold", "server"),
+      source("data/quality_inspection_correction_repo_test.go", "TestQualityInspectionCorrectionBlocksDownstreamDisposition", "server"),
       source(
         "data/quality_inspection_correction_postgres_test.go",
         "TestQualityInspectionPostgresCorrectionAtomicityAndConcurrency",

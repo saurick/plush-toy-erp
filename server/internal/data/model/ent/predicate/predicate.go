@@ -99,6 +99,9 @@ type OutsourcingOrderItem func(*sql.Selector)
 // OutsourcingReturnDisposition is the predicate function for outsourcingreturndisposition builders.
 type OutsourcingReturnDisposition func(*sql.Selector)
 
+// PaymentMethodPreference is the predicate function for paymentmethodpreference builders.
+type PaymentMethodPreference func(*sql.Selector)
+
 // Permission is the predicate function for permission builders.
 type Permission func(*sql.Selector)
 

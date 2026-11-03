@@ -135,6 +135,7 @@ import {
   withLifecycleScopeSearchParam,
   normalizeLifecycleStatus,
 } from '../utils/lifecycleScope.mjs'
+import BusinessForm from '../components/business-list/BusinessForm.jsx'
 
 const { Text } = Typography
 const EMPTY_COMPLETION_CONTEXT = Object.freeze({
@@ -2235,7 +2236,7 @@ export default function ProductionOrdersPage() {
         onCancel={() => setReasonAction(null)}
         onOk={() => reasonForm.submit()}
       >
-        <Form
+        <BusinessForm
           form={reasonForm}
           layout="vertical"
           onFinish={({ reason }) =>
@@ -2268,7 +2269,7 @@ export default function ProductionOrdersPage() {
           >
             <Input.TextArea autoFocus rows={4} maxLength={255} showCount />
           </Form.Item>
-        </Form>
+        </BusinessForm>
       </BusinessModal>
     </BusinessPageLayout>
   )

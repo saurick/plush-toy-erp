@@ -11,6 +11,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export function FinanceCreditEditor({
   financeFacts,
@@ -41,7 +42,7 @@ export function FinanceCreditEditor({
       onCancel={() => !loading && setCreditOpen(false)}
       onOk={() => submitCredit(creditOpen === 'reverse')}
     >
-      <Form
+      <BusinessForm
         form={creditForm}
         name="finance-credit-note"
         className="erp-business-action-form"
@@ -108,7 +109,7 @@ export function FinanceCreditEditor({
         >
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </CreditEditor>
   )
 }

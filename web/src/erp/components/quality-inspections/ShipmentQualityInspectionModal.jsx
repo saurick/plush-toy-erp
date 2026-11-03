@@ -11,6 +11,7 @@ import {
   sourceBusinessActionUUID,
 } from '../../utils/sourceBusinessAction.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function shipmentStatusText(status) {
   const labels = {
@@ -285,7 +286,7 @@ export default function ShipmentQualityInspectionModal({
             : []),
         ]}
       />
-      <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+      <BusinessForm form={form} layout="vertical" preserve={false} disabled={loading}>
         <Form.Item
           name="inspection_batch"
           label="送检批次"
@@ -316,7 +317,7 @@ export default function ShipmentQualityInspectionModal({
             showCount
           />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

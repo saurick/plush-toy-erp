@@ -373,18 +373,6 @@ function processColumns() {
       render: (value) =>
         value === true ? <Tag color="green">是</Tag> : <Tag>否</Tag>,
     },
-    {
-      title: '质检参考',
-      exportTitle: '质检参考',
-      dataIndex: 'quality_required',
-      defaultHidden: true,
-      width: 100,
-      sorter: (a, b) =>
-        compareBoolean(a?.quality_required, b?.quality_required),
-      exportValue: (record) => booleanExportText(record?.quality_required),
-      render: (value) =>
-        value === true ? <Tag color="orange">是</Tag> : <Tag>否</Tag>,
-    },
     statusColumn(),
   ]
 }

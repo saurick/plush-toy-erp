@@ -116,6 +116,10 @@ test("populated upgrade SQL is read-only and covers every 055504 data boundary",
   const source = fs.readFileSync(sqlPath, "utf8");
   for (const required of [
     "bom_headers",
+    "bom_reference_dates_removed",
+    "20261102122123",
+    "bom_reference_dates_removed AND column_count <> 1",
+    "NOT bom_reference_dates_removed AND column_count <> 3",
     "finance_facts",
     "process_instances",
     "workflow_business_states",

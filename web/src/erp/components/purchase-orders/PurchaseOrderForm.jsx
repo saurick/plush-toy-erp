@@ -5,6 +5,9 @@ import {
   FolderOpenOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Space, Typography } from 'antd'
+import PurchaseMaterialSnapshotFields from './PurchaseMaterialSnapshotFields.jsx'
+import PurchaseOrderLineSummary from './PurchaseOrderLineSummary.jsx'
+import './purchaseOrderForm.css'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import { purchaseMaterialLineGroupKey } from '../../utils/sourceDocumentLineGroupKeys.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
@@ -18,10 +21,11 @@ import {
   summarizePurchaseOrderLines,
 } from '../../utils/sourceOrderAmounts.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import PaymentMethodInput from '../PaymentMethodInput.jsx'
 
-import { DateInput } from '../business-list/BusinessDateInputs.jsx'
+import { DateInput, InheritedDateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
-import FieldWithUnitSuffix, {
+import {
   unitPrecisionFromOptions,
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
@@ -59,12 +63,12 @@ import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx
 import { purchaseMaterialMatchesSupplier, purchaseMaterialOption } from '../../utils/purchaseMaterialSupplier.mjs'
 import { canReadReference } from '../../utils/remoteReferences.mjs'
 import { canUndoPurchaseMaterialImport, createPurchaseMaterialImportUndo, purchaseMaterialImportSnapshot } from '../../utils/purchaseMaterialImportUndo.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const PURCHASE_ORDER_COLUMNS = [
   { label: '材料名称', width: 240, flexible: true, required: true },
-  { label: '单位', width: 100, required: true },
-  { label: '单价', width: 112 },
-  { label: '采购数量', width: 180, required: true },
+  { label: '采购数量 / 单位', width: 194, required: true },
+  { label: '单价', width: 96 },
   {
     label: (
       <BusinessHelpLabel
@@ -73,9 +77,9 @@ const PURCHASE_ORDER_COLUMNS = [
         pageKey="accessories-purchase"
       />
     ),
-    width: 144,
+    width: 120,
   },
-  { label: '预计到货日期', width: 160 },
+  { label: '预计到货日期', width: 150 },
 ]
 
 function getNextLineNo(lines = []) {
@@ -267,7 +271,7 @@ export function PurchaseOrderFormFields({
   )
 
   return (
-    <Form
+    <BusinessForm
       form={form}
       layout="vertical"
       disabled={!canEdit || !referenceDataReady || saving}
@@ -276,7 +280,7 @@ export function PurchaseOrderFormFields({
       <Form.Item name="supplier_snapshot" hidden>
         <Input />
       </Form.Item>
-      <BusinessFormSection title="订单与供应商">
+      <BusinessFormSection fieldLayout="adaptive" title="订单与供应商">
         <Form.Item
           className="erp-business-action-form__field"
           name="purchase_order_no"
@@ -286,7 +290,7 @@ export function PurchaseOrderFormFields({
           <Input maxLength={64} placeholder="自动生成，可按需要调整" />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--wide"
           name="supplier_id"
           label="供应商"
           rules={[{ required: true, message: '请选择供应商' }]}
@@ -308,7 +312,7 @@ export function PurchaseOrderFormFields({
           <Input maxLength={128} />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           name="currency"
           label="币种"
           rules={[{ required: true, message: '请选择币种' }]}
@@ -316,7 +320,7 @@ export function PurchaseOrderFormFields({
           <Select placeholder="请选择币种" options={BUSINESS_CURRENCY_OPTIONS} />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           name="purchase_date"
           label="下单日期"
           rules={[
@@ -341,7 +345,7 @@ export function PurchaseOrderFormFields({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           dependencies={['purchase_date']}
           name="expected_arrival_date"
           label="预计到货日期"
@@ -363,8 +367,10 @@ export function PurchaseOrderFormFields({
       </BusinessFormSection>
       <BusinessFormSection title="采购明细" showHeading={false}>
         <BusinessLineItemsSection
+          className="erp-purchase-order-lines"
           grouping={{
             form,
+            defaultExpanded: context?.taskBusiness?.device !== 'mobile',
             getGroup: (item) => ({
               key: purchaseMaterialLineGroupKey(item),
               label: referenceLabel(materialOptions, item.material_id, '待选择材料'),
@@ -454,7 +460,10 @@ export function PurchaseOrderFormFields({
             <BusinessLineItemRow
               key={field.key}
               index={index}
-              detailsLabel="来源、下单资料与备注"
+              detailsLabel={`第 ${index + 1} 条 · 下单资料与来源`}
+              detailsIdentity={<PurchaseOrderLineSummary form={form} fieldName={field.name} materials={materials} identityOnly />}
+              collapsibleDetails
+              detailsToggleLabel="下单资料"
               rowRef={(node) => registerLineItemRow(index, node)}
               actions={
                 <Space
@@ -498,51 +507,67 @@ export function PurchaseOrderFormFields({
                 </>
               }
               cells={[
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--source"
-                  name={[field.name, 'material_id']}
-                  label="材料名称"
-                  dependencies={['supplier_id']}
-                  rules={[
-                    { required: true, message: '请选择材料' },
-                    { validator: (_, id) => purchaseMaterialMatchesSupplier(materials.find((material) => Number(material.id) === Number(id)), form.getFieldValue('supplier_id'))
-                      ? Promise.resolve() : Promise.reject(new Error('材料属于其他厂商，请重新选择')) },
-                  ]}
-                >
-                  <RemoteReferenceSelect
-                    referenceType="materials"
-                    params={materialParams}
-                    disabled={!canEdit || !referenceDataReady || saving || !supplierID}
-                    mapOption={(material) => purchaseMaterialOption(material, supplierID)}
-                    placeholder="请选择材料名称"
-                    allowClear
-                    showSearch
-                    options={materialOptions}
-                    optionFilterProp="label"
-                    onChange={(value) => onMaterialChange(field.name, value)}
-                  />
-                </Form.Item>,
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--unit"
-                  name={[field.name, 'unit_id']}
-                  label="单位"
-                  rules={[{ required: true, message: '请选择单位' }]}
-                >
-                  <Select
-                    allowClear
-                    optionFilterProp="searchText"
-                    options={unitOptions}
-                    placeholder="请选择单位"
-                    showSearch
-                    onChange={() => {
-                      form
-                        .validateFields([
-                          ['items', field.name, 'purchased_quantity'],
-                        ])
-                        .catch(() => {})
-                    }}
-                  />
-                </Form.Item>,
+                <div className="erp-purchase-line-material">
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--source"
+                    name={[field.name, 'material_id']}
+                    label="材料名称"
+                    dependencies={['supplier_id']}
+                    rules={[
+                      { required: true, message: '请选择材料' },
+                      { validator: (_, id) => purchaseMaterialMatchesSupplier(materials.find((material) => Number(material.id) === Number(id)), form.getFieldValue('supplier_id'))
+                        ? Promise.resolve() : Promise.reject(new Error('材料属于其他厂商，请重新选择')) },
+                    ]}
+                  >
+                    <RemoteReferenceSelect
+                      referenceType="materials"
+                      params={materialParams}
+                      disabled={!canEdit || !referenceDataReady || saving || !supplierID}
+                      mapOption={(material) => purchaseMaterialOption(material, supplierID)}
+                      placeholder="请选择材料名称"
+                      allowClear
+                      showSearch
+                      options={materialOptions}
+                      optionFilterProp="label"
+                      onChange={(value) => onMaterialChange(field.name, value)}
+                    />
+                  </Form.Item>
+                  <PurchaseOrderLineSummary form={form} fieldName={field.name} materials={materials} />
+                </div>,
+                <div className="erp-line-editor__quantity erp-purchase-line-quantity">
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--quantity"
+                    name={[field.name, 'purchased_quantity']}
+                    label="采购数量"
+                    rules={[
+                      { required: true, message: '请输入采购数量' },
+                      quantityPrecisionRule({ form, fieldName: field.name, unitOptions }),
+                    ]}
+                  >
+                    <Input inputMode="decimal" />
+                  </Form.Item>
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--unit"
+                    name={[field.name, 'unit_id']}
+                    label="单位"
+                    rules={[{ required: true, message: '请选择单位' }]}
+                  >
+                    <Select
+                      allowClear
+                      optionFilterProp="searchText"
+                      options={unitOptions}
+                      placeholder="单位"
+                      showSearch
+                      onChange={() => {
+                        form
+                          .validateFields([
+                            ['items', field.name, 'purchased_quantity'],
+                          ])
+                          .catch(() => {})
+                      }}
+                    />
+                  </Form.Item>
+                </div>,
                 <Form.Item
                   className="erp-line-item-field erp-line-item-field--money"
                   name={[field.name, 'unit_price']}
@@ -551,37 +576,7 @@ export function PurchaseOrderFormFields({
                 >
                   <Input />
                 </Form.Item>,
-                <Form.Item
-                  noStyle
-                  shouldUpdate={(previous, current) =>
-                    previous?.items?.[field.name]?.unit_id !==
-                    current?.items?.[field.name]?.unit_id
-                  }
-                >
-                  {({ getFieldValue }) => (
-                    <Form.Item
-                      className="erp-line-item-field erp-line-item-field--quantity"
-                      name={[field.name, 'purchased_quantity']}
-                      label="采购数量"
-                      rules={[
-                        { required: true, message: '请输入采购数量' },
-                        quantityPrecisionRule({
-                          form,
-                          fieldName: field.name,
-                          unitOptions,
-                        }),
-                      ]}
-                    >
-                      <FieldWithUnitSuffix
-                        control={<Input />}
-                        unitText={unitSuffixTextFromOptions(
-                          unitOptions,
-                          getFieldValue(['items', field.name, 'unit_id'])
-                        )}
-                      />
-                    </Form.Item>
-                  )}
-                </Form.Item>,
+
                 <Form.Item
                   className="erp-line-item-field erp-line-item-field--money"
                   name={[field.name, 'amount']}
@@ -603,7 +598,9 @@ export function PurchaseOrderFormFields({
                     }),
                   ]}
                 >
-                  <DateInput
+                  <InheritedDateInput
+                    inheritedValue={supplierConfirmedArrivalDate || expectedArrivalDate}
+                    label="预计到货日期"
                     disabledDate={
                       purchaseDate
                         ? disableExpectedArrivalBeforePurchaseDate
@@ -613,6 +610,8 @@ export function PurchaseOrderFormFields({
                 </Form.Item>,
               ]}
             >
+              <PurchaseMaterialSnapshotFields fieldName={field.name} disabled={!canEdit || !referenceDataReady || saving} />
+              <div className="erp-purchase-line-source-label">产品来源</div>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--snapshot-code"
                 name={[field.name, 'product_order_no_snapshot']}
@@ -633,27 +632,6 @@ export function PurchaseOrderFormFields({
                 label="产品名称"
               >
                 <BusinessTextArea minRows={1} maxLength={255} />
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--snapshot-code"
-                name={[field.name, 'material_code_snapshot']}
-                label="下单材料编码"
-              >
-                <Input maxLength={64} />
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--snapshot-name"
-                name={[field.name, 'material_name_snapshot']}
-                label="下单材料名称"
-              >
-                <BusinessTextArea minRows={1} maxLength={255} />
-              </Form.Item>
-              <Form.Item
-                className="erp-line-item-field erp-line-item-field--snapshot-small"
-                name={[field.name, 'color_snapshot']}
-                label="下单颜色"
-              >
-                <Input maxLength={64} />
               </Form.Item>
               <Form.Item
                 className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
@@ -716,9 +694,9 @@ export function PurchaseOrderFormFields({
           })}
         />
       </BusinessFormSection>
-      <BusinessFormSection title="交付与结算">
+      <BusinessFormSection fieldLayout="adaptive" title="交付与结算">
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           dependencies={['purchase_date']}
           name="supplier_confirmed_arrival_date"
           label="供应商确认到货日期"
@@ -749,10 +727,10 @@ export function PurchaseOrderFormFields({
           name="payment_method"
           label={<BusinessHelpLabel label="付款方式" description="从供应商档案带出后可按本单调整。" />}
         >
-          <Input allowClear maxLength={128} placeholder="如银行转账、月结" />
+          <PaymentMethodInput />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           name="payment_term_days"
           label={<BusinessHelpLabel label="付款周期（天）" description="保存后冻结为本单付款条件，不随供应商档案后续调整。" />}
           rules={[
@@ -767,7 +745,7 @@ export function PurchaseOrderFormFields({
           <InputNumber style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           name="invoice_required"
           label="是否需要发票"
         >
@@ -783,7 +761,7 @@ export function PurchaseOrderFormFields({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           dependencies={['invoice_required']}
           name="invoice_category"
           label="发票类别"
@@ -802,7 +780,7 @@ export function PurchaseOrderFormFields({
           />
         </Form.Item>
       </BusinessFormSection>
-      <BusinessFormSection title="合同订购方信息">
+      <BusinessFormSection fieldLayout="adaptive" title="合同订购方信息">
         <Form.Item
           className="erp-business-action-form__field"
           name={['contract_party_snapshot', 'buyerCompany']}
@@ -839,16 +817,16 @@ export function PurchaseOrderFormFields({
           <Input maxLength={64} />
         </Form.Item>
       </BusinessFormSection>
-      <BusinessFormSection title="备注与附件">
+      <BusinessFormSection fieldLayout="support" title="备注与附件">
         <Form.Item
-          className="erp-business-action-form__field erp-business-action-form__field--full"
+          className="erp-business-action-form__field"
           name="note"
           label="备注"
         >
           <BusinessTextArea minRows={2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
         </Form.Item>
-        {attachmentPanel}
+        {attachmentPanel ? <div className="erp-business-form-section__attachments">{attachmentPanel}</div> : null}
       </BusinessFormSection>
-    </Form>
+    </BusinessForm>
   )
 }

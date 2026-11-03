@@ -103,6 +103,10 @@ func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *
 	}
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrPaymentMethodVersionConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "付款方式推荐状态已变化，请刷新后重试"}
+	case errors.Is(err, biz.ErrPaymentMethodNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "付款方式候选不存在，请刷新后重试"}
 	case errors.Is(err, biz.ErrDataScopeForbidden):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	case errors.Is(err, biz.ErrBadParam):

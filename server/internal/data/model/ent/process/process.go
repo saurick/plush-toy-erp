@@ -26,8 +26,6 @@ const (
 	FieldOutsourcingEnabled = "outsourcing_enabled"
 	// FieldInhouseEnabled holds the string denoting the inhouse_enabled field in the database.
 	FieldInhouseEnabled = "inhouse_enabled"
-	// FieldQualityRequired holds the string denoting the quality_required field in the database.
-	FieldQualityRequired = "quality_required"
 	// FieldSortOrder holds the string denoting the sort_order field in the database.
 	FieldSortOrder = "sort_order"
 	// FieldNote holds the string denoting the note field in the database.
@@ -67,7 +65,6 @@ var Columns = []string{
 	FieldProductionRouteOperationCode,
 	FieldOutsourcingEnabled,
 	FieldInhouseEnabled,
-	FieldQualityRequired,
 	FieldSortOrder,
 	FieldNote,
 	FieldIsActive,
@@ -104,8 +101,6 @@ var (
 	DefaultOutsourcingEnabled bool
 	// DefaultInhouseEnabled holds the default value on creation for the "inhouse_enabled" field.
 	DefaultInhouseEnabled bool
-	// DefaultQualityRequired holds the default value on creation for the "quality_required" field.
-	DefaultQualityRequired bool
 	// DefaultSortOrder holds the default value on creation for the "sort_order" field.
 	DefaultSortOrder int
 	// SortOrderValidator is a validator for the "sort_order" field. It is called by the builders before save.
@@ -158,11 +153,6 @@ func ByOutsourcingEnabled(opts ...sql.OrderTermOption) OrderOption {
 // ByInhouseEnabled orders the results by the inhouse_enabled field.
 func ByInhouseEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldInhouseEnabled, opts...).ToFunc()
-}
-
-// ByQualityRequired orders the results by the quality_required field.
-func ByQualityRequired(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldQualityRequired, opts...).ToFunc()
 }
 
 // BySortOrder orders the results by the sort_order field.

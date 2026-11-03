@@ -58,7 +58,6 @@ type CoreDemoProcessSeed struct {
 	ProductionRouteOperationCode string
 	OutsourcingEnabled           bool
 	InhouseEnabled               bool
-	QualityRequired              bool
 	SortOrder                    int
 	Note                         string
 }
@@ -273,12 +272,12 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			{Code: prefix + "-WIP-WH", Name: "在制仓", Type: "MATERIAL"},
 		},
 		Processes: []CoreDemoProcessSeed{
-			{Code: prefix + "-PROC-CHECKING", Name: "查货", Category: "查货", OutsourcingEnabled: true, InhouseEnabled: true, QualityRequired: true, SortOrder: 10, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外、内制与质检参考。"},
-			{Code: prefix + "-PROC-SEWING", Name: "车缝", Category: "车缝", ProductionRouteOperationCode: biz.ProductionWIPOperationSewing, OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 20, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外、内制与质检参考。"},
-			{Code: prefix + "-PROC-HANDWORK", Name: "手工", Category: "手工", ProductionRouteOperationCode: biz.ProductionWIPOperationHandwork, OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 30, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外、内制与质检参考。"},
-			{Code: prefix + "-PROC-PACKAGING", Name: "包装", Category: "包装", ProductionRouteOperationCode: biz.ProductionWIPOperationPackaging, OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 40, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外、内制与质检参考。"},
+			{Code: prefix + "-PROC-CHECKING", Name: "查货", Category: "查货", OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 10, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外与内制范围。"},
+			{Code: prefix + "-PROC-SEWING", Name: "车缝", Category: "车缝", ProductionRouteOperationCode: biz.ProductionWIPOperationSewing, OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 20, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外与内制范围。"},
+			{Code: prefix + "-PROC-HANDWORK", Name: "手工", Category: "手工", ProductionRouteOperationCode: biz.ProductionWIPOperationHandwork, OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 30, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外与内制范围。"},
+			{Code: prefix + "-PROC-PACKAGING", Name: "包装", Category: "包装", ProductionRouteOperationCode: biz.ProductionWIPOperationPackaging, OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 40, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外与内制范围。"},
 			{Code: prefix + "-PROC-CUTTING-DIE", Name: "制作刀模", Category: "刀模", OutsourcingEnabled: true, SortOrder: 50, Note: "委外工序，可按实际工厂继续扩展。"},
-			{Code: prefix + "-PROC-CUT-PIECE-IQC", Name: "裁片IQC", Category: "裁片质检", OutsourcingEnabled: true, QualityRequired: true, SortOrder: 60, Note: "委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-CUT-PIECE-IQC", Name: "裁片IQC", Category: "裁片质检", OutsourcingEnabled: true, SortOrder: 60, Note: "委外工序，可按实际工厂继续扩展。"},
 			{Code: prefix + "-PROC-MACHINE-CUTTING", Name: "机裁", Category: "裁片", ProductionRouteOperationCode: biz.ProductionWIPOperationFabricProcessing, OutsourcingEnabled: true, SortOrder: 70, Note: "委外工序，可按实际工厂继续扩展。"},
 			{Code: prefix + "-PROC-SILKSCREEN", Name: "丝印", Category: "印刷", OutsourcingEnabled: true, SortOrder: 80, Note: "委外工序，可按实际工厂继续扩展。"},
 			{Code: prefix + "-PROC-LAMINATION", Name: "贴合", Category: "贴合", OutsourcingEnabled: true, SortOrder: 90, Note: "委外工序，可按实际工厂继续扩展。"},
@@ -939,15 +938,14 @@ RETURNING id`, warehouse.Code, warehouse.Name, warehouse.Type).Scan(&id)
 func upsertCoreDemoProcess(ctx context.Context, tx *sql.Tx, process CoreDemoProcessSeed) (int, error) {
 	var id int
 	err := tx.QueryRowContext(ctx, `
-INSERT INTO processes (code, name, category, production_route_operation_code, outsourcing_enabled, inhouse_enabled, quality_required, sort_order, note, is_active, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, NOW(), NOW())
+INSERT INTO processes (code, name, category, production_route_operation_code, outsourcing_enabled, inhouse_enabled, sort_order, note, is_active, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), NOW())
 ON CONFLICT (code) DO UPDATE SET
   name = EXCLUDED.name,
   category = EXCLUDED.category,
   production_route_operation_code = EXCLUDED.production_route_operation_code,
   outsourcing_enabled = EXCLUDED.outsourcing_enabled,
   inhouse_enabled = EXCLUDED.inhouse_enabled,
-  quality_required = EXCLUDED.quality_required,
   sort_order = EXCLUDED.sort_order,
   note = EXCLUDED.note,
   is_active = TRUE,
@@ -959,7 +957,6 @@ RETURNING id`,
 		nullString(process.ProductionRouteOperationCode),
 		process.OutsourcingEnabled,
 		process.InhouseEnabled,
-		process.QualityRequired,
 		process.SortOrder,
 		nullString(process.Note),
 	).Scan(&id)

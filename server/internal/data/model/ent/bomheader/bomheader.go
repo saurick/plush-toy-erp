@@ -20,10 +20,6 @@ const (
 	FieldVersion = "version"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
-	// FieldEffectiveFrom holds the string denoting the effective_from field in the database.
-	FieldEffectiveFrom = "effective_from"
-	// FieldEffectiveTo holds the string denoting the effective_to field in the database.
-	FieldEffectiveTo = "effective_to"
 	// FieldSourceOrderNo holds the string denoting the source_order_no field in the database.
 	FieldSourceOrderNo = "source_order_no"
 	// FieldQuantityText holds the string denoting the quantity_text field in the database.
@@ -83,8 +79,6 @@ var Columns = []string{
 	FieldProductID,
 	FieldVersion,
 	FieldStatus,
-	FieldEffectiveFrom,
-	FieldEffectiveTo,
 	FieldSourceOrderNo,
 	FieldQuantityText,
 	FieldSpareText,
@@ -162,16 +156,6 @@ func ByVersion(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
-}
-
-// ByEffectiveFrom orders the results by the effective_from field.
-func ByEffectiveFrom(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldEffectiveFrom, opts...).ToFunc()
-}
-
-// ByEffectiveTo orders the results by the effective_to field.
-func ByEffectiveTo(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldEffectiveTo, opts...).ToFunc()
 }
 
 // BySourceOrderNo orders the results by the source_order_no field.

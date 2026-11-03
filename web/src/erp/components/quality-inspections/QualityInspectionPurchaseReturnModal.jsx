@@ -14,6 +14,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function localDateTimeValue() {
   const now = new Date()
@@ -118,7 +119,7 @@ export default function QualityInspectionPurchaseReturnModal({
           },
         ]}
       />
-      <Form
+      <BusinessForm
         form={form}
         layout="vertical"
         preserve={false}
@@ -168,7 +169,7 @@ export default function QualityInspectionPurchaseReturnModal({
         <Form.Item name="note" label="备注">
           <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

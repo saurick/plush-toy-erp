@@ -37,6 +37,8 @@ import { createProductionMaterialIssueScenarios } from './productionMaterialIssu
 import { createBusinessAttachmentRecoveryScenarios } from './businessAttachmentRecoveryScenarios.mjs'
 import { createBusinessCorePagesScenarios } from './businessCorePagesScenarios.mjs'
 import { createCompactPageScenarios } from './compactPageScenarios.mjs'
+import { createPurchaseLineDetailsScenarios } from './purchaseLineDetailsScenarios.mjs'
+import { createLineEditorsToolbarScenarios } from './lineEditorsToolbarScenarios.mjs'
 
 export function createBusinessFormalScenarios(deps) {
   return [
@@ -48,6 +50,8 @@ export function createBusinessFormalScenarios(deps) {
     ...createBOMTaskActionsScenarios(deps),
     ...createBOMRevisionScenarios(deps),
     ...createBusinessFormPagesScenarios(deps),
+    ...createPurchaseLineDetailsScenarios(deps),
+    ...createLineEditorsToolbarScenarios(deps),
     ...createWarehouseClassificationScenarios(deps),
     ...createOrderEngineeringScenarios(deps),
     ...createOutsourcingSourceFactScenarios(deps),

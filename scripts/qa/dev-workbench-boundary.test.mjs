@@ -262,6 +262,9 @@ const businessSamplePresentationImports = new Set([
   "components/business-list/SourceImportPickerModal.jsx",
 ]);
 const businessSampleFormStateDependencies = [
+  "components/business-list/BusinessForm.jsx",
+  "components/business-list/BusinessSplitContext.jsx",
+  "components/ReferenceRecordsContext.jsx",
   "components/business-list/BusinessEditorGroup.jsx",
   "components/business-list/businessFormReadOnly.mjs",
   "components/business-list/businessLineItemDisclosure.mjs",
@@ -269,6 +272,8 @@ const businessSampleFormStateDependencies = [
   "components/business-list/useBusinessLineItemGroups.js",
   "components/business-list/BusinessGroupedLineItems.jsx",
   "components/business-list/BusinessLineItemGroupControls.jsx",
+  "components/business-list/BusinessLineEditor.jsx",
+  "components/business-list/businessLineEditor.css",
   "utils/adjacentLineItemRuns.mjs",
   "hooks/useWorkflowTaskBusinessBusy.js",
 ];
@@ -281,7 +286,17 @@ const selectValueSamplePresentationImports = new Set([
 ]);
 const commonSamplePresentationDependencies = [
   "web/src/common/components/navigation/SlidingSegmented.jsx",
+  "web/src/common/components/navigation/SlidingTabList.jsx",
   "web/src/common/components/navigation/useSlidingIndicator.js",
+  "web/src/common/components/select/AppSelect.jsx",
+  "web/src/common/components/select/app-select.css",
+  "web/src/common/components/empty/AppEmpty.jsx",
+  "web/src/common/components/empty/empty-state.css",
+  "web/src/common/components/table/TableStickyHeader.jsx",
+  "web/src/common/components/table/TableScrollRegion.jsx",
+  "web/src/common/components/table/TableScrollControls.jsx",
+  "web/src/common/components/table/tableScrollToolbar.mjs",
+  "web/src/common/components/table/table-scroll-controls.css",
   "web/src/common/components/select/SelectPresentationContext.jsx",
   "web/src/common/components/select/useSelectPopupWidth.mjs",
   "web/src/common/theme/erpThemeContext.jsx",
@@ -293,6 +308,12 @@ const commonSamplePresentationDependencies = [
   "server/internal/unitpolicy/units.json",
 ];
 const allowedERPImportsByFile = new Map([
+  ["web/src/dev-workbench/components/DevUIEmptyExamples.jsx", new Set([
+    "components/business-list/BusinessFormSection.jsx",
+    "components/business-list/BusinessCompactFieldTable.jsx",
+    "components/business-list/BusinessLineItemsFooter.jsx",
+    "components/business-list/BusinessTextArea.jsx",
+  ])],
   ["web/src/dev-workbench/components/flow-state/FinanceRelationshipsView.jsx", new Set(["utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/components/flow-state/FinanceTraceView.jsx", new Set(["api/operationalFactApi.mjs", "components/finance/financePaymentPresentation.jsx"])],
   ["web/src/dev-workbench/config/devFulfillmentRelations.mjs", new Set(["utils/roleKeys.mjs"])],
@@ -428,6 +449,7 @@ const allowedERPImportsByFile = new Map([
       "components/business-list/BusinessTextArea.jsx",
       "utils/dateRange.mjs",
       "utils/workflowTaskTiming.mjs",
+      "utils/historySourceSelectOptions.mjs",
     ]),
   ],
   [
@@ -607,6 +629,7 @@ test("shared component consumers read only page presentation metadata", () => {
     for (const prefix of ["@/erp/", "../../erp/"]) {
       assert.equal(isAllowedERPImport(file, `${prefix}config/businessModules.mjs`), false);
       assert.equal(isAllowedERPImport(file, `${prefix}config/commandCenter.mjs`), false);
+      assert.equal(isAllowedERPImport(file, `${prefix}config/seedData.mjs`), false);
       assert.equal(isAllowedERPImport(file, `${prefix}config/businessUsabilityCatalog.mjs`), true);
     }
   }
@@ -632,6 +655,7 @@ function assertBusinessSamplePresentationGraph(readSource = read) {
     "utils/dateRange.mjs",
     "utils/modalSizes.mjs",
     "utils/referenceSelectOptions.mjs",
+    "utils/historySourceSelectOptions.mjs",
     "utils/unitQuantity.mjs",
     "utils/numeric20Scale6.mjs",
     "styles/app/business-form-page.css",
@@ -659,10 +683,12 @@ function assertBusinessSamplePresentationGraph(readSource = read) {
     "web/src/common/components/SearchInput",
     "web/src/common/components/scroll/MobileBackToTop",
     "web/src/common/components/navigation/SlidingSegmented",
+    "web/src/common/components/navigation/SlidingTabList",
     "web/src/common/components/navigation/useSlidingIndicator",
   ]);
   const samples = [
     "web/src/dev-workbench/components/DevUIBusinessExamples.jsx",
+    "web/src/dev-workbench/components/DevUIEmptyExamples.jsx",
     "web/src/dev-workbench/components/DevUIInputExamples.jsx",
     "web/src/dev-workbench/components/DevSelectValueExample.jsx",
   ];
@@ -737,6 +763,7 @@ test("business form presentation dependencies reject business I/O and persistenc
     "web/src/erp/utils/referenceSelectOptions.mjs",
     "web/src/dev-workbench/components/DevSelectValueExample.jsx",
     "web/src/dev-workbench/components/DevUIInputExamples.jsx",
+    "web/src/dev-workbench/components/DevUIEmptyExamples.jsx",
   ]) {
     for (const injection of [
       "import { listOrders } from '@/erp/api/masterDataOrderApi.mjs';",
@@ -857,7 +884,10 @@ test("date input samples keep shared pickers free of business dependencies", () 
       "dayjs", "dayjs/plugin/customParseFormat.js",
     ])],
     ["web/src/common/components/select/AppSelect.jsx", new Set([
-      "react", "antd", "./app-select.css", "./useSelectPopupWidth.mjs", "./SelectPresentationContext.jsx",
+      "react", "antd", "@ant-design/icons", "../empty/AppEmpty.jsx", "./app-select.css", "./useSelectPopupWidth.mjs", "./SelectPresentationContext.jsx",
+    ])],
+    ["web/src/common/components/empty/AppEmpty.jsx", new Set([
+      "react", "antd", "@ant-design/icons", "./empty-state.css",
     ])],
     ["web/src/common/components/select/useSelectPopupWidth.mjs", new Set([
       "react",

@@ -18,6 +18,7 @@ import {
   QUALITY_DEFECT_RATE_CUSTOM_SELECTION,
   QUALITY_DEFECT_RATE_PRESETS,
 } from '../../utils/qualityDefectRate.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const RESULT_DECISION_OPTIONS = [
   { label: '合格', value: 'PASS' },
@@ -69,7 +70,7 @@ export function QualityInspectionCreateForm({
   onReceiptChange,
 }) {
   return (
-    <Form
+    <BusinessForm
       form={form}
       layout="vertical"
       disabled={disabled}
@@ -124,7 +125,7 @@ export function QualityInspectionCreateForm({
       >
         <BusinessTextArea maxLength={BusinessTextPolicy.noteMaxCharacters} showCount minRows={2} />
       </Form.Item>
-    </Form>
+    </BusinessForm>
   )
 }
 
@@ -145,7 +146,7 @@ export function QualityInspectionDecisionForm({
   }
 
   return (
-    <Form
+    <BusinessForm
       form={form}
       layout="vertical"
       disabled={disabled}
@@ -241,6 +242,6 @@ export function QualityInspectionDecisionForm({
       >
         <BusinessTextArea maxLength={BusinessTextPolicy.noteMaxCharacters} showCount minRows={2} />
       </Form.Item>
-    </Form>
+    </BusinessForm>
   )
 }

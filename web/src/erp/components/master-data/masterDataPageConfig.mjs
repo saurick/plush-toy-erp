@@ -134,7 +134,6 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     initialValues: {
       outsourcing_enabled: true,
       inhouse_enabled: false,
-      quality_required: false,
     },
   },
   products: {

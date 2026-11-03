@@ -23,11 +23,9 @@ func TestInventoryRepo_BOMEditorFieldsPersistAndClear(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "inventory_repo_bom_editor_fields")
 	f := createInventoryTestFixtures(t, ctx, client)
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
-	start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
-	end := start.AddDate(0, 1, 0)
-	printed := start.AddDate(0, 0, 26)
+	printed := time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC)
 	in := &biz.BOMVersionMutation{ProductID: f.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{
-		EffectiveFrom: &start, EffectiveTo: &end, PrintDate: &printed,
+		PrintDate:     &printed,
 		SourceOrderNo: stringPtr("SO-EDITOR-1"), QuantityText: stringPtr("100"), SpareText: stringPtr("5"),
 		Designer: stringPtr("工程设计员"), Maker: stringPtr("工程制表员"), Auditor: stringPtr("工程审核员"),
 		HairDirection: stringPtr("单方向"), Note: stringPtr("待清空表头"),
@@ -50,8 +48,8 @@ func TestInventoryRepo_BOMEditorFieldsPersistAndClear(t *testing.T) {
 			t.Fatalf("header field %s did not persist", key)
 		}
 	}
-	if read.Header.EffectiveFrom == nil || !read.Header.EffectiveFrom.Equal(start) || read.Header.EffectiveTo == nil || !read.Header.EffectiveTo.Equal(end) || read.Header.PrintDate == nil || !read.Header.PrintDate.Equal(printed) {
-		t.Fatal("BOM date fields did not persist")
+	if read.Header.PrintDate == nil || !read.Header.PrintDate.Equal(printed) {
+		t.Fatal("BOM print date did not persist")
 	}
 	if len(read.Items) != 1 || read.Items[0].ProcessBase == nil || *read.Items[0].ProcessBase != "贴衬" || read.Items[0].ProcessMethod == nil || *read.Items[0].ProcessMethod != "车缝" || read.Items[0].TotalUsageSnapshot == nil || *read.Items[0].TotalUsageSnapshot != "137.5" {
 		t.Fatal("BOM part fields did not persist")
@@ -71,7 +69,7 @@ func TestInventoryRepo_BOMEditorFieldsPersistAndClear(t *testing.T) {
 			t.Fatalf("cleared field %s retained a stale value", key)
 		}
 	}
-	if cleared.Header.EffectiveFrom != nil || cleared.Header.EffectiveTo != nil || cleared.Header.PrintDate != nil || cleared.Items[0].ID != read.Items[0].ID || cleared.Header.Status != biz.BOMStatusDraft {
+	if cleared.Header.PrintDate != nil || cleared.Items[0].ID != read.Items[0].ID || cleared.Header.Status != biz.BOMStatusDraft {
 		t.Fatal("clearing fields changed identity/state or retained dates")
 	}
 }

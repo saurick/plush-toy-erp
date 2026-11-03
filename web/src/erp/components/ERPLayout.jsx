@@ -47,7 +47,6 @@ import {
   Typography,
 } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { TaskBusinessWorkspaceContext } from '../hooks/useBusinessPageContext.js'
 import WorkflowTaskBusinessWorkspace from './workflow/WorkflowTaskBusinessWorkspace.jsx'
 import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import BusinessModuleTabs from './BusinessModuleTabs.jsx'
@@ -94,6 +93,7 @@ import SessionRecoveryDialog from './SessionRecoveryDialog'
 import AccountPasswordModal from './AccountPasswordModal.jsx'
 import AccountIdentity from './AccountIdentity.jsx'
 import ERPPageActions, { ERPPageActionsContext } from './ERPPageActions.jsx'
+import BusinessSplitWorkspace from './BusinessSplitWorkspace.jsx'
 import {
   getBusinessModule,
   isCustomerBusinessDataPageKey,
@@ -350,9 +350,13 @@ function buildUnavailableCachedAdminProfile(profile) {
   })
 }
 
-export default function ERPLayout({ legalNotice }) {
+export default function ERPLayout({ legalNotice, renderSplitPage }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const splitWorkspace = useRef(null)
+  const [splitOpen, setSplitOpen] = useState(false)
+  const [activeSplitSide, setActiveSplitSide] = useState('left')
+  const [splitRightLocation, setSplitRightLocation] = useState(null)
   const tokenAdmin = getCurrentUser(AUTH_SCOPE.ADMIN)
   const activeBrand = useMemo(() => getActiveERPBrand(), [])
   const entryConfig = useMemo(() => getEntryConfig(), [])
@@ -1051,13 +1055,15 @@ export default function ERPLayout({ legalNotice }) {
         ) : (
           icon
         ),
-        label: taskEntry ? (
-          <span className="erp-menu-task-label">
-            <span>{item.label}</span>
-            <NavigationCountBadge {...taskCount} />
+        label: (
+          <span className="erp-split-menu-label" draggable={splitOpen} onDragStart={(event) => splitWorkspace.current?.dragPage(event, item.path)}>
+            {taskEntry ? (
+              <span className="erp-menu-task-label">
+                <span>{item.label}</span>
+                <NavigationCountBadge {...taskCount} />
+              </span>
+            ) : item.label}
           </span>
-        ) : (
-          item.label
         ),
         title: taskEntry
           ? `${item.label} · ${navigationCountDescription(taskCount)}`
@@ -1111,14 +1117,18 @@ export default function ERPLayout({ legalNotice }) {
     useRoleGuidedNavigation,
     shouldUseProductCoreNavigation,
     taskCount,
+    splitOpen,
   ])
 
+  const sidebarNavigationEntry = splitOpen && activeSplitSide === 'right' && splitRightLocation
+    ? resolveCurrentNavigationEntry({ navigationSections: routeNavigationSections, locationPath: splitRightLocation.pathname })
+    : currentNavigationEntry
   const currentSidebarPath = getBusinessModuleSidebarKey(
-    currentEntry?.sidebarParentPath || currentNavigationEntry.menuPath
+    sidebarNavigationEntry.entry?.sidebarParentPath || sidebarNavigationEntry.menuPath
   )
 
   const selectedKeys =
-    currentNavigationEntry.matched && currentSidebarPath
+    sidebarNavigationEntry.matched && currentSidebarPath
       ? [currentSidebarPath]
       : []
   const hideCurrentEntryPageHead = hasSelfContainedBusinessPageHead(
@@ -1209,7 +1219,9 @@ export default function ERPLayout({ legalNotice }) {
     if (loggingOut) {
       return
     }
-    if (pageLeaveGuard && !(await pageLeaveGuard({ intent: 'logout' }))) return
+    if (splitWorkspace.current?.ownsNavigation) {
+      if (!(await splitWorkspace.current.confirmLeaveAll({ intent: 'logout' }))) return
+    } else if (pageLeaveGuard && !(await pageLeaveGuard({ intent: 'logout' }))) return
 
     setLoggingOut(true)
     try {
@@ -1223,6 +1235,9 @@ export default function ERPLayout({ legalNotice }) {
   }
 
   const handleRefreshCurrentPage = useCallback(async () => {
+    if (splitOpen || splitWorkspace.current?.ownsNavigation) {
+      return splitWorkspace.current?.refresh('left')
+    }
     if (!pageRefreshHandler || refreshingCurrentPageRef.current) {
       return
     }
@@ -1243,16 +1258,26 @@ export default function ERPLayout({ legalNotice }) {
       refreshingCurrentPageRef.current = false
       setRefreshingCurrentPage(false)
     }
-  }, [pageLeaveGuard, pageRefreshHandler, taskCount])
+  }, [pageLeaveGuard, pageRefreshHandler, taskCount, splitOpen])
 
   const pageActions = useMemo(() => ({
     onRefresh: pageRefreshHandler ? handleRefreshCurrentPage : null,
     refreshing: refreshingCurrentPage,
     onOpenNavigation: () => setMobileNavOpen(true),
-  }), [handleRefreshCurrentPage, pageRefreshHandler, refreshingCurrentPage])
+    onSplit: renderSplitPage ? () => {
+      setSplitOpen((current) => !current)
+      setActiveSplitSide(splitOpen ? 'left' : 'right')
+    } : null,
+    splitOpen,
+  }), [handleRefreshCurrentPage, pageRefreshHandler, refreshingCurrentPage, renderSplitPage, splitOpen])
 
   const handleNavigate = async (nextPath, navigateOptions) => {
     if (!nextPath) {
+      setMobileNavOpen(false)
+      return
+    }
+    if (splitOpen || splitWorkspace.current?.ownsNavigation) {
+      await splitWorkspace.current.navigate(nextPath, navigateOptions)
       setMobileNavOpen(false)
       return
     }
@@ -1285,6 +1310,11 @@ export default function ERPLayout({ legalNotice }) {
       if (item.path === '/erp/task-board' && taskCount.enabled) {
         if (taskCount.error) taskCount.refresh()
         handleNavigate('/erp/task-board?mode=todo')
+        return
+      }
+      if (splitOpen && activeSplitSide === 'right') {
+        splitWorkspace.current?.navigateMenu(item)
+        setMobileNavOpen(false)
         return
       }
       handleNavigate(
@@ -1468,6 +1498,19 @@ export default function ERPLayout({ legalNotice }) {
         currentNavigationEntry.pageKey
       ))
 
+  const resolveSplitPage = useCallback((pathname) => {
+    const resolved = resolveCurrentNavigationEntry({ navigationSections: visibleSections, locationPath: pathname })
+    const guarded = shouldGuardCustomerBusinessPageRuntime({
+      effectiveSessionDiagnostic,
+      isCustomerBusinessDataPage: isCustomerBusinessDataPageKey(resolved.pageKey),
+    }) || (isLocalCustomerDesktopPreview && LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS.has(resolved.pageKey))
+    return {
+      allowed: resolved.matched,
+      entry: resolved.entry,
+      guarded: guarded ? <ProductCoreCapabilityReview currentEntry={resolved.entry} /> : null,
+    }
+  }, [visibleSections, effectiveSessionDiagnostic, isLocalCustomerDesktopPreview])
+
   if (profileLoading && !adminProfile) {
     return (
       <Loading
@@ -1519,7 +1562,7 @@ export default function ERPLayout({ legalNotice }) {
       />
       <ERPPageActionsContext.Provider value={pageActions}>
         <Layout
-          className="erp-admin-shell"
+          className={`erp-admin-shell${splitOpen ? ' erp-admin-shell--split' : ''}`}
           data-effective-session-source={effectiveSessionDiagnostic.source}
           data-effective-session-mode={effectiveSessionDiagnostic.visibilityMode}
           data-effective-session-data-scope={
@@ -1551,7 +1594,7 @@ export default function ERPLayout({ legalNotice }) {
           </Drawer>
 
           <Layout>
-            <Content className="erp-admin-content">
+            <Content className={`erp-admin-content${splitOpen ? ' erp-admin-content--split' : ''}`}>
               {taskNavigation ? (
                 <Space
                   wrap
@@ -1585,47 +1628,64 @@ export default function ERPLayout({ legalNotice }) {
                 />
               ) : null}
 
-              {(!hidePageHead && !shouldGuardProductCoreBusinessData) || shouldBlockOutlet ? (
-                <div className="erp-admin-page-head">
-                  <div className="erp-admin-page-head__main">
-                    <div className="erp-admin-page-head__title">
-                      {currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label}
+              <BusinessSplitWorkspace
+                ref={splitWorkspace}
+                open={splitOpen}
+                onOpenChange={setSplitOpen}
+                activeSide={activeSplitSide}
+                onActiveSideChange={setActiveSplitSide}
+                location={location}
+                navigate={navigate}
+                outletContext={outletContext}
+                leftGuard={pageLeaveGuard}
+                leftRefresh={pageRefreshHandler}
+                renderPage={renderSplitPage}
+                sections={visibleSections}
+                resolvePage={resolveSplitPage}
+                onRightLocationChange={setSplitRightLocation}
+                taskWorkspace={WorkflowTaskBusinessWorkspace}
+              >
+                {(!hidePageHead && !shouldGuardProductCoreBusinessData) || shouldBlockOutlet ? (
+                  <div className="erp-admin-page-head">
+                    <div className="erp-admin-page-head__main">
+                      <div className="erp-admin-page-head__title">
+                        {currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label}
+                      </div>
                     </div>
+                    <ERPPageActions />
                   </div>
-                  <ERPPageActions />
-                </div>
               ) : null}
 
-              <div
-                className={`erp-admin-outlet${
+                <div
+                  className={`erp-admin-outlet${
                   moduleWorkspace &&
                   !shouldBlockOutlet &&
                   !shouldGuardProductCoreBusinessData
                     ? ' erp-admin-outlet--module'
                     : ''
                 }`}
-              >
-                {!shouldBlockOutlet && !shouldGuardProductCoreBusinessData && !taskNavigation ? (
-                  <BusinessModuleTabs
-                    workspace={moduleWorkspace}
-                    cache={pageUIState.values}
-                    onNavigate={handleNavigate}
-                    helpKey={currentEntry?.pageKey || currentEntry?.key}
-                  />
+                >
+                  {!shouldBlockOutlet && !shouldGuardProductCoreBusinessData && !taskNavigation ? (
+                    <BusinessModuleTabs
+                      workspace={moduleWorkspace}
+                      cache={pageUIState.values}
+                      onNavigate={handleNavigate}
+                      helpKey={currentEntry?.pageKey || currentEntry?.key}
+                    />
                 ) : null}
-                {shouldBlockOutlet ? (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    message={
+                  {shouldBlockOutlet ? (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message={
                       noVisibleMenus ? '当前账号暂无可用页面' : '当前页面不可用'
                     }
-                    description={
+                      description={
                       noVisibleMenus
                         ? '请确认当前账号已设置正确的岗位和可用页面。若刷新后仍无入口，请联系管理员。'
                         : '正在返回当前账号可用的页面。'
                     }
-                  />
+                    />
                 ) : shouldGuardProductCoreBusinessData ? (
                   <ProductCoreCapabilityReview currentEntry={currentEntry} />
                 ) : (
@@ -1639,12 +1699,11 @@ export default function ERPLayout({ legalNotice }) {
                       />
                     }
                   >
-                    <TaskBusinessWorkspaceContext.Provider value={WorkflowTaskBusinessWorkspace}>
-                      <Outlet context={outletContext} key={businessPageGeneration} />
-                    </TaskBusinessWorkspaceContext.Provider>
+                    <Outlet context={outletContext} key={businessPageGeneration} />
                   </Suspense>
                 )}
-              </div>
+                </div>
+              </BusinessSplitWorkspace>
             </Content>
           </Layout>
         </Layout>

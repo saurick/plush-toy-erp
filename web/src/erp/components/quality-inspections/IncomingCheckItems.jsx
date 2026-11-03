@@ -3,6 +3,7 @@ import { Button, Form, Input, Space, Typography } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import BusinessLineEditor from '../business-list/BusinessLineEditor.jsx'
 import Select from '@/common/components/select/AppSelect'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
@@ -21,16 +22,18 @@ export function IncomingCheckItemsForm() {
     requestLineItemScroll(index)
   }
   return (
-    <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
+    <BusinessLineEditor data-table-scroll-scope style={{ gridColumn: '1 / -1', minWidth: 0 }}>
       <Form.List name="check_items">
         {(fields, { add, remove }) => (
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
             <BusinessLineItemsHeader
               title="检查项目"
+              scrollControls
               description="全检与抽检分别记录，未检不视为合格。"
             />
             <BusinessCompactFieldTable
               label="质检检查项"
+              scrollControlsInToolbar
               showSequence
               columns={[
                 { label: '检查项目', required: true },
@@ -39,7 +42,7 @@ export function IncomingCheckItemsForm() {
                 { label: '实际情况' },
                 { label: '检查范围', width: 104 },
                 { label: '说明 / 抽检范围' },
-                { label: '操作', width: 52 },
+                { actions: true, label: '操作', width: 52 },
               ]}
             >
               {fields.map(({ key, name, ...rest }, index) => (
@@ -121,7 +124,9 @@ export function IncomingCheckItemsForm() {
                       icon={<DeleteOutlined />}
                       aria-label={`移除此检查项 ${name + 1}`}
                       onClick={() => remove(name)}
-                    />
+                    >
+                      移除行
+                    </Button>
                   }
                 />
               ))}
@@ -142,7 +147,7 @@ export function IncomingCheckItemsForm() {
           </Space>
         )}
       </Form.List>
-    </div>
+    </BusinessLineEditor>
   )
 }
 

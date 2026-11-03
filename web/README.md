@@ -229,7 +229,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 版本发布页的“操作指引”在当前标签页进入 `/__dev/version-center/guide`。左侧章节目录支持同页跳转，右侧全部章节直接展开阅读；地址栏保留章节锚点，支持直接访问与刷新，长内容随整页滚动；阅读不依赖实时发布或目标状态，边界见 [版本发布说明](../docs/engineering/研发效能工作台与CI-CD设计.md#版本发布与部署中心-__devversion-center)。
 
-效能工作台的 Mermaid 图首次显示即适应全图，隐藏区域展开及容器尺寸变化时继续自动适配；手动缩放、适配宽度和重置由用户控制。共享交互与打印边界见 [可视化表达规范](../docs/engineering/可视化表达规范.md#图形与交互--presentation)。
+效能工作台的状态、流程、业务关系、权限及文档图统一复用共享 Mermaid 查看器。业务目录通过 `BusinessFlowDiagram` 生成 flowchart，保留节点点选、规则详情、筛选与返回上下文；17 环节总链分三段展示，主数据启停、分类与事实规则使用同源图。首次显示即适应全图，隐藏区域展开及容器尺寸变化时继续自动适配；手动缩放、适配宽度和重置由用户控制。共享交互与打印边界见 [可视化表达规范](../docs/engineering/可视化表达规范.md#图形与交互--presentation)。
 
 ## 当前前端边界
 

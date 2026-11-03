@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { appendFile } from 'node:fs/promises'
+import { BUSINESS_FORM_READING_MARGIN } from '../../src/erp/utils/businessFormSections.mjs'
 import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
@@ -9,7 +10,7 @@ export async function assertBusinessSectionTitleBands(editor) {
   await waitForFiniteAnimations(editor.page())
   const coverage = await editor.evaluate((root) => [...root.querySelectorAll('[data-form-section]')].filter((section) => section.getClientRects().length).map((section) => ({
     title: section.dataset.formSection,
-    headings: [...section.querySelectorAll('.erp-business-form-heading')].filter((heading) => heading.closest('[data-form-section]') === section).map((heading) => heading.querySelector('.erp-business-action-form__section-title-text, h2, strong[role="heading"]')?.textContent.trim()),
+    headings: [...section.querySelectorAll('.erp-business-form-heading, .erp-line-editor__heading[data-line-items-title="true"]')].filter((heading) => heading.closest('[data-form-section]') === section).map((heading) => heading.querySelector('.erp-business-action-form__section-title-text, h2, strong[role="heading"]')?.textContent.trim()),
   })))
   for (const section of coverage) {
     assert.ok(section.headings.includes(section.title), `every visible section retains its shared title in this mode: ${JSON.stringify(section)}`)
@@ -66,6 +67,18 @@ export async function assertBusinessSectionTitleBands(editor) {
     assert.equal(heading.divider, 'none', `section titles do not retain the decorative long divider: ${detail}`)
     if (heading.singleLineLabel) assert.ok(heading.height >= 32 && heading.height <= 34, `a single-line title stays compact: ${detail}`)
   }
+  const editors = await editor.locator('.erp-line-editor__heading[data-line-items-title="true"]').evaluateAll((nodes) => nodes.filter((node) => node.getClientRects().length).map((node) => ({
+    title: node.querySelector('strong[role="heading"]')?.textContent.trim(),
+    height: node.getBoundingClientRect().height,
+    overflow: node.scrollWidth - node.clientWidth,
+    color: getComputedStyle(node).color,
+    background: getComputedStyle(node).backgroundColor,
+  })))
+  for (const heading of editors) {
+    assert.ok(heading.title, `明细工具栏保留可识别标题：${JSON.stringify(heading)}`)
+    assert.ok(heading.height >= 32 && heading.overflow <= 1, `明细标题与动作自然换行：${JSON.stringify(heading)}`)
+    assert.ok(getContrastRatio(parseRgb(heading.color), parseRgb(heading.background)) >= 4.5, `中性明细标题保持可读对比度：${JSON.stringify(heading)}`)
+  }
 }
 
 export async function assertCurrentBusinessSection(page, editor, title) {
@@ -77,6 +90,8 @@ export async function assertCurrentBusinessSection(page, editor, title) {
     return {
     background: getComputedStyle(node).backgroundColor,
     border: getComputedStyle(node).borderTopWidth,
+    borderColor: getComputedStyle(node).borderTopColor,
+    neutralTitle: Boolean(node.querySelector('.erp-line-editor__heading[data-line-items-title="true"]')) && !node.querySelector('.erp-business-form-heading'),
     titleBand: node.querySelector('.erp-business-form-heading') ? getComputedStyle(node.querySelector('.erp-business-form-heading')).backgroundColor : null,
     otherBands: [...root.querySelectorAll('[data-form-section]:not([data-current-form-section="true"]) .erp-business-form-heading')].filter((heading) => heading.getClientRects().length).map((heading) => getComputedStyle(heading).backgroundColor),
     otherBackgrounds: [...root.querySelectorAll('[data-form-section]:not([data-current-form-section="true"])')].filter((section) => section.getClientRects().length).map((section) => ({ title: section.dataset.formSection, background: getComputedStyle(section).backgroundColor, border: getComputedStyle(section).borderTopColor })),
@@ -84,7 +99,13 @@ export async function assertCurrentBusinessSection(page, editor, title) {
   })
   assert.equal(metrics.border, '1px', JSON.stringify(metrics))
   assert.ok(metrics.background && !['transparent', 'rgba(0, 0, 0, 0)'].includes(metrics.background), JSON.stringify(metrics))
+  if (metrics.neutralTitle) {
+    const edge = parseRgb(metrics.borderColor)
+    const fill = parseRgb(metrics.background)
+    assert.ok(edge && fill && edge[3] > 0 && Math.max(...edge.slice(0, 3).map((channel, index) => Math.abs(channel - fill[index]))) >= 8, `中性明细标题通过本分区边框与底色明确当前位置：${JSON.stringify(metrics)}`)
+  }
   for (const otherBand of metrics.otherBands) {
+    if (metrics.neutralTitle) continue
     const current = parseRgb(metrics.titleBand)
     const other = parseRgb(otherBand)
     assert.ok(current && other && Math.max(...current.slice(0, 3).map((channel, index) => Math.abs(channel - other[index]))) >= 20, `the current section is visibly distinct from ordinary title bands: ${JSON.stringify(metrics)}`)
@@ -153,8 +174,8 @@ export async function assertBusinessSectionInteractions(page, editor) {
   const titles = await editor.locator('[data-form-section]:visible').evaluateAll((nodes) => nodes.map((node) => node.dataset.formSection))
   for (const title of [...titles, ...titles.slice(0, 1)]) {
     const section = editor.locator(`[data-form-section=${JSON.stringify(title)}]`)
-    const heading = section.locator('.erp-business-form-heading').first()
-    await heading.click()
+    const heading = section.locator('.erp-business-form-heading, .erp-line-editor__heading[data-line-items-title="true"]').first()
+    await heading.locator('.erp-business-action-form__section-title-text, h2, strong[role="heading"]').first().click()
     await assertCurrentBusinessSection(page, editor, title)
     await assertBusinessSectionSpacing(editor, layout)
   }
@@ -281,8 +302,9 @@ export async function assertBusinessFormScrollTracking(page, editor) {
   if (!result) return null
   if (result.scrollable) {
     const detail = JSON.stringify(result)
-    assert.deepEqual(result.forward, result.titles, `scrolling down reaches every section: ${detail}`)
-    assert.deepEqual(result.backward, result.titles.toReversed(), `scrolling up restores every section: ${detail}`)
+    const expected = result.max <= BUSINESS_FORM_READING_MARGIN ? result.titles.slice(0, 1) : result.titles
+    assert.deepEqual(result.forward, expected, `scrolling down follows the readable sections: ${detail}`)
+    assert.deepEqual(result.backward, expected.toReversed(), `scrolling up restores the readable sections: ${detail}`)
     assert.deepEqual(result.errors, [], `directory and highlight stay exclusive and aligned: ${detail}`)
     assert.equal(result.geometryStable, true, `section switches preserve layout: ${detail}`)
     assert.equal(result.inputsStable && result.valuesStable, true, `scrolling preserves mounted fields and draft values: ${detail}`)
@@ -342,6 +364,9 @@ export async function assertBusinessFormNavigationSurface(page, editor) {
       picker: visible(picker),
       background: nav ? getComputedStyle(nav).backgroundColor : null,
       border: nav ? getComputedStyle(nav).borderRightWidth : null,
+      bottomBorder: nav ? getComputedStyle(nav).borderBottomWidth : null,
+      topNavigation: Boolean(nav && body && Math.abs(nav.getBoundingClientRect().left - body.getBoundingClientRect().left) <= 1 && Math.abs(nav.getBoundingClientRect().width - body.getBoundingClientRect().width) <= 1),
+      stickyNavigation: nav ? getComputedStyle(nav).position === 'sticky' : false,
       bodyOverflow: body ? body.scrollWidth - body.clientWidth : null,
     }
   })
@@ -353,13 +378,21 @@ export async function assertBusinessFormNavigationSurface(page, editor) {
   }
   assert.ok(metrics.nav, `complete forms retain their shared directory: ${detail}`)
   assert.ok(metrics.background && !['transparent', 'rgba(0, 0, 0, 0)'].includes(metrics.background), `directory has an opaque theme surface: ${detail}`)
-  if (metrics.sidebar) {
+  if (metrics.sidebar && !metrics.topNavigation) {
     assert.ok(Math.abs(metrics.nav.top - metrics.main.top) <= 1 && Math.abs(metrics.nav.bottom - metrics.main.bottom) <= 1, `directory background and divider cover the full editor column: ${detail}`)
     assert.ok(Math.abs(metrics.nav.right - metrics.body.left) <= 1, `directory divider meets the body without a gap: ${detail}`)
     assert.equal(metrics.border, '1px', detail)
   } else {
-    assert.equal(metrics.picker, true, `narrow editors retain an accessible section picker: ${detail}`)
-    assert.ok(Math.abs(metrics.nav.width - metrics.main.width) <= 1, `section picker background spans the narrow editor: ${detail}`)
+    if (!metrics.sidebar) assert.equal(metrics.picker, true, `narrow editors retain an accessible section picker: ${detail}`)
+    assert.equal(metrics.topNavigation, true, `horizontal navigation stays above the editor body: ${detail}`)
+    assert.ok(Math.abs(metrics.nav.width - metrics.main.width) <= 1 && Math.abs(metrics.nav.left - metrics.main.left) <= 1, `horizontal directory background spans the editor: ${detail}`)
+    if (metrics.stickyNavigation) {
+      assert.ok(Math.abs(metrics.body.top - metrics.main.top - metrics.nav.height) <= 1, `sticky directory retains its place in the document flow: ${detail}`)
+      assert.ok(metrics.nav.top >= metrics.main.top - 1 && metrics.nav.bottom <= metrics.main.bottom + 1, `sticky directory remains inside its editor: ${detail}`)
+    } else {
+      assert.ok(Math.abs(metrics.nav.bottom - metrics.body.top) <= 1, `horizontal directory divider meets the body without a gap: ${detail}`)
+    }
+    assert.equal(metrics.bottomBorder, '1px', detail)
   }
   return metrics
 }

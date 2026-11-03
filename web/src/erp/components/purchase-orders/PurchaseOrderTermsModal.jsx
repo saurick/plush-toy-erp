@@ -16,6 +16,7 @@ import { createSourceBusinessActionAttemptStore } from '../../utils/sourceBusine
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const dateParam = (value) =>
   value ? Date.parse(`${value}T00:00:00Z`) / 1000 : null
@@ -158,7 +159,7 @@ export default function PurchaseOrderTermsModal({
       okButtonProps={{ disabled: loading || !context }}
     >
       <Spin spinning={loading}>
-        <Form form={form} layout="vertical" disabled={saving}>
+        <BusinessForm form={form} layout="vertical" disabled={saving}>
           <p>
             {deliveryOnly ? '交期可独立维护或清空，无需填写价格。明细交期优先于整单交期，采购数量沿用批准结果。' : '采购数量沿用批准结果。已确认价格保持锁定，晚补价用于缺价收货的结算。'}
           </p>
@@ -222,7 +223,7 @@ export default function PurchaseOrderTermsModal({
               )
             }}
           </BusinessGroupedLineItems>
-        </Form>
+        </BusinessForm>
       </Spin>
     </BusinessModal>
   )

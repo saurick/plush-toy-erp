@@ -10,6 +10,7 @@ import {
   sourceBusinessActionUUID,
 } from '../../utils/sourceBusinessAction.mjs'
 import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function formattedDateTime(value) {
   const timestamp = Number(value || 0)
@@ -119,7 +120,7 @@ export default function OutsourcingReturnQualityInspectionModal({
           },
         ]}
       />
-      <Form name="outsourcing-return-quality" form={form} layout="vertical" preserve={false} disabled={loading}>
+      <BusinessForm name="outsourcing-return-quality" form={form} layout="vertical" preserve={false} disabled={loading}>
         <Form.Item
           name="inspection_no"
           label="质检单号（自动）"
@@ -132,7 +133,7 @@ export default function OutsourcingReturnQualityInspectionModal({
         <Form.Item name="note" label="送检备注">
           <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

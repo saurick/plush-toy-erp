@@ -68,20 +68,13 @@ import {
   BusinessLineItemRow,
 } from '../business-list/BusinessLineItemsTable.jsx'
 import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.jsx'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const SHIPMENT_ITEM_COLUMNS = [
-  { label: '产品', width: 220, flexible: true, required: true },
-  { label: 'SKU', width: 190 },
-  { label: '仓库', width: 200, required: true },
-  { label: '批次', width: 190 },
-  { label: '数量', width: 132, required: true },
-  { label: '单位', width: 94, required: true },
-]
-
-const SHIPMENT_DESKTOP_COLUMNS = [
-  SHIPMENT_ITEM_COLUMNS[1],
-  { ...SHIPMENT_ITEM_COLUMNS[2], flexible: true },
-  ...SHIPMENT_ITEM_COLUMNS.slice(3),
+{ label: '产品 / SKU', width: 300, flexible: true, required: true },
+{ label: '仓库', width: 200, required: true },
+{ label: '批次', width: 190 },
+{ label: '数量 / 单位', width: 200, required: true }
 ]
 
 const { Text } = Typography
@@ -155,6 +148,7 @@ function ShipmentFormFields({
   attachmentPanel,
 }) {
   const { taskBusiness } = useBusinessPageContext() || {}
+  const showSourceFacts = Boolean(taskBusiness || sourceLocked)
   const normalizedSourceCurrency = String(sourceCurrency || '')
     .trim()
     .toUpperCase()
@@ -167,11 +161,13 @@ function ShipmentFormFields({
 
   return (
     <>
-      <BusinessFormSection title={taskBusiness ? '本次出货' : '单据与客户'}>
-        {taskBusiness ? <TaskSourceFacts
+      <BusinessFormSection fieldLayout="adaptive" title={taskBusiness ? '本次出货' : '单据与客户'}>
+        {showSourceFacts ? <TaskSourceFacts
           form={form}
+          label={taskBusiness ? '本次任务来源' : '销售来源'}
+          inline={!taskBusiness}
           fields={[
-          { name: 'shipment_no', label: '出货单号' },
+          ...(taskBusiness ? [{ name: 'shipment_no', label: '出货单号' }] : []),
           { name: 'sales_order_id', label: '销售订单', options: salesOrderOptions },
           { name: 'customer_snapshot', label: '客户' },
           { name: 'currency', label: '币种', value: normalizedSourceCurrency },
@@ -199,7 +195,7 @@ function ShipmentFormFields({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          hidden={Boolean(taskBusiness)}
+          hidden={showSourceFacts}
           label="销售订单"
           name="sales_order_id"
         >
@@ -213,8 +209,8 @@ function ShipmentFormFields({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
-          hidden={Boolean(taskBusiness)}
+          className="erp-business-action-form__field erp-business-action-form__field--wide"
+          hidden={showSourceFacts}
           label="客户"
           name="customer_id"
         >
@@ -229,7 +225,7 @@ function ShipmentFormFields({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          hidden={Boolean(taskBusiness)}
+          hidden={showSourceFacts}
           label="单据客户名称"
           name="customer_snapshot"
         >
@@ -241,7 +237,7 @@ function ShipmentFormFields({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          hidden={Boolean(taskBusiness)}
+          hidden={showSourceFacts}
           label="币种（跟随销售订单）"
         >
           <Input
@@ -256,7 +252,7 @@ function ShipmentFormFields({
         </Form.Item>
 
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           label="计划出货日期"
           name="planned_ship_at"
         >
@@ -271,7 +267,7 @@ function ShipmentFormFields({
           description="从销售订单带出后可按本次出货调整；保存后固定为本单收货信息。"
         />
       </BusinessFormSection>
-      <BusinessFormSection title="运输与费用">
+      <BusinessFormSection fieldLayout="adaptive" title="运输与费用">
         <Form.Item
           className="erp-business-action-form__field"
           label="运输方式"
@@ -310,7 +306,7 @@ function ShipmentFormFields({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           label="件数 / 箱数"
           name="package_count"
           rules={[
@@ -324,7 +320,7 @@ function ShipmentFormFields({
           <InputNumber disabled={disabled} style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           label="毛重（千克）"
           name="gross_weight_kg"
           dependencies={['total_net_weight_g', 'items']}
@@ -351,7 +347,7 @@ function ShipmentFormFields({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           label="体积（立方米）"
           name="volume_m3"
           rules={[
@@ -416,9 +412,9 @@ function ShipmentFormFields({
           />
         </Form.Item>
       </BusinessFormSection>
-      <BusinessFormSection title="备注与附件">
+      <BusinessFormSection fieldLayout="support" title="备注与附件">
         <Form.Item
-          className="erp-business-action-form__field erp-business-action-form__field--full"
+          className="erp-business-action-form__field"
           label="备注"
           name="note"
         >
@@ -431,7 +427,7 @@ function ShipmentFormFields({
           />
         </Form.Item>
 
-        {attachmentPanel}
+        {attachmentPanel ? <div className="erp-business-form-section__attachments">{attachmentPanel}</div> : null}
       </BusinessFormSection>
     </>
   )
@@ -466,18 +462,7 @@ function ShipmentSelectedSourceAlert({
             className="erp-business-source-summary erp-business-inline-note"
             role="note"
           >
-            <Text strong>
-              {`来源销售订单：${
-                selectedSalesOrder.order_no ||
-                selectedSalesOrder.customer_order_no ||
-                '已选择'
-              }`}
-            </Text>
-            <Text type="secondary">
-              客户：{salesOrderCustomerText(selectedSalesOrder) || '-'}；已导入{' '}
-              {selectedSourceRows.length} 行；币种：
-              {selectedSalesOrder.currency || '未记录'}
-            </Text>
+            <Text type="secondary">已导入 {selectedSourceRows.length} 行</Text>
           </div>
         )
       }}
@@ -690,8 +675,6 @@ function ShipmentItemFormContent({
   unitOptions = [],
   warehouseOptions = [],
 }) {
-  const { taskBusiness } = useBusinessPageContext() || {}
-  const grouped = taskBusiness?.device !== 'mobile'
   const namePrefix = field ? field.name : undefined
   const fieldName = (key) => (field ? [namePrefix, key] : key)
   const itemPath = field ? ['items', namePrefix] : []
@@ -712,8 +695,8 @@ function ShipmentItemFormContent({
     form.setFieldValue(itemPath, { ...current, ...patch })
   }
   const productField = (
-    <div className={grouped ? 'erp-line-item-table__cell erp-line-item-identity-action' : 'erp-product-field-control'}>
-      {!grouped && productID ? <ProductThumbnail productId={productID} name={referenceLabel(productOptions, productID, '产品')} /> : null}
+    <div className="erp-product-field-control">
+      {productID ? <ProductThumbnail productId={productID} name={referenceLabel(productOptions, productID, '产品')} /> : null}
       <Form.Item
         className="erp-business-action-form__field"
         label="产品"
@@ -729,9 +712,6 @@ function ShipmentItemFormContent({
           optionRender={renderProductOption}
           aria-label={`第 ${index + 1} 行产品`}
           placeholder="请选择产品"
-          labelRender={grouped ? () => sourceLocked ? '来源锁定' : '更换产品' : undefined}
-          suffixIcon={grouped && sourceLocked ? null : undefined}
-          variant={grouped && sourceLocked ? 'borderless' : undefined}
           showSearch
           onChange={(nextID) =>
             applyItemPatch(buildShipmentProductChangePatch(nextID, products))
@@ -746,26 +726,28 @@ function ShipmentItemFormContent({
       detailsLabel="来源、包装与备注"
       showDetailsHeading={false}
       rowRef={rowRef}
-      actions={grouped ? <div className="erp-line-item-identity-actions">{productField}{actions}</div> : actions}
+      actions={actions}
       cells={[
-        ...(!grouped ? [productField] : []),
-        <Form.Item
-          className="erp-business-action-form__field"
-          label="SKU"
-          name={fieldName('product_sku_id')}
-        >
-          <Select
-            allowClear
-            disabled={sourceLocked || !Number(productID || 0)}
-            optionFilterProp="label"
-            options={filteredProductSKUOptions}
-            placeholder={!Number(productID || 0) ? '请先选择产品' : sourceLocked ? '来源未指定规格' : '选择产品规格'}
-            showSearch
-            onChange={(nextID) =>
+        <div className="erp-line-item-identity-fields">
+          {productField}
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="SKU"
+            name={fieldName('product_sku_id')}
+          >
+            <Select
+              allowClear
+              disabled={sourceLocked || !Number(productID || 0)}
+              optionFilterProp="label"
+              options={filteredProductSKUOptions}
+              placeholder={!Number(productID || 0) ? '请先选择产品' : sourceLocked ? '来源未指定规格' : '选择产品规格'}
+              showSearch
+              onChange={(nextID) =>
               applyItemPatch(buildShipmentSKUChangePatch(nextID, productSKUs))
             }
-          />
-        </Form.Item>,
+            />
+          </Form.Item>
+        </div>,
         <Form.Item
           className="erp-business-action-form__field"
           label="仓库"
@@ -794,12 +776,13 @@ function ShipmentItemFormContent({
             showSearch
           />
         </Form.Item>,
-        <Form.Item
-          className="erp-business-action-form__field"
-          label="数量"
-          name={fieldName('quantity')}
-          dependencies={[[...itemPath, 'unit_id']]}
-          rules={[
+        <div className="erp-line-editor__quantity">
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="数量"
+            name={fieldName('quantity')}
+            dependencies={[[...itemPath, 'unit_id']]}
+            rules={[
             unitQuantityRuleFromOptions(unitOptions, () =>
               form.getFieldValue([...itemPath, 'unit_id'])
             ),
@@ -815,25 +798,26 @@ function ShipmentItemFormContent({
               },
             },
           ]}
-        >
-          <Input allowClear autoComplete="off" placeholder="例如：120.5" />
-        </Form.Item>,
-        <Form.Item
-          className="erp-business-action-form__field"
-          label="单位"
-          name={fieldName('unit_id')}
-          rules={[{ required: true, message: '请选择单位' }]}
-        >
-          <Select
-            allowClear
-            disabled={sourceLocked}
-            optionFilterProp="searchText"
-            options={unitOptions}
-            placeholder="请选择单位"
-            showSearch
-          />
-        </Form.Item>,
-      ]}
+          >
+            <Input allowClear autoComplete="off" placeholder="例如：120.5" />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="单位"
+            name={fieldName('unit_id')}
+            rules={[{ required: true, message: '请选择单位' }]}
+          >
+            <Select
+              allowClear
+              disabled={sourceLocked}
+              optionFilterProp="searchText"
+              options={unitOptions}
+              placeholder="请选择单位"
+              showSearch
+            />
+          </Form.Item>
+        </div>
+]}
     >
       <Form.Item
         className="erp-business-action-form__field"
@@ -880,7 +864,7 @@ function ShipmentItemFormContent({
 }
 
 function ShipmentEditableLines({
-  fields, form, remove, registerLineItemRow, requestLineItemScroll, selectedSalesOrder, ...options
+  fields, form, remove, registerLineItemRow, requestLineItemScroll, selectedSalesOrder, headerActions, ...options
 }) {
   const productOptions = useMemo(
     () => new Map(options.productOptions.map((option) => [Number(option.value), option])),
@@ -889,11 +873,12 @@ function ShipmentEditableLines({
   const { inventoryLots, inventoryLotOptions, products, productSKUs, productSKUOptions, salesOrderItems, salesOrderItemOptions, unitOptions, warehouseOptions } = options
   return (
     <BusinessGroupedLineItems
+      title="出货明细"
+      description="确认出货时才会扣减相应库存。"
+      headerActions={headerActions}
       fields={fields}
       form={form}
-      alwaysGrouped
-      columnCount={SHIPMENT_DESKTOP_COLUMNS.length + 2}
-      tableProps={{ columns: SHIPMENT_ITEM_COLUMNS, desktopColumns: SHIPMENT_DESKTOP_COLUMNS, actionsWidth: 224, label: '出货明细' }}
+      tableProps={{ columns: SHIPMENT_ITEM_COLUMNS, label: '出货明细' }}
       getGroup={(item, field, index) => {
         const productID = Number(item.product_id) || undefined
         const product = productOptions.get(productID)
@@ -1141,7 +1126,7 @@ export default function ShipmentEditor({
           </Space>
         </BusinessFormSection>
       ) : null}
-      <Form layout="vertical" form={form} className="erp-business-action-form">
+      <BusinessForm layout="vertical" form={form} className="erp-business-action-form">
         <ShipmentFormFields
           form={form}
           products={products}
@@ -1211,35 +1196,6 @@ export default function ShipmentEditor({
                 <Form.List name="items">
                   {(fields, { add, remove }) => (
                     <section className="erp-sales-order-lines-form erp-shipment-modal-items">
-                      <BusinessLineItemsHeader
-                        title="出货明细"
-                        description="确认出货时才会扣减相应库存。"
-                      >
-                        {!taskFocused ? (
-                          <>
-                            {!canImportSalesOrderSource ? (
-                              <Text type="secondary" role="status">当前账号无权导入销售订单</Text>
-                            ) : null}
-                            <BusinessImportActions
-                              undoState={sourceImportUndoState}
-                              disabled={saving || sourceLoading || !canSave || !canImportSalesOrderSource}
-                              onUndo={() => {
-                                if (onUndoSourceImport?.()) sourceImportButtonRef.current?.focus()
-                              }}
-                            >
-                              <Button
-                                ref={sourceImportButtonRef}
-                                icon={<FolderOpenOutlined aria-hidden="true" />}
-                                className="erp-line-items-form__import-button erp-action-button"
-                                disabled={!canImportSalesOrderSource}
-                                onClick={onOpenSalesOrderImport}
-                              >
-                                从销售订单导入
-                              </Button>
-                            </BusinessImportActions>
-                          </>
-                        ) : null}
-                      </BusinessLineItemsHeader>
                       <SourceImportPickerModal
                         open={salesOrderImportOpen}
                         title={<BusinessHelpLabel label="从销售订单导入出货明细" description="选择同一张销售订单的来源行；导入后回到编辑页维护仓库和批次。产品、SKU、单位和订单行追溯沿用来源。" />}
@@ -1320,6 +1276,30 @@ export default function ShipmentEditor({
                         onImport={importSalesOrderToShipment}
                       />
                       <ShipmentEditableLines
+                        headerActions={!taskFocused ? (
+                          <>
+                            {!canImportSalesOrderSource ? (
+                              <Text type="secondary" role="status">当前账号无权导入销售订单</Text>
+                            ) : null}
+                            <BusinessImportActions
+                              undoState={sourceImportUndoState}
+                              disabled={saving || sourceLoading || !canSave || !canImportSalesOrderSource}
+                              onUndo={() => {
+                                if (onUndoSourceImport?.()) sourceImportButtonRef.current?.focus()
+                              }}
+                            >
+                              <Button
+                                ref={sourceImportButtonRef}
+                                icon={<FolderOpenOutlined aria-hidden="true" />}
+                                className="erp-line-items-form__import-button erp-action-button"
+                                disabled={!canImportSalesOrderSource}
+                                onClick={onOpenSalesOrderImport}
+                              >
+                                从销售订单导入
+                              </Button>
+                            </BusinessImportActions>
+                          </>
+                        ) : null}
                         fields={fields}
                         form={form}
                         remove={remove}
@@ -1364,7 +1344,7 @@ export default function ShipmentEditor({
             </BusinessFormSection>
           }
         />
-      </Form>
+      </BusinessForm>
     </BusinessFormPage>
   )
 }

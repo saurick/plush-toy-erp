@@ -102,6 +102,7 @@ import { createPurchaseFlowRepairScenarios } from './purchaseFlowRepairScenarios
 import { createPurchaseFollowupScenarios } from './purchaseFollowupScenarios.mjs'
 import { createProductPaginationScenarios } from './productPaginationScenarios.mjs'
 import { createBOMPaginationScenarios } from './bomPaginationScenarios.mjs'
+import { createBusinessSplitScenarios } from './businessSplitScenarios.mjs'
 import { createSalesOrderImportScenarios } from './salesOrderImportScenarios.mjs'
 import { createWorkbenchSummaryScenarios } from './workbenchSummaryScenarios.mjs'
 import { createOutsourcingSummaryScenarios } from './outsourcingSummaryScenarios.mjs'
@@ -963,5 +964,5 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
   ]
-  return [...scenarios, ...createImportPickerScenarios({ ...deps, customerRuntimeEffectiveSession, outputDir }), ...createScrollEdgeScenarios(scenarios, { outputDir }), ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession }), ...createDensityCompletionScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
+  return [...scenarios, ...createBusinessSplitScenarios({ ...deps, customerRuntimeEffectiveSession, outputDir }), ...createImportPickerScenarios({ ...deps, customerRuntimeEffectiveSession, outputDir }), ...createScrollEdgeScenarios(scenarios, { outputDir }), ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession }), ...createDensityCompletionScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
 }

@@ -20,14 +20,6 @@ func bomHeaderCreateFromParams(pm map[string]any) (*biz.BOMHeaderCreate, bool) {
 	if _, supplied := pm["version"]; supplied {
 		return nil, false
 	}
-	effectiveFrom, ok := getOptionalJSONRPCTime(pm, "effective_from")
-	if !ok {
-		return nil, false
-	}
-	effectiveTo, ok := getOptionalJSONRPCTime(pm, "effective_to")
-	if !ok {
-		return nil, false
-	}
 	printDate, ok := getOptionalJSONRPCTime(pm, "print_date")
 	if !ok {
 		return nil, false
@@ -35,8 +27,6 @@ func bomHeaderCreateFromParams(pm map[string]any) (*biz.BOMHeaderCreate, bool) {
 	return &biz.BOMHeaderCreate{
 		ProductID:     getInt(pm, "product_id", 0),
 		Status:        biz.BOMStatusDraft,
-		EffectiveFrom: effectiveFrom,
-		EffectiveTo:   effectiveTo,
 		SourceOrderNo: getWorkflowStringPtr(pm, "source_order_no"),
 		QuantityText:  getWorkflowStringPtr(pm, "quantity_text"),
 		SpareText:     getWorkflowStringPtr(pm, "spare_text"),
@@ -53,21 +43,11 @@ func bomHeaderUpdateFromParams(pm map[string]any) (*biz.BOMHeaderUpdate, bool) {
 	if _, supplied := pm["version"]; supplied {
 		return nil, false
 	}
-	effectiveFrom, ok := getOptionalJSONRPCTime(pm, "effective_from")
-	if !ok {
-		return nil, false
-	}
-	effectiveTo, ok := getOptionalJSONRPCTime(pm, "effective_to")
-	if !ok {
-		return nil, false
-	}
 	printDate, ok := getOptionalJSONRPCTime(pm, "print_date")
 	if !ok {
 		return nil, false
 	}
 	return &biz.BOMHeaderUpdate{
-		EffectiveFrom: effectiveFrom,
-		EffectiveTo:   effectiveTo,
 		SourceOrderNo: getWorkflowStringPtr(pm, "source_order_no"),
 		QuantityText:  getWorkflowStringPtr(pm, "quantity_text"),
 		SpareText:     getWorkflowStringPtr(pm, "spare_text"),
@@ -253,8 +233,6 @@ func bomHeaderToAny(item *biz.BOMHeader) map[string]any {
 		"product_id":      item.ProductID,
 		"version":         item.Version,
 		"status":          item.Status,
-		"effective_from":  optionalUnix(item.EffectiveFrom),
-		"effective_to":    optionalUnix(item.EffectiveTo),
 		"source_order_no": optionalStringToAny(item.SourceOrderNo),
 		"quantity_text":   optionalStringToAny(item.QuantityText),
 		"spare_text":      optionalStringToAny(item.SpareText),

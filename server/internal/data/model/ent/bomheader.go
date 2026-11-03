@@ -24,10 +24,6 @@ type BOMHeader struct {
 	Version string `json:"version,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
-	// EffectiveFrom holds the value of the "effective_from" field.
-	EffectiveFrom *time.Time `json:"effective_from,omitempty"`
-	// EffectiveTo holds the value of the "effective_to" field.
-	EffectiveTo *time.Time `json:"effective_to,omitempty"`
 	// SourceOrderNo holds the value of the "source_order_no" field.
 	SourceOrderNo *string `json:"source_order_no,omitempty"`
 	// QuantityText holds the value of the "quantity_text" field.
@@ -107,7 +103,7 @@ func (*BOMHeader) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case bomheader.FieldVersion, bomheader.FieldStatus, bomheader.FieldSourceOrderNo, bomheader.FieldQuantityText, bomheader.FieldSpareText, bomheader.FieldDesigner, bomheader.FieldMaker, bomheader.FieldAuditor, bomheader.FieldHairDirection, bomheader.FieldNote:
 			values[i] = new(sql.NullString)
-		case bomheader.FieldEffectiveFrom, bomheader.FieldEffectiveTo, bomheader.FieldPrintDate, bomheader.FieldCreatedAt, bomheader.FieldUpdatedAt:
+		case bomheader.FieldPrintDate, bomheader.FieldCreatedAt, bomheader.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -147,20 +143,6 @@ func (_m *BOMHeader) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
-			}
-		case bomheader.FieldEffectiveFrom:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field effective_from", values[i])
-			} else if value.Valid {
-				_m.EffectiveFrom = new(time.Time)
-				*_m.EffectiveFrom = value.Time
-			}
-		case bomheader.FieldEffectiveTo:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field effective_to", values[i])
-			} else if value.Valid {
-				_m.EffectiveTo = new(time.Time)
-				*_m.EffectiveTo = value.Time
 			}
 		case bomheader.FieldSourceOrderNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -296,16 +278,6 @@ func (_m *BOMHeader) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
-	builder.WriteString(", ")
-	if v := _m.EffectiveFrom; v != nil {
-		builder.WriteString("effective_from=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
-	builder.WriteString(", ")
-	if v := _m.EffectiveTo; v != nil {
-		builder.WriteString("effective_to=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
 	builder.WriteString(", ")
 	if v := _m.SourceOrderNo; v != nil {
 		builder.WriteString("source_order_no=")

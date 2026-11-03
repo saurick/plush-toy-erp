@@ -10,6 +10,7 @@ import {
 } from '../utils/remoteReferences.mjs'
 import { showPageLoadError } from './PageLoadFeedback.jsx'
 import { listAllReferenceRecords } from '../utils/referencePagination.mjs'
+import { REFERENCE_RECORDS_CHANGED } from '../utils/referenceRecordChanges.mjs'
 
 export default function RemoteReferencePicker(props) {
   const { referenceType, params } = props
@@ -67,6 +68,16 @@ function RemoteReferencePickerContent({
   useEffect(() => {
     if (!open) setQuery({ page: 1, keyword: '', retry: 0, filters: {} })
   }, [open])
+  useEffect(() => {
+    if (!open || !canRead) return undefined
+    const changed = ({ detail }) => {
+      if (detail?.referenceType === referenceType && Number.isSafeInteger(detail.id) && detail.id > 0) {
+        setQuery((current) => ({ ...current, retry: current.retry + 1 }))
+      }
+    }
+    window.addEventListener(REFERENCE_RECORDS_CHANGED, changed)
+    return () => window.removeEventListener(REFERENCE_RECORDS_CHANGED, changed)
+  }, [open, canRead, referenceType])
   useEffect(() => {
     if (!open || !canRead) {
       setData({ rows: [], total: 0, page: 1, loading: false, failed: false })

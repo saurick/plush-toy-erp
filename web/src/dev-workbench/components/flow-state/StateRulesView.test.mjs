@@ -3,6 +3,9 @@ import test from 'node:test'
 import { createElement as h } from 'react'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCatalog.mjs'
+import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRuntime.mjs'
+
+registerMermaidTestRenderer()
 
 test('条件过账保留正常路径计数，流程结束在图和详情保持中性', async (t) => {
   const harness = await createReactTestHarness(t)
@@ -36,7 +39,7 @@ state: flow.states.find((state) => state.key === key),
   await render('active')
   assert.equal(harness.container.querySelectorAll('[data-graph-node]').length, flow.states.length)
   assert(harness.container.textContent.includes('正常关单或短结'))
-  await harness.act(() => harness.container.querySelector('[data-graph-node="active"]').click())
+  await harness.act(() => harness.container.querySelector('[data-graph-node="active"]').dispatchEvent(new harness.runtimeWindow.MouseEvent('click', { bubbles: true })))
   assert.deepEqual(selected, [null])
   await render('canceled')
   assert(harness.container.querySelector('.erp-dev-flow-selected-state').textContent.includes('终态'))

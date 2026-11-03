@@ -5,6 +5,7 @@ import Select from '@/common/components/select/AppSelect'
 import { FinanceAllocationStatus } from '../../../common/consts/statuses.generated.mjs'
 
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export function FinanceAllocationReversalModal({
   currentPayment,
@@ -26,7 +27,7 @@ export function FinanceAllocationReversalModal({
       <p className="erp-business-inline-note">
         只恢复应收应付和款项可用余额；实际退款另行登记并审批。
       </p>
-      <Form form={unallocateForm} layout="vertical" preserve={false}>
+      <BusinessForm form={unallocateForm} layout="vertical" preserve={false}>
         <Form.Item
           name="allocation_id"
           label="已抵扣记录"
@@ -55,7 +56,7 @@ export function FinanceAllocationReversalModal({
         >
           <Input.TextArea maxLength={255} />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessFormModal>
   )
 }
@@ -80,7 +81,7 @@ export function FinancePaymentCancelModal({
       onCancel={() => !loading && setCancelOpen(false)}
       onOk={cancelPayment}
     >
-      <Form
+      <BusinessForm
         form={cancelForm}
         name="finance-payment-cancel"
         className="erp-business-action-form"
@@ -97,7 +98,7 @@ export function FinancePaymentCancelModal({
         >
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessFormModal>
   )
 }
@@ -122,7 +123,7 @@ export function FinancePaymentReversalModal({
       onCancel={() => !loading && setReverseOpen(false)}
       onOk={reversePayment}
     >
-      <Form
+      <BusinessForm
         form={reverseForm}
         name="finance-payment-reverse"
         className="erp-business-action-form"
@@ -138,7 +139,7 @@ export function FinancePaymentReversalModal({
         >
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessFormModal>
   )
 }

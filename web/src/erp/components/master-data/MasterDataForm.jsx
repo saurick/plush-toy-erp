@@ -4,6 +4,7 @@ import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mj
 import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import PaymentMethodInput from '../PaymentMethodInput.jsx'
 import DeliveryAddressFields from '../business-list/DeliveryAddressFields.jsx'
 import { renderProductOption } from './ProductIdentity.jsx'
 import MaterialStockFields from './MaterialStockFields.jsx'
@@ -54,7 +55,7 @@ function DefaultUnitSelect({
       : undefined
   return (
     <Form.Item
-      className="erp-business-action-form__field"
+      className="erp-business-action-form__field erp-business-action-form__field--short"
       dependencies={requiredWhenWeightField ? [requiredWhenWeightField] : []}
       label="默认单位"
       name="default_unit_id"
@@ -237,8 +238,6 @@ export function MasterDataFormFields({
   supplierProcessOptions = [],
   canEditSupplierProcesses = true,
   supplierTypeOptions = [],
-  customerPaymentConditionOptions = [],
-  onCustomerPaymentMethodChange,
   contactSection,
 }) {
   const productSKUParentField = productSKUParentFieldContract(isEditing)
@@ -247,7 +246,7 @@ export function MasterDataFormFields({
   if (type === 'products') {
     return (
       <>
-        <BusinessFormSection title="基本资料">
+        <BusinessFormSection fieldLayout="adaptive" title="基本资料">
           <Form.Item
             className="erp-business-action-form__field"
             label="产品编号（自动）"
@@ -261,7 +260,7 @@ export function MasterDataFormFields({
             />
           </Form.Item>
           <Form.Item
-            className="erp-business-action-form__field"
+            className="erp-business-action-form__field erp-business-action-form__field--wide"
             label="产品名称"
             name="name"
             rules={[{ required: true, message: '请填写产品名称' }]}
@@ -283,7 +282,7 @@ export function MasterDataFormFields({
             <Input allowClear autoComplete="off" />
           </Form.Item>
         </BusinessFormSection>
-        <BusinessFormSection title="外贸信息">
+        <BusinessFormSection fieldLayout="adaptive" title="外贸信息">
           <Form.Item
             className="erp-business-action-form__field"
             label="英文品名"
@@ -309,7 +308,7 @@ export function MasterDataFormFields({
             />
           </Form.Item>
         </BusinessFormSection>
-        <BusinessFormSection title="计量信息">
+        <BusinessFormSection fieldLayout="adaptive" title="计量信息">
           <DefaultUnitSelect
             form={form}
             required
@@ -325,9 +324,9 @@ export function MasterDataFormFields({
   if (type === 'product_skus') {
     return (
       <>
-        <BusinessFormSection title="归属与编号">
+        <BusinessFormSection fieldLayout="adaptive" title="归属与编号">
           <Form.Item
-            className="erp-business-action-form__field"
+            className="erp-business-action-form__field erp-business-action-form__field--wide"
             extra={productSKUParentField.helpText}
             label="所属产品"
             name="product_id"
@@ -357,7 +356,7 @@ export function MasterDataFormFields({
             />
           </Form.Item>
           <Form.Item
-            className="erp-business-action-form__field"
+            className="erp-business-action-form__field erp-business-action-form__field--wide"
             label="SKU 名称"
             name="sku_name"
           >
@@ -378,7 +377,7 @@ export function MasterDataFormFields({
             <Input allowClear autoComplete="off" />
           </Form.Item>
         </BusinessFormSection>
-        <BusinessFormSection title="规格属性">
+        <BusinessFormSection fieldLayout="adaptive" title="规格属性">
           <Form.Item
             className="erp-business-action-form__field"
             label="颜色"
@@ -408,7 +407,7 @@ export function MasterDataFormFields({
             <Input allowClear autoComplete="off" />
           </Form.Item>
         </BusinessFormSection>
-        <BusinessFormSection title="计量信息">
+        <BusinessFormSection fieldLayout="adaptive" title="计量信息">
           <DefaultUnitSelect
             form={form}
             requiredWhenWeightField="unit_net_weight_g"
@@ -428,7 +427,7 @@ export function MasterDataFormFields({
   if (type === 'processes') {
     return (
       <>
-        <BusinessFormSection title="基本资料">
+        <BusinessFormSection fieldLayout="adaptive" title="基本资料">
           <Form.Item
             className="erp-business-action-form__field"
             label="环节编号（自动）"
@@ -442,7 +441,7 @@ export function MasterDataFormFields({
             />
           </Form.Item>
           <Form.Item
-            className="erp-business-action-form__field"
+            className="erp-business-action-form__field erp-business-action-form__field--wide"
             label="环节名称"
             name="name"
             rules={[{ required: true, message: '请填写环节名称' }]}
@@ -465,7 +464,7 @@ export function MasterDataFormFields({
             />
           </Form.Item>
         </BusinessFormSection>
-        <BusinessFormSection title="路线与加工能力">
+        <BusinessFormSection fieldLayout="adaptive" title="路线与加工能力">
           <Form.Item
             className="erp-business-action-form__field"
             label={<BusinessHelpLabel label="标准生产路线位置" description="将工序明确绑定到固定生产路线；不能根据名称、类别或排序自动推断。" />}
@@ -496,16 +495,7 @@ export function MasterDataFormFields({
             <Switch />
           </Form.Item>
         </BusinessFormSection>
-        <BusinessFormSection title="补充资料">
-          <Form.Item
-            className="erp-business-action-form__field"
-            label={<BusinessHelpLabel label="质检参考" description="记录该工序通常是否需要检验，供资料查询。" />}
-            name="quality_required"
-            extra="仅作参考，不生成任务或代替检验结果。"
-            valuePropName="checked"
-          >
-            <Switch />
-          </Form.Item>
+        <BusinessFormSection fieldLayout="adaptive" title="补充资料">
           <Form.Item
             className="erp-business-action-form__field erp-business-action-form__field--full"
             label="备注"
@@ -520,7 +510,7 @@ export function MasterDataFormFields({
 
   return (
     <>
-      <BusinessFormSection title="基本资料">
+      <BusinessFormSection fieldLayout="adaptive" title="基本资料">
         <Form.Item
           className="erp-business-action-form__field"
           label={type === 'materials' ? '系统物料编号（自动）' : '编号（自动）'}
@@ -534,7 +524,7 @@ export function MasterDataFormFields({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--wide"
           label="名称"
           name="name"
           rules={[{ required: true, message: '请填写名称' }]}
@@ -599,7 +589,7 @@ export function MasterDataFormFields({
               />
             </Form.Item>
             <Form.Item
-              className="erp-business-action-form__field"
+              className="erp-business-action-form__field erp-business-action-form__field--wide"
               label="规格"
               name="spec"
             >
@@ -635,7 +625,7 @@ export function MasterDataFormFields({
       {contactSection}
       {type === 'suppliers' ? (
         <>
-          <BusinessFormSection title="结算与发票">
+          <BusinessFormSection fieldLayout="adaptive" title="结算与发票">
             <Form.Item className="erp-business-action-form__field erp-business-action-form__field--full">
               <span>付款默认值仅用于新建订单；已保存订单的付款条件保持不变。</span>
             </Form.Item>
@@ -644,15 +634,10 @@ export function MasterDataFormFields({
               label={<BusinessHelpLabel label="默认付款方式" description="仅作为新建采购订单的默认值，订单保存后不再随档案变化。" />}
               name="default_payment_method"
             >
-              <Input
-                allowClear
-                autoComplete="off"
-                maxLength={128}
-                placeholder="如银行转账、月结"
-              />
+              <PaymentMethodInput />
             </Form.Item>
             <Form.Item
-              className="erp-business-action-form__field"
+              className="erp-business-action-form__field erp-business-action-form__field--short"
               label={<BusinessHelpLabel label="默认付款周期（天）" description="仅作为新建采购或委外订单的默认值；订单保存后不会随供应商档案变化。" />}
               name="default_payment_term_days"
               rules={[
@@ -667,7 +652,7 @@ export function MasterDataFormFields({
               <InputNumber style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item
-              className="erp-business-action-form__field"
+              className="erp-business-action-form__field erp-business-action-form__field--short"
               label={<BusinessHelpLabel label="默认是否需要发票" description="历史资料可不设置；新建采购订单时会带出本项。" />}
               name="default_invoice_required"
             >
@@ -683,7 +668,7 @@ export function MasterDataFormFields({
               />
             </Form.Item>
             <Form.Item
-              className="erp-business-action-form__field"
+              className="erp-business-action-form__field erp-business-action-form__field--short"
               dependencies={['default_invoice_required']}
               label="默认发票类别"
               name="default_invoice_category"
@@ -702,7 +687,7 @@ export function MasterDataFormFields({
               />
             </Form.Item>
           </BusinessFormSection>
-          <BusinessFormSection title="加工能力">
+          <BusinessFormSection fieldLayout="adaptive" title="加工能力">
             <Form.Item
               className="erp-business-action-form__field erp-business-action-form__field--full"
               label={<BusinessHelpLabel label="可加工工序" description="记录该加工厂声明可承接的工序，用于资料查询；具体订单仍需逐行选择工序。" />}
@@ -723,14 +708,14 @@ export function MasterDataFormFields({
       ) : null}
       {type === 'customers' ? (
         <>
-          <BusinessFormSection title="默认收货信息">
+          <BusinessFormSection fieldLayout="adaptive" title="默认收货信息">
             <DeliveryAddressFields
               form={form}
               customer
               description="新建销售订单时带出，可在订单中单独修改。"
             />
           </BusinessFormSection>
-          <BusinessFormSection title="结算方式">
+          <BusinessFormSection fieldLayout="adaptive" title="结算方式">
             <Form.Item
               className="erp-business-action-form__field"
               dependencies={['default_payment_term_days']}
@@ -745,15 +730,12 @@ export function MasterDataFormFields({
                 }),
               ]}
             >
-              <TextSuggestionInput
+              <PaymentMethodInput
                 className="erp-customer-payment-method-suggested-input"
-                options={customerPaymentConditionOptions}
-                placeholder="如现结、30天月结，也可直接输入"
-                onChange={onCustomerPaymentMethodChange}
               />
             </Form.Item>
             <Form.Item
-              className="erp-business-action-form__field"
+              className="erp-business-action-form__field erp-business-action-form__field--short"
               dependencies={['default_payment_method']}
               label="付款周期(天)"
               name="default_payment_term_days"
@@ -772,10 +754,10 @@ export function MasterDataFormFields({
         </>
       ) : null}
       {type === 'materials' ? (
-        <BusinessFormSection title="采购与库存">
+        <BusinessFormSection fieldLayout="adaptive" title="采购与库存">
           <MaterialStockFields form={form} />
           <Form.Item
-            className="erp-business-action-form__field"
+            className="erp-business-action-form__field erp-business-action-form__field--wide"
             label="厂商"
             name="supplier_id"
           >

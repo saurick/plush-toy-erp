@@ -35,7 +35,6 @@
   .erp-dev-fulfillment-guide__choices > .ant-select { flex: 1 1 220px; width: auto; }
 }
 [data-flow-print-current] .erp-dev-fulfillment-guide { display: block; padding: 0; border: 0; }
-[data-flow-print-current] .erp-dev-fulfillment-guide [data-stage-card] { display: grid; }
 [data-flow-print-current] .erp-dev-fulfillment-guide :is(.erp-dev-fulfillment-guide__role, .ant-segmented, .erp-dev-exception-directory, .erp-dev-fulfillment-guide__detail-actions) { display: none; }
 [data-flow-print-current] .erp-dev-fulfillment-guide .erp-dev-chain__exception-trigger,
 [data-flow-print-current] .erp-dev-fulfillment-guide .erp-dev-chain__independent button { display: inline-block; }
@@ -45,6 +44,7 @@
 [data-flow-print-current] .erp-dev-fulfillment-guide:has(.erp-dev-chain) .erp-dev-fulfillment-guide__panel { break-before: page; }
 [data-flow-print-current] .erp-dev-fulfillment-guide__instructions:not([open]) { display: none; }
 [data-flow-print-current] .erp-dev-fulfillment-guide__boundary { break-before: avoid-page; }
+[data-flow-print-current] .erp-dev-fulfillment-guide details:not([open]) { display: none; }
 .erp-dev-flow-reading-nav { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; padding: 8px 0; }
 .erp-dev-flow-instance-reading { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 8px 0; }
 .erp-dev-flow-instance-reading small { color: var(--erp-text-muted); }

@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { DEV_TESTING_ACTIONS } from "./dev-testing-operation-store.mjs";
 
 export const DEV_QA_EXECUTION_LOCK_SCHEMA = "plush.dev-qa-execution-lock/v1";
 export const DEV_QA_EXECUTION_KINDS = Object.freeze([
@@ -22,13 +23,7 @@ export const DEV_QA_EXECUTION_KINDS = Object.freeze([
 ]);
 export const DEV_QA_EXECUTION_PROFILES = Object.freeze([
   "baseline",
-  "fast",
-  "role-access",
-  "field-linkage",
-  "business-consistency",
-  "rpc-examples",
-  "pressure-quick",
-  "pressure-capacity",
+  ...DEV_TESTING_ACTIONS,
   "full",
   "strict",
 ]);
@@ -60,16 +55,7 @@ function assertExactKeys(value, expected, field) {
 function validateKindProfile(kind, profile) {
   const valid =
     (kind === "coverage" && profile === "baseline") ||
-    (kind === "testing" &&
-      [
-        "fast",
-        "role-access",
-        "field-linkage",
-        "business-consistency",
-        "rpc-examples",
-        "pressure-quick",
-        "pressure-capacity",
-      ].includes(profile)) ||
+    (kind === "testing" && DEV_TESTING_ACTIONS.includes(profile)) ||
     (kind === "quality" && ["full", "strict"].includes(profile));
   if (!valid) throw new Error("QA execution lock kind/profile is invalid");
 }

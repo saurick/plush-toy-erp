@@ -12,6 +12,7 @@ import {
   suggestedFinanceBusinessNo,
 } from '../../utils/financeBusinessSourceAction.mjs'
 import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const FINANCE_FACT_TYPE_LABELS = Object.freeze({
   RECEIVABLE: '应收',
@@ -172,7 +173,7 @@ export default function FinanceBusinessSourceModal({
         style={{ marginTop: 16, marginBottom: 8 }}
         items={sourceSummaryItems(effectiveAction, source)}
       />
-      <Form
+      <BusinessForm
         key={`${effectiveAction}:${source?.id || 'closed'}`}
         name="finance_business_source"
         form={form}
@@ -199,7 +200,7 @@ export default function FinanceBusinessSourceModal({
         <Form.Item name="note" label="备注">
           <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

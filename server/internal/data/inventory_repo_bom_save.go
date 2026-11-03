@@ -50,8 +50,6 @@ func (r *inventoryRepo) SaveBOMWithItems(ctx context.Context, id int, in *biz.BO
 			SetProductID(in.ProductID).
 			SetVersion(version).
 			SetStatus(biz.BOMStatusDraft).
-			SetNillableEffectiveFrom(in.EffectiveFrom).
-			SetNillableEffectiveTo(in.EffectiveTo).
 			SetNillableSourceOrderNo(in.SourceOrderNo).
 			SetNillableQuantityText(in.QuantityText).
 			SetNillableSpareText(in.SpareText).

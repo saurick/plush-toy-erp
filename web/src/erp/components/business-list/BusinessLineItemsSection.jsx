@@ -7,6 +7,7 @@ import BusinessLineItemsFooter, {
 } from './BusinessLineItemsFooter.jsx'
 import BusinessLineItemsTable from './BusinessLineItemsTable.jsx'
 import BusinessGroupedLineItems from './BusinessGroupedLineItems.jsx'
+import BusinessLineEditor from './BusinessLineEditor.jsx'
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ')
@@ -28,7 +29,7 @@ export default function BusinessLineItemsSection({
   title,
 }) {
   return (
-    <section className={classNames('erp-sales-order-lines-form', className)}>
+    <section className={classNames('erp-sales-order-lines-form', 'erp-line-editor-surface', className)} data-table-scroll-scope>
       <Form.List name={name}>
         {(fields, operations, meta) => {
           const context = { fields, ...operations, meta }
@@ -40,34 +41,34 @@ export default function BusinessLineItemsSection({
           return (
             <>
               {renderBeforeHeader ? renderBeforeHeader(context) : null}
-              <BusinessLineItemsHeader
-                title={title}
-                description={description}
-                notice={headerNotice}
-              >
-                {headerActions ?? normalizedFooterProps?.children}
-              </BusinessLineItemsHeader>
-              {fields.length === 0 ? (
-                <BusinessLineItemsEmpty>{emptyDescription}</BusinessLineItemsEmpty>
-              ) : grouping ? (
+              {grouping && fields.length > 0 ? (
                 <BusinessGroupedLineItems
+                  title={title}
+                  description={description}
+                  notice={headerNotice}
+                  headerActions={headerActions ?? normalizedFooterProps?.children}
                   fields={fields}
                   form={grouping.form}
                   getGroup={grouping.getGroup}
+                  defaultExpanded={grouping.defaultExpanded}
                   name={name}
                   tableProps={{ columns, label: addLineAriaLabel || title }}
                 >
                   {(field, index) => renderRow({ ...context, field, index })}
                 </BusinessGroupedLineItems>
               ) : (
-                <BusinessLineItemsTable
-                  columns={columns}
-                  label={addLineAriaLabel || title}
-                >
-                  {fields.map((field, index) =>
-                    renderRow({ ...context, field, index })
+                <BusinessLineEditor>
+                  <BusinessLineItemsHeader title={title} description={description} notice={headerNotice} scrollControls>
+                    {headerActions ?? normalizedFooterProps?.children}
+                  </BusinessLineItemsHeader>
+                  {fields.length === 0 ? (
+                    <BusinessLineItemsEmpty>{emptyDescription}</BusinessLineItemsEmpty>
+                  ) : (
+                    <BusinessLineItemsTable columns={columns} label={addLineAriaLabel || title} scrollControlsInToolbar>
+                      {fields.map((field, index) => renderRow({ ...context, field, index }))}
+                    </BusinessLineItemsTable>
                   )}
-                </BusinessLineItemsTable>
+                </BusinessLineEditor>
               )}
               {normalizedFooterProps ? (
                 <BusinessLineItemsFooter {...normalizedFooterProps} />

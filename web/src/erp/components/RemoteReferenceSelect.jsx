@@ -1,5 +1,4 @@
 import React, {
-  createContext,
   forwardRef,
   useCallback,
   useContext,
@@ -14,7 +13,9 @@ import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { RpcErrorCode } from '@/common/consts/errorCodes.js'
 import { getPageLoadErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
-import { showPageLoadError } from './PageLoadFeedback.jsx'
+import { showPageLoadError, usePageLoadFeedback } from './PageLoadFeedback.jsx'
+import { REFERENCE_RECORDS_CHANGED } from '../utils/referenceRecordChanges.mjs'
+import { ReferenceRecordsContext } from './ReferenceRecordsContext.jsx'
 import {
   remoteReferences,
   loadReferenceIDs,
@@ -27,7 +28,7 @@ import {
   PRODUCTION_ORDER_REFERENCE_PAGE_SIZE,
 } from '../utils/productionOrderReferencePagination.mjs'
 
-export const ReferenceRecordsContext = createContext(null)
+export { ReferenceRecordsContext } from './ReferenceRecordsContext.jsx'
 
 export function ReferenceRecordsProvider({
   component: Component,
@@ -36,13 +37,110 @@ export function ReferenceRecordsProvider({
   children,
   ...props
 }) {
-  const value = useMemo(
-    () => ({ ...handlers, adminProfile }),
-    [handlers, adminProfile]
-  )
+  const scopeKey = JSON.stringify(adminProfile || null)
+  const handlerTypesKey = Object.keys(handlers || {})
+    .filter((type) => typeof handlers[type] === 'function')
+    .sort().join('|')
+  const latest = useRef(null)
+  latest.current = { handlers, adminProfile, scopeKey }
+  const requests = useRef(new Map())
+  const failures = useRef(new Map())
+  const retryRequest = useRef(null)
+  const [refreshError, setRefreshError] = useState(null)
+  const [retrying, setRetrying] = useState(false)
+  const feedbackHosts = useRef(new Set())
+  const [hasFeedbackHost, setHasFeedbackHost] = useState(false)
+  const registerFeedbackHost = useCallback((id) => {
+    feedbackHosts.current.add(id)
+    setHasFeedbackHost(true)
+    return () => {
+      feedbackHosts.current.delete(id)
+      setHasFeedbackHost(feedbackHosts.current.size > 0)
+    }
+  }, [])
+  const refreshRecord = useCallback(async (referenceType, id) => {
+    const { current } = latest
+    if (
+      current.scopeKey !== scopeKey ||
+      !Object.hasOwn(remoteReferences, referenceType) ||
+      !Object.hasOwn(current.handlers || {}, referenceType) ||
+      typeof current.handlers[referenceType] !== 'function' ||
+      !canReadReference(current.adminProfile, referenceType)
+    ) return
+    const key = `${referenceType}:${id}`
+    requests.current.get(key)?.abort()
+    const controller = new AbortController()
+    requests.current.set(key, controller)
+    try {
+      const data = await loadReferenceIDs(referenceType, [id], { signal: controller.signal })
+      if (
+        controller.signal.aborted ||
+        latest.current.scopeKey !== scopeKey ||
+        requests.current.get(key) !== controller
+      ) return
+      latest.current.handlers[referenceType]?.(data[referenceType])
+      failures.current.delete(key)
+      setRefreshError(failures.current.values().next().value?.error || null)
+    } catch (error) {
+      if (!isRpcAbortError(error) && !controller.signal.aborted && latest.current.scopeKey === scopeKey) {
+        failures.current.set(key, { referenceType, id, error })
+        setRefreshError(error)
+      }
+    } finally {
+      if (requests.current.get(key) === controller) requests.current.delete(key)
+    }
+  }, [scopeKey])
+  const retry = useCallback(() => {
+    if (retryRequest.current) return retryRequest.current
+    setRetrying(true)
+    const request = Promise.allSettled([...failures.current.values()].map(
+      ({ referenceType, id }) => refreshRecord(referenceType, id)
+    )).finally(() => {
+      retryRequest.current = null
+      setRetrying(false)
+    })
+    retryRequest.current = request
+    return request
+  }, [refreshRecord])
+  const feedback = usePageLoadFeedback({
+    error: refreshError,
+    retry,
+    priority: hasFeedbackHost ? 30 : 20,
+  })
+  useEffect(() => {
+    const pending = requests.current
+    failures.current.clear()
+    setRefreshError(null)
+    const changed = ({ detail }) => {
+      if (Number.isSafeInteger(detail?.id) && detail.id > 0) {
+        refreshRecord(detail.referenceType, detail.id)
+      }
+    }
+    window.addEventListener(REFERENCE_RECORDS_CHANGED, changed)
+    return () => {
+      window.removeEventListener(REFERENCE_RECORDS_CHANGED, changed)
+      pending.forEach((controller) => controller.abort())
+      pending.clear()
+    }
+  }, [scopeKey, handlerTypesKey, refreshRecord])
+  const referenceFeedback = useMemo(() => feedback.visible ? (
+    <Alert
+      type="warning"
+      showIcon
+      message="关联资料更新失败"
+      description={`${getPageLoadErrorMessage(refreshError, '更新可选资料')}；当前输入已保留，重试只读取资料。`}
+      action={<Button loading={retrying || feedback.retrying} onClick={feedback.retry}>重试读取</Button>}
+    />
+  ) : null, [feedback.visible, feedback.retrying, feedback.retry, refreshError, retrying])
+  const value = useMemo(() => ({
+    ...handlers, adminProfile, referenceFeedback, registerFeedbackHost,
+  }), [handlers, adminProfile, referenceFeedback, registerFeedbackHost])
   return (
     <ReferenceRecordsContext.Provider value={value}>
-      <Component {...props}>{children}</Component>
+      <Component {...props}>
+        {!hasFeedbackHost ? referenceFeedback : null}
+        {children}
+      </Component>
     </ReferenceRecordsContext.Provider>
   )
 }
@@ -84,6 +182,7 @@ const RemoteReferenceSelect = forwardRef(
       loading: false,
       keyword: '',
       inputKeyword: '',
+      open: false,
     })
     const controller = useRef(null)
     const timer = useRef(null)
@@ -94,6 +193,8 @@ const RemoteReferenceSelect = forwardRef(
       onRecords,
       scopeKey,
       mapOption: mapOption || descriptor.option,
+      disabled,
+      controlledOpen: props.open,
     }
     const accept = useCallback(
       (records) => {
@@ -166,7 +267,7 @@ const RemoteReferenceSelect = forwardRef(
       [descriptor, referenceType, paramsKey, accept, scopeKey]
     )
     const search = useCallback(
-      (keyword = '') => {
+      (keyword = '', debounce = true) => {
         clearTimeout(timer.current)
         controller.current?.abort()
         const generation = state.current.gate.next()
@@ -178,11 +279,28 @@ const RemoteReferenceSelect = forwardRef(
         setOptions([])
         timer.current = setTimeout(
           () => load(keyword, 0, generation),
-          keyword ? 220 : 0
+          debounce && keyword ? 220 : 0
         )
       },
       [load]
     )
+    callbacks.current.search = search
+    useEffect(() => {
+      const changed = ({ detail }) => {
+        const { current } = callbacks
+        const open = typeof current.controlledOpen === 'boolean'
+          ? current.controlledOpen : state.current.open
+        if (
+          detail?.referenceType === referenceType &&
+          Number.isSafeInteger(detail.id) && detail.id > 0 &&
+          !current.disabled && open
+        ) {
+          current.search(state.current.inputKeyword, false)
+        }
+      }
+      window.addEventListener(REFERENCE_RECORDS_CHANGED, changed)
+      return () => window.removeEventListener(REFERENCE_RECORDS_CHANGED, changed)
+    }, [referenceType])
     useEffect(() => {
       const requestState = state.current
       requestState.gate.next()
@@ -237,11 +355,11 @@ const RemoteReferenceSelect = forwardRef(
       ]
     }, [options, selectedOptions, initialOptions, selectedID])
     const candidateDenied = candidateError?.code === RpcErrorCode.PERMISSION_DENIED
-    const retryCandidates = useCallback(() => search(state.current.inputKeyword), [search])
+    const retryCandidates = useCallback(() => search(state.current.inputKeyword, false), [search])
     const clearCandidateSearch = () => {
       state.current.inputKeyword = ''
       setSearchKeyword('')
-      search('')
+      search('', false)
       onSearch?.('')
     }
     const readFeedback = useMemo(() => candidateError ? (
@@ -290,6 +408,7 @@ const RemoteReferenceSelect = forwardRef(
         showSearch
         filterOption={false}
         onOpenChange={(open) => {
+          state.current.open = open
           // 输入可先于展开事件到达，展开不能覆盖刚输入的搜索词。
           if (open && !disabled) search(state.current.inputKeyword)
           if (!open) {

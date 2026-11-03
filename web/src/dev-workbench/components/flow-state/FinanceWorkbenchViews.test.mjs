@@ -4,6 +4,9 @@ import { createElement as h } from 'react'
 import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCatalog.mjs'
+import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRuntime.mjs'
+
+registerMermaidTestRenderer()
 
 const initialURL =
   '/__dev/business-topics?flow_topic=finance_relations'

@@ -38,6 +38,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/outsourcingreturndisposition"
+	"server/internal/data/model/ent/paymentmethodpreference"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/processinstance"
@@ -182,6 +183,7 @@ func checkColumn(t, c string) error {
 			outsourcingorder.Table:                   outsourcingorder.ValidColumn,
 			outsourcingorderitem.Table:               outsourcingorderitem.ValidColumn,
 			outsourcingreturndisposition.Table:       outsourcingreturndisposition.ValidColumn,
+			paymentmethodpreference.Table:            paymentmethodpreference.ValidColumn,
 			permission.Table:                         permission.ValidColumn,
 			process.Table:                            process.ValidColumn,
 			processinstance.Table:                    processinstance.ValidColumn,

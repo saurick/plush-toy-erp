@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { lstat, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -17,6 +17,7 @@ import {
   verifyGoTestJson,
 } from "./verify-go-test-json.mjs";
 import { buildManualAcceptanceBusinessChainContract } from "./manual-acceptance-business-chain-contract.mjs";
+import { CHAIN_AUDIT_BATCH_PATTERN } from "../../web/src/dev-workbench/config/devBusinessChainAudit.mjs";
 import { DEV_FLOW_STATE_CATALOG } from "../../web/src/dev-workbench/config/devFlowStateCatalog.mjs";
 import {
   describeDevBusinessChainResponsibility,
@@ -164,7 +165,7 @@ export function buildChainRuleCheckReport({
       customer: "Product Core",
       data: "用例自建的合成与 SQLite 隔离数据",
       mode: "具名后端规则验证",
-      terminal: "采购应付过账规则",
+      terminal: "所选业务链的具名后端规则",
       notIncluded: [
         "共享开发库及真实客户数据",
         "真实 PostgreSQL 并发门禁",
@@ -247,16 +248,21 @@ export function buildChainRuleCheckReport({
 
 async function main(argv) {
   let chainKey = "purchase_to_inventory",
-    run = false;
+    run = false,
+    requestedBatch = "";
   for (let index = 0; index < argv.length; index++) {
     if (argv[index] === "--chain") chainKey = argv[++index];
+    else if (argv[index] === "--batch") requestedBatch = argv[++index];
     else if (argv[index] === "--run") run = true;
     else
       throw new Error(
-        "用法：node scripts/qa/business-chain-rule-check.mjs [--chain purchase_to_inventory] [--run]",
+        "用法：node scripts/qa/business-chain-rule-check.mjs [--chain 业务链] [--batch 批次] [--run]",
       );
   }
   const root = path.resolve(import.meta.dirname, "../..");
+  if (requestedBatch && !CHAIN_AUDIT_BATCH_PATTERN.test(requestedBatch)) {
+    throw new Error("规则检查批次无效");
+  }
   const plan = planChainRuleCheck(chainKey);
   if (!run) {
     console.log(
@@ -271,6 +277,16 @@ async function main(argv) {
       ),
     );
     return;
+  }
+  const reportRoot = path.join(root, "output/qa/business-chain-audit");
+  await mkdir(reportRoot, { recursive: true });
+  if (requestedBatch) {
+    try {
+      await lstat(path.join(reportRoot, requestedBatch));
+      throw new Error("规则检查批次已存在，不能覆盖历史");
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
   }
   const repositoryBefore = await readRepositoryIdentity(root);
   const runs = plan.commands.map(({ command, args }) => {
@@ -297,9 +313,9 @@ async function main(argv) {
     repositoryAfter: await readRepositoryIdentity(root),
     generatedAt,
   });
-  const batch = `${generatedAt.replace(/[^0-9]/gu, "")}-rules-${randomBytes(3).toString("hex")}`;
-  const directory = path.join(root, "output/qa/business-chain-audit", batch);
-  await mkdir(directory, { recursive: true });
+  const batch = requestedBatch || `${generatedAt.replace(/[^0-9]/gu, "")}-rules-${randomBytes(3).toString("hex")}`;
+  const directory = path.join(reportRoot, batch);
+  await mkdir(directory);
   const files = {
     "go-test.json": runs.map((run) => run.stdout).join("\n"),
     "commands.json": JSON.stringify(

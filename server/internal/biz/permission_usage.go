@@ -274,6 +274,11 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addBackend(PermissionFieldFinanceSettlementRead, nil, []string{"服务端返回应收、应付、发票、对账和收付款数据时保留结算金额及账户字段；缺失时统一脱敏"})
 
 	// Master data. Method names are explicit; no permission suffix inference is used.
+	paymentMethodSurfaces := make([]PermissionUsageSurface, 0, 4)
+	for _, menuKey := range []string{"customers", "suppliers", "sales-orders", "accessories-purchase"} {
+		paymentMethodSurfaces = append(paymentMethodSurfaces, menuPermissionSurface(menuKey, "payment-conditions", "付款条件", "manage-payment-methods", "管理付款方式", permissionControlButton, "允许停止推荐、恢复和撤销推荐变更", permissionMethods("masterdata", "list_payment_method_recommendations", "set_payment_method_recommendation"), []string{"公司共用候选；只调整推荐状态，不修改业务记录或付款周期"}))
+	}
+	add(PermissionPaymentMethodManage, paymentMethodSurfaces...)
 	addCRUD(PermissionCustomerRead, PermissionCustomerCreate, PermissionCustomerUpdate, PermissionCustomerDisable, "customers", "customers", "客户档案", "客户", "masterdata", []string{"get_customer", "list_customers"}, []string{"create_customer", "save_customer_with_contacts"}, []string{"update_customer", "save_customer_with_contacts"}, []string{"set_customer_active"})
 	addCRUD(PermissionSupplierRead, PermissionSupplierCreate, PermissionSupplierUpdate, PermissionSupplierDisable, "suppliers", "suppliers", "供应商与加工厂", "供应商", "masterdata", []string{"get_supplier", "list_suppliers"}, []string{"create_supplier", "save_supplier_with_contacts"}, []string{"update_supplier", "save_supplier_with_contacts"}, []string{"set_supplier_active"})
 	addCRUD(PermissionMaterialRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionMaterialDisable, "materials", "materials", "材料档案", "材料", "masterdata", []string{"get_material", "list_materials", "list_material_warehouses"}, []string{"create_material"}, []string{"update_material"}, []string{"set_material_active"})

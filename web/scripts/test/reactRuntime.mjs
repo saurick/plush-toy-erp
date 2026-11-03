@@ -112,6 +112,7 @@ function installTestDOM() {
   const globals = {
     window: runtimeWindow,
     document: runtimeWindow.document,
+    DOMParser: runtimeWindow.DOMParser,
     innerWidth: runtimeWindow.innerWidth,
     innerHeight: runtimeWindow.innerHeight,
     scrollX: runtimeWindow.scrollX,

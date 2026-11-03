@@ -220,6 +220,7 @@ export function createDevBusinessChainAuditService({
             title: report.title,
             generatedAt: report.generatedAt,
             sourceCommit: report.scope.sourceCommit,
+            chainKeys: report.chains.map((chain) => chain.key),
           })
         } catch {
           batches.push({

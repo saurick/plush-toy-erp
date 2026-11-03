@@ -1,3 +1,4 @@
+import { clickLineItemAction, revealLineItemDetails } from './lineEditorActions.mjs'
 import { findVisibleBusinessPage } from '../businessNavigation.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
@@ -12,6 +13,8 @@ import { createBusinessFormCornerScenarios } from './businessFormCornerScenarios
 import { createBusinessFormFullscreenScenarios } from './businessFormFullscreenScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { assertBusinessFormSections, assertCurrentBusinessSection, assertBusinessFormScrollTracking } from './businessFormSectionAssertions.mjs'
+import { createEditorDensityScenarios } from './editorDensityScenarios.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
 
 export function createBusinessFormPagesScenarios(deps) {
@@ -80,6 +83,11 @@ export function createBusinessFormPagesScenarios(deps) {
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       await editor.getByRole('heading', { name: title, exact: true }).waitFor()
       await assertBusinessFormPage(page, editor)
+      if (key === 'bom') {
+        deps.assert.equal(await editor.locator('.erp-line-editor').count(), 0, 'BOM 不接入顶部选行操作布局')
+        const inherited = await editor.evaluate((root) => getComputedStyle(root.querySelector('.erp-bom-material-groups')).getPropertyValue('--erp-line-header-weight').trim())
+        deps.assert.equal(inherited, '', 'BOM 不继承非 BOM 明细的简化变量')
+      }
       if (['bom', 'sales', 'purchase', 'outsourcing', 'shipment', 'production', 'customers', 'suppliers'].includes(key)) {
         await createLineItemUnitAssertions(deps).assertLineItemFooterFollowsModalScroll(
           editor,
@@ -91,7 +99,7 @@ export function createBusinessFormPagesScenarios(deps) {
                 ? '.erp-compact-field-table'
                 : key === 'bom'
                   ? '.erp-bom-parts-scroll'
-                  : '.erp-sales-order-lines-form__list',
+                  : '.erp-sales-order-lines-form__list, .erp-task-line-cards',
           }
         )
       }
@@ -129,17 +137,12 @@ export function createBusinessFormPagesScenarios(deps) {
           headers.map((value) => value.replace(/\*|\s/gu, '')),
           [
             '序号',
-            '产品订单编号',
-            '加工品类',
-            '产品/材料',
-            '加工项目',
-            '工序',
-            '单位',
+            '加工品类/对象',
+            '加工项目/工序',
+            '加工数量/单位',
             '单价',
-            '加工数量',
             '加工金额',
             '预计回货日期',
-            '操作',
           ]
         )
         const parties = editor.locator(
@@ -206,6 +209,8 @@ export function createBusinessFormPagesScenarios(deps) {
       await editor
         .getByRole('button', { name: '返回列表', exact: true })
         .click()
+      await page.locator('.ant-modal-confirm:visible').waitFor()
+      await waitForFiniteAnimations(page)
       await page.getByRole('button', { name: '继续编辑', exact: true }).click()
       await page.locator('.ant-modal-confirm').waitFor({ state: 'hidden' })
       deps.assert.equal(await note.inputValue(), '整页编辑保留输入')
@@ -255,6 +260,8 @@ export function createBusinessFormPagesScenarios(deps) {
       await editor
         .getByRole('button', { name: '返回列表', exact: true })
         .click()
+      await page.locator('.ant-modal-confirm:visible').waitFor()
+      await waitForFiniteAnimations(page)
       await page.getByRole('button', { name: '放弃修改', exact: true }).click()
       await editor.waitFor({ state: 'hidden' })
       await trigger.click()
@@ -279,6 +286,7 @@ export function createBusinessFormPagesScenarios(deps) {
   }))
   const modeScenarios = createBusinessFormModeScenarios(deps, documents)
   return [
+    ...createEditorDensityScenarios(deps, scenarios, documents),
     ...createBusinessFormFullscreenScenarios(deps, scenarios),
     ...createBusinessFormPageDraftScenarios(deps),
     ...scenarios,
@@ -294,7 +302,7 @@ export function createBusinessFormPagesScenarios(deps) {
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await page.waitForFunction((root) => root.getAttribute('aria-busy') !== 'true', await editor.elementHandle())
         const contacts = ['customers', 'suppliers'].includes(key)
-        const rows = editor.locator(contacts ? '.erp-master-contact-list__row' : key === 'production' ? '.erp-production-order-line' : '.erp-sales-order-lines-form__row')
+        const rows = editor.locator(contacts ? '.erp-master-contact-list__row' : key === 'production' ? '.erp-production-order-line' : '.erp-sales-order-lines-form__row, .erp-task-line-card')
         const addNames = { sales: '添加订货明细', purchase: '添加采购明细', outsourcing: '添加加工明细', shipment: '添加出货明细', production: '添加生产明细' }
         const add = editor.getByRole('button', { name: contacts ? '添加联系人' : addNames[key], exact: true })
         while (await rows.count() < 10) {
@@ -668,7 +676,7 @@ export function createBusinessFormPagesScenarios(deps) {
           const list = editor.locator(
             contacts
               ? '.erp-master-contact-list__items'
-              : '.erp-sales-order-lines-form__list'
+              : '.erp-sales-order-lines-form__list, .erp-task-line-cards'
           )
           const columnWidths = () =>
             list.locator('thead th').evaluateAll((headers) =>
@@ -714,7 +722,7 @@ export function createBusinessFormPagesScenarios(deps) {
           )
           if (!contacts) {
             const quantity = list
-              .locator('.erp-sales-order-lines-form__row')
+              .locator('.erp-sales-order-lines-form__row, .erp-task-line-card')
               .first()
               .getByLabel(
                 key === 'sales'
@@ -753,9 +761,7 @@ export function createBusinessFormPagesScenarios(deps) {
               .nth(1)
               .getByLabel('联系人', { exact: true })
               .fill('收货联系人')
-            await editor
-              .getByRole('button', { name: '复制联系人条目 1', exact: true })
-              .click()
+            await clickLineItemAction(rows.first(), '复制联系人条目 1')
             await rows
               .nth(1)
               .locator('input:focus')
@@ -776,9 +782,11 @@ export function createBusinessFormPagesScenarios(deps) {
             )
           }
           if (['sales', 'purchase', 'outsourcing'].includes(key)) {
-            const rows = list.locator('.erp-sales-order-lines-form__row')
+            const rows = list.locator('.erp-sales-order-lines-form__row, .erp-task-line-card')
             const count = await rows.count()
             const nameLabel = key === 'sales' ? '订货产品名称' : '产品名称'
+            await revealLineItemDetails(rows.first())
+            await revealLineItemDetails(rows.nth(1))
             if (key !== 'outsourcing') {
               await rows
                 .first()
@@ -789,15 +797,13 @@ export function createBusinessFormPagesScenarios(deps) {
                 .getByLabel(nameLabel, { exact: true })
                 .fill('相邻明细乙')
             }
-            await rows
-              .first()
-              .getByRole('button', { name: '复制第 1 行' })
-              .click()
+            await clickLineItemAction(rows.first(), '复制第 1 行')
             await rows
               .nth(1)
               .locator('input:focus, textarea:focus, select:focus')
               .waitFor({ state: 'visible' })
             deps.assert.equal(await rows.count(), count + 1)
+            await revealLineItemDetails(rows.nth(1))
             if (key !== 'outsourcing') {
               const valueAt = (index) =>
                 rows
@@ -814,10 +820,7 @@ export function createBusinessFormPagesScenarios(deps) {
               deps.assert.equal(await valueAt(1), '独立修改的复制行')
               deps.assert.equal(await valueAt(2), '相邻明细乙')
               deps.assert.equal(await editor.getByRole('button', { name: /^(上移|下移)第 \d+ 行$/u }).count(), 0)
-              await rows
-                .nth(1)
-                .getByRole('button', { name: /移除行/ })
-                .click()
+              await clickLineItemAction(rows.nth(1), /移除行/u)
               await rows.nth(count).waitFor({ state: 'detached' })
               deps.assert.equal(await rows.count(), count)
               deps.assert.equal(await valueAt(0), '尚未保存的明细甲')
@@ -832,7 +835,7 @@ export function createBusinessFormPagesScenarios(deps) {
             await assertBusinessFormPage(page, editor)
             const rowSelector = contacts
               ? '.erp-master-contact-list__row'
-              : '.erp-sales-order-lines-form__row'
+              : '.erp-sales-order-lines-form__row, .erp-task-line-card'
             const rowCount = await editor.locator(rowSelector).count()
             await editor
               .getByRole('button', {
@@ -935,7 +938,7 @@ export function createBusinessFormPagesScenarios(deps) {
               `${name}-${variant}: 宽表不能撑开页面 ${JSON.stringify(flow)}`
             )
             const firstRow = list
-              .locator(contacts ? '.erp-contact-editor__fields' : 'thead')
+              .locator(contacts ? '.erp-contact-editor__fields' : 'thead, .erp-task-line-card__heading')
               .first()
             await firstRow.evaluate((node) =>
               node.scrollIntoView({ block: 'start', inline: 'start' })
@@ -1044,7 +1047,7 @@ export function createBusinessFormPagesScenarios(deps) {
             .getByLabel('明细备注', { exact: true })
             .fill(note)
         }
-        await rows.first().getByRole('button', { name: '移除明细 1' }).click()
+        await clickLineItemAction(rows.first(), '移除明细 1')
         deps.assert.match(
           await rows.first().getByLabel('明细备注', { exact: true }).inputValue(),
           /保留生产说明/u
@@ -1127,10 +1130,12 @@ export function createBusinessFormPagesScenarios(deps) {
         await page.evaluate(() => {
           const dialogs = new Set()
           const observer = new MutationObserver((records) => {
-            for (const record of records) for (const node of record.addedNodes) {
-              if (!(node instanceof Element)) continue
-              if (node.matches('.ant-modal-confirm')) dialogs.add(node)
-              for (const dialog of node.querySelectorAll('.ant-modal-confirm')) dialogs.add(dialog)
+            for (const record of records) {
+              for (const node of record.addedNodes) {
+                if (!(node instanceof Element)) continue
+                if (node.matches('.ant-modal-confirm')) dialogs.add(node)
+                for (const dialog of node.querySelectorAll('.ant-modal-confirm')) dialogs.add(dialog)
+              }
             }
           })
           observer.observe(document.body, { childList: true, subtree: true })

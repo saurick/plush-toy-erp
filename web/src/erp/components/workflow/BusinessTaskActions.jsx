@@ -37,6 +37,7 @@ import { getWorkflowTaskOwnerRoleLabel, getWorkflowTaskStatusMeta, writeWorkflow
 import { isWorkflowTaskMutationResultUnknown, workflowTaskMutationUUID } from '../../utils/workflowTaskMutation.mjs'
 import { buildWorkflowDeadlineQuickOptions } from '../../utils/workflowTaskTiming.mjs'
 import './businessTaskPanel.css'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const WORKFLOW_DEADLINE_QUICK_OPTIONS = buildWorkflowDeadlineQuickOptions()
 
@@ -382,14 +383,14 @@ export default function BusinessTaskActions({ collaborationTask = null, collabor
           <div hidden={view !== 'create'}>
             <Spin spinning={loading && view === 'create'}>
               {options && !options.can_create && !pending ? <Alert type="info" message={options.reason} /> : null}
-              <Form form={form} layout="vertical" initialValues={{ assignee_id: 'pool', priority: 0 }} disabled={saving || pending || loading || !options?.can_create} className="erp-business-task-form">
+              <BusinessForm form={form} layout="vertical" initialValues={{ assignee_id: 'pool', priority: 0 }} disabled={saving || pending || loading || !options?.can_create} className="erp-business-task-form">
                 <Form.Item name="task_name" label="任务事项" className="erp-business-task-form__wide" rules={[{ required: true, whitespace: true, message: '请填写任务事项' }]}><Input maxLength={128} placeholder="例如：补充包装稿、确认交期变化" /></Form.Item>
                 <Form.Item name="owner_role_key" label="责任岗位" rules={[{ required: true, message: '请选择责任岗位' }]}><Select placeholder="请选择责任岗位" options={(options?.roles || []).map((role) => ({ value: role.role_key, label: role.label }))} onChange={() => form.setFieldsValue({ assignee_id: 'pool' })} /></Form.Item>
                 <Form.Item name="assignee_id" label="办理人"><Select placeholder="请选择办理人" options={[{ value: 'pool', label: '由岗位人员处理' }, ...(selectedRole?.assignees || []).map((person) => ({ value: person.admin_id, label: person.display_name }))]} /></Form.Item>
                 <Form.Item name="deadline" label="截止时间" rules={[{ required: true, message: '请选择截止时间' }]}><DateTimeInput quickOptions={WORKFLOW_DEADLINE_QUICK_OPTIONS} quickOptionsLabel="快捷截止" showNow={false} /></Form.Item>
                 <Form.Item name="priority" label="优先级"><Select placeholder="请选择优先级" options={[{ value: 0, label: '普通' }, { value: 10, label: '紧急' }]} /></Form.Item>
                 <Form.Item name="description" label="需要对方完成什么" className="erp-business-task-form__wide" rules={[{ required: true, whitespace: true, message: '请写清任务要求和期望结果' }]}><Input.TextArea maxLength={2000} showCount autoSize={{ minRows: 3, maxRows: 7 }} /></Form.Item>
-              </Form>
+              </BusinessForm>
             </Spin>
           </div>
           {view === 'receipt' && receipt ? <><Typography.Paragraph>已发给{getWorkflowTaskOwnerRoleLabel(receipt)}，可在相关任务中查看进度和催办。</Typography.Paragraph><Typography.Title level={5}>{receipt.task_name}</Typography.Title><WorkflowFollowupDetails task={receipt} /></> : null}

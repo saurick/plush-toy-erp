@@ -2253,8 +2253,6 @@
         "created_at": 1792394183,
         "designer": "罗伟",
         "edit_version": 1792394183105344,
-        "effective_from": null,
-        "effective_to": null,
         "hair_direction": "单方向",
         "id": 2,
         "items": [
@@ -2301,8 +2299,6 @@
         "created_at": 1792394183,
         "designer": "罗伟",
         "edit_version": 1792394183103638,
-        "effective_from": 1,
-        "effective_to": 1,
         "hair_direction": "单方向",
         "id": 1,
         "item_count": 1,
@@ -2330,8 +2326,6 @@
         "created_at": 1792394183,
         "designer": "罗伟",
         "edit_version": 1792394183104878,
-        "effective_from": null,
-        "effective_to": null,
         "hair_direction": "单方向",
         "id": 2,
         "items": [
@@ -2379,8 +2373,6 @@
         "created_at": 1792394183,
         "designer": null,
         "edit_version": 1792394183159051,
-        "effective_from": null,
-        "effective_to": null,
         "hair_direction": null,
         "id": 1,
         "items": [
@@ -2447,8 +2439,6 @@
         "created_at": 1792394183,
         "designer": null,
         "edit_version": 1792394183134380,
-        "effective_from": null,
-        "effective_to": null,
         "hair_direction": null,
         "id": 1,
         "items": [
@@ -2465,21 +2455,21 @@
             "process_method": null,
             "quantity": "1.000000000001",
             "source_snapshot": {
-              "file_name": "教学材料.xlsx",
-              "material_code": "MAT-EXAMPLE",
-              "material_name": "原表短毛绒",
-              "supplier_item_no": "客供",
-              "material_spec": "51\"",
               "color": "黑色",
+              "file_name": "教学材料.xlsx",
               "loss_rate": "0",
               "loss_source": "explicit",
               "loss_value": "0",
+              "material_code": "MAT-EXAMPLE",
+              "material_name": "原表短毛绒",
+              "material_spec": "51\"",
               "order_quantity": "100",
               "quantity_format": "0.000",
               "quantity_label": "单位用量",
               "quantity_value": "1.000000000001",
               "row_number": 6,
               "sheet_name": "材料分析明细表",
+              "supplier_item_no": "客供",
               "total_format": "0.00",
               "total_label": "总用量",
               "total_value": "100.0000000001"
@@ -2509,21 +2499,21 @@
           "material_id": 1,
           "quantity": "1.000000000001",
           "source_snapshot": {
+            "color": "黑色",
             "file_name": "教学材料.xlsx",
-              "material_code": "MAT-EXAMPLE",
-              "material_name": "原表短毛绒",
-              "supplier_item_no": "客供",
-              "material_spec": "51\"",
-              "color": "黑色",
             "loss_rate": "0",
             "loss_source": "explicit",
             "loss_value": "0",
+            "material_code": "MAT-EXAMPLE",
+            "material_name": "原表短毛绒",
+            "material_spec": "51\"",
             "order_quantity": "100",
             "quantity_format": "0.000",
             "quantity_label": "单位用量",
             "quantity_value": "1.000000000001",
             "row_number": 6,
             "sheet_name": "材料分析明细表",
+            "supplier_item_no": "客供",
             "total_format": "0.00",
             "total_label": "总用量",
             "total_value": "100.0000000001"
@@ -13831,7 +13821,6 @@
         "note": null,
         "outsourcing_enabled": true,
         "production_route_operation_code": null,
-        "quality_required": false,
         "updated_at": 1
       }
     },
@@ -14078,7 +14067,6 @@
         "note": null,
         "outsourcing_enabled": true,
         "production_route_operation_code": null,
-        "quality_required": false,
         "updated_at": 1
       }
     },
@@ -14297,6 +14285,43 @@
     },
     "test": "TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules"
   },
+  "masterdata.list_payment_method_recommendations": {
+    "basis": "handler-fixture",
+    "data": {
+      "has_more": false,
+      "items": [
+        {
+          "is_recommended": false,
+          "method": "aa",
+          "version": 1
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "is_recommended": false,
+      "keyword": "aa",
+      "limit": 50,
+      "offset": 0
+    },
+    "test": "TestJSONRPCPaymentMethodManagementPermissionAndContract"
+  },
+  "masterdata.list_payment_methods": {
+    "basis": "handler-fixture",
+    "data": {
+      "can_manage": false,
+      "has_more": false,
+      "keyword_not_recommended": false,
+      "methods": [
+        "银行转账"
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "keyword": ""
+    },
+    "test": "TestJSONRPCPaymentMethodSuggestions"
+  },
   "masterdata.list_processes": {
     "basis": "handler-fixture",
     "data": {
@@ -14314,7 +14339,6 @@
           "note": null,
           "outsourcing_enabled": true,
           "production_route_operation_code": null,
-          "quality_required": false,
           "updated_at": 1
         }
       ],
@@ -14626,6 +14650,23 @@
       "id": 2
     }
   },
+  "masterdata.set_payment_method_recommendation": {
+    "basis": "handler-fixture",
+    "data": {
+      "item": {
+        "is_recommended": false,
+        "method": "aa",
+        "version": 1
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 0,
+      "is_recommended": false,
+      "method": "aa"
+    },
+    "test": "TestJSONRPCPaymentMethodManagementPermissionAndContract"
+  },
   "masterdata.set_primary_contact": {
     "basis": "backend-wire-shape",
     "data": {
@@ -14663,7 +14704,6 @@
         "note": "DEMO",
         "outsourcing_enabled": true,
         "production_route_operation_code": "DEMO",
-        "quality_required": true,
         "updated_at": 1
       }
     },
@@ -14855,7 +14895,6 @@
         "note": null,
         "outsourcing_enabled": true,
         "production_route_operation_code": null,
-        "quality_required": false,
         "updated_at": 1
       }
     },
@@ -21523,12 +21562,12 @@
         "task_code": "",
         "task_group": "generic",
         "task_name": "",
+        "task_no": "RW20261018-0029",
         "task_status_key": "blocked",
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 2,
-        "task_no": "RW20261018-0029"
+        "version": 2
       }
     },
     "message": "任务阻塞已记录",
@@ -21581,12 +21620,12 @@
         "task_code": "",
         "task_group": "engineering_data",
         "task_name": "",
+        "task_no": "RW20261018-0029",
         "task_status_key": "done",
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 2,
-        "task_no": "RW20261018-0029"
+        "version": 2
       }
     },
     "message": "任务动作已完成",
@@ -21635,12 +21674,12 @@
         "task_code": "",
         "task_group": "",
         "task_name": "",
+        "task_no": "RW20261018-0029",
         "task_status_key": "ready",
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 0,
-        "task_no": "RW20261018-0029"
+        "version": 0
       }
     },
     "message": "跟进任务已创建",
@@ -21691,12 +21730,12 @@
         "task_code": "",
         "task_group": "",
         "task_name": "",
+        "task_no": "RW20261018-0029",
         "task_status_key": "ready",
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 0,
-        "task_no": "RW20261018-0029"
+        "version": 0
       }
     },
     "message": "任务已创建",
@@ -21978,12 +22017,12 @@
         "task_code": "",
         "task_group": "",
         "task_name": "工程资料",
+        "task_no": "RW20261018-0029",
         "task_status_key": "ready",
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 1,
-        "task_no": "RW20261018-0029"
+        "version": 1
       }
     },
     "message": "OK",
@@ -22336,12 +22375,12 @@
           "task_code": "",
           "task_group": "",
           "task_name": "",
+          "task_no": "RW20261018-0029",
           "task_status_key": "ready",
           "updated_at": -62135596800,
           "updated_by": null,
           "urge_count": 0,
-          "version": 1,
-          "task_no": "RW20261018-0029"
+          "version": 1
         }
       ],
       "limit": 8,
@@ -22469,18 +22508,18 @@
           "id": 7,
           "payload": {},
           "reason": "等待库位确认",
-          "task_id": 42,
-          "task_version": 3,
-          "to_status_key": "blocked",
           "task": {
             "id": 42,
-            "task_name": "核对收货库位",
-            "task_group": "warehouse_receiving",
             "owner_role_key": "warehouse",
             "required_capability_key": null,
+            "source_id": 6,
             "source_type": "purchase_receipt",
-            "source_id": 6
-          }
+            "task_group": "warehouse_receiving",
+            "task_name": "核对收货库位"
+          },
+          "task_id": 42,
+          "task_version": 3,
+          "to_status_key": "blocked"
         }
       ],
       "truncated": false
@@ -22489,8 +22528,8 @@
     "params": {
       "before_event_id": 0,
       "limit": 100,
-      "task_id": 42,
-      "scope": "flow"
+      "scope": "flow",
+      "task_id": 42
     },
     "test": "TestWorkflowTaskFlowEventsRequirePermissionAndBoundedScope"
   },
@@ -22595,12 +22634,12 @@
           "task_code": "",
           "task_group": "",
           "task_name": "",
+          "task_no": "RW20261018-0029",
           "task_status_key": "ready",
           "updated_at": -62135596800,
           "updated_by": null,
           "urge_count": 0,
-          "version": 1,
-          "task_no": "RW20261018-0029"
+          "version": 1
         }
       ],
       "next_cursor": "",
@@ -22681,12 +22720,12 @@
         "task_code": "source-production-scheduling-1",
         "task_group": "production_scheduling",
         "task_name": "安排生产订单 MO-DEMO-001",
+        "task_no": "RW20261018-0029",
         "task_status_key": "done",
         "updated_at": 1792394185,
         "updated_by": 7,
         "urge_count": 0,
-        "version": 2,
-        "task_no": "RW20261018-0029"
+        "version": 2
       }
     },
     "params": {
@@ -22732,12 +22771,12 @@
         "task_code": "",
         "task_group": "order_approval",
         "task_name": "",
+        "task_no": "RW20261018-0029",
         "task_status_key": "rejected",
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 2,
-        "task_no": "RW20261018-0029"
+        "version": 2
       }
     },
     "message": "任务退回已记录",
@@ -22787,12 +22826,12 @@
         "task_code": "",
         "task_group": "generic",
         "task_name": "",
+        "task_no": "RW20261018-0029",
         "task_status_key": "ready",
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 2,
-        "task_no": "RW20261018-0029"
+        "version": 2
       }
     },
     "message": "任务已解除阻塞，可继续处理",
@@ -22845,12 +22884,12 @@
         "task_code": "TASK-001",
         "task_group": "shipment_release",
         "task_name": "出货放行",
+        "task_no": "RW20261018-0029",
         "task_status_key": "ready",
         "updated_at": -62135596800,
         "updated_by": null,
         "urge_count": 0,
-        "version": 2,
-        "task_no": "RW20261018-0029"
+        "version": 2
       }
     },
     "message": "任务催办已记录",

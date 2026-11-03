@@ -27,6 +27,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function localDateTimeValue() {
   const now = new Date()
@@ -250,7 +251,7 @@ export default function OutsourcingOrderSourceFactModal({
           },
         ]}
       />
-      <Form
+      <BusinessForm
         name="outsourcing-source-fact"
         form={form}
         className="erp-business-action-form"
@@ -385,7 +386,7 @@ export default function OutsourcingOrderSourceFactModal({
             <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
           </Form.Item>
         </BusinessFormSection>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

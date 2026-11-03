@@ -16,6 +16,7 @@ export default function BusinessTopicsView({ catalog, actions, currentChainKey, 
     next.set(keys.roleTopic, key ?? '')
     ;[
       keys.roleTopicNode, keys.roleTopicStep, keys.roleMap, keys.roleMapNode,
+      keys.roleTopicPanel, keys.roleTopicBatch,
       keys.relationAction, keys.financeTopic, keys.financeStep,
       keys.financeStage, keys.financeChange, keys.financeRule, keys.financeFact,
     ].forEach((name) => next.delete(name))

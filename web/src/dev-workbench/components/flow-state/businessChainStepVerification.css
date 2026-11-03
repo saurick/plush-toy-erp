@@ -1,5 +1,10 @@
 .erp-dev-chain-step-verification {
-  margin-top: 16px;
+  min-width: 0;
+}
+
+.erp-dev-chain-step-verification__body {
+  display: grid;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -10,30 +15,56 @@
 
 .erp-dev-chain-step-verification .erp-workbench-facts > div {
   display: grid;
-  grid-template-columns: 8em minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 6em minmax(0, 1fr);
+  gap: 10px;
 }
 
-.erp-dev-chain-step-verification__rules {
+.erp-dev-chain-step-verification__rules,
+.erp-dev-chain-step-verification__checks {
+  display: grid;
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
-  display: grid;
-  gap: 16px;
 }
 
-.erp-dev-chain-step-verification__rules > li {
-  min-width: 0;
-  padding-top: 12px;
+.erp-dev-chain-step-verification__rules > li + li,
+.erp-dev-chain-step-verification__checks > li + li {
+  padding-top: 10px;
   border-top: 1px solid var(--erp-border);
 }
 
-.erp-dev-chain-step-verification__rule-title,
-.erp-dev-chain-step-verification__evidence {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 16px;
+.erp-dev-chain-step-verification__rules p {
+  margin: 4px 0 0;
+}
+
+.erp-dev-chain-step-verification__checks ul {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-dev-chain-step-verification__checks ul > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 8px;
+}
+
+.erp-dev-chain-step-verification__checks code {
+  grid-column: 1 / -1;
+}
+
+.erp-dev-chain-step-verification__sources {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+}
+
+.erp-dev-chain-step-verification code {
+  overflow-wrap: anywhere;
 }
 
 .erp-dev-chain-step-verification table {
@@ -50,10 +81,28 @@
 }
 
 .erp-dev-chain-step-verification th:first-child {
-  width: 64%;
+  width: 22%;
 }
 
-.erp-dev-chain-step-verification small {
+.erp-dev-chain-step-verification th:nth-child(2) {
+  width: 25%;
+}
+
+.erp-dev-chain-step-verification td time {
   display: block;
+}
+
+.erp-dev-chain-step-verification__batch {
+  width: 100%;
+  min-width: 0;
+}
+
+.erp-dev-chain-step-verification__hint {
+  margin: 0;
   color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+}
+
+.erp-dev-chain-step-verification__operation {
+  margin: 0;
 }

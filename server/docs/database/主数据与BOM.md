@@ -14,7 +14,7 @@
 - [生产工艺路线与在制品边界评审](../../../docs/architecture/生产工艺路线与在制品边界评审.md)
 - [业务数据生命周期与页面动作规则](../../../docs/product/业务数据生命周期与页面动作规则.md)
 
-本分域共 12 张应用表。
+本分域共 13 张应用表。
 
 <a id="table-bom-headers"></a>
 
@@ -33,15 +33,11 @@
 
 类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
 
-#### 字段 1–16
-
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
 | `version` | `varchar` | `string` | 非空 | — | 产品内的 BOM 业务版号；新建和复制由后端分配 V1、V2 等，编辑保持原值。并发控制另用由 updated_at 派生的 edit_version。 |
 | `status` | `varchar` | `string` | 非空 | `'DRAFT'` | 对象生命周期状态；允许值和组合约束见本表 CHECK 与生命周期说明。 |
-| `effective_from` | `timestamp with time zone` | `time.Time` | 可空 | — | — |
-| `effective_to` | `timestamp with time zone` | `time.Time` | 可空 | — | — |
 | `source_order_no` | `varchar` | `string` | 可空 | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
 | `quantity_text` | `varchar` | `string` | 可空 | — | — |
 | `spare_text` | `varchar` | `string` | 可空 | — | — |
@@ -53,11 +49,6 @@
 | `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
-
-#### 字段 17–17
-
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
-| --- | --- | --- | --- | --- | --- |
 | `product_id` | `bigint` | `int` | 非空 | — | 外键，关联 `products`。 |
 
 ### 主键
@@ -79,12 +70,6 @@
 | `bomheader_product_id_version` | 是 | `product_id`, `version` | — |
 
 ### CHECK 约束
-
-- `bom_headers_effective_dates_ordered`
-
-```sql
-effective_from IS NULL OR effective_to IS NULL OR effective_to > effective_from
-```
 
 - `bom_headers_status_allowed`
 
@@ -384,6 +369,66 @@ stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')
 - [生产工艺路线与在制品边界评审](../../../docs/architecture/生产工艺路线与在制品边界评审.md)
 - [业务数据生命周期与页面动作规则](../../../docs/product/业务数据生命周期与页面动作规则.md)
 
+<a id="table-payment-method-preferences"></a>
+
+## `payment_method_preferences` — 付款方式推荐设置
+
+| 项目 | 说明 |
+| --- | --- |
+| Schema | `public` |
+| 分类 | Config / 配置 |
+| 用途 | 保存公司共用付款方式名称的推荐状态和并发版本。 |
+| 明确不负责 | 不替代客户、供应商与订单的付款方式字段，不保存付款周期；停止推荐不改写历史记录或打印快照。 |
+| 生命周期 / 删除语义 | 有维护权限时停止推荐或恢复；撤销同样核对最近版本，不提供业务记录删除。 |
+| 写入边界 | MasterDataUsecase.SetPaymentMethodRecommendation 校验维护权限，推荐状态与控制面审计同事务保存。 |
+
+### 字段
+
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `method` | `varchar` | `string` | 非空 | 列级唯一 | 去除首尾空格的付款方式名称，长度为 1 至 128 字符，唯一；不作为订单字段的强制枚举。 |
+| `is_recommended` | `boolean` | `bool` | 非空 | `true` | 候选推荐状态；false 时不进入推荐候选，普通录入仍可按本单输入文字。 |
+| `version` | `bigint` | `int` | 非空 | `1` | 正整数并发版本；维护和撤销均校验 expected_version。 |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+
+### 主键
+
+`id`
+
+### 外键
+
+无外键。
+
+### 索引
+
+无额外显式索引；主键和列级唯一性见上文。
+
+### CHECK 约束
+
+- `payment_method_preferences_method_valid`
+
+```sql
+method = TRIM(method) AND LENGTH(method) BETWEEN 1 AND 128
+```
+
+- `payment_method_preferences_version_positive`
+
+```sql
+version > 0
+```
+
+### 代码与业务真源
+
+- [Schema source: `payment_method_preference.go`](../../internal/data/model/schema/payment_method_preference.go)
+- [客户供应商主数据评审](../../../docs/architecture/客户供应商主数据评审.md)
+- [产品款号物料清单边界评审](../../../docs/architecture/产品款号物料清单边界评审.md)
+- [生产工艺路线与在制品边界评审](../../../docs/architecture/生产工艺路线与在制品边界评审.md)
+- [业务数据生命周期与页面动作规则](../../../docs/product/业务数据生命周期与页面动作规则.md)
+
 <a id="table-processes"></a>
 
 ## `processes` — 生产工序
@@ -411,7 +456,6 @@ stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')
 | `production_route_operation_code` | `varchar` | `string` | 可空 | — | — |
 | `outsourcing_enabled` | `boolean` | `bool` | 非空 | `false` | — |
 | `inhouse_enabled` | `boolean` | `bool` | 非空 | `true` | — |
-| `quality_required` | `boolean` | `bool` | 非空 | `false` | — |
 | `sort_order` | `bigint` | `int` | 非空 | `0` | — |
 | `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | `is_active` | `boolean` | `bool` | 非空 | `true` | — |

@@ -1,3 +1,4 @@
+import { clickLineItemAction } from './lineEditorActions.mjs'
 import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
@@ -356,11 +357,12 @@ export function createPurchaseReceiptScenarios(deps) {
             )
           }
         }
+        await page.setViewportSize({ width: 1440, height: 900 })
         const noteRows = modal.locator('.erp-purchase-receipt-exception-row')
         for (const [index, note] of ['待移除说明', '保留的明细说明'].entries()) {
           await noteRows.nth(index).getByLabel('明细备注', { exact: true }).fill(note)
         }
-        await noteRows.first().getByRole('button', { name: '移除明细 1' }).click()
+        await clickLineItemAction(noteRows.first(), '移除明细 1')
         assert.ok(await noteRows.first().getByLabel('明细备注', { exact: true }).isVisible(), '移除前行后备注仍直接可填')
         assert.equal(await noteRows.first().getByLabel('明细备注', { exact: true }).inputValue(), '保留的明细说明')
         await noteRows.first().getByLabel('明细备注', { exact: true }).fill('')

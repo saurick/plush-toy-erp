@@ -14,6 +14,11 @@ export function normalizeMermaidZoom(value) {
   )
 }
 
+export function getInitialMermaidZoomMode(value) {
+  if (value === 'fit-width') return 'fit-width'
+  return value === 'fit' ? 'fit-all' : 'manual'
+}
+
 // Only the root flowchart declaration changes; labels and subgraph directions stay intact.
 const FLOWCHART_HEADER =
   /^(\s*(?:---\s*\r?\n[\s\S]*?\r?\n---\s*)?(?:(?:%%\{[\s\S]*?\}%%|%%[^\n]*)\s*)*(?:flowchart|graph)\s+)(TB|TD|BT|LR|RL)(?=\s|;|$)/u

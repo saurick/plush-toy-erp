@@ -35,6 +35,13 @@ import {
   readCurrentPressureSource,
   readDevPressureReports,
 } from './devQaPressureReports.mjs'
+import {
+  BUSINESS_CHAIN_RULE_ACTION,
+  businessChainRuleBatch,
+  inspectBusinessChainRuleResults,
+} from '../../scripts/qa/lib/business-chain-rule-contract.mjs'
+import { planChainRuleCheck } from '../../scripts/qa/business-chain-rule-check.mjs'
+import { createDevBusinessChainAuditService } from './devBusinessChainAuditPlugin.mjs'
 
 export const DEV_QA_TESTING_API_PATH = '/__dev/api/qa/testing'
 export const DEV_QA_TESTING_SESSION_API_PATH = `${DEV_QA_TESTING_API_PATH}/session`
@@ -51,8 +58,13 @@ const OPERATION_PATH_PATTERN = new RegExp(
   'u'
 )
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage|business-consistency|rpc-examples|pressure-quick|pressure-capacity):[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+  /^testing:(fast|role-access|field-linkage|business-consistency|rpc-examples|chain-rules|pressure-quick|pressure-capacity):[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const ACTION_MESSAGES = Object.freeze({
+  [BUSINESS_CHAIN_RULE_ACTION]: Object.freeze({
+    running: '正在检查所选业务链的具名规则',
+    passed: '本链后端规则检查完成，检查结果已保存',
+    failed: '本链规则检查未通过，请查看检查项与执行记录',
+  }),
   fast: Object.freeze({
     running: '正在运行开发门禁',
     passed: '开发门禁完成，回执已绑定稳定仓库身份',
@@ -115,6 +127,7 @@ function readConfiguredGitHooksPath(root) {
   try {
     return execFileSync('git', ['config', '--get', 'core.hooksPath'], {
       cwd: root,
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim()
@@ -200,11 +213,16 @@ export function validateDevQaTestingAction(value) {
     value.payload,
     value.action.startsWith('pressure-')
       ? ['idempotencyKey', 'dataScale']
+      : value.action === BUSINESS_CHAIN_RULE_ACTION
+        ? ['idempotencyKey', 'chainKey']
       : ['idempotencyKey'],
     'testing action payload'
   )
   if (value.action.startsWith('pressure-'))
     { pressureDataScale(value.payload.dataScale) }
+  if (value.action === BUSINESS_CHAIN_RULE_ACTION) {
+    planChainRuleCheck(value.payload.chainKey)
+  }
   const match = IDEMPOTENCY_PATTERN.exec(
     String(value.payload.idempotencyKey || '')
   )
@@ -250,9 +268,19 @@ export function buildDevQaTestingCommand({
   operationId,
   projectRoot,
   dataScale,
+  chainKey,
 }) {
   if (action.startsWith('pressure-')) pressureDataScale(dataScale)
+  if (action === BUSINESS_CHAIN_RULE_ACTION) planChainRuleCheck(chainKey)
   const commands = {
+    [BUSINESS_CHAIN_RULE_ACTION]: action === BUSINESS_CHAIN_RULE_ACTION ? [
+      'scripts/qa/business-chain-rule-check.mjs',
+      '--chain',
+      chainKey,
+      '--batch',
+      businessChainRuleBatch(operationId),
+      '--run',
+    ] : null,
     fast: [
       'scripts/qa/run-gate-with-receipt.mjs',
       '--gate',
@@ -301,6 +329,7 @@ export function buildDevQaTestingCommand({
     cwd: projectRoot,
     env: {
       ...process.env,
+      GIT_OPTIONAL_LOCKS: '0',
       PATH: [path.dirname(nodeRuntime), String(process.env.PATH || '')]
         .filter(Boolean)
         .join(path.delimiter),
@@ -315,6 +344,7 @@ function publicOperation(operation) {
     id: operation.id,
     action: operation.action,
     ...(operation.dataScale ? { dataScale: operation.dataScale } : {}),
+    ...(operation.action === BUSINESS_CHAIN_RULE_ACTION ? { chainKey: operation.chainKey } : {}),
     repository: operation.repository,
     status: operation.status,
     stage: operation.stage,
@@ -470,7 +500,6 @@ export function createDevQaTestingService({
 
   async function finishOperation(operation, code) {
     if (!active.has(operation.id)) return
-    active.delete(operation.id)
     let current = readDevTestingOperation(store, operation.id)
     try {
       if (current.status === 'running') {
@@ -502,6 +531,22 @@ export function createDevQaTestingService({
             operation.action.slice('pressure-'.length) ||
           evidence.report?.dataset?.dataScale !== operation.dataScale
         ) {
+          code = 1
+        }
+      }
+      if (code === 0 && operation.action === BUSINESS_CHAIN_RULE_ACTION) {
+        try {
+          const plan = planChainRuleCheck(operation.chainKey)
+          const artifact = await createDevBusinessChainAuditService({ projectRoot: root }).artifact(
+            businessChainRuleBatch(operation.id), 'test-results.json'
+          )
+          const value = JSON.parse(artifact.bytes.toString('utf8'))
+          if (!inspectBusinessChainRuleResults(value, {
+            chain: plan.chain,
+            rules: plan.rules,
+            repository,
+          }).passed) code = 1
+        } catch {
           code = 1
         }
       }
@@ -540,6 +585,7 @@ export function createDevQaTestingService({
         markNotProven(persisted, '验证终态读回失败，结果无法证明，请重新运行')
       }
     } finally {
+      active.delete(operation.id)
       releaseLock(operation)
     }
   }
@@ -551,6 +597,7 @@ export function createDevQaTestingService({
       const spec = buildDevQaTestingCommand({
         action: operation.action,
         dataScale: operation.dataScale,
+        chainKey: operation.chainKey,
         nodeRuntime,
         operationId: operation.id,
         projectRoot: root,
@@ -602,7 +649,8 @@ export function createDevQaTestingService({
     if (existing) {
       if (
         existing.action !== action ||
-        existing.dataScale !== payload.dataScale
+        existing.dataScale !== payload.dataScale ||
+        existing.chainKey !== payload.chainKey
       )
         { throw new Error('testing idempotency intent mismatch') }
       return {
@@ -632,6 +680,7 @@ export function createDevQaTestingService({
         action,
         idempotencyKey: payload.idempotencyKey,
         dataScale: payload.dataScale,
+        chainKey: payload.chainKey,
         repository,
         operationId,
         now: now().toISOString(),

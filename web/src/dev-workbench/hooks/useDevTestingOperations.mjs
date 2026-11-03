@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { message } from '@/common/utils/antdApp'
 import {
-  DEV_PRESSURE_ACTIONS,
-  DEV_TESTING_FIXED_ACTIONS,
+  DEV_TESTING_AVAILABLE_ACTIONS,
   createDevTestingIdempotencyKey,
   createDevTestingOperationClient,
   isDevTestingOperationActive,
 } from '../config/devTestingOperation.mjs'
 
 export const EMPTY_TESTING_OPERATIONS = Object.freeze(Object.fromEntries(
-  [...DEV_TESTING_FIXED_ACTIONS, ...DEV_PRESSURE_ACTIONS].map(({ key }) => [key, null])
+  DEV_TESTING_AVAILABLE_ACTIONS.map(({ key }) => [key, null])
 ))
 
 export default function useDevTestingOperations({ client } = {}) {
@@ -151,7 +150,7 @@ export default function useDevTestingOperations({ client } = {}) {
     setTestingSummaryReloadKey((current) => current + 1)
   }, [])
 
-  const runTestingAction = async (action, dataScale) => {
+  const runTestingAction = async (action, dataScale, chainKey) => {
     if (
       actionController.current ||
       testingActionStarting ||
@@ -162,6 +161,11 @@ export default function useDevTestingOperations({ client } = {}) {
     ) {
       return
     }
+    const pending = testingIdempotencyKeys.current[action]
+    if (pending && pending.chainKey !== chainKey) {
+      setTestingSummaryError('上一条业务链的请求结果尚未确认，请先返回原链重试或核对操作记录。')
+      return
+    }
     const controller = new AbortController()
     actionController.current = controller
     setTestingActionStarting(action)
@@ -169,12 +173,12 @@ export default function useDevTestingOperations({ client } = {}) {
     try {
       if (!testingIdempotencyKeys.current[action]) {
         testingIdempotencyKeys.current[action] =
-          { key: createDevTestingIdempotencyKey(action), dataScale }
+          { key: createDevTestingIdempotencyKey(action), dataScale, chainKey }
       }
       const operation = await testingOperationClient.start(
         action,
         testingIdempotencyKeys.current[action].key,
-        { dataScale: testingIdempotencyKeys.current[action].dataScale, signal: controller.signal }
+        { dataScale: testingIdempotencyKeys.current[action].dataScale, chainKey: testingIdempotencyKeys.current[action].chainKey, signal: controller.signal }
       )
       if (controller.signal.aborted) return
       setTestingSummary((current) => ({
@@ -193,6 +197,7 @@ export default function useDevTestingOperations({ client } = {}) {
       if (!isDevTestingOperationActive(operation)) {
         handleTestingTerminal(operation)
       }
+      return operation
     } catch (_error) {
       if (controller.signal.aborted) return
       setTestingSummaryError(

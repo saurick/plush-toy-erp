@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react'
 import {
   Navigate,
+  Outlet,
   Route,
   Routes,
   useLocation,
@@ -274,7 +275,7 @@ function DesktopShellRoute() {
   return (
     <AuthGuard requireAdmin>
       <LegalNoticeGate>
-        {(notice) => <ERPLayout legalNotice={notice} />}
+        {(notice) => <ERPLayout legalNotice={notice} renderSplitPage={renderSplitPage} />}
       </LegalNoticeGate>
     </AuthGuard>
   )
@@ -405,6 +406,31 @@ function businessTaskRoutes() {
   )
 }
 
+function renderSplitPage(location, context) {
+  return (
+    <Routes location={location}>
+      <Route path="/erp" element={<SplitPageOutlet context={context} />}>
+        {desktopPageRoutes()}
+      </Route>
+    </Routes>
+  )
+}
+
+function desktopPageRoutes() {
+  return (
+    <>
+      <Route path="dashboard" element={<DashboardPage initialView="workbench" />} />
+      <Route path="task-board" element={<DashboardPage initialView="task-board" />} />
+      {businessTaskRoutes()}
+      <Route path="help-center" element={<HelpCenterPage />} />
+    </>
+  )
+}
+
+function SplitPageOutlet({ context }) {
+  return <Outlet context={context} />
+}
+
 export default function ERPRouter() {
   return (
     <RouteRuntimeBoundary>
@@ -436,16 +462,7 @@ export default function ERPRouter() {
           />
           <Route path="/erp" element={<DesktopShellRoute />}>
             <Route index element={<DesktopEntryRedirect />} />
-            <Route
-              path="dashboard"
-              element={<DashboardPage initialView="workbench" />}
-            />
-            <Route
-              path="task-board"
-              element={<DashboardPage initialView="task-board" />}
-            />
-            {businessTaskRoutes()}
-            <Route path="help-center" element={<HelpCenterPage />} />
+            {desktopPageRoutes()}
           </Route>
 
           <Route

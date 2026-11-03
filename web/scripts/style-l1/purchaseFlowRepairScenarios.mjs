@@ -3,6 +3,7 @@ import { currentBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { assertLineItemGroupHeaderInteraction } from './businessLineItemDisclosureAssertions.mjs'
 
 const unix = (date) => Date.parse(`${date}T00:00:00Z`) / 1000
 
@@ -82,7 +83,7 @@ export function createPurchaseFlowRepairScenarios({
           currency: 'CNY',
           lifecycle_status: 'approved',
           version: 1,
-          item_count: 1,
+          item_count: 2,
           purchase_date: unix(today),
           expected_arrival_date: null,
           supplier_confirmed_arrival_date: null,
@@ -103,6 +104,7 @@ export function createPurchaseFlowRepairScenarios({
             expected_arrival_date: null,
           },
         ]
+        items.push({ ...items[0], id: 91003, line_no: 2, material_id: 2, material_code_snapshot: 'MAT-PRICE-2', material_name_snapshot: '补价模拟里布', purchased_quantity: '6' })
         await page.route('**/rpc/purchase_order', async (route) => {
           const payload = route.request().postDataJSON()
           switch (payload?.method) {
@@ -119,7 +121,7 @@ export function createPurchaseFlowRepairScenarios({
             case 'list_purchase_order_items':
               return respond(route, payload, {
                 purchase_order_items: items,
-                total: 1,
+                total: items.length,
                 limit: payload.params.limit,
                 offset: payload.params.offset,
               })
@@ -127,7 +129,7 @@ export function createPurchaseFlowRepairScenarios({
               termRequests.push(payload.params)
               if (termRequests.length === 1) {
                 order.version = 2
-                items[0].unit_price = payload.params.items[0].unit_price
+                items.forEach((item, index) => { item.unit_price = payload.params.items[index].unit_price })
                 return respond(route, payload, { purchase_order: null })
               }
               return respond(route, payload, { purchase_order: order })
@@ -156,7 +158,12 @@ export function createPurchaseFlowRepairScenarios({
             .click({ timeout: 5000 })
         }
         const dialog = page.getByRole('dialog', { name: /补齐价格与交期/u })
+        await dialog.getByRole('button', { name: '分组显示', exact: true }).click()
+        await dialog.getByRole('button', { name: '全部展开', exact: true }).waitFor()
+        await assertLineItemGroupHeaderInteraction(page, dialog)
+        await dialog.getByRole('button', { name: '全部展开', exact: true }).click()
         await dialog.getByLabel('第1行单价', { exact: true }).fill('2.5')
+        await dialog.getByLabel('第2行单价', { exact: true }).fill('3')
         assert.equal(
           await dialog.getByLabel('采购数量', { exact: true }).count(),
           0
@@ -181,6 +188,8 @@ export function createPurchaseFlowRepairScenarios({
         assert.equal(termRequests[0].actor_id, undefined)
         assert.equal(termRequests[0].items[0].purchased_quantity, undefined)
         assert.equal(termRequests[0].items[0].unit_price, '2.5')
+        assert.equal(termRequests[0].items.length, 2)
+        assert.equal(termRequests[0].items[1].unit_price, '3')
       },
     },
     {

@@ -14,6 +14,7 @@ import EngineeringMaterialSummarySheet from './EngineeringMaterialSummarySheet.j
 import { materialNoteFits } from '../../utils/engineeringMaterialSummary.mjs'
 import { ENGINEERING_MATERIAL_STATUS as STATUS } from '../../utils/engineeringMaterialTask.mjs'
 import './EngineeringMaterialRequest.css'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function EngineeringMaterialRequestForm({
   orderID,
@@ -289,7 +290,7 @@ export default function EngineeringMaterialRequestForm({
   )
   const content = (
     <Spin spinning={loading}>
-      <Form
+      <BusinessForm
         form={form}
         layout="vertical"
         onValuesChange={() => {
@@ -421,7 +422,7 @@ export default function EngineeringMaterialRequestForm({
             />
           </>
         ) : null}
-      </Form>
+      </BusinessForm>
     </Spin>
   )
   return render({ content, footer, title, request, saving, discardThen, form })

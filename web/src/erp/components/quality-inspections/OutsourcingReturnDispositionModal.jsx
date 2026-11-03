@@ -23,6 +23,7 @@ import {
   sourceBusinessActionNo,
   sourceBusinessActionUUID,
 } from '../../utils/sourceBusinessAction.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function OutsourcingReturnDispositionModal({
   open,
@@ -251,7 +252,7 @@ export default function OutsourcingReturnDispositionModal({
           style={{ marginTop: 12 }}
         />
       ) : null}
-      <Form
+      <BusinessForm
         form={form}
         name="outsourcing-return-disposition"
         layout="vertical"
@@ -298,7 +299,7 @@ export default function OutsourcingReturnDispositionModal({
         <Form.Item name="cancel_reason" label="取消或冲正原因">
           <Input.TextArea rows={2} maxLength={255} />
         </Form.Item>
-      </Form>
+      </BusinessForm>
       <Table
         size="small"
         rowKey="id"

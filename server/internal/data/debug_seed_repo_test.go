@@ -311,7 +311,6 @@ func createDebugOutsourcingOrderWithProcess(t *testing.T, ctx context.Context, c
 		SetCategory("委外").
 		SetOutsourcingEnabled(true).
 		SetInhouseEnabled(false).
-		SetQualityRequired(false).
 		SetSortOrder(1).
 		Save(ctx)
 	if err != nil {

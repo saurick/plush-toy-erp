@@ -11,16 +11,22 @@ export { BUSINESS_RULES, BUSINESS_RULE_CATEGORIES, BUSINESS_RULE_DIAGRAMS }
 
 export function normalizeBusinessRuleEvidence(value) {
   const ids = new Set(businessRuleTests('postgres').map(businessTestKey))
-  if (!Array.isArray(value?.ruleTests) || value.ruleTests.length !== ids.size) {
+  if (!Array.isArray(value?.ruleTests) || value.ruleTests.length > 2000 ||
+    (value.current !== undefined && typeof value.current !== 'boolean') ||
+    (value.current !== false && value.ruleTests.length !== ids.size)) {
     throw new Error('关键场景证据不完整')
   }
+  const seen = new Set()
   for (const entry of value.ruleTests) {
     if (
-      !ids.delete(entry.id) ||
+      seen.has(entry.id) ||
+      !/^server\/internal\/(?:biz|data|service|server):Test[A-Za-z0-9_]+$/u.test(entry.id) ||
+      (value.current !== false && !ids.delete(entry.id)) ||
       !['passed', 'failed', 'skipped', 'missing'].includes(entry.status)
     ) {
       throw new Error('关键场景证据无效')
     }
+    seen.add(entry.id)
     if (
       entry.status === 'passed' &&
       (!Number.isInteger(entry.counts?.executed) ||

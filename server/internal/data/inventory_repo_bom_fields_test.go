@@ -30,12 +30,8 @@ func TestBOMHeaderOptionalFieldsReplaceAndClearThroughAggregateSave(t *testing.T
 		t.Fatal(err)
 	}
 	header := created.Header
-	from := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
-	to := from.AddDate(0, 1, 0)
-	printed := from.AddDate(0, 0, 2)
+	printed := time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC)
 	filled := biz.BOMHeaderUpdate{
-		EffectiveFrom: &from,
-		EffectiveTo:   &to,
 		PrintDate:     &printed,
 		SourceOrderNo: stringPtr("source"),
 		QuantityText:  stringPtr("100"),
@@ -46,7 +42,7 @@ func TestBOMHeaderOptionalFieldsReplaceAndClearThroughAggregateSave(t *testing.T
 		HairDirection: stringPtr("direction"),
 		Note:          stringPtr("note"),
 	}
-	fields := []string{"EffectiveFrom", "EffectiveTo", "PrintDate", "SourceOrderNo", "QuantityText", "SpareText", "Designer", "Maker", "Auditor", "HairDirection", "Note"}
+	fields := []string{"PrintDate", "SourceOrderNo", "QuantityText", "SpareText", "Designer", "Maker", "Auditor", "HairDirection", "Note"}
 	for _, input := range []biz.BOMHeaderUpdate{filled, {}} {
 		detail, saveErr := uc.SaveBOMWithItems(ctx, header.ID, &biz.BOMVersionMutation{
 			ExpectedVersion: header.EditVersion,

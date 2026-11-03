@@ -15,6 +15,10 @@ import {
 import path from "node:path";
 import process from "node:process";
 import { pressureDataScale } from "../../web/src/dev-workbench/config/devPressureData.mjs";
+import {
+  BUSINESS_CHAIN_RULE_ACTION,
+  requireBusinessChainRuleKey,
+} from "./lib/business-chain-rule-contract.mjs";
 
 export const DEV_TESTING_OPERATION_SCHEMA = "plush.dev-qa-testing-operation/v1";
 export const DEV_TESTING_ACTIONS = Object.freeze([
@@ -23,6 +27,7 @@ export const DEV_TESTING_ACTIONS = Object.freeze([
   "field-linkage",
   "business-consistency",
   "rpc-examples",
+  BUSINESS_CHAIN_RULE_ACTION,
   "pressure-quick",
   "pressure-capacity",
 ]);
@@ -46,7 +51,7 @@ export const DEV_TESTING_OPERATION_STAGES = Object.freeze([
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage|business-consistency|rpc-examples|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u;
+  /^testing:(fast|role-access|field-linkage|business-consistency|rpc-examples|chain-rules|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const MAX_RECORD_BYTES = 64 * 1024;
 const STAGE_INDEX = new Map(
@@ -126,6 +131,7 @@ export function validateDevTestingOperation(operation) {
     [
       "action",
       ...(Object.hasOwn(operation, "dataScale") ? ["dataScale"] : []),
+      ...(Object.hasOwn(operation, "chainKey") ? ["chainKey"] : []),
       "createdAt",
       "exitCode",
       "finishedAt",
@@ -162,6 +168,11 @@ export function validateDevTestingOperation(operation) {
   if (Object.hasOwn(operation, "dataScale")) {
     if (!operation.action.startsWith("pressure-")) throw new Error("data scale only applies to pressure actions");
     pressureDataScale(operation.dataScale);
+  }
+  if (operation.action === BUSINESS_CHAIN_RULE_ACTION) {
+    requireBusinessChainRuleKey(operation.chainKey);
+  } else if (Object.hasOwn(operation, "chainKey")) {
+    throw new Error("chain scope only applies to chain rules");
   }
   validateRepository(operation.repository);
   assertSafeText(operation.message, "testing operation message");
@@ -290,6 +301,7 @@ export function createOrReuseDevTestingOperation(
     action,
     idempotencyKey,
     dataScale,
+    chainKey,
     repository,
     operationId = randomUUID(),
     now = new Date().toISOString(),
@@ -300,9 +312,11 @@ export function createOrReuseDevTestingOperation(
   }
   if (action.startsWith("pressure-")) pressureDataScale(dataScale);
   else if (dataScale !== undefined) throw new Error("data scale only applies to pressure actions");
+  if (action === BUSINESS_CHAIN_RULE_ACTION) requireBusinessChainRuleKey(chainKey);
+  else if (chainKey !== undefined) throw new Error("chain scope only applies to chain rules");
   const existing = readDevTestingOperationByIdempotencyKey(store, idempotencyKey);
   if (existing) {
-    if (existing.action !== action || existing.dataScale !== dataScale) throw new Error("testing idempotency intent mismatch");
+    if (existing.action !== action || existing.dataScale !== dataScale || existing.chainKey !== chainKey) throw new Error("testing idempotency intent mismatch");
     return { operation: existing, reused: true };
   }
   const operation = validateDevTestingOperation({
@@ -311,6 +325,7 @@ export function createOrReuseDevTestingOperation(
     idempotencyKey,
     action,
     ...(action.startsWith("pressure-") ? { dataScale } : {}),
+    ...(action === BUSINESS_CHAIN_RULE_ACTION ? { chainKey } : {}),
     repository,
     status: "queued",
     stage: "queued",

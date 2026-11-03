@@ -16,6 +16,7 @@ import { productOption, uniqueReferenceOptions } from '../../utils/referenceSele
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function ProductRecordEditor({ type = 'products', open, record, form: providedForm, initialValues, products = [], records = [], onSaved, onClose, continuous = false, lockProduct = false }) {
   const context = useBusinessPageContext()
@@ -133,10 +134,10 @@ export default function ProductRecordEditor({ type = 'products', open, record, f
   return (
     <BusinessFormPage open={open} form={form} baselineKey={revision} title={`${!writable ? '查看' : current?.id ? '编辑' : '新建'}${config.entityLabel}`} okText={`保存${config.entityLabel}`} okButtonProps={{ disabled: !referencesReady }} readOnly={!writable} loading={loading} confirmLoading={saving} onOk={save} onCancel={onClose}>
       {error ? <Alert type="warning" message={error} showIcon action={referencesReady ? <Button onClick={save} disabled={!writable || saving}>重试保存</Button> : <Button onClick={() => setRetry((value) => value + 1)}>重新读取</Button>} /> : null}
-      <Form name={inWorkspace ? `master-${formID}` : undefined} form={form} layout="vertical" className="erp-business-action-form" disabled={!writable || saving} onValuesChange={changeValues}>
+      <BusinessForm name={inWorkspace ? `master-${formID}` : undefined} form={form} layout="vertical" className="erp-business-action-form" disabled={!writable || saving} onValuesChange={changeValues}>
         <MasterDataFormFields form={form} type={type} isEditing={Boolean(current?.id) || lockProduct} products={products} productOptions={productOptions} unitOptions={unitOptions} unitLoading={loading} />
         {type === 'products' ? <BusinessFormSection title="产品图片" layout="content"><ProductImageSlots ref={images} productId={current?.id} open={open} canEdit={canUploadImages} /></BusinessFormSection> : <BusinessFormSection title="附件"><BusinessAttachmentPanel compact ref={attachment} ownerType="product_sku" ownerId={current?.id} title="产品规格附件" canUpload={writable} canWithdraw={writable && Boolean(current?.id)} variant="inline" /></BusinessFormSection>}
-      </Form>
+      </BusinessForm>
     </BusinessFormPage>
   )
 }

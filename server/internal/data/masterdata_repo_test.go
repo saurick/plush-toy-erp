@@ -289,7 +289,6 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 		ProductionRouteOperationCode: &productionRouteOperationCode,
 		OutsourcingEnabled:           true,
 		InhouseEnabled:               false,
-		QualityRequired:              true,
 	})
 	if err != nil {
 		t.Fatalf("create process failed: %v", err)
@@ -300,7 +299,6 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 		*processItem.ProductionRouteOperationCode != biz.ProductionWIPOperationSewing ||
 		!processItem.OutsourcingEnabled ||
 		processItem.InhouseEnabled ||
-		!processItem.QualityRequired ||
 		processItem.SortOrder != 10 {
 		t.Fatalf("expected process fields retained, got %#v", processItem)
 	}
@@ -319,7 +317,6 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 		Name:               "车缝 A",
 		OutsourcingEnabled: true,
 		InhouseEnabled:     true,
-		QualityRequired:    false,
 		Note:               &note,
 	})
 	if err != nil {
@@ -329,7 +326,6 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 		updated.ProductionRouteOperationCode != nil ||
 		!updated.OutsourcingEnabled ||
 		!updated.InhouseEnabled ||
-		updated.QualityRequired ||
 		updated.SortOrder != 10 ||
 		updated.Note == nil ||
 		*updated.Note != note {

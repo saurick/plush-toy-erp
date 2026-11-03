@@ -4,7 +4,10 @@ import { createElement as h } from 'react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { TASK_HANDLING_ROWS } from '../../config/devTaskHandling.mjs'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
+import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRuntime.mjs'
 import { DEV_FLOW_STATE_CATALOG } from '../../config/devFlowStateCatalog.mjs'
+
+registerMermaidTestRenderer()
 
 async function mount(t) {
   const ui = await createReactTestHarness(t)

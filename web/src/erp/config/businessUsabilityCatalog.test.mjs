@@ -5,6 +5,7 @@ import test from 'node:test'
 
 import { businessModuleDefinitions } from './businessModules.mjs'
 import { commandCenterViews } from './commandCenter.mjs'
+import { navigationItemRegistry } from './seedData.mjs'
 import {
   BUSINESS_HELP_TYPES,
   BUSINESS_USABILITY_CATALOG,
@@ -27,8 +28,14 @@ test('business page presentation projects only canonical titles and paths', () =
     })
     assert(Object.isFrozen(presentation), `${entry.key} presentation is read-only`)
   }
-  for (const key of ['', 'unregistered-page', '/erp/task-board', null]) {
+  for (const key of ['', 'unregistered-page', '/erp/task-board', 'constructor', '__proto__', null]) {
     assert.equal(getBusinessPagePresentation(key), null)
+  }
+  for (const key of ['history-records', 'help-center', 'system-audit-logs']) {
+    const entry = navigationItemRegistry[key]
+    const presentation = getBusinessPagePresentation(key)
+    assert.deepEqual(presentation, { title: entry.label, path: entry.path })
+    assert(Object.isFrozen(presentation))
   }
 })
 

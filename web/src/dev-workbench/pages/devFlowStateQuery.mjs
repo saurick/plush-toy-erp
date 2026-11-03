@@ -35,6 +35,8 @@ export const DEV_FLOW_STATE_QUERY_KEYS = Object.freeze({
   roleTopic: 'flow_topic',
   roleTopicNode: 'flow_topic_node',
   roleTopicStep: 'flow_topic_step',
+  roleTopicPanel: 'flow_topic_panel',
+  roleTopicBatch: 'flow_topic_batch',
   roleMap: 'flow_map',
   roleMapNode: 'flow_map_node',
   exception: 'flow_exception',

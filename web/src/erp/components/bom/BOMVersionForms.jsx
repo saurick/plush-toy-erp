@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React from 'react'
 import { Form, Input } from 'antd'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
@@ -6,19 +6,14 @@ import Select from '@/common/components/select/AppSelect'
 import { parseBOMSourceNumber } from '../../utils/bomSourceValues.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
-import ProductIdentity, {
+import {
+  ProductThumbnail,
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
 
 import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
-import {
-  dateInputNotAfterRule,
-  dateInputNotBeforeRule,
-  isDateInputAfter,
-  isDateInputBefore,
-} from '../../utils/dateRange.mjs'
 import { unixSecondsToBusinessDate } from '../../utils/businessDate.mjs'
 
 export function unixToDateInputValue(value) {
@@ -34,8 +29,6 @@ export function buildHeaderParams(values = {}, extra = {}) {
   return {
     ...extra,
     product_id: Number(values.product_id || extra.product_id || 0),
-    effective_from: dateInputToParam(values.effective_from),
-    effective_to: dateInputToParam(values.effective_to),
     source_order_no: values.source_order_no
       ? String(values.source_order_no).trim()
       : undefined,
@@ -82,6 +75,18 @@ export function buildItemParams(values = {}, extra = {}) {
   }
 }
 
+export function BOMVersionSummary({ form, readState }) {
+  const version = Form.useWatch('version', { form, preserve: true })
+  const ready = readState === 'ready'
+  return (
+    <span className="erp-bom-version-summary" aria-label="BOM 版本" data-bom-version-state={readState}>
+      <span>BOM 版本</span>
+      <strong>{ready ? version || '保存后自动生成' : readState === 'loading' ? '正在读取' : '尚未读取'}</strong>
+      {ready ? <BusinessCopyButton label="BOM 版本" value={version} /> : null}
+    </span>
+  )
+}
+
 export function BOMHeaderFormFields({
   form,
   children,
@@ -93,82 +98,48 @@ export function BOMHeaderFormFields({
   productActions,
 }) {
   const productID = Form.useWatch('product_id', form)
-  const version = Form.useWatch('version', form)
   const sourceOrderNo = Form.useWatch('source_order_no', form)
   const selectedProduct = productOptions.find(
     (option) => Number(option.value) === Number(productID)
-  )
-  const effectiveFrom = Form.useWatch('effective_from', form)
-  const effectiveTo = Form.useWatch('effective_to', form)
-  const disableEffectiveFromOnOrAfterEnd = useCallback(
-    (current) =>
-      isDateInputAfter(current, effectiveTo, {
-        allowSameDay: false,
-      }),
-    [effectiveTo]
-  )
-  const disableEffectiveToOnOrBeforeStart = useCallback(
-    (current) =>
-      isDateInputBefore(current, effectiveFrom, {
-        allowSameDay: false,
-      }),
-    [effectiveFrom]
   )
 
   return (
     <>
       <BusinessFormSection title="版本信息" className="erp-bom-header-primary">
-        {includeProduct ? (
-          <Form.Item
-            className="erp-business-action-form__field"
-            label="产品"
-            extra={
-              <>
-                {productID ? (
-                  <ProductIdentity
-                    productId={productID}
-                    name={selectedProduct?.label || '当前产品'}
-                    compact
-                  />
-                ) : null}
-                {productActions}
-              </>
-            }
-            name="product_id"
-            rules={[{ required: true, message: '请选择产品' }]}
-          >
-            <RemoteReferenceSelect
-              referenceType="products"
-              params={{ active_only: false }}
-              allowClear
-              disabled={disabled || productDisabled}
-              optionFilterProp="label"
-              options={productOptions}
-              listItemHeight={48}
-              optionRender={renderProductOption}
-              placeholder="请选择产品"
-              showSearch
-            />
-          </Form.Item>
-        ) : null}
-        <Form.Item
-          className="erp-business-action-form__field"
-          label="BOM 版本"
-          name="version"
-        >
-          <Input
-            className="erp-bom-version"
-            autoComplete="off"
-            disabled
-            suffix={
-              <BusinessCopyButton
-                label="BOM 版本"
-                value={version}
-              />
-            }
-            placeholder="保存后自动生成"
-          />
+        <Form.Item name="version" hidden>
+          <Input readOnly />
         </Form.Item>
+        {includeProduct ? (
+          <div className="erp-product-field-control erp-bom-header-product">
+            {productID ? (
+              <ProductThumbnail
+                productId={productID}
+                name={selectedProduct?.identity?.name || '当前产品'}
+                code={selectedProduct?.identity?.code}
+              />
+            ) : null}
+            <Form.Item
+              className="erp-business-action-form__field"
+              label="产品"
+              extra={productActions}
+              name="product_id"
+              rules={[{ required: true, message: '请选择产品' }]}
+            >
+              <RemoteReferenceSelect
+                referenceType="products"
+                params={{ active_only: false }}
+                allowClear
+                disabled={disabled || productDisabled}
+                optionFilterProp="label"
+                options={productOptions}
+                listItemHeight={48}
+                optionRender={renderProductOption}
+                placeholder="请选择产品"
+                showSearch
+              />
+            </Form.Item>
+          </div>
+        ) : null}
         <Form.Item
           className="erp-business-action-form__field"
           label="订单数量"
@@ -179,48 +150,6 @@ export function BOMHeaderFormFields({
             autoComplete="off"
             disabled={disabled}
             placeholder="例如 3030"
-          />
-        </Form.Item>
-      </BusinessFormSection>
-      {children}
-      <BusinessFormSection title="订单与制表资料">
-        <Form.Item
-          className="erp-business-action-form__field"
-          label={<BusinessHelpLabel label="参考适用开始" description="仅供人工查阅；BOM 是否可选仍由启用状态决定，不会按日期自动启用或停用。" />}
-          name="effective_from"
-          rules={[
-            dateInputNotAfterRule({
-              getEndValue: () => form.getFieldValue('effective_to'),
-              message: '参考适用开始必须早于参考适用结束',
-              allowSameDay: false,
-            }),
-          ]}
-        >
-          <DateInput
-            disabled={disabled}
-            disabledDate={
-              effectiveTo ? disableEffectiveFromOnOrAfterEnd : undefined
-            }
-          />
-        </Form.Item>
-        <Form.Item
-          className="erp-business-action-form__field"
-          dependencies={['effective_from']}
-          label="参考适用结束"
-          name="effective_to"
-          rules={[
-            dateInputNotBeforeRule({
-              getStartValue: () => form.getFieldValue('effective_from'),
-              message: '参考适用结束必须晚于参考适用开始',
-              allowSameDay: false,
-            }),
-          ]}
-        >
-          <DateInput
-            disabled={disabled}
-            disabledDate={
-              effectiveFrom ? disableEffectiveToOnOrBeforeStart : undefined
-            }
           />
         </Form.Item>
         <Form.Item
@@ -241,6 +170,9 @@ export function BOMHeaderFormFields({
             placeholder="例如 WL260102"
           />
         </Form.Item>
+      </BusinessFormSection>
+      {children}
+      <BusinessFormSection title="订单与制表资料">
         <Form.Item
           className="erp-business-action-form__field"
           label="备品"
@@ -284,7 +216,7 @@ export function BOMHeaderFormFields({
           <Input allowClear autoComplete="off" disabled={disabled} />
         </Form.Item>
       </BusinessFormSection>
-      <BusinessFormSection title="备注与附件">
+      <BusinessFormSection title="备注与附件" className="erp-bom-header-support">
         <Form.Item
           className="erp-business-action-form__field erp-bom-header-note"
           label="备注"
@@ -292,7 +224,9 @@ export function BOMHeaderFormFields({
         >
           <BusinessTextArea showCount minRows={2} allowClear disabled={disabled} maxLength={BusinessTextPolicy.noteMaxCharacters} />
         </Form.Item>
-        {attachmentPanel}
+        {attachmentPanel ? (
+          <div className="erp-bom-header-attachments">{attachmentPanel}</div>
+        ) : null}
       </BusinessFormSection>
     </>
   )

@@ -1,16 +1,17 @@
 import React from 'react'
 import { Form } from 'antd'
+import './taskSourceFacts.css'
 
 // Keep the existing Form fields mounted; this is a compact view of their source values.
-export default function TaskSourceFacts({ form, fields }) {
+export default function TaskSourceFacts({ form, fields, label = '本次任务来源', inline = false }) {
   const values = Form.useWatch((value) => value, { form, preserve: true }) || {}
   return (
-    <dl className="mobile-task-facts__grid" aria-label="本次任务来源">
+    <dl className={inline ? 'erp-business-source-facts erp-business-action-form__field--full' : 'mobile-task-facts__grid'} aria-label={label}>
       {fields.map(({ name, label, options, value }) => {
         const raw = value ?? values[name]
         const display = options ? options.find((option) => String(option.value) === String(raw))?.label : raw
         return display !== undefined && display !== null && display !== '' ? (
-          <div key={name} className="mobile-task-facts__field mobile-task-facts__field--wide">
+          <div key={name} className={`mobile-task-facts__field${inline ? '' : ' mobile-task-facts__field--wide'}`}>
             <dt>{label}</dt><dd>{display}</dd>
           </div>
         ) : null

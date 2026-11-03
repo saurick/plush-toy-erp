@@ -1,6 +1,6 @@
 import React from 'react'
 import { CalendarOutlined } from '@ant-design/icons'
-import { Button, DatePicker } from 'antd'
+import { Button, DatePicker, Form } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import {
   DATE_INPUT_DISPLAY_FORMAT,
@@ -31,6 +31,7 @@ const BusinessDatePicker = React.forwardRef(
       placeholder,
       allowClear = true,
       inputReadOnly = true,
+      defaultOpen = false,
       onClick,
       onMouseDown,
       onOpenChange,
@@ -44,7 +45,7 @@ const BusinessDatePicker = React.forwardRef(
     },
     ref
   ) => {
-    const [open, setOpen] = React.useState(false)
+    const [open, setOpen] = React.useState(defaultOpen)
     const pickerValue = parseValue(value)
     const handleChange = React.useCallback(
       (nextValue) => {
@@ -217,6 +218,69 @@ export const DateInput = React.forwardRef((props, ref) => (
     valueFormat={DATE_INPUT_VALUE_FORMAT}
   />
 ))
+
+export const InheritedDateInput = React.forwardRef(
+  ({ value, onChange, inheritedValue, label = '行交期', disabled, onOpenChange, ...props }, ref) => {
+    const [editing, setEditing] = React.useState(false)
+    const pickerRef = React.useRef(null)
+    const buttonRef = React.useRef(null)
+    const restoreFocus = React.useRef(false)
+    const { status } = Form.Item.useStatus()
+    const showPicker = Boolean(value) || editing || status === 'error'
+    const inheritedDate = parseDateInputValue(inheritedValue)?.format(DATE_INPUT_DISPLAY_FORMAT)
+    const summary = inheritedDate ? `${inheritedDate} · 沿用` : '沿用整单交期'
+
+    React.useImperativeHandle(ref, () => ({
+      focus: () => (pickerRef.current || buttonRef.current)?.focus(),
+    }), [])
+    React.useEffect(() => {
+      if (!showPicker && restoreFocus.current) {
+        buttonRef.current?.focus()
+        restoreFocus.current = false
+      }
+    }, [showPicker])
+
+    if (!showPicker) {
+      return (
+        <Button
+          ref={buttonRef}
+          id={props.id}
+          type="link"
+          size="small"
+          htmlType="button"
+          disabled={disabled}
+          aria-label={`${label}：${summary}，单独修改`}
+          onClick={() => setEditing(true)}
+        >
+          {summary}
+        </Button>
+      )
+    }
+    return (
+      <DateInput
+        {...props}
+        ref={pickerRef}
+        disabled={disabled}
+        value={value}
+        placeholder={inheritedDate || '沿用整单交期'}
+        defaultOpen={editing && !value}
+        autoFocus={editing}
+        onChange={(next) => {
+          if (!next) restoreFocus.current = true
+          onChange?.(next)
+          if (!next) setEditing(false)
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            restoreFocus.current = true
+            setEditing(false)
+          }
+          onOpenChange?.(open)
+        }}
+      />
+    )
+  }
+)
 
 export const DateTimeInput = React.forwardRef((props, ref) => (
   <BusinessDatePicker

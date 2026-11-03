@@ -3,6 +3,9 @@ import test from 'node:test'
 import { createElement as h } from 'react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
+import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRuntime.mjs'
+
+registerMermaidTestRenderer()
 
 async function setup(t, initialURL) {
   const harness = await createReactTestHarness(t)

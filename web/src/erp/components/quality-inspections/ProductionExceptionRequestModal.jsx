@@ -21,6 +21,7 @@ import {
   sourceBusinessActionNo,
   sourceBusinessActionUUID,
 } from '../../utils/sourceBusinessAction.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function ProductionExceptionRequestModal({
   open,
@@ -162,7 +163,7 @@ export default function ProductionExceptionRequestModal({
       {!context && !contextError ? <Spin /> : null}
       {context ? <p>{context.batch_no} · {context.operation_name} · {context.quantity} {context.unit_name} · {context.original_supplier_name || '本厂加工'}</p> : null}
       <ProcessSubmissionRoute processKey="production_exception_approval" customerKey={customerKey} open={open} />
-      <Form
+      <BusinessForm
         form={form}
         name="production-exception-request"
         layout="vertical"
@@ -213,7 +214,7 @@ export default function ProductionExceptionRequestModal({
         >
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

@@ -71,10 +71,6 @@ import {
   buildMasterDataParams,
   buildProcessParams,
 } from '../utils/masterDataParams.mjs'
-import {
-  buildPaymentConditionOptions,
-  resolvePaymentTermDays,
-} from '../utils/paymentConditions.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import { filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.mjs'
 import {
@@ -108,6 +104,7 @@ import {
   lifecycleScopeFromSearchParams,
   withLifecycleScopeSearchParam,
 } from '../utils/lifecycleScope.mjs'
+import BusinessForm from '../components/business-list/BusinessForm.jsx'
 
 export default function MasterDataPage({ type }) {
   const isProductCatalogPage = type === 'product_skus'
@@ -298,28 +295,9 @@ export default function MasterDataPage({ type }) {
         : [],
     [effectiveType, records]
   )
-  const customerPaymentConditionOptions = useMemo(
-    () =>
-      effectiveType === 'customers'
-        ? buildPaymentConditionOptions(records)
-        : [],
-    [effectiveType, records]
-  )
   const unitDisplay = useCallback(
     (unitID) => formatUnitShortDisplayName(unitID, unitByID),
     [unitByID]
-  )
-  const applyCustomerPaymentMethod = useCallback(
-    (method) => {
-      const termDays = resolvePaymentTermDays(
-        method,
-        customerPaymentConditionOptions
-      )
-      if (termDays !== undefined) {
-        recordForm.setFieldValue('default_payment_term_days', termDays)
-      }
-    },
-    [customerPaymentConditionOptions, recordForm]
   )
   const handleRecordValuesChange = useCallback(
     (changedValues) => {
@@ -1172,7 +1150,7 @@ export default function MasterDataPage({ type }) {
             contactLoading || (needsUnitDictionary(effectiveType) && unitLoading)
           }
         >
-          <Form
+          <BusinessForm
             form={recordForm}
             layout="vertical"
             className="erp-business-action-form"
@@ -1193,8 +1171,6 @@ export default function MasterDataPage({ type }) {
               supplierProcessOptions={supplierProcessOptions}
               canEditSupplierProcesses={canReadProcesses}
               supplierTypeOptions={SUPPLIER_TYPE_OPTIONS}
-              customerPaymentConditionOptions={customerPaymentConditionOptions}
-              onCustomerPaymentMethodChange={applyCustomerPaymentMethod}
               contactSection={
                 showContactForm ? (
                   <BusinessFormSection
@@ -1211,7 +1187,7 @@ export default function MasterDataPage({ type }) {
               }
             />
 
-          </Form>
+          </BusinessForm>
         </BusinessFormPage>
 
       )}

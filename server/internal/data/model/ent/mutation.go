@@ -38,6 +38,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/outsourcingreturndisposition"
+	"server/internal/data/model/ent/paymentmethodpreference"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/process"
@@ -135,6 +136,7 @@ const (
 	TypeOutsourcingOrder                   = "OutsourcingOrder"
 	TypeOutsourcingOrderItem               = "OutsourcingOrderItem"
 	TypeOutsourcingReturnDisposition       = "OutsourcingReturnDisposition"
+	TypePaymentMethodPreference            = "PaymentMethodPreference"
 	TypePermission                         = "Permission"
 	TypeProcess                            = "Process"
 	TypeProcessInstance                    = "ProcessInstance"
@@ -4019,8 +4021,6 @@ type BOMHeaderMutation struct {
 	id                                            *int
 	version                                       *string
 	status                                        *string
-	effective_from                                *time.Time
-	effective_to                                  *time.Time
 	source_order_no                               *string
 	quantity_text                                 *string
 	spare_text                                    *string
@@ -4250,104 +4250,6 @@ func (m *BOMHeaderMutation) OldStatus(ctx context.Context) (v string, err error)
 // ResetStatus resets all changes to the "status" field.
 func (m *BOMHeaderMutation) ResetStatus() {
 	m.status = nil
-}
-
-// SetEffectiveFrom sets the "effective_from" field.
-func (m *BOMHeaderMutation) SetEffectiveFrom(t time.Time) {
-	m.effective_from = &t
-}
-
-// EffectiveFrom returns the value of the "effective_from" field in the mutation.
-func (m *BOMHeaderMutation) EffectiveFrom() (r time.Time, exists bool) {
-	v := m.effective_from
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldEffectiveFrom returns the old "effective_from" field's value of the BOMHeader entity.
-// If the BOMHeader object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *BOMHeaderMutation) OldEffectiveFrom(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldEffectiveFrom is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldEffectiveFrom requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldEffectiveFrom: %w", err)
-	}
-	return oldValue.EffectiveFrom, nil
-}
-
-// ClearEffectiveFrom clears the value of the "effective_from" field.
-func (m *BOMHeaderMutation) ClearEffectiveFrom() {
-	m.effective_from = nil
-	m.clearedFields[bomheader.FieldEffectiveFrom] = struct{}{}
-}
-
-// EffectiveFromCleared returns if the "effective_from" field was cleared in this mutation.
-func (m *BOMHeaderMutation) EffectiveFromCleared() bool {
-	_, ok := m.clearedFields[bomheader.FieldEffectiveFrom]
-	return ok
-}
-
-// ResetEffectiveFrom resets all changes to the "effective_from" field.
-func (m *BOMHeaderMutation) ResetEffectiveFrom() {
-	m.effective_from = nil
-	delete(m.clearedFields, bomheader.FieldEffectiveFrom)
-}
-
-// SetEffectiveTo sets the "effective_to" field.
-func (m *BOMHeaderMutation) SetEffectiveTo(t time.Time) {
-	m.effective_to = &t
-}
-
-// EffectiveTo returns the value of the "effective_to" field in the mutation.
-func (m *BOMHeaderMutation) EffectiveTo() (r time.Time, exists bool) {
-	v := m.effective_to
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldEffectiveTo returns the old "effective_to" field's value of the BOMHeader entity.
-// If the BOMHeader object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *BOMHeaderMutation) OldEffectiveTo(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldEffectiveTo is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldEffectiveTo requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldEffectiveTo: %w", err)
-	}
-	return oldValue.EffectiveTo, nil
-}
-
-// ClearEffectiveTo clears the value of the "effective_to" field.
-func (m *BOMHeaderMutation) ClearEffectiveTo() {
-	m.effective_to = nil
-	m.clearedFields[bomheader.FieldEffectiveTo] = struct{}{}
-}
-
-// EffectiveToCleared returns if the "effective_to" field was cleared in this mutation.
-func (m *BOMHeaderMutation) EffectiveToCleared() bool {
-	_, ok := m.clearedFields[bomheader.FieldEffectiveTo]
-	return ok
-}
-
-// ResetEffectiveTo resets all changes to the "effective_to" field.
-func (m *BOMHeaderMutation) ResetEffectiveTo() {
-	m.effective_to = nil
-	delete(m.clearedFields, bomheader.FieldEffectiveTo)
 }
 
 // SetSourceOrderNo sets the "source_order_no" field.
@@ -5032,7 +4934,7 @@ func (m *BOMHeaderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BOMHeaderMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 14)
 	if m.product != nil {
 		fields = append(fields, bomheader.FieldProductID)
 	}
@@ -5041,12 +4943,6 @@ func (m *BOMHeaderMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, bomheader.FieldStatus)
-	}
-	if m.effective_from != nil {
-		fields = append(fields, bomheader.FieldEffectiveFrom)
-	}
-	if m.effective_to != nil {
-		fields = append(fields, bomheader.FieldEffectiveTo)
 	}
 	if m.source_order_no != nil {
 		fields = append(fields, bomheader.FieldSourceOrderNo)
@@ -5095,10 +4991,6 @@ func (m *BOMHeaderMutation) Field(name string) (ent.Value, bool) {
 		return m.Version()
 	case bomheader.FieldStatus:
 		return m.Status()
-	case bomheader.FieldEffectiveFrom:
-		return m.EffectiveFrom()
-	case bomheader.FieldEffectiveTo:
-		return m.EffectiveTo()
 	case bomheader.FieldSourceOrderNo:
 		return m.SourceOrderNo()
 	case bomheader.FieldQuantityText:
@@ -5136,10 +5028,6 @@ func (m *BOMHeaderMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldVersion(ctx)
 	case bomheader.FieldStatus:
 		return m.OldStatus(ctx)
-	case bomheader.FieldEffectiveFrom:
-		return m.OldEffectiveFrom(ctx)
-	case bomheader.FieldEffectiveTo:
-		return m.OldEffectiveTo(ctx)
 	case bomheader.FieldSourceOrderNo:
 		return m.OldSourceOrderNo(ctx)
 	case bomheader.FieldQuantityText:
@@ -5191,20 +5079,6 @@ func (m *BOMHeaderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
-		return nil
-	case bomheader.FieldEffectiveFrom:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetEffectiveFrom(v)
-		return nil
-	case bomheader.FieldEffectiveTo:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetEffectiveTo(v)
 		return nil
 	case bomheader.FieldSourceOrderNo:
 		v, ok := value.(string)
@@ -5316,12 +5190,6 @@ func (m *BOMHeaderMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *BOMHeaderMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(bomheader.FieldEffectiveFrom) {
-		fields = append(fields, bomheader.FieldEffectiveFrom)
-	}
-	if m.FieldCleared(bomheader.FieldEffectiveTo) {
-		fields = append(fields, bomheader.FieldEffectiveTo)
-	}
 	if m.FieldCleared(bomheader.FieldSourceOrderNo) {
 		fields = append(fields, bomheader.FieldSourceOrderNo)
 	}
@@ -5363,12 +5231,6 @@ func (m *BOMHeaderMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *BOMHeaderMutation) ClearField(name string) error {
 	switch name {
-	case bomheader.FieldEffectiveFrom:
-		m.ClearEffectiveFrom()
-		return nil
-	case bomheader.FieldEffectiveTo:
-		m.ClearEffectiveTo()
-		return nil
 	case bomheader.FieldSourceOrderNo:
 		m.ClearSourceOrderNo()
 		return nil
@@ -5412,12 +5274,6 @@ func (m *BOMHeaderMutation) ResetField(name string) error {
 		return nil
 	case bomheader.FieldStatus:
 		m.ResetStatus()
-		return nil
-	case bomheader.FieldEffectiveFrom:
-		m.ResetEffectiveFrom()
-		return nil
-	case bomheader.FieldEffectiveTo:
-		m.ResetEffectiveTo()
 		return nil
 	case bomheader.FieldSourceOrderNo:
 		m.ResetSourceOrderNo()
@@ -47159,6 +47015,584 @@ func (m *OutsourcingReturnDispositionMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown OutsourcingReturnDisposition edge %s", name)
 }
 
+// PaymentMethodPreferenceMutation represents an operation that mutates the PaymentMethodPreference nodes in the graph.
+type PaymentMethodPreferenceMutation struct {
+	config
+	op             Op
+	typ            string
+	id             *int
+	method         *string
+	is_recommended *bool
+	version        *int
+	addversion     *int
+	created_at     *time.Time
+	updated_at     *time.Time
+	clearedFields  map[string]struct{}
+	done           bool
+	oldValue       func(context.Context) (*PaymentMethodPreference, error)
+	predicates     []predicate.PaymentMethodPreference
+}
+
+var _ ent.Mutation = (*PaymentMethodPreferenceMutation)(nil)
+
+// paymentmethodpreferenceOption allows management of the mutation configuration using functional options.
+type paymentmethodpreferenceOption func(*PaymentMethodPreferenceMutation)
+
+// newPaymentMethodPreferenceMutation creates new mutation for the PaymentMethodPreference entity.
+func newPaymentMethodPreferenceMutation(c config, op Op, opts ...paymentmethodpreferenceOption) *PaymentMethodPreferenceMutation {
+	m := &PaymentMethodPreferenceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePaymentMethodPreference,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPaymentMethodPreferenceID sets the ID field of the mutation.
+func withPaymentMethodPreferenceID(id int) paymentmethodpreferenceOption {
+	return func(m *PaymentMethodPreferenceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PaymentMethodPreference
+		)
+		m.oldValue = func(ctx context.Context) (*PaymentMethodPreference, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PaymentMethodPreference.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPaymentMethodPreference sets the old PaymentMethodPreference of the mutation.
+func withPaymentMethodPreference(node *PaymentMethodPreference) paymentmethodpreferenceOption {
+	return func(m *PaymentMethodPreferenceMutation) {
+		m.oldValue = func(context.Context) (*PaymentMethodPreference, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PaymentMethodPreferenceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PaymentMethodPreferenceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PaymentMethodPreferenceMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PaymentMethodPreferenceMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PaymentMethodPreference.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetMethod sets the "method" field.
+func (m *PaymentMethodPreferenceMutation) SetMethod(s string) {
+	m.method = &s
+}
+
+// Method returns the value of the "method" field in the mutation.
+func (m *PaymentMethodPreferenceMutation) Method() (r string, exists bool) {
+	v := m.method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMethod returns the old "method" field's value of the PaymentMethodPreference entity.
+// If the PaymentMethodPreference object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentMethodPreferenceMutation) OldMethod(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMethod: %w", err)
+	}
+	return oldValue.Method, nil
+}
+
+// ResetMethod resets all changes to the "method" field.
+func (m *PaymentMethodPreferenceMutation) ResetMethod() {
+	m.method = nil
+}
+
+// SetIsRecommended sets the "is_recommended" field.
+func (m *PaymentMethodPreferenceMutation) SetIsRecommended(b bool) {
+	m.is_recommended = &b
+}
+
+// IsRecommended returns the value of the "is_recommended" field in the mutation.
+func (m *PaymentMethodPreferenceMutation) IsRecommended() (r bool, exists bool) {
+	v := m.is_recommended
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsRecommended returns the old "is_recommended" field's value of the PaymentMethodPreference entity.
+// If the PaymentMethodPreference object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentMethodPreferenceMutation) OldIsRecommended(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIsRecommended is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIsRecommended requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsRecommended: %w", err)
+	}
+	return oldValue.IsRecommended, nil
+}
+
+// ResetIsRecommended resets all changes to the "is_recommended" field.
+func (m *PaymentMethodPreferenceMutation) ResetIsRecommended() {
+	m.is_recommended = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *PaymentMethodPreferenceMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *PaymentMethodPreferenceMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the PaymentMethodPreference entity.
+// If the PaymentMethodPreference object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentMethodPreferenceMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *PaymentMethodPreferenceMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *PaymentMethodPreferenceMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *PaymentMethodPreferenceMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PaymentMethodPreferenceMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PaymentMethodPreferenceMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PaymentMethodPreference entity.
+// If the PaymentMethodPreference object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentMethodPreferenceMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PaymentMethodPreferenceMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PaymentMethodPreferenceMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PaymentMethodPreferenceMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the PaymentMethodPreference entity.
+// If the PaymentMethodPreference object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentMethodPreferenceMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PaymentMethodPreferenceMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the PaymentMethodPreferenceMutation builder.
+func (m *PaymentMethodPreferenceMutation) Where(ps ...predicate.PaymentMethodPreference) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PaymentMethodPreferenceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PaymentMethodPreferenceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PaymentMethodPreference, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PaymentMethodPreferenceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PaymentMethodPreferenceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PaymentMethodPreference).
+func (m *PaymentMethodPreferenceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PaymentMethodPreferenceMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.method != nil {
+		fields = append(fields, paymentmethodpreference.FieldMethod)
+	}
+	if m.is_recommended != nil {
+		fields = append(fields, paymentmethodpreference.FieldIsRecommended)
+	}
+	if m.version != nil {
+		fields = append(fields, paymentmethodpreference.FieldVersion)
+	}
+	if m.created_at != nil {
+		fields = append(fields, paymentmethodpreference.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, paymentmethodpreference.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PaymentMethodPreferenceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case paymentmethodpreference.FieldMethod:
+		return m.Method()
+	case paymentmethodpreference.FieldIsRecommended:
+		return m.IsRecommended()
+	case paymentmethodpreference.FieldVersion:
+		return m.Version()
+	case paymentmethodpreference.FieldCreatedAt:
+		return m.CreatedAt()
+	case paymentmethodpreference.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PaymentMethodPreferenceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case paymentmethodpreference.FieldMethod:
+		return m.OldMethod(ctx)
+	case paymentmethodpreference.FieldIsRecommended:
+		return m.OldIsRecommended(ctx)
+	case paymentmethodpreference.FieldVersion:
+		return m.OldVersion(ctx)
+	case paymentmethodpreference.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case paymentmethodpreference.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PaymentMethodPreference field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PaymentMethodPreferenceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case paymentmethodpreference.FieldMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMethod(v)
+		return nil
+	case paymentmethodpreference.FieldIsRecommended:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsRecommended(v)
+		return nil
+	case paymentmethodpreference.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case paymentmethodpreference.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case paymentmethodpreference.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PaymentMethodPreference field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PaymentMethodPreferenceMutation) AddedFields() []string {
+	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, paymentmethodpreference.FieldVersion)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PaymentMethodPreferenceMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case paymentmethodpreference.FieldVersion:
+		return m.AddedVersion()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PaymentMethodPreferenceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case paymentmethodpreference.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PaymentMethodPreference numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PaymentMethodPreferenceMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PaymentMethodPreferenceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PaymentMethodPreferenceMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PaymentMethodPreference nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PaymentMethodPreferenceMutation) ResetField(name string) error {
+	switch name {
+	case paymentmethodpreference.FieldMethod:
+		m.ResetMethod()
+		return nil
+	case paymentmethodpreference.FieldIsRecommended:
+		m.ResetIsRecommended()
+		return nil
+	case paymentmethodpreference.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case paymentmethodpreference.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case paymentmethodpreference.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PaymentMethodPreference field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PaymentMethodPreferenceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PaymentMethodPreferenceMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PaymentMethodPreferenceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PaymentMethodPreferenceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PaymentMethodPreferenceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PaymentMethodPreferenceMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PaymentMethodPreferenceMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PaymentMethodPreference unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PaymentMethodPreferenceMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PaymentMethodPreference edge %s", name)
+}
+
 // PermissionMutation represents an operation that mutates the Permission nodes in the graph.
 type PermissionMutation struct {
 	config
@@ -47929,7 +48363,6 @@ type ProcessMutation struct {
 	production_route_operation_code *string
 	outsourcing_enabled             *bool
 	inhouse_enabled                 *bool
-	quality_required                *bool
 	sort_order                      *int
 	addsort_order                   *int
 	note                            *string
@@ -48288,42 +48721,6 @@ func (m *ProcessMutation) ResetInhouseEnabled() {
 	m.inhouse_enabled = nil
 }
 
-// SetQualityRequired sets the "quality_required" field.
-func (m *ProcessMutation) SetQualityRequired(b bool) {
-	m.quality_required = &b
-}
-
-// QualityRequired returns the value of the "quality_required" field in the mutation.
-func (m *ProcessMutation) QualityRequired() (r bool, exists bool) {
-	v := m.quality_required
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldQualityRequired returns the old "quality_required" field's value of the Process entity.
-// If the Process object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ProcessMutation) OldQualityRequired(ctx context.Context) (v bool, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldQualityRequired is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldQualityRequired requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldQualityRequired: %w", err)
-	}
-	return oldValue.QualityRequired, nil
-}
-
-// ResetQualityRequired resets all changes to the "quality_required" field.
-func (m *ProcessMutation) ResetQualityRequired() {
-	m.quality_required = nil
-}
-
 // SetSortOrder sets the "sort_order" field.
 func (m *ProcessMutation) SetSortOrder(i int) {
 	m.sort_order = &i
@@ -48679,7 +49076,7 @@ func (m *ProcessMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProcessMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 11)
 	if m.code != nil {
 		fields = append(fields, process.FieldCode)
 	}
@@ -48697,9 +49094,6 @@ func (m *ProcessMutation) Fields() []string {
 	}
 	if m.inhouse_enabled != nil {
 		fields = append(fields, process.FieldInhouseEnabled)
-	}
-	if m.quality_required != nil {
-		fields = append(fields, process.FieldQualityRequired)
 	}
 	if m.sort_order != nil {
 		fields = append(fields, process.FieldSortOrder)
@@ -48736,8 +49130,6 @@ func (m *ProcessMutation) Field(name string) (ent.Value, bool) {
 		return m.OutsourcingEnabled()
 	case process.FieldInhouseEnabled:
 		return m.InhouseEnabled()
-	case process.FieldQualityRequired:
-		return m.QualityRequired()
 	case process.FieldSortOrder:
 		return m.SortOrder()
 	case process.FieldNote:
@@ -48769,8 +49161,6 @@ func (m *ProcessMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldOutsourcingEnabled(ctx)
 	case process.FieldInhouseEnabled:
 		return m.OldInhouseEnabled(ctx)
-	case process.FieldQualityRequired:
-		return m.OldQualityRequired(ctx)
 	case process.FieldSortOrder:
 		return m.OldSortOrder(ctx)
 	case process.FieldNote:
@@ -48831,13 +49221,6 @@ func (m *ProcessMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetInhouseEnabled(v)
-		return nil
-	case process.FieldQualityRequired:
-		v, ok := value.(bool)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetQualityRequired(v)
 		return nil
 	case process.FieldSortOrder:
 		v, ok := value.(int)
@@ -48976,9 +49359,6 @@ func (m *ProcessMutation) ResetField(name string) error {
 		return nil
 	case process.FieldInhouseEnabled:
 		m.ResetInhouseEnabled()
-		return nil
-	case process.FieldQualityRequired:
-		m.ResetQualityRequired()
 		return nil
 	case process.FieldSortOrder:
 		m.ResetSortOrder()

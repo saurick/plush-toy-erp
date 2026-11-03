@@ -1,8 +1,9 @@
 import { Buffer } from 'node:buffer'
+import { clickLineItemAction } from './lineEditorActions.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { withDeadline } from './boundedWait.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
-import { verifyPurchaseArrivalRedesign } from './purchaseArrivalRedesignScenarios.mjs'
+import { verifyPurchaseArrivalRedesign, verifyPurchaseArrivalGroupHeaders } from './purchaseArrivalRedesignScenarios.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
@@ -46,7 +47,6 @@ export function createBusinessFormInteractionScenarios({
 }) {
   const {
     assertLineItemAddActionScrollsToNewRow,
-    assertLineQuantityUnitSuffix,
   } = createLineItemUnitAssertions({
     assert,
   })
@@ -231,7 +231,7 @@ export function createBusinessFormInteractionScenarios({
   let purchaseOrderEmptyRefreshSettled = Promise.resolve()
   let purchaseOrderFullRefreshSettled = Promise.resolve()
   let releasePurchaseOrderInitialReference = () => {}
-  return [
+  const scenarios = [
     {
       name: 'unit-quantity-precision-desktop',
       path: '/erp/sales/project-orders/sales-orders',
@@ -991,16 +991,17 @@ export function createBusinessFormInteractionScenarios({
               selectedNoun: '材料',
               scenarioName: 'purchase-order-source-import-picker',
             })
-            await modal.getByRole('button', { name: '复制第 1 行', exact: true }).click()
+            await clickLineItemAction(modal.locator('.erp-sales-order-lines-form__row').first(), '复制第 1 行')
+            const originalViewport = page.viewportSize()
+            await page.setViewportSize({ width: 1280, height: originalViewport.height })
             await assertLineItemsUnifiedHorizontalScroll(modal, {
               scenarioName: 'business-formal-purchase-order-form-modal',
               minRows: 2,
             })
-            await assertLineQuantityUnitSuffix(modal, {
-              label: '采购数量',
-              expectedText: '个',
-              scenarioName: 'business-formal-purchase-order-form-modal',
-            })
+            await page.setViewportSize(originalViewport)
+            const quantityUnit = modal.locator('.erp-purchase-line-quantity').first()
+            assert.equal(await quantityUnit.getByLabel('采购数量', { exact: true }).count(), 1)
+            assert.equal(await quantityUnit.locator('.ant-select-selection-item').innerText(), '个')
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-formal-purchase-order-form-modal',
               addButtonName: '添加采购明细',
@@ -2138,4 +2139,62 @@ export function createBusinessFormInteractionScenarios({
       },
     },
   ]
+  const arrival = scenarios.find((scenario) => scenario.name === 'purchase-order-inbound-draft-modal-controls-desktop')
+  scenarios.push({
+    ...arrival,
+    name: 'purchase-arrival-group-header-interaction',
+    beforeNavigate: async (page) => {
+      await arrival.beforeNavigate(page)
+      await page.route('**/rpc/purchase_order', async (route) => {
+        const { id, method } = route.request().postDataJSON()
+        const items = [1, 2].map((number) => ({
+          id: number,
+          purchase_order_id: 1,
+          line_no: number,
+          material_id: number,
+          material_code_snapshot: `MAT-GROUP-${number}`,
+          material_name_snapshot: `分组模拟面料 ${number}`,
+          purchased_quantity: '20',
+          unit_id: 1,
+          unit_price: '3.50',
+          amount: '70.00',
+          line_status: 'open',
+        }))
+        let data
+        if (method === 'list_purchase_order_items') {
+          data = { purchase_order_items: items, total: items.length, limit: 100, offset: 0 }
+        } else if (method === 'get_purchase_order_receipt_progress') {
+          data = { purchase_order_receipt_progress: {
+            purchase_order_id: 1,
+            purchase_order_no: 'PO-STYLE-L1',
+            lifecycle_status: 'approved',
+            items: items.map((item) => ({
+              purchase_order_item_id: item.id,
+              line_no: item.line_no,
+              material_id: item.material_id,
+              material_code: item.material_code_snapshot,
+              material_name: item.material_name_snapshot,
+              unit_id: item.unit_id,
+              unit_code: 'PCS',
+              unit_name: '件',
+              line_status: item.line_status,
+              purchased_quantity: item.purchased_quantity,
+              effective_received_quantity: '0',
+              draft_reserved_quantity: '0',
+              remaining_receivable_quantity: '20',
+              remaining_generatable_quantity: '20',
+              can_generate: true,
+              disabled_reason: '',
+            })),
+          } }
+        } else {
+          await route.fallback()
+          return
+        }
+        await route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(data) } })
+      })
+    },
+    verify: async (page) => verifyPurchaseArrivalGroupHeaders(page, { outputDir }),
+  })
+  return scenarios
 }

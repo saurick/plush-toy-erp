@@ -326,7 +326,7 @@ func productionOrderReferenceOptionToMap(option *biz.ProductionOrderReferenceOpt
 		"unit_code": optionalStringValue(option.UnitCode), "unit_name": optionalStringValue(option.UnitName), "unit_precision": optionalIntValue(option.UnitPrecision),
 		"sales_order_no": optionalStringValue(option.SalesOrderNo), "sales_line_no": optionalIntValue(option.SalesLineNo), "ordered_quantity": optionalStringValue(option.OrderedQuantity), "planned_delivery_at": optionalTimeUnix(option.PlannedDeliveryAt),
 		"planned_production_quantity": optionalStringValue(option.PlannedProductionQuantity), "remaining_plannable_quantity": optionalStringValue(option.RemainingPlannableQuantity),
-		"sales_order_status": optionalStringValue(option.SalesOrderStatus), "sales_line_status": optionalStringValue(option.SalesLineStatus), "bom_version": optionalStringValue(option.BOMVersion), "effective_from": optionalTimeUnix(option.EffectiveFrom), "effective_to": optionalTimeUnix(option.EffectiveTo),
+		"sales_order_status": optionalStringValue(option.SalesOrderStatus), "sales_line_status": optionalStringValue(option.SalesLineStatus), "bom_version": optionalStringValue(option.BOMVersion),
 	}
 }
 

@@ -1,5 +1,17 @@
 import { pressureDataScale } from './devPressureData.mjs'
 import { createDevOperationUUID } from './devOperationIdentity.mjs'
+import {
+  BUSINESS_CHAIN_RULE_ACTION,
+  requireBusinessChainRuleKey,
+} from '../../../../scripts/qa/lib/business-chain-rule-contract.mjs'
+
+export const DEV_CHAIN_RULE_ACTION = Object.freeze({
+  key: BUSINESS_CHAIN_RULE_ACTION,
+  label: '运行本链规则检查',
+  shortLabel: '本链规则',
+  description: '执行所选业务链已登记的后端规则与 SQLite 合同。',
+  boundary: '不包含真实 PostgreSQL、岗位浏览器、部署或客户验收。',
+})
 
 export const DEV_TESTING_OPERATION_API_PATH = '/__dev/api/qa/testing'
 export const DEV_TESTING_OPERATION_SESSION_API_PATH = `${DEV_TESTING_OPERATION_API_PATH}/session`
@@ -176,7 +188,12 @@ export const DEV_TESTING_OPERATION_TERMINAL_STATUSES = Object.freeze([
   'not_proven',
 ])
 
-const ACTION_KEYS = [...DEV_TESTING_FIXED_ACTIONS, ...DEV_PRESSURE_ACTIONS].map((action) => action.key)
+export const DEV_TESTING_AVAILABLE_ACTIONS = Object.freeze([
+  ...DEV_TESTING_FIXED_ACTIONS,
+  ...DEV_PRESSURE_ACTIONS,
+  DEV_CHAIN_RULE_ACTION,
+])
+const ACTION_KEYS = DEV_TESTING_AVAILABLE_ACTIONS.map((action) => action.key)
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const COMMIT_PATTERN = /^[0-9a-f]{40,64}$/u
@@ -185,7 +202,7 @@ const AFFECTED_SCOPE_PATTERN = /^T[0-8]$/u
 const PLAN_COMMAND_SCOPE_PATTERN = /^(?:T[0-8]|LOCAL_FULL)$/u
 const LOCAL_GATE_VALUES = Object.freeze(['focused', 'full'])
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage|business-consistency|rpc-examples|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
+  /^testing:(fast|role-access|field-linkage|business-consistency|rpc-examples|chain-rules|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
 const STATUS_META = Object.freeze({
   queued: Object.freeze({ label: '等待启动', tone: 'primary' }),
   running: Object.freeze({ label: '运行中', tone: 'primary' }),
@@ -263,6 +280,7 @@ export function normalizeDevTestingOperation(operation) {
     [
       'action',
       ...(Object.hasOwn(operation, 'dataScale') ? ['dataScale'] : []),
+      ...(Object.hasOwn(operation, 'chainKey') ? ['chainKey'] : []),
       'createdAt',
       'exitCode',
       'finishedAt',
@@ -296,6 +314,11 @@ export function normalizeDevTestingOperation(operation) {
   if (Object.hasOwn(operation, 'dataScale')) {
     if (!operation.action.startsWith('pressure-')) { throw new Error('data scale only applies to pressure actions') }
     pressureDataScale(operation.dataScale)
+  }
+  if (operation.action === BUSINESS_CHAIN_RULE_ACTION) {
+    requireBusinessChainRuleKey(operation.chainKey)
+  } else if (Object.hasOwn(operation, 'chainKey')) {
+    throw new Error('chain scope only applies to chain rules')
   }
   const terminal = DEV_TESTING_OPERATION_TERMINAL_STATUSES.includes(
     operation.status
@@ -608,13 +631,15 @@ export function createDevTestingOperationClient({
       return normalizeDevTestingPlan(await readJsonResponse(response))
     },
 
-    async start(action, idempotencyKey, { signal, dataScale } = {}) {
+    async start(action, idempotencyKey, { signal, dataScale, chainKey } = {}) {
       const match = IDEMPOTENCY_PATTERN.exec(String(idempotencyKey || ''))
       if (!ACTION_KEYS.includes(action) || match?.[1] !== action) {
         throw new Error('固定验证请求标识无效')
       }
       if (action.startsWith('pressure-')) pressureDataScale(dataScale)
       else if (dataScale !== undefined) { throw new Error('data scale only applies to pressure actions') }
+      if (action === BUSINESS_CHAIN_RULE_ACTION) requireBusinessChainRuleKey(chainKey)
+      else if (chainKey !== undefined) { throw new Error('chain scope only applies to chain rules') }
       const csrfToken = await readSession(signal)
       const response = await fetchImpl(DEV_TESTING_OPERATION_ACTION_API_PATH, {
         method: 'POST',
@@ -625,7 +650,7 @@ export function createDevTestingOperationClient({
         },
         body: JSON.stringify({
           action,
-          payload: { idempotencyKey, ...(action.startsWith('pressure-') ? { dataScale } : {}) },
+          payload: { idempotencyKey, ...(action.startsWith('pressure-') ? { dataScale } : {}), ...(action === BUSINESS_CHAIN_RULE_ACTION ? { chainKey } : {}) },
         }),
         cache: 'no-store',
         credentials: 'same-origin',
@@ -644,7 +669,11 @@ export function createDevTestingOperationClient({
       ) {
         throw requestError()
       }
-      return normalizeDevTestingOperation(payload.operation)
+      const operation = normalizeDevTestingOperation(payload.operation)
+      if (operation.action !== action || operation.chainKey !== chainKey) {
+        throw requestError()
+      }
+      return operation
     },
 
     async read(operationId, { signal } = {}) {

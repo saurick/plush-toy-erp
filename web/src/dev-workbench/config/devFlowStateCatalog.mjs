@@ -1284,7 +1284,7 @@ const FLOW_DEFINITIONS = [
     transitions: [],
     transitionAuthority: 'object-specific',
     linearLifecycle: false,
-    guard: '启停保留历史引用；仓库另查库存与默认仓依赖。下表说明现有规则，不提供启停操作。',
+    guard: '启停保留历史引用；仓库另查库存与默认仓依赖。按对象查看启停条件，本页不提供启停操作。',
     factBoundary: 'master_data_only',
     sourceRefs: [STATUS_INDEX_DOC],
     evidence: [

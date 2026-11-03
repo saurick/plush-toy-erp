@@ -84,6 +84,7 @@ import {
   permissionCenterAdminDialogReducer,
 } from '../../utils/permissionCenterAdminDialog.mjs'
 import FilterSelect from '@/common/components/select/FilterSelect'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function PermissionAdminAccounts({
   toolbarContainer,
@@ -1021,7 +1022,7 @@ export default function PermissionAdminAccounts({
         confirmLoading={creating}
         okText="创建"
       >
-        <Form
+        <BusinessForm
           form={createForm}
           className="erp-business-action-form"
           layout="vertical"
@@ -1117,7 +1118,7 @@ export default function PermissionAdminAccounts({
               当前账号不能分配岗位；新账号创建后，请联系账号负责人完成岗位设置。
             </Paragraph>
           ) : null}
-        </Form>
+        </BusinessForm>
       </BusinessFormPage>
       <BusinessModal
         className="erp-permission-modal"
@@ -1245,7 +1246,7 @@ export default function PermissionAdminAccounts({
         forceRender
       >
         <p>重置后，该账号所有设备上的当前登录都会失效。</p>
-        <Form
+        <BusinessForm
           form={resetForm}
           name="admin-password-reset"
           layout="vertical"
@@ -1262,7 +1263,7 @@ export default function PermissionAdminAccounts({
           >
             <Input.Password autoComplete="new-password" />
           </Form.Item>
-        </Form>
+        </BusinessForm>
       </BusinessModal>
       <BusinessModal
         size="confirm"
@@ -1291,7 +1292,7 @@ export default function PermissionAdminAccounts({
           }
           style={{ marginBottom: 16 }}
         />
-        <Form form={statusForm} layout="vertical" onFinish={applyAdminStatus}>
+        <BusinessForm form={statusForm} layout="vertical" onFinish={applyAdminStatus}>
           <Form.Item
             label="变更原因"
             name="reason"
@@ -1308,7 +1309,7 @@ export default function PermissionAdminAccounts({
               placeholder="例如：临时离岗、安全核查或恢复正常使用"
             />
           </Form.Item>
-        </Form>
+        </BusinessForm>
       </BusinessModal>
       <BusinessModal
         size="confirm"
@@ -1335,7 +1336,7 @@ export default function PermissionAdminAccounts({
           description="账号和历史操作记录会保留，未完成的个人待办将退回原负责岗位，供该岗位其他人员继续处理。注销不可恢复；如需该人员重新使用系统，必须创建新账号。"
           style={{ marginBottom: 16 }}
         />
-        <Form form={revokeForm} layout="vertical" onFinish={revokeAdminAccount}>
+        <BusinessForm form={revokeForm} layout="vertical" onFinish={revokeAdminAccount}>
           <Form.Item
             label="注销原因"
             name="reason"
@@ -1348,7 +1349,7 @@ export default function PermissionAdminAccounts({
               placeholder="例如：员工离职，账号停止使用"
             />
           </Form.Item>
-        </Form>
+        </BusinessForm>
       </BusinessModal>
     </>
   )

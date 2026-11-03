@@ -22,7 +22,6 @@ test('finance pages project only fields that belong to their fact type', () => {
     'amount',
     'fee_amount',
     'currency',
-    'collection_type',
     'payment_term',
     'due_at',
   ])

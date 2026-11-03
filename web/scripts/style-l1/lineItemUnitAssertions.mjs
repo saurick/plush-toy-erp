@@ -1,3 +1,5 @@
+import { clickLineItemAction } from './lineEditorActions.mjs'
+
 export function createLineItemUnitAssertions({ assert }) {
   const assertLineQuantityUnitSuffix = async (
     modal,
@@ -435,9 +437,7 @@ export function createLineItemUnitAssertions({ assert }) {
   }
 
   const assertLineItemDuplicateAction = async (modal, { scenarioName }) => {
-    const duplicateButton = modal.getByRole('button', { name: '复制第 1 行' })
-    await duplicateButton.waitFor({ state: 'visible', timeout: 5_000 })
-    await duplicateButton.click()
+    await clickLineItemAction(modal.locator('.erp-sales-order-lines-form__row').first(), '复制第 1 行')
     await modal
       .locator('.erp-sales-order-lines-form__row')
       .nth(1)
@@ -454,13 +454,8 @@ export function createLineItemUnitAssertions({ assert }) {
         copyLabels: Array.from(
           node.querySelectorAll('button[aria-label^="复制第"]')
         ).map((button) => button.getAttribute('aria-label')),
-        rowActionTexts: rows.map(
-          (row) =>
-            row
-              .querySelector('.erp-sales-order-lines-form__row-actions')
-              ?.textContent?.replace(/\s+/g, ' ')
-              .trim() || ''
-        ),
+        rowActionTexts: Array.from(node.querySelectorAll('.erp-line-editor__action-content')).map((entry) => entry.textContent?.replace(/\s+/g, ' ').trim() || ''),
+        focusedSelection: Boolean(document.activeElement?.closest('.erp-line-editor__row-marker')),
         visibleText,
       }
     })
@@ -469,6 +464,7 @@ export function createLineItemUnitAssertions({ assert }) {
       metrics.rowCount >= 2,
       `${scenarioName} 复制本行后应插入新明细行: ${JSON.stringify(metrics)}`
     )
+    assert.equal(metrics.focusedSelection, false, `${scenarioName} 复制后进入业务字段，而非选行控件`)
     assert(
       metrics.copyLabels.includes('复制第 1 行') &&
         metrics.copyLabels.includes('复制第 2 行'),
@@ -674,8 +670,8 @@ export function createLineItemUnitAssertions({ assert }) {
       maxSingleAddMs = 1800,
       maxAverageScrollFrameMs = 24,
       maxSingleScrollFrameMs = 80,
-      listSelector = '.erp-sales-order-lines-form__list',
-      rowSelector = '.erp-sales-order-lines-form__row',
+      listSelector = '.erp-sales-order-lines-form__list, .erp-task-line-cards',
+      rowSelector = '.erp-sales-order-lines-form__row, .erp-task-line-card',
     }
   ) => {
     const addButton = modal.getByRole('button', {

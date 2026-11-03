@@ -17,9 +17,17 @@ import {
   getDevTestingOperationPresentation,
   normalizeDevTestingPlan,
   normalizeDevTestingSummary,
+  normalizeDevTestingOperation,
 } from './devTestingOperation.mjs'
 
 const ID = '123e4567-e89b-42d3-a456-426614174000'
+test('chain operation responses keep their required scope and reject scope on other actions', () => {
+  const value = operation({ action: 'chain-rules', chainKey: 'production_exception' })
+  assert.equal(normalizeDevTestingOperation(value).chainKey, 'production_exception')
+  assert.throws(() => normalizeDevTestingOperation({ ...value, chainKey: '../shell' }))
+  assert.throws(() => normalizeDevTestingOperation({ ...value, chainKey: undefined }))
+  assert.throws(() => normalizeDevTestingOperation({ ...value, action: 'fast' }))
+})
 const REPOSITORY = {
   commit: 'a'.repeat(40),
   dirty: true,
@@ -74,6 +82,7 @@ test('testing summary keeps fixed results and Git Hook wiring independent', () =
       'field-linkage': null,
       'business-consistency': null,
       'rpc-examples': null,
+      'chain-rules': null,
       'pressure-quick': null,
       'pressure-capacity': null,
     },
@@ -112,6 +121,7 @@ test('testing summary recognizes a quality gate holding the shared QA lock', () 
       'field-linkage': null,
       'business-consistency': null,
       'rpc-examples': null,
+      'chain-rules': null,
       'pressure-quick': null,
       'pressure-capacity': null,
     },
@@ -227,6 +237,7 @@ test('testing client posts only action and idempotency key', async () => {
             'field-linkage': null,
             'business-consistency': null,
             'rpc-examples': null,
+      'chain-rules': null,
             'pressure-quick': null,
             'pressure-capacity': null,
           },

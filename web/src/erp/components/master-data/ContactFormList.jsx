@@ -1,4 +1,4 @@
-import React, { useId } from 'react'
+import React, { useId, useState } from 'react'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Form, Input, Radio, Space } from 'antd'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
@@ -15,6 +15,7 @@ import {
 import { withPrimaryContact } from './contactFormRows.mjs'
 import './contactFormList.css'
 import '../business-list/businessLineItemGroups.css'
+import BusinessLineEditor, { BusinessLineEditorInlineActions, BusinessLineEditorRowControls, useBusinessLineEditor } from '../business-list/BusinessLineEditor.jsx'
 
 const contactFields = [
   {
@@ -44,7 +45,17 @@ function ContactRow({
   onCopy,
   onRemove,
 }) {
-  const columns = multiple ? 8 : 7
+  const editor = useBusinessLineEditor()
+  const [noteOpen, setNoteOpen] = useState(false)
+  const noteID = useId()
+  const showNote = editor?.compact || noteOpen
+  const columns = (multiple ? 7 : 6) + Number(Boolean(editor?.compact))
+  const actions = (
+    <Space size={0}>
+      <Button type="text" size="small" icon={<CopyOutlined />} aria-label={`复制联系人条目 ${index + 1}`} onClick={onCopy}>复制行</Button>
+      <Button type="text" size="small" danger icon={<DeleteOutlined />} aria-label={`移除联系人条目 ${index + 1}`} disabled={disabled || !multiple} onClick={onRemove}>移除行</Button>
+    </Space>
+  )
 
   return (
     <tbody
@@ -55,10 +66,12 @@ function ContactRow({
       <tr className="erp-contact-editor__fields">
         <td
           className="erp-contact-editor__sequence erp-editable-line-group__sequence"
-          rowSpan={2}
+          rowSpan={showNote ? 2 : 1}
           aria-label={`第 ${index + 1} 位`}
         >
-          <span className="erp-editable-line-group__number">{index + 1}</span>
+          <BusinessLineEditorRowControls index={index} identity={row?.name} actions={actions}>
+            {!editor?.compact ? <Button type="text" className="erp-line-editor__details-toggle" disabled={false} aria-expanded={noteOpen} aria-controls={noteID} aria-label={`${noteOpen ? '收起' : '展开'}第 ${index + 1} 行备注`} onClick={() => setNoteOpen((open) => !open)}><span aria-hidden="true">{noteOpen ? '⌄' : '›'}</span><span className="erp-editable-line-group__number">{index + 1}</span></Button> : <span className="erp-editable-line-group__number">{index + 1}</span>}
+          </BusinessLineEditorRowControls>
         </td>
         {contactFields.map(({ name, label, rules }) => (
           <td key={name} className={`erp-contact-editor__${name}`}>
@@ -92,28 +105,9 @@ function ContactRow({
             />
           </td>
         ) : null}
-        <td className="erp-contact-editor__actions">
-          <Space size={0}>
-            <Button
-              type="text"
-              size="small"
-              icon={<CopyOutlined />}
-              aria-label={`复制联系人条目 ${index + 1}`}
-              onClick={onCopy}
-            />
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              aria-label={`移除联系人条目 ${index + 1}`}
-              disabled={disabled || !multiple}
-              onClick={onRemove}
-            />
-          </Space>
-        </td>
+        <BusinessLineEditorInlineActions><td className="erp-contact-editor__actions">{actions}</td></BusinessLineEditorInlineActions>
       </tr>
-      <tr className="erp-contact-editor__note-editor">
+      <tr id={noteID} className="erp-contact-editor__note-editor" hidden={!showNote}>
         <td colSpan={columns - 1}>
           <Form.Item label="备注" name={[field.name, 'note']}>
             <BusinessTextArea
@@ -156,12 +150,12 @@ export default function ContactFormList({ form, entityLabel }) {
       ]}
     >
       {(fields, { add, remove }, { errors }) => (
-        <div className="erp-master-contact-list erp-contact-editor">
-          <BusinessLineItemsHeader title="联系人" />
-          <TableScrollRegion className="erp-master-contact-list__items">
+        <BusinessLineEditor className="erp-master-contact-list erp-contact-editor" compactThreshold={820} data-table-scroll-scope>
+          <BusinessLineItemsHeader title="联系人" scrollControls />
+          <TableScrollRegion className="erp-master-contact-list__items" useToolbar stickyHeader>
             <table
               className="erp-contact-editor__table"
-              data-table-lines="appearance"
+              data-table-lines="fixed"
               aria-label={`${entityLabel}联系人`}
             >
               <colgroup>
@@ -174,7 +168,7 @@ export default function ContactFormList({ form, entityLabel }) {
                 {fields.length > 1 ? (
                   <col className="erp-contact-editor__primary-column" />
                 ) : null}
-                <col className="erp-contact-editor__actions-column" />
+                <BusinessLineEditorInlineActions><col className="erp-contact-editor__actions-column" /></BusinessLineEditorInlineActions>
               </colgroup>
               <thead>
                 <tr>
@@ -195,7 +189,7 @@ export default function ContactFormList({ form, entityLabel }) {
                     </th>
                   ))}
                   {fields.length > 1 ? <th scope="col">主联系人</th> : null}
-                  <th scope="col">操作</th>
+                  <BusinessLineEditorInlineActions><th scope="col">操作</th></BusinessLineEditorInlineActions>
                 </tr>
               </thead>
               {fields.map((field, index) => (
@@ -250,7 +244,7 @@ export default function ContactFormList({ form, entityLabel }) {
             ]}
           />
           <Form.ErrorList errors={errors} />
-        </div>
+        </BusinessLineEditor>
       )}
     </Form.List>
   )

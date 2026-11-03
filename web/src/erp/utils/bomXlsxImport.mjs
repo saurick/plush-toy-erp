@@ -832,8 +832,6 @@ export function buildBOMImportDraft(
   const values = {
     product_id: positiveID(productMatch.record?.id),
     version: '',
-    effective_from: '',
-    effective_to: '',
     source_order_no: parsed.context?.sourceOrderNo || '',
     quantity_text: parsed.context?.quantityText || '',
     spare_text: parsed.context?.spareText || '',

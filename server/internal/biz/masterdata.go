@@ -113,7 +113,6 @@ type Process struct {
 	ProductionRouteOperationCode *string
 	OutsourcingEnabled           bool
 	InhouseEnabled               bool
-	QualityRequired              bool
 	SortOrder                    int
 	Note                         *string
 	IsActive                     bool
@@ -223,7 +222,6 @@ type ProcessMutation struct {
 	ProductionRouteOperationCode *string
 	OutsourcingEnabled           bool
 	InhouseEnabled               bool
-	QualityRequired              bool
 	Note                         *string
 }
 
@@ -311,6 +309,9 @@ type ProductSKUFilter struct {
 }
 
 type MasterDataRepo interface {
+	ListPaymentMethods(ctx context.Context, filter PaymentMethodFilter) (PaymentMethodSuggestions, error)
+	ListPaymentMethodRecommendations(ctx context.Context, filter PaymentMethodRecommendationFilter) ([]PaymentMethodRecommendation, bool, error)
+	SetPaymentMethodRecommendation(ctx context.Context, change PaymentMethodRecommendationChange, audit *RuntimeAuditEventCreate) (*PaymentMethodRecommendation, error)
 	CreateCustomer(ctx context.Context, in *CustomerMutation) (*Customer, error)
 	UpdateCustomer(ctx context.Context, id int, in *CustomerMutation) (*Customer, error)
 	SaveCustomerWithContacts(ctx context.Context, id int, in *CustomerMutation, contacts []*ContactSaveMutation) (*CustomerWithContacts, error)

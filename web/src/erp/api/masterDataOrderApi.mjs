@@ -13,6 +13,12 @@ import {
 } from '../utils/referencePagination.mjs'
 import { validatePurchaseOrderReceiptProgress } from '../utils/purchaseOrderInboundPreview.mjs'
 import { validateSalesOrderExport } from '../utils/salesOrderExport.mjs'
+import { notifyReferenceRecordsChanged } from '../utils/referenceRecordChanges.mjs'
+
+function savedReference(type, record) {
+  notifyReferenceRecordsChanged(type, record?.id)
+  return record
+}
 
 const masterDataRpc = new JsonRpc({
   url: RpcDomain.MASTERDATA,
@@ -106,23 +112,51 @@ export async function listCustomers(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listPaymentMethods(params = {}, options = {}) {
+  const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.LIST_PAYMENT_METHODS, params, options))
+  if (!Array.isArray(data?.methods) || data.methods.some((method) => typeof method !== 'string') || typeof data.has_more !== 'boolean' || typeof data.keyword_not_recommended !== 'boolean' || typeof data.can_manage !== 'boolean') {
+    throw new Error('付款方式候选读取失败，请重试')
+  }
+  return data
+}
+
+const validPaymentMethodRecommendation = (item) => item && typeof item.method === 'string' && item.method.trim() !== '' && typeof item.is_recommended === 'boolean' && Number.isSafeInteger(item.version) && item.version >= 0
+
+export async function listPaymentMethodRecommendations(params, options = {}) {
+  const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.LIST_PAYMENT_METHOD_RECOMMENDATIONS, params, options))
+  if (!Array.isArray(data?.items) || !data.items.every(validPaymentMethodRecommendation) || typeof data.has_more !== 'boolean') {
+    throw new Error('付款方式候选读取失败，请重试')
+  }
+  return data
+}
+
+export async function setPaymentMethodRecommendation(params) {
+  const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.SET_PAYMENT_METHOD_RECOMMENDATION, params))
+  if (!validPaymentMethodRecommendation(data?.item) || data.item.method !== params.method || data.item.is_recommended !== params.is_recommended) {
+    throw new Error('付款方式推荐结果未确认，请刷新后核对')
+  }
+  return data.item
+}
+
 export async function listAllCustomers(params = {}, options = {}) {
   return listAllReferenceRecords(listCustomers, params, 'customers', options)
 }
 
 export async function createCustomer(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_CUSTOMER, params)
-  return dataOf(result)?.customer || null
+  return savedReference('customers', dataOf(result)?.customer || null)
 }
 
 export async function updateCustomer(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_CUSTOMER, params)
-  return dataOf(result)?.customer || null
+  return savedReference('customers', dataOf(result)?.customer || null)
 }
 
 export async function saveCustomerWithContacts(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.SAVE_CUSTOMER_WITH_CONTACTS, params)
-  return dataOf(result)
+  const data = dataOf(result)
+  savedReference('customers', data?.customer)
+  return data
 }
 
 export async function getCustomer(params = {}) {
@@ -132,7 +166,7 @@ export async function getCustomer(params = {}) {
 
 export async function setCustomerActive(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.SET_CUSTOMER_ACTIVE, params)
-  return dataOf(result)?.customer || null
+  return savedReference('customers', dataOf(result)?.customer || null)
 }
 
 export async function listSuppliers(params = {}, options = {}) {
@@ -146,17 +180,19 @@ export async function listAllSuppliers(params = {}, options = {}) {
 
 export async function createSupplier(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_SUPPLIER, params)
-  return dataOf(result)?.supplier || null
+  return savedReference('suppliers', dataOf(result)?.supplier || null)
 }
 
 export async function updateSupplier(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_SUPPLIER, params)
-  return dataOf(result)?.supplier || null
+  return savedReference('suppliers', dataOf(result)?.supplier || null)
 }
 
 export async function saveSupplierWithContacts(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.SAVE_SUPPLIER_WITH_CONTACTS, params)
-  return dataOf(result)
+  const data = dataOf(result)
+  savedReference('suppliers', data?.supplier)
+  return data
 }
 
 export async function getSupplier(params = {}) {
@@ -166,7 +202,7 @@ export async function getSupplier(params = {}) {
 
 export async function setSupplierActive(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.SET_SUPPLIER_ACTIVE, params)
-  return dataOf(result)?.supplier || null
+  return savedReference('suppliers', dataOf(result)?.supplier || null)
 }
 
 export async function listMaterials(params = {}, options = {}) {
@@ -222,12 +258,12 @@ export async function updateWarehouse(params) {
 
 export async function createMaterial(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_MATERIAL, params)
-  return dataOf(result)?.material || null
+  return savedReference('materials', dataOf(result)?.material || null)
 }
 
 export async function updateMaterial(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_MATERIAL, params)
-  return dataOf(result)?.material || null
+  return savedReference('materials', dataOf(result)?.material || null)
 }
 
 export async function getMaterial(params = {}) {
@@ -237,7 +273,7 @@ export async function getMaterial(params = {}) {
 
 export async function setMaterialActive(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.SET_MATERIAL_ACTIVE, params)
-  return dataOf(result)?.material || null
+  return savedReference('materials', dataOf(result)?.material || null)
 }
 
 export async function listProcesses(params = {}, options = {}) {
@@ -280,12 +316,12 @@ export async function listAllProducts(params = {}, options = {}) {
 
 export async function createProduct(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_PRODUCT, params)
-  return dataOf(result)?.product || null
+  return savedReference('products', dataOf(result)?.product || null)
 }
 
 export async function updateProduct(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_PRODUCT, params)
-  return dataOf(result)?.product || null
+  return savedReference('products', dataOf(result)?.product || null)
 }
 
 export async function getProduct(params = {}) {
@@ -295,7 +331,7 @@ export async function getProduct(params = {}) {
 
 export async function setProductActive(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.SET_PRODUCT_ACTIVE, params)
-  return dataOf(result)?.product || null
+  return savedReference('products', dataOf(result)?.product || null)
 }
 
 export async function listProductSKUs(params = {}, options = {}) {
@@ -314,12 +350,12 @@ export async function listAllProductSKUs(params = {}, options = {}) {
 
 export async function createProductSKU(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_PRODUCT_SKU, params)
-  return dataOf(result)?.product_sku || null
+  return savedReference('product_skus', dataOf(result)?.product_sku || null)
 }
 
 export async function updateProductSKU(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_PRODUCT_SKU, params)
-  return dataOf(result)?.product_sku || null
+  return savedReference('product_skus', dataOf(result)?.product_sku || null)
 }
 
 export async function getProductSKU(params = {}) {
@@ -329,7 +365,7 @@ export async function getProductSKU(params = {}) {
 
 export async function setProductSKUActive(params = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.SET_PRODUCT_SKU_ACTIVE, params)
-  return dataOf(result)?.product_sku || null
+  return savedReference('product_skus', dataOf(result)?.product_sku || null)
 }
 
 export async function listContactsByOwner(params = {}, options = {}) {

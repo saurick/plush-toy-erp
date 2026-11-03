@@ -2,7 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createElement as h } from 'react'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
+import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRuntime.mjs'
 import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCatalog.mjs'
+
+registerMermaidTestRenderer()
 
 test('质检纠正只在原判定状态展示，并保留新旧记录与受阻边界', async (t) => {
   const harness = await createReactTestHarness(t)
@@ -65,4 +68,29 @@ test('明确清空办理动作时保留选择入口，并隐藏上一动作的�
   assert(harness.container.querySelector('input[aria-label="办理动作"]'))
   assert(harness.container.textContent.includes('选择办理动作'))
   assert.equal(harness.container.querySelector('.erp-dev-flow-rule-detail'), null)
+})
+
+test('材料启停关联到 BOM 原文和测试，切换对象与清空后不残留', async (t) => {
+  const harness = await createReactTestHarness(t)
+  const { MasterLifecycleRules } = await import('./FlowRuleTables.jsx')
+  const flow = catalog.flows.find((item) => item.lifecycleRules.length)
+  const render = (selectedKey) => harness.render(h(MasterLifecycleRules, { flow, selectedKey, onSelect: () => {} }))
+  await render('material')
+  const links = [...harness.container.querySelectorAll('a')]
+  assert.equal(links.length, 2)
+  const document = new URL(links[0].getAttribute('href'), 'http://localhost')
+  assert.equal(document.pathname, '/__dev/docs')
+  assert.equal(document.searchParams.get('path'), 'docs/product/ui-design/交互设计说明.md')
+  assert.equal(document.hash, '#bom-material-selection')
+  const testing = new URL(links[1].getAttribute('href'), 'http://localhost')
+  assert.equal(testing.pathname, '/__dev/testing')
+  assert.equal(testing.searchParams.get('coverage'), 'rules')
+  assert.equal(testing.searchParams.get('rule'), 'bom-material-selection')
+  assert(!harness.container.textContent.includes('用例通过'))
+  await render('supplier')
+  assert.equal(harness.container.querySelectorAll('a').length, 0)
+  await render('material')
+  assert.equal(harness.container.querySelectorAll('a').length, 2)
+  await render('')
+  assert.equal(harness.container.querySelectorAll('a').length, 0)
 })

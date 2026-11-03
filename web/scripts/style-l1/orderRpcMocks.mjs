@@ -511,8 +511,6 @@ export async function installOrderRpcMocks(page, context) {
       version: 'BOM-STYLE-L1',
       status: 'ACTIVE',
       item_count: 3,
-      effective_from: nowUnix(),
-      effective_to: null,
       note: '样式回归 BOM',
       created_at: nowUnix(),
       updated_at: nowUnix(),

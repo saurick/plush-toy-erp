@@ -9,21 +9,6 @@ const fullRowRemarkContracts = [
     field: 'price_condition_note',
   },
   {
-    file: '../components/sales-orders/SalesOrderForm.jsx',
-    label: '备注',
-    field: 'note',
-  },
-  {
-    file: '../components/purchase-orders/PurchaseOrderForm.jsx',
-    label: '备注',
-    field: 'note',
-  },
-  {
-    file: '../components/outsourcing-orders/OutsourcingOrderForm.jsx',
-    label: '备注',
-    field: 'note',
-  },
-  {
     file: '../components/quality-inspections/QualityInspectionForms.jsx',
     label: '备注',
     field: 'decision_note',
@@ -66,6 +51,21 @@ test('business modal non-item remarks stay on their own form row', () => {
   for (const contract of fullRowRemarkContracts) {
     assertFullRowRemark(contract)
   }
+})
+
+test('订单备注与附件使用共享宽窄布局，不挤入明细行', () => {
+  for (const file of lineItemRemarkContracts) {
+    const sections = sourceFor(file).match(/<BusinessFormSection\b[\s\S]*?<\/BusinessFormSection>/gu) || []
+    const support = sections.find((block) => /title="备注与附件"/u.test(block))
+    assert.ok(support, `${file}: missing remark and attachment section`)
+    assert.match(support, /fieldLayout="support"/u)
+    assert.match(support, /<Form\.Item\b[^>]*name="note"[^>]*label="备注"|<Form\.Item\b[^>]*label="备注"[^>]*name="note"/u)
+    assert.doesNotMatch(support, /erp-line-item-field--note/u)
+    assert.match(support, /\{attachmentPanel\}/u)
+  }
+  const styles = sourceFor('../components/business-list/businessFormSections.css')
+  assert.match(styles, /\[data-field-layout='support'\]\s*\{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/u)
+  assert.match(styles, /@container business-form-fields \(max-width: 720px\)[\s\S]*?\[data-field-layout='support'\]\s*\{\s*grid-template-columns: minmax\(0, 1fr\)/u)
 })
 
 test('line item remarks keep the item-row layout contract', () => {

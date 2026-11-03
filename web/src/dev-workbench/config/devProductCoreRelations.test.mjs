@@ -97,3 +97,15 @@ test('关联导航只开放已登记对象和发布记录，不生成通用跨�
     '/erp/task-board', 'https://example.com/', '//example.com/',
   ]) assert.equal(isProductCoreReadingDestination(url), false, url)
 })
+test('step evidence links validate both chain ownership and the exact step key', () => {
+  const step = 'production_exception_execution_task:calls_domain_command:production_exception_execution'
+  assert(isProductCoreReadingDestination(`/__dev/business-chain-audit?${new URLSearchParams({ chain: 'production_exception', step })}`))
+  assert(isProductCoreReadingDestination(`/__dev/business-chain-audit?${new URLSearchParams({ chain: 'production_exception', step, batch: 'rules-20261103' })}`))
+  for (const query of [
+    { chain: 'purchase_to_inventory', step },
+    { chain: 'production_exception', step: 'unknown' },
+    { chain: 'production_exception', step, command: 'run' },
+    { chain: 'production_exception', step, batch: '../other' },
+    { chain: 'production_exception', step, batch: '' },
+  ]) assert.equal(isProductCoreReadingDestination(`/__dev/business-chain-audit?${new URLSearchParams(query)}`), false)
+})

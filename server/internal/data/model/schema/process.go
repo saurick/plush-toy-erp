@@ -52,8 +52,6 @@ func (Process) Fields() []ent.Field {
 			Default(false),
 		field.Bool("inhouse_enabled").
 			Default(true),
-		field.Bool("quality_required").
-			Default(false),
 		field.Int("sort_order").
 			Default(0).
 			NonNegative(),

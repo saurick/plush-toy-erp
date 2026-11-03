@@ -100,7 +100,6 @@ func (f productionWIPQualityTestFixture) createWaitingBatch(
 		SetCategory(biz.ProductionWIPOperationHandwork).
 		SetInhouseEnabled(true).
 		SetOutsourcingEnabled(true).
-		SetQualityRequired(true).
 		SaveX(f.ctx)
 	operation := f.client.ProductionOrderOperation.Create().
 		SetProductionOrderID(order.ID).

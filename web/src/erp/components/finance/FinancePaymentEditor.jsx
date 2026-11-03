@@ -22,6 +22,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export function FinancePaymentEditor({
   accountSuggestions = [],
@@ -50,7 +51,7 @@ export function FinancePaymentEditor({
       onCancel={() => !loading && setPaymentOpen(false)}
       onOk={createPayment}
     >
-      <Form
+      <BusinessForm
         form={paymentForm}
         name="finance-payment-create"
         className="erp-business-action-form"
@@ -218,7 +219,7 @@ export function FinancePaymentEditor({
         <BusinessFormSection title="账户与凭据">
           <FinancePaymentEvidenceFields form={paymentForm} open={paymentOpen} accountSuggestions={accountSuggestions} canRead={hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYMENT_READ)} />
         </BusinessFormSection>
-      </Form>
+      </BusinessForm>
     </BusinessFormPage>
   )
 }

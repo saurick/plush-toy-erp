@@ -11,6 +11,7 @@ import {
   SHIPMENT_FINANCE_INVOICE_CATEGORY_OPTIONS,
   shipmentFinanceSourceActionConfig,
 } from '../../utils/shipmentFinanceSourceAction.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function shipmentCustomerText(shipment = {}) {
   const snapshot = shipment?.customer_snapshot
@@ -76,7 +77,7 @@ export default function ShipmentFinanceSourceModal({
           },
         ]}
       />
-      <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+      <BusinessForm form={form} layout="vertical" preserve={false} disabled={loading}>
         {config.requiresInvoiceCategory ? (
           <Form.Item
             name="invoice_category"
@@ -95,7 +96,7 @@ export default function ShipmentFinanceSourceModal({
         <Form.Item name="note" label="备注">
           <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessModal>
   )
 }

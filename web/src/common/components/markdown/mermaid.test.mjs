@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   fitMermaidZoom,
+  getInitialMermaidZoomMode,
   getMermaidDirection,
   toggleMermaidDirection,
   withMermaidDirection,
@@ -13,6 +14,13 @@ const componentSource = readFileSync(
   'utf8'
 )
 const css = readFileSync(new URL('./mermaid.css', import.meta.url), 'utf8')
+
+test('initial fit-width stays distinct from full fit and manual zoom', () => {
+  assert.equal(getInitialMermaidZoomMode('fit'), 'fit-all')
+  assert.equal(getInitialMermaidZoomMode('fit-width'), 'fit-width')
+  assert.equal(getInitialMermaidZoomMode(1), 'manual')
+  assert.equal(getInitialMermaidZoomMode(0.8), 'manual')
+})
 
 test('Mermaid viewer owns its shared interaction styles', () => {
   assert.match(componentSource, /import '\.\/mermaid\.css'/u)

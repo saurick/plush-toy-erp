@@ -119,7 +119,7 @@ test('sales and shipment compound cells omit missing parts and preserve real tex
 
 test('master-data boolean exports distinguish missing values from true and false', () => {
   const columns = modules.master.buildMasterDataRecordColumns({ type: 'processes' })
-  for (const key of ['is_active', 'outsourcing_enabled', 'inhouse_enabled', 'quality_required']) {
+  for (const key of ['is_active', 'outsourcing_enabled', 'inhouse_enabled']) {
     assert.equal(columnValue(columns, key), '')
     assert.equal(columnValue(columns, key, { [key]: false }), key === 'is_active' ? '停用' : '否')
     assert.equal(columnValue(columns, key, { [key]: true }), key === 'is_active' ? '启用' : '是')

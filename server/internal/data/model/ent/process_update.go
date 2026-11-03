@@ -126,20 +126,6 @@ func (_u *ProcessUpdate) SetNillableInhouseEnabled(v *bool) *ProcessUpdate {
 	return _u
 }
 
-// SetQualityRequired sets the "quality_required" field.
-func (_u *ProcessUpdate) SetQualityRequired(v bool) *ProcessUpdate {
-	_u.mutation.SetQualityRequired(v)
-	return _u
-}
-
-// SetNillableQualityRequired sets the "quality_required" field if the given value is not nil.
-func (_u *ProcessUpdate) SetNillableQualityRequired(v *bool) *ProcessUpdate {
-	if v != nil {
-		_u.SetQualityRequired(*v)
-	}
-	return _u
-}
-
 // SetSortOrder sets the "sort_order" field.
 func (_u *ProcessUpdate) SetSortOrder(v int) *ProcessUpdate {
 	_u.mutation.ResetSortOrder()
@@ -385,9 +371,6 @@ func (_u *ProcessUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.InhouseEnabled(); ok {
 		_spec.SetField(process.FieldInhouseEnabled, field.TypeBool, value)
 	}
-	if value, ok := _u.mutation.QualityRequired(); ok {
-		_spec.SetField(process.FieldQualityRequired, field.TypeBool, value)
-	}
 	if value, ok := _u.mutation.SortOrder(); ok {
 		_spec.SetField(process.FieldSortOrder, field.TypeInt, value)
 	}
@@ -608,20 +591,6 @@ func (_u *ProcessUpdateOne) SetInhouseEnabled(v bool) *ProcessUpdateOne {
 func (_u *ProcessUpdateOne) SetNillableInhouseEnabled(v *bool) *ProcessUpdateOne {
 	if v != nil {
 		_u.SetInhouseEnabled(*v)
-	}
-	return _u
-}
-
-// SetQualityRequired sets the "quality_required" field.
-func (_u *ProcessUpdateOne) SetQualityRequired(v bool) *ProcessUpdateOne {
-	_u.mutation.SetQualityRequired(v)
-	return _u
-}
-
-// SetNillableQualityRequired sets the "quality_required" field if the given value is not nil.
-func (_u *ProcessUpdateOne) SetNillableQualityRequired(v *bool) *ProcessUpdateOne {
-	if v != nil {
-		_u.SetQualityRequired(*v)
 	}
 	return _u
 }
@@ -900,9 +869,6 @@ func (_u *ProcessUpdateOne) sqlSave(ctx context.Context) (_node *Process, err er
 	}
 	if value, ok := _u.mutation.InhouseEnabled(); ok {
 		_spec.SetField(process.FieldInhouseEnabled, field.TypeBool, value)
-	}
-	if value, ok := _u.mutation.QualityRequired(); ok {
-		_spec.SetField(process.FieldQualityRequired, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.SortOrder(); ok {
 		_spec.SetField(process.FieldSortOrder, field.TypeInt, value)

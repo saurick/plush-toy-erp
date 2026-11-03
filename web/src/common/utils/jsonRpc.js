@@ -4,6 +4,7 @@ import { authBus } from '../auth/authBus.js'
 import { isAuthFailureCode } from '../consts/errorCodes.js'
 import { getUserFacingErrorMessage } from './errorMessage.js'
 import { RpcError } from './rpcError.js'
+import { captureRpcChangeSource, notifyRpcRecordsChanged } from './rpcChanges.mjs'
 
 let globalRpcId = 0
 const pausedScopes = new Map()
@@ -131,6 +132,7 @@ export class JsonRpc {
   }
 
   async call(method, params = {}, options = {}) {
+    const changeSource = captureRpcChangeSource()
     const { receiveError = false, signal, withAuth = this.withAuth } = options
     if (
       withAuth &&
@@ -221,6 +223,7 @@ export class JsonRpc {
       throw err
     }
 
+    notifyRpcRecordsChanged(this.url, method, changeSource)
     return result
   }
 }

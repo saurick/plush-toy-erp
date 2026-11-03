@@ -15,6 +15,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function localDateTimeValue() {
   const now = new Date()
@@ -204,7 +205,7 @@ export default function ProductionMaterialIssueModal({
           },
         ]}
       />
-      <Form
+      <BusinessForm
         className={editing ? 'erp-business-action-form' : undefined}
         form={form}
         name="production-material-issue"
@@ -291,7 +292,7 @@ export default function ProductionMaterialIssueModal({
         >
           <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </Editor>
   )
 }

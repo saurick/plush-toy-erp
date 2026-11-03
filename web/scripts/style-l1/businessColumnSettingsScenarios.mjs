@@ -287,7 +287,6 @@ export function createBusinessColumnSettingsScenarios({
           ['/erp/master/partners/customers', '默认收货信息'],
           ['/erp/master/partners/suppliers', '经营 / 加工地址'],
           ['/erp/master/products', '英文品名'],
-          ['/erp/engineering/processes', '质检参考'],
           ['/erp/sales/project-orders/sales-orders', '税额'],
           ['/erp/purchase/accessories', '收货地址'],
           ['/erp/purchase/processing-contracts'],

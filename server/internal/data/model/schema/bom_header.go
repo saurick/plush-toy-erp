@@ -20,8 +20,7 @@ type BOMHeader struct {
 func (BOMHeader) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
-			"bom_headers_status_allowed":          "status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')",
-			"bom_headers_effective_dates_ordered": "effective_from IS NULL OR effective_to IS NULL OR effective_to > effective_from",
+			"bom_headers_status_allowed": "status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')",
 		}},
 	}
 }
@@ -37,12 +36,6 @@ func (BOMHeader) Fields() []ent.Field {
 			NotEmpty().
 			Default("DRAFT").
 			MaxLen(32),
-		field.Time("effective_from").
-			Optional().
-			Nillable(),
-		field.Time("effective_to").
-			Optional().
-			Nillable(),
 		field.String("source_order_no").
 			Optional().
 			Nillable().

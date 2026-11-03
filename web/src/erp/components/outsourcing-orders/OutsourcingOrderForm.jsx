@@ -21,16 +21,15 @@ import {
   ProductThumbnail,
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
-import { DateInput } from '../business-list/BusinessDateInputs.jsx'
+import { DateInput, InheritedDateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
-import FieldWithUnitSuffix, {
+import {
   isQuantityTextWithinUnitPrecision,
   unitPrecisionErrorMessage,
   unitPrecisionFromOptions,
-  unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
@@ -55,17 +54,14 @@ import {
 } from '../../utils/numeric20Scale6.mjs'
 import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx'
 import { productSKUOption, referenceLabel } from '../../utils/referenceSelectOptions.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const OUTSOURCING_ORDER_COLUMNS = [
-  { label: '产品订单编号', width: 155 },
-  { label: '加工品类', width: 115, required: true },
-  { label: '产品 / 材料', width: 230, flexible: true, required: true },
-  { label: '加工项目', width: 160 },
-  { label: '工序', width: 140, required: true },
-  { label: '单位', width: 100, required: true },
-  { label: '单价', width: 110 },
-  { label: '加工数量', width: 180, required: true },
-  {
+{ label: '加工品类 / 对象', width: 250, flexible: true, required: true },
+{ label: '加工项目 / 工序', width: 320, required: true },
+{ label: '加工数量 / 单位', width: 200, required: true },
+{ label: '单价', width: 110 },
+{
     label: (
       <BusinessHelpLabel
         itemKey="outsourcing-line-amount"
@@ -75,7 +71,7 @@ const OUTSOURCING_ORDER_COLUMNS = [
     ),
     width: 144,
   },
-  { label: '预计回货日期', width: 160 },
+{ label: '预计回货日期', width: 160 }
 ]
 
 function decimalRule({ positive = false } = {}) {
@@ -209,14 +205,14 @@ export default function OutsourcingOrderForm({
   )
 
   return (
-    <Form
+    <BusinessForm
       form={form}
       name="outsourcing-order-editor"
       disabled={taskReadOnly}
       layout="vertical"
       className="erp-business-action-form erp-outsourcing-contract-form"
     >
-      <BusinessFormSection title="合同与加工厂">
+      <BusinessFormSection fieldLayout="adaptive" title="合同与加工厂">
         <Form.Item
           className="erp-business-action-form__field"
           name="outsourcing_order_no"
@@ -226,7 +222,7 @@ export default function OutsourcingOrderForm({
           <Input maxLength={64} placeholder="自动生成，可按需要调整" />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--wide"
           name="supplier_id"
           label="加工厂（乙方）"
           rules={[{ required: true, message: '请选择加工厂' }]}
@@ -247,7 +243,7 @@ export default function OutsourcingOrderForm({
           <Input maxLength={128} placeholder="整份合同共用时填写" />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           name="currency"
           label="币种"
           rules={[{ required: true, message: '请选择币种' }]}
@@ -255,7 +251,7 @@ export default function OutsourcingOrderForm({
           <Select placeholder="请选择币种" options={BUSINESS_CURRENCY_OPTIONS} />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           name="payment_term_days"
           label={<BusinessHelpLabel label="付款周期（天）" description="保存后固定为本单付款条件，不随加工厂档案调整。" />}
           rules={[
@@ -270,7 +266,7 @@ export default function OutsourcingOrderForm({
           <InputNumber style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           name="order_date"
           label="下单日期"
           rules={[
@@ -290,7 +286,7 @@ export default function OutsourcingOrderForm({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           dependencies={['order_date']}
           name="expected_return_date"
           label="预计回货日期"
@@ -419,26 +415,16 @@ export default function OutsourcingOrderForm({
                 </>
               }
               cells={[
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--source"
-                  name={[field.name, 'product_order_no_snapshot']}
-                  label="产品订单编号"
-                >
-                  <Input
-                    allowClear
-                    maxLength={128}
-                    placeholder="原产品订单编号"
-                  />
-                </Form.Item>,
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--source"
-                  name={[field.name, 'subject_type']}
-                  label="加工品类"
-                  rules={[{ required: true, message: '请选择加工品类' }]}
-                >
-                  <Select
-                    placeholder="请选择加工品类"
-                    options={[
+                <div className="erp-line-editor__paired-fields">
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--source"
+                    name={[field.name, 'subject_type']}
+                    label="加工品类"
+                    rules={[{ required: true, message: '请选择加工品类' }]}
+                  >
+                    <Select
+                      placeholder="请选择加工品类"
+                      options={[
                       {
                         value: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
                         label: '产品 / 半成品',
@@ -448,12 +434,12 @@ export default function OutsourcingOrderForm({
                         label: '材料',
                       },
                     ]}
-                    onChange={(value) => onSubjectTypeChange(field.name, value)}
-                  />
-                </Form.Item>,
-                <Form.Item
-                  noStyle
-                  shouldUpdate={(previous, current) =>
+                      onChange={(value) => onSubjectTypeChange(field.name, value)}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    noStyle
+                    shouldUpdate={(previous, current) =>
                     previous?.items?.[field.name]?.subject_type !==
                       current?.items?.[field.name]?.subject_type ||
                     previous?.items?.[field.name]?.product_id !==
@@ -461,8 +447,8 @@ export default function OutsourcingOrderForm({
                     previous?.items?.[field.name]?.product_name_snapshot !==
                       current?.items?.[field.name]?.product_name_snapshot
                   }
-                >
-                  {({ getFieldValue }) => {
+                  >
+                    {({ getFieldValue }) => {
                     const subjectType = getFieldValue([
                       'items',
                       field.name,
@@ -537,92 +523,44 @@ export default function OutsourcingOrderForm({
                       </div>
                     )
                   }}
-                </Form.Item>,
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--source"
-                  name={[field.name, 'processing_item']}
-                  label="加工项目"
-                  tooltip="提交前必填"
-                >
-                  <BusinessTextArea
-                    minRows={1}
-                    allowClear
-                    maxLength={255}
-                    placeholder="如 脸*1"
-                  />
-                </Form.Item>,
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--source"
-                  name={[field.name, 'process_id']}
-                  label="工序"
-                  rules={[{ required: true, message: '请选择工序' }]}
-                >
-                  <Select
-                    placeholder="请选择工序"
-                    allowClear
-                    showSearch
-                    options={processOptions}
-                    optionFilterProp="searchText"
-                    onChange={(value) => onProcessChange(field.name, value)}
-                  />
-                </Form.Item>,
-                <Form.Item
-                  noStyle
-                  shouldUpdate={(previous, current) =>
-                    previous?.items?.[field.name]?.product_sku_id !==
-                    current?.items?.[field.name]?.product_sku_id
-                  }
-                >
-                  {({ getFieldValue }) => (
-                    <Form.Item
-                      className="erp-line-item-field erp-line-item-field--unit"
-                      name={[field.name, 'unit_id']}
-                      label="单位"
-                      rules={[{ required: true, message: '请选择单位' }]}
-                    >
-                      <Select
-                        placeholder="请选择单位"
-                        disabled={taskReadOnly || Boolean(
-                          getFieldValue(['items', field.name, 'product_sku_id'])
-                        )}
-                        showSearch
-                        options={unitOptions}
-                        optionFilterProp="searchText"
-                        onChange={(value) => {
-                          onUnitChange(field.name, value)
-                          form
-                            .validateFields([
-                              ['items', field.name, 'outsourcing_quantity'],
-                            ])
-                            .catch(() => {})
-                        }}
-                      />
-                    </Form.Item>
-                  )}
-                </Form.Item>,
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--money"
-                  name={[field.name, 'unit_price']}
-                  label="单价"
-                  rules={[decimalRule()]}
-                >
-                  <Input inputMode="decimal" placeholder="可暂不定价" />
-                </Form.Item>,
-                <Form.Item
-                  noStyle
-                  shouldUpdate={(previous, current) =>
-                    previous?.items?.[field.name]?.unit_id !==
-                      current?.items?.[field.name]?.unit_id ||
-                    previous?.items?.[field.name]?.unit_name_snapshot !==
-                      current?.items?.[field.name]?.unit_name_snapshot
-                  }
-                >
-                  {({ getFieldValue }) => (
-                    <Form.Item
-                      className="erp-line-item-field erp-line-item-field--quantity"
-                      name={[field.name, 'outsourcing_quantity']}
-                      label="加工数量"
-                      rules={[
+                  </Form.Item>
+                </div>,
+                <div className="erp-line-editor__paired-fields">
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--source"
+                    name={[field.name, 'processing_item']}
+                    label="加工项目"
+                    tooltip="提交前必填"
+                  >
+                    <BusinessTextArea
+                      minRows={1}
+                      allowClear
+                      maxLength={255}
+                      placeholder="如 脸*1"
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--source"
+                    name={[field.name, 'process_id']}
+                    label="工序"
+                    rules={[{ required: true, message: '请选择工序' }]}
+                  >
+                    <Select
+                      placeholder="请选择工序"
+                      allowClear
+                      showSearch
+                      options={processOptions}
+                      optionFilterProp="searchText"
+                      onChange={(value) => onProcessChange(field.name, value)}
+                    />
+                  </Form.Item>
+                </div>,
+                <div className="erp-line-editor__quantity">
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--quantity"
+                    name={[field.name, 'outsourcing_quantity']}
+                    label="加工数量"
+                    rules={[
                         { required: true, message: '请输入加工数量' },
                         decimalRule({ positive: true }),
                         quantityPrecisionRule({
@@ -631,21 +569,51 @@ export default function OutsourcingOrderForm({
                           unitOptions,
                         }),
                       ]}
-                    >
-                      <FieldWithUnitSuffix
-                        control={<Input inputMode="decimal" />}
-                        unitText={unitSuffixTextFromOptions(
-                          unitOptions,
-                          getFieldValue(['items', field.name, 'unit_id']),
-                          getFieldValue([
-                            'items',
-                            field.name,
-                            'unit_name_snapshot',
-                          ])
+                  >
+                    <Input inputMode="decimal" />
+                  </Form.Item>
+                  <Form.Item
+                    noStyle
+                    shouldUpdate={(previous, current) =>
+                    previous?.items?.[field.name]?.product_sku_id !==
+                    current?.items?.[field.name]?.product_sku_id
+                  }
+                  >
+                    {({ getFieldValue }) => (
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--unit"
+                        name={[field.name, 'unit_id']}
+                        label="单位"
+                        rules={[{ required: true, message: '请选择单位' }]}
+                      >
+                        <Select
+                          placeholder="请选择单位"
+                          disabled={taskReadOnly || Boolean(
+                          getFieldValue(['items', field.name, 'product_sku_id'])
                         )}
-                      />
-                    </Form.Item>
+                          showSearch
+                          options={unitOptions}
+                          optionFilterProp="searchText"
+                          onChange={(value) => {
+                          onUnitChange(field.name, value)
+                          form
+                            .validateFields([
+                              ['items', field.name, 'outsourcing_quantity'],
+                            ])
+                            .catch(() => {})
+                        }}
+                        />
+                      </Form.Item>
                   )}
+                  </Form.Item>
+                </div>,
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--money"
+                  name={[field.name, 'unit_price']}
+                  label="单价"
+                  rules={[decimalRule()]}
+                >
+                  <Input inputMode="decimal" placeholder="可暂不定价" />
                 </Form.Item>,
                 <Form.Item
                   noStyle
@@ -685,7 +653,9 @@ export default function OutsourcingOrderForm({
                     }),
                   ]}
                 >
-                  <DateInput
+                  <InheritedDateInput
+                    inheritedValue={expectedReturnDate}
+                    label="预计回货日期"
                     placeholder={expectedReturnDate || '沿用合同日期'}
                     disabledDate={
                       orderDate
@@ -693,9 +663,21 @@ export default function OutsourcingOrderForm({
                         : undefined
                     }
                   />
-                </Form.Item>,
-              ]}
+                </Form.Item>
+]}
             >
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--source"
+                name={[field.name, 'product_order_no_snapshot']}
+                label="产品订单编号"
+              >
+                <Input
+                  allowClear
+                  maxLength={128}
+                  placeholder="原产品订单编号"
+                />
+              </Form.Item>
+
               <div className="erp-line-item-details__notes">
                 <Form.Item
                   noStyle
@@ -945,16 +927,16 @@ export default function OutsourcingOrderForm({
           </section>
         </div>
       </BusinessFormSection>
-      <BusinessFormSection title="备注与附件">
+      <BusinessFormSection fieldLayout="support" title="备注与附件">
         <Form.Item
-          className="erp-business-action-form__field erp-business-action-form__field--full"
+          className="erp-business-action-form__field"
           name="note"
           label="备注"
         >
           <BusinessTextArea minRows={2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
         </Form.Item>
-        {attachmentPanel}
+        {attachmentPanel ? <div className="erp-business-form-section__attachments">{attachmentPanel}</div> : null}
       </BusinessFormSection>
-    </Form>
+    </BusinessForm>
   )
 }

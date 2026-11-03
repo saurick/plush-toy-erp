@@ -26,17 +26,16 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	))
 	adminCtx := workflowJSONRPCAdminContext()
 
-	_, invalidDateRes, err := j.handleBOM(adminCtx, "save_bom_with_items", "invalid-date", mustJSONRPCStruct(t, map[string]any{
+	_, invalidPrintDateRes, err := j.handleBOM(adminCtx, "save_bom_with_items", "invalid-print-date", mustJSONRPCStruct(t, map[string]any{
 		"product_id": float64(fixtures.productID),
 
-		"effective_from": "2026-06-17",
-		"effective_to":   "2026-06-02",
+		"print_date": "invalid-date",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if invalidDateRes == nil || invalidDateRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected invalid param for reversed BOM effective dates, got %#v", invalidDateRes)
+	if invalidPrintDateRes == nil || invalidPrintDateRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for an invalid BOM print date, got %#v", invalidPrintDateRes)
 	}
 
 	_, draftRes, err := j.handleBOM(adminCtx, "save_bom_with_items", "1", mustJSONRPCStruct(t, map[string]any{

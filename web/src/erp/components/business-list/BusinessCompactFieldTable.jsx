@@ -5,20 +5,37 @@ import SelectPresentationContext from '@/common/components/select/SelectPresenta
 import './businessCompactFieldTable.css'
 import './businessLineItemGroups.css'
 import { useBusinessLineItemDisclosure } from './BusinessLineItemDisclosureContext.js'
+import BusinessLineEditor, { BusinessLineEditorRowControls, useBusinessLineEditor } from './BusinessLineEditor.jsx'
+import { BusinessLineItemsHeader } from './BusinessLineItemsFooter.jsx'
 
-export default function BusinessCompactFieldTable({
+export default function BusinessCompactFieldTable({ columns, ...props }) {
+  const editor = useBusinessLineEditor()
+  const rowActions = columns.some((column) => column.actions)
+  return editor ? <CompactFieldTableContent {...props} columns={columns} /> : (
+    <BusinessLineEditor rowActions={rowActions} data-table-scroll-scope>
+      {rowActions ? <BusinessLineItemsHeader scrollControls /> : null}
+      <CompactFieldTableContent {...props} columns={columns} />
+    </BusinessLineEditor>
+  )
+}
+
+function CompactFieldTableContent({
   columns,
   label,
   children,
   className = '',
   showSequence = false,
+  scrollControlsInToolbar = false,
+  stickyHeader = scrollControlsInToolbar,
 }) {
+  const editor = useBusinessLineEditor()
+  const visibleColumns = editor?.compact ? columns : columns.filter((column) => !column.actions)
   return (
-    <TableScrollRegion className={`erp-compact-field-table ${className}`.trim()}>
-      <table data-table-lines="appearance" aria-label={label}>
+    <TableScrollRegion className={`erp-compact-field-table ${className}`.trim()} useToolbar={scrollControlsInToolbar} stickyHeader={stickyHeader}>
+      <table data-table-lines="fixed" aria-label={label}>
         <colgroup>
-          {showSequence ? <col style={{ width: 44 }} /> : null}
-          {columns.map((column, index) => (
+          {showSequence ? <col style={{ width: 'var(--erp-line-item-sequence-width)' }} /> : null}
+          {visibleColumns.map((column, index) => (
             <col key={index} style={{ width: column.width }} />
           ))}
         </colgroup>
@@ -32,7 +49,7 @@ export default function BusinessCompactFieldTable({
                 序号
               </th>
             ) : null}
-            {columns.map((column, index) => (
+            {visibleColumns.map((column, index) => (
               <th key={index} scope="col">
                 {column.required ? (
                   <span
@@ -62,15 +79,20 @@ export function BusinessCompactFieldRow({
   rowRef,
   sequence,
   lineItemIndex,
+  identity,
+  hidden = false,
 }) {
   const disclosure = useBusinessLineItemDisclosure()
+  const editor = useBusinessLineEditor()
+  const inlineActions = !editor?.rowActions || editor.compact
+  const rowHidden = hidden || disclosure?.hidden
   return (
     <tbody
       className={`erp-compact-field-table__row erp-editable-line-group ${className}`.trim()}
       aria-label={label}
       ref={rowRef}
-      hidden={disclosure?.hidden}
-      data-line-item-collapsed={disclosure?.hidden ? 'true' : undefined}
+      hidden={rowHidden}
+      data-line-item-collapsed={rowHidden ? 'true' : undefined}
       data-line-item-index={disclosure?.index ?? lineItemIndex}
       onFocusCapture={disclosure?.onFocus}
     >
@@ -81,13 +103,15 @@ export function BusinessCompactFieldRow({
             rowSpan={children ? 2 : 1}
             aria-label={`第 ${sequence} 条`}
           >
-            <span className="erp-editable-line-group__number">{sequence}</span>
+            <BusinessLineEditorRowControls index={sequence - 1} identity={identity || disclosure?.identity} actions={actions} hidden={rowHidden}>
+              <span className="erp-editable-line-group__number">{sequence}</span>
+            </BusinessLineEditorRowControls>
           </td>
         ) : null}
         {cells.map((cell, index) => (
           <td key={index}><SelectPresentationContext.Provider value="reference">{cell}</SelectPresentationContext.Provider></td>
         ))}
-        {actions !== undefined ? (
+        {actions !== undefined && inlineActions ? (
           <td className="erp-compact-field-table__actions">{actions}</td>
         ) : null}
       </tr>
@@ -96,7 +120,7 @@ export function BusinessCompactFieldRow({
           <td
             colSpan={
               cells.length +
-              (actions !== undefined ? 1 : 0)
+              (actions !== undefined && inlineActions ? 1 : 0)
             }
           >
             {children}

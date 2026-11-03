@@ -37,6 +37,7 @@ import {
   salesOrderProductionQuantity,
   salesOrderRequirementName,
 } from '../../utils/salesOrderRequirements.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function EngineeringSourceSelect({ onChange, ...props }) {
   const editors = useBusinessEditorGroup()
@@ -337,7 +338,7 @@ function SalesOrderEngineeringWorkspace({
         >
           {loadError ? <p role="alert">{loadError}<Button onClick={() => setReloadKey((value) => value + 1)}>重新读取</Button></p> : null}
           {taskReadOnly && selectedSource && !selectedValue.product_id ? <p>产品尚未建档，请在电脑完成产品资料。</p> : null}
-          <Form
+          <BusinessForm
             name={`engineering-${orderID}`}
             form={form}
             disabled={saving || !canMaintainEngineering}
@@ -361,7 +362,7 @@ function SalesOrderEngineeringWorkspace({
                 </BusinessCompactFieldTable>
               )}
             </Form.List>
-          </Form>
+          </BusinessForm>
         </BusinessFormPage>
       </BusinessEditorPane>
       {visited.has('product') ? (

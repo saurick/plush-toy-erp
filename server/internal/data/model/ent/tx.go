@@ -76,6 +76,8 @@ type Tx struct {
 	OutsourcingOrderItem *OutsourcingOrderItemClient
 	// OutsourcingReturnDisposition is the client for interacting with the OutsourcingReturnDisposition builders.
 	OutsourcingReturnDisposition *OutsourcingReturnDispositionClient
+	// PaymentMethodPreference is the client for interacting with the PaymentMethodPreference builders.
+	PaymentMethodPreference *PaymentMethodPreferenceClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
 	// Process is the client for interacting with the Process builders.
@@ -334,6 +336,7 @@ func (tx *Tx) init() {
 	tx.OutsourcingOrder = NewOutsourcingOrderClient(tx.config)
 	tx.OutsourcingOrderItem = NewOutsourcingOrderItemClient(tx.config)
 	tx.OutsourcingReturnDisposition = NewOutsourcingReturnDispositionClient(tx.config)
+	tx.PaymentMethodPreference = NewPaymentMethodPreferenceClient(tx.config)
 	tx.Permission = NewPermissionClient(tx.config)
 	tx.Process = NewProcessClient(tx.config)
 	tx.ProcessInstance = NewProcessInstanceClient(tx.config)

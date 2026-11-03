@@ -9,14 +9,94 @@ import {
 import {
   chainStepAuditURL,
   chainStepRuleRows,
+  chainStepEvidenceLayers,
   chainStepSourceAccessFacts,
+  readChainVerificationBatch,
   readChainVerificationEvidence,
 } from './devBusinessChainVerification.mjs'
+import {
+  buildChainRuleCheckReport,
+  planChainRuleCheck,
+} from '../../../../scripts/qa/business-chain-rule-check.mjs'
 import { filterChainAuditSteps } from './devBusinessChainAudit.mjs'
 
 const chain = catalog.businessChains.find(
   (entry) => entry.key === 'purchase_to_inventory'
 )
+
+function ruleBatchFixture() {
+  const plan = planChainRuleCheck('production_exception')
+  const repository = { commit: 'a'.repeat(40), dirty: true, fingerprint: 'b'.repeat(64) }
+  const value = buildChainRuleCheckReport({
+    plan,
+repositoryBefore: repository,
+repositoryAfter: repository,
+    generatedAt: '2026-11-03T00:00:00.000Z',
+    runs: plan.commands.map((command) => ({
+      ...command,
+status: 0,
+      stdout: plan.tests.filter((test) => test.gate === 'server' && command.args.includes(`./${test.package.slice('server/'.length)}`))
+        .flatMap((test) => ['run', 'pass'].map((Action) => JSON.stringify({ Package: test.package, Test: test.name, Action }))).join('\n'),
+    })),
+  })
+  return {
+    plan,
+results: value.results,
+    envelope: { batch: 'rules-fixture',
+report: value.report,
+      currentRepository: repository,
+freshness: 'unverified',
+      files: [{ path: 'test-results.json' }] },
+  }
+}
+
+test('具名规则报告核对工作区指纹，单层通过不提升数据库或链路实测', async () => {
+  const fixture = ruleBatchFixture()
+  const read = (envelope, results) => readChainVerificationBatch({
+    batch: 'rules-fixture',
+chain: fixture.plan.chain,
+    fetchImpl: async (url) => ({ ok: true, json: async () => url.includes('/report?') ? envelope : results }),
+  })
+  const value = await read(fixture.envelope, fixture.results)
+  assert.equal(value.ruleResult.current, true)
+  const step = fixture.plan.chain.steps[5]
+  const layers = chainStepEvidenceLayers(step, { ruleResult: value.ruleResult }, value.audit)
+  assert.equal(layers.find((layer) => layer.key === 'server').status, 'passed')
+  assert.equal(layers.find((layer) => layer.key === 'postgres').status, 'missing')
+  assert.equal(layers.find((layer) => layer.key === 'chain').status, 'missing')
+  const historical = await read({ ...fixture.envelope,
+currentRepository: {
+    ...fixture.envelope.currentRepository, fingerprint: 'c'.repeat(64),
+  } }, fixture.results)
+  assert.equal(historical.ruleResult.current, false)
+  assert.equal(chainStepEvidenceLayers(step, { ruleResult: historical.ruleResult })[0].status, 'stale')
+  const invalid = structuredClone(fixture.results)
+  invalid.tests.find((test) => test.status === 'passed').counts.executed = 0
+  const rejected = await read(fixture.envelope, invalid)
+  assert.equal(rejected.ruleResult, null)
+  assert.match(rejected.error, /计数不完整/u)
+})
+
+test('历史记录关联变化仍可阅读原报告，跨链记录不能借相同名称套用', async () => {
+  const fixture = ruleBatchFixture()
+  const old = structuredClone(fixture.results)
+  old.steps[0].testIds = []
+  const value = await readChainVerificationBatch({
+    batch: 'rules-fixture',
+chain: fixture.plan.chain,
+    fetchImpl: async (url) => ({ ok: true,
+json: async () => url.includes('/report?')
+      ? { ...fixture.envelope, freshness: 'historical' } : old }),
+  })
+  assert(value.audit)
+  assert.equal(value.ruleResult, null)
+  assert.match(value.warning, /当前目录不同/u)
+  await assert.rejects(() => readChainVerificationBatch({
+    batch: 'rules-fixture',
+chain,
+    fetchImpl: async () => ({ ok: true, json: async () => fixture.envelope }),
+  }), /范围不匹配/u)
+})
 const database = (current = true) => ({
   kind: 'plush.integration-evidence',
   current,
@@ -135,6 +215,7 @@ test('报告只读且独立失败；普通证据失败不隐藏有效数据库�
   const value = await readChainVerificationEvidence({
     fetchImpl: async (url, options) => {
       requests.push({ url, options })
+      if (url.endsWith('/business-chain-audit')) return { ok: true, status: 200, json: async () => ({ batches: [] }) }
       if (url.endsWith('/coverage'))
         { throw new Error('private diagnostic must not leak') }
       return { ok: true, json: async () => database() }
@@ -143,7 +224,7 @@ test('报告只读且独立失败；普通证据失败不隐藏有效数据库�
   assert.deepEqual(value.errors, ['普通测试报告读取失败'])
   assert.equal(value.reportCurrent, false)
   assert.equal(value.evidence.current, true)
-  assert.equal(requests.length, 2)
+  assert.equal(requests.length, 3)
   assert(
     requests.every(
       ({ options }) =>
@@ -156,7 +237,9 @@ test('报告只读且独立失败；普通证据失败不隐藏有效数据库�
       ok: true,
       status: 200,
       json: async () =>
-        url.endsWith('/coverage')
+        url.endsWith('/business-chain-audit')
+          ? { batches: [] }
+          : url.endsWith('/coverage')
           ? { status: 'missing' }
           : { ...database(), ruleTests: [] },
     }),
@@ -170,6 +253,9 @@ test('实测报告按稳定交接标识定位，不用旧合并步骤或相似�
   const url = new URL(chainStepAuditURL(chain.key, key), 'http://localhost')
   assert.equal(url.searchParams.get('chain'), chain.key)
   assert.equal(url.searchParams.get('step'), key)
+  const selected = new URL(chainStepAuditURL(chain.key, key, 'rules-20261103'), 'http://localhost')
+  assert.equal(selected.searchParams.get('batch'), 'rules-20261103')
+  assert.throws(() => chainStepAuditURL(chain.key, key, '../other'))
   const report = {
     chains: [
       {

@@ -121,7 +121,7 @@ test("frontend error message boundary: Markdown Mermaid errors do not expose par
     "utf8",
   );
 
-  assert(source.includes("请检查 Mermaid 源码语法或稍后重试。"));
+  assert.match(source, /catch\s*\(_error\)[\s\S]*?error: '请刷新页面后重试。'/u);
   assert(!source.includes("error instanceof Error && error.message"));
   assert(!source.includes("? error.message"));
 });

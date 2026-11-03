@@ -21,16 +21,16 @@ import {
   deriveSalesOrderItemAmount,
 } from '../../utils/sourceOrderAmounts.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import PaymentMethodInput from '../PaymentMethodInput.jsx'
 import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTable.jsx'
 import SalesOrderSourceEvidence from './SalesOrderSourceEvidence.jsx'
 import SalesOrderSourcePaymentSection from './SalesOrderSourcePaymentSection.jsx'
-import { DateInput } from '../business-list/BusinessDateInputs.jsx'
+import { DateInput, InheritedDateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import DeliveryAddressFields from '../business-list/DeliveryAddressFields.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
-  singleUnitSuffixTextFromOptions,
   unitPrecisionErrorMessage,
   unitPrecisionFromOptions,
   unitSuffixTextFromOptions,
@@ -39,6 +39,7 @@ import BusinessLineItemsFooter, {
   BusinessLineItemsHeader,
 } from '../business-list/BusinessLineItemsFooter.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
+import BusinessLineEditor from '../business-list/BusinessLineEditor.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
@@ -82,11 +83,10 @@ import {
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 
 const SALES_ORDER_COLUMNS = [
-  { label: '订货产品 / 客户款号', width: 240, flexible: true },
-  { label: '订单数量', width: 192, required: true },
-  { label: '单位', width: 100, required: true },
-  { label: '单价', width: 125 },
-  {
+{ label: '订货产品 / 客户款号', width: 240, flexible: true },
+{ label: '订单数量 / 单位', width: 200, required: true },
+{ label: '单价', width: 125 },
+{
     label: (
       <BusinessHelpLabel
         itemKey="line-amount"
@@ -96,7 +96,7 @@ const SALES_ORDER_COLUMNS = [
     ),
     width: 144,
   },
-  { label: '计划交付日期', width: 160 },
+{ label: '计划交付日期', width: 160 }
 ]
 
 function contactOptionLabel(contact = {}) {
@@ -231,10 +231,8 @@ export function SalesOrderFormFields({
   customers,
   contactOptions = [],
   salesOwnerOptions = [],
-  paymentConditionOptions = [],
   onCustomerChange,
   onContactSelect,
-  onPaymentMethodChange,
   onPaymentConditionBlur,
 }) {
   const orderDate = Form.useWatch('order_date', form)
@@ -253,7 +251,7 @@ export function SalesOrderFormFields({
 
   return (
     <>
-      <BusinessFormSection title="订单与客户">
+      <BusinessFormSection fieldLayout="adaptive" title="订单与客户">
         <Form.Item
           className="erp-business-action-form__field"
           label="订单号（自动）"
@@ -281,7 +279,7 @@ export function SalesOrderFormFields({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--wide"
           label="客户"
           name="customer_id"
           rules={[{ required: true, message: '请选择客户' }]}
@@ -304,7 +302,7 @@ export function SalesOrderFormFields({
           <Input allowClear autoComplete="off" />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           label="币种"
           name="currency"
           rules={[{ required: true, message: '请选择币种' }]}
@@ -312,7 +310,7 @@ export function SalesOrderFormFields({
           <Select placeholder="请选择币种" options={BUSINESS_CURRENCY_OPTIONS} />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           label="下单日期"
           name="order_date"
           rules={[
@@ -332,7 +330,7 @@ export function SalesOrderFormFields({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           dependencies={['order_date']}
           label="计划交付日期"
           name="planned_delivery_date"
@@ -432,7 +430,7 @@ export function SalesOrderFormFields({
           description="从客户档案带出后可按本单调整；保存后固定为本单收货信息。"
         />
       </BusinessFormSection>
-      <BusinessFormSection title="结算与报价">
+      <BusinessFormSection fieldLayout="adaptive" title="结算与报价">
         <Form.Item
           className="erp-business-action-form__field"
           dependencies={['payment_term_days']}
@@ -447,22 +445,10 @@ export function SalesOrderFormFields({
             }),
           ]}
         >
-          <AutoComplete
-            allowClear
-            autoComplete="off"
-            filterOption={(inputValue, option) =>
-              String(option?.value || '')
-                .toLowerCase()
-                .includes(String(inputValue || '').toLowerCase())
-            }
-            options={paymentConditionOptions}
-            placeholder="选择或输入本单付款方式"
-            onBlur={onPaymentConditionBlur}
-            onChange={onPaymentMethodChange}
-          />
+          <PaymentMethodInput onBlur={onPaymentConditionBlur} />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           dependencies={['payment_method']}
           label="付款周期(天)"
           name="payment_term_days"
@@ -501,7 +487,7 @@ export function SalesOrderFormFields({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           dependencies={['tax_mode']}
           label="税率"
           name="tax_rate"
@@ -519,7 +505,7 @@ export function SalesOrderFormFields({
           />
         </Form.Item>
         <Form.Item
-          className="erp-business-action-form__field"
+          className="erp-business-action-form__field erp-business-action-form__field--short"
           label="报价是否含运费"
           name="freight_terms"
           required
@@ -576,15 +562,15 @@ export function SalesOrderFormFields({
           />
         </Form.Item>
       </BusinessFormSection>
-      <BusinessFormSection title="备注与附件">
+      <BusinessFormSection fieldLayout="support" title="备注与附件">
         <Form.Item
-          className="erp-business-action-form__field erp-business-action-form__field--full"
+          className="erp-business-action-form__field"
           label="备注"
           name="note"
         >
           <BusinessTextArea minRows={2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
         </Form.Item>
-        {attachmentPanel}
+        {attachmentPanel ? <div className="erp-business-form-section__attachments">{attachmentPanel}</div> : null}
       </BusinessFormSection>
     </>
   )
@@ -603,6 +589,7 @@ export function SalesOrderItemsFormSection({
   orderID,
 }) {
   const orderDate = Form.useWatch('order_date', form)
+  const plannedDeliveryDate = Form.useWatch('planned_delivery_date', form)
   const watchedItems = Form.useWatch('items', form)
   const taxMode = Form.useWatch('tax_mode', form)
   const taxRate = Form.useWatch('tax_rate', form)
@@ -666,17 +653,20 @@ export function SalesOrderItemsFormSection({
   }
 
   return (
-    <section className="erp-sales-order-lines-form">
+    <section className="erp-sales-order-lines-form erp-line-editor-surface">
       <Form.List name="items">
         {(fields, { add, remove }) => (
           <>
-            <BusinessLineItemsHeader title="订货明细" />
             {fields.length === 0 ? (
-              <BusinessLineItemsEmpty>
-                暂无订货明细，可先保存订单草稿
-              </BusinessLineItemsEmpty>
+              <BusinessLineEditor rowActions={false}>
+                <BusinessLineItemsHeader title="订货明细" />
+                <BusinessLineItemsEmpty>
+                  暂无订货明细，可先保存订单草稿
+                </BusinessLineItemsEmpty>
+              </BusinessLineEditor>
             ) : (
               <BusinessGroupedLineItems
+                title="订货明细"
                 fields={fields}
                 form={form}
                 getGroup={(item) => ({ key: salesOrderLineGroupKey(item), label: salesOrderRequirementName(item) || '待填写订货产品' })}
@@ -831,19 +821,12 @@ export function SalesOrderItemsFormSection({
                             />
                           </Form.Item>
                         </div>,
-                        <Form.Item
-                          noStyle
-                          shouldUpdate={(previous, current) =>
-                            previous?.items?.[field.name]?.unit_id !==
-                            current?.items?.[field.name]?.unit_id
-                          }
-                        >
-                          {({ getFieldValue }) => (
-                            <Form.Item
-                              className="erp-line-item-field erp-line-item-field--quantity"
-                              label="订单数量"
-                              name={[field.name, 'ordered_quantity']}
-                              rules={[
+                        <div className="erp-line-editor__quantity">
+                          <Form.Item
+                            className="erp-line-item-field erp-line-item-field--quantity"
+                            label="订单数量"
+                            name={[field.name, 'ordered_quantity']}
+                            rules={[
                                 {
                                   required: true,
                                   message: '请填写订单数量',
@@ -854,51 +837,38 @@ export function SalesOrderItemsFormSection({
                                   unitOptions,
                                 }),
                               ]}
-                            >
-                              <FieldWithUnitSuffix
-                                control={
-                                  <Input
-                                    allowClear
-                                    autoComplete="off"
-                                    disabled={!canEditLine}
-                                    placeholder="输入数量"
-                                  />
-                                }
-                                unitText={unitSuffixTextFromOptions(
-                                  unitOptions,
-                                  getFieldValue([
-                                    'items',
-                                    field.name,
-                                    'unit_id',
-                                  ]),
-                                  singleUnitSuffixTextFromOptions(unitOptions)
-                                )}
-                              />
-                            </Form.Item>
-                          )}
-                        </Form.Item>,
-                        <Form.Item
-                          className="erp-line-item-field erp-line-item-field--unit"
-                          label="单位"
-                          name={[field.name, 'unit_id']}
-                          rules={[{ required: true, message: '请选择单位' }]}
-                        >
-                          <Select
-                            allowClear
-                            showSearch
-                            disabled={!canEditLine}
-                            optionFilterProp="searchText"
-                            options={unitOptions}
-                            placeholder="选择单位"
-                            onChange={() => {
+                          >
+                            <Input
+                              allowClear
+                              autoComplete="off"
+                              disabled={!canEditLine}
+                              placeholder="输入数量"
+                              inputMode="decimal"
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            className="erp-line-item-field erp-line-item-field--unit"
+                            label="单位"
+                            name={[field.name, 'unit_id']}
+                            rules={[{ required: true, message: '请选择单位' }]}
+                          >
+                            <Select
+                              allowClear
+                              showSearch
+                              disabled={!canEditLine}
+                              optionFilterProp="searchText"
+                              options={unitOptions}
+                              placeholder="选择单位"
+                              onChange={() => {
                               form
                                 .validateFields([
                                   ['items', field.name, 'ordered_quantity'],
                                 ])
                                 .catch(() => {})
                             }}
-                          />
-                        </Form.Item>,
+                            />
+                          </Form.Item>
+                        </div>,
                         <Form.Item
                           className="erp-line-item-field erp-line-item-field--money"
                           label="单价"
@@ -974,7 +944,9 @@ export function SalesOrderItemsFormSection({
                             }),
                           ]}
                         >
-                          <DateInput
+                          <InheritedDateInput
+                            inheritedValue={plannedDeliveryDate}
+                            label="计划交付日期"
                             disabled={!canEditLine}
                             disabledDate={
                               orderDate
@@ -982,8 +954,8 @@ export function SalesOrderItemsFormSection({
                                 : undefined
                             }
                           />
-                        </Form.Item>,
-                      ]}
+                        </Form.Item>
+]}
                     >
                       <Form.Item
                         className="erp-line-item-field erp-line-item-field--snapshot-small"

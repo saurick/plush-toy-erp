@@ -5,25 +5,25 @@
 }
 
 .erp-editable-line-group:is(:focus-within, [data-line-active='true']) {
-  outline: 1px solid var(--erp-interactive-border-focus);
+  outline: var(--erp-line-group-focus-width, 1px) solid var(--erp-interactive-border-focus);
   outline-offset: -1px;
 }
 
 tbody.erp-editable-line-group + tbody.erp-editable-line-group {
-  border-block-start: 2px solid var(--erp-border-strong);
+  border-block-start: var(--erp-line-group-separator-width, 2px) solid var(--erp-line-group-separator-color, var(--erp-border-strong));
 }
 
 .erp-editable-line-group + .erp-editable-line-group > tr:first-child > td {
-  border-block-start: var(--erp-line-group-cell-separator-width, 2px) solid var(--erp-border-strong);
+  border-block-start: var(--erp-line-group-cell-separator-width, var(--erp-line-group-separator-width, 2px)) solid var(--erp-line-group-separator-color, var(--erp-border-strong));
 }
 
 .erp-editable-line-group:nth-of-type(even):not([data-line-parity]),
 .erp-editable-line-group[data-line-parity='even'] {
-  --erp-line-group-bg: var(--erp-surface-bg-muted);
+  --erp-line-group-bg: var(--erp-line-alternate-bg, var(--erp-surface-bg-muted));
 }
 
 .erp-editable-line-group > tr > .erp-editable-line-group__sequence {
-  border-inline-end: 1px solid var(--erp-border);
+  border-inline-end: var(--erp-line-sequence-border-width, 1px) solid var(--erp-border);
   background: var(--erp-line-group-bg);
   vertical-align: top;
 }
@@ -38,8 +38,12 @@ tbody.erp-editable-line-group + tbody.erp-editable-line-group {
 }
 
 .erp-editable-line-group:is(:focus-within, [data-line-active='true']) .erp-editable-line-group__number {
-  background: var(--erp-primary);
-  color: var(--erp-on-accent);
+  background: var(--erp-line-number-active-bg, var(--erp-primary));
+  color: var(--erp-line-number-active-color, var(--erp-on-accent));
+}
+
+.erp-line-editor .erp-editable-line-group:has(.erp-line-editor__row-marker .ant-radio-checked) {
+  --erp-line-group-bg: var(--erp-surface-bg-muted);
 }
 
 .erp-line-item-identity-group {
@@ -90,25 +94,63 @@ tbody.erp-editable-line-group + tbody.erp-editable-line-group {
 }
 
 .erp-line-item-group-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-block-end: 8px;
-}
-
-.erp-line-item-group-controls__count {
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  flex: none;
 }
 
 .erp-line-item-disclosure-heading {
+  position: relative;
+  background: var(--erp-surface-bg-muted);
+}
+
+.erp-line-item-identity-group > tr > .erp-line-item-disclosure-cell {
+  padding: 0;
+}
+
+.erp-line-item-disclosure-heading__toggle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.erp-line-item-disclosure-heading__toggle:hover {
+  background: var(--erp-interactive-bg-hover);
+}
+
+.erp-line-item-disclosure-heading__toggle:focus-visible {
+  outline: 2px solid var(--erp-interactive-border-focus);
+  outline-offset: -2px;
+}
+
+.erp-line-item-disclosure-heading__summary {
+  position: relative;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding-block: 6px;
+  min-height: 38px;
+  padding: 6px 12px;
+  pointer-events: none;
+}
+
+.erp-line-item-disclosure-heading__summary--table {
+  position: sticky;
+  left: 0;
+  width: 100cqi;
+  max-width: 100%;
+}
+
+.erp-line-item-disclosure-heading__arrow {
+  flex: none;
+  font-size: 12px;
+}
+
+.erp-line-item-disclosure-heading__toggle[aria-expanded='true'] + .erp-line-item-disclosure-heading__summary .erp-line-item-disclosure-heading__arrow {
+  transform: rotate(90deg);
 }
 
 .erp-line-item-disclosure-heading__title {
@@ -116,7 +158,18 @@ tbody.erp-editable-line-group + tbody.erp-editable-line-group {
   min-width: 0;
 }
 
+.erp-line-item-disclosure-heading__title :is(button, a[href], [role='button']) {
+  position: relative;
+  pointer-events: auto;
+}
+
 .erp-line-item-disclosure-heading__errors {
   color: var(--erp-danger);
   font-size: var(--erp-font-caption);
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .erp-line-item-disclosure-heading__summary {
+    min-height: 44px;
+  }
 }

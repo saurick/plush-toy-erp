@@ -17,6 +17,9 @@ export const FLOW_READING_CONTEXT_KEYS = [
   keys.roleTab,
   keys.roleTopic,
   keys.roleTopicNode,
+  keys.roleTopicStep,
+  keys.roleTopicPanel,
+  keys.roleTopicBatch,
   keys.roleMap,
   keys.roleMapNode,
   keys.exception,
@@ -32,7 +35,10 @@ export function restoreDevFlowPrimaryContext(previous, current, { independentKey
   const shared = [...FLOW_READING_CONTEXT_KEYS, keys.chain, keys.node, keys.role, keys.relationMachine, keys.relationPermission]
     .filter((key) => !independentKeys.includes(key))
   const contextValue = (params, key) => key === keys.chain ? params.get(key) || 'all' : params.get(key)
-  const changed = shared.some((key) => contextValue(next, key) !== contextValue(current, key))
+  const changed = shared.some((key) =>
+    ![keys.roleTopicPanel, keys.roleTopicBatch].includes(key) &&
+    contextValue(next, key) !== contextValue(current, key)
+  )
   for (const key of shared) {
     if (current.has(key)) next.set(key, current.get(key))
     else next.delete(key)

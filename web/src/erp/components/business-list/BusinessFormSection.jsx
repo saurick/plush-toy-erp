@@ -6,6 +6,7 @@ export default function BusinessFormSection({
   title,
   showHeading = true,
   layout = 'fields',
+  fieldLayout = 'grid',
   children,
   className = '',
 }) {
@@ -33,7 +34,7 @@ export default function BusinessFormSection({
   return (
     <section {...props}>
       {showHeading ? heading : null}
-      <div className={`erp-business-form-section__${layout}`}>{children}</div>
+      <div className={`erp-business-form-section__${layout}`} data-field-layout={layout === 'fields' && fieldLayout !== 'grid' ? fieldLayout : undefined}>{children}</div>
     </section>
   )
 }

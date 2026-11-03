@@ -73,7 +73,6 @@ export async function verifyBusinessCoreProcurement(page, deps) {
       '环节类别',
       '可委外',
       '可内制',
-      '质检参考',
       '可与“可内制”同时开启',
       '仅供查阅该工序通常是否需要检验',
     ],

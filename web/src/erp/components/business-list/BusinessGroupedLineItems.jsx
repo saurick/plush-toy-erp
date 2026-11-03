@@ -1,13 +1,16 @@
-import React, { useMemo } from 'react'
-import { Form } from 'antd'
+import React, { useMemo, useState } from 'react'
+import { Button, Form, Space } from 'antd'
 import { adjacentLineItemRuns } from '../../utils/adjacentLineItemRuns.mjs'
 import BusinessLineItemsTable, { BusinessLineItemGroupHeading } from './BusinessLineItemsTable.jsx'
 import { BusinessLineItemDisclosureContext } from './BusinessLineItemDisclosureContext.js'
 import BusinessLineItemGroupControls from './BusinessLineItemGroupControls.jsx'
 import useBusinessLineItemGroups from './useBusinessLineItemGroups.js'
+import { BusinessLineItemsHeader } from './BusinessLineItemsFooter.jsx'
+import BusinessLineEditor from './BusinessLineEditor.jsx'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 
-function GroupedRow({ hidden, index, onFocus, form, children }) {
-  const value = useMemo(() => ({ hidden, index, form, onFocus: () => onFocus(index) }), [hidden, index, onFocus, form])
+function GroupedRow({ hidden, index, identity, onFocus, form, lineErrors, validationRevision, children }) {
+  const value = useMemo(() => ({ hidden, index, identity, form, lineErrors, validationRevision, onFocus: () => onFocus(index) }), [hidden, index, identity, onFocus, form, lineErrors, validationRevision])
   return <BusinessLineItemDisclosureContext.Provider value={value}>{children}</BusinessLineItemDisclosureContext.Provider>
 }
 
@@ -21,8 +24,15 @@ export default function BusinessGroupedLineItems({
   tableProps,
   columnCount,
   label = tableProps?.label || '明细',
-  alwaysGrouped = false,
+  defaultExpanded,
+  title,
+  description,
+  headerActions,
+  notice,
 }) {
+  const { taskBusiness } = useBusinessPageContext() || {}
+  const mobile = taskBusiness?.device === 'mobile'
+  const [groupView, setGroupView] = useState(false)
   const watched = Form.useWatch(name, form)
   const items = watched || form.getFieldValue(name) || []
   const descriptors = new Map(fields.map((field, index) => [field.name, getGroup(items[field.name] || {}, field, index)]))
@@ -32,16 +42,34 @@ export default function BusinessGroupedLineItems({
     indexes: fields.slice(run.start, run.start + run.count).map((field) => field.name),
     descriptor: descriptors.get(fields[run.start].name),
   }))
-  const controller = useBusinessLineItemGroups({ form, groups, name })
+  const controller = useBusinessLineItemGroups({ form, groups, name, defaultExpanded: defaultExpanded ?? !mobile })
   const rows = new Map(groups.flatMap((group) => group.indexes.map((index) => [index, group])))
   const headings = new Map(groups.map((group) => [group.start, group]))
-  const columns = columnCount ?? ((tableProps?.columns || []).length + (Table === BusinessLineItemsTable ? 2 : Number(Boolean(tableProps?.showSequence))))
-  const grouped = fields.length > 1 || (alwaysGrouped && fields.length > 0)
+  const actionColumns = (tableProps?.columns || []).filter((column) => column.actions).length
+  const columns = columnCount ?? ((tableProps?.columns || []).length - actionColumns + (Table === BusinessLineItemsTable ? 1 : Number(Boolean(tableProps?.showSequence))))
+  const canGroup = fields.length > 1
+  const grouped = canGroup && (mobile || groupView)
 
   return (
-    <div className="erp-line-item-disclosures" ref={controller.rootRef} onFocusCapture={controller.onFocusCapture}>
-      {grouped ? <BusinessLineItemGroupControls controller={controller} form={form} label={label} groupCount={groups.length} /> : null}
-      <Table {...tableProps}>
+    <BusinessLineEditor className="erp-line-item-disclosures" rowActions={Table === BusinessLineItemsTable || actionColumns > 0} data-table-scroll-scope ref={controller.rootRef} onFocusCapture={controller.onFocusCapture}>
+      {title || fields.length > 0 || headerActions ? (
+        <BusinessLineItemsHeader
+          title={title}
+          description={description}
+          notice={notice}
+          groupCount={grouped ? groups.length : undefined}
+          groupActions={canGroup ? (
+            <Space size={4} wrap>
+              {!mobile ? <Button type="text" disabled={false} onClick={() => setGroupView((current) => !current)}>{groupView ? '取消归组' : '分组显示'}</Button> : null}
+              {grouped ? <BusinessLineItemGroupControls controller={controller} form={form} label={label} /> : null}
+            </Space>
+          ) : null}
+          scrollControls
+        >
+          {headerActions}
+        </BusinessLineItemsHeader>
+      ) : notice}
+      <Table {...tableProps} scrollControlsInToolbar>
         {fields.map((field, index) => {
           const group = rows.get(field.name)
           const heading = headings.get(index)
@@ -62,13 +90,13 @@ export default function BusinessGroupedLineItems({
                   {group.descriptor?.title || group.descriptor?.label || `第 ${index + 1} 条明细`}
                 </BusinessLineItemGroupHeading>
               ) : null}
-              <GroupedRow key="row" hidden={hidden} index={field.name} onFocus={controller.onRowFocus} form={form}>
+              <GroupedRow key="row" hidden={hidden} index={field.name} identity={group.descriptor?.label} onFocus={controller.onRowFocus} form={form} lineErrors={controller.lineErrors} validationRevision={controller.validationRevision}>
                 {children(field, index)}
               </GroupedRow>
             </React.Fragment>
           )
         })}
       </Table>
-    </div>
+    </BusinessLineEditor>
   )
 }

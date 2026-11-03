@@ -563,7 +563,6 @@ func (r *masterDataRepo) CreateProcess(ctx context.Context, in *biz.ProcessMutat
 		SetNillableProductionRouteOperationCode(in.ProductionRouteOperationCode).
 		SetOutsourcingEnabled(in.OutsourcingEnabled).
 		SetInhouseEnabled(in.InhouseEnabled).
-		SetQualityRequired(in.QualityRequired).
 		SetSortOrder(sortOrder).
 		SetNillableNote(in.Note).
 		Save(ctx)
@@ -578,8 +577,7 @@ func (r *masterDataRepo) UpdateProcess(ctx context.Context, id int, in *biz.Proc
 		SetCode(in.Code).
 		SetName(in.Name).
 		SetOutsourcingEnabled(in.OutsourcingEnabled).
-		SetInhouseEnabled(in.InhouseEnabled).
-		SetQualityRequired(in.QualityRequired)
+		SetInhouseEnabled(in.InhouseEnabled)
 	if in.ProductionRouteOperationCode == nil {
 		update.ClearProductionRouteOperationCode()
 	} else {
@@ -1569,7 +1567,6 @@ func entProcessToBiz(row *ent.Process) *biz.Process {
 		ProductionRouteOperationCode: row.ProductionRouteOperationCode,
 		OutsourcingEnabled:           row.OutsourcingEnabled,
 		InhouseEnabled:               row.InhouseEnabled,
-		QualityRequired:              row.QualityRequired,
 		SortOrder:                    row.SortOrder,
 		Note:                         row.Note,
 		IsActive:                     row.IsActive,

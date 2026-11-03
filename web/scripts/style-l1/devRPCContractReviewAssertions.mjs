@@ -1,7 +1,6 @@
 import { RPC_CONTRACT_REVIEW_API } from '../../src/dev-workbench/config/devRPCContractReview.mjs'
 import {
-  DEV_PRESSURE_ACTIONS,
-  DEV_TESTING_FIXED_ACTIONS,
+  DEV_TESTING_AVAILABLE_ACTIONS,
   DEV_TESTING_GIT_HOOK_CHECKS,
 } from '../../src/dev-workbench/config/devTestingOperation.mjs'
 
@@ -60,7 +59,7 @@ export async function verifyRPCContractReviewWorkspace(page, { assert, assertNoH
     : route.fulfill({ json: review(new URL(route.request().url()).searchParams.get('range'), state) })
   const testingRoute = (route) => route.fulfill({ json: {
     kind: 'plush.dev-qa-testing-summary', busy: { active: false, kind: '', profile: '' },
-    operations: Object.fromEntries([...DEV_TESTING_FIXED_ACTIONS, ...DEV_PRESSURE_ACTIONS].map(
+    operations: Object.fromEntries(DEV_TESTING_AVAILABLE_ACTIONS.map(
       (action) => [action.key, action.key === 'rpc-examples' ? lastOperation : null]
     )),
     hooks: {

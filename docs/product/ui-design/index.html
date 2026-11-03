@@ -1117,6 +1117,26 @@
     .form-section > .section-title > :is(button,.form-import-actions) { margin-left: auto; }
     .form-import-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 100%; order: 2; }
     .form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 12px; }
+
+    .bom-form-primary { grid-template-columns:minmax(0,1.6fr) minmax(0,.6fr) minmax(0,1fr); }
+    .bom-form-product { display:flex; align-items:center; gap:8px; min-width:0; }
+    .bom-form-product .field { flex:1; min-width:0; }
+    .bom-version-summary { display:inline-flex; flex-wrap:wrap; gap:6px; align-items:center; color:var(--text-3); font-size:12px; }
+    .bom-version-summary strong { color:var(--text); font-weight:500; }
+    .bom-material-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 12px; }
+    .bom-material-footer > span { color:var(--text-3); font-size:12px; }
+    .bom-form-support { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    @media(max-width:767px) { .bom-form-primary,.bom-form-support { grid-template-columns:minmax(0,1fr); } }
+    .form-scroll:has(.form-grid--adaptive) { container:editor-fields / inline-size; }
+    .form-grid--adaptive { display:flex; align-items:flex-start; flex-wrap:wrap; }
+    .form-grid--adaptive > .field { flex:1 1 220px; min-width:min(100%,220px); max-width:min(100%,420px); }
+    .form-grid--adaptive > .field:has(input[type="date"],input[type="number"],[data-form-field="currency"],[data-form-field="days"],[data-form-field="unit"],[data-form-field="invoice"],[data-form-field="invoice-type"]) { flex:0 1 180px; min-width:min(100%,160px); max-width:min(100%,240px); }
+    .form-grid--adaptive > .field:has([data-form-field="party"],[data-form-field="english-name"],[data-form-field="spec"]) { flex:2 1 280px; min-width:min(100%,260px); max-width:min(100%,680px); }
+    .form-grid--adaptive > .field.span-2 { flex:0 0 100%; max-width:100%; }
+    .form-grid--support { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
+    .form-grid--support > .span-2 { grid-column:auto; }
+    @container editor-fields (max-width:720px) { .form-grid--support { grid-template-columns:minmax(0,1fr); } }
+    @container editor-fields (max-width:520px) { .form-grid--adaptive > .field:has(input,ui-select,textarea) { flex-basis:100%; min-width:0; max-width:100%; } }
     .form-grid .field label::after { content: ""; }
     .form-grid .field.required label::before { content: "* "; color: var(--danger); }
     .form-grid .field.error input, .form-grid .field.error ui-select { border-color: var(--danger); }
@@ -2843,6 +2863,12 @@
     .editable-line-number { display:inline-grid; min-width:24px; min-height:24px; place-items:center; border-radius:5px; font-variant-numeric:tabular-nums; }
     .editable-line-group:focus-within .editable-line-number { background:var(--brand); color:var(--on-brand); }
     .document-line-identity { display:grid; gap:6px; }
+    .purchase-quantity-unit { display:grid; grid-template-columns:minmax(0,1fr) minmax(80px,.8fr); gap:8px; }
+    .document-purchase-details { padding:10px 12px; border:1px solid var(--line); background:var(--surface-muted); }
+    .document-purchase-details .document-line-fields { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .purchase-source-heading { grid-column:1/-1; color:var(--text); }
+    .document-purchase-details .document-line-notes { grid-template-columns:minmax(0,1fr); }
+    @media(max-width:720px){.document-purchase-details .document-line-fields{grid-template-columns:repeat(2,minmax(0,1fr));}}
     .document-line-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)); gap:12px 16px; padding:10px 0 4px; }
     .document-line-fields .field { min-width:0; }
     .document-line-fields textarea { width:100%; min-height:34px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--text); }
@@ -3601,7 +3627,9 @@
     .design-select-option[aria-selected="true"] { background:var(--brand-soft); color:var(--brand-strong); font-weight:600; }
     .design-select-option[aria-selected="true"] > .design-select-check { visibility:visible; }
     .design-select-option[aria-disabled="true"] { opacity:.5; cursor:not-allowed; }
-    .design-select-group { padding:6px 10px; color:var(--text-3); font-size:12px; }
+    .design-select-menu > [role="group"] + [role="group"] { margin-block-start:8px; }
+    .design-select-group { min-height:32px; margin-block-end:4px; padding:6px 10px; border-radius:4px; background:var(--surface-muted); color:var(--text-2); font-size:inherit; font-weight:500; line-height:1.4; overflow-wrap:anywhere; cursor:default; }
+    .design-select-menu > [role="group"] > .design-select-option { padding-inline-start:28px; }
     .help-picker ui-select { width:100%; }
     .role-mobile-device ui-select, .role-mobile-device .design-select-option { min-height:44px; font-size:16px; }
     @media(max-width:767px) { ui-select, .design-select-option { min-height:44px; font-size:16px; } }
@@ -4192,8 +4220,8 @@
       processes: defineListPage('processes', '产品工程', '加工环节', '加工环节', '环节名称', '适用范围', {
         kind: '主数据', icon: 'dashboard', prefix: 'PRC', dateLabel: '最近更新', metricLabel: '引用次数', metricType: 'quantity', unit: '次', primary: '新建环节', simpleForm: true,
         statuses: makeStatuses([['active', '启用', 8], ['inactive', '停用', 1]], 9),
-        sampleParties: ['刺绣', '丝印', '裁片', '车缝'], sampleItems: ['可委外 / 质检参考', '可委外 / 质检参考', '质检参考', '可委外 / 质检参考'],
-        boundary: '加工环节用于委外合同与标准路线引用；质检参考仅供查阅，不自动生成质检任务或结果。'
+        sampleParties: ['刺绣', '丝印', '裁片', '车缝'], sampleItems: ['可委外 / 可内制', '可委外 / 可内制', '可内制', '可委外 / 可内制'],
+        boundary: '加工环节用于委外合同与标准路线引用。'
       }),
       inbound: defineListPage('inbound', '仓储管理', '入库办理', '入库单', '供应商', '到货物料', {
         kind: '事实单据', icon: 'inventory', prefix: 'GRN', dateLabel: '到货日期', metricLabel: '到货数量', metricType: 'quantity', unit: '个', primary: null,
@@ -5613,7 +5641,7 @@
       {key:'permissions', purpose:'岗位权限、实际侧栏与数据范围', area:'engineering', title:'权限关系', source:'岗位、账号与正式菜单', status:'已核对', detail:'选择岗位或账号，初始查看权限总览，可切换具体模块或清空后重新选择；明细按模块筛选，未授予时明确提示，统计覆盖全部模块。配置变更回正式权限管理。', path:'/__dev/permission-relationships'},
       {key:'flows', purpose:'业务交接与运行路径', area:'engineering', title:'业务链路', source:'流程定义与运行实例', status:'待核对', detail:'业务结构看链路，实例跟踪查任务与异常；技术详情按需查看，导出集中在一个入口。', path:'/__dev/status-flows'},
       {key:'rules', purpose:'状态、动作条件与纠正', area:'engineering', title:'业务规则', source:'状态、流程与事实的同源目录', status:'待核对', detail:'独立查阅状态流转、流程定义、事实规则与财务口径；关联查看保留原对象与返回位置。', path:'/__dev/business-rules'},
-      {key:'topics', purpose:'跨模块关系、条件与责任', area:'engineering', title:'业务专题', source:'与业务链路共用正式目录', status:'待核对', detail:'独立选择专题查看关系图，保留关联筛选、规则与验证、导出和跨页返回。', path:'/__dev/business-topics'},
+      {key:'topics', purpose:'跨模块关系、规则与验证', area:'engineering', title:'业务专题', source:'与业务链路共用正式目录', status:'待核对', detail:'选择关联动作后，左侧保留本链动作，右侧就近查看办理规则与分层证据；检查项按需展开。报告和页签随返回恢复，切换专题清空旧报告。真实检查经固定 QA 入口执行，后端通过不代替整链实测。', path:'/__dev/business-topics'},
       {key:'handling', purpose:'岗位任务与电脑、手机支持范围', area:'engineering', title:'任务办理', source:'正式任务目录与共享分类', status:'待核对', detail:'直接显示筛选、任务清单和事项详情；电脑覆盖同权限下手机的办理能力，筛选清空即取消条件。', path:'/__dev/task-handling'},
       {key:'integration', purpose:'接口清单、权限、合同与验证缺口', area:'resources', title:'接口与集成', source:'生成接口、只读权限登记与正式合同', status:'只读核对', detail:'按业务域和方法搜索，核对权限、合同与验证来源；缺失明确标注，整体门禁不证明逐接口通过。', path:'/__dev/integration'},
       {key:'usability', purpose:'业务页面的说明缺口', area:'quality', title:'页面说明检查', source:'业务页面说明目录', status:'已核对', detail:'只读核对任务说明、完成标准、交接和字段解释；说明覆盖不代表员工体验或客户验收。', path:'/__dev/business-usability'},
@@ -5754,8 +5782,9 @@
         {from:'待审批',to:'已批准',kind:'standard',condition:'审批通过'},
         {from:'待审批',to:'草稿',kind:'exceptional',condition:'退回后补齐资料'},
       ];
-      const modes=[['standard','正常推进'],['all','全部'],['exceptional','异常与纠正']];
-      if(key==='rules') return `<section data-dev-rules-preview aria-label="业务规则交互样例"><h3>业务规则 · 虚构样例</h3><section data-flow-rules><div class="segment" role="tablist" aria-label="规则分类示例">${[['states','状态流转'],['processes','流程定义'],['facts','事实规则'],['finance','财务口径']].map(([key,label])=>`<button role="tab" class="${key==='states'?'active':''}" aria-selected="${key==='states'}" data-action="dev-rule-kind" data-value="${key}">${label}</button>`).join('')}</div><section data-dev-rule-preview data-rule-kind="states"><div class="dev-design-toolbar" role="group" aria-label="规则对象示例"><button class="btn" data-action="dev-rule-object" data-value="state" aria-pressed="true">采购订单</button><button class="btn" data-action="dev-rule-object" data-value="record" aria-pressed="false">财务红冲单</button></div><div data-rule-object-panel="state"><div class="dev-design-toolbar"><strong>采购订单</strong></div><div class="dev-design-toolbar" role="group" aria-label="状态转换筛选示例">${modes.map(([mode,label])=>`<button class="btn" data-action="dev-rule-view" data-value="${mode}" aria-pressed="${mode==='all'}">${label}</button>`).join('')}</div>${modes.map(([mode,label])=>{const visible=transitions.filter(item=>mode==='all'||item.kind===mode);return `<div data-rule-panel="${mode}"${mode==='all'?'':' hidden'}><div role="img" aria-label="${label}状态图示">${visible.map(item=>`<div class="dev-rule-preview-edge"><span class="dev-git-lock-flow__node">${item.from}</span><span aria-hidden="true">→</span><span class="dev-git-lock-flow__node">${item.to}</span></div>`).join('')}</div><details><summary>完整转换清单（${visible.length}）</summary><ul>${visible.map(item=>`<li>${item.from} → ${item.to}：${item.condition}</li>`).join('')}</ul></details></div>`;}).join('')}<h3>办理条件与影响 · 样例</h3><p class="data-note">说明已有规则，不能据此认定某条实时单据可以办理。</p><div class="table-wrap"><table class="dev-tool-table" aria-label="办理条件与影响样例"><thead><tr><th>动作与责任</th><th>办理条件与阻断</th><th>结果与纠正</th></tr></thead><tbody><tr><th>采购入库</th><td>核对本次就绪行的质检、仓库范围和采购剩余量；部分就绪不代表全部交接完成。</td><td>按实际就绪行入账；已过账错误通过正式取消、退货或调整纠正。<details><summary>规则依据</summary><p>正式页面关联所属后端动作与测试，样例不执行业务。</p></details></td></tr></tbody></table></div><h3>主数据启停 · 样例</h3><div class="table-wrap"><table class="dev-tool-table" aria-label="逐对象启停规则样例"><thead><tr><th>对象</th><th>启停限制</th><th>历史与恢复</th></tr></thead><tbody><tr><th>材料</th><td>使用材料专属启停动作；不能套用仓库的库存清零条件。</td><td>历史引用保留；可通过同一动作重新启用。</td></tr><tr><th>仓库</th><td>编辑保存；停用前处理正数库存和材料默认仓引用。</td><td>原流水和仓库身份保留；重新启用仍编辑原仓库。</td></tr></tbody></table></div></div><div data-rule-object-panel="record" hidden><h3>财务红冲单 · 不可变记录样例</h3><div class="dev-git-lock-flow" role="img" aria-label="反向记录引用原记录"><div class="dev-git-lock-flow__node">反向记录</div><span aria-hidden="true">↓ 引用原记录</span><div class="dev-git-lock-flow__node">原记录 · 已过账</div></div><dl><dt>原记录</dt><dd>继续留存，不能更新或删除。</dd><dt>纠正方式</dt><dd>另建反向记录，不修改原行状态。</dd><dt>关联核对</dt><dd>保留原记录、反向记录和所属账款的关联。</dd></dl></div></section><section data-rule-kind="processes" hidden><div class="dev-design-toolbar"><strong>采购审批</strong></div><div class="dev-git-lock-flow" role="img" aria-label="采购审批路径样例"><span class="dev-git-lock-flow__node">提交采购订单</span><span aria-hidden="true">→</span><span class="dev-git-lock-flow__node">审批</span><span aria-hidden="true">→</span><span class="dev-git-lock-flow__node">通过 / 退回</span></div><details><summary>定义与代码依据</summary><p>此处描述允许的路径；真实运行步骤在实例跟踪查看。</p></details></section><section data-rule-kind="facts" hidden><div class="dev-design-toolbar"><strong>采购入库</strong></div><dl><dt>何时生效</dt><dd>合格材料按采购收货正式过账后生效。</dd><dt>业务影响</dt><dd>增加合格库存，保留来源与批次。</dd><dt>如何纠正</dt><dd>通过退货、调整或冲正处理。</dd></dl><details><summary>规则与代码依据</summary><p>正式页面保留权威真源、幂等与代码证据；实际记录在实例跟踪或所属业务页面查看。</p></details></section><section data-rule-kind="finance" hidden><div class="dev-design-toolbar"><strong>来源与金额</strong></div><dl><dt>销售应收</dt><dd>真实出货后按冻结来源生成。</dd><dt>采购应付</dt><dd>按已入库行和冻结价格生成，财务独立过账。</dd></dl><details><summary>规则依据与验证</summary><p>登记的测试不代表本次运行通过。</p></details></section></section></section>`;
+      const ruleStates=[...new Set(transitions.flatMap(item=>[item.from,item.to]))];
+      const ruleStateNode=label=>`<button class="btn dev-git-lock-flow__node" data-action="dev-rule-state" data-value="${label}" aria-pressed="false">${label}</button>`;
+      if(key==='rules') return `<section data-dev-rules-preview aria-label="业务规则交互样例"><h3>业务规则 · 虚构样例</h3><section data-flow-rules><div class="segment" role="tablist" aria-label="规则分类示例">${[['states','状态流转'],['processes','流程定义'],['facts','事实规则'],['finance','财务口径']].map(([key,label])=>`<button role="tab" class="${key==='states'?'active':''}" aria-selected="${key==='states'}" data-action="dev-rule-kind" data-value="${key}">${label}</button>`).join('')}</div><section data-dev-rule-preview data-rule-kind="states"><div class="dev-design-toolbar" role="group" aria-label="规则对象示例"><button class="btn" data-action="dev-rule-object" data-value="state" aria-pressed="true">采购订单</button><button class="btn" data-action="dev-rule-object" data-value="record" aria-pressed="false">财务红冲单</button></div><div data-rule-object-panel="state"><div class="dev-design-toolbar"><strong>采购订单</strong></div><div data-rule-panel="all"><div role="group" aria-label="完整状态图示">${transitions.map(item=>`<div class="dev-rule-preview-edge">${ruleStateNode(item.from)}<span aria-hidden="true">→</span>${ruleStateNode(item.to)}</div>`).join('')}</div><div aria-live="polite"><p data-rule-state-hint>点选状态查看进入和离开的条件。</p>${ruleStates.map(label=>`<section data-rule-state-detail="${label}" hidden><h4>${label}</h4><ul>${transitions.filter(item=>item.from===label||item.to===label).map(item=>`<li>${item.from} → ${item.to}：${item.condition}</li>`).join('')}</ul></section>`).join('')}</div><details><summary>完整转换清单（${transitions.length}）</summary><ul>${transitions.map(item=>`<li>${item.from} → ${item.to}：${item.condition}</li>`).join('')}</ul></details></div><h3>办理条件与影响 · 样例</h3><p class="data-note">说明已有规则，不能据此认定某条实时单据可以办理。</p><div class="table-wrap"><table class="dev-tool-table" aria-label="办理条件与影响样例"><thead><tr><th>动作与责任</th><th>办理条件与阻断</th><th>结果与纠正</th></tr></thead><tbody><tr><th>采购入库</th><td>核对本次就绪行的质检、仓库范围和采购剩余量；部分就绪不代表全部交接完成。</td><td>按实际就绪行入账；已过账错误通过正式取消、退货或调整纠正。<details><summary>规则依据</summary><p>正式页面关联所属后端动作与测试，样例不执行业务。</p></details></td></tr></tbody></table></div><h3>主数据启停 · 样例</h3><div class="table-wrap"><table class="dev-tool-table" aria-label="逐对象启停规则样例"><thead><tr><th>对象</th><th>启停限制</th><th>历史与恢复</th></tr></thead><tbody><tr><th>材料</th><td>使用材料专属启停动作；不能套用仓库的库存清零条件。</td><td>历史引用保留；可通过同一动作重新启用。</td></tr><tr><th>仓库</th><td>编辑保存；停用前处理正数库存和材料默认仓引用。</td><td>原流水和仓库身份保留；重新启用仍编辑原仓库。</td></tr></tbody></table></div></div><div data-rule-object-panel="record" hidden><h3>财务红冲单 · 不可变记录样例</h3><div class="dev-git-lock-flow" role="img" aria-label="反向记录引用原记录"><div class="dev-git-lock-flow__node">反向记录</div><span aria-hidden="true">↓ 引用原记录</span><div class="dev-git-lock-flow__node">原记录 · 已过账</div></div><dl><dt>原记录</dt><dd>继续留存，不能更新或删除。</dd><dt>纠正方式</dt><dd>另建反向记录，不修改原行状态。</dd><dt>关联核对</dt><dd>保留原记录、反向记录和所属账款的关联。</dd></dl></div></section><section data-rule-kind="processes" hidden><div class="dev-design-toolbar"><strong>采购审批</strong></div><div class="dev-git-lock-flow" role="img" aria-label="采购审批路径样例"><span class="dev-git-lock-flow__node">提交采购订单</span><span aria-hidden="true">→</span><span class="dev-git-lock-flow__node">审批</span><span aria-hidden="true">→</span><span class="dev-git-lock-flow__node">通过 / 退回</span></div><details><summary>定义与代码依据</summary><p>此处描述允许的路径；真实运行步骤在实例跟踪查看。</p></details></section><section data-rule-kind="facts" hidden><div class="dev-design-toolbar"><strong>采购入库</strong></div><dl><dt>何时生效</dt><dd>合格材料按采购收货正式过账后生效。</dd><dt>业务影响</dt><dd>增加合格库存，保留来源与批次。</dd><dt>如何纠正</dt><dd>通过退货、调整或冲正处理。</dd></dl><details><summary>规则与代码依据</summary><p>正式页面保留权威真源、幂等与代码证据；实际记录在实例跟踪或所属业务页面查看。</p></details></section><section data-rule-kind="finance" hidden><div class="dev-design-toolbar"><strong>来源与金额</strong></div><dl><dt>销售应收</dt><dd>真实出货后按冻结来源生成。</dd><dt>采购应付</dt><dd>按已入库行和冻结价格生成，财务独立过账。</dd></dl><details><summary>规则依据与验证</summary><p>登记的测试不代表本次运行通过。</p></details></section></section></section>`;
       return `<section data-dev-flow-preview aria-label="业务链路交互样例"><h3>业务链路 · 虚构样例</h3><div class="dev-design-toolbar"><div class="segment" role="tablist" aria-label="观察方式示例"><button role="tab" aria-selected="true" class="active" data-action="dev-flow-view" data-value="chain">业务结构</button><button role="tab" aria-selected="false" data-action="dev-flow-view" data-value="tracking">实例跟踪</button></div><details><summary>导出</summary><button class="btn" data-action="dev-flow-export" data-value="当前视图">当前视图 · 打印 / PDF</button><button class="btn" data-action="dev-flow-export" data-value="客户校对稿">客户校对稿</button></details></div><div data-flow-panel="chain"><details><summary>关联筛选与动作详情 · 交互示例</summary>${renderDevRelationExample()}</details><div data-flow-design-panel="main">${renderDevFulfillmentPreview()}</div></div><div data-flow-panel="tracking" hidden><div class="dev-design-toolbar"><label class="search"><input aria-label="示例来源单号" placeholder="示例单号 SO-DEMO-001" value="SO-DEMO-001" /></label><button class="btn primary" data-action="dev-flow-find">定位</button></div><p class="data-note">关联任务、协同记录和流程轨迹共用当前查询对象。</p><p data-flow-empty>输入示例单号，定位关联任务。</p><div data-flow-example hidden><h4>SO-DEMO-001 · 关联任务</h4><table class="dev-tool-table"><thead><tr><th>业务环节</th><th>负责岗位</th><th>任务状态</th></tr></thead><tbody><tr><th>采购与来料 · 清点</th><td>仓库</td><td>已完成</td></tr><tr><th>外发裁片 · 回货质检</th><td>IQC</td><td>已完成，发现色差</td></tr></tbody></table><h4>异常分支 · 外发裁片</h4><p><span class="badge warning">待处理</span> 业务决定补料返工、改换厂商或放弃本批次。</p><p class="data-note">任务状态不代替业务结果；此处仅为虚构界面样例。</p><details><summary>协同记录 · 模拟任务</summary><p>当前责任：IQC · 待处理 · 原因：色差待确认</p><ol><li>模拟任务已创建</li><li>已记录色差，等待处理决定</li></ol><details><summary>查询依据</summary><p>正式页面按所选任务读取事件，保留事件时间和处理人。</p></details></details><details><summary>流程轨迹 · 模拟任务</summary><p>当前环节：质量处理 · IQC</p><ol><li>检验已结束</li><li>质量处理待办理</li></ol><details><summary>运行依据与责任核对</summary><p>正式页面保留实例版本、节点与责任来源；只显示实际查询结果。</p></details></details></div></div><p data-flow-export-result hidden role="status"></p></section>`;
     }
     function renderDevCiGuidePreview(initialSection='overview') {
@@ -6164,10 +6193,12 @@ active = new Set()
         for(const panel of scope.querySelectorAll('[data-rule-kind]')) panel.hidden=panel.dataset.ruleKind!==target.dataset.value;
         return true;
       }
-      if(action==='dev-rule-view') {
+      if(action==='dev-rule-state') {
         const scope=target.closest('[data-dev-rule-preview]');
-        for(const button of scope.querySelectorAll('[data-action="dev-rule-view"]')) button.setAttribute('aria-pressed',String(button.dataset.value===target.dataset.value));
-        for(const panel of scope.querySelectorAll('[data-rule-panel]')) panel.hidden=panel.dataset.rulePanel!==target.dataset.value;
+        const selected=target.getAttribute('aria-pressed')==='true'?'':target.dataset.value;
+        for(const button of scope.querySelectorAll('[data-action="dev-rule-state"]')) button.setAttribute('aria-pressed',String(button.dataset.value===selected));
+        for(const panel of scope.querySelectorAll('[data-rule-state-detail]')) panel.hidden=panel.dataset.ruleStateDetail!==selected;
+        scope.querySelector('[data-rule-state-hint]').hidden=Boolean(selected);
         return true;
       }
 
@@ -9235,7 +9266,7 @@ return {orders,financeCustomers};})();
               "roles": [
                 "pmc"
               ],
-              "description": "核对内制、委外适用范围及对应生产环节，填写必要质检参考。"
+              "description": "核对内制、委外适用范围及对应生产环节。"
             },
             {
               "title": "交给业务引用",
@@ -10552,7 +10583,7 @@ return {orders,financeCustomers};})();
     "path": "/erp/engineering/processes",
     "flowSteps": [
       "先搜索环节名称和编号，确认是否已有可用资料。",
-      "核对内制、委外适用范围及对应生产环节，填写必要质检参考。",
+      "核对内制、委外适用范围及对应生产环节。",
       "保存后在生产路线或委外合同中核对引用结果。"
     ],
     "roleHelpKeys": [
@@ -10560,18 +10591,8 @@ return {orders,financeCustomers};})();
     ],
     "completion": "环节名称、适用方式、对应生产环节和启用状态已核对并保存。",
     "handoff": "工程或委外经办岗位引用；实际加工顺序回生产路线或合同核对。",
-    "boundary": "加工环节用于委外合同和标准生产路线引用；质检参考仅供查阅，不会自动生成质检任务或结果。",
+    "boundary": "加工环节用于委外合同和标准生产路线引用。",
     "items": [
-      {
-        "type": "term",
-        "key": "process-reference",
-        "title": "质检参考会自动发起检验吗",
-        "explanation": "不会。这里的质检参考供人工查看，实际检验仍在质检页面办理。",
-        "source": "",
-        "example": "",
-        "effect": "",
-        "updateRule": ""
-      },
       {
         "type": "term",
         "key": "process-order",
@@ -12458,7 +12479,7 @@ return {orders,financeCustomers};})();
         ],
         [
           "付款条件",
-          "核对默认付款方式与付款周期，二者需配套填写；0 天是明确约定，空白表示未设置。新订单带值后仍须复核。"
+          "付款方式可选择或直接输入，保存后可复用。有维护权限时，点输入框旁“管理付款方式”停止推荐、恢复或撤销；历史记录保持不变。核对默认付款方式与付款周期，二者需配套填写；0 天是明确约定，空白表示未设置。新订单带值后仍须复核。"
         ]
       ]
     },
@@ -12571,7 +12592,7 @@ return {orders,financeCustomers};})();
         ],
         [
           "结算与发票",
-          "填写默认付款方式和默认付款周期；需要发票时选择发票类别，不需要时不保留不适用的类别。"
+          "默认付款方式可选择或直接输入，保存后可复用；默认付款周期独立填写。有维护权限时，可从输入框旁管理推荐；保存已停止推荐的名称不会自动恢复。需要发票时选择发票类别，不需要时不保留不适用的类别。"
         ],
         [
           "加工能力",
@@ -12972,11 +12993,11 @@ return {orders,financeCustomers};})();
         ],
         [
           "结算与报价",
-          "付款方式和付款周期配套填写；核对计税方式、税率、报价是否含运费及报价运费。空白账期不能当成 0 天。"
+          "付款方式和付款周期配套填写；方式可选或手输，保存后可复用，选择方式不覆盖账期。有维护权限时，可从输入框旁管理推荐；返回后保留付款条件和报价备注草稿。核对计税方式、税率、报价是否含运费及报价运费。空白账期不能当成 0 天。"
         ],
         [
           "订货明细",
-          "逐行填写订货产品名称、客户款号、订单数量、单位、单价和交期；可补充类别、船头版数量、工艺要求及已有规格。工程产品与 BOM 在“工程资料”维护。"
+          "逐行填写订货产品名称、客户款号、订单数量、单位和单价；交期默认沿用整单，个别行可单独改期，清空后恢复沿用；可补充类别、船头版数量、工艺要求及已有规格。工程产品与 BOM 在“工程资料”维护。"
         ]
       ]
     },
@@ -13141,7 +13162,7 @@ return {orders,financeCustomers};})();
       "rows": [
         [
           "版本与制表资料",
-          "选择产品；新建和复制保存后自动生成 V1、V2…，无需填写或选择版号，修改草稿保留原版号。核对订单数量、来源订单号、备品、日期、设计师及制表 / 审核人；参考适用日期不是自动生效开关。"
+          "选择产品；新建和复制保存后自动生成 V1、V2…，无需填写或选择版号，修改草稿保留原版号。核对订单数量、来源订单号、备品、制表日期、设计师及制表 / 审核人。"
         ],
         [
           "材料与部位",
@@ -13300,7 +13321,7 @@ return {orders,financeCustomers};})();
       "paragraphs": [],
       "steps": [
         "先搜索环节名称和编号，确认是否已有可用资料。",
-        "核对内制、委外适用范围及对应生产环节，填写必要质检参考。",
+        "核对内制、委外适用范围及对应生产环节。",
         "保存后在生产路线或委外合同中核对引用结果。"
       ]
     },
@@ -13319,10 +13340,6 @@ return {orders,financeCustomers};})();
         [
           "可委外 / 可内制",
           "两项可同时开启，表达工序能力；具体订单仍由生产经理决定。"
-        ],
-        [
-          "质检参考",
-          "只记录通常是否需要检验，实际检验任务与结果从对应业务来源办理。"
         ]
       ]
     },
@@ -13347,10 +13364,6 @@ return {orders,financeCustomers};})();
         [
           "路线位置冲突",
           "查找该位置已绑定的启用工序，由工程确定保留哪一条，不通过改名规避重复绑定。"
-        ],
-        [
-          "开启质检参考后没有待办",
-          "这是资料标记；回到实际收货或生产批次按相应入口发起检验。"
         ]
       ]
     },
@@ -13361,14 +13374,6 @@ return {orders,financeCustomers};})();
         "环节名称、适用方式、对应生产环节和启用状态已核对并保存。",
         "工程或委外经办岗位引用；实际加工顺序回生产路线或合同核对。"
       ]
-    },
-    {
-      "key": "process-reference",
-      "title": "质检参考会自动发起检验吗",
-      "paragraphs": [
-        "不会。这里的质检参考供人工查看，实际检验仍在质检页面办理。"
-      ],
-      "rows": []
     },
     {
       "key": "process-order",
@@ -13401,7 +13406,7 @@ return {orders,financeCustomers};})();
       "key": "boundary",
       "title": "业务边界",
       "paragraphs": [
-        "加工环节用于委外合同和标准生产路线引用；质检参考仅供查阅，不会自动生成质检任务或结果。"
+        "加工环节用于委外合同和标准生产路线引用。"
       ]
     }
   ],
@@ -13435,11 +13440,11 @@ return {orders,financeCustomers};})();
         ],
         [
           "采购明细",
-          "逐行核对材料、单位、数量、单价、金额及行交期；工程来源的订单、产品、材料和颜色信息保留追踪。"
+          "逐行核对材料、单位、数量、单价和金额；交期默认沿用供应商确认日期或整单预计日期，个别行单独修改。下单名称和颜色自动带出，需要不同叫法时再调整，历史信息保留追踪。"
         ],
         [
           "结算与订购方",
-          "核对付款方式、付款周期、发票要求与类别，以及订购单位、订购人、电话、地址和签字人。"
+          "付款方式可选择或直接输入，保存后可复用；付款周期独立填写。有维护权限时，可从输入框旁停止推荐、恢复或撤销；历史订单不变。核对发票要求与类别，以及订购单位、订购人、电话、地址和签字人。"
         ]
       ]
     },
@@ -14043,7 +14048,7 @@ return {orders,financeCustomers};})();
         ],
         [
           "来源与交付",
-          "关联生产业务时核对本次来源行及在制批次，按本次合同约定确认交期。"
+          "关联生产业务时核对本次来源行及在制批次；行交期默认沿用整单，个别行可单独调整，清空后恢复沿用。"
         ],
         [
           "发料与回货",
@@ -14711,7 +14716,7 @@ return {orders,financeCustomers};})();
       "rows": [
         [
           "出货明细",
-          "逐行核对产品、规格、单位、本次数量及销售来源；分批交付只填写本批数量。"
+          "客户、来源订单和币种在销售来源摘要中统一核对；逐行核对产品、规格、单位和本次数量，分批交付只填写本批数量。"
         ],
         [
           "交付与重量",
@@ -16621,34 +16626,55 @@ return {orders,financeCustomers};})();
       focusTarget?.focus({preventScroll:true});
       focusTarget?.scrollIntoView({block:'nearest',inline:'nearest'});
     }
+    function setPurchaseLineDetails(row, expanded) {
+      if(state.formSourcePage!=='purchase'||!row)return;
+      const index=Number(row.dataset.formRow),key=state.formLineIds[index]||String(index);
+      state.purchaseLineDetails??={};state.purchaseLineDetails[key]=expanded;
+      const more=row.querySelector('.document-line-more'),button=row.querySelector('[data-action="purchase-line-details"]');
+      if(more)more.hidden=!expanded;
+      const sequence=row.querySelector('.document-line-sequence');if(sequence)sequence.rowSpan=expanded?2:1;
+      if(button){button.setAttribute('aria-expanded',String(expanded));button.textContent=expanded?'收起资料':'下单资料';}
+    }
+    function updatePurchaseLineSummary(target) {
+      if(state.formSourcePage!=='purchase')return;
+      const row=target.closest('tbody[data-form-row]');if(!row)return;
+      const name=row.querySelector('[data-form-field^="material-name-"]')?.value||'',color=row.querySelector('[data-form-field^="color-"]')?.value||'';
+      const summary=row.querySelector('[data-purchase-summary]');if(summary)summary.textContent=[name?`下单：${name}`:'',color?`颜色：${color}`:''].filter(Boolean).join(' · ');
+    }
+
     function renderDocumentLines(kind) {
       const sales=kind==='sales',purchase=kind==='purchase',outsourcing=kind==='outsourcing',shipment=kind==='shipments';
-      const headers=sales?['序号','订货产品 / 客户款号','数量','单位','单价','金额','计划交付','操作']:purchase?['序号','材料名称','单位','单价','采购数量','金额','预计到货','操作']:outsourcing?['序号','产品订单编号','加工品类','产品 / 材料','加工项目','工序','单位','单价','加工数量','加工金额','预计回货','操作']:['序号','规格','仓库','批次','数量','单位','操作'];
-      const widths=sales?[40,240,180,100,125,144,160,160]:purchase?[40,240,100,112,180,144,160,160]:outsourcing?[40,155,115,230,160,140,100,110,180,144,160,160]:[44,190,200,190,132,94,224];
+      const headers=sales?['序号','订货产品 / 客户款号','数量','单位','单价','金额','计划交付','操作']:purchase?['序号','材料名称','采购数量 / 单位','单价','金额','预计到货','操作']:outsourcing?['序号','产品订单编号','加工品类','产品 / 材料','加工项目','工序','单位','单价','加工数量','加工金额','预计回货','操作']:['序号','规格','仓库','批次','数量','单位','操作'];
+      const widths=sales?[40,240,180,100,125,144,160,160]:purchase?[40,240,194,96,120,150,176]:outsourcing?[40,155,115,230,160,140,100,110,180,144,160,160]:[44,190,200,190,132,94,224];
       const flexibleColumn=outsourcing?3:shipment?2:1;
       const shipmentProduct=(index)=>state.formValues[`item-${index}`]??(index===0?'IP 联名公仔':'');
       const body=Array.from({length:state.lineCount},(_,i)=>{
         const value=(key,fallback='')=>state.formValues[`${key}-${i}`]??(i===0?fallback:'');
+        const lineKey=state.formLineIds[i]||String(i);
+        const purchaseDetailsOpen=state.purchaseLineDetails?.[lineKey]??(i===0);
         const input=(key,label,fallback='',type='text',extra='')=>`<input aria-label="${label} ${i+1}" data-form-field="${key}-${i}" type="${type}" ${type==='number'?'step="any"':''} value="${escapeHTML(value(key,fallback))}" ${extra} />`;
+        const inheritedDate=(key,label,fallback)=>`<details><summary class="text-btn" aria-label="单独修改${label} ${i+1}">${escapeHTML(value(key)||state.formValues.date||fallback)} · ${value(key)?'单独':'沿用'}</summary>${input(key,label,'','date')}</details>`;
         const select=(key,label,options,initial=options[0])=>`<ui-select aria-label="${label} ${i+1}" data-form-field="${key}-${i}"><option value="">请选择</option>${options.map(text=>`<option ${value(key,initial)===text?'selected':''}>${text}</option>`).join('')}</ui-select>`;
         const detail=(label,control)=>`<div class="field"><label>${label}</label>${control}</div>`;
         const note=(key,label,fallback='')=>detail(label,`<textarea aria-label="${label} ${i+1}" data-form-field="${key}-${i}" rows="${key==='note'?2:1}" maxlength="${key==='note'?2000:shipment?300:255}">${escapeHTML(value(key,fallback))}</textarea>`);
-        const actions=`${purchase||sales?'<button class="text-btn" data-action="line-up">上移</button>':''}${shipment?'':'<button class="text-btn" data-action="copy-line">复制</button>'}<button class="text-btn" data-action="remove-line">移除</button>`;
+        const actions=`${sales?'<button class="text-btn" data-action="line-up">上移</button>':''}${shipment?'':'<button class="text-btn" data-action="copy-line">复制</button>'}<button class="text-btn" data-action="remove-line">移除</button>`;
         const quantity=input('qty',shipment?'数量':sales?'订单数量':purchase?'采购数量':'加工数量',1200,'number');
         const unit=`<ui-select aria-label="单位 ${i+1}" data-form-field="unit-${i}">${quantityUnitOptions(value('unit',purchase?'码':'个'))}</ui-select>`;
         const price=input('price','单价',purchase?18.6:outsourcing?5.8:42.8,'number');
         const amount='<span data-line-amount>—</span>';
         let cells,extra,label;
         if(sales){
-          cells=[i+1,`<div class="document-line-identity">${input('item','订货产品名称','节庆毛绒礼盒')}${input('customer-sku','客户款号','CUS-PLUSH-30','text','placeholder="客户款号（选填）"')}</div>`,quantity,unit,price,amount,input('line-date','计划交付','2026-10-10','date'),actions];
+          cells=[i+1,`<div class="document-line-identity">${input('item','订货产品名称','节庆毛绒礼盒')}${input('customer-sku','客户款号','CUS-PLUSH-30','text','placeholder="客户款号（选填）"')}</div>`,quantity,unit,price,amount,inheritedDate('line-date','计划交付','2026-10-10'),actions];
           label='规格、船头版与补充说明';
           extra=detail('类别',select('category','类别',['新单','返单']))+detail('船头版数量',input('sample','船头版数量',2,'number','min="0"'))+detail('已有规格（选填）',select('sku','已有规格',['30cm / 米白','18cm / 蓝色']))+`<div class="document-line-facts"><span>生产数量 <output data-production-quantity="${i}"></output></span><span>未出货数 ${escapeHTML(value('qty',1200))}</span><span>工程设计师 周敏</span></div><div class="document-line-notes">${note('process','工艺要求','绣花定位按确认稿')}${note('note','备注')}</div>`;
         }else if(purchase){
-          cells=[i+1,select('item','材料名称',[...new Set(['短毛绒 2mm / 米白','PP 棉','塑料眼',...PURCHASE_IMPORT_MATERIALS.map(material=>material.name)])]),unit,price,quantity,amount,input('line-date','预计到货','2026-10-04','date'),actions];
-          label='来源、下单资料与备注';
-          extra=[['source-order','产品订单编号','SO-20260912-009'],['product-code','产品编号','PL-30-W'],['product-name','产品名称','节庆毛绒礼盒'],['material-code','下单材料编码','MAT-FAB-0021'],['material-name','下单材料名称','短毛绒 2mm'],['color','下单颜色','米白']].map(([key,title,fallback])=>detail(title,input(key,title,fallback))).join('')+`<div class="document-line-notes">${note('note','备注')}</div>`;
+          const summary=[value('material-name','短毛绒 2mm')?`下单：${value('material-name','短毛绒 2mm')}`:'',value('color','米白')?`颜色：${value('color','米白')}`:''].filter(Boolean).join(' · ');
+          const toggle=`<button type="button" class="text-btn" data-action="purchase-line-details" aria-expanded="${purchaseDetailsOpen}" aria-controls="purchase-detail-${i}">${purchaseDetailsOpen?'收起资料':'下单资料'}</button>`;
+          cells=[i+1,select('item','材料名称',[...new Set(['短毛绒 2mm / 米白','PP 棉','塑料眼',...PURCHASE_IMPORT_MATERIALS.map(material=>material.name)])])+`<div class="data-note" data-purchase-summary>${escapeHTML(summary)}</div>`,`<div class="purchase-quantity-unit">${quantity}${unit}</div>`,price,amount,inheritedDate('line-date','预计到货','2026-10-10'),toggle+actions];
+          label=`第 ${i+1} 条 · 下单资料与来源`;
+          extra=[['material-code','下单材料编码','MAT-FAB-0021'],['material-name','下单材料名称','短毛绒 2mm'],['color','下单颜色','米白']].map(([key,title,fallback])=>detail(title,input(key,title,fallback))).join('')+'<div class="purchase-source-heading">产品来源</div>'+[['source-order','产品订单编号','SO-20260912-009'],['product-code','产品编号','PL-30-W'],['product-name','产品名称','节庆毛绒礼盒']].map(([key,title,fallback])=>detail(title,input(key,title,fallback))).join('')+`<div class="document-line-notes">${note('note','备注')}</div>`;
         }else if(outsourcing){
-          cells=[i+1,input('product-order','产品订单编号','SO-20260912-009'),select('subject-type','加工品类',['产品 / 半成品','材料']),select('item','产品 / 材料',['节庆毛绒礼盒','短毛绒 2mm']),input('work-item','加工项目','车缝加工'),select('process','工序',['车缝','绣花','包装']),unit,price,quantity,amount,input('line-return','预计回货','2026-10-12','date'),actions];
+          cells=[i+1,input('product-order','产品订单编号','SO-20260912-009'),select('subject-type','加工品类',['产品 / 半成品','材料']),select('item','产品 / 材料',['节庆毛绒礼盒','短毛绒 2mm']),input('work-item','加工项目','车缝加工'),select('process','工序',['车缝','绣花','包装']),unit,price,quantity,amount,inheritedDate('line-return','预计回货','2026-10-12'),actions];
           label='规格与行备注';
           extra=`<div class="document-line-notes">${detail('产品规格',select('sku','产品规格',['30cm / 米白','18cm / 蓝色']))}${note('note','行备注')}</div>`;
         }else{
@@ -16664,7 +16690,7 @@ return {orders,financeCustomers};})();
           while(product&&i+count<state.lineCount&&shipmentProduct(i+count)===product)count++;
           productHeading=`<tbody class="document-line-product-heading"><tr><td colspan="${headers.length}"><div class="document-line-product-heading__content">${product?renderProductThumb(i,product):''}<span class="document-line-product-heading__identity"><strong>${escapeHTML(product||`待选择产品 · 第 ${i+1} 条`)}</strong>${product?`<small>${product==='IP 联名公仔'?'CP-IP-001':'CP-PLUSH-002'}</small>`:''}</span><small>${count} 条明细</small></div></td></tr></tbody>`;
         }
-        return `${productHeading}<tbody class="editable-line-group" data-form-row="${i}" data-line-parity="${i%2?'even':'odd'}"><tr><td class="document-line-sequence" rowspan="2"><span class="editable-line-number">${cells[0]}</span></td>${cells.slice(1).map((cell,index)=>`<td${[sales?5:purchase?5:outsourcing?9:-1].includes(index+1)?' class="mono"':''}>${cell}</td>`).join('')}</tr><tr class="document-line-more"><td colspan="${headers.length-1}"><div class="document-line-supplement"><section class="compact-optional document-line-details">${shipment?'':`<div class="compact-form-heading">${label}</div>`}<div class="document-line-fields">${extra}</div></section></div></td></tr></tbody>`;
+        return `${productHeading}<tbody class="editable-line-group" data-form-row="${i}" data-line-parity="${i%2?'even':'odd'}"><tr><td class="document-line-sequence" rowspan="${purchase&&!purchaseDetailsOpen?1:2}"><span class="editable-line-number">${cells[0]}</span></td>${cells.slice(1).map((cell,index)=>`<td${[sales?5:purchase?5:outsourcing?9:-1].includes(index+1)?' class="mono"':''}>${cell}</td>`).join('')}</tr><tr class="document-line-more" ${purchase?`id="purchase-detail-${i}" ${purchaseDetailsOpen?'':'hidden'}`:''}><td colspan="${headers.length-1}"><div class="document-line-supplement"><section class="compact-optional document-line-details${purchase?' document-purchase-details':''}">${shipment?'':`<div class="compact-form-heading">${label}</div>`}<div class="document-line-fields">${extra}</div></section></div></td></tr></tbody>`;
       }).join('');
       return `<div class="line-items document-line-table ${state.lineCount?'':'is-empty'}"><table style="${shipment?'--document-line-sequence-width:44px;':''}min-width:${widths.reduce((total,width)=>total+width,0)}px">${renderFormColumns(widths.map((width,index)=>index===flexibleColumn?null:width))}<thead><tr>${headers.map(label=>`<th>${label}</th>`).join('')}</tr></thead>${body}</table>${state.lineCount?'':'<div class="compact-form-empty">暂无明细</div>'}</div>`;
     }
@@ -16682,8 +16708,8 @@ return {orders,financeCustomers};})();
         <div class="form-main">
           <nav class="anchor-nav">${sections.map(([id,label],i) => `<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav>
           <div class="form-scroll" id="form-scroll">
-            <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">${isSales?'订单与客户':'订单与供应商'}</span></h2><div class="form-grid">
-              <div class="field required"><label>订单号（自动）</label><input value="${no}" disabled /></div>
+            <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">${isSales?'订单与客户':'订单与供应商'}</span></h2><div class="form-grid form-grid--adaptive">
+              <div class="field required"><label>订单号（自动）</label><input data-form-field="no" value="${no}" /></div>
               <div class="field required ${state.formErrors.party ? 'error' : ''}"><label>${party}</label><ui-select data-form-field="party"><option value="">请选择${party}</option><option ${isEdit?'selected':''}>${isSales ? '华南礼品有限公司' : '锦丰面料有限公司'}</option><option>${isSales ? '星河文创有限公司' : '宏达辅料有限公司'}</option></ui-select>${state.formErrors.party ? '<span class="error-text">请选择'+party+'</span>' : ''}</div>
               <div class="field"><label>${isSales ? '客户订单号' : '供应商订单号'}</label><input data-form-field="reference" placeholder="选填" /></div>
               <div class="field required"><label>币种</label><ui-select data-form-field="currency"><option>人民币（CNY）</option><option>美元（USD）</option></ui-select></div>
@@ -16694,30 +16720,30 @@ return {orders,financeCustomers};})();
               ${renderDocumentLines(type)}
               ${renderLineAddContinuation(isSales?'添加订货明细':'添加采购明细')}
             </section>
-${isSales ? `<section class="form-section" id="contact"><h2 class="section-title"><span class="form-section-title-label">联系与交付</span></h2><div class="form-grid">
+${isSales ? `<section class="form-section" id="contact"><h2 class="section-title"><span class="form-section-title-label">联系与交付</span></h2><div class="form-grid form-grid--adaptive">
               <div class="field"><label>联系人</label><input data-form-field="contact" placeholder="选择联系人或手动录入" /></div>
               <div class="field"><label>联系电话</label><input data-form-field="phone" /></div>
               <div class="field"><label>联系邮箱</label><input data-form-field="email" /></div>
               ${isSales?'':'<div class="field"><label>买方公司</label><input data-form-field="buyer-company" value="当前公司（由系统配置）" /></div><div class="field"><label>买方联系人</label><input data-form-field="buyer-contact" value="王宁" /></div><div class="field"><label>买方电话</label><input data-form-field="buyer-phone" value="13800007021" /></div>'}
-            ${isSales?'<div class="field"><label>运费条件</label><ui-select data-form-field="freight"><option>送货上门</option><option>客户自提</option></ui-select></div><div class="field"><label>运费金额</label><input type="number" data-form-field="freight-amount" /></div>'+renderDeliveryAddressFields()+'':'<div class="field"><label>供应商确认到货</label><input type="date" data-form-field="confirmed-arrival" /></div><div class="field span-2"><label>交货地址</label><input data-form-field="address" value="原料仓收货区" /></div><div class="field"><label>签收人</label><input data-form-field="signer" value="王宁" /></div>'}</div></section><section class="form-section" id="terms"><h2 class="section-title"><span class="form-section-title-label">结算与报价</span></h2><div class="form-grid">
+            ${isSales?'<div class="field"><label>运费条件</label><ui-select data-form-field="freight"><option>送货上门</option><option>客户自提</option></ui-select></div><div class="field"><label>运费金额</label><input type="number" data-form-field="freight-amount" /></div>'+renderDeliveryAddressFields()+'':'<div class="field"><label>供应商确认到货</label><input type="date" data-form-field="confirmed-arrival" /></div><div class="field span-2"><label>交货地址</label><input data-form-field="address" value="原料仓收货区" /></div><div class="field"><label>签收人</label><input data-form-field="signer" value="王宁" /></div>'}</div></section><section class="form-section" id="terms"><h2 class="section-title"><span class="form-section-title-label">结算与报价</span></h2><div class="form-grid form-grid--adaptive">
               <div class="field"><label>付款方式</label><ui-select data-form-field="payment"><option>月结 30 天</option><option>预付 30%，尾款 70%</option></ui-select></div>
               <div class="field"><label>账期天数</label><input type="number" value="30" data-form-field="term-days" /></div>
               <div class="field"><label>${isSales?'税费模式':'是否需要发票'}</label><ui-select data-form-field="tax"><option>${isSales?'含税':'需要'}</option><option>${isSales?'未税':'不需要'}</option></ui-select></div>
               <div class="field"><label>${isSales?'税率':'发票类别'}</label><ui-select data-form-field="invoice"><option>${isSales?'13%':'增值税专用发票'}</option><option>${isSales?'0%':'普通发票'}</option></ui-select></div>
               ${isSales?'<div class="field span-2"><label>来源付款信息</label><input data-form-field="payment-source" placeholder="客户约定或合同付款信息" /></div><div class="field span-2"><label>报价备注</label><textarea data-form-field="price-note" rows="2" maxlength="2000" placeholder="影响价格核对的信息"></textarea></div>':''}
-            </div></section>` : `<section class="form-section" id="delivery"><h2 class="section-title"><span class="form-section-title-label">交付与结算</span></h2><div class="form-grid">${isSales?'<div class="field"><label>运费条件</label><ui-select data-form-field="freight"><option>送货上门</option><option>客户自提</option></ui-select></div><div class="field"><label>运费金额</label><input type="number" data-form-field="freight-amount" /></div>'+renderDeliveryAddressFields()+'':'<div class="field"><label>供应商确认到货</label><input type="date" data-form-field="confirmed-arrival" /></div><div class="field span-2"><label>交货地址</label><input data-form-field="address" value="原料仓收货区" /></div><div class="field"><label>签收人</label><input data-form-field="signer" value="王宁" /></div>'}
+            </div></section>` : `<section class="form-section" id="delivery"><h2 class="section-title"><span class="form-section-title-label">交付与结算</span></h2><div class="form-grid form-grid--adaptive">${isSales?'<div class="field"><label>运费条件</label><ui-select data-form-field="freight"><option>送货上门</option><option>客户自提</option></ui-select></div><div class="field"><label>运费金额</label><input type="number" data-form-field="freight-amount" /></div>'+renderDeliveryAddressFields()+'':'<div class="field"><label>供应商确认到货</label><input type="date" data-form-field="confirmed-arrival" /></div><div class="field span-2"><label>交货地址</label><input data-form-field="address" value="原料仓收货区" /></div><div class="field"><label>签收人</label><input data-form-field="signer" value="王宁" /></div>'}
               <div class="field"><label>付款方式</label><ui-select data-form-field="payment"><option>月结 30 天</option><option>预付 30%，尾款 70%</option></ui-select></div>
               <div class="field"><label>账期天数</label><input type="number" value="30" data-form-field="term-days" /></div>
               <div class="field"><label>${isSales?'税费模式':'是否需要发票'}</label><ui-select data-form-field="tax"><option>${isSales?'含税':'需要'}</option><option>${isSales?'未税':'不需要'}</option></ui-select></div>
               <div class="field"><label>${isSales?'税率':'发票类别'}</label><ui-select data-form-field="invoice"><option>${isSales?'13%':'增值税专用发票'}</option><option>${isSales?'0%':'普通发票'}</option></ui-select></div>
               ${isSales?'<div class="field span-2"><label>来源付款信息</label><input data-form-field="payment-source" placeholder="客户约定或合同付款信息" /></div><div class="field span-2"><label>报价备注</label><textarea data-form-field="price-note" rows="2" maxlength="2000" placeholder="影响价格核对的信息"></textarea></div>':''}
-            </div></section><section class="form-section" id="contact"><h2 class="section-title"><span class="form-section-title-label">合同订购方信息</span></h2><div class="form-grid">
+            </div></section><section class="form-section" id="contact"><h2 class="section-title"><span class="form-section-title-label">合同订购方信息</span></h2><div class="form-grid form-grid--adaptive">
               <div class="field"><label>联系人</label><input data-form-field="contact" placeholder="选择联系人或手动录入" /></div>
               <div class="field"><label>联系电话</label><input data-form-field="phone" /></div>
               <div class="field"><label>联系邮箱</label><input data-form-field="email" /></div>
               ${isSales?'':'<div class="field"><label>买方公司</label><input data-form-field="buyer-company" value="当前公司（由系统配置）" /></div><div class="field"><label>买方联系人</label><input data-form-field="buyer-contact" value="王宁" /></div><div class="field"><label>买方电话</label><input data-form-field="buyer-phone" value="13800007021" /></div>'}
             </div></section>`}
-<section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid"><div class="field span-2"><label>业务备注</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000" placeholder="仅填写会影响执行或核对的信息"></textarea></div><div class="field span-2"><section class="form-attachment-summary"><div class="form-attachment-summary__header">${icon('paperclip')}${isSales?'订单附件':'采购附件'} · 0 个已上传</div><div class="form-attachment-summary__content"><button class="btn primary" data-action="fake-upload">${icon('paperclip')}选择附件</button><span class="data-note">选择后随订单保存上传</span></div></section></div></div></section>
+<section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid form-grid--support"><div class="field span-2"><label>业务备注</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000" placeholder="仅填写会影响执行或核对的信息"></textarea></div><div class="field span-2"><section class="form-attachment-summary"><div class="form-attachment-summary__header">${icon('paperclip')}${isSales?'订单附件':'采购附件'} · 0 个已上传</div><div class="form-attachment-summary__content"><button class="btn primary" data-action="fake-upload">${icon('paperclip')}选择附件</button><span class="data-note">选择后随订单保存上传</span></div></section></div></div></section>
           </div>
         </div>
         <footer class="form-foot"><span class="dirty-state${state.formDirty ? ' is-dirty' : ''}" role="status">${state.formDirty ? '有未保存修改' : '尚未修改'}</span><button class="btn" data-action="back-list">返回列表</button><button class="btn primary" data-action="save-form">${isEdit ? '保存修改' : '保存草稿'}</button></footer>
@@ -16728,12 +16754,32 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const isEdit = state.formMode === 'edit';
       const row = listConfig.bom.rows.find(item=>item.id===state.formRecordId) || listConfig.bom.rows[0];
       const sections = [['basic','版本信息'],['materials','材料分析明细表'],['sheet','订单与制表资料'],['remark','备注与附件']];
-      return `<section class="form-view"><header class="form-head"><h1>${isEdit?'编辑':'新建'}物料清单（BOM）</h1>${renderPageActions()}<span class="badge info">草稿 · 未生效</span></header><div class="form-main"><nav class="anchor-nav">${sections.map(([id,label],i)=>`<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav><div class="form-scroll">
-        <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">版本信息</span></h2><div class="form-grid"><div class="field required ${state.formErrors.party?'error':''}"><label>产品</label><ui-select data-form-field="party"><option value="">请选择产品</option><option ${isEdit?'selected':''}>节庆毛绒礼盒</option><option>IP 联名公仔 18cm</option></ui-select>${state.formErrors.party?'<span class="error-text">请选择产品</span>':''}</div><div class="field"><label>BOM 版本</label><input data-form-field="bom-version" value="${isEdit?escapeHTML((row.item||'').split(' · ')[0]):''}" placeholder="保存后自动生成" readonly /></div><div class="field"><label>订单数量</label><input type="number" data-form-field="order-qty" value="1200" /></div><div class="field"><label>状态</label><input value="${isEdit?row.statusText:'草稿'}" disabled /></div><div class="field span-2"><label>版本说明</label><input data-form-field="version-note" value="量产确认版" /></div></div></section>
-        <section class="form-section" id="materials"><h2 class="section-title"><span class="form-section-title-label">材料分析明细表</span> ${renderFormImportActions('bom','从 Excel 导入')}${renderLineAddButton('添加部位')}<button class="btn ghost" data-action="bom-import-format">查看 Excel 格式</button></h2><div class="line-items ${state.lineCount?'':'is-empty'}"><table style="min-width:1660px">${renderFormColumns([44,null,150,85,100,115,80,110,85,140,110,110,null,95])}<thead><tr>${['序号','材料名称','供应商货号','规格','单位','装配部位','单件数量','单位用量','损耗 %','含损总用量','工艺基础','工艺方法','备注','操作'].map(label=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${Array.from({length:state.lineCount},(_,i)=>`<tr><td>${i+1}</td><td><ui-select data-form-field="material-${i}"><option>${i===0?'V3 · 12 短毛绒':'V2 · 9 塑料眼'}</option></ui-select></td><td><input data-form-field="vendor-item-${i}" value="${i===0?'JF-2MM-W':''}" /></td><td><input data-form-field="spec-${i}" value="${i===0?'2mm / 米白':'12mm / 黑'}" /></td><td><ui-select data-form-field="unit-${i}"><option>${i===0?'码':'个'}</option></ui-select></td><td><input data-form-field="position-${i}" value="${i===0?'身体外皮':'眼部'}" /></td><td><input type="number" data-form-field="piece-${i}" value="${i===0?2:2}" /></td><td><input type="number" data-form-field="usage-${i}" value="${i===0?.82:2}" /></td><td><input type="number" data-form-field="loss-${i}" value="${i===0?5:1}" /></td><td><input value="${i===0?'1,033.20 码':'2,424 个'}" disabled /></td><td><input data-form-field="process-base-${i}" value="${i===0?'裁片':'装配'}" /></td><td><input data-form-field="process-${i}" value="${i===0?'顺毛裁剪':'热压固定'}" /></td><td><textarea aria-label="备注 ${i+1}" data-form-field="note-${i}" rows="2" maxlength="2000"></textarea></td><td><button class="text-btn" data-action="copy-line">复制</button><button class="text-btn" data-action="remove-line" >移除</button></td></tr>`).join('')}</tbody></table>${state.lineCount?'':'<div class="compact-form-empty">暂无明细</div>'}</div>${renderLineAddContinuation('添加物料','add-material-group',state.lineCount,'个部位')}<p class="data-note" style="margin:9px 0 0">含损总用量由订单数量、单件用量与损耗率计算，不作为独立手工真源。</p></section>
-        <section class="form-section" id="sheet"><h2 class="section-title"><span class="form-section-title-label">订单与制表资料</span></h2><div class="form-grid"><div class="field"><label>来源订单号</label><input data-form-field="source-order" value="SO-20260912-009" /></div><div class="field"><label>参考适用开始</label><input type="date" data-form-field="effective-from" value="2026-10-01" /></div><div class="field"><label>参考适用结束</label><input type="date" data-form-field="effective-to" /></div><div class="field"><label>备品数量</label><input type="number" data-form-field="spare" value="12" /></div><div class="field"><label>打印日期</label><input type="date" data-form-field="print-date" value="2026-09-25" /></div><div class="field"><label>设计师</label><input data-form-field="designer" value="周敏" /></div><div class="field"><label>制表</label><input data-form-field="maker" value="何敏" /></div><div class="field"><label>审核</label><input data-form-field="reviewer" value="林晓" /></div><div class="field span-2"><label>毛向说明</label><input data-form-field="hair-direction" placeholder="按图稿标记毛向" /></div></div><p class="data-note">参考适用期仅供人工查阅；BOM 是否可选仍以启用状态为准。</p></section>
-        <section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid"><div class="field span-2"><label>工艺备注</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000"></textarea></div><div class="field span-2"><label>图稿与附件</label><button class="control" data-action="fake-upload" style="justify-content:flex-start">${icon('paperclip')}上传图稿或 Excel 附件</button></div></div></section>
-      </div></div><footer class="form-foot"><span class="dirty-state${state.formDirty ? ' is-dirty' : ''}" role="status">${state.formDirty?'有未保存修改':'草稿尚未启用'}</span><button class="btn" data-action="back-list">返回列表</button>${isEdit&&row.status==='draft'&&!state.formDirty?`<button class="btn" data-action="business-record-action" data-operation="activate" data-page="bom" data-id="${row.id}">启用此版本</button>`:''}<button class="btn primary" data-action="save-form">保存${isEdit?'修改':'草稿'}</button></footer></section>`;
+      const value = (i,key,fallback='') => state.formValues[`${key}-${i}`] ?? fallback;
+      const version = state.formValues['bom-version'] || (isEdit?(row.item||'').split(' · ')[0]:'');
+      const groups = new Map();
+      Array.from({length:state.lineCount},(_,i)=>{
+        const material=value(i,'material',i===0?'米白短毛绒':'黑色塑料眼');
+        const unit=value(i,'unit',i===0?'码':'个');
+        const line={i,material,unit,vendor:value(i,'vendor-item',i===0?'JF-2MM-W':'EY-12'),spec:value(i,'spec',i===0?'2mm / 米白':'12mm / 黑')};
+        const key=material?`${material}:${unit}`:`draft:${state.formLineIds[i]||i}`;
+        if(!groups.has(key))groups.set(key,[]);
+        groups.get(key).push(line);
+      });
+      const materials=[...groups.values()].map(lines=>{
+        const first=lines[0],indexes=lines.map(line=>line.i).join(',');
+        const materialOptions=['','米白短毛绒','黑色塑料眼'];if(first.material&&!materialOptions.includes(first.material))materialOptions.push(first.material);
+        return `<tbody data-bom-material-group>${lines.map((line,lineIndex)=>{
+          const i=line.i,usage=value(i,'usage',i===0?.82:2),loss=value(i,'loss',i===0?5:1);
+          const materialCells=lineIndex===0?`<td rowspan="${lines.length+1}"><ui-select aria-label="物料名称 ${first.i+1}" data-bom-group-field="material" data-bom-group-indexes="${indexes}">${materialOptions.map(name=>`<option value="${escapeHTML(name)}" ${name===first.material?'selected':''}>${escapeHTML(name||'请选择材料')}</option>`).join('')}</ui-select></td><td rowspan="${lines.length+1}">${escapeHTML(first.vendor||'—')}</td><td rowspan="${lines.length+1}">${escapeHTML(first.spec||'—')}</td><td rowspan="${lines.length+1}"><ui-select aria-label="单位 ${first.i+1}" data-bom-group-field="unit" data-bom-group-indexes="${indexes}">${['码','个','米','千克'].map(unit=>`<option ${unit===first.unit?'selected':''}>${unit}</option>`).join('')}</ui-select></td>`:'';
+          return `<tr data-bom-part>${materialCells}<td>${[['material',line.material],['vendor-item',line.vendor],['spec',line.spec],['unit',line.unit]].map(([key,val])=>`<input type="hidden" data-form-field="${key}-${i}" value="${escapeHTML(val)}" />`).join('')}<input data-form-field="position-${i}" aria-label="组装部位 ${i+1}" value="${escapeHTML(value(i,'position',i===0?'身体外皮':'眼部'))}" /></td><td><input type="number" data-form-field="piece-${i}" aria-label="片数 ${i+1}" value="${escapeHTML(value(i,'piece',2))}" /></td><td><input type="number" data-form-field="usage-${i}" aria-label="单位用量 ${i+1}" value="${escapeHTML(usage)}" /></td><td><input type="number" data-form-field="loss-${i}" aria-label="损耗 % ${i+1}" value="${escapeHTML(loss)}" /></td><td><input value="${escapeHTML(requiredMaterialPreview(usage,state.formValues['order-qty']??1200,loss,line.unit))}" disabled /></td><td><input data-form-field="process-base-${i}" value="${escapeHTML(value(i,'process-base',i===0?'裁片':'装配'))}" /></td><td><input data-form-field="process-${i}" value="${escapeHTML(value(i,'process',i===0?'顺毛裁剪':'热压固定'))}" /></td><td><textarea aria-label="备注 ${i+1}" data-form-field="note-${i}" rows="2" maxlength="2000">${escapeHTML(value(i,'note'))}</textarea></td><td><button class="text-btn" data-action="copy-line">复制</button><button class="text-btn" data-action="remove-line">移除</button></td></tr>`;
+        }).join('')}<tr data-bom-summary><td colspan="9"><div class="bom-material-footer"><button class="btn tiny" data-bom-add-part="${lines.at(-1).i}">添加部位</button><span>${lines.length} 个部位</span></div></td></tr></tbody>`;
+      }).join('');
+      return `<section class="form-view bom-form-view"><header class="form-head"><h1>${isEdit?'编辑':'新建'}物料清单（BOM）</h1><span class="bom-version-summary">BOM 版本 <strong>${escapeHTML(version||'保存后自动生成')}</strong></span><input type="hidden" data-form-field="bom-version" value="${escapeHTML(version)}" />${renderPageActions()}<span class="badge info">草稿 · 未生效</span></header><div class="form-main"><nav class="anchor-nav">${sections.map(([id,label],i)=>`<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav><div class="form-scroll">
+        <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">版本信息</span></h2><div class="form-grid bom-form-primary"><div class="bom-form-product"><span data-bom-product-preview>${renderProductThumb(0,state.formValues.party||(isEdit?'节庆毛绒礼盒':'当前产品'))}</span><div class="field required ${state.formErrors.party?'error':''}"><label>产品</label><ui-select data-form-field="party"><option value="">请选择产品</option><option ${isEdit?'selected':''}>节庆毛绒礼盒</option><option>IP 联名公仔 18cm</option></ui-select>${state.formErrors.party?'<span class="error-text">请选择产品</span>':''}</div></div><div class="field"><label>订单数量</label><input type="number" data-form-field="order-qty" value="1200" /></div><div class="field"><label>来源订单号</label><input data-form-field="source-order" value="SO-20260912-009" /></div></div></section>
+        <section class="form-section" id="materials"><h2 class="section-title"><span class="form-section-title-label">材料分析明细表</span> ${renderFormImportActions('bom','从 Excel 导入')}${renderLineAddButton('添加物料','add-material-group')}<button class="btn ghost" data-action="bom-import-format">查看 Excel 格式</button></h2><div class="line-items ${state.lineCount?'':'is-empty'}"><table style="min-width:1620px">${renderFormColumns([null,150,85,115,115,65,95,75,100,110,110,125,95])}<thead><tr>${['物料名称','厂商料号','规格','单位','组装部位','片数','单位用量','损耗 %','总用量含损耗','加工基础','加工方式','备注','操作'].map(label=>`<th>${label}</th>`).join('')}</tr></thead>${materials}</table>${state.lineCount?'':'<div class="compact-form-empty">暂无明细</div>'}</div>${renderLineAddContinuation('添加物料','add-material-group',state.lineCount,'个部位')}<p class="data-note" style="margin:9px 0 0">总用量由订单数量、单位用量与损耗率计算。</p></section>
+        <section class="form-section" id="sheet"><h2 class="section-title"><span class="form-section-title-label">订单与制表资料</span></h2><div class="form-grid"><div class="field"><label>备品</label><input type="number" data-form-field="spare" value="12" /></div><div class="field"><label>制表日期</label><input type="date" data-form-field="print-date" value="2026-09-25" /></div><div class="field"><label>设计师</label><input data-form-field="designer" value="周敏" /></div><div class="field"><label>制表人</label><input data-form-field="maker" value="何敏" /></div><div class="field"><label>审核人</label><input data-form-field="reviewer" value="林晓" /></div><div class="field"><label>毛向</label><input data-form-field="hair-direction" placeholder="按图稿标记毛向" /></div></div></section>
+        <section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid bom-form-support"><div class="field"><label>备注</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000"></textarea></div><div class="field"><label>图稿与附件</label><button class="control" data-action="fake-upload" style="justify-content:flex-start">${icon('paperclip')}上传图稿或 Excel 附件</button></div></div></section>
+      </div></div><footer class="form-foot"><span class="dirty-state${state.formDirty?' is-dirty':''}" role="status">${state.formDirty?'有未保存修改':'草稿尚未启用'}</span><button class="btn" data-action="back-list">返回列表</button>${isEdit&&row.status==='draft'&&!state.formDirty?`<button class="btn" data-action="business-record-action" data-operation="activate" data-page="bom" data-id="${row.id}">启用此版本</button>`:''}<button class="btn primary" data-action="save-form">保存${isEdit?'修改':'草稿'}</button></footer></section>`;
     }
 
     function renderOutsourcingForm() {
@@ -16741,10 +16787,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const row = listConfig.outsourcing.rows.find(item=>item.id===state.formRecordId) || listConfig.outsourcing.rows[0];
       const sections = [['basic','合同与加工厂'],['items','加工明细'],['parties','合同双方信息'],['remark','备注与附件']];
       return `<section class="form-view"><header class="form-head"><h1>${isEdit?'编辑':'新建'}委外加工订单</h1>${renderPageActions()}<span class="badge ${isEdit?badgeClass(row):'info'}">${isEdit?row.statusText:'草稿'}</span></header><div class="form-main"><nav class="anchor-nav">${sections.map(([id,label],i)=>`<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav><div class="form-scroll">
-        <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">合同与加工厂</span></h2><div class="form-grid"><div class="field required"><label>合同号（自动）</label><input value="${isEdit?row.no:'OS-20260925-NEW'}" disabled /></div><div class="field required ${state.formErrors.party?'error':''}"><label>加工厂</label><ui-select data-form-field="party"><option value="">请选择加工厂</option><option ${isEdit?'selected':''}>新盛车缝厂</option><option>宏达绣花厂</option></ui-select>${state.formErrors.party?'<span class="error-text">请选择加工厂</span>':''}</div><div class="field"><label>来源订单号</label><input data-form-field="source-order" value="SO-20260912-009" /></div><div class="field"><label>币种</label><ui-select data-form-field="currency"><option>人民币（CNY）</option></ui-select></div><div class="field"><label>付款账期</label><input type="number" value="30" data-form-field="payment-days" /></div><div class="field required"><label>下单日期</label><input type="date" value="2026-09-25" data-form-field="order-date" /></div><div class="field required"><label>预计回货</label><input type="date" value="2026-10-12" data-form-field="return-date" /></div></div></section>
+        <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">合同与加工厂</span></h2><div class="form-grid form-grid--adaptive"><div class="field required"><label>合同号（自动）</label><input value="${isEdit?row.no:'OS-20260925-NEW'}" disabled /></div><div class="field required ${state.formErrors.party?'error':''}"><label>加工厂</label><ui-select data-form-field="party"><option value="">请选择加工厂</option><option ${isEdit?'selected':''}>新盛车缝厂</option><option>宏达绣花厂</option></ui-select>${state.formErrors.party?'<span class="error-text">请选择加工厂</span>':''}</div><div class="field"><label>来源订单号</label><input data-form-field="source-order" value="SO-20260912-009" /></div><div class="field"><label>币种</label><ui-select data-form-field="currency"><option>人民币（CNY）</option></ui-select></div><div class="field"><label>付款账期</label><input type="number" value="30" data-form-field="payment-days" /></div><div class="field required"><label>下单日期</label><input type="date" value="2026-09-25" data-form-field="order-date" /></div><div class="field required"><label>预计回货</label><input type="date" value="2026-10-12" data-form-field="return-date" /></div></div></section>
         <section class="form-section" id="items"><h2 class="section-title"><span class="form-section-title-label">加工明细</span> </h2>${renderDocumentLines('outsourcing')}${renderLineAddContinuation('添加加工明细')}<div class="rm-callout" style="margin-top:10px">回货数量、欠数、交付完成度等 Excel 统计列来自回货事实，不在合同编辑页手工填写。</div></section>
-        <section class="form-section" id="parties"><h2 class="section-title"><span class="form-section-title-label">合同双方信息</span></h2><div class="form-grid"><div class="field"><label>加工方联系人</label><input data-form-field="factory-contact" value="陈经理" /></div><div class="field"><label>加工方电话</label><input data-form-field="factory-phone" value="13800007022" /></div><div class="field span-2"><label>加工方地址</label><input data-form-field="factory-address" value="东莞市样例工业园" /></div><div class="field"><label>委托方联系人</label><input data-form-field="buyer-contact" value="林晓" /></div><div class="field"><label>委托方电话</label><input data-form-field="buyer-phone" value="13800007023" /></div><div class="field span-2"><label>委托方地址</label><input data-form-field="buyer-address" value="成品仓业务中心" /></div></div></section>
-        <section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid"><div class="field span-2"><label>加工要求</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000" placeholder="填写影响加工、验收或交付的要求"></textarea></div><div class="field span-2"><label>图稿与附件</label><button class="control" data-action="fake-upload" style="justify-content:flex-start">${icon('paperclip')}上传合同附件</button></div></div></section>
+        <section class="form-section" id="parties"><h2 class="section-title"><span class="form-section-title-label">合同双方信息</span></h2><div class="form-grid form-grid--adaptive"><div class="field"><label>加工方联系人</label><input data-form-field="factory-contact" value="陈经理" /></div><div class="field"><label>加工方电话</label><input data-form-field="factory-phone" value="13800007022" /></div><div class="field span-2"><label>加工方地址</label><input data-form-field="factory-address" value="东莞市样例工业园" /></div><div class="field"><label>委托方联系人</label><input data-form-field="buyer-contact" value="林晓" /></div><div class="field"><label>委托方电话</label><input data-form-field="buyer-phone" value="13800007023" /></div><div class="field span-2"><label>委托方地址</label><input data-form-field="buyer-address" value="成品仓业务中心" /></div></div></section>
+        <section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid form-grid--support"><div class="field span-2"><label>加工要求</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000" placeholder="填写影响加工、验收或交付的要求"></textarea></div><div class="field span-2"><label>图稿与附件</label><button class="control" data-action="fake-upload" style="justify-content:flex-start">${icon('paperclip')}上传合同附件</button></div></div></section>
       </div></div><footer class="form-foot"><span class="dirty-state${state.formDirty ? ' is-dirty' : ''}" role="status">${state.formDirty?'有未保存修改':'尚未修改'}</span><button class="btn" data-action="back-list">返回列表</button><button class="btn primary" data-action="save-form">保存${isEdit?'修改':'草稿'}</button></footer></section>`;
     }
 
@@ -16753,10 +16799,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const row = listConfig.production.rows.find(item=>item.id===state.formRecordId) || listConfig.production.rows[0];
       const sections = [['basic','生产计划'],['items','生产明细'],['remark','备注']];
       return `<section class="form-view"><header class="form-head"><h1>${isEdit?'编辑':'新建'}生产订单</h1>${renderPageActions()}<span class="badge ${isEdit?badgeClass(row):'info'}">${isEdit?row.statusText:'草稿'}</span></header><div class="form-main"><nav class="anchor-nav">${sections.map(([id,label],i)=>`<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav><div class="form-scroll">
-        <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">生产计划</span></h2><div class="form-grid"><div class="field required"><label>生产单号</label><input data-form-field="no" value="${isEdit?row.no:''}" /></div><div class="field"><label>计划开始</label><input type="date" data-form-field="start" /></div><div class="field"><label>计划结束</label><input type="date" data-form-field="end" /></div></div></section>
+        <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">生产计划</span></h2><div class="form-grid form-grid--adaptive"><div class="field required"><label>生产单号</label><input data-form-field="no" value="${isEdit?row.no:''}" /></div><div class="field"><label>计划开始</label><input type="date" data-form-field="start" /></div><div class="field"><label>计划结束</label><input type="date" data-form-field="end" /></div></div></section>
 
         <section class="form-section" id="items"><h2 class="section-title"><span class="form-section-title-label">生产明细</span> </h2><div class="line-items compact-form-table"><table aria-label="生产明细">${renderFormColumns([44,null,'28%',null,100,180,null,52])}<thead><tr>${['序号','销售订单行','产品 *','规格','单位 *','计划数量 *','BOM 版本','操作'].map(label=>`<th>${label}</th>`).join('')}</tr></thead>${Array.from({length:state.lineCount},(_,i)=>`<tbody class="editable-line-group" data-form-row><tr><td class="compact-sequence" data-label="序号" rowspan="2"><span class="editable-line-number">${i+1}</span></td><td data-label="销售订单行"><input aria-label="销售订单行 ${i+1}" data-form-field="source-${i}" /></td><td data-label="产品"><div class="product-field-control"><span data-production-product-preview="${i}"></span><ui-select aria-label="产品 ${i+1}" data-form-field="product-${i}"><option value="">请选择产品</option><option ${isEdit?'selected':''}>节庆毛绒礼盒</option></ui-select></div></td><td data-label="规格"><ui-select aria-label="规格 ${i+1}" data-form-field="sku-${i}"><option value="">选择规格</option><option>30cm / 米白</option></ui-select></td><td data-label="单位"><ui-select aria-label="单位 ${i+1}" data-form-field="unit-${i}"><option>个</option></ui-select></td><td data-label="计划数量"><input aria-label="计划数量 ${i+1}" type="number" min="1" data-form-field="qty-${i}" value="1" /></td><td data-label="BOM 版本"><input aria-label="BOM 版本 ${i+1}" data-form-field="bom-${i}" /></td><td><button class="text-btn" data-action="remove-line" ${state.lineCount===1?'disabled':''}>移除</button></td></tr><tr class="compact-row-details"><td colspan="7"><section class="compact-optional"><div class="compact-form-heading">路线、验货与备注</div><div class="production-line-fields"><div class="field required"><div class="compact-field-label"><label>生产路线</label><details class="compact-field-help"><summary aria-label="查看生产路线说明">?</summary><p>发布后冻结为“布料加工 → 车缝 → 手工 → 包装”，车缝和手工分别决定本厂或外发。</p></details></div><ui-select aria-label="生产路线 ${i+1}" data-form-field="route-${i}"><option>毛绒标准路线（先车缝、后手工）</option></ui-select></div><div class="field"><div class="compact-field-label"><label>客户验货</label><details class="compact-field-help"><summary aria-label="查看客户验货说明">?</summary><p>仅订单明确要求时开启；不等同于系统验收。</p></details></div><ui-select aria-label="客户验货 ${i+1}" data-form-field="inspection-${i}"><option>不需要</option><option>需要</option></ui-select></div><div class="field line-note"><label>明细备注</label><textarea aria-label="明细备注 ${i+1}" data-form-field="line-note-${i}" maxlength="2000" rows="2"></textarea></div></div></section></td></tr></tbody>`).join('')}</table></div>${renderLineAddContinuation('添加生产明细')}</section>
-        <section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注</span></h2><div class="form-grid"><div class="field span-2"><label>生产备注</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000"></textarea></div></div></section>
+        <section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注</span></h2><div class="form-grid form-grid--support"><div class="field span-2"><label>生产备注</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000"></textarea></div></div></section>
       </div></div><footer class="form-foot"><span class="dirty-state${state.formDirty ? ' is-dirty' : ''}" role="status">${state.formDirty?'有未保存修改':'尚未修改'}</span><button class="btn" data-action="back-list">返回列表</button><button class="btn primary" data-action="save-form">保存${isEdit?'修改':'草稿'}</button></footer></section>`;
     }
 
@@ -16777,11 +16823,11 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const row = listConfig.shipments.rows.find(item=>item.id===state.formRecordId) || listConfig.shipments.rows[0];
       const sections = [['basic','单据与客户'],['items','出货明细'],['delivery','收货信息'],['transport','运输与费用'],['remark','备注与附件']];
       return `<section class="form-view"><header class="form-head"><h1>${isEdit?'编辑':'新建'}出货单</h1>${renderPageActions()}<span class="badge ${isEdit?badgeClass(row):'info'}">${isEdit?row.statusText:'草稿'}</span></header><div class="form-main"><nav class="anchor-nav">${sections.map(([id,label],i)=>`<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav><div class="form-scroll">
-        <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">单据与客户</span></h2><div class="form-grid"><div class="field required"><label>出货单号（自动）</label><input value="${isEdit?row.no:'SH-20260925-NEW'}" data-form-field="no" /></div><div class="field required"><label>销售订单</label><ui-select data-form-field="sales-order"><option>SO-20260924-006</option><option>SO-20260925-001</option></ui-select></div><div class="field required ${state.formErrors.party?'error':''}"><label>客户</label><ui-select data-form-field="party"><option value="">请选择客户</option><option ${isEdit?'selected':''}>星河文创有限公司</option><option>华南礼品有限公司</option></ui-select>${state.formErrors.party?'<span class="error-text">请选择客户</span>':''}</div><div class="field"><label>单据客户名称</label><input data-form-field="customer-name" value="星河文创有限公司" /></div><div class="field"><label>币种（跟随销售订单）</label><input value="人民币（CNY）" disabled /></div><div class="field required"><label>计划出货日期</label><input type="date" value="2026-10-03" data-form-field="ship-date" /></div></div></section>
+        <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">单据与客户</span></h2><div class="form-grid form-grid--adaptive"><div class="field required"><label>出货单号（自动）</label><input value="${isEdit?row.no:'SH-20260925-NEW'}" data-form-field="no" /></div><div class="field span-2"><label>销售来源</label><span>SO-20260924-006 · 星河文创有限公司 · 人民币（CNY）</span><input type="hidden" data-form-field="sales-order" value="SO-20260924-006" /><input type="hidden" data-form-field="party" value="星河文创有限公司" /><input type="hidden" data-form-field="customer-name" value="星河文创有限公司" /></div><div class="field required"><label>计划出货日期</label><input type="date" value="2026-10-03" data-form-field="ship-date" /></div></div></section>
         <section class="form-section" id="items"><h2 class="section-title"><span class="form-section-title-label">出货明细</span> ${renderFormImportActions('shipment','从销售订单导入')}</h2><p class="data-note">确认出货时才会扣减相应库存。</p>${renderDocumentLines('shipments')}${renderLineAddContinuation('添加出货明细')}${state.lineCount?'<div class="shipment-weight-summary"><div class="rm-callout warning"><strong>预计总净重暂不可计算</strong><p>当前样例未提供产品单重；系统不会提交部分合计。请补齐档案或填写整单实称净重。</p></div><div class="field"><label>实际总净重（克）</label><input type="number" min="0" data-form-field="total-net-weight" /><span class="data-note">选填；明细变更后需重填。</span></div></div>':'<p class="data-note">填写出货明细后显示预计总净重。</p>'}</section>
-        <section class="form-section" id="delivery"><h2 class="section-title"><span class="form-section-title-label">收货信息</span></h2><div class="form-grid">${renderDeliveryAddressFields({country:'中国',recipient:'刘女士',phone:'13900001840',address:'样例园区 8 号'})}</div></section>
-        <section class="form-section" id="transport"><h2 class="section-title"><span class="form-section-title-label">运输与费用</span></h2><div class="form-grid"><div class="field"><label>运输方式</label><input data-form-field="transport" value="陆运" /></div><div class="field"><label>承运商</label><input data-form-field="carrier" value="顺丰物流" /></div><div class="field"><label>物流 / 提单号</label><input data-form-field="tracking" /></div><div class="field"><label>件数 / 箱数</label><input type="number" data-form-field="packages" value="80" /></div><div class="field"><label>毛重（千克）</label><input type="number" data-form-field="gross-weight" value="560" /></div><div class="field"><label>体积（立方米）</label><input type="number" data-form-field="volume" value="8.6" /></div><div class="field"><label>实际运费金额</label><input type="number" data-form-field="freight" value="680" /></div><div class="field span-2"><label>唛头</label><textarea data-form-field="shipping-mark">STARLIGHT / CARTON 1-80</textarea></div></div></section>
-        <section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid"><div class="field span-2"><label>备注</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000"></textarea></div><div class="field span-2"><label>出货附件</label><button class="control" data-action="fake-upload" style="justify-content:flex-start">${icon('paperclip')}上传附件</button></div></div></section>
+        <section class="form-section" id="delivery"><h2 class="section-title"><span class="form-section-title-label">收货信息</span></h2><div class="form-grid form-grid--adaptive">${renderDeliveryAddressFields({country:'中国',recipient:'刘女士',phone:'13900001840',address:'样例园区 8 号'})}</div></section>
+        <section class="form-section" id="transport"><h2 class="section-title"><span class="form-section-title-label">运输与费用</span></h2><div class="form-grid form-grid--adaptive"><div class="field"><label>运输方式</label><input data-form-field="transport" value="陆运" /></div><div class="field"><label>承运商</label><input data-form-field="carrier" value="顺丰物流" /></div><div class="field"><label>物流 / 提单号</label><input data-form-field="tracking" /></div><div class="field"><label>件数 / 箱数</label><input type="number" data-form-field="packages" value="80" /></div><div class="field"><label>毛重（千克）</label><input type="number" data-form-field="gross-weight" value="560" /></div><div class="field"><label>体积（立方米）</label><input type="number" data-form-field="volume" value="8.6" /></div><div class="field"><label>实际运费金额</label><input type="number" data-form-field="freight" value="680" /></div><div class="field span-2"><label>唛头</label><textarea data-form-field="shipping-mark">STARLIGHT / CARTON 1-80</textarea></div></div></section>
+        <section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid form-grid--support"><div class="field span-2"><label>备注</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000"></textarea></div><div class="field span-2"><label>出货附件</label><button class="control" data-action="fake-upload" style="justify-content:flex-start">${icon('paperclip')}上传附件</button></div></div></section>
       </div></div><footer class="form-foot"><span class="dirty-state${state.formDirty ? ' is-dirty' : ''}" role="status">${state.formDirty?'有未保存修改':'尚未修改'}</span><button class="btn" data-action="back-list">返回列表</button><button class="btn primary" data-action="save-form">保存${isEdit?'修改':'草稿'}</button></footer></section>`;
     }
 
@@ -16795,7 +16841,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const isEdit = state.formMode === 'edit';
       const row = listConfig.payments.rows.find(item=>item.id===state.formRecordId) || listConfig.payments.rows[0];
       const sections = [['basic','收付款信息'],['allocations','核销明细'],['remark','备注与附件']];
-      return `<section class="form-view"><header class="form-head"><h1>${isEdit?'编辑':'登记'}收付款</h1>${renderPageActions()}<span class="badge ${isEdit?badgeClass(row):'info'}">${isEdit?row.statusText:'草稿'}</span></header><div class="form-main"><nav class="anchor-nav">${sections.map(([id,label],i)=>`<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav><div class="form-scroll"><section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">收付款信息</span></h2><div class="form-grid"><div class="field"><label>单据号</label><input value="${isEdit?row.no:'PAY-20260925-NEW'}" disabled /></div><div class="field required"><label>业务类型</label><ui-select data-form-field="type"><option>收款</option><option>付款</option></ui-select></div><div class="field required ${state.formErrors.party?'error':''}"><label>往来方</label><ui-select data-form-field="party"><option value="">请选择客户 / 供应商</option><option ${isEdit?'selected':''}>华南礼品有限公司</option><option>锦丰面料有限公司</option></ui-select>${state.formErrors.party?'<span class="error-text">请选择往来方</span>':''}</div><div class="field required"><label>收付日期</label><input type="date" value="2026-09-25" data-form-field="date" /></div><div class="field required"><label>币种</label><ui-select data-form-field="currency"><option>人民币（CNY）</option></ui-select></div><div class="field required"><label>金额</label><input type="number" value="50000" data-form-field="amount" /></div><div class="field"><label>银行账户</label><ui-select data-form-field="bank"><option>基本户（尾号 1028）</option><option>现金</option></ui-select></div><div class="field"><label>银行流水号</label><input data-form-field="bank-reference" /></div></div></section><section class="form-section" id="allocations"><h2 class="section-title"><span class="form-section-title-label">核销明细</span> ${renderLineAddButton('添加核销来源')}</h2><div class="line-items compact-form-table"><table aria-label="核销明细">${renderFormColumns([44,null,180,180,52])}<thead><tr>${['序号','应收 / 应付','未核销余额','本次核销金额','操作'].map(label=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${Array.from({length:state.lineCount},(_,i)=>`<tr><td class="compact-sequence" data-label="序号">${i+1}</td><td data-label="应收 / 应付"><input aria-label="应收 / 应付 ${i+1}" data-form-field="source-${i}" value="AR-20260924-006 / CNY" readonly /></td><td data-label="未核销余额"><input aria-label="未核销余额 ${i+1}" value="86400" readonly /></td><td data-label="本次核销金额"><input aria-label="本次核销金额 ${i+1}" type="number" min="0" max="86400" data-form-field="allocation-${i}" value="${i===0?50000:''}" /></td><td><button class="text-btn" data-action="remove-line" ${state.lineCount===1?'disabled':''}>移除</button></td></tr>`).join('')}</tbody></table></div>${renderLineAddContinuation('添加核销来源')}<p class="data-note" style="margin:9px 0 0">本次核销合计不能超过收付款金额或来源未核销余额。</p></section><section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid"><div class="field span-2"><label>摘要</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="255"></textarea></div><div class="field span-2"><label>回单附件</label><button class="control" data-action="fake-upload" style="justify-content:flex-start">${icon('paperclip')}上传银行回单</button></div></div></section></div></div><footer class="form-foot"><span class="dirty-state${state.formDirty ? ' is-dirty' : ''}" role="status">${state.formDirty?'有未保存修改':'尚未修改'}</span><button class="btn" data-action="back-list">返回列表</button><button class="btn primary" data-action="save-form">保存${isEdit?'修改':'草稿'}</button></footer></section>`;
+      return `<section class="form-view"><header class="form-head"><h1>${isEdit?'编辑':'登记'}收付款</h1>${renderPageActions()}<span class="badge ${isEdit?badgeClass(row):'info'}">${isEdit?row.statusText:'草稿'}</span></header><div class="form-main"><nav class="anchor-nav">${sections.map(([id,label],i)=>`<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav><div class="form-scroll"><section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">收付款信息</span></h2><div class="form-grid form-grid--adaptive"><div class="field"><label>单据号</label><input value="${isEdit?row.no:'PAY-20260925-NEW'}" disabled /></div><div class="field required"><label>业务类型</label><ui-select data-form-field="type"><option>收款</option><option>付款</option></ui-select></div><div class="field required ${state.formErrors.party?'error':''}"><label>往来方</label><ui-select data-form-field="party"><option value="">请选择客户 / 供应商</option><option ${isEdit?'selected':''}>华南礼品有限公司</option><option>锦丰面料有限公司</option></ui-select>${state.formErrors.party?'<span class="error-text">请选择往来方</span>':''}</div><div class="field required"><label>收付日期</label><input type="date" value="2026-09-25" data-form-field="date" /></div><div class="field required"><label>币种</label><ui-select data-form-field="currency"><option>人民币（CNY）</option></ui-select></div><div class="field required"><label>金额</label><input type="number" value="50000" data-form-field="amount" /></div><div class="field"><label>银行账户</label><ui-select data-form-field="bank"><option>基本户（尾号 1028）</option><option>现金</option></ui-select></div><div class="field"><label>银行流水号</label><input data-form-field="bank-reference" /></div></div></section><section class="form-section" id="allocations"><h2 class="section-title"><span class="form-section-title-label">核销明细</span> ${renderLineAddButton('添加核销来源')}</h2><div class="line-items compact-form-table"><table aria-label="核销明细">${renderFormColumns([44,null,180,180,52])}<thead><tr>${['序号','应收 / 应付','未核销余额','本次核销金额','操作'].map(label=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${Array.from({length:state.lineCount},(_,i)=>`<tr><td class="compact-sequence" data-label="序号">${i+1}</td><td data-label="应收 / 应付"><input aria-label="应收 / 应付 ${i+1}" data-form-field="source-${i}" value="AR-20260924-006 / CNY" readonly /></td><td data-label="未核销余额"><input aria-label="未核销余额 ${i+1}" value="86400" readonly /></td><td data-label="本次核销金额"><input aria-label="本次核销金额 ${i+1}" type="number" min="0" max="86400" data-form-field="allocation-${i}" value="${i===0?50000:''}" /></td><td><button class="text-btn" data-action="remove-line" ${state.lineCount===1?'disabled':''}>移除</button></td></tr>`).join('')}</tbody></table></div>${renderLineAddContinuation('添加核销来源')}<p class="data-note" style="margin:9px 0 0">本次核销合计不能超过收付款金额或来源未核销余额。</p></section><section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid form-grid--support"><div class="field span-2"><label>摘要</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="255"></textarea></div><div class="field span-2"><label>回单附件</label><button class="control" data-action="fake-upload" style="justify-content:flex-start">${icon('paperclip')}上传银行回单</button></div></div></section></div></div><footer class="form-foot"><span class="dirty-state${state.formDirty ? ' is-dirty' : ''}" role="status">${state.formDirty?'有未保存修改':'尚未修改'}</span><button class="btn" data-action="back-list">返回列表</button><button class="btn primary" data-action="save-form">保存${isEdit?'修改':'草稿'}</button></footer></section>`;
     }
 
     function contactFormRows() {
@@ -16840,8 +16886,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         ? [['basic','基本资料',basic+field('内部款号','style')+field('客户款号','customer-style')],['trade','外贸信息',field('英文品名','english-name')+field('海关编码（HS Code）','hs-code')],['units','计量信息',field('默认单位','unit')+field('单位净重（克）','weight')],['images','产品图片',null]]
         : config.key==='materials'
         ? [['basic','基本资料',basic+field('细分分类','category')+field('规格','spec')+field('颜色','color')+field('默认单位','unit')],['stock','采购与库存',field('库存类别','stock-type')+field('默认入库仓库','warehouse')+field('厂商','supplier')+field('厂商料号','supplier-item')],['remark','备注',note]]
-        : [['basic','基本资料',basic+field('环节类别','category')],['route','路线与加工能力',field('标准生产路线位置','route','',false,'将工序明确绑定到固定生产路线；不能根据名称、类别或排序自动推断。','每个路线位置只能绑定一条启用工序。')+field('可委外','outsourcing','',false,'这里只记录工序能力；具体订单由生产经理决定本厂或外发安排。','可与内制同时启用；具体订单另行安排。')+field('可内制','inhouse')],['remark','补充资料',field('质检参考','quality','',false,'记录该工序通常是否需要检验，供资料查询。','仅作参考，不生成任务或代替检验结果。')+note]];
-      return `<section class="form-view"><header class="form-head"><h1>${isEdit?'编辑':'新建'}${config.entity}</h1>${renderPageActions()}</header><div class="form-main"><nav class="anchor-nav">${groups.map(([id,label],i)=>`<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav><div class="form-scroll">${groups.map(([id,label,fields])=>id==='images'?`<section class="form-section" id="images"><h2 class="section-title"><span class="form-section-title-label">产品图片</span></h2><div class="product-media-editor"><div class="product-main-image">${renderProductArt(Math.max(0,['正面图','侧面图','包装图','细节图'].indexOf(state.productMediaPrimary)),rowParty(row,config))}</div><div><h3 style="margin:0 0 7px;font-size:14px">主图 · ${state.productMediaPrimary}</h3><p class="data-note" style="margin:0 0 12px;line-height:1.6">主图用于产品列表和选款；细节、包装与标签图片按原图保留，不压进表格。</p><div class="product-media-actions"><button class="btn primary" data-action="open-attachments" data-context="product" data-owner="${number}">${icon('paperclip')}上传与管理图片</button><button class="btn" data-action="media-set-main" data-value="正面图">正面图设为主图</button><button class="btn" data-action="media-sort">调整顺序</button></div></div></div></section>`:`<section class="form-section" id="${id}"><h2 class="section-title"><span class="form-section-title-label">${label}</span></h2><div class="form-grid">${fields}</div></section>`).join('')}</div></div><footer class="form-foot"><span class="dirty-state${state.formDirty ? ' is-dirty' : ''}" role="status">${state.formDirty?'有未保存修改':'尚未修改'}</span><button class="btn" data-action="back-list">返回列表</button><button class="btn primary" data-action="save-form">保存${isEdit?'修改':'资料'}</button></footer></section>`;
+        : [['basic','基本资料',basic+field('环节类别','category')],['route','路线与加工能力',field('标准生产路线位置','route','',false,'将工序明确绑定到固定生产路线；不能根据名称、类别或排序自动推断。','每个路线位置只能绑定一条启用工序。')+field('可委外','outsourcing','',false,'这里只记录工序能力；具体订单由生产经理决定本厂或外发安排。','可与内制同时启用；具体订单另行安排。')+field('可内制','inhouse')],['remark','补充资料',note]];
+      return `<section class="form-view"><header class="form-head"><h1>${isEdit?'编辑':'新建'}${config.entity}</h1>${renderPageActions()}</header><div class="form-main"><nav class="anchor-nav">${groups.map(([id,label],i)=>`<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav><div class="form-scroll">${groups.map(([id,label,fields])=>id==='images'?`<section class="form-section" id="images"><h2 class="section-title"><span class="form-section-title-label">产品图片</span></h2><div class="product-media-editor"><div class="product-main-image">${renderProductArt(Math.max(0,['正面图','侧面图','包装图','细节图'].indexOf(state.productMediaPrimary)),rowParty(row,config))}</div><div><h3 style="margin:0 0 7px;font-size:14px">主图 · ${state.productMediaPrimary}</h3><p class="data-note" style="margin:0 0 12px;line-height:1.6">主图用于产品列表和选款；细节、包装与标签图片按原图保留，不压进表格。</p><div class="product-media-actions"><button class="btn primary" data-action="open-attachments" data-context="product" data-owner="${number}">${icon('paperclip')}上传与管理图片</button><button class="btn" data-action="media-set-main" data-value="正面图">正面图设为主图</button><button class="btn" data-action="media-sort">调整顺序</button></div></div></div></section>`:`<section class="form-section" id="${id}"><h2 class="section-title"><span class="form-section-title-label">${label}</span></h2><div class="form-grid${['basic','trade','units','stock','terms','capacity','route'].includes(id)?' form-grid--adaptive':''}">${fields}</div></section>`).join('')}</div></div><footer class="form-foot"><span class="dirty-state${state.formDirty ? ' is-dirty' : ''}" role="status">${state.formDirty?'有未保存修改':'尚未修改'}</span><button class="btn" data-action="back-list">返回列表</button><button class="btn primary" data-action="save-form">保存${isEdit?'修改':'资料'}</button></footer></section>`;
     }
 
     function renderGenericForm(config) {
@@ -18070,6 +18116,20 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       document.querySelector('#permission-access-module')?.addEventListener('change',e=>{state.permissionAccessModule=e.target.value;renderView();});
       document.querySelector('#mobile-reason')?.addEventListener('input', e => { state.mobileReason = e.target.value; state.mobileError = ''; });
       document.querySelectorAll('[data-form-field]').forEach(el => el.addEventListener('input', event => { const input = event.currentTarget; state.formValues[input.dataset.formField] = input.type === 'checkbox' || input.type === 'radio' ? input.checked : input.value; state.formDirty = true; state.formErrors = {}; const dirty = document.querySelector('.dirty-state'); if (dirty) { dirty.textContent = '有未保存修改'; dirty.classList.add('is-dirty'); } updateLineComputedValues(); updateFormLineSummary(); updateCompactFormSummaries(); }));
+      document.querySelectorAll('[data-bom-group-field]').forEach(input=>input.addEventListener('input',()=>{
+        captureFormDraft();
+        const keys=input.dataset.bomGroupIndexes.split(',').map(Number),field=input.dataset.bomGroupField;
+        keys.forEach(index=>{state.formValues[`${field}-${index}`]=input.value;});
+        if(field==='material')keys.forEach(index=>{const cloth=input.value==='米白短毛绒';state.formValues[`unit-${index}`]=input.value?(cloth?'码':'个'):'';state.formValues[`vendor-item-${index}`]=input.value?(cloth?'JF-2MM-W':'EY-12'):'';state.formValues[`spec-${index}`]=input.value?(cloth?'2mm / 米白':'12mm / 黑'):'';});
+        state.formDirty=true;rememberScroll();renderView();
+      }));
+      document.querySelectorAll('[data-bom-add-part]').forEach(button=>button.addEventListener('click',()=>{
+        const rows=formRowData(),index=Number(button.dataset.bomAddPart),source=rows[index];if(!source)return;
+        const values=Object.fromEntries(Object.keys(source.values).map(key=>[key,['material','unit','vendor-item','spec'].includes(key)?source.values[key]:'']));
+        rows.splice(index+1,0,{id:`line-${++state.lineSerial}`,values,readonly:['']});
+        rememberScroll();applyFormRows(rows);state.formDirty=true;renderView();
+        const next=formLineElements()[index+1];focusAppendedLine(next,next?.querySelector('input:not([type="hidden"]),textarea'));
+      }));
       document.querySelectorAll('[data-contact-primary]').forEach(input=>input.addEventListener('change',()=>{captureFormDraft();const rows=contactFormRows().map((row,index)=>({...row,primary:index===Number(input.dataset.contactPrimary)}));applyContactFormRows(rows);renderView();}));
       document.querySelector('[data-delivery-country]')?.addEventListener('change', event => { captureFormDraft(); state.formValues.region=event.target.value; state.formValues['address-region']=''; state.formValues.address=''; state.formDirty=true; renderView(); });
       document.querySelector('[data-delivery-region]')?.addEventListener('change', () => { captureFormDraft(); state.formDirty=true; renderView(); });
@@ -19153,12 +19213,13 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       else if (action === 'save-form') {
         captureFormDraft();const party=document.querySelector(state.formSourcePage==='production'?'[data-form-field="product-0"]':'[data-form-field="party"]');
-        const invalidDetail=[...document.querySelectorAll('.document-line-details input')].find(input=>!input.validity.valid);if(invalidDetail){invalidDetail.reportValidity();invalidDetail.focus();return;}
-        updateQuantityValidity();const invalidQuantity=document.querySelector('[data-form-field^="qty-"][aria-invalid="true"]');if(invalidQuantity){invalidQuantity.reportValidity();invalidQuantity.focus();return;}
+        const invalidDetail=[...document.querySelectorAll('.document-line-details input')].find(input=>!input.validity.valid);if(invalidDetail){setPurchaseLineDetails(invalidDetail.closest('tbody[data-form-row]'),true);invalidDetail.reportValidity();invalidDetail.focus();return;}
+        updateQuantityValidity();const invalidQuantity=document.querySelector('[data-form-field^="qty-"][aria-invalid="true"]');if(invalidQuantity){setPurchaseLineDetails(invalidQuantity.closest('tbody[data-form-row]'),true);invalidQuantity.reportValidity();invalidQuantity.focus();return;}
         const invalidContact=document.querySelector('.compact-contacts input:invalid');if(invalidContact){invalidContact.reportValidity();invalidContact.focus();return;}
         if(!party?.value){state.formErrors.party=true;renderView();document.querySelector('[data-form-field="party"]')?.focus();}
         else{state.shipmentImportUndo=null;state.bomImportUndo=null;state.purchaseImportUndo=null;const config=listConfig[state.formSourcePage];let row=config.rows.find(item=>item.id===state.formRecordId);if(!row){const sequence=config.rows.length+1;row={id:`saved-${config.key}-${sequence}`,no:`${config.prefix||({sales:'SO',purchase:'PO'}[config.key])||'DOC'}-20260926-${String(sequence).padStart(3,'0')}`,status:'draft',statusText:'草稿',progress:'草稿待提交',risk:'正常',amount:0};config.rows.unshift(row);state.formRecordId=row.id;state.formMode='edit';}row.party=state.formValues.party;if(config.key==='sales')row.customer=row.party;if(config.key==='purchase')row.supplier=row.party;row.owner=state.formValues.owner||row.owner||'当前账号';row.item=(config.key==='production'?state.formValues['product-0']:state.formValues['item-0'])||row.item||'待补齐';row.date=displayDate(isoDay(state.formValues.date||state.formValues['return-date']||state.formValues['order-date']));row.delivery=row.date;row.currency=String(state.formValues.currency||'CNY').includes('USD')?'USD':'CNY';row.lines=state.lineCount;if(config.key==='sales')row.product=row.item;if(config.key==='purchase'){row.material=row.item;row.arrival={planned:isoDay(state.formValues['confirmed-arrival']||state.formValues.date),confirmed:!!state.formValues['confirmed-arrival'],quantity:formQuantityByUnit()};}if(['sales','purchase','outsourcing'].includes(config.key))row.amount=formIndexedNumbers('qty-').some(item=>formNumber('price-'+item.name.slice(4))!==null)?formAmountFromRows():null;refreshStatusCounts(config);if(config.key==='bom')state.formValues['bom-version']=state.formValues['bom-version']||nextPrototypeBOMVersion(row.party);const formRows=formRowData();applyFormRows(formRows);formDrafts.set(`${config.key}:${row.id}`,{values:{...state.formValues},ids:[...state.formLineIds],readonly:state.formReadonlyRows.map(row=>[...row])});if(config.key==='bom'){row.item=state.formValues['bom-version']||row.item;row.metric=`${row.lines} 项`;tasks.filter(task=>task.bomRecordId===row.id).forEach(task=>{task.bomDraft=structuredClone(formDrafts.get(`bom:${row.id}`));task.bomSaved=true;task.bomActivated=false;});}state.formDirty=false;state.formErrors={};renderView();toast(config.key==='bom'?'BOM 草稿已保存，尚未启用。确认后可启用新版本。':'已保存本次演示修改，可返回列表重新打开');}
       }
+      else if(action==='purchase-line-details'){const row=target.closest('tbody[data-form-row]');setPurchaseLineDetails(row,target.getAttribute('aria-expanded')!=='true');}
       else if (action === 'form-anchor') { const section=document.getElementById(target.dataset.target); if(section){document.querySelector('.form-scroll')?.selectFormSection?.(section);if(state.formDisplay!=='section'){section.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});const heading=section.querySelector('.section-title');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}}} }
       else if (action === 'bom-import-format') { state.overlay='bom-import-format';renderFloating(); }
       else if (action === 'search-import-review') { state.importReviewKeyword=document.querySelector('[data-import-review-search]')?.value.trim()||'';if(state.importMode==='purchase')state.purchaseImportPage=1;renderFloating(); }
@@ -19542,6 +19603,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         count.textContent=`${input.value.length} / ${input.maxLength}`;
       });
       document.querySelectorAll('[data-production-product-preview]').forEach(node=>{const selected=document.querySelector(`[data-form-field="product-${node.dataset.productionProductPreview}"]`)?.value||'';if(node.dataset.product!==selected){node.dataset.product=selected;node.innerHTML=selected?renderProductThumb(Number(node.dataset.productionProductPreview),selected):'';}});
+      document.querySelectorAll('[data-bom-product-preview]').forEach(node=>{const selected=document.querySelector('[data-form-field="party"]')?.value||'';if(node.dataset.product!==selected){node.dataset.product=selected;node.innerHTML=selected?renderProductThumb(0,selected):'';}});
       document.querySelectorAll('textarea').forEach(resizePrototypeTextArea);
       document.querySelectorAll('[data-production-quantity]').forEach(output=>{const i=output.dataset.productionQuantity;const qty=document.querySelector(`[data-form-field="qty-${i}"]`)?.value;const sample=document.querySelector(`[data-form-field="sample-${i}"]`)?.value;output.textContent=qty?Number(qty)+Number(sample||0):'待补齐';});
       if(state.formSourcePage==='inventory'){
@@ -19551,14 +19613,14 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     window.addEventListener('resize', updateCompactFormSummaries);
-    document.addEventListener('input',event=>{if(event.target.matches('textarea'))resizePrototypeTextArea(event.target);});
+    document.addEventListener('input',event=>{if(event.target.matches('textarea'))resizePrototypeTextArea(event.target);updatePurchaseLineSummary(event.target);});
 
     function captureFormDraft() {
       if(state.page!=='entity-form')return;
       document.querySelectorAll('[data-form-field]').forEach(el=>state.formValues[el.dataset.formField]=['checkbox','radio'].includes(el.type)?el.checked:el.value);
     }
     function formLineElements() {
-      return document.querySelectorAll('.line-items tbody[data-form-row], .line-items tbody:not([data-form-row]):not(.document-line-product-heading) > tr, .compact-inventory-line');
+      return document.querySelectorAll('.line-items tbody[data-form-row], .line-items tbody:not([data-form-row]):not(.document-line-product-heading) > tr:not([data-bom-summary]), .compact-inventory-line');
     }
     function formRowData() {
       captureFormDraft();

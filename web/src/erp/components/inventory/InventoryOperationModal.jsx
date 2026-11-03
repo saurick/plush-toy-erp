@@ -20,6 +20,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const TYPE_META = Object.freeze({
   CYCLE_COUNT: {
@@ -149,8 +150,9 @@ export default function InventoryOperationModal({
       {inventoryOperationRequiresApproval(effectiveType) && !isEdit ? (
         <ProcessSubmissionRoute processKey="inventory_adjustment_approval" customerKey={customerKey} open={open} />
       ) : null}
-      <Form
+      <BusinessForm
         form={form}
+        className="erp-business-action-form"
         layout="vertical"
         preserve={false}
         disabled={loading}
@@ -355,7 +357,7 @@ export default function InventoryOperationModal({
             </BusinessGroupedLineItems>
           )}
         </Form.List>
-      </Form>
+      </BusinessForm>
     </BusinessFormModal>
   )
 }

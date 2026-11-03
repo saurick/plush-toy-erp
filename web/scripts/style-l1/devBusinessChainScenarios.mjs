@@ -1,34 +1,22 @@
 import { expect } from 'playwright/test'
-import { assertFulfillmentChainClickTargets, assertFulfillmentChainGeometry, assertFulfillmentDetailGeometry, openFulfillmentExceptionDirectory, fulfillmentWireCollisions } from './fulfillmentChainAssertions.mjs'
+import { assertBusinessMermaidGraph } from './mermaidGraphAssertions.mjs'
+import { writeFile } from 'node:fs/promises'
+import { DEV_FLOW_STATE_CATALOG as graphCatalog } from '../../src/dev-workbench/config/devFlowStateCatalog.mjs'
+import { assertFulfillmentChainClickTargets, assertFulfillmentChainGeometry, assertFulfillmentDetailGeometry, openFulfillmentExceptionDirectory } from './fulfillmentChainAssertions.mjs'
 import { assertInactivePrintStylesDoNotHideApp } from './styleIsolationAssertions.mjs'
 
 export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOverflow, expectText, outputDir, path, observatoryPath, startNoWriteAudit }) {
-  const verifyDiagram = async (page, diagram) => {
-    await expect(diagram).toHaveAttribute('data-graph-status', 'rendered')
-    await expect(diagram.locator('[data-graph-wire]').first()).toBeAttached()
-    const geometry = await diagram.evaluate((root) => {
-      const base = root.getBoundingClientRect()
-      return {
-        width: root.clientWidth,
-        scrollWidth: root.scrollWidth,
-        boxes: [...root.querySelectorAll('[data-graph-node],[data-graph-edge]')].map((node) => {
-          const box = node.getBoundingClientRect()
-          return { key: node.dataset.graphNode || node.dataset.graphEdge, x: box.x - base.x, y: box.y - base.y, width: box.width, height: box.height, clipped: node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1 }
-        }),
-        paths: [...root.querySelectorAll('[data-graph-wire]')].map((node) => ({ key: node.dataset.graphWire, from: node.dataset.from, to: node.dataset.to, d: node.getAttribute('d') })),
-      }
-    })
-    assert(geometry.scrollWidth <= geometry.width + 1, '原生业务图不能挤出容器')
-    assert.deepEqual(geometry.boxes.filter((box) => box.clipped), [], '节点与必要条件完整展示')
-    assert.deepEqual(fulfillmentWireCollisions(geometry), [], '业务图连线不能穿过其他节点或条件')
+  const verifyDiagram = async (page, diagrams) => {
+    for (const graph of await diagrams.all()) await assertBusinessMermaidGraph(graph)
+    const diagram = diagrams.first()
     const before = page.url()
     const node = diagram.locator('[data-graph-node]').first()
     await node.focus()
     await node.press('Enter')
     await expect(node).toHaveAttribute('aria-pressed', 'true')
     assert.equal(new URL(page.url()).searchParams.get('view'), new URL(before).searchParams.get('view'), '节点点选不跳页')
-    assert.equal(await diagram.locator('button[aria-label*=全屏]').count(), 0)
-    await assertNoHorizontalOverflow(page, '原生业务图')
+    assert.equal(await diagram.locator('[data-mermaid-fullscreen-action="open"]').count(), 1)
+    await assertNoHorizontalOverflow(page, 'Mermaid 业务图')
   }
   const verifySelectionRecovery = async (page) => {
       for (const [view, id, key, detail, placeholder] of [
@@ -76,6 +64,117 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
   const writeRequestsByPage = new WeakMap()
   return [
     {
+      name: 'dev-mermaid-print-readability',
+      path: '/__dev/status-flows?view=chain&chain=all',
+      viewport: { width: 1920, height: 1080 },
+      beforeNavigate: (page) => page.addInitScript(() => { window.__flowPrintCount = 0; window.print = () => { window.__flowPrintCount += 1 } }),
+      verify: async (page) => {
+        await page.locator('[data-fulfillment-chain] [data-chain-stage]').first().waitFor()
+        await page.getByRole('button', { name: '导出', exact: true }).hover()
+        await page.getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' }).click()
+        await page.waitForFunction(() => window.__flowPrintCount === 1)
+        await page.emulateMedia({ media: 'print' })
+        await writeFile(path.join(outputDir, 'print-geometry.json'), JSON.stringify(await page.locator('[data-flow-print-part]').first().evaluate((root) => ({
+          svg: root.querySelector('svg').getBoundingClientRect().toJSON(), viewBox: root.querySelector('svg').getAttribute('viewBox'),
+          nodes: [...root.querySelectorAll('[data-graph-node]')].map((node) => ({ key: node.dataset.graphNode, box: node.getBoundingClientRect().toJSON() })),
+          edges: [...root.querySelectorAll('[data-graph-wire]')].map((node) => { const m = node.getScreenCTM(); return { from: node.dataset.from, to: node.dataset.to, d: node.getAttribute('d'), matrix: [m.a, m.b, m.c, m.d, m.e, m.f], points: [0.1, 0.5, 0.9].map((t) => { const p = node.getPointAtLength(node.getTotalLength() * t).matrixTransform(m); return [p.x, p.y] }) } }),
+        })), null, 2))
+        try { await assertFulfillmentChainGeometry(page.locator('[data-fulfillment-chain]')) }
+        finally { await page.pdf({ path: path.join(outputDir, 'order-print-readable.pdf'), preferCSSPageSize: true, printBackground: true }) }
+        await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
+        await page.emulateMedia({ media: 'screen' })
+        await expect(page.locator('[data-flow-print-part]')).toHaveCount(0)
+        await expect(page.locator('[data-chain-stage]')).toHaveCount(17)
+      },
+    },
+    {
+      name: 'dev-mermaid-state-rule-coverage',
+      path: '/__dev/business-rules?view=states',
+      viewport: { width: 1920, height: 1080 },
+      verify: async (page) => {
+        const origin = new URL(page.url()).origin
+        const verified = []
+        for (const flow of graphCatalog.flows) {
+          await page.goto(`${origin}/__dev/business-rules?view=states&flow=${encodeURIComponent(flow.key)}`)
+          const reader = page.locator('[data-selected-flow]')
+          await expect(reader).toHaveAttribute('data-selected-flow', flow.key)
+          const graph = reader.locator('[data-business-flow]')
+          await assertBusinessMermaidGraph(graph)
+          if (flow.kind === 'taxonomy' && !flow.lifecycleRules.length && !['fact.finance_credit_note', 'fact.finance_allocation'].includes(flow.key)) await expect(graph.locator('[data-graph-wire]')).toHaveCount(0)
+          if (flow.lifecycleRules.length) {
+            for (const rule of flow.lifecycleRules) {
+              const select = reader.getByRole('combobox', { name: '主数据对象', exact: true })
+              await select.locator('xpath=ancestor::*[contains(@class,"ant-select")]').first().locator('.ant-select-selector').click()
+              await page.locator('.ant-select-dropdown:visible').getByText(rule.label, { exact: true }).click()
+              await assertBusinessMermaidGraph(graph)
+              await expect(reader).toContainText(rule.blocked)
+              await expect(reader).toContainText('启用、停用')
+            }
+          }
+          await assertNoHorizontalOverflow(page, flow.label)
+          verified.push({ key: flow.key, nodes: await graph.locator('[data-graph-node]').count(), edges: await graph.locator('[data-graph-wire]').count() })
+        }
+        await writeFile(path.join(outputDir, 'mermaid-state-coverage.json'), JSON.stringify(verified, null, 2))
+      },
+    },
+    {
+      name: 'dev-mermaid-definition-coverage',
+      path: '/__dev/business-rules?view=processes',
+      viewport: { width: 1920, height: 1080 },
+      verify: async (page) => {
+        const origin = new URL(page.url()).origin
+        const verified = []
+        for (const definition of graphCatalog.processDefinitions) {
+          await page.goto(`${origin}/__dev/business-rules?view=processes&process=${encodeURIComponent(definition.key)}`)
+          await assertBusinessMermaidGraph(page.locator('.erp-dev-flow-process-definition [data-business-flow]'))
+          await assertNoHorizontalOverflow(page, definition.label)
+          verified.push({ process: definition.key })
+        }
+        for (const fact of graphCatalog.factDefinitions) {
+          await page.goto(`${origin}/__dev/business-rules?view=facts&fact=${encodeURIComponent(fact.factKey)}`)
+          const reader = page.locator('[data-selected-fact]')
+          await expect(reader).toHaveAttribute('data-selected-fact', fact.factKey)
+          await assertBusinessMermaidGraph(reader.locator('[data-business-flow]'))
+          await expect(reader).toContainText(fact.correction)
+          await assertNoHorizontalOverflow(page, fact.label)
+          verified.push({ fact: fact.factKey })
+        }
+        await writeFile(path.join(outputDir, 'mermaid-definition-coverage.json'), JSON.stringify(verified, null, 2))
+      },
+    },
+    {
+      name: 'dev-mermaid-business-interaction',
+      path: '/__dev/business-rules?view=states&flow=source.engineering_material_request',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: (page) => startNoWriteAudit(page, writeRequestsByPage),
+      verify: async (page) => {
+        const graph = page.locator('[data-selected-flow] [data-business-flow]')
+        await assertBusinessMermaidGraph(graph)
+        const node = graph.locator('[data-graph-node]').nth(1)
+        const key = await node.getAttribute('data-graph-node')
+        await node.focus()
+        await node.press('Enter')
+        await expect(node).toHaveAttribute('aria-pressed', 'true')
+        assert.equal(new URL(page.url()).searchParams.get('state'), key)
+        await page.reload()
+        await expect(graph.locator(`[data-graph-node="${key}"]`)).toHaveAttribute('aria-pressed', 'true')
+        const edge = graph.locator('.edgeLabel[data-graph-edge]').first()
+        await edge.focus()
+        await expect(page.locator('.erp-markdown-mermaid__inspection')).toContainText('当前样品和材料与提交资料一致')
+        await edge.press('Escape')
+        await expect(page.locator('.erp-markdown-mermaid__inspection')).toHaveCount(0)
+        await graph.locator('[data-mermaid-layout-action]').click()
+        await assertBusinessMermaidGraph(graph)
+        await graph.locator('[data-mermaid-fullscreen-action="open"]').click()
+        await expect(graph.locator('[data-mermaid-fullscreen="true"]')).toBeVisible()
+        await graph.locator('[data-mermaid-fullscreen-action="close"]').click()
+        await expect(graph.locator('[data-mermaid-fullscreen-action="open"]')).toBeFocused()
+        await page.screenshot({ path: path.join(outputDir, 'mermaid-state-rules-4k.png') })
+        assert.deepEqual(writeRequestsByPage.get(page), [], '查图不写业务数据')
+      },
+    },
+    {
     name: 'dev-business-chain-reading-and-export',
     path: observatoryPath,
     viewport: { width: 1920, height: 1080 },
@@ -100,14 +199,14 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await verifyDiagram(page, panel.locator('[data-business-flow]'))
       await assertFulfillmentDetailGeometry(panel)
       await guide.locator('[data-stage-exception="cutting_quality"]').click()
-      await panel.locator('[data-graph-status="rendered"]').waitFor()
+      await panel.locator('[data-graph-status="rendered"]').first().waitFor()
       await panel.locator('[data-graph-node="original_rework"]').click()
       await panel.getByRole('button', { name: '查看此方案', exact: true }).click()
-      await panel.locator('[data-exception-plan="original_rework"] [data-graph-status="rendered"]').waitFor()
+      await panel.locator('[data-exception-plan="original_rework"] [data-graph-status="rendered"]').first().waitFor()
       await verifyDiagram(page, panel.locator('[data-business-flow]'))
       await assertFulfillmentChainGeometry(guide.locator('[data-fulfillment-chain]'))
       await assertFulfillmentDetailGeometry(panel)
-      await guide.getByRole('button', { name: '业务专题', exact: true }).click()
+      await guide.getByRole('button', { name: '查看相关专题', exact: true }).click()
       guide = page.getByRole('region', { name: '业务专题阅读', exact: true })
       await guide.locator('.ant-select')
         .filter({ has: page.getByRole('combobox', { name: '选择业务专题', exact: true }) })
@@ -116,7 +215,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await expect(topicOptions.getByRole('option', { name: '销售受理到生产准备', exact: true })).toBeVisible()
       await topicOptions.getByRole('option', { name: '成品出货到应收建立', exact: true }).click()
       await topicOptions.waitFor({ state: 'hidden' })
-      await guide.locator('[data-topic-diagram="delivery_to_settlement"] [data-graph-status="rendered"]').waitFor()
+      await guide.locator('[data-topic-diagram="delivery_to_settlement"] [data-graph-status="rendered"]').first().waitFor()
       await verifyDiagram(page, guide.locator('[data-topic-diagram="delivery_to_settlement"] [data-business-flow]'))
       await guide.locator('[data-graph-node="shipped"]').click()
       await expect(guide.locator('[data-graph-node="shipped"]')).toHaveAttribute('aria-pressed', 'true')
@@ -132,7 +231,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await page.getByRole('button', { name: '返回 业务专题', exact: true }).click()
       await guide.locator('[data-topic-diagram="delivery_to_settlement"]').waitFor()
       await page.reload()
-      await guide.locator('[data-topic-diagram="delivery_to_settlement"] [data-graph-status="rendered"]').waitFor()
+      await guide.locator('[data-topic-diagram="delivery_to_settlement"] [data-graph-status="rendered"]').first().waitFor()
       await guide.locator('.ant-select')
         .filter({ has: page.getByRole('combobox', { name: '选择业务专题', exact: true }) })
         .locator('.ant-select-selector').click()
@@ -154,10 +253,10 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await guide.getByRole('combobox', { name: '异常类型', exact: true }).click()
       await expect(page.locator('.ant-select-dropdown:visible .ant-select-item-option')).toHaveCount(6)
       await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '裁片、皮套与成品不合格' }).click()
-      await panel.locator('[data-graph-status="rendered"]').waitFor()
+      await panel.locator('[data-graph-status="rendered"]').first().waitFor()
       await panel.locator('[data-graph-node="remake"]').click()
       await panel.getByRole('button', { name: '查看此方案', exact: true }).click()
-      await panel.locator('[data-exception-plan="remake"] [data-graph-status="rendered"]').waitFor()
+      await panel.locator('[data-exception-plan="remake"] [data-graph-status="rendered"]').first().waitFor()
       assert.equal(new URL(page.url()).searchParams.has('flow_exception_origin'), false)
       await panel.locator('.ant-select')
         .filter({ has: page.getByRole('combobox', { name: '发生环节', exact: true }) })
@@ -167,7 +266,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await originOptions.waitFor({ state: 'hidden' })
       await expect(page).toHaveURL((url) => url.searchParams.get('flow_decision') === 'remake'
         && url.searchParams.get('flow_exception_origin') === 'shell_quality')
-      await panel.locator('[data-graph-status="rendered"]').waitFor()
+      await panel.locator('[data-graph-status="rendered"]').first().waitFor()
       await panel.locator('[data-graph-node="end:original"]').click()
       await panel.locator('[data-selected-exception-node="end:original"]').waitFor()
       await assertFulfillmentDetailGeometry(panel)
@@ -198,29 +297,30 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       assert.equal(await taskSearch.getAttribute('aria-invalid'), null)
       await primary.getByRole('tab', { name: '业务结构' }).click()
       await expect(taskSearch).toHaveCount(0)
-      await panel.locator('[data-exception-plan="remake"] [data-graph-status="rendered"]').waitFor()
-      await primary.getByRole('tab', { name: '查看规则', exact: true }).click()
-      for (const [name, view] of [['流程定义', 'processes'], ['事实定义', 'facts'], ['状态与流转规则', 'states']]) {
-        await page.getByRole('tablist', { name: '关联信息类型' }).getByRole('tab', { name: new RegExp(`^${name}`) }).click()
+      await panel.locator('[data-exception-plan="remake"] [data-graph-status="rendered"]').first().waitFor()
+      const chainReadingURL = page.url()
+      await page.getByRole('link', { name: '业务规则', exact: true }).click()
+      for (const [name, view] of [['流程定义', 'processes'], ['事实规则', 'facts'], ['状态流转', 'states']]) {
+        await page.getByRole('tablist', { name: '关联信息类型' }).getByRole('tab', { name, exact: true }).click()
         await expect(page).toHaveURL((url) => url.searchParams.get('view') === view)
         await expect(taskSearch).toHaveCount(0)
         if (view === 'processes') await verifyDiagram(page, page.locator('.erp-dev-flow-process-definition [data-business-flow]'))
         if (view === 'states') await verifyDiagram(page, page.locator('[data-selected-flow] [data-business-flow]'))
       }
-      await primary.getByRole('tab', { name: '业务结构' }).click()
+      await page.goto(chainReadingURL)
       await primary.getByRole('tab', { name: '实例跟踪' }).click()
       await expect(taskSearch).toHaveValue('')
       await expect(inputError).toHaveCount(0)
       await taskSearch.fill('')
       await primary.getByRole('tab', { name: '业务结构' }).click()
-      await panel.locator('[data-exception-plan="remake"] [data-graph-status="rendered"]').waitFor()
+      await panel.locator('[data-exception-plan="remake"] [data-graph-status="rendered"]').first().waitFor()
       await page.getByRole('button', { name: '导出', exact: true }).hover()
       await page.getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' }).click()
       await page.waitForFunction(() => window.__flowPrintCount === 1)
       await page.emulateMedia({ media: 'print' })
       assert.equal(await root.getAttribute('data-flow-print-current'), 'true')
-      assert.equal(await panel.locator('[data-graph-status="rendered"]').count(), 1)
-      assert(await panel.locator('[data-graph-node]').evaluateAll((nodes) => nodes.length > 0 && nodes.every((node) => node.getBoundingClientRect().width > 0)), '打印必须保留原生图节点')
+      assert.equal(await panel.locator('[data-graph-status="rendered"]').count(), await panel.locator('[data-business-flow]').count(), '打印保留当前范围的全部关系图')
+      assert(await panel.locator('[data-graph-node]').evaluateAll((nodes) => nodes.length > 0 && nodes.every((node) => node.getBoundingClientRect().width > 0)), '打印必须保留 Mermaid 图节点')
       if (page.context().browser()?.browserType().name() === 'chromium') await page.pdf({ path: path.join(outputDir, 'exception-flow-current.pdf'), preferCSSPageSize: true, printBackground: true })
       await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
       await page.emulateMedia({ media: 'screen' })
@@ -281,8 +381,10 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await instance.getByRole('button', { name: /待处理/ }).first().click()
       await expect(instance.locator('[data-task-record]')).toHaveCount(3)
       const primary = page.getByRole('tablist', { name: '业务链路方式' })
-      await primary.getByRole('tab', { name: '查看规则', exact: true }).click()
+      const instanceReadingURL = page.url()
+      await page.getByRole('link', { name: '业务规则', exact: true }).click()
       await expect(page.getByRole('button', { name: /^返回 / })).toHaveCount(0)
+      await page.goto(instanceReadingURL)
       await primary.getByRole('tab', { name: '业务结构', exact: true }).click()
       await primary.getByRole('tab', { name: '实例跟踪', exact: true }).click()
       await expect(instance.locator('[data-task-record]')).toHaveCount(3)

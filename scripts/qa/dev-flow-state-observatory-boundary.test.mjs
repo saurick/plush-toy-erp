@@ -141,7 +141,7 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(chain, /data-stage-exception=\{step.stage\}/u);
   assert.match(guide, /<FulfillmentChainCanvas/u, "the main chain remains present while an exception is open");
   assert.match(chainModel, /buildFulfillmentOverview\(flow\)/u, "the total flow groups the canonical source stages");
-  assert.match(chain, /data-fulfillment-stage=\{step\.stage\}/u, "each main node retains its canonical identity");
+  assert.match(chainModel, /'fulfillment-stage': step\.stage/u, "each Mermaid node retains its canonical identity");
   assert.doesNotMatch(guide, /\bfunction\s+ExceptionGuide\s*\(|exception-position/u, "the separate exception main view is removed");
   for (const copy of [
     "Workflow 管“人”", "ProcessRuntime 管“路”", "Fact / Ledger 管“账”",
@@ -303,6 +303,8 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
     "flow_topic",
     "flow_topic_node",
     "flow_topic_step",
+    "flow_topic_panel",
+    "flow_topic_batch",
     "flow_map",
     "flow_map_node",
     "flow_exception",
@@ -483,7 +485,7 @@ test("dev flow state observatory: Runtime completion never promotes Workflow or 
 
   assert.match(chain, /item\.processKeys\.includes\(runtimeProcessKey\)/u);
   assert.match(chain, /runtimeKey=\{currentRuntimeNode\?\.key\}/u);
-  assert.match(page, /data-runtime-current=\{node.key === runtimeKey/u);
+  assert(read('web/src/common/components/markdown/mermaidGraph.mjs').includes("'runtime-current': node.key === runtimeKey"), 'Mermaid runtime highlight is limited to the exact current node');
   assert.match(overview, /matchingChain\?\.key/u);
   assert.match(overview, /总图最多只高亮这笔任务所属的一条业务链/u);
   assert.match(overview, /只证明定位到所属链；尚未证明上下游完成/u);

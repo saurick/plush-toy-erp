@@ -14,6 +14,8 @@ import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { message, modal } from '@/common/utils/antdApp'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
 import { BusinessEditorPaneContext, BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
+import { ReferenceRecordsFeedback } from '../ReferenceRecordsContext.jsx'
+import { useBusinessSplit } from './BusinessSplitContext.jsx'
 import BusinessFormBody from './BusinessFormBody.jsx'
 import { useBusinessEditorGroup } from './BusinessEditorGroup.jsx'
 import { businessFormReadOnly } from './businessFormReadOnly.mjs'
@@ -112,11 +114,12 @@ export default function BusinessFormPage({
   children,
 }) {
   const outletContext = useBusinessPageContext()
+  const split = useBusinessSplit()
   const { appearance, setAppearance, appearanceSaveError, retryAppearanceSave } = useERPTheme()
   const [hasSectionNavigation, setHasSectionNavigation] = useState(false)
   const formBodyRef = useRef(null)
   const pane = React.useContext(BusinessEditorPaneContext)
-  const visible = open && pane?.active !== false
+  const visible = open && pane?.active !== false && split?.visible !== false
   const editorGroup = useBusinessEditorGroup()
   const editorOwner = useRef(Symbol('business-editor')).current
   const onTaskFormEditingChange = outletContext?.taskBusiness?.onFormEditingChange
@@ -133,7 +136,7 @@ export default function BusinessFormPage({
   const readOnly = sourceReadOnly || outletContext?.taskBusiness?.readOnly === true
   const { pathname } = useLocation()
   const screens = Grid.useBreakpoint()
-  const canFullscreen = Boolean(screens.md && !taskFocused && !pathname.startsWith('/m/'))
+  const canFullscreen = Boolean(screens.md && !taskFocused && !split?.open && !pathname.startsWith('/m/'))
   const [fullscreen, setFullscreen] = useState(false)
   const fullscreenActive = visible && canFullscreen && fullscreen
   const fullscreenLabel = fullscreenActive ? '退出全屏' : readOnly ? '全屏查看' : '全屏编辑'
@@ -290,7 +293,7 @@ export default function BusinessFormPage({
     if (!visible) return undefined
     leavingRef.current = false
     triggerRef.current = document.activeElement
-    const scroller = pageRef.current?.closest('.ant-drawer-body, .erp-admin-content, .mobile-business-layout__content, .mobile-role-tasks-page__detail-main')
+    const scroller = pageRef.current?.closest('[data-erp-split-pane], .ant-drawer-body, .erp-admin-content, .mobile-business-layout__content, .mobile-role-tasks-page__detail-main')
     const layout = pageRef.current?.closest('.erp-business-page-layout')
     const taskLayout = pageRef.current?.closest('.mobile-task-business, .workflow-task-business-workspace')
     scrollPositionRef.current = scroller
@@ -315,7 +318,7 @@ export default function BusinessFormPage({
         if (trigger?.isConnected) trigger.focus?.({ preventScroll: true })
       })
     }
-  }, [visible])
+  }, [visible, split?.open])
 
   useEffect(() => {
     if (!open) {
@@ -386,13 +389,13 @@ export default function BusinessFormPage({
       if (!(await confirmDiscard())) return false
       if (intent === 'refresh') {
         currentRef.current.onCancel?.()
-      } else {
+      } else if (!split?.handlingNavigation) {
         leavingRef.current = true
       }
       return true
     }
     return editorGroup ? editorGroup.registerGuard(editorOwner, guard) : registerPageLeaveGuard?.(guard)
-  }, [confirmDiscard, open, registerPageLeaveGuard, editorGroup, editorOwner, pane?.value])
+  }, [confirmDiscard, open, registerPageLeaveGuard, editorGroup, editorOwner, pane?.value, split?.handlingNavigation])
 
   useEffect(() => {
     if (!open || (!dirty && !busy)) return undefined
@@ -510,7 +513,7 @@ export default function BusinessFormPage({
           onChange={setFormChange}
         />
       ) : null}
-      {open && !editorGroup && (dirty || busy) ? (
+      {open && !editorGroup && !split?.handlingNavigation && (dirty || busy) ? (
         <NavigationGuard
           dirty={dirty}
           saving={busy}
@@ -549,6 +552,7 @@ export default function BusinessFormPage({
           <BusinessFormPendingAttachmentsContext.Provider
             value={reportPendingAttachments}
           >
+            <ReferenceRecordsFeedback active={visible} />
             {readOnly ? businessFormReadOnly(children) : children}
           </BusinessFormPendingAttachmentsContext.Provider>
         </Spin>

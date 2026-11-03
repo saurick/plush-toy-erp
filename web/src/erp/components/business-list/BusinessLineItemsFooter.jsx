@@ -1,7 +1,9 @@
-import React, { forwardRef } from 'react'
+import React, { forwardRef, useRef } from 'react'
 import { PlusOutlined } from '@ant-design/icons'
 import { Button, Popover } from 'antd'
 import './businessFormSections.css'
+import { useTableStickyToolbar } from '@/common/components/table/TableStickyHeader.jsx'
+import { BusinessLineEditorActionHost, useBusinessLineEditor } from './BusinessLineEditor.jsx'
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ')
@@ -37,18 +39,29 @@ export function BusinessLineItemsAddButton({
   )
 }
 
-export function BusinessLineItemsHeader({ title, description, notice, children }) {
+export function BusinessLineItemsHeader({ title, description, notice, children, groupCount, groupActions, scrollControls = false }) {
+  const editor = useBusinessLineEditor()
+  const headerRef = useRef(null)
+  useTableStickyToolbar(headerRef, Boolean(groupActions || scrollControls), 'var(--erp-form-reading-top, 0px)')
   return (
     <>
-      <div className="erp-business-form-heading erp-sales-order-lines-form__head">
-        <div>
-          <strong role="heading" aria-level={3} tabIndex={-1}>
-            {title}
-          </strong>
-          {description ? <span>{description}</span> : null}
+      <div ref={headerRef} className={`${editor ? 'erp-line-editor__heading ' : title ? 'erp-business-form-heading ' : ''}erp-sales-order-lines-form__head`} data-line-items-title={title ? 'true' : 'false'} data-line-items-toolbar={groupActions || scrollControls ? 'true' : 'false'}>
+        <div className="erp-line-items-form__head-identity">
+          {title ? (
+            <strong role="heading" aria-level={3} tabIndex={-1}>
+              {title}
+            </strong>
+          ) : null}
+          {groupCount !== undefined ? <span className="erp-line-items-form__group-count">{groupCount} 组</span> : null}
+          {description ? <span className="erp-line-items-form__head-description">{description}</span> : null}
         </div>
-        {children ? (
-          <div className="erp-line-items-form__head-actions">{children}</div>
+        <BusinessLineEditorActionHost />
+        {children || groupActions || scrollControls ? (
+          <div className="erp-line-items-form__head-actions">
+            {groupActions}
+            {scrollControls ? <span className="erp-line-items-form__scroll-tools" data-table-scroll-toolbar /> : null}
+            {children ? <div className="erp-line-items-form__head-extra-actions">{children}</div> : null}
+          </div>
         ) : null}
       </div>
       {notice}

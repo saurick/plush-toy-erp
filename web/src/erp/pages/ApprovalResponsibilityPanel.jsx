@@ -51,6 +51,7 @@ import {
   normalizeApprovalCondition,
 } from '../utils/approvalCondition.mjs'
 import { BUSINESS_CURRENCY_OPTIONS } from '../utils/businessCurrency.mjs'
+import BusinessForm from '../components/business-list/BusinessForm.jsx'
 
 const { Text, Title } = Typography
 
@@ -1110,7 +1111,7 @@ export default function ApprovalResponsibilityPanel({
         centered
         destroyOnHidden
       >
-        <Form
+        <BusinessForm
           form={form}
           layout="vertical"
           className="erp-approval-responsibility-form"
@@ -1397,7 +1398,7 @@ export default function ApprovalResponsibilityPanel({
               </Form.Item>
             </div>
           ))}
-        </Form>
+        </BusinessForm>
       </BusinessModal>
     </Card>
   )

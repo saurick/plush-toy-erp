@@ -8,6 +8,7 @@ import MaterialSupplierSelect from '../master-data/MaterialSupplierSelect.jsx'
 import { prepareProductionOutsourcingOrder } from '../../api/productionWipApi.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function ProductionOutsourcingPrepareModal({
   open,
@@ -71,7 +72,7 @@ export default function ProductionOutsourcingPrepareModal({
       maskClosable={!saving}
     >
       {error ? <Alert type="error" showIcon message={error} /> : null}
-      <Form
+      <BusinessForm
         form={form}
         layout="vertical"
         disabled={saving}
@@ -118,7 +119,7 @@ export default function ProductionOutsourcingPrepareModal({
         >
           <DateInput />
         </Form.Item>
-      </Form>
+      </BusinessForm>
     </BusinessFormModal>
   )
 }

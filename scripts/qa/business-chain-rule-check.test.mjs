@@ -5,6 +5,8 @@ import {
   buildChainRuleCheckReport,
 } from "./business-chain-rule-check.mjs";
 import { validateBusinessChainDefinitionSnapshot } from "./manual-acceptance-business-chain-contract.mjs";
+import { DEV_FLOW_STATE_CATALOG } from "../../web/src/dev-workbench/config/devFlowStateCatalog.mjs";
+import { inspectBusinessChainRuleResults } from "./lib/business-chain-rule-contract.mjs";
 
 const plan = planChainRuleCheck("purchase_to_inventory");
 const repository = {
@@ -35,9 +37,37 @@ const input = () => ({
   })),
 });
 
+test("every registered chain has named checks and missing associations fail closed", () => {
+  for (const chain of DEV_FLOW_STATE_CATALOG.businessChains) {
+    assert(chain.steps.every((step) => step.verificationRuleIds.length > 0), chain.key);
+    assert(planChainRuleCheck(chain.key).commands.length > 0, chain.key);
+  }
+  const broken = { ...DEV_FLOW_STATE_CATALOG, businessChains: [
+    { ...plan.chain, steps: plan.chain.steps.map((step, index) => index ? step : { ...step, verificationRuleIds: [] }) },
+  ] };
+  assert.throws(() => planChainRuleCheck(plan.chain.key, broken), /关联具名规则/u);
+});
+
+test("rule results require exact scope, nonzero counts and the complete workspace identity", () => {
+  const value = buildChainRuleCheckReport(input()).results;
+  const scope = { chain: plan.chain, rules: plan.rules, repository };
+  assert.equal(inspectBusinessChainRuleResults(value, scope).passed, true);
+  assert.equal(inspectBusinessChainRuleResults(value, { ...scope, repository: { ...repository, fingerprint: "c".repeat(64) } }).current, false);
+  for (const change of [
+    (copy) => { copy.tests.find((test) => test.status === "passed").counts.executed = 0; },
+    (copy) => { copy.steps[0].chainKey = "production_exception"; },
+    (copy) => { copy.steps[0].testIds = []; },
+    (copy) => { copy.tests.pop(); },
+    (copy) => { copy.tests.find((test) => test.gate !== "server").status = "passed"; },
+  ]) {
+    const copy = structuredClone(value); change(copy);
+    assert.throws(() => inspectBusinessChainRuleResults(copy, scope), /来源、范围或计数/u);
+  }
+});
+
 test("采购定向检查从同源关联选取具名用例，命令只运行非数据库分区", () => {
   assert.throws(() => planChainRuleCheck("missing"));
-  assert.throws(() => planChainRuleCheck("production_to_inventory"));
+  assert(planChainRuleCheck("production_to_inventory").commands.length > 0);
   assert(
     plan.commands.every(
       (command) =>

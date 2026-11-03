@@ -85,11 +85,6 @@ func InhouseEnabled(v bool) predicate.Process {
 	return predicate.Process(sql.FieldEQ(FieldInhouseEnabled, v))
 }
 
-// QualityRequired applies equality check predicate on the "quality_required" field. It's identical to QualityRequiredEQ.
-func QualityRequired(v bool) predicate.Process {
-	return predicate.Process(sql.FieldEQ(FieldQualityRequired, v))
-}
-
 // SortOrder applies equality check predicate on the "sort_order" field. It's identical to SortOrderEQ.
 func SortOrder(v int) predicate.Process {
 	return predicate.Process(sql.FieldEQ(FieldSortOrder, v))
@@ -413,16 +408,6 @@ func InhouseEnabledEQ(v bool) predicate.Process {
 // InhouseEnabledNEQ applies the NEQ predicate on the "inhouse_enabled" field.
 func InhouseEnabledNEQ(v bool) predicate.Process {
 	return predicate.Process(sql.FieldNEQ(FieldInhouseEnabled, v))
-}
-
-// QualityRequiredEQ applies the EQ predicate on the "quality_required" field.
-func QualityRequiredEQ(v bool) predicate.Process {
-	return predicate.Process(sql.FieldEQ(FieldQualityRequired, v))
-}
-
-// QualityRequiredNEQ applies the NEQ predicate on the "quality_required" field.
-func QualityRequiredNEQ(v bool) predicate.Process {
-	return predicate.Process(sql.FieldNEQ(FieldQualityRequired, v))
 }
 
 // SortOrderEQ applies the EQ predicate on the "sort_order" field.

@@ -267,8 +267,6 @@ type ProductionOrderReferenceOption struct {
 	SalesOrderStatus           *string
 	SalesLineStatus            *string
 	BOMVersion                 *string
-	EffectiveFrom              *time.Time
-	EffectiveTo                *time.Time
 }
 
 type ProductionOrderRepo interface {

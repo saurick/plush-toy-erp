@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"testing"
-	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -151,17 +150,6 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 		SetStatus("UNKNOWN").
 		Save(ctx); !ent.IsConstraintError(err) {
 		t.Fatalf("expected DB check constraint for known BOM status, got %v", err)
-	}
-	from := time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC)
-	to := from.Add(-24 * time.Hour)
-	if _, err := client.BOMHeader.Create().
-		SetProductID(fixtures.productID).
-		SetVersion("INVALID-DATES").
-		SetStatus(biz.BOMStatusDraft).
-		SetEffectiveFrom(from).
-		SetEffectiveTo(to).
-		Save(ctx); !ent.IsConstraintError(err) {
-		t.Fatalf("expected DB check constraint for ordered BOM effective dates, got %v", err)
 	}
 }
 

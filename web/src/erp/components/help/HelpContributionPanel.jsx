@@ -13,6 +13,8 @@ import {
 } from '../../api/helpContentApi.mjs'
 import HelpSupplementMarkdown from './HelpSupplementMarkdown'
 import { HelpContentPolicy } from '../../../common/consts/policies.generated.mjs'
+import { useBusinessSplit } from '../business-list/BusinessSplitContext.jsx'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 
 const actionLabels = {
   save: '保存草稿',
@@ -22,12 +24,29 @@ const actionLabels = {
 const time = (value) =>
   value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : ''
 
+function ContributionNavigationGuard({ dirty, busy, confirmLeave }) {
+  const blocker = useBlocker(dirty || busy)
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return undefined
+    let active = true
+    confirmLeave().then((allowed) => {
+      if (!active) return
+      if (allowed) blocker.proceed()
+      else blocker.reset()
+    })
+    return () => { active = false }
+  }, [blocker, confirmLeave])
+  return null
+}
+
 function ContributionDialog({
   document,
   publishedVersion,
   onClose,
   onPublished,
 }) {
+  const split = useBusinessSplit()
+  const page = useBusinessPageContext()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -68,22 +87,23 @@ function ContributionDialog({
       onOk: onClose,
     })
   }, [busy, dirty, onClose])
-  const blocker = useBlocker(dirty || busy)
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return
-    if (busy) {
-      blocker.reset()
-      return
-    }
-    modal.confirm({
-      maskClosable: true,
-      title: '离开前放弃未保存的内容？',
-      okText: '放弃并离开',
-      cancelText: '继续填写',
-      onOk: () => blocker.proceed(),
-      onCancel: () => blocker.reset(),
+  const confirmLeave = useCallback(async ({ intent } = {}) => {
+    if (busy) return false
+    const allowed = !dirty || await new Promise((resolve) => {
+      modal.confirm({
+        maskClosable: true,
+        title: '离开前放弃未保存的内容？',
+        okText: '放弃并离开',
+        cancelText: '继续填写',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      })
     })
-  }, [blocker, busy])
+    if (allowed && intent === 'refresh') onClose()
+    return allowed
+  }, [busy, dirty, onClose])
+  const registerLeaveGuard = page?.registerPageLeaveGuard
+  useEffect(() => split?.handlingNavigation ? registerLeaveGuard?.(confirmLeave) : undefined, [split?.handlingNavigation, registerLeaveGuard, confirmLeave])
   useEffect(() => {
     const beforeUnload = (event) => {
       if (dirty || busy) {
@@ -205,6 +225,7 @@ function ContributionDialog({
         </Button>
       }
     >
+      {!split?.handlingNavigation ? <ContributionNavigationGuard dirty={dirty} busy={busy} confirmLeave={confirmLeave} /> : null}
       {loading ? (
         <Spin tip="正在读取本章记录">
           <div style={{ minHeight: 100 }} />

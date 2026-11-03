@@ -78,7 +78,6 @@ function buildProcessParams(values = {}, extra = {}) {
     ),
     outsourcing_enabled: values.outsourcing_enabled === true,
     inhouse_enabled: values.inhouse_enabled !== false,
-    quality_required: values.quality_required === true,
     note: trimOptional(values.note),
   })
 }

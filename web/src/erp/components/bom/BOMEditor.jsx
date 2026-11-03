@@ -21,7 +21,7 @@ import { invalidateBOMUsageSnapshots } from '../../utils/bomMaterialGroups.mjs'
 import { MAX_BOM_XLSX_FILE_BYTES, parseBOMXlsx, buildBOMImportDraft, getBOMImportDraftIssues, describeBOMImportIssues, mergeBOMImportedValues } from '../../utils/bomXlsxImport.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
-import { BOMHeaderFormFields, buildHeaderParams, buildItemParams, unixToDateInputValue } from './BOMVersionForms.jsx'
+import { BOMHeaderFormFields, BOMVersionSummary, buildHeaderParams, buildItemParams, unixToDateInputValue } from './BOMVersionForms.jsx'
 import BOMMaterialGroupsForm from './BOMMaterialGroupsForm.jsx'
 import BOMExcelImportPreview, { bomImportItemsSnapshot } from './BOMExcelImportPreview.jsx'
 import BusinessImportActions from '../business-list/BusinessImportActions.jsx'
@@ -30,6 +30,7 @@ import BOMImportReviewSummary from './BOMImportReviewSummary.jsx'
 import BOMRevisionAction from './BOMRevisionAction.jsx'
 import { canEditBOM } from './bomLifecycle.mjs'
 import { bomStatusText } from './BOMVersionColumns.jsx'
+import BusinessForm from '../business-list/BusinessForm.jsx'
 
 function formValues(record = {}) {
   return {
@@ -44,8 +45,6 @@ function formValues(record = {}) {
     auditor: record.auditor || '',
     hair_direction: record.hair_direction || '',
     note: record.note || '',
-    effective_from: unixToDateInputValue(record.effective_from),
-    effective_to: unixToDateInputValue(record.effective_to),
     print_date: unixToDateInputValue(record.print_date),
     items: (record.items || []).map((item) => ({ ...item, material_id: item.material_id || undefined, unit_id: item.unit_id || undefined, quantity: item.quantity ?? '', loss_rate: item.loss_rate ?? '0' })),
   }
@@ -142,7 +141,7 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
         ? formValues(next)
         : { ...formValues(initial.current || {}), ...imported.current?.values }
       if (!next) values.version = ''
-      if (mode === 'copy') Object.assign(values, { version: '', effective_from: '', effective_to: '', note: '', items: [] })
+      if (mode === 'copy') Object.assign(values, { version: '', note: '', items: [] })
       const [unitData, productData, materialData] = await Promise.all([
         listAllUnits({}, { signal: controller.signal }),
         canReadProducts ? loadReferenceIDs('products', [values.product_id].filter(Boolean), { signal: controller.signal }) : { products: [] },
@@ -362,14 +361,14 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
       >
         <Button ref={importButton} aria-label="从 Excel 导入" icon={<UploadOutlined aria-hidden="true" />} disabled={saving || !referencesReady} loading={importing} onClick={() => importInput.current?.click()}>从 Excel 导入</Button>
       </BusinessImportActions>
-      <Button type="link" size="small" disabled={saving} onClick={() => setFormatOpen(true)}>查看 Excel 格式</Button>
+      <Button type="link" disabled={saving} onClick={() => setFormatOpen(true)}>查看 Excel 格式</Button>
     </Space>
   ) : null
   return (
     <ReferenceRecordsProvider component={React.Fragment} adminProfile={profile} handlers={{ products: (rows) => setProducts((current) => mergeReferenceRecords(current, rows)), materials: (rows) => setMaterials((current) => mergeReferenceRecords(current, rows)) }}>
-      <BusinessFormPage open={open} form={form} baselineKey={`${readyScope}:${editorRevision}`} className="erp-bom-editor" title={title} readOnly={!writable} initialDirty={mode === 'import'} hasChanges={Boolean(pendingResult)} loading={loading} confirmLoading={saving} processing={importing} onOk={onComplete && canActivate ? complete : save} okText={onComplete && canActivate ? '完成工程资料' : '保存草稿'} okButtonProps={{ disabled: creationUnknown || Boolean(pendingImport) || !referencesReady }} onCancel={onClose} headerActions={<Space wrap>{actions}{editorMode === 'view' && canUpdate ? <BOMRevisionAction record={detail} canCreate={canCreate} disabled={saving} onEdit={(next) => { setDetail(next); setEditorMode('edit'); applyBusinessFormReadback(form, formValues(next)); savedSnapshot.current = null; setEditorRevision((value) => value + 1) }} /> : null}</Space>} secondaryAction={onComplete ? (writable && canActivate ? <Button disabled={saving || importing || creationUnknown || Boolean(pendingImport) || !referencesReady} onClick={() => save()}>保存草稿</Button> : !writable && canActivate ? <Button type="primary" loading={saving} disabled={importing || loading} onClick={complete}>完成工程资料</Button> : null) : !pendingResult && continuous && canActivate && detail?.status === 'DRAFT' ? <Popconfirm title="确认启用此 BOM 版本？" onConfirm={activate} disabled={saving}><Button disabled={saving || importing}>启用 BOM</Button></Popconfirm> : null}>
+      <BusinessFormPage open={open} form={form} baselineKey={`${readyScope}:${editorRevision}`} className="erp-bom-editor" title={title} readOnly={!writable} initialDirty={mode === 'import'} hasChanges={Boolean(pendingResult)} loading={loading} confirmLoading={saving} processing={importing} onOk={onComplete && canActivate ? complete : save} okText={onComplete && canActivate ? '完成工程资料' : '保存草稿'} okButtonProps={{ disabled: creationUnknown || Boolean(pendingImport) || !referencesReady }} onCancel={onClose} headerActions={<Space wrap><BOMVersionSummary form={form} readState={loading ? 'loading' : referencesReady ? 'ready' : 'unavailable'} />{actions}{editorMode === 'view' && canUpdate ? <BOMRevisionAction record={detail} canCreate={canCreate} disabled={saving} onEdit={(next) => { setDetail(next); setEditorMode('edit'); applyBusinessFormReadback(form, formValues(next)); savedSnapshot.current = null; setEditorRevision((value) => value + 1) }} /> : null}</Space>} secondaryAction={onComplete ? (writable && canActivate ? <Button disabled={saving || importing || creationUnknown || Boolean(pendingImport) || !referencesReady} onClick={() => save()}>保存草稿</Button> : !writable && canActivate ? <Button type="primary" loading={saving} disabled={importing || loading} onClick={complete}>完成工程资料</Button> : null) : !pendingResult && continuous && canActivate && detail?.status === 'DRAFT' ? <Popconfirm title="确认启用此 BOM 版本？" onConfirm={activate} disabled={saving}><Button disabled={saving || importing}>启用 BOM</Button></Popconfirm> : null}>
         {error ? <Alert type="warning" showIcon message={error} action={pendingResult ? <Button loading={saving} onClick={retrySavedResult}>重试保存</Button> : !referencesReady ? <Button onClick={() => setRetry((value) => value + 1)}>重新读取</Button> : undefined} /> : null}
-        <Form name={inWorkspace ? `bom-${formID}` : undefined} form={form} layout="vertical" className="erp-business-action-form" disabled={!writable || saving} onValuesChange={changeValues}>
+        <BusinessForm name={inWorkspace ? `bom-${formID}` : undefined} form={form} layout="vertical" className="erp-business-action-form" disabled={!writable || saving} onValuesChange={changeValues}>
           {undo && !undo.invalidated ? <BOMImportUndoWatcher form={form} snapshot={undo.appliedSnapshot} onInvalidated={() => setUndo((current) => current ? { ...current, invalidated: true } : null)} /> : null}
           <BOMHeaderFormFields form={form} disabled={!writable} productDisabled={['edit', 'copy'].includes(editorMode) || (inWorkspace && Boolean(initialValues?.product_id))} productActions={writable && !['edit', 'copy'].includes(editorMode) ? renderProductActions?.({ onSelect: (product) => { setProducts((current) => mergeReferenceRecords(current, [product])); applyBusinessFormReadback(form, { product_id: product.id }) } }) : null} productOptions={productOptions} attachmentPanel={<BusinessAttachmentPanel ref={attachment} ownerType="bom_header" ownerId={detail?.id} title="BOM 附件" description="色卡、工艺图、作业说明和原始材料清单" canUpload={writable} canWithdraw={writable && canUpdate} variant="inline" compact />}>
             {review ? <BOMImportReviewSummary form={form} review={review} productOptions={productOptions} /> : null}
@@ -382,7 +381,7 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
                   materialOptions={materialOptions}
                   unitOptions={unitOptions}
                   canCreateMaterial={writable && hasActionPermission(profile, PermissionCode.MATERIAL_CREATE)}
-                  onMaterialCreated={(item) => setMaterials((current) => [item, ...current])}
+                  onMaterialCreated={(item) => setMaterials((current) => mergeReferenceRecords(current, [item]))}
                   onItemsChange={() => setUndo((current) => current ? { ...current, invalidated: true } : null)}
                   registerLineItemRow={registerLineItemRow}
                   requestLineItemScroll={requestLineItemScroll}
@@ -392,7 +391,7 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
             )}
             </BusinessFormSection>
           </BOMHeaderFormFields>
-        </Form>
+        </BusinessForm>
       </BusinessFormPage>
       <input ref={importInput} hidden type="file" aria-label="选择 BOM Excel 文件" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={importFile} />
       <BOMExcelImportPreview pending={pendingImport ? { draft: pendingImport, target: 'items' } : null} currentQuantity={open && pendingImport ? form.getFieldValue('quantity_text') : undefined} existingCount={open && pendingImport ? (form.getFieldValue('items') || []).length : 0} materialOptions={materialOptions} unitOptions={unitOptions} onCancel={() => setPendingImport(null)} onConfirm={applyImport} />

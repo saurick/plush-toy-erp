@@ -9,6 +9,7 @@ import React, {
 import {
   ArrowsAltOutlined,
   ColumnWidthOutlined,
+  CloseOutlined,
   FullscreenOutlined,
   FullscreenExitOutlined,
   OneToOneOutlined,
@@ -17,6 +18,7 @@ import {
   ZoomOutOutlined,
 } from '@ant-design/icons'
 import { Remarkable } from 'remarkable'
+import { Popover } from 'antd'
 import RemarkableReactRenderer from 'remarkable-react'
 
 import {
@@ -26,6 +28,7 @@ import {
 import {
   MERMAID_ZOOM,
   normalizeMermaidZoom,
+  getInitialMermaidZoomMode,
   getMermaidDirection,
   toggleMermaidDirection,
   withMermaidDirection,
@@ -92,16 +95,28 @@ export function MermaidDiagram({
   initialZoom = 'fit',
   nativeSize = false,
   interactiveNodes,
+  interactiveEdges,
   selectedNodeId,
   onNodeSelect,
+  onNodeInspect,
+  onStatusChange,
 }) {
+  const [inspection, setInspection] = useState(null)
+  const inspectionTrigger = useRef(null)
+  const inspect = useCallback((item, trigger) => {
+    if (trigger) inspectionTrigger.current = trigger
+    onNodeInspect?.(item?.id || null, trigger)
+    const target = trigger?.getBoundingClientRect()
+    const root = trigger?.closest('.erp-markdown-mermaid')?.getBoundingClientRect()
+    const anchor = target && root ? { left: target.left - root.left, top: target.top - root.top, width: target.width, height: target.height } : null
+    setInspection(item ? { ...item, chart, anchor } : null)
+  }, [chart, onNodeInspect])
   const appearance = useCurrentERPAppearance()
   const fixedTheme = themeMode === 'light' || themeMode === 'dark'
   const theme = fixedTheme ? themeMode : appearance.mode
   const accent = fixedTheme ? null : appearance.accent
   const useFlowchartHtmlLabels = flowchartHtmlLabels !== false
-  const fitInitially = initialZoom === 'fit'
-  const initialZoomMode = fitInitially ? 'fit-all' : 'manual'
+  const initialZoomMode = getInitialMermaidZoomMode(initialZoom)
   const startingZoom = normalizeMermaidZoom(initialZoom)
   const displayLabel = String(label || '').trim() || '图表'
   const diagramId = useMemo(() => {
@@ -151,6 +166,7 @@ export function MermaidDiagram({
 
   const setNextZoom = useCallback(
     (nextZoom, { mode = 'manual' } = {}) => {
+      setInspection(null)
       const nextValue = normalizeMermaidZoom(nextZoom)
       const scope = fullscreenOpen ? 'fullscreen' : 'inline'
       setZoomModes((previous) =>
@@ -359,7 +375,7 @@ export function MermaidDiagram({
           setRenderState({
             status: 'error',
             svg: '',
-            error: '请检查 Mermaid 源码语法或稍后重试。',
+            error: '请刷新页面后重试。',
           })
         }
       }
@@ -372,27 +388,32 @@ export function MermaidDiagram({
   }, [chart, renderedChart, diagramId, theme, accent, fixedTheme, useFlowchartHtmlLabels])
 
   useEffect(() => {
-    if (renderState.chart !== chart || typeof onNodeSelect !== 'function') {
+    if (renderState.chart !== chart || !interactiveNodes?.length) {
       return undefined
     }
     return bindMermaidNodeActions(
       canvasRef.current,
       interactiveNodes,
-      (id) => {
+      onNodeSelect ? (id) => {
         onNodeSelect?.(id)
         if (fullscreenOpen) setFullscreenOpen(false)
-      },
-      selectedNodeId
+      } : undefined,
+      selectedNodeId,
+      { edges: interactiveEdges, onInspect: inspect }
     )
   }, [
     chart,
     renderState.chart,
     renderState.svg,
     interactiveNodes,
+    interactiveEdges,
+    inspect,
     selectedNodeId,
     onNodeSelect,
     fullscreenOpen,
   ])
+
+  useEffect(() => { onStatusChange?.(renderState.status) }, [onStatusChange, renderState.status])
 
   if (renderState.status === 'empty') {
     return null
@@ -417,7 +438,7 @@ export function MermaidDiagram({
       event.button !== 0 ||
       event.pointerType === 'touch' ||
       event.target.closest(
-        'a, button, input, select, textarea, [data-mermaid-node-id]'
+        'a, button, input, select, textarea, [role="button"]'
       ) ||
       (viewport.scrollWidth <= viewport.clientWidth &&
         viewport.scrollHeight <= viewport.clientHeight)
@@ -626,6 +647,7 @@ export function MermaidDiagram({
             onPointerUp={stopPan}
             onPointerCancel={stopPan}
             onLostPointerCapture={stopPan}
+            onScroll={() => setInspection(null)}
           >
             <div
               ref={canvasRef}
@@ -644,6 +666,34 @@ export function MermaidDiagram({
             />
           </div>
           {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
+          {(!onNodeInspect || fullscreenOpen) && inspection?.chart === chart && inspection.description && inspection.anchor ? (
+            <Popover
+              open
+              trigger={[]}
+              placement="top"
+              getPopupContainer={fullscreenOpen ? () => diagramRef.current : undefined}
+              content={(
+                <div className="erp-markdown-mermaid__inspection" role="status" aria-live="polite">
+                  <strong>{inspection.label}</strong>
+                  {inspection.description !== inspection.label ? <span>{inspection.description}</span> : null}
+                  <button
+                    type="button"
+                    className="erp-markdown-mermaid__tool"
+                    aria-label="关闭图形说明"
+                    onKeyDown={(event) => { if (event.key === 'Escape') { inspectionTrigger.current?.focus({ preventScroll: true }); setInspection(null) } }}
+                    onClick={() => {
+                const current = [...(canvasRef.current?.querySelectorAll('[data-mermaid-node-id], [data-id][role="button"]') || [])].find((element) => element.getAttribute('data-mermaid-node-id') === inspection.id || element.getAttribute('data-id') === inspection.id)
+                ;(current || inspectionTrigger.current)?.focus({ preventScroll: true })
+                setInspection(null)
+              }}
+                  ><CloseOutlined />
+                  </button>
+                </div>
+            )}
+            >
+              <span aria-hidden="true" className="erp-markdown-mermaid__inspection-anchor" style={inspection.anchor} />
+            </Popover>
+          ) : null}
         </>
       ) : null}
       {renderState.status === 'error' ? (

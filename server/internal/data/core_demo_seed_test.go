@@ -307,10 +307,9 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 	requiredProcesses := map[string]struct {
 		outsourcing bool
 		inhouse     bool
-		quality     bool
 		operation   string
 	}{
-		"查货": {outsourcing: true, inhouse: true, quality: true},
+		"查货": {outsourcing: true, inhouse: true},
 		"手工": {outsourcing: true, inhouse: true, operation: biz.ProductionWIPOperationHandwork},
 		"车缝": {outsourcing: true, inhouse: true, operation: biz.ProductionWIPOperationSewing},
 		"包装": {outsourcing: true, inhouse: true, operation: biz.ProductionWIPOperationPackaging},
@@ -328,11 +327,10 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 		if process.Category != process.Name ||
 			process.ProductionRouteOperationCode != expected.operation ||
 			process.OutsourcingEnabled != expected.outsourcing ||
-			process.InhouseEnabled != expected.inhouse ||
-			process.QualityRequired != expected.quality {
+			process.InhouseEnabled != expected.inhouse {
 			t.Fatalf("unexpected default plush process %q: %#v", process.Name, process)
 		}
-		if !strings.Contains(process.Note, "质检参考") || strings.Contains(process.Note, "排序") {
+		if !strings.Contains(process.Note, "内制") || strings.Contains(process.Note, "排序") {
 			t.Fatalf("default plush process %q must describe only business-facing reference fields: %#v", process.Name, process)
 		}
 		defaultProcessSortOrder[process.Name] = process.SortOrder
