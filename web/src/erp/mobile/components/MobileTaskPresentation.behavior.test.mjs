@@ -21,7 +21,7 @@ test('空的选填说明省略，历史必填缺失如实显示未记录', async
   assert.match(document.querySelector('.workflow-task-event-trail__audit').textContent, /催办说明未补充说明/u)
 })
 
-test('手机业务资料保留所有有值字段、数值零和否，缺值可展开，字段权限沿用共享映射', async (t) => {
+test('任务业务资料保留所有有值字段、数值零和否，省略选填空值并沿用字段权限', async (t) => {
   const harness = await businessFormHarness(t)
   const { default: Details } = await import('../../components/business-list/BusinessRecordDetails.jsx')
   const columns = [
@@ -34,21 +34,66 @@ test('手机业务资料保留所有有值字段、数值零和否，缺值可�
   ]
   const record = { no: 'SHIP-LONG-20261019-000000000000001', quantity: 0, amount: '0.00', frozen: false, packaging: null, secret: '不可泄露' }
   await harness.render(h(Details, { presentation: 'mobile-task', columns, record }))
-  assert.equal(document.querySelector('.ant-descriptions'), null)
+  assert.equal(document.querySelector('.ant-descriptions') === null, true)
   const fields = [...document.querySelectorAll('.mobile-task-facts > dl > div')]
   assert.deepEqual(fields.map((field) => field.querySelector('dt').textContent), ['单号', '数量（个）', '金额（USD）', '冻结'])
   assert.deepEqual(fields.slice(1).map((field) => field.querySelector('dd').textContent), ['0', '0.00', '否'])
   assert.ok(fields[0].classList.contains('mobile-task-facts__field--wide'))
   assert.doesNotMatch(document.body.textContent, /无权读取|不可泄露/u)
-  const more = document.querySelector('.mobile-task-facts__empty')
-  assert.equal(more.open, false)
-  await harness.click(more.querySelector('summary'))
-  assert.equal(more.open, true)
-  assert.match(more.textContent, /包装要求/u)
+  assert.equal(document.querySelector('.mobile-task-facts__empty') === null, true)
+  assert.doesNotMatch(document.body.textContent, /包装要求|未填写信息/u)
   await harness.render(h(Details, { columns, record }))
   assert.ok(document.querySelector('.ant-descriptions'))
   assert.match(document.body.textContent, /包装要求/u)
   assert.doesNotMatch(document.body.textContent, /不可泄露/u)
+})
+
+test('销售订单缺值在原字段显示统一状态，金额更新与权限过滤不产生残留提示', async (t) => {
+  const harness = await businessFormHarness(t)
+  const [{ default: Details }, { buildSalesOrderColumns, buildSalesOrderListColumns }] = await Promise.all([
+    import('../../components/business-list/BusinessRecordDetails.jsx'),
+    import('../../components/sales-orders/salesOrderColumns.jsx'),
+  ])
+  const columns = buildSalesOrderListColumns(buildSalesOrderColumns())
+  const record = { currency: 'CNY', order_total: null, tax_mode: null, freight_terms: null, quoted_freight_amount: null, contact_snapshot: {} }
+  await harness.render(h(Details, { presentation: 'mobile-task', columns, record }))
+  const statuses = [...document.querySelectorAll('.mobile-task-facts__status')]
+  assert.deepEqual(statuses.map((node) => node.textContent), ['待补充', '暂未生成', '待补充'])
+  assert.ok(statuses.every((node) => node.tagName === 'SPAN' && !node.classList.contains('ant-tag')))
+  assert.deepEqual(statuses.map((node) => node.dataset.missingTone), ['warning', 'neutral', 'warning'])
+  assert.equal(document.querySelectorAll('.mobile-task-facts__status[data-missing-tone="warning"]').length, 2)
+  assert.equal(document.querySelector('.mobile-task-facts__note').textContent, '计税方式、运费条件尚未补齐。')
+  assert.equal(document.querySelectorAll('.mobile-task-facts button').length, 0)
+  assert.doesNotMatch(document.querySelector('.mobile-task-facts').textContent, /未填写信息|联系人|产品单价.*未齐/u)
+  await harness.render(h(Details, { presentation: 'mobile-task', columns, record: { ...record, order_total: '0', tax_mode: 'NONE', freight_terms: 'EXCLUDED', quoted_freight_amount: '' } }))
+  assert.match(document.body.textContent, /订单总额CNY 0/u)
+  assert.deepEqual([...document.querySelectorAll('.mobile-task-facts__status')].map((node) => node.textContent), ['待补充'])
+  assert.match(document.querySelector('.mobile-task-facts__status').closest('div').textContent, /报价运费/u)
+  await harness.render(h(Details, { presentation: 'mobile-task', columns, record: { currency: 'CNY', tax_mode: 'NONE', freight_terms: 'INCLUDED' } }))
+  assert.equal(document.querySelectorAll('.mobile-task-facts__status').length, 0)
+  assert.doesNotMatch(document.body.textContent, /订单总额|暂未生成|待补充/u)
+  const totalColumn = buildSalesOrderColumns().find((column) => column.dataIndex === 'order_total')
+  await harness.render(h(Details, { presentation: 'mobile-task', columns: [{ ...totalColumn, hiddenByEffectiveFieldPolicy: true }], record }))
+  assert.doesNotMatch(document.body.textContent, /订单总额|暂未生成|待补充/u)
+})
+
+test('明确的缺值原因沿用字段展示，切换委外资料后清除状态和空备注', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: Details } = await import('../../components/business-list/BusinessRecordDetails.jsx')
+  const columns = [
+    { title: '资料确认', dataIndex: 'confirmed', taskDetailEmptyValue: (record) => record.confirmed == null ? { text: '待补充', tone: 'warning', reason: record.missing_reason } : null },
+    { title: '备注', dataIndex: 'note' },
+  ]
+  await harness.render(h(Details, { presentation: 'mobile-task', columns, record: { confirmed: null, missing_reason: '收货要求尚未确认', note: '' } }))
+  assert.equal(document.querySelector('.mobile-task-facts__note').textContent, '收货要求尚未确认')
+  assert.equal(document.querySelectorAll('.mobile-task-facts button').length, 0)
+  await harness.render(h(Details, { presentation: 'mobile-task', columns, record: { confirmed: true } }))
+  assert.equal(document.querySelector('.mobile-task-facts dd').textContent, '是')
+  assert.equal(document.querySelector('.mobile-task-facts__status') === null, true)
+  await harness.render(h(Details, { presentation: 'mobile-task', columns: [{ title: '退货数量', dataIndex: 'quantity' }, { title: '备注', dataIndex: 'note' }], record: { quantity: 80, note: null } }))
+  assert.match(document.body.textContent, /退货数量80/u)
+  assert.doesNotMatch(document.body.textContent, /备注|待补充|收货要求|未填写/u)
+  assert.equal(document.querySelectorAll('.mobile-task-facts__status, .mobile-task-facts__note').length, 0)
 })
 
 test('出货净重缺失与最终重量口径保持默认可见，不并入空信息', async (t) => {
@@ -66,10 +111,22 @@ test('出货净重缺失与最终重量口径保持默认可见，不并入空�
     [ShipmentStatus.DRAFT, '0', '实际 0 克'],
   ]) {
     await harness.render(h(Details, { presentation: 'mobile-task', columns: [column], record: { status, total_net_weight_g } }))
-    assert.equal(document.querySelector('.mobile-task-facts__empty'), null)
+    assert.equal(document.querySelector('.mobile-task-facts__empty') === null, true)
     assert.match(document.querySelector('.mobile-task-facts > dl').textContent, /总净重（克）/u)
     assert.equal(document.querySelector('.mobile-task-facts dd').textContent, expected)
+    const hint = document.querySelector('.mobile-task-facts__status')
+    assert.equal(Boolean(hint), total_net_weight_g === null)
+    if (hint) {
+      assert.equal(hint.classList.contains('ant-tag'), false)
+      assert.equal(hint.dataset.missingTone, status === ShipmentStatus.DRAFT ? 'warning' : 'neutral')
+    }
   }
+  await harness.render(h(Details, { presentation: 'mobile-task', columns: [{ ...column, hiddenByEffectiveFieldPolicy: true }], record: { status: ShipmentStatus.DRAFT, total_net_weight_g: null } }))
+  assert.equal(document.querySelector('.mobile-task-facts__status') === null, true)
+  assert.doesNotMatch(document.body.textContent, /总净重|待确认/u)
+  await harness.render(h(Details, { columns: [column], record: { status: ShipmentStatus.DRAFT, total_net_weight_g: null } }))
+  assert.equal(document.querySelector('.mobile-task-facts__status') === null, true)
+  assert.match(document.body.textContent, /待确认/u)
 })
 
 test('共享任务信息卡不显示空业务分区，有值摘要和零数量保持可见', async (t) => {

@@ -1,6 +1,5 @@
 import React from 'react'
 import { Descriptions } from 'antd'
-import { DownOutlined } from '@ant-design/icons'
 import { resolveBusinessDetailCopyText, resolveBusinessTableCopyLabel } from '../../utils/businessTableCopy.mjs'
 import { getColumnLabel } from './ColumnOrderModal.jsx'
 import BusinessCopyButton from './BusinessCopyButton.jsx'
@@ -50,12 +49,21 @@ export default function BusinessRecordDetails({ columns = [], record, column = {
             `${label}-${index}`
           const value = visibleDetailValue(detailValue(column, record || {}))
           const copyText = resolveBusinessDetailCopyText(column, record)
+          const empty = value === '-' && !copyText
+          const emptyValue = presentation === 'mobile-task'
+            ? column.taskDetailEmptyValue?.(record || {})
+            : null
           return {
             key,
             label,
-            empty: value === '-' && !copyText,
-            wide: Boolean(copyText) || (typeof value === 'string' && value.length > 24),
-            children: copyText ? (
+            empty: empty && !emptyValue?.text,
+            wide: Boolean(copyText) || Boolean(emptyValue?.text) || (typeof value === 'string' && value.length > 24),
+            children: emptyValue?.text ? (
+              <>
+                <span className="mobile-task-facts__status" data-missing-tone={emptyValue.tone === 'warning' ? 'warning' : 'neutral'}>{emptyValue.text}</span>
+                {emptyValue.reason ? <p className="mobile-task-facts__note">{emptyValue.reason}</p> : null}
+              </>
+            ) : copyText ? (
               <span className="erp-business-details-modal__copy-value">
                 <span className="erp-business-details-modal__copy-text">{value}</span>
                 <BusinessCopyButton
@@ -71,9 +79,8 @@ export default function BusinessRecordDetails({ columns = [], record, column = {
 
   if (presentation === 'mobile-task') {
     const populated = items.filter((item) => !item.empty)
-    const empty = items.filter((item) => item.empty)
     const fields = (rows) => <dl className="mobile-task-facts__grid">{rows.map((item) => <div key={item.key} className={item.wide ? 'mobile-task-facts__field mobile-task-facts__field--wide' : 'mobile-task-facts__field'}><dt>{item.label}</dt><dd>{item.children}</dd></div>)}</dl>
-    return <section className="mobile-task-facts" aria-label={title}><h3>{title}</h3>{fields(populated)}{empty.length ? <details className="mobile-task-facts__empty"><summary>未填写信息（{empty.length} 项）<DownOutlined aria-hidden="true" /></summary>{fields(empty)}</details> : null}</section>
+    return <section className="mobile-task-facts" aria-label={title}><h3>{title}</h3>{fields(populated)}</section>
   }
 
   return <Descriptions bordered column={column} size="small" items={items.map(({ key, label, children }) => ({ key, label, children }))} />

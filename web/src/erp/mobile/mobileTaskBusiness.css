@@ -122,19 +122,19 @@
   font-size: var(--erp-font-body);
 }
 
-.mobile-task-facts__empty {
-  margin-top: 12px;
-  border-top: 1px solid var(--erp-border);
+.mobile-task-facts__status {
+  color: var(--erp-text-muted);
+  font-weight: 500;
 }
 
-.mobile-task-facts__empty > summary {
-  justify-content: space-between;
-  gap: 8px;
-  display: flex;
-  min-height: 44px;
-  align-items: center;
+.mobile-task-facts__status[data-missing-tone='warning'] {
+  color: var(--erp-warning-text);
+}
+
+.mobile-task-facts__note {
+  margin: 4px 0 0;
   color: var(--erp-text-muted);
-  cursor: pointer;
+  font-size: var(--erp-font-caption);
 }
 
 .mobile-task-business-action-host,
@@ -210,10 +210,6 @@
 .mobile-task-business-primary .erp-business-selection-action-bar__compact-visible .erp-business-action-tooltip-anchor,
 .mobile-task-business-primary .erp-business-selection-action-bar__compact-visible .ant-btn {
   width: 100%;
-}
-
-.mobile-task-facts__empty[open] > summary > .anticon {
-  transform: rotate(180deg);
 }
 
 .mobile-task-business-form-footer {

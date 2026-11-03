@@ -26,6 +26,7 @@ import { createMobileEntryAuditScenarios } from './mobileEntryAuditScenarios.mjs
 import { createMobileTaskBusinessScenarios } from './mobileTaskBusinessScenarios.mjs'
 import { createMobileTaskHandlingCoverageScenarios } from './mobileTaskHandlingCoverageScenarios.mjs'
 import { createTaskUnifiedHandlingScenarios } from './taskUnifiedHandlingScenarios.mjs'
+import { createTaskBusinessFactsScenarios } from './taskBusinessFactsScenarios.mjs'
 import { createTaskEditorCompletenessScenarios } from './taskEditorCompletenessScenarios.mjs'
 import { createEngineeringWorkspaceChainScenarios } from './engineeringWorkspaceChainScenarios.mjs'
 import { createTaskSourceEditorSaveScenarios } from './taskSourceEditorSaveScenarios.mjs'
@@ -713,6 +714,7 @@ export function createStyleL1Scenarios(deps) {
     ...createMobileTaskBusinessScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileTaskHandlingCoverageScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...taskHandlingScenarios,
+    ...createTaskBusinessFactsScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createTaskEditorCompletenessScenarios({ ...deps, customerRuntimeEffectiveSession }, taskHandlingScenarios),
     ...createEngineeringWorkspaceChainScenarios({ ...deps, customerRuntimeEffectiveSession }, taskHandlingScenarios),
     ...createTaskSourceEditorSaveScenarios({ ...deps, customerRuntimeEffectiveSession }, taskHandlingScenarios),

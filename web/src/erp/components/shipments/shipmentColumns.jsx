@@ -101,6 +101,13 @@ function shipmentWeightText(value, record) {
   return `${weight} 克`
 }
 
+function shipmentWeightEmptyValue(record) {
+  if (!Object.hasOwn(record, 'total_net_weight_g') || String(record.total_net_weight_g ?? '').trim() !== '') return null
+  if (record.status === ShipmentStatus.DRAFT) return { text: '待确认', tone: 'warning' }
+  if (hasFinalShipmentWeight(record.status)) return { text: '未记录', tone: 'neutral' }
+  return null
+}
+
 function shipmentDatesText(record = {}, { emptyText = '-' } = {}) {
   const planned = formatUnixDate(record.planned_ship_at, { emptyText })
   const actual = formatUnixDate(record.shipped_at, { emptyText })
@@ -210,6 +217,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       sortable: false,
       render: shipmentWeightText,
       detailValue: (record) => shipmentWeightText(record?.total_net_weight_g, record),
+      taskDetailEmptyValue: shipmentWeightEmptyValue,
       exportValue: (record) => String(record?.total_net_weight_g ?? '').trim(),
     },
     {

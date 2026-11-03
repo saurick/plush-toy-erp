@@ -1524,6 +1524,8 @@
     .rm-facts { margin: 12px 0 0; border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
     .rm-fact { min-height: 43px; padding: 9px 11px; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: start; border-bottom: 1px solid var(--line); }
     .rm-fact:last-child { border-bottom: 0; }
+    .task-source-field-status { color: var(--text-3); font-weight: 500; }
+    .task-source-field-status[data-missing-tone='warning'] { color: var(--warning); }
     .rm-fact dt { color: var(--text-3); }
     .rm-fact dd { min-width: 0; margin: 0; text-align: right; overflow-wrap: anywhere; }
     .rm-callout { margin-top: 11px; padding: 10px; border-radius: 10px; font-size: 13px; line-height: 1.55; }
@@ -17175,7 +17177,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         <main class="rm-flow-scroll">
           ${renderMobileTaskIdentityCard(task)}
           ${accessNote}
-          <section class="rm-section"><h3>业务信息</h3><dl class="rm-facts">${task.facts.filter(([label])=>label!=='进入岗位').map(([label,value]) => `<div class="rm-fact"><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl><details class="task-information"><summary>任务信息</summary>${renderTaskNumberInfo(task)}${renderTaskClassification(task)}<dl class="rm-facts">${task.facts.filter(([label])=>label==='进入岗位').map(([label,value]) => `<div class="rm-fact"><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl></details></section>
+          <section class="rm-section"><h3>业务信息</h3><dl class="rm-facts">${renderTaskReadOnlyFields(task.facts.filter(([label])=>label!=='进入岗位'),true)}</dl><details class="task-information"><summary>任务信息</summary>${renderTaskNumberInfo(task)}${renderTaskClassification(task)}<dl class="rm-facts">${renderTaskReadOnlyFields(task.facts.filter(([label])=>label==='进入岗位'),true)}</dl></details></section>
           ${task.sourceSummary?`<section class="rm-section">${renderTaskSourceSummary(task)}</section>`:''}
           ${task.handling?renderFulfillmentChain(task):''}
 
@@ -18708,6 +18710,16 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<section class="task-history-section" data-task-history="${escapeHTML(task.id)}"><div class="task-history-head"><span class="task-history-heading"><span>流程处理记录</span><span class="task-history-count">${visible.length} 条</span></span></div><div class="segment" role="tablist" aria-label="处理记录范围">${[['flow','本次流程'],['task','仅本任务']].map(([key,label])=>`<button type="button" role="tab" aria-selected="${scope===key}" class="${scope===key?'active':''}" data-action="task-record-scope" data-id="${escapeHTML(task.id)}" data-value="${key}">${label}</button>`).join('')}</div><div class="${mobile?'rm-timeline':'timeline'}">${entries||'<div class="empty">暂无流程处理记录</div>'}</div></section>`;
     }
 
+    function renderTaskReadOnlyFields(fields, wrap=false) {
+      return fields.map(([label,value,emptyValue])=>{
+        const empty=value===undefined||value===null||value==='';
+        if(empty&&!emptyValue?.text)return '';
+        const content=empty?`<span class="task-source-field-status" data-missing-tone="${emptyValue.tone==='warning'?'warning':'neutral'}">${escapeHTML(emptyValue.text)}</span>${emptyValue.reason?`<p class="data-note">${escapeHTML(emptyValue.reason)}</p>`:''}`:typeof value==='boolean'?(value?'是':'否'):value;
+        const field=`<dt>${escapeHTML(label)}</dt><dd>${content}</dd>`;
+        return wrap?`<div class="rm-fact">${field}</div>`:field;
+      }).join('');
+    }
+
     function renderTaskStep(task) {
       if (state.taskStep === 1) {
         const source = listConfig[task.sourcePage]?.rows.find(row=>row.id===task.sourceRecordId);
@@ -18728,7 +18740,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(task.lane==='done'||task.sourceAction) {
         const config=listConfig[task.sourcePage];
         const operations=source&&task.lane!=='done'?(businessRecordActions[task.sourcePage]||[]).filter(spec=>!['related','records','print'].includes(spec.id)&&!spec.template&&(!spec.states||spec.states.includes(source.status))):[];
-        return `<section class="detail-section"><h3>本次业务资料</h3><dl class="detail-grid"><dt>单号</dt><dd>${escapeHTML(source?.no||task.object)}</dd><dt>状态</dt><dd>${escapeHTML(source?.statusText||task.state)}</dd><dt>产品 / 材料</dt><dd>${escapeHTML(getTaskListSubject(task)||task.object)}</dd></dl>${operations.length?`<div class="action-choice-grid">${operations.map(spec=>`<button class="btn" data-action="business-record-action" data-page="${config.key}" data-id="${source.id}" data-operation="${spec.id}" ${businessActionBlock(config,source,spec)?'disabled':''}>${spec.label}</button>`).join('')}</div>`:''}</section>${renderTaskSourceSummary(task)}`;
+        return `<section class="detail-section"><h3>本次业务资料</h3><dl class="detail-grid">${renderTaskReadOnlyFields([['单号',escapeHTML(source?.no||task.object)],['状态',escapeHTML(source?.statusText||task.state)],['产品 / 材料',escapeHTML(getTaskListSubject(task)||task.object)]])}</dl>${operations.length?`<div class="action-choice-grid">${operations.map(spec=>`<button class="btn" data-action="business-record-action" data-page="${config.key}" data-id="${source.id}" data-operation="${spec.id}" ${businessActionBlock(config,source,spec)?'disabled':''}>${spec.label}</button>`).join('')}</div>`:''}</section>${renderTaskSourceSummary(task)}`;
       }
       const actions=taskActions(task);
       const choices=`<section class="detail-section"><h3>选择处理方式</h3><div class="action-choice-grid">${actions.map(key=>`<button class="action-choice ${state.taskAction===key?'active':''}" aria-pressed="${state.taskAction===key}" data-action="task-choice" data-value="${key}"><strong>${taskActionLabel(task,key)}</strong></button>`).join('')}</div></section>`;

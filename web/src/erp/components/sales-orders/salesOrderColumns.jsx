@@ -57,6 +57,21 @@ function moneyText(value, currency, fallback = '-') {
   )}`.trim()
 }
 
+function taskDetailEmptyValue(record, key, text, tone = 'warning') {
+  if (!Object.hasOwn(record, key) || String(record[key] ?? '').trim() !== '') return null
+  return { text, tone }
+}
+
+function orderTotalEmptyValue(record) {
+  const emptyValue = taskDetailEmptyValue(record, 'order_total', '暂未生成', 'neutral')
+  if (!emptyValue) return null
+  const required = [['tax_mode', '计税方式'], ['freight_terms', '运费条件']]
+  if (['INCLUSIVE', 'EXCLUSIVE'].includes(record.tax_mode)) required.push(['tax_rate', '税率'])
+  if (record.freight_terms === 'EXCLUDED') required.push(['quoted_freight_amount', '报价运费'])
+  const missing = required.filter(([key]) => Object.hasOwn(record, key) && String(record[key] ?? '').trim() === '')
+  return { ...emptyValue, reason: missing.length ? `${missing.map(([, label]) => label).join('、')}尚未补齐。` : '' }
+}
+
 function taxTermsText(record = {}, options = {}) {
   const mode = salesOrderTaxModeText(record.tax_mode, options)
   const rate = String(record.tax_rate ?? '').trim()
@@ -206,6 +221,7 @@ export function buildSalesOrderColumns() {
       title: '计税信息',
       exportTitle: '计税信息',
       key: 'tax_terms',
+      taskDetailEmptyValue: (record) => taskDetailEmptyValue(record, 'tax_mode', '待补充'),
       defaultHidden: true,
       width: 200,
       sorter: (a, b) => compareText(taxTermsText(a), taxTermsText(b)),
@@ -231,6 +247,7 @@ export function buildSalesOrderColumns() {
       title: '订单总额',
       exportTitle: '订单总额',
       dataIndex: 'order_total',
+      taskDetailEmptyValue: orderTotalEmptyValue,
       width: 150,
       sorter: (a, b) =>
         compareNumeric20Scale6Values(a?.order_total, b?.order_total),
@@ -243,6 +260,7 @@ export function buildSalesOrderColumns() {
       title: '运费条件',
       exportTitle: '运费条件',
       dataIndex: 'freight_terms',
+      taskDetailEmptyValue: (record) => taskDetailEmptyValue(record, 'freight_terms', '待补充'),
       defaultHidden: true,
       width: 150,
       sorter: (a, b) => compareText(a?.freight_terms, b?.freight_terms),
@@ -255,6 +273,9 @@ export function buildSalesOrderColumns() {
       title: '报价运费',
       exportTitle: '报价运费',
       dataIndex: 'quoted_freight_amount',
+      taskDetailEmptyValue: (record) => record.freight_terms === 'EXCLUDED'
+        ? taskDetailEmptyValue(record, 'quoted_freight_amount', '待补充')
+        : null,
       defaultHidden: true,
       width: 140,
       sorter: (a, b) =>
