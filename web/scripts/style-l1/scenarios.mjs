@@ -57,6 +57,7 @@ import { createWorkCenterPaginationScenarios } from './workCenterPaginationScena
 import { createTaskImagePreviewScenarios } from './taskImagePreviewScenarios.mjs'
 import { createProductGalleryScenarios } from './productGalleryScenarios.mjs'
 import { createProductIdentityScenarios } from './productIdentityScenarios.mjs'
+import { createBusinessColumnWidthScenarios } from './businessColumnWidthScenarios.mjs'
 import { createCustomerSessionScenarios } from './customerSessionScenarios.mjs'
 import { createHelpCenterScenarios } from './helpCenterScenarios.mjs'
 import { createAuthenticationEntryScenarios } from './authenticationEntryScenarios.mjs'
@@ -103,6 +104,7 @@ import { createPurchaseFollowupScenarios } from './purchaseFollowupScenarios.mjs
 import { createProductPaginationScenarios } from './productPaginationScenarios.mjs'
 import { createBOMPaginationScenarios } from './bomPaginationScenarios.mjs'
 import { createBusinessSplitScenarios } from './businessSplitScenarios.mjs'
+import { createBusinessSplitSurfaceScenarios } from './businessSplitSurfaceScenarios.mjs'
 import { createSalesOrderImportScenarios } from './salesOrderImportScenarios.mjs'
 import { createWorkbenchSummaryScenarios } from './workbenchSummaryScenarios.mjs'
 import { createOutsourcingSummaryScenarios } from './outsourcingSummaryScenarios.mjs'
@@ -883,6 +885,7 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
       outputDir,
     }),
+    ...createBusinessColumnWidthScenarios({ customerRuntimeEffectiveSession, outputDir }),
     ...createBusinessFormInteractionScenarios({
       customerRuntimeEffectiveSession,
       expectHeading,
@@ -964,5 +967,5 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
   ]
-  return [...scenarios, ...createBusinessSplitScenarios({ ...deps, customerRuntimeEffectiveSession, outputDir }), ...createImportPickerScenarios({ ...deps, customerRuntimeEffectiveSession, outputDir }), ...createScrollEdgeScenarios(scenarios, { outputDir }), ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession }), ...createDensityCompletionScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
+  return [...scenarios, ...createBusinessSplitScenarios({ ...deps, customerRuntimeEffectiveSession, outputDir }), ...createBusinessSplitSurfaceScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession, outputDir }), ...createImportPickerScenarios({ ...deps, customerRuntimeEffectiveSession, outputDir }), ...createScrollEdgeScenarios(scenarios, { outputDir }), ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession }), ...createDensityCompletionScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
 }

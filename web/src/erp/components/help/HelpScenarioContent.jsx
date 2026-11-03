@@ -1,8 +1,13 @@
-import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useId, useMemo, useRef, useState } from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
-import { Button } from 'antd'
+import { Button, Grid } from 'antd'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
-import { getHelpScenarioPresentation } from '../../config/helpScenarioPresentation.mjs'
+import {
+  getHelpScenarioPresentation,
+  buildHelpScenarioGraph,
+} from '../../config/helpScenarioPresentation.mjs'
+import { MermaidDiagram } from '@/common/components/markdown'
+import { buildBusinessFlowMermaid } from '@/common/components/markdown/mermaidGraph.mjs'
 import HelpScenarioIllustration from './HelpScenarioIllustration'
 
 const viewOptions = [
@@ -14,34 +19,28 @@ const kindLabels = { chain: '业务交接', steps: '操作步骤', path: '查询
 
 function HelpOverview({
   model,
+  scenario,
   selected,
   roleKey,
   onSelect,
   detailId,
   overviewRef,
 }) {
-  const markerId = `help-arrow-${useId().replaceAll(':', '')}`
-  const stepsRef = useRef(null)
-  const [rowHeight, setRowHeight] = useState(96)
-  useLayoutEffect(() => {
-    if (model.kind !== 'chain') return undefined
-    const element = stepsRef.current
-    const measure = () =>
-      setRowHeight(Math.ceil(element.getBoundingClientRect().height))
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [model.kind])
-  const count = model.steps.length
-  const nodeWidth = (1000 - (count - 1) * 24) / count
-  const nodeStart = (index) => index * (nodeWidth + 24)
-  const nodeCenter = (id) =>
-    nodeStart(model.steps.findIndex((item) => item.id === id)) + nodeWidth / 2
-  const from = nodeCenter(model.exception.from)
-  const back = nodeCenter(model.exception.back) - nodeWidth * 0.24
-  // 横向坐标来自同一网格，纵向跟随实际换行高度，避免长岗位名称挡住异常箭头。
-  const issueCenter = Math.max(160, Math.min(840, from))
+  const screens = Grid.useBreakpoint()
+  const narrow = screens.md === false
+  const graph = useMemo(
+    () =>
+      model.kind === 'chain'
+        ? buildBusinessFlowMermaid(
+            {
+              ...buildHelpScenarioGraph(model, scenario),
+              direction: narrow ? 'TB' : 'LR',
+            },
+            { role: roleKey }
+          )
+        : null,
+    [model, scenario, roleKey, narrow]
+  )
   return (
     <section
       className={`erp-help-flow erp-help-flow--${model.kind}`}
@@ -53,105 +52,61 @@ function HelpOverview({
         <h3>办理概览</h3>
         <span>{kindLabels[model.kind]} · 点击步骤看说明 · 非实际进度</span>
       </div>
-      <div className="erp-help-flow__scroll">
-        <div
-          className="erp-help-flow__canvas"
-          style={{
-            '--help-step-count': count,
-            '--help-flow-min-width': `${count * 140 + (count - 1) * 24}px`,
-            '--help-flow-height': `${rowHeight + 150}px`,
+      {graph ? (
+        <MermaidDiagram
+          chart={graph.chart}
+          label="业务交接与异常恢复图"
+          initialZoom={narrow ? 'fit-width' : 'fit'}
+          showSourceOnError={false}
+          interactiveNodes={graph.nodes}
+          interactiveEdges={graph.edges}
+          selectedNodeId={graph.ids.get(selected.id)}
+          onNodeSelect={(id) => {
+            const key = graph.nodes.find((node) => node.id === id)?.key
+            const step =
+              model.steps.find((item) => item.id === key) ||
+              (key === model.exception.id ? model.exception : null)
+            if (step) onSelect(step)
           }}
-        >
-          <ol ref={stepsRef} className="erp-help-flow__steps">
-            {model.steps.map((step) => (
-              <li key={step.id}>
-                <button
-                  type="button"
-                  className="erp-help-flow__step"
-                  data-help-step={step.id}
-                  aria-pressed={selected.id === step.id}
-                  aria-controls={detailId}
-                  aria-label={`查看步骤 ${step.number}：${step.title}`}
-                  onClick={() => onSelect(step)}
-                >
-                  <span className="erp-help-flow__number" aria-hidden="true">
-                    {step.number}
-                  </span>
-                  <span className="erp-help-flow__step-copy">
-                    <strong>{step.title}</strong>
-                    <span>{step.owner}</span>
-                    {step.roles.includes(roleKey) ? <em>本岗位参与</em> : null}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ol>
-          {model.kind === 'chain' ? (
-            <>
-              <svg
-                className="erp-help-flow__edges"
-                viewBox={`0 0 1000 ${rowHeight + 150}`}
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <defs>
-                  <marker
-                    id={markerId}
-                    viewBox="0 0 10 10"
-                    refX="9"
-                    refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
-                    orient="auto-start-reverse"
+        />
+      ) : (
+        <div className="erp-help-flow__scroll">
+          <div
+            className="erp-help-flow__canvas"
+            style={{
+              '--help-step-count': model.steps.length,
+              '--help-flow-min-width': `${model.steps.length * 140 + (model.steps.length - 1) * 24}px`,
+            }}
+          >
+            <ol className="erp-help-flow__steps">
+              {model.steps.map((step) => (
+                <li key={step.id}>
+                  <button
+                    type="button"
+                    className="erp-help-flow__step"
+                    data-help-step={step.id}
+                    aria-pressed={selected.id === step.id}
+                    aria-controls={detailId}
+                    aria-label={`查看步骤 ${step.number}：${step.title}`}
+                    onClick={() => onSelect(step)}
                   >
-                    <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
-                  </marker>
-                </defs>
-                {model.steps.slice(0, -1).map((step, index) => (
-                  <path
-                    key={step.id}
-                    d={`M ${nodeStart(index) + nodeWidth} ${rowHeight / 2} H ${nodeStart(index + 1) - 3}`}
-                    markerEnd={`url(#${markerId})`}
-                  />
-                ))}
-                <path
-                  className="erp-help-flow__branch"
-                  d={`M ${from} ${rowHeight} V ${rowHeight + 23} H ${issueCenter} V ${rowHeight + 50}`}
-                  markerEnd={`url(#${markerId})`}
-                />
-                <path
-                  className="erp-help-flow__branch"
-                  d={`M ${issueCenter - 140} ${rowHeight + 85} H ${Math.min(issueCenter - 156, back - 25)} V ${rowHeight + 13} H ${back} V ${rowHeight + 2}`}
-                  markerEnd={`url(#${markerId})`}
-                />
-              </svg>
-              <div
-                className="erp-help-flow__issue"
-                style={{
-                  left: `${issueCenter / 10}%`,
-                  top: `${rowHeight + 52}px`,
-                }}
-              >
-                <span className="erp-help-flow__condition">
-                  {model.exception.label || '条件未满足'}
-                </span>
-                <button
-                  type="button"
-                  aria-pressed={selected.view === 'exception'}
-                  aria-controls={detailId}
-                  onClick={() => onSelect(model.exception)}
-                >
-                  <strong>{model.exception.title}</strong>
-                  <span>{model.exception.owner}</span>
-                </button>
-                <span className="erp-help-flow__return">
-                  核对后返回第 {model.exception.backNumber} 步
-                </span>
-              </div>
-            </>
-          ) : null}
+                    <span className="erp-help-flow__number" aria-hidden="true">
+                      {step.number}
+                    </span>
+                    <span className="erp-help-flow__step-copy">
+                      <strong>{step.title}</strong>
+                      <span>{step.owner}</span>
+                      {step.roles.includes(roleKey) ? (
+                        <em>本岗位参与</em>
+                      ) : null}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
-      </div>
+      )}
     </section>
   )
 }
@@ -253,7 +208,11 @@ function Exception({ scenario, model, onResume }) {
   )
 }
 
-export default function HelpScenarioContent({ scenario, roleKey, compact = false }) {
+export default function HelpScenarioContent({
+  scenario,
+  roleKey,
+  compact = false,
+}) {
   const model = useMemo(
     () => getHelpScenarioPresentation(scenario, roleKey),
     [scenario, roleKey]
@@ -282,6 +241,7 @@ export default function HelpScenarioContent({ scenario, roleKey, compact = false
     <div className="erp-help-scenario">
       <HelpOverview
         model={model}
+        scenario={scenario}
         selected={selected}
         roleKey={roleKey}
         onSelect={setSelected}
@@ -367,16 +327,21 @@ export default function HelpScenarioContent({ scenario, roleKey, compact = false
                           </strong>
                           <p>{step.description}</p>
                         </li>
-                  ))}
+                      ))}
                     </ol>
                   </details>
-                  <section className="erp-help-step-checks" aria-label="完成标准与常见问题">
+                  <section
+                    className="erp-help-step-checks"
+                    aria-label="完成标准与常见问题"
+                  >
                     <h4>怎样算办成了</h4>
                     <p>{scenario.completion}</p>
                     <h4>完成后交给谁</h4>
                     <p>{scenario.handoff}</p>
                     <details>
-                      <summary className="erp-help-step-checks-toggle">卡住时看这里</summary>
+                      <summary className="erp-help-step-checks-toggle">
+                        卡住时看这里
+                      </summary>
                       <p>{scenario.exception.trigger}</p>
                       <p>{scenario.exception.action}</p>
                     </details>

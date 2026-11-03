@@ -398,12 +398,10 @@ export default function SalesOrderBatchImportEditor({
           customers={customers}
           contactOptions={contacts}
           salesOwnerOptions={salesOwnerOptions}
-          paymentConditionOptions={payment.paymentConditionOptions}
           onCustomerChange={onCustomerChange}
           onContactSelect={(contact) =>
             form.setFieldsValue(buildSalesOrderContactFormValues(contact))
           }
-          onPaymentMethodChange={payment.applyPaymentMethodTermDays}
           onPaymentConditionBlur={payment.requestPaymentConditionPriceReview}
         />
       </BusinessForm>

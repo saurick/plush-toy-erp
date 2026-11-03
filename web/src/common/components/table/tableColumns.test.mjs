@@ -1,7 +1,34 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync, readdirSync } from 'node:fs'
-import { normalizeTableColumns } from './tableColumns.mjs'
+import { normalizeTableColumns, tableColumnsMinimumWidth } from './tableColumns.mjs'
+
+test('selection tables keep explicit column budgets for populated and empty layouts', () => {
+  const columns = [
+    { dataIndex: 'name', width: 260 },
+    { dataIndex: 'status', width: 90 },
+    { dataIndex: 'unit', width: 90 },
+    { dataIndex: 'note', width: 180 },
+  ]
+  const result = normalizeTableColumns(columns, { hasRowSelection: true, tableLayout: 'auto' })
+  assert.equal(tableColumnsMinimumWidth(columns), 620)
+  assert.deepEqual(result.map((column) => column.width), [260, 90, 90, undefined])
+  assert.equal(result.at(-1).minWidth, 180)
+  assert.deepEqual(columns.map((column) => column.width), [260, 90, 90, 180])
+})
+
+test('column budgets ignore hidden leaves and retain pinned column widths', () => {
+  const columns = [
+    { title: '身份', children: [{ dataIndex: 'name', width: 260, fixed: 'left' }] },
+    { dataIndex: 'extra', width: 300, hidden: true },
+    { dataIndex: 'note', width: 180 },
+  ]
+  assert.equal(tableColumnsMinimumWidth(columns), 440)
+  const result = normalizeTableColumns(columns, { hasRowSelection: true })
+  assert.equal(result[0].children[0].width, 260)
+  assert.equal(result[1].width, 300)
+  assert.equal(result[2].minWidth, 180)
+})
 
 test('table headers follow their body alignment and default to the reading edge', () => {
   const render = (value) => value

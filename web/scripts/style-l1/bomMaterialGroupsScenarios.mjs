@@ -1,15 +1,21 @@
 import { expect as expectLocator } from 'playwright/test'
+import { createBOMToolbarScenarios } from './bomToolbarScenarios.mjs'
+import { clickBOMMaterialAction, clickBOMPartAction } from './bomToolbarActions.mjs'
 import {
   assertBusinessFormPage,
   closeBusinessFormPage,
 } from './businessFormPageAssertions.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
-import { exerciseTableScrollControls } from './tableScrollControlAssertions.mjs'
+import { assertSingleTableScrollbar, tableScrollButtons } from './tableScrollControlAssertions.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
-import { createBOMMaterialMatchingScenarios } from './bomMaterialMatchingScenarios.mjs'
+import { assertLineItemGroupHeaderInteraction } from './businessLineItemDisclosureAssertions.mjs'
+import { createBOMMaterialMatchingScenarios, installBOMMaterialMatchingMocks } from './bomMaterialMatchingScenarios.mjs'
 import { createBOMMaterialDropdownStabilityScenarios } from './bomMaterialDropdownStabilityScenarios.mjs'
 import { createBOMImportPreviewScenarios } from './bomImportPreviewScenarios.mjs'
+import { assertBOMEditorDensity, isBOMVersionReadOnly } from './bomEditorDensityAssertions.mjs'
+import { chooseSelectOption } from './selectControlActions.mjs'
+import { assertTableStickyHeaderAlignment } from './tableStickyHeaderAssertions.mjs'
 
 async function chooseImportedReference(page, control, query, label) {
   await control.click()
@@ -53,7 +59,7 @@ export async function verifyBOMMaterialGroups(
   const hasHorizontalOverflow = await partsScroll.evaluate(
     (node) => node.scrollWidth > node.clientWidth + 1
   )
-  const scrollButtons = partsScroll.locator('.app-table-scroll-buttons')
+  const scrollButtons = await tableScrollButtons(page, partsScroll)
   if (hasHorizontalOverflow) {
     await scrollButtons.waitFor({ state: 'visible' })
   } else {
@@ -64,6 +70,8 @@ export async function verifyBOMMaterialGroups(
     )
   }
   assert.equal(await groups.count(), 3)
+  await assertBOMEditorDensity(modal)
+  await assertLineItemGroupHeaderInteraction(page, modal)
   assert.equal(
     await page.getByRole('button', { name: /^新建物料/ }).count(),
     0,
@@ -78,7 +86,7 @@ export async function verifyBOMMaterialGroups(
   await first.getByLabel('单位用量 1', { exact: true }).fill('0.125')
   await first.getByLabel('损耗 % 1', { exact: true }).fill('10')
   await first.getByText('139.15', { exact: true }).waitFor({ state: 'visible' })
-  await first.getByRole('button', { name: '＋ 添加部位', exact: true }).click()
+  await clickBOMMaterialAction(first, '添加部位')
   assert.equal(
     await groups.count(),
     3,
@@ -118,7 +126,7 @@ export async function verifyBOMMaterialGroups(
       scrollWidth: scroller.clientWidth,
       tableHeadCount: node.querySelectorAll('.erp-bom-parts-table thead')
         .length,
-      materialRowSpan: group.querySelector('td').rowSpan,
+      materialRowSpan: group.querySelector('.erp-bom-material-cell').rowSpan,
       groupWidth: group.getBoundingClientRect().width,
       scrollable: getComputedStyle(scroller).overflowX,
       ancestors: Array.from(
@@ -148,7 +156,6 @@ export function createBOMMaterialGroupsScenarios(deps) {
   let saveAttempts = 0
   let createdMaterialUnitID = null
   const scenarios = [
-    ...createBOMMaterialMatchingScenarios(deps),
     {
       name: 'bom-material-groups-desktop',
       path: '/erp/purchase/material-bom',
@@ -173,14 +180,29 @@ export function createBOMMaterialGroupsScenarios(deps) {
           node.scrollLeft = 0
           node.dispatchEvent(new Event('scroll', { bubbles: true }))
         })
-        await page.waitForFunction(
-          (node) =>
-            node.scrollLeft === 0 &&
-            node.querySelector('button[aria-label="向左查看列"]')?.disabled ===
-              true,
-          await scrollRegion.elementHandle()
-        )
-        await exerciseTableScrollControls(page, scrollRegion, scrollRegion)
+        const scrollButtons = await tableScrollButtons(page, scrollRegion)
+        deps.assert.equal(await scrollRegion.evaluate((node) => node.scrollLeft), 0)
+        if (await scrollRegion.evaluate((node) => node.scrollWidth > node.clientWidth + 1)) {
+          await expectLocator(scrollButtons.getByRole('button', { name: '向左查看列', exact: true })).toBeDisabled()
+          // BOM 的横向控件挂在标题栏，沿用固定工具栏合同，不检查浮动 dock。
+          await assertSingleTableScrollbar(modal, scrollRegion)
+          await scrollButtons.getByRole('button', { name: '向右查看列', exact: true }).click()
+          await expectLocator.poll(() => scrollRegion.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0)
+          await scrollRegion.hover()
+          await page.mouse.wheel(10000, 0)
+          await page.waitForFunction((node) => Math.abs(node.scrollWidth - node.clientWidth - node.scrollLeft) <= 2, await scrollRegion.elementHandle())
+          await scrollRegion.getByLabel('备注 1', { exact: true }).click()
+          deps.assert.match(await modal.getByRole('group', { name: 'BOM 选中对象操作', exact: true }).getByRole('status').innerText(), /^部位：/u, '横向查看末列时，点击当前字段即可选择部位')
+          await assertTableStickyHeaderAlignment(modal)
+          const end = await scrollRegion.evaluate((node) => node.scrollLeft)
+          await scrollButtons.getByRole('button', { name: '向左查看列', exact: true }).press('Enter')
+          await expectLocator.poll(() => scrollRegion.evaluate((node) => node.scrollLeft)).toBeLessThan(end)
+          await scrollRegion.hover()
+          await page.mouse.wheel(-10000, 0)
+          await page.waitForFunction((node) => node.scrollLeft <= 1, await scrollRegion.elementHandle())
+        } else {
+          deps.assert.equal(await scrollButtons.count(), 0, '整张部位表已可读时不保留无效滚动按钮')
+        }
         deps.assert.equal(
           await modal.getByLabel('单位用量 3', { exact: true }).inputValue(),
           '0.015',
@@ -226,7 +248,9 @@ export function createBOMMaterialGroupsScenarios(deps) {
   return [
     ...createBOMImportPreviewScenarios(deps),
     ...createBOMMaterialDropdownStabilityScenarios(deps),
+    ...createBOMMaterialMatchingScenarios(deps),
     ...scenarios,
+    ...createBOMToolbarScenarios(deps, scenarios[0]),
     {
       ...scenarios[0],
       name: 'bom-material-groups-before-selection',
@@ -250,10 +274,9 @@ export function createBOMMaterialGroupsScenarios(deps) {
           { scenarioName: 'bom-material-groups-before-selection' }
         )
         await addMaterial.click()
+        await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '物料名称 1')
         for (let count = 2; count <= 3; count += 1) {
-          await first
-            .getByRole('button', { name: '＋ 添加部位', exact: true })
-            .click()
+          await clickBOMMaterialAction(first, '添加部位')
           assert.equal(
             await groups.count(),
             1,
@@ -267,10 +290,8 @@ export function createBOMMaterialGroupsScenarios(deps) {
           )
         }
         await first.getByLabel('部位 1', { exact: true }).fill('头部')
-        await parts
-          .first()
-          .getByRole('button', { name: '复制', exact: true })
-          .click()
+        await clickBOMPartAction(parts
+          .first(), '复制部位')
         assert.equal(await groups.count(), 1)
         assert.equal(
           await first.getByLabel('部位 2', { exact: true }).inputValue(),
@@ -299,15 +320,13 @@ export function createBOMMaterialGroupsScenarios(deps) {
           1
         )
         assert.equal(
-          await first.locator('td').first().getAttribute('rowspan'),
+          await first.locator('.erp-bom-material-cell').first().getAttribute('rowspan'),
           '6'
         )
 
         await addMaterial.click()
-        await groups
-          .nth(1)
-          .getByRole('button', { name: '复制', exact: true })
-          .click()
+        await clickBOMPartAction(groups
+          .nth(1), '复制部位')
         assert.equal(
           await groups.count(),
           2,
@@ -342,10 +361,8 @@ export function createBOMMaterialGroupsScenarios(deps) {
           await groups.nth(2).locator('tr[data-bom-part-index]').count(),
           2
         )
-        await groups
-          .nth(2)
-          .getByRole('button', { name: '移除物料', exact: true })
-          .click()
+        await clickBOMMaterialAction(groups
+          .nth(2), '移除物料')
         await editor
           .getByRole('heading', { name: '材料分析明细表', exact: true })
           .scrollIntoViewIfNeeded()
@@ -368,16 +385,15 @@ export function createBOMMaterialGroupsScenarios(deps) {
         await chooseMaterial(groups.nth(1), 'MAT-STYLE-L1')
         assert.equal(await groups.count(), 1, '相同物料和单位应合并部位')
         assert.equal(await parts.count(), 7)
+        const firstMaterial = first.locator('.ant-select:has(input[aria-label="物料名称 1"])')
+        await firstMaterial.scrollIntoViewIfNeeded()
+        await firstMaterial.hover()
         await first
           .locator(
             '.ant-select:has(input[aria-label^="物料名称 "]) .ant-select-clear'
           )
-          .click({ force: true })
-        assert.equal(
-          await groups.count(),
-          2,
-          '清空已合并物料后恢复原来的待选物料组'
-        )
+          .click()
+        await expectLocator(groups).toHaveCount(2)
         assert.equal(await parts.count(), 5)
         assert.equal(
           await groups.nth(1).locator('tr[data-bom-part-index]').count(),
@@ -397,10 +413,8 @@ export function createBOMMaterialGroupsScenarios(deps) {
         assert.equal(await groups.count(), 1)
         assert.equal(await parts.count(), 7)
         await chooseMaterial(first, 'MAT-STYLE-L1')
-        await parts
-          .first()
-          .getByRole('button', { name: '移除', exact: true })
-          .click()
+        await clickBOMPartAction(parts
+          .first(), '移除部位')
         assert.equal(await groups.count(), 1, '移除首个部位不应拆分剩余部位')
         assert.equal(await parts.count(), 6)
         assert.equal(
@@ -409,16 +423,14 @@ export function createBOMMaterialGroupsScenarios(deps) {
         )
         await addMaterial.click()
         assert.equal(await groups.count(), 2)
-        await groups
-          .nth(1)
-          .getByRole('button', { name: '移除物料', exact: true })
-          .click()
+        await clickBOMMaterialAction(groups
+          .nth(1), '移除物料')
         assert.equal(await groups.count(), 1)
         assert.equal(await parts.count(), 6)
 
         const product = editor.locator('input#product_id')
         await chooseImportedReference(page, product, 'PROD-STYLE-L1', '样式产品')
-        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+        assert.equal(await isBOMVersionReadOnly(editor), true)
         for (const input of await editor
           .getByRole('textbox', { name: /^单位用量 / })
           .all()) {
@@ -512,6 +524,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
       auth: 'admin',
       effectiveSession: deps.customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
+      beforeNavigate: installBOMMaterialMatchingMocks,
       verify: async (page) => {
         const { assert } = deps
         const saves = []
@@ -540,6 +553,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         const review = editor.locator('.erp-bom-import-review')
         await review.waitFor()
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click({ trial: true })
+        await editor.getByRole('button', { name: '全部展开', exact: true }).click()
         await editor.getByLabel('单位用量 3', { exact: true }).fill('0')
         assert.equal(await review.getAttribute('data-bom-import-issue-count'), '4')
         assert.ok(
@@ -548,7 +562,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
           )
         )
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
-        await deps.expectText(page, '暂未保存：请先选择产品、关联 2 种物料')
+        await editor.locator('.ant-form-item-explain-error').getByText('请选择产品', { exact: true }).waitFor()
         await page.waitForFunction(() => document.activeElement?.id === 'product_id')
         assert.equal(saves.length, 0)
         await page.screenshot({
@@ -565,8 +579,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
           .click({ force: true })
         await editor.locator('[data-bom-import-product-status="unresolved"]').waitFor()
         assert.ok((await review.innerText()).includes('尚未关联'))
-        await product.fill('PROD-STYLE-L1')
-        await product.press('Enter')
+        await chooseImportedReference(page, product, 'PROD-STYLE-L1', '样式产品')
         await editor.locator('[data-bom-import-issue-count="3"]').waitFor()
 
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
@@ -575,27 +588,27 @@ export function createBOMMaterialGroupsScenarios(deps) {
         )
         assert.equal(saves.length, 0)
         const material = editor.getByRole('combobox', { name: '物料名称 2', exact: true })
-        await chooseImportedReference(page, material, 'MAT-STYLE-L1', '样式材料')
+        await chooseImportedReference(page, material, 'MAT-MATCH', '对应测试材料')
         await editor.locator('[data-bom-import-issue-count="2"]').waitFor()
         assert.equal(
-          await editor.locator('.erp-bom-material-group').first()
+          await editor.locator('.erp-bom-material-group').nth(1)
             .locator('tr[data-bom-part-index]').count(),
-          3,
+          2,
           '关联一次应补齐同一物料的全部部位'
         )
         const lastMaterial = editor.getByRole('combobox', { name: '物料名称 4', exact: true })
-        await chooseImportedReference(page, lastMaterial, 'MAT-STYLE-L1', '样式材料')
+        await chooseImportedReference(page, lastMaterial, 'MAT-OTHER', '对应另一材料')
         await editor.locator('[data-bom-import-issue-count="1"]').waitFor()
 
         await editor.getByLabel('单位用量 3', { exact: true }).fill('0')
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
-        await deps.expectText(page, '暂未保存：请先核对 1 个部位的用量')
+        await editor.locator('.ant-form-item-explain-error').getByText('填写正数用量', { exact: true }).waitFor()
         await page.waitForFunction(() =>
           document.activeElement?.getAttribute('aria-label') === '单位用量 3'
         )
         assert.equal(saves.length, 0)
         await editor.getByLabel('单位用量 3', { exact: true }).fill('0.25')
-        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+        assert.equal(await isBOMVersionReadOnly(editor), true)
         await editor.locator('[data-bom-import-issue-count="0"]').waitFor()
         await review.scrollIntoViewIfNeeded()
         await page.screenshot({
@@ -607,7 +620,8 @@ export function createBOMMaterialGroupsScenarios(deps) {
         assert.equal(saves.length, 1)
         assert.equal(saves[0].product_id, 1)
         assert.equal(saves[0].items.length, 4)
-        assert.ok(saves[0].items.every((item) => item.material_id === 1 && item.unit_id === 1))
+        assert.deepEqual(saves[0].items.map((item) => item.material_id), [1, 77, 77, 78])
+        assert.ok(saves[0].items.every((item) => item.unit_id === 1))
         assert.equal(saves[0].items[2].quantity, '0.25')
       },
     },
@@ -634,9 +648,10 @@ export function createBOMMaterialGroupsScenarios(deps) {
         const editor = page.locator('.erp-bom-editor:visible')
         await editor.getByText('页签', { exact: true }).click()
         await editor.getByRole('tab', { name: '材料分析明细表', exact: true }).click()
+        await editor.getByRole('button', { name: '全部展开', exact: true }).click()
         const row = editor.locator('tr[data-bom-part-index="1"]')
         await expectLocator(row.locator('.erp-bom-import-line-status__source')).toHaveText('Excel 第 7 行')
-        const unit = row.getByRole('combobox', { name: '单位 2', exact: true }).locator('xpath=ancestor::div[contains(concat(" ",normalize-space(@class)," ")," ant-select ")][1]')
+        const unit = editor.getByRole('combobox', { name: '单位 2', exact: true }).locator('xpath=ancestor::div[contains(concat(" ",normalize-space(@class)," ")," ant-select ")][1]')
         await unit.hover()
         await unit.locator('.ant-select-clear').click()
         await row.getByLabel('单位用量 2', { exact: true }).fill('')
@@ -666,6 +681,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
       auth: 'admin',
       effectiveSession: deps.customerRuntimeEffectiveSession,
       viewport: { width: 1920, height: 1080 },
+      beforeNavigate: installBOMMaterialMatchingMocks,
       verify: async (page) => {
         const { assert } = deps
         await deps.expectHeading(page, '物料清单（BOM）')
@@ -726,29 +742,21 @@ export function createBOMMaterialGroupsScenarios(deps) {
         await parts.nth(1).getByText('27.5', { exact: true }).waitFor()
         assert.ok((await unresolved.innerText()).includes('总用量：127.5'))
 
-        await unresolved
-          .getByRole('button', { name: '＋ 添加部位', exact: true })
-          .click()
+        await clickBOMMaterialAction(unresolved, '添加部位')
         assert.equal(await groups.count(), 3)
         assert.equal(await parts.count(), 3)
-        await parts
-          .last()
-          .getByRole('button', { name: '移除', exact: true })
-          .click()
-        await parts
-          .first()
-          .getByRole('button', { name: '复制', exact: true })
-          .click()
+        await clickBOMPartAction(parts
+          .last(), '移除部位')
+        await clickBOMPartAction(parts
+          .first(), '复制部位')
         assert.equal(await groups.count(), 3)
         assert.equal(await parts.count(), 3)
-        await parts
-          .nth(1)
-          .getByRole('button', { name: '移除', exact: true })
-          .click()
+        await clickBOMPartAction(parts
+          .nth(1), '移除部位')
         assert.equal(await parts.count(), 2)
 
         await editor
-          .locator('.erp-bom-material-groups__heading')
+          .locator('.erp-sales-order-lines-form__head')
           .scrollIntoViewIfNeeded()
         await editor.locator('.erp-bom-parts-scroll').evaluate((node) => {
           node.scrollLeft = 0
@@ -762,14 +770,13 @@ export function createBOMMaterialGroupsScenarios(deps) {
             contained:
               node.clientWidth <=
               node.closest('.erp-business-form-page').clientWidth,
-            rowSpan: node.querySelectorAll('.erp-bom-material-group')[1].querySelector('td')
-              .rowSpan,
+            materialRowSpan: node.querySelectorAll('.erp-bom-material-group')[1].querySelector('td').rowSpan,
             overflowX: getComputedStyle(node).overflowX,
           }))
         assert.deepEqual(metrics, {
           overflow: 0,
           contained: true,
-          rowSpan: 3,
+          materialRowSpan: 3,
           overflowX: 'auto',
         })
         await page.screenshot({
@@ -781,14 +788,14 @@ export function createBOMMaterialGroupsScenarios(deps) {
           name: '物料名称 2',
           exact: true,
         })
-        await chooseImportedReference(page, materialSelect, 'MAT-STYLE-L1', '样式材料')
+        await chooseImportedReference(page, materialSelect, 'MAT-MATCH', '对应测试材料')
         await page.waitForFunction(
           () =>
-            document.querySelectorAll('.erp-bom-material-group').length === 2
+            document.querySelectorAll('.erp-bom-material-group').length === 3
         )
         assert.equal(
-          await groups.first().locator('tr[data-bom-part-index]').count(),
-          3
+          await groups.nth(1).locator('tr[data-bom-part-index]').count(),
+          2
         )
         assert.equal(
           await editor
@@ -798,17 +805,16 @@ export function createBOMMaterialGroupsScenarios(deps) {
         )
         assert.equal(
           await groups
-            .first()
+            .nth(1)
             .getByText('SUP-MISSING', { exact: true })
             .count(),
-          0
+          1
         )
 
-        await groups
-          .first()
-          .locator('.ant-select-clear')
-          .first()
-          .click({ force: true })
+        const importedMaterial = groups.nth(1).locator('.ant-select:has(input[aria-label^="物料名称 "])')
+        await importedMaterial.scrollIntoViewIfNeeded()
+        await importedMaterial.hover()
+        await importedMaterial.locator('.ant-select-clear').click()
         await page.waitForFunction(
           () =>
             document.querySelectorAll('.erp-bom-material-group').length === 3
@@ -989,7 +995,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         await editor.getByLabel('单位用量 2', { exact: true }).fill('0.037')
         await editor.getByLabel('备注 2', { exact: true }).fill('修改后复制')
         await row(1).getByText('39.3162', { exact: true }).waitFor()
-        await row(1).getByRole('button', { name: '复制', exact: true }).click()
+        await clickBOMPartAction(row(1), '复制部位')
         deps.assert.equal(
           await editor.getByLabel('单位用量 3', { exact: true }).inputValue(),
           '0.037'
@@ -1002,11 +1008,11 @@ export function createBOMMaterialGroupsScenarios(deps) {
           await editor.getByLabel('备注 3', { exact: true }).inputValue(),
           '修改后复制'
         )
-        await row(1).getByRole('button', { name: '移除', exact: true }).click()
+        await clickBOMPartAction(row(1), '移除部位')
         await row(1).getByText('39.3162', { exact: true }).waitFor()
         await editor.locator('input[id$="quantity_text"]').fill('2024')
         await row(1).getByText('78.6324', { exact: true }).waitFor()
-        await row(0).getByRole('button', { name: '移除', exact: true }).click()
+        await clickBOMPartAction(row(0), '移除部位')
         deps.assert.equal(
           await editor.getByLabel('单位用量 1', { exact: true }).inputValue(),
           '0.037'
@@ -1097,6 +1103,22 @@ export function createBOMMaterialGroupsScenarios(deps) {
     },
     {
       ...scenarios[0],
+      name: 'bom-toolbar-no-overflow-4k',
+      viewport: { width: 3840, height: 2160 },
+      deviceScaleFactor: 1,
+      verify: async (page) => {
+        const editor = await verifyBOMMaterialGroups(page, deps)
+        const region = editor.locator('.erp-bom-parts-scroll')
+        const buttons = await tableScrollButtons(page, region)
+        deps.assert.equal(await buttons.count(), 0, '宽度足够时不显示横向查看按钮')
+        deps.assert.equal(await editor.locator('.erp-line-items-form__scroll-tools').isVisible(), false, '空滚动插槽不占位')
+        await assertBusinessFormPage(page, editor)
+        await page.screenshot({ path: `${deps.outputDir}/bom-toolbar-editor-no-overflow-4k.png` })
+        await closeBusinessFormPage(page, editor)
+      },
+    },
+    {
+      ...scenarios[0],
       name: 'bom-page-wide-desktop',
       viewport: { width: 1920, height: 1080 },
       verify: async (page) => {
@@ -1107,7 +1129,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
             node.scrollTop = 0
           })
         await editor
-          .getByRole('heading', { name: '编辑 BOM 草稿', exact: true })
+          .getByRole('heading', { name: '编辑 BOM 草稿 · 未生效', exact: true })
           .focus()
         await assertBusinessFormPage(page, editor)
         await page.screenshot({
@@ -1118,6 +1140,112 @@ export function createBOMMaterialGroupsScenarios(deps) {
       },
     },
 
+    {
+      ...scenarios[0],
+      name: 'bom-page-version-read-lifecycle',
+      beforeNavigate: async (page) => {
+        let release
+        page.bomVersionReadGate = {
+          pause: false,
+          fail: false,
+          pending: new Promise((resolve) => { release = resolve }),
+          release: () => release(),
+        }
+        await page.route('**/rpc/bom', async (route) => {
+          const { id, method } = route.request().postDataJSON()
+          if (method !== 'get_bom_version') return route.fallback()
+          // 列表预读仍正常返回，只控制编辑页打开后的独立读取。
+          if (!(await page.locator('.erp-bom-editor:visible').count())) return route.fallback()
+          if (page.bomVersionReadGate.pause) await page.bomVersionReadGate.pending
+          if (page.bomVersionReadGate.fail) return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 500, message: '模拟读取失败' } } })
+          return route.fallback()
+        })
+      },
+      verify: async (page) => {
+        await page.getByText('BOM-STYLE-DRAFT', { exact: true }).dblclick()
+        const editor = page.locator('.erp-bom-editor:visible')
+        await expectLocator(editor.locator('.erp-bom-version-summary strong')).toHaveText('BOM-STYLE-DRAFT')
+        await closeBusinessFormPage(page, editor)
+        page.bomVersionReadGate.pause = true
+        await page.getByText('BOM-STYLE-L1', { exact: true }).dblclick()
+        const summary = editor.getByLabel('BOM 版本', { exact: true })
+        try {
+          await expectLocator(summary.locator('strong')).toHaveText('正在读取')
+          deps.assert.equal(await summary.getByRole('button', { name: '复制BOM 版本', exact: true }).count(), 0)
+        } finally {
+          page.bomVersionReadGate.release()
+        }
+        await expectLocator(summary.locator('strong')).toHaveText('BOM-STYLE-L1')
+        await closeBusinessFormPage(page, editor)
+        page.bomVersionReadGate.fail = true
+        await page.getByText('BOM-STYLE-DRAFT', { exact: true }).dblclick()
+        await expectLocator(summary.locator('strong')).toHaveText('尚未读取')
+        deps.assert.equal(await summary.getByRole('button', { name: '复制BOM 版本', exact: true }).count(), 0)
+        await closeBusinessFormPage(page, editor)
+      },
+    },
+    {
+      ...scenarios[0],
+      name: 'bom-page-density-short-desktop',
+      viewport: { width: 1024, height: 600 },
+    },
+    {
+      ...scenarios[0],
+      name: 'bom-page-density-sidebar-overflow',
+      viewport: { width: 1340, height: 800 },
+    },
+    {
+      ...scenarios[0],
+      name: 'bom-page-density-retina',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const editor = await verifyBOMMaterialGroups(page, deps)
+        await assertBusinessFormPage(page, editor)
+        await editor.locator('.erp-business-form-page__body').evaluate((node) => { node.scrollTop = 0 })
+        await page.screenshot({ path: `${deps.outputDir}/bom-editor-density-4k.png` })
+        await closeBusinessFormPage(page, editor)
+      },
+    },
+    {
+      name: 'dev-ui-design-bom-editor-density',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        await page.getByRole('button', { name: /全屏预览/u }).click()
+        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        await frame.locator('.nav-item[data-page="engineering-hub"]').click()
+        await frame.locator('[data-action="new-record"]').click()
+        const editor = frame.locator('.bom-form-view')
+        await editor.waitFor()
+        await chooseSelectOption(editor.locator('[data-form-field="party"]'), '节庆毛绒礼盒')
+        await editor.locator('[data-form-field="order-qty"]').fill('2400')
+        const parts = editor.locator('tr[data-bom-part]')
+        if (!(await parts.count())) await editor.locator('[data-action="add-material-group"]').first().click()
+        const before = await parts.count()
+        const groupCount = await editor.locator('tbody[data-bom-material-group]').count()
+        await parts.first().locator('td:not(.bom-material-cell)').first().click()
+        await editor.getByRole('group', { name: 'BOM 选中对象操作', exact: true }).getByRole('button', { name: '复制部位', exact: true }).click()
+        deps.assert.equal(await parts.count(), before + 1, '设计稿复制部位保留材料列与合并单元格')
+        deps.assert.equal(await editor.locator('tbody[data-bom-material-group]').count(), groupCount)
+        await chooseSelectOption(editor.locator('[data-bom-group-field="material"]').first(), '黑色塑料眼')
+        deps.assert.equal(await editor.locator('tbody[data-bom-material-group]').count(), 1, '同材料和单位的示例部位合并展示')
+        await editor.locator('.bom-material-cell').nth(1).click()
+        await editor.getByRole('group', { name: 'BOM 选中对象操作', exact: true }).getByRole('button', { name: '添加部位', exact: true }).click()
+        deps.assert.equal(await parts.count(), before + 2)
+        deps.assert.equal(await editor.locator('[data-form-field="order-qty"]').inputValue(), '2400')
+        deps.assert.equal(await editor.locator('.line-items thead th').count(), 12)
+        const geometry = await editor.evaluate((root) => ({
+          navRight: root.querySelector('.anchor-nav').getBoundingClientRect().right,
+          contentLeft: root.querySelector('.form-scroll').getBoundingClientRect().left,
+          overflow: root.scrollWidth - root.clientWidth,
+        }))
+        deps.assert.ok(Math.abs(geometry.navRight - geometry.contentLeft) <= 1, JSON.stringify(geometry))
+        deps.assert.equal(geometry.overflow, 0)
+        await page.screenshot({ path: `${deps.outputDir}/bom-design-density-4k.png` })
+      },
+    },
     {
       ...scenarios[0],
       name: 'bom-material-create-and-reuse-desktop',
@@ -1221,7 +1349,8 @@ export function createBOMMaterialGroupsScenarios(deps) {
         deps.assert.equal(await selectedMaterial.innerText(), originalMaterial)
         deps.assert.equal(await dropdown.count(), 0)
         await material.fill('找不到的模拟物料')
-        await dropdown.locator('.ant-select-item-empty').waitFor()
+        await expectLocator(dropdown.locator('.ant-select-item-option')).toHaveCount(1)
+        deps.assert.ok((await dropdown.locator('.ant-select-item-option').innerText()).includes(originalMaterial), '无其他搜索结果时保留当前已选档案的显示')
         await createButton.click()
         await create.waitFor({ state: 'visible' })
         await create.locator('input[id="name"]').fill('模拟新建短毛绒')
@@ -1276,7 +1405,9 @@ export function createBOMMaterialGroupsScenarios(deps) {
         await create.getByLabel('厂商', { exact: true }).click()
         await page
           .locator('.ant-select-dropdown:visible')
-          .getByText('SUP-STYLE-L1 / 样式供应商', { exact: true })
+          .locator('.ant-select-item-option')
+          .filter({ hasText: 'SUP-STYLE-L1' })
+          .filter({ hasText: '样式供应商' })
           .click()
         await create.locator('input[id="supplier_item_no"]').fill('Q-001')
         await create
@@ -1303,12 +1434,18 @@ export function createBOMMaterialGroupsScenarios(deps) {
           path: `${deps.outputDir}/bom-material-created-and-reused.png`,
           fullPage: true,
         })
-        deps.assert.ok(
-          (
-            await first.locator('.erp-bom-material-cell__context').innerText()
-          ).includes('样式供应商'),
-          await first.innerText()
-        )
+        await expectLocator(first.locator('.ant-select-selection-item').first()).toHaveText('模拟新建短毛绒')
+        const createdSelect = first.getByRole('combobox', { name: '物料名称 1', exact: true })
+        await createdSelect.press('ArrowDown')
+        await waitForMaterialDropdown(page)
+        const createdOption = dropdown.locator('.erp-bom-material-option').filter({ hasText: '模拟新建短毛绒' })
+        await dropdown.locator('.rc-virtual-list-holder').hover()
+        await page.mouse.wheel(0, 600)
+        await createdOption.waitFor()
+        deps.assert.ok((await createdOption.innerText()).includes('样式供应商'))
+        deps.assert.ok((await createdOption.innerText()).includes('Q-001'))
+        await createdSelect.press('Escape')
+        await dropdown.waitFor({ state: 'hidden' })
         deps.assert.equal(
           await first.locator('tr[data-bom-part-index]').count(),
           3
@@ -1356,6 +1493,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
           name: '物料名称 1',
           exact: true,
         })
+        await material.scrollIntoViewIfNeeded()
         await material.press('ArrowDown')
         const dropdown = page.locator('.ant-select-dropdown:visible')
         await dropdown.waitFor({ state: 'visible' })
@@ -1363,6 +1501,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
           await dropdown.getByRole('button', { name: /^新建物料/ }).count(),
           0
         )
+        await dropdown.locator('.ant-select-item-option').first().waitFor({ state: 'visible' })
         deps.assert.ok(
           await dropdown.locator('.ant-select-item-option').count()
         )

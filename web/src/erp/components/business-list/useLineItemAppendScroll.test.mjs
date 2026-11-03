@@ -57,7 +57,7 @@ async function mount(t) {
           height: 32,
         }))
         const matches = node.matches.bind(node)
-        // happy-dom 10 不实现 :disabled；布局和原生伪类在浏览器回归中验证。
+        // DOM 夹具固定禁用语义；布局和原生伪类在浏览器回归中验证。
         t.mock.method(node, 'matches', (selector) =>
           selector === ':disabled' ? Boolean(node.disabled) : matches(selector)
         )
@@ -122,6 +122,22 @@ test('a newer append request supersedes pending focus without moving to the olde
   view.frame()
   assert.equal(document.activeElement === newRow.firstElementChild, true)
   assert.equal(oldRow.scrollIntoView.mock.callCount(), 0)
+})
+
+test('removal returns focus to the remaining row without activating a business field', async (t) => {
+  const view = await mount(t)
+  const row = view.row(0)
+  row.tabIndex = -1
+  let fieldFocus = 0
+  row.firstElementChild.addEventListener('focus', () => { fieldFocus += 1 })
+  view.api.requestLineItemScroll(0, { focusField: false })
+  view.frame()
+  assert.equal(document.activeElement === row, true)
+  assert.equal(fieldFocus, 0)
+  assert.ok(row.scrollIntoView.mock.callCount() > 0)
+  view.api.requestLineItemScroll(0)
+  view.frame()
+  assert.equal(document.activeElement === row.firstElementChild, true, '后续新增仍默认进入业务字段')
 })
 
 test('append waits for the new row to mount', async (t) => {

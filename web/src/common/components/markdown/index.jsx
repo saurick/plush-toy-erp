@@ -20,6 +20,8 @@ import {
 import { Remarkable } from 'remarkable'
 import { Popover } from 'antd'
 import RemarkableReactRenderer from 'remarkable-react'
+import { canRestoreOverlayFocus, useOverlayScope } from '../overlay/OverlayScopeContext.mjs'
+import { isolateOverlaySiblings, lockOverlayScroll } from '../overlay/ScopedOverlayDialog.jsx'
 
 import {
   extractMarkdownHeadings,
@@ -102,6 +104,10 @@ export function MermaidDiagram({
   onStatusChange,
 }) {
   const [inspection, setInspection] = useState(null)
+  const overlay = useOverlayScope()
+  const overlayRef = useRef(overlay)
+  overlayRef.current = overlay
+  const fullscreenVisible = overlay?.visible !== false
   const inspectionTrigger = useRef(null)
   const inspect = useCallback((item, trigger) => {
     if (trigger) inspectionTrigger.current = trigger
@@ -153,6 +159,7 @@ export function MermaidDiagram({
   })
   const restoreFullscreenFocus = useCallback((returnFocusElement) => {
     window.setTimeout(() => {
+      if (!canRestoreOverlayFocus(overlayRef.current)) return
       const focusTarget = fullscreenOpenRef.current || returnFocusElement
       if (focusTarget?.isConnected && typeof focusTarget.focus === 'function') {
         focusTarget.focus({ preventScroll: true })
@@ -273,7 +280,7 @@ export function MermaidDiagram({
   }, [chart, startingZoom, initialZoomMode])
 
   useLayoutEffect(() => {
-    if (!fullscreenOpen) return undefined
+    if (!fullscreenOpen || !fullscreenVisible) return undefined
 
     const root = diagramRef.current
     // 顶层显示保留 DOM 和主题继承，同时越过父级的裁剪与层叠上下文。
@@ -281,18 +288,20 @@ export function MermaidDiagram({
     return () => {
       if (root.matches(':popover-open')) root.hidePopover()
     }
-  }, [fullscreenOpen])
+  }, [fullscreenOpen, fullscreenVisible])
 
   useEffect(() => {
-    if (!fullscreenOpen || typeof document === 'undefined') {
+    if (!fullscreenOpen || !fullscreenVisible || typeof document === 'undefined') {
       return undefined
     }
 
-    const previousOverflow = document.body.style.overflow
+    const root = diagramRef.current
+    const boundary = overlay?.enabled ? overlay.containerRef.current : document.body
+    const releases = [lockOverlayScroll(boundary)]
+    if (overlay?.enabled) releases.push(isolateOverlaySiblings(root, boundary))
     const returnFocusElement = fullscreenReturnFocusRef.current
-    document.body.style.overflow = 'hidden'
     const closeOnEscape = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && (!overlay?.enabled || root.contains(event.target))) {
         event.preventDefault()
         event.stopPropagation()
         setFullscreenOpen(false)
@@ -300,17 +309,17 @@ export function MermaidDiagram({
     }
     document.addEventListener('keydown', closeOnEscape, true)
     const focusTimer = window.setTimeout(
-      () => fullscreenExitRef.current?.focus({ preventScroll: true }),
+      () => { if (canRestoreOverlayFocus(overlayRef.current)) fullscreenExitRef.current?.focus({ preventScroll: true }) },
       0
     )
 
     return () => {
       window.clearTimeout(focusTimer)
-      document.body.style.overflow = previousOverflow
+      releases.toReversed().forEach((release) => release())
       document.removeEventListener('keydown', closeOnEscape, true)
       restoreFullscreenFocus(returnFocusElement)
     }
-  }, [fullscreenOpen, restoreFullscreenFocus])
+  }, [fullscreenOpen, fullscreenVisible, overlay, restoreFullscreenFocus])
 
   useEffect(() => {
     const source = String(renderedChart || '').trim()
@@ -508,7 +517,7 @@ export function MermaidDiagram({
       popover={fullscreenOpen ? 'manual' : undefined}
       aria-busy={renderState.status === 'loading'}
       role={fullscreenOpen ? 'dialog' : undefined}
-      aria-modal={fullscreenOpen ? 'true' : undefined}
+      aria-modal={fullscreenOpen ? overlay?.enabled ? 'false' : 'true' : undefined}
       aria-label={fullscreenOpen ? `${displayLabel}全屏查看` : undefined}
     >
       {renderState.status === 'loading' ? (

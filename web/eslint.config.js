@@ -32,7 +32,7 @@ const sharedImports = [
   { name: 'Select', entry: 'AppSelect / FilterSelect，业务列表沿用 SelectFilter', owners: ['src/common/components/select/AppSelect.jsx'] },
   { name: 'Pagination', entry: 'AppPagination，表格分页由 AppTable 管理', owners: ['src/common/components/pagination/AppPagination.jsx'] },
   { name: 'Table', entry: 'AppTable', owners: ['src/common/components/table/AppTable.jsx'] },
-  { name: 'Modal', entry: 'AppModal / BusinessModal，命令式确认使用 common/utils/antdApp 的 modal', owners: ['src/common/components/modal/AppModal.jsx'] },
+  { name: 'Modal', entry: 'AppModal / BusinessModal，命令式确认使用 common/utils/antdApp 的 useModal', owners: ['src/common/components/modal/AppModal.jsx', 'src/common/components/overlay/OverlayScopeProvider.jsx'] },
   { name: 'Tabs', entry: 'SlidingTabs', owners: ['src/common/components/navigation/SlidingTabs.jsx'] },
   { name: 'Segmented', entry: 'SlidingSegmented', owners: ['src/common/components/navigation/SlidingSegmented.jsx'] },
   { name: 'message', entry: 'common/utils/antdApp 的 message', owners: [] },
@@ -42,6 +42,7 @@ const antDesignEntrypoints = ['antd', 'antd/es', 'antd/es/index', 'antd/es/index
 
 function sharedImportRestrictions(owner, business = false) {
   const restricted = sharedImports.filter(({ owners }) => !owners.includes(owner))
+  if (business) restricted.push({ name: 'Drawer', entry: 'common/components/drawer/AppDrawer' })
   return ['error', {
     paths: antDesignEntrypoints.flatMap((moduleName) => [
       { name: moduleName, importNames: ['default'], message: '使用 Ant Design 命名导入与对应共享入口，避免聚合默认导出绕过组件约束。' },

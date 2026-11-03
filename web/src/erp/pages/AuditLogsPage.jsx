@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Alert, Button, Drawer, Grid, Tag, Typography } from 'antd'
+import { Alert, Button, Grid, Tag, Typography } from 'antd'
+import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import { AUTH_SCOPE } from '@/common/auth/auth'

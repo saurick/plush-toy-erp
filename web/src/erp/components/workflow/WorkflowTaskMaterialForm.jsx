@@ -19,7 +19,7 @@ export default function WorkflowTaskMaterialForm() {
   const register = context.registerPageLeaveGuard
   const canViewWorkspace = hasActionPermission(context.adminProfile, PermissionCode.SALES_ORDER_READ) && [PermissionCode.PRODUCT_READ, PermissionCode.PRODUCT_SKU_READ, PermissionCode.BOM_READ, PermissionCode.MATERIAL_READ].every((permission) => hasActionPermission(context.adminProfile, permission))
   const revisionOrderID = canViewWorkspace && taskBusiness.task?.task_group === 'engineering_material_revision' ? getEngineeringMaterialTaskContext(taskBusiness.task)?.orderID : null
-  useEffect(() => revisionOrderID ? undefined : register?.(() => leaveGuard.current?.() ?? true), [register, revisionOrderID])
+  useEffect(() => revisionOrderID ? undefined : register?.((options) => leaveGuard.current?.(options) ?? true), [register, revisionOrderID])
   if (revisionOrderID) return <React.Suspense fallback={<Spin />}><EngineeringWorkspace orderID={revisionOrderID} materialTask={taskBusiness.task} /></React.Suspense>
   return <EngineeringMaterialTaskAction
     task={taskBusiness.task}

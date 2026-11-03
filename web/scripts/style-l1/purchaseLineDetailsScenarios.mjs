@@ -141,7 +141,7 @@ export function createPurchaseLineDetailsScenarios(deps) {
       await first.locator('[data-action="line-details"]').click()
       assert.equal(await first.locator('.document-line-more').isVisible(), true)
       const count = await rows.count()
-      await first.locator('[data-design-row-select]').check()
+      await first.locator('td').first().click()
       await editor.locator('.line-editor-toolbar').getByRole('button', { name: /^复制/u }).click()
       assert.equal(await rows.count(), count + 1)
       assert.equal(await rows.nth(1).getByLabel('下单材料名称 2', { exact: true }).inputValue(), '正式设计稿的本单材料名称')

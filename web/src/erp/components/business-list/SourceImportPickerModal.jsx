@@ -2,7 +2,7 @@ import { RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Checkbox, Popover, Tag, Typography } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
-import { modal } from '@/common/utils/antdApp'
+import { useModal } from '@/common/utils/antdApp'
 import Pagination from '@/common/components/pagination/AppPagination'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
@@ -137,6 +137,7 @@ export default function SourceImportPickerModal({
   onSelectAllFiltered,
   expandable,
 }) {
+  const modal = useModal()
   const [keyword, setKeyword] = useState('')
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const [selectedRowSnapshotsByKey, setSelectedRowSnapshotsByKey] = useState(

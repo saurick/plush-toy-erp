@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
+import { isBOMVersionReadOnly, readBOMVersion } from './bomEditorDensityAssertions.mjs'
+import { installBOMMaterialMatchingMocks } from './bomMaterialMatchingScenarios.mjs'
 import { assertBusinessFormNavigationSurface } from './businessFormSectionAssertions.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
@@ -22,7 +24,7 @@ async function setTextFields(editor, values, excluded = []) {
 async function prepareBOM(page) {
   const bomEditor = page.locator('.erp-bom-editor:visible')
   await assertBusinessFormNavigationSurface(page, bomEditor)
-  if (!(await bomEditor.getByLabel('BOM 版本', { exact: true }).isDisabled())) throw new Error('BOM 版本应由系统生成')
+  if (!(await isBOMVersionReadOnly(bomEditor))) throw new Error('BOM 版本应由系统生成')
   for (const [label, value] of Object.entries({ 备品: '2', 设计师: '工程甲', 制表人: '制表乙', 审核人: '审核丙', 毛向: '向下' })) await bomEditor.getByLabel(label, { exact: true }).fill(value)
   const importWorkbook = async () => {
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), bomEditor.getByRole('button', { name: '从 Excel 导入', exact: true }).click()])
@@ -41,8 +43,8 @@ async function prepareBOM(page) {
   const secondMaterial = bomEditor.getByRole('combobox', { name: '物料名称 2', exact: true })
   await preview.waitFor({ state: 'hidden' })
   await secondMaterial.click()
-  await secondMaterial.fill('样式材料')
-  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '样式材料' }).first().click()
+  await secondMaterial.fill('对应测试材料')
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '对应测试材料' }).first().click()
   return bomEditor
 }
 
@@ -72,6 +74,7 @@ menus: [
       } : {}),
       beforeNavigate: async (page) => {
         await base.beforeNavigate(page)
+        await installBOMMaterialMatchingMocks(page)
         calls = []; files = []; product = null; sku = null; bom = null; request = null; imageAttempts = 0
         task.task_status_key = 'ready'; task.version = 1; task.completed_at = null
         order = { id: 1, order_no: task.source_no, lifecycle_status: 'active', version: 1, customer_id: 1, currency: 'CNY' }
@@ -245,8 +248,8 @@ menus: [
         await page.getByTestId('workflow-task-action-receipt').getByText('工程资料已完成，用料已自动送审', { exact: false }).first().waitFor()
         await steps.getByRole('tab').nth(1).click()
         await bomEditor.getByRole('heading', { name: /查看 BOM 版本.*已启用/u }).waitFor()
-        assert.equal(await bomEditor.getByLabel('BOM 版本', { exact: true }).inputValue(), 'V1', 'automatic review and step changes must preserve the saved editor')
-        assert.equal(await bomEditor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+        assert.equal(await readBOMVersion(bomEditor), 'V1', 'automatic review and step changes must preserve the saved editor')
+        assert.equal(await isBOMVersionReadOnly(bomEditor), true)
         await assertNoHorizontalOverflow(page, `chain-${definition.key}`)
         await page.screenshot({ path: path.join(outputDir, `engineering-workspace-chain-${definition.key}.png`) })
         await writeFile(path.join(outputDir, `engineering-workspace-chain-${definition.key}.json`), JSON.stringify({ calls, product, bom, order, files: files.map(({ content_base64: _contentBase64, ...file }) => file), imageAttempts }, null, 2))

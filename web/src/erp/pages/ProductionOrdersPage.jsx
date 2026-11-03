@@ -19,7 +19,7 @@ import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
@@ -271,6 +271,7 @@ function draftParams(values) {
 }
 
 export default function ProductionOrdersPage() {
+  const modal = useModal()
   const outletContext = useBusinessPageContext()
   const taskSource = outletContext?.taskCommand?.kind === 'production_plan' ? outletContext.taskCommand : null
   const reportBusinessResult = useWorkflowTaskBusinessResult()

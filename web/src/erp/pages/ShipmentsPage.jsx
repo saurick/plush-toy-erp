@@ -45,7 +45,7 @@ import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
@@ -284,6 +284,7 @@ function shipmentFormValues(shipment = {}) {
 }
 
 export default function ShipmentsPage() {
+  const modal = useModal()
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const navigate = useBusinessNavigate()
   const outletContext = useBusinessPageContext()
@@ -1551,6 +1552,7 @@ export default function ShipmentsPage() {
     ...(hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ) ? [{
       key: 'product_gallery',
       title: '产品图片',
+      taskDetailRole: 'media',
       width: 180,
       defaultPriority: 5,
       exportable: false,
@@ -1565,7 +1567,7 @@ export default function ShipmentsPage() {
     }] : []),
     ...columns,
   ], [adminProfile, columns, productsByID])
-  const { tableColumns, exportColumns, openColumnOrder, columnOrderModal } =
+  const { tableColumns, visibleColumns: taskDetailColumns, exportColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
       moduleKey: SHIPMENTS_MODULE_KEY,
@@ -2086,6 +2088,7 @@ export default function ShipmentsPage() {
         loading={loading}
         dataSource={rows}
         columns={tableColumns}
+        taskDetailColumns={taskDetailColumns}
         pagination={createBusinessTablePagination({
           pagination,
           total,

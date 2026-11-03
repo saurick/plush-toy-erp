@@ -15,7 +15,7 @@ import {
 import { withPrimaryContact } from './contactFormRows.mjs'
 import './contactFormList.css'
 import '../business-list/businessLineItemGroups.css'
-import BusinessLineEditor, { BusinessLineEditorInlineActions, BusinessLineEditorRowControls, useBusinessLineEditor } from '../business-list/BusinessLineEditor.jsx'
+import BusinessLineEditor, { BusinessLineEditorInlineActions, BusinessLineEditorRowControls, useBusinessLineEditor, useBusinessLineEditorRow } from '../business-list/BusinessLineEditor.jsx'
 
 const contactFields = [
   {
@@ -56,12 +56,13 @@ function ContactRow({
       <Button type="text" size="small" danger icon={<DeleteOutlined />} aria-label={`移除联系人条目 ${index + 1}`} disabled={disabled || !multiple} onClick={onRemove}>移除行</Button>
     </Space>
   )
+  const selection = useBusinessLineEditorRow({ actions, rowRef: registerRow })
 
   return (
     <tbody
       className="erp-master-contact-list__row erp-editable-line-group"
       aria-label={`第 ${index + 1} 位联系人`}
-      ref={registerRow}
+      {...selection.rowProps}
     >
       <tr className="erp-contact-editor__fields">
         <td
@@ -69,7 +70,7 @@ function ContactRow({
           rowSpan={showNote ? 2 : 1}
           aria-label={`第 ${index + 1} 位`}
         >
-          <BusinessLineEditorRowControls index={index} identity={row?.name} actions={actions}>
+          <BusinessLineEditorRowControls selection={selection} index={index} identity={row?.name} actions={actions}>
             {!editor?.compact ? <Button type="text" className="erp-line-editor__details-toggle" disabled={false} aria-expanded={noteOpen} aria-controls={noteID} aria-label={`${noteOpen ? '收起' : '展开'}第 ${index + 1} 行备注`} onClick={() => setNoteOpen((open) => !open)}><span aria-hidden="true">{noteOpen ? '⌄' : '›'}</span><span className="erp-editable-line-group__number">{index + 1}</span></Button> : <span className="erp-editable-line-group__number">{index + 1}</span>}
           </BusinessLineEditorRowControls>
         </td>

@@ -6,6 +6,7 @@ export default function useSlidingIndicator({
   containerSelector,
   itemSelector,
   selectedSelector,
+  revealSelected = false,
 }) {
   const rootRef = useRef(null)
   const measureRef = useRef(null)
@@ -36,6 +37,11 @@ export default function useSlidingIndicator({
         item.offsetHeight,
       ]
       const geometryKey = geometry.join(',')
+      if (revealSelected) {
+        const right = item.offsetLeft + item.offsetWidth
+        if (item.offsetLeft < container.scrollLeft) container.scrollLeft = item.offsetLeft
+        else if (right > container.scrollLeft + container.clientWidth) container.scrollLeft = right - container.clientWidth
+      }
       const snap = !previousItem || previousItem === item
       previousItem = item
       if (previousGeometry === geometryKey) return
@@ -91,7 +97,7 @@ export default function useSlidingIndicator({
       resizeObserver.disconnect()
       measureRef.current = null
     }
-  }, [containerSelector, itemSelector, selectedSelector])
+  }, [containerSelector, itemSelector, selectedSelector, revealSelected])
 
   useLayoutEffect(() => {
     measureRef.current?.()

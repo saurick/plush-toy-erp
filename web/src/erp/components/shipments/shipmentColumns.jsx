@@ -122,8 +122,10 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '出货单号',
       exportTitle: '出货单号',
       dataIndex: 'shipment_no',
+      taskDetailRole: 'identity',
       copyable: true,
-      width: 280,
+      detailCopyable: true,
+      width: 180,
       sortType: 'text',
     },
     {
@@ -131,6 +133,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '状态',
       exportTitle: '状态',
       dataIndex: 'status',
+      taskDetailRole: 'status',
       width: 110,
       sortValue: (record) => shipmentStatusText(record.status),
       render: shipmentStatusTag,
@@ -140,6 +143,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       defaultPriority: 25,
       title: '财务审批',
       dataIndex: 'finance_release_status',
+      taskDetailOrder: 40,
       width: 110,
       sortValue: (record) => shipmentApprovalState(record).label,
       render: (_, record) => {
@@ -154,13 +158,15 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '来源单据',
       exportTitle: '来源单据',
       dataIndex: 'sales_order_id',
+      taskDetailOrder: 10,
+      detailCopyable: true,
       copyable: {
         resolveValue: (value) => {
           const order = salesOrdersByID.get(Number(value || 0))
           return order?.order_no || order?.customer_order_no || ''
         },
       },
-      width: 120,
+      width: 160,
       sortType: 'number',
       render: (value) => {
         const order = salesOrdersByID.get(Number(value || 0))
@@ -184,11 +190,13 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       defaultPriority: 30,
       title: '客户',
       exportTitle: '客户',
+      taskDetailOrder: 20,
+      detailCopyable: true,
       copyable: {
         label: '客户',
         resolveValue: (_value, record) => record?.customer_snapshot || '',
       },
-      width: 260,
+      width: 180,
       sortValue: (record) =>
         record.customer_snapshot || (record.customer_id ? '客户已关联' : ''),
       render: (_, record) =>
@@ -201,6 +209,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '明细行',
       exportTitle: '明细行',
       key: 'item_count',
+      taskDetailOrder: 50,
       defaultHidden: true,
       width: 90,
       sortValue: (record) => record.items?.length || 0,
@@ -213,7 +222,8 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '总净重（克）',
       exportTitle: '总净重（克）',
       dataIndex: 'total_net_weight_g',
-      width: 190,
+      taskDetailOrder: 30,
+      width: 140,
       sortable: false,
       render: shipmentWeightText,
       detailValue: (record) => shipmentWeightText(record?.total_net_weight_g, record),
@@ -226,7 +236,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '收货信息',
       exportTitle: '收货信息',
       dataIndex: 'delivery_snapshot',
-      width: 360,
+      width: 220,
       sortValue: (record) => deliveryText(record?.delivery_snapshot),
       render: (value) => <DeliveryInfoCell snapshot={value} />,
       exportValue: (record) => deliveryText(record?.delivery_snapshot, { emptyText: '' }),
@@ -237,6 +247,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '物流信息',
       exportTitle: '物流信息',
       key: 'transport',
+      defaultHidden: true,
       copyable: {
         label: '物流单号',
         resolveValue: (_value, record) => record?.tracking_no || '',
@@ -257,6 +268,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '包装信息',
       exportTitle: '包装信息',
       key: 'package_summary',
+      defaultHidden: true,
       width: 280,
       sortable: false,
       render: (_, record) => packageText(record),
@@ -268,6 +280,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '实际运费',
       exportTitle: '实际运费',
       key: 'freight',
+      defaultHidden: true,
       width: 150,
       sortable: false,
       render: (_, record) => freightText(record),
@@ -288,7 +301,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       defaultPriority: 40,
       title: '出货日期',
       exportTitle: '出货日期',
-      width: 180,
+      width: 140,
       sortValue: (record) => record.shipped_at || record.planned_ship_at,
       sortType: 'date',
       render: (_, record) => (
@@ -303,7 +316,8 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '备注',
       exportTitle: '备注',
       dataIndex: 'note',
-      width: 320,
+      taskDetailOrder: 60,
+      width: 160,
       sortable: false,
     },
   ])

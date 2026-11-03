@@ -1,6 +1,6 @@
 .workflow-business-chain { display: grid; gap: 10px; min-width: 0; margin: 12px 0 16px; }
 .workflow-business-chain__heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.workflow-business-chain__heading .ant-btn { min-height: 44px; }
+.workflow-business-chain__heading > .ant-btn { min-height: 44px; }
 .workflow-business-chain__main { min-width: 0; }
 .workflow-business-chain__group { position: relative; display: flow-root; min-width: 0; }
 .workflow-business-chain__main > .workflow-business-chain__group:not(:last-child)::before { position: absolute; z-index: 1; top: 21px; bottom: -21px; left: 12.5px; width: 1px; background: var(--erp-border); pointer-events: none; content: ''; }

@@ -12,6 +12,7 @@ import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { listInventoryOperations } from '../../api/inventoryApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
 import FilterSelect from '@/common/components/select/FilterSelect'
+import { BusinessDataTable, BusinessOperationPanel } from '../business-list/BusinessListLayout.jsx'
 
 const TYPE_LABELS = Object.freeze({
   CYCLE_COUNT: '库存盘点',
@@ -81,6 +82,7 @@ export default function InventoryOperationRecordsModal({
   refreshKey = 0,
   currentAdminID = 0,
   canCreate = false,
+  onCreate,
   onCancel,
   onSelect,
   onEdit,
@@ -244,53 +246,68 @@ export default function InventoryOperationRecordsModal({
     [actionKey, canCreate, currentAdminID, onEdit, onSelect, runRecordAction]
   )
 
-  const content = (
+  const filters = (
     <>
-      <div className="erp-business-inline-note" role="note">仅草稿可继续编辑，已提交内容只读。</div>
-      <Space wrap style={{ margin: '16px 0' }}>
-        <FilterSelect
-          label="作业类型"
-          placeholder="作业类型"
-          aria-label="作业类型"
-          value={operationType}
-          options={TYPE_OPTIONS}
-          style={{ width: 180 }}
-          onChange={(value) => {
+      <FilterSelect
+        label="作业类型"
+        placeholder="作业类型"
+        aria-label="作业类型"
+        value={operationType}
+        options={TYPE_OPTIONS}
+        style={{ width: 180 }}
+        onChange={(value) => {
             setOperationType(value)
             setPagination((current) => ({ ...current, current: 1 }))
           }}
-        />
-        <FilterSelect
-          label="作业状态"
-          placeholder="作业状态"
-          aria-label="作业状态"
-          value={status}
-          options={STATUS_OPTIONS}
-          style={{ width: 180 }}
-          onChange={(value) => {
+      />
+      <FilterSelect
+        label="作业状态"
+        placeholder="作业状态"
+        aria-label="作业状态"
+        value={status}
+        options={STATUS_OPTIONS}
+        style={{ width: 180 }}
+        onChange={(value) => {
             setStatus(value)
             setPagination((current) => ({ ...current, current: 1 }))
           }}
-        />
-        <Checkbox
-          checked={onlyMine}
-          onChange={(event) => {
+      />
+      <Checkbox
+        checked={onlyMine}
+        onChange={(event) => {
             setOnlyMine(event.target.checked)
             setPagination((current) => ({ ...current, current: 1 }))
           }}
-        >
-          仅看我创建
-        </Checkbox>
-        <Button
-          icon={<ReloadOutlined aria-hidden="true" />}
-          className="erp-action-button"
-          disabled={loading}
-          onClick={loadRecords}
-        >
-          刷新
-        </Button>
-      </Space>
-      <Table
+      >
+        仅看我创建
+      </Checkbox>
+    </>
+  )
+  const refreshAction = (
+    <Button
+      icon={<ReloadOutlined aria-hidden="true" />}
+      className="erp-action-button"
+      disabled={loading}
+      onClick={loadRecords}
+    >
+      刷新
+    </Button>
+  )
+  const note = <span className="erp-business-inline-note" role="note">仅草稿可继续编辑，已提交内容只读。</span>
+  const TableComponent = inline ? BusinessDataTable : Table
+  const content = (
+    <>
+      {inline ? (
+        <BusinessOperationPanel
+          compact
+          viewSwitch={<div className="erp-inventory-operation-filters">{filters}</div>}
+          actions={note}
+          primaryAction={onCreate ? <Button type="primary" onClick={onCreate}>选择库存登记盘点、调拨或调整</Button> : null}
+        />
+      ) : (
+        <>{note}<Space wrap style={{ margin: '16px 0' }}>{filters}{refreshAction}</Space></>
+      )}
+      <TableComponent
         rowKey="id"
         size="small"
         scroll={{ x: 980 }}

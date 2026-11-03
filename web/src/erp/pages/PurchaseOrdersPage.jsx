@@ -17,7 +17,7 @@ import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState.js'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
@@ -153,6 +153,7 @@ import { sourceActionAccess } from '../utils/sourceActionAccess.mjs'
 import SourceActionAccessNotice from '../components/SourceActionAccessNotice.jsx'
 
 export default function PurchaseOrdersPage() {
+  const modal = useModal()
   const outletContext = useBusinessPageContext()
   const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
   const reportBusinessResult = useWorkflowTaskBusinessResult()

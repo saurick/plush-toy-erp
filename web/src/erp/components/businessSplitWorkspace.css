@@ -85,6 +85,18 @@
   overflow: hidden;
 }
 
+.erp-split-layout-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.erp-split-layout-options > label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 @media (max-width: 991px) {
   .erp-split-switcher {
     display: block;

@@ -4,6 +4,28 @@ import React, { act, createElement as h } from 'react'
 import { businessFormHarness } from '../../../../scripts/test/businessFormHarness.mjs'
 import { filterSelectOptions, isEmptyFilterValue } from './filterSelectOptions.mjs'
 
+test('分组单选保留分类语义和勾选标记，自定义图标与字段映射仍生效', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: AppSelect } = await import('./AppSelect.jsx')
+  const props = {
+    open: true,
+    virtual: false,
+    value: 'purchase',
+    fieldNames: { label: 'name', value: 'key', options: 'children' },
+    options: [{ name: '业务单据', children: [{ key: 'purchase', name: '采购订单' }, { key: 'sales', name: '销售订单' }] }],
+  }
+  await harness.render(h(AppSelect, props))
+  const group = document.querySelector('.ant-select-item-group')
+  assert.equal(group.textContent, '业务单据')
+  assert.notEqual(group.getAttribute('role'), 'option')
+  assert.ok(document.querySelector('.ant-select-item-option-selected .ant-select-item-option-state [aria-label="check"]'))
+  assert.equal(document.querySelectorAll('.ant-select-item-option-selected').length, 1)
+  await harness.render(h(AppSelect, { ...props, menuItemSelectedIcon: h('span', { 'data-custom-selected': true }, '当前') }))
+  assert.equal(document.querySelector('[data-custom-selected]')?.textContent, '当前')
+  await harness.render(h(AppSelect, { ...props, menuItemSelectedIcon: null }))
+  assert.equal(document.querySelector('.ant-select-item-option-state [aria-label="check"]'), null)
+})
+
 test('筛选空值按合同处理，保留分组、零、false 与真实业务范围', () => {
   const zero = { value: 0, label: '零' }
   const no = { value: false, label: '否' }

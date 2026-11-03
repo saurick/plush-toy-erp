@@ -25,7 +25,7 @@ import useBusinessListStickyHeader from '../components/business-list/useBusiness
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   applyApprovalSettings,
@@ -267,6 +267,7 @@ export default function ApprovalResponsibilityPanel({
   refreshVersion = 0,
   onDirtyChange,
 }) {
+  const modal = useModal()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState('')

@@ -23,6 +23,7 @@ import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import WorkflowTrackingDrawer from './WorkflowTrackingDrawer.jsx'
 import WorkflowBusinessChain from './WorkflowBusinessChain.jsx'
 import { supportsWorkflowBusinessChain } from '../../utils/workflowBusinessChain.mjs'
+import WorkflowTaskScopeHelp from './WorkflowTaskScopeHelp.jsx'
 
 export default function WorkflowTaskHandlingChain({
   onOpenTracking,
@@ -126,10 +127,13 @@ export default function WorkflowTaskHandlingChain({
       data-process-state={state}
     >
       <div className="workflow-business-chain__heading">
-        {focused && !showOrderChain ? (
-          <span className="workflow-task-detail-flow__label" aria-label="业务流程"><ForkOutlined aria-hidden="true" />{processContext ? getProcessLabel(processContext.process_instance) : model?.processLabel || '本任务处理进度'}</span>
-        ) : <h3 className="erp-task-action-drawer__section-title">{showOrderChain ? '订单全流程' : '本任务处理进度'}</h3>}
-        {canShowOrderChain ? <Button type={focused ? 'link' : 'default'} size="small" onClick={() => setOrderChainTaskID(showOrderChain ? null : task.id)}>{showOrderChain ? '返回本任务' : '查看订单全流程'}{focused ? <ArrowRightOutlined aria-hidden="true" /> : null}</Button> : null}
+        <div className="workflow-task-scope-heading">
+          {focused && !showOrderChain ? (
+            <span className="workflow-task-detail-flow__label" aria-label="业务流程"><ForkOutlined aria-hidden="true" />{processContext ? getProcessLabel(processContext.process_instance) : model?.processLabel || '相关任务进度'}</span>
+          ) : <h3 className="erp-task-action-drawer__section-title">{showOrderChain ? '整单进度' : '相关任务进度'}</h3>}
+          <WorkflowTaskScopeHelp kind="progress" orderView={showOrderChain} />
+        </div>
+        {canShowOrderChain ? <Button type={focused ? 'link' : 'default'} size="small" onClick={() => setOrderChainTaskID(showOrderChain ? null : task.id)}>{showOrderChain ? '返回本任务' : '查看整单进度'}{focused ? <ArrowRightOutlined aria-hidden="true" /> : null}</Button> : null}
       </div>
       {!showOrderChain ? resources : null}
       {showOrderChain ? (
@@ -165,7 +169,7 @@ export default function WorkflowTaskHandlingChain({
               />
               <div className="erp-task-process-footer">
                 <span>{getProcessStatusLabel(processContext.process_instance)} · 发起于 {formatProcessStartedAt(processContext.process_instance.started_at)}</span>
-                <Button size="small" type="link" onClick={onOpenTracking || (() => setTrackingOpen(true))}>流程跟踪</Button>
+                <Button size="small" type="link" onClick={onOpenTracking || (() => setTrackingOpen(true))}>查看此流程详情</Button>
               </div>
               {!onOpenTracking ? <WorkflowTrackingDrawer trackingRef={trackingOpen ? { kind: 'process', id: task.process_instance_id } : null} onClose={() => setTrackingOpen(false)} refreshKey={task.version} closeLabel="返回任务" /> : null}
             </>

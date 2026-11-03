@@ -460,7 +460,7 @@ export function createBusinessDetailsScenarios(deps) {
           )
         },
         verify: async (page) => {
-          if (isReceipt) await page.getByRole('tab', { name: '采购收货', exact: true, selected: true }).waitFor()
+          if (isReceipt) await page.locator('.erp-business-module-view-tabs [role="tab"][aria-selected="true"]').filter({ hasText: '采购收货' }).waitFor()
           else await expectHeading(page, config.heading)
           const row = page
             .getByRole('row')

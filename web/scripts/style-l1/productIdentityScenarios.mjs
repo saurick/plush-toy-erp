@@ -1,7 +1,142 @@
+import { selectWarehouseView } from './warehouseNavigationActions.mjs'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
 import { assertVisibleBusinessFormControlHeight } from './inputControlAssertions.mjs'
+import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { openBusinessTableTool } from './businessTableTools.mjs'
+import { clickERPThemeOption } from './themeAssertions.mjs'
+
+async function assertProductIdentityLayout(page) {
+  const metrics = await page.locator('.ant-table-tbody .erp-product-identity').evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const image = node.querySelector('.erp-task-product-image').getBoundingClientRect()
+      const gallery = node.querySelector('.erp-product-gallery').getBoundingClientRect()
+      const text = node.querySelector('.erp-product-identity__text')
+      const textBox = text.getBoundingClientRect()
+      const content = node.closest('.erp-business-table-copyable-cell__content') || node.closest('td')
+      return {
+        name: text.textContent,
+        gap: textBox.left - image.right,
+        imageOverflow: image.right - gallery.right,
+        textOverflow: text.scrollWidth - text.clientWidth,
+        contentOverflow: textBox.right - content.getBoundingClientRect().right,
+      }
+    })
+  )
+  assert.ok(metrics.length > 0, '应存在可核对的产品图片与名称')
+  for (const metric of metrics) {
+    const detail = JSON.stringify(metric)
+    assert.ok(metric.gap >= 11, `图片与名称应保留 12px 间距，不能遮挡文字: ${detail}`)
+    assert.ok(metric.imageOverflow <= 1, `图片入口应为完整缩略图保留宽度: ${detail}`)
+    assert.ok(metric.textOverflow <= 1 && metric.contentOverflow <= 1, `长名称应在文字区域内换行: ${detail}`)
+  }
+}
+
+function createBOMProductListScenarios({ customerRuntimeEffectiveSession, outputDir }) {
+  return ['list', 'retry', 'no-permission'].map((mode) => ({
+    name: `product-identification-bom-${mode}`,
+    path: '/erp/purchase/material-bom',
+    auth: 'admin',
+    effectiveSession: mode === 'no-permission'
+      ? { ...customerRuntimeEffectiveSession, actions: customerRuntimeEffectiveSession.actions.filter((key) => key !== 'product.read') }
+      : customerRuntimeEffectiveSession,
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
+    beforeNavigate: async (page) => {
+      await installImages(page)
+      const products = [
+        { id: 1, code: 'BOM-P-001', name: '模拟长耳兔可拆卸围巾礼盒与多配件组合款产品', is_active: true },
+        { id: 2, code: 'BOM-P-INACTIVE-WITH-A-LONG-PRODUCT-CODE', name: '模拟停用产品', is_active: false },
+        { id: 4, code: 'BOM-P-004', name: '模拟第二页产品', is_active: true },
+      ]
+      const records = Array.from({ length: 51 }, (_, index) => ({
+        id: 51 - index,
+        product_id: index === 50 ? 4 : index === 2 ? 3 : index === 1 ? 2 : 1,
+        version: `BOM-VIEW-${51 - index}`,
+        status: 'DRAFT',
+      }))
+      page.bomProductProbe = { products, requests: [], details: 0, fail: mode === 'retry' }
+      await page.route('**/rpc/**', async (route) => {
+        const { id, method, params = {} } = route.request().postDataJSON()
+        const reply = (data) => route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data } } })
+        if (method === 'list_bom_versions') return reply(stylePaginatedRpcData(records, 'bom_versions', params))
+        if (method === 'get_bom_version') page.bomProductProbe.details += 1
+        if (method !== 'list_products') return route.fallback()
+        page.bomProductProbe.requests.push(params)
+        if (page.bomProductProbe.fail) {
+          page.bomProductProbe.fail = false
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 50000, message: '关联资料读取失败' } } })
+        }
+        return reply(stylePaginatedRpcData(products, 'products', params))
+      })
+    },
+    verify: async (page) => {
+      const rows = page.locator('.erp-business-data-table-card tr[data-row-key]')
+      const first = rows.filter({ hasText: 'BOM-VIEW-51' })
+      await first.waitFor()
+      if (mode === 'no-permission') {
+        assert.equal(await first.locator('.erp-product-identity__text').innerText(), '产品已关联')
+        assert.equal(page.bomProductProbe.requests.length, 0, '无产品读取权限时不能请求产品资料')
+        assert.equal(page.productImageProbe.requests.length, 0, '无产品读取权限时不能请求产品图片')
+        assert.equal(await first.locator('.erp-product-gallery__trigger').count(), 0)
+        return
+      }
+      if (mode === 'retry') {
+        await page.locator('.ant-message-error').first().waitFor()
+        assert.equal(await first.locator('.erp-product-identity__text').innerText(), '产品已关联')
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+      }
+      const name = page.bomProductProbe.products[0].name
+      await first.getByText(name).waitFor()
+      await rows.filter({ hasText: 'BOM-VIEW-50' }).getByText('模拟停用产品').waitFor()
+      assert.equal(page.bomProductProbe.details, 0, '产品名称不依赖选中记录或打开详情')
+      assert.ok(page.bomProductProbe.requests.every((params) => JSON.stringify(params.ids) === '[1,2,3]' && params.active_only !== true), '首屏只批量读取当前页的去重产品，并保留停用产品')
+      assert.equal(await rows.filter({ hasText: 'BOM-VIEW-49' }).locator('.erp-product-identity__text').innerText(), '产品已关联', '缺失资料不补造产品名称')
+      const geometry = async () => first.locator('.erp-product-identity').evaluate((node) => {
+        const cell = node.closest('td')
+        const image = node.querySelector('.erp-task-product-image').getBoundingClientRect()
+        const text = node.querySelector('.erp-product-identity__text')
+        return { cellWidth: cell.getBoundingClientRect().width, width: image.width, height: image.height, overflow: text.scrollWidth - text.clientWidth }
+      })
+      const wide = await geometry()
+      assert.deepEqual([wide.width, wide.height], [64, 64])
+      assert.ok(wide.cellWidth >= 200 && wide.cellWidth <= 305, `产品列应收紧到约 300px: ${JSON.stringify(wide)}`)
+      assert.ok(wide.overflow <= 1, '长产品名称应完整换行')
+      const preview = first.getByRole('button', { name: `查看${name}大图`, exact: true })
+      await preview.click()
+      await page.locator('.erp-task-image-preview__stage img').waitFor()
+      await closeImage(page)
+      assert.equal(await page.locator('.ant-table-row-selected').count(), 0)
+      assert.equal(await preview.evaluate((node) => node === document.activeElement), true)
+      if (mode === 'retry') return
+      await page.screenshot({ path: path.join(outputDir, 'bom-product-list-4k.png'), animations: 'disabled' })
+      await page.locator('.ant-pagination-item-2').click()
+      await rows.filter({ hasText: 'BOM-VIEW-1' }).getByText('模拟第二页产品').waitFor()
+      assert.deepEqual(page.bomProductProbe.requests.at(-1).ids, [4], '翻页只补读该页产品')
+      await page.locator('.ant-pagination-item-1').click()
+      await first.getByText(name).waitFor()
+      page.bomProductProbe.products[0].name = '模拟刷新后的长耳兔'
+      await page.getByRole('button', { name: '刷新当前页' }).click()
+      await first.getByText('模拟刷新后的长耳兔').waitFor()
+      assert.equal(await first.getByText(name).count(), 0, '刷新不能残留旧名称')
+      const download = page.waitForEvent('download')
+      await openBusinessTableTool(page, '导出筛选结果')
+      const csv = await readFile(await (await download).path(), 'utf8')
+      assert.ok(csv.includes('模拟刷新后的长耳兔') && csv.includes('模拟第二页产品') && csv.includes('模拟停用产品'), '完整筛选导出包含未访问页与停用产品的真实名称')
+      assert.deepEqual(page.bomProductProbe.requests.at(-1).ids, [1, 2, 3, 4])
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await clickERPThemeOption(page, '暗色')
+      const narrow = await geometry()
+      assert.deepEqual([narrow.width, narrow.height], [64, 64])
+      assert.ok(narrow.overflow <= 1)
+      await page.screenshot({ path: path.join(outputDir, 'bom-product-list-dark.png'), animations: 'disabled' })
+      await page.setViewportSize({ width: 520, height: 900 })
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), '窄屏只在表格内横向滚动')
+    },
+  }))
+}
 
 async function installImages(page) {
   const image = await page.evaluate(() => {
@@ -110,6 +245,7 @@ export function createProductIdentityScenarios({
   outputDir,
 }) {
   return [
+    ...createBOMProductListScenarios({ customerRuntimeEffectiveSession, outputDir }),
     {
       name: 'product-identification-catalog',
       path: '/erp/master/products',
@@ -140,7 +276,7 @@ export function createProductIdentityScenarios({
       },
       verify: async (page) => {
         const row = page
-          .locator('.ant-table-tbody tr')
+          .locator('.ant-table-tbody tr[data-row-key]')
           .filter({ hasText: 'PRODUCT-1' })
           .first()
         const button = row.getByRole('button', {
@@ -148,6 +284,7 @@ export function createProductIdentityScenarios({
           exact: true,
         })
         await button.waitFor()
+        await assertProductIdentityLayout(page)
         const initialURL = page.url()
         assert.equal(
           page.productImageProbe.requests.some(
@@ -182,20 +319,20 @@ export function createProductIdentityScenarios({
             .every((r) => r.params.product_ids.length <= 80)
         )
         const empty = page
-          .locator('.ant-table-tbody tr')
+          .locator('.ant-table-tbody tr[data-row-key]')
           .filter({ hasText: '识图产品 2' })
           .first()
         assert.equal(
           await empty.locator('.erp-task-product-image img').count(),
           0
         )
-        const geometry = await row
+        const geometry = await button
           .locator('.erp-task-product-image')
           .evaluate((node) => ({
             width: node.getBoundingClientRect().width,
             height: node.getBoundingClientRect().height,
           }))
-        assert.deepEqual(geometry, { width: 56, height: 56 })
+        assert.deepEqual(geometry, { width: 64, height: 64 })
         await page.screenshot({
           path: path.join(
             outputDir,
@@ -257,8 +394,12 @@ export function createProductIdentityScenarios({
         )
         await option.click()
         const preview = modal
-          .locator('.erp-product-identity .erp-product-gallery__trigger')
+          .locator('.erp-product-field-control .erp-product-gallery__trigger')
           .first()
+        assert.deepEqual(await preview.locator('.erp-task-product-image').evaluate((node) => ({
+          width: node.getBoundingClientRect().width,
+          height: node.getBoundingClientRect().height,
+        })), { width: 48, height: 48 }, '表单产品控件保留紧凑尺寸')
         await preview.click()
         await closeImage(page)
         await modal.screenshot({
@@ -274,7 +415,7 @@ export function createProductIdentityScenarios({
           .hover()
         await modal.locator('.ant-select-clear').first().click()
         assert.equal(
-          await modal.locator('.erp-product-identity').count(),
+          await modal.locator('.erp-product-field-control .erp-task-product-image').count(),
           0,
           'clearing association removes the old image'
         )
@@ -288,18 +429,39 @@ export function createProductIdentityScenarios({
       path: '/erp/warehouse/inventory',
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
-      viewport: { width: 1440, height: 1000 },
-      beforeNavigate: installImages,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await installImages(page)
+        await page.route('**/rpc/masterdata', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_products') return route.fallback()
+          const products = [{
+            id: 1,
+            code: 'PRODUCT-OVERLAP-LONG-CODE-001',
+            name: '模拟长耳兔可拆卸围巾礼盒与多配件组合款产品',
+            default_unit_id: 1,
+            is_active: true,
+          }]
+          return route.fulfill({ json: {
+            jsonrpc: '2.0', id,
+            result: { code: 0, data: stylePaginatedRpcData(products, 'products', params) },
+          } })
+        })
+      },
       verify: async (page) => {
         for (const tab of [null, '库存批次', '库存变动记录']) {
           if (tab) {
-            await page.getByRole('tab', { name: tab, exact: true }).click()
+            await selectWarehouseView(page, tab)
           }
           const button = page
             .locator('.ant-table-tbody .erp-product-identity button')
             .first()
+          await button.waitFor()
+          await assertProductIdentityLayout(page)
           await button.click()
           await closeImage(page)
+          await assertProductIdentityLayout(page)
           assert.equal(await page.locator('.ant-table-row-selected').count(), 0)
           if (tab === '库存批次') {
             const material = page
@@ -319,6 +481,10 @@ export function createProductIdentityScenarios({
             'product-identification-inventory-desktop.png'
           ),
         })
+        await page.setViewportSize({ width: 960, height: 900 })
+        await assertProductIdentityLayout(page)
+        await clickERPThemeOption(page, '暗色')
+        await assertProductIdentityLayout(page)
       },
     },
     ...[

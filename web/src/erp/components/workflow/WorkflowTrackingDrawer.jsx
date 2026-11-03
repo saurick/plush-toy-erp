@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { LeftOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Drawer, Space, Spin, Tag, Timeline } from 'antd'
+import { Alert, Button, Space, Spin, Tag, Timeline } from 'antd'
+import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Tag } from 'antd'
+import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
 import { InventoryLotStatus } from '../../../common/consts/statuses.generated.mjs'
 import { materialStockCategoryLabel } from '../../utils/warehouseClassification.mjs'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
@@ -8,6 +9,7 @@ import {
   formatUnixDateTime,
 } from '../../utils/masterDataOrderView.mjs'
 import { businessSourceRouteFor } from '../../utils/businessSourceNavigation.mjs'
+import { INVENTORY_VIEWS } from '../../utils/warehouseViews.mjs'
 
 export const VIEW_BALANCES = 'balances'
 
@@ -15,17 +17,7 @@ export const VIEW_LOTS = 'lots'
 
 export const VIEW_TXNS = 'txns'
 
-export const VIEW_ITEMS = [
-  { key: VIEW_BALANCES, label: '库存余额', children: null },
-  { key: VIEW_LOTS, label: '库存批次', children: null },
-  { key: VIEW_TXNS, label: '库存变动记录', children: null },
-]
-
-export const VIEW_LABELS = Object.freeze({
-  [VIEW_BALANCES]: '库存余额',
-  [VIEW_LOTS]: '库存批次',
-  [VIEW_TXNS]: '库存变动记录',
-})
+export const VIEW_LABELS = Object.freeze(Object.fromEntries(INVENTORY_VIEWS.map(({ key, label }) => [key, label])))
 
 export const SUBJECT_TYPE_OPTIONS = [
   { label: '全部存货类型', value: '' },
@@ -263,7 +255,7 @@ export function createInventoryLedgerColumns({
         title: '存货类型',
         exportTitle: '存货类型',
         dataIndex: 'subject_type',
-        width: 110,
+        width: 100,
         render: (value, record) =>
           value === 'MATERIAL'
             ? materialStockCategoryLabel(record.stock_category)
@@ -283,7 +275,7 @@ export function createInventoryLedgerColumns({
           resolveValue: (_value, record) =>
             renderSubjectReference(record?.subject_id, record),
         },
-        width: 300,
+        width: 260,
         className: 'erp-product-identity-cell',
         render: renderSubjectIdentity,
         detailValue: (record) =>
@@ -301,7 +293,7 @@ export function createInventoryLedgerColumns({
           resolveValue: (_value, record) =>
             renderProductSKUReference(record?.product_sku_id, record),
         },
-        width: 220,
+        width: 160,
         render: renderProductSKUReference,
         exportValue: (record) =>
           record?.subject_type === 'PRODUCT' ? renderProductSKUReference(record?.product_sku_id, record) : '',
@@ -311,7 +303,7 @@ export function createInventoryLedgerColumns({
         dataIndex: 'supplier_lot_no',
         copyable: { label: '供应商批次' },
         detailCopyable: true,
-        width: 150,
+        width: 140,
         render: dash,
       },
       {
@@ -365,6 +357,7 @@ export function createInventoryLedgerColumns({
         defaultPriority: 150,
         title: '变动记录',
         dataIndex: 'id',
+        defaultHidden: true,
         width: 130,
         render: (value) => (value ? '已记录' : '-'),
         exportValue: (record) => (record?.id ? '已记录' : ''),
@@ -383,7 +376,7 @@ export function createInventoryLedgerColumns({
         title: '方向',
         exportTitle: '方向',
         dataIndex: 'direction',
-        width: 100,
+        width: 90,
         render: directionTag,
         exportValue: (record) => directionText(record?.direction),
       },
@@ -392,6 +385,7 @@ export function createInventoryLedgerColumns({
         title: '存货类型',
         exportTitle: '存货类型',
         dataIndex: 'subject_type',
+        defaultHidden: true,
         width: 110,
         render: (value, record) =>
           value === 'MATERIAL'
@@ -412,7 +406,7 @@ export function createInventoryLedgerColumns({
           resolveValue: (_value, record) =>
             renderSubjectReference(record?.subject_id, record),
         },
-        width: 300,
+        width: 240,
         className: 'erp-product-identity-cell',
         render: renderSubjectIdentity,
         detailValue: (record) =>
@@ -430,7 +424,7 @@ export function createInventoryLedgerColumns({
           resolveValue: (_value, record) =>
             renderProductSKUReference(record?.product_sku_id, record),
         },
-        width: 220,
+        width: 140,
         render: renderProductSKUReference,
         exportValue: (record) =>
           record?.subject_type === 'PRODUCT' ? renderProductSKUReference(record?.product_sku_id, record) : '',
@@ -444,7 +438,7 @@ export function createInventoryLedgerColumns({
           resolveValue: (_value, record) =>
             renderWarehouseReference(record?.warehouse_id),
         },
-        width: 180,
+        width: 110,
         render: renderWarehouseReference,
         exportValue: (record) => Number(record?.warehouse_id) > 0 ? renderWarehouseReference(record?.warehouse_id) : '',
       },
@@ -457,7 +451,7 @@ export function createInventoryLedgerColumns({
           resolveValue: (_value, record) => renderLotReference(record?.lot_id),
         },
         detailCopyable: true,
-        width: 180,
+        width: 140,
         render: renderLotReference,
         exportValue: (record) => Number(record?.lot_id) > 0 ? renderLotReference(record?.lot_id) : '',
       },
@@ -467,7 +461,7 @@ export function createInventoryLedgerColumns({
         title: '数量',
         exportTitle: '数量',
         dataIndex: 'quantity',
-        width: 120,
+        width: 110,
         render: formatQuantity,
         exportValue: (record) => (record?.quantity ?? ''),
       },
@@ -475,7 +469,7 @@ export function createInventoryLedgerColumns({
         defaultPriority: 60,
         title: '单位',
         dataIndex: 'unit_id',
-        width: 130,
+        width: 90,
         render: renderUnitReference,
         exportValue: (record) => Number(record?.unit_id) > 0 ? renderUnitReference(record?.unit_id) : '',
       },
@@ -485,6 +479,7 @@ export function createInventoryLedgerColumns({
         title: '来源',
         exportTitle: '来源',
         key: 'source_type_label',
+        defaultHidden: true,
         width: 170,
         render: (_, record) => sourceTypeText(record?.source_type) || '-',
         exportValue: (record) => sourceTypeText(record?.source_type),
@@ -500,14 +495,20 @@ export function createInventoryLedgerColumns({
             record?.source_no || '',
         },
         detailCopyable: true,
-        width: 120,
-        render: (_, record) => formatSourceDocumentRef(record),
+        width: 180,
+        render: (_, record) => (
+          <BusinessCellStack
+            primary={formatSourceDocumentRef(record)}
+            secondary={sourceTypeText(record?.source_type)}
+          />
+        ),
         exportValue: (record) => formatSourceDocumentRef(record, { emptyText: '' }),
       },
       {
         defaultPriority: 130,
         title: '来源明细',
         dataIndex: 'source_line_id',
+        defaultHidden: true,
         width: 130,
         render: (value) => relationRef('来源明细', value),
         exportValue: (record) =>
@@ -517,6 +518,7 @@ export function createInventoryLedgerColumns({
         defaultPriority: 140,
         title: '原库存变动记录',
         dataIndex: 'reversal_of_txn_id',
+        defaultHidden: true,
         width: 130,
         render: (value) => relationRef('原库存变动记录', value),
         exportValue: (record) =>
@@ -527,11 +529,11 @@ export function createInventoryLedgerColumns({
         title: '发生时间',
         exportTitle: '发生时间',
         dataIndex: 'occurred_at',
-        width: 170,
+        width: 150,
         render: formatUnixDateTime,
         exportValue: (record) => formatUnixDateTime(record?.occurred_at, { emptyText: '' }),
       },
-      { align: 'left', title: '备注', dataIndex: 'note', width: 300 },
+      { align: 'left', title: '备注', dataIndex: 'note', width: 170 },
     ]
   }
 
@@ -541,6 +543,7 @@ export function createInventoryLedgerColumns({
       defaultPriority: 90,
       title: '库存项',
       dataIndex: 'id',
+      defaultHidden: true,
       width: 130,
       render: (value) => (value ? '已登记库存' : '-'),
       exportValue: (record) => (record?.id ? '已登记库存' : ''),
@@ -550,6 +553,7 @@ export function createInventoryLedgerColumns({
       title: '存货类型',
       exportTitle: '存货类型',
       dataIndex: 'subject_type',
+      defaultHidden: true,
       width: 110,
       render: (value, record) =>
         value === 'MATERIAL'
@@ -570,7 +574,7 @@ export function createInventoryLedgerColumns({
         resolveValue: (_value, record) =>
           renderSubjectReference(record?.subject_id, record),
       },
-      width: 300,
+      width: 240,
       className: 'erp-product-identity-cell',
       render: renderSubjectIdentity,
       detailValue: (record) => renderSubjectIdentity(record.subject_id, record),
@@ -587,7 +591,7 @@ export function createInventoryLedgerColumns({
         resolveValue: (_value, record) =>
           renderProductSKUReference(record?.product_sku_id, record),
       },
-      width: 220,
+      width: 140,
       render: renderProductSKUReference,
       exportValue: (record) =>
         record?.subject_type === 'PRODUCT' ? renderProductSKUReference(record?.product_sku_id, record) : '',
@@ -601,7 +605,7 @@ export function createInventoryLedgerColumns({
         resolveValue: (_value, record) =>
           renderWarehouseReference(record?.warehouse_id),
       },
-      width: 180,
+      width: 120,
       render: renderWarehouseReference,
       exportValue: (record) => Number(record?.warehouse_id) > 0 ? renderWarehouseReference(record?.warehouse_id) : '',
     },
@@ -614,7 +618,7 @@ export function createInventoryLedgerColumns({
         resolveValue: (_value, record) => renderLotReference(record?.lot_id),
       },
       detailCopyable: true,
-      width: 180,
+      width: 140,
       render: renderLotReference,
       exportValue: (record) => Number(record?.lot_id) > 0 ? renderLotReference(record?.lot_id) : '',
     },
@@ -622,7 +626,7 @@ export function createInventoryLedgerColumns({
       defaultPriority: 45,
       title: '单位',
       dataIndex: 'unit_id',
-      width: 130,
+      width: 90,
       render: renderUnitReference,
       exportValue: (record) => Number(record?.unit_id) > 0 ? renderUnitReference(record?.unit_id) : '',
     },
@@ -632,7 +636,7 @@ export function createInventoryLedgerColumns({
       title: '账面数量',
       exportTitle: '账面数量',
       dataIndex: 'quantity',
-      width: 130,
+      width: 110,
       render: formatQuantity,
       exportValue: (record) => (record?.quantity ?? ''),
     },
@@ -642,7 +646,7 @@ export function createInventoryLedgerColumns({
       title: '已预留',
       exportTitle: '已预留',
       dataIndex: 'active_reserved_quantity',
-      width: 130,
+      width: 100,
       render: formatQuantity,
       exportValue: (record) => (record?.active_reserved_quantity ?? ''),
     },
@@ -658,7 +662,7 @@ export function createInventoryLedgerColumns({
       ),
       exportTitle: '未预留数量',
       dataIndex: 'available_quantity',
-      width: 130,
+      width: 120,
       render: formatQuantity,
       exportValue: (record) => (record?.available_quantity ?? ''),
     },
@@ -666,7 +670,7 @@ export function createInventoryLedgerColumns({
       title: '材料可领用',
 exportTitle: '材料可领用',
 dataIndex: 'issuable_quantity',
-width: 130,
+width: 110,
 align: 'right',
 defaultPriority: 40,
       render: (value, record) => record.subject_type === 'MATERIAL' ? formatQuantity(value) : '—',
@@ -676,7 +680,7 @@ defaultPriority: 40,
       title: <BusinessHelpLabel label="受限库存" description="暂扣、不合格或停用批次的账面库存，仍计入结存；不能普通领用或出货。" />,
       exportTitle: '受限库存',
 dataIndex: 'restricted_quantity',
-width: 130,
+width: 120,
 align: 'right',
 defaultPriority: 45,
       render: formatQuantity,
@@ -690,7 +694,7 @@ exportValue: (record) => record.restricted_quantity ?? '',
       title,
       exportTitle: title,
       dataIndex: key,
-      width: 130,
+      width: key === 'pending_packaging_quantity' ? 130 : 110,
       align: 'right',
       defaultPriority: 45,
       render: (value, record) =>

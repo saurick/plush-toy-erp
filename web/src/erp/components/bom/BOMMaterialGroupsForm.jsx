@@ -5,7 +5,8 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Button, Form, Input, Space } from 'antd'
+import { Button, Form, Input, Popconfirm } from 'antd'
+import { CloseOutlined } from '@ant-design/icons'
 import useBusinessLineItemGroups from '../business-list/useBusinessLineItemGroups.js'
 import BusinessLineItemGroupControls from '../business-list/BusinessLineItemGroupControls.jsx'
 import { BusinessLineItemGroupHeading } from '../business-list/BusinessLineItemsTable.jsx'
@@ -20,7 +21,7 @@ import BOMMaterialCreateModal from './BOMMaterialCreateModal.jsx'
 import BOMMaterialSelect from './BOMMaterialSelect.jsx'
 import { bomMaterialConflictText, buildBOMMaterialCreateDefaults, readBOMMaterialSource } from '../../utils/bomMaterialMatching.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
-import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
+import BusinessLineItemsFooter, { BusinessLineItemsHeader } from '../business-list/BusinessLineItemsFooter.jsx'
 import '../business-list/businessLineItemGroups.css'
 import '../business-list/businessFormSections.css'
 import {
@@ -167,6 +168,62 @@ function BOMImportRowStatus({ index }) {
   )
 }
 
+// 选择跟随当前 Form.List 的生命周期；重置或换单后不保留旧操作对象。
+function BOMSelectionScope({ children }) {
+  const [selection, setSelection] = useState(null)
+  return children({ selection, setSelection })
+}
+
+function BOMSelectionActions({ selection, target, onClear, onCopy, onRemovePart, onAddPart, onRemoveMaterial, limitReached }) {
+  useLayoutEffect(() => {
+    if (selection && !target) onClear()
+  }, [selection, target, onClear])
+  const materialSelected = target?.type === 'material'
+  return (
+    <div className="erp-bom-selection-actions" role="group" aria-label="BOM 选中对象操作">
+      <Form.Item noStyle shouldUpdate={(previous, current) => previous.items?.[target?.index]?.position !== current.items?.[target?.index]?.position}>
+        {({ getFieldValue }) => (
+          <span className="erp-bom-selection-actions__identity" role="status">
+            {target ? materialSelected
+              ? `物料：${target.name} · ${target.group.indexes.length} 个部位`
+              : `部位：${target.name} · ${getFieldValue(['items', target.index, 'position']) || `第 ${target.index + 1} 个部位`}`
+              : '点击物料或部位后操作'}
+          </span>
+        )}
+      </Form.Item>
+      {target ? <Button type="text" size="middle" aria-label="清空 BOM 选择" icon={<CloseOutlined />} onClick={onClear} /> : null}
+      {materialSelected ? (
+        <React.Fragment key={`material:${target.key}:${target.group.key}`}>
+          <Button size="middle" disabled={limitReached} onClick={onAddPart}>添加部位</Button>
+          <Popconfirm
+            title="移除这组物料？"
+            description={`将从当前 BOM 移除 ${target.name} 及其 ${target.group.indexes.length} 个部位。`}
+            okText="移除整组"
+            cancelText="保留"
+            okButtonProps={{ danger: true }}
+            onConfirm={onRemoveMaterial}
+          >
+            <Button size="middle" type="text" danger>移除物料</Button>
+          </Popconfirm>
+        </React.Fragment>
+      ) : (
+        <React.Fragment key={`part:${target?.key ?? 'none'}`}>
+          <Button size="middle" disabled={!target || limitReached} onClick={onCopy}>复制部位</Button>
+          <Button
+            size="middle"
+            type="text"
+            danger
+            disabled={!target || target.group.indexes.length === 1}
+            title={target?.group.indexes.length === 1 ? '仅剩一个部位，请选择物料后移除整组' : undefined}
+            onClick={onRemovePart}
+          >移除部位
+          </Button>
+        </React.Fragment>
+      )}
+    </div>
+  )
+}
+
 export default function BOMMaterialGroupsForm({
   canEdit,
   canCreateMaterial,
@@ -198,17 +255,28 @@ export default function BOMMaterialGroupsForm({
   const [creatingFor, setCreatingFor] = useState(null)
   const [focusRequest, setFocusRequest] = useState(null)
   const rowRefs = useRef(new Map())
+  const materialRefs = useRef(new Map())
   const materialGroupSequence = useRef(0)
+  const referenceFocusIndex = focusRequest && (focusRequest.material || focusRequest.unit)
+    ? groups.find((group) => group.indexes.includes(focusRequest.index))?.indexes[0]
+    : undefined
 
   useLayoutEffect(() => {
     if (!focusRequest) return
     const row = rowRefs.current.get(focusRequest.index)
-    const selector = focusRequest.material
-      ? 'input[role="combobox"]'
+    const selector = focusRequest.unit
+      ? 'input[aria-label^="单位 "]'
+      : focusRequest.material
+      ? 'input[aria-label^="物料名称 "]'
       : `textarea[aria-label="部位 ${focusRequest.index + 1}"]`
-    row?.querySelector(selector)?.focus({ preventScroll: true })
-    requestLineItemScroll?.(focusRequest.index)
-  }, [focusRequest, items.length, requestLineItemScroll])
+    const reference = focusRequest.material || focusRequest.unit
+    const target = reference ? materialRefs.current.get(referenceFocusIndex)?.parentElement : row
+    const input = target?.querySelector(selector)
+    input?.focus({ preventScroll: true })
+    if (reference) input?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    else requestLineItemScroll?.(focusRequest.index)
+    if (input) setFocusRequest(null)
+  }, [focusRequest, referenceFocusIndex, items.length, requestLineItemScroll])
 
   const updateMaterialGroup = (indexes, changes = {}) => {
     onItemsChange?.()
@@ -274,22 +342,76 @@ export default function BOMMaterialGroupsForm({
   }
 
   return (
-    <section className="erp-bom-material-groups" aria-label="材料分析明细表" ref={disclosure.rootRef} onFocusCapture={disclosure.onFocusCapture}>
-      <div className="erp-business-form-heading erp-bom-material-groups__heading">
-        <h2>材料分析明细表</h2>
-        {actions || (canEdit ? <span>Tab 换格 · 支持粘贴部位数据</span> : null)}
-      </div>
-      {notice}
-      {groups.length > 1 ? <BusinessLineItemGroupControls controller={disclosure} form={form} label="材料分析明细表" groupCount={groups.length} /> : null}
+    <section className="erp-bom-material-groups" data-table-scroll-scope aria-label="材料分析明细表" ref={disclosure.rootRef} onFocusCapture={disclosure.onFocusCapture}>
       <Form.List name="items">
         {(fields, { add, remove }) => (
-          <>
-            {fields.length === 0 ? (
-              <BusinessLineItemsEmpty>
-                先添加一种物料，再填写它的部位和用量
-              </BusinessLineItemsEmpty>
+          <BOMSelectionScope>{({ selection, setSelection }) => {
+          const selectedIndex = fields.findIndex((field) => field.key === selection?.key)
+          const selectedGroup = groups.find((group) => group.indexes.includes(selectedIndex))
+          const selectedVisible = selectedGroup && !(groups.length > 1 && disclosure.isCollapsed(selectedGroup.key))
+          const target = selection && selectedVisible ? {
+            ...selection,
+            index: selectedIndex,
+            group: selectedGroup,
+            name: materialByID.get(Number(selectedGroup.materialID))?.name || readBOMMaterialSource(items[selectedIndex])?.materialName || '待选物料',
+          } : null
+          const clearSelection = (event) => {
+            setSelection(null)
+            if (!event || !target) return
+            rowRefs.current.get(target.index)?.focus({ preventScroll: true })
+          }
+          const removeSelected = (indexes) => {
+            clearSelection()
+            remove(indexes)
+          }
+          return (
+            <>
+              <BusinessLineItemsHeader
+                title="材料分析明细表"
+                groupCount={groups.length > 1 ? groups.length : undefined}
+                groupActions={groups.length > 1 ? <BusinessLineItemGroupControls controller={disclosure} form={form} label="材料分析明细表" /> : null}
+                notice={notice}
+                scrollControls
+              >
+                {canEdit ? <BOMSelectionActions
+                  selection={selection}
+                  target={target}
+                  onClear={clearSelection}
+                  limitReached={fields.length >= MAX_PARTS}
+                  onCopy={() => {
+            if (!target || target.type !== 'part') return
+            const copy = { ...updateMaterialGroup(target.group.indexes)[target.index] }
+            delete copy.id
+            delete copy._import_source
+            delete copy.source_snapshot
+            delete copy.total_usage_snapshot
+            add(copy, target.index + 1)
+            setFocusRequest({ index: target.index + 1 })
+          }}
+                  onRemovePart={() => {
+            if (target?.type === 'part' && target.group.indexes.length > 1) removeSelected(target.index)
+          }}
+                  onAddPart={() => {
+            if (target?.type !== 'material') return
+            const nextIndex = target.group.indexes.at(-1) + 1
+            const source = updateMaterialGroup(target.group.indexes)[target.group.indexes[0]]
+            add(blankPart(source), nextIndex)
+            setFocusRequest({ index: nextIndex })
+          }}
+                  onRemoveMaterial={() => {
+            if (target?.type === 'material') removeSelected(target.group.indexes)
+          }}
+                /> : null}
+                {actions || (canEdit ? <span className="erp-line-items-form__head-description">Tab 换格 · 支持粘贴部位数据</span> : null)}
+              </BusinessLineItemsHeader>
+              {fields.length === 0 ? (
+                <BusinessLineItemsEmpty>
+                  先添加一种物料，再填写它的部位和用量
+                </BusinessLineItemsEmpty>
             ) : (
               <TableScrollRegion
+                useToolbar
+                stickyHeader
                 className="erp-bom-parts-scroll"
                 role="region"
                 aria-label="物料和部位明细"
@@ -309,7 +431,6 @@ export default function BOMMaterialGroupsForm({
                     <col className="erp-bom-col-process" />
                     <col className="erp-bom-col-process" />
                     <col className="erp-bom-col-note" />
-                    {canEdit ? <col className="erp-bom-col-actions" /> : null}
                   </colgroup>
                   <thead>
                     <tr>
@@ -331,11 +452,6 @@ export default function BOMMaterialGroupsForm({
                           {label}
                         </th>
                       ))}
-                      {canEdit ? (
-                        <th scope="col" className="erp-bom-part-actions">
-                          操作
-                        </th>
-                      ) : null}
                     </tr>
                   </thead>
                   {groups.map((group) => {
@@ -358,7 +474,7 @@ export default function BOMMaterialGroupsForm({
                       <React.Fragment key={field.key}>
                         {groups.length > 1 ? (
                           <BusinessLineItemGroupHeading
-                            columnCount={canEdit ? 13 : 12}
+                            columnCount={12}
                             collapsed={collapsed}
                             onToggle={() => disclosure.toggle(group.key)}
                             label={materialName}
@@ -375,16 +491,38 @@ export default function BOMMaterialGroupsForm({
                           hidden={collapsed}
                           data-line-item-collapsed={collapsed ? 'true' : undefined}
                           className="erp-bom-material-group erp-editable-line-group"
+                          data-bom-material-selected={target?.type === 'material' && target.group.key === group.key ? 'true' : undefined}
                           aria-label={`${material?.name || importSource?.materialName || '待选物料'}的部位`}
                         >
                           {group.indexes.map((itemIndex, partIndex) => {
                           const partField = fields[itemIndex]
                           const source = items[itemIndex]?._import_source
+                          const selectObject = (event) => {
+                            if (!canEdit || !event.currentTarget.contains(event.target)) return
+                            const materialCell = event.target.closest?.('.erp-bom-material-cell')
+                            setSelection({ type: materialCell ? 'material' : 'part', key: materialCell ? field.key : partField.key })
+                          }
+                          const selectionProps = canEdit ? {
+                            tabIndex: -1,
+                            'aria-current': target?.type === 'part' && target.key === partField.key ? 'true' : undefined,
+                            onClick: selectObject,
+                            onFocusCapture: (event) => {
+                              if (event.target !== event.currentTarget) selectObject(event)
+                            },
+                            onKeyDown: (event) => {
+                              if (event.target === event.currentTarget && ['Enter', ' '].includes(event.key)) {
+                                event.preventDefault()
+                                selectObject(event)
+                              }
+                            },
+                          } : {}
                           return (
                             <tr
                               key={partField.key}
                               data-bom-part-index={itemIndex}
                               data-line-item-index={itemIndex}
+                              data-bom-part-selected={target?.type === 'part' && target.key === partField.key ? 'true' : undefined}
+                              {...selectionProps}
                               ref={(node) => {
                                 if (node) rowRefs.current.set(itemIndex, node)
                                 else rowRefs.current.delete(itemIndex)
@@ -396,6 +534,10 @@ export default function BOMMaterialGroupsForm({
                                   <td
                                     rowSpan={rowSpan}
                                     className="erp-bom-material-cell"
+                                    ref={(node) => {
+                                      if (node) materialRefs.current.set(index, node)
+                                      else materialRefs.current.delete(index)
+                                    }}
                                   >
                                     {!material && importSource ? (
                                       <div>
@@ -500,6 +642,7 @@ export default function BOMMaterialGroupsForm({
                                             }
                                           })
                                           form.setFieldsValue({ items: next })
+                                          setFocusRequest({ index, unit: true })
                                         }}
                                       />
                                     </Form.Item>
@@ -644,72 +787,13 @@ export default function BOMMaterialGroupsForm({
                                   </td>
                                 </React.Fragment>
                               ))}
-                              {canEdit ? (
-                                <td className="erp-bom-part-actions">
-                                  <Button
-                                    size="small"
-                                    className="erp-line-items-form__add-button"
-                                    disabled={fields.length >= MAX_PARTS}
-                                    onClick={() => {
-                                      const copy = {
-                                        ...updateMaterialGroup(group.indexes)[
-                                          itemIndex
-                                        ],
-                                      }
-                                      delete copy.id
-                                      delete copy._import_source
-                                      delete copy.source_snapshot
-                                      delete copy.total_usage_snapshot
-                                      add(copy, itemIndex + 1)
-                                      setFocusRequest({ index: itemIndex + 1 })
-                                    }}
-                                  >
-                                    复制
-                                  </Button>
-                                  <Button
-                                    type="link"
-                                    size="small"
-                                    danger
-                                    disabled={group.indexes.length === 1}
-                                    onClick={() => remove(itemIndex)}
-                                  >
-                                    移除
-                                  </Button>
-                                </td>
-                              ) : null}
+
                             </tr>
                           )
                         })}
                           <tr className="erp-bom-material-group__summary">
-                            <td colSpan={canEdit ? 9 : 8}>
+                            <td colSpan={8}>
                               <div className="erp-bom-material-group__footer">
-                                {canEdit ? (
-                                  <Space size={8}>
-                                    <Button
-                                      size="small"
-                                      className="erp-line-items-form__add-button"
-                                      disabled={fields.length >= MAX_PARTS}
-                                      onClick={() => {
-                                      const nextIndex = group.indexes.at(-1) + 1
-                                      const source = updateMaterialGroup(
-                                        group.indexes
-                                      )[index]
-                                      add(blankPart(source), nextIndex)
-                                      setFocusRequest({ index: nextIndex })
-                                    }}
-                                    >
-                                      ＋ 添加部位
-                                    </Button>
-                                    <Button
-                                      type="text"
-                                      size="small"
-                                      danger
-                                      onClick={() => remove(group.indexes)}
-                                    >
-                                      移除物料
-                                    </Button>
-                                  </Space>
-                              ) : null}
                                 <BOMMaterialTotals
                                   indexes={group.indexes}
                                   unit={unit}
@@ -724,10 +808,10 @@ export default function BOMMaterialGroupsForm({
                 </table>
               </TableScrollRegion>
             )}
-            <BusinessLineItemsFooter
-              addLabel="添加物料"
-              addDisabled={fields.length >= MAX_PARTS}
-              onAdd={
+              <BusinessLineItemsFooter
+                addLabel="添加物料"
+                addDisabled={fields.length >= MAX_PARTS}
+                onAdd={
                 canEdit
                   ? () => {
                       add(blankPart())
@@ -735,12 +819,15 @@ export default function BOMMaterialGroupsForm({
                     }
                   : undefined
               }
-              stats={[
+                stats={[
                 { key: 'materials', value: groups.length, suffix: '种物料' },
                 { key: 'parts', value: fields.length, suffix: '个部位' },
               ]}
-            />
-          </>
+              />
+            </>
+          )
+        }}
+          </BOMSelectionScope>
         )}
       </Form.List>
       <BOMMaterialCreateModal

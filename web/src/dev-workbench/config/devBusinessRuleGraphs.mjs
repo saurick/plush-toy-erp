@@ -68,3 +68,28 @@ export function buildFactRuleGraph(fact) {
     ],
   }
 }
+
+export function buildActionRelationGraph(action) {
+  return {
+    direction: 'LR',
+    nodes: [
+      { key: 'input', label: '上游输入', summary: action.input },
+      { key: 'action', label: action.label, summary: action.condition },
+      { key: 'result', label: '下游结果', summary: action.result },
+    ],
+    edges: [
+      {
+        from: 'input',
+        to: 'action',
+        label: '输入与条件',
+        condition: [action.input, action.condition].filter(Boolean).join('；'),
+      },
+      {
+        from: 'action',
+        to: 'result',
+        label: '办理结果',
+        condition: action.result,
+      },
+    ],
+  }
+}

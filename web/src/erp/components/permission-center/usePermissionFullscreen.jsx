@@ -1,7 +1,12 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { canRestoreOverlayFocus, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
+import { isolateOverlaySiblings, lockOverlayScroll } from '@/common/components/overlay/ScopedOverlayDialog.jsx'
 
 // Keep the same editor mounted so fullscreen shares its draft and filters.
 export function usePermissionFullscreen({ enabled, dismissPopup }) {
+  const overlay = useOverlayScope()
+  const overlayRef = useRef(overlay)
+  overlayRef.current = overlay
   const [open, setOpen] = useState(false)
   const workspaceRef = useRef(null)
   const enterRef = useRef(null)
@@ -10,7 +15,7 @@ export function usePermissionFullscreen({ enabled, dismissPopup }) {
   const dismissPopupRef = useRef(dismissPopup)
   const fullscreen = enabled && open
   const restoreFocus = useCallback(() => {
-    enterRef.current?.focus({ preventScroll: true })
+    if (canRestoreOverlayFocus(overlayRef.current)) enterRef.current?.focus({ preventScroll: true })
   }, [])
 
   const enterFullscreen = () => {
@@ -20,6 +25,7 @@ export function usePermissionFullscreen({ enabled, dismissPopup }) {
     const positions = [[table, table.scrollTop, table.scrollLeft]]
     for (let node = workspace; node; node = node.parentElement) {
       positions.push([node, node.scrollTop, node.scrollLeft])
+      if (overlay?.enabled && node === overlay.containerRef.current) break
     }
     scrollPositionsRef.current = positions
     setOpen(true)
@@ -34,37 +40,29 @@ export function usePermissionFullscreen({ enabled, dismissPopup }) {
   }, [enabled])
 
   useLayoutEffect(() => {
-    if (!fullscreen) return undefined
+    if (!fullscreen || overlay?.visible === false) return undefined
     const workspace = workspaceRef.current
     if (!workspace) return undefined
     const table = workspace.querySelector('.erp-role-policy, .erp-permission-checklist')
     const scrollPositions = scrollPositionsRef.current
-    const background = []
-    const scrollLocks = []
+    const boundary = overlay?.enabled ? overlay.containerRef.current : document.body
+    const releases = [isolateOverlaySiblings(workspace, boundary), lockOverlayScroll(boundary)]
     // Body portals stay available to the data-scope modal and its selectors.
     for (
       let node = workspace;
-      node.parentElement && node.parentElement !== document.body;
+      node.parentElement && node !== boundary && node.parentElement !== document.body;
       node = node.parentElement
     ) {
       const parent = node.parentElement
       if (/auto|scroll/.test(getComputedStyle(parent).overflowY)) {
-        scrollLocks.push([parent, parent.style.overflow])
-        parent.style.overflow = 'hidden'
-      }
-      for (const sibling of parent.children) {
-        if (sibling !== node) {
-          background.push([sibling, sibling.inert])
-          sibling.inert = true
-        }
+        releases.push(lockOverlayScroll(parent))
       }
     }
-    const { overflow } = document.body.style
-    document.body.style.overflow = 'hidden'
     exitRef.current?.focus({ preventScroll: true })
 
     const onKeyDown = (event) => {
       if (event.defaultPrevented || event.isComposing) return
+      if (overlay?.enabled && !workspace.contains(event.target) && !overlay.host.contains(event.target)) return
       // Nested Ant Design dialogs own their keyboard handling and focus trap.
       if (event.target.closest?.('.ant-modal-wrap')) return
       if (event.key === 'Escape') {
@@ -94,13 +92,7 @@ export function usePermissionFullscreen({ enabled, dismissPopup }) {
     window.addEventListener('keydown', onKeyDown, true)
     return () => {
       window.removeEventListener('keydown', onKeyDown, true)
-      document.body.style.overflow = overflow
-      scrollLocks.forEach(([node, previous]) => {
-        node.style.overflow = previous
-      })
-      background.forEach(([node, inert]) => {
-        node.inert = inert
-      })
+      releases.toReversed().forEach((release) => release())
       requestAnimationFrame(() => {
         if (!table?.isConnected) return
         scrollPositions.forEach(([node, top, left]) => {
@@ -110,10 +102,11 @@ export function usePermissionFullscreen({ enabled, dismissPopup }) {
         restoreFocus()
       })
     }
-  }, [fullscreen, restoreFocus])
+  }, [fullscreen, overlay, restoreFocus])
 
   return {
     fullscreen,
+    fullscreenAriaModal: fullscreen ? overlay?.enabled ? 'false' : 'true' : undefined,
     setFullscreen: setOpen,
     enterFullscreen,
     workspaceRef,

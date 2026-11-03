@@ -3,8 +3,8 @@ import test from 'node:test'
 import { createElement as h } from 'react'
 import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
-import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCatalog.mjs'
 import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRuntime.mjs'
+import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCatalog.mjs'
 
 registerMermaidTestRenderer()
 
@@ -55,8 +55,8 @@ test('十二个财务步骤就近解释，点击与关闭均保留总览和当�
   )
   assert.deepEqual(
     lanes.map((lane) =>
-      [...lane.querySelectorAll('button strong')].map(
-        (node) => node.textContent
+      [...lane.querySelectorAll('[data-finance-node]')].map(
+        (node) => node.getAttribute('aria-label')
       )
     ),
     [
@@ -66,8 +66,8 @@ test('十二个财务步骤就近解释，点击与关闭均保留总览和当�
     ]
   )
   const { location } = state
-  for (const node of overview.querySelectorAll('[data-finance-lane] button')) {
-    await harness.act(() => node.click())
+  for (const node of overview.querySelectorAll('[data-finance-lane] [data-finance-node]')) {
+    await harness.act(() => node.dispatchEvent(new window.MouseEvent('click', { bubbles: true })))
     await harness.flush()
     const note = document.getElementById(
       `finance-note-${node.dataset.financeNode}`
@@ -106,7 +106,7 @@ test('专题与规则在同一侧栏查看，情景选择只替换 URL 状态且
   )
   await harness.act(() => drawer.querySelector('input[value="draft"]').click())
   await harness.act(() =>
-    drawer.querySelector('[data-finance-node="purchase-2"]').click()
+    drawer.querySelector('[data-finance-node="purchase-2"]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
   )
   assert(drawer.textContent.includes('先取消冻结来源的草稿'))
   assert.equal(

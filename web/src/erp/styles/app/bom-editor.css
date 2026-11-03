@@ -3,17 +3,6 @@
   grid-column: 1 / -1;
 }
 
-.erp-bom-material-groups__heading {
-  justify-content: space-between;
-  margin: 0 0 12px;
-}
-
-.erp-bom-material-groups__heading > span,
-.erp-bom-material-cell__context {
-  color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-caption);
-}
-
 .erp-bom-parts-scroll {
   max-width: 100%;
   overflow: auto;
@@ -123,16 +112,28 @@
 .erp-bom-material-cell__context {
   display: block;
   padding: 4px 8px;
+  color: var(--erp-text-muted, #64748b);
+  font-size: var(--erp-font-caption);
 }
 
-.erp-bom-parts-table .erp-bom-part-actions {
-  white-space: nowrap;
-  text-align: center;
-  vertical-align: middle;
+.erp-bom-selection-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
 }
 
-.erp-bom-part-actions .ant-btn {
-  padding-inline: 3px;
+.erp-bom-selection-actions__identity {
+  max-width: 320px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  overflow-wrap: anywhere;
+}
+
+.erp-bom-parts-table tr[data-bom-part-selected='true'] > td:not(.erp-bom-material-cell),
+.erp-bom-material-group[data-bom-material-selected='true'] .erp-bom-material-cell {
+  background: var(--erp-primary-softer);
 }
 
 .erp-bom-material-group__footer {
@@ -186,26 +187,38 @@
 .erp-bom-col-note {
   width: 125px;
 }
-.erp-bom-col-actions {
-  width: 95px;
+.erp-bom-header-primary > .erp-business-form-section__fields {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.6fr) minmax(0, 1fr);
+  align-items: start;
 }
 
-.erp-bom-header-primary > .erp-business-form-section__fields {
-  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr));
+.erp-bom-version-summary {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
 }
-.erp-bom-header-note {
-  grid-column: 1 / -1;
+
+.erp-bom-version-summary strong {
+  color: var(--erp-text);
+  font-weight: 500;
 }
+
+.erp-bom-header-support > .erp-business-form-section__fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.erp-bom-header-attachments {
+  min-width: 0;
+}
+
 @container business-form-fields (max-width: 520px) {
-  .erp-bom-header-primary > .erp-business-form-section__fields {
+  .erp-bom-header-primary > .erp-business-form-section__fields,
+  .erp-bom-header-support > .erp-business-form-section__fields {
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-.erp-bom-editor .erp-bom-version:disabled {
-  color: var(--erp-text);
-  -webkit-text-fill-color: var(--erp-text);
-  opacity: 1;
 }
 
 .erp-bom-import-preview .ant-modal-content {

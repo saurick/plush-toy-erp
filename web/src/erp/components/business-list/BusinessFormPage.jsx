@@ -11,7 +11,8 @@ import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, } from 'react-router-dom'
 import { revealBusinessLineItemErrors } from './businessLineItemDisclosure.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
+import { hasVisibleOverlayPopup } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
 import { BusinessEditorPaneContext, BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
 import { ReferenceRecordsFeedback } from '../ReferenceRecordsContext.jsx'
@@ -113,6 +114,7 @@ export default function BusinessFormPage({
   baselineKey,
   children,
 }) {
+  const modal = useModal()
   const outletContext = useBusinessPageContext()
   const split = useBusinessSplit()
   const { appearance, setAppearance, appearanceSaveError, retryAppearanceSave } = useERPTheme()
@@ -229,9 +231,7 @@ export default function BusinessFormPage({
       if (
         event.key === 'Escape' && (
           pageRef.current?.querySelector('input[aria-expanded="true"], [role="combobox"][aria-expanded="true"], [aria-haspopup][aria-expanded="true"]') ||
-          Array.from(document.querySelectorAll(
-            '.ant-select-dropdown:not(.ant-select-dropdown-hidden), .ant-picker-dropdown:not(.ant-picker-dropdown-hidden)'
-          )).some((node) => node.getClientRects().length > 0)
+          hasVisibleOverlayPopup()
         )
       ) popupEscape = event
     }
@@ -352,7 +352,7 @@ export default function BusinessFormPage({
     return () => window.cancelAnimationFrame(frame)
   }, [baseline, loading, open, pane, readOnly, taskFocused])
 
-  const confirmDiscard = useCallback(async () => {
+  const confirmDiscard = useCallback(async ({ overlay } = {}) => {
     if (currentRef.current.saving) {
       message.info(
         currentRef.current.attachmentBusy
@@ -371,6 +371,7 @@ export default function BusinessFormPage({
       }
       modal.confirm({
         maskClosable: true,
+        getContainer: overlay === 'workspace' ? () => globalThis.document.body : undefined,
         centered: true,
         title: '放弃未保存的修改？',
         content: `${typeof currentRef.current.title === 'string' ? currentRef.current.title : '当前编辑内容'}中的修改和待上传附件尚未保存。`,
@@ -380,13 +381,13 @@ export default function BusinessFormPage({
         onCancel: () => finish(false),
       })
     })
-  }, [])
+  }, [modal])
 
   useEffect(() => {
     if (!open) return undefined
-    const guard = async ({ intent } = {}) => {
+    const guard = async ({ intent, overlay } = {}) => {
       if (intent === 'object' && pane?.value === 'engineering') return true
-      if (!(await confirmDiscard())) return false
+      if (!(await confirmDiscard({ overlay }))) return false
       if (intent === 'refresh') {
         currentRef.current.onCancel?.()
       } else if (!split?.handlingNavigation) {

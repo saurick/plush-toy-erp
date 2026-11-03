@@ -6,11 +6,12 @@ import BusinessModal from '../business-list/BusinessModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { correctQualityInspectionResult } from '../../api/qualityApi.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { isSourceBusinessActionResultUnknown, sourceBusinessActionNo, sourceBusinessActionUUID } from '../../utils/sourceBusinessAction.mjs'
 import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function QualityInspectionCorrectionModal({ inspection, customerKey, onClose, onCreated }) {
+  const modal = useModal()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [pending, setPending] = useState(null)
@@ -32,7 +33,7 @@ export default function QualityInspectionCorrectionModal({ inspection, customerK
     form.resetFields()
     form.setFieldsValue(retained || { correction_inspection_no: sourceBusinessActionNo('QI-RECHECK', 'QUALITY', sourceBusinessActionUUID()), reason: '' })
   }, [inspection?.id, inspection?.inspection_no, form])
-  const confirmLeave = React.useCallback(async () => {
+  const confirmLeave = React.useCallback(async ({ overlay } = {}) => {
     if (stateRef.current.saved) return true
     if (stateRef.current.loading || pendingRef.current) {
       message.warning('请先确认本次复检结果，再离开办理。')
@@ -41,6 +42,7 @@ export default function QualityInspectionCorrectionModal({ inspection, customerK
     if (!stateRef.current.dirty) return true
     return new Promise((resolve) => modal.confirm({
       maskClosable: true,
+      getContainer: overlay === 'workspace' ? () => globalThis.document.body : undefined,
       title: '放弃未保存的修改？',
       content: '本次复检单号和纠正原因尚未保存。',
       okText: '放弃修改',
@@ -48,7 +50,7 @@ export default function QualityInspectionCorrectionModal({ inspection, customerK
       onOk: () => resolve(true),
       onCancel: () => resolve(false),
     }))
-  }, [])
+  }, [modal])
   const registerLeave = outlet?.registerPageLeaveGuard
   useEffect(() => {
     if (!inspection) return undefined

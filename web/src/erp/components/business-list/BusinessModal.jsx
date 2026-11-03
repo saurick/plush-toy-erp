@@ -6,6 +6,8 @@ import { resolveBusinessModalWidth } from '../../utils/modalSizes.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import BusinessFormPage from './BusinessFormPage.jsx'
 import BusinessFormSectionScope from './BusinessFormSectionScope.jsx'
+import { useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
+import { message, useModal } from '@/common/utils/antdApp'
 
 export default function BusinessModal({
   size = 'localAction',
@@ -28,11 +30,50 @@ export default function BusinessModal({
 }) {
   const { token } = theme.useToken()
   const context = useBusinessPageContext()
+  const overlay = useOverlayScope()
+  const modal = useModal()
+  const overlayOwner = React.useRef(Symbol('business-modal'))
+  const pendingLeave = React.useRef(null)
   const inline = taskInline && Boolean(context?.taskBusiness)
   const readOnly = context?.taskBusiness?.readOnly === true
   const submittingRef = React.useRef(false)
   const [submitting, setSubmitting] = React.useState(false)
   const busy = confirmLoading || submitting
+  const leaveState = React.useRef(null)
+  leaveState.current = { busy, hasChanges }
+  React.useEffect(() => {
+    if (!props.open || inline || !overlay) return undefined
+    const unregister = overlay.registerGuard(overlayOwner.current, async ({ overlay: target } = {}) => {
+      if (submittingRef.current || leaveState.current.busy) {
+        message.info('正在保存，请稍候')
+        return false
+      }
+      if (!leaveState.current.hasChanges) return true
+      return new Promise((resolve) => {
+        pendingLeave.current = resolve
+        const finish = (allowed) => {
+          if (pendingLeave.current === resolve) pendingLeave.current = null
+          resolve(allowed)
+        }
+        modal.confirm({
+          maskClosable: true,
+          getContainer: target === 'workspace' ? () => globalThis.document.body : undefined,
+          title: '放弃未保存的修改？',
+          content: '当前弹窗中的填写内容尚未保存，放弃后无法恢复。',
+          okText: '放弃修改',
+          cancelText: '继续编辑',
+          okButtonProps: { danger: true },
+          onOk: () => finish(true),
+          onCancel: () => finish(false),
+        })
+      })
+    })
+    return () => {
+      pendingLeave.current?.(false)
+      pendingLeave.current = null
+      unregister()
+    }
+  }, [props.open, inline, overlay, modal])
   const confirm = async (event) => {
     if (submittingRef.current || busy || okButtonProps?.disabled || (inline && readOnly)) return
     submittingRef.current = true

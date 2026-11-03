@@ -2,7 +2,7 @@ import React, { useRef } from 'react'
 import { Alert, Descriptions } from 'antd'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { OutsourcingOrderStatus } from '../../../common/consts/statuses.generated.mjs'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import SourceOrderLifecycleConfirmContent from '../business-list/SourceOrderLifecycleConfirmContent.jsx'
 import { listBusinessAttachments } from '../../api/attachmentApi.mjs'
@@ -26,6 +26,7 @@ export function useOutsourcingOrderLifecycle({
   openEdit,
   onChanged,
 }) {
+  const modal = useModal()
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const lifecycleInFlightRef = useRef(false)
 

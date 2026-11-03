@@ -468,3 +468,18 @@ export function getHelpScenarioPresentation(scenario, roleKey) {
     ),
   }
 }
+
+export function buildHelpScenarioGraph(model, scenario) {
+  return {
+    direction: 'LR',
+    nodes: [
+      ...model.steps.map((step) => ({ key: step.id, label: `${step.number} · ${step.title}`, role: step.owner, role_keys: step.roles, summary: step.description, accessibleLabel: `查看步骤 ${step.number}：${step.title}`, data: { 'help-step': step.id } })),
+      { key: model.exception.id, label: model.exception.title, role: model.exception.owner, summary: scenario.exception.trigger, risk: true },
+    ],
+    edges: [
+      ...model.steps.slice(1).map((step, index) => ({ from: model.steps[index].id, to: step.id, label: '业务交接', condition: step.description })),
+      { from: model.exception.from, to: model.exception.id, label: model.exception.label || '条件未满足', condition: scenario.exception.trigger, branch: true },
+      { from: model.exception.id, to: model.exception.back, label: `核对后返回第 ${model.exception.backNumber} 步`, condition: scenario.exception.action, branch: true },
+    ],
+  }
+}

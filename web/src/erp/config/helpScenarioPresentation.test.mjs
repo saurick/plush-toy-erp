@@ -13,7 +13,9 @@ import { getRoleHelpScenarios } from './helpScenarios.mjs'
 import {
   HELP_OVERVIEW_LAYOUTS,
   getHelpScenarioPresentation,
+  buildHelpScenarioGraph,
 } from './helpScenarioPresentation.mjs'
+import { buildBusinessFlowMermaid } from '../../common/components/markdown/mermaidGraph.mjs'
 
 const sceneFor = (role, key) =>
   getRoleHelpScenarios(getRoleHelpGuide(role)).find(
@@ -28,6 +30,13 @@ test('每个岗位场景的编号、图解热点和异常去向均有有效目�
     })) {
       keys.add(scenario.key)
       const model = getHelpScenarioPresentation(scenario, role.key)
+      if (model.kind === 'chain') {
+        const graph = buildBusinessFlowMermaid(buildHelpScenarioGraph(model, scenario), { role: role.key })
+        assert.equal(graph.nodes.length, model.steps.length + 1)
+        assert.equal(graph.edges.length, model.steps.length + 1)
+        assert(graph.edges.some((edge) => edge.from === model.exception.id && edge.to === model.exception.back))
+        assert(graph.nodes.filter((node) => node.key !== model.exception.id).every((node) => node.data['help-step'] === node.key))
+      }
       const label = `${role.key}:${scenario.key}`
       assert.ok(['chain', 'path', 'steps'].includes(model.kind), label)
       assert.ok(model.steps.includes(model.defaultStep), label)

@@ -42,8 +42,8 @@ tbody.erp-editable-line-group + tbody.erp-editable-line-group {
   color: var(--erp-line-number-active-color, var(--erp-on-accent));
 }
 
-.erp-line-editor .erp-editable-line-group:has(.erp-line-editor__row-marker .ant-radio-checked) {
-  --erp-line-group-bg: var(--erp-surface-bg-muted);
+.erp-line-editor .erp-editable-line-group[data-line-editor-row-selected='true'] {
+  --erp-line-group-bg: var(--erp-primary-softer);
 }
 
 .erp-line-item-identity-group {

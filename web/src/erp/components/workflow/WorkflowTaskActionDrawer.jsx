@@ -6,7 +6,8 @@ import {
   ExportOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Drawer, Input, Tag, Typography } from 'antd'
+import { Alert, Button, Input, Tag, Typography } from 'antd'
+import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { resolveMobileTaskBusinessEntry } from '../../mobile/utils/mobileTaskBusiness.mjs'
 import WorkflowTaskReceipt from './WorkflowTaskReceipt.jsx'

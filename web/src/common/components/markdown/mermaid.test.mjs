@@ -40,8 +40,10 @@ test('Mermaid viewer applies zoom and fullscreen geometry without a page wrapper
   )
   assert.match(
     css,
-    /\.erp-markdown-mermaid--fullscreen[\s\S]*?position:\s*fixed[\s\S]*?inset:\s*0/u
+    /\.erp-markdown-mermaid--fullscreen[\s\S]*?position:\s*fixed[\s\S]*?inset:\s*var\(--app-overlay-top, 0\) auto auto var\(--app-overlay-left, 0\)/u
   )
+  assert.match(css, /width:\s*var\(--app-overlay-width, 100vw\)/u)
+  assert.match(css, /height:\s*var\(--app-overlay-height, 100dvh\)/u)
   assert.match(
     css,
     /@media \(max-width: 480px\)[\s\S]*?\.erp-markdown-mermaid--fullscreen/u

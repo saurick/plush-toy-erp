@@ -241,35 +241,6 @@
   max-width: 100%;
 }
 
-.erp-dev-integration__flow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.erp-dev-integration__flow-step {
-  display: grid;
-  flex: 1;
-  gap: 8px;
-  min-width: 0;
-  padding: 16px 12px;
-  border: 1px dashed var(--erp-border);
-  border-radius: 8px;
-  background: var(--erp-page-bg);
-  text-align: center;
-  overflow-wrap: anywhere;
-}
-
-.erp-dev-integration__flow-step strong {
-  font-weight: 500;
-}
-
-.erp-dev-integration__flow-step > span {
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-small);
-}
-
 .erp-dev-integration__detail-identity {
   display: grid;
   gap: 6px;

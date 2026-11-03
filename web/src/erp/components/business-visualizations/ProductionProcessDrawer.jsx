@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Button, Drawer, Tag } from 'antd'
+import { Button, Tag } from 'antd'
+import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
 

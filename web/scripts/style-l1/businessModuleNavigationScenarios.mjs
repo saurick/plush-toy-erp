@@ -103,7 +103,7 @@ export function createBusinessModuleNavigationScenarios({
         for (const [moduleName, first, second] of [
           ['基础资料', '客户档案', '材料档案'],
           ['产品工程', '物料清单（BOM）', '加工环节'],
-          ['库存管理', '采购入库', '库存台账'],
+          ['仓储管理', '入库办理', '库存查询'],
           ['财务管理', '应收', '对账'],
         ]) {
           await sidebar.getByRole('button', { name: moduleName, exact: true }).click()
@@ -120,7 +120,7 @@ export function createBusinessModuleNavigationScenarios({
     ...[
       ['master', '/erp/master/partners/customers', ['客户档案', '供应商与加工厂', '产品档案', '材料档案'], '客户档案', '供应商与加工厂'],
       ['engineering', '/erp/purchase/material-bom', ['物料清单（BOM）', '加工环节'], '物料清单（BOM）', '加工环节'],
-      ['warehouse', '/erp/warehouse/inbound', ['采购入库', '库存台账'], '采购入库', '库存台账'],
+      ['warehouse', '/erp/warehouse/inventory', ['库存查询', '入库办理', '出库办理', '库存作业'], '库存查询', '入库办理'],
     ].map(([key, route, labels, firstHeading, secondHeading]) => ({
       name: `module-${key}-navigation`,
       path: route,
@@ -131,7 +131,7 @@ export function createBusinessModuleNavigationScenarios({
         const search = () => page.locator('.erp-admin-outlet input.ant-input').first()
         await moduleTabs(page).getByRole('tab', { name: firstHeading, exact: true, selected: true }).waitFor()
         assert.deepEqual(await moduleTabs(page).getByRole('tab').allTextContents(), labels)
-        const moduleName = { master: '基础资料', engineering: '产品工程', warehouse: '库存管理' }[key]
+        const moduleName = { master: '基础资料', engineering: '产品工程', warehouse: '仓储管理' }[key]
         assert.equal(await page.locator('.erp-business-module-header').getByRole('heading', { name: moduleName, exact: true }).count(), 1)
         await search().fill(`${key}第一页面查询`)
         await search().press('Enter')

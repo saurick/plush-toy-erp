@@ -281,6 +281,28 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   box-shadow: none;
 }
 
+.erp-navigation-chips {
+  --erp-slider-radius: 8px;
+  display: inline-flex;
+  max-width: 100%;
+  gap: 8px;
+  overflow-x: auto;
+  vertical-align: top;
+}
+
+.erp-navigation-chips > .erp-filter-chip {
+  --erp-filter-chip-background: transparent;
+  min-height: 38px;
+  padding: 6px 12px;
+  font-size: var(--erp-font-body);
+}
+
+@media (max-width: 767px) {
+  .erp-navigation-chips > .erp-filter-chip {
+    min-height: 44px;
+  }
+}
+
 .erp-control-button {
   border: 1px solid var(--erp-control-border);
   background: var(--erp-control-surface);
@@ -449,7 +471,7 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   width: var(--mobile-search-expanded-width, 100%);
 }
 
-.erp-mobile-search-row:has(.erp-mobile-search--expanded) > :not(.erp-mobile-search--expanded):not(:has(.erp-mobile-search--expanded)) {
+.erp-mobile-search-row[data-mobile-search-expanded='true'] > :not([data-mobile-search-active='true']) {
   visibility: hidden;
 }
 
@@ -622,7 +644,8 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   }
 
   .erp-filter-chip,
-  .erp-control-button {
+  .erp-control-button,
+  .erp-line-items-form__head-actions .ant-btn {
     min-height: 44px;
   }
 

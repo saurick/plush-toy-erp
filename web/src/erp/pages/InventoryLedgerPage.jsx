@@ -38,7 +38,6 @@ import {
   VIEW_BALANCES,
   VIEW_LOTS,
   VIEW_TXNS,
-  VIEW_ITEMS,
   VIEW_LABELS,
   SUBJECT_TYPE_OPTIONS,
   LOT_STATUS_OPTIONS,
@@ -65,7 +64,6 @@ import useBusinessPageState from '../hooks/useBusinessPageState'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import Table from '@/common/components/table/AppTable'
-import Tabs from '@/common/components/navigation/SlidingTabs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../utils/warehouseClassification.mjs'
@@ -186,10 +184,6 @@ export default function InventoryLedgerPage() {
     [outletContext?.adminProfile]
   )
   const operationAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
-  const [savedActiveView, setSavedActiveView] = useBusinessPageState(
-    'activeView',
-    VIEW_BALANCES
-  )
   const [balanceDisplay, setBalanceDisplay] = useBusinessPageState(
     'balanceDisplay',
     'list'
@@ -244,7 +238,8 @@ export default function InventoryLedgerPage() {
   const routeView = searchParamText(searchParams, 'view')
   const activeView = Object.hasOwn(VIEW_LABELS, routeView)
     ? routeView
-    : savedActiveView
+    : VIEW_BALANCES
+  const previousView = useRef(activeView)
   const routeLotID = taskStock?.lot_id || searchParamPositiveInt(searchParams, 'lot_id')
   const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
   const routeInventoryOperationID = searchParamPositiveInt(
@@ -504,10 +499,16 @@ export default function InventoryLedgerPage() {
   }, [loadRows])
 
   useEffect(() => {
-    setSavedActiveView(activeView)
     setSelectedRow(null)
     setDetailRecord(null)
-  }, [activeView, setSavedActiveView, setSelectedRow])
+    if (previousView.current !== activeView) {
+      previousView.current = activeView
+      if (activeView !== VIEW_BALANCES) setBalanceDisplay('list')
+      setDateFilterStart('')
+      setDateFilterEnd('')
+      setPagination((current) => current.current === 1 ? current : { ...current, current: 1 })
+    }
+  }, [activeView, setSelectedRow, setBalanceDisplay, setDateFilterStart, setDateFilterEnd, setPagination])
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(() => {
@@ -532,30 +533,6 @@ export default function InventoryLedgerPage() {
   const resetCurrentPage = useCallback(() => {
     resetBusinessPaginationCurrent(setPagination)
   }, [setPagination])
-
-  const handleViewChange = useCallback(
-    (nextView) => {
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current)
-        next.set('view', nextView)
-        return next
-      })
-      if (nextView !== VIEW_BALANCES) setBalanceDisplay('list')
-      setSelectedRow(null)
-      setDetailRecord(null)
-      setDateFilterStart('')
-      setDateFilterEnd('')
-      resetCurrentPage()
-    },
-    [
-      resetCurrentPage,
-      setSelectedRow,
-      setSearchParams,
-      setBalanceDisplay,
-      setDateFilterEnd,
-      setDateFilterStart,
-    ]
-  )
 
   const activeLabel = VIEW_LABELS[activeView]
   const inventoryBalanceSwitch = (
@@ -1409,16 +1386,7 @@ export default function InventoryLedgerPage() {
         <>
           <BusinessOperationPanel
             compact
-            viewSwitch={
-              <div className="erp-inventory-ledger-view-bar">
-                <Tabs
-                  activeKey={activeView}
-                  items={VIEW_ITEMS}
-                  onChange={handleViewChange}
-                />
-                {activeView === VIEW_BALANCES ? inventoryBalanceSwitch : null}
-              </div>
-        }
+            viewSwitch={activeView === VIEW_BALANCES ? inventoryBalanceSwitch : null}
             onClearFilters={clearFilters}
             activeFilterCount={activeFilterCount}
             filters={
@@ -1771,6 +1739,8 @@ export default function InventoryLedgerPage() {
               />
         ) : (
           <InventoryTable
+            widthMode="columns"
+            tableLayout="fixed"
             scrollToolbar
             sticky={sticky}
             rowKey={(record) => `${activeView}-${record.id}`}
@@ -1783,7 +1753,6 @@ export default function InventoryLedgerPage() {
               onChange: (current, pageSize) =>
                 setPagination({ current, pageSize }),
             })}
-            scroll={{ x: activeView === VIEW_TXNS ? 1900 : 1500 }}
             rowSelection={{
               type: activeView === VIEW_BALANCES ? 'checkbox' : 'radio',
               selectedRowKeys: selectedRecords.map((row) => `${activeView}-${row.id}`),
@@ -1801,10 +1770,7 @@ export default function InventoryLedgerPage() {
           </Card>
         </>
       ) : operationsOnly && !taskOperation ? (
-        <Card>
-          {canCreateInventoryOperation ? <Button type="primary" onClick={() => navigate('/erp/warehouse/inventory')}>选择库存登记盘点、调拨或调整</Button> : null}
-          <InventoryOperationRecordsModal inline open refreshKey={`${operationRecordsRevision}:${currentOperation?.id || 0}:${currentOperation?.version || 0}`} currentAdminID={currentAdminID} canCreate={canCreateInventoryOperation} onSelect={async (record) => { const recovered = await recoverInventoryOperation(record.id); if (recovered?.id) setOperationDetailsOpen(true) }} onEdit={openInventoryOperationEdit} />
-        </Card>
+        <InventoryOperationRecordsModal inline open refreshKey={`${operationRecordsRevision}:${currentOperation?.id || 0}:${currentOperation?.version || 0}`} currentAdminID={currentAdminID} canCreate={canCreateInventoryOperation} onCreate={canCreateInventoryOperation ? () => navigate('/erp/warehouse/inventory') : null} onSelect={async (record) => { const recovered = await recoverInventoryOperation(record.id); if (recovered?.id) setOperationDetailsOpen(true) }} onEdit={openInventoryOperationEdit} />
       ) : null}
       {columnOrderModal}
       <BusinessDetailsModal

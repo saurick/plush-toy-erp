@@ -237,14 +237,14 @@ export function createEmptyStateScenarios({
         await observation.locator('summary').filter({ hasText: '导出' }).click()
         await observation.getByRole('button', { name: '客户校对稿', exact: true }).click()
         await observation.getByRole('status').waitFor()
-        await frame.locator('summary').filter({ hasText: '状态规则与依据示例' }).click()
+        await page.keyboard.press('Escape')
+        await table.getByRole('button', { name: '业务规则', exact: true }).click()
         const rules = frame.locator('[data-dev-rule-preview]')
-        await rules.getByRole('img', { name: '正常推进状态图示' }).waitFor()
-        await rules.getByRole('button', { name: '异常与纠正', exact: true }).click()
-        await rules.getByRole('img', { name: '异常与纠正状态图示' }).waitFor()
-        assert.equal(await rules.locator('[data-rule-panel="exceptional"] li').count(), 1)
-        await rules.getByRole('button', { name: '全部', exact: true }).click()
-        assert.equal(await rules.locator('[data-rule-panel="all"] li').count(), 3)
+        const stateGraph = rules.getByRole('group', { name: '完整状态图示', exact: true })
+        await stateGraph.waitFor()
+        assert.equal(await rules.getByRole('group', { name: '状态转换筛选示例', exact: true }).count(), 0)
+        assert.equal(await stateGraph.locator('.dev-rule-preview-edge').count(), 3)
+        assert.equal(await rules.locator('[data-rule-panel="all"] details li').count(), 3)
         await page.keyboard.press('Escape')
         await table.getByRole('button', { name: '测试数据', exact: true }).click()
         await frame.locator('summary').filter({ hasText: '复用判断与模块依赖' }).click()
@@ -264,17 +264,19 @@ export function createEmptyStateScenarios({
           .getByRole('button', { name: '交付运维', exact: true })
           .click()
         for (const task of [
-          { tool: '客户配置', expected: '试跑与发布' },
-          { tool: '数据库迁移', summary: '正式页面的任务标签', expected: '运行检查' },
-          { tool: '版本发布', summary: '正式页面的任务标签', expected: '发布检查' },
-          { tool: '安全与恢复', summary: '安全核验、恢复演练与应急指引', expected: '应急指引' },
+          { tool: '客户配置', expected: ['试跑与发布'] },
+          { tool: '数据库迁移', expand: true, expected: ['运行检查'] },
+          { tool: '版本发布', expand: true, expected: ['发布检查'] },
+          { tool: '安全与恢复', expand: true, expected: ['安全核验', '恢复演练', '备份记录', '应急指引'] },
         ]) {
           await sidebar.getByRole('button', { name: task.tool, exact: true }).click()
           await frame.getByRole('heading', { name: task.tool, level: 1, exact: true }).waitFor()
-          if (task.summary) {
-            await frame.locator('.dev-design-settings > summary').filter({ hasText: task.summary }).click()
+          const taskTable = frame.getByRole('table', { name: '正式交付页面任务', exact: true })
+          if (task.expand) {
+            assert.equal(await taskTable.isVisible(), false, `${task.tool}任务说明默认收起`)
+            await frame.locator('details:has(> table[aria-label="正式交付页面任务"]) > summary').click()
           }
-          await frame.getByRole('table', { name: '正式交付页面任务' }).getByRole('row', { name: new RegExp(task.expected, 'u') }).waitFor()
+          for (const label of task.expected) await taskTable.getByRole('rowheader', { name: label, exact: true }).waitFor()
         }
         await sidebar.getByRole('button', { name: '版本发布', exact: true }).click()
         assert.ok(
@@ -392,10 +394,11 @@ export function createEmptyStateScenarios({
         await frame
           .getByRole('button', { name: '演示本轮验证', exact: true })
           .click()
+        await frame.getByText('样例检查已完成；固定版本 CI 单独核对。', { exact: true }).waitFor()
         await frame.getByRole('tab', { name: '覆盖报告', exact: true }).click()
-        await frame
-          .getByText('定向页面检查 · 样例完成', { exact: true })
-          .waitFor()
+        const coverageReport = frame.getByRole('table', { name: '覆盖报告关键结果样例', exact: true })
+        await coverageReport.waitFor()
+        assert.equal(await coverageReport.getByRole('cell', { name: '未采集', exact: true }).count(), 2, '验证演示不替代覆盖报告采集结果')
         await sidebar
           .getByRole('button', { name: '数据库迁移', exact: true })
           .click()

@@ -992,7 +992,7 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
 
 async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
   const issues = await page.evaluate(() => {
-    const formSelector = '.erp-business-form, .erp-business-action-form'
+    const formSelector = '.erp-business-form, .erp-business-action-form, form:has(.erp-business-textarea)'
     const candidateSelector = [
       '.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)',
       '.ant-input-number-affix-wrapper',
@@ -1000,6 +1000,8 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
       '.ant-picker',
       '.ant-select-single',
       'input.ant-input:not([type="hidden"])',
+      'textarea.erp-business-textarea',
+      '.erp-business-textarea textarea',
     ].join(',')
     const ignoredAncestorSelector = [
       '.ant-picker-dropdown',
@@ -1074,7 +1076,7 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
       // Custom properties preserve max()/calc(); let the browser resolve the token in the form's scope.
       const heightProbe = document.createElement('div')
       heightProbe.style.cssText =
-        'position:absolute;visibility:hidden;pointer-events:none;box-sizing:content-box;padding:0;border:0;min-height:0;max-height:none;height:var(--erp-control-height, 36px)'
+        'position:absolute;visibility:hidden;pointer-events:none;box-sizing:content-box;padding:0;border:0;min-height:0;max-height:none;height:var(--erp-control-height, var(--erp-form-control-height, 36px))'
       form.append(heightProbe)
       const expectedHeight = Number.parseFloat(
         window.getComputedStyle(heightProbe).height
@@ -1097,11 +1099,54 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
           continue
         }
         if (
-          node.matches('textarea, input[type="checkbox"], input[type="radio"]')
+          node.matches('input[type="checkbox"], input[type="radio"]')
         ) {
           continue
         }
         let controlExpectedHeight = expectedHeight
+        let heightOwner = node
+        if (node.matches('textarea')) {
+          const style = getComputedStyle(node)
+          heightOwner = node.closest('.ant-input-textarea-affix-wrapper') || node
+          const outerStyle = getComputedStyle(heightOwner)
+          const lineHeight = parseFloat(style.lineHeight)
+          const rows = Number(style.getPropertyValue('--erp-textarea-rows')) || 2
+          const borders = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth) +
+            (heightOwner === node ? 0 : parseFloat(outerStyle.borderTopWidth) + parseFloat(outerStyle.borderBottomWidth))
+          const padding = Math.max(0, (expectedHeight - borders - lineHeight) / 2)
+          const count = node.closest('.ant-input-textarea-show-count')?.querySelector('.ant-input-data-count')
+          const bottomPadding = count && isVisible(count)
+            ? Math.max(30, parseFloat(style.fontSize) * 1.8)
+            : padding
+          // 独立测量文字所需空间，避免把错误留白或截断后的框高当作期望值。
+          const probe = node.cloneNode()
+          probe.removeAttribute('id')
+          probe.removeAttribute('name')
+          probe.className = ''
+          probe.setAttribute('aria-hidden', 'true')
+          probe.tabIndex = -1
+          Object.assign(probe.style, {
+            position: 'absolute', visibility: 'hidden', pointerEvents: 'none',
+            width: style.width, height: '0px', minHeight: '0px', maxHeight: 'none',
+            boxSizing: style.boxSizing, borderWidth: style.borderWidth, borderStyle: 'solid',
+            font: style.font, letterSpacing: style.letterSpacing, textIndent: style.textIndent,
+            whiteSpace: style.whiteSpace, wordBreak: style.wordBreak, overflowWrap: style.overflowWrap,
+            paddingLeft: style.paddingLeft, paddingRight: style.paddingRight,
+            paddingTop: '0px', paddingBottom: '0px', overflow: 'hidden',
+          })
+          probe.value = node.value || node.placeholder || ''
+          document.body.append(probe)
+          const contentHeight = probe.scrollHeight
+          probe.remove()
+          controlExpectedHeight = Math.max(rows * lineHeight, contentHeight) + padding + bottomPadding + borders
+          if (!Number.isFinite(controlExpectedHeight) ||
+            Math.abs(parseFloat(style.paddingTop) - padding) > 1 ||
+            Math.abs(parseFloat(style.paddingBottom) - bottomPadding) > 1 ||
+            node.scrollHeight > node.clientHeight + 1) {
+            failures.push({ ...describe(node, form, controlExpectedHeight), reason: '文本域留白应沿用标准框高并完整容纳内容和字数提示' })
+            continue
+          }
+        }
         const referenceName = node.matches('.app-select--reference.ant-select-single')
           ? node.querySelector('.app-select__reference-name')
           : null
@@ -1124,9 +1169,9 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
             continue
           }
         }
-        const height = getLayoutHeight(node)
+        const height = getLayoutHeight(heightOwner)
         if (Math.abs(height - controlExpectedHeight) > 1) {
-          failures.push(describe(node, form, controlExpectedHeight))
+          failures.push({ ...describe(node, form, controlExpectedHeight), height, ownerClassName: heightOwner.className })
         }
       }
     }

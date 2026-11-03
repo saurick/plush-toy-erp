@@ -1760,7 +1760,7 @@ export function createBusinessFormInteractionScenarios({
       },
       viewport: { width: 1600, height: 900 },
       verify: async (page) => {
-        await page.getByRole('tab', { name: '库存余额', exact: true, selected: true }).waitFor()
+        await page.locator('.erp-business-module-view-tabs [role="tab"][aria-selected="true"]').filter({ hasText: '库存余额' }).waitFor()
         await page.locator('.ant-table-row').first().click()
         const cycleCountButton = page
           .locator('button:visible')

@@ -398,22 +398,25 @@
 
 .erp-business-operation-panel__view-switch {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: 7px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 
 .erp-business-operation-panel__view-switch::after {
   content: '';
   flex: 0 0 1px;
+  width: 1px;
   height: 20px;
   background: var(--erp-border);
 }
 
 .erp-business-operation-panel__search {
   display: flex;
-  min-width: min(100%, 268px);
-  flex: 1 1 268px;
+  min-width: min(100%, var(--erp-business-search-min-width, 268px));
+  flex: 1 1 var(--erp-business-search-min-width, 268px);
 }
 
 .erp-business-operation-panel__quick {

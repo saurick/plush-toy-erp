@@ -897,7 +897,7 @@ function ShipmentEditableLines({
               size="small"
               icon={<DeleteOutlined />}
               disabled={fields.length <= 1}
-              onClick={() => { remove(field.name); requestLineItemScroll(Math.min(index, fields.length - 2)) }}
+              onClick={() => { remove(field.name); requestLineItemScroll(Math.min(index, fields.length - 2), { focusField: false }) }}
             >
               移除明细
             </Button>

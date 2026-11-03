@@ -15,6 +15,8 @@
 
 Node.js 统一由 `n` 管理，唯一版本文件为根目录 `.n-node-version`，当前精确锁定 `24.22.1`；`web/package.json#engines.node` 声明 `24.22.x`。pnpm 由 `web/package.json#packageManager` 固定为 `pnpm@10.34.5`。首次安装见 [工具链安装](../scripts/README.md#版本锁定)。
 
+必要的上游修正通过 [依赖补丁](patches/README.md) 随版本管理，`pnpm install --frozen-lockfile` 与 Docker 构建均应用同一补丁。
+
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 sudo n auto
@@ -31,6 +33,8 @@ pnpm install
 组件选型、复用顺序与底层使用边界见[组件复用与使用入口](../docs/engineering/前端实现与交互约定.md#组件复用与使用入口--shared-component-entrypoints)，领域实现按 [ERP 组件入口](src/erp/components/README.md)定位。
 
 列表、表单、下拉及工作台的空提示统一使用 [`AppEmpty`](src/common/components/empty/AppEmpty.jsx)，规格、读取反馈与恢复边界见[空提示约定](../docs/product/ui-design/交互设计说明.md#empty-states)。
+
+分栏内的页面浮层由 [`OverlayScopeProvider`](src/common/components/overlay/OverlayScopeProvider.jsx) 统一管理；弹窗、抽屉和命令式确认分别使用 `AppModal` / `BusinessModal`、[`AppDrawer`](src/common/components/drawer/AppDrawer.jsx) 和 `useModal()`，具体边界见[分栏工作区](../docs/engineering/前端实现与交互约定.md#desktop-split-workspace)。
 
 业务页负责权限、当前选择和领域组件的编排，查询、提交及表单按实际职责放在对应领域目录。收付款实现集中在 `src/erp/components/finance/`，各动作复用页面级防重尝试记录与忙碌状态；事实和状态仍取后端及生成契约。
 

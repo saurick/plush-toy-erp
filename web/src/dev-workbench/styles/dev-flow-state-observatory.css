@@ -571,30 +571,6 @@
   width: min(560px, calc(100vw - 32px));
 }
 
-.erp-dev-flow-definition-select-popup .ant-select-item-group {
-  min-height: 32px;
-  padding: 8px 12px 6px;
-  border-top: 1px solid var(--erp-border);
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.erp-dev-flow-definition-select-popup .ant-select-item-group:first-of-type {
-  border-top: 0;
-}
-
-.erp-dev-flow-definition-select-popup .ant-select-item-option {
-  min-height: 42px;
-  padding-block: 7px;
-}
-
-.erp-dev-flow-definition-select-popup .ant-select-item-option-content {
-  min-width: 0;
-  white-space: normal;
-}
-
 .erp-dev-flow-definition-option {
   display: grid;
   width: 100%;
@@ -605,7 +581,6 @@
 .erp-dev-flow-definition-option__label {
   min-width: 0;
   color: var(--erp-text);
-  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
@@ -1499,31 +1474,6 @@
   color: var(--erp-text-muted);
 }
 
-.erp-dev-flow-transition-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 9px 12px;
-}
-
-.erp-dev-flow-transition-toolbar > .ant-select {
-  flex: 0 1 220px;
-  width: 220px;
-}
-
-.erp-dev-flow-transition-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.erp-dev-flow-transition-filters .ant-btn {
-  min-height: 32px;
-  height: auto;
-  white-space: normal;
-}
-
 .erp-dev-flow-transitions li {
   --erp-dev-state-path-color: var(--erp-primary);
 
@@ -2162,20 +2112,6 @@
     width: 100%;
   }
 
-  .erp-dev-flow-transition-toolbar {
-    display: grid;
-    justify-content: stretch;
-  }
-
-  .erp-dev-flow-transition-filters {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .erp-dev-flow-transition-filters .ant-btn {
-    width: 100%;
-  }
-
   .erp-dev-flow-transition-heading {
     grid-template-columns: 28px minmax(0, 1fr);
   }
@@ -2205,10 +2141,6 @@
 }
 
 @media (max-width: 640px) {
-  .erp-dev-flow-definition-select-popup .ant-select-item-option {
-    min-height: 44px;
-  }
-
   .erp-dev-flow-definition-option {
     display: grid;
     justify-content: stretch;

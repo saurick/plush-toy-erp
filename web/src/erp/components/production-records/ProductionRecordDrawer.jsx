@@ -1,5 +1,6 @@
 import React from 'react'
-import { Button, Drawer } from 'antd'
+import { Button } from 'antd'
+import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import BusinessRecordDetails from '../business-list/BusinessRecordDetails.jsx'
 import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
 import './productionRecords.css'

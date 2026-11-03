@@ -24,7 +24,6 @@ export default function SalesOrderEditor({
   customers,
   customerContacts,
   salesOwnerOptions,
-  paymentConditionOptions,
   unitOptions,
   productSKUs,
   canCreateOrder,
@@ -36,7 +35,6 @@ export default function SalesOrderEditor({
   onCancel,
   onCustomerChange,
   onContactSelect,
-  onPaymentMethodChange,
   onPaymentConditionBlur,
 }) {
   const [attachments, setAttachments] = useState([])
@@ -140,10 +138,8 @@ export default function SalesOrderEditor({
           customers={customers}
           contactOptions={customerContacts}
           salesOwnerOptions={salesOwnerOptions}
-          paymentConditionOptions={paymentConditionOptions}
           onCustomerChange={onCustomerChange}
           onContactSelect={onContactSelect}
-          onPaymentMethodChange={onPaymentMethodChange}
           onPaymentConditionBlur={onPaymentConditionBlur}
         />
       </BusinessForm>

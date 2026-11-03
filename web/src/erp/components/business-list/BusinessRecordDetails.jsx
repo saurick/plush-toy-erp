@@ -57,7 +57,9 @@ export default function BusinessRecordDetails({ columns = [], record, column = {
             key,
             label,
             empty: empty && !emptyValue?.text,
-            wide: Boolean(copyText) || Boolean(emptyValue?.text) || (typeof value === 'string' && value.length > 24),
+            role: ['identity', 'status', 'media'].includes(column.taskDetailRole) ? column.taskDetailRole : 'field',
+            order: column.taskDetailOrder ?? 100 + index,
+            wide: Boolean(emptyValue?.reason) || copyText.length > 24 || (typeof value === 'string' && value.length > 24),
             children: emptyValue?.text ? (
               <>
                 <span className="mobile-task-facts__status" data-missing-tone={emptyValue.tone === 'warning' ? 'warning' : 'neutral'}>{emptyValue.text}</span>
@@ -78,9 +80,28 @@ export default function BusinessRecordDetails({ columns = [], record, column = {
         })
 
   if (presentation === 'mobile-task') {
-    const populated = items.filter((item) => !item.empty)
-    const fields = (rows) => <dl className="mobile-task-facts__grid">{rows.map((item) => <div key={item.key} className={item.wide ? 'mobile-task-facts__field mobile-task-facts__field--wide' : 'mobile-task-facts__field'}><dt>{item.label}</dt><dd>{item.children}</dd></div>)}</dl>
-    return <section className="mobile-task-facts" aria-label={title}><h3>{title}</h3>{fields(populated)}</section>
+    const populated = items.filter((item) => !item.empty).sort((left, right) => left.order - right.order)
+    const fields = (rows, className, hideLabels = false) => rows.length ? (
+      <dl className={className}>
+        {rows.map((item) => (
+          <div key={item.key} data-field-key={item.key} className={item.wide ? 'mobile-task-facts__field mobile-task-facts__field--wide' : 'mobile-task-facts__field'}>
+            <dt className={hideLabels ? 'erp-sr-only' : undefined}>{item.label}</dt>
+            <dd>{item.children}</dd>
+          </div>
+        ))}
+      </dl>
+    ) : null
+    return (
+      <section className="mobile-task-facts" data-layout="compact" aria-label={title}>
+        <div className="mobile-task-facts__heading">
+          <h3>{title}</h3>
+          {fields(populated.filter((item) => item.role === 'status'), 'mobile-task-facts__state', true)}
+        </div>
+        {fields(populated.filter((item) => item.role === 'identity'), 'mobile-task-facts__identity')}
+        {fields(populated.filter((item) => item.role === 'field'), 'mobile-task-facts__grid')}
+        {fields(populated.filter((item) => item.role === 'media'), 'mobile-task-facts__media')}
+      </section>
+    )
   }
 
   return <Descriptions bordered column={column} size="small" items={items.map(({ key, label, children }) => ({ key, label, children }))} />

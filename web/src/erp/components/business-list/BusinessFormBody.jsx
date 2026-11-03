@@ -27,7 +27,7 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
   const positionKeyRef = useRef('all')
   const [sections, setSections] = useState([])
   const [active, setActive] = useState('')
-  const [scrollArea, setScrollArea] = useState({ shared: false, top: 0, height: 0 })
+  const [scrollArea, setScrollArea] = useState({ shared: false, top: 0, height: 0, readingTop: 0 })
   const showNavigation = navigation && open && !loading && sections.length >= 3
   const sectionMode = showNavigation && formDisplay === 'section'
   const activeRef = useRef(active)
@@ -114,7 +114,7 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
       const horizontalNavigation = sectionModeRef.current || sectionNavigation?.querySelector('.erp-business-form-page__section-picker')?.getClientRects().length
       const navigationHeight = shared && horizontalNavigation ? sectionNavigation?.offsetHeight || 0 : 0
       const readingInset = shared ? top + navigationHeight : 0
-      setScrollArea((previous) => previous.shared === shared && previous.top === top && previous.height === height ? previous : { shared, top, height })
+      setScrollArea((previous) => previous.shared === shared && previous.top === top && previous.height === height && previous.readingTop === readingInset ? previous : { shared, top, height, readingTop: readingInset })
       const nodes = [...body.querySelectorAll('[data-form-section]')].filter((node) =>
         node.closest('[data-business-form-page]') === page
       )
@@ -237,7 +237,7 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
       data-section-navigation={showNavigation ? 'true' : undefined}
       data-shared-scroll={scrollArea.shared ? 'true' : undefined}
       data-form-display={sectionMode ? 'section' : 'all'}
-      style={scrollArea.shared ? { '--erp-form-section-top': `${scrollArea.top}px`, '--erp-form-section-height': `${scrollArea.height}px` } : undefined}
+      style={scrollArea.shared ? { '--erp-form-section-top': `${scrollArea.top}px`, '--erp-form-section-height': `${scrollArea.height}px`, '--erp-form-reading-top': `${scrollArea.readingTop}px` } : undefined}
     >
       {showNavigation ? (
         <nav

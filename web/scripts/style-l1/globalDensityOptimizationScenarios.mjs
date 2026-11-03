@@ -96,7 +96,7 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     await goto(page, route)
     await page.getByRole('button', { name: trigger }).click()
     const form = page.locator('.erp-business-form-page:visible')
-    const all = form.getByRole('radio', { name: '查看全部', exact: true })
+    const all = form.getByRole('radio', { name: '目录', exact: true })
     if (await all.count()) await all.check()
     const inheritedControls = form.getByRole('button', { name: new RegExp(`${label}：.*沿用`) })
     if (!(await inheritedControls.count())) await form.getByRole('button', { name: { sales: '添加订货明细', purchase: '添加采购明细', outsourcing: '添加加工明细' }[key], exact: true }).last().click()
@@ -140,6 +140,7 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
       await overlay.waitFor({ state: 'hidden' })
     }
     await choose('供应商')
+    await form.locator('#payment_term_days').fill('0')
     await choose('材料名称')
     const reveal = form.getByRole('button', { name: '展开第 1 行下单资料', exact: true })
     if (await reveal.count()) await reveal.click()

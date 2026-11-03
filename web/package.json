@@ -64,6 +64,10 @@
     "overrides": {
       "dompurify": "3.4.17",
       "uuid": "13.0.1"
+    },
+    "patchedDependencies": {
+      "rc-resize-observer@1.4.3": "patches/rc-resize-observer@1.4.3.patch",
+      "antd@5.29.3": "patches/antd@5.29.3.patch"
     }
   },
   "scripts": {

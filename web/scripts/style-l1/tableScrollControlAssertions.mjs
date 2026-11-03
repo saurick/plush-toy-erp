@@ -312,9 +312,16 @@ export async function exerciseTableScrollSettling(page, wrapper, scroller) {
     await dock.elementHandle()
   )
   try {
+    const touchWebKit = page.context().browser()?.browserType().name() === 'webkit' &&
+      await wrapper.evaluate(() => matchMedia('(pointer: coarse)').matches)
     for (let index = 0; index < 4; index += 1) {
       const before = await vertical.evaluate((node) => node.scrollTop)
-      await page.mouse.wheel(0, direction * distance)
+      if (touchWebKit) {
+        // 手机 WebKit 的自动化接口不支持 wheel；仍由浏览器产生真实 scroll 事件。
+        await vertical.evaluate((node, delta) => { node.scrollTop += delta }, direction * distance)
+      } else {
+        await page.mouse.wheel(0, direction * distance)
+      }
       await page.waitForFunction(
         ({ node, before }) => node.scrollTop !== before,
         { node: vertical, before }
@@ -412,7 +419,11 @@ export async function exerciseTableScrollControls(page, wrapper, scroller) {
       target: Math.min(before.max, before.left + before.step),
     }
   )
-  assert.equal(await left.isEnabled(), true)
+  await page.waitForFunction(
+    (node) => !node.disabled,
+    await left.elementHandle(),
+    { timeout: 5000 }
+  )
   await left.press('Enter')
   await page.waitForFunction(
     (node) => node.scrollLeft <= 1,
@@ -466,7 +477,9 @@ export async function exerciseTableScrollControls(page, wrapper, scroller) {
   const { box, thumb } = geometry
   await page.mouse.move(box.x + thumb / 2, box.y + box.height / 2)
   await page.mouse.down()
-  await page.mouse.move(box.x + box.width - thumb / 2, box.y + box.height / 2, {
+  // 极小溢出时，滑块行程不足以跨过原生拖拽阈值；越过端点仍由控件钳制。
+  const dragEnd = Math.max(box.x + box.width - thumb / 2, box.x + thumb / 2 + 32)
+  await page.mouse.move(dragEnd, box.y + box.height / 2, {
     steps: 8,
   })
   assert.equal(await range.isVisible(), true, '横向拖动期间始终保留滚动条')

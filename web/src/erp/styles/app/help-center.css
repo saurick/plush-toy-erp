@@ -877,86 +877,6 @@
   box-shadow: inset 0 0 0 1px var(--erp-primary);
 }
 
-.erp-help-flow--chain .erp-help-flow__canvas {
-  min-height: var(--help-flow-height);
-}
-
-.erp-help-flow__edges {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: var(--help-flow-height);
-  overflow: visible;
-  color: var(--erp-text-subtle);
-  pointer-events: none;
-}
-
-.erp-help-flow__edges > path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.4;
-}
-
-.erp-help-flow__edges .erp-help-flow__branch {
-  color: var(--erp-warning-text);
-  stroke-dasharray: 5 4;
-}
-
-.erp-help-flow__issue {
-  position: absolute;
-  width: 28%;
-  text-align: center;
-  transform: translateX(-50%);
-}
-
-.erp-help-flow__condition,
-.erp-help-flow__return {
-  display: block;
-  min-height: 26px;
-  color: var(--erp-warning-text);
-  font-size: var(--erp-font-caption);
-}
-
-.erp-help-flow__condition {
-  position: absolute;
-  top: -29px;
-  left: calc(50% + 8px);
-  width: max-content;
-  text-align: left;
-}
-
-.erp-help-flow__issue button {
-  display: grid;
-  width: 100%;
-  min-height: 68px;
-  align-content: center;
-  padding: 7px;
-  border: 1px dashed var(--erp-warning-text);
-  border-radius: 7px;
-  gap: 2px;
-  background: color-mix(
-    in srgb,
-    var(--erp-warning-text) 7%,
-    var(--erp-surface-bg)
-  );
-  color: var(--erp-warning-text);
-  cursor: pointer;
-  font: inherit;
-}
-
-.erp-help-flow__issue button[aria-pressed='true'] {
-  border-style: solid;
-  box-shadow: inset 0 0 0 1px var(--erp-warning-text);
-}
-
-.erp-help-flow__issue :where(button) > span {
-  font-size: var(--erp-font-caption);
-}
-
-.erp-help-flow__return {
-  padding-top: 5px;
-}
-
 .erp-help-flow--path .erp-help-flow__steps > li:where(:not(:last-child))::after,
 .erp-help-flow--steps
   .erp-help-flow__steps
@@ -1435,7 +1355,6 @@
 
 .erp-help-topic:focus-visible,
 .erp-help-flow__step:focus-visible,
-.erp-help-flow__issue button:focus-visible,
 .erp-help-example__area > button:focus-visible,
 .erp-help-note:focus-visible,
 .erp-help-source-details > summary:focus-visible,
@@ -1503,8 +1422,7 @@
 }
 
 @container (max-width: 620px) {
-  .erp-help-flow__canvas,
-  .erp-help-flow--chain .erp-help-flow__canvas {
+  .erp-help-flow__canvas {
     min-width: 0;
     min-height: 0;
   }
@@ -1529,7 +1447,7 @@
     grid-column: 1 / -1;
   }
 
-  .erp-help-flow__edges,
+
   .erp-help-flow--path
     .erp-help-flow__steps
     > li:where(:not(:last-child))::after,
@@ -1537,23 +1455,6 @@
     .erp-help-flow__steps
     > li:where(:not(:last-child))::after {
     display: none;
-  }
-
-  .erp-help-flow__issue {
-    position: static;
-    width: 100%;
-    margin-top: 12px;
-    transform: none;
-  }
-
-  .erp-help-flow__issue button {
-    min-height: 56px;
-  }
-
-  .erp-help-flow__condition {
-    position: static;
-    width: auto;
-    text-align: center;
   }
 
   .erp-help-notes {

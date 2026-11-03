@@ -60,6 +60,8 @@ pnpm preview:yoyoosun
 
 `STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归；`STYLE_L1_SCENARIO_MAX_ATTEMPTS` 只接受 `1` 或 `2`，CI 固定为一次；`STYLE_L1_OUTPUT_DIR` 只接受仓库 `output/` 下的受管目录。
 
+`mobile-task-handling-*` 走“任务信息 → 任务办理 → 结果回执”，覆盖历史来源资料、事件回执、步骤往返、手机附件触区及零写入；`mobile-task-handling-sales-pending` 检查未办理时的回执锁定与手机办理限制。来源上下文与流程记录的模拟响应遵循当前接口合同；回执中的“来源业务当前资料”独立读取，与历史办理结论分开核对。实际提交、失败重试和回执恢复复用 `task-unified-onsite-*`、`task-unified-capture-*`，两端来源只读回归复用 `task-unified-history-*`。 `task-unified-authoring-*` 覆盖工程入口的按需打开与 BOM 保存；普通来源场景同时检查未打开工程编辑器时不查询空订单、办理页不存在读取失败占位。
+
 `business-form-corners-<module>-desktop|mobile|dark|mobile-dark` 沿用现有编辑或只读入口，逐个选择分区并检查四角、边框、标题内圆角与祖先裁切，同时保留背景、输入焦点和草稿状态。销售、采购、加工合同与出货另有 `business-form-corners-<module>-create-<appearance>`，覆盖新建空明细及目录 / 页签两种显示；普通标题带与明细编辑器标题均参与实际叠层检查，`display: contents` 因不生成布局盒不计作祖先裁切。桌面使用 1920×1080、DPR 2，手机使用 390×844、DPR 2；截图与分区几何证据保存到同一受管输出目录。完整模块和场景名以 `businessFormCornerScenarios.mjs` 与现有表单注册为准，平铺短表单不会为检查强行增加分区。
 
 默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
@@ -150,6 +152,10 @@ Workflow 计划还核对老板阻塞 / 完成 / 退回、跨角色催办、reaso
 `dev-workbench-switches-1024/1200/1280/1920` 从工作台路由目录检查主、次级页签、搜索提交与清除、筛选和恢复；逐帧记录控件挂载、选中状态和几何位置，报告写入 `workbench-switches-<width>.json`。运行与发布接口使用现有只读浏览器夹具，不触发迁移、造数或发布。
 
 场景名称、顺序与请求计数的生命周期保持独立；通过 `STYLE_L1_SCENARIOS` 选择受影响场景，完整运行遵循 QA 的高成本授权规则。
+
+仓储历史回归在延迟列表响应的夹具下，等待目标查询响应、实际行和关联名称显示，再连续五轮后退、前进与刷新，并输出 `inventory-history-refresh.json`。SPA 历史切换不能以文档此前的 `networkidle` 状态作为新视图完成的证据；旧文档卸载期间才发起的 fetch 即使已被捕获，WebKit 仍可能通过自动化通道报告访问控制错误。场景继续保留所有 `pageerror`、控制台错误和失败请求的检查。
+
+默认第 1 页切换库存视图时，每次操作只发起一次列表查询；`warehouse-inventory-pagination-view-reset` 另用 51 条批次核对第 2 页保持可用，切换到库存变动记录后按第 1 页读取。
 
 `businessFormalScenarios.mjs` 组合主数据、订单、库存、生产、出货及附件恢复的领域场景；共享断言位于 `businessFormalAssertions.mjs`。跨业务页的 `businessCorePagesScenarios.mjs` 按固定顺序调用各领域的 `businessCore*Checks.mjs`，请求记录与局部夹具归对应检查持有，保留场景名称、顺序、分页及权限断言。
 

@@ -17,6 +17,7 @@ function canFocusLineInput(input) {
 
 export function useLineItemAppendScroll(itemCount, { initialFocusSelector } = {}) {
   const pendingScrollIndexRef = useRef(null)
+  const pendingFocusFieldRef = useRef(true)
   const rowRefs = useRef([])
   const scrollFrameRef = useRef(null)
 
@@ -64,8 +65,8 @@ export function useLineItemAppendScroll(itemCount, { initialFocusSelector } = {}
       target.querySelectorAll('input:not([type="hidden"]), textarea, select')
     ).filter(canFocusLineInput)
     const initialInput = initialFocusSelector ? target.querySelector(initialFocusSelector) : null
-    // 新增与复制后进入业务输入，保留表单已指定的合法字段焦点。
-    const focusTarget = inputs.includes(document.activeElement)
+    // 新增与复制进入字段；移除只回到相邻行，避免重新激活顶部动作。
+    const focusTarget = !pendingFocusFieldRef.current ? target : inputs.includes(document.activeElement)
       ? document.activeElement
       : inputs.includes(initialInput) ? initialInput : inputs[0]
     const scrollOptions = {
@@ -86,10 +87,11 @@ export function useLineItemAppendScroll(itemCount, { initialFocusSelector } = {}
   }, [initialFocusSelector])
 
   const requestLineItemScroll = useCallback(
-    (index) => {
+    (index, { focusField = true } = {}) => {
       const numericIndex = Number(index)
       if (!Number.isFinite(numericIndex) || numericIndex < 0) return
       pendingScrollIndexRef.current = Math.floor(numericIndex)
+      pendingFocusFieldRef.current = focusField
       cancelScheduledScroll()
       scrollFrameRef.current = window.requestAnimationFrame(() =>
         flushPendingScroll()

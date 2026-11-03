@@ -5,6 +5,8 @@ import AppSelect from '@/common/components/select/AppSelect'
 import { PermissionLabel } from '../../../common/consts/permissions.generated.mjs'
 import { WorkbenchFacts, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import { describeDevBusinessChainResponsibility } from '../../config/devBusinessChainProjection.mjs'
+import { buildActionRelationGraph } from '../../config/devBusinessRuleGraphs.mjs'
+import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 
 import './businessRelations.css'
 
@@ -54,20 +56,8 @@ export default function BusinessActionRelations({
           />
         </WorkbenchToolbar>
       ) : null}
-      <div
-        className="erp-dev-action-relations__handoff"
-        aria-label="动作上下游"
-      >
-        <div>
-          <small>上游输入</small>
-          <strong>{action.input}</strong>
-        </div>
-        <span aria-hidden>→</span>
-        <div>
-          <small>下游结果</small>
-          <strong>{action.result}</strong>
-        </div>
-      </div>
+      <BusinessFlowDiagram key={action.key} relationships flow={buildActionRelationGraph(action)} label={`${action.label}动作上下游关系图`} />
+      <WorkbenchFacts items={[{ label: '上游输入', value: action.input }, { label: '下游结果', value: action.result }]} />
       <WorkbenchFacts
         items={[
           {

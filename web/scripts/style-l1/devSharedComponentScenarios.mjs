@@ -4,6 +4,7 @@ import { assertControlPreviewThemeIsolation } from './controlThemeAssertions.mjs
 import { createDevPaginationScenarios } from './devPaginationScenarios.mjs'
 import { createDevBusinessComponentScenarios } from './devBusinessComponentScenarios.mjs'
 import { createSelectOverflowScenarios } from './selectOverflowScenarios.mjs'
+import { createGroupedSelectScenarios } from './groupedSelectScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { isAcceptedFocusBorder } from './colorAssertions.mjs'
 import {
@@ -84,6 +85,7 @@ export function createDevSharedComponentScenarios({
       },
     },
     ...createSelectOverflowScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createGroupedSelectScenarios({ assert, assertNoHorizontalOverflow, outputDir }),
     ...createDevPaginationScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevBusinessComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
     {

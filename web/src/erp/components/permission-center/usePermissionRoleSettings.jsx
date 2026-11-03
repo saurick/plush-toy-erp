@@ -55,7 +55,7 @@ import { RolePermissionPolicyPanel } from './RolePermissionPolicyPanel.jsx'
 import { readRolePermissionPolicy, constrainRolePermissionSelection } from '../../utils/rolePermissionPolicy.mjs'
 import { usePermissionFullscreen } from './usePermissionFullscreen.jsx'
 import { RpcErrorCode } from '@/common/consts/errorCodes'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
@@ -89,10 +89,12 @@ export function usePermissionRoleSettings({
   setSaving,
   saving,
 }) {
+  const modal = useModal()
   const [detailView, setDetailView] = useState(null)
   const [openPopover, setOpenPopover] = useState(null)
   const {
     fullscreen,
+    fullscreenAriaModal,
     setFullscreen,
     enterFullscreen,
     workspaceRef,
@@ -330,13 +332,14 @@ export function usePermissionRoleSettings({
   )
 
   const confirmDiscardRoleChanges = useCallback(
-    ({ title, content, onDiscard, onKeepEditing }) => {
+    ({ title, content, onDiscard, onKeepEditing, overlay }) => {
       if (!roleConfigurationDirty) {
         onDiscard?.()
         return
       }
       modal.confirm({
         maskClosable: true,
+        getContainer: overlay === 'workspace' ? () => globalThis.document.body : undefined,
         centered: true,
         title,
         content,
@@ -350,7 +353,7 @@ export function usePermissionRoleSettings({
         onCancel: onKeepEditing,
       })
     },
-    [roleConfigurationDirty]
+    [modal, roleConfigurationDirty]
   )
 
   const roleSummaries = useMemo(
@@ -757,7 +760,7 @@ export function usePermissionRoleSettings({
           ref={workspaceRef}
           className={`erp-role-center-detail${fullscreen ? ' erp-role-center-detail--fullscreen' : ''}`}
           role={fullscreen ? 'dialog' : undefined}
-          aria-modal={fullscreen ? 'true' : undefined}
+          aria-modal={fullscreenAriaModal}
           aria-label={
             fullscreen
               ? `${getRoleVisibleName(selectedRole)}岗位设置`

@@ -32,9 +32,9 @@ export default function ERPPageActions({ showRefresh = true }) {
           icon={<LayoutOutlined />}
           onClick={actions.onSplit}
           aria-pressed={actions.splitOpen}
-          aria-label={actions.splitOpen ? '收起分栏' : '分栏编辑'}
+          aria-label={actions.splitOpen ? '收起分栏' : '分栏'}
         >
-          {actions.splitOpen ? '收起分栏' : '分栏编辑'}
+          {actions.splitOpen ? '收起分栏' : '分栏'}
         </Button>
       ) : null}
     </div>

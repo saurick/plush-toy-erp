@@ -6,6 +6,7 @@ import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { buildWorkflowTaskEventTrailModel } from '../../utils/workflowTaskEventPresentation.mjs'
 import { buildWorkflowTaskFlowEventItems } from '../../utils/workflowTaskFlowEventPresentation.mjs'
 import './workflowTaskEventTrail.css'
+import WorkflowTaskScopeHelp from './WorkflowTaskScopeHelp.jsx'
 
 function WorkflowEventAuditDetails({ item }) {
   const [open, setOpen] = React.useState(false)
@@ -118,7 +119,7 @@ export default function WorkflowTaskEventTrail({
     task,
   })
   const page = records ? records[records.scope] : { items: events, status: state, truncated }
-  const title = records ? '流程处理记录' : '本任务处理记录'
+  const title = records ? '处理记录' : '本任务处理记录'
   const items = records ? buildWorkflowTaskFlowEventItems({ events: page.items, task, scope: records.scope }) : model.items
   const loading = page.status === 'idle' || page.status === 'loading'
   const summaryText = loading ? '读取中' : page.status === 'error' ? '读取失败' : items.length
@@ -140,17 +141,17 @@ export default function WorkflowTaskEventTrail({
     >
       <div key={task.id} className="workflow-task-event-trail__body">
         <div className="workflow-task-event-trail__head">
-          <div className={compact ? 'workflow-task-event-trail__heading-label' : undefined}>
+          <div className="workflow-task-event-trail__heading-label">
             {compact ? <HistoryOutlined aria-hidden="true" /> : null}
             <h3 id={`workflow-task-event-trail-title-${task.id || 'current'}`}>
               {title}
             </h3>
+            {records ? <WorkflowTaskScopeHelp kind="records" scope={records.scope} /> : null}
             {compact ? summary : null}
           </div>
           {!compact ? summary : null}
+          {records ? <SlidingSegmented className="workflow-task-event-trail__scope" hierarchy="secondary" size="small" aria-label="处理记录范围" options={[{ label: '含关联任务', value: 'flow' }, { label: '只看本任务', value: 'task' }]} value={records.scope} onChange={records.changeScope} /> : null}
         </div>
-
-        {records ? <SlidingSegmented className="workflow-task-event-trail__scope" hierarchy="secondary" size="small" aria-label="处理记录范围" options={[{ label: '本次流程', value: 'flow' }, { label: '仅本任务', value: 'task' }]} value={records.scope} onChange={records.changeScope} /> : null}
 
         {showResponsibility ? (
           <dl

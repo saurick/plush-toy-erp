@@ -1,3 +1,4 @@
+import { isBOMVersionReadOnly, readBOMVersion } from './bomEditorDensityAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 export function createBOMPaginationScenarios({ assert, customerRuntimeEffectiveSession, assertNoHorizontalOverflow, outputDir, path }) {
@@ -85,9 +86,9 @@ export function createBOMPaginationScenarios({ assert, customerRuntimeEffectiveS
           await editor.getByLabel('产品', { exact: true }).click()
           await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'PROD-STYLE-L1' }).click()
         }
-        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+        assert.equal(await isBOMVersionReadOnly(editor), true)
         if (mode === 'create') await page.screenshot({ path: path.join(outputDir, 'bom-auto-version-new-4k.png'), animations: 'disabled' })
-        if (mode !== 'edit') assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), '')
+        if (mode !== 'edit') assert.equal(await readBOMVersion(editor), '保存后自动生成')
         else await editor.getByLabel('备注', { exact: true }).fill('当前页编辑后的说明')
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
         if (['lost-response', 'invalid-response'].includes(mode)) {
@@ -98,7 +99,7 @@ export function createBOMPaginationScenarios({ assert, customerRuntimeEffectiveS
         }
         if (mode === 'readback-retry') {
           await editor.getByRole('alert').waitFor()
-          assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), 'V125')
+          assert.equal(await readBOMVersion(editor), 'V125')
           await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
         }
         await editor.waitFor({ state: 'hidden' })

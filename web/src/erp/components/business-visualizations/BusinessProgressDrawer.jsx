@@ -6,12 +6,13 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Alert, Button, Drawer, Spin, Tag } from 'antd'
+import { Alert, Button, Spin, Tag } from 'antd'
 import {
   ArrowRightOutlined,
   DownOutlined,
   RightOutlined,
 } from '@ant-design/icons'
+import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'

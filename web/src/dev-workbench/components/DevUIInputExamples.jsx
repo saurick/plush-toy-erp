@@ -11,6 +11,7 @@ import {
 } from '@/erp/components/business-list/BusinessDateInputs.jsx'
 import { isDateInputRangeReversed } from '@/erp/utils/dateRange.mjs'
 import { buildWorkflowDeadlineQuickOptions } from '@/erp/utils/workflowTaskTiming.mjs'
+import { buildHistorySourceSelectOptions } from '@/erp/utils/historySourceSelectOptions.mjs'
 
 const STATES = [
   { value: 'normal', label: '正常' },
@@ -25,6 +26,77 @@ const INITIAL_DATES = {
   end: '2026-10-15',
 }
 const DEADLINE_OPTIONS = buildWorkflowDeadlineQuickOptions()
+const GROUPED_SOURCE_OPTIONS = buildHistorySourceSelectOptions([
+  { key: 'materials', label: '材料档案', kind: 'master' },
+  { key: 'suppliers', label: '供应商与加工厂', kind: 'master' },
+  { key: 'sales_orders', label: '销售订单', kind: 'order' },
+  { key: 'purchase_orders', label: '采购订单', kind: 'order' },
+  { key: 'outsourcing_orders', label: '委外订单', kind: 'order' },
+]).map((group) => ({
+  ...group,
+  options: group.options.map((option) => ({
+    ...option,
+    disabled: option.value === 'suppliers',
+  })),
+}))
+const GROUPED_SOURCE_LABELS = new Map(
+  GROUPED_SOURCE_OPTIONS.flatMap((group) => group.options.map(({ value, label }) => [value, label]))
+)
+
+export function GroupedSelectExample() {
+  const [source, setSource] = useState('purchase_orders')
+  const [sources, setSources] = useState(['materials', 'sales_orders'])
+  return (
+    <div className="erp-control-example-stack">
+      <div className="erp-control-input-grid">
+        <div className="erp-control-input-field">
+          <label htmlFor="control-grouped-source">单选记录类型</label>
+          <Select
+            id="control-grouped-source"
+            aria-label="单选记录类型"
+            placeholder="选择记录类型"
+            showSearch
+            virtual={false}
+            optionFilterProp="label"
+            notFoundContent="没有匹配的记录类型"
+            value={source}
+            onChange={setSource}
+            options={GROUPED_SOURCE_OPTIONS}
+          />
+          <output aria-label="分组单选结果">{GROUPED_SOURCE_LABELS.get(source) || '未选择记录类型'}</output>
+        </div>
+        <div className="erp-control-input-field">
+          <label htmlFor="control-grouped-sources">多选记录类型</label>
+          <Select
+            id="control-grouped-sources"
+            aria-label="多选记录类型"
+            placeholder="选择记录类型"
+            mode="multiple"
+            showSearch
+            virtual={false}
+            optionFilterProp="label"
+            notFoundContent="没有匹配的记录类型"
+            value={sources}
+            onChange={setSources}
+            options={GROUPED_SOURCE_OPTIONS}
+          />
+          <output aria-label="分组多选结果">{sources.length ? sources.map((value) => GROUPED_SOURCE_LABELS.get(value)).join('、') : '未选择记录类型'}</output>
+        </div>
+      </div>
+      <p>供应商与加工厂仅用于演示禁用状态；这些选择不查询或修改业务记录。</p>
+      <div className="erp-control-example-row">
+        <Button
+          onClick={() => {
+            setSource('purchase_orders')
+            setSources(['materials', 'sales_orders'])
+          }}
+        >
+          重置分组示例
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 export function BasicInputExample() {
   const [state, setState] = useState('normal')

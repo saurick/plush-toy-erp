@@ -1,5 +1,6 @@
 import React from 'react'
-import { App } from 'antd'
+import { useModal } from '@/common/utils/antdApp'
+import { canRestoreOverlayFocus, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 import BusinessModal from './BusinessModal.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
@@ -8,10 +9,10 @@ function joinClassNames(...parts) {
   return parts.filter(Boolean).join(' ')
 }
 
-function findTopVisibleModal() {
+function findTopVisibleModal(scope) {
   if (typeof document === 'undefined') return null
   const visibleDialogs = Array.from(
-    document.querySelectorAll('.ant-modal')
+    (scope?.enabled ? scope.host : document).querySelectorAll('.ant-modal')
   ).filter((dialog) => {
     const rect = dialog.getBoundingClientRect()
     const style = window.getComputedStyle(dialog)
@@ -30,8 +31,9 @@ function findTopVisibleModal() {
   return visibleDialogs[visibleDialogs.length - 1] || null
 }
 
-function focusLatestVisibleBusinessFormModal() {
-  const dialog = findTopVisibleModal()
+function focusLatestVisibleBusinessFormModal(scope) {
+  if (!canRestoreOverlayFocus(scope)) return true
+  const dialog = findTopVisibleModal(scope)
   if (!dialog) return false
   // A delayed form callback must leave focus to a newer confirmation or dialog.
   if (!dialog.matches('.erp-business-action-modal--form')) return true
@@ -72,14 +74,14 @@ function focusLatestVisibleBusinessFormModal() {
   )
 }
 
-export function scheduleBusinessFormModalFocus(delay = 0) {
+export function scheduleBusinessFormModalFocus(delay = 0, scope = null) {
   let cancelled = false
   let timer = null
   let attempts = 0
   const run = () => {
     if (cancelled) return
     attempts += 1
-    const focused = focusLatestVisibleBusinessFormModal()
+    const focused = focusLatestVisibleBusinessFormModal(scope)
     if (!focused && attempts < 6) {
       timer = window.setTimeout(run, 80)
     }
@@ -91,16 +93,16 @@ export function scheduleBusinessFormModalFocus(delay = 0) {
   }
 }
 
-function focusBusinessFormModalAfterTransition(delay = 0) {
-  scheduleBusinessFormModalFocus(delay)
+function focusBusinessFormModalAfterTransition(delay = 0, scope = null) {
+  scheduleBusinessFormModalFocus(delay, scope)
 }
 
-export function scheduleBusinessFormModalTriggerFocus(triggerElementRef, openRef) {
+export function scheduleBusinessFormModalTriggerFocus(triggerElementRef, openRef, scope) {
   window.setTimeout(() => {
     // Closing can finish after this form reopened or another dialog took focus.
-    if (openRef.current) return
+    if (openRef.current || !canRestoreOverlayFocus(scope)) return
     const trigger = triggerElementRef.current
-    const topDialog = findTopVisibleModal()
+    const topDialog = findTopVisibleModal(scope)
     if (topDialog && !topDialog.contains(trigger)) return
     if (trigger?.isConnected && typeof trigger.focus === 'function') {
       trigger.focus({ preventScroll: true })
@@ -135,7 +137,8 @@ export default function BusinessFormModal({
   okText = '保存',
   ...modalProps
 }) {
-  const { modal } = App.useApp()
+  const modal = useModal()
+  const overlayScope = useOverlayScope()
   const context = useBusinessPageContext()
   const inline = taskInline && Boolean(context?.taskBusiness)
   const discardRef = React.useRef(null)
@@ -175,13 +178,13 @@ export default function BusinessFormModal({
       userAfterOpenChange?.(open)
       if (inline || typeof document === 'undefined') return
       if (!open) {
-        scheduleBusinessFormModalTriggerFocus(triggerElementRef, previousOpenRef)
+        scheduleBusinessFormModalTriggerFocus(triggerElementRef, previousOpenRef, overlayScope)
         return
       }
 
-      focusBusinessFormModalAfterTransition(160)
+      focusBusinessFormModalAfterTransition(160, overlayScope)
     },
-    [userAfterOpenChange, inline]
+    [userAfterOpenChange, inline, overlayScope]
   )
   React.useLayoutEffect(() => {
     if (
@@ -196,8 +199,8 @@ export default function BusinessFormModal({
   }, [open])
   React.useEffect(() => {
     if (!open || inline || typeof window === 'undefined') return undefined
-    return scheduleBusinessFormModalFocus(120)
-  }, [open, inline])
+    return scheduleBusinessFormModalFocus(120, overlayScope)
+  }, [open, inline, overlayScope])
 
   return (
     <BusinessModal

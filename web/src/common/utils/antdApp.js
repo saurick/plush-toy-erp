@@ -1,4 +1,5 @@
 import { createElement } from 'react'
+import { useOverlayScope } from '../components/overlay/OverlayScopeContext.mjs'
 import { CONFIRM_MODAL_WIDTH } from './feedbackConfig.mjs'
 
 const createBufferedApi = (methodNames) => {
@@ -95,7 +96,7 @@ const modalConfigMethodNames = [
   'error',
 ]
 
-const createCenteredModalApi = (modalApi) => {
+export const createCenteredModalApi = (modalApi) => {
   if (!modalApi) {
     return modalApi
   }
@@ -136,4 +137,7 @@ export const registerAntdAppApis = ({ message, modal, notification } = {}) => {
 
 export const message = messageBridge.proxy
 export const modal = modalBridge.proxy
+export function useModal() {
+  return useOverlayScope()?.modal || modal
+}
 export const notification = notificationBridge.proxy

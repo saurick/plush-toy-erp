@@ -17,6 +17,12 @@
   width: 100%;
 }
 
+@container business-form-fields (max-width: 480px) {
+  .erp-delivery-address--mainland {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 767px) {
   .erp-delivery-address--mainland {
     grid-template-columns: minmax(0, 1fr);

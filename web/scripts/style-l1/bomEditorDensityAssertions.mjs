@@ -55,7 +55,7 @@ export async function assertBOMEditorDensity(editor) {
         materialControls: group.querySelectorAll('input[aria-label^="物料名称 "]').length,
         unitControls: group.querySelectorAll('input[aria-label^="单位 "]').length,
         partCount: group.querySelectorAll('tr[data-bom-part-index]').length,
-        materialRowSpans: [...group.querySelector('tr[data-bom-part-index]').cells].slice(0, 4).map((cell) => cell.rowSpan),
+        materialRowSpans: [...group.querySelector('tr[data-bom-part-index]').querySelectorAll('.erp-bom-material-cell')].map((cell) => cell.rowSpan),
         summaries: group.querySelectorAll('.erp-bom-material-group__summary').length,
       })),
     }
@@ -68,7 +68,7 @@ export async function assertBOMEditorDensity(editor) {
   assert.equal(metrics.sourceInPrimary, true, '来源订单号与产品、订单数量同区')
   assert.ok(metrics.bodyOverflow <= 1, `明细横向滚动收口到表格：${detail}`)
   assert.equal(metrics.tableMinimum, 1620, `材料表保留原列宽与自身横向滚动：${detail}`)
-  assert.equal(metrics.columns, metrics.readOnly ? 12 : 13)
+  assert.equal(metrics.columns, 12)
   assert.deepEqual(metrics.materialColumns, ['物料名称', '厂商料号', '规格', '单位'])
   if (metrics.thumbnail && metrics.width >= 768) {
     assert.ok(metrics.thumbnail.right <= metrics.selector.left + 1, `产品图片与选择框并排：${detail}`)
@@ -83,7 +83,7 @@ export async function assertBOMEditorDensity(editor) {
     assert.equal(group.materialControls, 1, '同组部位共享物料关联')
     assert.equal(group.unitControls, 1, '同组部位共享单位')
     assert.deepEqual(group.materialRowSpans, Array(4).fill(group.partCount + 1), '原有材料列跨部位及组尾合并')
-    assert.equal(group.summaries, 1, '每组保留原有尾行操作与汇总')
+    assert.equal(group.summaries, 1, '每组保留原有用量汇总')
     assert.ok(group.partCount > 0, '身份行对应真实部位')
   }
   console.log(`[style:l1] bom-editor-density=${detail}`)

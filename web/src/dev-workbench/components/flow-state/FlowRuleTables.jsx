@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
 import { Button } from 'antd'
-import { buildMasterLifecycleGraph } from '../../config/devBusinessRuleGraphs.mjs'
-import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 import Select from '@/common/components/select/AppSelect'
+import { WorkbenchFacts, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import { buildDevDocsLocation } from '../../pages/devDocsNavigation.mjs'
 import { chainRuleTestingURL } from '../../config/devBusinessChainVerification.mjs'
 import { BUSINESS_RULES } from '../../config/devBusinessRules.mjs'
-import { WorkbenchFacts, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
+import { buildMasterLifecycleGraph } from '../../config/devBusinessRuleGraphs.mjs'
+import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 
 function RuleReader({ rules, title, selectLabel, states, lifecycle = false, selectedKey, onSelect }) {
   const [localKey, setLocalKey] = useState(null)

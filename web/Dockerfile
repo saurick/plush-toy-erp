@@ -11,6 +11,7 @@ FROM ${NODE_BUILDER_IMAGE} AS builder
 WORKDIR /app
 
 COPY web/package.json web/pnpm-lock.yaml ./web/
+COPY web/patches ./web/patches
 
 RUN npm config set registry https://registry.npmmirror.com && \
     npm install -g pnpm@10.34.5 && \

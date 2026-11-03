@@ -66,7 +66,7 @@ export function FinancePaymentEditor({
             open={paymentOpen}
           />
         </Form.Item>
-        <BusinessFormSection title="往来与金额">
+        <BusinessFormSection fieldLayout="adaptive" title="往来与金额">
           {refundSource ? (
             <p className="erp-business-inline-note">
               退回原款 {refundSource.payment_no}；当前可退{' '}
@@ -103,6 +103,7 @@ export function FinancePaymentEditor({
             />
           </Form.Item>
           <Form.Item
+            className="erp-business-action-form__field--short"
             name="direction"
             label="收付款方向"
             rules={[{ required: true }]}
@@ -125,6 +126,7 @@ export function FinancePaymentEditor({
             />
           </Form.Item>
           <Form.Item
+            className="erp-business-action-form__field--wide"
             name="counterparty_id"
             label={partyIsCustomer ? '客户' : '供应商'}
             rules={[{ required: true, message: '请选择往来方' }]}
@@ -152,6 +154,7 @@ export function FinancePaymentEditor({
             sourceContext={sourceContext}
           />
           <Form.Item
+            className="erp-business-action-form__field--wide"
             name="purpose_note"
             label={refundSource ? '退款原因' : '款项说明'}
             rules={
@@ -205,7 +208,7 @@ export function FinancePaymentEditor({
           >
             <Input inputMode="decimal" />
           </Form.Item>
-          <Form.Item name="currency" label="币种" rules={[{ required: true }]}>
+          <Form.Item className="erp-business-action-form__field--short" name="currency" label="币种" rules={[{ required: true }]}>
             <Select
               placeholder="请选择币种"
               disabled={paymentKind !== FinancePaymentKind.SETTLEMENT}
@@ -216,7 +219,7 @@ export function FinancePaymentEditor({
             <DateTimeInput />
           </Form.Item>
         </BusinessFormSection>
-        <BusinessFormSection title="账户与凭据">
+        <BusinessFormSection fieldLayout="adaptive" title="账户与凭据">
           <FinancePaymentEvidenceFields form={paymentForm} open={paymentOpen} accountSuggestions={accountSuggestions} canRead={hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYMENT_READ)} />
         </BusinessFormSection>
       </BusinessForm>

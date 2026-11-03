@@ -24,7 +24,7 @@ import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
 import DevSharedComponentGuide, { DevUIConsumerName, SHARED_COMPONENT_SEARCH_TEXT } from './DevSharedComponentGuide.jsx'
 import DevUIPaginationExample from './DevUIPaginationExample.jsx'
 import DevUIPageStateExamples from './DevUIPageStateExamples.jsx'
-import { BasicInputExample, DateInputExample } from './DevUIInputExamples.jsx'
+import { BasicInputExample, DateInputExample, GroupedSelectExample } from './DevUIInputExamples.jsx'
 import DevSelectValueExample from './DevSelectValueExample.jsx'
 import {
   PROGRESS_SCOPE_OPTIONS,
@@ -38,6 +38,7 @@ const DevUIBusinessExamples = lazyWithDynamicImportRetry(
 const PURCHASE_PAGE = getBusinessPagePresentation('accessories-purchase')
 const MATERIAL_PAGE = getBusinessPagePresentation('materials')
 const TASK_PAGE = getBusinessPagePresentation('task-board')
+const HISTORY_PAGE = getBusinessPagePresentation('history-records')
 
 const TOPICS = [
   {
@@ -148,6 +149,25 @@ const TOPICS = [
     checks: ['修改名称和类别，核对当前结果；输入多行备注，观察字数和高度。', '清空内容，再恢复初始值。', '切换禁用与错误，核对值保留、计数和状态外观。'],
     source: 'antd: Button / Input · BusinessTextArea · common/components/select · common/theme/erpAntdTheme.mjs · erp/styles/app/control-*.css',
     consumer: { ...MATERIAL_PAGE, task: '打开新建或编辑，核对字段输入、选择、清空与禁用；取消返回。' },
+  },
+  {
+    key: 'grouped-select',
+    title: '分组下拉',
+    summary: '分类标题、组内选项与选中标记',
+    description: '用共享选择框区分分类与可选项，核对单选、多选、搜索、清空和禁用状态。',
+    rules: [
+      ['分类标题', '中性底色与组间留白', '标题不可选择、不参与方向键定位；保持可读字号，不使用选项的悬停或选中外观。'],
+      ['组内选项', '缩进与常规字重', '选项比分类标题向右缩进 18px；选中后使用高亮、较强字重和勾选标记。'],
+      ['什么时候分组', '已有稳定业务分类', '适用于来源类型、定义分类与岗位候选；短枚举保持平铺，远程资料按原搜索和分页合同读取。'],
+      ['分类来源', '领域选项构造器', '分类由页面业务数据提供；共享控件只负责呈现，不从名称猜分类，不改变权限或可选范围。'],
+    ],
+    checks: [
+      '打开单选和多选，一眼区分浅底分类标题、缩进选项与当前勾选。',
+      '点击分类标题、尝试禁用项，再用方向键选择；标题和禁用项不能成为选中值。',
+      '搜索采购、尝试无结果，再清空和重新选择；切换浅深主题并核对窄窗口。',
+    ],
+    source: 'AppSelect · historySourceSelectOptions · control-foundation.css；规范：交互设计说明 #grouped-select-options',
+    consumer: { ...HISTORY_PAGE, task: '展开记录类型，核对基础资料与业务单据两类，以及搜索、清空和选择后的结果。' },
   },
   {
     key: 'select-overflow',
@@ -834,6 +854,8 @@ export default function DevControlStandards() {
                     <ActionsExample />
                   ) : current.key === 'inputs' ? (
                     <BasicInputExample />
+                  ) : current.key === 'grouped-select' ? (
+                    <GroupedSelectExample />
                   ) : current.key === 'select-overflow' ? (
                     <DevSelectValueExample />
                   ) : current.key === 'dates' ? (

@@ -2,12 +2,12 @@ import { expect as expectLocator } from 'playwright/test'
 import { readFile, writeFile } from 'node:fs/promises'
 import { isBOMVersionReadOnly, readBOMVersion } from './bomEditorDensityAssertions.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
-import { createPaymentMethodScenarios } from './paymentMethodScenarios.mjs'
 import { installBOMMaterialMatchingMocks } from './bomMaterialMatchingScenarios.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { BOM_IMPORT_EXAMPLE_CONTEXT, BOM_IMPORT_EXAMPLE_FILENAME, BOM_IMPORT_EXAMPLE_MATERIALS, BOM_IMPORT_EXAMPLE_ROWS } from '../../src/erp/data/bomImportFormat.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertImportUndoPlacement } from './importUndoAssertions.mjs'
+import { createPaymentMethodScenarios } from './paymentMethodScenarios.mjs'
 
 export function createMasterDataFieldScenarios(deps) {
   const {

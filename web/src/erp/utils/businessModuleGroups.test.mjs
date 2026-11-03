@@ -6,6 +6,7 @@ import {
   businessNavigationSections,
   getBusinessModule,
 } from '../config/businessModules.mjs'
+import { resolveWarehouseView, warehouseViewPath } from './warehouseViews.mjs'
 import {
   getBusinessModuleGroup,
   groupSidebarNavigationSections,
@@ -21,6 +22,30 @@ import {
 const section = (...keys) => ({
   title: '业务',
   items: keys.map(getBusinessModule),
+})
+
+test('仓储页头分类与内容共用权限及 URL，切换不扩大可见来源', () => {
+  const actions = ['production.fact.read', 'warehouse.outbound.read']
+  const profile = { permissions: actions, effective_session: { actions } }
+  const inbound = resolveWarehouseView('/erp/warehouse/inbound', '?warehouse_view=purchase&receipt_id=31', profile)
+  assert.deepEqual(inbound.items.map(({ key }) => key), ['completion'])
+  assert.equal(inbound.activeKey, 'completion')
+  assert.equal(warehouseViewPath(inbound, 'purchase'), null)
+  assert.equal(warehouseViewPath(inbound, 'completion'), null)
+  const outbound = resolveWarehouseView('/erp/warehouse/outbound', '', profile)
+  assert.deepEqual(outbound.items.map(({ key }) => key), ['material-issue', 'reservations'])
+  assert.equal(warehouseViewPath(outbound, 'reservations'), '/erp/warehouse/outbound?warehouse_view=reservations')
+  assert.equal(resolveWarehouseView('/erp/warehouse/inbound', '', {}).items.length, 0)
+  const workspace = getBusinessModuleTabs('/erp/warehouse/outbound', [section('outbound')], { adminProfile: profile })
+  assert.deepEqual(workspace.secondaryNavigation, outbound)
+})
+
+test('库存分类保留来源上下文，库存作业没有重复的查询分类', () => {
+  const navigation = resolveWarehouseView('/erp/warehouse/inventory', '?view=balances&lot_id=81&source_id=4', {})
+  assert.equal(warehouseViewPath(navigation, 'lots'), '/erp/warehouse/inventory?view=lots&lot_id=81&source_id=4')
+  assert.equal(warehouseViewPath(navigation, 'unknown'), null)
+  assert.equal(resolveWarehouseView('/erp/warehouse/inventory', '?workspace=operations', {}), null)
+  assert.equal(resolveWarehouseView('/erp/warehouse/inventory', '?view=unknown', {}).activeKey, 'balances')
 })
 
 test('委外以独立模块直达订单，只有一个页面时不增加页签', () => {

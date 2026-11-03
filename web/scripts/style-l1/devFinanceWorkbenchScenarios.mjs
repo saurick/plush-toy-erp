@@ -1,4 +1,5 @@
 import { expect } from 'playwright/test'
+import { assertBusinessMermaidGraph } from './mermaidGraphAssertions.mjs'
 import { FINANCE_RULES } from '../../src/dev-workbench/config/devFinanceWorkbench.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
@@ -45,41 +46,8 @@ export function createDevFinanceWorkbenchScenarios({
         for (const width of [1920, 1280, 1024]) {
           await page.setViewportSize({ width, height: 1080 })
           await assertNoHorizontalOverflow(page)
-          const rows = await overview
-            .locator('[data-finance-lane]')
-            .evaluateAll((lanes) =>
-              lanes.map((lane) =>
-                [...lane.querySelectorAll('[data-finance-node]')].map(
-                  (node) => {
-                    const r = node.getBoundingClientRect()
-                    return {
-                      x: r.x,
-                      y: r.y,
-                      width: r.width,
-                      clipped: node.scrollWidth > node.clientWidth + 1,
-                    }
-                  }
-                )
-              )
-            )
-          for (const row of rows) {
-            assert(
-              row.every(
-                (box) => !box.clipped && Math.abs(box.y - row[0].y) <= 1
-              ),
-              '同一业务链四个步骤同排且文字不裁切'
-            )
-          }
-          for (let column = 0; column < 4; column += 1) {
-            assert(
-              rows.every(
-                (row) =>
-                  Math.abs(row[column].x - rows[0][column].x) <= 1 &&
-                  Math.abs(row[column].width - rows[0][column].width) <= 1
-              ),
-              '三条链的对应步骤列对齐'
-            )
-          }
+          for (const graph of await overview.locator('[data-business-flow]').all()) await assertBusinessMermaidGraph(graph)
+
         }
         const initialURL = page.url()
         const historyLength = await page.evaluate(() => history.length)

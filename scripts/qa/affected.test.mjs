@@ -22,6 +22,40 @@ function ids(plan) {
   return plan.commands.map((item) => item.id);
 }
 
+test("warehouse and shared navigation changes retain both-engine category regression", () => {
+  for (const file of ["web/src/erp/components/BusinessModuleTabs.jsx", "web/src/erp/components/businessModuleTabs.css", "web/src/common/components/navigation/SlidingTabList.jsx", "web/src/common/components/navigation/useSlidingIndicator.js", "web/src/erp/styles/app/control-affordance.css", "web/scripts/style-l1/warehouseNavigationActions.mjs"]) {
+    const text = buildAffectedPlan([file], { root: ROOT }).followUps.find(({ id }) => id === "warehouse-navigation-browser")?.text || "";
+    for (const expected of ["warehouse-category-chip-navigation", "warehouse-workbench-control-parity", "inventory-visible-copy-desktop", "WebKit", "Chromium"]) assert.ok(text.includes(expected), `${file}: ${expected}`);
+  }
+  assert.equal(buildAffectedPlan(["web/src/erp/utils/paymentConditions.mjs"], { root: ROOT }).followUps.some(({ id }) => id === "warehouse-navigation-browser"), false);
+});
+
+test("business column changes retain empty-state, default-field and output browser coverage", () => {
+  for (const file of ["web/src/common/components/table/tableColumns.mjs", "web/src/erp/components/inventory/inventoryLedgerPresentation.jsx", "web/src/erp/pages/InventoryLedgerPage.jsx", "web/src/erp/components/master-data/productIdentity.css", "web/scripts/style-l1/businessColumnWidthScenarios.mjs"]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const followUp = plan.followUps.find((entry) => entry.id === "business-column-width-browser");
+    assert.ok(followUp, file);
+    for (const name of ["business-column-width-empty-recovery", "business-column-width-shipment-defaults", "business-column-width-inventory-defaults"]) assert.ok(followUp.text.includes(name), `${file}: ${name}`);
+    assert.ok(plan.commands.some((entry) => entry.args?.includes("web/src/erp/utils/businessDefaultColumns.test.mjs")), file);
+  }
+  assert.equal(buildAffectedPlan(["web/src/erp/utils/paymentConditions.mjs"], { root: ROOT }).followUps.some((entry) => entry.id === "business-column-width-browser"), false);
+});
+
+test("grouped select changes retain hierarchy and actual consumer browser checks", () => {
+  for (const file of [
+    "web/src/common/components/select/AppSelect.jsx",
+    "web/src/erp/styles/app/control-foundation.css",
+    "web/src/dev-workbench/components/DevUIInputExamples.jsx",
+    "web/scripts/style-l1/groupedSelectAssertions.mjs",
+    "web/scripts/style-l1/groupedSelectScenarios.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const text = plan.followUps.find((item) => item.id === "browser-regression")?.text || "";
+    for (const scenario of ["shared-grouped-select-light-desktop", "shared-grouped-select-dark-desktop", "shared-grouped-select-light-mobile", "shared-grouped-select-dark-mobile", "grouped-select-business-rules", "grouped-select-design-html", "history-records-source-switch", "system-audit-logs-desktop"]) assert(text.includes(scenario), `${file}: ${scenario}`);
+    assert(!ids(plan).includes("full"), file);
+  }
+});
+
 test("material lifecycle references retain document, test and selection recovery follow-ups", () => {
   for (const file of [
     "web/src/dev-workbench/config/devFlowActionRules.mjs",

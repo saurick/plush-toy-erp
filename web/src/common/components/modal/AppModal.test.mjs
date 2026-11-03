@@ -98,7 +98,7 @@ test('AppModal: isolates the application background with stack-safe restoration'
   )
   assert.match(
     source,
-    /if \(!releaseBackgroundIsolationRef\.current\)[\s\S]*?acquireBackgroundIsolation\(\)/u
+    /if \(!scope\?\.host\.contains\(dialogRef\.current\) && !releaseBackgroundIsolationRef\.current\)[\s\S]*?acquireBackgroundIsolation\(\)/u
   )
   assert.match(
     source,

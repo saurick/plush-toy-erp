@@ -13,10 +13,8 @@
   flex: 0 0 auto;
 }
 
-.erp-product-identity .erp-task-product-image {
-  width: 56px;
-  height: 56px;
-  flex-basis: 56px;
+.erp-product-identity > .erp-product-gallery {
+  flex: 0 0 auto;
 }
 
 .erp-product-identity--compact .erp-task-product-image {

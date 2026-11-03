@@ -1,12 +1,13 @@
 import { writeFile } from 'node:fs/promises'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
-import { createMobileTaskHandlingCoverageScenarios } from './mobileTaskHandlingCoverageScenarios.mjs'
+import { assertNoTaskReadFailures, createMobileTaskHandlingCoverageScenarios } from './mobileTaskHandlingCoverageScenarios.mjs'
 import { createTaskBusinessReturnScenarios } from './taskBusinessReturnScenarios.mjs'
 import { createTaskFusedFlowScenarios } from './taskFusedFlowScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { createBusinessFollowupScenarios } from './businessFollowupScenarios.mjs'
+import { assertCompactShipmentFacts } from './businessRecordDetailsAssertions.mjs'
 
 const writeMethod = /^(?:save_|post_|create_|execute_|submit_|ship_|complete_task|reject_task|resume_task|block_task|urge_task|reassign_task|cancel_|update_|delete_|release_|confirm_)/u
 
@@ -59,7 +60,11 @@ export function createTaskUnifiedHandlingScenarios(deps) {
     const caseIdentity = `${identity}${approved ? '-approved' : ''}${retryShip ? '-retry' : ''}`
     const base = historyBases.find((scenario) => scenario.name === 'mobile-task-handling-shipment')
     const task = { ...base.workflowTaskFixtures[0], id: 99880 + index, task_status_key: 'ready', completed_at: null, task_group: 'handoff_shipment_execute', task_code: 'source-handoff-shipment-execute-1', owner_role_key: 'sales', process_instance_id: null, discovery: { stage_key: 'shipment' }, payload: { source_task_contract: 'workflow.source-task/v1', source_task_producer: 'fulfillment.source', source_record_id: 1, source_task_intent_hash: 'a'.repeat(64), entry_path: '/erp/warehouse/shipments?shipment_id=1' } }
-    const initialRecord = { id: 1, shipment_no: task.source_no, status: 'DRAFT', version: 1, finance_release_status: approved ? 'APPROVED' : 'PENDING', finance_release_version: 1, sales_order_id: 1, customer_id: 1, customer_snapshot: '模拟客户', currency: 'CNY', planned_ship_at: 1793116800, shipping_mark: '本次唛头', note: '分批出货', items: Array.from({ length: 25 }, (_, row) => ({ id: row + 11, shipment_id: 1, sales_order_item_id: row + 1, product_id: 1, product_sku_id: 1, warehouse_id: 1, unit_id: 1, lot_id: 1, quantity: '10' })) }
+    const initialRecord = { id: 1, shipment_no: task.source_no, status: 'DRAFT', version: 1, finance_release_status: approved ? 'APPROVED' : 'PENDING', finance_release_version: 1, sales_order_id: 1, customer_id: 1, customer_snapshot: '模拟客户', currency: 'CNY', total_net_weight_g: null, planned_ship_at: 1793116800, shipping_mark: '本次唛头', note: '分批出货', items: Array.from({ length: 25 }, (_, row) => ({ id: row + 11, shipment_id: 1, sales_order_item_id: row + 1, product_id: row % 18 + 1, product_sku_id: 1, warehouse_id: 1, unit_id: 1, lot_id: 1, quantity: '10' })) }
+    if (identity === 'supervisor') {
+      initialRecord.customer_snapshot = '模拟客户（收货、包装与对账资料统一核对的长名称示例）'
+      initialRecord.note = '分批出货，按确认的包装与唛头逐批核对，保留每批收货要求和产品资料。'.repeat(5)
+    }
     let reads
     let record
     let shipAttempts
@@ -67,6 +72,7 @@ export function createTaskUnifiedHandlingScenarios(deps) {
     return {
       ...base,
       name: `task-step-source-shipment-${mobile ? 'mobile' : 'desktop'}-${caseIdentity}`,
+      themeMode: identity === 'supervisor' ? 'dark' : 'light',
       path: mobile ? '/m/all/tasks' : '/erp/task-board',
       viewport: mobile ? { width: 393, height: 852 } : { width: 1920, height: 1080 },
       workflowTaskFixtures: [task],
@@ -108,6 +114,7 @@ export function createTaskUnifiedHandlingScenarios(deps) {
         await information.getByText(task.source_no, { exact: true }).first().waitFor()
         await page.waitForFunction(() => !document.querySelector('.erp-task-action-drawer [data-business-form-page][aria-busy="true"]'))
         if (mobile) await information.getByRole('heading', { name: '出货明细 · 25 项', exact: true }).waitFor()
+        await assertCompactShipmentFacts(page, { assert, path, outputDir, information, mobile, caseIdentity, sourceNo: task.source_no, note: record.note, customer: record.customer_snapshot })
         await page.screenshot({ path: path.join(outputDir, `shipment-${mobile ? 'mobile' : 'desktop'}-${caseIdentity}-information.png`) })
         await waitForFiniteAnimations(page)
         await steps.getByRole('tab').nth(1).click()
@@ -192,8 +199,8 @@ export function createTaskUnifiedHandlingScenarios(deps) {
           if (method !== 'list_task_events' || params.task_id !== task.id) return route.fallback()
           return rpcResponder(route, id, {
             items: [
-              { id: task.id * 10 + 2, task_id: task.id, event_type: 'payload_refreshed', task_version: task.version, created_at: task.completed_at + 30, reason: '资料整理不能替换办理结果' },
-              { id: task.id * 10 + 1, task_id: task.id, event_type: 'status_changed', from_status_key: 'ready', to_status_key: 'done', actor_role_key: task.owner_role_key, actor_display_name: '历史办理人', actor_username: 'sim_handler', reason: `已核对${task.source_no}并完成本次任务`, task_version: task.version, created_at: task.completed_at },
+              { id: task.id * 10 + 2, task_id: task.id, ...(params.scope === 'flow' ? { task } : {}), event_type: 'payload_refreshed', task_version: task.version, created_at: task.completed_at + 30, reason: '资料整理不能替换办理结果' },
+              { id: task.id * 10 + 1, task_id: task.id, ...(params.scope === 'flow' ? { task } : {}), event_type: 'status_changed', from_status_key: 'ready', to_status_key: 'done', actor_role_key: task.owner_role_key, actor_display_name: '历史办理人', actor_username: 'sim_handler', reason: `已核对${task.source_no}并完成本次任务`, task_version: task.version, created_at: task.completed_at },
             ],
             truncated: false,
             total: 2,
@@ -221,8 +228,13 @@ export function createTaskUnifiedHandlingScenarios(deps) {
         assert.ok(fields.length >= 6, `${task.source_type}: actual read-only fields are present`)
         assert.ok(fields.some((field) => field.includes(task.source_no)), 'source identity is read from the original business record')
         await writeFile(path.join(outputDir, `task-unified-history-${mobile ? 'mobile' : 'desktop'}-${task.source_type}-fields.json`), JSON.stringify(fields, null, 2))
+        await steps.getByRole('tab').nth(0).click()
+        const records = page.getByTestId('workflow-task-event-trail').filter({ visible: true })
+        await records.locator('.workflow-task-event-trail__reason').filter({ hasText: `已核对${task.source_no}并完成本次任务` }).waitFor()
+        assert.equal(await records.getByText('读取失败', { exact: true }).count(), 0)
         await steps.getByRole('tab').nth(1).click()
         assert.equal(await business.locator('input:not(:disabled):not([readonly]):not([type="range"]), textarea:not(:disabled):not([readonly])').filter({ visible: true }).count(), 0)
+        await assertNoTaskReadFailures(page, business, assert)
         if (!inventory) {
           assert.equal(await sourceView.isVisible(), false, 'full source fields belong to information, including historical and readonly tasks')
           assert.equal(await business.getByTestId('mobile-task-business-source').count(), 0)
@@ -450,7 +462,10 @@ process_instance_id: null,
             version += 1
             return rpcResponder(route, id, { sales_order_id: 1, version })
           }
-          if (method === 'get_sales_order') return rpcResponder(route, id, { sales_order: { id: 1, order_no: task.source_no, lifecycle_status: 'draft', version, customer_id: 1, currency: 'CNY' } })
+          if (method === 'get_sales_order') {
+            assert.equal(params.id, 1)
+            return rpcResponder(route, id, { sales_order: { id: 1, order_no: task.source_no, lifecycle_status: 'draft', version, customer_id: 1, currency: 'CNY' } })
+          }
           return route.fallback()
         })
       },

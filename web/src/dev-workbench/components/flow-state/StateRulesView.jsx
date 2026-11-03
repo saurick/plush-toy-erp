@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { InfoCircleOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Tag } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
@@ -16,12 +16,9 @@ import { FlowActionRules, MasterLifecycleRules } from './FlowRuleTables.jsx'
 import { createDevFlowDefinitionOptionFilter } from '../../pages/devFlowDefinitionSearch.mjs'
 import { buildStateDefinitionSelectOptions } from '../../pages/devFlowDefinitionSelectOptions.mjs'
 import {
-  DEV_FLOW_STATE_TRANSITION_FILTERS,
   buildDevFlowStateNodeSummary,
   buildDevFlowRecordRelationship,
   buildDevFlowStateRelatedViews,
-  buildDevFlowStateRuleSummary,
-  filterDevFlowStateTransitions,
   getDevFlowStateTransitionPresentation,
   getDevFlowStateTransitionDiagramLabel,
 } from '../../pages/devFlowStateRulePresentation.mjs'
@@ -140,9 +137,6 @@ function StateRulesView({
 }
 
 function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, ruleAction, onSelectRuleAction }) {
-  const [transitionFilter, setTransitionFilter] = useState(
-    DEV_FLOW_STATE_TRANSITION_FILTERS.all
-  )
   const stateByKey = useMemo(
     () => new Map(flow.states.map((item) => [item.key, item])),
     [flow]
@@ -158,59 +152,16 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
     [flow]
   )
   const selectedStateSummary = state ? stateSummaries.get(state.key) : null
-  const summary = useMemo(() => buildDevFlowStateRuleSummary(flow), [flow])
-
-  const visibleTransitions = useMemo(
-    () => filterDevFlowStateTransitions(flow, state?.key, transitionFilter),
-    [flow, state?.key, transitionFilter]
-  )
   const transitionOrder = useMemo(
     () => new Map(flow.transitions.map((item, index) => [item.key, index])),
     [flow]
   )
-  const relatedTransitionCount = state
-    ? filterDevFlowStateTransitions(
-        flow,
-        state.key,
-        DEV_FLOW_STATE_TRANSITION_FILTERS.related
-      ).length
-    : 0
-  const filterOptions = [
-    {
-      key: DEV_FLOW_STATE_TRANSITION_FILTERS.standard,
-      label: '正常推进',
-      count: filterDevFlowStateTransitions(flow, '', DEV_FLOW_STATE_TRANSITION_FILTERS.standard).length,
-    },
-    {
-      key: DEV_FLOW_STATE_TRANSITION_FILTERS.all,
-      label: '全部',
-      count: summary.transitionCount,
-    },
-    ...(summary.exceptionalTransitionCount > 0
-      ? [
-          {
-            key: DEV_FLOW_STATE_TRANSITION_FILTERS.exceptional,
-            label: '异常与纠正',
-            count: summary.exceptionalTransitionCount,
-          },
-        ]
-      : []),
-    ...(state
-      ? [
-          {
-            key: DEV_FLOW_STATE_TRANSITION_FILTERS.related,
-            label: '当前状态',
-            count: relatedTransitionCount,
-          },
-        ]
-      : []),
-  ]
   const graph = useMemo(() => ({
     entryNodeKeys: flow.initialStates,
-    nodes: flow.states.filter((item) => !flow.transitions.length || transitionFilter === DEV_FLOW_STATE_TRANSITION_FILTERS.all || item.key === state?.key || visibleTransitions.some((edge) => edge.from === item.key || edge.to === item.key)).map((item) => ({ ...item, kind: flow.terminalStates.includes(item.key) ? 'terminal' : 'state' })),
-    edges: visibleTransitions.map((item) => { const { group } = getDevFlowStateTransitionPresentation(flow, item); return { ...item, label: getDevFlowStateTransitionDiagramLabel(item), condition: item.guard, stroke: group.diagramStroke, dasharray: group.diagramStrokeDasharray } }),
-  }), [flow, visibleTransitions, state?.key, transitionFilter])
-  const focusedTransitions = state ? visibleTransitions.filter((item) => item.from === state.key || item.to === state.key) : []
+    nodes: flow.states.map((item) => ({ ...item, kind: flow.terminalStates.includes(item.key) ? 'terminal' : 'state' })),
+    edges: flow.transitions.map((item) => { const { group } = getDevFlowStateTransitionPresentation(flow, item); return { ...item, label: getDevFlowStateTransitionDiagramLabel(item), condition: item.guard, stroke: group.diagramStroke, dasharray: group.diagramStrokeDasharray } }),
+  }), [flow])
+  const focusedTransitions = state ? flow.transitions.filter((item) => item.from === state.key || item.to === state.key) : []
   const recordRelationship = useMemo(() => buildDevFlowRecordRelationship(flow), [flow])
   const related = useMemo(() => buildDevFlowStateRelatedViews(catalog, flow), [catalog, flow])
   const relatedItems = [
@@ -220,7 +171,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
 
   const renderTransitions = (items) => items.length ? (
     <ol>{items.map((transition) => <StateTransitionCard key={transition.key} flow={flow} index={transitionOrder.get(transition.key) || 0} selectedStateKey={state?.key || ''} stateByKey={stateByKey} transition={transition} />)}</ol>
-  ) : <Empty description="当前筛选没有登记的转换" />
+  ) : <Empty description="当前状态没有登记的转换" />
 
   return (
     <WorkbenchSection flat className="erp-dev-flow-state-rule" data-selected-flow={flow.key} data-record-reference={recordRelationship ? 'true' : undefined} aria-label={flow.label}>
@@ -239,17 +190,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
           {recordRelationship ? (
             <BusinessFlowDiagram relationships flow={recordRelationship} label={`${flow.label}记录引用关系图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} legend="箭头表示记录引用；两条记录分别保留。" />
       ) : flow.transitions.length > 0 ? (
-        <>
-          <div className="erp-dev-flow-transition-toolbar">
-            <div className="erp-dev-flow-transition-filters" role="group" aria-label="状态转换筛选">
-              {filterOptions.map((option) => <Button key={option.key} size="small" type={transitionFilter === option.key ? 'primary' : 'default'} aria-pressed={transitionFilter === option.key} onClick={() => setTransitionFilter(option.key)}>{option.label} {option.count}</Button>)}
-            </div>
-            <Select id="dev-flow-state-focus" aria-label="聚焦状态" allowClear showSearch optionFilterProp="label" placeholder="定位状态" value={state?.key} options={flow.states.map((item) => ({ value: item.key, label: item.label }))} onChange={(key) => onSelectState(key || null)} />
-          </div>
-          {visibleTransitions.length > 0 || state ? (
-            <BusinessFlowDiagram relationships legend="实线：状态转换 · 虚线：分支或纠正 · 点选状态查看条件。" flow={graph} label={`${flow.label}状态转换图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} />
-          ) : <Empty description="当前筛选没有登记的转换" />}
-        </>
+        <BusinessFlowDiagram relationships legend="实线：状态转换 · 虚线：分支或纠正 · 点选状态查看条件。" flow={graph} label={`${flow.label}状态转换图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} />
       ) : flow.lifecycleRules.length === 0 ? <BusinessFlowDiagram relationships flow={graph} label={`${flow.label}分类图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} legend="节点仅表示已登记分类，不表示执行顺序或允许转换。" /> : null}
         </div>
         <div className="erp-dev-rule-inspection">

@@ -1,8 +1,8 @@
 export async function selectLineItem(row) {
-  const radio = row.locator('.erp-line-editor__row-marker input[type="radio"]')
-  if (!(await radio.count()) || !(await radio.isVisible())) return null
-  await radio.check()
-  return row.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " erp-line-editor ")][1]')
+  const editor = row.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " erp-line-editor ")][1]')
+  if (!(await editor.count()) || await editor.getAttribute('data-line-editor-compact') === 'true' || !(await row.getAttribute('tabindex'))) return null
+  await row.locator('td').first().click({ position: { x: 2, y: 2 } })
+  return editor
 }
 
 export async function clickLineItemAction(row, name, { exact = typeof name === 'string' } = {}) {

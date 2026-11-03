@@ -1,3 +1,4 @@
+import { selectWarehouseView } from './warehouseNavigationActions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
@@ -326,7 +327,7 @@ export async function verifyBusinessCoreInventory(page, deps) {
     },
   })
 
-  await page.getByRole('tab', { name: '库存批次' }).click()
+  await selectWarehouseView(page, '库存批次')
 
   await expectText(page, 'INV-LOT-001')
 
@@ -338,7 +339,7 @@ export async function verifyBusinessCoreInventory(page, deps) {
     scenarioName: 'business-standard-inventory-lots',
   })
 
-  await page.getByRole('tab', { name: '库存变动记录' }).click()
+  await selectWarehouseView(page, '库存变动记录')
 
   await expectText(page, '撤销调整')
 

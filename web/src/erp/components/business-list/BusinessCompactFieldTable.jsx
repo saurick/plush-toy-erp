@@ -5,7 +5,7 @@ import SelectPresentationContext from '@/common/components/select/SelectPresenta
 import './businessCompactFieldTable.css'
 import './businessLineItemGroups.css'
 import { useBusinessLineItemDisclosure } from './BusinessLineItemDisclosureContext.js'
-import BusinessLineEditor, { BusinessLineEditorRowControls, useBusinessLineEditor } from './BusinessLineEditor.jsx'
+import BusinessLineEditor, { BusinessLineEditorRowControls, useBusinessLineEditor, useBusinessLineEditorRow } from './BusinessLineEditor.jsx'
 import { BusinessLineItemsHeader } from './BusinessLineItemsFooter.jsx'
 
 export default function BusinessCompactFieldTable({ columns, ...props }) {
@@ -86,15 +86,15 @@ export function BusinessCompactFieldRow({
   const editor = useBusinessLineEditor()
   const inlineActions = !editor?.rowActions || editor.compact
   const rowHidden = hidden || disclosure?.hidden
+  const selection = useBusinessLineEditorRow({ actions, hidden: rowHidden, rowRef, onFocus: disclosure?.onFocus })
   return (
     <tbody
       className={`erp-compact-field-table__row erp-editable-line-group ${className}`.trim()}
       aria-label={label}
-      ref={rowRef}
       hidden={rowHidden}
       data-line-item-collapsed={rowHidden ? 'true' : undefined}
       data-line-item-index={disclosure?.index ?? lineItemIndex}
-      onFocusCapture={disclosure?.onFocus}
+      {...selection.rowProps}
     >
       <tr className="erp-compact-field-table__fields">
         {sequence !== undefined ? (
@@ -103,7 +103,7 @@ export function BusinessCompactFieldRow({
             rowSpan={children ? 2 : 1}
             aria-label={`第 ${sequence} 条`}
           >
-            <BusinessLineEditorRowControls index={sequence - 1} identity={identity || disclosure?.identity} actions={actions} hidden={rowHidden}>
+            <BusinessLineEditorRowControls selection={selection} index={sequence - 1} identity={identity || disclosure?.identity} actions={actions}>
               <span className="erp-editable-line-group__number">{sequence}</span>
             </BusinessLineEditorRowControls>
           </td>

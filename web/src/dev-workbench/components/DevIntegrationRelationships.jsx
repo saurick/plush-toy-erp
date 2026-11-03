@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react'
-import { ArrowRightOutlined } from '@ant-design/icons'
 import { Descriptions, Tag } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { Markdown } from '@/common/components/markdown'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
+import BusinessFlowDiagram from './flow-state/BusinessFlowDiagram.jsx'
 import { buildDevDocsLocation, resolveDevDocsMarkdownHref } from '../pages/devDocsNavigation.mjs'
 
 export function DevIntegrationAccess({ boundary, method = false, guide }) {
@@ -88,21 +88,13 @@ export default function DevIntegrationRelationshipExamples({ examples, value, on
             options={examples.rows.map((row) => row.label)}
             onChange={onChange}
           />
-          <div
-            className="erp-dev-integration__flow"
-            role="img"
-            aria-label={`${selected.label}，未实施示例：${selected.steps.map((step) => step.title).join(' → ')}`}
-          >
-            {selected.steps.map((step, index) => (
-              <React.Fragment key={step.title}>
-                {index > 0 ? <ArrowRightOutlined aria-hidden="true" /> : null}
-                <span className="erp-dev-integration__flow-step">
-                  <strong>{step.title}</strong>
-                  {step.description ? <span>{step.description}</span> : null}
-                </span>
-              </React.Fragment>
-            ))}
-          </div>
+          <BusinessFlowDiagram
+            key={selected.label}
+            relationships
+            label={`${selected.label}，未实施示例`}
+            flow={{ direction: 'LR', nodes: selected.steps.map((step, index) => ({ key: String(index), label: step.title, summary: step.description })), edges: selected.steps.slice(1).map((step, index) => ({ from: String(index), to: String(index + 1), label: '示例衔接', condition: step.description })) }}
+            legend="仅为接入关系展示示例，不表示当前已经开放外部接入。"
+          />
           <p className="erp-dev-integration__note" aria-live="polite">{selected.note}</p>
         </div>
       ) : (

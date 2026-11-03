@@ -19,7 +19,7 @@ import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mj
 import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
-import { modal } from '@/common/utils/antdApp'
+import { useModal } from '@/common/utils/antdApp'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { BusinessLineItemsHeader } from '../business-list/BusinessLineItemsFooter.jsx'
@@ -208,6 +208,7 @@ export default function PurchaseOrderInboundDraftModal({
   onCancel,
   onRetry,
 }) {
+  const modal = useModal()
   const values = Form.useWatch('arrival_items', form) || []
   const disclosureGroups = (rows || []).map((row) => ({
     id: String(row.key),

@@ -10,6 +10,8 @@ import {
   ZoomOutOutlined,
 } from '@ant-design/icons'
 import { Image, Spin } from 'antd'
+import { useOverlayContainer, useOverlayDialog } from '@/common/components/overlay/ScopedOverlayDialog.jsx'
+import { canRestoreOverlayFocus } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import './workflowTaskImagePreview.css'
 import { isUsableImageDimensions } from '../../utils/imageDisplay.mjs'
 import { listProductImages } from '../../api/attachmentApi.mjs'
@@ -20,11 +22,15 @@ import { RpcErrorCode } from '@/common/consts/errorCodes'
 export default function WorkflowTaskImagePreview({
   item,
   thumbnail,
+  source,
   load,
   onClose,
   gallery,
 }) {
   const [visible, setVisible] = useState(true)
+  const [preview, setPreview] = useState(null)
+  const overlay = useOverlayContainer(visible)
+  useOverlayDialog(preview, visible, overlay.scope)
   const [resource, setResource] = useState(null)
   const [attempt, setAttempt] = useState(0)
   const [productIndex, setProductIndex] = useState(0)
@@ -41,7 +47,7 @@ export default function WorkflowTaskImagePreview({
   const selectedPhoto = photos[photoIndex] || photos[0]
   const attachmentID = gallery ? selectedPhoto?.id || 0 : item.imageAttachmentID
   const resourceKey = `${productID}:${attachmentID}:${attempt}`
-  const original = resource?.key === resourceKey ? resource.src : ''
+  const original = source || (resource?.key === resourceKey ? resource.src : '')
   const failed = resource?.key === resourceKey && resource.failed
   const denied = resource?.key === resourceKey && resource.denied
   const name = selected.name || '产品主图'
@@ -76,7 +82,7 @@ export default function WorkflowTaskImagePreview({
   }, [galleryEnabled, productID])
 
   useEffect(() => {
-    if (!visible || !attachmentID) return undefined
+    if (!visible || source || !attachmentID) return undefined
     let active = true
     load({
       productID,
@@ -92,11 +98,11 @@ export default function WorkflowTaskImagePreview({
     return () => {
       active = false
     }
-  }, [visible, resourceKey, productID, attachmentID, load])
+  }, [visible, source, resourceKey, productID, attachmentID, load])
 
   const renderImage = (image) => (
     <>
-      <div className="erp-task-image-preview__header">
+      <div ref={setPreview} className="erp-task-image-preview__header">
         <div className="erp-task-image-preview__identity">
           <strong>{name}</strong>
           {selected.code ? <span>产品编号 {selected.code}</span> : null}
@@ -159,12 +165,15 @@ export default function WorkflowTaskImagePreview({
           visible,
           src: original || (gallery ? '' : thumbnail),
           rootClassName: 'erp-task-image-preview',
-          getContainer: () => document.body,
+          getContainer: overlay.getContainer,
+          focusTriggerAfterClose: overlay.scope ? false : undefined,
           title: `${name}图片预览`,
           maxScale: 8,
           onVisibleChange: setVisible,
           afterOpenChange: (open) => {
-            if (!open) onClose()
+            if (!open) {
+              onClose({ restoreFocus: !overlay.scope || canRestoreOverlayFocus(overlay.scope) })
+            }
           },
           imageRender: renderImage,
           // Keep the library's zoom actions inside its dialog so keyboard focus stays in the preview.

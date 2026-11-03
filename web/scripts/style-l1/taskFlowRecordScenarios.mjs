@@ -176,15 +176,57 @@ export function createTaskFlowRecordScenarios({
             : page.locator('.erp-task-action-drawer')
           const records = detail.getByTestId('workflow-task-event-trail')
           await records
-            .getByRole('heading', { name: '流程处理记录', exact: true })
+            .getByRole('heading', { name: '处理记录', exact: true })
             .waitFor()
           await records
             .getByRole('button', { name: '重新读取', exact: true })
             .waitFor()
           assert.match(
             await records.getByRole('alert').innerText(),
-            /流程处理记录加载失败/u
+            /处理记录加载失败/u
           )
+          await assertRecordHeaderLayout(records, assert, mobile)
+          const checkScopeHelp = async (kind, expectedIncluded) => {
+            const progress = kind === 'progress'
+            const label = progress ? '任务进度范围' : '处理记录范围'
+            const trigger = detail.getByRole('button', { name: `查看${label}说明`, exact: true })
+            await trigger.scrollIntoViewIfNeeded()
+            if (mobile) await trigger.tap()
+            else await trigger.hover()
+            const help = page.getByRole('region', { name: `${label}说明`, exact: true })
+            await help.waitFor()
+            await waitForFiniteAnimations(page)
+            assert.equal(await help.locator('[data-included]').count(), expectedIncluded)
+            const box = await help.boundingBox()
+            const viewport = page.viewportSize()
+            assert.ok(box.x >= 0 && box.x + box.width <= viewport.width, JSON.stringify({ box, viewport }))
+            if (mobile) {
+              const target = await trigger.boundingBox()
+              assert.ok(target.width >= 44 && target.height >= 44, JSON.stringify(target))
+            }
+            await page.screenshot({ path: path.join(outputDir, `task-scope-help-${surface}-${themeMode}-${kind}-${expectedIncluded}.png`) })
+            const close = help.getByRole('button', { name: `关闭${label}说明`, exact: true })
+            await close.focus()
+            await close.press('Escape')
+            await help.waitFor({ state: 'hidden' })
+            assert.equal(await detail.isVisible(), true, '关闭说明不能关闭任务详情')
+            assert.equal(await trigger.evaluate((node) => document.activeElement === node), true)
+            await page.mouse.move(0, 0)
+            await trigger.click()
+            await help.waitFor()
+            await help.getByRole('button', { name: `关闭${label}说明`, exact: true }).click()
+            await help.waitFor({ state: 'hidden' })
+            assert.equal(await trigger.getAttribute('aria-expanded'), 'false')
+            await page.mouse.move(0, 0)
+            await trigger.click()
+            await help.waitFor()
+            await help.getByRole('button', { name: `关闭${label}说明`, exact: true }).focus()
+            await detail.getByRole('heading', { name: task.task_name, exact: true }).click()
+            await help.waitFor({ state: 'hidden' })
+            assert.equal(await detail.isVisible(), true, '点击说明外的任务内容只关闭说明')
+          }
+          await checkScopeHelp('progress', 2)
+          await checkScopeHelp('records', 2)
           const scopeRoot = records.locator('.workflow-task-event-trail__scope')
           await scopeRoot.scrollIntoViewIfNeeded()
           const before = await scopeRoot.boundingBox()
@@ -214,6 +256,13 @@ export function createTaskFlowRecordScenarios({
             await switchElement.evaluate((node) => node.isConnected),
             true
           )
+          await checkScopeHelp('records', 1)
+          if (mobile && themeMode === 'dark') {
+            await page.setViewportSize({ width: 320, height: 844 })
+            await checkScopeHelp('records', 1)
+            await assertRecordHeaderLayout(records, assert, mobile)
+            await page.setViewportSize({ width: 390, height: 844 })
+          }
           await verifyMobileNavigationMotion(
             page,
             assert,
@@ -305,6 +354,7 @@ export function createTaskFlowRecordScenarios({
             JSON.stringify(geometry)
           )
           assert.equal(geometry.scopeCount, 1)
+          geometry.headerLayout = await assertRecordHeaderLayout(records, assert, mobile)
           await waitForFiniteAnimations(page)
           await page.mouse.move(20, 20)
           await page.screenshot({
@@ -324,6 +374,40 @@ export function createTaskFlowRecordScenarios({
       }
     })
   )
+}
+
+async function assertRecordHeaderLayout(records, assert, mobile) {
+  const geometry = await records.evaluate((node) => {
+    const box = (element) => {
+      const { x, y, width, height, right, bottom } = element.getBoundingClientRect()
+      return { x, y, width, height, right, bottom }
+    }
+    const head = node.querySelector('.workflow-task-event-trail__head')
+    return {
+      head: box(head),
+      label: box(node.querySelector('.workflow-task-event-trail__heading-label')),
+      scope: box(node.querySelector('.workflow-task-event-trail__scope')),
+      content: box(head.nextElementSibling),
+      clientWidth: node.clientWidth,
+      scrollWidth: node.scrollWidth,
+    }
+  })
+  const { head, label, scope, content } = geometry
+  const evidence = JSON.stringify(geometry)
+  const sameRow = Math.abs(label.y + label.height / 2 - scope.y - scope.height / 2) <= 1
+  if (!mobile) assert.ok(sameRow, `桌面记录标题与范围应同排：${evidence}`)
+  assert.ok(scope.x >= head.x - 1 && scope.right <= head.right + 1, evidence)
+  assert.ok(label.x >= head.x - 1 && label.right <= head.right + 1, evidence)
+  assert.ok(Math.abs(Math.min(label.y, scope.y) - head.y) <= 1, evidence)
+  assert.ok(Math.abs(Math.max(label.bottom, scope.bottom) - head.bottom) <= 1, evidence)
+  if (sameRow) {
+    assert.ok(scope.x - label.right >= 8, `标题和范围不能重叠：${evidence}`)
+  } else {
+    assert.ok(scope.y - label.bottom >= 0 && scope.y - label.bottom <= 8, `窄屏换行只保留必要间距：${evidence}`)
+  }
+  assert.ok(content.y - head.bottom >= 8 && content.y - head.bottom <= 12, `记录正文与标题间距应紧凑：${evidence}`)
+  assert.ok(geometry.scrollWidth <= geometry.clientWidth + 1, evidence)
+  return geometry
 }
 
 async function fsWriteEvidence(file, evidence) {

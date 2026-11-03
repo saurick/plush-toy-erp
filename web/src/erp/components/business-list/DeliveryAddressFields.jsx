@@ -3,6 +3,7 @@ import { Cascader, Form, Input } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import BusinessTextArea from './BusinessTextArea.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
+import { useOverlayPopupAlign } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import { optionalContactPhoneRule } from '../../utils/contactValidation.mjs'
 import {
   DELIVERY_COUNTRY_OPTIONS,
@@ -16,6 +17,7 @@ import {
 import './delivery-address.css'
 
 function DeliveryAddressInput({ value = '', onChange, country, disabled, id, description }) {
+  const dropdownAlign = useOverlayPopupAlign()
   const text = String(value ?? '')
   const [draft, setDraft] = useState(() => ({
     text,
@@ -46,6 +48,7 @@ function DeliveryAddressInput({ value = '', onChange, country, disabled, id, des
           className="erp-delivery-address__part"
         >
           <Cascader
+            dropdownAlign={dropdownAlign}
             id={regionID}
             aria-label="所在地区"
             allowClear

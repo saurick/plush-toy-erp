@@ -1,0 +1,44 @@
+.app-overlay-scope {
+  --erp-overlay-width: 100cqw;
+  --erp-overlay-height: 100cqh;
+
+  position: fixed;
+  left: var(--app-overlay-left, 0);
+  top: var(--app-overlay-top, 0);
+  width: var(--app-overlay-width, 100vw);
+  height: var(--app-overlay-height, 100dvh);
+  contain: layout paint;
+  overflow: hidden;
+  container-type: size;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.app-overlay-scope > :not(.ant-drawer) {
+  pointer-events: auto;
+}
+
+.app-overlay-scope .ant-modal-wrap,
+.app-overlay-scope .ant-drawer-body {
+  overscroll-behavior: contain;
+}
+
+.app-overlay-scope .ant-select-dropdown,
+.app-overlay-scope .ant-popover,
+.app-overlay-scope .ant-tooltip,
+.app-overlay-scope .ant-dropdown,
+.app-overlay-scope .ant-picker-dropdown,
+.app-overlay-scope .ant-cascader-dropdown {
+  max-width: calc(100cqw - 16px);
+}
+
+.app-overlay-scope .ant-picker-panel-container,
+.app-overlay-scope .ant-cascader-menus {
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.app-scoped-dialog-content {
+  display: contents;
+}

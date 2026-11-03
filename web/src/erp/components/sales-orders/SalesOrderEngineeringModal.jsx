@@ -435,5 +435,6 @@ function SalesOrderEngineeringWorkspace({
 export default function SalesOrderEngineeringModal(props) {
   const { orderID, materialTask } = props
   const outlet = useBusinessPageContext()
+  if (!orderID) return null
   return <BusinessEditorGroup key={`${orderID || ''}:${materialTask?.id || ''}`}>{outlet?.taskBusiness ? <SalesOrderTaskBOMEditor {...props} /> : <SalesOrderEngineeringWorkspace {...props} />}</BusinessEditorGroup>
 }

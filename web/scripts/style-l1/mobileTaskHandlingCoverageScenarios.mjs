@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
-import { orderSubmissionSuccessMessage } from '../../src/erp/utils/approvalCondition.mjs'
+import { ProcessKey } from '../../src/common/consts/statuses.generated.mjs'
 
 const SOURCES = [
   { key: 'sales', type: 'sales_order', id: 1, no: 'SO-STYLE-L1' },
@@ -16,6 +16,12 @@ const SOURCES = [
   { key: 'payment', type: 'finance_payment', id: 41, no: 'PAY-STYLE-L1' },
   { key: 'inventory', type: 'inventory_operation', id: 51, no: 'INV-STYLE-L1' },
 ]
+
+export async function assertNoTaskReadFailures(page, surface, assert) {
+  await waitForFiniteAnimations(page)
+  const failures = await surface.getByRole('alert').filter({ hasText: /读取.*失败|暂时无法.*(?:读取|确认)|业务资料暂不可用/u }).allTextContents()
+  assert.deepEqual(failures, [], '来源模块读取成功，不能把错误占位当成只读办理页')
+}
 
 export function createMobileTaskHandlingCoverageScenarios({ assert, path, outputDir, customerRuntimeEffectiveSession, assertNoHorizontalOverflow }) {
   return [...SOURCES, { ...SOURCES[0], key: 'sales-pending', kind: 'sales', pending: true }].map((source, index) => {
@@ -42,6 +48,7 @@ export function createMobileTaskHandlingCoverageScenarios({ assert, path, output
           await page.route(`**/rpc/${source.type}`, async (route) => {
             const { id, method, params = {} } = route.request().postDataJSON()
             if (![`get_${source.type}`, `list_${source.type}s`].includes(method)) return route.fallback()
+            if (method.startsWith('get_')) assert.equal(params.id, source.id)
             const data = method.startsWith('get_') ? { [source.type]: record } : stylePaginatedRpcData([record], `${source.type}s`, params)
             return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data } } })
           })
@@ -125,108 +132,112 @@ export function createMobileTaskHandlingCoverageScenarios({ assert, path, output
         await page.route('**/rpc/workflow', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
           if (method === 'explain_action_access' && params.task_id === task.id) return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: { task_id: task.id, source_access: { applicable: true, resolved: true, allowed: true }, actions: ['complete', 'block', 'reject', 'resume', 'urge'].map((action_key) => ({ action_key, allowed: false })) } } } })
-          if (method !== 'list_task_events') return route.fallback()
-          return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: { items: [{ id: 1, task_id: task.id, event_type: source.pending ? 'created' : 'status_changed', actor_display_name: '核对员', actor_role_key: 'boss', created_at: task.completed_at || task.created_at, task_version: 1, from_status_key: source.pending ? null : 'ready', to_status_key: task.task_status_key, reason: source.pending ? '' : '本次资料已核对' }], truncated: false } } } })
+          if (method === 'get_task_handling_chain' && params.task_id === task.id) return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: { items: params.offset ? [] : [task], truncated: false } } } })
+          if (method === 'get_task_process_context' && params.task_id === task.id) {
+            const processKey = { sales_order: ProcessKey.SALES_ORDER_ACCEPTANCE, production_order: ProcessKey.SALES_ORDER_ACCEPTANCE, production_fact: ProcessKey.SALES_ORDER_ACCEPTANCE, shipment: ProcessKey.FINISHED_GOODS_DELIVERY, finance_payment: ProcessKey.FINANCE_PAYMENT_APPROVAL, inventory_operation: ProcessKey.INVENTORY_ADJUSTMENT_APPROVAL }[task.source_type] || ProcessKey.MATERIAL_SUPPLY
+            return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: { process_context: { source: { type: task.source_type, id: task.source_id, no: task.source_no }, process_instance: { id: task.process_instance_id, process_key: processKey, process_version: 'v1', status: source.pending ? 'active' : 'completed', started_at: task.created_at }, nodes: [], current_nodes: [], completed_nodes: [], current_responsibilities: [], linked_node: null } } } } })
+          }
+          if (method !== 'list_task_events' || params.task_id !== task.id) return route.fallback()
+          const event = { id: task.id * 10, task_id: task.id, ...(params.scope === 'flow' ? { task } : {}), event_type: source.pending ? 'created' : 'status_changed', actor_display_name: '核对员', actor_role_key: 'boss', created_at: task.completed_at || task.created_at, task_version: 1, from_status_key: source.pending ? null : 'ready', to_status_key: task.task_status_key, reason: source.pending ? '' : '本次资料已核对' }
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: { items: params.before_event_id && event.id >= params.before_event_id ? [] : [event], truncated: false } } } })
         })
       },
       verify: async (page) => {
         await page.getByTestId('mobile-role-nav-tasks').click()
         await page.getByRole('tab', { name: source.pending ? /^待办(?:\s|$)/u : /^已办(?:\s|$)/u }).click()
         const card = page.locator(`[data-mobile-task-id="${task.id}"]`)
+        await card.waitFor()
         await clickTaskCardContent(card, card.getByText(task.task_name, { exact: true }))
-        await page.getByTestId('mobile-task-detail-screen').getByRole('button', { name: '填写办理表单', exact: true }).click()
-        const screen = page.getByTestId('mobile-task-action-screen')
-        const sourceView = business === 'inventory' ? screen.locator('.erp-inventory-operation-receipt').filter({ hasText: source.no }) : page.locator(`[data-testid="mobile-task-business-source"][data-record-id="${source.id}"]`)
-        await sourceView.waitFor()
-        const footer = screen.locator('.mobile-role-action-bar')
-        if (business !== 'inventory') await footer.getByRole('group', { name: '本次业务操作', exact: true }).waitFor()
-        assert.equal(await screen.getByRole('group', { name: '其他业务操作', exact: true }).count(), 0)
-        assert.equal(await screen.locator('[data-business-action-key="related-records"], [data-business-action-key$="-attachments"], [data-business-action-key$="-details"], [data-business-action-role="output"]').filter({ visible: true }).count(), 0)
-        assert.equal(await footer.getByTestId('mobile-task-attachment-action').count(), 1)
-        const attachment = await footer.getByTestId('mobile-task-attachment-action').boundingBox()
-        assert.ok(attachment && attachment.width >= 44 && attachment.height >= 44, '统一附件入口可见且可触达')
-        const footerMetrics = await footer.evaluate((node) => ({
-          viewport: { width: innerWidth, height: innerHeight },
-          footer: node.getBoundingClientRect().toJSON(),
-          children: [...node.children].map((child) => ({ className: child.className, rect: child.getBoundingClientRect().toJSON(), display: getComputedStyle(child).display })),
-        }))
-        await fs.writeFile(path.join(outputDir, `mobile-handling-${source.key}-footer.json`), JSON.stringify(footerMetrics, null, 2))
-        assert.ok(attachment.y >= 0 && attachment.y + attachment.height <= footerMetrics.viewport.height + 1, '附件位于屏幕可触达区域')
-        const actionButtons = business === 'inventory' ? sourceView.getByRole('button', { name: '过账', exact: true }) : footer.locator('.erp-business-selection-action-bar__compact-visible button')
-        const actions = await actionButtons.evaluateAll((nodes) => nodes.map((node) => ({ key: node.dataset.businessActionKey, text: node.textContent.trim(), disabled: node.disabled })))
-        await fs.writeFile(path.join(outputDir, `mobile-handling-${source.key}-actions.json`), JSON.stringify(actions, null, 2))
-        assert.ok(actions.some((action) => !action.disabled), `${source.key} 保留可用的办理入口`)
-        assert.equal(await screen.locator('[data-business-action-key="workflow-progress"]').filter({ visible: true }).count(), 0)
+        const steps = page.getByRole('tablist', { name: '任务处理步骤', exact: true })
+        const tabs = steps.getByRole('tab')
+        assert.equal(await tabs.count(), 3)
+        const titles = await tabs.allTextContents()
+        for (const [index, label] of ['任务信息', '任务办理', '结果回执'].entries()) assert.ok(titles[index].includes(label))
+        assert.equal(await tabs.nth(0).getAttribute('aria-selected'), 'true')
+        assert.equal(await page.locator('.mobile-task-flow-header').count(), 1)
+        const strip = await steps.elementHandle()
+        const information = page.getByTestId('workflow-task-business-information')
+        const inventory = business === 'inventory'
+        await page.getByTestId('mobile-task-detail-screen').getByText(task.task_name, { exact: true }).waitFor()
+        const records = page.getByTestId('workflow-task-event-trail').filter({ visible: true })
+        await records.getByText(source.pending ? '任务已创建' : '任务已完成', { exact: true }).first().waitFor()
+        if (!source.pending) assert.match(await records.locator('.workflow-task-event-trail__reason').innerText(), /本次资料已核对/u)
+        assert.equal(await page.getByText('暂时无法读取任务处理链，请重新读取。', { exact: true }).filter({ visible: true }).count(), 0)
+        await tabs.nth(1).click()
+        const businessPanel = page.getByTestId('mobile-task-fact-form')
+        await businessPanel.waitFor()
+        await page.waitForFunction(() => document.querySelector('[data-task-business-page]')?.getAttribute('aria-busy') !== 'true')
+        if (!inventory) await tabs.nth(0).click()
+        const sourceView = inventory
+          ? businessPanel.locator('.erp-inventory-ledger-page')
+          : information.getByTestId('mobile-task-business-source')
+        await sourceView.getByText(source.no, { exact: true }).first().waitFor()
+        const fields = await sourceView.locator(inventory ? '.ant-descriptions-item-label, .ant-descriptions-item-content' : 'dt, dd').allTextContents()
+        assert.ok(fields.length >= 6, `${source.key} 保留来自原业务记录的完整只读资料`)
+        assert.ok(fields.some((value) => value.includes(source.no)))
+        await tabs.nth(1).click()
+        await businessPanel.waitFor()
+        if (!inventory) {
+          assert.equal(await sourceView.isVisible(), false, '完整来源资料只在任务信息中展示')
+          assert.equal(await businessPanel.getByTestId('mobile-task-business-source').count(), 0)
+        }
+        assert.equal(await businessPanel.locator('input:not(:disabled):not([readonly]):not([type="range"]), textarea:not(:disabled):not([readonly])').filter({ visible: true }).count(), 0)
+        await assertNoTaskReadFailures(page, businessPanel, assert)
+        assert.equal(await page.locator('[data-business-action-role="primary"]:visible:not(:disabled)').count(), 0, '历史任务和当前无获准动作的待办不开放业务写入')
+        if (inventory) {
+          assert.equal(await businessPanel.getByRole('button', { name: '过账', exact: true }).filter({ visible: true }).evaluateAll((buttons) => buttons.some((button) => !button.disabled)), false)
+          assert.equal(page.inventoryOperationStatus, 'APPROVED', '任务已完成不代表库存事实已过账')
+        }
+        const attachment = page.getByTestId('mobile-task-attachment-action').filter({ visible: true })
+        assert.equal(await attachment.count(), 1)
+        const attachmentBox = await attachment.boundingBox()
+        assert.ok(attachmentBox && attachmentBox.width >= 44 && attachmentBox.height >= 44)
+        assert.ok(attachmentBox.y >= 0 && attachmentBox.y + attachmentBox.height <= page.viewportSize().height + 1)
+        const sourceRead = /^(?:get_(?:sales_order|purchase_order|outsourcing_order|purchase_receipt|quality_inspection|production_order|production_fact|shipment|finance_payment|inventory_operation)|list_production_facts)$/u
+        const initialSourceReads = page.handlingRequests.filter((method) => sourceRead.test(method)).length
+        await tabs.nth(0).click()
+        await tabs.nth(1).click()
+        assert.equal(page.handlingRequests.filter((method) => sourceRead.test(method)).length, initialSourceReads, '资料与办理步骤往返不重复读取业务记录')
+        let receiptText = null
+        if (source.pending) {
+          assert.equal(await tabs.nth(2).isEnabled(), false, '尚未办理的任务不显示成功回执')
+          assert.equal(task.task_status_key, 'ready')
+          assert.equal(task.version, 1)
+        } else {
+          assert.equal(await tabs.nth(2).isEnabled(), true)
+          await tabs.nth(2).click()
+          const receipt = page.getByTestId('workflow-task-action-receipt').filter({ visible: true })
+          await receipt.getByText('本次资料已核对', { exact: true }).waitFor()
+          await receipt.getByText(/核对员/u).waitFor()
+          const recordedAt = new Date(task.completed_at * 1000).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+          await receipt.getByText(recordedAt, { exact: true }).waitFor()
+          await receipt.getByRole('region', { name: '来源业务当前资料', exact: true }).getByText(source.no, { exact: true }).waitFor()
+          receiptText = await receipt.innerText()
+          await page.screenshot({ path: path.join(outputDir, `mobile-handling-${source.key}-receipt.png`) })
+          await tabs.nth(1).click()
+          assert.equal(await tabs.nth(2).isEnabled(), true, '查看历史回执后仍可再次进入')
+          await tabs.nth(2).click()
+          await receipt.getByText('本次资料已核对', { exact: true }).waitFor()
+          await receipt.getByText(recordedAt, { exact: true }).waitFor()
+        }
+        await tabs.nth(0).click()
+        assert.equal(await tabs.nth(0).getAttribute('aria-selected'), 'true')
+        if (!inventory) await sourceView.getByText(source.no, { exact: true }).first().waitFor()
+        await tabs.nth(1).click()
+        if (inventory) await sourceView.waitFor()
+        else {
+          await tabs.nth(0).click()
+          await sourceView.waitFor()
+        }
+        assert.equal(await steps.evaluate((node, previous) => node === previous, strip), true, '步骤导航保持挂载')
+        assert.ok((await sourceView.innerText()).includes(source.no), '步骤往返仍显示当前来源业务')
+        const mutations = page.handlingRequests.filter((method) => /^(?:save_|post_|create_|execute_|submit_|ship_|start_|complete_|reject_|resume_|block_|urge_|reassign_|cancel_|update_|delete_|release_|confirm_)/u.test(method))
+        assert.deepEqual(mutations, [], '浏览和步骤切换不得写业务或任务状态')
+        assert.equal(new URL(page.url()).pathname, '/m/all/tasks')
         await assertNoHorizontalOverflow(page, `mobile-task-handling-${source.key}`)
         await waitForFiniteAnimations(page)
+        await fs.writeFile(path.join(outputDir, `mobile-handling-${source.key}-steps.json`), JSON.stringify({ fields, receipt: receiptText, editorReads: initialSourceReads, totalSourceReads: page.handlingRequests.filter((method) => sourceRead.test(method)).length, mutations, attachment: attachmentBox, pending: Boolean(source.pending) }, null, 2))
         await page.screenshot({ path: path.join(outputDir, `mobile-handling-${source.key}.png`) })
-        if (business === 'inventory') {
-          const width = await sourceView.locator('.ant-alert-content').evaluate((node) => node.getBoundingClientRect().width)
-          assert.ok(width >= 200, '库存作业说明保留可阅读宽度')
-        }
-        await actionButtons.first().click()
-        await waitForFiniteAnimations(page)
-        await fs.writeFile(path.join(outputDir, `mobile-handling-${source.key}-clicked.json`), JSON.stringify({ requests: page.handlingRequests, text: await page.locator('body').innerText() }, null, 2))
-        const resultMessage = ['sales', 'purchase'].includes(business) ? orderSubmissionSuccessMessage(source.type, {}) : ({ receipt: '本次合格材料已入库', outsourcing: '提交合同成功', shipment: '财务审批已提交；成品质检仍由品质检验单独判定' })[business]
-        if (!['sales', 'purchase'].includes(business)) {
-          const confirmation = page.locator('.ant-modal:visible, .ant-popconfirm:visible').last()
-          await confirmation.waitFor()
-          await waitForFiniteAnimations(page)
-          await assertNoHorizontalOverflow(page, `mobile-task-handling-${source.key}-confirmation`)
-          await page.screenshot({ path: path.join(outputDir, `mobile-handling-${source.key}-confirmation.png`) })
-          const confirmText = { receipt: /^确\s*认$/u, outsourcing: '确认提交', shipment: '提交放行' }[business]
-          if (confirmText) await confirmation.getByRole('button', { name: confirmText, exact: typeof confirmText === 'string' }).click()
-          else {
-            await confirmation.getByRole('button', { name: /^(取\s*消|返\s*回|返回核对|稍后处理|关\s*闭)$/u }).last().click()
-            await confirmation.waitFor({ state: 'hidden' })
-          }
-        }
-        if (resultMessage) {
-          await footer.getByRole('button', { name: '查看办理结果', exact: true }).waitFor()
-          assert.equal(await footer.locator('.mobile-task-business-action-host').isVisible(), false, '提交成功后只保留结果主入口')
-          assert.equal(await page.getByRole('button', { name: '打开任务管理', exact: true }).count(), 0)
-          await footer.getByRole('button', { name: '查看办理结果', exact: true }).click()
-          const result = page.getByTestId('mobile-task-receipt-screen')
-          await result.getByText(resultMessage, { exact: true }).waitFor()
-          await result.getByText(`业务单号：${source.no}`, { exact: true }).waitFor()
-          if (source.pending) await result.getByText('可执行', { exact: true }).waitFor()
-          await page.waitForFunction(() => !document.querySelector('.ant-message-notice'))
-          await page.screenshot({ path: path.join(outputDir, `mobile-handling-${source.key}-receipt.png`) })
-          await result.getByRole('button', { name: '任务办理', exact: true }).click()
-          await sourceView.waitFor()
-        }
-        await screen.getByRole('button', { name: '结果回执', exact: true }).click()
-        const receipt = page.getByTestId('mobile-task-receipt-screen')
-        await receipt.getByText(resultMessage || '本次资料已核对', { exact: false }).waitFor()
-        await receipt.getByRole('button', { name: '任务办理', exact: true }).click()
-        await sourceView.waitFor()
-        assert.equal(new URL(page.url()).pathname, '/m/all/tasks')
-        if (business === 'inventory') {
-          page.inventoryOperationStatus = 'SUBMITTED'
-          assert.equal(await screen.getByText('未读取到任务对应单据，请返回任务后重新读取。', { exact: true }).count(), 0)
-          await sourceView.getByRole('button', { name: '重新读取', exact: true }).click()
-          await sourceView.getByText('等待另一位有权人员批准或驳回；审批本身不会改变库存。', { exact: true }).waitFor()
-          assert.equal(await screen.getByRole('button', { name: '去任务中心审批', exact: true }).count(), 0)
-          assert.equal(await screen.locator('[data-business-action-key="workflow-progress"]').filter({ visible: true }).count(), 0)
-        }
-        if (business === 'receipt') {
-          await screen.getByRole('button', { name: '登记本次实际收付', exact: true }).click()
-          const payment = screen.getByTestId('mobile-task-payment-entry')
-          await payment.getByRole('button', { name: '填写收付款', exact: true }).click()
-          const editor = screen.locator('[data-business-form-page="true"]:visible')
-          await editor.waitFor()
-          await editor.getByPlaceholder('填写账户，或选择最近用过的账户', { exact: true }).fill('A'.repeat(129))
-          await footer.getByRole('button', { name: '创建收付款记录', exact: true }).click()
-          assert.ok(await editor.locator('.ant-form-item-has-error').count() > 0, '登记收付款仍执行必填校验')
-          await editor.getByText('账户摘要不能超过128个字符', { exact: true }).waitFor()
-          await footer.getByRole('button', { name: '返回办理', exact: true }).click()
-          await page.getByRole('dialog').filter({ hasText: '放弃未保存的修改？' }).getByRole('button', { name: '放弃修改', exact: true }).click()
-          await editor.waitFor({ state: 'hidden' })
-          assert.equal(await screen.getByRole('button', { name: '返回任务办理', exact: true }).count(), 1)
-          assert.equal(await screen.getByRole('button', { name: '返回业务办理', exact: true }).count(), 0)
-          await screen.getByRole('button', { name: '返回任务办理', exact: true }).click()
-          await sourceView.waitFor()
-        }
       },
     }
   })

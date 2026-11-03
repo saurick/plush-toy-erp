@@ -5,6 +5,7 @@ import { createOrderEngineeringScenarios } from './orderEngineeringScenarios.mjs
 import { createBOMTaskActionsScenarios } from './bomTaskActionsScenarios.mjs'
 import { createBOMRevisionScenarios } from './bomRevisionScenarios.mjs'
 import { createBOMMaterialGroupsScenarios } from './bomMaterialGroupsScenarios.mjs'
+import { createLineItemStickyHeaderScenarios } from './lineItemStickyHeaderScenarios.mjs'
 
 import { createOutsourcingSourceFactScenarios } from './outsourcingSourceFactScenarios.mjs'
 import { createProductionSourceInboundLotScenarios } from './productionSourceInboundLotScenarios.mjs'
@@ -47,6 +48,7 @@ export function createBusinessFormalScenarios(deps) {
     ...createSalesOrderSkuGrainScenarios(deps),
     ...createSalesOrderSubmissionScenarios(deps),
     ...createBOMMaterialGroupsScenarios(deps),
+    ...createLineItemStickyHeaderScenarios(deps),
     ...createBOMTaskActionsScenarios(deps),
     ...createBOMRevisionScenarios(deps),
     ...createBusinessFormPagesScenarios(deps),

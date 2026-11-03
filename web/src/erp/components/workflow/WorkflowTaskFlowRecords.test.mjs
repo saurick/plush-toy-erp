@@ -72,7 +72,7 @@ test('flow records use the shared scope switch without replacing it across loadi
     )
   }
   await render()
-  assert.match(container.querySelector('h3').textContent, /流程处理记录/u)
+  assert.match(container.querySelector('h3').textContent, /处理记录/u)
   assert.equal(
     container.querySelectorAll('.workflow-task-event-trail__source').length,
     2
@@ -86,7 +86,7 @@ test('flow records use the shared scope switch without replacing it across loadi
     '.workflow-task-event-trail__scope'
   )
   const taskScope = Array.from(container.querySelectorAll('label')).find(
-    (label) => label.textContent === '仅本任务'
+    (label) => label.textContent === '只看本任务'
   )
   assert.equal(Boolean(taskScope), true)
   await act(async () => taskScope.click())
@@ -105,6 +105,6 @@ test('flow records use the shared scope switch without replacing it across loadi
     container.querySelector('.workflow-task-event-trail__scope') === switchNode,
     true
   )
-  assert.match(container.textContent, /流程处理记录加载失败/u)
+  assert.match(container.textContent, /处理记录加载失败/u)
   assert.match(container.textContent, /重新读取/u)
 })

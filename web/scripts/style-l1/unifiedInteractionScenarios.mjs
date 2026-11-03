@@ -110,7 +110,7 @@ export function createUnifiedInteractionScenarios({
           page,
           'inventory-distribution',
           outputDir,
-          { presentationSelector: '.erp-inventory-ledger-view-bar .ant-segmented-group' }
+          { presentationSelector: '.erp-inventory-ledger-page .erp-business-operation-panel__view-switch .ant-segmented-group' }
         )
         const panel = page.getByRole('region', {
           name: '仓库库存分布',
@@ -128,7 +128,7 @@ export function createUnifiedInteractionScenarios({
           )
           if (width === 390) {
             const toolbar = await page
-              .locator('.erp-inventory-ledger-view-bar')
+              .locator('.erp-inventory-ledger-page .erp-business-operation-panel__view-switch')
               .evaluate((element) => {
                 const switcher = element.querySelector(
                   '.erp-business-visual-switch'

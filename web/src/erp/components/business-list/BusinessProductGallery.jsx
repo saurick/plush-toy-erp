@@ -52,7 +52,7 @@ function ProductGallerySession({ products, productCount, title = '产品图片',
         item={opened.products[0]}
         load={loadImage}
         gallery={{ products: opened.products, title, renderThumbnail }}
-        onClose={() => { setOpened(null); onClose?.(); trigger.current?.focus({ preventScroll: true }) }}
+        onClose={({ restoreFocus = true } = {}) => { setOpened(null); onClose?.(); if (restoreFocus) trigger.current?.focus({ preventScroll: true }) }}
       /> : null}
     </span>
   )

@@ -6,6 +6,18 @@
   padding: 0;
 }
 
+.erp-inventory-ledger-page {
+  --erp-business-search-min-width: 180px;
+}
+
+.erp-inventory-operation-filters {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .erp-business-view-surface {
   display: flex;
   flex-direction: column;
@@ -42,43 +54,6 @@
   > .erp-business-data-table-card.ant-card
   > .ant-card-body {
   padding-top: 0;
-}
-
-.erp-inventory-ledger-view-bar {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 7px;
-}
-
-.erp-inventory-ledger-view-bar > .ant-tabs {
-  min-width: 0;
-  max-width: 100%;
-  flex: 0 1 auto;
-}
-
-.erp-inventory-ledger-view-bar .erp-business-visual-switch {
-  flex: 0 0 auto;
-  gap: 7px;
-  max-width: 100%;
-}
-
-.erp-inventory-ledger-view-bar .erp-business-visual-switch::before {
-  content: '';
-  flex: 0 0 1px;
-  height: 20px;
-  background: var(--erp-border);
-}
-
-.erp-inventory-ledger-page .erp-business-operation-panel__command {
-  flex-wrap: wrap;
-}
-
-.erp-inventory-ledger-page .erp-business-operation-panel__view-switch {
-  min-width: 0;
-  max-width: 100%;
-  flex-shrink: 1;
 }
 
 .erp-business-visual-frame > .erp-business-visual-switch {
@@ -604,10 +579,6 @@
 .erp-business-view-tabs > .ant-tabs-nav {
   min-height: 38px;
   margin: 0;
-}
-
-.erp-inventory-ledger-view-bar > .ant-tabs > .ant-tabs-nav {
-  margin-bottom: 0;
 }
 
 .erp-business-visual-frame > .erp-operational-visual-toolbar {
@@ -1387,10 +1358,6 @@ button.erp-production-process__step {
   .erp-business-visual-switch {
     align-items: flex-start;
     flex-wrap: wrap;
-  }
-
-  .erp-inventory-ledger-view-bar .erp-business-visual-switch::before {
-    display: none;
   }
 
   .erp-business-visual-metric {

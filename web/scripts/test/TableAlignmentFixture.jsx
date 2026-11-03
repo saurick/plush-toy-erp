@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
-import { Button, ConfigProvider, Form, Input, Space, Tag, theme } from 'antd'
+import { Button, ConfigProvider, Form, Input, Space, Tag } from 'antd'
 import AppTable from '../../src/common/components/table/AppTable'
 import ERPThemeToggle from '../../src/common/components/theme/ERPThemeToggle'
 import { ERPThemeProvider, useERPTheme } from '../../src/common/theme/erpTheme'
+import { createERPAntdTheme } from '../../src/common/theme/erpAntdTheme.mjs'
 import { BusinessDataTable } from '../../src/erp/components/business-list/BusinessListLayout'
 import { ColumnOrderModal } from '../../src/erp/components/business-list/ColumnOrderModal'
 import BusinessLineItemsTable, {
@@ -117,7 +118,7 @@ const request = {
 
 function Fixture() {
   const [contactForm] = Form.useForm()
-  const { isDark: dark, setThemeMode } = useERPTheme()
+  const { isDark: dark, setThemeMode, accent, appearance } = useERPTheme()
   const [mobile, setMobile] = useState(false)
   const [empty, setEmpty] = useState(false)
   const [order, setOrder] = useState(columns.map((column) => column.key))
@@ -133,7 +134,7 @@ function Fixture() {
   }))
   return (
     <ConfigProvider
-      theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm }}
+      theme={createERPAntdTheme({ isDark: dark, accent, density: appearance.density })}
     >
       <main
         style={{

@@ -718,7 +718,7 @@ body
     padding: 12px;
   }
 
-  .erp-sales-order-lines-form__head {
+  .erp-sales-order-lines-form__head[data-line-items-title='true'] {
     --erp-form-heading-align: stretch;
 
     flex-direction: column;
@@ -731,7 +731,7 @@ body
     flex-direction: column;
   }
 
-  .erp-sales-order-lines-form__head
+  .erp-sales-order-lines-form__head[data-line-items-title='true']
     > .erp-line-items-form__head-actions {
     width: 100%;
     justify-content: flex-start;

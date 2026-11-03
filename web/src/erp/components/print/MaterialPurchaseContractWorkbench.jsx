@@ -27,7 +27,7 @@ import {
 } from '../../utils/materialPurchaseContractEditor.mjs'
 import { getPrintRowBlock } from '../../utils/printItemOperations.mjs'
 import { getPrintOutputProblem } from '../../utils/printOutputPreflight.mjs'
-import { modal } from '@/common/utils/antdApp'
+import { useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PrintWorkspaceShell, {
   PrintWorkspaceToolSection,
@@ -107,6 +107,7 @@ export default function MaterialPurchaseContractWorkbench({
   businessInput = false,
   customerKey = '',
 }) {
+  const modal = useModal()
   const [draft, setDraft, flushDraft, draftRef, persistenceStatus] =
     usePersistentPrintWorkspaceDraft(
       () =>

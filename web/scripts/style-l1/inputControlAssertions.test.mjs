@@ -46,3 +46,66 @@ test('form height checks accept complete wrapped references and reject clipping 
   await name.evaluate((node) => { node.textContent = '来源锁定的长材料名称仍须完整换行，并按无边框控件的实际尺寸显示。' })
   await check()
 })
+
+test('textarea checks reject excess empty height and clipping while allowing rows, counts and readonly content', async (t) => {
+  const browser = await chromium.launch({ headless: true })
+  t.after(() => browser.close())
+  const page = await browser.newPage()
+  await page.setContent(`<!doctype html><style>
+    * { box-sizing: border-box; }
+    .erp-business-action-form { --erp-control-height: 34px; font: 14px/22px sans-serif; }
+    textarea { display: block; width: 200px; height: 34px; padding: 5px 8px; border: 1px solid; font: inherit; }
+  </style><form class="erp-business-action-form">
+    <textarea class="erp-business-textarea" style="--erp-textarea-rows: 1" aria-label="名称"></textarea>
+  </form>`)
+  const field = page.getByRole('textbox', { name: '名称' })
+  const check = () => assertVisibleBusinessFormControlHeight(page, '文本域高度合同')
+  await check()
+  await field.evaluate((node) => { node.style.height = '42px'; node.style.paddingBlock = '9px' })
+  await assert.rejects(check(), /文本域留白/u)
+  await field.evaluate((node) => { node.style.height = ''; node.style.paddingBlock = '' })
+  await field.fill('短名称')
+  await check()
+  await field.fill('第一行\n第二行\n第三行')
+  await assert.rejects(check(), /文本域留白/u)
+  await field.evaluate((node) => { node.style.height = '78px' })
+  await check()
+  await field.evaluate((node) => { node.disabled = true })
+  await check()
+  await field.evaluate((node) => { node.disabled = false; node.readOnly = true })
+  await check()
+  await field.evaluate((node) => {
+    node.readOnly = false
+    node.value = ''
+    node.style.height = '56px'
+    node.style.setProperty('--erp-textarea-rows', '2')
+  })
+  await check()
+  await field.evaluate((node) => {
+    const wrapper = document.createElement('span')
+    wrapper.className = 'ant-input-textarea-show-count'
+    node.before(wrapper)
+    wrapper.append(node)
+    const count = document.createElement('span')
+    count.className = 'ant-input-data-count'
+    count.textContent = '0 / 2000'
+    wrapper.append(count)
+    node.style.paddingBottom = '30px'
+    node.style.height = '81px'
+  })
+  await check()
+  await field.evaluate((node) => { node.style.paddingBottom = '5px'; node.style.height = '56px' })
+  await assert.rejects(check(), /文本域留白/u)
+  await field.evaluate((node) => {
+    const wrapper = node.parentElement
+    wrapper.querySelector('.ant-input-data-count').remove()
+    wrapper.className = 'ant-input-textarea-affix-wrapper'
+    wrapper.style.cssText = 'display:inline-block;border:1px solid'
+    node.style.setProperty('--erp-textarea-rows', '1')
+    node.style.border = '0'
+    node.style.height = '32px'
+  })
+  await check()
+  await field.evaluate((node) => { node.style.height = '42px' })
+  await assert.rejects(check(), /单行输入控件高度未统一/u)
+})

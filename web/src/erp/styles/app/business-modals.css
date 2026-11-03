@@ -1,6 +1,6 @@
 .erp-business-modal.ant-modal {
   --erp-modal-viewport-gap: 64px;
-  max-width: calc(100vw - 32px);
+  max-width: calc(var(--erp-overlay-width, 100vw) - 32px);
   top: 0;
   padding-bottom: 0;
 }
@@ -8,7 +8,7 @@
 .erp-business-modal .ant-modal-content {
   display: flex;
   flex-direction: column;
-  max-height: calc(100dvh - var(--erp-modal-viewport-gap));
+  max-height: calc(var(--erp-overlay-height, 100dvh) - var(--erp-modal-viewport-gap));
   overflow: hidden;
 }
 
@@ -40,7 +40,7 @@
 
 .erp-permission-modal.ant-modal,
 .erp-business-entry-modal.ant-modal {
-  max-width: calc(100vw - 32px);
+  max-width: calc(var(--erp-overlay-width, 100vw) - 32px);
 }
 
 .erp-permission-modal .ant-modal-content,
@@ -99,7 +99,7 @@
 .erp-business-action-modal.ant-modal {
   --erp-control-height: max(36px, var(--erp-touch-field-height, 0px));
   --erp-textarea-rows: 3;
-  max-width: calc(100vw - 32px);
+  max-width: calc(var(--erp-overlay-width, 100vw) - 32px);
 }
 
 .erp-business-action-modal .ant-modal-content {
@@ -669,7 +669,7 @@
 }
 
 .erp-source-import-picker__selected-popover .ant-popover-inner {
-  max-width: min(380px, calc(100vw - 48px));
+  max-width: min(380px, calc(var(--erp-overlay-width, 100vw) - 48px));
 }
 
 .erp-source-import-picker__selected-popover-content {
@@ -845,7 +845,7 @@
   display: grid;
   gap: 10px;
   min-width: 220px;
-  max-width: min(340px, calc(100vw - 64px));
+  max-width: min(340px, calc(var(--erp-overlay-width, 100vw) - 64px));
   margin: 0;
 }
 
@@ -1538,7 +1538,7 @@
 
 .erp-approval-responsibility__help {
   display: grid;
-  width: min(340px, calc(100vw - 56px));
+  width: min(340px, calc(var(--erp-overlay-width, 100vw) - 56px));
   gap: 8px;
 }
 
@@ -1724,10 +1724,10 @@
 
 .erp-role-center-detail.erp-role-center-detail--fullscreen {
   position: fixed;
-  inset: 0;
+  inset: var(--app-overlay-top, 0) auto auto var(--app-overlay-left, 0);
   z-index: 990;
-  width: 100%;
-  height: 100dvh;
+  width: var(--app-overlay-width, 100%);
+  height: var(--app-overlay-height, 100dvh);
   overflow: hidden;
   background: var(--erp-surface-bg);
   padding: 12px;
@@ -2021,7 +2021,7 @@
 }
 
 .erp-role-effective-access__revision {
-  width: min(420px, calc(100vw - 80px));
+  width: min(420px, calc(var(--erp-overlay-width, 100vw) - 80px));
   overflow-wrap: anywhere;
 }
 

@@ -54,7 +54,47 @@ export function createBusinessSplitPerformanceScenarios({ assert, customerRuntim
         evidence.samples.push(sample)
         return sample
       }
-      const open = () => page.getByRole('button', { name: '分栏编辑', exact: true }).first().click()
+      const resizeSample = async (state) => {
+        const panels = page.locator('.erp-split-panels')
+        const bar = panels.locator(':scope > .ant-splitter-bar .ant-splitter-bar-dragger')
+        const bounds = await panels.boundingBox()
+        const handle = await bar.boundingBox()
+        const before = await session?.send('Performance.getMetrics')
+        await page.evaluate(() => {
+          const pane = document.querySelector('.erp-split-pane--left')
+          const sample = { frames: [], frame: 0 }
+          window.__splitResizeSample = sample
+          const tick = (time) => {
+            if (sample.frames.length < 240) sample.frames.push({ time, width: pane.getBoundingClientRect().width })
+            sample.frame = requestAnimationFrame(tick)
+          }
+          sample.frame = requestAnimationFrame(tick)
+        })
+        const started = performance.now()
+        await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+        await page.mouse.down()
+        await page.mouse.move(bounds.x + bounds.width * 0.63, handle.y + handle.height / 2, { steps: 60 })
+        const duringWidth = (await page.locator('.erp-split-pane--left').boundingBox()).width
+        await page.mouse.up()
+        await page.waitForTimeout(100)
+        const frames = await page.evaluate(() => {
+          const sample = window.__splitResizeSample
+          cancelAnimationFrame(sample.frame)
+          delete window.__splitResizeSample
+          return sample.frames
+        })
+        const metrics = Object.fromEntries((await session?.send('Performance.getMetrics'))?.metrics?.map((entry) => [entry.name, entry.value]) || [])
+        const previous = Object.fromEntries(before?.metrics?.map((entry) => [entry.name, entry.value]) || [])
+        const intervals = frames.slice(1).map((frame, index) => frame.time - frames[index].time).sort((a, b) => a - b)
+        const sample = { state, pointerSteps: 60, durationMs: performance.now() - started, changedFrames: frames.slice(1).filter((frame, index) => Math.abs(frame.width - frames[index].width) > 0.5).length, frameCount: frames.length, p95FrameMs: intervals[Math.floor(intervals.length * 0.95)], maxFrameMs: intervals.at(-1), duringWidth, endWidth: (await page.locator('.erp-split-pane--left').boundingBox()).width, taskSeconds: metrics.TaskDuration - previous.TaskDuration, layoutCount: metrics.LayoutCount - previous.LayoutCount, recalcCount: metrics.RecalcStyleCount - previous.RecalcStyleCount }
+        evidence.operations.resize ||= []
+        evidence.operations.resize.push(sample)
+        await left.getByRole('button', { name: '布局', exact: true }).click()
+        await page.locator('.erp-split-layout-options input').fill('50')
+        await page.locator('.erp-split-layout-options input').blur()
+        await left.getByRole('button', { name: '布局', exact: true }).click()
+      }
+      const open = () => page.getByRole('button', { name: '分栏', exact: true }).first().click()
       const right = page.getByRole('region', { name: '右栏页面', exact: true })
       const left = page.locator('.erp-split-pane--left')
       const collapse = () => right.getByRole('button', { name: '收起分栏', exact: true }).first().click()
@@ -80,10 +120,17 @@ export function createBusinessSplitPerformanceScenarios({ assert, customerRuntim
         assert.equal(count('list_materials'), beforeEmpty, '空分栏不读取另一份业务列表')
         await snapshot('empty-split')
         await right.getByRole('combobox', { name: '选择右栏页面' }).click()
+        await right.getByRole('combobox', { name: '选择右栏页面' }).fill('材料档案')
         await page.locator('.ant-select-dropdown:visible').getByText('材料档案', { exact: true }).click()
         await right.getByRole('button', { name: '新建材料' }).waitFor()
         await page.waitForLoadState('networkidle')
         await snapshot('two-pages')
+        await resizeSample('original-order')
+        await left.getByRole('button', { name: '布局', exact: true }).click()
+        await page.getByRole('button', { name: '左右互换' }).click()
+        await resizeSample('swapped-order')
+        await left.getByRole('button', { name: '布局', exact: true }).click()
+        await page.getByRole('button', { name: '左右互换' }).click()
         const idleBefore = count('list_materials')
         const idleStart = await snapshot('idle-start')
         await page.waitForTimeout(1000)

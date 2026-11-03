@@ -3,7 +3,7 @@ import { Button, Input, Spin } from 'antd'
 import { CommentOutlined } from '@ant-design/icons'
 import { useBlocker } from 'react-router-dom'
 import BusinessModal from '../business-list/BusinessModal.jsx'
-import { modal } from '../../../common/utils/antdApp'
+import { useModal } from '../../../common/utils/antdApp'
 import { isRpcAbortError } from '../../../common/utils/jsonRpc.js'
 import {
   createHelpFeedback,
@@ -45,6 +45,7 @@ function ContributionDialog({
   onClose,
   onPublished,
 }) {
+  const modal = useModal()
   const split = useBusinessSplit()
   const page = useBusinessPageContext()
   const [data, setData] = useState(null)
@@ -86,12 +87,13 @@ function ContributionDialog({
       cancelText: '继续填写',
       onOk: onClose,
     })
-  }, [busy, dirty, onClose])
-  const confirmLeave = useCallback(async ({ intent } = {}) => {
+  }, [busy, dirty, modal, onClose])
+  const confirmLeave = useCallback(async ({ intent, overlay } = {}) => {
     if (busy) return false
     const allowed = !dirty || await new Promise((resolve) => {
       modal.confirm({
         maskClosable: true,
+        getContainer: overlay === 'workspace' ? () => globalThis.document.body : undefined,
         title: '离开前放弃未保存的内容？',
         okText: '放弃并离开',
         cancelText: '继续填写',
@@ -101,7 +103,7 @@ function ContributionDialog({
     })
     if (allowed && intent === 'refresh') onClose()
     return allowed
-  }, [busy, dirty, onClose])
+  }, [busy, dirty, modal, onClose])
   const registerLeaveGuard = page?.registerPageLeaveGuard
   useEffect(() => split?.handlingNavigation ? registerLeaveGuard?.(confirmLeave) : undefined, [split?.handlingNavigation, registerLeaveGuard, confirmLeave])
   useEffect(() => {

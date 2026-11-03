@@ -321,7 +321,7 @@ export function createPurchaseReceiptScenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const addButtonName = mode === 'return' ? '添加退货明细' : '添加调整明细'
-        await page.getByRole('tab', { name: '采购收货', exact: true, selected: true }).waitFor()
+        await page.locator('.erp-business-module-view-tabs [role="tab"][aria-selected="true"]').filter({ hasText: '采购收货' }).waitFor()
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, triggerName)
         const modal = page.getByRole('dialog', { name: title, exact: true })
@@ -591,7 +591,7 @@ export function createPurchaseReceiptScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await page.getByRole('tab', { name: '采购收货', exact: true, selected: true }).waitFor()
+        await page.locator('.erp-business-module-view-tabs [role="tab"][aria-selected="true"]').filter({ hasText: '采购收货' }).waitFor()
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, '退货与调整记录')
 

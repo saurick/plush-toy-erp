@@ -8,13 +8,10 @@ import {
 import {
   DEV_FLOW_STATE_PATH_GROUP_PRESENTATION,
   DEV_FLOW_STATE_PATH_KIND_PRESENTATION,
-  DEV_FLOW_STATE_TRANSITION_FILTERS,
   buildDevFlowStateNodeSummary,
   buildDevFlowRecordRelationship,
   buildDevFlowStateRelatedViews,
   buildDevFlowStateRuleMermaid,
-  buildDevFlowStateRuleSummary,
-  filterDevFlowStateTransitions,
   getDevFlowStateHumanActionLabel,
   getDevFlowStateTransitionDiagramLabel,
   getDevFlowStateTransitionPresentation,
@@ -79,15 +76,8 @@ test('every registered transition has a plain-language action label', () => {
   assert.deepEqual(genericActions, [])
 })
 
-test('sales order summary separates normal progress from cancellation exits', () => {
+test('sales order state conditions distinguish normal progress and cancellation exits', () => {
   const salesOrder = flow('source.sales_order')
-  assert.deepEqual(buildDevFlowStateRuleSummary(salesOrder), {
-    stateCount: 5,
-    transitionCount: 6,
-    exceptionalTransitionCount: 3,
-    terminalCount: 2,
-    terminalPolicyLabel: '有明确终态',
-  })
   assert.deepEqual(
     listDevFlowStatePathGroups(salesOrder).map((item) => item.key),
     ['normal', 'stop']
@@ -118,34 +108,6 @@ test('sales order summary separates normal progress from cancellation exits', ()
       outgoingExceptionalCount: 1,
       positionLabel: '中间状态',
     }
-  )
-})
-
-test('state transition filters keep all, exceptional, and selected-state views distinct', () => {
-  const salesOrder = flow('source.sales_order')
-  assert.equal(
-    filterDevFlowStateTransitions(
-      salesOrder,
-      '',
-      DEV_FLOW_STATE_TRANSITION_FILTERS.all
-    ).length,
-    6
-  )
-  assert.equal(
-    filterDevFlowStateTransitions(
-      salesOrder,
-      '',
-      DEV_FLOW_STATE_TRANSITION_FILTERS.exceptional
-    ).length,
-    3
-  )
-  assert.deepEqual(
-    filterDevFlowStateTransitions(
-      salesOrder,
-      'submitted',
-      DEV_FLOW_STATE_TRANSITION_FILTERS.related
-    ).map((item) => item.key),
-    ['draft->submitted', 'submitted->active', 'submitted->canceled']
   )
 })
 
@@ -226,23 +188,22 @@ test('state rule Mermaid colors transition lines from the shared path presentati
   assert.doesNotMatch(productionDiagram, /stroke:#722ed1/u)
 })
 
-test('用料退回进入异常筛选，同接口下的业务动作仍可区分', () => {
+test('用料退回保留异常分类，同接口下的业务动作仍可区分', () => {
   const materials = flow('source.engineering_material_request')
-  assert.deepEqual(filterDevFlowStateTransitions(materials, '', 'exceptional').map((item) => item.key), ['SUBMITTED->REJECTED', 'BOSS_APPROVED->REJECTED'])
+  assert.deepEqual(materials.transitions.filter((item) => getDevFlowStateTransitionPresentation(materials, item).isExceptional).map((item) => item.key), ['SUBMITTED->REJECTED', 'BOSS_APPROVED->REJECTED'])
   assert.equal(new Set(materials.transitions.map(getDevFlowStateTransitionDiagramLabel)).size, 4)
 })
 
-test('有条件的返工保留正常过账，同一转换可同时属于正常与条件异常范围', () => {
+test('有条件的返工保留正常过账与条件异常说明', () => {
   const production = flow('fact.production')
   const post = transition(production, 'DRAFT->POSTED')
-  assert(filterDevFlowStateTransitions(production, '', 'standard').includes(post))
-  assert(filterDevFlowStateTransitions(production, '', 'exceptional').includes(post))
+  assert.equal(getDevFlowStateTransitionPresentation(production, post).isExceptional, true)
   assert.equal(getDevFlowStateTransitionPresentation(production, post).groupKey, 'normal')
   assert.equal(getDevFlowStateTransitionPresentation(production, post).conditional, true)
   assert(listDevFlowStatePathGroups(production).some((item) => item.key === 'normal'))
-  assert.match(buildDevFlowStateRuleMermaid(production, { filter: 'standard' }), /过账/u)
+  assert.match(buildDevFlowStateRuleMermaid(production), /过账/u)
   const adjustment = flow('fact.inventory_operation')
-  assert(!filterDevFlowStateTransitions(adjustment, '', 'standard').includes(transition(adjustment, 'DRAFT->SUBMITTED')))
+  assert.equal(getDevFlowStateTransitionPresentation(adjustment, transition(adjustment, 'DRAFT->SUBMITTED')).groupKey, 'correction')
 })
 
 test('流程结束使用中性结果维度，补偿结束不冒充成功或单一取消', () => {
@@ -257,10 +218,8 @@ test('流程结束使用中性结果维度，补偿结束不冒充成功或单�
     assert.equal(presentation.groupKey, 'outcome')
     assert.match(presentation.condition, /补偿结束/u)
     assert.match(presentation.condition, /结束不代表成功/u)
-    assert(filterDevFlowStateTransitions(runtime, '', 'exceptional').includes(edge))
+    assert.equal(presentation.isExceptional, true)
   }
-  assert(filterDevFlowStateTransitions(runtime, '', 'standard').includes(complete))
-  assert(!filterDevFlowStateTransitions(runtime, '', 'standard').includes(stopped))
   assert.equal(getDevFlowStateTransitionPresentation(runtime, transition(runtime, 'blocked->active')).groupKey, 'pause_restore')
 })
 
@@ -327,27 +286,20 @@ test('related-view projection only creates exact catalog-backed destinations', (
   )
 })
 
-test('focused state diagrams use the same transitions as the list and preserve complete access', () => {
-  const source = flow('source.sales_order')
-  const standard = filterDevFlowStateTransitions(source, '', DEV_FLOW_STATE_TRANSITION_FILTERS.standard)
-  const exceptional = filterDevFlowStateTransitions(source, '', DEV_FLOW_STATE_TRANSITION_FILTERS.exceptional)
-  assert.equal(standard.length + exceptional.length, source.transitions.length)
-  const selected = source.transitions[0].from
-  for (const filter of Object.values(DEV_FLOW_STATE_TRANSITION_FILTERS)) {
-    const visible = filterDevFlowStateTransitions(source, selected, filter)
-    const graph = buildDevFlowStateRuleMermaid(source, { filter, stateKey: selected })
-    assert.equal((graph.match(/ -->\|/gu) || []).length, visible.length)
+test('state diagrams retain every registered state and transition', () => {
+  for (const source of DEV_FLOW_STATE_CATALOG.flows) {
+    const graph = buildDevFlowStateRuleMermaid(source)
+    assert.equal((graph.match(/ -->\|/gu) || []).length, source.transitions.length, source.key)
     const ids = new Set([...graph.matchAll(/^ {2}(S\d+)\[/gmu)].map((match) => match[1]))
+    assert.equal(ids.size, source.states.length, source.key)
     for (const edge of graph.matchAll(/(S\d+) -->\|[^\n]+\| (S\d+)/gu)) {
       assert(ids.has(edge[1]) && ids.has(edge[2]), 'every visible transition retains both endpoints')
     }
   }
-  assert.equal((buildDevFlowStateRuleMermaid(source).match(/ -->\|/gu) || []).length, source.transitions.length)
 })
 
-test('state focus does not invent start or end markers for a nonterminal subset', () => {
+test('state diagrams retain disconnected states and registered start and end markers', () => {
   const source = { states: [{ key: 'draft', label: '草稿' }, { key: 'active', label: '生效' }, { key: 'done', label: '结束' }], initialStates: ['draft'], terminalStates: ['done'], transitions: [] }
-  const graph = buildDevFlowStateRuleMermaid(source, { filter: 'related', stateKey: 'active' })
-  assert.match(graph, /生效/u)
-  assert.doesNotMatch(graph, /草稿|结束|STATE_START|STATE_END/u)
+  const graph = buildDevFlowStateRuleMermaid(source)
+  for (const label of ['生效', '草稿', '结束', 'STATE_START', 'STATE_END']) assert(graph.includes(label), label)
 })

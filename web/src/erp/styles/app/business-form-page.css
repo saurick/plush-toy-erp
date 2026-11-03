@@ -420,6 +420,7 @@
 
 .erp-business-form-page__footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -430,6 +431,7 @@
 }
 
 .erp-business-form-page__status {
+  white-space: nowrap;
   color: var(--erp-text-muted, #64748b);
   font-size: var(--erp-font-caption);
 }
@@ -452,12 +454,21 @@
 
 .erp-business-form-page__actions {
   display: flex;
+  flex-wrap: wrap;
   flex-shrink: 0;
   gap: 8px;
+  max-width: 100%;
+  margin-inline-start: auto;
 }
 
 .erp-business-form-page__actions .ant-btn {
   min-width: 96px;
+}
+
+@container business-editor (max-width: 420px) {
+  :is(.erp-split-pane[data-erp-split-pane], .app-overlay-scope) .erp-business-form-page__header :is(h1, h2) {
+    flex-basis: 100%;
+  }
 }
 
 @media (max-width: 600px) {

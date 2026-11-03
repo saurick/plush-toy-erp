@@ -104,57 +104,6 @@
   font-size: var(--erp-font-body);
   font-weight: 600;
 }
-.erp-dev-finance__flow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 24px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-.erp-dev-finance__flow > li {
-  position: relative;
-  display: flex;
-  min-width: 0;
-}
-.erp-dev-finance__arrow {
-  position: absolute;
-  inset-inline-start: -20px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--erp-text-muted);
-}
-.erp-dev-finance__node.ant-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  height: auto;
-  min-height: 84px;
-  padding: 14px 16px;
-  text-align: start;
-  white-space: normal;
-}
-.erp-dev-finance__node strong {
-  font-size: var(--erp-font-body);
-  font-weight: 600;
-}
-.erp-dev-finance__node > span {
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-body);
-}
-.erp-dev-finance__node.ant-btn[data-financial='true'] {
-  background: color-mix(in srgb, var(--erp-primary) 7%, var(--erp-surface-bg));
-}
-.erp-dev-finance__node.ant-btn[aria-pressed='true'],
-.erp-dev-finance__node.ant-btn[data-match='true'] {
-  border-color: var(--erp-primary);
-}
-.erp-dev-finance__node.ant-btn[aria-pressed='true'] {
-  background: color-mix(in srgb, var(--erp-primary) 10%, var(--erp-surface-bg));
-}
 .erp-dev-finance__shortcuts {
   display: flex;
   flex-wrap: wrap;
@@ -170,9 +119,6 @@
 }
 .erp-dev-finance__boundary p {
   margin: 6px 0 0;
-}
-.erp-dev-finance__detail .erp-dev-finance__flow {
-  margin-top: 20px;
 }
 .erp-dev-finance__scenario-controls .ant-select {
   width: 224px;
@@ -208,20 +154,11 @@
   }
 }
 @media (width <= 680px) {
-  .erp-dev-finance__flow,
   .erp-dev-finance__term-choices {
     grid-template-columns: 1fr;
   }
-  .erp-dev-finance__arrow {
-    inset-inline-start: 50%;
-    top: -20px;
-    transform: translateX(-50%) rotate(90deg);
-  }
 }
 
-[data-flow-print-current] .erp-dev-finance__node.ant-btn {
-  display: flex;
-}
 [data-flow-print-current] .erp-dev-finance__lane {
   break-inside: avoid;
 }
@@ -243,17 +180,8 @@
 .erp-dev-finance__note-roles {
   color: var(--erp-text-muted);
 }
-.erp-dev-finance__node[aria-expanded='true'] {
-  border-color: var(--erp-primary);
-}
 .erp-dev-finance-drawer .ant-drawer-body {
   padding: 20px 24px;
-}
-.erp-dev-finance-drawer .erp-dev-finance__flow {
-  gap: 20px;
-}
-.erp-dev-finance-drawer .erp-dev-finance__node.ant-btn {
-  padding: 12px;
 }
 .erp-dev-finance-drawer .erp-dev-finance__table td {
   overflow-wrap: anywhere;

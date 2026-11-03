@@ -19,7 +19,7 @@ import BusinessStatusFilter from '../components/business-list/BusinessStatusFilt
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import { canReadReference, loadReferenceIDs } from '../utils/remoteReferences.mjs'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
-import { useReferenceRecords } from '../hooks/useReferenceRecords.js'
+import { useReferenceHydration, useReferenceRecords } from '../hooks/useReferenceRecords.js'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessModal from '../components/business-list/BusinessModal.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -213,6 +213,14 @@ export default function BOMVersionsPage() {
   const [importFormatOpen, setImportFormatOpen] = useState(false)
   const [products, setProducts, mergeProducts] = useReferenceRecords(adminProfile)
   const [materials, setMaterials, mergeMaterials] = useReferenceRecords(adminProfile)
+  useReferenceHydration({
+    products: {
+      ids: versions.map((record) => record.product_id),
+      records: products,
+      onRecords: mergeProducts,
+      enabled: canReadReference(adminProfile, 'products'),
+    },
+  }, adminProfile, versions)
   const [units, setUnits] = useState([])
   const [referenceOptionsState, setReferenceOptionsState] = useState({
     loading: true,
@@ -685,9 +693,18 @@ export default function BOMVersionsPage() {
     async ({ signal }) => {
       if (!canRead) return []
       const result = await listAllBOMVersions(bomListParams, { signal })
-      return result?.bom_versions
+      const rows = result?.bom_versions
+      if (!Array.isArray(rows)) return rows
+      const productData = canReadReference(adminProfile, 'products')
+        ? await loadReferenceIDs('products', rows.map((record) => record.product_id), { signal })
+        : { products: [] }
+      const exportProductOptions = uniqueReferenceOptions(productData.products, productOption)
+      return rows.map((record) => ({
+        ...record,
+        product_label: referenceLabel(exportProductOptions, record.product_id, '产品', { emptyText: '' }),
+      }))
     },
-    [bomListParams, canRead]
+    [adminProfile, bomListParams, canRead]
   )
   const { exporting, exportRows: exportVersions } = useBusinessListExport({
     requestKey: 'bom-versions-export',
@@ -1093,6 +1110,7 @@ export default function BOMVersionsPage() {
       <BusinessDataTable
         loading={loading}
         rowKey="id"
+        tableLayout="fixed"
         columns={columns}
         dataSource={versions}
         pagination={createBusinessTablePagination({

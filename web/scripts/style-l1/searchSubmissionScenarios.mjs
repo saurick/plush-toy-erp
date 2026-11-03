@@ -11,6 +11,48 @@ export function createSearchSubmissionScenarios(deps) {
   const mobile = mobileTaskListOptionsScenario(deps)
   const tracking = createTaskTrackingFilterScenarios(deps)[0]
   return [
+    ...[320, 390].map((width) => ({
+      name: `search-submit-direct-mobile-${width}`,
+      path: '/m/boss/handle/help-center?view=reference&book=operations&ref=manual:operations:overview',
+      auth: 'admin',
+      adminProfile: { is_super_admin: true },
+      effectiveSession: deps.customerRuntimeEffectiveSession,
+      viewport: { width, height: 844 },
+      deviceScaleFactor: 2,
+      hasTouch: true,
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/admin', async (route) => {
+          const body = route.request().postDataJSON()
+          if (body.method !== 'help_content') return route.fallback()
+          const document = { id: 'manual:operations:overview', book: 'operations', title: '使用说明', source_hash: 'a'.repeat(64), supplement: true, can_edit: true, can_publish: true }
+          return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: styleRpcResult({ documents: [document], published: [] }) } })
+        })
+      },
+      verify: async (page) => {
+        const root = page.locator('.erp-help-center-page')
+        const input = root.locator('.erp-mobile-search input')
+        const directory = root.locator('.erp-help-mobile-directory-button')
+        await input.waitFor()
+        const before = await directory.evaluate((node) => getComputedStyle(node).visibility)
+        assert.equal(before, 'visible')
+        await input.fill('未提交的搜索')
+        await directory.waitFor({ state: 'hidden' })
+        const expandedState = await input.evaluate((node) => ({ focused: node === document.activeElement, searchClass: node.closest('.erp-mobile-search').className, row: { ...node.closest('.erp-mobile-search-row').dataset }, holders: [...node.closest('.erp-mobile-search-row').children].map((child) => ({ tag: child.tagName, active: child.dataset.mobileSearchActive, visibility: getComputedStyle(child).visibility })) }))
+        assert.equal(await directory.evaluate((node) => getComputedStyle(node).visibility), 'hidden', JSON.stringify(expandedState))
+        await root.getByRole('button', { name: '取消搜索', exact: true }).click()
+        await directory.waitFor({ state: 'visible' })
+        assert.equal(await input.inputValue(), '')
+        assert.equal(await directory.evaluate((node) => getComputedStyle(node).visibility), before)
+        await input.fill('材料')
+        await root.getByRole('button', { name: '搜索', exact: true }).click()
+        await directory.waitFor({ state: 'visible' })
+        assert.equal(await input.inputValue(), '材料')
+        assert.equal(await input.evaluate((node) => node === document.activeElement), false)
+        assert.equal(await directory.evaluate((node) => getComputedStyle(node).visibility), before)
+        await assertNoHorizontalOverflow(page, `search-direct-mobile-${width}`)
+        await page.screenshot({ path: path.join(outputDir, `search-direct-mobile-${width}.png`) })
+      },
+    })),
     {
       ...tracking,
       name: 'search-submit-tracking',
@@ -182,6 +224,8 @@ export function createSearchSubmissionScenarios(deps) {
           const row = page.locator('.mobile-role-task-query')
           const collapsed = await root.boundingBox()
           const rowBefore = await row.boundingBox()
+          const peerVisibility = () => input.evaluate((node) => [...node.closest('.erp-mobile-search-row').children].filter((peer) => !peer.contains(node)).map((peer) => getComputedStyle(peer).visibility))
+          const peersBefore = await peerVisibility()
           const before = page.searchRPCs.length
           await input.click()
           await input.fill(`慢搜索${width}`)
@@ -192,6 +236,7 @@ export function createSearchSubmissionScenarios(deps) {
           assert(expanded.width > collapsed.width + 20, JSON.stringify({ collapsed, expanded, state: await root.evaluate((node) => ({ className: node.className, width: node.style.cssText, focus: document.activeElement?.outerHTML, row: node.closest('.erp-mobile-search-row')?.getBoundingClientRect().toJSON() })) }))
           assert(Math.abs(expanded.x + expanded.width - rowAfter.x - rowAfter.width) <= 2, 'focused search fills the toolbar row')
           assert.equal(rowAfter.height, rowBefore.height, 'expansion must not shift the list vertically')
+          assert((await peerVisibility()).every((visibility) => visibility === 'hidden'), 'expanded search hides neighboring toolbar controls')
           for (const button of await root.getByRole('button').all()) {
             const box = await button.boundingBox()
             assert(box.width >= 44 && box.height >= 44, JSON.stringify(box))
@@ -204,6 +249,7 @@ export function createSearchSubmissionScenarios(deps) {
             assert.equal(await input.evaluate((node) => document.activeElement === node), false, 'submit dismisses keyboard focus')
             assert(page.releaseSearch, 'the delayed request must still be pending')
             assert.equal(await input.inputValue(), `慢搜索${width}`)
+            assert.deepEqual(await peerVisibility(), peersBefore, 'submit restores neighboring controls before the response')
           } finally { page.releaseSearch?.(); page.releaseSearch = null }
           await page.waitForLoadState('networkidle')
           await input.fill('取消这段输入')

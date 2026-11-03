@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { expect } from 'playwright/test'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
@@ -200,44 +201,30 @@ export function createHelpCenterScenarios({
     'style-help-warehouse'
   )
   const assertFlowFits = async (page) => {
-    const boxes = await page
-      .locator('.erp-help-flow__steps')
-      .evaluate((element) => ({
-        width: element.clientWidth,
-        content: element.scrollWidth,
-        childrenFit: [...element.querySelectorAll('button')].every(
-          (button) => button.scrollWidth <= button.clientWidth + 1
-        ),
-      }))
-    assert(
-      boxes.content <= boxes.width + 1 && boxes.childrenFit,
-      JSON.stringify(boxes)
-    )
+    const root = page.locator('.erp-help-flow')
+    if (await root.getAttribute('data-overview-kind') === 'chain') await root.locator('[data-mermaid-status="rendered"]').waitFor()
+    const boxes = await root.evaluate((element) => ({
+      width: element.clientWidth, content: element.scrollWidth,
+      childrenFit: [...element.querySelectorAll('button')].every((button) => button.scrollWidth <= button.clientWidth + 1),
+      labelsFit: [...element.querySelectorAll('foreignObject')].every((node) => !node.firstElementChild || node.firstElementChild.getBoundingClientRect().height <= node.getBoundingClientRect().height + 2),
+    }))
+    assert(boxes.content <= boxes.width + 1 && boxes.childrenFit && boxes.labelsFit, JSON.stringify(boxes))
     await assertNoHorizontalOverflow(page, '岗位流程与页面不应横向溢出')
   }
   const assertSelectedStepIsVisible = async (page) => {
-    const colors = await page
-      .locator('.erp-help-flow__steps')
-      .evaluate((element) => {
-        const selected = getComputedStyle(
-          element.querySelector('[aria-pressed="true"]')
-        )
-        const other = getComputedStyle(
-          element.querySelector('[aria-pressed="false"]')
-        )
-        return {
-          selected: selected.backgroundColor,
-          other: other.backgroundColor,
-          selectedBorder: selected.borderTopColor,
-          otherBorder: other.borderTopColor,
-        }
-      })
-    assert.notEqual(colors.selected, colors.other, '选中步骤应有明确的背景区分')
-    assert.notEqual(
-      colors.selectedBorder,
-      colors.otherBorder,
-      '选中步骤应有明确的边框区分'
-    )
+    const colors = await page.locator('.erp-help-flow').evaluate((element) => {
+      const selectedNode = element.querySelector('[data-help-step][aria-pressed="true"]')
+      const otherNode = element.querySelector('[data-help-step][aria-pressed="false"]')
+      const mermaid = element.dataset.overviewKind === 'chain'
+      const selected = getComputedStyle(mermaid ? selectedNode.querySelector('.label-container') : selectedNode)
+      const other = getComputedStyle(mermaid ? otherNode.querySelector('.label-container') : otherNode)
+      return { mermaid, selected: mermaid ? selected.fill : selected.backgroundColor, other: mermaid ? other.fill : other.backgroundColor, selectedBorder: mermaid ? selected.stroke : selected.borderTopColor, otherBorder: mermaid ? other.stroke : other.borderTopColor, selectedWidth: parseFloat(selected.strokeWidth), otherWidth: parseFloat(other.strokeWidth) }
+    })
+    if (colors.mermaid) assert(colors.selectedWidth > colors.otherWidth && (colors.selected !== colors.other || colors.selectedBorder !== colors.otherBorder), 'Mermaid 选中步骤具有独立的填充与加粗轮廓')
+    else {
+      assert.notEqual(colors.selected, colors.other, '选中步骤应有明确的背景区分')
+      assert.notEqual(colors.selectedBorder, colors.otherBorder, '选中步骤应有明确的边框区分')
+    }
   }
   const waitForPickerClosed = async (page) => {
     await page
@@ -1550,7 +1537,7 @@ export function createHelpCenterScenarios({
             await article.waitFor()
             const model = getHelpScenarioPresentation(scenario, guide.key)
             assert.equal(
-              await article.locator('.erp-help-flow__steps button').count(),
+              await article.locator('[data-help-step]').count(),
               model.steps.length
             )
             for (const step of model.steps) {
@@ -1639,6 +1626,30 @@ export function createHelpCenterScenarios({
       },
     },
     {
+      name: 'help-center-mermaid-mobile',
+      path: '/erp/help-center?role=warehouse&scene=finished-goods',
+      auth: 'admin',
+      adminProfile: warehouseProfile,
+      effectiveSession: warehouseSession,
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+      verify: async (page) => {
+        const graph = page.locator('.erp-help-flow .erp-markdown-mermaid')
+        await graph.locator('[data-mermaid-node-id]').first().waitFor()
+        await expect(graph).toHaveAttribute('data-mermaid-direction', 'TB')
+        await expect(graph).toHaveAttribute('data-mermaid-zoom-mode', 'fit-width')
+        for (const key of await graph.locator('[data-help-step]').evaluateAll((nodes) => nodes.map((node) => node.dataset.helpStep))) {
+          const node = graph.locator(`[data-help-step="${key}"]`)
+          await node.scrollIntoViewIfNeeded()
+          await node.tap()
+          await expect(node).toHaveAttribute('aria-pressed', 'true')
+        }
+        await assertFlowFits(page)
+        await page.screenshot({ path: path.join(outputDir, 'help-mermaid-mobile.png'), fullPage: true })
+      },
+    },
+    {
       name: 'help-center-warehouse-desktop-light',
       path: '/erp/help-center?role=warehouse&scene=finished-goods',
       auth: 'admin',
@@ -1724,20 +1735,16 @@ export function createHelpCenterScenarios({
         })
         await page.setViewportSize({ width: 1100, height: 800 })
         await assertFlowFits(page)
-        const flowGeometry = await article.evaluate(async (element) => {
-          const issue = element.querySelector('.erp-help-flow__issue')
-          const steps = element.querySelector('.erp-help-flow__steps')
-          const measure = () => ({ branchBox: issue.querySelector('button').getBoundingClientRect().toJSON(), stepsBox: steps.getBoundingClientRect().toJSON(), stacked: getComputedStyle(issue).position === 'static', issuePosition: getComputedStyle(issue).position, issueTop: getComputedStyle(issue).top, issueMarginTop: getComputedStyle(issue).marginTop })
-          const samples = [measure()]
-          for (let frame = 0; frame < 4; frame += 1) { await new Promise(requestAnimationFrame); samples.push(measure()) }
-          return samples
+        const flowGeometry = await article.evaluate((element) => {
+          const graph = element.querySelector('.erp-help-flow [data-mermaid-status="rendered"]')
+          const nodes = [...graph.querySelectorAll('g.node')]
+          const issue = nodes.find((node) => !node.hasAttribute('data-help-step')).getBoundingClientRect()
+          const overlap = (a, b) => Math.min(a.right, b.right) > Math.max(a.left, b.left) + 1 && Math.min(a.bottom, b.bottom) > Math.max(a.top, b.top) + 1
+          return { nodes: nodes.length, overlaps: nodes.filter((node) => node.hasAttribute('data-help-step') && overlap(issue, node.getBoundingClientRect())).map((node) => node.dataset.helpStep), width: graph.clientWidth, scrollWidth: graph.scrollWidth }
         })
         await writeFile(path.join(outputDir, 'help-center-warehouse-narrow-geometry.json'), JSON.stringify(flowGeometry, null, 2))
-        const { branchBox, stepsBox, stacked } = flowGeometry.at(-1)
-        assert(
-          branchBox.y >= stepsBox.y + stepsBox.height + (stacked ? 10 : 40),
-          `异常分支不能压住换行后的步骤: ${JSON.stringify(flowGeometry)}`
-        )
+        assert.deepEqual(flowGeometry.overlaps, [], '异常分支不能压住步骤')
+        assert(flowGeometry.scrollWidth <= flowGeometry.width + 1, '异常分支保留在 Mermaid 画布内')
         await page.screenshot({
           path: path.join(
             outputDir,

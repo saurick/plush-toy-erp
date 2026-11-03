@@ -79,13 +79,6 @@
   min-height: var(--erp-control-height);
 }
 
-.erp-line-editor__row-marker .ant-radio-wrapper {
-  margin: 0;
-  min-width: max(24px, var(--erp-touch-target, 0px));
-  min-height: max(24px, var(--erp-touch-target, 0px));
-  justify-content: center;
-}
-
 .erp-line-editor__details-toggle.ant-btn {
   display: inline-flex;
   align-items: center;

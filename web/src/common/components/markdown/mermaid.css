@@ -25,10 +25,10 @@
 .erp-markdown-mermaid--fullscreen {
   position: fixed;
   z-index: 1300;
-  inset: 0;
+  inset: var(--app-overlay-top, 0) auto auto var(--app-overlay-left, 0);
   display: flex;
-  width: auto;
-  height: auto;
+  width: var(--app-overlay-width, 100vw);
+  height: var(--app-overlay-height, 100dvh);
   flex-direction: column;
   margin: 0;
   border: 0;

@@ -89,13 +89,13 @@ test('inventory header keeps navigation compact without duplicate counts', () =>
   const source = readScenarioSource('inventoryPresentationScenarios')
 
   const startIndex = source.indexOf("name: 'inventory-visible-copy-desktop'")
-  const interaction = source.slice(startIndex, startIndex + 2_600)
+  const interaction = source.slice(startIndex, source.indexOf("name: 'inventory-compact-header-dark-mobile'", startIndex))
 
   assert.ok(startIndex >= 0)
   assert.match(interaction, /assertBusinessHeaderCompact/u)
   assert.doesNotMatch(interaction, /expectedLabels/u)
-  assert.match(interaction, /name: '库存批次'/u)
-  assert.match(interaction, /name: '库存变动记录'/u)
+  assert.match(interaction, /selectWarehouseView\(page, '库存批次'\)/u)
+  assert.match(interaction, /selectWarehouseView\(page, '库存变动记录'\)/u)
   assert.match(interaction, /assertTextAbsent\(page, '查看内容'\)/u)
   assert.doesNotMatch(interaction, /expectText\(page, '查看内容'\)/u)
   assert.match(source, /name: 'inventory-compact-header-dark-mobile'/u)

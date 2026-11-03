@@ -57,19 +57,19 @@
   line-height: 42px;
 }
 
-.erp-business-action-form :where(textarea.ant-input, .ant-input-textarea-affix-wrapper) {
+:is(.erp-business-form, .erp-business-action-form) :where(.ant-input-textarea-affix-wrapper),
+:where(#root, .ant-modal, .ant-drawer) .erp-business-textarea.ant-input-textarea-affix-wrapper {
   height: auto;
-  min-height: calc(
-    var(--erp-control-height, 36px) * var(--erp-textarea-rows, 3)
-  );
+  min-height: var(--erp-control-height, var(--erp-form-control-height, 36px));
+  padding-block: 0;
 }
 
-.erp-business-action-form :where(textarea.ant-input) {
-  padding-block: 9px;
-}
-
-.erp-line-item-details__fields :where(textarea.ant-input) {
-  min-height: var(--erp-control-height, 36px);
+:is(.erp-business-form, .erp-business-action-form) :where(textarea.ant-input),
+:where(#root, .ant-modal, .ant-drawer) :is(textarea.erp-business-textarea, .erp-business-textarea textarea) {
+  height: auto;
+  min-height: calc(var(--erp-control-height, var(--erp-form-control-height, 36px)) + (var(--erp-textarea-rows, 2) - 1) * 1lh);
+  /* 一行留白消费标准框高，换行后的增高继续由 TextArea 测量。 */
+  padding-block: max(0px, calc((var(--erp-control-height, var(--erp-form-control-height, 36px)) - 2px - 1lh) / 2));
 }
 
 .erp-business-date-input.ant-picker {
@@ -481,8 +481,6 @@ body
 
 body :is(.ant-modal, .erp-task-action-drawer) .erp-business-form textarea.ant-input,
 #root .erp-business-form textarea.ant-input {
-  height: auto;
-  min-height: calc(var(--erp-control-height) * var(--erp-textarea-rows, 2));
   line-height: 1.45;
 }
 

@@ -6,7 +6,7 @@ import { outsourcingTaskFactMatches, outsourcingTaskScope } from '../../utils/ou
 import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { useOutsourcingReturnPayable } from './useOutsourcingReturnPayable.mjs'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   listAllOutsourcingOrderItems,
@@ -107,6 +107,7 @@ export function useOutsourcingSourceFacts({
   canCreateReturnReceipt,
   unitOptions,
 }) {
+  const modal = useModal()
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const taskScope = useMemo(() => outsourcingTaskScope(taskBusiness), [taskBusiness])
   const [sourceFactOpen, setSourceFactOpen] = useState(false)
@@ -419,7 +420,7 @@ export function useOutsourcingSourceFacts({
         },
       })
     },
-    [canCancelOutsourcingFact, mutateOutsourcingFact]
+    [canCancelOutsourcingFact, modal, mutateOutsourcingFact]
   )
 
   const openOutsourcingReturnQualityInspection = useCallback(

@@ -74,7 +74,7 @@ function unitColumn(unitDisplay) {
     title: '默认单位',
     exportTitle: '默认单位',
     dataIndex: 'default_unit_id',
-    width: 130,
+    width: 90,
     sorter: (a, b) =>
       compareText(
         unitDisplay(a?.default_unit_id),
@@ -104,7 +104,7 @@ function productColumns({ unitDisplay }) {
       exportTitle: '产品名称',
       dataIndex: 'name',
       copyable: true,
-      width: 220,
+      width: 260,
       sorter: (a, b) => compareText(a?.name, b?.name),
       className: 'erp-product-identity-cell',
       render: (value, record) => (
@@ -165,7 +165,7 @@ function productColumns({ unitDisplay }) {
       title: '产品单重（净重）',
       exportTitle: '产品单重（克）',
       dataIndex: 'unit_net_weight_g',
-      width: 190,
+      width: 150,
       sorter: (a, b) =>
         compareNumeric20Scale6Values(
           a?.unit_net_weight_g,
@@ -317,7 +317,7 @@ function processColumns() {
       exportTitle: '环节名称',
       dataIndex: 'name',
       copyable: true,
-      width: 180,
+      width: 220,
       sorter: (a, b) => compareText(a?.name, b?.name),
     },
     {
@@ -325,7 +325,7 @@ function processColumns() {
       title: '环节类别',
       exportTitle: '环节类别',
       dataIndex: 'category',
-      width: 150,
+      width: 120,
       sorter: (a, b) => compareText(a?.category, b?.category),
       render: (value) => value || '-',
     },
@@ -333,7 +333,7 @@ function processColumns() {
       title: '标准路线位置',
       exportTitle: '标准路线位置',
       dataIndex: 'production_route_operation_code',
-      width: 170,
+      width: 150,
       sorter: (a, b) =>
         compareText(
           PRODUCTION_ROUTE_OPERATION_LABELS[a?.production_route_operation_code],
@@ -356,7 +356,7 @@ function processColumns() {
       title: '可委外',
       exportTitle: '可委外',
       dataIndex: 'outsourcing_enabled',
-      width: 100,
+      width: 90,
       sorter: (a, b) =>
         compareBoolean(a?.outsourcing_enabled, b?.outsourcing_enabled),
       exportValue: (record) => booleanExportText(record?.outsourcing_enabled),
@@ -367,7 +367,7 @@ function processColumns() {
       title: '可内制',
       exportTitle: '可内制',
       dataIndex: 'inhouse_enabled',
-      width: 100,
+      width: 90,
       sorter: (a, b) => compareBoolean(a?.inhouse_enabled, b?.inhouse_enabled),
       exportValue: (record) => booleanExportText(record?.inhouse_enabled),
       render: (value) =>
@@ -408,7 +408,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
       exportTitle: '名称',
       dataIndex: 'name',
       copyable: true,
-      width: 220,
+      width: 260,
       sorter: (a, b) => compareText(a?.name, b?.name),
     },
     ...(type === 'materials'
@@ -456,7 +456,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             copyable: true,
             effectiveFieldKey:
               type === 'customers' ? 'display_name' : undefined,
-            width: 160,
+            width: 140,
             sorter: (a, b) => compareText(a?.short_name, b?.short_name),
             render: (value) => value || '-',
           },
@@ -491,7 +491,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             title: '国家 / 地区',
             exportTitle: '国家 / 地区',
             dataIndex: 'country_region',
-            width: 150,
+            width: 140,
             sorter: (a, b) => compareText(a?.country_region, b?.country_region),
             render: (value) => value || '-',
           },

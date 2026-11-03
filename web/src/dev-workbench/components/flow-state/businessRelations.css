@@ -6,12 +6,8 @@
 .erp-dev-relation-filter-value.ant-btn { height: auto; min-height: 32px; max-width: 100%; white-space: normal; text-align: left; }
 .erp-dev-relation-filter-value > span { overflow-wrap: anywhere; }
 .erp-dev-action-relations { min-width: 0; }
-.erp-dev-action-relations__handoff { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; padding-block: 8px; }
-.erp-dev-action-relations__handoff > div { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
-.erp-dev-action-relations__handoff small, .erp-dev-action-relations__conditions > span { color: var(--erp-text-muted); font-size: var(--erp-font-small); }
-.erp-dev-action-relations__handoff strong { font-weight: 500; }
+.erp-dev-action-relations__conditions > span { color: var(--erp-text-muted); font-size: var(--erp-font-small); flex-shrink: 0; }
 .erp-dev-action-relations__conditions { display: flex; align-items: baseline; gap: 16px; }
-.erp-dev-action-relations__conditions > span { flex-shrink: 0; }
 .erp-dev-action-relations__conditions ul { margin: 0; padding-left: 18px; }
 .erp-dev-action-relations code { display: inline-block; margin: 0 8px 4px 0; overflow-wrap: anywhere; }
 [data-flow-print-current] .erp-dev-relation-filters { display: none; }

@@ -8,7 +8,7 @@ import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import SelectPresentationContext from '@/common/components/select/SelectPresentationContext.jsx'
 import { useBusinessLineItemDisclosure } from './BusinessLineItemDisclosureContext.js'
 import { useBusinessLineItemErrorCount, useBusinessLineItemGroupErrors } from './useBusinessLineItemGroups.js'
-import BusinessLineEditor, { BusinessLineEditorRowControls, useBusinessLineEditor } from './BusinessLineEditor.jsx'
+import BusinessLineEditor, { BusinessLineEditorRowControls, useBusinessLineEditor, useBusinessLineEditorRow } from './BusinessLineEditor.jsx'
 import { BusinessLineItemsHeader } from './BusinessLineItemsFooter.jsx'
 
 const LineItemCardsContext = React.createContext(null)
@@ -162,8 +162,9 @@ export function BusinessLineItemRow({
       if (!event.currentTarget.contains(event.relatedTarget)) setActive(false)
     },
   }
+  const selection = useBusinessLineEditorRow({ actions, hidden: disclosure?.hidden, rowRef, onFocus: focusProps.onFocusCapture })
   if (cardColumns) { return (
-    <section className="erp-task-line-card erp-editable-line-group" aria-label={`第 ${index + 1} 条明细`} ref={rowRef} hidden={disclosure?.hidden} data-line-item-collapsed={disclosure?.hidden ? 'true' : undefined} data-line-item-index={disclosure?.index} {...focusProps}>
+    <section className="erp-task-line-card erp-editable-line-group" aria-label={`第 ${index + 1} 条明细`} hidden={disclosure?.hidden} data-line-item-collapsed={disclosure?.hidden ? 'true' : undefined} data-line-item-index={disclosure?.index} {...focusProps} {...selection.rowProps}>
       <div className="erp-task-line-card__heading"><strong>第 <span className="erp-editable-line-group__number">{index + 1}</span> 条明细</strong>{status}</div>
       <div className="erp-task-line-card__fields">
         {hiddenFields}
@@ -177,7 +178,6 @@ export function BusinessLineItemRow({
   return (
     <tbody
       className="erp-sales-order-lines-form__row erp-editable-line-group"
-      ref={rowRef}
       aria-label={`第 ${index + 1} 条明细`}
       data-line-parity={index % 2 ? 'even' : 'odd'}
       hidden={disclosure?.hidden}
@@ -185,13 +185,14 @@ export function BusinessLineItemRow({
       data-line-item-index={disclosure?.index}
       data-line-item-details={collapsibleDetails ? 'collapsible' : undefined}
       {...focusProps}
+      {...selection.rowProps}
     >
       <tr className="erp-line-item-table__main-row">
         <td
           className="erp-line-item-table__index erp-editable-line-group__sequence"
           rowSpan={children && detailsVisible ? 2 : 1}
         >
-          <BusinessLineEditorRowControls index={index} identity={detailsIdentity || disclosure?.identity} actions={actions} hidden={disclosure?.hidden}>
+          <BusinessLineEditorRowControls selection={selection} index={index} identity={detailsIdentity || disclosure?.identity} actions={actions}>
             {collapsibleDetails && children ? (
               <Button
                 className="erp-line-editor__details-toggle"

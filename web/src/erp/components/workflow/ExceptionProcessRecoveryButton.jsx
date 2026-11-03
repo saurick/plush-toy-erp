@@ -1,7 +1,7 @@
 import { ReloadOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from 'antd'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
 import {
@@ -21,6 +21,7 @@ export default function ExceptionProcessRecoveryButton({
   onRecovered,
   size = 'small',
 }) {
+  const modal = useModal()
   const [loading, setLoading] = useState(false)
   const inspectionVersion = useRef(0)
   const confirmation = useRef(null)
@@ -128,7 +129,7 @@ export default function ExceptionProcessRecoveryButton({
     } finally {
       if (version === inspectionVersion.current) setLoading(false)
     }
-  }, [loadProcess, recover])
+  }, [loadProcess, modal, recover])
 
   if (!canRecover) return null
   const actionDisabled = disabled || loading

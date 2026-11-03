@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { ArrowRightOutlined, CloseOutlined } from '@ant-design/icons'
+import { CloseOutlined } from '@ant-design/icons'
 import { Button, Drawer, Popover, Radio } from 'antd'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import AppSelect from '@/common/components/select/AppSelect'
@@ -20,142 +20,67 @@ import {
   relationMatches,
   relationFiltersActive,
 } from '../../config/devFulfillmentRelations.mjs'
+import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 import './financeWorkbench.css'
 
-function FinanceNode({ node, selected, onSelect, preview }) {
-  const button = useRef(null)
-  const explanation = useRef(null)
-  const closing = useRef(false)
-  const open = preview?.active === node.key
-  const close = () => {
-    closing.current = true
-    preview.setActive(null)
-    button.current?.focus({ preventScroll: true })
-    closing.current = false
+function FinanceSteps({ nodes, label, selected, onSelect, preview }) {
+  const root = useRef(null)
+  const active = nodes.find((node) => node.key === preview?.active)
+  const graph = {
+    direction: 'LR',
+    nodes: nodes.map((node) => ({
+      ...node,
+      summary: [node.description || node.summary, node.roles?.length ? `关联岗位：${node.roles.join('、')}` : ''].filter(Boolean).join('；'),
+      expanded: preview ? preview.active === node.key : undefined,
+      data: { 'finance-node': node.key, financial: node.financial || undefined, match: node.match || undefined },
+    })),
+    edges: nodes.slice(1).map((node, index) => ({ from: nodes[index].key, to: node.key, label: '办理顺序', condition: node.description || node.summary })),
   }
-  const dismissOnEscape = (event) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation()
-      close()
-    }
+  const trigger = () => [...root.current.querySelectorAll('[data-finance-node]')].find((node) => node.dataset.financeNode === active?.key)
+  const close = () => { trigger()?.focus({ preventScroll: true }); preview?.setActive(null) }
+  const dismissOnEscape = (event) => { if (event.key === 'Escape') { event.stopPropagation(); close() } }
+  const dismissOnBlur = (event) => {
+    if (!preview) return
+    const explanation = active ? document.getElementById(`finance-note-${active.key}`) : null
+    if (!root.current?.contains(event.relatedTarget) && !explanation?.contains(event.relatedTarget)) preview.setActive(null)
   }
-  const control = (
-    <Button
-      ref={button}
-      className="erp-dev-finance__node"
-      data-finance-node={node.key}
-      data-financial={node.financial || undefined}
-      data-match={node.match || undefined}
-      aria-pressed={preview ? undefined : selected}
-      aria-expanded={preview ? open : undefined}
-      aria-controls={open ? `finance-note-${node.key}` : undefined}
-      onClick={preview ? () => preview.setActive(node.key) : onSelect}
-      onFocus={() => {
-        if (preview && !closing.current) preview.setActive(node.key)
-      }}
-      onBlur={(event) => {
-        if (preview && !explanation.current?.contains(event.relatedTarget)) {
-          preview.setActive((current) =>
-            current === node.key ? null : current
-          )
-        }
-      }}
-      onKeyDown={(event) => {
-        if (preview && event.key === 'Escape') {
-          event.stopPropagation()
-          close()
-        } else if (open && event.key === 'ArrowDown') {
-          event.preventDefault()
-          explanation.current
-            ?.querySelector('button')
-            ?.focus({ preventScroll: true })
-        }
-      }}
-    >
-      <strong>{node.label}</strong>
-      {node.summary ? <span>{node.summary}</span> : null}
-    </Button>
+  const diagram = (
+    <div ref={root} onBlur={dismissOnBlur} onKeyDownCapture={(event) => { if (event.key === 'Escape' && active) close() }}>
+      <BusinessFlowDiagram
+        relationships
+        flow={graph}
+        label={label}
+        selectedKey={preview ? preview.active : nodes[selected]?.key}
+        onInspect={preview ? preview.setActive : undefined}
+        onSelect={(key) => {
+          const index = nodes.findIndex((node) => node.key === key)
+          if (preview) preview.setActive(key)
+          else onSelect?.(nodes[index], index)
+        }}
+        legend="按登记的办理顺序阅读；首款、审批与事实过账仍分别判断。"
+      />
+    </div>
   )
-  if (!preview) return control
+  if (!preview) return diagram
   return (
     <Popover
+      open={Boolean(active)}
       trigger={['hover']}
-      open={open}
-      onOpenChange={(next) =>
-        preview.setActive((current) =>
-          next ? node.key : current === node.key ? null : current
-        )
-      }
+      onOpenChange={(open) => { if (!open) preview.setActive(null) }}
       placement="bottom"
-      content={
-        <div
-          ref={explanation}
-          role="dialog"
-          tabIndex={-1}
-          id={`finance-note-${node.key}`}
-          className="erp-dev-finance__node-note"
-          aria-label={`${node.label}说明`}
-          onBlur={(event) => {
-            if (
-              !event.currentTarget.contains(event.relatedTarget) &&
-              event.relatedTarget !== button.current
-            ) {
-              preview.setActive((current) =>
-                current === node.key ? null : current
-              )
-            }
-          }}
-        >
+      content={active ? (
+        <div role="dialog" tabIndex={-1} id={`finance-note-${active.key}`} className="erp-dev-finance__node-note" aria-label={`${active.label}说明`} onBlur={dismissOnBlur}>
           <div className="erp-dev-finance__note-heading">
-            <strong>{node.label}</strong>
-            <Button
-              type="text"
-              aria-label="关闭步骤说明"
-              icon={<CloseOutlined aria-hidden="true" />}
-              onClick={close}
-              onKeyDown={dismissOnEscape}
-            />
+            <strong>{active.label}</strong>
+            <Button type="text" aria-label="关闭步骤说明" icon={<CloseOutlined aria-hidden="true" />} onClick={close} onKeyDown={dismissOnEscape} />
           </div>
-          <p>{node.description}</p>
-          {node.roles.length ? (
-            <p className="erp-dev-finance__note-roles">
-              关联岗位：{node.roles.join('、')}
-            </p>
-          ) : null}
-          <Button
-            onClick={() => preview.onExpand(node, button.current)}
-            onKeyDown={dismissOnEscape}
-          >
-            展开说明与规则
-          </Button>
+          <p>{active.description}</p>
+          {active.roles?.length ? <p>关联岗位：{active.roles.join('、')}</p> : null}
+          <Button onClick={() => preview.onExpand(active, trigger())} onKeyDown={dismissOnEscape}>展开说明与规则</Button>
         </div>
-      }
-    >
-      {control}
+      ) : null}
+    >{diagram}
     </Popover>
-  )
-}
-
-function FinanceSteps({ nodes, label, selected, onSelect, preview }) {
-  return (
-    <ol className="erp-dev-finance__flow" aria-label={label}>
-      {nodes.map((node, index) => (
-        <li key={node.key}>
-          {index > 0 ? (
-            <ArrowRightOutlined
-              className="erp-dev-finance__arrow"
-              aria-hidden="true"
-            />
-          ) : null}
-          <FinanceNode
-            node={node}
-            selected={selected === undefined ? undefined : selected === index}
-            onSelect={() => onSelect?.(node, index)}
-            preview={preview}
-          />
-        </li>
-      ))}
-    </ol>
   )
 }
 

@@ -5,6 +5,8 @@ import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { businessModuleDefinitions } from '../../src/erp/config/businessModules.mjs'
 import { navigationItemRegistry } from '../../src/erp/config/seedData.mjs'
+import { assertGroupedSelectHierarchy } from './groupedSelectAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const customers = Array.from({ length: 201 }, (_, index) => ({
   id: index + 1,
@@ -410,12 +412,14 @@ export function createHistoryRecordScenarios(deps) {
         const source = page.getByRole('combobox', { name: '历史记录类型', exact: true })
         const sourceControl = page.locator('.ant-select').filter({ has: source }).locator('.ant-select-selector')
         const table = page.locator('.ant-table-tbody')
-        await table.getByText('HISTORY-021', { exact: true }).click()
+        await table.locator('tr[data-row-key]').first().click()
+        assert.equal(await page.getByRole('button', { name: '查看详情', exact: true }).isEnabled(), true, '切换来源前已选中当前页记录')
         await assertQueryLayout(page)
         await sourceControl.click()
         const options = page.locator('.ant-select-dropdown:visible')
         await options.getByText('基础资料', { exact: true }).waitFor()
         await options.getByText('业务单据与版本', { exact: true }).waitFor()
+        await assertGroupedSelectHierarchy(options, '历史记录类型')
         await options.getByText('销售订单', { exact: true }).click()
         await table.getByText('HISTORY-SO-001', { exact: true }).waitFor()
         const query = new URL(page.url()).searchParams
@@ -427,7 +431,9 @@ export function createHistoryRecordScenarios(deps) {
         await page.waitForFunction(() => new URL(location.href).searchParams.get('status') === 'canceled' && document.querySelector('[aria-label="历史状态"]')?.getAttribute('aria-busy') === 'false' && document.querySelectorAll('.ant-table-tbody tr[data-row-key]').length === 0)
         assert.equal(await table.locator('tr[data-row-key]').count(), 0)
         await sourceControl.click()
-        await options.locator('.rc-virtual-list-holder').evaluate((node) => { node.scrollTop = 0 })
+        await waitForFiniteAnimations(page)
+        await options.locator('.rc-virtual-list-holder').hover()
+        await page.mouse.wheel(0, -1000)
         await options.getByText('客户档案', { exact: true }).click()
         await table.getByText('HISTORY-001', { exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.has('status'), false)

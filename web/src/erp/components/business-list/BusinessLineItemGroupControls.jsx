@@ -3,12 +3,7 @@ import { Button, Space } from 'antd'
 import { lineItemFieldIndex, revealBusinessLineItemErrors } from './businessLineItemDisclosure.mjs'
 import { useBusinessLineItemGroupErrors } from './useBusinessLineItemGroups.js'
 
-export function BusinessLineItemGroupErrorCount({ controller, groupId }) {
-  const count = useBusinessLineItemGroupErrors(controller).get(groupId) || 0
-  return count ? ` · ${count} 项待修改` : null
-}
-
-export default function BusinessLineItemGroupControls({ controller, form, label, groupCount }) {
+export default function BusinessLineItemGroupControls({ controller, form, label }) {
   const counts = useBusinessLineItemGroupErrors(controller)
   const errors = [...counts.values()].reduce((total, count) => total + count, 0)
   const locate = async () => {
@@ -19,13 +14,10 @@ export default function BusinessLineItemGroupControls({ controller, form, label,
     form.scrollToField(fields[0].name, { focus: true, block: 'nearest' })
   }
   return (
-    <div className="erp-line-item-group-controls" role="group" aria-label={`${label}分组`}>
-      <span className="erp-line-item-group-controls__count">{groupCount} 组</span>
-      <Space size={4} wrap>
-        <Button size="small" disabled={false} onClick={controller.expandAll}>全部展开</Button>
-        <Button size="small" disabled={false} onClick={controller.collapseAll}>全部收起</Button>
-        {errors ? <Button size="small" disabled={false} onClick={locate}>{errors} 项待修改 · 定位</Button> : null}
-      </Space>
-    </div>
+    <Space className="erp-line-item-group-controls" role="group" aria-label={`${label}分组`} size={4} wrap>
+      <Button disabled={false} onClick={controller.expandAll}>全部展开</Button>
+      <Button disabled={false} onClick={controller.collapseAll}>全部收起</Button>
+      {errors ? <Button disabled={false} onClick={locate}>{errors} 项待修改 · 定位</Button> : null}
+    </Space>
   )
 }

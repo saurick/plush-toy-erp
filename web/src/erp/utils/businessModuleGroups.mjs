@@ -5,6 +5,7 @@ import {
 import { hasActionPermission } from './masterDataOrderView.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { canReadProductionExceptionDecisions, canReadProductionProcess } from './productionRecordViews.mjs'
+import { resolveWarehouseView } from './warehouseViews.mjs'
 
 const productionTabs = [
   { key: 'production-orders', label: '生产订单', path: '/erp/production/orders' },
@@ -169,7 +170,7 @@ export function getBusinessModuleTabs(pathname, sections, { search = '', adminPr
     }
     const activeKey = pathname === '/erp/warehouse/inventory' && new URLSearchParams(search).get('workspace') === 'operations'
       ? 'inventory-operations' : match.tab.key
-    return { group: match.group, activeKey, tabs }
+    return { group: match.group, activeKey, tabs, secondaryNavigation: resolveWarehouseView(pathname, search, adminProfile) }
   }
   if (match.group.key === 'production') {
     const tabs = productionTabs.filter((tab) => {

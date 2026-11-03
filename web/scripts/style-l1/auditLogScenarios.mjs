@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { assertGroupedSelectHierarchy } from './groupedSelectAssertions.mjs'
 
 const events = Array.from({ length: 201 }, (_, index) => ({
   id: index + 1,
@@ -36,7 +37,7 @@ const events = Array.from({ length: 201 }, (_, index) => ({
   },
 }))
 
-async function installAuditRoute(page) {
+export async function installAuditRoute(page) {
   page.auditRequests = []
   let failureConsumed = false
   await page.route('**/rpc/admin', async (route) => {
@@ -146,6 +147,7 @@ export function createAuditLogScenarios({
         return body?.method === 'audit_logs' && body.params?.event_key
       })
       await operation.getByRole('combobox').press('ArrowDown')
+      await assertGroupedSelectHierarchy(page.locator('.ant-select-dropdown:visible'), '操作类型')
       await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
       await filteredRead
       assert(page.auditRequests.some((params) => params.event_key), '选择操作类型应提交筛选条件')

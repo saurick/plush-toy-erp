@@ -886,6 +886,24 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
+    if (/BusinessModuleTabs\.jsx|businessModuleTabs\.css|common\/components\/navigation\/(?:SlidingTabList\.jsx|useSlidingIndicator\.js)|styles\/app\/control-affordance\.css|warehouseNavigationActions\.mjs/u.test(file)) {
+      addFollowUp(state, "warehouse-navigation-browser", "T5",
+        "运行 STYLE_L1_SCENARIOS=warehouse-category-chip-navigation,warehouse-workbench-control-parity,warehouse-outbound-cold-entry-stability,warehouse-layout-all-views,warehouse-layout-dark-split,inventory-visible-copy-desktop pnpm --dir web style:l1，并分别验证 WebKit 与 Chromium，核对分类展开、键盘与动效、窄屏滚动、默认工作台隔离、首次加载和历史刷新。", file);
+    }
+    if (/common\/components\/table\/(?:AppTable\.jsx|tableColumns\.mjs)|BusinessListLayout\.jsx|InventoryLedgerPage\.jsx|productIdentity\.css|(?:masterData|shipment|qualityInspection)Columns\.jsx|inventoryLedgerPresentation\.jsx|businessColumnWidthScenarios\.mjs/u.test(file)) {
+      addNodeTests(state, ["web/src/common/components/table/tableColumns.test.mjs", "web/src/erp/utils/businessDefaultColumns.test.mjs", "web/src/erp/components/inventory/inventoryLedgerPresentation.behavior.test.mjs"], file, "T5");
+      addFollowUp(state, "business-column-width-browser", "T5",
+        "运行 STYLE_L1_SCENARIOS=business-column-width-empty-recovery,business-column-width-shipment-defaults,business-column-width-inventory-defaults pnpm --dir web style:l1，核对加载、空结果、恢复、默认列与完整导出、详情、窄屏和暗色。", file);
+    }
+    if (/common\/components\/empty\/|DevUIEmptyExamples|devUIEmptyExamples|emptyFeedbackScenarios|RemoteReference(?:Picker|Select)\.jsx$/u.test(file)) {
+      addFollowUp(
+        state,
+        "empty-feedback-browser",
+        "T5",
+        "运行 STYLE_L1_SCENARIOS=empty-feedback-standards-desktop,empty-feedback-business-forms,empty-feedback-reference-picker,empty-feedback-reference-dropdown,empty-states-mobile-light,empty-states-mobile-dark,empty-states-desktop pnpm --dir web style:l1，核对三种空提示规格、加载与失败分离、权限反馈、搜索清空、草稿保留及真实消费者。",
+        file,
+      );
+    }
     if (file === "scripts/qa/lib/business-chain-rule-contract.mjs") {
       addNodeTests(state, [
         "scripts/qa/business-chain-rule-check.test.mjs",
@@ -896,12 +914,12 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         "web/src/dev-workbench/config/devTestingOperation.test.mjs",
       ], file, "T3");
     }
-    if (/common\/components\/empty\/|DevUIEmptyExamples|devUIEmptyExamples|emptyFeedbackScenarios|RemoteReference(?:Picker|Select)\.jsx$/u.test(file)) {
+    if (/(?:DevControlStandards|DevUIInputExamples|common\/components\/select\/AppSelect|control-foundation\.css|groupedSelect(?:Assertions|Scenarios))/u.test(file)) {
       addFollowUp(
         state,
-        "empty-feedback-browser",
+        "browser-regression",
         "T5",
-        "运行 STYLE_L1_SCENARIOS=empty-feedback-standards-desktop,empty-feedback-business-forms,empty-feedback-reference-picker,empty-feedback-reference-dropdown,empty-states-mobile-light,empty-states-mobile-dark,empty-states-desktop pnpm --dir web style:l1，核对三种空提示规格、加载与失败分离、权限反馈、搜索清空、草稿保留及真实消费者。",
+        "运行 STYLE_L1_SCENARIOS=shared-grouped-select-light-desktop,shared-grouped-select-dark-desktop,shared-grouped-select-light-mobile,shared-grouped-select-dark-mobile,grouped-select-business-rules,grouped-select-design-html,history-records-source-switch,system-audit-logs-desktop pnpm --dir web style:l1，核对分类标题、组内缩进、选中勾选、搜索清空、禁用与键盘、浅深主题、独立 HTML 及普通选项隔离。",
         file,
       );
     }

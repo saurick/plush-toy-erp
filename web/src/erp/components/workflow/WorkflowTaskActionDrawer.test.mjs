@@ -49,7 +49,7 @@ test('task action drawer exposes the shared task attachment action with task res
 test('task action drawer separates business trajectory from permission-scoped processing records', () => {
   assert.match(source, /useWorkflowTaskEventRecords\(\{ task, profile \}\)/u)
   assert.match(source, /WorkflowTaskEventTrail/u)
-  assert.match(taskEventTrailSource, /流程处理记录/u)
+  assert.match(taskEventTrailSource, /处理记录/u)
   assert.doesNotMatch(taskEventTrailSource, /完整审批链/u)
   assert.doesNotMatch(source, /!task\?\.id \|\| !approvalTask/u)
   assert.match(source, /records=\{taskEventRecords\}/u)
@@ -598,7 +598,7 @@ test('drawer reads events for the selected task and cancels the previous request
   assert.equal(previous.every((call) => call.options.signal.aborted), true)
   assert.deepEqual(ui.calls[2].params, { task_id: 43, limit: 100 })
   assert.deepEqual(ui.calls[3].params, { task_id: 43, limit: 100, scope: 'flow' })
-  assert.match(document.body.textContent, /流程处理记录/)
+  assert.match(document.body.textContent, /处理记录/)
 })
 
 for (const status of ['done', 'rejected', 'withdrawn']) {

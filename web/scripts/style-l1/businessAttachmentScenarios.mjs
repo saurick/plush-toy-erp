@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { assertBusinessAttachmentFooter } from './businessAttachmentAssertions.mjs'
+import { createAttachmentNarrowScenarios } from './attachmentNarrowScenarios.mjs'
 
 const PNG = readFileSync(
   new URL(
@@ -359,7 +360,7 @@ export function createBusinessAttachmentScenarios({
               await chooser.setFiles({ name, mimeType: 'image/png', buffer: Buffer.from(PNG, 'base64') })
               const row = modal.locator('.business-attachment-panel__row').filter({ hasText: name })
               await row.getByRole('button', { name: '预览附件', exact: true }).click()
-              const preview = page.getByRole('dialog', { name: name, exact: true })
+              const preview = page.getByRole('dialog', { name, exact: true })
               await preview.getByRole('img', { name, exact: true }).waitFor()
               await preview.locator('img').evaluate((image) => image.decode())
               await waitForFiniteAnimations(page)
@@ -1220,6 +1221,9 @@ export function createBusinessAttachmentScenarios({
         errorLayout.alertWidth >= errorLayout.parentWidth - 2,
         JSON.stringify(errorLayout)
       )
+      const detailsToggle = editor.locator('.erp-line-editor__details-toggle').first()
+      await detailsToggle.waitFor()
+      if (await detailsToggle.getAttribute('aria-expanded') === 'false') await detailsToggle.click()
       const sourceButton = editor.getByRole('button', {
         name: '核对原表：订单 第 2 行',
         exact: true,
@@ -1247,17 +1251,23 @@ export function createBusinessAttachmentScenarios({
       await sourceButton.click()
       await evidence.locator('img[alt="订单产品原表图片"]').waitFor()
       await page.setViewportSize({ width: 390, height: 844 })
+      await waitForFiniteAnimations(page)
+      if (!await evidence.isVisible()) {
+        if (await detailsToggle.count() && await detailsToggle.getAttribute('aria-expanded') === 'false') await detailsToggle.click()
+        await sourceButton.click()
+        await evidence.locator('img[alt="订单产品原表图片"]').waitFor()
+      }
       const bounds = await evidence.evaluate((node) => ({
         width: node.clientWidth,
         scrollWidth: node.scrollWidth,
       }))
       assert(bounds.scrollWidth <= bounds.width + 1, JSON.stringify(bounds))
       await page.setViewportSize({ width: 1440, height: 900 })
-      await sourceButton.click()
       await editor
         .getByRole('button', { name: '返回列表', exact: true })
         .click()
       await editor.waitFor({ state: 'hidden' })
+      await evidence.waitFor({ state: 'hidden' })
       await page.getByRole('button', { name: /新建订单/u }).click()
       const newEditor = page
         .locator('.erp-business-form-page:not([hidden])')
@@ -1281,6 +1291,7 @@ export function createBusinessAttachmentScenarios({
       themeMode: 'dark',
     },
     ownerLifecycleScenario,
+    ...createAttachmentNarrowScenarios({ outputDir }, ownerLifecycleScenario),
     orderAttachmentRecoveryScenario,
   ]
 }

@@ -28,6 +28,7 @@ import {
   theme,
 } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
+import { hasVisibleOverlayPopup, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import useBusinessPageContext, { BusinessPageContext } from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import FilterSelect from '@/common/components/select/FilterSelect'
@@ -1067,6 +1068,7 @@ export function BusinessOperationPanel({
   }
   const filterTriggerRef = React.useRef(null)
   const filterPanelRef = React.useRef(null)
+  const overlay = useOverlayScope()
   const filterPanelId = React.useId()
   const closeFilters = () => {
     setFiltersOpen(false)
@@ -1104,9 +1106,11 @@ export function BusinessOperationPanel({
             {quickFilters}
           </div>
         ) : null}
-        <div className="erp-business-operation-panel__search">
-          {searchControls}
-        </div>
+        {primarySearch ? (
+          <div className="erp-business-operation-panel__search">
+            {searchControls}
+          </div>
+        ) : null}
         {additionalFilters.length > 0 ? (
           <Space.Compact
             className="erp-business-filter-trigger-group"
@@ -1141,9 +1145,7 @@ export function BusinessOperationPanel({
                   onKeyDownCapture={(event) => {
                     if (
                       event.defaultPrevented ||
-                      document.querySelector(
-                        '.ant-select-dropdown:not(.ant-select-dropdown-hidden), .ant-picker-dropdown:not(.ant-picker-dropdown-hidden)'
-                      )
+                      hasVisibleOverlayPopup(overlay)
                     ) {
                       return
                     }
@@ -1673,8 +1675,7 @@ export function BusinessDataTable({
   rowKey,
   columns,
   dataSource,
-  // Let complete headers determine minimum column widths even with sticky columns.
-  tableLayout = 'auto',
+  tableLayout = 'fixed',
   expandable,
   scroll,
   rowSelection,
@@ -1684,6 +1685,7 @@ export function BusinessDataTable({
   onChange,
   pagination,
   taskSourceDetails = null,
+  taskDetailColumns = columns,
   emptyDescription = '暂无匹配记录',
 }) {
   const pageContext = useBusinessPageContext() || {}
@@ -1757,7 +1759,7 @@ export function BusinessDataTable({
       <section className="mobile-task-business-source" data-testid="mobile-task-business-source" data-record-id={selected?.id} aria-busy={busy}>
         <Spin spinning={busy && Boolean(selected)}>
           {selected ? (
-            <><BusinessRecordDetails columns={columns} record={selected} presentation="mobile-task" title={isTerminalWorkflowTask(taskBusiness.task) ? '来源业务当前资料' : '本次业务资料'} />{taskSourceDetails}</>
+            <><BusinessRecordDetails columns={taskDetailColumns} record={selected} presentation="mobile-task" title={isTerminalWorkflowTask(taskBusiness.task) ? '来源业务当前资料' : '本次业务资料'} />{taskSourceDetails}</>
           ) : <Empty state={busy ? 'loading' : 'empty'} description={busy ? '正在读取任务业务资料' : '未读取到任务对应单据，请返回任务后重新读取。'} />}
         </Spin>
       </section>
@@ -1774,6 +1776,7 @@ export function BusinessDataTable({
         <div className="erp-business-data-table-card__header">{tableHeader}</div>
       ) : null}
       <Table
+        widthMode="columns"
         scrollToolbar
         sticky={sticky}
         size="small"

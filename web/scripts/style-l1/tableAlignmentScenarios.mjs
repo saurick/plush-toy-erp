@@ -27,6 +27,7 @@ async function measureTables(page) {
     }
     return {
       overflow: document.documentElement.scrollWidth > innerWidth + 1,
+      overflowElements: document.documentElement.scrollWidth > innerWidth + 1 ? [...document.querySelectorAll('body *')].filter((node) => node.getBoundingClientRect().right > innerWidth + 1 && !node.closest('.ant-table-body, .ant-table-content')).slice(0, 10).map((node) => ({ tag: node.tagName, id: node.id, className: typeof node.className === 'string' ? node.className : '', width: node.getBoundingClientRect().width, right: node.getBoundingClientRect().right, overflowX: getComputedStyle(node).overflowX })) : [],
       selectionColumns: [
         ...document.querySelectorAll('.app-table .ant-table-selection-column'),
       ].filter(visible).map((cell) => {
@@ -86,7 +87,7 @@ function assertCommonAlignment(evidence) {
   assert.equal(
     evidence.overflow,
     false,
-    'table overflow must stay inside its scroll container'
+    `table overflow must stay inside its scroll container: ${JSON.stringify(evidence.overflowElements)}`
   )
   assert(evidence.bodyAlignment.length > 0, 'expected a rendered table body')
   assert(evidence.headers.length > 0, 'expected rendered table headers')
@@ -175,6 +176,7 @@ export function createTableAlignmentScenarios({
       if (mode === 'light') {
         for (const width of [1920, 768, 1440]) {
           await page.setViewportSize({ width, height: 1000 })
+          await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
           evidence.push(await measureTables(page))
           assertAligned(evidence.at(-1))
         }

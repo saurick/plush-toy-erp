@@ -25,7 +25,7 @@ import { getPrintRowBlock } from '../utils/printItemOperations.mjs'
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import { getPrintOutputProblem } from '../utils/printOutputPreflight.mjs'
 import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
-import { modal } from '@/common/utils/antdApp'
+import { useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PrintAppendixImageManager from '../components/print/PrintAppendixImages.jsx'
 import ProcessingContractPaper from '../components/print/ProcessingContractPaper.jsx'
@@ -121,6 +121,7 @@ function formatExportFileName() {
 }
 
 export default function ProcessingContractPrintWorkspacePage() {
+  const modal = useModal()
   const template = getPrintTemplateByKey(PROCESSING_CONTRACT_TEMPLATE_KEY)
   const { templateKey } = useParams()
   const [searchParams] = useSearchParams()

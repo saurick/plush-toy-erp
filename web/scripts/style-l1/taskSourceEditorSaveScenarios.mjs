@@ -12,7 +12,7 @@ const reply = (route, id, data) => route.fulfill({ json: { jsonrpc: '2.0', id, r
 
 export function createTaskSourceEditorSaveScenarios(deps, existing) {
   const { assert, path, outputDir, assertNoHorizontalOverflow } = deps
-  return definitions.map((definition) => {
+  const scenarios = definitions.map((definition) => {
     const base = existing.find((scenario) => scenario.name === `task-unified-history-desktop-${definition.source}`)
     const task = { ...base.workflowTaskFixtures[0], task_group: definition.group, discovery: { stage_key: definition.stage }, task_status_key: 'ready', completed_at: null, version: 1 }
     if (task.task_group.startsWith('handoff_')) {
@@ -191,4 +191,46 @@ reads
       },
     }
   })
+  const purchase = scenarios.find((scenario) => scenario.name === 'task-source-editor-save-purchase_order')
+  return [...scenarios, {
+    ...purchase,
+    name: 'business-split-task-draft',
+    verify: async (page) => {
+      const task = purchase.workflowTaskFixtures[0]
+      await page.getByRole('button', { name: '分栏', exact: true }).first().click()
+      const left = page.locator('.erp-split-pane--left')
+      const right = page.locator('.erp-split-pane--right')
+      const picker = right.getByRole('combobox', { name: '选择右栏页面' })
+      await picker.click()
+      await picker.fill('任务管理')
+      await page.locator('.ant-select-dropdown:visible').getByText('任务管理', { exact: true }).click()
+      await left.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
+      await page.getByRole('tablist', { name: '任务处理步骤', exact: true }).getByRole('tab').nth(1).click()
+      const editor = page.locator('[data-business-form-page]').filter({ has: page.getByRole('heading', { name: '编辑采购订单', exact: true }) }).last()
+      const note = editor.getByLabel('备注', { exact: true }).filter({ visible: true }).last()
+      await note.fill('任务抽屉内尚未保存的内容')
+      const draft = await note.elementHandle()
+      const leaveDialog = () => page.getByRole('dialog').filter({ hasText: '放弃未保存的修改？' })
+      await page.locator('.erp-admin-menu').getByText('销售管理', { exact: true }).click()
+      await leaveDialog().waitFor()
+      assert.equal(await leaveDialog().evaluate((node) => Boolean(node.closest('.app-overlay-scope'))), true)
+      await leaveDialog().getByRole('button', { name: '继续编辑', exact: true }).click()
+      await leaveDialog().waitFor({ state: 'hidden' })
+      assert.equal(await note.evaluate((node, original) => node === original, draft), true)
+      assert.equal(await note.inputValue(), '任务抽屉内尚未保存的内容')
+      await page.getByRole('button', { name: /^账号菜单：/u }).click()
+      await page.getByRole('menuitem', { name: /退出登录$/u }).click()
+      await leaveDialog().waitFor()
+      assert.equal(await leaveDialog().evaluate((node) => node.closest('.app-overlay-scope') === null), true)
+      await leaveDialog().getByRole('button', { name: '继续编辑', exact: true }).click()
+      await leaveDialog().waitFor({ state: 'hidden' })
+      await note.focus()
+      await page.locator('.erp-admin-menu').getByText('销售管理', { exact: true }).click()
+      await leaveDialog().getByRole('button', { name: '放弃修改', exact: true }).click()
+      await left.getByRole('button', { name: /新建订单$/u }).waitFor()
+      assert.equal(await right.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).count() > 0, true)
+      await draft.dispose()
+      await assertNoHorizontalOverflow(page, 'business-split-task-draft')
+    },
+  }]
 }

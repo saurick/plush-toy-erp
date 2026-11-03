@@ -44,6 +44,17 @@ function bomStatusTag(status) {
 }
 
 export function buildBOMVersionColumns({ productOptions = [] }) {
+  const productsByID = new Map(productOptions.map((option) => [option.value, option]))
+  const renderProduct = (value) => {
+    const option = productsByID.get(Number(value))
+    return (
+      <ProductIdentity
+        productId={value}
+        name={option?.identity?.name || referenceLabel(productOptions, value, '产品')}
+        code={option?.identity?.code}
+      />
+    )
+  }
   return applyBusinessColumnSorters([
     {
       align: 'left',
@@ -51,24 +62,14 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       title: '产品',
       exportTitle: '产品',
       dataIndex: 'product_id',
-      width: 300,
+      width: 260,
       sortType: 'number',
       sorter: (a, b) => Number(a?.product_id || 0) - Number(b?.product_id || 0),
       className: 'erp-product-identity-cell',
-      render: (value) => (
-        <ProductIdentity
-          productId={value}
-          name={referenceLabel(productOptions, value, '产品')}
-        />
-      ),
-      detailValue: (record) => (
-        <ProductIdentity
-          productId={record.product_id}
-          name={referenceLabel(productOptions, record.product_id, '产品')}
-        />
-      ),
+      render: renderProduct,
+      detailValue: (record) => renderProduct(record.product_id),
       exportValue: (record) =>
-        referenceLabel(productOptions, record?.product_id, '产品', { emptyText: '' }),
+        record?.product_label ?? referenceLabel(productOptions, record?.product_id, '产品', { emptyText: '' }),
     },
     {
       defaultPriority: 20,

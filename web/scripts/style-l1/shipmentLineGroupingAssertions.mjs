@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { assertLineItemGroupHeaderInteraction } from './businessLineItemDisclosureAssertions.mjs'
 
 export async function assertShipmentLineGrouping(page, editor, outputDir) {
   const rows = editor.locator('.erp-sales-order-lines-form__row')
@@ -23,6 +24,14 @@ export async function assertShipmentLineGrouping(page, editor, outputDir) {
   }
   assert.equal(await headings.count(), 1, '相邻同产品身份共用一次')
   assert((await headings.innerText()).includes('3 条明细'))
+  await assertLineItemGroupHeaderInteraction(page, editor)
+  const preview = headings.getByRole('button', { name: /查看.+大图/u }).first()
+  await preview.click()
+  const closePreview = page.getByRole('button', { name: '关闭图片预览', exact: true })
+  await closePreview.waitFor({ state: 'visible' })
+  assert.equal(await headings.locator('.erp-line-item-disclosure-heading__toggle').getAttribute('aria-expanded'), 'true', '产品图片预览不收起分组')
+  await closePreview.click()
+  await closePreview.waitFor({ state: 'hidden' })
   const third = rows.nth(2)
   await third.locator('input[id$="_unit_id"]').press('ArrowDown')
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '箱' }).first().click()

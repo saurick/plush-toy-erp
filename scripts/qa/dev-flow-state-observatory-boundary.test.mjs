@@ -511,7 +511,7 @@ test("dev flow state observatory: state rules explain exceptional paths without 
     "web/src/dev-workbench/pages/devFlowStateRulePresentation.mjs",
   );
   for (const copy of [
-    "什么时候可以", "聚焦状态",
+    "什么时候可以", "点选状态查看进入和离开的条件",
   ]) {
     assert(page.includes(copy), `missing state-rule detail: ${copy}`);
   }
@@ -524,8 +524,9 @@ test("dev flow state observatory: state rules explain exceptional paths without 
   const focusedRules = read("web/src/dev-workbench/components/flow-state/FlowRuleTables.jsx");
   for (const label of ["办理规则", "办理条件", "受阻时", "结果与纠正", "纠正与恢复"]) assert(focusedRules.includes(label));
   assert.doesNotMatch(page, /data-all-transitions/u);
-  assert.match(page, /filterDevFlowStateTransitions/u);
-  assert.match(page, /aria-label="状态转换筛选"/u);
+  assert.match(page, /nodes: flow\.states\.map/u);
+  assert.match(page, /edges: flow\.transitions\.map/u);
+  assert.doesNotMatch(page, /状态转换筛选|聚焦状态|定位状态|transitionFilter/u);
   assert.doesNotMatch(page, /生命周期转换/u);
 
   for (const group of [
@@ -537,12 +538,7 @@ test("dev flow state observatory: state rules explain exceptional paths without 
   ]) {
     assert(presentation.includes(group), `missing path group: ${group}`);
   }
-  assert.match(page, /label: '全部'/u);
-  assert.match(page, /label: '异常与纠正'/u);
-  assert.match(page, /label: '当前状态'/u);
-  assert.match(presentation, /all: 'all'/u);
-  assert.match(presentation, /exceptional: 'exceptional'/u);
-  assert.match(presentation, /related: 'related'/u);
+  assert.doesNotMatch(presentation, /DEV_FLOW_STATE_TRANSITION_FILTERS|filterDevFlowStateTransitions/u);
   assert.match(presentation, /按登记规则转换/u);
   assert.match(presentation, /flowchart LR/u);
   assert.match(presentation, /linkStyle/u);

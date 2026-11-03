@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { assertBusinessMermaidGraph } from './mermaidGraphAssertions.mjs'
 import { RpcMethod } from '../../src/common/consts/rpcMethods.generated.mjs'
 import { INTEGRATION_EVIDENCE_API, INTEGRATION_GUIDE_DOCUMENT, readIntegrationScenarios } from '../../src/dev-workbench/config/devIntegration.mjs'
 import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
@@ -236,7 +237,8 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   const examples = page.getByLabel('接入关系展示示例', { exact: true })
   await examples.getByText('设计示例 · 未实施', { exact: true }).waitFor()
   await examples.getByText('适配后调用', { exact: true }).click()
-  await examples.locator('.erp-dev-integration__flow-step').getByText('入站适配器', { exact: true }).waitFor()
+  await examples.getByRole('button', { name: '入站适配器', exact: true }).waitFor()
+  await assertBusinessMermaidGraph(examples.locator('[data-business-flow]'))
   await examples.getByText('ERP 主动对接', { exact: true }).click()
   await examples.getByText('不一定新增本地 API', { exact: false }).waitFor()
   assert.equal(new URL(page.url()).searchParams.get('example'), 'ERP 主动对接')

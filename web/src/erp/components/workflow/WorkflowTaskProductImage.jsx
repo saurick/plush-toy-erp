@@ -134,9 +134,9 @@ function ProductImage({ item, load, preview }) {
           item={item}
           thumbnail={thumbnail}
           load={load}
-          onClose={() => {
+          onClose={({ restoreFocus = true } = {}) => {
             setOpened(false)
-            trigger.current?.focus({ preventScroll: true })
+            if (restoreFocus) trigger.current?.focus({ preventScroll: true })
           }}
         />
       ) : null}

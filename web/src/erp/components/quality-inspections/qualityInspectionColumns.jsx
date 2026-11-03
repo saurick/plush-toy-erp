@@ -421,7 +421,7 @@ export function buildQualityInspectionExportColumns({
       title: '判定备注',
       exportTitle: '判定备注',
       dataIndex: 'decision_note',
-      width: 300,
+      width: 220,
       render: (_value, record) => qualityRemarkText(record),
       exportValue: (record) => qualityRemarkText(record, { emptyText: '' }),
     },

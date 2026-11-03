@@ -1,3 +1,4 @@
+import { selectWarehouseView } from './warehouseNavigationActions.mjs'
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -58,7 +59,10 @@ export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSessi
     viewport: { width: 1440, height: entry.key.startsWith('progress-statistics') || entry.key === 'progress-receivables' || entry.impact ? 600 : 900 },
     verify: async (page) => {
       await page.locator('.erp-admin-content').waitFor()
-      if (entry.tab) await page.getByRole('tab', { name: entry.tab, exact: true }).click()
+      if (entry.tab) {
+        if (entry.path.startsWith('/erp/warehouse/inventory')) await selectWarehouseView(page, entry.tab)
+        else await page.getByRole('tab', { name: entry.tab, exact: true }).click()
+      }
       if (entry.impact) await page.locator('.erp-role-permission-impact > summary').click()
       await page.waitForFunction(() => [...document.querySelectorAll('.erp-admin-content .ant-spin-spinning, .erp-admin-content [aria-busy="true"]')].every((node) => !node.checkVisibility()))
       if (fixtures[entry.key]) await page.locator('.erp-admin-content tbody tr:not(.ant-table-measure-row)').first().waitFor()

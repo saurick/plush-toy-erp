@@ -1,6 +1,33 @@
 import React from 'react'
 import { Modal } from 'antd'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
+import ScopedOverlayDialog, { useOverlayContainer } from '../overlay/ScopedOverlayDialog.jsx'
+import { canRestoreOverlayFocus, OverlayDialogOpenContext, useOverlayScope } from '../overlay/OverlayScopeContext.mjs'
+
+function ScopedModal({ getContainer, modalRender, afterOpenChange, focusTriggerAfterClose = true, ...props }) {
+  const scoped = useOverlayContainer(props.open, getContainer)
+  const trigger = React.useRef(null)
+  const previous = React.useRef(false)
+  if (props.open && !previous.current && typeof document !== 'undefined') trigger.current = document.activeElement
+  previous.current = props.open
+  return (
+    <OverlayDialogOpenContext.Provider value={props.open}>
+      <Modal
+        {...props}
+        getContainer={scoped.getContainer}
+        focusTriggerAfterClose={scoped.scope ? false : focusTriggerAfterClose}
+        afterOpenChange={(open) => {
+          if (!open && scoped.scope && focusTriggerAfterClose && canRestoreOverlayFocus(scoped.scope) && trigger.current?.isConnected) trigger.current.focus?.({ preventScroll: true })
+          afterOpenChange?.(open)
+        }}
+        modalRender={(content) => {
+          const body = scoped.scope ? <ScopedOverlayDialog open={props.open} mask={props.mask !== false}>{content}</ScopedOverlayDialog> : content
+          return modalRender ? modalRender(body) : body
+        }}
+      />
+    </OverlayDialogOpenContext.Provider>
+  )
+}
 
 const backgroundIsolationStates = new WeakMap()
 
@@ -63,6 +90,7 @@ function PanelModal({
   initialFocusSelector = '',
   busy = false,
 }) {
+  const scope = useOverlayScope()
   const dialogRef = React.useRef(null)
   const openRef = React.useRef(open)
   const releaseBackgroundIsolationRef = React.useRef(null)
@@ -106,18 +134,18 @@ function PanelModal({
             initialFocusElement.focus({ preventScroll: true })
           }
         }
-        if (!releaseBackgroundIsolationRef.current) {
+        if (!scope?.host.contains(dialogRef.current) && !releaseBackgroundIsolationRef.current) {
           releaseBackgroundIsolationRef.current = acquireBackgroundIsolation()
         }
         return
       }
       if (!openRef.current) releaseBackgroundIsolation()
     },
-    [initialFocusSelector, releaseBackgroundIsolation]
+    [initialFocusSelector, releaseBackgroundIsolation, scope?.host]
   )
 
   return (
-    <Modal
+    <ScopedModal
       open={open}
       onCancel={busy ? undefined : onClose}
       afterOpenChange={handleAfterOpenChange}
@@ -133,7 +161,7 @@ function PanelModal({
       focusTriggerAfterClose
       destroyOnHidden
       styles={{
-        body: { padding: 0, maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto' },
+        body: { padding: 0, minHeight: 0, maxHeight: 'calc(var(--erp-overlay-height, 100dvh) - 32px)', overflowY: 'auto' },
         content: {
           padding: 0,
           overflow: 'visible',
@@ -152,11 +180,11 @@ function PanelModal({
       >
         {children}
       </SurfacePanel>
-    </Modal>
+    </ScopedModal>
   )
 }
 
 export default function AppModal({ variant = 'standard', ...props }) {
   if (variant === 'panel') return <PanelModal {...props} />
-  return <Modal {...props} />
+  return <ScopedModal {...props} />
 }

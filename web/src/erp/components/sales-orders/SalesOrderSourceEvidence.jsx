@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Button, Image, Popover, Typography } from 'antd'
 import Table from '@/common/components/table/AppTable'
 import { downloadBusinessAttachment } from '../../api/attachmentApi.mjs'
+import WorkflowTaskImagePreview from '../workflow/WorkflowTaskImagePreview.jsx'
 
 export function SalesOrderImportImage({
   image,
@@ -12,11 +13,14 @@ export function SalesOrderImportImage({
 }) {
   const [src, setSrc] = useState('')
   const [error, setError] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const trigger = useRef(null)
   useEffect(() => {
     let active = true
     let url
     setSrc('')
     setError(false)
+    setPreviewOpen(false)
     if (image?.bytes) {
       url = URL.createObjectURL(
         new Blob([image.bytes], { type: image.mimeType })
@@ -55,13 +59,20 @@ export function SalesOrderImportImage({
   }
   if (error) placeholder = '图片加载失败，请到订单附件重试'
   return src ? (
-    <Image
-      width={64}
-      height={64}
-      style={{ objectFit: 'contain' }}
-      src={src}
-      alt={`${name}原表图片`}
-    />
+    <>
+      <Button type="text" ref={trigger} aria-label={`查看${name}原表图片`} onClick={() => setPreviewOpen(true)} style={{ width: 64, height: 64, padding: 0 }}>
+        <Image width={64} height={64} style={{ objectFit: 'contain' }} src={src} alt={`${name}原表图片`} preview={false} />
+      </Button>
+      {previewOpen ? <WorkflowTaskImagePreview
+        item={{ name: `${name}原表` }}
+        source={src}
+        thumbnail={src}
+        onClose={({ restoreFocus = true } = {}) => {
+          setPreviewOpen(false)
+          if (restoreFocus) trigger.current?.focus({ preventScroll: true })
+        }}
+      /> : null}
+    </>
   ) : (
     <Typography.Text type="secondary">{placeholder}</Typography.Text>
   )

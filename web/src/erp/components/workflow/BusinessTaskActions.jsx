@@ -1,7 +1,8 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { CalendarOutlined, LeftOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import { Alert, Button, Drawer, Form, Grid, Input, Space, Spin, Tag, Typography } from 'antd'
+import { Alert, Button, Form, Grid, Input, Space, Spin, Tag, Typography } from 'antd'
 import { useLocation, } from 'react-router-dom'
+import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
@@ -17,7 +18,7 @@ import { canOpenWorkflowTaskEntry } from '../../utils/workflowTaskEntryAccess.mj
 import { workflowTaskEntryNavigation } from '../../utils/workflowTaskNavigation.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import Table from '@/common/components/table/AppTable.jsx'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
@@ -42,6 +43,7 @@ import BusinessForm from '../business-list/BusinessForm.jsx'
 const WORKFLOW_DEADLINE_QUICK_OPTIONS = buildWorkflowDeadlineQuickOptions()
 
 export default function BusinessTaskActions({ collaborationTask = null, collaborationAction = '', onCollaborationClose, sourceType, record, adminProfile, disabled = false, allowCreate = true, onCreated, panelOpen, onPanelClose, renderSourceContext, sourceLoading = false, sourceEmptyText = '请先选择来源单据' }) {
+  const modal = useModal()
   const navigate = useBusinessNavigate()
   const location = useLocation()
   const { taskBusiness } = useBusinessPageContext() || {}

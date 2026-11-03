@@ -23,7 +23,7 @@ import { useOutsourcingOrderTasks } from '../components/outsourcing-orders/useOu
 import { useOutsourcingOrderQuery } from '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs'
 import { useOutsourcingSourceFacts } from '../components/outsourcing-orders/useOutsourcingSourceFacts.jsx'
 import MobileOutsourcingTaskActions from '../mobile/components/MobileOutsourcingTaskActions.jsx'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
 import { currentBusinessDate } from '../utils/businessDate.mjs'
@@ -130,6 +130,7 @@ import {
 } from '../utils/lifecycleScope.mjs'
 
 export default function OutsourcingOrdersPage() {
+  const modal = useModal()
   const outletContext = useBusinessPageContext()
   const navigate = useBusinessNavigate()
 

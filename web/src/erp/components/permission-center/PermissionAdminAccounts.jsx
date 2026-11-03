@@ -54,7 +54,7 @@ import {
   DEFAULT_TABLE_PAGE_SIZE,
   DuplicateAdminNameWarning,
 } from './RoleAssociatedAccounts.jsx'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   ADMIN_ACCOUNT_STATUS,
@@ -100,6 +100,7 @@ export default function PermissionAdminAccounts({
   saving,
   filterRequest,
 }) {
+  const modal = useModal()
   const outletContext = useOutletContext()
   const tableCardRef = useRef(null)
   const sticky = useBusinessListStickyHeader(tableCardRef, active)

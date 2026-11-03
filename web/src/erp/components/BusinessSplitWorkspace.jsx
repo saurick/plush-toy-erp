@@ -1,11 +1,12 @@
-import React, { forwardRef, Suspense, useCallback, useContext, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Grid, InputNumber, Popover, Splitter } from 'antd'
-import { CloseOutlined } from '@ant-design/icons'
+import React, { forwardRef, Suspense, useCallback, useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, ConfigProvider, Grid, InputNumber, Popover, Splitter } from 'antd'
+import { CloseOutlined, SwapOutlined } from '@ant-design/icons'
 import { createPath, resolvePath, UNSAFE_NavigationContext as RouterNavigationContext, UNSAFE_RouteContext as RouterRouteContext, useBlocker } from 'react-router-dom'
 import AppSelect from '@/common/components/select/AppSelect'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { Loading } from '@/common/components/loading'
+import OverlayScopeProvider from '@/common/components/overlay/OverlayScopeProvider.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getPageLoadErrorMessage } from '@/common/utils/errorMessage'
 import { RPC_RECORDS_CHANGED, registerRpcChangeSource } from '@/common/utils/rpcChanges.mjs'
@@ -13,7 +14,7 @@ import { reportBrowserError } from '@/common/runtime/browserErrors.js'
 import { BusinessSplitContext } from './business-list/BusinessSplitContext.jsx'
 import { ERPPageActionsContext } from './ERPPageActions.jsx'
 import BusinessModuleTabs from './BusinessModuleTabs.jsx'
-import { getBusinessModuleTabs, rememberBusinessModuleLocation, resolveBusinessModuleMenuTarget } from '../utils/businessModuleGroups.mjs'
+import { getBusinessModuleTabs, groupSidebarNavigationSections, rememberBusinessModuleLocation, resolveBusinessModuleMenuTarget } from '../utils/businessModuleGroups.mjs'
 import { TaskBusinessWorkspaceContext } from '../hooks/useBusinessPageContext.js'
 import './businessSplitWorkspace.css'
 
@@ -59,21 +60,49 @@ function SplitNavigationGuard({ current }) {
   return null
 }
 
-// 左栏始终保留原 Outlet；右栏只复用同一组路由和页面，不复制业务表单。
+// 原页面始终保留 Outlet；附加页复用同一组路由和表单，互换只改变显示方向。
 function BusinessSplitWorkspace({
   open, onOpenChange, activeSide, onActiveSideChange, location, navigate,
   outletContext, leftGuard, leftRefresh, renderPage, sections, resolvePage, onRightLocationChange, taskWorkspace, children,
 }, ref) {
   const workspaceID = useId()
+  const leftPaneRef = useRef(null)
+  const rightPaneRef = useRef(null)
   const parentNavigation = useContext(RouterNavigationContext)
   const inheritedActions = useContext(ERPPageActionsContext)
+  const { direction: contentDirection = 'ltr' } = useContext(ConfigProvider.ConfigContext)
   const [rightLocation, setRightLocation] = useState(null)
   const [rightGuard, setRightGuard] = useState(null)
   const [rightRefresh, setRightRefresh] = useState(null)
+  const [leftOverlayGuard, setLeftOverlayGuard] = useState(null)
+  const [rightOverlayGuard, setRightOverlayGuard] = useState(null)
+  const registerLeftOverlayGuard = useCallback((guard) => setLeftOverlayGuard(() => guard), [])
+  const registerRightOverlayGuard = useCallback((guard) => setRightOverlayGuard(() => guard), [])
+  const guardLeft = useMemo(() => leftOverlayGuard || leftGuard ? async (options) => {
+    for (const guard of [leftOverlayGuard, leftGuard]) if (guard && !(await guard(options))) return false
+    return true
+  } : null, [leftGuard, leftOverlayGuard])
+  const guardRight = useMemo(() => rightOverlayGuard || rightGuard ? async (options) => {
+    for (const guard of [rightOverlayGuard, rightGuard]) if (guard && !(await guard(options))) return false
+    return true
+  } : null, [rightGuard, rightOverlayGuard])
   const [pending, setPending] = useState({ left: false, right: false })
   const [errors, setErrors] = useState({ left: null, right: null })
   const [refreshing, setRefreshing] = useState({ left: false, right: false })
   const [sizes, setSizes] = useState([50, 50])
+  const [swapped, setSwapped] = useState(false)
+  const [layoutOpen, setLayoutOpen] = useState(false)
+  const layoutRef = useRef(null)
+  useLayoutEffect(() => {
+    if (layoutOpen) layoutRef.current?.forceAlign()
+  }, [layoutOpen, sizes, swapped])
+  const paneLabel = (side) => (side === 'left') !== swapped ? '左栏' : '右栏'
+  const splitterDirection = swapped ? 'rtl' : 'ltr'
+  const swapPanes = () => {
+    setLayoutOpen(false)
+    setSwapped((value) => !value)
+    setSizes((value) => [value[1], value[0]])
+  }
   const screens = Grid.useBreakpoint()
   const narrow = screens.lg === false
   const history = useRef({ entries: [], index: -1 })
@@ -83,12 +112,13 @@ function BusinessSplitWorkspace({
   const readScopes = useRef({})
   const focus = useRef(activeSide)
   const current = useRef({})
-  const ownsNavigation = Boolean(rightLocation)
+  const ownsNavigation = Boolean(rightLocation || leftOverlayGuard || rightOverlayGuard)
   const focusPane = useCallback((side) => {
     focus.current = side
     onActiveSideChange(side)
   }, [onActiveSideChange])
   useEffect(() => { focus.current = activeSide }, [activeSide])
+  useEffect(() => { if (!open) setLayoutOpen(false) }, [open])
   useEffect(() => { onRightLocationChange?.(rightLocation) }, [onRightLocationChange, rightLocation])
   const rightAccess = rightLocation ? resolvePage(rightLocation.pathname) : null
   const rightUIState = useMemo(() => ({
@@ -108,7 +138,7 @@ function BusinessSplitWorkspace({
   }, [])
   const confirmAll = useCallback(async (options) => {
     for (const guard of [current.current.leftGuard, current.current.rightGuard]) {
-      if (guard && !(await guard(options))) return false
+      if (guard && !(await guard({ ...options, overlay: 'workspace' }))) return false
     }
     return true
   }, [])
@@ -116,7 +146,7 @@ function BusinessSplitWorkspace({
     const guards = next.pathname.startsWith('/erp/')
       ? [current.current.leftGuard]
       : [current.current.leftGuard, current.current.rightGuard]
-    for (const guard of guards) if (guard && !(await guard())) return false
+    for (const guard of guards) if (guard && !(await guard(next.pathname.startsWith('/erp/') ? undefined : { overlay: 'workspace' }))) return false
     return true
   }, [])
   const navigatePane = useCallback(async (side, to, options = {}) => {
@@ -162,8 +192,8 @@ function BusinessSplitWorkspace({
     ...current.current,
 location,
 rightLocation,
-leftGuard,
-rightGuard,
+leftGuard: guardLeft,
+rightGuard: guardRight,
 leftRefresh,
 rightRefresh,
     confirmOuter,
@@ -221,9 +251,9 @@ rightAllowed: rightAccess?.allowed,
     }
   }, [])
   useEffect(() => {
-    if (pending.left && !leftGuard) refreshPane('left')
-    if (pending.right && !rightGuard) refreshPane('right')
-  }, [leftGuard, rightGuard, pending, leftRefresh, rightRefresh, refreshPane])
+    if (pending.left && !guardLeft) refreshPane('left')
+    if (pending.right && !guardRight) refreshPane('right')
+  }, [guardLeft, guardRight, pending, leftRefresh, rightRefresh, refreshPane])
   useEffect(() => registerRpcChangeSource(() => ({ workspaceID, pane: focus.current })), [workspaceID])
   useEffect(() => {
     const pendingTimers = timers.current
@@ -286,13 +316,13 @@ rightAllowed: rightAccess?.allowed,
     onRefresh: leftRefresh ? () => refreshPane('left', true) : null,
     refreshing: refreshing.left,
   }) : inheritedActions, [inheritedActions, open, ownsNavigation, leftRefresh, refreshing.left, refreshPane])
-  const choices = useMemo(() => sections.flatMap((section) => section.items || [])
-    .map((item) => ({ value: item.path, label: item.label })), [sections])
+  const choices = useMemo(() => groupSidebarNavigationSections(sections, { pageCatalog: true })
+    .map((section) => ({ label: section.title, options: section.items.map((item) => ({ value: item.path, label: item.label })) })), [sections])
   const availableChoices = rightLocation && !rightAccess?.allowed
-    ? [...choices.filter((choice) => choice.value !== rightLocation.pathname), { value: rightLocation.pathname, label: '原页面已不可用', disabled: true }]
+    ? [...choices.map((group) => ({ ...group, options: group.options.filter((choice) => choice.value !== rightLocation.pathname) })).filter((group) => group.options.length), { label: '不可用页面', options: [{ value: rightLocation.pathname, label: '原页面已不可用', disabled: true }] }]
     : choices
   const clearRightPage = async () => {
-    if (rightGuard && !(await rightGuard())) return
+    if (guardRight && !(await guardRight())) return
     setRightLocation(null)
     setRightGuard(null)
     setRightRefresh(null)
@@ -339,6 +369,13 @@ rightAllowed: rightAccess?.allowed,
     ) : <Alert type="warning" message="当前账号不能查看这个页面" />
   }
   const visibleSizes = !open ? [100, 0] : narrow ? activeSide === 'left' ? [100, 0] : [0, 100] : sizes
+  const resizePanes = (values) => {
+    const total = values[0] + values[1]
+    if (open && !narrow && total > 0) {
+      const next = values.map((value) => value / total * 100)
+      setSizes((previous) => Math.abs(previous[0] - next[0]) < 0.001 ? previous : next)
+    }
+  }
   const paneEvents = (side) => ({
     onPointerDownCapture: () => focusPane(side),
     onFocusCapture: () => focusPane(side),
@@ -352,48 +389,68 @@ rightAllowed: rightAccess?.allowed,
         <div className="erp-split-workspace" data-split-open={open} data-active-pane={activeSide}>
           {open ? (
             <div className="erp-split-switcher">
-              <SlidingSegmented block aria-label="选择编辑栏" options={[{ value: 'left', label: '左栏' }, { value: 'right', label: '右栏' }]} value={activeSide} onChange={focusPane} />
+              <SlidingSegmented block aria-label="选择编辑栏" options={swapped ? [{ value: 'right', label: '左栏' }, { value: 'left', label: '右栏' }] : [{ value: 'left', label: '左栏' }, { value: 'right', label: '右栏' }]} value={activeSide} onChange={focusPane} />
             </div>
         ) : null}
-          <Splitter
-            className="erp-split-panels"
-            lazy
-            onResize={(values) => {
-          const total = values[0] + values[1]
-          if (open && !narrow && total > 0) setSizes(values.map((value) => value / total * 100))
-        }}
-          >
-            <Splitter.Panel className="erp-split-panel--left" size={`${visibleSizes[0]}%`} min={open && !narrow ? '32%' : 0} max={open && !narrow ? '68%' : '100%'} resizable={open && !narrow}>
-              <ERPPageActionsContext.Provider value={leftActions}>
-                <section className="erp-split-pane erp-split-pane--left" data-erp-split-pane={open ? 'left' : undefined} aria-label={open ? '左栏页面' : undefined} hidden={!leftVisible} {...paneEvents('left')}>
-                  {open ? (
-                    <div className="erp-split-pane__header">
-                      <Button type={activeSide === 'left' ? 'primary' : 'default'} aria-pressed={activeSide === 'left'} onClick={() => focusPane('left')}>左栏</Button>
-                      <span>点击菜单在当前栏打开</span>
-                      <Popover trigger="click" content={<label>左栏宽度（%） <InputNumber aria-label="左栏宽度百分比" min={32} max={68} value={Math.round(sizes[0])} onChange={(value) => { if (value !== null) { const width = Math.max(32, Math.min(68, value)); setSizes([width, 100 - width]) } }} /></label>}>
-                        <Button>布局</Button>
-                      </Popover>
-                    </div>
+          <ConfigProvider direction={splitterDirection}>
+            <Splitter
+              className="erp-split-panels"
+              style={{ direction: splitterDirection }}
+              lazy
+              onResize={resizePanes}
+              onResizeEnd={resizePanes}
+            >
+              <Splitter.Panel className="erp-split-panel--left" style={{ direction: contentDirection }} size={`${visibleSizes[0]}%`} min={open && !narrow ? '32%' : 0} max={open && !narrow ? '68%' : '100%'} resizable={open && !narrow}>
+                <ConfigProvider direction={contentDirection}>
+                  <OverlayScopeProvider enabled={open} visible={leftVisible} containerRef={leftPaneRef} layoutKey={`${swapped}:${sizes[0]}`} scopeKey={leftScope} onInteract={() => focusPane('left')} onGuardChange={registerLeftOverlayGuard}>
+                    <ERPPageActionsContext.Provider value={leftActions}>
+                      <section ref={leftPaneRef} className="erp-split-pane erp-split-pane--left" data-erp-split-pane={open ? 'left' : undefined} aria-label={open ? `${paneLabel('left')}页面` : undefined} hidden={!leftVisible} {...paneEvents('left')}>
+                        {open ? (
+                          <div className="erp-split-pane__header">
+                            <Button type={activeSide === 'left' ? 'primary' : 'default'} aria-pressed={activeSide === 'left'} onClick={() => focusPane('left')}>{paneLabel('left')}</Button>
+                            <span>点击菜单在当前栏打开</span>
+                            <Popover
+                              ref={layoutRef}
+                              trigger="click"
+                              open={layoutOpen && open}
+                              onOpenChange={setLayoutOpen}
+                              content={(
+                                <div className="erp-split-layout-options">
+                                  <label>{paneLabel('left')}宽度（%） <InputNumber aria-label={`${paneLabel('left')}宽度百分比`} min={32} max={68} precision={0} value={Math.round(sizes[0])} onChange={(value) => { if (typeof value === 'number' && value >= 32 && value <= 68) setSizes([value, 100 - value]) }} /></label>
+                                  <Button icon={<SwapOutlined />} disabled={!rightLocation || !rightAccess?.allowed} onClick={swapPanes}>左右互换</Button>
+                                </div>
+                      )}
+                            >
+                              <Button aria-label="布局">布局</Button>
+                            </Popover>
+                          </div>
               ) : null}
-                  {feedback('left')}
-                  {children}
-                </section>
-              </ERPPageActionsContext.Provider>
-            </Splitter.Panel>
-            <Splitter.Panel className="erp-split-panel--right" size={`${visibleSizes[1]}%`} min={open && !narrow ? '32%' : 0} max={open && !narrow ? '68%' : '100%'} resizable={open && !narrow}>
-              <BusinessSplitContext.Provider value={rightPaneContext}>
-                <section className="erp-split-pane erp-split-pane--right" data-erp-split-pane={open ? 'right' : undefined} aria-label="右栏页面" hidden={!rightVisible} {...paneEvents('right')}>
-                  <div className="erp-split-pane__header">
-                    <Button type={activeSide === 'right' ? 'primary' : 'default'} aria-pressed={activeSide === 'right'} onClick={() => focusPane('right')}>右栏</Button>
-                    <AppSelect aria-label="选择右栏页面" showSearch optionFilterProp="label" placeholder="选择要并排打开的页面" value={rightLocation ? rightAccess?.allowed ? rightAccess.entry.path : rightLocation.pathname : undefined} options={availableChoices} onChange={(path) => { if (path) navigatePane('right', path); else clearRightPage() }} />
-                    <Button aria-label="收起分栏" icon={<CloseOutlined />} onClick={() => { onOpenChange(false); focusPane('left') }} />
-                  </div>
-                  {feedback('right')}
-                  {rightContent}
-                </section>
-              </BusinessSplitContext.Provider>
-            </Splitter.Panel>
-          </Splitter>
+                        {feedback('left')}
+                        {children}
+                      </section>
+                    </ERPPageActionsContext.Provider>
+                  </OverlayScopeProvider>
+                </ConfigProvider>
+              </Splitter.Panel>
+              <Splitter.Panel className="erp-split-panel--right" style={{ direction: contentDirection }} size={`${visibleSizes[1]}%`} min={open && !narrow ? '32%' : 0} max={open && !narrow ? '68%' : '100%'} resizable={open && !narrow}>
+                <ConfigProvider direction={contentDirection}>
+                  <OverlayScopeProvider enabled={open} visible={rightVisible} containerRef={rightPaneRef} layoutKey={`${swapped}:${sizes[1]}`} scopeKey={rightScope} onInteract={() => focusPane('right')} onGuardChange={registerRightOverlayGuard}>
+                    <BusinessSplitContext.Provider value={rightPaneContext}>
+                      <section ref={rightPaneRef} className="erp-split-pane erp-split-pane--right" data-erp-split-pane={open ? 'right' : undefined} aria-label={`${paneLabel('right')}页面`} hidden={!rightVisible} {...paneEvents('right')}>
+                        <div className="erp-split-pane__header">
+                          <Button type={activeSide === 'right' ? 'primary' : 'default'} aria-pressed={activeSide === 'right'} onClick={() => focusPane('right')}>{paneLabel('right')}</Button>
+                          <AppSelect aria-label={`选择${paneLabel('right')}页面`} showSearch optionFilterProp="label" placeholder="选择要并排打开的页面" value={rightLocation ? rightAccess?.allowed ? rightAccess.entry.path : rightLocation.pathname : undefined} options={availableChoices} onChange={(path) => { if (path) navigatePane('right', path); else clearRightPage() }} />
+                          <Button aria-label="收起分栏" icon={<CloseOutlined />} onClick={() => { onOpenChange(false); focusPane('left') }} />
+                        </div>
+                        {feedback('right')}
+                        {rightContent}
+                      </section>
+                    </BusinessSplitContext.Provider>
+                  </OverlayScopeProvider>
+                </ConfigProvider>
+              </Splitter.Panel>
+            </Splitter>
+          </ConfigProvider>
         </div>
       </BusinessSplitContext.Provider>
     </TaskBusinessWorkspaceContext.Provider>

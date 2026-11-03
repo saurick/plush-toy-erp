@@ -286,12 +286,47 @@ body .erp-business-selection-action-menu__item .ant-btn {
   min-height: max(36px, var(--erp-touch-target, 0px));
   align-items: center;
   border-radius: 8px;
-  padding: 8px 10px;
+  padding-block: 8px;
+  padding-inline-end: 10px;
   line-height: 1.45;
   white-space: normal;
 }
 
-body .ant-select-dropdown .ant-select-item-option:not(:last-child),
+body .ant-select-dropdown .ant-select-item-option:not(.ant-select-item-option-grouped),
+body :where(.ant-dropdown) .ant-dropdown-menu-item,
+body :where(.ant-dropdown) .ant-dropdown-menu-submenu-title,
+body .erp-business-selection-action-menu__item .ant-btn {
+  padding-inline-start: 10px;
+}
+
+body .ant-select-dropdown .ant-select-item-group {
+  min-height: 32px;
+  margin-block: 8px 4px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: var(--erp-surface-bg-muted);
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-body);
+  font-weight: 500;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  cursor: default;
+}
+
+body .ant-select-dropdown .ant-select-item-group:first-child {
+  margin-block-start: 0;
+}
+
+body .ant-select-dropdown .ant-select-item-option-grouped {
+  padding-inline-start: 28px;
+}
+
+body .ant-select-dropdown .ant-select-item-option-grouped .ant-select-item-option-state {
+  margin-inline-start: 8px;
+}
+
+body .ant-select-dropdown .ant-select-item-option:not(.ant-select-item-option-grouped):not(:last-child),
 body .ant-dropdown .ant-dropdown-menu-item:not(:last-child),
 body .ant-dropdown .ant-dropdown-menu-submenu:not(:last-child),
 body .erp-business-selection-action-menu__item:not(:last-child) {

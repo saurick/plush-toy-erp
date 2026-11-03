@@ -7,15 +7,14 @@ import { registerMermaidTestRenderer } from '../../../../scripts/test/mermaidRun
 
 registerMermaidTestRenderer()
 
-test('条件过账保留正常路径计数，流程结束在图和详情保持中性', async (t) => {
+test('状态图直接展示完整路径，流程结束在图和详情保持中性', async (t) => {
   const harness = await createReactTestHarness(t)
   const { StateRulesView } = await import('./StateRulesView.jsx')
   const production = catalog.flows.find((item) => item.key === 'fact.production')
   await harness.render(h(StateRulesView, { catalog, flow: production, state: null, onSelectState: () => {} }))
-  const standard = [...harness.container.querySelectorAll('[aria-label="状态转换筛选"] button')].find((item) => /正常推进\s*1/u.test(item.textContent))
-  assert(Boolean(standard))
-  await harness.act(() => standard.click())
-  assert.deepEqual([...harness.container.querySelectorAll('[data-graph-node]')].map((node) => node.getAttribute('data-graph-node')), ['DRAFT', 'POSTED'])
+  assert.equal(harness.container.querySelector('[aria-label="状态转换筛选"]'), null)
+  assert.equal(harness.container.querySelector('[aria-label="聚焦状态"]'), null)
+  assert.deepEqual([...harness.container.querySelectorAll('[data-graph-node]')].map((node) => node.getAttribute('data-graph-node')), ['DRAFT', 'POSTED', 'CANCELLED'], harness.container.querySelector('.erp-markdown-mermaid__error')?.textContent || harness.container.querySelector('.erp-markdown-mermaid')?.dataset.mermaidStatus)
   assert(harness.container.textContent.includes('过账'))
   const runtime = catalog.flows.find((item) => item.key === 'process.instance')
   await harness.render(h(StateRulesView, { catalog, flow: runtime, state: runtime.states.find((item) => item.key === 'completed'), onSelectState: () => {} }))
@@ -32,19 +31,30 @@ test('状态选择保留完整流转图并只展示适用的办理规则，清�
   const selected = []
   const render = (key) => harness.render(h(StateRulesView, {
     catalog,
-flow,
-state: flow.states.find((state) => state.key === key),
+    flow,
+    state: flow.states.find((state) => state.key === key),
     onSelectState: (key) => selected.push(key),
   }))
+  await render(null)
+  await harness.act(() => harness.container.querySelector('[data-graph-node="active"]').dispatchEvent(new harness.runtimeWindow.MouseEvent('click', { bubbles: true })))
+  assert.deepEqual(selected, ['active'])
   await render('active')
   assert.equal(harness.container.querySelectorAll('[data-graph-node]').length, flow.states.length)
+  assert.deepEqual(
+    [...harness.container.querySelectorAll('[data-transition-key]')].map((node) => node.getAttribute('data-transition-key')),
+    ['submitted->active', 'active->closed', 'active->canceled']
+  )
+  assert(harness.container.querySelector('[data-graph-node="draft"]'))
+  assert(harness.container.querySelector('[data-graph-node="canceled"]'))
   assert(harness.container.textContent.includes('正常关单或短结'))
   await harness.act(() => harness.container.querySelector('[data-graph-node="active"]').dispatchEvent(new harness.runtimeWindow.MouseEvent('click', { bubbles: true })))
-  assert.deepEqual(selected, [null])
+  assert.deepEqual(selected, ['active', null])
   await render('canceled')
   assert(harness.container.querySelector('.erp-dev-flow-selected-state').textContent.includes('终态'))
   assert.equal(harness.container.querySelector('[data-action-rules]'), null)
   await render(null)
+  assert.equal(harness.container.querySelector('.erp-dev-flow-selected-state'), null)
+  assert.equal(harness.container.querySelectorAll('[data-graph-node]').length, flow.states.length)
   assert(harness.container.textContent.includes('正常关单或短结'))
 })
 

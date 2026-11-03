@@ -12,6 +12,19 @@ export default function MobileSearchInput({
   useEffect(() => {
     setExpanded(false)
   }, [resetKey])
+  // 将展开状态限制在所属搜索栏，避免长单据输入时重算整页后代样式。
+  useLayoutEffect(() => {
+    const element = root.current
+    const row = element?.closest('.erp-mobile-search-row')
+    const holder = row && [...row.children].find((child) => child.contains(element))
+    if (!holder) return undefined
+    row.dataset.mobileSearchExpanded = String(expanded)
+    holder.dataset.mobileSearchActive = String(expanded)
+    return () => {
+      delete row.dataset.mobileSearchExpanded
+      delete holder.dataset.mobileSearchActive
+    }
+  }, [expanded])
   useLayoutEffect(() => {
     const element = root.current
     const row = element?.closest('.erp-mobile-search-row') || element

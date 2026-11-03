@@ -1,4 +1,5 @@
-import { isBusinessFormPageTitle, assertBusinessFormPage } from './businessFormPageAssertions.mjs'
+import { isBusinessFormPageTitle, assertBusinessFormPage, assertEditorTableHeadersCentered } from './businessFormPageAssertions.mjs'
+
 export function createBusinessFormModalAssertions({ assert }) {
   async function assertBusinessFormModalKeyboardRecovery(
     page,
@@ -14,6 +15,7 @@ export function createBusinessFormModalAssertions({ assert }) {
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
     const isPage = isBusinessFormPageTitle(titleText)
     if (isPage) await assertBusinessFormPage(page, modal)
+    else await assertEditorTableHeadersCentered(modal)
     try {
       await page.waitForFunction(
         (text) => {
@@ -47,7 +49,7 @@ export function createBusinessFormModalAssertions({ assert }) {
     } catch (error) {
       const focusMetric = await modal.evaluate((node) => {
         const root = node.closest('.ant-modal-root') || node
-        const activeElement = document.activeElement
+        const { activeElement } = document
         return {
           activeTagName: activeElement?.tagName || '',
           activeClassName: String(activeElement?.className || ''),

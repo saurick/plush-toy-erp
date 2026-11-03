@@ -25,11 +25,12 @@ import { getPermissionCenterRoleName as getRoleVisibleName } from '../utils/perm
 
 import { Loading } from '@/common/components/loading'
 
-import { modal } from '@/common/utils/antdApp'
+import { useModal } from '@/common/utils/antdApp'
 
 import ApprovalResponsibilityPanel from './ApprovalResponsibilityPanel.jsx'
 
 export default function PermissionCenterPage() {
+  const modal = useModal()
   const [searchParams] = useSearchParams()
   const [editorContainer, setEditorContainer] = useState(null)
   const [toolbarContainer, setToolbarContainer] = useState(null)
@@ -105,13 +106,14 @@ export default function PermissionCenterPage() {
     saving,
   })
   const confirmDiscardApprovalChanges = useCallback(
-    ({ title, content, onDiscard, onKeepEditing }) => {
+    ({ title, content, onDiscard, onKeepEditing, overlay }) => {
       if (!approvalResponsibilityDirty) {
         onDiscard?.()
         return
       }
       modal.confirm({
         maskClosable: true,
+        getContainer: overlay === 'workspace' ? () => globalThis.document.body : undefined,
         centered: true,
         title,
         content,
@@ -125,17 +127,18 @@ export default function PermissionCenterPage() {
         onCancel: onKeepEditing,
       })
     },
-    [approvalResponsibilityDirty]
+    [approvalResponsibilityDirty, modal]
   )
 
   const confirmLeavePermissionCenter = useCallback(
-    () =>
+    ({ overlay } = {}) =>
       new Promise((resolve) => {
         if (
           activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS &&
           approvalResponsibilityDirty
         ) {
           confirmDiscardApprovalChanges({
+            overlay,
             title: '离开前要放弃审批责任调整吗？',
             content:
               '尚未发布的调整或已经发布但尚未启用的新设置，离开后需要重新处理。',
@@ -145,6 +148,7 @@ export default function PermissionCenterPage() {
           return
         }
         confirmDiscardRoleChanges({
+          overlay,
           title: '离开前要放弃未保存的修改吗？',
           content: '离开权限管理后，当前岗位尚未保存的功能调整会丢失。',
           onDiscard: () => resolve(true),

@@ -24,7 +24,7 @@ import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
-import { message, modal } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
@@ -241,6 +241,7 @@ async function loadReservationStockForItem(item = {}) {
 }
 
 export default function SalesOrdersPage() {
+  const modal = useModal()
   const outletContext = useBusinessPageContext()
   const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
   const reportBusinessResult = useWorkflowTaskBusinessResult()
@@ -513,14 +514,11 @@ export default function SalesOrdersPage() {
   }, [])
   const {
     applyCustomerPaymentDefaults,
-    applyPaymentMethodTermDays,
-    paymentConditionOptions,
     rememberPaymentCondition,
     requestPaymentConditionPriceReview,
   } = useSalesOrderPaymentReview({
     customers,
     form: orderForm,
-    orders,
   })
   const salesOwnerOptions = useMemo(() => {
     const seen = new Set()
@@ -2030,7 +2028,6 @@ export default function SalesOrdersPage() {
         customers={customers}
         customerContacts={customerContacts}
         salesOwnerOptions={salesOwnerOptions}
-        paymentConditionOptions={paymentConditionOptions}
         unitOptions={unitOptions}
         productSKUs={productSKUs}
         canCreateOrder={canCreateOrder}
@@ -2046,7 +2043,6 @@ export default function SalesOrdersPage() {
         }}
         onCustomerChange={applyCustomerOrderDefaults}
         onContactSelect={applyContactToOrderForm}
-        onPaymentMethodChange={applyPaymentMethodTermDays}
         onPaymentConditionBlur={requestPaymentConditionPriceReview}
       />
 

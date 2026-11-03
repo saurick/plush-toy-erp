@@ -1,4 +1,5 @@
 .business-attachment-panel {
+  container-type: inline-size;
   min-width: 0;
   border: 1px solid var(--erp-border);
   border-radius: 10px;
@@ -59,6 +60,8 @@
 
 .business-attachment-panel__toolbar {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -313,19 +316,21 @@
   object-fit: contain;
 }
 
-@media (max-width: 640px) {
-  .business-attachment-panel__upload-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: 100%;
-  }
-
+@container (max-width: 640px) {
   .business-attachment-panel__row {
     grid-template-columns: 42px minmax(0, 1fr);
   }
 
   .business-attachment-panel__row-actions {
     grid-column: 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .business-attachment-panel__upload-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
   }
 
   .business-attachment-panel__toolbar {

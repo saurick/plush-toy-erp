@@ -1,9 +1,13 @@
 import React, { useContext, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { Select } from 'antd'
+import { CheckOutlined } from '@ant-design/icons'
 import Empty from '../empty/AppEmpty.jsx'
 import { useSelectPopupWidth } from './useSelectPopupWidth.mjs'
 import SelectPresentationContext from './SelectPresentationContext.jsx'
+import { useOverlayPopupAlign } from '../overlay/OverlayScopeContext.mjs'
 import './app-select.css'
+
+const GROUPED_SELECTED_ICON = <CheckOutlined />
 
 export function hasSelectValue(value) {
   return Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== ''
@@ -41,15 +45,20 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
   // 显式受控空值保持受控，省略 value 的输入仍使用 defaultValue。
   const selectValue = Object.hasOwn(inputProps, 'value') && value === undefined ? null : value
   const inheritedPresentation = useContext(SelectPresentationContext)
-  const { identities, displayOptions } = useMemo(() => {
+  const { identities, displayOptions, hasOptionGroups } = useMemo(() => {
     const result = new Map()
+    let grouped = false
     const { value: valueField = 'value', label: labelField = 'label', options: optionsField = 'options' } = props.fieldNames || {}
     const visit = (options = []) => options.map((option) => {
-      if (option[optionsField]) return { ...option, [optionsField]: visit(option[optionsField]) }
+      if (option[optionsField]) {
+        grouped = true
+        return { ...option, [optionsField]: visit(option[optionsField]) }
+      }
       if (option.identity) result.set(option[valueField], option.identity)
       return { ...option, selectedLabel: option.identity?.name || option.identity?.code || option[labelField] }
     })
-    return { identities: result, displayOptions: props.options ? visit(props.options) : undefined }
+    const options = props.options ? visit(props.options) : undefined
+    return { identities: result, displayOptions: options, hasOptionGroups: grouped }
   }, [props.options, props.fieldNames])
   const reference = !props.mode && !props.labelRender && identities.size > 0
   const referenceLayout = !props.mode && !props.labelRender && (reference || presentation === 'reference') && (
@@ -63,9 +72,11 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
   useImperativeHandle(ref, () => selectRef.current)
   const basePrefix = prefix ?? (label && hasSelectValue(currentValue) ? <span className="app-select__label">{label}</span> : undefined)
   const popupWidth = useSelectPopupWidth(selectRef, props.mode, props.showSearch, referenceLayout || identities.size > 0)
+  const dropdownAlign = useOverlayPopupAlign(props.dropdownAlign)
   const select = (
     <Select
       {...props}
+      dropdownAlign={dropdownAlign}
       notFoundContent={props.loading ? (
         <Empty variant="compact" state="loading" description="正在读取候选…" />
       ) : typeof props.notFoundContent === 'string' ? (
@@ -82,6 +93,9 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
         props.onOpenChange?.(open)
       }}
       options={displayOptions}
+      menuItemSelectedIcon={props.menuItemSelectedIcon === undefined && hasOptionGroups
+        ? GROUPED_SELECTED_ICON
+        : props.menuItemSelectedIcon}
       optionLabelProp={props.optionLabelProp ?? (identities.size ? 'selectedLabel' : undefined)}
       ref={selectRef}
       value={selectValue}

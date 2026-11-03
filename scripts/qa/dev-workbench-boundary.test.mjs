@@ -285,6 +285,7 @@ const selectValueSamplePresentationImports = new Set([
   "utils/referenceSelectOptions.mjs",
 ]);
 const commonSamplePresentationDependencies = [
+  "web/src/common/components/overlay/OverlayScopeContext.mjs",
   "web/src/common/components/navigation/SlidingSegmented.jsx",
   "web/src/common/components/navigation/SlidingTabList.jsx",
   "web/src/common/components/navigation/useSlidingIndicator.js",
@@ -797,6 +798,12 @@ test("feedback sample modal dependencies remain presentation-only", () => {
     "../../common/utils/feedbackConfig.mjs",
     "@/common/components/modal/AppModal",
     "@/common/components/layout/SurfacePanel",
+    "../overlay/ScopedOverlayDialog.jsx",
+    "../overlay/OverlayScopeContext.mjs",
+    "./OverlayScopeContext.mjs",
+    "@/common/utils/antdApp",
+    "@/common/components/overlay/OverlayScopeContext.mjs",
+    "../../utils/antdApp.js",
   ]);
   for (const file of [
     "web/src/erp/components/business-list/BusinessFormModal.jsx",
@@ -805,6 +812,8 @@ test("feedback sample modal dependencies remain presentation-only", () => {
     "web/src/common/utils/feedbackConfig.mjs",
     "web/src/common/components/modal/AppModal.jsx",
     "web/src/common/components/layout/SurfacePanel.jsx",
+    "web/src/common/components/overlay/ScopedOverlayDialog.jsx",
+    "web/src/common/components/overlay/OverlayScopeContext.mjs",
     "web/src/erp/hooks/useBusinessPageContext.js",
     "web/src/erp/components/business-list/BusinessFormSectionScope.jsx",
     "web/src/erp/components/business-list/BusinessFormSectionContext.js",
@@ -885,7 +894,9 @@ test("date input samples keep shared pickers free of business dependencies", () 
     ])],
     ["web/src/common/components/select/AppSelect.jsx", new Set([
       "react", "antd", "@ant-design/icons", "../empty/AppEmpty.jsx", "./app-select.css", "./useSelectPopupWidth.mjs", "./SelectPresentationContext.jsx",
+      "../overlay/OverlayScopeContext.mjs",
     ])],
+    ["web/src/common/components/overlay/OverlayScopeContext.mjs", new Set(["react"])],
     ["web/src/common/components/empty/AppEmpty.jsx", new Set([
       "react", "antd", "@ant-design/icons", "./empty-state.css",
     ])],

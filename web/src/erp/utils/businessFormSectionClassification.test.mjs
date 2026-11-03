@@ -135,12 +135,14 @@ test('operational long forms expose the audited semantic sections', () => {
     purchaseReceiptExceptionSource,
     /const detailTitle = isReturn \? '退货明细' : '调整明细'/u
   )
-  assert.match(purchaseReceiptExceptionSource, /<BusinessGroupedLineItems[^>]*title=\{detailTitle\}/u)
   assertOrdered(purchaseReceiptExceptionSource, [
     '整单信息',
-    '<BusinessGroupedLineItems',
+    '<BusinessFormSection title={detailTitle}',
     '整单备注',
   ])
+  const detailBlock = sliceBetween(purchaseReceiptExceptionSource, '<BusinessFormSection title={detailTitle}', '<BusinessFormSection title="整单备注"')
+  assert.match(detailBlock, /<BusinessGroupedLineItems\s+title=\{detailTitle\}/u)
+  assert.match(source('../components/business-list/BusinessGroupedLineItems.jsx'), /<BusinessLineItemsHeader\s+title=\{title\}/u)
 
   const contracts = [
     [

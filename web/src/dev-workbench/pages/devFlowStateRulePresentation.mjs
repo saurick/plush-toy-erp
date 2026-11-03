@@ -139,21 +139,6 @@ const GROUP_PRIORITY = Object.freeze({
   rework: 4,
 })
 
-const TERMINAL_POLICY_LABELS = Object.freeze({
-  explicit: '有明确终态',
-  none_reactivatable: '无固定终态，可按规则重新启用',
-  none_object_specific: '终止方式由对象专属规则决定',
-  none_derived_projection: '只读阶段投影，不构成统一状态机',
-  none_multi_revision_switch: '多版本受控切换，无单一终态',
-})
-
-export const DEV_FLOW_STATE_TRANSITION_FILTERS = Object.freeze({
-  all: 'all',
-  standard: 'standard',
-  exceptional: 'exceptional',
-  related: 'related',
-})
-
 export function buildDevFlowRecordRelationship(flow) {
   if (flow?.factBoundary !== 'immutable_red_entry_fact') return null
   const original = flow.states.find((item) => item.key === 'POSTED')
@@ -344,17 +329,11 @@ export function getDevFlowStateTransitionDiagramLabel(transition) {
   return unique(labels).join(' · ')
 }
 
-export function buildDevFlowStateRuleMermaid(
-  flow,
-  { filter = DEV_FLOW_STATE_TRANSITION_FILTERS.all, stateKey = '' } = {}
-) {
+export function buildDevFlowStateRuleMermaid(flow) {
   if (!flow) return ''
 
-  const transitions = filterDevFlowStateTransitions(flow, stateKey, filter)
-  const scoped = filter !== DEV_FLOW_STATE_TRANSITION_FILTERS.all
-  const included = new Set(transitions.flatMap((item) => [item.from, item.to]))
-  if (stateKey) included.add(stateKey)
-  const states = asArray(flow.states).filter((item) => !scoped || included.has(item.key))
+  const transitions = asArray(flow.transitions)
+  const states = asArray(flow.states)
   const stateIDs = new Map()
   states.forEach((state, index) => {
     const stateKey = cleanText(state?.key)
@@ -366,8 +345,8 @@ export function buildDevFlowStateRuleMermaid(
     stateIDs.set(stateKey, `S${index}`)
   })
 
-  const initialStates = asArray(flow.initialStates).filter((key) => !scoped || included.has(key))
-  const terminalStates = asArray(flow.terminalStates).filter((key) => !scoped || included.has(key))
+  const initialStates = asArray(flow.initialStates)
+  const terminalStates = asArray(flow.terminalStates)
   const lines = ['flowchart LR']
   if (initialStates.length > 0) lines.push('  STATE_START(["开始"])')
   states.forEach((state) => {
@@ -437,19 +416,6 @@ export function buildDevFlowStateRuleMermaid(
   return lines.join('\n')
 }
 
-export function buildDevFlowStateRuleSummary(flow) {
-  const transitions = asArray(flow?.transitions)
-  const exceptionalTransitionCount = transitions.filter(hasExceptionalPath).length
-  return Object.freeze({
-    stateCount: asArray(flow?.states).length,
-    transitionCount: transitions.length,
-    exceptionalTransitionCount,
-    terminalCount: asArray(flow?.terminalStates).length,
-    terminalPolicyLabel:
-      TERMINAL_POLICY_LABELS[flow?.terminalPolicy] || '按对象专属规则判断',
-  })
-}
-
 export function buildDevFlowStateNodeSummary(flow, state) {
   const transitions = asArray(flow?.transitions)
   const incoming = transitions.filter((item) => item.to === state?.key)
@@ -493,26 +459,6 @@ export function listDevFlowStatePathGroups(flow) {
       (key) => DEV_FLOW_STATE_PATH_GROUP_PRESENTATION[key]
     )
   )
-}
-
-export function filterDevFlowStateTransitions(
-  flow,
-  stateKey,
-  filterKey = DEV_FLOW_STATE_TRANSITION_FILTERS.all
-) {
-  const transitions = asArray(flow?.transitions)
-  if (filterKey === DEV_FLOW_STATE_TRANSITION_FILTERS.standard) {
-    return transitions.filter(hasStandardPath)
-  }
-  if (filterKey === DEV_FLOW_STATE_TRANSITION_FILTERS.exceptional) {
-    return transitions.filter(hasExceptionalPath)
-  }
-  if (filterKey === DEV_FLOW_STATE_TRANSITION_FILTERS.related && stateKey) {
-    return transitions.filter(
-      (item) => item.from === stateKey || item.to === stateKey
-    )
-  }
-  return transitions
 }
 
 export function buildDevFlowStateRelatedViews(catalog, flow) {

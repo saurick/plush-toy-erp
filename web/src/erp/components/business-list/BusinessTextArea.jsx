@@ -13,11 +13,12 @@ const BusinessTextArea = forwardRef(
   ) => {
     const { componentDisabled } = ConfigProvider.useConfig()
     const screens = Grid.useBreakpoint()
-    const [sizedForDesktop, setSizedForDesktop] = useState(screens.md)
-    // 窄屏字号变化不一定改变固定列宽，重新启用自动高度以触发组件测量。
+    const [measuredFor, setMeasuredFor] = useState(() => ({ desktop: screens.md, placeholder: props.placeholder }))
+    // 字号或提示文字变化不会改变输入值，重新启用自动高度以触发测量。
     useLayoutEffect(() => {
-      setSizedForDesktop(screens.md)
-    }, [screens.md])
+      setMeasuredFor((previous) => previous.desktop === screens.md && previous.placeholder === props.placeholder
+        ? previous : { desktop: screens.md, placeholder: props.placeholder })
+    }, [screens.md, props.placeholder])
     return (
       <Input.TextArea
         {...props}
@@ -33,7 +34,7 @@ const BusinessTextArea = forwardRef(
         }}
         className={`erp-business-textarea ${className}`.trim()}
         style={{ ...style, '--erp-textarea-rows': minRows }}
-        autoSize={sizedForDesktop === screens.md ? { minRows } : false}
+        autoSize={measuredFor.desktop === screens.md && measuredFor.placeholder === props.placeholder ? { minRows } : false}
       />
     )
   }

@@ -1,4 +1,5 @@
 import { expect as expectLocator } from 'playwright/test'
+import { isBOMVersionReadOnly, readBOMVersion } from './bomEditorDensityAssertions.mjs'
 import { chooseWorkspaceEditor } from './businessEditorWorkspaceTools.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
@@ -153,9 +154,9 @@ export function createBOMPreparationScenarios(deps) {
           if (mode === 'create') {
             deps.assert.equal(await editor.getByLabel('来源订单号', { exact: true }).inputValue(), orderNo)
             deps.assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '102')
-            deps.assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).isDisabled(), true)
+            deps.assert.equal(await isBOMVersionReadOnly(editor), true)
           } else {
-            deps.assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), mode === 'multiple' ? 'V3' : 'V2')
+            deps.assert.equal(await readBOMVersion(editor), mode === 'multiple' ? 'V3' : 'V2')
           }
           await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
           await page.waitForFunction(() => document.querySelector('.erp-bom-editor')?.getAttribute('data-unsaved') === 'false')

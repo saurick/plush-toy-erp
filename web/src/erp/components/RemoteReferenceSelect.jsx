@@ -11,8 +11,8 @@ import { Alert, Button } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { RpcErrorCode } from '@/common/consts/errorCodes.js'
-import { getPageLoadErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { getPageLoadErrorMessage } from '@/common/utils/errorMessage'
 import { showPageLoadError, usePageLoadFeedback } from './PageLoadFeedback.jsx'
 import { REFERENCE_RECORDS_CHANGED } from '../utils/referenceRecordChanges.mjs'
 import { ReferenceRecordsContext } from './ReferenceRecordsContext.jsx'
@@ -307,10 +307,10 @@ const RemoteReferenceSelect = forwardRef(
       controller.current?.abort()
       clearTimeout(timer.current)
       requestState.loading = false
+      requestState.inputKeyword = ''
       setLoading(false)
       setCandidateError(null)
       setSearchKeyword('')
-      requestState.inputKeyword = ''
       setOptions([])
       return () => {
         requestState.gate.next()

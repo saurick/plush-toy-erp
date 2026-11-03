@@ -35,18 +35,9 @@ import {
   ToolOutlined,
   TruckOutlined,
 } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Drawer,
-  Dropdown,
-  Layout,
-  Menu,
-  Space,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, Button, Dropdown, Layout, Menu, Space, Tag, Typography } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import WorkflowTaskBusinessWorkspace from './workflow/WorkflowTaskBusinessWorkspace.jsx'
 import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import BusinessModuleTabs from './BusinessModuleTabs.jsx'

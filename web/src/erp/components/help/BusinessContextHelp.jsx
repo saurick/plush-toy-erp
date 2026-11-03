@@ -166,12 +166,19 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
   )
 }
 
-export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', description = '', iconOnly = false }) {
+export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', description = '', iconOnly = false, renderContent }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef(null)
   const contentRef = useRef(null)
+  // 关闭后的焦点恢复与待执行悬停不能重开说明；新输入才解除关闭意图。
+  const explicitlyClosed = useRef(false)
   const item = getBusinessHelpItem(pageKey, itemKey)
-  if (!item && !description) return iconOnly ? null : label
+  if (!item && !description && !renderContent) return iconOnly ? null : label
+  const closeHelp = () => {
+    explicitlyClosed.current = true
+    triggerRef.current?.focus({ preventScroll: true })
+    setOpen(false)
+  }
 
   return (
     <span className="erp-business-help-label">
@@ -180,9 +187,13 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', descripti
         destroyOnHidden
         trigger={description ? 'click' : ['hover', 'click']}
         open={open}
-        onOpenChange={(nextOpen) => {
+        onOpenChange={(nextOpen, event) => {
+          if (nextOpen && explicitlyClosed.current) return
           if (
             nextOpen ||
+            event?.type === 'click' ||
+            event?.type === 'mousedown' ||
+            event?.type === 'pointerdown' ||
             !contentRef.current?.contains(document.activeElement)
           ) {
             setOpen(nextOpen)
@@ -208,12 +219,12 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', descripti
               ) {
                 event.preventDefault()
                 event.stopPropagation()
-                triggerRef.current?.focus()
-                if (event.key === 'Escape') setOpen(false)
+                if (event.key === 'Escape') closeHelp()
+                else triggerRef.current?.focus()
               }
             }}
           >
-            {description ? <p>{description}</p> : <ExplanationDetails item={item} pageKey={pageKey} />}
+            {renderContent ? renderContent(closeHelp) : description ? <p>{description}</p> : <ExplanationDetails item={item} pageKey={pageKey} />}
           </div>
         }
       >
@@ -226,21 +237,30 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', descripti
           icon={<QuestionCircleOutlined />}
           aria-label={`查看${label}说明`}
           aria-expanded={open}
+          onMouseEnter={() => { explicitlyClosed.current = false }}
+          onPointerDown={() => { explicitlyClosed.current = false }}
           onFocus={(event) => {
             // 键盘聚焦打开说明；触控留给点击，避免同一手势先打开再关闭。
-            if (event.currentTarget.matches(':focus-visible')) setOpen(true)
+            if (!explicitlyClosed.current && event.currentTarget.matches(':focus-visible')) setOpen(true)
           }}
           onBlur={(event) => {
+            explicitlyClosed.current = false
             if (!contentRef.current?.contains(event.relatedTarget)) {
               setOpen(false)
             }
           }}
-          onClick={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            const reopen = explicitlyClosed.current
+            explicitlyClosed.current = false
+            if (reopen) setOpen(true)
+            event.stopPropagation()
+          }}
           onKeyDownCapture={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') explicitlyClosed.current = false
             if (open && event.key === 'Escape') {
               event.preventDefault()
               event.stopPropagation()
-              setOpen(false)
+              closeHelp()
             }
           }}
           onKeyDown={(event) => {
@@ -254,7 +274,7 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', descripti
               }
             } else if (event.key === 'Escape') {
               event.stopPropagation()
-              setOpen(false)
+              closeHelp()
             }
           }}
         />

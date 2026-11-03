@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import { buildWorkflowTaskBoardMock } from '../../src/mocks/workflowTaskBoardMock.mjs'
 import { createMobileTouchSession } from './mobileGestureAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const productName = '图片预览模拟长耳兔抱枕（可拆卸围巾礼盒款）'
 const previewButtonName = `查看${productName}大图`
@@ -366,6 +367,38 @@ export function createTaskImagePreviewScenarios({
     beforeNavigate: installPreviewImage,
   }
   return [
+    {
+      ...common,
+      name: 'business-split-image-preview',
+      path: '/erp/task-board?q=图片预览',
+      viewport: { width: 1920, height: 1080 },
+      verify: async (page) => {
+        await page.getByRole('button', { name: '分栏', exact: true }).first().click()
+        const left = page.locator('.erp-split-pane--left')
+        const right = page.locator('.erp-split-pane--right')
+        const button = left.getByRole('button', { name: previewButtonName, exact: true }).first()
+        await button.click()
+        const dialog = page.getByRole('dialog', { name: `${productName}图片预览`, exact: true })
+        await dialog.waitFor()
+        await waitImage(page)
+        await waitForFiniteAnimations(page)
+        const region = await left.boundingBox()
+        const preview = await dialog.boundingBox()
+        assert.ok(preview.x >= region.x - 1 && preview.y >= region.y - 1 && preview.x + preview.width <= region.x + region.width + 1 && preview.y + preview.height <= region.y + region.height + 1, JSON.stringify({ region, preview }))
+        assert.equal(await dialog.getAttribute('aria-modal'), 'false')
+        const picker = right.getByRole('combobox', { name: '选择右栏页面' })
+        await picker.click()
+        await picker.fill('任务管理')
+        await page.locator('.ant-select-dropdown:visible').getByText('任务管理', { exact: true }).click()
+        await picker.focus()
+        await dialog.getByRole('button', { name: '关闭图片预览', exact: true }).evaluate((node) => node.click())
+        await dialog.waitFor({ state: 'hidden' })
+        assert.equal(await picker.evaluate((node) => document.activeElement === node), true, '关闭另一栏图片不能抢走当前焦点')
+        assert.equal(await left.getAttribute('inert'), null)
+        await button.click()
+        await closePreview(page, button, { escape: true })
+      },
+    },
     {
       ...common,
       name: 'task-image-preview-desktop',

@@ -1,0 +1,104 @@
+diff --git a/es/splitter/SplitBar.d.ts b/es/splitter/SplitBar.d.ts
+index 82937c545c049b984602ae5be8ca7d294fde9306..0e790d51a91be42995cf6145591071c3a85e7608 100644
+--- a/es/splitter/SplitBar.d.ts
++++ b/es/splitter/SplitBar.d.ts
+@@ -14,6 +14,7 @@ export interface SplitBarProps {
+     onOffsetEnd: (lazyEnd?: boolean) => void;
+     onCollapse: (index: number, type: 'start' | 'end') => void;
+     vertical: boolean;
++    reverse?: boolean;
+     ariaNow: number;
+     ariaMin: number;
+     ariaMax: number;
+diff --git a/es/splitter/SplitBar.js b/es/splitter/SplitBar.js
+index 52998b5fe3742606c5e1521ff04e613f4c85c89f..636f7fd44c914702c39ab78bc894ae2dc3b47686 100644
+--- a/es/splitter/SplitBar.js
++++ b/es/splitter/SplitBar.js
+@@ -15,6 +15,7 @@ const SplitBar = props => {
+   const {
+     prefixCls,
+     vertical,
++    reverse = false,
+     index,
+     active,
+     ariaNow,
+@@ -54,13 +55,13 @@ const SplitBar = props => {
+   // Updated constraint calculation
+   const getConstrainedOffset = rawOffset => {
+     const currentPos = containerSize * ariaNow / 100;
+-    const newPos = currentPos + rawOffset;
++    const newPos = currentPos + (reverse ? -rawOffset : rawOffset);
+     // Calculate available space
+     const minAllowed = Math.max(0, containerSize * ariaMin / 100);
+     const maxAllowed = Math.min(containerSize, containerSize * ariaMax / 100);
+     // Constrain new position within bounds
+     const clampedPos = Math.max(minAllowed, Math.min(maxAllowed, newPos));
+-    return clampedPos - currentPos;
++    return (clampedPos - currentPos) * (reverse ? -1 : 1);
+   };
+   const handleLazyMove = useEvent((offsetX, offsetY) => {
+     const constrainedOffsetValue = getConstrainedOffset(vertical ? offsetY : offsetX);
+diff --git a/es/splitter/Splitter.js b/es/splitter/Splitter.js
+index f5127de9caa8241b219dedbb489ed7f8a434ebbc..d285589385ea7552ca397a84e6c2b7a5fbe06625 100644
+--- a/es/splitter/Splitter.js
++++ b/es/splitter/Splitter.js
+@@ -141,6 +141,7 @@ const Splitter = props => {
+         active: movingIndex === idx,
+         prefixCls: prefixCls,
+         vertical: isVertical,
++        reverse: reverse,
+         resizable: resizableInfo.resizable,
+         ariaNow: stackSizes[idx] * 100,
+         ariaMin: Math.max(ariaMinStart, ariaMinEnd) * 100,
+diff --git a/lib/splitter/SplitBar.d.ts b/lib/splitter/SplitBar.d.ts
+index 82937c545c049b984602ae5be8ca7d294fde9306..0e790d51a91be42995cf6145591071c3a85e7608 100644
+--- a/lib/splitter/SplitBar.d.ts
++++ b/lib/splitter/SplitBar.d.ts
+@@ -14,6 +14,7 @@ export interface SplitBarProps {
+     onOffsetEnd: (lazyEnd?: boolean) => void;
+     onCollapse: (index: number, type: 'start' | 'end') => void;
+     vertical: boolean;
++    reverse?: boolean;
+     ariaNow: number;
+     ariaMin: number;
+     ariaMax: number;
+diff --git a/lib/splitter/SplitBar.js b/lib/splitter/SplitBar.js
+index d741b83aee3b3b770fdc904f2b41462c45b0e1c4..ef163276acc002e4844d5301a024fe075164fa95 100644
+--- a/lib/splitter/SplitBar.js
++++ b/lib/splitter/SplitBar.js
+@@ -22,6 +22,7 @@ const SplitBar = props => {
+   const {
+     prefixCls,
+     vertical,
++    reverse = false,
+     index,
+     active,
+     ariaNow,
+@@ -61,13 +62,13 @@ const SplitBar = props => {
+   // Updated constraint calculation
+   const getConstrainedOffset = rawOffset => {
+     const currentPos = containerSize * ariaNow / 100;
+-    const newPos = currentPos + rawOffset;
++    const newPos = currentPos + (reverse ? -rawOffset : rawOffset);
+     // Calculate available space
+     const minAllowed = Math.max(0, containerSize * ariaMin / 100);
+     const maxAllowed = Math.min(containerSize, containerSize * ariaMax / 100);
+     // Constrain new position within bounds
+     const clampedPos = Math.max(minAllowed, Math.min(maxAllowed, newPos));
+-    return clampedPos - currentPos;
++    return (clampedPos - currentPos) * (reverse ? -1 : 1);
+   };
+   const handleLazyMove = (0, _useEvent.default)((offsetX, offsetY) => {
+     const constrainedOffsetValue = getConstrainedOffset(vertical ? offsetY : offsetX);
+diff --git a/lib/splitter/Splitter.js b/lib/splitter/Splitter.js
+index 07de4a9ea564c8d36011ee6bef91ea880aee718a..3e4f80420b2f12ab3776945516e1ae8f8b244524 100644
+--- a/lib/splitter/Splitter.js
++++ b/lib/splitter/Splitter.js
+@@ -148,6 +148,7 @@ const Splitter = props => {
+         active: movingIndex === idx,
+         prefixCls: prefixCls,
+         vertical: isVertical,
++        reverse: reverse,
+         resizable: resizableInfo.resizable,
+         ariaNow: stackSizes[idx] * 100,
+         ariaMin: Math.max(ariaMinStart, ariaMinEnd) * 100,

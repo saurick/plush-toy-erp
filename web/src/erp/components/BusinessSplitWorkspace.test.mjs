@@ -2,7 +2,30 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createElement as h, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { setTimeout as delay } from 'node:timers/promises'
+import { createRequire } from 'node:module'
 import { createReactTestHarness } from '../../../scripts/test/reactRuntime.mjs'
+
+test('lazy splitter preview clamps physical pointer offsets in both directions without intermediate commits', async (t) => {
+  const ui = await createReactTestHarness(t)
+  const SplitBar = createRequire(import.meta.url)('antd/lib/splitter/SplitBar').default
+  const mouse = (type, x = 500, y = 500) => {
+    const event = new window.MouseEvent(type, { bubbles: true, clientX: x, clientY: y })
+    Object.defineProperties(event, { pageX: { value: x }, pageY: { value: y } })
+    return event
+  }
+  for (const [reverse, size, offset, expected, vertical = false] of [[false, 40, -500, -80], [false, 40, 500, 280], [true, 40, -500, -280], [true, 40, 500, 80], [true, 32, -500, -360], [true, 68, 500, 360], [false, 40, -500, -80, true], [false, 40, 500, 280, true]]) {
+    const updates = []
+    await ui.render(h(SplitBar, { prefixCls: 'ant-splitter', vertical, reverse, index: 0, active: false, resizable: true, lazy: true, containerSize: 1000, ariaNow: size, ariaMin: 32, ariaMax: 68, onOffsetStart: () => {}, onOffsetUpdate: (...args) => updates.push(args), onOffsetEnd: () => {} }))
+    const bar = document.querySelector('.ant-splitter-bar-dragger')
+    await ui.act(async () => bar.dispatchEvent(mouse('mousedown')))
+    await ui.act(async () => window.dispatchEvent(mouse('mousemove', 500 + (vertical ? 0 : offset), 500 + (vertical ? offset : 0))))
+    assert.equal(updates.length, 0, 'pointer movement only changes the preview')
+    await ui.act(async () => window.dispatchEvent(mouse('mouseup')))
+    assert.equal(updates.length, 1)
+    assert.ok(Math.abs(updates[0][vertical ? 2 : 1] - expected) < 0.001, `reverse=${reverse} vertical=${vertical} size=${size} offset=${offset}`)
+    assert.equal(updates[0][3], true)
+  }
+})
 
 async function setup(t) {
   const nativeAbortController = globalThis.AbortController
@@ -12,11 +35,13 @@ async function setup(t) {
   const { Form, Input } = await import('antd')
   const { default: Workspace } = await import('./BusinessSplitWorkspace.jsx')
   const { default: FormPage } = await import('./business-list/BusinessFormPage.jsx')
+  const { default: BusinessModal } = await import('./business-list/BusinessModal.jsx')
   const { ERPThemeProvider } = await import('../../common/theme/erpTheme.jsx')
   const events = await import('../../common/utils/rpcChanges.mjs')
   const reads = { one: 0, two: 0, three: 0 }
   const forms = {}
   const editors = {}
+  const modals = {}
   let workspace
   let allowRight
   let blockRight = false
@@ -29,6 +54,8 @@ async function setup(t) {
     const context = useOutletContext()
     const [query, setQuery] = useSearchParams()
     const [open, changeOpen] = useState(false)
+    const [modalOpen, setModalOpen] = useState(false)
+    modals[name] = setModalOpen
     editors[name] = changeOpen
     const [form] = Form.useForm()
     forms[name] = form
@@ -40,7 +67,7 @@ async function setup(t) {
     }, [name])
     useEffect(() => context.registerPageRefresh(refresh), [context, refresh])
     useEffect(() => name === 'two' ? context.registerPageLeaveGuard(() => !blockRight) : undefined, [context, name])
-    return h('div', { 'data-page': name }, h('output', { 'data-query': name }, query.get('q') || ''), h('button', { 'data-query-button': name, onClick: () => setQuery({ q: '保留搜索' }) }, '筛选'), h(FormPage, { open, form, title: `编辑 ${name}`, onCancel: () => changeOpen(false) }, h(Form, { form, initialValues: { note: `${name} 初始内容`, qty: '12.5' } }, h(Form.Item, { name: 'note' }, h(Input, { 'aria-label': `${name} 备注` })), h(Form.Item, { name: 'qty' }, h(Input))
+    return h('div', { 'data-page': name }, h(BusinessModal, { open: modalOpen, hasChanges: true, title: `快捷编辑 ${name}`, onCancel: () => setModalOpen(false) }, h('input', { 'aria-label': '浮层草稿', defaultValue: '尚未保存' })), h('output', { 'data-query': name }, query.get('q') || ''), h('button', { 'data-query-button': name, onClick: () => setQuery({ q: '保留搜索' }) }, '筛选'), h(FormPage, { open, form, title: `编辑 ${name}`, onCancel: () => changeOpen(false) }, h(Form, { form, initialValues: { note: `${name} 初始内容`, qty: '12.5' } }, h(Form.Item, { name: 'note' }, h(Input, { 'aria-label': `${name} 备注` })), h(Form.Item, { name: 'qty' }, h(Input))
         )
       )
     )
@@ -80,6 +107,7 @@ reads,
 events,
     get workspace() { return workspace.current },
     open: () => ui.act(async () => setOpen(true)),
+    openModal: (name) => ui.act(async () => modals[name](true)),
     collapse: () => ui.act(async () => setOpen(false)),
     side: (side) => ui.act(async () => setSide(side)),
     allow: (value) => ui.act(async () => allowRight(value)),
@@ -116,6 +144,56 @@ test('two panes use the same pages with independent location, search and mounted
   assert.equal(document.querySelector('input[aria-label="two 备注"]') === originalInput, true)
   assert.equal(ui.forms.one.getFieldValue('note'), '左栏未保存')
   assert.equal(ui.forms.two.getFieldValue('note'), '右栏未保存')
+})
+
+test('swapping visual sides preserves both drafts, search and page instances without replaying reads', async (t) => {
+  const ui = await setup(t)
+  await ui.open()
+  await ui.navigate('/erp/two')
+  await ui.act(async () => document.querySelector('[data-query-button="two"]').click())
+  await ui.edit('one')
+  await ui.edit('two')
+  await ui.settle(35)
+  await ui.act(async () => {
+    ui.forms.one.setFieldValue('note', '原页面未保存')
+    ui.forms.two.setFieldValue('note', '附加页面未保存')
+  })
+  const one = document.querySelector('input[aria-label="one 备注"]')
+  const two = document.querySelector('input[aria-label="two 备注"]')
+  const originalHeader = document.querySelector('.erp-split-pane--left .erp-split-pane__header')
+  const attachedHeader = document.querySelector('.erp-split-pane--right .erp-split-pane__header')
+  const layout = () => document.querySelector('button[aria-label="布局"]')
+  const swap = () => [...document.querySelectorAll('.erp-split-layout-options button')].find((node) => node.textContent.includes('左右互换'))
+  await ui.act(async () => layout().click())
+  await ui.flush()
+  assert.equal(document.querySelector('input[aria-label="左栏宽度百分比"]').value, '50')
+  assert.equal(swap().disabled, false)
+  await ui.act(async () => swap().click())
+  await ui.settle(35)
+  assert.equal(document.querySelector('.erp-split-panels').style.direction, 'rtl')
+  assert.equal(document.querySelector('.erp-split-pane--left').getAttribute('aria-label'), '右栏页面')
+  assert.equal(document.querySelector('.erp-split-pane--right').getAttribute('aria-label'), '左栏页面')
+  assert.equal(document.querySelector('.erp-split-pane--left .erp-split-pane__header') === originalHeader, true)
+  assert.equal(document.querySelector('.erp-split-pane--right .erp-split-pane__header') === attachedHeader, true)
+  assert.equal(document.querySelector('input[aria-label="one 备注"]') === one, true)
+  assert.equal(document.querySelector('input[aria-label="two 备注"]') === two, true)
+  assert.equal(ui.forms.one.getFieldValue('note'), '原页面未保存')
+  assert.equal(ui.forms.two.getFieldValue('note'), '附加页面未保存')
+  assert.equal(document.querySelector('[data-query="two"]').textContent, '保留搜索')
+  assert.equal(ui.router.state.location.pathname, '/erp/one')
+  assert.deepEqual(ui.reads, { one: 0, two: 0, three: 0 })
+  await ui.collapse()
+  await ui.open()
+  assert.equal(document.querySelector('input[aria-label="two 备注"]') === two, true)
+  assert.equal(document.querySelector('.erp-split-panels').style.direction, 'rtl')
+  await ui.act(async () => layout().click())
+  await ui.flush()
+  assert.equal(document.querySelector('input[aria-label="右栏宽度百分比"]').value, '50')
+  await ui.act(async () => swap().click())
+  await ui.flush()
+  assert.equal(document.querySelector('.erp-split-panels').style.direction, 'ltr')
+  assert.equal(document.querySelector('input[aria-label="one 备注"]') === one, true)
+  assert.equal(document.querySelector('input[aria-label="two 备注"]') === two, true)
 })
 
 test('confirmed changes refresh the other pane once; reads do not loop, and drafts wait until editing ends', async (t) => {
@@ -195,4 +273,22 @@ test('a later write queues one fresh read and changing a page ignores the earlie
   await ui.settle()
   assert.equal(document.querySelectorAll('.erp-split-pane--left [data-page="three"]').length, 1)
   assert.doesNotMatch(document.querySelector('.erp-split-pane--left').textContent, /关联页面更新失败/)
+})
+
+test('browser back checks an open modal even before a second page is selected', async (t) => {
+  const ui = await setup(t)
+  await ui.act(async () => ui.router.navigate('/erp/two'))
+  await ui.open()
+  await ui.openModal('two')
+  assert.equal(ui.workspace.ownsNavigation, true)
+  const draft = document.querySelector('input[aria-label="浮层草稿"]')
+  await ui.act(async () => ui.router.navigate(-1))
+  await ui.act(async () => delay(350))
+  const confirmation = [...document.querySelectorAll('.ant-modal-confirm')].find((node) => node.textContent.includes('放弃未保存的修改？'))
+  assert.equal(Boolean(confirmation), true)
+  await ui.act(async () => [...confirmation.querySelectorAll('button')].find((node) => node.textContent.replaceAll(' ', '') === '继续编辑').click())
+  await ui.act(async () => delay(350))
+  assert.equal(ui.router.state.location.pathname, '/erp/two')
+  assert.equal(document.querySelector('input[aria-label="浮层草稿"]') === draft, true)
+  assert.equal(draft.value, '尚未保存')
 })

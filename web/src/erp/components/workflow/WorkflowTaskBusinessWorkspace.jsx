@@ -22,11 +22,14 @@ import { canOpenMobileTaskBusiness, mobileTaskRelatedCommands, resolveMobileTask
 import { loadMobileTaskRelatedSource } from '../../mobile/utils/mobileTaskRelatedSource.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
+import { useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import '../../mobile/mobileTaskBusiness.css'
 import './workflowTaskBusinessWorkspace.css'
 
 export default function WorkflowTaskBusinessWorkspace({ controls, renderPage }) {
   const parent = useBusinessPageContext() || {}
+  const overlay = useOverlayScope()
+  const overlayOwner = useRef(Symbol('task-business-workspace'))
   const information = React.useContext(TaskBusinessInformationContext)
   const routeNavigate = useNavigate()
   const location = useLocation()
@@ -150,11 +153,12 @@ export default function WorkflowTaskBusinessWorkspace({ controls, renderPage }) 
     onTaskRead?.(fresh)
     return fresh
   }, [actual, onTaskRead, taskScope])
-  const confirmLeave = useCallback(async () => !busyRef.current && (!leaveGuard.current || leaveGuard.current()), [])
+  const confirmLeave = useCallback(async (options) => !busyRef.current && (!leaveGuard.current || leaveGuard.current(options)), [])
   useEffect(() => {
     controls.registerLeaveGuard?.(confirmLeave)
     return () => controls.registerLeaveGuard?.(null)
   }, [controls, confirmLeave])
+  useEffect(() => overlay?.registerGuard(overlayOwner.current, confirmLeave), [overlay, confirmLeave])
   const changeMode = useCallback(async (next) => {
     if (!(await confirmLeave())) return
     try {

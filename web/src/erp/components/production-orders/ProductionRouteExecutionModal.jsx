@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
-  App,
   Button,
   Card,
   Descriptions,
@@ -33,7 +32,7 @@ import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import ProductionOutsourcingPrepareModal from './ProductionOutsourcingPrepareModal.jsx'
 
-import { message } from '@/common/utils/antdApp'
+import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
@@ -261,7 +260,7 @@ export default function ProductionRouteExecutionModal({
       ? { taskID: sourceTask.id, group: sourceTask.task_group, sourceID: sourceTask.source_id, sourceType: sourceTask.source_type } : null), [taskNavigation?.productionHandling, sourceTask])
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const navigate = useBusinessNavigate()
-  const { modal } = App.useApp()
+  const modal = useModal()
   const [dirty, setDirty] = useState(false)
   const dirtyRef = useRef(false)
   dirtyRef.current = dirty
@@ -699,11 +698,12 @@ export default function ProductionRouteExecutionModal({
     directEntry.current?.()
   }, [open, loading, aggregate, selectedBatch, handling, initialAction, initialBatchID, taskNavigation?.businessReceipt])
 
-  const confirmLeave = useCallback(() => {
+  const confirmLeave = useCallback(({ overlay } = {}) => {
     if (saving) return Promise.resolve(false)
     if (!dirtyRef.current) return Promise.resolve(true)
     return new Promise((resolve) => modal.confirm({
       maskClosable: true,
+      getContainer: overlay === 'workspace' ? () => globalThis.document.body : undefined,
       title: '离开当前办理？',
       content: '尚未保存的填写内容将丢失。',
       okText: '离开',
