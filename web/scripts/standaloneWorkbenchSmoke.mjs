@@ -235,14 +235,16 @@ try {
     exact: true,
   })
   await purchaseStep.waitFor()
+  await purchaseStep.getByRole('tab', { name: '办理规则', exact: true }).click()
+  await purchaseStep.getByText(/库存由仓库另行入账/u).waitFor()
   assert.match(await purchaseStep.innerText(), /库存由仓库另行入账/u)
   assert.equal(
     await purchaseStep.getByRole('button', { name: /运行/u }).count(),
     0
   )
   assert.equal(await purchaseStep.getByRole('link').count(), 0)
-  assert.equal(await purchaseStep.evaluate((element) => Boolean(element.closest('[data-topic-relation]'))), true)
-  await page.getByRole('button', { name: '收起IQC 确认本行检验通过的规则与验证', exact: true }).click()
+  assert.equal(await purchaseStep.evaluate((element) => Boolean(element.closest('[data-topic-diagram="purchase_to_inventory"]'))), true)
+  await purchaseStep.getByRole('button', { name: '返回关系图', exact: true }).click()
   await page.locator('[data-graph-node="purchase_accepted"]').click()
   await page
     .getByRole('button', {
@@ -250,9 +252,12 @@ try {
       exact: true,
     })
     .click()
-  await purchaseStep
-    .getByText('合格行入库与异常收尾', { exact: true })
-    .waitFor()
+  await purchaseStep.getByRole('tab', { name: '办理规则', exact: true }).click()
+  await purchaseStep.getByText(/待检与不合格行保留后续处理/u).waitFor()
+  assert.match(await purchaseStep.innerText(), /待检与不合格行保留后续处理/u)
+  await purchaseStep.getByRole('tab', { name: '验证证据', exact: true }).click()
+  await purchaseStep.getByText('具名检查项与执行结果', { exact: true }).click()
+  await purchaseStep.getByText('合格行入库与异常收尾', { exact: true }).waitFor()
   checks.push(
     'built procurement graph separates quality from inbound and links exact-step evidence without writes'
   )
