@@ -8,7 +8,7 @@
 
 | 路径                                                                                    | 用途                                                                                            |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `docs/archive/progress-2026-11-03-completed-history.md` | 财务工作台接入与验收目录登记的已完成过程原文 |
+| `docs/archive/progress-2026-11-03-completed-history.md` | 财务接入、验收目录、付款方式推荐及 CI / 工作台升级的已完成过程原文 |
 | `docs/archive/progress-2026-11-02-completed-history.md` | 业务数据标记清理、前三项性能优化及制品 / 备份轮换的已完成过程原文 |
 | `docs/archive/progress-2026-10-29-ci-workbench-history.md` | CI 修复与工作台升级前，已完成的原生测试报告及工作台分工过程原文 |
 | `docs/archive/progress-2026-10-28-bom-attachment-history.md` | 2026-10-27～28 BOM 来源核对、完整精度与附件 200MB 阶段过程原文 |

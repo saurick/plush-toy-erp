@@ -22,6 +22,7 @@ FROM --platform=$BUILDPLATFORM ${NODE_BUILDER_IMAGE} AS web-builder
 WORKDIR /web
 
 COPY web/package.json web/pnpm-lock.yaml ./
+COPY web/patches ./patches
 RUN --mount=type=cache,id=plush-npm,target=/root/.npm,sharing=locked \
     --mount=type=cache,id=plush-pnpm,target=/web/.pnpm-store,sharing=locked \
     npm config set registry https://registry.npmmirror.com && \

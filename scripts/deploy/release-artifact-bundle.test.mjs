@@ -416,6 +416,12 @@ test("release image builders consume the committed generated projection without 
   );
   assert.match(serverDockerfile, /^RUN chmod -R u=rX,go=rX \/app\/build$/mu);
   for (const dockerfile of [webDockerfile, serverDockerfile]) {
+    assert.match(dockerfile, /^COPY web\/patches [.]\/(?:web\/)?patches$/mu);
+    assert.ok(
+      dockerfile.indexOf("COPY web/patches") <
+        dockerfile.indexOf("pnpm install --frozen-lockfile"),
+      "dependency patches must exist before the locked installation",
+    );
     assert.doesNotMatch(
       dockerfile,
       /pnpm build:all|pnpm run build(?:\s|&&)|gen-error-codes/u,
