@@ -404,7 +404,7 @@ test("release image builders consume the committed generated projection without 
   );
   assert.match(
     serverDockerfile,
-    /^RUN install -d -o node -g node -m 0555 \/app\/build \/app\/scripts$/mu,
+    /^RUN install -d -o node -g node -m 0555 \/app\/build \/app\/scripts \/app\/src\/common\/consts$/mu,
   );
   assert.match(
     serverDockerfile,
@@ -427,6 +427,45 @@ test("release image builders consume the committed generated projection without 
       /pnpm build:all|pnpm run build(?:\s|&&)|gen-error-codes/u,
     );
     assert.doesNotMatch(dockerfile, /COPY server\/internal\/errcode/u);
+  }
+});
+
+test("both Web runtimes carry the static service entrypoint and its relative module closure", () => {
+  const modules = new Set();
+  const pending = ["web/scripts/serveStaticApp.mjs"];
+  while (pending.length) {
+    const file = pending.pop();
+    if (modules.has(file)) continue;
+    modules.add(file);
+    const source = readFileSync(path.join(repoRoot, file), "utf8");
+    for (const match of source.matchAll(
+      /\b(?:from\s*|import\s*(?:\(\s*)?)["'](\.[^"']+)["']/gu,
+    )) {
+      const dependency = path.posix.normalize(
+        path.posix.join(path.posix.dirname(file), match[1]),
+      );
+      assert.ok(dependency.startsWith("web/"), "Web runtime dependency must remain inside web");
+      pending.push(dependency);
+    }
+  }
+  for (const [file, stage, sourcePrefix] of [
+    ["server/Dockerfile", "web-runtime", ""],
+    ["web/Dockerfile", "runtime", "/app/"],
+  ]) {
+    const source = readFileSync(path.join(repoRoot, file), "utf8");
+    const runtime = source.split(` AS ${stage}\n`)[1].split(/\nFROM /u)[0];
+    const copies = [...runtime.matchAll(/^COPY\s+(.+)$/gmu)].map((match) => {
+      const fields = match[1].split(/\s+/u).filter((value) => !value.startsWith("--"));
+      return { source: fields[0], destination: path.posix.normalize(fields.at(-1)) };
+    });
+    for (const module of modules) {
+      assert.ok(
+        copies.some((copy) =>
+          copy.source === sourcePrefix + module &&
+          copy.destination === module.slice("web/".length)),
+        `${file} must package runtime module ${module}`,
+      );
+    }
   }
 });
 

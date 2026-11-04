@@ -82,9 +82,10 @@ ENV PROXY_TIMEOUT_MS=30000
 
 WORKDIR /app
 
-RUN install -d -o node -g node -m 0555 /app/build /app/scripts
+RUN install -d -o node -g node -m 0555 /app/build /app/scripts /app/src/common/consts
 COPY --chown=node:node --from=web-builder /web/build ./build
 COPY --chown=node:node --chmod=0444 web/scripts/serveStaticApp.mjs ./scripts/serveStaticApp.mjs
+COPY --chown=node:node --chmod=0444 web/src/common/consts/attachments.generated.mjs ./src/common/consts/attachments.generated.mjs
 RUN chmod -R u=rX,go=rX /app/build
 
 USER node

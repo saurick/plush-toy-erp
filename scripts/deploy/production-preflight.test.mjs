@@ -2168,7 +2168,7 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
   );
   assert.match(
     dockerfile,
-    /^RUN install -d -o node -g node -m 0555 \/app\/build \/app\/scripts$/mu,
+    /^RUN install -d -o node -g node -m 0555 \/app\/build \/app\/scripts \/app\/src\/common\/consts$/mu,
   );
   assert.match(
     dockerfile,
