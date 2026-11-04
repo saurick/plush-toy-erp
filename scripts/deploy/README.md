@@ -43,6 +43,8 @@
 | `rollback-controller.mjs` | 校验旧 manifest、migration 与客户配置兼容性 | 不写目标 |
 | `rollback-executor.mjs` | 回滚 Compose / 公网入口到兼容旧版本 | 不 down migration，不自动恢复数据库 |
 | `gitlab-deployment-records-cli.mjs` | 计划、补录与核验 GitLab 部署登记和项目回执 | `plan` / `verify` 只读；`sync --execute` / `reconcile --execute` 只登记 GitLab，不操作目标 |
+| `gitlab-deployment-evidence.mjs` | 工作台按固定目标读取已提交的 GitLab 操作归档，核对哈希、回执和原生部署状态 | 只读，不导入可执行 store，不发起或重试部署 |
+| `gitlab-release-credentials.mjs` | CLI 与登记执行器共用发布凭据读取、项目权限和有效期核对 | 不发起发布；只读归档继续使用独立只读凭据 |
 | `database-rebuild-controller.mjs` | 仅为 demo/test 生成备份、物理数据代和空基线资格计划 | 不停服务、不备份、不迁移 |
 | `database-rebuild-executor.mjs` | 执行 ready rebuild operation | 会停单一 target、备份并切换其 PostgreSQL 数据目录 |
 | `bootstrap-production-admin.sh` | 在已迁移 fresh 数据库创建首个管理员并读回 marker/audit/RBAC | 只允许 fresh target 的一次性确认窗口 |
@@ -128,7 +130,7 @@ GitLab 原生 Environments / Deployments 管理 `demo`、`test`、`erp` 的部�
 
 Generic Package 保存 `operation.json`、已有的 `receipt.json`、`link.json` 和部署创建前的 `intent.json`。每次上传回读 SHA-256；相同 UUID 幂等复用，内容冲突立即失败。缺失的历史回执和检查证据不补造。历史补录按原始完成时间升序登记，原始开始 / 结束时间不变；GitLab API 不支持回填 created_at，原生登记时间不能用于历史部署频率或耗时统计。
 
-本地 `gitlab/<operation UUID>.json` 只缓存 GitLab 引用和同步进度，历史列表不等待 GitLab；原 operation、计划、回执不因同步被改写或删除。完整远端归档可恢复丢失的引用缓存。创建 Deployment 响应丢失时保留本地及远端 intent，禁止自动重复 POST；明确读回精确部署 ID 后才 reconcile。GitLab 登记失败阻止新的目标写入；目标完成后的归档失败保留真实结果，显示待补录。执行器结束仅尝试一次补录，其余通过页面“补录 GitLab”或下列 CLI 显式恢复，不建后台轮询。
+本地 `gitlab/<operation UUID>.json` 只缓存 GitLab 引用和同步进度；原 operation、计划、回执不因同步被改写或删除。完整远端归档可恢复丢失的引用缓存。创建 Deployment 响应丢失时保留本地及远端 intent，禁止自动重复 POST；明确读回精确部署 ID 后才 reconcile。GitLab 登记失败阻止新的目标写入；目标完成后的归档失败保留真实结果，显示待补录。执行器结束仅尝试一次补录，其余通过页面“补录 GitLab”或下列 CLI 显式恢复，不建后台轮询。
 
 在仓库根目录执行：
 
@@ -143,6 +145,10 @@ node scripts/deploy/gitlab-deployment-records-cli.mjs reconcile --execute --oper
 ```
 
 登记复用 `gitlab-release-cli.mjs` 的项目级 API 写凭据解析与权限核验，不使用只读 token；凭据仅留在登记进程，不进入浏览器、operation、Package 或目标 SSH 环境。`sync` 只处理终态，保留未结束操作。清理原始记录前必须独立完成备份恢复验证；GitLab 归档不授权删除本地证据。该包纳入 GitLab 原有应用备份，不能称为已完成异地恢复验证。
+
+三个现役目标的历史读取通过 `gitlab-deployment-evidence.mjs` 合并本机操作与已完成 GitLab 归档。`link.json` 是归档提交标记，读取时核对 operation UUID、target、SHA、终态、原始时间及 operation / receipt SHA-256；详情另核对原生 Deployment 的目标与结果。迁移要求读取原回执，不从工作台源码版本推算。同 UUID 的本地副本优先，内容冲突显示完整性缺口；归档记录只读，不导入可执行 store，不创建重试或补录动作。读取失败保留本地历史并明确标注不完整，服务器验证不显示通过。
+
+目录并发共用在途请求，成功后缓存 15 秒，失败立即失效。不可变归档头按需保留最多 1000 项；每次目录读取最多 20 页、每页 100 项，每目标最多 4 路读取，响应沿用 2 MiB / 15 秒边界。超限明确失败，不静默截断列表或统计；持续增长到此边界前，应扩展现有 GitLab 归档的可查询索引或分页合同。没有后台轮询或磁盘状态复制。
 
 ## Operation 真源
 

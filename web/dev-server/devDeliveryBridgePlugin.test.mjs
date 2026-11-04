@@ -604,7 +604,7 @@ test('version center keeps test data rebuild on its dedicated two-step executor'
   assert.equal(spawned.options.cwd, root)
 
   child.emit('close', 1)
-  const failed = service.readOperation(OPERATION_ID)
+  const failed = await service.readOperation(OPERATION_ID)
   assert.equal(failed.status, 'failed')
   assert.equal(failed.issues[0].code, 'database_rebuild_executor_start_failed')
   assert.equal(failed.retry.allowed, false)
@@ -1143,7 +1143,7 @@ test('workbench does not offer generic retry for dedicated high-risk actions', a
       downloadRelease: () => {},
     },
   })
-  const operation = service.readOperation(created.operation.id)
+  const operation = await service.readOperation(created.operation.id)
   assert.equal(operation.retry.allowed, false)
   assert.equal(operation.retry.reason, 'action_not_retryable')
   await assert.rejects(
@@ -2376,7 +2376,7 @@ test('formal rollback lineage survives the public operation and client contracts
       ok: true,
       json: async () => ({
         kind: 'plush.dev-delivery-operation-result',
-        operation: service.readOperation(url.split('/').at(-1)),
+        operation: await service.readOperation(url.split('/').at(-1)),
       }),
     }),
   })
@@ -2439,32 +2439,40 @@ test('delivery history searches all retained operations and returns bounded page
     operationStore: store,
     provider: { provider: 'gitlab' },
   })
-  const all = service.history()
+  const all = await service.history()
   assert.equal(all.total, 116)
   assert.equal(all.target, 'demo-133')
-  assert.ok(all.operations.every((operation) => operation.target === 'demo-133'))
+  assert.ok(
+    all.operations.every((operation) => operation.target === 'demo-133')
+  )
   assert.equal(all.operations.length, 10)
   assert.equal(all.statistics.counts.passed, 77)
   assert.equal(all.statistics.counts.failed, 39)
   assert.equal(all.statistics.passedDurationMedianMs, 10_000)
-  assert.equal(service.history({ page: '12' }).operations.length, 6)
-  assert.equal(service.history({ page: '999' }).page, 12)
-  const oldest = service.history({
+  assert.equal((await service.history({ page: '12' })).operations.length, 6)
+  assert.equal((await service.history({ page: '999' })).page, 12)
+  const oldest = await service.history({
     keyword: '00000000-0000-4000-8000-000000000000',
   })
   assert.equal(oldest.matched, 1)
   assert.equal(oldest.operations[0].version, '2026.08.01-1')
-  const filtered = service.history({
+  const filtered = await service.history({
     target: 'production-133',
     result: 'attention',
     pageSize: '50',
   })
   assert.equal(filtered.total, 115)
   assert.equal(filtered.matched, 38)
-  assert.throws(() => service.readOperation(all.operations[0].id, 'production-133'), /target does not match/u)
+  await assert.rejects(
+    () => service.readOperation(all.operations[0].id, 'production-133'),
+    /target does not match/u
+  )
   assert.equal(filtered.statistics.counts.failed, 38)
   assert.equal(filtered.statistics.passedDurationMedianMs, null)
-  assert.equal(service.history({ keyword: 'no-such-version' }).matched, 0)
+  assert.equal(
+    (await service.history({ keyword: 'no-such-version' })).matched,
+    0
+  )
   for (const query of [
     { page: '0' },
     { pageSize: '51' },
@@ -2474,7 +2482,7 @@ test('delivery history searches all retained operations and returns bounded page
     { keyword: 'a'.repeat(129) },
     { command: 'anything' },
   ]) {
-    assert.throws(() => service.history(query), /invalid/u)
+    await assert.rejects(() => service.history(query), /invalid/u)
   }
   const middleware = createDevDeliveryMiddleware({
     service,
@@ -2492,41 +2500,103 @@ test('delivery history searches all retained operations and returns bounded page
 
 test('history isolates all three deployments and shared releases even when another record is damaged at startup', async (t) => {
   const { root, store } = createProject(t)
-  const targets = ['demo-133', 'customer-test-133', 'production-133', 'gitlab-release', 'test-133']
+  const targets = [
+    'demo-133',
+    'customer-test-133',
+    'production-133',
+    'gitlab-release',
+    'test-133',
+  ]
   const ids = targets.map((target, index) => {
     const { operation } = createOrReuseDeliveryOperation(store, {
       action: target.endsWith('-release') ? 'release' : 'promote',
-target,
+      target,
       gitSha: SHA,
-version: '2026.10.22-1',
-idempotencyKey: `isolated-history-${index}`,
+      version: '2026.10.22-1',
+      idempotencyKey: `isolated-history-${index}`,
     })
-    transitionDeliveryOperation(store, operation.id, { status: 'running', message: 'started' })
-    transitionDeliveryOperation(store, operation.id, { status: 'passed', message: 'finished' })
+    transitionDeliveryOperation(store, operation.id, {
+      status: 'running',
+      message: 'started',
+    })
+    transitionDeliveryOperation(store, operation.id, {
+      status: 'passed',
+      message: 'finished',
+    })
     return operation.id
   })
-  const damaged = path.join(store, 'operations', 'ffffffff-ffff-4fff-8fff-ffffffffffff.json')
+  const damaged = path.join(
+    store,
+    'operations',
+    'ffffffff-ffff-4fff-8fff-ffffffffffff.json'
+  )
   writeFileSync(damaged, '{')
-  const service = createDevDeliveryService({ projectRoot: root, operationStore: store, provider: { provider: 'gitlab' } })
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: { provider: 'gitlab' },
+  })
   for (const [index, target] of targets.entries()) {
-    const history = service.history({ target })
+    const history = await service.history({ target })
     assert.equal(history.total, 1)
     assert.equal(history.matched, 1)
     assert.equal(history.operations[0].id, ids[index])
     assert.equal(history.integrity.unreadableOperations, 1)
-    if (target === 'test-133') assert.deepEqual(history.operations[0].retry, { allowed: false, reason: 'historical_target_read_only' })
-    assert.equal(service.history({ target, keyword: ids[(index + 1) % ids.length] }).matched, 0)
-    assert.equal(service.readOperation(ids[index], target).target, target)
-    assert.throws(() => service.readOperation(ids[index], targets[(index + 1) % ids.length]), /target does not match/u)
+    if (target === 'test-133')
+      { assert.deepEqual(history.operations[0].retry, {
+        allowed: false,
+        reason: 'historical_target_read_only',
+      }) }
+    assert.equal(
+      (
+        await service.history({
+          target,
+          keyword: ids[(index + 1) % ids.length],
+        })
+      ).matched,
+      0
+    )
+    assert.equal(
+      (await service.readOperation(ids[index], target)).target,
+      target
+    )
+    await assert.rejects(
+      () =>
+        service.readOperation(ids[index], targets[(index + 1) % ids.length]),
+      /target does not match/u
+    )
   }
   await assert.rejects(service.summary())
   // Mutation/recovery must stay fail-closed even while intact history is readable.
-  await assert.rejects(service.act({ action: 'dispatch-release', payload: { gitSha: SHA, version: '2026.10.22-1', idempotencyKey: 'isolation-no-write-1' } }))
+  await assert.rejects(
+    service.act({
+      action: 'dispatch-release',
+      payload: {
+        gitSha: SHA,
+        version: '2026.10.22-1',
+        idempotencyKey: 'isolation-no-write-1',
+      },
+    })
+  )
   rmSync(damaged)
-  assert.equal(service.history().integrity.unreadableOperations, 0)
-  await assert.rejects(service.act({ action: 'retry-operation', payload: { operationId: ids.at(-1), idempotencyKey: 'historical-target-no-retry' } }), /historical deployment target is read-only/u)
-  const middleware = createDevDeliveryMiddleware({ service, csrfToken: 'a'.repeat(32) })
-  const response = await requestMiddleware(middleware, { url: `/__dev/api/delivery/operations/${ids[0]}?target=production-133` })
+  assert.equal((await service.history()).integrity.unreadableOperations, 0)
+  await assert.rejects(
+    service.act({
+      action: 'retry-operation',
+      payload: {
+        operationId: ids.at(-1),
+        idempotencyKey: 'historical-target-no-retry',
+      },
+    }),
+    /historical deployment target is read-only/u
+  )
+  const middleware = createDevDeliveryMiddleware({
+    service,
+    csrfToken: 'a'.repeat(32),
+  })
+  const response = await requestMiddleware(middleware, {
+    url: `/__dev/api/delivery/operations/${ids[0]}?target=production-133`,
+  })
   assert.equal(response.statusCode, 409)
 })
 
@@ -2541,24 +2611,47 @@ test('large version summaries yield to local history and share ancestry work for
   const service = createDevDeliveryService({
     projectRoot: root,
     operationStore: store,
-    provider: { provider: 'gitlab', listVersions: () => versions, getReleaseStatus: () => ({ status: 'missing' }) },
-    readRepositoryState: () => ({ commit: SHA, dirty: false, fingerprint: 'd'.repeat(64) }),
-    runPreflight: (target) => ({ status: 'passed', target, remote: { runtime: { serverSha: SHA, webSha: SHA } } }),
+    provider: {
+      provider: 'gitlab',
+      listVersions: () => versions,
+      getReleaseStatus: () => ({ status: 'missing' }),
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
+    runPreflight: (target) => ({
+      status: 'passed',
+      target,
+      remote: { runtime: { serverSha: SHA, webSha: SHA } },
+    }),
     readRecoveryEvidence: () => null,
     classifyRelation: () => {
       comparisons += 1
-      if (comparisons === 1) { setImmediate(() => {
-        assert.equal(service.history({ target: 'production-133' }).target, 'production-133')
-        historyServedDuringSummary = comparisons < versions.length
-      }) }
-      return { actionClass: 'promote', actionReason: 'candidate_descends_from_current' }
+      if (comparisons === 1) {
+        setImmediate(async () => {
+          assert.equal(
+            (await service.history({ target: 'production-133' })).target,
+            'production-133'
+          )
+          historyServedDuringSummary = comparisons < versions.length
+        })
+      }
+      return {
+        actionClass: 'promote',
+        actionReason: 'candidate_descends_from_current',
+      }
     },
   })
   const summary = await service.summary()
   assert.equal(historyServedDuringSummary, true)
   assert.equal(comparisons, versions.length)
   assert.equal(summary.versions.length, versions.length)
-  assert.equal(summary.versions[0].actionsByTarget['production-133'].actionClass, 'promote')
+  assert.equal(
+    summary.versions[0].actionsByTarget['production-133'].actionClass,
+    'promote'
+  )
 })
 
 test('GitLab record repair is terminal-only and cannot spawn a deployment or mutate its original result', async (t) => {
@@ -2567,28 +2660,43 @@ test('GitLab record repair is terminal-only and cannot spawn a deployment or mut
   const store = resolveDeliveryOperationStore(root)
   const { operation } = createOrReuseDeliveryOperation(store, {
     action: 'promote',
-target: 'demo-133',
-gitSha: SHA,
+    target: 'demo-133',
+    gitSha: SHA,
     version: '2026.10.22-1',
-idempotencyKey: IDEMPOTENCY_KEY,
+    idempotencyKey: IDEMPOTENCY_KEY,
   })
   let recordings = 0
   const service = createDevDeliveryService({
     projectRoot: root,
-operationStore: store,
-provider: { provider: 'gitlab' },
-    spawnProcess: () => { throw new Error('recording must never spawn target execution') },
+    operationStore: store,
+    provider: { provider: 'gitlab' },
+    spawnProcess: () => {
+      throw new Error('recording must never spawn target execution')
+    },
     syncDeploymentRecord: async ({ operationId, store: source }) => {
       assert.equal(operationId, operation.id)
       assert.equal(source, store)
       recordings++
     },
   })
-  const request = { action: 'sync-gitlab-record', payload: { operationId: operation.id } }
-  assert.throws(() => validateDevDeliveryAction({ ...request, payload: { ...request.payload, command: 'deploy' } }), /unsupported fields/u)
+  const request = {
+    action: 'sync-gitlab-record',
+    payload: { operationId: operation.id },
+  }
+  assert.throws(
+    () =>
+      validateDevDeliveryAction({
+        ...request,
+        payload: { ...request.payload, command: 'deploy' },
+      }),
+    /unsupported fields/u
+  )
   await assert.rejects(service.act(request), /terminal/u)
   assert.equal(recordings, 0)
-  transitionDeliveryOperation(store, operation.id, { status: 'blocked', message: 'preflight blocked' })
+  transitionDeliveryOperation(store, operation.id, {
+    status: 'blocked',
+    message: 'preflight blocked',
+  })
   const before = readDeliveryOperation(store, operation.id)
   const result = await service.act(request)
   assert.equal(result.operation.status, 'blocked')
@@ -2601,31 +2709,63 @@ test('overlapping refreshes share probes, keep history readable and age successf
   let clock = 0
   t.mock.method(Date, 'now', () => clock)
   let resolveProbe
-  const pending = new Promise((resolve) => { resolveProbe = resolve })
+  const pending = new Promise((resolve) => {
+    resolveProbe = resolve
+  })
   const reads = []
   let versions = 0
   const service = createDevDeliveryService({
     projectRoot: root,
-operationStore: store,
-preflightTtlMs: 30,
-    provider: { provider: 'gitlab', listVersions: () => { versions++; return [] }, getReleaseStatus: () => ({ status: 'missing' }) },
-    readRepositoryState: () => ({ commit: SHA, dirty: false, fingerprint: 'd'.repeat(64) }),
-    runPreflight: async (target) => { reads.push(target); await pending; return { target, status: 'passed' } },
+    operationStore: store,
+    preflightTtlMs: 30,
+    provider: {
+      provider: 'gitlab',
+      listVersions: () => {
+        versions++
+        return []
+      },
+      getReleaseStatus: () => ({ status: 'missing' }),
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
+    runPreflight: async (target) => {
+      reads.push(target)
+      await pending
+      return { target, status: 'passed' }
+    },
     readRecoveryEvidence: () => null,
   })
   const loads = Array.from({ length: 4 }, () => service.summary())
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(reads.length, 3)
   assert.equal(versions, 1)
-  assert.equal(service.history({ target: 'customer-test-133' }).total, 0)
+  assert.equal(
+    (await service.history({ target: 'customer-test-133' })).total,
+    0
+  )
   clock = 100
   resolveProbe()
   const results = await Promise.all(loads)
-  assert(results.every((result) => result === results[0] && result.status === 'success'))
+  assert(
+    results.every(
+      (result) => result === results[0] && result.status === 'success'
+    )
+  )
   clock = 101
   await service.summary()
-  assert.equal(reads.length, 3, 'probe duration must not consume the evidence TTL')
-  assert.equal(versions, 2, 'completed summaries are never retained as fresh refresh results')
+  assert.equal(
+    reads.length,
+    3,
+    'probe duration must not consume the evidence TTL'
+  )
+  assert.equal(
+    versions,
+    2,
+    'completed summaries are never retained as fresh refresh results'
+  )
   clock = 131
   await service.summary()
   assert.equal(reads.length, 6)
@@ -2639,31 +2779,64 @@ test('failed target refreshes retain isolated history, report safe diagnostics a
   let initializationReads = 0
   const service = createDevDeliveryService({
     projectRoot: root,
-operationStore: store,
-    provider: { provider: 'gitlab', listVersions: () => [{ gitSha: SHA, version: '2026.10.23-1' }], getReleaseStatus: () => ({ status: 'missing' }) },
-    readRepositoryState: () => ({ commit: SHA, dirty: false, fingerprint: 'd'.repeat(64) }),
+    operationStore: store,
+    provider: {
+      provider: 'gitlab',
+      listVersions: () => [{ gitSha: SHA, version: '2026.10.23-1' }],
+      getReleaseStatus: () => ({ status: 'missing' }),
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
     runPreflight: (target) => {
       if (target === 'customer-test-133') {
         targetReads++
-        if (broken) { throw Object.assign(new Error('private-token-must-not-leak'), {
-          preflightDiagnostic: { code: 'target_preflight_timeout', stage: 'retention', elapsedMs: 30000, exitCode: null, transport: 'local' },
-        }) }
+        if (broken) {
+          throw Object.assign(new Error('private-token-must-not-leak'), {
+            preflightDiagnostic: {
+              code: 'target_preflight_timeout',
+              stage: 'retention',
+              elapsedMs: 30000,
+              exitCode: null,
+              transport: 'local',
+            },
+          })
+        }
       }
-      return { target, status: 'passed', remote: { runtime: { serverSha: SHA, webSha: SHA } } }
+      return {
+        target,
+        status: 'passed',
+        remote: { runtime: { serverSha: SHA, webSha: SHA } },
+      }
     },
-    runInitializationPreflight: () => { initializationReads++; throw new Error('failed transport is not an empty target') },
+    runInitializationPreflight: () => {
+      initializationReads++
+      throw new Error('failed transport is not an empty target')
+    },
     readRecoveryEvidence: () => null,
-    classifyRelation: () => ({ actionClass: 'current', actionReason: 'exact_sha_current' }),
+    classifyRelation: () => ({
+      actionClass: 'current',
+      actionReason: 'exact_sha_current',
+    }),
     onDiagnostic: (event) => diagnostics.push(event),
   })
   const first = await service.summary({ requestId: 'safe-request-id' })
   assert.equal(first.status, 'partial')
   assert.equal(first.targets[1].preflight, null)
   assert.equal(first.targets[1].initializationPreflight, null)
-  assert.equal(first.versions[0].actionsByTarget['customer-test-133'].actionClass, 'blocked')
+  assert.equal(
+    first.versions[0].actionsByTarget['customer-test-133'].actionClass,
+    'blocked'
+  )
   assert.match(first.issues[0].message, /只读预检超时/u)
   assert.equal(initializationReads, 0)
-  assert.equal(service.history({ target: 'customer-test-133' }).integrity.unreadableOperations, 0)
+  assert.equal(
+    (await service.history({ target: 'customer-test-133' })).integrity
+      .unreadableOperations,
+    0
+  )
   assert.equal(diagnostics.length, 1)
   assert.equal(diagnostics[0].requestId, 'safe-request-id')
   assert.equal(diagnostics[0].stage, 'retention')
@@ -2677,25 +2850,57 @@ operationStore: store,
 
 test('a write invalidates pending read evidence without letting an older completion repopulate it', async (t) => {
   const { root, store } = createProject(t)
-  const { operation } = createOrReuseDeliveryOperation(store, { action: 'promote', target: 'demo-133', gitSha: SHA, version: '2026.10.23-1', idempotencyKey: IDEMPOTENCY_KEY })
-  transitionDeliveryOperation(store, operation.id, { status: 'running', message: 'started' })
-  transitionDeliveryOperation(store, operation.id, { status: 'passed', message: 'finished' })
+  const { operation } = createOrReuseDeliveryOperation(store, {
+    action: 'promote',
+    target: 'demo-133',
+    gitSha: SHA,
+    version: '2026.10.23-1',
+    idempotencyKey: IDEMPOTENCY_KEY,
+  })
+  transitionDeliveryOperation(store, operation.id, {
+    status: 'running',
+    message: 'started',
+  })
+  transitionDeliveryOperation(store, operation.id, {
+    status: 'passed',
+    message: 'finished',
+  })
   let finishOld
-  const old = new Promise((resolve) => { finishOld = resolve })
+  const old = new Promise((resolve) => {
+    finishOld = resolve
+  })
   let generation = 0
   let reads = 0
   const service = createDevDeliveryService({
     projectRoot: root,
-operationStore: store,
-    provider: { provider: 'gitlab', listVersions: () => [], getReleaseStatus: () => ({ status: 'missing' }) },
-    readRepositoryState: () => ({ commit: SHA, dirty: false, fingerprint: 'd'.repeat(64) }),
-    runPreflight: async (target) => { const captured = generation; reads++; if (!captured) await old; return { status: 'passed', target, generation: captured } },
+    operationStore: store,
+    provider: {
+      provider: 'gitlab',
+      listVersions: () => [],
+      getReleaseStatus: () => ({ status: 'missing' }),
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'd'.repeat(64),
+    }),
+    runPreflight: async (target) => {
+      const captured = generation
+      reads++
+      if (!captured) await old
+      return { status: 'passed', target, generation: captured }
+    },
     readRecoveryEvidence: () => null,
-    syncDeploymentRecord: () => { generation++ },
+    syncDeploymentRecord: () => {
+      generation++
+    },
   })
   const stale = service.summary()
   await new Promise((resolve) => setImmediate(resolve))
-  await service.act({ action: 'sync-gitlab-record', payload: { operationId: operation.id } })
+  await service.act({
+    action: 'sync-gitlab-record',
+    payload: { operationId: operation.id },
+  })
   const current = await service.summary()
   assert.equal(current.targets[0].preflight.generation, 1)
   finishOld()

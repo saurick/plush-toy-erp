@@ -4,7 +4,14 @@ import path from 'node:path'
 import process from 'node:process'
 import { setImmediate as yieldReadRequests } from 'node:timers/promises'
 import { readRetentionSummary } from './devRetentionSummary.mjs'
-import { readGitlabDeploymentRecord, syncGitlabDeploymentRecord } from '../../scripts/deploy/gitlab-deployment-records.mjs'
+import {
+  readGitlabDeploymentRecord,
+  syncGitlabDeploymentRecord,
+} from '../../scripts/deploy/gitlab-deployment-records.mjs'
+import {
+  assertArchivedOperationMatches,
+  createGitlabDeploymentEvidenceReader,
+} from '../../scripts/deploy/gitlab-deployment-evidence.mjs'
 
 import {
   consumeDeliveryOperationStore,
@@ -21,7 +28,10 @@ import {
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
 } from '../../scripts/deploy/delivery-operation-store.mjs'
-import { closeReadyDeliveryPlan, deliveryPlanInvalidation } from '../../scripts/deploy/delivery-plan-lifecycle.mjs'
+import {
+  closeReadyDeliveryPlan,
+  deliveryPlanInvalidation,
+} from '../../scripts/deploy/delivery-plan-lifecycle.mjs'
 import { createGithubDeliveryProvider } from '../../scripts/deploy/github-delivery-provider.mjs'
 import {
   createGitlabDeliveryProvider,
@@ -114,15 +124,20 @@ function readThroughCache(cache, key, ttlMs, load, { force = false } = {}) {
     return Promise.resolve(previous.value)
   }
   const entry = {}
-  const pending = Promise.resolve().then(load).then((value) => {
-    if (cache.get(key) === entry) {
-      Object.assign(entry, { value, readAt: Date.now(), pending: null })
-    }
-    return value
-  }, (error) => {
-    if (cache.get(key) === entry) cache.delete(key)
-    throw error
-  })
+  const pending = Promise.resolve()
+    .then(load)
+    .then(
+      (value) => {
+        if (cache.get(key) === entry) {
+          Object.assign(entry, { value, readAt: Date.now(), pending: null })
+        }
+        return value
+      },
+      (error) => {
+        if (cache.get(key) === entry) cache.delete(key)
+        throw error
+      }
+    )
   entry.pending = pending
   cache.set(key, entry)
   return pending
@@ -180,11 +195,14 @@ async function bindVersionActions({
         try {
           const identity = `${serverSha}:${version.gitSha}`
           if (!relations.has(identity)) {
-            relations.set(identity, classifyRelation({
-              repoRoot: projectRoot,
-              currentGitSha: serverSha,
-              candidateGitSha: version.gitSha,
-            }))
+            relations.set(
+              identity,
+              classifyRelation({
+                repoRoot: projectRoot,
+                currentGitSha: serverSha,
+                candidateGitSha: version.gitSha,
+              })
+            )
           }
           const relation = relations.get(identity)
           return [
@@ -336,8 +354,15 @@ export function validateDevDeliveryAction(value) {
       throw new Error('rollback execution payload is invalid')
     }
   } else if (action === 'abandon-plan') {
-    assertExactKeys(value.payload, ['operationId', 'target'], 'plan abandonment payload')
-    if (!UUID_V4_PATTERN.test(String(value.payload.operationId || '')) || !isDeliveryTarget(value.payload.target)) {
+    assertExactKeys(
+      value.payload,
+      ['operationId', 'target'],
+      'plan abandonment payload'
+    )
+    if (
+      !UUID_V4_PATTERN.test(String(value.payload.operationId || '')) ||
+      !isDeliveryTarget(value.payload.target)
+    ) {
       throw new Error('plan abandonment payload is invalid')
     }
   } else if (action === 'sync-gitlab-record') {
@@ -365,7 +390,13 @@ export function validateDevDeliveryAction(value) {
 
 function publicOperation(
   operation,
-  { eventLimit = 20, requestCount = 1, evidence = null, gitlabRecord = null } = {}
+  {
+    eventLimit = 20,
+    requestCount = 1,
+    evidence = null,
+    gitlabRecord = null,
+    source = 'local',
+  } = {}
 ) {
   const readyConfirmation =
     operation.status !== 'ready'
@@ -572,6 +603,7 @@ function publicOperation(
     updatedAt: operation.updatedAt,
     evidence,
     gitlabRecord,
+    source,
     trace: {
       commitUrl: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/commit/${operation.gitSha}`,
       pipelinesUrl: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/commit/${operation.gitSha}/pipelines`,
@@ -632,9 +664,69 @@ function publicOperation(
       reuseCount: Math.max(0, requestCount - 1),
       basis: ['action', 'target', 'git_sha', 'version', 'delivery_inputs'],
     },
-    retry: deliveryOperationRetryPolicy(operation),
+    retry: deliveryOperationRetryPolicy({ ...operation, source }),
     confirmationRequired: readyConfirmation,
     terminal: TERMINAL_STATUSES.has(operation.status),
+  }
+}
+
+function executionEvidence(stored, requiredMigration) {
+  if (!stored) return null
+  const { receipt } = stored
+  return {
+    receiptSha256: stored.sha256,
+    contract: receipt.schemaVersion,
+    status: receipt.status,
+    finishedAt: receipt.finishedAt,
+    beforeGitSha: SHA_PATTERN.test(
+      String(receipt.before?.runtimeSha || receipt.fromGitSha || '')
+    )
+      ? receipt.before?.runtimeSha || receipt.fromGitSha
+      : null,
+    checks: Object.fromEntries(
+      [
+        'releaseIdentity',
+        'health',
+        'ready',
+        'basicSmoke',
+        'publicEntry',
+        'backupRestore',
+        'staticConfig',
+        'dataEnvironment',
+        'migrationUnchanged',
+        'customerConfigUnchanged',
+        'freshDatabase',
+        'emptyBusinessBaseline',
+        'webHealth',
+      ]
+        .filter((key) => typeof receipt.checks?.[key] === 'boolean')
+        .map((key) => [key, receipt.checks[key]])
+    ),
+    migration: {
+      required: requiredMigration,
+      readback: /^[0-9]{14}$/u.test(String(receipt.migration?.readback || ''))
+        ? receipt.migration.readback
+        : null,
+      applyStarted:
+        typeof receipt.migration?.applyStarted === 'boolean'
+          ? receipt.migration.applyStarted
+          : null,
+      readbackStatus:
+        receipt.timings?.find((stage) => stage.id === 'migration_applied')
+          ?.status || null,
+    },
+    backup: receipt.rollbackPoint
+      ? {
+          alias: receipt.rollbackPoint.backupAlias,
+          sha256: /^[0-9a-f]{64}$/u.test(
+            String(receipt.rollbackPoint.backupSha256)
+          )
+            ? receipt.rollbackPoint.backupSha256
+            : null,
+          sizeBytes: receipt.rollbackPoint.backupSizeBytes,
+          restoreChecked: receipt.rollbackPoint.restoreChecked,
+        }
+      : null,
   }
 }
 
@@ -750,6 +842,7 @@ export function createDevDeliveryService({
   readRecoveryEvidence = readLatestBackupRestoreEvidence,
   spawnProcess = spawn,
   syncDeploymentRecord = syncGitlabDeploymentRecord,
+  deploymentEvidenceReader,
   now = () => new Date().toISOString(),
   preflightTtlMs = 30_000,
   pipelineTimingTtlMs = 60_000,
@@ -816,6 +909,17 @@ export function createDevDeliveryService({
     readProvider ||
     providerEnvironments.readEnvironment.PLUSH_GITLAB_TOKEN
   )
+  const archiveReader =
+    deploymentEvidenceReader === undefined
+      ? providerKey === 'gitlab' &&
+        readCredentialConfigured &&
+        !provider &&
+        !readProvider
+        ? createGitlabDeploymentEvidenceReader({
+            token: providerEnvironments.readEnvironment.PLUSH_GITLAB_TOKEN,
+          })
+        : null
+      : deploymentEvidenceReader
   const children = new Map()
   const preflightCache = new Map()
   const initializationPreflightCache = new Map()
@@ -839,8 +943,11 @@ export function createDevDeliveryService({
   }
 
   function gitlabRecordForOperation(operation) {
-    try { return readGitlabDeploymentRecord(store, operation) }
-    catch { return { status: 'unavailable' } }
+    try {
+      return readGitlabDeploymentRecord(store, operation)
+    } catch {
+      return { status: 'unavailable' }
+    }
   }
 
   function presentOperation(operation, options = {}) {
@@ -850,7 +957,6 @@ export function createDevDeliveryService({
     if (options.eventLimit === 100) {
       const stored = readDeliveryOperationReceipt(store, operation)
       if (stored) {
-        const { receipt } = stored
         const plan =
           operation.action === 'promote'
             ? readPromotionPlan(store, operation.id)
@@ -863,72 +969,27 @@ export function createDevDeliveryService({
         ) {
           throw new Error('operation evidence plan identity is inconsistent')
         }
-        evidence = {
-          receiptSha256: stored.sha256,
-          contract: receipt.schemaVersion,
-          status: receipt.status,
-          finishedAt: receipt.finishedAt,
-          beforeGitSha: SHA_PATTERN.test(
-            String(receipt.before?.runtimeSha || receipt.fromGitSha || '')
-          )
-            ? receipt.before?.runtimeSha || receipt.fromGitSha
-            : null,
-          checks: Object.fromEntries(
-            [
-              'releaseIdentity',
-              'health',
-              'ready',
-              'basicSmoke',
-              'publicEntry',
-              'backupRestore',
-              'staticConfig',
-              'dataEnvironment',
-              'migrationUnchanged',
-              'customerConfigUnchanged',
-              'freshDatabase',
-              'emptyBusinessBaseline',
-              'webHealth',
-            ]
-              .filter((key) => typeof receipt.checks?.[key] === 'boolean')
-              .map((key) => [key, receipt.checks[key]])
-          ),
-          migration: {
-            required: plan?.release?.migration?.latest || null,
-            readback: /^[0-9]{14}$/u.test(
-              String(receipt.migration?.readback || '')
-            )
-              ? receipt.migration.readback
-              : null,
-            applyStarted:
-              typeof receipt.migration?.applyStarted === 'boolean'
-                ? receipt.migration.applyStarted
-                : null,
-            readbackStatus:
-              receipt.timings?.find((stage) => stage.id === 'migration_applied')
-                ?.status || null,
-          },
-          backup: receipt.rollbackPoint
-            ? {
-                alias: receipt.rollbackPoint.backupAlias,
-                sha256: /^[0-9a-f]{64}$/u.test(
-                  String(receipt.rollbackPoint.backupSha256)
-                )
-                  ? receipt.rollbackPoint.backupSha256
-                  : null,
-                sizeBytes: receipt.rollbackPoint.backupSizeBytes,
-                restoreChecked: receipt.rollbackPoint.restoreChecked,
-              }
-            : null,
-        }
+        evidence = executionEvidence(
+          stored,
+          plan?.release?.migration?.latest || null
+        )
       }
     }
-    const presented = publicOperation(operation, { ...options, requestCount, evidence, gitlabRecord: gitlabRecordForOperation(operation) })
+    const presented = publicOperation(operation, {
+      ...options,
+      requestCount,
+      evidence,
+      gitlabRecord: gitlabRecordForOperation(operation),
+    })
     if (indexed.unreadableRequests > 0) {
-      presented.issues = [...presented.issues, {
-        code: 'operation_request_index_incomplete',
-level: 'warning',
-        message: '请求索引未完整读回，幂等复用次数仅含已校验记录',
-      }]
+      presented.issues = [
+        ...presented.issues,
+        {
+          code: 'operation_request_index_incomplete',
+          level: 'warning',
+          message: '请求索引未完整读回，幂等复用次数仅含已校验记录',
+        },
+      ]
     }
     return presented
   }
@@ -941,7 +1002,11 @@ level: 'warning',
   }
   // An unrelated damaged operation must not prevent reading intact history.
   // Summary and all mutations still require the complete recovery check.
-  try { recoverOperations() } catch { /* Retried by summary/action. */ }
+  try {
+    recoverOperations()
+  } catch {
+    /* Retried by summary/action. */
+  }
 
   function releaseControlIdentity(download) {
     if (download?.transportMode === 'v2_direct') {
@@ -1044,20 +1109,34 @@ level: 'warning',
     if (!isDeliveryTarget(targetKey)) {
       throw new Error('delivery target is not registered')
     }
-    return readThroughCache(preflightCache, targetKey, preflightTtlMs, async () => {
-      const value = await runPreflight(targetKey)
-      if (value?.target !== targetKey) {
-        throw new Error('target preflight identity does not match the request')
-      }
-      return value
-    }, { force })
+    return readThroughCache(
+      preflightCache,
+      targetKey,
+      preflightTtlMs,
+      async () => {
+        const value = await runPreflight(targetKey)
+        if (value?.target !== targetKey) {
+          throw new Error(
+            'target preflight identity does not match the request'
+          )
+        }
+        return value
+      },
+      { force }
+    )
   }
 
   async function readPipelineTimings({ force = false } = {}) {
     if (typeof readDeliveryProvider.listPipelineTimings !== 'function') {
       return null
     }
-    return readThroughCache(pipelineTimingCache, 'timings', pipelineTimingTtlMs, () => readDeliveryProvider.listPipelineTimings({ limit: 8 }), { force })
+    return readThroughCache(
+      pipelineTimingCache,
+      'timings',
+      pipelineTimingTtlMs,
+      () => readDeliveryProvider.listPipelineTimings({ limit: 8 }),
+      { force }
+    )
   }
 
   async function readTargetInitializationPreflight(
@@ -1067,18 +1146,31 @@ level: 'warning',
     if (!isDeliveryTarget(targetKey)) {
       throw new Error('delivery target is not registered')
     }
-    return readThroughCache(initializationPreflightCache, targetKey, preflightTtlMs, async () => {
-      const value = await runInitializationPreflight(targetKey)
-      if (value?.target !== targetKey) {
-        throw new Error('target initialization preflight identity does not match the request')
-      }
-      return value
-    }, { force })
+    return readThroughCache(
+      initializationPreflightCache,
+      targetKey,
+      preflightTtlMs,
+      async () => {
+        const value = await runInitializationPreflight(targetKey)
+        if (value?.target !== targetKey) {
+          throw new Error(
+            'target initialization preflight identity does not match the request'
+          )
+        }
+        return value
+      },
+      { force }
+    )
   }
 
-  async function getSummary({ forcePreflight = false, requestId = randomUUID() } = {}) {
+  async function getSummary({
+    forcePreflight = false,
+    requestId = randomUUID(),
+  } = {}) {
     await reconcileWaitingOperations()
-    const retentionPromise = Promise.resolve().then(() => readRetention()).catch(() => null)
+    const retentionPromise = Promise.resolve()
+      .then(() => readRetention())
+      .catch(() => null)
     const [repositoryResult, versionsResult, timingsResult, ...targetResults] =
       await Promise.allSettled([
         readRepositoryState(root),
@@ -1098,7 +1190,9 @@ level: 'warning',
         const webSha = preflight?.remote?.runtime?.webSha
         const existingRuntimeIdentity =
           SHA_PATTERN.test(String(serverSha || '')) && serverSha === webSha
-        return !preflight || preflight.status === 'passed' || existingRuntimeIdentity
+        return !preflight ||
+          preflight.status === 'passed' ||
+          existingRuntimeIdentity
           ? Promise.resolve(null)
           : readTargetInitializationPreflight(targetKey, {
               force: forcePreflight,
@@ -1160,14 +1254,18 @@ level: 'warning',
         // SQL, command arguments, environment values or an arbitrary exception.
         onDiagnostic({
           event: 'delivery_preflight',
-requestId,
-target: targetKey,
+          requestId,
+          target: targetKey,
           outcome: 'error',
-code,
-          ...(diagnostic ? { stage: diagnostic.stage,
-elapsedMs: diagnostic.elapsedMs,
-            exitCode: diagnostic.exitCode,
-transport: diagnostic.transport } : {}),
+          code,
+          ...(diagnostic
+            ? {
+                stage: diagnostic.stage,
+                elapsedMs: diagnostic.elapsedMs,
+                exitCode: diagnostic.exitCode,
+                transport: diagnostic.transport,
+              }
+            : {}),
           at: generatedAt,
         })
         issues.push({
@@ -1214,15 +1312,25 @@ transport: diagnostic.transport } : {}),
         })
       }
     }
-    for (const candidate of readAllDeliveryOperations(store).filter(operation => operation.status === 'ready')) {
+    for (const candidate of readAllDeliveryOperations(store).filter(
+      (operation) => operation.status === 'ready'
+    )) {
       // Re-read after asynchronous probes: a confirmed plan may now be running.
       const operation = readDeliveryOperation(store, candidate.id)
       const evidence = targetEvidence.get(operation.target)
       const invalidation = deliveryPlanInvalidation(operation, {
-        now: generatedAt, ...evidence,
-        versions: versionsResult.status === 'fulfilled' ? versionsResult.value : null,
+        now: generatedAt,
+        ...evidence,
+        versions:
+          versionsResult.status === 'fulfilled' ? versionsResult.value : null,
       })
-      if (invalidation) closeReadyDeliveryPlan(store, operation.id, { target: operation.target, invalidation, now: generatedAt })
+      if (invalidation) {
+        closeReadyDeliveryPlan(store, operation.id, {
+          target: operation.target,
+          invalidation,
+          now: generatedAt,
+        })
+      }
     }
     return {
       kind: 'plush.dev-delivery-summary',
@@ -1720,7 +1828,11 @@ transport: diagnostic.transport } : {}),
     if (previous.action !== 'release' && !isDeliveryTarget(previous.target)) {
       throw new Error('historical deployment target is read-only')
     }
-    if (!['failed', 'blocked', 'abandoned', 'invalidated'].includes(previous.status)) {
+    if (
+      !['failed', 'blocked', 'abandoned', 'invalidated'].includes(
+        previous.status
+      )
+    ) {
       if (previous.status === 'not_proven') {
         throw new Error('target outcome must be read back before retry')
       }
@@ -1863,10 +1975,15 @@ transport: diagnostic.transport } : {}),
         // The operation store remains the only user-visible outcome source.
       }
       const current = readDeliveryOperation(store, operationId)
-      if (TERMINAL_STATUSES.has(current.status) && gitlabRecordForOperation(current)?.status === 'pending') {
+      if (
+        TERMINAL_STATUSES.has(current.status) &&
+        gitlabRecordForOperation(current)?.status === 'pending'
+      ) {
         // A single completion attempt closes interrupted executors. Recording
         // outages stay visible and are retried explicitly, never by redeploying.
-        Promise.resolve(syncDeploymentRecord({ store, operationId })).catch(() => {})
+        Promise.resolve(syncDeploymentRecord({ store, operationId })).catch(
+          () => {}
+        )
       }
     }
     child.once('error', finish)
@@ -1884,7 +2001,11 @@ transport: diagnostic.transport } : {}),
   function assertUnexpiredPlan(operation) {
     const invalidation = deliveryPlanInvalidation(operation, { now: now() })
     if (invalidation) {
-      closeReadyDeliveryPlan(store, operation.id, { target: operation.target, invalidation, now: now() })
+      closeReadyDeliveryPlan(store, operation.id, {
+        target: operation.target,
+        invalidation,
+        now: now(),
+      })
       throw new Error('delivery plan expired; prepare a new plan')
     }
   }
@@ -2188,12 +2309,17 @@ transport: diagnostic.transport } : {}),
 
   return {
     async summary(options) {
-      return readThroughCache(summaryCache, Boolean(options?.forcePreflight), 0, () => {
-        recoverOperations()
-        return getSummary(options)
-      })
+      return readThroughCache(
+        summaryCache,
+        Boolean(options?.forcePreflight),
+        0,
+        () => {
+          recoverOperations()
+          return getSummary(options)
+        }
+      )
     },
-    history(query = {}) {
+    async history(query = {}, { requestId = randomUUID() } = {}) {
       const allowedKeys = [
         'action',
         'result',
@@ -2225,14 +2351,74 @@ transport: diagnostic.transport } : {}),
         throw new Error('operation history pagination is invalid')
       }
       const indexed = operationReadIndex.read()
-      const all = indexed.operations.filter(
-        (operation) =>
-          operation.target === filters.target &&
-          TERMINAL_STATUSES.has(operation.status) &&
-          ['release', 'promote', 'rollback', 'rebuild-database'].includes(
-            operation.action
-          )
+      const scopedLocal = indexed.operations.filter(
+        (operation) => operation.target === filters.target
       )
+      const merged = new Map(
+        scopedLocal.map((operation) => [
+          operation.id,
+          { operation, source: 'local' },
+        ])
+      )
+      let archiveStatus = 'not_applicable'
+      let unreadableArchives = 0
+      if (archiveReader) {
+        try {
+          const archived = await archiveReader.list(filters.target)
+          archiveStatus = archived.status
+          unreadableArchives = archived.unreadable
+          for (const entry of archived.entries) {
+            const local = merged.get(entry.operation.id)
+            if (local) {
+              try {
+                assertArchivedOperationMatches(local.operation, entry.operation)
+              } catch {
+                unreadableArchives += 1
+                archiveStatus = 'partial'
+              }
+            } else {
+              merged.set(entry.operation.id, {
+                ...entry,
+                source: 'gitlab_archive',
+              })
+            }
+          }
+          if (unreadableArchives > 0) {
+            onDiagnostic({
+              event: 'delivery_archive',
+              requestId,
+              target: filters.target,
+              outcome: 'incomplete',
+              code: 'archive_integrity_incomplete',
+              count: unreadableArchives,
+              at: now(),
+            })
+          }
+        } catch {
+          archiveStatus = 'unavailable'
+          onDiagnostic({
+            event: 'delivery_archive',
+            requestId,
+            target: filters.target,
+            outcome: 'error',
+            code: 'archive_unavailable',
+            at: now(),
+          })
+        }
+      }
+      const all = [...merged.values()]
+        .map((entry) => entry.operation)
+        .filter(
+          (operation) =>
+            TERMINAL_STATUSES.has(operation.status) &&
+            ['release', 'promote', 'rollback', 'rebuild-database'].includes(
+              operation.action
+            )
+        )
+        .sort(
+          (a, b) =>
+            b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)
+        )
       const matches = filterDevOperationHistory(all, filters)
       const counts = Object.fromEntries(
         [...TERMINAL_STATUSES].map((status) => [
@@ -2242,9 +2428,11 @@ transport: diagnostic.transport } : {}),
       )
       const durations = matches
         .filter((operation) => operation.status === 'passed')
-        .map(
-          (operation) =>
-            Math.max(0, Date.parse(operation.updatedAt) - Date.parse(operation.createdAt))
+        .map((operation) =>
+          Math.max(
+            0,
+            Date.parse(operation.updatedAt) - Date.parse(operation.createdAt)
+          )
         )
         .sort((a, b) => a - b)
       const actualPage = Math.min(
@@ -2257,10 +2445,12 @@ transport: diagnostic.transport } : {}),
         target: filters.target,
         generatedAt: now(),
         integrity: {
-          unreadableOperations: indexed.unreadableOperations.filter(
-            (issue) => !issue.target || issue.target === filters.target
-          ).length,
+          unreadableOperations:
+            indexed.unreadableOperations.filter(
+              (issue) => !issue.target || issue.target === filters.target
+            ).length + unreadableArchives,
           unreadableRequests: indexed.unreadableRequests,
+          archiveStatus,
         },
         page: actualPage,
         pageSize,
@@ -2282,17 +2472,43 @@ transport: diagnostic.transport } : {}),
           .map((operation) =>
             publicOperation(operation, {
               requestCount: requestCounts.get(operation.id) || 1,
-              gitlabRecord: gitlabRecordForOperation(operation),
+              gitlabRecord:
+                merged.get(operation.id).gitlabRecord ||
+                gitlabRecordForOperation(operation),
+              source: merged.get(operation.id).source,
             })
           ),
       }
     },
-    readOperation(operationId, target) {
-      const operation = readDeliveryOperation(store, operationId)
-      if (target !== undefined && (
-        resolveDevOperationHistoryFilters({ target }).target !== target ||
-        operation.target !== target
-      )) {
+    async readOperation(operationId, target) {
+      let operation
+      try {
+        operation = readDeliveryOperation(store, operationId)
+      } catch (error) {
+        if (
+          error.code !== 'ENOENT' ||
+          !archiveReader ||
+          !isDeliveryTarget(target)
+        ) {
+          throw error
+        }
+        const archived = await archiveReader.read(operationId, target)
+        const required = archived.stored?.receipt?.migration?.required
+        return publicOperation(archived.operation, {
+          eventLimit: 100,
+          source: 'gitlab_archive',
+          gitlabRecord: archived.gitlabRecord,
+          evidence: executionEvidence(
+            archived.stored,
+            /^[0-9]{14}$/u.test(String(required || '')) ? required : null
+          ),
+        })
+      }
+      if (
+        target !== undefined &&
+        (resolveDevOperationHistoryFilters({ target }).target !== target ||
+          operation.target !== target)
+      ) {
         throw new Error('operation target does not match the requested scope')
       }
       return presentOperation(operation, {
@@ -2305,20 +2521,38 @@ transport: diagnostic.transport } : {}),
       // A read begun before a write cannot become the post-action snapshot.
       const invalidateReads = () => {
         summaryCache.clear()
+        archiveReader?.invalidate()
         preflightCache.clear()
         initializationPreflightCache.clear()
       }
       invalidateReads()
       try {
         if (validated.action === 'sync-gitlab-record') {
-          const operation = readDeliveryOperation(store, validated.payload.operationId)
-          if (!TERMINAL_STATUSES.has(operation.status)) throw new Error('only terminal operations can be archived')
+          const operation = readDeliveryOperation(
+            store,
+            validated.payload.operationId
+          )
+          if (!TERMINAL_STATUSES.has(operation.status)) {
+            throw new Error('only terminal operations can be archived')
+          }
           await syncDeploymentRecord({ store, operationId: operation.id })
-          return { kind: 'plush.dev-delivery-action-result', action: validated.action, operation: presentOperation(operation) }
+          return {
+            kind: 'plush.dev-delivery-action-result',
+            action: validated.action,
+            operation: presentOperation(operation),
+          }
         }
         if (validated.action === 'abandon-plan') {
-          const operation = closeReadyDeliveryPlan(store, validated.payload.operationId, { target: validated.payload.target, now: now() })
-          return { kind: 'plush.dev-delivery-action-result', action: validated.action, operation: presentOperation(operation) }
+          const operation = closeReadyDeliveryPlan(
+            store,
+            validated.payload.operationId,
+            { target: validated.payload.target, now: now() }
+          )
+          return {
+            kind: 'plush.dev-delivery-action-result',
+            action: validated.action,
+            operation: presentOperation(operation),
+          }
         }
         if (validated.action === 'dispatch-release') {
           return {
@@ -2462,9 +2696,13 @@ export function createDevDeliveryMiddleware({
         request.method === 'GET' &&
         requestPath === DEV_DELIVERY_SUMMARY_API_PATH
       ) {
-        sendJson(response, 200, await deliveryService.summary({
-          requestId: response.getHeader?.('x-request-id') || randomUUID(),
-        }))
+        sendJson(
+          response,
+          200,
+          await deliveryService.summary({
+            requestId: response.getHeader?.('x-request-id') || randomUUID(),
+          })
+        )
         return
       }
       if (
@@ -2478,14 +2716,19 @@ export function createDevDeliveryMiddleware({
         sendJson(
           response,
           200,
-          deliveryService.history(Object.fromEntries(params))
+          await deliveryService.history(Object.fromEntries(params), {
+            requestId: response.getHeader?.('x-request-id') || randomUUID(),
+          })
         )
         return
       }
       const operationMatch = OPERATION_PATH_PATTERN.exec(requestPath)
       if (request.method === 'GET' && operationMatch) {
         const params = new URL(request.url, 'http://localhost').searchParams
-        if ([...params.keys()].some((key) => key !== 'target') || params.getAll('target').length > 1) {
+        if (
+          [...params.keys()].some((key) => key !== 'target') ||
+          params.getAll('target').length > 1
+        ) {
           throw new Error('operation detail query is invalid')
         }
         if (!UUID_V4_PATTERN.test(operationMatch[1])) {
@@ -2493,7 +2736,10 @@ export function createDevDeliveryMiddleware({
         }
         sendJson(response, 200, {
           kind: 'plush.dev-delivery-operation-result',
-          operation: deliveryService.readOperation(operationMatch[1], params.get('target') ?? undefined),
+          operation: await deliveryService.readOperation(
+            operationMatch[1],
+            params.get('target') ?? undefined
+          ),
         })
         return
       }

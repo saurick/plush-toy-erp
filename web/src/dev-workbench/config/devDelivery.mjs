@@ -669,19 +669,28 @@ function validOperationIdempotency(operation) {
 }
 
 export function deliveryOperationRetryPolicy(operation) {
-  if (operation.action !== 'release' && !DEV_DELIVERY_TARGET_KEYS.includes(operation.target)) {
+  if (operation.source === 'gitlab_archive') {
+    return { allowed: false, reason: 'archived_operation_read_only' }
+  }
+  if (
+    operation.action !== 'release' &&
+    !DEV_DELIVERY_TARGET_KEYS.includes(operation.target)
+  ) {
     return { allowed: false, reason: 'historical_target_read_only' }
   }
   const retryableAction = RETRYABLE_DELIVERY_OPERATION_ACTIONS.has(
     operation.action
   )
   const allowed =
-    retryableAction && ['failed', 'blocked', 'abandoned', 'invalidated'].includes(operation.status)
+    retryableAction &&
+    ['failed', 'blocked', 'abandoned', 'invalidated'].includes(operation.status)
   const reason = allowed
     ? 'explicit_retry_available'
     : operation.status === 'not_proven'
       ? 'target_readback_required'
-      : ['failed', 'blocked', 'abandoned', 'invalidated'].includes(operation.status)
+      : ['failed', 'blocked', 'abandoned', 'invalidated'].includes(
+            operation.status
+          )
         ? 'action_not_retryable'
         : ['passed', 'failed', 'blocked', 'not_proven'].includes(
               operation.status
@@ -693,12 +702,17 @@ export function deliveryOperationRetryPolicy(operation) {
 
 function validOperationRetry(operation) {
   const expected = deliveryOperationRetryPolicy(operation)
-  return operation.retry?.allowed === expected.allowed && operation.retry?.reason === expected.reason
+  return (
+    operation.retry?.allowed === expected.allowed &&
+    operation.retry?.reason === expected.reason
+  )
 }
 
 function validateOperation(operation) {
   assertObject(operation, 'delivery operation')
   if (
+    (operation.source !== undefined &&
+      !['local', 'gitlab_archive'].includes(operation.source)) ||
     typeof operation.id !== 'string' ||
     !DELIVERY_OPERATION_ACTIONS.has(operation.action) ||
     (operation.promotionMode !== undefined &&
@@ -768,10 +782,19 @@ function validateOperation(operation) {
   }
   if (operation.gitlabRecord) {
     const record = operation.gitlabRecord
-    if (!['recorded', 'pending', 'unavailable'].includes(record.status) ||
-      (record.environmentUrl && !/^https:\/\/gitlab\.saurick\.me\/saurick\/plush-toy-erp\/-\/environments\/[1-9][0-9]*$/u.test(record.environmentUrl)) ||
-      (record.deploymentUrl && record.deploymentUrl !== record.environmentUrl) ||
-      (record.evidenceUrl && !/^https:\/\/gitlab\.saurick\.me\/saurick\/plush-toy-erp\/-\/packages\/[1-9][0-9]*$/u.test(record.evidenceUrl))) {
+    if (
+      !['recorded', 'pending', 'unavailable'].includes(record.status) ||
+      (record.environmentUrl &&
+        !/^https:\/\/gitlab\.saurick\.me\/saurick\/plush-toy-erp\/-\/environments\/[1-9][0-9]*$/u.test(
+          record.environmentUrl
+        )) ||
+      (record.deploymentUrl &&
+        record.deploymentUrl !== record.environmentUrl) ||
+      (record.evidenceUrl &&
+        !/^https:\/\/gitlab\.saurick\.me\/saurick\/plush-toy-erp\/-\/packages\/[1-9][0-9]*$/u.test(
+          record.evidenceUrl
+        ))
+    ) {
       throw new Error('GitLab deployment record links are invalid')
     }
   }
@@ -1207,23 +1230,28 @@ export function createDevDeliveryClient({
   }
   let csrfToken = ''
 
-  const readOperationJson = (url, signal) => requestWorkbenchJson(fetchImpl, url, {
-    method: 'GET',
-    headers: { accept: 'application/json' },
-    timeoutMs: readTimeoutMs,
-    exposeResponseMessage: true,
-    attempts: 2,
-    signal,
-  })
+  const readOperationJson = (url, signal) =>
+    requestWorkbenchJson(fetchImpl, url, {
+      method: 'GET',
+      headers: { accept: 'application/json' },
+      timeoutMs: readTimeoutMs,
+      exposeResponseMessage: true,
+      attempts: 2,
+      signal,
+    })
 
   async function session() {
     if (csrfToken) return csrfToken
-    const payload = await requestWorkbenchJson(fetchImpl, DEV_DELIVERY_SESSION_API_PATH, {
-      method: 'GET',
-      timeoutMs: readTimeoutMs,
-    exposeResponseMessage: true,
-      headers: { accept: 'application/json' },
-    })
+    const payload = await requestWorkbenchJson(
+      fetchImpl,
+      DEV_DELIVERY_SESSION_API_PATH,
+      {
+        method: 'GET',
+        timeoutMs: readTimeoutMs,
+        exposeResponseMessage: true,
+        headers: { accept: 'application/json' },
+      }
+    )
     if (
       payload?.kind !== 'plush.dev-delivery-session' ||
       typeof payload.csrfToken !== 'string' ||
@@ -1251,13 +1279,22 @@ export function createDevDeliveryClient({
         page: String(page),
         pageSize: String(pageSize),
       })
-      const payload = await readOperationJson(`${DEV_DELIVERY_OPERATION_API_PREFIX}?${query}`, signal)
+      const payload = await readOperationJson(
+        `${DEV_DELIVERY_OPERATION_API_PREFIX}?${query}`,
+        signal
+      )
       if (
         payload?.kind !== 'plush.dev-delivery-history' ||
         payload.target !== resolved.target ||
         !['unreadableOperations', 'unreadableRequests'].every(
-          (key) => Number.isSafeInteger(payload.integrity?.[key]) && payload.integrity[key] >= 0
+          (key) =>
+            Number.isSafeInteger(payload.integrity?.[key]) &&
+            payload.integrity[key] >= 0
         ) ||
+        (payload.integrity.archiveStatus !== undefined &&
+          !['not_applicable', 'ready', 'partial', 'unavailable'].includes(
+            payload.integrity.archiveStatus
+          )) ||
         !['page', 'pageSize', 'total', 'matched'].every(
           (key) => Number.isSafeInteger(payload[key]) && payload[key] >= 0
         ) ||
@@ -1267,7 +1304,14 @@ export function createDevDeliveryClient({
         !Array.isArray(payload.operations) ||
         payload.operations.length > pageSize ||
         !payload.statistics ||
-        !['passed', 'failed', 'blocked', 'not_proven', 'abandoned', 'invalidated'].every(
+        ![
+          'passed',
+          'failed',
+          'blocked',
+          'not_proven',
+          'abandoned',
+          'invalidated',
+        ].every(
           (key) =>
             Number.isSafeInteger(payload.statistics.counts?.[key]) &&
             payload.statistics.counts[key] >= 0
@@ -1286,7 +1330,8 @@ export function createDevDeliveryClient({
       }
       payload.operations.forEach((operation) => {
         validateOperation(operation)
-        if (operation.target !== resolved.target) throw new Error('操作记录环境不匹配')
+        if (operation.target !== resolved.target)
+          { throw new Error('操作记录环境不匹配') }
       })
       return payload
     },
@@ -1305,30 +1350,37 @@ export function createDevDeliveryClient({
       if (!OPERATION_ID_PATTERN.test(String(operationId || ''))) {
         throw new Error('版本中心 operation ID 无效')
       }
-      if (target !== undefined && !DEV_VERSION_CENTER_HISTORY_TARGET_VALUES.has(target)) {
+      if (
+        target !== undefined &&
+        !DEV_VERSION_CENTER_HISTORY_TARGET_VALUES.has(target)
+      ) {
         throw new Error('操作记录环境无效')
       }
       const query = target ? `?${new URLSearchParams({ target })}` : ''
-      const payload = await readOperationJson(`${DEV_DELIVERY_OPERATION_API_PREFIX}/${operationId}${query}`, signal)
+      const payload = await readOperationJson(
+        `${DEV_DELIVERY_OPERATION_API_PREFIX}/${operationId}${query}`,
+        signal
+      )
       if (payload?.kind !== 'plush.dev-delivery-operation-result') {
         throw new Error('版本中心 operation 响应无效')
       }
-      if (target && payload.operation?.target !== target) throw new Error('操作记录环境不匹配')
+      if (target && payload.operation?.target !== target)
+        { throw new Error('操作记录环境不匹配') }
       return validateOperation(payload.operation)
     },
     async action(action, payload) {
       const token = await session()
       return requestWorkbenchJson(fetchImpl, DEV_DELIVERY_ACTION_API_PATH, {
-          method: 'POST',
-          timeoutMs: actionTimeoutMs,
-          exposeResponseMessage: true,
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            'x-csrf-token': token,
-          },
-          body: JSON.stringify({ action, payload }),
-        })
+        method: 'POST',
+        timeoutMs: actionTimeoutMs,
+        exposeResponseMessage: true,
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'x-csrf-token': token,
+        },
+        body: JSON.stringify({ action, payload }),
+      })
     },
     clearSession() {
       csrfToken = ''
@@ -1383,6 +1435,7 @@ export function deliveryRetryPresentation(value) {
     target_readback_required: '结果未知，必须先读回目标',
     action_not_retryable: '该动作须返回专用流程处理，不能在此重试',
     historical_target_read_only: '历史目标只供查阅，不能再次执行',
+    archived_operation_read_only: '归档回执只供查阅，请在原执行端处理后续操作',
     terminal_no_retry_needed: '已完成，无需重试',
     operation_in_progress: '操作进行中',
   }
@@ -1550,17 +1603,24 @@ export function summarizePipelineStatus(timings) {
   const latest = runs[0] || null
   const latestJobs = new Map()
   for (const job of latest?.jobs || []) {
-    if (!latestJobs.has(job.name) || latestJobs.get(job.name).id < job.id) latestJobs.set(job.name, job)
+    if (!latestJobs.has(job.name) || latestJobs.get(job.name).id < job.id)
+      { latestJobs.set(job.name, job) }
   }
   return {
     latest,
     latestMode: deliveryPipelineRunMode(latest),
-    latestFullRelease: runs.find((run) =>
-      run.status === 'completed' && deliveryPipelineRunMode(run) === 'full_release'
-    ) || null,
-    failureJob: latest?.conclusion === 'failure'
-      ? [...latestJobs.values()].find((job) => job.conclusion === 'failure') || null
-      : null,
+    latestFullRelease:
+      runs.find(
+        (run) =>
+          run.status === 'completed' &&
+          deliveryPipelineRunMode(run) === 'full_release'
+      ) || null,
+    failureJob:
+      latest?.conclusion === 'failure'
+        ? [...latestJobs.values()].find(
+            (job) => job.conclusion === 'failure'
+          ) || null
+        : null,
   }
 }
 

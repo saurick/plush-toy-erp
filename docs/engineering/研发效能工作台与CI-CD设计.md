@@ -148,7 +148,7 @@ Release、Package、GHCR digest、manifest、`release-rehearsal.json` 和目标�
 
 GitLab Jobs API 是 Job 运行事实真源。质量门禁只为当前提交读取完整 Pipeline / Job，核对全部必要分片、聚合、零跳过与 CI Gate，同名重试取最新 attempt。最近 20 条 main 流水线仅从列表接口读取编号、SHA、原生结果和链接，不抓取历史 Job；历史“成功”不等于已证明完整门禁。原生测试报告复用同次选中的 Pipeline / Job，并发页面请求共用一次读取；历史列表或报告失败单独提示，不覆盖已取得的当前 CI 证据。详细性能、排队、依赖和趋势跳转 GitLab，不另存 CI 历史库。
 
-目标部署与回滚通过原有执行器登记 GitLab Environments / Deployments，三环境名称和 tier 从 target registry 派生。项目 operation / receipt 是执行事实，GitLab 原生状态是自动投影；本地仅新增可恢复的远端引用缓存，不建第二套 CI 库。工作台“操作记录”提供同环境汇总、原始时间、项目检查、GitLab 跳转和仅登记的补录入口；已有迁移、回滚、数据库重建、准备与显式执行保持原合同。历史补录、状态映射、未知创建结果、归档与凭据详见 [部署登记协议](../../scripts/deploy/README.md#gitlab-部署登记与回执归档)。
+目标部署与回滚通过原有执行器登记 GitLab Environments / Deployments，三环境名称和 tier 从 target registry 派生。项目 operation / receipt 是执行事实，GitLab 原生状态是自动投影；本地仅新增可恢复的远端引用缓存，不建第二套 CI 库。工作台“操作记录”提供同环境汇总、原始时间、项目检查、GitLab 跳转和仅登记的补录入口；已有迁移、回滚、数据库重建、准备与显式执行保持原合同。历史补录、状态映射、未知创建结果、归档与凭据详见 [部署登记协议](../../scripts/deploy/README.md#gitlab-部署登记与回执归档)。 三个现役目标的历史合并本机操作与已校验 GitLab 终态归档，按 UUID 去重；归档只供查阅，不复制为本机可执行状态。跨执行端的回执同样绑定原始 SHA、迁移与备份恢复，读取失败或冲突保留缺口。
 
 GitLab 未提供 step timing 时继续返回空 steps，不推算或伪造 GitHub 式 step timing。显式选择历史 GitHub Provider 时只展示既有 release / Actions 运行，不提供发布动作，也不把历史审查 CI 当作当前流水线证据。
 

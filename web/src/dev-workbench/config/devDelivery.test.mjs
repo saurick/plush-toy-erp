@@ -30,6 +30,7 @@ import {
   deliveryPipelineRunMode,
   deliveryPipelineRunModePresentation,
   deliveryRetryPresentation,
+  deliveryOperationRetryPolicy,
   deliveryStatusPresentation,
   deliveryTargetCachePresentation,
   deliveryVersionActionKind,
@@ -58,8 +59,12 @@ import {
 } from './devSummarySnapshot.mjs'
 
 const SHA = 'a'.repeat(40)
-const versionCenterPageSource = readDevWorkbenchPageSource('DevVersionCenterPage.jsx')
-const databaseMigrationPageSource = readDevWorkbenchPageSource('DevDatabaseMigrationPage.jsx')
+const versionCenterPageSource = readDevWorkbenchPageSource(
+  'DevVersionCenterPage.jsx'
+)
+const databaseMigrationPageSource = readDevWorkbenchPageSource(
+  'DevDatabaseMigrationPage.jsx'
+)
 function response(payload, ok = true) {
   return {
     ok,
@@ -163,7 +168,10 @@ function summaryFixture() {
         actionClass: 'blocked',
         actionReason: 'target_identity_unavailable',
         actionsByTarget: {
-          'production-133': { actionClass: 'blocked', actionReason: 'target_identity_unavailable' },
+          'production-133': {
+            actionClass: 'blocked',
+            actionReason: 'target_identity_unavailable',
+          },
           'customer-test-133': {
             actionClass: 'blocked',
             actionReason: 'target_identity_unavailable',
@@ -1217,7 +1225,10 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.doesNotMatch(source, /manualTakeoverTriggerRef|ManualGuideModal/u)
   assert.doesNotMatch(source, /查看发布当前版本制品说明/u)
   assert.match(source, /title="发布当前版本制品"/u)
-  assert.equal(source.match(/onClick=\{\(\) => setReleaseModalOpen\(true\)\}/gu)?.length, 1)
+  assert.equal(
+    source.match(/onClick=\{\(\) => setReleaseModalOpen\(true\)\}/gu)?.length,
+    1
+  )
   assert.match(source, /aria-label="当前发布结论与下一步"/u)
   assert.match(source, /summary[?][.]boundaries[?][.]releaseDispatchAllowed/u)
   assert.match(source, /deliveryReadOnlyReleasePresentation\(summary\)/u)
@@ -1315,8 +1326,14 @@ test('version center keeps critical state visible and uses stable tab pagination
   assert.match(versionCenterPageSource, /retry-operation/u)
   assert.match(versionCenterPageSource, /再次尝试/u)
   assert.doesNotMatch(versionCenterPageSource, /label: '幂等/u)
-  assert.match(versionCenterPageSource, /<CurrentDeliveryOperations[\s\S]*operations=\{openOperations\}/u)
-  assert.match(versionCenterPageSource, /compact=\{activeView !== 'versions'\}/u)
+  assert.match(
+    versionCenterPageSource,
+    /<CurrentDeliveryOperations[\s\S]*operations=\{openOperations\}/u
+  )
+  assert.match(
+    versionCenterPageSource,
+    /compact=\{activeView !== 'versions'\}/u
+  )
   assert.match(versionCenterPageSource, /放弃计划/u)
   assert.match(
     versionCenterPageSource,
@@ -1333,7 +1350,10 @@ test('version center keeps critical state visible and uses stable tab pagination
     versionCenterPageSource,
     /value=\{versions\[0\][?][.]publishedAt\}/u
   )
-  assert.match(versionCenterPageSource, /operation.status === 'ready' \? '准备完成于'/u)
+  assert.match(
+    versionCenterPageSource,
+    /operation.status === 'ready' \? '准备完成于'/u
+  )
   assert.match(versionCenterPageSource, /value=\{operation[.]updatedAt\}/u)
   assert.match(
     versionCenterPageSource,
@@ -1454,17 +1474,42 @@ test('history client validates bounded server pages and statistics without loadi
     kind: 'plush.dev-delivery-history',
     target: operation.target,
     integrity: { unreadableOperations: 0, unreadableRequests: 0 },
-generatedAt: '2026-10-22T14:00:00Z',
+    generatedAt: '2026-10-22T14:00:00Z',
     page: 21,
-pageSize: 10,
-total: 231,
-matched: 231,
+    pageSize: 10,
+    total: 231,
+    matched: 231,
     operations: Array.from({ length: 10 }, () => operation),
-    statistics: { counts: { passed: 231, failed: 0, blocked: 0, not_proven: 0, abandoned: 0, invalidated: 0 }, passedDurationSamples: 231, passedDurationMedianMs: 1000 },
+    statistics: {
+      counts: {
+        passed: 231,
+        failed: 0,
+        blocked: 0,
+        not_proven: 0,
+        abandoned: 0,
+        invalidated: 0,
+      },
+      passedDurationSamples: 231,
+      passedDurationMedianMs: 1000,
+    },
   }
   let requested
-  const client = createDevDeliveryClient({ fetchImpl: async (url) => { requested = new URL(url, 'http://localhost'); return response(data) } })
-  assert.equal((await client.history({ page: 21, keyword: '2026', target: operation.target })).total, 231)
+  const client = createDevDeliveryClient({
+    fetchImpl: async (url) => {
+      requested = new URL(url, 'http://localhost')
+      return response(data)
+    },
+  })
+  assert.equal(
+    (
+      await client.history({
+        page: 21,
+        keyword: '2026',
+        target: operation.target,
+      })
+    ).total,
+    231
+  )
   assert.equal(requested.pathname, '/__dev/api/delivery/operations')
   assert.equal(requested.searchParams.get('page'), '21')
   assert.equal(requested.searchParams.get('keyword'), '2026')
@@ -1475,39 +1520,71 @@ matched: 231,
 test('operation details reject unrelated or executable trace links', async () => {
   const operation = summaryFixture().operations[0]
   const base = 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/'
-  operation.trace = { commitUrl: `${base}commit/${operation.gitSha}`, pipelinesUrl: `${base}commit/${operation.gitSha}/pipelines`, releaseUrl: `${base}releases/artifact-${operation.gitSha}`, pipelineUrl: `${base}pipelines/91` }
-  const client = createDevDeliveryClient({ fetchImpl: async () => response({ kind: 'plush.dev-delivery-operation-result', operation }) })
-  assert.equal((await client.operation(operation.id)).trace.pipelineUrl, `${base}pipelines/91`)
+  operation.trace = {
+    commitUrl: `${base}commit/${operation.gitSha}`,
+    pipelinesUrl: `${base}commit/${operation.gitSha}/pipelines`,
+    releaseUrl: `${base}releases/artifact-${operation.gitSha}`,
+    pipelineUrl: `${base}pipelines/91`,
+  }
+  const client = createDevDeliveryClient({
+    fetchImpl: async () =>
+      response({ kind: 'plush.dev-delivery-operation-result', operation }),
+  })
+  assert.equal(
+    (await client.operation(operation.id)).trace.pipelineUrl,
+    `${base}pipelines/91`
+  )
   // Malformed evidence must never turn a trace link into executable code.
   // eslint-disable-next-line no-script-url
   operation.trace.commitUrl = 'javascript:alert(1)'
-  await assert.rejects(client.operation(operation.id), /trace links are invalid/u)
+  await assert.rejects(
+    client.operation(operation.id),
+    /trace links are invalid/u
+  )
 })
 
 test('record reads retry one transient failure, bound timeouts and cancel without retrying', async () => {
   const operation = summaryFixture().operations[0]
   let attempts = 0
-  const client = createDevDeliveryClient({ fetchImpl: async () => {
-    attempts += 1
-    if (attempts === 1) throw new TypeError('network disconnected')
-    return response({ kind: 'plush.dev-delivery-operation-result', operation })
-  } })
-  assert.equal((await client.operation(operation.id, { target: operation.target })).id, operation.id)
+  const client = createDevDeliveryClient({
+    fetchImpl: async () => {
+      attempts += 1
+      if (attempts === 1) throw new TypeError('network disconnected')
+      return response({
+        kind: 'plush.dev-delivery-operation-result',
+        operation,
+      })
+    },
+  })
+  assert.equal(
+    (await client.operation(operation.id, { target: operation.target })).id,
+    operation.id
+  )
   assert.equal(attempts, 2)
   attempts = 0
-  const timeoutClient = createDevDeliveryClient({ readTimeoutMs: 5,
-fetchImpl: async (url, { signal }) => {
-    attempts += 1
-    return new Promise((resolve, reject) => {
-      if (signal.aborted) reject(signal.reason)
-      else signal.addEventListener('abort', () => reject(signal.reason), { once: true })
-    })
-  } })
-  await assert.rejects(timeoutClient.operation(operation.id), { name: 'TimeoutError' })
+  const timeoutClient = createDevDeliveryClient({
+    readTimeoutMs: 5,
+    fetchImpl: async (url, { signal }) => {
+      attempts += 1
+      return new Promise((resolve, reject) => {
+        if (signal.aborted) reject(signal.reason)
+        else {
+          signal.addEventListener('abort', () => reject(signal.reason), {
+            once: true,
+          })
+        }
+      })
+    },
+  })
+  await assert.rejects(timeoutClient.operation(operation.id), {
+    name: 'TimeoutError',
+  })
   assert.equal(attempts, 2)
   const controller = new AbortController()
   attempts = 0
-  const pending = timeoutClient.operation(operation.id, { signal: controller.signal })
+  const pending = timeoutClient.operation(operation.id, {
+    signal: controller.signal,
+  })
   controller.abort()
   await assert.rejects(pending, { name: 'AbortError' })
   assert.equal(attempts, 1)
@@ -1516,32 +1593,73 @@ fetchImpl: async (url, { signal }) => {
 test('record reads reject cross-environment responses and do not retry contract failures', async () => {
   const operation = summaryFixture().operations[0]
   let attempts = 0
-  const client = createDevDeliveryClient({ fetchImpl: async () => {
-    attempts += 1
-    return response({ kind: 'plush.dev-delivery-operation-result', operation })
-  } })
-  const wrongTarget = operation.target === 'production-133' ? 'demo-133' : 'production-133'
-  await assert.rejects(client.operation(operation.id, { target: wrongTarget }), /环境不匹配/u)
+  const client = createDevDeliveryClient({
+    fetchImpl: async () => {
+      attempts += 1
+      return response({
+        kind: 'plush.dev-delivery-operation-result',
+        operation,
+      })
+    },
+  })
+  const wrongTarget =
+    operation.target === 'production-133' ? 'demo-133' : 'production-133'
+  await assert.rejects(
+    client.operation(operation.id, { target: wrongTarget }),
+    /环境不匹配/u
+  )
   assert.equal(attempts, 1)
-  const data = { kind: 'plush.dev-delivery-history',
-target: wrongTarget,
+  const data = {
+    kind: 'plush.dev-delivery-history',
+    target: wrongTarget,
     integrity: { unreadableOperations: 0, unreadableRequests: 0 },
     page: 1,
-pageSize: 10,
-total: 1,
-matched: 1,
-operations: [operation],
-    statistics: { counts: { passed: 1, failed: 0, blocked: 0, not_proven: 0, abandoned: 0, invalidated: 0 }, passedDurationSamples: 1, passedDurationMedianMs: 10 },
+    pageSize: 10,
+    total: 1,
+    matched: 1,
+    operations: [operation],
+    statistics: {
+      counts: {
+        passed: 1,
+        failed: 0,
+        blocked: 0,
+        not_proven: 0,
+        abandoned: 0,
+        invalidated: 0,
+      },
+      passedDurationSamples: 1,
+      passedDurationMedianMs: 10,
+    },
   }
-  const historyClient = createDevDeliveryClient({ fetchImpl: async () => response(data) })
-  await assert.rejects(historyClient.history({ target: wrongTarget }), /环境不匹配/u)
+  const historyClient = createDevDeliveryClient({
+    fetchImpl: async () => response(data),
+  })
+  await assert.rejects(
+    historyClient.history({ target: wrongTarget }),
+    /环境不匹配/u
+  )
   data.target = operation.target
-  await assert.rejects(historyClient.history({ target: wrongTarget }), /发布历史响应无效/u)
+  await assert.rejects(
+    historyClient.history({ target: wrongTarget }),
+    /发布历史响应无效/u
+  )
 })
 
 test('pipeline status summary keeps an active native run and skips historical performance calculations', () => {
-  const active = { id: 3, workflow: 'ci', status: 'in_progress', jobs: [], durationMs: null }
-  const release = { id: 2, workflow: 'release', status: 'completed', jobs: [], durationMs: 100 }
+  const active = {
+    id: 3,
+    workflow: 'ci',
+    status: 'in_progress',
+    jobs: [],
+    durationMs: null,
+  }
+  const release = {
+    id: 2,
+    workflow: 'release',
+    status: 'completed',
+    jobs: [],
+    durationMs: 100,
+  }
   const summary = summarizePipelineStatus({ runs: [active, release] })
   assert.strictEqual(summary.latest, active)
   assert.strictEqual(summary.latestFullRelease, release)
@@ -1561,5 +1679,28 @@ test('native failure links use the latest attempt and do not revive a recovered 
     ],
   }
   assert.equal(summarizePipelineStatus({ runs: [run] }).failureJob.id, 3)
-  assert.equal(summarizePipelineStatus({ runs: [{ ...run, conclusion: 'success' }] }).failureJob, null)
+  assert.equal(
+    summarizePipelineStatus({ runs: [{ ...run, conclusion: 'success' }] })
+      .failureJob,
+    null
+  )
+})
+
+test('archived execution records stay read-only and reject a forged retry grant', () => {
+  const summary = summaryFixture()
+  const operation = summary.operations[0]
+  operation.source = 'gitlab_archive'
+  operation.target = 'demo-133'
+  operation.action = 'promote'
+  operation.retry = deliveryOperationRetryPolicy(operation)
+  assert.deepEqual(operation.retry, {
+    allowed: false,
+    reason: 'archived_operation_read_only',
+  })
+  assert.equal(
+    validateDevDeliverySummary(summary).operations[0].source,
+    'gitlab_archive'
+  )
+  operation.retry.allowed = true
+  assert.throws(() => validateDevDeliverySummary(summary))
 })

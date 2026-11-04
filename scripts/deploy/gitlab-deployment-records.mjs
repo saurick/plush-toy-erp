@@ -253,7 +253,41 @@ export function createGitlabDeploymentClient({ token, request = fetch } = {}) {
       throw new Error("GitLab deployment response identity mismatch");
     return item;
   }
+  async function readArchivedFile(target, id, name) {
+    getDeploymentTarget(target);
+    if (
+      !UUID.test(id) ||
+      !["operation.json", "receipt.json", "link.json", "intent.json"].includes(
+        name,
+      )
+    )
+      throw new Error("deployment evidence identity is invalid");
+    return json(
+      `/packages/generic/${DEPLOYMENT_RECORD_PACKAGE}/${target}-${id}/${name}`,
+      { allowMissing: true },
+    );
+  }
   return {
+    readArchivedFile,
+    async listArchivePackages() {
+      const packages = [];
+      for (let page = 1; page <= 20; page += 1) {
+        const items = await json(
+          `/packages?package_type=generic&package_name=${DEPLOYMENT_RECORD_PACKAGE}&per_page=100&page=${page}&order_by=created_at&sort=desc`,
+        );
+        if (!Array.isArray(items) || items.length > 100)
+          throw new Error("GitLab deployment archive catalog is invalid");
+        packages.push(
+          ...items.filter(
+            (item) =>
+              item.name === DEPLOYMENT_RECORD_PACKAGE &&
+              item.package_type === "generic",
+          ),
+        );
+        if (items.length < 100) return packages;
+      }
+      throw new Error("GitLab deployment archive catalog exceeds read limit");
+    },
     async readArchive(operation, name) {
       validateDeliveryOperation(operation);
       if (
@@ -308,8 +342,13 @@ export function createGitlabDeploymentClient({ token, request = fetch } = {}) {
     async readDeployment(id, operation, environment) {
       if (!Number.isSafeInteger(id) || id < 1)
         throw new Error("GitLab deployment ID is invalid");
-      const deployment = assertDeployment(await json(`/deployments/${id}`), operation, environment);
-      if (deployment.id !== id) throw new Error("GitLab deployment ID readback mismatch");
+      const deployment = assertDeployment(
+        await json(`/deployments/${id}`),
+        operation,
+        environment,
+      );
+      if (deployment.id !== id)
+        throw new Error("GitLab deployment ID readback mismatch");
       return deployment;
     },
     async finishDeployment(id, status, operation, environment) {
@@ -574,7 +613,10 @@ export function createGitlabDeploymentRecorder({
             : operation.status === "blocked"
               ? "canceled"
               : "failed";
-        if (remote.status !== expected || remote.environment.id !== record.environmentId)
+        if (
+          remote.status !== expected ||
+          remote.environment.id !== record.environmentId
+        )
           throw new Error("GitLab deployment state differs from original");
       }
       return readGitlabDeploymentRecord(store, operation);
@@ -630,7 +672,10 @@ export async function runRecordedDeployment({
     operation.action === "promote"
       ? `PROMOTE:${operation.target}:${operation.gitSha}:${operation.id}`
       : `ROLLBACK:${operation.target}:${operation.metadata.currentGitSha}:${operation.gitSha}:${operation.id}`;
-  if (!nativeEnvironment(operation) || !["ready", "launching"].includes(operation.status))
+  if (
+    !nativeEnvironment(operation) ||
+    !["ready", "launching"].includes(operation.status)
+  )
     throw new Error("operation is not in the eligible ready state");
   if (confirmation !== expected)
     throw new Error(
@@ -638,7 +683,7 @@ export async function runRecordedDeployment({
     );
   if (!client) {
     const { resolveGitlabReleaseCredential, verifyGitlabReleaseCredential } =
-      await import("./gitlab-release-cli.mjs");
+      await import("./gitlab-release-credentials.mjs");
     const { token } = await (
       resolveCredential || resolveGitlabReleaseCredential
     )();
@@ -684,7 +729,7 @@ export async function syncGitlabDeploymentRecord({
     throw new Error("only terminal operations can be archived");
   if (!client) {
     const { resolveGitlabReleaseCredential, verifyGitlabReleaseCredential } =
-      await import("./gitlab-release-cli.mjs");
+      await import("./gitlab-release-credentials.mjs");
     const { token } = await resolveGitlabReleaseCredential();
     await verifyGitlabReleaseCredential(token);
     client = createGitlabDeploymentClient({ token });

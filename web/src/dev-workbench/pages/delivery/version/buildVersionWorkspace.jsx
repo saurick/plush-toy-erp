@@ -66,7 +66,8 @@ export function buildVersionWorkspace({
   const historyScope = OPERATION_HISTORY_TARGET_OPTIONS.find(
     (option) => option.value === operationHistoryFilters.target
   )
-  const sharedReleaseHistory = operationHistoryFilters.target.endsWith('-release')
+  const sharedReleaseHistory =
+    operationHistoryFilters.target.endsWith('-release')
   return [
     {
       key: DEV_VERSION_CENTER_VIEW_VERSIONS,
@@ -81,12 +82,17 @@ export function buildVersionWorkspace({
           <Card
             title="版本与制品"
             className="erp-dev-version-table-card"
-            extra={<Text type="secondary">制品保留最近 7 份 · 历史记录保留</Text>}
+            extra={
+              <Text type="secondary">制品保留最近 7 份 · 历史记录保留</Text>
+            }
           >
             <Table
               rowKey="gitSha"
               columns={versionColumns}
-              dataSource={versions.map((version) => ({ ...version, retention: versionRetention(version, summary) }))}
+              dataSource={versions.map((version) => ({
+                ...version,
+                retention: versionRetention(version, summary),
+              }))}
               loading={initialLoading}
               pagination={{
                 ...DEV_PAGINATION,
@@ -182,8 +188,21 @@ export function buildVersionWorkspace({
             }
           >
             <Space wrap style={{ marginBottom: 12 }}>
-              <Link href={historyResult?.operations?.find((operation) => operation.gitlabRecord?.environmentUrl)?.gitlabRecord.environmentUrl || 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/environments'} target="_blank" rel="noopener noreferrer">GitLab 环境部署列表</Link>
-              <Text type="secondary">此处保留项目检查、原始时间和恢复操作。</Text>
+              <Link
+                href={
+                  historyResult?.operations?.find(
+                    (operation) => operation.gitlabRecord?.environmentUrl
+                  )?.gitlabRecord.environmentUrl ||
+                  'https://gitlab.saurick.me/saurick/plush-toy-erp/-/environments'
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                GitLab 环境部署列表
+              </Link>
+              <Text type="secondary">
+                此处保留项目检查、原始时间和恢复操作。
+              </Text>
             </Space>
             <div
               className="erp-dev-operation-history-filters"
@@ -213,7 +232,13 @@ export function buildVersionWorkspace({
                     placeholder="动作"
                     aria-label="筛选动作"
                     value={operationHistoryFilters.action}
-                    options={OPERATION_HISTORY_ACTION_OPTIONS.filter((option) => option.value === 'all' || (sharedReleaseHistory ? option.value === 'release' : option.value !== 'release'))}
+                    options={OPERATION_HISTORY_ACTION_OPTIONS.filter(
+                      (option) =>
+                        option.value === 'all' ||
+                        (sharedReleaseHistory
+                          ? option.value === 'release'
+                          : option.value !== 'release')
+                    )}
                     onChange={(value) =>
                       updateOperationHistoryFilter(
                         DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action,
@@ -225,7 +250,9 @@ export function buildVersionWorkspace({
                 <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--target">
                   <Text type="secondary">记录归属</Text>
                   <AppSelect
-                    allowClear={false /* 不可清空：记录归属绑定具体环境的读取入口，未选择时不能查询跨目标记录。 */}
+                    allowClear={
+                      false /* 不可清空：记录归属绑定具体环境的读取入口，未选择时不能查询跨目标记录。 */
+                    }
                     aria-label="记录归属"
                     value={operationHistoryFilters.target}
                     options={OPERATION_HISTORY_TARGET_OPTIONS}
@@ -274,27 +301,53 @@ export function buildVersionWorkspace({
                   onClick={retryHistory}
                   disabled={historyLoading}
                 >
-                  {['failure', 'stale'].includes(operationHistoryState) ? '重试读取' : '刷新记录'}
+                  {['failure', 'stale'].includes(operationHistoryState)
+                    ? '重试读取'
+                    : '刷新记录'}
                 </Button>
-                <Button type="link" disabled={!hasOperationHistoryFilters} onClick={clearOperationHistoryFilters}>
+                <Button
+                  type="link"
+                  disabled={!hasOperationHistoryFilters}
+                  onClick={clearOperationHistoryFilters}
+                >
                   清空筛选
                 </Button>
               </div>
             </div>
             {activeView === DEV_VERSION_CENTER_VIEW_HISTORY ? notices : null}
             {operationHistoryFilters.target === 'test-133' ? (
-              <Alert type="info" showIcon message="原始目标已退役；此处仅保留当时的部署记录，不计入当前 demo、test 或 erp，也不能再次执行。" />
+              <Alert
+                type="info"
+                showIcon
+                message="原始目标已退役；此处仅保留当时的部署记录，不计入当前 demo、test 或 erp，也不能再次执行。"
+              />
             ) : null}
             {sharedReleaseHistory ? (
-              <Alert type="info" showIcon message="制品供各环境部署使用；各环境的部署结果在各自记录中查看。" />
+              <Alert
+                type="info"
+                showIcon
+                message="制品供各环境部署使用；各环境的部署结果在各自记录中查看。"
+              />
             ) : null}
-            {historyResult && (historyResult.integrity.unreadableOperations > 0 || historyResult.integrity.unreadableRequests > 0) ? (
+            {['partial', 'unavailable'].includes(
+              historyResult?.integrity.archiveStatus
+            ) ? (
               <Alert
                 type="warning"
                 showIcon
-                message="部分记录未通过完整性校验"
-                description={`操作记录 ${historyResult.integrity.unreadableOperations} 条、请求索引 ${historyResult.integrity.unreadableRequests} 条暂不可读；当前列表或统计可能不完整。修复原始记录后可重新读取。`}
+                message="GitLab 归档回执未完整读回"
+                description="当前仍可查看本机已校验记录，列表和统计可能不完整；重新读取成功前，不能确认缺少记录的环境验证已通过。"
               />
+            ) : null}
+            {historyResult &&
+            (historyResult.integrity.unreadableOperations > 0 ||
+              historyResult.integrity.unreadableRequests > 0) ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="部分记录未通过完整性校验"
+                  description={`操作记录 ${historyResult.integrity.unreadableOperations} 条、请求索引 ${historyResult.integrity.unreadableRequests} 条暂不可读；当前列表或统计可能不完整。修复原始记录后可重新读取。`}
+                />
             ) : null}
             {operationHistoryState === 'stale' ? (
               <Alert
@@ -322,11 +375,22 @@ export function buildVersionWorkspace({
                     aria-label="当前筛选的操作统计"
                   >
                     {[
-                      ['passed', '通过'], ['failed', '失败'], ['blocked', '阻断'],
-                      ['not_proven', '未证明'], ['abandoned', '已放弃'], ['invalidated', '已失效'],
-                    ].filter(([status]) => historyResult.statistics.counts[status] > 0).map(([status, label]) => (
-                      <Text key={status}>{label} {historyResult.statistics.counts[status]}</Text>
-                    ))}
+                      ['passed', '通过'],
+                      ['failed', '失败'],
+                      ['blocked', '阻断'],
+                      ['not_proven', '未证明'],
+                      ['abandoned', '已放弃'],
+                      ['invalidated', '已失效'],
+                    ]
+                      .filter(
+                        ([status]) =>
+                          historyResult.statistics.counts[status] > 0
+                      )
+                      .map(([status, label]) => (
+                        <Text key={status}>
+                          {label} {historyResult.statistics.counts[status]}
+                        </Text>
+                      ))}
                     {historyResult.statistics.passedDurationSamples > 0 ? (
                       <Text type="secondary">
                         成功操作耗时中位数{' '}
@@ -363,7 +427,9 @@ export function buildVersionWorkspace({
                         description={
                           hasOperationHistoryFilters
                             ? '没有符合筛选条件的记录，请调整或清空上方条件'
-                            : sharedReleaseHistory ? '尚无已结束的制品发布记录' : '当前环境尚无已结束的部署、数据清空重建或回滚记录'
+                            : sharedReleaseHistory
+                              ? '尚无已结束的制品发布记录'
+                              : '当前环境尚无已结束的部署、数据清空重建或回滚记录'
                         }
                       />
                     ),

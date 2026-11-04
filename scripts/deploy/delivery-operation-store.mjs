@@ -51,7 +51,14 @@ const STATUS_TRANSITIONS = Object.freeze({
     "blocked",
     "not_proven",
   ]),
-  ready: new Set(["launching", "running", "blocked", "failed", "abandoned", "invalidated"]),
+  ready: new Set([
+    "launching",
+    "running",
+    "blocked",
+    "failed",
+    "abandoned",
+    "invalidated",
+  ]),
   launching: new Set(["running", "blocked", "failed", "not_proven"]),
   waiting: new Set(["running", "passed", "failed", "not_proven"]),
   passed: new Set(),
@@ -655,7 +662,7 @@ function deliveryReceiptSuffix(operation) {
   return null;
 }
 
-function assertDeliveryReceiptBinding(operation, receipt) {
+export function assertDeliveryReceiptBinding(operation, receipt) {
   const rollback = operation.action === "rollback";
   const fingerprintField = rollback
     ? "rollbackFingerprint"
@@ -764,7 +771,9 @@ export function createDeliveryOperationReadIndex(store) {
       throw new Error("operation read index directory is invalid");
     }
     knownDirectories.add(kind);
-    const files = new Set(readdirSync(directory).filter((file) => pattern.test(file)));
+    const files = new Set(
+      readdirSync(directory).filter((file) => pattern.test(file)),
+    );
     for (const file of cache.keys()) if (!files.has(file)) cache.delete(file);
     const values = [];
     const unreadable = [];
@@ -773,11 +782,20 @@ export function createDeliveryOperationReadIndex(store) {
       try {
         const filePath = path.join(directory, file);
         const stat = lstatSync(filePath, { bigint: true });
-        if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("invalid file");
-        const identity = [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs, stat.mode].join(":");
-        const value = previous?.identity === identity
-          ? previous.value
-          : validate(readPrivateJson(filePath), file);
+        if (!stat.isFile() || stat.isSymbolicLink())
+          throw new Error("invalid file");
+        const identity = [
+          stat.dev,
+          stat.ino,
+          stat.size,
+          stat.mtimeNs,
+          stat.ctimeNs,
+          stat.mode,
+        ].join(":");
+        const value =
+          previous?.identity === identity
+            ? previous.value
+            : validate(readPrivateJson(filePath), file);
         cache.set(file, { identity, value });
         values.push(value);
       } catch {
@@ -790,21 +808,31 @@ export function createDeliveryOperationReadIndex(store) {
   }
   return {
     read() {
-      const operations = scan("operations", /^[0-9a-f-]{36}\.json$/u, (value, file) => {
-        const operation = validateDeliveryOperation(value);
-        if (`${operation.id}.json` !== file) throw new Error("operation file identity is invalid");
-        return operation;
-      });
+      const operations = scan(
+        "operations",
+        /^[0-9a-f-]{36}\.json$/u,
+        (value, file) => {
+          const operation = validateDeliveryOperation(value);
+          if (`${operation.id}.json` !== file)
+            throw new Error("operation file identity is invalid");
+          return operation;
+        },
+      );
       const requests = scan("idempotency", /^[0-9a-f]{64}\.json$/u, (value) =>
         validateIdempotencyIndex(value, value?.idempotencyKey),
       );
       const requestCounts = new Map();
       for (const request of requests.values) {
-        requestCounts.set(request.operationId, (requestCounts.get(request.operationId) || 0) + 1);
+        requestCounts.set(
+          request.operationId,
+          (requestCounts.get(request.operationId) || 0) + 1,
+        );
       }
       return {
-        operations: operations.values.sort((left, right) =>
-          right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id),
+        operations: operations.values.sort(
+          (left, right) =>
+            right.updatedAt.localeCompare(left.updatedAt) ||
+            left.id.localeCompare(right.id),
         ),
         requestCounts,
         unreadableOperations: operations.unreadable,
@@ -878,14 +906,17 @@ export function createOrReuseDeliveryOperation(
   });
   const existingKeyIndex = readIdempotencyIndex(store, idempotencyKey);
   if (existingKeyIndex) {
-    const implicitReprepareReplay = retryOfOperationId === null &&
+    const implicitReprepareReplay =
+      retryOfOperationId === null &&
       existingKeyIndex.retryOfOperationId !== null &&
       ["abandoned", "invalidated"].includes(
-        readDeliveryOperation(store, existingKeyIndex.retryOfOperationId).status,
+        readDeliveryOperation(store, existingKeyIndex.retryOfOperationId)
+          .status,
       );
     if (
       existingKeyIndex.requestFingerprint !== requestFingerprint ||
-      (existingKeyIndex.retryOfOperationId !== retryOfOperationId && !implicitReprepareReplay)
+      (existingKeyIndex.retryOfOperationId !== retryOfOperationId &&
+        !implicitReprepareReplay)
     ) {
       throw new Error("idempotency key was already used for another request");
     }
@@ -902,7 +933,10 @@ export function createOrReuseDeliveryOperation(
   }
   const intentOwner = readIntentOwner(store, requestFingerprint);
   const latestOperation = intentOwner?.operation || null;
-  if (retryOfOperationId === null && ["abandoned", "invalidated"].includes(latestOperation?.status)) {
+  if (
+    retryOfOperationId === null &&
+    ["abandoned", "invalidated"].includes(latestOperation?.status)
+  ) {
     retryOfOperationId = latestOperation.id;
   }
   if (retryOfOperationId === null && latestOperation) {
@@ -941,7 +975,11 @@ export function createOrReuseDeliveryOperation(
     if (retryParent.status === "not_proven") {
       throw new Error("unknown target outcome must be read back before retry");
     }
-    if (!["failed", "blocked", "abandoned", "invalidated"].includes(retryParent.status)) {
+    if (
+      !["failed", "blocked", "abandoned", "invalidated"].includes(
+        retryParent.status,
+      )
+    ) {
       throw new Error("only failed or blocked operations can be retried");
     }
     const parentLineage = normalizedOperationLineage(retryParent);
@@ -1036,8 +1074,10 @@ export function transitionDeliveryOperation(
   { status, message, issues, metadata, now = new Date().toISOString() },
 ) {
   const current = readDeliveryOperation(store, operationId);
-  if (["abandoned", "invalidated"].includes(status) &&
-      !["promote", "rollback", "rebuild-database"].includes(current.action)) {
+  if (
+    ["abandoned", "invalidated"].includes(status) &&
+    !["promote", "rollback", "rebuild-database"].includes(current.action)
+  ) {
     throw new Error("only a delivery plan can be closed");
   }
   if (!STATUS_TRANSITIONS[current.status].has(status)) {
