@@ -272,7 +272,8 @@ export function buildVersionWorkspace({
                   <SearchInput
                     id="dev-version-history-keyword"
                     aria-label="搜索版本、SHA 或操作 ID"
-                    placeholder="输入完整内容或前几位"
+                    placeholder="搜版本或操作"
+                    searchHint="可搜索：版本、SHA、操作 ID，支持完整内容或前缀"
                     value={operationHistoryFilters.keyword}
                     maxLength={128}
                     allowClear

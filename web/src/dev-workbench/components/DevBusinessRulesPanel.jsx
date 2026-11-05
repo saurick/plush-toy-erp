@@ -163,7 +163,8 @@ export default function DevBusinessRulesPanel({ report, reportCurrent, onRunCons
         />
         <SearchInput
           aria-label="搜索关键规则"
-          placeholder="搜索规则、业务或测试名"
+          placeholder="搜规则或业务"
+          searchHint="可搜索：规则名称、业务、测试名"
           value={filters.query}
           onSearch={(value) => update('ruleQuery', value)}
           allowClear

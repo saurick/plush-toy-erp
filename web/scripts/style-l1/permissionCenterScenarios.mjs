@@ -929,7 +929,7 @@ export function createPermissionCenterScenarios({
           .getByRole('button', { name: '去员工账号管理' })
           .click()
         const filteredAdminSearch =
-          page.getByPlaceholder('搜索姓名、员工账号、手机号或岗位')
+          page.getByPlaceholder('搜员工')
         assert.equal(
           await filteredAdminSearch.inputValue(),
           '财务',
@@ -1295,7 +1295,7 @@ export function createPermissionCenterScenarios({
           `权限管理员工账号 tab 出现横向溢出: ${JSON.stringify(adminTabMetrics)}`
         )
         const adminSearch =
-          page.getByPlaceholder('搜索姓名、员工账号、手机号或岗位')
+          page.getByPlaceholder('搜员工')
         await adminSearch.fill('assistant')
         await adminSearch.press('Enter')
         await expectText(page, '命中 1/7 个员工账号')

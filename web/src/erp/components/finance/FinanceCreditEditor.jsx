@@ -57,7 +57,7 @@ export function FinanceCreditEditor({
             rules={[{ required: true, message: '请选择来源财务记录' }]}
           >
             <Select
-              placeholder="请选择来源应收 / 应付"
+              placeholder="选择来源账款"
               showSearch
               optionFilterProp="label"
               loading={referenceLoading}

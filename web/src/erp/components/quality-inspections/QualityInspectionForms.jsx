@@ -85,7 +85,7 @@ export function QualityInspectionCreateForm({
         <Input
           allowClear
           autoComplete="off"
-          placeholder="自动生成，可按需要调整"
+          placeholder="自动生成"
         />
       </Form.Item>
       <Form.Item

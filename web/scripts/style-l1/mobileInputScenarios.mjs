@@ -100,6 +100,9 @@ export function createMobileInputScenarios() {
       })
       const output = page.getByTestId('input-submission')
       await quantity.waitFor()
+      const quantityHint = page.getByText('留空时按申请数量批准。', { exact: true })
+      await quantityHint.waitFor({ state: 'visible' })
+      assert.equal(await quantity.getAttribute('placeholder'), '选填')
       const titlePaint = await page
         .locator('[data-testid="mobile-task-action-screen"] h2')
         .first()
@@ -152,6 +155,7 @@ export function createMobileInputScenarios() {
         assert.equal(await output.textContent(), 'null')
       }
       await quantity.fill('12.345678')
+      assert.equal(await quantityHint.isVisible(), true, '填写数量后仍可查看留空规则')
       assert.equal(await quantity.getAttribute('aria-invalid'), 'false')
       await submit.click()
       assert.deepEqual(JSON.parse(await output.textContent()), {

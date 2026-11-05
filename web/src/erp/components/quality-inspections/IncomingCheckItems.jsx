@@ -60,7 +60,7 @@ export function IncomingCheckItemsForm() {
                     >
                       <Input
                         maxLength={80}
-                        placeholder="如色差、克重、异味，或其他检查项"
+                        placeholder="如色差、克重"
                       />
                     </Form.Item>,
                     <Form.Item
@@ -82,7 +82,7 @@ export function IncomingCheckItemsForm() {
                     >
                       <Input
                         maxLength={255}
-                        placeholder="订单约定、确认样或具体要求"
+                        placeholder="填写检查依据"
                       />
                     </Form.Item>,
                     <Form.Item
@@ -113,7 +113,7 @@ export function IncomingCheckItemsForm() {
                     >
                       <BusinessTextArea
                         maxLength={BusinessTextPolicy.noteMaxCharacters}
-                        placeholder="抽检数量、位置、不适用原因等"
+                        placeholder="填写检查说明"
                       />
                     </Form.Item>,
                   ]}

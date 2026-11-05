@@ -287,7 +287,8 @@ export default forwardRef((
           <>
             <SearchInput
               aria-label="搜索加工明细"
-              placeholder="合同、产品订单、产品或加工项目"
+              placeholder="搜合同或加工项目"
+              searchHint="可搜索：合同、产品订单、产品、加工项目"
               allowClear
               maxLength={100}
               {...search}

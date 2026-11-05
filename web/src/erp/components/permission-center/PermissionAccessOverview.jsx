@@ -475,7 +475,7 @@ function DataScopeOverview({
             disabled={disabled}
             status={warehouseIds.length === 0 ? 'error' : undefined}
             style={{ width: '100%' }}
-            placeholder="请选择仓库"
+            placeholder="仓库"
             options={warehouseOptions}
             onChange={onWarehouseIdsChange}
           />

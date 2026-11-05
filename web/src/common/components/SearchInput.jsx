@@ -23,7 +23,7 @@ const SearchInput = forwardRef(
       className = '',
       placeholder = '搜索关键词',
       searchHint,
-      showSearchScope = false,
+      showSearchScope = true,
       onSearch,
       onSubmitted,
       onCancel,
@@ -39,11 +39,12 @@ const SearchInput = forwardRef(
       resetKey,
     })
     const accessibleLabel = restProps['aria-label'] || searchHint || placeholder
-    const title = restProps.title || searchHint || undefined
+    const title = restProps.title || undefined
     const hintID = useId()
     const [focused, setFocused] = useState(false)
+    const hasSearchScope = Boolean(showSearchScope && searchHint && searchHint !== placeholder)
     const showHint = Boolean(
-      showSearchScope && searchHint && focused && !restProps.disabled
+      hasSearchScope && focused && !restProps.disabled
     )
     const cancel = () => {
       const changed = search.cancel()
@@ -58,6 +59,104 @@ const SearchInput = forwardRef(
       setFocused(false)
       onSubmitted?.(search.value.trim())
     }
+
+    const input = (
+      <Input
+        {...restProps}
+        value={search.value}
+        onChange={search.onChange}
+        onPressEnter={submit}
+        suffix={
+          <>
+            {allowClear && (search.value || restProps.value) ? (
+              <button
+                type="button"
+                className="ant-input-clear-icon erp-search-clear"
+                aria-label="清除搜索"
+                disabled={restProps.disabled}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={search.clear}
+              >
+                <CloseCircleFilled aria-hidden="true" />
+              </button>
+            ) : null}
+            <Button
+              className="erp-search-submit"
+              type="primary"
+              disabled={restProps.disabled}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={submit}
+            >
+              搜索
+            </Button>
+          </>
+        }
+        onCompositionStart={(event) => {
+          search.onCompositionStart()
+          restProps.onCompositionStart?.(event)
+        }}
+        onCompositionEnd={(event) => {
+          search.onCompositionEnd(event)
+          restProps.onCompositionEnd?.(event)
+        }}
+        ref={ref}
+        allowClear={false}
+        className={joinClassNames(
+          'erp-search-input',
+          'erp-search-input--submitted',
+          className
+        )}
+        prefix={
+          showCancel ? (
+            <button
+              type="button"
+              className="erp-search-cancel"
+              aria-label="取消搜索"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={(event) => {
+                event.stopPropagation()
+                cancel()
+              }}
+            >
+              <ArrowLeftOutlined aria-hidden="true" />
+            </button>
+          ) : (
+            <SearchOutlined aria-hidden="true" />
+          )
+        }
+        placeholder={placeholder}
+        aria-label={accessibleLabel}
+        title={title}
+        aria-describedby={
+          showHint
+            ? [restProps['aria-describedby'], hintID]
+                .filter(Boolean)
+                .join(' ')
+            : restProps['aria-describedby']
+        }
+        onFocus={(event) => {
+          setFocused(true)
+          restProps.onFocus?.(event)
+        }}
+        onBlur={(event) => {
+          setFocused(false)
+          restProps.onBlur?.(event)
+        }}
+        onKeyDown={(event) => {
+          if (search.composing.current || isComposing(event)) {
+            if (event.key === 'Escape' || event.key === 'Enter') event.stopPropagation()
+            return
+          }
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            if (cancel()) event.stopPropagation()
+          }
+          restProps.onKeyDown?.(event)
+        }}
+      />
+    )
+
+    if (!hasSearchScope) return input
 
     return (
       <Popover
@@ -76,99 +175,7 @@ const SearchInput = forwardRef(
           </div>
         }
       >
-        <Input
-          {...restProps}
-          value={search.value}
-          onChange={search.onChange}
-          onPressEnter={submit}
-          suffix={
-            <>
-              {allowClear && (search.value || restProps.value) ? (
-                <button
-                  type="button"
-                  className="ant-input-clear-icon erp-search-clear"
-                  aria-label="清除搜索"
-                  disabled={restProps.disabled}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={search.clear}
-                >
-                  <CloseCircleFilled aria-hidden="true" />
-                </button>
-              ) : null}
-              <Button
-                className="erp-search-submit"
-                type="primary"
-                disabled={restProps.disabled}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={submit}
-              >
-                搜索
-              </Button>
-            </>
-          }
-          onCompositionStart={(event) => {
-            search.onCompositionStart()
-            restProps.onCompositionStart?.(event)
-          }}
-          onCompositionEnd={(event) => {
-            search.onCompositionEnd(event)
-            restProps.onCompositionEnd?.(event)
-          }}
-          ref={ref}
-          allowClear={false}
-          className={joinClassNames(
-            'erp-search-input',
-            'erp-search-input--submitted',
-            className
-          )}
-          prefix={
-            showCancel ? (
-              <button
-                type="button"
-                className="erp-search-cancel"
-                aria-label="取消搜索"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  cancel()
-                }}
-              >
-                <ArrowLeftOutlined aria-hidden="true" />
-              </button>
-            ) : (
-              <SearchOutlined aria-hidden="true" />
-            )
-          }
-          placeholder={placeholder}
-          aria-label={accessibleLabel}
-          title={title}
-          aria-describedby={
-            showHint
-              ? [restProps['aria-describedby'], hintID]
-                  .filter(Boolean)
-                  .join(' ')
-              : restProps['aria-describedby']
-          }
-          onFocus={(event) => {
-            setFocused(true)
-            restProps.onFocus?.(event)
-          }}
-          onBlur={(event) => {
-            setFocused(false)
-            restProps.onBlur?.(event)
-          }}
-          onKeyDown={(event) => {
-            if (search.composing.current || isComposing(event)) {
-              if (event.key === 'Escape' || event.key === 'Enter') event.stopPropagation()
-              return
-            }
-            if (event.key === 'Escape') {
-              event.preventDefault()
-              if (cancel()) event.stopPropagation()
-            }
-            restProps.onKeyDown?.(event)
-          }}
-        />
+        {input}
       </Popover>
     )
   }

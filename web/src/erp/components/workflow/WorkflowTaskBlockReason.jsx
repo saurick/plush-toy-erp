@@ -38,7 +38,7 @@ export default function WorkflowTaskBlockReason({ value = '', onChange, disabled
           disabled={disabled}
           status={detail.length > detailLimit ? 'error' : undefined}
           aria-invalid={detail.length > detailLimit || undefined}
-          placeholder="可补充具体情况或需要谁协助"
+          placeholder="补充受阻情况"
           onChange={(event) => onChange?.(buildWorkflowTaskBlockReason({ choice, detail: event.target.value }))}
         />
         {detail.length > detailLimit ? <span role="alert">补充说明最多 {detailLimit} 字，请缩短后提交。</span> : null}

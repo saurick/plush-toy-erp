@@ -2,6 +2,7 @@ import { createBusinessQuickCountsScenarios } from './businessQuickCountsScenari
 import { createImportPickerScenarios } from './importPickerScenarios.mjs'
 import { createPerformanceReferenceScenarios } from './performanceReferenceScenarios.mjs'
 import { createSearchSubmissionScenarios } from './searchSubmissionScenarios.mjs'
+import { createInputHintScenarios } from './inputHintScenarios.mjs'
 import { createDensityCompletionScenarios } from './densityCompletionScenarios.mjs'
 import { createMobileTaskConsistencyScenarios } from './mobileTaskConsistencyScenarios.mjs'
 import { createGlobalDensityOptimizationScenarios } from './globalDensityOptimizationScenarios.mjs'
@@ -412,6 +413,7 @@ export function createStyleL1Scenarios(deps) {
 
   const taskHandlingScenarios = createTaskUnifiedHandlingScenarios({ ...deps, customerRuntimeEffectiveSession })
   const scenarios = [
+    ...createInputHintScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createSearchSubmissionScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createBusinessFollowupScenarios({
       ...deps,

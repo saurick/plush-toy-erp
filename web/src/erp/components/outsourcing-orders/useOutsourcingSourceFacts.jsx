@@ -396,11 +396,13 @@ export function useOutsourcingSourceFacts({
                 ? '草稿尚未过账，本次作废不会产生任何库存变动。'
                 : '取消后将冲正本次过账，并把库存恢复至过账前状态。'}
             </span>
+            <label htmlFor="outsourcing-fact-cancel-reason">业务原因</label>
             <Input.TextArea
+              id="outsourcing-fact-cancel-reason"
               rows={3}
               maxLength={255}
               showCount
-              placeholder="请填写作废或取消的业务原因"
+              placeholder="填写业务原因"
               onChange={(event) => {
                 cancelReason = event.target.value
               }}

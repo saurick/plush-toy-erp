@@ -154,7 +154,7 @@ export default function ProductionReworkModal({
             { max: 64, message: '返工业务编号不能超过 64 个字符' },
           ]}
         >
-          <Input maxLength={64} placeholder="例如：RW-20260714-001" />
+          <Input maxLength={64} placeholder="填写返工单号" />
         </Form.Item>
         <Form.Item
           name="quantity"
@@ -196,6 +196,7 @@ export default function ProductionReworkModal({
           className="erp-business-action-form__field--full"
           name="reason"
           label="返工原因"
+          extra="说明不合格现象、返工要求或处理依据。"
           rules={[
             { required: true, whitespace: true, message: '请填写返工原因' },
             { max: 255, message: '返工原因不能超过 255 个字符' },
@@ -205,7 +206,7 @@ export default function ProductionReworkModal({
             minRows={2}
             maxLength={255}
             showCount
-            placeholder="请说明不合格现象、返工要求或处理依据"
+            placeholder="填写返工原因"
           />
         </Form.Item>
       </BusinessForm>

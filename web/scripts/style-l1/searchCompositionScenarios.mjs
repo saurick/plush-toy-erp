@@ -31,6 +31,9 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
     deviceScaleFactor: 2,
     verify: async (page) => {
       if (name === 'definitions') await page.getByRole('button', { name: '搜索定义', exact: true }).click()
+      if (['prototype-tools', 'prototype-integration'].includes(name)) {
+        await page.getByLabel('工作台设计内容', { exact: true }).getByText('整体交互预览', { exact: true }).click()
+      }
       const frame = inputSelector ? page.frameLocator('iframe[title="ERP 最新可交互设计"]') : null
       if (frame) {
         await frame.locator('.app').waitFor()
@@ -50,6 +53,15 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
       const initialRowCount = submittedRows ? await submittedRows.count() : 0
       if (submittedRows) assert(initialRowCount > 0)
       await input.click()
+      const scope = name === 'controls'
+        ? page.getByRole('tooltip').filter({ hasText: '复用边界' })
+        : name === 'prototype-integration'
+          ? frame.getByRole('tooltip').filter({ hasText: '接口名称' })
+          : null
+      if (scope) {
+        await scope.waitFor({ state: 'visible' })
+        assert.equal(await input.getAttribute('title'), null, '搜索范围只使用聚焦浮层，不重复原生 title')
+      }
       const client = await page.context().newCDPSession(page)
       const compose = (text) => client.send('Input.imeSetComposition', {
         text, selectionStart: text.length, selectionEnd: text.length,
@@ -90,6 +102,7 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
         await assertQuery('')
         if (submittedRows) assert.equal(await submittedRows.count(), initialRowCount, 'candidate confirmation changes only the draft')
         await searchButton.click()
+        if (scope) await scope.waitFor({ state: 'hidden' })
         await assertQuery('下拉选择菜单')
         if (submittedRows) assert.equal(await submittedRows.count(), 0, 'the search button applies the Chinese query')
         if (name === 'prototype-help') await frame.locator('#rh-manualResults').getByRole('heading', {name:'搜索“下拉选择菜单”'}).waitFor()

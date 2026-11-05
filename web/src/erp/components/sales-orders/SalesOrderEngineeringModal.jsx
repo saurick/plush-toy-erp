@@ -138,7 +138,7 @@ function EngineeringRow({ field, form, context, readOnly, referenceActions, onOp
           <Input
             value={bom?.designer || ''}
             readOnly
-            placeholder="由 BOM 工程资料带出"
+            placeholder="由 BOM 带入"
           />
         </Form.Item>,
       ]}

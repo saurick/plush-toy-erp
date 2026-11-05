@@ -1,9 +1,7 @@
 import React, { useMemo } from 'react'
 import { Alert, Button, Form, Input, Space, Switch, Tag } from 'antd'
-import {
-  DeleteOutlined,
-  QuestionCircleOutlined,
-} from '@ant-design/icons'
+import { DeleteOutlined } from '@ant-design/icons'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
@@ -241,7 +239,7 @@ function RowReference({
               ...(skuID ? { product_sku_id: skuID } : {}),
               ...(unitID ? { unit_id: unitID } : {}),
             }}
-            placeholder="可先搜索销售单号或行号"
+            placeholder="销售单号或行号"
             onChange={(value, option) => {
               if (!value) {
                 setRow({ sales_order_item_id: null })
@@ -277,7 +275,7 @@ function RowReference({
               referenceType="product"
               disabled={readOnly || referenceAccess.product !== true}
               initialOptions={optionsByType.product}
-              placeholder="搜索产品编号或名称"
+              placeholder="选择产品"
               onChange={(value, option) => {
                 setRow({
                   product_id: value || null,
@@ -334,7 +332,7 @@ function RowReference({
               referenceType="unit"
               disabled={readOnly || referenceAccess.unit !== true}
               initialOptions={optionsByType.unit}
-              placeholder="搜索单位"
+              placeholder="单位"
               onChange={(value) =>
               setRow({
                 unit_id: value || null,
@@ -355,7 +353,7 @@ function RowReference({
             }
             initialOptions={optionsByType.active_bom}
             filters={productID ? { product_id: productID } : {}}
-            placeholder={productID ? '搜索当前生效 BOM' : '请先选择产品'}
+            placeholder={productID ? '选择生效 BOM' : '请先选择产品'}
           />
         </Form.Item>
 ]}
@@ -379,19 +377,8 @@ function RowReference({
       <div className="erp-compact-field-table__supplement erp-production-order-line__supplement">
         <Form.Item
           name={[field.name, 'route_code']}
-          label="生产路线"
+          label={<BusinessHelpLabel label="生产路线" description="布料加工 → 车缝 → 手工 → 包装；车缝和手工分别决定本厂或外发。" />}
           rules={[{ required: true, message: '请选择生产路线' }]}
-          tooltip={{
-            title:
-              '发布后冻结为“布料加工 → 车缝 → 手工 → 包装”，车缝和手工分别决定本厂或外发。',
-            trigger: ['hover', 'focus', 'click'],
-            icon: (
-              <QuestionCircleOutlined
-                tabIndex={0}
-                aria-label="查看生产路线说明"
-              />
-            ),
-          }}
         >
           <Select
             placeholder="请选择生产路线"
@@ -408,16 +395,6 @@ function RowReference({
           name={[field.name, 'customer_inspection_required']}
           label="客户验货"
           valuePropName="checked"
-          tooltip={{
-            title: '仅订单明确要求时开启；不等同于系统验收。',
-            trigger: ['hover', 'focus', 'click'],
-            icon: (
-              <QuestionCircleOutlined
-                tabIndex={0}
-                aria-label="查看客户验货说明"
-              />
-            ),
-          }}
         >
           <Switch
             disabled={readOnly || routeCode !== PRODUCTION_WIP_ROUTE_CODE}
@@ -546,6 +523,7 @@ export default function ProductionOrderEditor({
               >
                 <BusinessGroupedLineItems
                   title="生产明细"
+                  description="发布后固定生产路线；客户验货仅在订单明确要求时开启，不能替代系统验收。"
                   fields={fields}
                   form={form}
                   table={BusinessCompactFieldTable}

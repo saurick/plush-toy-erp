@@ -278,7 +278,7 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
   )
 }
 
-async function assertVisibleSearchPlaceholdersFit(page, scenarioName) {
+async function assertVisibleControlPlaceholdersFit(page, scenarioName) {
   const issues = await page.evaluate(() => {
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d')
@@ -287,7 +287,7 @@ async function assertVisibleSearchPlaceholdersFit(page, scenarioName) {
       context.font = font
       return context.measureText(text).width
     }
-    const selectors = '.erp-search-input input.ant-input'
+    const selectors = 'input[placeholder]:not([type="hidden"]), .ant-select-selection-placeholder'
     const isVisible = (node) => {
       const rect = node.getBoundingClientRect()
       const style = window.getComputedStyle(node)
@@ -305,6 +305,7 @@ async function assertVisibleSearchPlaceholdersFit(page, scenarioName) {
     const describe = (node, extra = {}) => {
       const owner =
         node.closest('.ant-input-affix-wrapper') ||
+        node.closest('.ant-select') ||
         node.closest('.erp-source-import-picker') ||
         node
       const ownerRect = owner.getBoundingClientRect()
@@ -315,7 +316,7 @@ async function assertVisibleSearchPlaceholdersFit(page, scenarioName) {
           : []
       return {
         className: classes.join(' '),
-        placeholder: node.getAttribute('placeholder') || '',
+        placeholder: node.getAttribute('placeholder') || node.textContent?.trim() || '',
         inputWidth: Number(rect.width.toFixed(1)),
         ownerWidth: Number(ownerRect.width.toFixed(1)),
         ...extra,
@@ -323,11 +324,10 @@ async function assertVisibleSearchPlaceholdersFit(page, scenarioName) {
     }
 
     return Array.from(document.querySelectorAll(selectors))
-      .filter((node) => node instanceof HTMLInputElement)
       .filter((node) => isVisible(node))
-      .filter((node) => !node.value)
+      .filter((node) => !(node instanceof HTMLInputElement) || !node.value)
       .map((node) => {
-        const placeholder = node.getAttribute('placeholder') || ''
+        const placeholder = node.getAttribute('placeholder') || node.textContent?.trim() || ''
         if (!placeholder) return null
         const style = window.getComputedStyle(node)
         const paddingX =
@@ -351,7 +351,7 @@ async function assertVisibleSearchPlaceholdersFit(page, scenarioName) {
   assert.deepEqual(
     issues,
     [],
-    `${scenarioName} 搜索框 placeholder 显示不全: ${JSON.stringify(issues)}`
+    `${scenarioName} 输入或下拉提示显示不全: ${JSON.stringify(issues)}`
   )
 }
 
@@ -1257,7 +1257,7 @@ export {
   assertVisibleDateFilterGeometry,
   assertVisibleAffixInputIsolation,
   assertVisibleInputControlRadius,
-  assertVisibleSearchPlaceholdersFit,
+  assertVisibleControlPlaceholdersFit,
   assertVisibleRoundedInputWrapperClipping,
   assertVisibleInputFocusRingNotClipped,
   assertVisibleInputTextVerticalRhythm,

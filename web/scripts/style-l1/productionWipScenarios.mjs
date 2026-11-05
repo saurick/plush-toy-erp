@@ -278,7 +278,7 @@ export function createProductionWipScenarios(deps) {
           .click()
         await expectText(
           page,
-          '匹配核对：产品 PROD-STYLE-L1 / 超长产品名称用于验证生产订单明细可读换行；规格 SKU-STYLE-L1-LONG；工序 车缝；数量 20 只'
+          '匹配核对：产品 PROD-STYLE-L1 超长产品名称用于验证生产订单明细可读换行；规格 SKU-STYLE-L1-LONG；工序 车缝；数量 20 只'
         )
         await routeModal.screenshot({
           path: path.resolve(
@@ -319,6 +319,8 @@ export function createProductionWipScenarios(deps) {
           .getByLabel('本次外发的材料', { exact: true })
           .press('Escape')
         const fabricContractSelect = routeModal.getByLabel('布料加工合同')
+        const fabricMatchHint = routeModal.getByText('全部布料须使用同一份合同；合同明细的材料、工序、单位和数量须与需求一致。', { exact: true })
+        await fabricMatchHint.waitFor({ state: 'visible' })
         await fabricContractSelect.click()
         await page
           .getByText(/SIM-OUTSOURCE-SEWING-CONFIRMED.*覆盖 2 项布料/u)
@@ -329,11 +331,11 @@ export function createProductionWipScenarios(deps) {
           .first()
           .waitFor({ state: 'hidden', timeout: 10_000 })
         const fabricMainSelect = routeModal.getByLabel(
-          'MAT-STYLE-L1 / 样式短毛绒布'
+          'MAT-STYLE-L1 样式短毛绒布'
         )
         const fabricMainField = routeModal
           .locator('.ant-form-item')
-          .filter({ hasText: 'MAT-STYLE-L1 / 样式短毛绒布' })
+          .filter({ hasText: 'MAT-STYLE-L1 样式短毛绒布' })
           .first()
         await fabricMainSelect.click()
         await page
@@ -341,11 +343,11 @@ export function createProductionWipScenarios(deps) {
           .last()
           .click()
         const fabricLiningSelect = routeModal.getByLabel(
-          'MAT-LINING-L1 / 样式里布'
+          'MAT-LINING-L1 样式里布'
         )
         const fabricLiningField = routeModal
           .locator('.ant-form-item')
-          .filter({ hasText: 'MAT-LINING-L1 / 样式里布' })
+          .filter({ hasText: 'MAT-LINING-L1 样式里布' })
           .first()
         await fabricLiningSelect.click()
         await page
@@ -353,8 +355,8 @@ export function createProductionWipScenarios(deps) {
           .last()
           .click()
         await routeModal.getByText('安排布料整单外发', { exact: true }).click()
-        await expectText(page, 'MAT-STYLE-L1 / 样式短毛绒布')
-        await expectText(page, 'MAT-LINING-L1 / 样式里布')
+        await expectText(page, 'MAT-STYLE-L1 样式短毛绒布')
+        await expectText(page, 'MAT-LINING-L1 样式里布')
         assert.match(
           await fabricMainField
             .locator('.ant-select-selection-item')
@@ -367,6 +369,7 @@ export function createProductionWipScenarios(deps) {
             .innerText(),
           /第 5 行/u
         )
+        assert.equal(await fabricMatchHint.isVisible(), true, '选择合同与材料后仍可查阅匹配规则')
         await expectText(page, '外发开工前还必须把合同对应材料发料过账')
         await routeModal.screenshot({
           path: path.resolve(

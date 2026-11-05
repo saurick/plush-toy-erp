@@ -1103,7 +1103,7 @@ export default function WorkInstructionImageAnnotationEditor({
                         ? 'error'
                         : undefined
                     }
-                    placeholder="例如：30 mm、45±2 mm"
+                    placeholder="如 30 mm"
                     onChange={(event) =>
                       updateSelectedAnnotation((annotation) => ({
                         ...annotation,

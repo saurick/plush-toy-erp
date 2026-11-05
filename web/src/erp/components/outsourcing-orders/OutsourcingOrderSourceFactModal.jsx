@@ -269,7 +269,7 @@ export default function OutsourcingOrderSourceFactModal({
               showSearch
               optionFilterProp="label"
               options={warehouseOptions}
-              placeholder="选择仓库"
+              placeholder="仓库"
             />
           </Form.Item>
           {returnReceipt ? (
@@ -336,7 +336,7 @@ export default function OutsourcingOrderSourceFactModal({
                 { max: 64, message: '新批次号不能超过 64 个字符' },
               ]}
             >
-              <Input maxLength={64} placeholder="填写本次回货的新批次号" />
+              <Input maxLength={64} placeholder="填写新批次号" />
             </Form.Item>
           ) : null}
         </BusinessFormSection>

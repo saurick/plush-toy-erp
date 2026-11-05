@@ -157,6 +157,7 @@ export function FinancePaymentEditor({
             className="erp-business-action-form__field--wide"
             name="purpose_note"
             label={refundSource ? '退款原因' : '款项说明'}
+            extra={refundSource ? '说明取消、退货或多收多付的原因。' : undefined}
             rules={
               refundSource
                 ? [
@@ -175,8 +176,8 @@ export function FinancePaymentEditor({
               maxLength={255}
               placeholder={
                 refundSource
-                  ? '说明取消、退货或多收多付的原因'
-                  : '例如：订单首款、第二期款或发货前尾款'
+                  ? '填写退款原因'
+                  : '如订单首款'
               }
             />
           </Form.Item>
@@ -210,7 +211,7 @@ export function FinancePaymentEditor({
           </Form.Item>
           <Form.Item className="erp-business-action-form__field--short" name="currency" label="币种" rules={[{ required: true }]}>
             <Select
-              placeholder="请选择币种"
+              placeholder="币种"
               disabled={paymentKind !== FinancePaymentKind.SETTLEMENT}
               options={BUSINESS_CURRENCY_OPTIONS}
             />

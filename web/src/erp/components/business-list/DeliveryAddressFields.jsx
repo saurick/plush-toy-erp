@@ -69,7 +69,7 @@ function DeliveryAddressInput({ value = '', onChange, country, disabled, id, des
         </Form.Item>
       ) : null}
       <Form.Item
-        label={<BusinessHelpLabel label={mainland && draft.path.length ? '详细地址' : '完整地址'} description={description} />}
+        label={<BusinessHelpLabel label={mainland && draft.path.length ? '详细地址' : '完整地址'} description={[description, mainland && draft.path.length ? '填写街道、园区、楼栋、门牌或仓库名称。' : '可粘贴完整地址，包含街道门牌、城市、州 / 省及邮编（如适用）。'].filter(Boolean).join(' ')} />}
         htmlFor={id}
         className="erp-delivery-address__part"
       >
@@ -84,8 +84,8 @@ function DeliveryAddressInput({ value = '', onChange, country, disabled, id, des
           value={draft.detail}
           placeholder={
             mainland && draft.path.length
-              ? '街道、园区、楼栋、门牌或仓库名称'
-              : '可粘贴完整地址，包含街道门牌、城市、州 / 省及邮编（如适用）'
+              ? '填写街道门牌'
+              : '粘贴或填写完整地址'
           }
           onChange={(event) => update(draft.path, event.target.value)}
         />
@@ -137,7 +137,7 @@ export default function DeliveryAddressFields({
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="收货电话"
+        label={<BusinessHelpLabel label="收货电话" description="支持手机号、座机号和国际区号。" />}
         name={phoneField}
         rules={[optionalContactPhoneRule()]}
       >
@@ -146,7 +146,7 @@ export default function DeliveryAddressFields({
           disabled={disabled}
           autoComplete="off"
           maxLength={64}
-          placeholder="支持手机、座机及国际区号"
+          placeholder="填写联系电话"
         />
       </Form.Item>
       <Form.Item
@@ -159,7 +159,7 @@ export default function DeliveryAddressFields({
           showSearch
           disabled={disabled}
           options={options}
-          placeholder="搜索国家 / 地区"
+          placeholder="选择国家或地区"
           filterOption={(input, option) =>
             option.searchText.includes(input.trim().toLowerCase())
           }

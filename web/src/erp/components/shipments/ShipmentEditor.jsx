@@ -190,7 +190,7 @@ function ShipmentFormFields({
                 value={disabled ? copyShipmentNo : ''}
               />
             }
-            placeholder="自动生成，可按需要调整"
+            placeholder="自动生成"
           />
         </Form.Item>
         <Form.Item
@@ -243,7 +243,7 @@ function ShipmentFormFields({
           <Input
             aria-label="币种（跟随销售订单）"
             disabled
-            placeholder="导入销售订单后自动带出"
+            placeholder="由订单带入"
             value={normalizedSourceCurrency}
           />
         </Form.Item>
@@ -278,7 +278,7 @@ function ShipmentFormFields({
             disabled={disabled}
             maxLength={64}
             options={SHIPMENT_TRANSPORT_METHOD_OPTIONS}
-            placeholder="可选择或直接输入"
+            placeholder="选择或填写"
           />
         </Form.Item>
         <Form.Item
@@ -758,7 +758,7 @@ function ShipmentItemFormContent({
             allowClear
             optionFilterProp="label"
             options={warehouseOptions}
-            placeholder="请选择仓库"
+            placeholder="仓库"
             showSearch
           />
         </Form.Item>,
@@ -799,7 +799,7 @@ function ShipmentItemFormContent({
             },
           ]}
           >
-            <Input allowClear autoComplete="off" placeholder="例如：120.5" />
+            <Input allowClear autoComplete="off" placeholder="如 120.5" />
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
@@ -812,7 +812,7 @@ function ShipmentItemFormContent({
               disabled={sourceLocked}
               optionFilterProp="searchText"
               options={unitOptions}
-              placeholder="请选择单位"
+              placeholder="单位"
               showSearch
             />
           </Form.Item>

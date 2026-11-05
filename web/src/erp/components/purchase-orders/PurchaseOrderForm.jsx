@@ -287,7 +287,7 @@ export function PurchaseOrderFormFields({
           label="采购单号（自动）"
           rules={[{ required: true, message: '请输入或保留自动采购单号' }]}
         >
-          <Input maxLength={64} placeholder="自动生成，可按需要调整" />
+          <Input maxLength={64} placeholder="自动生成" />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field erp-business-action-form__field--wide"
@@ -317,7 +317,7 @@ export function PurchaseOrderFormFields({
           label="币种"
           rules={[{ required: true, message: '请选择币种' }]}
         >
-          <Select placeholder="请选择币种" options={BUSINESS_CURRENCY_OPTIONS} />
+          <Select placeholder="币种" options={BUSINESS_CURRENCY_OPTIONS} />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field erp-business-action-form__field--short"
@@ -379,6 +379,7 @@ export function PurchaseOrderFormFields({
           }}
           columns={PURCHASE_ORDER_COLUMNS}
           title="采购明细"
+          description="金额＝采购数量 × 单价；留空自动计算，手填金额须与计算结果一致。"
           emptyDescription="暂无采购明细"
           headerActions={(
             <>
@@ -524,7 +525,7 @@ export function PurchaseOrderFormFields({
                       params={materialParams}
                       disabled={!canEdit || !referenceDataReady || saving || !supplierID}
                       mapOption={(material) => purchaseMaterialOption(material, supplierID)}
-                      placeholder="请选择材料名称"
+                      placeholder="选择材料"
                       allowClear
                       showSearch
                       options={materialOptions}
@@ -583,7 +584,7 @@ export function PurchaseOrderFormFields({
                   label="金额"
                   rules={[optionalMoneyRule('金额')]}
                 >
-                  <Input placeholder="留空时根据数量和单价自动计算" />
+                  <Input placeholder="自动计算" />
                 </Form.Item>,
 
                 <Form.Item

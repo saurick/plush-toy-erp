@@ -935,7 +935,8 @@ export default function PermissionAdminAccounts({
           className="erp-permission-list-toolbar__search"
           aria-label="搜索员工账号"
           value={adminSearchKeyword}
-          placeholder="搜索姓名、员工账号、手机号或岗位"
+          placeholder="搜员工"
+          searchHint="可搜索：姓名、员工账号、手机号、岗位"
           onSearch={(value) => {
             setAdminSearchKeyword(value)
             setTablePagination((prev) => ({ ...prev, current: 1 }))
@@ -1073,7 +1074,7 @@ export default function PermissionAdminAccounts({
             ]}
           >
             <Input
-              placeholder="例如 sales01 或 sales_01"
+              placeholder="如 sales01"
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
@@ -1108,8 +1109,8 @@ export default function PermissionAdminAccounts({
               disabled={!canAssignUserRoles}
               placeholder={
                 canAssignUserRoles
-                  ? '选择一个或多个岗位'
-                  : '当前账号只能创建未分配岗位的账号'
+                  ? '选择岗位'
+                  : '暂无可分配岗位'
               }
               options={roleOptions}
             />
@@ -1150,7 +1151,7 @@ export default function PermissionAdminAccounts({
               allowClear
               value={selectedRoleKeys}
               options={roleOptions}
-              placeholder="选择一个或多个可分配岗位"
+              placeholder="选择岗位"
               style={{ width: '100%', marginTop: 8 }}
               onChange={setSelectedRoleKeys}
             />
@@ -1307,7 +1308,7 @@ export default function PermissionAdminAccounts({
               maxLength={255}
               showCount
               rows={3}
-              placeholder="例如：临时离岗、安全核查或恢复正常使用"
+              placeholder="填写调整原因"
             />
           </Form.Item>
         </BusinessForm>
@@ -1347,7 +1348,7 @@ export default function PermissionAdminAccounts({
               maxLength={255}
               showCount
               rows={3}
-              placeholder="例如：员工离职，账号停止使用"
+              placeholder="填写停用原因"
             />
           </Form.Item>
         </BusinessForm>

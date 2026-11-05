@@ -272,7 +272,7 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
           allowClear
           optionFilterProp="searchText"
           options={unitOptions}
-          placeholder="请选择单位"
+          placeholder="单位"
           showSearch
         />
       </Form.Item>

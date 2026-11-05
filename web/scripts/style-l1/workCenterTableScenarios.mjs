@@ -18,7 +18,7 @@ async function verifyTaskViewKeyboardRecovery(page, assert) {
     await page.waitForFunction(() => document.querySelectorAll('.erp-work-center-table tr[data-row-key]').length === 50)
     await page.locator('.erp-task-board-lanes[aria-busy="false"]').waitFor()
   }
-  const search = page.getByPlaceholder('订单 / 产品 / 物料 / 款号', { exact: true })
+  const search = page.getByPlaceholder('搜单号、产品、物料', { exact: true })
   await search.fill('核对')
   await search.press('Enter')
   await page.waitForURL((url) => url.searchParams.get('q') === '核对')

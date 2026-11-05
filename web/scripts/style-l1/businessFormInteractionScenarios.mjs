@@ -389,7 +389,7 @@ export function createBusinessFormInteractionScenarios({
         await materialModal.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '新建材料档案')
         const materialCodeValue = await materialModal
-          .getByPlaceholder('自动生成，可按需要调整')
+          .getByPlaceholder('自动生成')
           .inputValue()
         assert(
           /^MAT-\d{8}-\d{3}$/u.test(materialCodeValue),

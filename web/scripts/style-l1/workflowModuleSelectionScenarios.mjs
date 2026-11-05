@@ -4,7 +4,7 @@ import {
   workflowModuleSelectionDefinitions,
 } from './workflowModuleSelectionFixtures.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
-import { assertVisibleSearchPlaceholdersFit } from './inputControlAssertions.mjs'
+import { assertVisibleControlPlaceholdersFit } from './inputControlAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const taskActions = [
@@ -621,7 +621,7 @@ export function createWorkflowModuleSelectionScenarios(deps) {
               `${name}/${width}: clearing restores the same table position`
             )
             await assertNoHorizontalOverflow(page, `${name}/${width}`)
-            await assertVisibleSearchPlaceholdersFit(page, `${name}/${width}`)
+            await assertVisibleControlPlaceholdersFit(page, `${name}/${width}`)
             if (width === 1440 || width === 390) {
               await page.screenshot({
                 path: path.join(outputDir, `${name}-${width}.png`),

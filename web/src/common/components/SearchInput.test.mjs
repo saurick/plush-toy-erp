@@ -117,13 +117,13 @@ test('search scope is discoverable on focus, dismisses on Escape and blur, and p
     dom.restore()
   })
   await act(async () => root.render(createElement(SearchInput, {
-    showSearchScope: true,
     searchHint: '可搜索：单号、产品、来源订单',
     onFocus: () => calls.push('focus'),
     onBlur: () => calls.push('blur'),
     onSubmitted: () => calls.push('enter'),
   })))
   const input = container.querySelector('input')
+  assert.equal(input.getAttribute('title'), null, '完整范围通过聚焦提示显示，不叠加浏览器原生悬停提示')
   const initialDescription = input.getAttribute('aria-describedby')
   assert.equal(document.getElementById(initialDescription), null)
   await act(async () => input.focus())
@@ -136,6 +136,52 @@ test('search scope is discoverable on focus, dismisses on Escape and blur, and p
   await act(async () => input.blur())
   assert.equal(input.getAttribute('aria-describedby'), initialDescription)
   assert.deepEqual(calls, ['focus', 'enter', 'blur', 'focus', 'blur'])
+  await act(async () => root.render(createElement(SearchInput, {
+    searchHint: '可搜索：产品与编号',
+    showSearchScope: false,
+    title: '专用说明',
+    'aria-describedby': 'external-search-description',
+  })))
+  const unscopedInput = container.querySelector('input')
+  await act(async () => unscopedInput.focus())
+  assert.equal(unscopedInput.getAttribute('aria-describedby'), 'external-search-description', '显式关闭范围浮层时保留外部说明')
+  assert.equal(unscopedInput.getAttribute('title'), '专用说明', '保留调用方明确提供的原生提示')
+  await act(async () => root.render(createElement(SearchInput, {
+    placeholder: '查资料',
+    searchHint: '查资料',
+  })))
+  const conciseInput = container.querySelector('input')
+  await act(async () => conciseInput.focus())
+  assert.equal(conciseInput.getAttribute('aria-describedby'), null, '完整范围与占位提示相同时不重复弹出说明')
+})
+
+test('runtime placeholders keep calculation and approval rules in visible instructions', () => {
+  const violations = []
+  const forbidden = /自动生成[，,].*调整|留空(?:时|表示).*?(?:计算|批准)|草稿.*提交前/u
+  const visit = (node, filePath) => {
+    if (!node || typeof node !== 'object') return
+    if (node.type === 'JSXAttribute' && node.name?.name === 'placeholder') {
+      const inspect = (value) => {
+        if (!value || typeof value !== 'object') return
+        if (value.type === 'StringLiteral' && forbidden.test(value.value)) violations.push(`${relative(srcRoot, filePath)}:${value.loc.start.line}`)
+        for (const [key, child] of Object.entries(value)) {
+          if (key === 'loc') continue
+          if (Array.isArray(child)) child.forEach(inspect)
+          else inspect(child)
+        }
+      }
+      inspect(node.value)
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'loc') continue
+      if (Array.isArray(value)) value.forEach((item) => visit(item, filePath))
+      else visit(value, filePath)
+    }
+  }
+  for (const filePath of collectJsxFiles(srcRoot).filter((file) => !file.includes('.test.'))) {
+    visit(parse(readFileSync(filePath, 'utf8'), { sourceType: 'module', plugins: ['jsx'] }), filePath)
+  }
+  assert.deepEqual(violations, [])
 })
 
 test('desktop and mobile search submit once, support clear and cancel, and collapse on submission', async (t) => {

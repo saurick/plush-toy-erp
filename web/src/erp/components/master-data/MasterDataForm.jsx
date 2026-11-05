@@ -256,7 +256,7 @@ export function MasterDataFormFields({
             <Input
               allowClear
               autoComplete="off"
-              placeholder="自动生成，可按需要调整"
+              placeholder="自动生成"
             />
           </Form.Item>
           <Form.Item
@@ -285,14 +285,14 @@ export function MasterDataFormFields({
         <BusinessFormSection fieldLayout="adaptive" title="外贸信息">
           <Form.Item
             className="erp-business-action-form__field"
-            label="英文品名"
+            label={<BusinessHelpLabel label="英文品名" description="用于外贸单据；未知时可留空。" />}
             name="english_name"
           >
             <Input
               allowClear
               autoComplete="off"
               maxLength={255}
-              placeholder="用于外贸单据，未知时可留空"
+              placeholder="填写英文品名"
             />
           </Form.Item>
           <Form.Item
@@ -304,7 +304,7 @@ export function MasterDataFormFields({
               allowClear
               autoComplete="off"
               maxLength={32}
-              placeholder="按实际报关编码填写"
+              placeholder="填写报关编码"
             />
           </Form.Item>
         </BusinessFormSection>
@@ -352,7 +352,7 @@ export function MasterDataFormFields({
             <Input
               allowClear
               autoComplete="off"
-              placeholder="自动生成，可按需要调整"
+              placeholder="自动生成"
             />
           </Form.Item>
           <Form.Item
@@ -437,30 +437,30 @@ export function MasterDataFormFields({
             <Input
               allowClear
               autoComplete="off"
-              placeholder="自动生成，可按需要调整"
+              placeholder="自动生成"
             />
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field erp-business-action-form__field--wide"
-            label="环节名称"
+            label={<BusinessHelpLabel label="环节名称" description="可选择查货、车缝、手工、包装等已有环节，也可直接输入新环节。" />}
             name="name"
             rules={[{ required: true, message: '请填写环节名称' }]}
           >
             <TextSuggestionInput
               className="erp-process-name-suggested-input"
               options={processNameOptions}
-              placeholder="如查货、车缝、手工、包装，也可直接输入新环节"
+              placeholder="选择或填写环节"
             />
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
-            label="环节类别"
+            label={<BusinessHelpLabel label="环节类别" description="可从行业默认类别选择，也可直接输入新类别。" />}
             name="category"
           >
             <TextSuggestionInput
               className="erp-process-category-suggested-input"
               options={processCategoryOptions}
-              placeholder="从行业默认类别选择，或直接输入新类别"
+              placeholder="选择或填写类别"
             />
           </Form.Item>
         </BusinessFormSection>
@@ -520,7 +520,7 @@ export function MasterDataFormFields({
           <Input
             allowClear
             autoComplete="off"
-            placeholder="自动生成，可按需要调整"
+            placeholder="自动生成"
           />
         </Form.Item>
         <Form.Item
@@ -563,14 +563,14 @@ export function MasterDataFormFields({
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field erp-supplier-address-field"
-              label="经营 / 加工地址"
+              label={<BusinessHelpLabel label="经营 / 加工地址" description="填写合同中需要带出的加工厂或供应商地址。" />}
               name="address"
             >
               <BusinessTextArea
                 minRows={1}
                 allowClear
                 maxLength={512}
-                placeholder="填写合同中需要带出的加工厂或供应商地址"
+                placeholder="填写经营或加工地址"
                 showCount
               />
             </Form.Item>
@@ -579,13 +579,13 @@ export function MasterDataFormFields({
           <>
             <Form.Item
               className="erp-business-action-form__field"
-              label="细分分类"
+              label={<BusinessHelpLabel label="细分分类" description="可选择已有分类，也可直接输入新分类。" />}
               name="category"
             >
               <TextSuggestionInput
                 className="erp-material-category-suggested-input"
                 options={materialCategoryOptions}
-                placeholder="从已有分类选择，或直接输入新分类"
+                placeholder="选择或填写分类"
               />
             </Form.Item>
             <Form.Item
@@ -597,13 +597,13 @@ export function MasterDataFormFields({
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field"
-              label="颜色"
+              label={<BusinessHelpLabel label="颜色" description="可选择已有颜色，也可直接输入新颜色。" />}
               name="color"
             >
               <TextSuggestionInput
                 className="erp-material-color-suggested-input"
                 options={materialColorOptions}
-                placeholder="从已有颜色选择，或直接输入新颜色"
+                placeholder="选择或填写颜色"
               />
             </Form.Item>
             <DefaultUnitSelect
@@ -697,7 +697,7 @@ export function MasterDataFormFields({
                 mode="multiple"
                 options={supplierProcessOptions}
                 optionFilterProp="label"
-                placeholder="请选择可承接的加工工序"
+                placeholder="选择加工工序"
                 showSearch
               />
             </Form.Item>
@@ -768,7 +768,7 @@ export function MasterDataFormFields({
               allowClear
               autoComplete="off"
               maxLength={255}
-              placeholder="填写料号，厂商在左侧选择"
+              placeholder="填写供应商料号"
             />
           </Form.Item>
         </BusinessFormSection>

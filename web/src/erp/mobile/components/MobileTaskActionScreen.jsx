@@ -19,6 +19,7 @@ import {
   isWorkflowProcessDecisionTask,
   workflowTaskActionInput,
   workflowTaskActionRequiresReason,
+  WORKFLOW_APPROVED_QUANTITY_HINT,
 } from '../../utils/workflowTaskActionContract.mjs'
 import { getWorkflowTaskProcessContext, listWorkflowTaskEvents } from '../../api/workflowApi.mjs'
 import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
@@ -558,7 +559,7 @@ function MobileWorkflowTaskActionScreen({
               {effectiveAction ? (
                 <div className="mobile-task-action-field">
                   <label htmlFor={`${fieldID}-reason`}>
-                    <BusinessHelpLabel label={actionInput.fieldLabel} description={visibleActions.find((option) => option.key === effectiveAction)?.description} />
+                    <BusinessHelpLabel label={actionInput.fieldLabel} description={`${actionInput.help}。${visibleActions.find((option) => option.key === effectiveAction)?.description || ''}`} />
                     {reasonRequired ? (
                       <span
                         className="mobile-task-action-required"
@@ -628,18 +629,18 @@ function MobileWorkflowTaskActionScreen({
                     inputMode="decimal"
                     disabled={busy}
                     aria-invalid={Boolean(validationErrors.approvedQuantity)}
-                    aria-describedby={
-                      validationErrors.approvedQuantity
-                        ? `${fieldID}-approved-quantity-error`
-                        : undefined
-                    }
-                    placeholder="留空表示按申请数量批准"
+                    aria-describedby={[
+                      `${fieldID}-approved-quantity-hint`,
+                      validationErrors.approvedQuantity ? `${fieldID}-approved-quantity-error` : null,
+                    ].filter(Boolean).join(' ')}
+                    placeholder="选填"
                     value={approvedQuantity}
                     onChange={(event) => {
                       clearValidationError('approvedQuantity')
                       onApprovedQuantityChange(event.target.value)
                     }}
                   />
+                  <p id={`${fieldID}-approved-quantity-hint`} className="mobile-task-action-field-help">{WORKFLOW_APPROVED_QUANTITY_HINT}</p>
                   {validationErrors.approvedQuantity ? (
                     <p
                       id={`${fieldID}-approved-quantity-error`}

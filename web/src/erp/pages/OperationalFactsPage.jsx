@@ -2001,18 +2001,14 @@ export function OperationalFactWorkspace({
               ? '撤销后将保留原入库时间，按系统规则冲正成品库存，并记录本次操作人、时间和原因。'
               : '取消后将保留原过账时间，按系统规则冲正库存，并记录本次操作人、时间和原因。'}
         </p>
+        <label htmlFor="operational-fact-cancel-reason">业务原因</label>
         <Input.TextArea
+          id="operational-fact-cancel-reason"
           value={financeCancelReason}
           maxLength={255}
           showCount
           rows={4}
-          placeholder={
-            currentActiveKey === 'finance'
-              ? '请填写客户、供应商或账款调整的业务原因'
-              : selectedIsProductionCompletion
-                ? '请填写作废完工报告或撤销成品入库的业务原因'
-                : '请填写作废或取消的业务原因'
-          }
+          placeholder="填写业务原因"
           onChange={(event) => setFinanceCancelReason(event.target.value)}
         />
       </BusinessModal>

@@ -52,7 +52,7 @@ function TrackingSearch({ value, onSearch }) {
     <MobileSearchInput
       aria-label="搜索流转记录"
       placeholder="单号/任务"
-      title="搜索单号、任务、产品或款号"
+      searchHint="可搜索：单号、任务、产品、款号"
       maxLength={100}
       {...search}
     />

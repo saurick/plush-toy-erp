@@ -105,31 +105,33 @@ export function workflowTaskActionRequiresReason(task, action) {
   return ['block', 'blocked', 'reject', 'rejected', 'assign'].includes(action)
 }
 
+export const WORKFLOW_APPROVED_QUANTITY_HINT = '留空时按申请数量批准。'
+
 export function workflowTaskActionInput(task, action) {
   const required = workflowTaskActionRequiresReason(task, action)
   const mode = ({ done: 'complete', blocked: 'block', rejected: 'reject' })[action] || action
   let label = '处理说明'
-  let placeholder = '可补充本次处理情况'
+  let help = '可补充本次处理情况'
   if (mode === 'complete' && isWorkflowApprovalTask(task)) {
     label = '审批意见'
-    placeholder = required ? '填写审批依据和需要交接的信息' : '可补充核对情况或交接事项'
+    help = required ? '填写审批依据和需要交接的信息' : '可补充核对情况或交接事项'
   } else if (mode === 'complete' && task?.task_group === 'business_followup') {
     label = '处理结果'
-    placeholder = '填写处理结果和需要发起人了解的情况'
+    help = '填写处理结果和需要发起人了解的情况'
   } else if (mode === 'block') {
     label = '受阻原因'
-    placeholder = '选择受阻原因，补充说明选填'
+    help = '选择受阻原因，补充说明选填'
   } else if (mode === 'reject') {
     label = '退回原因'
-    placeholder = '填写退回依据和需要补充的内容'
+    help = '填写退回依据和需要补充的内容'
   } else if (mode === 'assign') {
     label = '转交原因'
-    placeholder = '填写请假、人员调整等转交原因'
+    help = '填写请假、人员调整等转交原因'
   } else if (mode === 'resume') {
-    placeholder = '可补充阻塞处理情况或后续安排'
+    help = '可补充阻塞处理情况或后续安排'
   } else if (mode === 'urge') {
     label = '催办说明'
-    placeholder = '可补充需跟进事项或期望完成时间'
+    help = '可补充需跟进事项或期望完成时间'
   }
-  return { required, label, fieldLabel: required ? label : `${label}（选填）`, placeholder }
+  return { required, label, fieldLabel: required ? label : `${label}（选填）`, placeholder: `填写${label}`, help }
 }

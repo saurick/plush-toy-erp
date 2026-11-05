@@ -324,7 +324,7 @@ function ChainSteps({ data, chain, status, keyword, stepKey, updateQuery }) {
   return (
     <div className="erp-dev-chain-audit__stack">
       <div className="erp-dev-chain-audit__toolbar">
-        <SearchInput allowClear placeholder="搜索环节、岗位或实际读回" value={keyword} onSearch={(value) => updateQuery({ q: value || null })} />
+        <SearchInput allowClear placeholder="搜环节或岗位" searchHint="可搜索：环节、岗位、实际读回" aria-label="搜索环节、岗位或实际读回" value={keyword} onSearch={(value) => updateQuery({ q: value || null })} />
         <FilterSelect
           emptyValue="all"
           label="步骤结果"

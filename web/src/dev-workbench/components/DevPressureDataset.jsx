@@ -175,7 +175,7 @@ export default function DevPressureDataset({ report, reports }) {
             value: item.id,
             label: `${pressureScaleLabel(item.dataScale)} · ${item.profile === 'quick' ? '短档' : '容量'} · ${item.id}`,
           }))}
-          placeholder="选择另一数据规模的运行"
+          placeholder="选择另一规模运行"
         />
       </div>
       {!comparison || comparison.reason ? (

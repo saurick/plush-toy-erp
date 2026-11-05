@@ -1028,7 +1028,7 @@ onCancel: () => resolve(false),
                         <Alert
                           showIcon
                           type="warning"
-                          message={`暂无一份已确认加工合同能同时覆盖 ${fabricMaterialRequirements.length} 项布料需求。每项都必须在同一合同中有材料、工序、单位和数量完全一致的未关闭明细。`}
+                          message={`暂无一份已确认加工合同能同时覆盖 ${fabricMaterialRequirements.length} 项布料需求。`}
                         />
                       ) : (
                         <div className="erp-business-inline-note" role="note">
@@ -1040,6 +1040,7 @@ onCancel: () => resolve(false),
                       <Form.Item
                         name="fabric_contract_order_id"
                         label="布料加工合同"
+                        extra="全部布料须使用同一份合同；合同明细的材料、工序、单位和数量须与需求一致。"
                         preserve={false}
                         rules={[
                           { required: true, message: '请选择布料加工合同' },
@@ -1062,7 +1063,7 @@ onCancel: () => resolve(false),
                         <Select
                           showSearch
                           options={fabricContractOptions}
-                          placeholder="选择能覆盖全部布料的同一份合同"
+                          placeholder="选择加工合同"
                           disabled={fabricContractOptions.length === 0}
                           filterOption={(input, option) =>
                             String(option?.searchText || option?.label || '')
@@ -1142,7 +1143,7 @@ onCancel: () => resolve(false),
                                 <Select
                                   showSearch
                                   options={entry?.options || []}
-                                  placeholder="选择材料、工序、单位和数量一致的明细"
+                                  placeholder="选择合同明细"
                                   filterOption={(input, option) =>
                                     String(
                                       option?.searchText || option?.label || ''
@@ -1205,7 +1206,7 @@ onCancel: () => resolve(false),
                         <Select
                           showSearch
                           options={normalizedOutsourcingItemOptions}
-                          placeholder="按合同号、工序或加工厂选择"
+                          placeholder="选择合同明细"
                           filterOption={(input, option) =>
                             String(option?.searchText || option?.label || '')
                               .toLocaleLowerCase('zh-CN')
@@ -1301,7 +1302,7 @@ onCancel: () => resolve(false),
             {nextOperation?.operation_code === 'PACKAGING' ? (
               <Form.Item name="finished_goods_receipt_id" label="成品入库单" rules={[{ required: true, message: '请选择已入库且尚有待包装数量的成品' }]}>
                 <Select
-                  placeholder="选择已确认的成品入库单"
+                  placeholder="选择成品入库单"
                   options={productionWipPackagingReceiptChoices(aggregate, selectedBatch).map((receipt) => ({ value: receipt.id, label: `${receipt.fact_no} · 可包装 ${receipt.remaining_quantity}` }))}
                   onChange={(id) => actionForm.setFieldValue('quantity', productionWipPackagingReceiptChoices(aggregate, selectedBatch).find((receipt) => receipt.id === id)?.remaining_quantity)}
                 />
@@ -1347,7 +1348,7 @@ onCancel: () => resolve(false),
                 minRows={2}
                 maxLength={BusinessTextPolicy.noteMaxCharacters}
                 showCount
-                placeholder="可填写版面、颜色、包装方式等核对说明"
+                placeholder="填写核对说明"
               />
             </Form.Item>
           </>

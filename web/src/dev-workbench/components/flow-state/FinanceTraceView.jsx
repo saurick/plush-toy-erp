@@ -448,7 +448,8 @@ export default function FinanceTraceView({
         <SearchInput
           className="erp-dev-finance__search"
           aria-label="查询财务记录"
-          placeholder="账款号、来源单号或编号"
+          placeholder="搜账款或来源单"
+          searchHint="可搜索：账款号、来源单号、编号"
           value={keyword}
           onSearch={(value) => {
             setKeyword(value)

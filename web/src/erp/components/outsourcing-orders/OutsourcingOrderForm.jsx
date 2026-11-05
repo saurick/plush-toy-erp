@@ -219,7 +219,7 @@ export default function OutsourcingOrderForm({
           label="加工合同号（自动）"
           rules={[{ required: true, message: '请输入或保留自动加工合同号' }]}
         >
-          <Input maxLength={64} placeholder="自动生成，可按需要调整" />
+          <Input maxLength={64} placeholder="自动生成" />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field erp-business-action-form__field--wide"
@@ -228,7 +228,7 @@ export default function OutsourcingOrderForm({
           rules={[{ required: true, message: '请选择加工厂' }]}
         >
           <Select
-            placeholder="请选择加工厂（乙方）"
+            placeholder="选择加工厂"
             showSearch
             options={supplierOptions}
             optionFilterProp="label"
@@ -248,7 +248,7 @@ export default function OutsourcingOrderForm({
           label="币种"
           rules={[{ required: true, message: '请选择币种' }]}
         >
-          <Select placeholder="请选择币种" options={BUSINESS_CURRENCY_OPTIONS} />
+          <Select placeholder="币种" options={BUSINESS_CURRENCY_OPTIONS} />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field erp-business-action-form__field--short"
@@ -326,7 +326,7 @@ export default function OutsourcingOrderForm({
           }}
           columns={OUTSOURCING_ORDER_COLUMNS}
           title="加工明细"
-          description="加工项目填写部位或内容（如脸*1、耳*2），工序选择电绣、激光等加工方式。"
+          description="草稿单价可暂缺，提交前须补齐单价与加工项目。选用规格后固定单位，调整单位前先清除规格。"
           emptyDescription="暂无加工明细"
           renderRow={({ add, field, fields, index, remove }) => (
             <BusinessLineItemRow
@@ -508,7 +508,7 @@ export default function OutsourcingOrderForm({
                           ]}
                         >
                           <Select
-                            placeholder="请选择产品 / 半成品"
+                            placeholder="选择产品或半成品"
                             allowClear
                             showSearch
                             options={productOptions}
@@ -530,7 +530,6 @@ export default function OutsourcingOrderForm({
                     className="erp-line-item-field erp-line-item-field--source"
                     name={[field.name, 'processing_item']}
                     label="加工项目"
-                    tooltip="提交前必填"
                   >
                     <BusinessTextArea
                       minRows={1}
@@ -587,7 +586,7 @@ export default function OutsourcingOrderForm({
                         rules={[{ required: true, message: '请选择单位' }]}
                       >
                         <Select
-                          placeholder="请选择单位"
+                          placeholder="单位"
                           disabled={taskReadOnly || Boolean(
                           getFieldValue(['items', field.name, 'product_sku_id'])
                         )}
@@ -613,7 +612,7 @@ export default function OutsourcingOrderForm({
                   label="单价"
                   rules={[decimalRule()]}
                 >
-                  <Input inputMode="decimal" placeholder="可暂不定价" />
+                  <Input inputMode="decimal" placeholder="待定价" />
                 </Form.Item>,
                 <Form.Item
                   noStyle
@@ -729,10 +728,9 @@ export default function OutsourcingOrderForm({
                         className="erp-line-item-field erp-line-item-field--source"
                         name={[field.name, 'product_sku_id']}
                         label="产品规格"
-                        tooltip="可选；选择规格后固定使用该规格的单位。需要调整单位时先清除规格。"
                       >
                         <Select
-                          placeholder={productID ? '选择产品规格' : '请先选择产品 / 半成品'}
+                          placeholder={productID ? '选择产品规格' : '请先选择产品'}
                           allowClear
                           showSearch
                           disabled={taskReadOnly || !productID}
@@ -804,6 +802,7 @@ export default function OutsourcingOrderForm({
         />
       </BusinessFormSection>
       <BusinessFormSection title="合同双方信息" layout="content">
+        <p className="erp-business-inline-note">提交前须补齐双方单位、联系人、电话和地址；乙方电话也可使用所选联系人的手机。</p>
         <div className="erp-outsourcing-contract-form__parties">
           <section aria-label="加工方信息">
             <h3>加工方</h3>
@@ -834,7 +833,6 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['supplier_snapshot', 'contact_name']}
               label="乙方联系人"
-              extra="提交前必填，可选择加工厂联系人或直接填写。"
             >
               <AutoComplete
                 allowClear
@@ -856,14 +854,13 @@ export default function OutsourcingOrderForm({
                 onSelect={(_value, option) =>
                   onSupplierContactSelect?.(option?.contact)
                 }
-                placeholder="选择或填写乙方联系人"
+                placeholder="选择或填写联系人"
               />
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field"
               name={['supplier_snapshot', 'contact_phone']}
               label="乙方联系电话"
-              tooltip="提交前须填写联系电话或已选联系人的手机"
             >
               <Input maxLength={64} placeholder="座机或手机" />
             </Form.Item>
@@ -871,7 +868,6 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['supplier_snapshot', 'address']}
               label="乙方地址"
-              tooltip="提交前必填"
             >
               <Input maxLength={512} />
             </Form.Item>
@@ -889,7 +885,6 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['contract_party_snapshot', 'buyerCompany']}
               label="委托单位"
-              tooltip="提交前必填"
             >
               <Input maxLength={128} />
             </Form.Item>
@@ -897,7 +892,6 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['contract_party_snapshot', 'buyerContact']}
               label="委托人"
-              tooltip="提交前必填"
             >
               <Input maxLength={64} />
             </Form.Item>
@@ -905,7 +899,6 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['contract_party_snapshot', 'buyerPhone']}
               label="委托方电话"
-              tooltip="提交前必填"
             >
               <Input maxLength={64} />
             </Form.Item>
@@ -913,7 +906,6 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['contract_party_snapshot', 'buyerAddress']}
               label="公司地址"
-              tooltip="提交前必填"
             >
               <Input maxLength={255} />
             </Form.Item>

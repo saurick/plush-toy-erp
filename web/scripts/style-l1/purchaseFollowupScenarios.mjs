@@ -375,7 +375,7 @@ export function createPurchaseFollowupScenarios({
             .length,
           52
         )
-        const search = page.getByPlaceholder('搜索单号、供应商或材料', {
+        const search = page.getByPlaceholder('搜单号、供应商、材料', {
           exact: true,
         })
         await search.fill('MAT-3')

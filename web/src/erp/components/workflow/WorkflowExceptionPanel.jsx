@@ -275,12 +275,13 @@ export default function WorkflowExceptionPanel({
         {compact ? <MobileSearchInput
           aria-label="搜索异常单号、订单、批次或原因"
           placeholder="单号/原因"
-          title="搜索异常单号、订单、批次或原因"
+          searchHint="可搜索：异常单号、订单、批次、原因"
           {...search}
         /> : <SearchInput
           {...search}
           aria-label="搜索异常单号、订单、批次或原因"
-          placeholder="异常单号 / 订单 / 批次 / 原因"
+          placeholder="搜异常单或原因"
+          searchHint="可搜索：异常单号、订单、批次、原因"
           maxLength={100}
           allowClear
         />}

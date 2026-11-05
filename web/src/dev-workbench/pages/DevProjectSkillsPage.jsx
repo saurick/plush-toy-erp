@@ -176,7 +176,8 @@ export default function DevProjectSkillsPage() {
               <SearchInput
                 allowClear
                 aria-label="搜索任务或 Skill"
-                placeholder="搜索任务或 Skill"
+                placeholder="搜任务或 Skill"
+                searchHint="可搜索：任务、Skill 名称"
                 value={keyword}
                 onSearch={(value) =>
                   updateQuery({ q: value, skill: '' })

@@ -135,7 +135,7 @@ export function createTaskIdentitySearchScenarios({ assert }) {
             name: '搜索任务编号、订单、产品、物料或款号',
             exact: true,
           })
-        : page.getByPlaceholder('订单 / 产品 / 物料 / 款号')
+        : page.getByPlaceholder('搜单号、产品、物料')
       const submit = async (keyword) => {
         await search.fill(keyword)
         await search.press('Enter')

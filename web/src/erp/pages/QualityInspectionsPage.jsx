@@ -1921,7 +1921,7 @@ export default function QualityInspectionsPage() {
         <label className="mobile-detail-section">
           选择本次收货的质检单
           <Select
-            placeholder="选择本次收货的质检单"
+            placeholder="选择收货质检单"
             aria-label="选择本次收货的质检单"
             value={selectedRow?.id}
             disabled={loading || saving}

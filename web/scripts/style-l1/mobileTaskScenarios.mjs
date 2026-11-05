@@ -284,6 +284,14 @@ export function createMobileTaskScenarios({
           }
         }
         await assertSearchFocus('mobile-task-search-focused')
+        const searchScope = page.getByRole('tooltip').filter({ hasText: '可搜索：任务编号、任务、单号、产品、款号、物料、处理原因' })
+        await searchScope.waitFor({ state: 'visible' })
+        assert.equal(await search.getAttribute('placeholder'), '搜任务或单号')
+        assert.equal(await search.getAttribute('title'), null, '搜索范围不重复使用原生提示')
+        await search.press('Escape')
+        await searchScope.waitFor({ state: 'hidden' })
+        await search.click()
+        await searchScope.waitFor({ state: 'visible' })
         assert.equal(
           await page.getByRole('button', { name: '搜索', exact: true }).count(),
           1
@@ -443,11 +451,12 @@ export function createMobileTaskScenarios({
         await copyDetail.screenshot({
           path: path.join(outputDir, 'mobile-task-product-detail.png'),
         })
-        const more = copyDetail.getByRole('button', { name: '更多操作', exact: true })
+        const detailHeader = page.locator('.mobile-task-flow-header:visible')
+        const more = detailHeader.getByRole('button', { name: '更多操作', exact: true })
         const moreSize = await more.boundingBox()
         assert.ok(moreSize.width >= 44 && moreSize.height >= 44, '更多操作保持可触控范围')
-        await assertTaskMenuCopy(page, copyDetail, '产品信息', ['产品：图片识别模拟产品', '产品编号：PRODUCT-7', '内部款号：唯一款号-RB018'])
-        await assertTaskMenuCopy(page, copyDetail, '任务信息', ['任务：确认兔子样品', 'SO-IMAGE-0', '进入岗位：工程 · 2026年'])
+        await assertTaskMenuCopy(page, detailHeader, '产品信息', ['产品：图片识别模拟产品', '产品编号：PRODUCT-7', '内部款号：唯一款号-RB018'])
+        await assertTaskMenuCopy(page, detailHeader, '任务信息', ['任务：确认兔子样品', 'SO-IMAGE-0', '进入岗位：工程 · 2026年'])
         await page
           .getByRole('button', { name: '查看图片识别模拟产品大图' })
           .first()
@@ -611,7 +620,7 @@ export function createMobileTaskScenarios({
         await assertTaskCopy(page, materialDetail.getByRole('button', { name: '复制款号', exact: true }), '示例织造AB-001#-02#米白')
         await assertTaskMenuCopy(
           page,
-          materialDetail,
+          detailHeader,
           '物料信息',
           ['款号：示例织造AB-001#-02#米白', '系统物料编号：MAT-95002']
         )

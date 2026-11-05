@@ -528,8 +528,8 @@ export default function SourceImportPickerModal({
               onSearch={handleKeywordChange}
               resetKey={open}
               placeholder={searchPlaceholder}
+              searchHint={searchHint}
               aria-label={searchAccessibleLabel}
-              title={searchAccessibleLabel}
             />
             <Button
               icon={<RollbackOutlined aria-hidden="true" />}

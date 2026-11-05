@@ -35,6 +35,8 @@ node ../scripts/qa/run-test-gate.mjs --kind node --label web-test-runner -- node
 
 ## 常用命令
 
+字段提示回归由 [inputHintScenarios.mjs](style-l1/inputHintScenarios.mjs) 提供 `input-hints-purchase`、`input-hints-purchase-narrow`、`input-hints-outsourcing` 和 `input-hints-products`，覆盖短占位、规则常显、输入清空与 ⓘ 关闭恢复。共享几何检查按实际字体和可用宽度核对可见的单行输入、搜索与下拉提示，不设置统一字数阈值；备注等多行输入按原换行合同验收。
+
 ```bash
 cd "$(git rev-parse --show-toplevel)/web"
 pnpm style:l1

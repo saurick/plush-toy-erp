@@ -286,7 +286,8 @@ function PermissionChecklist({
         <SearchInput
           className="erp-permission-checklist-search"
           aria-label="搜索功能或页面"
-          placeholder="搜索功能名称或页面"
+          placeholder="搜功能或页面"
+          searchHint="可搜索：功能名称、页面"
           allowClear
           value={searchKeyword}
           onSearch={(value) => onSearchChange(value)}

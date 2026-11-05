@@ -290,7 +290,7 @@ export default function SalesOrderExcelImport({
             <Select
               label="原表缺少单位时使用"
               aria-label="原表缺少单位时使用"
-              placeholder="原表缺少单位时，统一选择单位"
+              placeholder="选择补缺单位"
               style={{ width: '100%' }}
               allowClear
               showSearch
@@ -302,7 +302,7 @@ export default function SalesOrderExcelImport({
             <Select
               label="原表缺少币种时使用"
               aria-label="原表缺少币种时使用"
-              placeholder="原表缺少币种时，统一选择币种"
+              placeholder="选择补缺币种"
               style={{ width: '100%' }}
               allowClear
               options={BUSINESS_CURRENCY_OPTIONS}
@@ -311,7 +311,8 @@ export default function SalesOrderExcelImport({
             />
           </Space>
         }
-        searchPlaceholder="搜索订单编号、客户或产品名称"
+        searchPlaceholder="搜订单、客户、产品"
+        searchHint="可搜索：订单编号、客户、产品名称"
         rows={previewOrders}
         emptyDescription="文件中没有可核对的订单"
         filteredEmptyDescription={reviewOnly ? '当前范围没有待核对订单' : '没有符合条件的订单'}

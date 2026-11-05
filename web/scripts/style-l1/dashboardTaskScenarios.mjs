@@ -330,7 +330,7 @@ export function createDashboardTaskScenarios({
           0
         )
         await moreFilters.click()
-        const layoutSearch = page.getByPlaceholder('订单 / 产品 / 物料 / 款号')
+        const layoutSearch = page.getByPlaceholder('搜单号、产品、物料')
         await layoutSearch.fill('布局验证无匹配任务')
         await layoutSearch.press('Enter')
         await expectText(page, '当前分类暂无匹配任务')
@@ -1547,7 +1547,7 @@ export function createDashboardTaskScenarios({
           )
         })
         const taskBoardSearch =
-          page.getByPlaceholder('订单 / 产品 / 物料 / 款号')
+          page.getByPlaceholder('搜单号、产品、物料')
         await taskBoardSearch.fill('RB-018')
         await taskBoardSearch.press('Enter')
         await page.waitForFunction(
@@ -1914,7 +1914,7 @@ export function createDashboardTaskScenarios({
           .click()
         await taskDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
         const restoredKeyword = await page
-          .getByPlaceholder('订单 / 产品 / 物料 / 款号')
+          .getByPlaceholder('搜单号、产品、物料')
           .inputValue()
         assert.equal(restoredKeyword, 'OUT-DASH-NAV')
         const taskBoardFilters = page.locator('.erp-task-board-controls')
@@ -1939,7 +1939,7 @@ export function createDashboardTaskScenarios({
         )
         assert.equal(new URL(page.url()).searchParams.get('q'), 'OUT-DASH-NAV', '清空筛选应保留搜索关键词')
         const retainedKeyword = await page
-          .getByPlaceholder('订单 / 产品 / 物料 / 款号')
+          .getByPlaceholder('搜单号、产品、物料')
           .inputValue()
         assert.equal(retainedKeyword, 'OUT-DASH-NAV')
         await clearFiltersButton.and(page.locator(':disabled')).waitFor({ state: 'visible', timeout: 10_000 })
@@ -2603,7 +2603,7 @@ export function createDashboardTaskScenarios({
           scenarioName: 'erp-task-board-dark-wide-desktop',
         })
         await page
-          .getByPlaceholder('订单 / 产品 / 物料 / 款号')
+          .getByPlaceholder('搜单号、产品、物料')
           .fill('OUT-DASH-WIDE-LAYOUT')
         await expectText(page, '宽屏重叠回归任务')
         await assertTextAbsent(page, '当前选中任务')

@@ -214,7 +214,7 @@ function EditorExample({ size = 'localAction' }) {
               { required: true, whitespace: true, message: '请填写说明标题' },
             ]}
           >
-            <Input placeholder="例如：核对下一批到货时间" />
+            <Input placeholder="如核对到货时间" />
           </Form.Item>
           <Form.Item name="category" label="事项">
             <Select
@@ -228,7 +228,7 @@ function EditorExample({ size = 'localAction' }) {
           <Form.Item name="note" label="补充内容">
             <BusinessTextArea
               minRows={4}
-              placeholder="可输入长内容，检查自动增高和保留输入"
+              placeholder="填写演示备注"
             />
           </Form.Item>
         </Form>

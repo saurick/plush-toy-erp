@@ -118,6 +118,7 @@ export function BasicInputExample() {
           <label htmlFor="control-product-name">产品名称</label>
           <Input
             id="control-product-name"
+            placeholder="填写产品名称"
             allowClear
             value={name}
             disabled={disabled}
@@ -128,7 +129,7 @@ export function BasicInputExample() {
         <div className="erp-control-input-field">
           <label htmlFor="control-product-category">产品类别</label>
           <Select
-            placeholder="产品类别"
+            placeholder="选择产品类别"
             aria-label="产品类别"
             id="control-product-category"
             allowClear

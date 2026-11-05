@@ -1596,7 +1596,7 @@ const BusinessAttachmentPanel = forwardRef(
               maxLength={255}
               showCount
               autoSize={{ minRows: 3, maxRows: 6 }}
-              placeholder="请说明为什么撤销，例如：上传了错误版本"
+              placeholder="填写撤销原因"
               onChange={(event) => setWithdrawalReason(event.target.value)}
             />
           </Space>

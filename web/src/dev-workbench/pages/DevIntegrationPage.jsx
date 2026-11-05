@@ -391,7 +391,8 @@ export default function DevIntegrationPage() {
                     <SearchInput
                       id="integration-search"
                       aria-label="搜索接口名称、方法名或用途"
-                      placeholder="搜索接口名称、方法名或用途"
+                      placeholder="搜接口或方法"
+                      searchHint="可搜索：接口名称、方法名、用途"
                       allowClear
                       value={query.q}
                       onSearch={(value) =>

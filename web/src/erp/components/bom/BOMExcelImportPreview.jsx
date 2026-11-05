@@ -155,7 +155,8 @@ export default function BOMExcelImportPreview({
             <SearchInput
               className="erp-source-import-picker__search"
               aria-label="搜索 BOM 导入明细"
-              placeholder="搜索材料、部位或原表内容"
+              placeholder="搜材料或部位"
+              searchHint="可搜索：材料、部位、原表内容"
               value={keyword}
               onSearch={(value) => { setKeyword(value); setPage(1) }}
             />

@@ -264,7 +264,7 @@ export default function DevUIEmptyExamples() {
           <Form.Item name="note" label="订单备注">
             <BusinessTextArea
               aria-label="空提示样例备注"
-              placeholder="切换场景后保留此处草稿"
+              placeholder="填写演示草稿"
               maxLength={2000}
             />
           </Form.Item>

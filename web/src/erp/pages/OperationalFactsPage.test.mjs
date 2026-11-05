@@ -58,8 +58,8 @@ test('production facts load the exact draft before opening the shared editor', (
 test('finance cancellation requires a bounded business reason and sends it to the canonical action', () => {
   assert.match(source, /'作废财务草稿'/)
   assert.match(source, /'取消财务记录'/)
-  assert.match(source, /请填写客户、供应商或账款调整的业务原因/u)
-  assert.match(source, /请填写作废或取消的业务原因/u)
+  assert.match(source, /<label htmlFor="operational-fact-cancel-reason">业务原因<\/label>/u)
+  assert.match(source, /id="operational-fact-cancel-reason"[\s\S]*?placeholder="填写业务原因"/u)
   assert.match(source, /maxLength=\{255\}/)
   assert.match(mutations, /\{ reason \}/)
   assert.match(source, /currentActiveKey === 'finance'/)

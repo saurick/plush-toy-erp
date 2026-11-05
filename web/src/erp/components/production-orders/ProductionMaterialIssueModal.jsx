@@ -222,7 +222,7 @@ export default function ProductionMaterialIssueModal({
             showSearch
             optionFilterProp="label"
             options={warehouseOptions}
-            placeholder="选择仓库"
+            placeholder="仓库"
             onChange={(value) => {
               form.setFieldValue('lot_id', undefined)
               onWarehouseChange?.(value)

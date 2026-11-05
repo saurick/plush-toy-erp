@@ -1874,7 +1874,9 @@ export default function DevTestingPage() {
         <SearchInput
           allowClear
           className="erp-dev-testing-search"
-          placeholder="搜索命令、来源、验收词"
+          placeholder="搜命令或验收词"
+          searchHint="可搜索：命令、来源、验收词"
+          aria-label="搜索命令、来源、验收词"
           value={keyword}
           onSearch={(value) => setCommandKeyword(value)}
         />

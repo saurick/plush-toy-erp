@@ -59,6 +59,7 @@ import {
   isWorkflowProcessDecisionTask,
   workflowTaskActionInput,
   workflowTaskActionRequiresReason,
+  WORKFLOW_APPROVED_QUANTITY_HINT,
 } from '../../utils/workflowTaskActionContract.mjs'
 import {
   buildWorkflowProcessDecision,
@@ -666,7 +667,7 @@ roleKey: task.owner_role_key,
           {actionMode !== 'block' ? (
             <div className="erp-task-action-drawer__action-head">
               <div>
-                <BusinessHelpLabel label={actionInput.fieldLabel} description={`${TASK_ACTION_DESCRIPTIONS[actionMode]} ${getTaskActionDescription(actionMode)}`} />
+                <BusinessHelpLabel label={actionInput.fieldLabel} description={`${actionInput.help}。${TASK_ACTION_DESCRIPTIONS[actionMode]} ${getTaskActionDescription(actionMode)}`} />
               </div>
             </div>
           ) : null}
@@ -689,7 +690,7 @@ roleKey: task.owner_role_key,
                 placeholder={
                             assignmentAccess.loading
                               ? '正在加载可选接收人'
-                              : '选择接收人，或由岗位人员处理'
+                              : '选择接收人或岗位'
                           }
                 notFoundContent={
                   <Empty
@@ -779,11 +780,13 @@ roleKey: task.owner_role_key,
                 value={approvedQuantity}
                 status={approvedQuantityError ? 'error' : undefined}
                 disabled={actionSaving || !canSubmitAction}
-                placeholder="留空表示按申请数量批准"
+                placeholder="选填"
+                aria-describedby="erp-task-approved-quantity-hint"
                 onChange={(event) =>
                             setApprovedQuantity(event.target.value)
                           }
               />
+              <Text id="erp-task-approved-quantity-hint" type="secondary">{WORKFLOW_APPROVED_QUANTITY_HINT}</Text>
               {approvedQuantityError ? (
                 <Alert
                   type="error"

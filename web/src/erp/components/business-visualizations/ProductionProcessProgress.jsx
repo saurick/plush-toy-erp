@@ -160,7 +160,7 @@ export default function ProductionProcessProgress({
               optionFilterProp="label"
               value={selectedOrderID || undefined}
               options={options}
-              placeholder="选择已发布或已关闭的生产订单"
+              placeholder="选择生产订单"
               onChange={(value) => onSelectOrder?.(value ?? null)}
             />
           </div>
@@ -194,7 +194,8 @@ export default function ProductionProcessProgress({
           <SearchInput
             className="erp-production-process__search"
             aria-label="搜索生产产品或规格"
-            placeholder="搜索产品、编码或规格"
+            placeholder="搜本单产品或规格"
+            searchHint="可搜索：本单产品、规格编码"
             allowClear
             value={viewState.query || ''}
             onSearch={(value) => change({ query: value, page: 1 })}

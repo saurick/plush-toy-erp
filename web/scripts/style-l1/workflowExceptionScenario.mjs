@@ -100,7 +100,7 @@ export function workflowExceptionScenario(deps) {
       await panel.getByText('EX-DESKTOP-021', { exact: true }).waitFor()
       assert.equal(reads.at(-1).offset, 20)
       await verifyMobileNavigationMotion(page, assert, '.erp-task-tracking-views', 0)
-      await toolbar.getByPlaceholder('单号 / 任务 / 产品 / 款号').waitFor()
+      await toolbar.getByPlaceholder('搜单号、任务、产品').waitFor()
       await verifyMobileNavigationMotion(page, assert, '.erp-task-tracking-views', 1, true)
       await panel.getByText('EX-DESKTOP-021', { exact: true }).waitFor()
       assert.equal(reads.at(-1).offset, 20, '切换追踪视图保留异常页码')

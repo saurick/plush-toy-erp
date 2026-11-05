@@ -273,8 +273,8 @@ export function SalesOrderFormFields({
             autoComplete="off"
             placeholder={
               orderID
-                ? '请保留或填写订单号'
-                : '留空时保存自动编号，也可手工填写'
+                ? '填写订单号'
+                : '自动编号或手填'
             }
           />
         </Form.Item>
@@ -307,7 +307,7 @@ export function SalesOrderFormFields({
           name="currency"
           rules={[{ required: true, message: '请选择币种' }]}
         >
-          <Select placeholder="请选择币种" options={BUSINESS_CURRENCY_OPTIONS} />
+          <Select placeholder="币种" options={BUSINESS_CURRENCY_OPTIONS} />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field erp-business-action-form__field--short"
@@ -388,7 +388,7 @@ export function SalesOrderFormFields({
                 contact,
               }))
               .filter((option) => option.value)}
-            placeholder="选择客户联系人或手动录入"
+            placeholder="选择或填写联系人"
             maxLength={128}
             onChange={(value) => {
               if (!value) {
@@ -557,7 +557,7 @@ export function SalesOrderFormFields({
             allowClear
             showCount
             maxLength={BusinessTextPolicy.noteMaxCharacters}
-            placeholder="账期影响报价时记录核对结论"
+            placeholder="填写账期核对结论"
           />
         </Form.Item>
       </BusinessFormSection>
@@ -658,7 +658,7 @@ export function SalesOrderItemsFormSection({
           <>
             {fields.length === 0 ? (
               <BusinessLineEditor rowActions={false}>
-                <BusinessLineItemsHeader title="订货明细" />
+                <BusinessLineItemsHeader title="订货明细" description="单价可暂缺，提交前须补齐；生产数量＝订单数量＋船头版。" />
                 <BusinessLineItemsEmpty>
                   暂无订货明细，可先保存订单草稿
                 </BusinessLineItemsEmpty>
@@ -666,6 +666,7 @@ export function SalesOrderItemsFormSection({
             ) : (
               <BusinessGroupedLineItems
                 title="订货明细"
+                description="单价可暂缺，提交前须补齐；生产数量＝订单数量＋船头版。"
                 fields={fields}
                 form={form}
                 getGroup={(item) => ({ key: salesOrderLineGroupKey(item), label: salesOrderRequirementName(item) || '待填写订货产品' })}
@@ -804,7 +805,7 @@ export function SalesOrderItemsFormSection({
                                   ? salesOrderRequirementName(
                                       watchedItems[field.name]
                                     )
-                                  : '客户要订的产品，无需先建档'
+                                  : '填写订货产品'
                               }
                             />
                           </Form.Item>
@@ -857,7 +858,7 @@ export function SalesOrderItemsFormSection({
                               disabled={!canEditLine}
                               optionFilterProp="searchText"
                               options={unitOptions}
-                              placeholder="选择单位"
+                              placeholder="单位"
                               onChange={() => {
                               form
                                 .validateFields([
@@ -878,7 +879,7 @@ export function SalesOrderItemsFormSection({
                             allowClear
                             autoComplete="off"
                             disabled={!canEditLine}
-                            placeholder="草稿可暂缺，提交前补齐"
+                            placeholder="填写单价"
                           />
                         </Form.Item>,
                         <Form.Item
@@ -962,7 +963,7 @@ export function SalesOrderItemsFormSection({
                         name={[field.name, 'order_category']}
                       >
                         <Select
-                          placeholder="请选择类别"
+                          placeholder="类别"
                           disabled={!canEditLine}
                           options={SALES_ORDER_CATEGORY_OPTIONS}
                         />
@@ -1016,7 +1017,7 @@ export function SalesOrderItemsFormSection({
                                 getFieldValue(['items', field.name]) || {}
                               )}
                               readOnly
-                              placeholder="订单数量＋船头版"
+                              placeholder="自动计算"
                             />
                           </Form.Item>
                         )}
@@ -1037,15 +1038,14 @@ export function SalesOrderItemsFormSection({
                           >
                             <Input
                               readOnly
-                              placeholder="工程关联物料清单后显示"
+                              placeholder="由工程资料带入"
                             />
                           </Form.Item>
                         </>
                       ) : null}
                       <Form.Item
                         className="erp-line-item-field erp-line-item-field--source"
-                        label="已有规格（选填）"
-                        tooltip="没有现成规格时，可由工程后续关联。"
+                        label={<BusinessHelpLabel label="已有规格（选填）" description="没有现成规格时，可由工程后续关联。" />}
                         name={[field.name, 'product_sku_id']}
                       >
                         <RemoteReferenceSelect

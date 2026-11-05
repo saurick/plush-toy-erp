@@ -403,7 +403,7 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
         allowClear
         maxLength={500}
         value={searchKeyword}
-        placeholder="例如：销售订单、销售 PMC、已提交"
+        placeholder="搜业务定义"
         searchHint="本页 5 个视图的定义总索引，不属于当前 Tab；不搜索具体任务、运行实例或真实业务记录"
         aria-autocomplete="list"
         aria-expanded={Boolean(normalized)}

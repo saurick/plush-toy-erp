@@ -51,6 +51,7 @@ import {
   canReadProductionExceptionDecisions,
 } from '../utils/productionRecordViews.mjs'
 import { getBusinessModule } from '../config/businessModules.mjs'
+import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
@@ -88,6 +89,8 @@ import {
   getWorkflowTaskActionPermission,
   isWorkflowApprovalTask,
   isWorkflowProcessDecisionTask,
+  workflowTaskActionInput,
+  WORKFLOW_APPROVED_QUANTITY_HINT,
 } from '../utils/workflowTaskActionContract.mjs'
 import {
   buildWorkflowProcessDecision,
@@ -1516,22 +1519,16 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             style={{ marginBottom: 16 }}
           />
         ) : null}
+        <label htmlFor="erp-module-task-reason">
+          <BusinessHelpLabel label={workflowTaskActionInput(selectedTasks[0], taskReasonModal?.mode).fieldLabel} description={workflowTaskActionInput(selectedTasks[0], taskReasonModal?.mode).help} />
+        </label>
         <Input.TextArea
+          id="erp-module-task-reason"
           rows={4}
           maxLength={240}
           showCount
           autoFocus
-          placeholder={
-            taskReasonModal?.mode === 'block'
-              ? '填写阻塞原因；提交后只更新当前任务状态。'
-              : taskReasonModal?.mode === 'complete'
-                ? '填写审批意见和判断依据；审批不会直接写入业务事实。'
-                : taskReasonModal?.mode === 'reject'
-                  ? '填写退回原因；提交后只更新当前任务状态。'
-                  : taskReasonModal?.mode === 'resume'
-                    ? '填写阻塞解除说明；任务将恢复为可执行。'
-                    : '填写催办原因；只保存本次催办记录。'
-          }
+          placeholder={workflowTaskActionInput(selectedTasks[0], taskReasonModal?.mode).placeholder}
           value={taskReasonModal?.reason || ''}
           onChange={(event) =>
             setTaskReasonModal((current) =>
@@ -1539,13 +1536,16 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             )
           }
         />
+        <p className="erp-business-inline-note">任务结果会保留；库存、出货与财务结果以对应业务单据的实际记录为准。</p>
         {taskReasonApprovedQuantityAllowed ? (
-          <>
+          <Space direction="vertical" size={6} style={{ width: '100%', marginTop: 16 }}>
+            <label htmlFor="erp-module-approved-quantity">批准数量（选填）</label>
             <Input
-              style={{ marginTop: 16 }}
+              id="erp-module-approved-quantity"
+              aria-describedby="erp-module-approved-quantity-hint"
               inputMode="decimal"
               status={taskReasonApprovedQuantityError ? 'error' : undefined}
-              placeholder="批准数量（可选；留空表示按申请数量批准）"
+              placeholder="选填"
               value={taskReasonModal?.approvedQuantity || ''}
               onChange={(event) =>
                 setTaskReasonModal((current) =>
@@ -1555,6 +1555,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 )
               }
             />
+            <span id="erp-module-approved-quantity-hint">{WORKFLOW_APPROVED_QUANTITY_HINT}</span>
             {taskReasonApprovedQuantityError ? (
               <Alert
                 type="error"
@@ -1563,7 +1564,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 style={{ marginTop: 8 }}
               />
             ) : null}
-          </>
+          </Space>
         ) : null}
       </BusinessModal>
     </>

@@ -8,6 +8,7 @@ import {
   isWorkflowApprovalTask,
   isWorkflowProcessDecisionTask,
   workflowTaskAllowsApprovedQuantity,
+  workflowTaskActionInput,
 } from './workflowTaskActionContract.mjs'
 
 const ALL_APPROVAL_CAPABILITIES = Object.freeze([
@@ -18,6 +19,21 @@ const ALL_APPROVAL_CAPABILITIES = Object.freeze([
   'engineering.material.boss_approve',
   'engineering.material.finance_approve',
 ])
+
+test('办理输入保留短提示，并把填写指导与必填责任分开', () => {
+  const approval = workflowTaskActionInput({ required_capability_key: 'production.exception.approve' }, 'complete')
+  assert.equal(approval.placeholder, '填写审批意见')
+  assert.equal(approval.required, true)
+  assert.match(approval.help, /审批依据/u)
+  const followup = workflowTaskActionInput({ task_group: 'business_followup' }, 'complete')
+  assert.equal(followup.placeholder, '填写处理结果')
+  assert.match(followup.help, /发起人/u)
+  const urge = workflowTaskActionInput({}, 'urge')
+  assert.equal(urge.placeholder, '填写催办说明')
+  assert.equal(urge.required, false)
+  assert.match(urge.fieldLabel, /选填/u)
+  assert.match(urge.help, /期望完成时间/u)
+})
 const APPROVAL_CAPABILITIES = Object.freeze([
   'finance.payment.approve',
   'warehouse.adjustment.approve',

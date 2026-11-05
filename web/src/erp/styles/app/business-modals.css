@@ -281,6 +281,7 @@
 }
 
 .erp-business-action-form .ant-form-item-label > label {
+  min-height: max(28px, var(--erp-touch-target, 0px));
   color: #273344;
   font-size: var(--erp-font-body);
   font-weight: 720;

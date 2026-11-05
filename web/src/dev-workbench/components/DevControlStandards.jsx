@@ -142,8 +142,11 @@ const TOPICS = [
     description: 'Button、Input 继承项目主题；下拉统一使用 AppSelect / FilterSelect，选中后保留用途，清空后恢复提示。',
     rules: [
       ['普通文本与枚举', 'Input / AppSelect', '字段有明确提示和可见用途；可编辑值支持清空，必填仍由表单校验。'],
+      ['占位提示', '简短且适合控件宽度', '标签说明填写对象，占位提示只提供短示例或操作提示；不按统一字数机械截断。'],
+      ['关键规则', '字段或明细区常显一次', '金额计算、留空含义和提交条件在输入后仍可查看；同一组明细不逐行重复说明。'],
+      ['补充帮助', 'BusinessHelpLabel', '需要额外解释时使用 ⓘ 原位查看，支持点击、键盘和触摸；含义清楚的字段保持简洁。'],
       ['普通备注', 'BusinessTextArea', '两行起步、自动增高，显示字数与字段上限；清空恢复初始高度，只读或禁用时隐藏计数。'],
-      ['搜索与业务筛选', 'SearchInput / FilterSelect / SelectFilter', '清空取消条件，下拉菜单不添加“全部……”占位项；固定模式保留有效值。'],
+      ['搜索与业务筛选', 'SearchInput / FilterSelect / SelectFilter', '搜索框用短提示点明主要对象，完整范围在聚焦时显示，提交、取消或失焦后收起；清空取消条件，下拉菜单不添加“全部……”占位项。'],
       ['领域选择', '已有来源或主数据选择器', '读取、搜索和来源快照合同由领域组件承接。'],
     ],
     checks: ['修改名称和类别，核对当前结果；输入多行备注，观察字数和高度。', '清空内容，再恢复初始值。', '切换禁用与错误，核对值保留、计数和状态外观。'],
@@ -762,6 +765,7 @@ export default function DevControlStandards() {
         <SearchInput
           aria-label="搜索控件设计"
           placeholder="控件或场景"
+          searchHint="可搜索：控件名称、使用场景、复用边界"
           value={query}
           allowClear
           onSearch={(value) => update({ controlq: value })}

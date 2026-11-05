@@ -275,7 +275,7 @@ revision,
         }
         const filtered = { expectedKeyword: '未设置截止的跟进', started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = filtered
-        const search = mobile ? page.getByRole('searchbox') : page.getByPlaceholder('订单 / 产品 / 物料 / 款号', { exact: true })
+        const search = mobile ? page.getByRole('searchbox') : page.getByPlaceholder('搜单号、产品、物料', { exact: true })
         await search.fill('未设置截止的跟进')
         await search.press('Enter')
         await filtered.started.promise

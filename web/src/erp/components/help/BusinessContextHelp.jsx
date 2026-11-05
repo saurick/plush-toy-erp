@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { QuestionCircleOutlined } from '@ant-design/icons'
+import { InfoCircleOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { Button, Popover, Tag, Typography } from 'antd'
 import Link from '../business-list/BusinessLink.jsx'
 import { getHelpCenterHref } from '../../config/helpManualCatalog.mjs'
@@ -234,7 +234,7 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', descripti
           size="small"
           className="erp-business-inline-help-trigger"
           disabled={false}
-          icon={<QuestionCircleOutlined />}
+          icon={<InfoCircleOutlined />}
           aria-label={`查看${label}说明`}
           aria-expanded={open}
           onMouseEnter={() => { explicitlyClosed.current = false }}

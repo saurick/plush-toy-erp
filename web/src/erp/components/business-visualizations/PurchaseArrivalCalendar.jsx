@@ -157,7 +157,9 @@ export default function PurchaseArrivalCalendar({
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索单号、供应商或材料"
+              placeholder="搜单号、供应商、材料"
+              searchHint="可搜索：单号、供应商、材料"
+              aria-label="搜索单号、供应商或材料"
               onSearch={(value) => {
                 change({})
                 onKeywordChange?.(value)

@@ -238,7 +238,7 @@ function TaskFinder({
           allowClear
           maxLength={200}
           value={draft}
-          placeholder="订单 / 来源单号 / 任务名称或编号"
+          placeholder="搜单号或任务"
           searchHint="查询当前账号可见任务；数字任务 ID 可用于开发排障"
           status={lookup.status === 'invalid' ? 'error' : undefined}
           aria-invalid={lookup.status === 'invalid' || undefined}

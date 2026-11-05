@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Button, Input, Spin } from 'antd'
 import { CommentOutlined } from '@ant-design/icons'
 import { useBlocker } from 'react-router-dom'
@@ -58,6 +58,7 @@ function ContributionDialog({
   const [summary, setSummary] = useState('')
   const [quote, setQuote] = useState('')
   const [feedback, setFeedback] = useState('')
+  const feedbackHintID = useId()
   const [response, setResponse] = useState({})
   const [preview, setPreview] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -448,9 +449,11 @@ function ContributionDialog({
                 autoSize={{ minRows: 3, maxRows: 6 }}
                 maxLength={HelpContentPolicy.feedbackMaxCharacters}
                 disabled={busy}
-                placeholder={`请说明哪里不准确，以及建议怎样调整（至少 ${HelpContentPolicy.feedbackMinCharacters} 个字）`}
+                placeholder="说明问题与修改建议"
+                aria-describedby={feedbackHintID}
               />
             </label>
+            <p id={feedbackHintID}>至少填写 {HelpContentPolicy.feedbackMinCharacters} 个字，说明哪里不准确以及建议怎样调整。</p>
             <Button
               type="primary"
               loading={busy}

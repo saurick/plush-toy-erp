@@ -149,7 +149,7 @@ function ArrivalRecord({
           <Select
             aria-label={`第${number}条入库仓库`}
             options={row.warehouseOptions || []}
-            placeholder="请选择仓库"
+            placeholder="仓库"
           />
         </Form.Item>,
         <Form.Item name={[field.name, 'lot_no']} label="批次 / 卷包编号">
@@ -186,7 +186,7 @@ function ArrivalRecord({
         <BusinessTextArea
           maxLength={BusinessTextPolicy.noteMaxCharacters}
           aria-label={`第${number}条说明`}
-          placeholder="记录异常情况或数量计算依据"
+          placeholder="填写入库说明"
         />
       </Form.Item>
     </BusinessCompactFieldRow>
@@ -410,7 +410,7 @@ export default function PurchaseOrderInboundDraftModal({
               showCount
               minRows={2}
               maxLength={BusinessTextPolicy.noteMaxCharacters}
-              placeholder="选填本次送货的补充信息"
+              placeholder="填写送货备注"
             />
           </Form.Item>
         </section>

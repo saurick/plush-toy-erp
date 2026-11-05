@@ -442,7 +442,7 @@ export function createFilterConflictScenarios(deps) {
       await dates.getByRole('button', { name: '取消', exact: true }).click()
       assert.equal(new URL(page.url()).searchParams.get('date_from'), selectedDate, '取消草稿保留已应用日期')
       await filters.getByRole('button', { name: '完成', exact: true }).click()
-      const search = panel.getByPlaceholder('订单 / 产品 / 物料 / 款号')
+      const search = panel.getByPlaceholder('搜单号、产品、物料')
       await search.fill('保留搜索条件')
       await search.press('Enter')
       await page.waitForURL((url) => url.searchParams.get('q') === '保留搜索条件')

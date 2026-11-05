@@ -395,7 +395,7 @@ export default function MobileProgressPanel({
             <MobileSearchInput
               aria-label="搜索进度"
               placeholder="单号/名称"
-              title="搜索单号、名称或负责人"
+              searchHint="可搜索：单号、名称、负责人"
               value={values.q}
               resetKey={`${scopeKey}:${query.view}:${active}`}
               onFocus={() => setFiltersOpen(false)}

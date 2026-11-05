@@ -58,7 +58,7 @@ import {
 import {
   assertVisibleInputControlRadius,
   assertVisibleAffixInputIsolation,
-  assertVisibleSearchPlaceholdersFit,
+  assertVisibleControlPlaceholdersFit,
   assertVisibleRoundedInputWrapperClipping,
   assertVisibleInputFocusRingNotClipped,
   assertVisibleInputTextVerticalRhythm,
@@ -1116,7 +1116,7 @@ async function runScenarioOnce(browser, scenario) {
     await assertVisibleRoundedInputWrapperClipping(page, scenario.name)
     await assertVisibleInputFocusRingNotClipped(page, scenario.name)
     await assertVisibleInputTextVerticalRhythm(page, scenario.name)
-    await assertVisibleSearchPlaceholdersFit(page, scenario.name)
+    await assertVisibleControlPlaceholdersFit(page, scenario.name)
     await assertVisibleBusinessFormControlHeight(page, scenario.name)
     await assertNoHorizontalOverflow(page, scenario.name)
     const consoleErrorContract =

@@ -297,7 +297,7 @@ export default function ShipmentQualityInspectionModal({
             optionFilterProp="label"
             options={sourceOptions}
             optionRender={renderShipmentQualityProductOption}
-            placeholder="请选择本次送检的成品批次"
+            placeholder="选择送检批次"
           />
         </Form.Item>
         <Form.Item

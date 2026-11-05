@@ -172,7 +172,8 @@ export default function DevBusinessUsabilityPage() {
           <SearchInput
             allowClear
             value={keyword}
-            placeholder="搜索页面、任务、公式、来源或岗位"
+            placeholder="搜页面或任务"
+            searchHint="可搜索：页面、任务、公式、来源、岗位"
             aria-label="搜索页面说明"
             onSearch={(value) => updateQuery({ keyword: value })}
           />

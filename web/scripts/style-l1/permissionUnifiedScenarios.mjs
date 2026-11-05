@@ -1438,8 +1438,8 @@ export function createPermissionUnifiedScenarios({
             .evaluate((input) => input.indeterminate),
           true
         )
-        await frame.getByPlaceholder('搜索功能名称或页面').fill('查看应付')
-        await frame.getByPlaceholder('搜索功能名称或页面').press('Enter')
+        await frame.getByPlaceholder('搜功能或页面').fill('查看应付')
+        await frame.getByPlaceholder('搜功能或页面').press('Enter')
         const checkbox = frame.getByRole('checkbox', {
           name: '查看应付',
           exact: true,
@@ -1546,8 +1546,8 @@ export function createPermissionUnifiedScenarios({
           .evaluate((node) => node.scrollWidth - node.clientWidth)
         assert(overflow <= 1)
         await tabs.getByRole('tab', { name: /岗位设置/ }).click()
-        await frame.getByPlaceholder('搜索功能名称或页面').fill('')
-        await frame.getByPlaceholder('搜索功能名称或页面').press('Enter')
+        await frame.getByPlaceholder('搜功能或页面').fill('')
+        await frame.getByPlaceholder('搜功能或页面').press('Enter')
         await page.screenshot({
           path: 'output/playwright/style-l1/permission-center-unified-design.png',
         })
