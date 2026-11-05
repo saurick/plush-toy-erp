@@ -47,6 +47,7 @@ import { createBusinessTableScrollScenarios } from './businessTableScrollScenari
 import { createBusinessListStickyScenarios } from './businessListStickyScenarios.mjs'
 import { createDesktopListStickyScenarios } from './desktopListStickyScenarios.mjs'
 import { createWorkCenterTableScenarios } from './workCenterTableScenarios.mjs'
+import { createWorkCenterSplitWidthScenarios } from './workCenterSplitWidthScenarios.mjs'
 import { createScrollEdgeScenarios } from './scrollEdgeScenarios.mjs'
 import { createMobileTaskScenarios } from './mobileTaskScenarios.mjs'
 import { createMobileWorkflowTrackingScenarios } from './mobileWorkflowTrackingScenarios.mjs'
@@ -618,6 +619,7 @@ export function createStyleL1Scenarios(deps) {
     ...createBusinessListStickyScenarios({ outputDir, customerRuntimeEffectiveSession }),
     ...createDesktopListStickyScenarios({ outputDir, customerRuntimeEffectiveSession }),
     ...createWorkCenterTableScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createWorkCenterSplitWidthScenarios(deps),
     ...createAuthenticationEntryScenarios({
       expectHeading,
       expectButton,

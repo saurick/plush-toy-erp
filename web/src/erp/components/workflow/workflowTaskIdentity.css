@@ -160,6 +160,8 @@
 
 .erp-task-identity__card-body {
   display: flex;
+  /* 让关联内容按当前宽度贡献高度，表格行随换行自然增高。 */
+  height: max-content;
   align-items: flex-start;
   gap: 10px;
   min-width: 0;
