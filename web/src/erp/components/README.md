@@ -19,7 +19,7 @@
 | 账号身份 | `AccountIdentity.jsx`、`accountIdentity.css` | 桌面账号入口和手机“我的”共用的默认文字头像、姓名、账号及实际所属岗位；头像颜色按账号固定，完整岗位在账号卡片换行展示 |
 | 业务列表共享层   | `business-list/*`                                                              | 列表壳、表单弹窗、附件、明细行、列顺序、协同任务面板和来源选择 |
 | 关联资料选择与更新 | `RemoteReferenceSelect.jsx`、`ReferenceRecordsContext.jsx` | 远程搜索、分页与已选资料回显；物料保存后按权限定点重读，`BusinessFormPage` 承接可重试的读取提示，保留表单草稿与冻结快照 |
-| 产品图片图集 | `business-list/BusinessProductGallery.jsx`、`BusinessDocumentProductGallery.jsx` | 单据列表以主图缩略图和去重款数打开全部关联产品；单品身份共用主图 / 辅图切换、缩放、失败重试和关闭恢复。批量摘要仅支持正式关联，物料和未关联需求不借图 |
+| 产品图片图集 | `business-list/BusinessProductGallery.jsx`、`BusinessDocumentProductGallery.jsx`、`workflow/WorkflowTaskImagePreview.jsx` | 单据列表以主图缩略图和去重款数打开全部关联产品；预览采用常驻产品条与合并操作行，选中边框与底衬跟随主题色，切换不改变尺寸。单图收起翻页，帮助按需展开；单品身份共用主辅图、缩放、失败重试和关闭恢复。批量摘要仅支持正式关联，物料和未关联需求不借图 |
 | 业务日期输入和范围筛选 | [`business-list/BusinessDateInputs.jsx`](business-list/BusinessDateInputs.jsx) | `DateInput`、`DateTimeInput`、`DateRangeFilter` 共用格式与范围约束；`InheritedDateInput` 供销售、采购、委外明细显示整单交期，单独改期后保存行值，清空恢复沿用。采购优先沿用供应商确认日期 |
 | 主数据和源单据   | `master-data/*`、`sales-orders/*`、`purchase-orders/*`、`outsourcing-orders/*` | 领域列配置、表单、业务动作面板和来源生成入口                   |
 | 付款方式录入与目录维护 | [`PaymentMethodInput.jsx`](PaymentMethodInput.jsx)、[`PaymentMethodManager.jsx`](PaymentMethodManager.jsx) | `PaymentMethodField` 供四类表单选择、手输及标签行维护入口；`PaymentMethodEntry` 供基础资料列表集中维护。下拉快捷新增使用小窗口并直接返回；维护窗口行内新增 / 改名，按状态保留搜索与页码，每页只挂载 20 项，固定底部翻页与返回。支持启停、撤销及删除未使用项，返回保留草稿；历史快照和付款周期独立 |

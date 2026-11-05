@@ -5,6 +5,7 @@ import {
   LeftOutlined,
   RightOutlined,
   PictureOutlined,
+  QuestionCircleOutlined,
   ReloadOutlined,
   ZoomInOutlined,
   ZoomOutOutlined,
@@ -52,6 +53,24 @@ export default function WorkflowTaskImagePreview({
   const denied = resource?.key === resourceKey && resource.denied
   const name = selected.name || '产品主图'
   const galleryEnabled = Boolean(gallery)
+  const productCount = gallery?.products.length || 0
+
+  useEffect(() => {
+    const strip = toolbar?.querySelector('.erp-product-gallery-preview__products')
+    if (!strip || !visible) return undefined
+    const revealSelected = () => {
+      const button = strip.querySelector('[aria-pressed="true"]')
+      if (!button) return
+      const current = button.getBoundingClientRect()
+      const bounds = strip.getBoundingClientRect()
+      if (current.left < bounds.left) strip.scrollLeft -= bounds.left - current.left
+      else if (current.right > bounds.right) strip.scrollLeft += current.right - bounds.right
+    }
+    revealSelected()
+    const observer = new ResizeObserver(revealSelected)
+    observer.observe(strip)
+    return () => observer.disconnect()
+  }, [toolbar, visible, productIndex, productCount])
 
   useEffect(() => {
     if (!galleryEnabled || !visible) return undefined
@@ -181,59 +200,74 @@ export default function WorkflowTaskImagePreview({
             toolbar &&
             createPortal(
               <>
-                {gallery ? (
-                  <>
-                    {gallery.products.length > 1 ? (
-                      <div className="erp-product-gallery-preview__products" role="group" aria-label="切换产品">
-                        {gallery.products.map((product, index) => (
-                          <button type="button" key={product.productID} aria-pressed={index === productIndex} aria-label={`查看${product.name}${product.code ? `（${product.code}）` : ''}图片`} onClick={() => { actions.onReset(); setProductIndex(index); setPhotoIndex(0) }}>
-                            {gallery.renderThumbnail?.(product)}<span className="erp-product-gallery-preview__product-name"><span>{product.name}</span>{product.code ? <small>{product.code}</small> : null}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    <div className="erp-product-gallery-preview__photos" role="group" aria-label="切换当前产品图片">
-                      <button type="button" aria-label="上一张图片" disabled={!selectedPhoto || photoIndex === 0} onClick={() => { actions.onReset(); setPhotoIndex((value) => value - 1) }}><LeftOutlined aria-hidden="true" /></button>
-                      <span aria-live="polite">{selectedPhoto ? `${selectedPhoto.label} · ${photoIndex + 1} / ${photos.length} 张` : currentMetadata?.state === 'ready' ? '暂无图片' : '正在读取图片'}</span>
-                      <button type="button" aria-label="下一张图片" disabled={!selectedPhoto || photoIndex >= photos.length - 1} onClick={() => { actions.onReset(); setPhotoIndex((value) => value + 1) }}><RightOutlined aria-hidden="true" /></button>
-                    </div>
-                  </>
+                {gallery && gallery.products.length > 1 ? (
+                  <div className="erp-product-gallery-preview__products" role="group" aria-label="切换产品">
+                    {gallery.products.map((product, index) => (
+                      <button type="button" key={product.productID} aria-pressed={index === productIndex} aria-label={`查看${product.name}${product.code ? `（${product.code}）` : ''}图片`} onClick={() => { actions.onReset(); setProductIndex(index); setPhotoIndex(0) }}>
+                        {gallery.renderThumbnail?.(product)}
+                        <span className="erp-product-gallery-preview__product-name"><span>{product.name}</span>{product.code ? <small>{product.code}</small> : null}</span>
+                      </button>
+                    ))}
+                  </div>
                 ) : null}
-                <div
-                  className="erp-task-image-preview__tools"
-                  role="group"
-                  aria-label="图片缩放"
-                >
-                  <button
-                    type="button"
-                    aria-label="缩小图片"
-                    disabled={!original || failed || transform.scale <= 1}
-                    onClick={actions.onZoomOut}
-                  >
-                    <ZoomOutOutlined aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!original || failed}
-                    onClick={actions.onReset}
-                  >
-                    适应屏幕
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="放大图片"
-                    disabled={!original || failed || transform.scale >= 8}
-                    onClick={actions.onZoomIn}
-                  >
-                    <ZoomInOutlined aria-hidden="true" />
-                  </button>
+                <div className={`erp-task-image-preview__controls${gallery ? '' : ' erp-task-image-preview__controls--single'}`}>
+                  {gallery ? (
+                    <div className="erp-product-gallery-preview__photos" role="group" aria-label="切换当前产品图片">
+                      {photos.length > 1 ? <button type="button" aria-label="上一张图片" disabled={photoIndex === 0} onClick={() => { actions.onReset(); setPhotoIndex((value) => value - 1) }}><LeftOutlined aria-hidden="true" /></button> : null}
+                      <span aria-live="polite">{selectedPhoto ? `${selectedPhoto.label} · ${photoIndex + 1} / ${photos.length} 张` : currentMetadata?.state === 'ready' ? '暂无图片' : '正在读取图片'}</span>
+                      {photos.length > 1 ? <button type="button" aria-label="下一张图片" disabled={photoIndex >= photos.length - 1} onClick={() => { actions.onReset(); setPhotoIndex((value) => value + 1) }}><RightOutlined aria-hidden="true" /></button> : null}
+                    </div>
+                  ) : null}
+                  <div className="erp-task-image-preview__actions">
+                    <div
+                      className="erp-task-image-preview__tools"
+                      role="group"
+                      aria-label="图片缩放"
+                    >
+                      <button
+                        type="button"
+                        aria-label="缩小图片"
+                        disabled={!original || failed || transform.scale <= 1}
+                        onClick={actions.onZoomOut}
+                      >
+                        <ZoomOutOutlined aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!original || failed}
+                        onClick={actions.onReset}
+                      >
+                        适应屏幕
+                      </button>
+                      <span className="erp-task-image-preview__scale" aria-label={`缩放比例 ${Math.round(transform.scale * 100)}%`}>{Math.round(transform.scale * 100)}%</span>
+                      <button
+                        type="button"
+                        aria-label="放大图片"
+                        disabled={!original || failed || transform.scale >= 8}
+                        onClick={actions.onZoomIn}
+                      >
+                        <ZoomInOutlined aria-hidden="true" />
+                      </button>
+                    </div>
+                    <details
+                      className="erp-task-image-preview__help"
+                      onKeyDownCapture={(event) => {
+                        if (event.key === 'Escape' && event.currentTarget.open) {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          event.currentTarget.open = false
+                        }
+                      }}
+                    >
+                      <summary aria-label="查看看图操作帮助"><QuestionCircleOutlined aria-hidden="true" /></summary>
+                      <div className="erp-task-image-preview__help-content">
+                        <span className="erp-task-image-preview__hint erp-task-image-preview__hint--mouse">滚轮缩放 · 拖动查看</span>
+                        <span className="erp-task-image-preview__hint erp-task-image-preview__hint--touch">双指缩放 · 放大后拖动</span>
+                        <span>Esc 关闭说明，再按退出预览</span>
+                      </div>
+                    </details>
+                  </div>
                 </div>
-                <span className="erp-task-image-preview__hint erp-task-image-preview__hint--mouse">
-                  滚轮缩放 · 拖动查看
-                </span>
-                <span className="erp-task-image-preview__hint erp-task-image-preview__hint--touch">
-                  双指缩放 · 放大后拖动
-                </span>
               </>,
               toolbar
             ),

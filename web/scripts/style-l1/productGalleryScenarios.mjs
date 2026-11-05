@@ -5,6 +5,8 @@ import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { ShipmentFinanceReleaseStatus } from '../../src/common/consts/statuses.generated.mjs'
 import { PRODUCT_IMAGES_CHANGED } from '../../src/erp/utils/productImageReferences.mjs'
 import { progressFixtureData } from './businessProgressFixtures.mjs'
+import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
+import { assertReadableOnBackground, parseRgb } from './colorAssertions.mjs'
 
 const photograph = readFileSync(new URL('../../src/erp/data/bom-example-images/product.jpg', import.meta.url)).toString('base64')
 const names = ['模拟蓝熊', '模拟粉熊', '模拟无图兔']
@@ -89,9 +91,17 @@ async function verifyGalleryGeometry(page) {
     const stageBox = document.querySelector('.erp-task-image-preview__stage').getBoundingClientRect()
     const head = document.querySelector('.erp-task-image-preview__header').getBoundingClientRect()
     const foot = document.querySelector('.erp-task-image-preview__footer').getBoundingClientRect()
-    return { stageTop: stageBox.top, stageBottom: stageBox.bottom, headerBottom: head.bottom, footerTop: foot.top, footerBottom: foot.bottom, viewport: innerHeight }
+    const controls = document.querySelector('.erp-task-image-preview__controls').getBoundingClientRect()
+    const photos = document.querySelector('.erp-product-gallery-preview__photos').getBoundingClientRect()
+    const actions = document.querySelector('.erp-task-image-preview__actions').getBoundingClientRect()
+    return { stageTop: stageBox.top, stageBottom: stageBox.bottom, headerBottom: head.bottom, footerTop: foot.top, footerBottom: foot.bottom, footerHeight: foot.height, viewport: innerHeight, width: innerWidth, controlsWidth: controls.width, photosCenter: photos.top + photos.height / 2, actionsCenter: actions.top + actions.height / 2, overflow: document.documentElement.scrollWidth > innerWidth }
   })
   assert.equal(boxes.headerBottom <= boxes.stageTop + 1 && boxes.stageBottom <= boxes.footerTop + 1 && boxes.footerBottom <= boxes.viewport + 1, true, JSON.stringify(boxes))
+  assert.equal(boxes.overflow, false, JSON.stringify(boxes))
+  if (boxes.width >= 768 && boxes.controlsWidth >= 600) {
+    assert.ok(boxes.footerHeight <= 140, JSON.stringify(boxes))
+    assert.ok(Math.abs(boxes.photosCenter - boxes.actionsCenter) <= 1, '翻页和缩放在同一行居中对齐')
+  }
 }
 async function verifyDocumentGallery(page, outputDir, name) {
   const trigger = page.getByRole('button', { name: /查看.*的 3 款产品图片/ }).first()
@@ -114,10 +124,11 @@ async function verifyDocumentGallery(page, outputDir, name) {
   await page.locator('.erp-product-gallery-preview__products button').nth(1).click()
   await imageReady(page)
   await page.getByText('主图 · 1 / 1 张', { exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: '下一张图片', exact: true }).count(), 0, '单张图片不显示无效翻页按钮')
   assert.equal(page.__galleryProbe.calls.some((call) => call.method === 'download_attachment' && call.params.id === 8201 && !call.params.variant), true)
   await page.locator('.erp-product-gallery-preview__products button').nth(2).click()
   await page.getByText('该产品暂无图片', { exact: true }).waitFor()
-  assert.equal(await page.getByRole('button', { name: '下一张图片', exact: true }).isDisabled(), true)
+  assert.equal(await page.getByRole('button', { name: '下一张图片', exact: true }).count(), 0)
   await page.locator('.erp-product-gallery-preview__products button').nth(0).click()
   await imageReady(page)
   await page.screenshot({ path: path.join(outputDir, `${name}-gallery.png`) })
@@ -137,6 +148,104 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
     ['shipment', '/erp/warehouse/shipments'],
   ]
   return [
+    ...[
+      ['blue', 'light'],
+      ['purple', 'light'],
+      ['orange', 'dark'],
+    ].map(([accent, themeMode]) => ({
+      ...common, name: `product-gallery-selection-${accent}-${themeMode}`, path: documents[0][1],
+      viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2, themeMode,
+      adminProfile: { erp_preferences: { column_orders: {}, appearance: { accent, theme_mode: themeMode } } },
+      verify: async (page) => {
+        const trigger = page.getByRole('button', { name: /查看.*的 3 款产品图片/ }).first()
+        await trigger.click()
+        await imageReady(page)
+        const buttons = page.locator('.erp-product-gallery-preview__products > button')
+        const selected = page.locator('.erp-product-gallery-preview__products > button[aria-pressed="true"]')
+        const readPaint = async () => selected.evaluate((button) => {
+          const style = getComputedStyle(button)
+          return { background: style.backgroundColor, border: style.borderTopColor, foreground: style.color }
+        })
+        const firstPaint = await readPaint()
+        const expected = ERP_ACCENTS[accent][themeMode === 'dark' ? 'dark' : 'primary']
+        assert.deepEqual(parseRgb(firstPaint.border), parseRgb(expected), '选中边框跟随当前主题主色')
+        assert.equal(await buttons.locator('[data-icon^="check"]').count(), 0, '产品切换不叠加勾选图标')
+        assertReadableOnBackground(firstPaint.foreground, firstPaint.background, '选中产品文字清晰可读')
+        const unselected = await buttons.nth(1).evaluate((node) => ({ background: getComputedStyle(node).backgroundColor }))
+        assert.notEqual(firstPaint.background, unselected.background, '选中底衬与未选中卡片有明显差别')
+        await selected.hover()
+        assert.equal((await readPaint()).background, firstPaint.background, '悬停保留选中底衬')
+        const before = await buttons.evaluateAll((nodes) => nodes.map((node) => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })))
+        const footerBefore = (await page.locator('.erp-task-image-preview__footer').boundingBox()).height
+        await buttons.nth(1).press('Enter')
+        await imageReady(page)
+        assert.equal(await selected.count(), 1)
+        assert.equal(await buttons.nth(1).getAttribute('aria-pressed'), 'true')
+        const after = await buttons.evaluateAll((nodes) => nodes.map((node) => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })))
+        assert.deepEqual(after, before, '切换选中不改变卡片尺寸')
+        assert.ok(Math.abs((await page.locator('.erp-task-image-preview__footer').boundingBox()).height - footerBefore) <= 1, '切换选中不增加底栏高度')
+        await page.screenshot({ path: path.join(outputDir, `product-gallery-selection-${accent}-${themeMode}.png`) })
+        const stripBox = await page.locator('.erp-product-gallery-preview__products').boundingBox()
+        const lastBox = await buttons.last().boundingBox()
+        await page.screenshot({ path: path.join(outputDir, `product-gallery-selection-${accent}-${themeMode}-detail.png`), clip: { x: stripBox.x, y: stripBox.y, width: lastBox.x + lastBox.width - stripBox.x, height: stripBox.height } })
+        await closeAndRestore(page, trigger)
+      },
+    })),
+    ...[
+      ['compact', { width: 1280, height: 720 }],
+      ['compact-short', { width: 736, height: 480 }],
+      ['compact-mobile', { width: 320, height: 640 }],
+    ].map(([name, viewport]) => ({
+      ...common, name: `product-gallery-${name}`, path: documents[0][1], viewport, deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await installGalleryFixture(page)
+        const eightProducts = [...products, ...Array.from({ length: 5 }, (_, index) => ({ ...products[0], id: index + 4, code: `GALLERY-P-${index + 4}`, name: index === 4 ? '模拟长耳兔抱枕（可拆卸围巾与节庆礼盒组合款）' : `模拟产品${index + 4}` }))]
+        await page.route('**/rpc/**', async (route) => {
+          const { method, params = {}, id } = route.request().postDataJSON()
+          let data
+          if (method === 'list_document_product_previews') data = { previews: params.document_ids.map((documentID) => ({ document_id: documentID, product_count: 8, product_id: 1, product_name: names[0], product_code: products[0].code })) }
+          else if (method === 'list_sales_order_items') data = stylePaginatedRpcData(eightProducts.map((product, index) => ({ ...lines[0], id: index + 1, line_no: index + 1, sales_order_id: params.sales_order_id, product_id: product.id, product_name_snapshot: product.name, product_code_snapshot: product.code })), 'sales_order_items', params)
+          else if (method === 'list_products') data = stylePaginatedRpcData(eightProducts, 'products', params)
+          else return route.fallback()
+          await route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data } } })
+        })
+      },
+      verify: async (page) => {
+        const trigger = page.getByRole('button', { name: /查看.*的 8 款产品图片/ }).first()
+        await page.locator('.erp-document-product-gallery').first().scrollIntoViewIfNeeded()
+        await trigger.click()
+        await imageReady(page)
+        await verifyGalleryGeometry(page)
+        const buttons = page.locator('.erp-product-gallery-preview__products button')
+        assert.equal(await buttons.count(), 8)
+        const footer = page.locator('.erp-task-image-preview__footer')
+        const height = (await footer.boundingBox()).height
+        const help = page.locator('.erp-task-image-preview__help > summary')
+        await help.click()
+        await page.getByText(viewport.width <= 600 ? '双指缩放 · 放大后拖动' : '滚轮缩放 · 拖动查看', { exact: true }).waitFor({ state: 'visible' })
+        assert.ok(Math.abs((await footer.boundingBox()).height - height) <= 1)
+        await help.press('Escape')
+        assert.equal(await page.locator('.erp-task-image-preview__stage').isVisible(), true)
+        await page.screenshot({ path: path.join(outputDir, `product-gallery-${name}-open.png`) })
+        await buttons.last().click()
+        await page.getByText('该产品暂无图片', { exact: true }).waitFor()
+        const resizedWidth = viewport.width > 992 ? 1100 : viewport.width > 600 ? 700 : 360
+        await page.setViewportSize({ width: resizedWidth, height: viewport.height })
+        await verifyGalleryGeometry(page)
+          await page.waitForFunction(() => {
+            const strip = document.querySelector('.erp-product-gallery-preview__products').getBoundingClientRect()
+            const selected = document.querySelector('.erp-product-gallery-preview__products [aria-pressed="true"]').getBoundingClientRect()
+            return selected.left >= strip.left - 1 && selected.right <= strip.right + 1
+          })
+          const geometry = await page.locator('.erp-task-image-preview__actions').evaluate((node) => {
+            const box = node.getBoundingClientRect()
+            return { left: box.left, right: box.right, width: innerWidth }
+          })
+          assert.ok(geometry.left >= 0 && geometry.right <= geometry.width, JSON.stringify(geometry))
+        await page.screenshot({ path: path.join(outputDir, `product-gallery-${name}-resized.png`) })
+        await closeAndRestore(page, trigger)
+      },
+    })),
     ...documents.map(([module, url]) => ({
       ...common, name: `product-gallery-${module}`, path: url,
       viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2,
@@ -233,6 +342,7 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
         const preview = frame.locator('.product-image-preview')
         await preview.waitFor({ state: 'visible' })
         assert.equal(await preview.locator('[data-action="product-gallery-product"]').count(), 3)
+        assert.equal(await preview.locator('[data-action="product-gallery-product"][aria-pressed="true"]').count(), 1)
         await preview.getByRole('button', { name: '下一张图片', exact: true }).click()
         await preview.getByText('辅图 · 2 / 2 张', { exact: true }).waitFor()
         await preview.locator('[data-action="product-gallery-product"]').nth(2).click()

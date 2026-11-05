@@ -1855,18 +1855,23 @@
     .product-image-preview { width: min(920px, calc(100vw - 32px)); }
     .product-image-preview-stage { min-height: min(66vh, 620px); display: grid; place-items: center; overflow: auto; border-radius: 10px; background: #0f172a; }
     .product-image-preview-stage .product-art { width: min(70vw, 560px); height: min(70vw, 560px); transform: scale(var(--preview-scale, 1)); transition: transform .16s ease; }
+    .product-image-preview-footer { display: grid; gap: 8px; }
+    .product-image-preview-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
     .product-image-preview-tools { display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .product-image-preview-tools .data-note { margin-left: 8px; }
+    .product-image-preview-help { position: relative; }
+    .product-image-preview-help > summary { display: grid; place-items: center; min-width: 44px; min-height: 44px; list-style: none; cursor: pointer; }
+    .product-image-preview-help > summary::-webkit-details-marker { display: none; }
+    .product-image-preview-help > p { position: absolute; right: 0; bottom: calc(100% + 8px); width: max-content; max-width: 260px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-md); }
     .product-gallery-trigger { display: inline-flex; align-items: center; gap: 14px; padding: 0; border: 0; background: transparent; color: var(--text); text-align: left; }
     .product-gallery-trigger > span:last-child { display: grid; gap: 3px; white-space: nowrap; }
     .product-gallery-trigger small { color: var(--text-3); font-size: 12px; }
     .product-gallery-thumb { width: 48px; height: 48px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 7px; box-shadow: 3px 3px 0 var(--surface-muted), 5px 5px 0 var(--line); overflow: hidden; }
     .product-image-gallery .product-image-preview-stage { min-height: min(48vh, 420px); }
-    .product-gallery-choices { display: flex; gap: 8px; padding: 12px 0; overflow-x: auto; }
-    .product-gallery-choices button { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .product-gallery-choices { display: flex; gap: 8px; min-width: 0; overflow-x: auto; }
+    .product-gallery-choices button { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; height: auto; min-height: 52px; }
     .product-gallery-choices svg { width: 42px; height: 42px; }
-    .product-gallery-choices button[aria-pressed="true"] { border-color: var(--brand); background: var(--brand-soft); }
-    .product-gallery-photo-switch { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; }
+    .product-gallery-choices button[aria-pressed="true"] { border-color: var(--brand); background: var(--brand-soft); box-shadow: inset 0 0 0 1px var(--brand); }
+    .product-gallery-photo-switch { display: flex; align-items: center; justify-content: center; gap: 12px; }
     .priority-identity .product-cell { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
     .priority-identity .product-cell > span:last-child { min-width: 0; margin-top: 0; }
     .priority-identity .product-thumb { margin-top: 0; width: 64px; height: 64px; flex-basis: 64px; }
@@ -18962,8 +18967,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const product=products[index];
       const photo=preview.photoIndex || 0;
       const choices=products.length>1?`<div class="product-gallery-choices" role="group" aria-label="切换产品">${products.map((item,i)=>`<button type="button" class="btn" data-action="product-gallery-product" data-index="${i}" aria-pressed="${i===index}">${item.photoCount?renderProductArt(item.seed,item.label):icon('image')}<span>${escapeHTML(item.label)}</span></button>`).join('')}</div>`:'';
-      const pictures=`<div class="product-gallery-photo-switch" role="group" aria-label="切换当前产品图片"><button type="button" class="btn" data-action="product-gallery-photo" data-value="-1" aria-label="上一张图片" ${photo===0||!product.photoCount?'disabled':''}>${icon('left')}</button><span>${product.photoCount?`${photo?'辅图':'主图'} · ${photo+1} / ${product.photoCount} 张`:'暂无图片'}</span><button type="button" class="btn" data-action="product-gallery-photo" data-value="1" aria-label="下一张图片" ${photo>=product.photoCount-1?'disabled':''}>${icon('right')}</button></div>`;
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal product-image-preview ${products.length>1?'product-image-gallery':''}" role="dialog" aria-modal="true" aria-label="${escapeHTML(preview.label)}图片预览"><header class="modal-head"><strong>${escapeHTML(product.label)}</strong><span class="data-note">${products.length>1?`${escapeHTML(preview.label)} · 产品 ${index+1} / ${products.length}`:'产品图片预览'}</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭图片预览">${icon('close')}</button></header><div class="modal-body"><div class="product-image-preview-stage" style="--preview-scale:${scale}">${product.photoCount?renderProductArt(product.seed+photo,product.label):'<div class="empty">该产品暂无图片</div>'}</div>${choices}${pictures}</div><footer class="modal-foot product-image-preview-tools"><button class="btn" data-action="product-image-zoom" data-value="out" ${scale<=1||!product.photoCount?'disabled':''}>缩小</button><button class="btn" data-action="product-image-zoom" data-value="reset" ${!product.photoCount?'disabled':''}>适应屏幕</button><button class="btn" data-action="product-image-zoom" data-value="in" ${scale>=3||!product.photoCount?'disabled':''}>放大</button><span class="data-note">滚轮或双指缩放 · 放大后拖动查看</span></footer></section></div>`;
+      const pictures=`<div class="product-gallery-photo-switch" role="group" aria-label="切换当前产品图片">${product.photoCount>1?`<button type="button" class="btn" data-action="product-gallery-photo" data-value="-1" aria-label="上一张图片" ${photo===0?'disabled':''}>${icon('left')}</button>`:''}<span aria-live="polite">${product.photoCount?`${photo?'辅图':'主图'} · ${photo+1} / ${product.photoCount} 张`:'暂无图片'}</span>${product.photoCount>1?`<button type="button" class="btn" data-action="product-gallery-photo" data-value="1" aria-label="下一张图片" ${photo>=product.photoCount-1?'disabled':''}>${icon('right')}</button>`:''}</div>`;
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal product-image-preview ${products.length>1?'product-image-gallery':''}" role="dialog" aria-modal="true" aria-label="${escapeHTML(preview.label)}图片预览"><header class="modal-head"><strong>${escapeHTML(product.label)}</strong><span class="data-note">${products.length>1?`${escapeHTML(preview.label)} · 产品 ${index+1} / ${products.length}`:'产品图片预览'}</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭图片预览">${icon('close')}</button></header><div class="modal-body"><div class="product-image-preview-stage" style="--preview-scale:${scale}">${product.photoCount?renderProductArt(product.seed+photo,product.label):'<div class="empty">该产品暂无图片</div>'}</div></div><footer class="modal-foot product-image-preview-footer">${choices}<div class="product-image-preview-controls">${pictures}<div class="product-image-preview-tools"><button class="btn" data-action="product-image-zoom" data-value="out" ${scale<=1||!product.photoCount?'disabled':''}>缩小</button><button class="btn" data-action="product-image-zoom" data-value="reset" ${!product.photoCount?'disabled':''}>适应屏幕</button><span class="data-note">${Math.round(scale*100)}%</span><button class="btn" data-action="product-image-zoom" data-value="in" ${scale>=3||!product.photoCount?'disabled':''}>放大</button><details class="product-image-preview-help"><summary class="btn" aria-label="查看看图操作帮助">${icon('help')}</summary><p>滚轮或双指缩放 · 放大后拖动查看<br>Esc 关闭说明，再按退出预览</p></details></div></div></footer></section></div>`;
     }
 
     function renderThemeModal() {
@@ -19813,6 +19818,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     });
 
     document.addEventListener('keydown', event => {
+      const imageHelp=event.target.closest('.product-image-preview-help[open]');
+      if(event.key==='Escape'&&imageHelp){event.preventDefault();event.stopPropagation();imageHelp.open=false;imageHelp.querySelector('summary')?.focus();return;}
       if (event.key === 'Tab') {
         const modal = [...document.querySelectorAll('#floating [role="dialog"][aria-modal="true"]')].at(-1) || (state.permissionFullscreen ? document.querySelector('.permission-workspace--fullscreen') : document.body.classList.contains('nav-open') ? document.querySelector('#sidebar') : null);
         if (modal) {

@@ -189,16 +189,27 @@ async function assertPreview(
   await dialog
     .getByRole('button', { name: '关闭图片预览', exact: true })
     .hover()
+  const help = dialog.locator('.erp-task-image-preview__help > summary')
+  assert.equal(await dialog.locator('.erp-task-image-preview__help').getAttribute('open'), null, '看图帮助默认收起')
+  const footerBeforeHelp = await dialog.locator('.erp-task-image-preview__footer').boundingBox()
+  await help.click()
   if (touch) {
     await dialog
       .getByText('双指缩放 · 放大后拖动', { exact: true })
       .waitFor({ state: 'visible' })
+  } else {
+    await dialog.getByText('滚轮缩放 · 拖动查看', { exact: true }).waitFor({ state: 'visible' })
   }
+  const footerWithHelp = await dialog.locator('.erp-task-image-preview__footer').boundingBox()
+  assert.ok(Math.abs(footerBeforeHelp.height - footerWithHelp.height) <= 1, '按需帮助不增加底栏高度')
+  await help.press('Escape')
+  assert.equal(await dialog.locator('.erp-task-image-preview__help').getAttribute('open'), null)
+  assert.equal(await dialog.isVisible(), true, 'Escape 先关闭帮助，保留图片预览')
   await page.screenshot({ path: path.join(outputDir, `${name}-open.png`) })
   assert.equal(
-    await dialog.getByRole('button').count(),
-    4,
-    '预览只保留关闭、缩小、适应屏幕和放大'
+    await dialog.locator('button, summary').count(),
+    5,
+    '预览保留关闭、缩放和按需帮助'
   )
   const geometry = await page.evaluate((selector) => {
     const rect = document.querySelector(selector).getBoundingClientRect()
@@ -212,13 +223,14 @@ async function assertPreview(
       .querySelector('.erp-task-image-preview__footer')
       .getBoundingClientRect()
     const buttons = Array.from(
-      document.querySelectorAll('.erp-task-image-preview button')
+      document.querySelectorAll('.erp-task-image-preview button, .erp-task-image-preview summary')
     ).filter((el) => el.getBoundingClientRect().width > 0)
     return {
       stageTop: rect.top,
       stageBottom: rect.bottom,
       headerBottom: header.bottom,
       footerTop: footer.top,
+      footerHeight: footer.height,
       imageWidth: image.width,
       stageWidth: rect.width,
       buttons: buttons.map((el) => ({
@@ -233,6 +245,7 @@ async function assertPreview(
     JSON.stringify(geometry)
   )
   assert.ok(geometry.imageWidth <= geometry.stageWidth)
+  assert.ok(geometry.footerHeight <= 72, JSON.stringify(geometry))
   assert.ok(
     geometry.buttons.every((box) => box.w >= 44 && box.h >= 44),
     JSON.stringify(geometry)
