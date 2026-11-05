@@ -6,7 +6,7 @@ import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { describeVisibleEditor } from './businessEditorWorkspaceTools.mjs'
 import { assertBusinessFormNavigationSurface, assertBusinessFormScrollTracking } from './businessFormSectionAssertions.mjs'
-import { ERP_FORM_DISPLAY_OPTIONS } from '../../src/common/theme/erpAppearance.mjs'
+import { setERPFormDisplay } from './themeAssertions.mjs'
 
 const HEADERS = {
   version: 'BOM-完整编辑验证',
@@ -100,7 +100,7 @@ async function openEditor(page, { entry, task }, assert) {
     } else await page.getByRole('tablist', { name: '任务处理步骤', exact: true }).getByRole('tab').nth(1).click()
     const workspace = page.locator('[data-business-editor-workspace]:visible')
     await workspace.locator('.erp-bom-editor:visible').getByLabel('BOM 版本', { exact: true }).waitFor()
-    assert.equal(await workspace.getByRole('tablist').count(), 0, 'related business objects are not a permanent second tab strip')
+    assert.equal(await workspace.locator('[role="tablist"]').evaluateAll((nodes) => nodes.filter((node) => !node.closest('[data-business-form-page]')).length), 0, 'related business objects are not a permanent second tab strip')
     assert.equal(await workspace.locator('[data-business-editor-pane="bom"]:visible').count(), 1, 'engineering tasks open the original complete BOM editor directly')
     assert.equal(await workspace.locator('[data-business-editor-pane="product"], [data-business-editor-pane="sku"]').count(), 0, 'related product editors remain on demand')
     assert.equal(await workspace.locator('.erp-sales-order-engineering-form:visible').count(), 0, 'the association and sampling supplement does not replace BOM authoring')
@@ -130,13 +130,11 @@ async function visibleAttachments(editor) {
 }
 
 async function assertTaskFormTabNavigation(page, editor, outputDir, path, assert) {
+  const tabs = editor.getByRole('tablist', { name: '表单页签', exact: true })
+  await tabs.getByRole('tab', { name: '备注与附件', exact: true }).click()
   const note = editor.getByLabel('备注', { exact: true })
   const original = await note.inputValue()
   await note.fill('任务内长备注的阅读与恢复\n'.repeat(60))
-  const control = editor.locator('.erp-business-form-page__display-control')
-  await control.getByText('页签', { exact: true }).click()
-  const tabs = editor.getByRole('tablist', { name: '表单页签', exact: true })
-  await tabs.getByRole('tab', { name: '备注与附件', exact: true }).click()
   const identity = await tabs.elementHandle()
   const scroller = page.locator('.erp-task-action-drawer .ant-drawer-body')
   await scroller.evaluate((node) => { node.scrollTop = 0 })
@@ -159,7 +157,6 @@ async function assertTaskFormTabNavigation(page, editor, outputDir, path, assert
   assert.equal(await note.inputValue(), '任务内长备注的阅读与恢复\n'.repeat(60))
   await page.screenshot({ path: path.join(outputDir, 'task-editor-form-tabs-sticky.png') })
   await note.fill(original)
-  await control.getByText('目录', { exact: true }).click()
 }
 
 export function createTaskEditorCompletenessScenarios(deps, taskScenarios) {
@@ -247,6 +244,7 @@ menus: [
         })
       },
       verify: async (page) => {
+        if (definition.navigationOnly) await setERPFormDisplay(page, 'section')
         let editor = await openEditor(page, { ...definition, task }, assert)
         if (definition.navigationOnly) {
           await assertTaskFormTabNavigation(page, editor, outputDir, path, assert)
@@ -327,14 +325,13 @@ menus: [
           assert.equal(await editor.getByRole('button', { name: '从 Excel 导入', exact: true }).count(), 0)
           assert.equal(await page.getByRole('button', { name: '保存草稿', exact: true }).filter({ visible: true }).count(), 0)
           assert.equal(await editor.locator('.ant-form .ant-select:not(.ant-select-disabled) [role="combobox"]').filter({ visible: true }).count(), 0, 'all source form selectors are read-only')
-          const editable = await editor.locator('input,textarea').evaluateAll((nodes) => nodes.filter((node) => node.getClientRects().length && !node.disabled && !node.readOnly && !node.closest('.ant-select-disabled')).map((node) => ({ id: node.id, type: node.type, label: node.getAttribute('aria-label'), placeholder: node.getAttribute('placeholder'), formField: Boolean(node.closest('.ant-form-item')), attachmentFilter: Boolean(node.closest('.business-attachment-panel__toolbar')), displayNavigation: Boolean(node.closest('.ant-segmented[aria-label="编辑页显示"]')), displayLabel: node.closest('.ant-segmented-item')?.querySelector('.ant-segmented-item-label')?.textContent.trim(), classes: node.className })))
+          const editable = await editor.locator('input,textarea').evaluateAll((nodes) => nodes.filter((node) => node.getClientRects().length && !node.disabled && !node.readOnly && !node.closest('.ant-select-disabled')).map((node) => ({ id: node.id, type: node.type, label: node.getAttribute('aria-label'), placeholder: node.getAttribute('placeholder'), formField: Boolean(node.closest('.ant-form-item')), attachmentFilter: Boolean(node.closest('.business-attachment-panel__toolbar')), classes: node.className })))
           assert.deepEqual(editable.filter((field) => field.formField), [])
           const unexpected = editable.filter((field) => !(
             (field.type === 'range' && field.label === '横向滚动位置') ||
-            (field.type === 'radio' && field.attachmentFilter) ||
-            (field.type === 'radio' && field.displayNavigation && ERP_FORM_DISPLAY_OPTIONS.some((option) => option.label === field.displayLabel))
+            (field.type === 'radio' && field.attachmentFilter)
           ))
-          assert.equal(unexpected.length, 0, `只读页只保留滚动、附件分类和显示导航，业务字段仍不可编辑：${JSON.stringify(unexpected.slice(0, 8))}`)
+          assert.equal(unexpected.length, 0, `只读页只保留滚动和附件分类，业务字段仍不可编辑：${JSON.stringify(unexpected.slice(0, 8))}`)
           const attachments = await visibleAttachments(editor)
           assert.equal(await attachments.getByRole('button', { name: '选择附件', exact: true }).count(), 0)
           assert.deepEqual(calls, [])

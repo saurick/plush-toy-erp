@@ -217,19 +217,6 @@
   flex: none;
 }
 
-.erp-business-form-page__display-control {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  max-width: 100%;
-}
-
-.erp-business-form-page__display-error {
-  color: var(--erp-visual-danger-text);
-  font-size: var(--erp-font-small);
-}
-
 .erp-business-form-page__section-errors {
   display: block;
   color: var(--erp-visual-danger-text);

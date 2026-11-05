@@ -1083,7 +1083,6 @@
     .form-head { flex: none; min-height: 46px; padding: 6px 12px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 12px; background: color-mix(in srgb, var(--brand) 3%, var(--surface)); }
     .form-head h1 { flex: 1; min-width: 0; margin: 0; font-size: 19px; }
     .form-head .badge { margin-left: auto; }
-    .form-display-control { flex: none; margin-left:auto; white-space: nowrap; }
     .form-section[hidden] { display:none; }
     .form-fullscreen-trigger { margin-left:auto; flex:none; }
     .form-head:has(.form-fullscreen-trigger) .badge { margin-left:0; }
@@ -17795,8 +17794,6 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const sections = [...scroller.querySelectorAll('.form-section')];
       const buttons = [...(nav?.querySelectorAll('[data-action="form-anchor"]') || [])];
       if (nav) nav.insertAdjacentHTML('beforeend', `<label class="form-section-picker">跳转到<ui-select aria-label="跳转到表单分区" data-required-selection>${buttons.map(button=>`<option value="${button.dataset.target}">${button.textContent}</option>`).join('')}</ui-select></label>`);
-      const header = scroller.closest('.form-view')?.querySelector('.form-head');
-      if (sections.length >= 3 && header && !header.querySelector('.form-display-control')) header.insertAdjacentHTML('beforeend', `<div class="theme-mode form-display-control" role="group" aria-label="编辑页显示"><button data-action="set-form-display" data-value="all">目录</button><button data-action="set-form-display" data-value="section">页签</button></div>`);
       const picker = nav?.querySelector('ui-select');
       picker?.addEventListener('change', () => buttons.find(button=>button.dataset.target===picker.value)?.click());
       let anchor = null;
@@ -18518,6 +18515,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     let floatingReturnFocus = null;
     function renderFloating() {
       const root = document.querySelector('#floating');
+      document.querySelectorAll('[data-action="open-account"]').forEach(button => button.setAttribute('aria-expanded', String(state.overlay === 'account')));
       document.querySelectorAll('.filter-trigger-group [aria-haspopup="dialog"]').forEach(button => button.setAttribute('aria-expanded', String(state.overlay===(button.dataset.action==='open-filter'?'filter':'task-filter'))));
       const previousFocus = root.contains(document.activeElement) ? document.activeElement : null;
       let html = '';
@@ -19288,7 +19286,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       else if (action === 'open-nav') setNavigationOpen(true);
       else if (action === 'close-nav') setNavigationOpen(false);
-      else if (action === 'open-account') { state.overlay = state.overlay === 'account' ? null : 'account'; renderAll(); }
+      else if (action === 'open-account') { state.overlay = state.overlay === 'account' ? null : 'account'; renderFloating(); }
       else if (action === 'account-entry') { state.overlay = null; navigate('tasks'); toast('已切换到桌面工作入口'); }
       else if (action === 'account-password') { state.infoModal = { title: '修改密码', html: '<div class="field"><label>当前密码</label><input type="password" /></div><div class="field" style="margin-top:10px"><label>新密码</label><input type="password" /></div><div class="field" style="margin-top:10px"><label>确认新密码</label><input type="password" /></div>' }; state.overlay='info'; renderFloating(); }
       else if (action === 'account-legal') { state.infoModal = { title: '隐私与使用规则', body: '系统仅按岗位授权处理业务资料；请勿共享账号、导出无关客户数据或绕过正式单据写入业务事实。' }; state.overlay='info'; renderFloating(); }

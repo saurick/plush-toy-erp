@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { openBusinessFormModeEditor } from './businessFormModeScenarios.mjs'
 import { assertBusinessFormCorners } from './businessFormCornerAssertions.mjs'
+import { setERPFormDisplay } from './themeAssertions.mjs'
 
 const views = [
   { suffix: 'desktop', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2, themeMode: 'light' },
@@ -31,7 +32,7 @@ export function createBusinessFormCornerScenarios(deps, documents, modeScenarios
           }
           const evidence = await assertBusinessFormCorners(page, editor)
           if (editorMode === 'create') {
-            await editor.getByRole('radio', { name: '页签', exact: true }).locator('..').click()
+            await setERPFormDisplay(page, 'section')
             await editor.getByRole('tablist', { name: '表单页签', exact: true }).waitFor()
             evidence.tabbed = await assertBusinessFormCorners(page, editor)
             const detail = evidence.sections.find(({ edges }) => edges[0]?.mode === 'inline')

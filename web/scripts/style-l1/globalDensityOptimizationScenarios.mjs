@@ -96,8 +96,6 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     await goto(page, route)
     await page.getByRole('button', { name: trigger }).click()
     const form = page.locator('.erp-business-form-page:visible')
-    const all = form.getByRole('radio', { name: '目录', exact: true })
-    if (await all.count()) await all.check()
     const inheritedControls = form.getByRole('button', { name: new RegExp(`${label}：.*沿用`) })
     if (!(await inheritedControls.count())) await form.getByRole('button', { name: { sales: '添加订货明细', purchase: '添加采购明细', outsourcing: '添加加工明细' }[key], exact: true }).last().click()
     await inheritedControls.first().waitFor()

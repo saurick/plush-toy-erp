@@ -52,7 +52,7 @@ path: '/erp/sales/project-orders/sales-orders',
         await left.getByRole('button', { name: '布局', exact: true }).click()
         await page.getByRole('spinbutton', { name: '左栏宽度百分比' }).fill('32')
         await page.keyboard.press('Escape')
-        await within(left, editor.locator('.erp-business-form-page__display-control'), '最窄栏的显示切换')
+        await expect(editor.locator('[aria-label="编辑页显示"]')).toHaveCount(0)
         await within(left, editor.locator('.erp-business-form-page__actions'), '最窄栏的保存操作')
         await expect(editor.getByRole('button', { name: '保存草稿', exact: true })).toBeInViewport()
         await editor.getByLabel('下单日期', { exact: true }).click()

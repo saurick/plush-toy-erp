@@ -40,7 +40,7 @@ export function createAttachmentNarrowScenarios({ outputDir }, base) {
       if (mode === 'new') await page.getByRole('button', { name: /新建 BOM$/u }).click()
       else await page.getByText(mode === 'readonly' ? 'BOM-STYLE-L1' : 'BOM-STYLE-DRAFT', { exact: true }).dblclick()
       const editor = page.locator('.erp-bom-editor:visible')
-      await editor.getByRole('radio', { name: '目录', exact: true }).check()
+      assert.equal(await editor.locator('[data-form-display]').getAttribute('data-form-display'), 'all')
       const panel = editor.getByRole('region', { name: 'BOM 附件', exact: true })
       await panel.waitFor()
       await panel.scrollIntoViewIfNeeded()

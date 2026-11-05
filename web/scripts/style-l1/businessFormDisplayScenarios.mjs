@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
-import { openERPAppearance } from './themeAssertions.mjs'
+import { openERPAppearance, setERPFormDisplay } from './themeAssertions.mjs'
 import { closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
@@ -35,8 +35,8 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
       verify: async (page) => {
         await page.getByRole('button', { name: '新建生产订单' }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
-        const control = editor.locator('.erp-business-form-page__display-control .ant-segmented')
-        await control.waitFor()
+        await editor.locator('[data-form-display="all"]').waitFor()
+        assert.equal(await editor.locator('[aria-label="编辑页显示"]').count(), 0, '显示方式统一从账号外观设置调整')
         const all = await visibleSections(editor)
         assert.ok(all.length >= 3)
         assert.equal(await editor.locator('[data-form-display]').getAttribute('data-form-display'), 'all')
@@ -44,8 +44,7 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
         const note = editor.getByRole('textbox', { name: '备注', exact: true })
         await note.fill('切换区域与全屏后仍保留的草稿')
         const noteHandle = await note.elementHandle()
-        if (themeMode === 'light') await verifyMobileNavigationMotion(page, assert, '.erp-business-form-page:not([hidden]) .erp-business-form-page__display-control .ant-segmented', 1)
-        else await control.getByText('页签', { exact: true }).click()
+        await setERPFormDisplay(page, 'section')
         await waitForDisplay(page, 'section')
         assert.deepEqual(await visibleSections(editor), ['备注'])
         if (themeMode === 'light') {
@@ -69,22 +68,11 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
         await editor.locator('[data-form-section="生产明细"]:visible .ant-form-item-has-error').first().waitFor()
         await page.waitForFunction((node) => !!node.querySelector('.erp-business-form-page__section-errors'), await editor.elementHandle())
 
-        if (themeMode === 'light') await verifyMobileNavigationMotion(page, assert, '.erp-business-form-page:not([hidden]) .erp-business-form-page__display-control .ant-segmented', 0, true)
-        else await control.getByText('目录', { exact: true }).click()
+        await setERPFormDisplay(page, 'all')
         await waitForDisplay(page, 'all')
         assert.deepEqual(await visibleSections(editor), all)
         assert.equal(await note.inputValue(), '切换区域与全屏后仍保留的草稿')
-        await openERPAppearance(page)
-        const dialog = page.getByRole('dialog', { name: '外观与密度', exact: true })
-        await dialog.locator('[aria-label="编辑页显示"]').getByText('页签', { exact: true }).click()
-        await waitForDisplay(page, 'section')
-        await dialog.getByRole('button', { name: '关闭', exact: true }).click()
-        await dialog.waitFor({ state: 'hidden' })
-        const navigationDrawer = page.locator('.erp-admin-drawer:visible')
-        if (await navigationDrawer.count()) {
-          await page.locator('.ant-drawer-mask:visible').click()
-          await navigationDrawer.waitFor({ state: 'hidden' })
-        }
+        await setERPFormDisplay(page, 'section')
         assert.equal((await visibleSections(editor)).length, 1)
         assert.equal(await editor.getAttribute('data-unsaved'), 'true')
         await waitForFiniteAnimations(page)
@@ -93,7 +81,7 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
         await closeBusinessFormPage(page, editor)
         await page.reload()
         await page.getByRole('button', { name: '新建生产订单' }).click()
-        await control.waitFor()
+        await editor.locator('[data-form-display="section"]').waitFor()
         assert.equal((await visibleSections(editor)).length, 1, 'server profile restores the saved preference after refresh')
         assert.equal(await editor.getAttribute('data-unsaved'), 'false', 'the display preference cannot dirty a fresh document')
         assert.equal(await editor.getAttribute('data-fullscreen'), null)
@@ -114,8 +102,8 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
       verify: async (page) => {
         await page.getByRole('button', { name: trigger }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
-        const control = editor.locator('.erp-business-form-page__display-control .ant-segmented')
-        await control.waitFor()
+        await editor.locator('[data-form-display="section"]').waitFor()
+        assert.equal(await editor.locator('[aria-label="编辑页显示"]').count(), 0)
         assert.equal((await visibleSections(editor)).length, 1)
         const tabs = editor.getByRole('tablist', { name: '表单页签', exact: true })
         await tabs.waitFor()
@@ -138,12 +126,12 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
           await page.setViewportSize({ width: 1440, height: 900 })
         }
         const count = await editor.locator('[data-form-section]').count()
-        await control.getByText('目录', { exact: true }).click()
+        await setERPFormDisplay(page, 'all')
         await waitForDisplay(page, 'all')
         assert.equal((await visibleSections(editor)).length, count)
         assert.equal(await editor.getAttribute('data-unsaved'), 'false')
         if (key === 'bom') {
-          await control.getByText('页签', { exact: true }).click()
+          await setERPFormDisplay(page, 'section')
           await waitForDisplay(page, 'section')
           await chooseSection(page, editor, '订单与制表资料')
           await waitForFiniteAnimations(page)
@@ -169,9 +157,12 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
       verify: async (page) => {
         await page.getByRole('button', { name: '新建 BOM' }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
-        const control = editor.locator('.erp-business-form-page__display-control')
+        assert.equal(await editor.locator('[aria-label="编辑页显示"]').count(), 0)
+        await openERPAppearance(page)
+        const dialog = page.getByRole('dialog', { name: '外观与密度', exact: true })
+        const control = dialog.locator('[aria-label="编辑页显示"]')
         await control.getByText('页签', { exact: true }).click()
-        const error = control.getByRole('alert')
+        const error = dialog.getByRole('alert')
         await error.waitFor()
         assert.match(await error.innerText(), /外观设置未保存到账号，请重试。/u)
         assert.equal((await visibleSections(editor)).length, 1)
@@ -179,6 +170,8 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
         await error.getByRole('button', { name: '重试', exact: true }).click()
         await waitForDisplay(page, 'section')
         await error.waitFor({ state: 'hidden' })
+        await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+        await dialog.waitFor({ state: 'hidden' })
         await closeBusinessFormPage(page, editor)
       },
     },
@@ -192,7 +185,7 @@ export function createBusinessFormDisplayScenarios({ customerRuntimeEffectiveSes
         await page.getByRole('button', { name: '登记收付款' }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.getByRole('heading', { name: '登记收付款' }).waitFor()
-        assert.equal(await editor.locator('.erp-business-form-page__display-control').count(), 0)
+        assert.equal(await editor.locator('[aria-label="编辑页显示"]').count(), 0)
         assert.equal((await visibleSections(editor)).length, await editor.locator('[data-form-section]').count())
         await closeBusinessFormPage(page, editor)
       },

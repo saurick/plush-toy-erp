@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { expect } from 'playwright/test'
 import { createBOMMaterialGroupsScenarios } from './bomMaterialGroupsScenarios.mjs'
 import { closeBusinessFormPage } from './businessFormPageAssertions.mjs'
+import { setERPFormDisplay } from './themeAssertions.mjs'
 import { assertTableStickyHeaderAlignment } from './tableStickyHeaderAssertions.mjs'
 
 function geometry(node) {
@@ -45,10 +46,10 @@ export function createLineItemStickyHeaderScenarios(deps) {
     ...base,
     ...options,
     verify: async (page) => {
+      if (options.sectionMode) await setERPFormDisplay(page, 'section')
       await page.getByText('BOM-STYLE-DRAFT', { exact: true }).dblclick()
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       if (options.sectionMode) {
-        await editor.getByRole('radio', { name: '页签', exact: true }).locator('..').click()
         await editor.getByRole('tab', { name: '材料分析明细表', exact: true }).click()
       }
       await editor.getByLabel('部位 1', { exact: true }).waitFor()

@@ -1,4 +1,5 @@
 import { expect as expectLocator } from 'playwright/test'
+import { setERPFormDisplay } from './themeAssertions.mjs'
 import { createBOMToolbarScenarios } from './bomToolbarScenarios.mjs'
 import { clickBOMMaterialAction, clickBOMPartAction } from './bomToolbarActions.mjs'
 import {
@@ -646,7 +647,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         await expectLocator(popup()).toHaveCount(0)
         await preview.getByRole('button', { name: '带入编辑', exact: true }).click()
         const editor = page.locator('.erp-bom-editor:visible')
-        await editor.getByText('页签', { exact: true }).click()
+        await setERPFormDisplay(page, 'section')
         await editor.getByRole('tab', { name: '材料分析明细表', exact: true }).click()
         await editor.getByRole('button', { name: '全部展开', exact: true }).click()
         const row = editor.locator('tr[data-bom-part-index="1"]')

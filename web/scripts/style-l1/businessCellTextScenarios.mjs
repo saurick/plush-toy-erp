@@ -206,7 +206,7 @@ export function createBusinessCellTextScenarios(deps) {
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       await editor.waitFor({ state: 'visible' })
       await page.waitForFunction(() => document.querySelector('.erp-business-form-page:not([hidden])')?.getAttribute('aria-busy') === 'false')
-      await editor.getByRole('radio', { name: '目录', exact: true }).check()
+      deps.assert.equal(await editor.locator('[data-form-display]').getAttribute('data-form-display'), 'all')
       const headerNote = editor.locator('[data-form-section="备注与附件"] textarea')
       await headerNote.scrollIntoViewIfNeeded()
       const headerCount = headerNote.locator('..').locator('.ant-input-data-count')

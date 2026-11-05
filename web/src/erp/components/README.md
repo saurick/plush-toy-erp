@@ -41,7 +41,7 @@
 - 菜单主列表的整页编辑复用 `business-list/BusinessFormPage.jsx`，统一管理保存、离开保护及桌面可选全屏。默认保存前校验当前表单；采购需先清理纯空白新行、批量导入需预检全部草稿时，使用 `validateOnSave={false}` 交给保存器整理后校验，仍须调用所属 form 的 `validateFields`；校验失败通过 `errorFields` 复用分区展开和字段聚焦。容器与恢复合同见[桌面业务编辑](../../../../docs/engineering/前端实现与交互约定.md#桌面业务编辑与弹窗约定)。
 - 局部弹窗由 `BusinessFormSectionScope` 提供独立聚焦范围；整页表单仍由 `BusinessFormBody` 提供目录、阅读位置及焦点，已有字段和浮层不重建。已有分组使用 `BusinessFormSection`，普通子标题继续使用 `BusinessFormSectionTitle`；查看、复制、导入及加载 / 空态 / 错误分支均保留标题。
 - 分区定位与聚焦复用 `BusinessFormBody`、`BusinessFormSection`；普通分区及 BOM 标题共用 `business-list/businessFormSections.css` 的 32px 紧凑标题带，以短竖线、主题文字和淡主题色底区分表头及只读框，当前分区底色加深。外观与当前分区不派生业务状态，不改变输入、明细行组或整单保存语义。
-- `BusinessFormBody` 共用“目录 / 页签”导航：目录连续展示整单，页签用 `SlidingTabList` 保持横向导航可见，任务共用滚动区时吸顶；窄屏横滑页签。切换保留字段挂载、阅读位置与整单校验，显示方式沿用账号偏好。
+- `BusinessFormBody` 共用“目录 / 页签”导航：目录连续展示整单，页签用 `SlidingTabList` 保持横向导航可见，任务共用滚动区时吸顶；窄屏横滑页签。切换保留字段挂载、阅读位置与整单校验，显示方式统一在账号“外观与密度”中设置，编辑页标题栏不重复提供入口。
 - `BusinessFormSection` 的 `fieldLayout="adaptive"` 按字段内容换行，`erp-business-action-form__field--short` / `__field--wide` 只控制字段区域预算；`fieldLayout="support"` 组织备注与附件，窄区域顺排。默认栅格及 Excel 明细结构保留，样式集中在 `businessFormSections.css`。
 - `BusinessLineItemsTable` 保持同一表头与滚动区域；`BusinessLineItemGroupHeading` 统一提供整条标题点击、箭头状态及键盘展开收起，保留标题内图片预览的独立操作。出货页用它归组相邻产品身份，`BusinessLineItemRow` 仍逐条维护字段、序号与浮层焦点，不改变 `Form.List` 的顺序和 key。业务归组适用范围见[编辑页归组](../../../../docs/product/ui-design/交互设计说明.md#editor-line-grouping)。
 - 明细标题、组数、批量展开、横向查看和来源操作统一交给 `BusinessLineItemsHeader`；`BusinessGroupedLineItems` 通过 `title`、`headerActions` 接入，BOM 与采购到货保留自身字段结构并复用同一标题组件。滚动入口仅挂入所属明细工具栏，布局与恢复合同见[明细录入](../../../../docs/engineering/前端实现与交互约定.md#明细录入)。

@@ -182,6 +182,22 @@ export async function openERPAppearance(page) {
   return trigger
 }
 
+export async function setERPFormDisplay(page, value) {
+  await openERPAppearance(page)
+  const dialog = page.getByRole('dialog', { name: '外观与密度', exact: true })
+  await dialog.locator('[aria-label="编辑页显示"]').getByRole('radio', {
+    name: value === 'section' ? '页签' : '目录', exact: true,
+  }).locator('..').click()
+  await page.waitForFunction((display) => JSON.parse(localStorage.getItem('admin_erp_preferences') || '{}').appearance?.formDisplay === display, value)
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await dialog.waitFor({ state: 'hidden' })
+  const navigationDrawer = page.locator('.erp-admin-drawer:visible')
+  if (await navigationDrawer.count()) {
+    await page.keyboard.press('Escape')
+    await navigationDrawer.waitFor({ state: 'hidden' })
+  }
+}
+
 async function clickERPThemeOption(page, label) {
   const expectedModeByLabel = {
     跟系统: 'system',

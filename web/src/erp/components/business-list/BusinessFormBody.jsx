@@ -19,7 +19,7 @@ function formSectionScroller(body) {
   return body
 }
 
-const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, busy, children, navigation = true, formDisplay = 'all', onNavigationChange }, ref) => {
+const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, busy, children, navigation = true, formDisplay = 'all' }, ref) => {
   const bodyRef = useRef(null)
   const navigationAnchor = useRef(null)
   const rememberedScroll = useRef(0)
@@ -53,8 +53,6 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
     activateSection: open && presented && !loading ? activateSection : null,
     sectionMode: sectionMode && presented,
   }), [active, activateSection, loading, open, presented, sectionMode])
-
-  useEffect(() => onNavigationChange?.(showNavigation), [onNavigationChange, showNavigation])
 
   useImperativeHandle(ref, () => ({
     revealValidationErrors() {

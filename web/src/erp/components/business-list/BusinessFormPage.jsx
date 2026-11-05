@@ -22,9 +22,7 @@ import { useBusinessEditorGroup } from './BusinessEditorGroup.jsx'
 import { businessFormReadOnly } from './businessFormReadOnly.mjs'
 import useWorkflowTaskBusinessBusy from '../../hooks/useWorkflowTaskBusinessBusy.js'
 import ERPPageActions from '../ERPPageActions.jsx'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { useERPTheme } from '@/common/theme/erpThemeContext.jsx'
-import { ERP_FORM_DISPLAY_OPTIONS } from '@/common/theme/erpAppearance.mjs'
 import '../../styles/app/business-form-page.css'
 
 function captureFormScroll(page, previous) {
@@ -117,8 +115,7 @@ export default function BusinessFormPage({
   const modal = useModal()
   const outletContext = useBusinessPageContext()
   const split = useBusinessSplit()
-  const { appearance, setAppearance, appearanceSaveError, retryAppearanceSave } = useERPTheme()
-  const [hasSectionNavigation, setHasSectionNavigation] = useState(false)
+  const { appearance } = useERPTheme()
   const formBodyRef = useRef(null)
   const pane = React.useContext(BusinessEditorPaneContext)
   const visible = open && pane?.active !== false && split?.visible !== false
@@ -488,13 +485,6 @@ export default function BusinessFormPage({
     ? <footer className={taskFocused ? 'mobile-task-business-form-footer' : 'erp-business-form-page__footer'}>{providedFooter}</footer>
     : defaultFooter
 
-  const displayControl = hasSectionNavigation ? (
-    <div className="erp-business-form-page__display-control">
-      <Segmented aria-label="编辑页显示" value={appearance.formDisplay} options={ERP_FORM_DISPLAY_OPTIONS} disabled={busy || loading} onChange={(formDisplay) => setAppearance({ formDisplay })} />
-      {appearanceSaveError ? <span className="erp-business-form-page__display-error" role="alert">{appearanceSaveError} <Button size="small" onClick={retryAppearanceSave}>重试</Button></span> : null}
-    </div>
-  ) : null
-
   const editor = (
     <section
       ref={pageRef}
@@ -526,13 +516,11 @@ export default function BusinessFormPage({
         <header className="erp-business-form-page__header">
           <h2 tabIndex={-1}>{title}</h2>
           {headerActions}
-          {displayControl}
         </header>
       ) : (
         <header className="erp-business-form-page__header">
           <h1 tabIndex={-1}>{title}</h1>
           {headerActions}
-          {displayControl}
           {open ? <ERPPageActions showRefresh={false} /> : null}
           {canFullscreen ? (
             <Button
@@ -548,7 +536,7 @@ export default function BusinessFormPage({
           ) : null}
         </header>
       )}
-      <BusinessFormBody ref={formBodyRef} open={open} active={pane?.active !== false} loading={loading} busy={busy || initializing} formDisplay={appearance.formDisplay} onNavigationChange={setHasSectionNavigation}>
+      <BusinessFormBody ref={formBodyRef} open={open} active={pane?.active !== false} loading={loading} busy={busy || initializing} formDisplay={appearance.formDisplay}>
         <Spin spinning={loading}>
           <BusinessFormPendingAttachmentsContext.Provider
             value={reportPendingAttachments}

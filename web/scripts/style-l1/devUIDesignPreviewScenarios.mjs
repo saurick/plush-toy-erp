@@ -43,11 +43,19 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await frame.getByRole('button', { name: '销售管理', exact: true }).click()
         await frame.getByRole('button', { name: '新建订单', exact: true }).click()
         const editor = frame.locator('.form-view')
-        const control = editor.locator('.form-head [aria-label="编辑页显示"]')
+        assert.equal(await editor.locator('[aria-label="编辑页显示"]').count(), 0, '原型编辑页沿用账号设置，标题栏不重复提供显示切换')
+        const chooseDisplay = async (label) => {
+          await frame.locator('[data-action="open-account"]').click()
+          await frame.locator('.account-popover [data-action="open-theme"]').click()
+          const dialog = frame.getByRole('dialog', { name: '外观与密度', exact: true })
+          await dialog.getByRole('group', { name: '编辑页显示', exact: true }).getByRole('button', { name: label, exact: true }).click()
+          await dialog.locator('.modal-foot').getByRole('button', { name: '关闭', exact: true }).click()
+          await dialog.waitFor({ state: 'hidden' })
+        }
         const note = editor.locator('textarea[data-form-field="remark"]')
         await note.fill('目录与页签切换后保留的原型草稿\n'.repeat(30))
         const identity = await note.elementHandle()
-        await control.getByRole('button', { name: '页签', exact: true }).click()
+        await chooseDisplay('页签')
         const tabs = editor.getByRole('tablist', { name: '表单页签', exact: true })
         for (const width of [1920, 390]) {
           await page.setViewportSize({ width, height: 1080 })
@@ -66,7 +74,8 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
           assert.equal(await identity.evaluate((node) => node.isConnected), true)
           assert.equal(await note.inputValue(), '目录与页签切换后保留的原型草稿\n'.repeat(30))
         }
-        await control.getByRole('button', { name: '目录', exact: true }).click()
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await chooseDisplay('目录')
         assert.equal(await editor.locator('.form-section:visible').count(), 5)
         assert.equal(await identity.evaluate((node) => node.isConnected), true)
       },
