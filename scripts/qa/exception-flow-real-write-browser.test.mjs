@@ -348,7 +348,7 @@ function taskTablePage(
   };
   const page = {
     getByPlaceholder: (placeholder, options) => {
-      assert.equal(placeholder, "订单 / 产品 / 物料 / 款号");
+      assert.equal(placeholder, "搜单号、产品、物料");
       assert.equal(options.exact, true);
       return control("search");
     },
@@ -490,14 +490,14 @@ test("exception-flow task search follows the current page placeholder contract",
   );
 
   assert.match(pageSource, /<TaskBoardSearch\b/u);
-  assert.match(dashboardSource, /placeholder="订单 \/ 产品 \/ 物料 \/ 款号"/u);
+  assert.match(dashboardSource, /placeholder="搜单号、产品、物料"/u);
   assert.match(
     dashboardSource,
     /searchHint="可搜索：任务编号、任务、单号、产品、款号、物料、处理原因"/u,
   );
   assert.match(
     runnerSource,
-    /getByPlaceholder\("订单 \/ 产品 \/ 物料 \/ 款号",\s*\{\s*exact: true,?\s*\}\)/u,
+    /getByPlaceholder\("搜单号、产品、物料",\s*\{\s*exact: true,?\s*\}\)/u,
   );
   assert.match(dashboardSource, /data-task-entry/u);
   assert.match(dashboardSource, /'data-task-id': task\.id/u);

@@ -707,7 +707,7 @@ export async function actOnExceptionFlowTaskPage(
   task,
   { actionTitle, confirmLabel, successMessage, reason = "" },
 ) {
-  const search = page.getByPlaceholder("订单 / 产品 / 物料 / 款号", {
+  const search = page.getByPlaceholder("搜单号、产品、物料", {
     exact: true,
   });
   await search.fill(task.task_code);

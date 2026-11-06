@@ -162,7 +162,7 @@ export function createMaterialSummaryScenarios({
         })
         await trigger.waitFor()
         await drawer.locator('[data-testid="workflow-task-handling-chain"][data-process-state="ready"]').waitFor()
-        assert.equal(reads, 1, '任务处理链核对本轮审批，汇总弹窗尚未读取')
+        assert.equal(reads, 2, '模拟运行的 StrictMode 双挂载仅核对处理链，汇总弹窗尚未读取')
         await trigger.scrollIntoViewIfNeeded()
         const taskScroll = await drawer
           .locator('.ant-drawer-body')
@@ -174,6 +174,7 @@ export function createMaterialSummaryScenarios({
         const dialog = page.locator('.erp-material-summary-modal')
         await dialog.getByText('米白短毛绒', { exact: true }).waitFor()
         assert.deepEqual(readRequests, [
+          { sales_order_id: 101, request_id: 51 },
           { sales_order_id: 101, request_id: 51 },
           { sales_order_id: 101, request_id: 51, preview: false },
         ])
