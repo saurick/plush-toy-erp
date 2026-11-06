@@ -1,6 +1,6 @@
+import { writeFile } from 'node:fs/promises'
 import { expect } from 'playwright/test'
 import { assertBusinessMermaidGraph } from './mermaidGraphAssertions.mjs'
-import { writeFile } from 'node:fs/promises'
 import { DEV_FLOW_STATE_CATALOG as graphCatalog } from '../../src/dev-workbench/config/devFlowStateCatalog.mjs'
 import { assertFulfillmentChainClickTargets, assertFulfillmentChainGeometry, assertFulfillmentDetailGeometry, openFulfillmentExceptionDirectory } from './fulfillmentChainAssertions.mjs'
 import { assertInactivePrintStylesDoNotHideApp } from './styleIsolationAssertions.mjs'
@@ -74,10 +74,10 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
         await page.getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' }).click()
         await page.waitForFunction(() => window.__flowPrintCount === 1)
         await page.emulateMedia({ media: 'print' })
-        await writeFile(path.join(outputDir, 'print-geometry.json'), JSON.stringify(await page.locator('[data-flow-print-part]').first().evaluate((root) => ({
-          svg: root.querySelector('svg').getBoundingClientRect().toJSON(), viewBox: root.querySelector('svg').getAttribute('viewBox'),
-          nodes: [...root.querySelectorAll('[data-graph-node]')].map((node) => ({ key: node.dataset.graphNode, box: node.getBoundingClientRect().toJSON() })),
-          edges: [...root.querySelectorAll('[data-graph-wire]')].map((node) => { const m = node.getScreenCTM(); return { from: node.dataset.from, to: node.dataset.to, d: node.getAttribute('d'), matrix: [m.a, m.b, m.c, m.d, m.e, m.f], points: [0.1, 0.5, 0.9].map((t) => { const p = node.getPointAtLength(node.getTotalLength() * t).matrixTransform(m); return [p.x, p.y] }) } }),
+        await writeFile(path.join(outputDir, 'print-geometry.json'), JSON.stringify(await page.locator('[data-fulfillment-chain]').evaluate((root) => ({
+          svg: root.querySelector('svg').getBoundingClientRect().toJSON(),
+          nodes: [...root.querySelectorAll('[data-chain-stage]')].map((node) => ({ key: node.dataset.chainStage, box: node.getBoundingClientRect().toJSON() })),
+          edges: [...root.querySelectorAll('[data-chain-wire]')].map((node) => ({ from: node.dataset.wireFrom, to: node.dataset.wireTo, d: node.getAttribute('d') })),
         })), null, 2))
         try { await assertFulfillmentChainGeometry(page.locator('[data-fulfillment-chain]')) }
         finally { await page.pdf({ path: path.join(outputDir, 'order-print-readable.pdf'), preferCSSPageSize: true, printBackground: true }) }
@@ -92,7 +92,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       path: '/__dev/business-rules?view=states',
       viewport: { width: 1920, height: 1080 },
       verify: async (page) => {
-        const origin = new URL(page.url()).origin
+        const { origin } = new URL(page.url())
         const verified = []
         for (const flow of graphCatalog.flows) {
           await page.goto(`${origin}/__dev/business-rules?view=states&flow=${encodeURIComponent(flow.key)}`)
@@ -122,7 +122,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       path: '/__dev/business-rules?view=processes',
       viewport: { width: 1920, height: 1080 },
       verify: async (page) => {
-        const origin = new URL(page.url()).origin
+        const { origin } = new URL(page.url())
         const verified = []
         for (const definition of graphCatalog.processDefinitions) {
           await page.goto(`${origin}/__dev/business-rules?view=processes&process=${encodeURIComponent(definition.key)}`)
@@ -194,6 +194,8 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
       await expect(root).toBeVisible()
       await expect(page.locator('#dev-flow-task-search')).toHaveCount(0)
       await assertInactivePrintStylesDoNotHideApp(page)
+      await assertFulfillmentChainGeometry(guide.locator('[data-fulfillment-chain]'))
+      await page.screenshot({ path: path.join(outputDir, '订单全流程-4K.png'), fullPage: false })
       await assertFulfillmentChainClickTargets(guide.locator('[data-fulfillment-chain]'))
       await guide.getByRole('button', { name: '11 皮套检验', exact: true }).click()
       await verifyDiagram(page, panel.locator('[data-business-flow]'))

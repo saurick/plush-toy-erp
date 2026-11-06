@@ -36,6 +36,7 @@
 }
 [data-flow-print-current] .erp-dev-fulfillment-guide { display: block; padding: 0; border: 0; }
 [data-flow-print-current] .erp-dev-fulfillment-guide :is(.erp-dev-fulfillment-guide__role, .ant-segmented, .erp-dev-exception-directory, .erp-dev-fulfillment-guide__detail-actions) { display: none; }
+[data-flow-print-current] .erp-dev-fulfillment-guide .erp-dev-chain__stage-main { display: grid; }
 [data-flow-print-current] .erp-dev-fulfillment-guide .erp-dev-chain__exception-trigger,
 [data-flow-print-current] .erp-dev-fulfillment-guide .erp-dev-chain__independent button { display: inline-block; }
 [data-flow-print-current] .erp-dev-fulfillment-guide__panel { margin-top: 12px; }

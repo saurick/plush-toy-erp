@@ -37,7 +37,7 @@ test('总图只展示已登记的专项分支，普通受阻说明不生成异�
     assert.deepEqual(branches.map((item) => item.dataset.stageGuide), step.handling.guides)
     assert(branches.every((item) => item.textContent !== '异常'))
   }
-  await click('[data-chain-stage="handwork_execute"]')
+  await click('[data-chain-stage="handwork_execute"] [data-stage-card]')
   assert(root.querySelector('[data-stage-normal="handwork_execute"] [data-business-flow]'))
   assert.equal(params().get('flow_stage'), 'handwork_execute')
   assert.equal(root.querySelector('[aria-label="环节办理方式"]'), null)
@@ -86,7 +86,7 @@ test('异常链接刷新后仍可返回，改选主环节清理旧异常与子�
   await click('[data-stage-exception="cutting_quality"]')
   assert.equal(params().get('flow_stage'), 'cutting_quality')
   assert.equal(params().has('flow_substep'), false)
-  await click('[data-chain-stage="supplier_advance"]')
+  await click('[data-chain-stage="supplier_advance"] [data-stage-card]')
   assert(root.querySelector('[data-stage-normal="supplier_advance"]'))
   assert.equal(params().has('flow_exception'), false)
   assert.equal(params().has('flow_exception_origin'), false)

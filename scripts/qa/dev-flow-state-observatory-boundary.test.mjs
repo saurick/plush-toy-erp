@@ -141,7 +141,7 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(chain, /data-stage-exception=\{step.stage\}/u);
   assert.match(guide, /<FulfillmentChainCanvas/u, "the main chain remains present while an exception is open");
   assert.match(chainModel, /buildFulfillmentOverview\(flow\)/u, "the total flow groups the canonical source stages");
-  assert.match(chainModel, /'fulfillment-stage': step\.stage/u, "each Mermaid node retains its canonical identity");
+  assert.match(chain, /data-fulfillment-stage=\{step.stage\}/u, "each overview entry retains its canonical identity");
   assert.doesNotMatch(guide, /\bfunction\s+ExceptionGuide\s*\(|exception-position/u, "the separate exception main view is removed");
   for (const copy of [
     "Workflow 管“人”", "ProcessRuntime 管“路”", "Fact / Ledger 管“账”",
@@ -237,7 +237,7 @@ test("dev flow state observatory: pasted business text search is local, grouped,
 
 
 
-  assert.match(search, /例如：销售订单、销售 PMC、已提交/u);
+  assert.match(search, /placeholder="搜业务定义"/u);
   assert.match(
     search,
     /这个框查目录定义，不查具体任务、运行实例或真实业务记录/u,
@@ -419,10 +419,14 @@ test("dev flow state observatory: task selection stays in the URL and uses one s
 test("dev flow state observatory: task-name lookup and unlinked runtime boundary remain exact", () => {
   const page = readObservatorySource();
   const helper = read("web/src/dev-workbench/pages/devFlowStateTaskLookup.mjs");
+  const taskFinder = readFunctionSource(
+    "web/src/dev-workbench/components/flow-state/FlowTaskContext.jsx",
+    "TaskFinder",
+  );
+  assert.match(taskFinder, /placeholder="搜单号或任务"/u);
 
   for (const copy of [
     "定位业务",
-    "订单 / 来源单号 / 任务名称或编号",
     "查询当前账号可见任务；数字任务 ID 可用于开发排障",
     "名称可能重复",
     "已找到任务，但它没有正式流程轨迹",
