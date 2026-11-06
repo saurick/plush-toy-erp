@@ -8,6 +8,7 @@ import { assertReadableOnBackground } from './colorAssertions.mjs'
 import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 import { createMockAdminSessionToken } from '../mockAdminSessionToken.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
+import { createAppearanceHelpScenarios } from './appearanceHelpScenarios.mjs'
 
 async function waitForSavedAppearance(page, expected) {
   await page.waitForFunction((expected) => {
@@ -133,6 +134,7 @@ export function createAccountAppearanceScenarios({
   const desktopSave = holdAppearanceSaves()
   const mobileSave = holdAppearanceSaves()
   return [
+    ...createAppearanceHelpScenarios({ desktop, outputDir }),
     ...[false, true].map((mobile) => ({
       name: `account-appearance-logout-${mobile ? 'mobile' : 'desktop'}`,
       path: '/admin-login',

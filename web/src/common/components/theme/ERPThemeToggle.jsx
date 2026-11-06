@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { DesktopOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
 import { Alert, Button } from 'antd'
 import Modal from '@/common/components/modal/AppModal'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { ERP_THEME_MODE, useERPTheme } from '@/common/theme/erpTheme'
 import { ERP_ACCENTS, ERP_FORM_DISPLAY_OPTIONS } from '@/common/theme/erpAppearance.mjs'
+import ERPAppearanceHelp from './ERPAppearanceHelp'
 
 const themeOptions = [
   {
@@ -87,9 +88,24 @@ export default function ERPThemeToggle({
     retryAppearanceSave,
   } = useERPTheme()
   const [internalOpen, setInternalOpen] = useState(false)
+  const [activeHelp, setActiveHelp] = useState(null)
   const appearanceOpen = controlledOpen ?? internalOpen
   const setAppearanceOpen = onOpenChange ?? setInternalOpen
   const appearanceTitle = showDensity ? '外观与密度' : '外观设置'
+  useEffect(() => {
+    if (!appearanceOpen) setActiveHelp(null)
+  }, [appearanceOpen])
+  const help = (kind) => (
+    <ERPAppearanceHelp
+      kind={kind}
+      open={appearanceOpen && activeHelp === kind}
+      onOpenChange={(nextOpen) => setActiveHelp((current) => nextOpen ? kind : current === kind ? null : current)}
+    />
+  )
+  const closeAppearance = () => {
+    setActiveHelp(null)
+    setAppearanceOpen(false)
+  }
   const saveStatus = (
     <span
       className="erp-appearance-save-status"
@@ -114,7 +130,7 @@ export default function ERPThemeToggle({
   )
   const settings = (
     <div
-      className={`erp-appearance-settings${variant === 'settings' ? ' erp-appearance-settings--mobile' : ''}`}
+      className={`erp-appearance-settings${variant === 'settings' ? ' erp-appearance-settings--mobile' : showDensity ? ' erp-appearance-settings--with-help' : ''}`}
     >
       {variant === 'settings' ? modeControl : null}
       <fieldset>
@@ -137,7 +153,7 @@ export default function ERPThemeToggle({
       {variant !== 'settings' && showDensity ? (
         <>
           <fieldset>
-            <legend>表格密度</legend>
+            <legend><span>表格密度</span>{help('density')}</legend>
             <Segmented
               block
               aria-label="表格密度"
@@ -150,7 +166,7 @@ export default function ERPThemeToggle({
             />
           </fieldset>
           <fieldset>
-            <legend>表格线条</legend>
+            <legend><span>表格线条</span>{help('lines')}</legend>
             <Segmented
               block
               aria-label="表格线条"
@@ -163,7 +179,7 @@ export default function ERPThemeToggle({
             />
           </fieldset>
           <fieldset>
-            <legend>编辑页显示</legend>
+            <legend><span>编辑页显示</span>{help('display')}</legend>
             <Segmented
               block
               aria-label="编辑页显示"
@@ -194,15 +210,18 @@ export default function ERPThemeToggle({
       title={appearanceTitle}
       width={470}
       styles={appearanceModalStyles}
-      onCancel={() => setAppearanceOpen(false)}
-      afterClose={afterClose}
+      onCancel={closeAppearance}
+      afterClose={() => {
+        setActiveHelp(null)
+        afterClose?.()
+      }}
       footer={
         <div className="erp-appearance-footer">
           {saveStatus}
           <Button
             type="primary"
             disabled={appearanceSaving}
-            onClick={() => setAppearanceOpen(false)}
+            onClick={closeAppearance}
           >
             关闭
           </Button>

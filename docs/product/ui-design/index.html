@@ -1175,6 +1175,31 @@
     .theme-mode button { min-height: 42px; padding: 7px 8px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
     .theme-mode button.active { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-strong); }
     .theme-density, .theme-table-lines { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .appearance-setting-heading { display:flex; align-items:center; gap:4px; min-height:28px; color:var(--text-2); font-size:12px; font-weight:600; }
+    .appearance-setting-help-trigger { display:grid; place-items:center; flex:none; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--text-2); cursor:pointer; }
+    .appearance-setting-help-trigger:hover, .appearance-setting-help-trigger:focus-visible { color:var(--brand); background:var(--brand-soft); }
+    .appearance-setting-help-popup { position:fixed; z-index:2000; width:min(380px,calc(100vw - 32px)); padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); box-shadow:var(--shadow); color:var(--text); font-size:13px; line-height:1.6; }
+    .appearance-setting-help-popup > strong { display:block; margin-bottom:8px; }
+    .appearance-setting-help-content { overflow:auto; overscroll-behavior:contain; }
+    .appearance-setting-help-compare { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:12px; }
+    .appearance-setting-help-compare figure { min-width:0; margin:0; }
+    .appearance-setting-help-compare figcaption { margin-bottom:6px; color:var(--text-2); font-size:12px; line-height:18px; }
+    .appearance-setting-help-table { width:100%; border-collapse:collapse; color:var(--text); font-size:12px; line-height:18px; }
+    .appearance-setting-help-table th, .appearance-setting-help-table td { height:auto; padding:5px; border:0; border-bottom:1px solid var(--line); font-weight:400; text-align:left; white-space:nowrap; }
+    .appearance-setting-help-table th { background:var(--surface-muted); }
+    .appearance-setting-help-table.is-compact td { padding-block:1px; }
+    .appearance-setting-help-table.is-grid th, .appearance-setting-help-table.is-grid td { border:1px solid var(--line); }
+    .appearance-setting-help-editor { height:160px; padding:6px; overflow:hidden; border:1px solid var(--line); border-radius:5px; background:var(--surface-muted); font-size:12px; line-height:18px; }
+    .appearance-setting-help-editor.is-directory { display:grid; grid-template-columns:28px minmax(0,1fr); gap:6px; }
+    .appearance-setting-help-editor aside { display:flex; flex-direction:column; gap:11px; padding-top:3px; color:var(--text-2); }
+    .appearance-setting-help-sections { display:flex; flex-direction:column; gap:7px; }
+    .appearance-setting-help-sections > div { padding:4px; border:1px solid var(--line); border-radius:3px; background:var(--surface); }
+    .appearance-setting-help-tabs { display:flex; gap:6px; margin-bottom:9px; color:var(--text-2); white-space:nowrap; }
+    .appearance-setting-help-tabs b { color:var(--brand); border-bottom:2px solid var(--brand); font-weight:500; }
+    .appearance-setting-help-placeholder { height:5px; margin-top:6px; border-radius:2px; background:var(--line); }
+    .appearance-setting-help-note { margin:12px 0 0; }
+    @media (max-width:767px) { .appearance-setting-heading { min-height:44px; } .appearance-setting-help-trigger { width:44px; height:44px; } }
     .mobile-appearance-grid { display: grid; gap: 12px; }
     .mobile-appearance-grid .theme-mode { margin-top: 0; gap: 5px; }
     .mobile-appearance-grid .theme-mode button { min-height: 38px; padding: 0 6px; font-size: 12px; }
@@ -18519,6 +18544,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
     let floatingReturnFocus = null;
     function renderFloating() {
+      closeAppearanceHelp();
       const root = document.querySelector('#floating');
       document.querySelectorAll('[data-action="open-account"]').forEach(button => button.setAttribute('aria-expanded', String(state.overlay === 'account')));
       document.querySelectorAll('.filter-trigger-group [aria-haspopup="dialog"]').forEach(button => button.setAttribute('aria-expanded', String(state.overlay===(button.dataset.action==='open-filter'?'filter':'task-filter'))));
@@ -18971,8 +18997,82 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="overlay" data-action="overlay-bg"><section class="modal product-image-preview ${products.length>1?'product-image-gallery':''}" role="dialog" aria-modal="true" aria-label="${escapeHTML(preview.label)}图片预览"><header class="modal-head"><strong>${escapeHTML(product.label)}</strong><span class="data-note">${products.length>1?`${escapeHTML(preview.label)} · 产品 ${index+1} / ${products.length}`:'产品图片预览'}</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭图片预览">${icon('close')}</button></header><div class="modal-body"><div class="product-image-preview-stage" style="--preview-scale:${scale}">${product.photoCount?renderProductArt(product.seed+photo,product.label):'<div class="empty">该产品暂无图片</div>'}</div></div><footer class="modal-foot product-image-preview-footer">${choices}<div class="product-image-preview-controls">${pictures}<div class="product-image-preview-tools"><button class="btn" data-action="product-image-zoom" data-value="out" ${scale<=1||!product.photoCount?'disabled':''}>缩小</button><button class="btn" data-action="product-image-zoom" data-value="reset" ${!product.photoCount?'disabled':''}>适应屏幕</button><span class="data-note">${Math.round(scale*100)}%</span><button class="btn" data-action="product-image-zoom" data-value="in" ${scale>=3||!product.photoCount?'disabled':''}>放大</button><details class="product-image-preview-help"><summary class="btn" aria-label="查看看图操作帮助">${icon('help')}</summary><p>滚轮或双指缩放 · 放大后拖动查看<br>Esc 关闭说明，再按退出预览</p></details></div></div></footer></section></div>`;
     }
 
+    function renderAppearanceHelpHeading(kind,label) {
+      return `<div class="appearance-setting-heading"><span>${label}</span><button type="button" class="appearance-setting-help-trigger" data-appearance-help="${kind}" aria-label="查看${label}说明" aria-expanded="false">${icon('info')}</button></div>`;
+    }
+
+    function renderAppearanceHelpContent(kind) {
+      const rows='<thead><tr><th>单号</th><th>状态</th></tr></thead><tbody><tr><td>PO-01</td><td>待收货</td></tr><tr><td>PO-02</td><td>待收货</td></tr><tr><td>PO-03</td><td>已完成</td></tr></tbody>';
+      const table=(caption,cls='')=>`<figure><figcaption>${caption}</figcaption><table class="appearance-setting-help-table ${cls}" aria-label="${caption}效果示意">${rows}</table></figure>`;
+      const placeholder='<div class="appearance-setting-help-placeholder"></div>';
+      if(kind==='density')return `<strong>表格密度</strong><div class="appearance-setting-help-content"><div class="appearance-setting-help-compare">${table('标准')}${table('紧凑','is-compact')}</div><p class="appearance-setting-help-note">紧凑减少行高和留白，同屏可显示更多记录。</p></div>`;
+      if(kind==='lines')return `<strong>表格线条</strong><div class="appearance-setting-help-content"><div class="appearance-setting-help-compare">${table('简洁')}${table('网格','is-grid')}</div><p class="appearance-setting-help-note">简洁弱化分隔线；网格突出行列边界，方便逐格核对。</p></div>`;
+      return `<strong>编辑页显示</strong><div class="appearance-setting-help-content"><div class="appearance-setting-help-compare"><figure><figcaption>目录</figcaption><div class="appearance-setting-help-editor is-directory" role="img" aria-label="左侧目录定位，右侧展示全部分区"><aside><span>基本</span><span>明细</span><span>交付</span></aside><div class="appearance-setting-help-sections">${['基本信息','采购明细','交付信息'].map(label=>`<div>${label}${placeholder}</div>`).join('')}</div></div></figure><figure><figcaption>页签</figcaption><div class="appearance-setting-help-editor" role="img" aria-label="顶部页签切换，一次展示一个分区"><div class="appearance-setting-help-tabs"><span>基本</span><b>明细</b><span>交付</span></div><div class="appearance-setting-help-sections"><div>采购明细${placeholder.repeat(3)}</div></div></div></figure></div><p class="appearance-setting-help-note">适用于长编辑页：目录整页展示并定位分区；页签按分区切换。</p></div>`;
+    }
+
+    let appearanceHelpAnchor=null, appearanceHelpPinned=false, appearanceHelpTimer, appearanceHelpRestoring=false;
+    function closeAppearanceHelp() {
+      clearTimeout(appearanceHelpTimer);
+      appearanceHelpAnchor?.setAttribute('aria-expanded','false');
+      appearanceHelpAnchor?.removeAttribute('aria-controls');
+      document.querySelector('#appearance-setting-help-popup')?.remove();
+      appearanceHelpAnchor=null;appearanceHelpPinned=false;
+    }
+    function positionAppearanceHelp() {
+      const popup=document.querySelector('#appearance-setting-help-popup'),button=appearanceHelpAnchor;
+      if(!popup||!button?.isConnected){closeAppearanceHelp();return;}
+      const r=button.getBoundingClientRect(),narrow=innerWidth<=767,below=innerHeight-r.bottom-16,above=r.top-16;
+      const top=narrow&&above>below;
+      popup.querySelector('.appearance-setting-help-content').style.maxHeight=Math.max(80,Math.min(400,(narrow?Math.max(above,below):innerHeight-48)-64))+'px';
+      const box=popup.getBoundingClientRect();
+      const x=narrow?r.left+r.width/2-box.width/2:r.right+8+box.width<=innerWidth-16?r.right+8:r.left-box.width-8;
+      const y=narrow?(top?r.top-box.height-8:r.bottom+8):r.top;
+      popup.style.left=Math.max(16,Math.min(innerWidth-box.width-16,x))+'px';
+      popup.style.top=Math.max(16,Math.min(innerHeight-box.height-16,y))+'px';
+    }
+    function openAppearanceHelp(button) {
+      clearTimeout(appearanceHelpTimer);
+      if(appearanceHelpAnchor===button)return;
+      closeAppearanceHelp();appearanceHelpAnchor=button;
+      const popup=document.createElement('aside');popup.id='appearance-setting-help-popup';popup.className='appearance-setting-help-popup';popup.setAttribute('role','tooltip');popup.innerHTML=renderAppearanceHelpContent(button.dataset.appearanceHelp);
+      document.body.append(popup);button.setAttribute('aria-expanded','true');button.setAttribute('aria-controls',popup.id);positionAppearanceHelp();
+    }
+    document.addEventListener('pointerover',event=>{
+      const button=event.target.closest('[data-appearance-help]');
+      if(button&&event.pointerType==='mouse')openAppearanceHelp(button);
+      if(event.target.closest('.appearance-setting-help-popup'))clearTimeout(appearanceHelpTimer);
+    });
+    document.addEventListener('pointerout',event=>{
+      if(event.target.closest('[data-appearance-help],.appearance-setting-help-popup'))appearanceHelpTimer=setTimeout(()=>{
+        const popup=document.querySelector('#appearance-setting-help-popup');
+        if(!appearanceHelpPinned&&!appearanceHelpAnchor?.matches(':hover,:focus-visible')&&!popup?.matches(':hover'))closeAppearanceHelp();
+      },160);
+    });
+    document.addEventListener('focusin',event=>{
+      const button=event.target.closest('[data-appearance-help]');
+      if(button&&!appearanceHelpRestoring&&button.matches(':focus-visible'))openAppearanceHelp(button);
+      else if(!button&&!event.target.closest('.appearance-setting-help-popup'))closeAppearanceHelp();
+    });
+    document.addEventListener('pointerdown',event=>{if(!event.target.closest('[data-appearance-help],.appearance-setting-help-popup'))closeAppearanceHelp();},true);
+    document.addEventListener('click',event=>{
+      const button=event.target.closest('[data-appearance-help]');if(!button)return;
+      event.preventDefault();event.stopPropagation();
+      if(appearanceHelpAnchor===button&&appearanceHelpPinned)closeAppearanceHelp();
+      else{openAppearanceHelp(button);appearanceHelpPinned=true;}
+    });
+    document.addEventListener('keydown',event=>{
+      if(event.key!=='Escape'||!appearanceHelpAnchor)return;
+      event.preventDefault();event.stopPropagation();
+      const button=appearanceHelpAnchor,restore=document.querySelector('.appearance-setting-help-popup')?.contains(document.activeElement);closeAppearanceHelp();
+      if(restore){
+        appearanceHelpRestoring=true;button.focus({preventScroll:true});appearanceHelpRestoring=false;
+      }
+    },true);
+    window.addEventListener('resize',positionAppearanceHelp);
+    document.addEventListener('scroll',positionAppearanceHelp,true);
+
     function renderThemeModal() {
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(470px,100%)"><header class="modal-head"><strong>${state.authenticated ? '外观与密度' : '外观设置'}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><div class="field"><label>主题色</label><div class="theme-grid">${Object.entries(accents).map(([key,a]) => `<button class="swatch ${state.accent===key?'active':''}" data-action="set-accent" data-value="${key}"><i style="background:${a[4]}"></i><span>${a[3]}</span></button>`).join('')}</div></div><div class="field" style="margin-top:16px"><label>明暗模式</label><div class="theme-mode"><button class="${state.mode==='system'?'active':''}" data-action="set-mode" data-value="system">${icon('theme')} 跟随系统</button><button class="${state.mode==='light'?'active':''}" data-action="set-mode" data-value="light">${icon('sun')} 浅色</button><button class="${state.mode==='dark'?'active':''}" data-action="set-mode" data-value="dark">${icon('moon')} 深色</button></div></div>${state.authenticated ? `<div class="field" style="margin-top:16px"><label>表格密度</label><div class="theme-mode theme-density"><button class="${state.density==='standard'?'active':''}" data-action="set-density" data-value="standard">标准 · 52px</button><button class="${state.density==='compact'?'active':''}" data-action="set-density" data-value="compact">紧凑 · 42px</button></div></div>` : ''}${state.authenticated ? `<div class="field" style="margin-top:16px"><label>表格线条</label><div class="theme-mode theme-table-lines"><button class="${state.tableLines==='simple'?'active':''}" data-action="set-table-lines" data-value="simple">简洁</button><button class="${state.tableLines==='grid'?'active':''}" data-action="set-table-lines" data-value="grid">网格</button></div></div>` : ''}${state.authenticated ? `<div class="field" style="margin-top:16px"><label>编辑页显示</label><div class="theme-mode" role="group" aria-label="编辑页显示"><button class="${state.formDisplay==='all'?'active':''}" data-action="set-form-display" data-value="all">目录</button><button class="${state.formDisplay==='section'?'active':''}" data-action="set-form-display" data-value="section">页签</button></div></div>` : ''}${state.authenticated ? '<p class="data-note" style="margin:16px 0 0">主题色影响导航、焦点与主要操作；业务状态色保持独立。</p>' : ''}</div><footer class="modal-foot"><button class="btn primary" data-action="close-overlay">关闭</button></footer></section></div>`;
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(470px,100%)"><header class="modal-head"><strong>${state.authenticated ? '外观与密度' : '外观设置'}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><div class="field"><label>主题色</label><div class="theme-grid">${Object.entries(accents).map(([key,a]) => `<button class="swatch ${state.accent===key?'active':''}" data-action="set-accent" data-value="${key}"><i style="background:${a[4]}"></i><span>${a[3]}</span></button>`).join('')}</div></div><div class="field" style="margin-top:16px"><label>明暗模式</label><div class="theme-mode"><button class="${state.mode==='system'?'active':''}" data-action="set-mode" data-value="system">${icon('theme')} 跟随系统</button><button class="${state.mode==='light'?'active':''}" data-action="set-mode" data-value="light">${icon('sun')} 浅色</button><button class="${state.mode==='dark'?'active':''}" data-action="set-mode" data-value="dark">${icon('moon')} 深色</button></div></div>${state.authenticated ? `<div class="field" style="margin-top:16px">${renderAppearanceHelpHeading('density','表格密度')}<div class="theme-mode theme-density"><button class="${state.density==='standard'?'active':''}" data-action="set-density" data-value="standard">标准</button><button class="${state.density==='compact'?'active':''}" data-action="set-density" data-value="compact">紧凑</button></div></div>` : ''}${state.authenticated ? `<div class="field" style="margin-top:16px">${renderAppearanceHelpHeading('lines','表格线条')}<div class="theme-mode theme-table-lines"><button class="${state.tableLines==='simple'?'active':''}" data-action="set-table-lines" data-value="simple">简洁</button><button class="${state.tableLines==='grid'?'active':''}" data-action="set-table-lines" data-value="grid">网格</button></div></div>` : ''}${state.authenticated ? `<div class="field" style="margin-top:16px">${renderAppearanceHelpHeading('display','编辑页显示')}<div class="theme-mode" role="group" aria-label="编辑页显示"><button class="${state.formDisplay==='all'?'active':''}" data-action="set-form-display" data-value="all">目录</button><button class="${state.formDisplay==='section'?'active':''}" data-action="set-form-display" data-value="section">页签</button></div></div>` : ''}${state.authenticated ? '<p class="data-note" style="margin:16px 0 0">主题色影响导航、焦点与主要操作；业务状态色保持独立。</p>' : ''}</div><footer class="modal-foot"><button class="btn primary" data-action="close-overlay">关闭</button></footer></section></div>`;
     }
 
     function renderConfirmNav() {

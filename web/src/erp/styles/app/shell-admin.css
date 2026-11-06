@@ -30,6 +30,13 @@
   font-size: var(--erp-font-small);
 }
 
+.erp-appearance-settings--with-help legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: calc(max(28px, var(--erp-touch-target, 0px)) + 8px);
+}
+
 .erp-appearance-footer {
   display: flex;
   align-items: center;
