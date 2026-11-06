@@ -51,21 +51,44 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
             const approval = { id: 100, version: 1, task_code: 'SO-APPROVAL-100', task_name: '销售订单审批', task_group: 'sales_order_approval', source_type: 'sales_order', source_id: 1, owner_role_key: 'sales', task_status_key: 'ready' }
             data = { tasks: created ? [created, approval] : [approval], total: created ? 2 : 1, limit: params.limit, offset: params.offset }
           } else if (method === 'get_tracking' && params.kind === 'task' && params.id === created?.id) {
-            data = { tracking: {
-              summary: {
-                kind: 'task', id: created.id, process_key: '', title: created.task_name,
-                source_type: created.source_type, source_id: created.source_id, source_no: created.source_no,
-                display_context: null, status: created.task_status_key, resolution_kind: null,
-                started_at: created.created_at, updated_at: created.updated_at, completed_at: created.updated_at,
-                initiator_name: '业务人员', initiator_role_key: 'sales', current_tasks: [],
+            data = {
+              tracking: {
+                summary: {
+                  kind: 'task',
+                  id: created.id,
+                  process_key: '',
+                  title: created.task_name,
+                  source_type: created.source_type,
+                  source_id: created.source_id,
+                  source_no: created.source_no,
+                  display_context: null,
+                  status: created.task_status_key,
+                  resolution_kind: null,
+                  started_at: created.created_at,
+                  updated_at: created.updated_at,
+                  completed_at: created.updated_at,
+                  initiator_name: '业务人员',
+                  initiator_role_key: 'sales',
+                  current_tasks: [],
+                },
+                tasks: [{
+                  task_id: created.id,
+                  task_name: created.task_name,
+                  node_instance_id: null,
+                  owner_role_key: created.owner_role_key,
+                  assignee_name: '',
+                  status: created.task_status_key,
+                  created_at: created.created_at,
+                  completed_at: created.updated_at,
+                  due_at: created.due_at || null,
+                }],
+                nodes: [],
+                events: [],
+                current_task_access: [],
+                events_truncated: false,
+                next_event_id: 0,
               },
-              tasks: [{
-                task_id: created.id, task_name: created.task_name, node_instance_id: null,
-                owner_role_key: created.owner_role_key, assignee_name: '', status: created.task_status_key,
-                created_at: created.created_at, completed_at: created.updated_at, due_at: created.due_at || null,
-              }],
-              nodes: [], events: [], current_task_access: [], events_truncated: false, next_event_id: 0,
-            } }
+            }
           } else if (method === 'list_tracking') {
             assert.equal(params.scope, 'visible')
             assert.equal(params.source_type, 'sales_order')

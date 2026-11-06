@@ -535,16 +535,18 @@ export function createSalesOrderDemandEntryScenarios(deps) {
             regressionState.orders.push(order)
             return respond({ sales_order: order, sales_order_items: [] })
           }
-          if (method === 'get_sales_order')
+          if (method === 'get_sales_order') {
             return respond({
               sales_order: regressionState.orders.find(
                 (order) => order.id === params.id
               ),
             })
-          if (method === 'list_sales_order_items')
+          }
+          if (method === 'list_sales_order_items') {
             return respond(
               stylePaginatedRpcData([], 'sales_order_items', params)
             )
+          }
           return route.fallback()
         })
       },
