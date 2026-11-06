@@ -1,3 +1,4 @@
+import { MANUAL_ACCEPTANCE_PRODUCT_IMAGE_FILES } from "./manual-acceptance-product-images.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -109,15 +110,26 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
       "scripts/qa/manual-acceptance-source-data.mjs",
       "scripts/qa/seed-business-values.mjs",
       "scripts/qa/manual-acceptance-source-driven-facts.mjs",
+      ...MANUAL_ACCEPTANCE_PRODUCT_IMAGE_FILES,
     ]),
-    task: Object.freeze(["scripts/qa/manual-acceptance-task-data.mjs", "scripts/qa/seed-business-values.mjs"]),
+    task: Object.freeze([
+      "scripts/qa/manual-acceptance-task-data.mjs",
+      "scripts/qa/manual-acceptance-task-catalog.mjs",
+      "scripts/qa/seed-business-values.mjs",
+    ]),
     facts: Object.freeze([
       "web/src/erp/utils/numeric20Scale6.mjs",
       "scripts/qa/manual-acceptance-fact-data.mjs",
+      "scripts/qa/manual-acceptance-finance-scenarios.mjs",
+      "scripts/qa/manual-acceptance-finance-readback.mjs",
+      "scripts/qa/manual-acceptance-cash-payment-data.mjs",
       "scripts/qa/seed-business-values.mjs",
       "scripts/qa/manual-acceptance-exception-chain-data.mjs",
       "scripts/qa/manual-acceptance-engineering-data.mjs",
       "scripts/qa/manual-acceptance-attachment-data.mjs",
+      "scripts/qa/fixtures/plush-products/order-requirements.pdf",
+      "scripts/qa/fixtures/plush-products/cloud_bear.png",
+      "scripts/qa/fixtures/plush-products/cloud_bear.jpg",
       "scripts/qa/manual-acceptance-fact-report-contract.mjs",
       "scripts/qa/manual-acceptance-source-driven-facts.mjs",
     ]),
@@ -128,16 +140,23 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
       "scripts/qa/manual-acceptance-task-data.mjs",
       "scripts/qa/manual-acceptance-account-identities.mjs",
       "scripts/qa/manual-acceptance-attachment-data.mjs",
+      "scripts/qa/fixtures/plush-products/order-requirements.pdf",
+      "scripts/qa/fixtures/plush-products/cloud_bear.png",
+      "scripts/qa/fixtures/plush-products/cloud_bear.jpg",
       "scripts/qa/seed-business-values.mjs",
     ]),
     readiness: Object.freeze([
+      "web/src/erp/utils/roleKeys.mjs",
+      "scripts/qa/manual-acceptance-account-identities.mjs",
       "scripts/qa/manual-acceptance-task-data.mjs",
       "web/src/erp/utils/numeric20Scale6.mjs",
       "scripts/qa/manual-acceptance-exception-chain-data.mjs",
       "scripts/qa/manual-acceptance-catalog.mjs",
+      "scripts/qa/manual-acceptance-task-catalog.mjs",
       "scripts/qa/manual-acceptance-fact-report-contract.mjs",
       "scripts/qa/manual-acceptance-page-data-contract.mjs",
       "scripts/qa/manual-acceptance-readiness.mjs",
+      "scripts/qa/manual-acceptance-test-index.mjs",
     ]),
   });
 

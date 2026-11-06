@@ -1,0 +1,186 @@
+{
+  "purpose": "虚构产品的固定款式图，供本地与隔离批次手工测试；不代表客户样品确认。",
+  "generation": "built-in image_gen",
+  "products": [
+    {
+      "key": "backpack_elephant",
+      "name": "背包小象",
+      "file": "backpack_elephant.jpg",
+      "sha256": "e08508b3b3955e31e26c86c9651df2bb5eae79a3b79080d368fc1107a3f14c4c",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 背包小象: a cream-white seated elephant plush with large round ears and a short curved trunk, wearing a small pale blue backpack clearly visible beside its shoulder in a three-quarter view. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "bell_deer",
+      "name": "铃铛小鹿",
+      "file": "bell_deer.jpg",
+      "sha256": "d2041aad1c80063c2afa2432b00df055cdb3d515af471b5b27ef17770e333772",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 铃铛小鹿: a cream-white seated deer plush with small soft beige antlers, long ears and one tiny golden bell on a pale pink ribbon. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "butterfly_cat",
+      "name": "蝴蝶小猫",
+      "file": "butterfly_cat.jpg",
+      "sha256": "88b4ba43e2b97d8f5fe13a50ce3e4e40c9960069a89889f330e26e02355ebe19",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 蝴蝶小猫: a cream-white seated kitten plush with triangular ears, small pink nose and a small pale purple butterfly applique on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "cloud_bear",
+      "name": "云朵小熊",
+      "file": "cloud_bear.jpg",
+      "sha256": "fb27edfda238f078ccd2cd3b02a29729f11dddf05cf3c9ecc4f7b8a107b613af",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. Create one photorealistic studio product photograph for a fictional ERP product named 云朵小熊 (Cloud Teddy Bear). A single seated cream-white plush teddy bear, cloud-soft short pile fabric, rounded ears, small black embroidered eyes, warm brown embroidered nose, pale blue small cloud applique on chest. Entire plush visible, centered, simple seamless white background with a subtle contact shadow, soft diffused catalog lighting, realistic sewn seams and tactile textile, neutral color accurate photograph, no text, no numbers, no watermark, no brand, no props. Square composition with safe white margins, native 3840x3840 if available. This is a concrete product catalog photograph asset, no UI or placeholder icon."
+    },
+    {
+      "key": "coffee_dog",
+      "name": "咖啡小狗",
+      "file": "coffee_dog.jpg",
+      "sha256": "d15db0cff6ce22795daee81404916d54b2d6101c9720ead3aec2af080cf5bd20",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 咖啡小狗: a seated warm cream and coffee-beige puppy plush with floppy darker beige ears holding a tiny soft brown fabric coffee cup without any text. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "cookie_bear",
+      "name": "饼干小熊",
+      "file": "cookie_bear.jpg",
+      "sha256": "4d15421b475e1a227491f2a4327ed93c8173bed7096219c187382cf7c7ae7ab0",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 饼干小熊: a cream-white seated teddy bear plush holding one round beige plush biscuit with small chocolate-brown embroidered dots. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "cream_dog",
+      "name": "奶油小狗",
+      "file": "cream_dog.jpg",
+      "sha256": "6ef19a11676aad6ca7ff34a76f4b85ea2a06cb9a805b2dd8504316dcd3d46cc9",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 奶油小狗: a cream-white seated plush puppy with floppy beige ears, embroidered black eyes and brown nose. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "garden_cat",
+      "name": "花园小猫",
+      "file": "garden_cat.jpg",
+      "sha256": "942ac824c740b0ee707b9d6c2de83a48a1153885aed0b8bae2bf064289817fe5",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 花园小猫: a cream-white seated kitten plush with a small soft pale pink flower crown and tiny embroidered green leaf on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "long_tail_cat",
+      "name": "长尾小猫",
+      "file": "long_tail_cat.jpg",
+      "sha256": "999c41521c9ed989fc9b3dfeb158cafb622830e5709d9557508d60a394bbb77b",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 长尾小猫: a cream-white seated plush kitten with triangular ears, pale pink nose, and a clearly visible long curled tail. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "lying_dog",
+      "name": "趴趴小狗",
+      "file": "lying_dog.jpg",
+      "sha256": "7797b8d93b43151d2b150fc4cec945630436a51ec6a1822f231af517d67a3c4f",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 趴趴小狗: a cream-white plush puppy lying flat on its belly with its front paws stretched forward, floppy beige ears and a tiny brown nose. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "moon_rabbit",
+      "name": "月亮小兔",
+      "file": "moon_rabbit.jpg",
+      "sha256": "88c86733cb3d5da1f3ffa229cd2f0ca8e76251e25199bd0b9f146f3a12b48e5a",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 月亮小兔: a cream-white seated long-eared rabbit plush holding one small pale yellow crescent moon pillow. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "orange_fox",
+      "name": "橘子狐狸",
+      "file": "orange_fox.jpg",
+      "sha256": "052c81b8ca0e853cca2f21adcf05b604edc5cc6849f48a42c85d966c80c97c05",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 橘子狐狸: a cream-white seated fox plush with pointed ears, bushy tail and a small plush orange fruit held in its paws. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "pocket_elephant",
+      "name": "口袋小象",
+      "file": "pocket_elephant.jpg",
+      "sha256": "32588fb12531e66444042315a08b21bce16a910484119be6db404e24eba65046",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 口袋小象: a cream-white seated elephant plush with large round floppy ears, a short curved trunk and one small pale blue fabric pocket on the belly. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "rainbow_rabbit",
+      "name": "彩虹小兔",
+      "file": "rainbow_rabbit.jpg",
+      "sha256": "c1ef0fbcbdb0d0e1645fffc28640190ac482c6796bff2a55106026e7bd3b9173",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 彩虹小兔: a cream-white seated rabbit plush with long upright ears and a small pastel rainbow applique on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "sailor_penguin",
+      "name": "水手企鹅",
+      "file": "sailor_penguin.jpg",
+      "sha256": "4eb391fbf9eca7fd1538a392c496512ae436bc58b35c03a78a7c462a2f4b43e7",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 水手企鹅: a seated penguin plush with cream-white belly, fog-blue body, small orange beak and white sailor collar with blue edging. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "scarf_fox",
+      "name": "围巾狐狸",
+      "file": "scarf_fox.jpg",
+      "sha256": "fd00d8cc1791c2c536c616745223b346ae929d3a536efa1f925493d8adc385b3",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 围巾狐狸: a cream-white seated arctic fox plush with pointed ears, bushy tail and a soft muted orange scarf. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "sea_salt_penguin",
+      "name": "海盐企鹅",
+      "file": "sea_salt_penguin.jpg",
+      "sha256": "df59e0c8a7e5730cd97b3bd2e9cc722d24a9799a90e24f12533d789fe5a3cd56",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 海盐企鹅: a small seated penguin plush, fog-blue flippers and head with a cream-white belly, small pale orange beak and feet. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "snow_deer",
+      "name": "雪花小鹿",
+      "file": "snow_deer.jpg",
+      "sha256": "ca73a408557642de62fab237e70c7c9e8cb64b6e779a2f69704a1a29d6e5174a",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 雪花小鹿: a cream-white seated deer plush with soft beige antlers and a pale blue snowflake applique on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "star_rabbit",
+      "name": "星星挂兔",
+      "file": "star_rabbit.jpg",
+      "sha256": "106936d24c6f306cb64560fccf466f4a4e92f971c36a229363a2639f8f472d0b",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 星星挂兔: a cream-white plush rabbit bag charm with long upright ears, tiny pale yellow star applique on its chest, small stitched hanging loop on top. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported."
+    },
+    {
+      "key": "strawberry_bear",
+      "name": "草莓小熊",
+      "file": "strawberry_bear.jpg",
+      "sha256": "9b56dc56ed6655fc549bf241ab1329d4875d156e5a4516e4700575c3310fbfac",
+      "nativeWidth": 1254,
+      "nativeHeight": 1254,
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 草莓小熊: a cream-white seated teddy bear plush holding one small red plush strawberry with green felt leaves. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+    }
+  ]
+}

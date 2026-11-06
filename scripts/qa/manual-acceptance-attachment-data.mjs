@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
-import { getManualAcceptanceTaskVisibleCodePrefix } from "./manual-acceptance-task-data.mjs";
+import {
+  getManualAcceptanceTaskVisibleCodePrefix,
+  manualAcceptanceTaskBatchIdentity,
+} from "./manual-acceptance-task-data.mjs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { createSyntheticSourceFixture } from "../import/fixtures/synthetic/createSyntheticSourceFixture.mjs";
@@ -117,20 +120,20 @@ export function buildAttachmentFixtures({ includeNearLimit = true } = {}) {
     fixture(
       "订单要求.pdf",
       "application/pdf",
-      Buffer.from("%PDF-1.4\n% simulated acceptance evidence\n%%EOF\n"),
+      fs.readFileSync(new URL("./fixtures/plush-products/order-requirements.pdf", import.meta.url)),
     ),
     fixture(
       "产品正面图.png",
       "image/png",
       fs.readFileSync(
-        new URL("./fixtures/manual-acceptance-image.png", import.meta.url),
+        new URL("./fixtures/plush-products/cloud_bear.png", import.meta.url),
       ),
     ),
     fixture(
-      "包装唛头.jpg",
+      "产品外观图.jpg",
       "image/jpeg",
       fs.readFileSync(
-        new URL("./fixtures/manual-acceptance-image.jpg", import.meta.url),
+        new URL("./fixtures/plush-products/cloud_bear.jpg", import.meta.url),
       ),
     ),
     fixture(
@@ -448,6 +451,23 @@ export function selectAttachmentWorkflowTask(tasks = [], { taskCode } = {}) {
   );
 }
 
+export function attachmentWorkflowTaskCodeForReport(taskReport) {
+  const identity = manualAcceptanceTaskBatchIdentity(taskReport?.runId, {
+    taskProfile: taskReport?.taskProfile,
+  });
+  for (const key of [
+    "batchRunId",
+    "copyRevision",
+    "sourceType",
+    "sourceID",
+    "prefix",
+  ]) {
+    if (taskReport?.[key] !== identity[key])
+      throw new Error(`task report batch identity drifted: ${key}`);
+  }
+  return `${getManualAcceptanceTaskVisibleCodePrefix("pmc", taskReport.taskProfile)}-01`;
+}
+
 async function rpc({ backendURL, domain, method, params = {}, token = "" }) {
   const response = await fetch(`${backendURL}/rpc/${domain}`, {
     method: "POST",
@@ -518,13 +538,7 @@ export async function applyAttachmentData({
     factReport,
     workflowTask: { id: 1, version: 1 },
   });
-  if (
-    !String(taskReport?.sourceType || "").trim() ||
-    !Number.isSafeInteger(Number(taskReport?.sourceID)) ||
-    Number(taskReport.sourceID) <= 0
-  ) {
-    throw new Error("task report is missing a stable source reference");
-  }
+  const workflowTaskCode = attachmentWorkflowTaskCodeForReport(taskReport);
   const adminLogin = await rpc({
     backendURL,
     domain: "auth",
@@ -606,13 +620,13 @@ export async function applyAttachmentData({
     domain: "workflow",
     method: "list_tasks",
     params: {
-      search: `${getManualAcceptanceTaskVisibleCodePrefix("pmc", taskReport.taskProfile)}-01`,
+      keyword: workflowTaskCode,
       limit: 200,
     },
     token: actorTokens.workflow_task,
   });
   const workflowTask = selectAttachmentWorkflowTask(taskList.tasks, {
-    taskCode: `${getManualAcceptanceTaskVisibleCodePrefix("pmc", taskReport.taskProfile)}-01`,
+    taskCode: workflowTaskCode,
   });
   const targets = buildAttachmentTargets({
     sourceReport,

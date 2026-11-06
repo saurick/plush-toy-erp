@@ -269,6 +269,7 @@ test("volume source profile produces linked multi-page records without changing 
     assert.ok(refs.suppliers.has(order.supplierRef));
     for (const item of order.items) {
       assert.ok(refs.materials.has(item.materialRef));
+      assert.equal(volume.records.materials.find((row) => row.code === item.materialRef).supplierRef, order.supplierRef);
       const source = salesByNo.get(item.product_order_no_snapshot);
       assert.ok(source?.items.some((line) => line.product_code_snapshot === item.product_no_snapshot && line.product_name_snapshot === item.product_name_snapshot));
     }
@@ -539,13 +540,13 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
 test("source readback paginates the complete long-lived prefix result", async () => {
   const records = Array.from({ length: 445 }, (_, index) => ({
     id: index + 1,
-    purchase_order_no: `YS8-CG-${String(index + 1).padStart(3, "0")}`,
+    purchase_order_no: `YS9-CG-${String(index + 1).padStart(3, "0")}`,
   }));
   const offsets = [];
   const fetchImpl = async (_url, init) => {
     const body = JSON.parse(init.body);
     assert.equal(body.method, "list_purchase_orders");
-    assert.equal(body.params.keyword, "YS8");
+    assert.equal(body.params.keyword, "YS9");
     assert.equal(body.params.limit, 200);
     offsets.push(body.params.offset);
     return ok({
@@ -558,7 +559,7 @@ test("source readback paginates the complete long-lived prefix result", async ()
   };
 
   const actual = await listAll({
-    plan: { backendURL: LOCAL_ACCEPTANCE_BACKEND_URL, prefix: "YS8" },
+    plan: { backendURL: LOCAL_ACCEPTANCE_BACKEND_URL, prefix: "YS9" },
     token: "purchase-token",
     domain: "purchase_order",
     method: "list_purchase_orders",
@@ -570,28 +571,28 @@ test("source readback paginates the complete long-lived prefix result", async ()
   assert.deepEqual(actual, records);
 });
 
-test("current V8 plans use short yoyoosun-style visible business numbers", () => {
+test("current 当前批次 plans use short yoyoosun-style visible business numbers", () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
   });
-  assert.equal(plan.prefix, "YS8");
-  assert.equal(plan.records.customers[0].code, "YS8-KH-001");
-  assert.equal(plan.records.suppliers[0].code, "YS8-GYS-001");
-  assert.equal(plan.records.materials[0].code, "YS8-WL-001");
-  assert.equal(plan.records.products[0].code, "YS8-CP-001");
-  assert.equal(plan.records.products[0].skus[0].sku_code, "YS8-GG-001-01");
-  assert.equal(plan.records.processes[0].code, "YS8-GX-001");
-  assert.equal(plan.records.salesOrders[0].order_no, "YS8-XD-001");
-  assert.equal(plan.records.purchaseOrders[0].purchase_order_no, "YS8-CG-001");
+  assert.equal(plan.prefix, "YS9");
+  assert.equal(plan.records.customers[0].code, "YS9-KH-001");
+  assert.equal(plan.records.suppliers[0].code, "YS9-GYS-001");
+  assert.equal(plan.records.materials[0].code, "YS9-WL-001");
+  assert.equal(plan.records.products[0].code, "YS9-CP-001");
+  assert.equal(plan.records.products[0].skus[0].sku_code, "YS9-GG-001-01");
+  assert.equal(plan.records.processes[0].code, "YS9-GX-001");
+  assert.equal(plan.records.salesOrders[0].order_no, "YS9-XD-001");
+  assert.equal(plan.records.purchaseOrders[0].purchase_order_no, "YS9-CG-001");
   assert.equal(
     plan.records.outsourcingOrders[0].outsourcing_order_no,
-    "YS8-WW-001",
+    "YS9-WW-001",
   );
   assert.equal(plan.records.bomVersions[0].version, "V1");
 });
 
-test("V8 source apply retires and replaces only the exact registered V7 route holders", async () => {
+test("当前批次 source apply retires and replaces only the exact registered previous route holders", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -602,7 +603,7 @@ test("V8 source apply retires and replaces only the exact registered V7 route ho
   const previous = expectedRoutes.map((item, index) => ({
     ...item,
     id: index + 1,
-    code: item.code.replace(/^YS8-/u, "YS7-"),
+    code: item.code.replace(/^YS9-/u, "YS8-"),
     is_active: true,
   }));
   const state = new Map(previous.map((item) => [item.code, { ...item }]));
@@ -612,7 +613,7 @@ test("V8 source apply retires and replaces only the exact registered V7 route ho
     if (body.method === "list_processes") {
       const keyword = body.params.keyword;
       const processes =
-        keyword === "YS7-GX-"
+        keyword === "YS8-GX-"
           ? [...state.values()].filter((item) => item.code.startsWith(keyword))
           : [...state.values()].filter(
               (item) => item.production_route_operation_code === keyword,
@@ -697,7 +698,7 @@ test("V8 source apply retires and replaces only the exact registered V7 route ho
   );
 });
 
-test("V8 route upgrade blocks every unregistered holder before mutations", async () => {
+test("当前批次 route upgrade blocks every unregistered holder before mutations", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -736,7 +737,7 @@ test("V8 route upgrade blocks every unregistered holder before mutations", async
   assert.deepEqual(writes, []);
 });
 
-test("V8 route upgrade resumes after an already released predecessor without rewriting it", async () => {
+test("当前批次 route upgrade resumes after an already released predecessor without rewriting it", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -747,7 +748,7 @@ test("V8 route upgrade resumes after an already released predecessor without rew
   const previous = {
     ...expected,
     id: 1,
-    code: expected.code.replace(/^YS8-/u, "YS7-"),
+    code: expected.code.replace(/^YS9-/u, "YS8-"),
     production_route_operation_code: null,
     is_active: false,
   };
@@ -755,7 +756,7 @@ test("V8 route upgrade resumes after an already released predecessor without rew
   const fetchImpl = async (_url, init) => {
     const body = JSON.parse(init.body);
     if (body.method === "list_processes") {
-      const processes = body.params.keyword === "YS7-GX-" ? [previous] : [];
+      const processes = body.params.keyword === "YS8-GX-" ? [previous] : [];
       return ok({ processes, total: processes.length });
     }
     writes.push(body.method);
@@ -774,13 +775,13 @@ test("V8 route upgrade resumes after an already released predecessor without rew
   assert.deepEqual(migrated, [
     {
       operationCode: "FABRIC_PROCESSING",
-      previousCode: "YS7-GX-001",
-      currentCode: "YS8-GX-001",
+      previousCode: "YS8-GX-001",
+      currentCode: "YS9-GX-001",
     },
   ]);
 });
 
-test("V8 route upgrade restores the previous binding when replacement creation fails", async () => {
+test("当前批次 route upgrade restores the previous binding when replacement creation fails", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -791,7 +792,7 @@ test("V8 route upgrade restores the previous binding when replacement creation f
   const previous = {
     ...expected,
     id: 1,
-    code: expected.code.replace(/^YS8-/u, "YS7-"),
+    code: expected.code.replace(/^YS9-/u, "YS8-"),
     is_active: true,
   };
   const state = { ...previous };
@@ -800,7 +801,7 @@ test("V8 route upgrade restores the previous binding when replacement creation f
     const body = JSON.parse(init.body);
     if (body.method === "list_processes") {
       const processes =
-        body.params.keyword === "YS7-GX-" ||
+        body.params.keyword === "YS8-GX-" ||
         body.params.keyword === "FABRIC_PROCESSING"
           ? [{ ...state }]
           : [];
@@ -900,7 +901,7 @@ test("outsourcing source plans satisfy the current contract readiness boundary",
       ({ order, item }) =>
         order.targetStatus === "CONFIRMED" &&
         item.subject_type === "MATERIAL" &&
-        item.processRef === "YS8-GX-001" &&
+        item.processRef === "YS9-GX-001" &&
         Number(item.outsourcing_quantity) > 0,
     ),
   );
@@ -983,7 +984,7 @@ test("versioned source plans use a stable date anchor and semantic digest across
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
   });
 
-  assert.equal(localPlan.anchorDate, "2026-09-27");
+  assert.equal(localPlan.anchorDate, "2026-11-07");
   assert.equal(remotePlan.anchorDate, localPlan.anchorDate);
   assert.equal(remotePlan.semanticDigest, localPlan.semanticDigest);
   assert.equal(localPlan.roleUsers.sales, "demo_sales");
@@ -1065,7 +1066,7 @@ test("manual acceptance source plan covers supported business lifecycle states",
     customers: 5,
     suppliers: 5,
     materials: 6,
-    products: 2,
+    products: 3,
     processes: 3,
   });
   for (const material of plan.records.materials) {
@@ -1306,8 +1307,8 @@ test("CLI help points only to the dedicated current local acceptance database", 
     help.text,
     /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
-  assert.match(help.text, /--data-version 2026\.09\.27-v8/u);
-  assert.match(help.text, /--run-id 20260927-V8/u);
+  assert.match(help.text, /--data-version 2026\.11\.07-v9/u);
+  assert.match(help.text, /--run-id 20261107-V9/u);
   assert.doesNotMatch(help.text, /127\.0\.0\.1:8300/u);
 });
 
@@ -2173,8 +2174,8 @@ test("sales source replay accepts only the exact downstream ProcessRuntime lifec
     target: "scenario-demo",
     backendURL: "http://127.0.0.1:8300",
     databaseName: "plush_erp",
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
   });
   const candidates = plan.records.salesOrders
     .filter((record) => record.targetStatus === "DRAFT")

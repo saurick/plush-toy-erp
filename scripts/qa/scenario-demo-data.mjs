@@ -655,12 +655,13 @@ async function applyScenarioDemo({
       fetchImpl,
     },
   );
-  await checkRepository();
   if (!report.ok) {
+    const failure = report.stages?.find((stage) => stage.key === report.failedStage)?.error || "no stage diagnostic";
     throw new ScenarioDemoError(
-      `scenario-demo canonical stage failed: ${report.failedStage || "unknown"}`,
+      `scenario-demo canonical stage failed: ${report.failedStage || "unknown"}; ${safeErrorMessage(failure)}`,
     );
   }
+  await checkRepository();
   return buildScenarioDemoReadback({ plan, datasetReport: report });
 }
 

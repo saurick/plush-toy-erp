@@ -23,74 +23,17 @@ const EXPECTED_MOBILE_PAGE_COUNT = 9;
 const EXPECTED_PRINT_TEMPLATE_COUNT = 5;
 const FORMAL_TRIAL_ACCOUNT_COUNT = 10;
 
-export const MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT = 47;
+export const MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT = 51;
 export const MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT = 1;
 export const MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT = 25;
 
-export const MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS = Object.freeze({
-  boss: Object.freeze([
-    "delivery_review",
-    "quotation_review",
-    "delay_risk",
-    "customer_requirement",
-    "priority_order",
-  ]),
-  sales: Object.freeze([
-    "customer_details",
-    "color_confirmation",
-    "packaging_confirmation",
-    "delivery_address",
-    "delivery_date_reply",
-  ]),
-  purchase: Object.freeze([
-    "main_material_arrival",
-    "accessory_delivery",
-    "supplier_reply",
-    "purchase_quantity",
-    "expedite_material",
-  ]),
-  production: Object.freeze([
-    "today_production",
-    "outsourcing_return",
-    "rework",
-    "production_exception",
-  ]),
-  warehouse: Object.freeze([
-    "receiving",
-    "inbound",
-    "material_picking",
-    "shipping",
-    "exception",
-  ]),
-  finance: Object.freeze([
-    "customer_receipt",
-    "supplier_statement",
-    "invoice_details",
-    "overdue_receivable",
-    "weekly_payment",
-  ]),
-  pmc: Object.freeze([
-    "material_readiness",
-    "order_priority",
-    "delay_risk",
-    "production_readiness",
-    "open_item_followup",
-  ]),
-  quality: Object.freeze([
-    "incoming_inspection",
-    "first_article",
-    "rework_inspection",
-    "pre_shipment_inspection",
-    "appearance_issue",
-  ]),
-  engineering: Object.freeze([
-    "material_list",
-    "drawing_dimensions",
-    "sewing_instructions",
-    "packaging_information",
-    "first_article_requirements",
-  ]),
-});
+import {
+  MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS,
+  MANUAL_ACCEPTANCE_TASKS_PER_ROLE,
+  MANUAL_ACCEPTANCE_TOTAL_TASKS,
+} from "./manual-acceptance-task-catalog.mjs";
+export { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS };
+
 const SYSTEM_ADMIN_ROLE_KEY = "system_admin";
 const CUSTOMER_ROLE_LABELS = Object.freeze({
   pmc: "生产计划",
@@ -173,8 +116,8 @@ const DESKTOP_PLANS = Object.freeze({
   },
   "task-board": {
     isList: true,
-    minimumRecords: 20,
-    minimumRecordUnit: "当前账号可见岗位任务（九个岗位合计 180 条）",
+    minimumRecords: MANUAL_ACCEPTANCE_TASKS_PER_ROLE,
+    minimumRecordUnit: `当前账号可见岗位任务（九个岗位合计 ${MANUAL_ACCEPTANCE_TOTAL_TASKS} 条）`,
     keyStates: ["可执行", "临近到期", "已阻塞", "已退回", "已完成", "已逾期"],
     whatToDo: [
       "你要按岗位、状态和到期时间筛选任务，并打开几条长标题和多次处理记录。",
@@ -300,7 +243,7 @@ const DESKTOP_PLANS = Object.freeze({
   },
   "quality-inspections": {
     isList: true,
-    minimumRecords: 54,
+    minimumRecords: 75,
     minimumRecordUnit: "来料质检记录",
     keyStates: ["草稿", "已提交", "合格", "不合格", "已取消", "批次暂缓"],
     whatToDo: [
@@ -314,7 +257,7 @@ const DESKTOP_PLANS = Object.freeze({
   },
   inbound: {
     isList: true,
-    minimumRecords: 54,
+    minimumRecords: 63,
     minimumRecordUnit: "采购入库记录",
     keyStates: [
       "草稿待检",
@@ -419,12 +362,24 @@ const DESKTOP_PLANS = Object.freeze({
   },
   "production-exceptions": {
     isList: true,
-    minimumRecords: 1,
+    minimumRecords: 73,
     minimumRecordUnit: "正式生产异常申请及其审批任务",
-    keyStates: ["已批准", "超领", "待执行"],
+    keyStates: [
+      "待审批",
+      "已批准",
+      "已退回",
+      "已撤回",
+      "超领",
+      "让步",
+      "报废",
+      "原厂返工",
+      "换厂返工",
+      "补料重做",
+      "待执行",
+    ],
     whatToDo: [
-      "你要以老板岗位按正式审批任务编号查找，并打开同一条超领生产异常申请。",
-      "你要核对申请数量、批准数量、来源生产订单、审批意见和流程轨迹，再到生产订单查看剩余可领额度。",
+      "你要按异常类型与状态查找，用报告中的正式审批任务编号定位同一条申请。",
+      "你要核对数量、生产订单、质检或物料来源、目标工序与加工厂、审批意见和流程轨迹；超领再查看剩余可领额度。",
     ],
     whatToSee: [
       "应看到异常申请、正式审批任务和 ProcessRuntime 指向同一来源，状态为已批准且批准数量清楚可核对。",
@@ -531,9 +486,12 @@ const DESKTOP_PLANS = Object.freeze({
   },
   "finance-payments": {
     isList: true,
-    minimumRecords: 4,
-    minimumRecordUnit: "收付款记录（另有 3 条红冲记录）",
+    minimumRecords: 148,
+    minimumRecordUnit: "收付款记录（另有 9 条红冲记录）",
     keyStates: [
+      "订单首款",
+      "往来结算",
+      "退款",
       "已批准待核销",
       "已收款",
       "已付款",
@@ -542,11 +500,11 @@ const DESKTOP_PLANS = Object.freeze({
       "反向红冲",
     ],
     whatToDo: [
-      "你要分别查看已批准待核销、已收款、已付款和已冲销记录，再切换到红冲记录。",
+      "你要按订单首款、往来结算和退款分类，比较草稿、待执行、退回、已收款、已付款、已冲销和已取消，再切换到红冲记录。",
       "你要核对往来单位、收付方向、金额、币种和核销明细，并打开一组原红冲与反向红冲记录。",
     ],
     whatToSee: [
-      "应看到四条固定收付款记录和三条固定红冲记录，原核销、冲销和恢复后的未核销金额可以相互核对。",
+      "应看到 148 条收付款记录和九条红冲记录；首款可退余额、原核销、退款与冲销都能回到各自来源核对。",
       "应看到已批准不等于已经收付，已冲销记录保留原核销及相反记录；反向红冲通过关联单号回到原红冲，不覆盖历史。",
     ],
   },
@@ -1033,7 +991,7 @@ export function buildManualAcceptanceCatalog() {
     const technicalPlan = {
       ...plan,
       isList: true,
-      minimumRecords: 20,
+      minimumRecords: MANUAL_ACCEPTANCE_TASKS_PER_ROLE,
       minimumRecordUnit: "岗位任务",
     };
     return createTechnicalItem({
@@ -1052,7 +1010,7 @@ export function buildManualAcceptanceCatalog() {
       {
         ...MOBILE_PLANS[item.key],
         isList: true,
-        minimumRecords: 20,
+        minimumRecords: MANUAL_ACCEPTANCE_TASKS_PER_ROLE,
         minimumRecordUnit: "岗位任务",
       },
       roleByKey,

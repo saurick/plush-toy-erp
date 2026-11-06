@@ -214,7 +214,7 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
     minimumRecordsByKey(catalog.technicalManifest.desktopPages),
     {
       "global-dashboard": 18,
-      "task-board": 20,
+      "task-board": 90,
       "business-dashboard": 20,
       customers: 60,
       suppliers: 60,
@@ -224,20 +224,20 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
       "material-bom": 45,
       processes: 30,
       "accessories-purchase": 45,
-      "quality-inspections": 54,
-      inbound: 54,
+      "quality-inspections": 75,
+      inbound: 63,
       inventory: 45,
       "processing-contracts": 45,
       "production-orders": 45,
       "production-scheduling": 45,
       "production-progress": 45,
-      "production-exceptions": 1,
+      "production-exceptions": 73,
       outbound: 45,
-      shipments: 47,
+      shipments: 51,
       reconciliation: 45,
       payables: 45,
       receivables: 45,
-      "finance-payments": 4,
+      "finance-payments": 148,
       invoices: 45,
       "print-center": 5,
       "permission-center": 10,
@@ -247,15 +247,15 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
   assert.deepEqual(
     minimumRecordsByKey(catalog.technicalManifest.mobileRolePages),
     {
-      boss: 20,
-      sales: 20,
-      purchase: 20,
-      production: 20,
-      warehouse: 20,
-      finance: 20,
-      pmc: 20,
-      quality: 20,
-      engineering: 20,
+      boss: 90,
+      sales: 90,
+      purchase: 90,
+      production: 90,
+      warehouse: 90,
+      finance: 90,
+      pmc: 90,
+      quality: 90,
+      engineering: 90,
     },
   );
   assert.deepEqual(
@@ -317,14 +317,18 @@ test("production collaboration pages match the roles' executable task states", (
     [...scheduling.keyStates, ...scheduling.whatToDo].join("\n"),
     /退回/u,
   );
-  assert.doesNotMatch(
-    [...exceptions.keyStates, ...exceptions.whatToDo].join("\n"),
-    /退回/u,
-  );
-  assert.match(
-    exceptions.whatToDo.join("\n"),
-    /正式审批任务编号.*超领生产异常申请/u,
-  );
+  assert.match(exceptions.keyStates.join("\n"), /已退回/u);
+  assert.match(exceptions.keyStates.join("\n"), /已撤回/u);
+  assert.match(exceptions.whatToDo.join("\n"), /正式审批任务编号.*同一条申请/u);
+  for (const type of [
+    "超领",
+    "让步",
+    "报废",
+    "原厂返工",
+    "换厂返工",
+    "补料重做",
+  ])
+    assert.ok(exceptions.keyStates.includes(type));
   assert.match(exceptions.whatToSee.join("\n"), /只形成可消费额度/u);
 });
 
@@ -424,10 +428,7 @@ test("mobile acceptance copy only asks each role to use supported task actions",
     desktopByKey.get("production-exceptions")?.requiredTaskScenarios,
     undefined,
   );
-  assert.equal(
-    desktopByKey.get("shipping-release"),
-    undefined,
-  );
+  assert.equal(desktopByKey.get("shipping-release"), undefined);
 });
 
 test("manual acceptance catalog separates fixed previews from business-filled workspaces", () => {

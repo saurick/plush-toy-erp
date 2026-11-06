@@ -252,7 +252,7 @@ async function datasetApplyEvidenceFixture({
     `binding_${randomBytes(8).toString("hex")}`,
   );
   await fs.mkdir(outputRoot, { recursive: true });
-  const dataVersion = "2026.09.27-v8";
+  const dataVersion = "2026.11.07-v9";
   const targetAlias = remote ? "customer-trial-133" : "local";
   const taskCoverage = taskGroupCoverageFixture();
   const taskSchedule = buildManualAcceptanceTaskSchedule(2_000_000_000);
@@ -279,15 +279,15 @@ async function datasetApplyEvidenceFixture({
   const printInput = {
     datasetKey: "yoyoosun-manual-acceptance",
     dataVersion,
-    runId: "20260927-V8",
-    sourceRunId: "20260927-V8",
+    runId: "20261107-V9",
+    sourceRunId: "20261107-V9",
     target: remote ? "customer-trial-133" : "local-dev",
     backendURL: remote ? "https://demo.yoyoosun.net" : "http://127.0.0.1:8310",
     databaseName: remote
       ? "plush_erp_demo_v1"
       : "plush_erp_acceptance_local_fixture_dev",
     semanticDigest: "d".repeat(64),
-    sourcePrefix: "YS8",
+    sourcePrefix: "YS9",
     configRevision: remote ? "customer-trial-config-v8" : "local-config-v5",
     financeFieldDigest: financeFieldContract.digest,
     financeRepresentatives: financeFieldContract.representatives,
@@ -333,7 +333,7 @@ async function datasetApplyEvidenceFixture({
   Object.assign(reports.core, {
     configRevision: printInput.configRevision,
     configProductVersion: remote
-      ? "customer-trial-133-test-2026.09.27-v8"
+      ? "customer-trial-133-test-2026.11.07-v9"
       : "local-customer-v5",
     configApplyPurpose: remote ? "customer_trial_apply" : "local_test_apply",
     configDatasetVersion: printInput.dataVersion,
@@ -374,7 +374,7 @@ async function datasetApplyEvidenceFixture({
       units: CORE_UNIT_CODES.length,
       warehouses: 4,
       unitCodes: CORE_UNIT_CODES,
-      warehouseCodes: ["YS8-CK-01", "YS8-CK-02", "YS8-CK-03", "YS8-CK-04"],
+      warehouseCodes: ["YS9-CK-01", "YS9-CK-02", "YS9-CK-03", "YS9-CK-04"],
     },
     zeroCounts,
     summary: {
@@ -422,7 +422,7 @@ async function datasetApplyEvidenceFixture({
     reports.task[key] = taskPlan[key];
   reports.task.summary.persisted = taskPlan.tasks.length;
   reports.facts.referenceRecords = {
-    shipments: Array.from({ length: 47 }, (_, index) => ({
+    shipments: Array.from({ length: 51 }, (_, index) => ({
       id: 120_000 + index,
       shipmentNo: `SIM-SDF-SHIP-${String(index + 1).padStart(3, "0")}`,
       status: index < 45 ? "SHIPPED" : index === 45 ? "DRAFT" : "CANCELLED",
@@ -1227,7 +1227,7 @@ test("CLI help and active docs keep isolated defaults and explicit shared browse
     /--backend-url http:\/\/127\.0\.0\.1:8300/u,
   );
   assert.match(sharedHelp, /--backend-url http:\/\/127\.0\.0\.1:8300/u);
-  assert.match(help, /2026\.09\.27-v8\/local\/dataset\/apply-report\.json/u);
+  assert.match(help, /2026\.11\.07-v9\/local\/dataset\/apply-report\.json/u);
   assert.match(help, /--dataset-report/u);
   assert.match(help, /customer-trial-133/u);
   assert.match(help, /--target-attestation-json/u);
@@ -1299,30 +1299,30 @@ test("bound print inputs stay in the acceptance report root and match the curren
     simulatedOnly: true,
     realCustomerImport: false,
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
     target: "local-dev",
     backendURL: "http://127.0.0.1:8310",
     databaseName: "plush_erp_acceptance_local_fixture_dev",
     semanticDigest: "digest-v5",
-    prefix: "YS8",
+    prefix: "YS9",
     runtime,
     referenceRecords: {
       purchaseOrders: [
         {
-          orderNo: "YS8-CG-013",
+          orderNo: "YS9-CG-013",
           items: Array.from({ length: 25 }, () => ({})),
         },
       ],
       outsourcingOrders: [
         {
-          orderNo: "YS8-WW-013",
+          orderNo: "YS9-WW-013",
           items: Array.from({ length: 25 }, () => ({})),
         },
       ],
       bomVersions: [
         {
-          version: "YS8-BOM-013-1",
+          version: "YS9-BOM-013-1",
           items: Array.from({ length: 25 }, () => ({})),
         },
       ],
@@ -1341,22 +1341,22 @@ test("bound print inputs stay in the acceptance report root and match the curren
   };
   assert.deepEqual(assertBoundSimulatedPrintReports(source, fact), {
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
-    sourceRunId: "20260927-V8",
-    factRunId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
+    sourceRunId: "20261107-V9",
+    factRunId: "20261107-V9",
     target: "local-dev",
     backendURL: "http://127.0.0.1:8310",
     databaseName: "plush_erp_acceptance_local_fixture_dev",
     semanticDigest: "digest-v5",
-    sourcePrefix: "YS8",
+    sourcePrefix: "YS9",
     configRevision: "customer-config-v5",
     financeFieldDigest: financeFieldContract.digest,
     financeRepresentatives: financeFieldContract.representatives,
     printRecords: {
-      purchaseOrder: { recordQuery: "YS8-CG-013", lineCount: 25 },
-      outsourcingOrder: { recordQuery: "YS8-WW-013", lineCount: 25 },
-      bomVersion: { recordQuery: "YS8-BOM-013-1", lineCount: 25 },
+      purchaseOrder: { recordQuery: "YS9-CG-013", lineCount: 25 },
+      outsourcingOrder: { recordQuery: "YS9-WW-013", lineCount: 25 },
+      bomVersion: { recordQuery: "YS9-BOM-013-1", lineCount: 25 },
     },
     runtimeAttestation: null,
   });
@@ -1365,13 +1365,13 @@ test("bound print inputs stay in the acceptance report root and match the curren
     referenceRecords: {
       ...source.referenceRecords,
       bomVersions: [
-        { version: "YS8-BOM-001-2", items: Array.from({ length: 3 }) },
+        { version: "YS9-BOM-001-2", items: Array.from({ length: 3 }) },
       ],
     },
     steps: [
       {
         target: "bom_version",
-        key: "YS8-BOM-013-1",
+        key: "YS9-BOM-013-1",
         action: "reuse",
         id: 37,
         items: 25,
@@ -1396,12 +1396,12 @@ test("bound print inputs stay in the acceptance report root and match the curren
       ...source.referenceRecords,
       bomVersions: [
         {
-          version: "YS8-BOM-005-1",
+          version: "YS9-BOM-005-1",
           status: "ARCHIVED",
           items: Array.from({ length: 25 }),
         },
         {
-          version: "YS8-BOM-005-3",
+          version: "YS9-BOM-005-3",
           status: "DRAFT",
           items: Array.from({ length: 25 }),
         },
@@ -1418,7 +1418,7 @@ test("bound print inputs stay in the acceptance report root and match the curren
       },
       financeFieldContract,
     }).printRecords.bomVersion.recordQuery,
-    "YS8-BOM-005-3",
+    "YS9-BOM-005-3",
   );
   assert.throws(
     () =>
@@ -1448,7 +1448,7 @@ test("bound print inputs stay in the acceptance report root and match the curren
 });
 
 test("remote browser evidence binds the exact readiness batch and canonical report path", () => {
-  const taskBatch = manualAcceptanceTaskBatchIdentity("20260927-V8", {
+  const taskBatch = manualAcceptanceTaskBatchIdentity("20261107-V9", {
     taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
   });
   const taskCoverage = taskGroupCoverageFixture();
@@ -1462,14 +1462,14 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
   );
   const printInput = {
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
-    sourceRunId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
+    sourceRunId: "20261107-V9",
     target: "customer-trial-133",
     backendURL: "https://demo.yoyoosun.net",
     databaseName: "plush_erp_demo_v1",
     semanticDigest: "digest-v5",
-    sourcePrefix: "YS8",
+    sourcePrefix: "YS9",
     configRevision: "customer-trial-v5",
     financeFieldDigest: financeFieldContract.digest,
     financeRepresentatives: financeFieldContract.representatives,
@@ -1576,11 +1576,11 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
     binding.taskCopyRevision,
     LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
   );
-  assert.equal(binding.taskVisibleCodePrefixes.boss, "YS-WB3-LD");
+  assert.equal(binding.taskVisibleCodePrefixes.boss, "YS-WB4-LD");
   assert.equal(binding.taskGroupCoverage.complete, true);
 
   const canonical = resolveManualAcceptanceBrowserReportPath(
-    "output/qa/manual-acceptance/datasets/2026.09.27-v8/customer-trial-133/browser/report.json",
+    "output/qa/manual-acceptance/datasets/2026.11.07-v9/customer-trial-133/browser/report.json",
   );
   assert.equal(
     assertManualAcceptanceBrowserReportPathBinding(canonical, printInput),
@@ -1659,8 +1659,8 @@ test("local browser requires the exact dataset batch before runtime probes", asy
       backendURL: "http://127.0.0.1:8310",
       printInput: {
         datasetKey: "yoyoosun-manual-acceptance",
-        dataVersion: "2026.09.27-v8",
-        sourceRunId: "20260927-V8",
+        dataVersion: "2026.11.07-v9",
+        sourceRunId: "20261107-V9",
         target: "local-dev",
         backendURL: "http://127.0.0.1:8310",
         databaseName: "plush_erp_acceptance_local_fixture_dev",
@@ -1911,7 +1911,7 @@ test("remote browser binding compares the database rebuild proof by canonical va
 });
 
 test("dataset report root only accepts canonical or one controlled lifecycle run", () => {
-  const dataVersion = "2026.09.27-v8";
+  const dataVersion = "2026.11.07-v9";
   const targetAlias = "local";
   const datasetRoot = path.join(
     repoRoot,
@@ -2476,10 +2476,10 @@ test("compact status DOM totals exclude adjacent selectors and unselected dropdo
 test("shipment release browser evidence proves live due-soon and overdue categories", () => {
   const schedule = buildManualAcceptanceTaskSchedule(2_000_000_000);
   const rows = [
-    { code: "YS-V8-CK-02", text: "YS-V8-CK-02 可执行 即将到期" },
-    { code: "YS-V8-CK-13", text: "YS-V8-CK-13 阻塞 已超时" },
-    { code: "YS-V8-CK-16", text: "YS-V8-CK-16 已完成" },
-    { code: "YS-V8-CK-19", text: "YS-V8-CK-19 退回" },
+    { code: "YS-V9-CK-02", text: "YS-V9-CK-02 可执行 即将到期" },
+    { code: "YS-V9-CK-13", text: "YS-V9-CK-13 阻塞 已超时" },
+    { code: "YS-V9-CK-16", text: "YS-V9-CK-16 已完成" },
+    { code: "YS-V9-CK-19", text: "YS-V9-CK-19 退回" },
   ];
   assert.equal(
     evaluateShipmentReleaseEvidence(rows, schedule, 2_000_000_100_000).passed,
@@ -2500,7 +2500,7 @@ test("shipment release browser evidence proves live due-soon and overdue categor
   );
   assert.equal(
     evaluateShipmentReleaseEvidence(
-      [...rows, { code: "YS-V8-CK-20", text: "其他仓库任务" }],
+      [...rows, { code: "YS-V9-CK-20", text: "其他仓库任务" }],
       schedule,
       2_000_000_100_000,
     ).passed,
@@ -2520,11 +2520,11 @@ function sourceQuantityFixture(
   unit,
   total,
   probeID = unit,
-  representative = "YS8",
+  representative = "YS9",
 ) {
   const currentBatchDOM = {
     mode: "source_prefix",
-    identifier: "YS8",
+    identifier: "YS9",
     visibleItems: 10,
     matchingCurrentBatchItems: 10,
     currentBatchVisible: true,
@@ -2539,8 +2539,8 @@ function sourceQuantityFixture(
           status: "pass",
           actual: total,
           batchEvidence: "prefix_filtered",
-          batchPrefix: "YS8",
-          queryKeyword: "YS8",
+          batchPrefix: "YS9",
+          queryKeyword: "YS9",
         },
       ],
     },
@@ -2557,10 +2557,10 @@ function sourceQuantityFixture(
       expectedTotal: total,
       totalConsistent: true,
       sourceProbeId: probeID,
-      sourceBatchPrefix: "YS8",
+      sourceBatchPrefix: "YS9",
       renderedRows: 10,
       matchingRows: 10,
-      scope: { lifecycle: "all", search: "YS8" },
+      scope: { lifecycle: "all", search: "YS9" },
       currentBatchDOM,
     },
   };
@@ -2575,7 +2575,7 @@ test("current-batch list evidence cannot be satisfied by an unrelated page total
         id: "customers",
         status: "pass",
         batchEvidence: "prefix_filtered",
-        batchPrefix: "YS8",
+        batchPrefix: "YS9",
       },
     ],
   };
@@ -2584,7 +2584,7 @@ test("current-batch list evidence cannot be satisfied by an unrelated page total
       currentBatch,
       currentBatchDOM: {
         mode: "source_prefix",
-        identifier: "YS8",
+        identifier: "YS9",
         visibleItems: 20,
         matchingCurrentBatchItems: 0,
         currentBatchVisible: false,
@@ -2618,8 +2618,8 @@ test("page-data contract and readiness expose current-batch list identifiers", (
             status: "pass",
             actual: 60,
             batchEvidence: "prefix_filtered",
-            batchPrefix: "YS8",
-            params: { keyword: "YS8" },
+            batchPrefix: "YS9",
+            params: { keyword: "YS9" },
           },
         ],
       },
@@ -2631,11 +2631,11 @@ test("page-data contract and readiness expose current-batch list identifiers", (
       customers.dataContractTargetId
     ];
   assert.equal(currentBatch.dataStatus, "pass");
-  assert.equal(currentBatch.probes[0].batchPrefix, "YS8");
-  assert.equal(currentBatch.probes[0].queryKeyword, "YS8");
+  assert.equal(currentBatch.probes[0].batchPrefix, "YS9");
+  assert.equal(currentBatch.probes[0].queryKeyword, "YS9");
   assert.deepEqual(resolveCurrentBatchListFilter(customers, currentBatch, {}), {
     mode: "source_prefix",
-    identifier: "YS8",
+    identifier: "YS9",
   });
   assert.throws(
     () =>
@@ -2677,31 +2677,31 @@ test("no-search current-batch pages use only their exact visible business number
       { dataStatus: "pass", actual: 1, probes: [] },
       {
         dataset: {
-          currentBatchIdentifiers: { customers: "YS8-KH-001" },
+          currentBatchIdentifiers: { customers: "YS9-KH-001" },
         },
       },
     ),
-    { mode: "exact_business_number", identifier: "YS8-KH-001" },
+    { mode: "exact_business_number", identifier: "YS9-KH-001" },
   );
 });
 
 test("source document searches exclude related generated orders and reject another batch", () => {
-  assert.equal(sourceDocumentSearchPrefix("YS8", "YS8-CG-013"), "YS8-CG-");
-  assert.equal(sourceDocumentSearchPrefix("YS8", "YS8-BOM-005-3"), "YS8-BOM-");
+  assert.equal(sourceDocumentSearchPrefix("YS9", "YS9-CG-013"), "YS9-CG-");
+  assert.equal(sourceDocumentSearchPrefix("YS9", "YS9-BOM-005-3"), "YS9-BOM-");
   assert.throws(
-    () => sourceDocumentSearchPrefix("YS8", "YS7-CG-013"),
+    () => sourceDocumentSearchPrefix("YS9", "YS7-CG-013"),
     /当前批次/u,
   );
   assert.throws(
-    () => sourceDocumentSearchPrefix("YS8", "YS8-013"),
+    () => sourceDocumentSearchPrefix("YS9", "YS9-013"),
     /业务类别/u,
   );
   const result = resolveCurrentBatchListFilter(
     { key: "accessories-purchase" },
-    { probes: [{ batchEvidence: "prefix_filtered", batchPrefix: "YS8" }] },
-    { printRecords: { purchaseOrder: { recordQuery: "YS8-CG-013" } } },
+    { probes: [{ batchEvidence: "prefix_filtered", batchPrefix: "YS9" }] },
+    { printRecords: { purchaseOrder: { recordQuery: "YS9-CG-013" } } },
   );
-  assert.deepEqual(result, { mode: "source_prefix", identifier: "YS8-CG-" });
+  assert.deepEqual(result, { mode: "source_prefix", identifier: "YS9-CG-" });
 });
 
 test("task board binds task-code metadata to the exact current-batch total", () => {
@@ -2825,7 +2825,7 @@ test("mobile current-batch proof requires an exact role source and a visible cur
     currentBatch,
   });
   assert.equal(passing.minimumSatisfied, true);
-  const longLivedPrefix = "YS-WB3-XS";
+  const longLivedPrefix = "YS-WB4-XS";
   assert.equal(
     evaluateMobileCurrentBatchEvidence({
       roleKey,
@@ -2937,7 +2937,7 @@ test("dashboard task evidence binds the visible page to the exact current batch"
   };
   const exactTaskCodes = Array.from(
     { length: 18 },
-    (_, index) => `YS-V8-LD-${String(index + 1).padStart(2, "0")}`,
+    (_, index) => `YS-V9-LD-${String(index + 1).padStart(2, "0")}`,
   );
   const currentPageTaskCodes = exactTaskCodes.slice(0, 8);
   assert.equal(
@@ -2945,12 +2945,12 @@ test("dashboard task evidence binds the visible page to the exact current batch"
       evidence: base,
       currentBatch,
       roleKey: "boss",
-      visibleTaskCodes: ["YS-V8-LD-01"],
+      visibleTaskCodes: ["YS-V9-LD-01"],
       currentBatchTaskCodes: currentPageTaskCodes,
     }).minimumSatisfied,
     true,
   );
-  const longLivedPrefix = "YS-WB3-LD";
+  const longLivedPrefix = "YS-WB4-LD";
   assert.equal(
     evaluateDashboardTaskCurrentBatchEvidence({
       evidence: base,
@@ -2989,7 +2989,7 @@ test("dashboard task evidence binds the visible page to the exact current batch"
       evidence: base,
       currentBatch,
       roleKey: "boss",
-      visibleTaskCodes: ["YS-V8-LD-01"],
+      visibleTaskCodes: ["YS-V9-LD-01"],
       currentBatchTaskCodes: [],
     }).minimumSatisfied,
     false,
@@ -3012,10 +3012,10 @@ test("dashboard task evidence binds the visible page to the exact current batch"
     ],
   };
   const exceptionCodes = [
-    "YS-V8-SC-01",
-    "YS-V8-SC-02",
-    "YS-V8-SC-03",
-    "YS-V8-SC-04",
+    "YS-V9-SC-01",
+    "YS-V9-SC-02",
+    "YS-V9-SC-03",
+    "YS-V9-SC-04",
   ];
   assert.equal(
     evaluateDashboardTaskCurrentBatchEvidence({
@@ -3023,14 +3023,14 @@ test("dashboard task evidence binds the visible page to the exact current batch"
       currentBatch: exceptionBatch,
       roleKey: "production",
       taskGroup: "production_exception",
-      visibleTaskCodes: ["YS-V8-SC-01"],
+      visibleTaskCodes: ["YS-V9-SC-01"],
       currentBatchTaskCodes: exceptionCodes,
     }).minimumSatisfied,
     true,
   );
   for (const invalidCodes of [
     [],
-    [...exceptionCodes, "YS-V8-SC-05"],
+    [...exceptionCodes, "YS-V9-SC-05"],
     [exceptionCodes[0], exceptionCodes[0], ...exceptionCodes.slice(2)],
   ]) {
     assert.equal(
@@ -3039,7 +3039,7 @@ test("dashboard task evidence binds the visible page to the exact current batch"
         currentBatch: exceptionBatch,
         roleKey: "production",
         taskGroup: "production_exception",
-        visibleTaskCodes: ["YS-V8-SC-01"],
+        visibleTaskCodes: ["YS-V9-SC-01"],
         currentBatchTaskCodes: invalidCodes,
       }).minimumSatisfied,
       false,
@@ -3149,7 +3149,7 @@ test("print preview and current-batch source minimum evidence fail closed", () =
   );
 
   const sourceEvidence = evaluatePrintSourceMinimumEvidence({
-    sourcePrefix: "YS8",
+    sourcePrefix: "YS9",
     visibleRows: 5,
     matchingCurrentBatchRows: 5,
     paginationTexts: ["1-20 / 共 45 条"],
@@ -3160,7 +3160,7 @@ test("print preview and current-batch source minimum evidence fail closed", () =
   assert.equal(sourceEvidence.minimumSatisfied, true);
   assert.equal(
     evaluatePrintSourceMinimumEvidence({
-      sourcePrefix: "YS8",
+      sourcePrefix: "YS9",
       visibleRows: 20,
       matchingCurrentBatchRows: 20,
       filteredTotal: 45,
@@ -3170,7 +3170,7 @@ test("print preview and current-batch source minimum evidence fail closed", () =
   );
   assert.equal(
     evaluatePrintSourceMinimumEvidence({
-      sourcePrefix: "YS8",
+      sourcePrefix: "YS9",
       visibleRows: 20,
       matchingCurrentBatchRows: 20,
       filteredTotal: 45,
@@ -3181,7 +3181,7 @@ test("print preview and current-batch source minimum evidence fail closed", () =
   );
   assert.equal(
     evaluatePrintSourceMinimumEvidence({
-      sourcePrefix: "YS8",
+      sourcePrefix: "YS9",
       visibleRows: 5,
       matchingCurrentBatchRows: 4,
       paginationTexts: ["共 45 条"],
@@ -3191,7 +3191,7 @@ test("print preview and current-batch source minimum evidence fail closed", () =
   );
   assert.equal(
     evaluatePrintSourceMinimumEvidence({
-      sourcePrefix: "YS8",
+      sourcePrefix: "YS9",
       visibleRows: 4,
       matchingCurrentBatchRows: 4,
       paginationTexts: [],
@@ -4032,8 +4032,8 @@ test("DOM reference sets preserve fact units, formal accounts and same-plan task
   assert.deepEqual(records["permission-center"], [
     { key: "20", identifier: "demo_boss" },
   ]);
-  assert.equal(records["task-board"].length, 20);
-  assert.equal(records["task-board"][0].identifier, "YS-V8-LD-01");
+  assert.equal(records["task-board"].length, 90);
+  assert.equal(records["task-board"][0].identifier, "YS-V9-LD-01");
   for (const key of [
     "sourceID",
     "sourceType",
@@ -4087,7 +4087,7 @@ test("both registered task profiles derive the boss DOM code set from the formal
         .filter((task) => task.roleKey === "boss")
         .map((task) => task.createParams.task_code),
     );
-    assert.equal(records["task-board"].length, 20);
+    assert.equal(records["task-board"].length, 90);
     assert.throws(() =>
       buildCurrentBatchDOMRecords({
         task: { ...report, summary: { persisted: 179 } },
@@ -4098,17 +4098,17 @@ test("both registered task profiles derive the boss DOM code set from the formal
 
 test("source quantity binds the formal probe scope independently of a representative category", () => {
   for (const [unit, probeID, representative, total] of [
-    ["material-bom", "bom-versions", "YS8-BOM-", 48],
+    ["material-bom", "bom-versions", "YS9-BOM-", 48],
   ]) {
     const base = sourceQuantityFixture(unit, total, probeID, representative);
     base.minimumRecords = 45;
     assert.equal(evaluateCurrentBatchListEvidence(base).minimumSatisfied, true);
-    assert.equal(base.quantityScope.scope.search, "YS8");
+    assert.equal(base.quantityScope.scope.search, "YS9");
     for (const change of [
       { sourceProbeId: "products" },
       { sourceBatchPrefix: "YS7" },
       { scope: { lifecycle: "all", search: representative } },
-      { scope: { lifecycle: "active", search: "YS8" } },
+      { scope: { lifecycle: "active", search: "YS9" } },
       { total: 45, expectedTotal: 45 },
       {
         currentBatchDOM: {
@@ -4147,7 +4147,7 @@ test("source quantity binds the formal probe scope independently of a representa
     assert.equal(
       evaluateCurrentBatchListEvidence({
         ...base,
-        currentBatchDOM: { ...base.currentBatchDOM, identifier: "YS80-CG-" },
+        currentBatchDOM: { ...base.currentBatchDOM, identifier: "YS90-CG-" },
       }).minimumSatisfied,
       false,
     );
@@ -4365,7 +4365,7 @@ test("broad purchase199/outsourcing46 UI results prove only exact canonical sour
       const rows = [
         ...Array.from({ length: extraCount }, (_, index) => ({
           key: String(46 + index),
-          identifier: `${extraPrefix}${index + 1} 来源YS8`,
+          identifier: `${extraPrefix}${index + 1} 来源YS9`,
         })),
         ...records,
       ];
@@ -4427,7 +4427,7 @@ test("broad purchase199/outsourcing46 UI results prove only exact canonical sour
       );
       const base = {
         currentBatch: { dataStatus: "pass", actual: 45 },
-        currentBatchDOM: { mode: "source_prefix", identifier: "YS8" },
+        currentBatchDOM: { mode: "source_prefix", identifier: "YS9" },
         renderedItems: proof.renderedRows,
         pageReportedTotal: total,
         minimumRecords: 45,
@@ -4470,8 +4470,8 @@ test("broad purchase199/outsourcing46 UI results prove only exact canonical sour
 
 test("broad-search source orders cannot use a prefix total as canonical batch quantity", () => {
   for (const [unit, probeID, representative] of [
-    ["accessories-purchase", "purchase-orders", "YS8-CG-"],
-    ["processing-contracts", "outsourcing-orders", "YS8-WW-"],
+    ["accessories-purchase", "purchase-orders", "YS9-CG-"],
+    ["processing-contracts", "outsourcing-orders", "YS9-WW-"],
   ]) {
     const input = sourceQuantityFixture(unit, 45, probeID, representative);
     assert.equal(

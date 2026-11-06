@@ -3040,6 +3040,10 @@ async function readTaskBoardQuantity(
 }
 
 async function readListEvidence(page, target, datasetBinding) {
+  if (target.key === "quality-inspections") {
+    await page.getByRole("combobox", { name: "记录范围", exact: true }).click();
+    await page.getByRole("option", { name: "含已替代记录", exact: true }).click();
+  }
   let specializedEvidence = null;
   let currentBatchDOM = null;
   const expectedShipments =

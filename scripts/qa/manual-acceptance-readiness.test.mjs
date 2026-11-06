@@ -1,4 +1,9 @@
+import { MANUAL_ACCEPTANCE_PAYMENT_SCENARIOS } from "./manual-acceptance-finance-scenarios.mjs";
 import assert from "node:assert/strict";
+import {
+  cashPaymentReferences,
+  wipExceptionReferences,
+} from "./test-fixtures/manual-acceptance-state-samples.mjs";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { exceptionChainFixture } from "./test-fixtures/manual-acceptance-exception-chains.mjs";
@@ -118,6 +123,12 @@ function sourceReport(overrides = {}) {
     semanticDigest: "source-semantic-digest-v1",
     prefix: "YS5",
     referenceRecords: {
+      bomVersions: Array.from({ length: overrides.scale?.bomVersions || 45 }, (_, index) => ({
+        id: 200_001 + index,
+        productId: 300_001 + Math.floor(index / 3),
+        version: `V${index % 3 + 1}`,
+        status: ["DRAFT", "ACTIVE", "ARCHIVED"][index % 3],
+      })),
       salesOrders: Array.from({ length: 11 }, (_, index) => ({
         id: index + 1,
         orderNo: `YS5-SO-${index + 1}`,
@@ -289,8 +300,35 @@ function factReferenceRecords(countOverrides = {}) {
         approvalProcessNodeID: 330_001,
         approvedRemainingQuantity: "1",
       },
-    ],
-    purchaseReceipts: referenceRecords(count("purchaseReceipts", 54), {
+      ...["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"].flatMap(
+        (status, group) =>
+          Array.from({ length: 3 }, (_, index) => ({
+            id: 15_002 + group * 3 + index,
+            decisionNo: `SIM-SDF-SCYC-${1001 + group * 3 + index}`,
+            decisionType: "OVER_ISSUE",
+            status,
+            executionStatus: "PENDING",
+            productionOrderID: 1_010 + group * 3 + index,
+            productionOrderItemID: 1_110 + group * 3 + index,
+            productionMaterialRequirementID: 1_210 + group * 3 + index,
+            requestedQuantity: "1",
+            approvedQuantity: status === "APPROVED" ? "1" : "0",
+            approvedRemainingQuantity: status === "APPROVED" ? "1" : "0",
+            productionOrderNo: `SIM-SDF-PO-${index + 2}`,
+            processInstanceID:
+              status === "CANCELLED" ? null : 311_000 + group * 3 + index,
+            approvalTaskID:
+              status === "CANCELLED" ? null : 321_000 + group * 3 + index,
+            approvalProcessNodeID:
+              status === "CANCELLED" ? null : 331_000 + group * 3 + index,
+            approvalTaskCode:
+              status === "CANCELLED"
+                ? null
+                : `PROC-${311_000 + group * 3 + index}-NODE-${331_000 + group * 3 + index}-A1`,
+          })),
+      ),
+    ].concat(wipExceptionReferences({ camel: true })),
+    purchaseReceipts: referenceRecords(count("purchaseReceipts", 63), {
       idBase: 20_000,
       numberKey: "receiptNo",
       numberPrefix: "SIM-SDF-PR",
@@ -313,7 +351,7 @@ function factReferenceRecords(countOverrides = {}) {
         secondaryValues: ["QUANTITY_INCREASE", "QUANTITY_DECREASE"],
       },
     ),
-    qualityInspections: referenceRecords(count("qualityInspections", 54), {
+    qualityInspections: referenceRecords(count("qualityInspections", 75), {
       idBase: 50_000,
       numberKey: "inspectionNo",
       numberPrefix: "SIM-SDF-QI",
@@ -387,7 +425,7 @@ function factReferenceRecords(countOverrides = {}) {
       statuses: ["ACTIVE", "RELEASED"],
       sourceType: "SALES_ORDER",
     }),
-    shipments: referenceRecords(count("shipments", 47), {
+    shipments: referenceRecords(count("shipments", 51), {
       idBase: 120_000,
       numberKey: "shipmentNo",
       numberPrefix: "SIM-SDF-SHIP",
@@ -395,23 +433,23 @@ function factReferenceRecords(countOverrides = {}) {
     }).map((shipment, index) => ({
       ...shipment,
       status:
-        index < count("shipments", 47) - 2
+        index < count("shipments", 51) - 6
           ? "SHIPPED"
-          : index === count("shipments", 47) - 2
+          : index === count("shipments", 51) - 6
             ? "DRAFT"
             : "CANCELLED",
       financeReleaseStatus:
-        index < count("shipments", 47) - 2 ? "APPROVED" : "PENDING",
+        index < count("shipments", 51) - 6 ? "APPROVED" : "PENDING",
       financeReleaseProcessInstanceID:
-        index < count("shipments", 47) - 2 ? 210_000 + index : null,
+        index < count("shipments", 51) - 6 ? 210_000 + index : null,
       financeReleaseProcessNodeID:
-        index < count("shipments", 47) - 2 ? 230_000 + index : null,
+        index < count("shipments", 51) - 6 ? 230_000 + index : null,
       financeApprovalTaskID:
-        index < count("shipments", 47) - 2 ? 240_000 + index : null,
+        index < count("shipments", 51) - 6 ? 240_000 + index : null,
       financeApprovalProcessNodeID:
-        index < count("shipments", 47) - 2 ? 220_000 + index : null,
+        index < count("shipments", 51) - 6 ? 220_000 + index : null,
       financeApprovalTaskCode:
-        index < count("shipments", 47) - 2
+        index < count("shipments", 51) - 6
           ? `PROC-${210_000 + index}-NODE-${220_000 + index}-A1`
           : null,
       items:
@@ -463,7 +501,20 @@ function factReferenceRecords(countOverrides = {}) {
         amount: "1",
         currency: "CNY",
       },
-    ],
+      ...MANUAL_ACCEPTANCE_PAYMENT_SCENARIOS.map((sample, index) => ({
+        id: 126_005 + index,
+        paymentNo: `SIM-SDF-${sample.number.code}-${sample.number.sequence}`,
+        status: sample.status,
+        direction: sample.factType === "PAYABLE" ? "DISBURSEMENT" : "RECEIPT",
+        counterpartyType:
+          sample.factType === "PAYABLE" ? "SUPPLIER" : "CUSTOMER",
+        counterpartyID: 10_010 + index,
+        amount: "1",
+        currency: "CNY",
+      })),
+    ]
+      .map((item) => ({ ...item, kind: "SETTLEMENT" }))
+      .concat(cashPaymentReferences({ camel: true })),
     financeCreditNotes: [
       {
         id: 127_001,
@@ -498,7 +549,13 @@ function factReferenceRecords(countOverrides = {}) {
         currency: "CNY",
         reversalOfCreditNoteID: 127_002,
       },
-    ],
+    ].flatMap((item, index) => Array.from({ length: 3 }, (_, copy) => ({
+      ...item,
+      id: item.id + copy * 3,
+      creditNoteNo: `SIM-SDF-YS-${951 + index + copy * 3}`,
+      reversalOfCreditNoteID: item.reversalOfCreditNoteID == null
+        ? null : item.reversalOfCreditNoteID + copy * 3,
+    }))),
   };
   records.attachmentOwners = {
     productionFactId: productionFacts.find((item) => item.status === "POSTED")
@@ -634,7 +691,7 @@ test("readiness fact contract requires bound identity, runtime, exact references
             referenceCounts: { shipments: shipmentCount },
           }),
         }),
-      /必须精确包含 47 张出货单/u,
+      /必须精确包含 51 张出货单/u,
     );
   }
   const duplicateLongShipment = factReport();
@@ -724,7 +781,7 @@ function taskReport(overrides = {}) {
     displayOnlyTasks: {
       evidenceClass: "simulated_display_only",
       provesProcessRuntime: false,
-      total: 180,
+      total: 810,
     },
     datasetKey: "yoyoosun-manual-acceptance",
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
@@ -739,25 +796,10 @@ function taskReport(overrides = {}) {
     sourceID: batchIdentity.sourceID,
     coverage,
     summary: {
-      total: 180,
-      persisted: 180,
-      byRole: {
-        boss: 20,
-        sales: 20,
-        purchase: 20,
-        production: 20,
-        warehouse: 20,
-        finance: 20,
-        pmc: 20,
-        quality: 20,
-        engineering: 20,
-      },
-      byStatus: {
-        ready: 121,
-        blocked: 27,
-        done: 24,
-        rejected: 8,
-      },
+      total: 810,
+      persisted: 810,
+      byRole: { ...taskPlan.summary.byRole },
+      byStatus: { ...taskPlan.summary.byStatus },
       byTaskGroup: { ...taskPlan.summary.byTaskGroup },
     },
     ...overrides,
@@ -837,6 +879,10 @@ function createReadinessFetch(runtimeOptions = {}) {
         production_order_item_id: item.productionOrderItemID,
         production_material_requirement_id:
           item.productionMaterialRequirementID,
+        production_wip_batch_id: item.productionWIPBatchID ?? null,
+        quality_inspection_id: item.qualityInspectionID ?? null,
+        target_operation_id: item.targetOperationID ?? null,
+        target_supplier_id: item.targetSupplierID ?? null,
         requested_quantity: item.requestedQuantity,
         approved_quantity: item.approvedQuantity,
       })),
@@ -964,6 +1010,10 @@ function createReadinessFetch(runtimeOptions = {}) {
       factRefs.financePayments.map((item) => ({
         id: item.id,
         payment_no: item.paymentNo,
+        kind: item.kind,
+        source_type: item.sourceType ?? null,
+        source_id: item.sourceID ?? null,
+        refund_of_payment_id: item.refundOfPaymentID ?? null,
         status: item.status,
         direction: item.direction,
         counterparty_type: item.counterpartyType,
@@ -987,6 +1037,14 @@ function createReadinessFetch(runtimeOptions = {}) {
       })),
     ],
   };
+  const qualityRecords = backendFactLists.list_quality_inspections[1];
+  backendFactLists.list_production_stage_quality_inspections = [
+    "quality_inspections",
+    qualityRecords.filter((item) => item.source_type === "PRODUCTION_WIP"),
+  ];
+  backendFactLists.list_quality_inspections[1] = qualityRecords.filter(
+    (item) => item.source_type !== "PRODUCTION_WIP",
+  );
   const listSpecs = {
     list_customers: ["customers", 60, "is_active", [true, false], "code"],
     list_suppliers: ["suppliers", 60, "is_active", [true, false], "code"],
@@ -1186,7 +1244,11 @@ function createReadinessFetch(runtimeOptions = {}) {
           taskGroup === "production_scheduling" &&
           sourceRecord?.status === "RELEASED"
             ? "ready"
-            : "done";
+            : taskGroup === "production_exception_decision_approval"
+              ? { SUBMITTED: "ready", APPROVED: "done", REJECTED: "rejected" }[
+                  sourceRecord.status
+                ]
+              : "done";
         const taskCode =
           taskGroup === "shipment_finance_approval"
             ? sourceRecord?.financeApprovalTaskCode
@@ -1262,12 +1324,21 @@ function createReadinessFetch(runtimeOptions = {}) {
           task_group: runtimeOptions.taskGroup || task.createParams.task_group,
           payload: {
             acceptance_scenario_key:
-              runtimeOptions.taskScenarioKey ||
-              task.scenarioKey,
+              runtimeOptions.taskScenarioKey || task.scenarioKey,
           },
         })),
         total: runtimeOptions.taskResponseTotal ?? count,
       });
+    }
+    if (body.method === "get_bom_version") {
+      const record = sourceReport().referenceRecords.bomVersions.find((item) => item.id === body.params.id);
+      return okResponse({ bom_version: record ? { id: record.id, product_id: record.productId, version: record.version, status: record.status } : undefined });
+    }
+    if (body.method === "get_finance_fact") {
+      const record = backendFactLists.list_finance_facts[1].find(
+        (item) => item.id === body.params.id,
+      );
+      return okResponse({ finance_fact: record });
     }
     if (backendFactLists[body.method]) {
       const [listKey, allItems] = backendFactLists[body.method];
@@ -1501,7 +1572,7 @@ test("default plan covers all 50 targets and never connects to a backend", async
   assert(
     result.plan.targets
       .filter((item) => item.catalogGroup === "mobileRolePages")
-      .every((item) => item.expectedMinimum === 20),
+      .every((item) => item.expectedMinimum === 90),
   );
   assert.deepEqual(
     result.plan.targets.find(
@@ -1531,8 +1602,17 @@ test("default plan covers all 50 targets and never connects to a backend", async
       "workflow-tasks:production_exception_decision_approval",
     ],
   );
-  assert.equal(result.plan.targets.some((item) => item.id === "desktopPages:shipping-release"), false);
-  assert.ok(uatPlan.probes.some((probe) => probe.id === "workflow-tasks:shipment_finance_approval"));
+  assert.equal(
+    result.plan.targets.some(
+      (item) => item.id === "desktopPages:shipping-release",
+    ),
+    false,
+  );
+  assert.ok(
+    uatPlan.probes.some(
+      (probe) => probe.id === "workflow-tasks:shipment_finance_approval",
+    ),
+  );
   const productionOrders = result.plan.targets.find(
     (item) => item.id === "desktopPages:production-orders",
   );
@@ -1554,7 +1634,7 @@ test("default plan covers all 50 targets and never connects to a backend", async
   assert.ok(businessDashboard.probeIds.includes("business-progress"));
   assert.equal(businessDashboard.probeIds.includes("product-skus"), false);
   assert.equal(result.plan.expected.targets, 50);
-  assert.equal(result.plan.expected.mobileTaskTotal, 180);
+  assert.equal(result.plan.expected.mobileTaskTotal, 810);
   const probesByID = new Map(
     result.plan.probes.map((probe) => [probe.id, probe]),
   );
@@ -1594,10 +1674,7 @@ test("readiness binds the explicit long-lived workbench batch identity and prefi
     byID.get("mobile-tasks:production").exactTaskCodePrefix,
     LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE.production,
   );
-  assert.equal(
-    byID.get("mobile-tasks:production").exactSourceID,
-    null,
-  );
+  assert.equal(byID.get("mobile-tasks:production").exactSourceID, null);
 });
 
 test("progress projection requires complete records, source access and current-batch evidence", () => {
@@ -1656,7 +1733,7 @@ test("apply reports may raise minimums while the shipment dataset stays exact", 
   const plan = buildManualAcceptanceReadinessPlan({
     sourceReport: sourceReport({ scale: { customers: 75, salesOrders: 20 } }),
     factReport: factReport({
-      referenceCounts: { shipments: 47, "finance:PAYABLE": 55 },
+      referenceCounts: { shipments: 51, "finance:PAYABLE": 55 },
     }),
     taskReport: taskReport(),
   });
@@ -1664,13 +1741,13 @@ test("apply reports may raise minimums while the shipment dataset stays exact", 
 
   assert.equal(byId.get("customers").expectedMinimum, 75);
   assert.equal(byId.get("sales-orders").expectedMinimum, 45);
-  assert.equal(byId.get("shipments").expectedMinimum, 47);
-  assert.equal(byId.get("shipments").expectedExact, 47);
+  assert.equal(byId.get("shipments").expectedMinimum, 51);
+  assert.equal(byId.get("shipments").expectedExact, 51);
   assert.equal(byId.get("finance-payables").expectedMinimum, 55);
   assert.equal(byId.get("customers").params.keyword, "YS5");
   assert.equal(byId.get("shipments").params.keyword, undefined);
   assert.equal(byId.get("shipments").batchEvidence, "exact_references");
-  assert.equal(byId.get("shipments").referenceQueries.length, 47);
+  assert.equal(byId.get("shipments").referenceQueries.length, 51);
   assert.equal(
     Object.hasOwn(
       byId.get("shipments").expectedReferences[0].expectedFields,
@@ -2110,7 +2187,10 @@ test("task evidence requires exact source, role, prefix, count, and canonical st
 
   const missingScenario = batchTasks.map((item) => ({
     ...item,
-    task_code: item.payload.acceptance_scenario_key === "delivery_date_reply" ? "YS-V5-XS-01" : item.task_code,
+    task_code:
+      item.payload.acceptance_scenario_key === "delivery_date_reply"
+        ? "YS-V5-XS-01"
+        : item.task_code,
   }));
   const missingScenarioFailure = evaluateManualAcceptanceDataset(probe, {
     tasks: missingScenario,
@@ -2130,9 +2210,7 @@ test("task evidence requires exact source, role, prefix, count, and canonical st
     total: 20,
   });
   assert.equal(unknownScenarioFailure.status, "fail");
-  assert.deepEqual(unknownScenarioFailure.unknownScenarios, [
-    "unknown_task",
-  ]);
+  assert.deepEqual(unknownScenarioFailure.unknownScenarios, ["unknown_task"]);
 
   const unknownTaskGroup = structuredClone(batchTasks);
   unknownTaskGroup[0].task_group = "unknown_group";
@@ -2167,6 +2245,71 @@ test("task evidence requires exact source, role, prefix, count, and canonical st
   assert.equal(countFailure.status, "fail");
   assert.equal(countFailure.actual, 21);
   assert.equal(countFailure.enoughRecords, false);
+});
+
+test("readiness binds unprefixed BOM versions to products and reads WIP quality through its formal list", async () => {
+  const source = sourceReport();
+  const facts = factReport();
+  facts.referenceRecords.qualityInspections.push({
+    id: 999_001, inspectionNo: "WIP-777-FINISHED_GOODS", status: "REJECTED",
+    sourceType: "PRODUCTION_WIP", sourceID: 777,
+  });
+  const plan = buildManualAcceptanceReadinessPlan({ sourceReport: source, factReport: facts, taskReport: taskReport() });
+  const bom = plan.probes.find((probe) => probe.id === "bom-versions");
+  assert.equal(bom.batchEvidence, "exact_references");
+  assert.equal(bom.referenceQueries[0].method, "get_bom_version");
+  assert.equal(bom.expectedReferences[0].businessNo, "V1");
+  const normal = createReadinessFetch({ referenceRecords: facts.referenceRecords });
+  const options = localVerificationOptions({ password: "local-demo-password", adminPassword: "local-admin-password", fetchImpl: normal.fetchImpl });
+  const report = await verifyManualAcceptanceReadiness(plan, options);
+  assert.equal(report.summary.queryChecksPassed, true);
+  assert(normal.calls.some((call) => call.method === "list_production_stage_quality_inspections" && call.params.keyword === "WIP-777-FINISHED_GOODS"));
+  const wrong = await verifyManualAcceptanceReadiness(plan, {
+    ...options,
+    fetchImpl: async (url, options) => {
+      const response = await normal.fetchImpl(url, options);
+      if (options.body && JSON.parse(options.body).method === "get_bom_version") {
+        const body = await response.json();
+        return okResponse({ bom_version: { ...body.result.data.bom_version, product_id: 999_999 } });
+      }
+      return response;
+    },
+  });
+  assert.equal(wrong.summary.queryChecksPassed, false);
+  assert.equal(wrong.targets.find((target) => target.id === "desktopPages:material-bom").dataStatus, "fail");
+});
+
+test("finance detail verification rejects missing, foreign, and changed records", async () => {
+  const plan = buildManualAcceptanceReadinessPlan({
+    sourceReport: sourceReport(),
+    factReport: factReport(),
+    taskReport: taskReport(),
+  });
+  for (const tamper of [
+    () => undefined,
+    (record) => ({ ...record, id: record.id + 1_000_000 }),
+    (record) => ({ ...record, fact_no: "ANOTHER-BATCH" }),
+    (record) => ({ ...record, status: "CANCELLED" }),
+  ]) {
+    const normal = createReadinessFetch();
+    const report = await verifyManualAcceptanceReadiness(
+      plan,
+      localVerificationOptions({
+        password: "local-demo-password",
+        adminPassword: "local-admin-password",
+        fetchImpl: async (url, options) => {
+          const response = await normal.fetchImpl(url, options);
+          if (options.body && JSON.parse(options.body).method === "get_finance_fact") {
+            const body = await response.json();
+            return okResponse({ finance_fact: tamper(body.result.data.finance_fact) });
+          }
+          return response;
+        },
+      }),
+    );
+    assert.equal(report.summary.queryChecksPassed, false);
+    assert(report.summary.failedTargetData > 0);
+  }
 });
 
 test("explicit verification reports page data, nine role totals, and honest manual gaps", async () => {
@@ -2210,7 +2353,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert.equal(report.summary.browserChecksCompleted, 0);
   assert.equal(report.summary.manualAcceptanceCompleted, false);
   assert.equal(report.summary.mobileRolePages, 9);
-  assert.equal(report.summary.mobileTaskTotalActual, 180);
+  assert.equal(report.summary.mobileTaskTotalActual, 810);
   assert.equal(
     report.reportInputs.taskReport.taskGroupCoverageDigest,
     TASK_CATALOG_SCENARIO_DIGEST,
@@ -2240,7 +2383,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   );
   assert.deepEqual(
     new Set(Object.values(report.summary.mobileActualByRole)),
-    new Set([20]),
+    new Set([90]),
   );
   assert.equal(report.targets.length, 50);
   assert.equal(report.runtimePreflight.environment, "local");
@@ -2287,7 +2430,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
     mobileProbes.every(
       (item) =>
         item.status === "pass" &&
-        item.actual === 20 &&
+        item.actual === 90 &&
         item.statusKinds ===
           (item.id === "mobile-tasks:boss" ||
           [
@@ -2305,7 +2448,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert.equal(
     report.targets.find((item) => item.id === "desktopPages:global-dashboard")
       .actual,
-    18,
+    75,
   );
   assert.equal(
     report.targets.find((item) => item.id === "desktopPages:inventory")
@@ -2357,6 +2500,13 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert(calls.some((item) => item.method === "list_inventory_balances"));
   assert(calls.some((item) => item.method === "list_inventory_txns"));
   assert(calls.some((item) => item.method === "list_production_orders"));
+  assert(calls.some((item) => item.method === "get_finance_fact"));
+  assert(
+    calls
+      .filter((item) => item.method === "get_finance_fact")
+      .every((item) => Number.isSafeInteger(item.params.id) && item.params.id > 0),
+  );
+  assert(!calls.some((item) => item.method === "list_finance_facts"));
   assert(
     calls
       .filter((item) => item.method === "list_production_orders")
@@ -2408,8 +2558,9 @@ test("explicit verification reports page data, nine role totals, and honest manu
           );
         }
         return (
-          String(item.params.search || "").startsWith("YS-") &&
-          !("source_type" in item.params) && !("source_id" in item.params) &&
+          String(item.params.keyword || "").startsWith("YS-") &&
+          !("source_type" in item.params) &&
+          !("source_id" in item.params) &&
           Boolean(item.params.owner_role_key) &&
           !("customer_key" in item.params)
         );
@@ -2417,7 +2568,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   );
   assert(
     calls.every(({ method }) =>
-      /^(?:runtime_identity|admin_login|capabilities|get_effective_session|list_progress|list|list_|rbac_options|audit_logs)/u.test(
+      /^(?:runtime_identity|admin_login|capabilities|get_effective_session|get_finance_fact|get_bom_version|list_progress|list|list_|rbac_options|audit_logs)/u.test(
         method,
       ),
     ),
@@ -2967,7 +3118,7 @@ test("customer-facing report uses ordinary business wording", async () => {
   const markdown = renderManualAcceptanceReadinessMarkdown(report);
 
   assert.match(markdown, /# 全页面手动验收就绪核验/u);
-  assert.match(markdown, /九个岗位任务合计：180 \/ 180/u);
+  assert.match(markdown, /九个岗位任务合计：810 \/ 810/u);
   assert.match(markdown, /尚未证明/u);
   assert.match(markdown, /人工验收：未完成/u);
   assert.match(markdown, /页面操作已完成：0 \/ 50/u);

@@ -1,5 +1,14 @@
 #!/usr/bin/env node
 
+import { MANUAL_ACCEPTANCE_PAYMENT_SCENARIOS } from "./manual-acceptance-finance-scenarios.mjs";
+import {
+  createManualAcceptanceFinanceReadbackRPC,
+  readIndexedManualAcceptanceFinanceFact,
+} from "./manual-acceptance-finance-readback.mjs";
+import {
+  ensureManualAcceptanceCashPayments,
+  MANUAL_ACCEPTANCE_CASH_PAYMENT_SCENARIOS,
+} from "./manual-acceptance-cash-payment-data.mjs";
 import { assertSeedBusinessValues } from "./seed-business-values.mjs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -12,6 +21,7 @@ import {
   manualAcceptanceRPCParams,
   buildSourceDrivenFactPlan,
   applySourceDrivenFactPlan,
+  ensureSourceDrivenProductionRoute,
   exactProcessApprovalTask,
   manualAcceptanceBusinessNo,
   sourceDrivenFactConfirmation,
@@ -41,6 +51,9 @@ import { approvePurchaseOrderThroughProcess } from "./purchase-order-approval-pr
 import { prepareManualAcceptanceEngineering } from "./manual-acceptance-engineering-data.mjs";
 import {
   assertManualAcceptanceExceptionChainCoverage,
+  buildManualAcceptanceWIPExceptionScenarios,
+  ensureManualAcceptanceWIPExceptionScenario,
+  MANUAL_ACCEPTANCE_WIP_EXCEPTION_TYPES,
   runManualAcceptanceExceptionChains,
 } from "./manual-acceptance-exception-chain-data.mjs";
 import {
@@ -55,16 +68,18 @@ const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/fact-data";
 const APPLY_CONFIRMATION = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const RECEIPT_COUNT = 54;
-const QUALITY_CORRECTION_STATUSES = Object.freeze([
-  "SUBMITTED",
-  "PASSED",
-  "REJECTED",
-]);
+const QUALITY_CORRECTION_STATUSES = Object.freeze(
+  Array.from({ length: 3 }, () => ["SUBMITTED", "PASSED", "REJECTED"]).flat(),
+);
 const FACT_RUN_COUNT = MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.runs;
 const PRODUCTION_PLANNED_QUANTITY =
   MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.plannedQuantity;
-const FINANCE_PAYMENT_REFERENCE_COUNT = 4;
-const FINANCE_CREDIT_NOTE_REFERENCE_COUNT = 3;
+const SETTLEMENT_PAYMENT_REFERENCE_COUNT =
+  4 + MANUAL_ACCEPTANCE_PAYMENT_SCENARIOS.length;
+const FINANCE_PAYMENT_REFERENCE_COUNT =
+  SETTLEMENT_PAYMENT_REFERENCE_COUNT +
+  MANUAL_ACCEPTANCE_CASH_PAYMENT_SCENARIOS.length;
+const FINANCE_CREDIT_NOTE_REFERENCE_COUNT = 9;
 const REQUIRED_MODULES = Object.freeze([
   "purchase_orders",
   "outsourcing_orders",
@@ -165,14 +180,31 @@ const LIFECYCLE_SEQUENCE = Object.freeze({
   CANCEL: 902,
   ACTIVE: 901,
   RELEASE: 902,
+  DRAFT_2: 903,
+  CANCEL_2: 904,
+  ACTIVE_2: 903,
+  RELEASE_2: 904,
+  DRAFT_3: 905,
+  CANCEL_3: 906,
+  ACTIVE_3: 905,
+  RELEASE_3: 906,
 });
 
-const FINANCE_DRAFT_NUMBER = Object.freeze({
-  "PAYABLE-DRAFT": Object.freeze({ code: "CGYF", sequence: 901 }),
-  "RECEIVABLE-DRAFT": Object.freeze({ code: "YS", sequence: 901 }),
-  "INVOICE-DRAFT": Object.freeze({ code: "FP", sequence: 901 }),
-  "RECONCILIATION-DRAFT": Object.freeze({ code: "CGDZ", sequence: 901 }),
-});
+const FINANCE_DRAFT_NUMBER = Object.freeze(
+  Object.fromEntries(
+    [
+      ["PAYABLE", "CGYF"],
+      ["RECEIVABLE", "YS"],
+      ["INVOICE", "FP"],
+      ["RECONCILIATION", "CGDZ"],
+    ].flatMap(([type, code]) =>
+      Array.from({ length: 3 }, (_, index) => [
+        `${type}-DRAFT${index ? `-${index + 1}` : ""}`,
+        Object.freeze({ code, sequence: 901 + index }),
+      ]),
+    ),
+  ),
+);
 
 const FINANCE_PAYMENT_NUMBER = Object.freeze({
   "PAYABLE-SETTLED": Object.freeze({ code: "FK", sequence: 901 }),
@@ -181,11 +213,16 @@ const FINANCE_PAYMENT_NUMBER = Object.freeze({
   "RECEIVABLE-REVERSED": Object.freeze({ code: "SK", sequence: 903 }),
 });
 
-const FINANCE_CREDIT_NOTE_NUMBER = Object.freeze({
-  ACTIVE: Object.freeze({ code: "YS", sequence: 951 }),
-  ORIGINAL: Object.freeze({ code: "YS", sequence: 952 }),
-  REVERSAL: Object.freeze({ code: "YS", sequence: 953 }),
-});
+const FINANCE_CREDIT_NOTE_NUMBER = Object.freeze(
+  Object.fromEntries(
+    Array.from({ length: 3 }, (_, copy) =>
+      ["ACTIVE", "ORIGINAL", "REVERSAL"].map((key, index) => [
+        copy ? `${key}-${copy + 1}` : key,
+        Object.freeze({ code: "YS", sequence: 951 + copy * 3 + index }),
+      ]),
+    ).flat(),
+  ),
+);
 
 function decimal(value, name) {
   const number = Number(value);
@@ -437,17 +474,17 @@ function selectShipmentLineSample(candidates) {
   return Object.freeze({ order: sample.order, items: Object.freeze(items) });
 }
 
-function receiptStatus(index) {
-  if (index < 24) return "POSTED";
-  if (index < 36) return "CANCELLED";
+function receiptStatus(index, postedCount = 24) {
+  if (index < postedCount) return "POSTED";
+  if (index < postedCount + 12) return "CANCELLED";
   return "DRAFT";
 }
 
-function qualityTarget(index) {
-  if (index < 36) return "PASSED";
-  if (index < 42) return "SUBMITTED";
-  if (index < 47) return "REJECTED";
-  if (index < 51) return "CANCELLED";
+function qualityTarget(index, postedCount = 24) {
+  if (index < postedCount + 12) return "PASSED";
+  if (index < postedCount + 18) return "SUBMITTED";
+  if (index < postedCount + 23) return "REJECTED";
+  if (index < postedCount + 27) return "CANCELLED";
   return "DRAFT";
 }
 
@@ -583,29 +620,55 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
     );
   }
   const materialGrains = [...requiredMaterialGrains.values()];
-  const manualPostedSlots = 15;
-  const postedItems = Array.from({ length: manualPostedSlots }, () => []);
-  for (const [offset, grain] of materialGrains.entries()) {
-    postedItems[offset % manualPostedSlots].push(grain);
+  const grainsBySupplier = new Map();
+  const supplierByID = new Map(
+    refs.suppliers.map((item) => [Number(item.id), item]),
+  );
+  for (const grain of materialGrains) {
+    const supplierID = positiveID(
+      materialById.get(grain.materialId)?.supplierId,
+      "material.supplierId",
+    );
+    if (!supplierByID.has(supplierID))
+      throw new CliError(
+        `material supplier ${supplierID} is outside this batch`,
+      );
+    const ownedGrains = grainsBySupplier.get(supplierID) || [];
+    ownedGrains.push(grain);
+    grainsBySupplier.set(supplierID, ownedGrains);
   }
-  const fallbackGrain = materialGrains[0];
-  if (!fallbackGrain)
+  const supplierGroups = [...grainsBySupplier.values()];
+  if (!supplierGroups.length)
     throw new CliError("source report has no required material grain", 2);
+  const manualPostedSlots = Math.max(15, supplierGroups.length);
+  const postedCount = 9 + manualPostedSlots;
+  const receiptCount = RECEIPT_COUNT + manualPostedSlots - 15;
+  const postedItems = Array.from(
+    { length: manualPostedSlots },
+    (_, index) => supplierGroups[index % supplierGroups.length],
+  );
   const receipts = Array.from(
-    { length: RECEIPT_COUNT + QUALITY_CORRECTION_STATUSES.length },
+    { length: receiptCount + QUALITY_CORRECTION_STATUSES.length },
     (_, offset) => {
       const index = offset + 1;
       const linked = offset < 9;
-      const correctionSample = offset >= RECEIPT_COUNT;
-      const status = correctionSample ? "DRAFT" : receiptStatus(offset);
-      const quality = correctionSample ? "PASSED" : qualityTarget(offset);
+      const correctionSample = offset >= receiptCount;
+      const status = correctionSample
+        ? "DRAFT"
+        : receiptStatus(offset, postedCount);
+      const quality = correctionSample
+        ? "PASSED"
+        : qualityTarget(offset, postedCount);
       const grains = linked
         ? []
-        : status === "POSTED" && offset < 24
-          ? postedItems[offset - 9]?.length
-            ? postedItems[offset - 9]
-            : [fallbackGrain]
-          : [fallbackGrain];
+        : status === "POSTED" && offset < postedCount
+          ? postedItems[offset - 9]
+          : [supplierGroups[offset % supplierGroups.length][0]];
+      const materialSupplier = linked
+        ? null
+        : supplierByID.get(
+            Number(materialById.get(grains[0].materialId).supplierId),
+          );
       return {
         index,
         receiptNo: shortBusinessNo(report, "PR", index),
@@ -620,14 +683,12 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
           ? linkedOrders[offset].orderNo
           : shortBusinessNo(report, "PR", 1000 + index),
         supplierId: positiveID(
-          linked
-            ? linkedOrders[offset].supplierId
-            : (refs.suppliers || [])[offset % refs.suppliers.length]?.id,
+          linked ? linkedOrders[offset].supplierId : materialSupplier.id,
           "receipt.supplierId",
         ),
         supplierName: linked
           ? linkedOrders[offset].supplierName
-          : (refs.suppliers || [])[offset % refs.suppliers.length]?.name,
+          : materialSupplier.name,
         warehouseId: positiveID(materialWarehouse.id, "materialWarehouse.id"),
         items: grains.map((grain, itemOffset) => ({
           ...grain,
@@ -659,7 +720,7 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
   // and the rejected-receipt disposition specimens.
   const qualityCorrections = QUALITY_CORRECTION_STATUSES.map(
     (status, offset) => ({
-      receiptIndex: RECEIPT_COUNT + offset,
+      receiptIndex: receiptCount + offset,
       inspectionNo: shortBusinessNo(report, "ZJ", 2001 + offset),
       reason: "确认资料补齐后重新检验",
       status,
@@ -699,7 +760,7 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
         qualityCorrections.length,
       productionOrders: FACT_RUN_COUNT,
       productionFacts: FACT_RUN_COUNT,
-      productionExceptions: 1,
+      productionExceptions: 73,
       stockReservations: FACT_RUN_COUNT,
       shipments: MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
       payables: FACT_RUN_COUNT,
@@ -1074,6 +1135,18 @@ async function exactByBusinessNo({
   businessNo,
   params = {},
 }) {
+  if (
+    domain === "operational_fact" &&
+    method === "list_finance_facts" &&
+    businessField === "fact_no" &&
+    Object.keys(params).length === 0
+  ) {
+    const indexed = await readIndexedManualAcceptanceFinanceFact(
+      rpc,
+      businessNo,
+    );
+    if (indexed) return indexed.record;
+  }
   const data = await rpc({
     domain,
     method,
@@ -1116,6 +1189,7 @@ export async function readPurchaseReceiptQualities(rpc, receipt) {
     method: "list_quality_inspections",
     params: {
       purchase_receipt_id: receiptID,
+      include_superseded: true,
       source_type: "PURCHASE_RECEIPT",
       inspection_type: "INCOMING",
       limit: 200,
@@ -1929,7 +2003,7 @@ export async function ensureManualAcceptanceQualityCorrections(
       QUALITY_CORRECTION_STATUSES.length
   ) {
     throw new CliError(
-      "quality correction plan must contain three independent specimens",
+      "quality correction plan must contain nine independent specimens",
     );
   }
   const records = [];
@@ -3383,7 +3457,9 @@ function fullyIssuedOverIssueRequirement({
 }) {
   if (
     existing &&
-    (!["SUBMITTED", "APPROVED"].includes(existing.status) ||
+    (!["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"].includes(
+      existing.status,
+    ) ||
       existing.execution_status !== "PENDING")
   )
     throw new CliError(`${label} existing approval state drifted`);
@@ -3482,6 +3558,8 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
   plan,
   production,
   apply = true,
+  targetStatus = "APPROVED",
+  sequence = 1,
 }) {
   const order = production?.order;
   const productionOrderID = positiveID(
@@ -3493,7 +3571,7 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
     "production exception production order no",
     64,
   );
-  const decisionNo = shortBusinessNo(plan, "SCYC", 1);
+  const decisionNo = shortBusinessNo(plan, "SCYC", sequence);
   const existing = (
     await listProductionExceptionsForOrder(rpc, productionOrderID)
   ).filter((item) => String(item?.decision_no || "") === decisionNo);
@@ -3531,7 +3609,7 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
   if (!decision && apply) {
     decision = resultItem(
       await rpc({
-        actor: "admin",
+        actor: "production",
         domain: "operational_fact",
         method: "submit_production_exception",
         params: {
@@ -3562,6 +3640,34 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
     throw new CliError(`${decisionNo} source grain drifted`);
   }
 
+  if (targetStatus === "CANCELLED") {
+    if (decision.status === "SUBMITTED" && apply)
+      decision = resultItem(
+        await rpc({
+          actor: "production",
+          domain: "operational_fact",
+          method: "cancel_production_exception",
+          params: {
+            id: decision.id,
+            expected_version: decision.version,
+            reason: "生产安排调整，撤回申请",
+          },
+        }),
+        "production_exception",
+        "cancel_production_exception",
+      );
+    if (decision.status !== "CANCELLED")
+      throw new CliError(`${decisionNo} expected CANCELLED`);
+    return {
+      ...decision,
+      production_order_no: orderNo,
+      process_instance_id: null,
+      approval_task_id: null,
+      approval_task_code: null,
+      approval_process_node_id: null,
+      approved_remaining_quantity: String(requirement.remaining_quantity),
+    };
+  }
   let processData = await readProductionExceptionApprovalProcess(
     rpc,
     decisionID,
@@ -3571,7 +3677,7 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
       throw new CliError(`${decisionNo} approval process is missing`);
     }
     processData = await rpc({
-      actor: "admin",
+      actor: "production",
       domain: "customer_config",
       method: "start_production_exception_approval_process",
       params: {
@@ -3605,6 +3711,56 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
     processInstanceID: Number(instance.id),
     processNodeID: Number(approvalNode.id),
   });
+  if (targetStatus === "SUBMITTED" || targetStatus === "REJECTED") {
+    if (
+      targetStatus === "REJECTED" &&
+      approvalTask.task_status_key === "ready" &&
+      apply
+    ) {
+      await rpc({
+        actor: "boss",
+        domain: "workflow",
+        method: "reject_task_action",
+        params: {
+          task_id: approvalTask.id,
+          expected_version: approvalTask.version,
+          idempotency_key: `manual-acceptance:${plan.dataVersion}:production-exception:${decisionNo}:reject`,
+          action_key: "reject",
+          reason: "追加领料依据待补齐",
+          payload: {
+            surface_key: "workflow_business_module",
+          },
+        },
+      });
+    }
+    const readback = await readProductionExceptionApprovalProcess(
+      rpc,
+      decisionID,
+    );
+    approvalTask = await exactProductionExceptionApprovalTask({
+      rpc,
+      decisionID,
+      processInstanceID: Number(instance.id),
+      processNodeID: Number(approvalNode.id),
+    });
+    if (
+      readback.source_readback?.status !== targetStatus ||
+      approvalTask.task_status_key !==
+        (targetStatus === "SUBMITTED" ? "ready" : "rejected")
+    )
+      throw new CliError(
+        `${decisionNo} ${targetStatus} approval readback drifted`,
+      );
+    return {
+      ...readback.source_readback,
+      production_order_no: orderNo,
+      process_instance_id: Number(instance.id),
+      approval_task_id: approvalTask.id,
+      approval_task_code: approvalTask.task_code,
+      approval_process_node_id: Number(approvalNode.id),
+      approved_remaining_quantity: String(requirement.remaining_quantity),
+    };
+  }
   const approvalReason = "批准本批超领额度。";
   if (
     String(approvalTask.task_status_key || "").toLowerCase() === "ready" &&
@@ -4023,6 +4179,7 @@ async function completeFinancePaymentHumanNode({
   processData,
   processDecision,
   rpc,
+  actionKey = "complete",
 }) {
   const node = requireExceptionProcessNode(
     processData,
@@ -4057,34 +4214,186 @@ async function completeFinancePaymentHumanNode({
   ) {
     throw new CliError(`${nodeKey} active task is missing or not ready`);
   }
-  const reason = "已核对收付款来源与核销金额。";
+  const reason =
+    actionKey === "reject"
+      ? "单据依据待补齐，退回重新核对。"
+      : "已核对收付款用途、来源与金额。";
   const completed = await rpc({
     actor,
     domain: "workflow",
-    method: "complete_task_action",
+    method:
+      actionKey === "reject" ? "reject_task_action" : "complete_task_action",
     params: {
       task_id: task.id,
       expected_version: task.version,
-      idempotency_key: `manual-acceptance:finance-payment:${payment.id}:task:${task.id}:complete`,
-      action_key: "complete",
+      idempotency_key: `manual-acceptance:finance-payment:${payment.id}:task:${task.id}:${actionKey}`,
+      action_key: actionKey,
       reason,
       payload: {
         surface_key:
           nodeKey === "finance_payment_approval"
             ? "finance-payment-approval"
             : "finance-payment-execution",
-        ...(processDecision ? { process_decision: { reason } } : {}),
+        ...(processDecision && actionKey === "complete"
+          ? { process_decision: { reason } }
+          : {}),
       },
     },
   });
   if (
     Number(completed?.task?.id) !== Number(task.id) ||
-    String(completed?.task?.task_status_key || "").toLowerCase() !== "done" ||
+    String(completed?.task?.task_status_key || "").toLowerCase() !==
+      (actionKey === "reject" ? "rejected" : "done") ||
     Number(completed?.task?.version || 0) <= Number(task.version)
   ) {
     throw new CliError(`${nodeKey} task completion readback is incomplete`);
   }
   return readFinancePaymentProcess(rpc, payment.id);
+}
+
+export async function transitionManualAcceptanceFinancePayment({
+  rpc,
+  payment,
+  desiredStatus,
+  allocations = [],
+}) {
+  const paymentNo = payment.payment_no;
+  const post = ["POSTED", "REVERSED"].includes(desiredStatus);
+  if (desiredStatus === "DRAFT" || desiredStatus === "CANCELLED") {
+    let current = payment;
+    if (desiredStatus === "CANCELLED" && current.status === "DRAFT") {
+      current = resultItem(
+        await rpc({
+          actor: "finance",
+          domain: "operational_fact",
+          method: "cancel_finance_payment",
+          params: {
+            id: current.id,
+            expected_version: current.version,
+            reason: "凭证作废后重新登记",
+          },
+        }),
+        "payment",
+        "cancel_finance_payment",
+      );
+    }
+    const readback = resultItem(
+      await rpc({
+        actor: "finance",
+        domain: "operational_fact",
+        method: "get_finance_payment",
+        params: { id: current.id },
+      }),
+      "payment",
+      "get_finance_payment",
+    );
+    if (readback.payment_no !== paymentNo || readback.status !== desiredStatus)
+      throw new CliError(`${paymentNo} expected ${desiredStatus}`);
+    return readback;
+  }
+  let processData = await readFinancePaymentProcess(rpc, payment.id);
+  if (
+    String(payment.status || "").toUpperCase() !== "REVERSED" &&
+    !processData?.process_context
+  ) {
+    processData = await rpc({
+      actor: "finance",
+      domain: "customer_config",
+      method: "start_finance_payment_approval_process",
+      params: {
+        finance_payment_id: payment.id,
+        idempotency_key: `finance-payment-approval/${payment.id}`,
+      },
+    });
+  }
+  let currentPayment = processData?.source_readback || payment;
+  if (String(currentPayment.status || "").toUpperCase() === "DRAFT") {
+    processData = await completeFinancePaymentHumanNode({
+      actor: "boss",
+      nodeKey: "finance_payment_approval",
+      payment: currentPayment,
+      processData,
+      processDecision: true,
+      rpc,
+      actionKey: desiredStatus === "REJECTED" ? "reject" : "complete",
+    });
+    currentPayment = processData?.source_readback;
+  }
+  if (desiredStatus === "REJECTED") {
+    if (
+      currentPayment?.status !== "REJECTED" ||
+      currentPayment?.payment_no !== paymentNo
+    )
+      throw new CliError(`${paymentNo} rejection did not persist`);
+    return currentPayment;
+  }
+  if (
+    !currentPayment ||
+    !["APPROVED", "POSTED", "REVERSED"].includes(
+      String(currentPayment.status || "").toUpperCase(),
+    )
+  ) {
+    throw new CliError(
+      `${paymentNo} approval did not reach APPROVED or POSTED`,
+    );
+  }
+  if (!post) {
+    if (String(currentPayment.status).toUpperCase() !== "APPROVED") {
+      throw new CliError(`${paymentNo} must remain APPROVED for browser flow`);
+    }
+    requireExceptionProcessNode(
+      processData,
+      "finance_payment_execution",
+      ["active"],
+      "approved finance payment specimen",
+    );
+    return currentPayment;
+  }
+  if (String(currentPayment.status).toUpperCase() === "APPROVED") {
+    processData = await completeFinancePaymentHumanNode({
+      actor: "finance",
+      nodeKey: "finance_payment_execution",
+      payment: currentPayment,
+      processData,
+      processDecision: false,
+      rpc,
+    });
+    const commandNode = requireExceptionProcessNode(
+      processData,
+      "post_finance_payment",
+      ["active"],
+      "finance payment post",
+    );
+    const instance = processData?.process_context?.process_instance;
+    const execution = await rpc({
+      actor: "finance",
+      domain: "customer_config",
+      method: "execute_finance_payment_post",
+      params: {
+        process_instance_id: positiveID(
+          instance?.id,
+          "finance payment process instance",
+        ),
+        process_node_instance_id: commandNode.id,
+        expected_version: commandNode.version,
+        finance_payment_id: currentPayment.id,
+        idempotency_key: `finance-payment-post/${currentPayment.id}/${commandNode.id}`,
+        allocations,
+        ...(["ADVANCE", "REFUND"].includes(currentPayment.kind) ? { cash_only: true } : {}),
+      },
+    });
+    currentPayment = execution?.source_readback;
+  }
+  return resultItem(
+    await rpc({
+      actor: "finance",
+      domain: "operational_fact",
+      method: "get_finance_payment",
+      params: { id: payment.id },
+    }),
+    "payment",
+    "get_finance_payment",
+  );
 }
 
 async function ensureFinancePaymentSpecimen({
@@ -4108,7 +4417,12 @@ async function ensureFinancePaymentSpecimen({
       direction: "RECEIPT",
     },
   }[factType];
-  const number = FINANCE_PAYMENT_NUMBER[specimenKey];
+  const scenario = MANUAL_ACCEPTANCE_PAYMENT_SCENARIOS.find(
+    (item) => item.key === specimenKey,
+  );
+  const number = FINANCE_PAYMENT_NUMBER[specimenKey] || scenario?.number;
+  const desiredStatus =
+    scenario?.status || (reverse ? "REVERSED" : post ? "POSTED" : "APPROVED");
   if (
     !expected ||
     !number ||
@@ -4131,7 +4445,16 @@ async function ensureFinancePaymentSpecimen({
         ? requiredText(financeFact.amount, `${specimenKey}.amount`, 64)
         : "1";
   if (!apply) {
-    const expectedSourceStatus = reverse ? "POSTED" : post ? "SETTLED" : null;
+    const expectedSourceStatus =
+      reverse ||
+      (post &&
+        amountOverride != null &&
+        BigInt(numeric20Scale6Units(amountOverride)) <
+          BigInt(numeric20Scale6Units(financeFact.amount)))
+        ? "POSTED"
+        : post
+          ? "SETTLED"
+          : null;
     if (
       expectedSourceStatus &&
       String(financeFact.status || "").toUpperCase() !== expectedSourceStatus
@@ -4167,99 +4490,13 @@ async function ensureFinancePaymentSpecimen({
     "payment",
     "create_finance_payment",
   );
-  let processData = await readFinancePaymentProcess(rpc, payment.id);
-  if (
-    String(payment.status || "").toUpperCase() !== "REVERSED" &&
-    !processData?.process_context
-  ) {
-    processData = await rpc({
-      actor: "finance",
-      domain: "customer_config",
-      method: "start_finance_payment_approval_process",
-      params: {
-        finance_payment_id: payment.id,
-        idempotency_key: `finance-payment-approval/${payment.id}`,
-      },
-    });
-  }
-  let currentPayment = processData?.source_readback || payment;
-  if (String(currentPayment.status || "").toUpperCase() === "DRAFT") {
-    processData = await completeFinancePaymentHumanNode({
-      actor: "boss",
-      nodeKey: "finance_payment_approval",
-      payment: currentPayment,
-      processData,
-      processDecision: true,
-      rpc,
-    });
-    currentPayment = processData?.source_readback;
-  }
-  if (
-    !currentPayment ||
-    !["APPROVED", "POSTED", "REVERSED"].includes(
-      String(currentPayment.status || "").toUpperCase(),
-    )
-  ) {
-    throw new CliError(
-      `${paymentNo} approval did not reach APPROVED or POSTED`,
-    );
-  }
-  if (!post) {
-    if (String(currentPayment.status).toUpperCase() !== "APPROVED") {
-      throw new CliError(`${paymentNo} must remain APPROVED for browser flow`);
-    }
-    requireExceptionProcessNode(
-      processData,
-      "finance_payment_execution",
-      ["active"],
-      "approved finance payment specimen",
-    );
-    return financeFact;
-  }
-  if (String(currentPayment.status).toUpperCase() === "APPROVED") {
-    processData = await completeFinancePaymentHumanNode({
-      actor: "finance",
-      nodeKey: "finance_payment_execution",
-      payment: currentPayment,
-      processData,
-      processDecision: false,
-      rpc,
-    });
-    const commandNode = requireExceptionProcessNode(
-      processData,
-      "post_finance_payment",
-      ["active"],
-      "finance payment post",
-    );
-    const instance = processData?.process_context?.process_instance;
-    const execution = await rpc({
-      actor: "finance",
-      domain: "customer_config",
-      method: "execute_finance_payment_post",
-      params: {
-        process_instance_id: positiveID(
-          instance?.id,
-          "finance payment process instance",
-        ),
-        process_node_instance_id: commandNode.id,
-        expected_version: commandNode.version,
-        finance_payment_id: currentPayment.id,
-        idempotency_key: `finance-payment-post/${currentPayment.id}/${commandNode.id}`,
-        allocations: [{ finance_fact_id: factID, amount }],
-      },
-    });
-    currentPayment = execution?.source_readback;
-  }
-  let currentReadback = resultItem(
-    await rpc({
-      actor: "finance",
-      domain: "operational_fact",
-      method: "get_finance_payment",
-      params: { id: payment.id },
-    }),
-    "payment",
-    "get_finance_payment",
-  );
+  let currentReadback = await transitionManualAcceptanceFinancePayment({
+    rpc,
+    payment,
+    desiredStatus,
+    allocations: [{ finance_fact_id: factID, amount }],
+  });
+  if (!post) return financeFact;
   if (
     reverse &&
     String(currentReadback.status || "").toUpperCase() === "POSTED"
@@ -4327,7 +4564,13 @@ async function ensureFinancePaymentSpecimen({
     businessField: "fact_no",
     businessNo: financeFact.fact_no,
   });
-  const expectedSourceStatus = reverse ? "POSTED" : "SETTLED";
+  const expectedSourceStatus =
+    reverse ||
+    (amountOverride != null &&
+      BigInt(numeric20Scale6Units(amountOverride)) <
+        BigInt(numeric20Scale6Units(financeFact.amount)))
+      ? "POSTED"
+      : "SETTLED";
   if (
     String(sourceReadback.status || "").toUpperCase() !== expectedSourceStatus
   ) {
@@ -4510,6 +4753,16 @@ export async function applyManualAcceptanceFinanceLifecycle({
       finance.push(
         await createFinanceDraft(rpc, plan, records[3], suffix, false),
       );
+      for (const replica of [2, 3])
+        finance.push(
+          await createFinanceDraft(
+            rpc,
+            plan,
+            records[replica + 2],
+            `${suffix}-${replica}`,
+            false,
+          ),
+        );
     }
     const parentByID = new Map(
       financeFacts
@@ -4530,20 +4783,30 @@ export async function applyManualAcceptanceFinanceLifecycle({
           parentByID.get(Number(item.source_id))?.status || "",
         ).toUpperCase() === "POSTED",
     );
-    if (reconciliationDraftSources.length !== 1) {
+    if (reconciliationDraftSources.length !== 3)
       throw new CliError(
-        `expected one stable reconciliation source for the DRAFT specimen, got ${reconciliationDraftSources.length}`,
+        "three stable reconciliation draft sources are required",
       );
-    }
-    finance.push(
-      await createFinanceDraft(
+    for (const replica of [1, 2, 3]) {
+      const key = `RECONCILIATION-DRAFT${replica > 1 ? `-${replica}` : ""}`;
+      const number = FINANCE_DRAFT_NUMBER[key];
+      const existing = await exactRequired({
         rpc,
-        plan,
-        reconciliationDraftSources[0],
-        "RECONCILIATION-DRAFT",
-        false,
-      ),
-    );
+        domain: "operational_fact",
+        method: "list_finance_facts",
+        listKey: "finance_facts",
+        businessField: "fact_no",
+        businessNo: shortBusinessNo(plan, number.code, number.sequence),
+      });
+      const source = reconciliationDraftSources.find(
+        (item) => Number(item.source_id) === Number(existing.source_id),
+      );
+      if (!source)
+        throw new CliError(
+          `${key} source is not a cancelled reconciliation with a posted parent`,
+        );
+      finance.push(await createFinanceDraft(rpc, plan, source, key, false));
+    }
     return dedupeByID(finance);
   }
 
@@ -4607,6 +4870,25 @@ export async function applyManualAcceptanceFinanceLifecycle({
     finance.push(
       await createFinanceDraft(rpc, plan, records[3], `${type}-DRAFT`, true),
     );
+    for (const replica of [2, 3]) {
+      const source = records[replica + 2];
+      if (!source)
+        throw new CliError(`${type} needs six stable source records`);
+      await cancelDependency(source);
+      replaceByID(
+        finance,
+        await financeTransition(rpc, source, "CANCELLED", true),
+      );
+      finance.push(
+        await createFinanceDraft(
+          rpc,
+          plan,
+          source,
+          `${type}-DRAFT-${replica}`,
+          true,
+        ),
+      );
+    }
   }
 
   await ensureFinancePaymentSpecimen({
@@ -4691,7 +4973,7 @@ export async function applyManualAcceptanceFinanceLifecycle({
       item.id !== draftSource.id &&
       String(item.status || "").toUpperCase() === "SETTLED",
   );
-  if (alreadySettled.length > 1) {
+  if (alreadySettled.length > 3) {
     throw new CliError(
       "multiple reconciliation SETTLED specimens conflict with stable replay",
     );
@@ -4723,6 +5005,63 @@ export async function applyManualAcceptanceFinanceLifecycle({
       true,
     ),
   );
+  const usedDraftSources = new Set([draftSource.id]);
+  for (const replica of [2, 3]) {
+    const key = `RECONCILIATION-DRAFT-${replica}`;
+    const number = FINANCE_DRAFT_NUMBER[key];
+    const existing = await exactByBusinessNo({
+      rpc,
+      domain: "operational_fact",
+      method: "list_finance_facts",
+      listKey: "finance_facts",
+      businessField: "fact_no",
+      businessNo: shortBusinessNo(plan, number.code, number.sequence),
+    });
+    const source = existing
+      ? reconciliationCandidates.find(
+          (item) =>
+            Number(item.source_id) === Number(existing.source_id) &&
+            item.status === "CANCELLED",
+        )
+      : reconciliationCandidates.find(
+          (item) =>
+            !usedDraftSources.has(item.id) &&
+            item.id !== settleSource.id &&
+            item.status === "POSTED" &&
+            parentByID.get(Number(item.source_id))?.fact_type === "INVOICE" &&
+            parentByID.get(Number(item.source_id))?.status === "POSTED",
+        );
+    if (!source)
+      throw new CliError(`${key} needs an independent posted invoice source`);
+    usedDraftSources.add(source.id);
+    replaceByID(
+      finance,
+      await financeTransition(rpc, source, "CANCELLED", true),
+    );
+    finance.push(await createFinanceDraft(rpc, plan, source, key, true));
+  }
+  const usedSettledSources = new Set([settleSource.id]);
+  for (const replica of [2, 3]) {
+    const source =
+      reconciliationCandidates.find(
+        (item) =>
+          !usedDraftSources.has(item.id) &&
+          !usedSettledSources.has(item.id) &&
+          item.status === "SETTLED",
+      ) ||
+      reconciliationCandidates.find(
+        (item) =>
+          !usedDraftSources.has(item.id) &&
+          !usedSettledSources.has(item.id) &&
+          item.status === "POSTED",
+      );
+    if (!source)
+      throw new CliError(
+        "three independent reconciliation settlements are required",
+      );
+    usedSettledSources.add(source.id);
+    replaceByID(finance, await financeTransition(rpc, source, "SETTLED", true));
+  }
   return dedupeByID(finance);
 }
 
@@ -4734,21 +5073,31 @@ function eligiblePostedFinanceFacts(financeFacts, factType) {
   );
 }
 
-async function listAllFinancePageRecords(rpc, method, listKey) {
-  const data = await rpc({
-    actor: "finance",
-    domain: "operational_fact",
-    method,
-    params: { limit: 200, offset: 0 },
-  });
-  const items = Array.isArray(data?.[listKey]) ? data[listKey] : [];
-  if (Number(data?.total ?? items.length) > items.length) {
-    throw new CliError(`${method} readback was truncated`);
+export async function listAllFinancePageRecords(rpc, method, listKey) {
+  const items = [];
+  for (let offset = 0; offset < 200_000; offset += 200) {
+    const data = await rpc({
+      actor: "finance",
+      domain: "operational_fact",
+      method,
+      params: { limit: 200, offset },
+    });
+    const rows = data?.[listKey];
+    if (!Array.isArray(rows))
+      throw new CliError(`${method} readback is malformed`);
+    items.push(...rows);
+    if (items.length >= Number(data.total ?? items.length)) {
+      if (new Set(items.map((item) => item.id)).size !== items.length)
+        throw new CliError(`${method} returned duplicate records across pages`);
+      return items;
+    }
+    if (rows.length === 0)
+      throw new CliError(`${method} readback was truncated`);
   }
-  return items;
+  throw new CliError(`${method} readback exceeded its page budget`);
 }
 
-async function ensureFinanceCreditNoteSpecimens({
+export async function ensureFinanceCreditNoteSpecimens({
   apply,
   activeSource,
   plan,
@@ -4801,65 +5150,115 @@ async function ensureFinanceCreditNoteSpecimens({
     return record;
   };
 
-  const active = await ensurePosted("ACTIVE", activeSource);
-  const original = await ensurePosted("ORIGINAL", reversalSource);
-  const reversalNo = numberFor("REVERSAL");
-  let reversal = (
-    await listAllFinancePageRecords(
-      rpc,
-      "list_finance_credit_notes",
-      "credit_notes",
-    )
-  ).find((item) => item?.credit_note_no === reversalNo);
-  if (!reversal && apply) {
-    reversal = resultItem(
-      await rpc({
-        actor: "finance",
-        domain: "operational_fact",
-        method: "reverse_finance_credit_note",
-        params: {
-          credit_note_id: original.id,
-          credit_note_no: reversalNo,
-          reason: "原红冲单有误，反向红冲。",
-          idempotency_key: `manual-acceptance:${plan.dataVersion}:finance-credit-note:reversal`,
-        },
-      }),
-      "credit_note",
-      "reverse_finance_credit_note",
-    );
+  const records = [];
+  for (let copy = 0; copy < 3; copy += 1) {
+    const key = (kind) => (copy ? `${kind}-${copy + 1}` : kind);
+    const active = await ensurePosted(key("ACTIVE"), activeSource);
+    const original = await ensurePosted(key("ORIGINAL"), reversalSource);
+    const reversalNo = numberFor(key("REVERSAL"));
+    let reversal = (
+      await listAllFinancePageRecords(
+        rpc,
+        "list_finance_credit_notes",
+        "credit_notes",
+      )
+    ).find((item) => item?.credit_note_no === reversalNo);
+    if (!reversal && apply) {
+      reversal = resultItem(
+        await rpc({
+          actor: "finance",
+          domain: "operational_fact",
+          method: "reverse_finance_credit_note",
+          params: {
+            credit_note_id: original.id,
+            credit_note_no: reversalNo,
+            reason: "原红冲单有误，反向红冲。",
+            idempotency_key: `manual-acceptance:${plan.dataVersion}:finance-credit-note:${key("REVERSAL").toLowerCase()}`,
+          },
+        }),
+        "credit_note",
+        "reverse_finance_credit_note",
+      );
+    }
+    if (
+      !reversal ||
+      String(reversal.status || "").toUpperCase() !== "REVERSED" ||
+      Number(reversal.finance_fact_id) !== Number(reversalSource.id) ||
+      Number(reversal.reversal_of_credit_note_id) !== Number(original.id) ||
+      Number(reversal.amount) !== 1
+    ) {
+      throw new CliError(`${reversalNo} reversal linkage is incomplete`);
+    }
+    records.push(active, original, reversal);
   }
-  if (
-    !reversal ||
-    String(reversal.status || "").toUpperCase() !== "REVERSED" ||
-    Number(reversal.finance_fact_id) !== Number(reversalSource.id) ||
-    Number(reversal.reversal_of_credit_note_id) !== Number(original.id) ||
-    Number(reversal.amount) !== 1
-  ) {
-    throw new CliError(`${reversalNo} reversal linkage is incomplete`);
-  }
-  return [active, original, reversal];
+  return records;
 }
 
 function assertFinancePageReferenceMatrix({
   financeCreditNotes,
   financePayments,
+  includeCash = false,
 }) {
-  if (financePayments.length !== FINANCE_PAYMENT_REFERENCE_COUNT) {
+  const settlements = financePayments.filter(
+    (item) => item.kind === "SETTLEMENT",
+  );
+  if (settlements.length !== SETTLEMENT_PAYMENT_REFERENCE_COUNT) {
     throw new CliError(
-      `financePayments need exactly ${FINANCE_PAYMENT_REFERENCE_COUNT} references`,
+      `settlement payments need exactly ${SETTLEMENT_PAYMENT_REFERENCE_COUNT} references`,
     );
   }
-  const paymentStatuses = countBy(financePayments, "status");
+  const paymentStatuses = countBy(settlements, "status");
   if (
-    paymentStatuses.APPROVED !== 1 ||
-    paymentStatuses.POSTED !== 2 ||
-    paymentStatuses.REVERSED !== 1
+    paymentStatuses.DRAFT !== 6 ||
+    paymentStatuses.APPROVED !== 7 ||
+    paymentStatuses.REJECTED !== 6 ||
+    paymentStatuses.POSTED !== 8 ||
+    paymentStatuses.REVERSED !== 7 ||
+    paymentStatuses.CANCELLED !== 6
   ) {
     throw new CliError(
       `financePayments status matrix drifted: ${JSON.stringify(paymentStatuses)}`,
     );
   }
-  for (const payment of financePayments.filter(
+  for (const scenario of MANUAL_ACCEPTANCE_PAYMENT_SCENARIOS) {
+    const direction =
+      scenario.factType === "PAYABLE" ? "DISBURSEMENT" : "RECEIPT";
+    if (
+      settlements.filter(
+        (item) =>
+          item.status === scenario.status && item.direction === direction,
+      ).length < 3
+    ) {
+      throw new CliError(
+        `${direction}/${scenario.status} needs three payment specimens`,
+      );
+    }
+  }
+  if (includeCash) {
+    if (financePayments.length !== FINANCE_PAYMENT_REFERENCE_COUNT)
+      throw new CliError(
+        `financePayments need exactly ${FINANCE_PAYMENT_REFERENCE_COUNT} references`,
+      );
+    const byID = new Map(
+      financePayments.map((payment) => [payment.id, payment]),
+    );
+    for (const scenario of MANUAL_ACCEPTANCE_CASH_PAYMENT_SCENARIOS) {
+      const matches = financePayments.filter(
+        (payment) =>
+          payment.kind === scenario.kind &&
+          payment.status === scenario.status &&
+          (payment.kind === "ADVANCE"
+            ? payment.source_type
+            : byID.get(payment.refund_of_payment_id)?.source_type) ===
+            scenario.sourceType,
+      );
+      if (matches.length !== 3)
+        throw new CliError(
+          `${scenario.kind}/${scenario.sourceType}/${scenario.status} requires three cash specimens`,
+        );
+    }
+  }
+  for (const payment of settlements.filter(
     (item) => item.status === "POSTED",
   )) {
     if (
@@ -4874,26 +5273,27 @@ function assertFinancePageReferenceMatrix({
       );
     }
   }
-  const reversedPayment = financePayments.find(
+  for (const reversedPayment of settlements.filter(
     (item) => item.status === "REVERSED",
-  );
-  const originalAllocations = (reversedPayment?.allocations || []).filter(
-    (item) =>
-      String(item?.status || "").toUpperCase() === "POSTED" &&
-      item?.reversal_of_allocation_id == null,
-  );
-  const linkedReversals = (reversedPayment?.allocations || []).filter(
-    (item) =>
-      String(item?.status || "").toUpperCase() === "REVERSED" &&
-      originalAllocations.some(
-        (original) =>
-          Number(item?.reversal_of_allocation_id) === Number(original.id),
-      ),
-  );
-  if (originalAllocations.length !== 1 || linkedReversals.length !== 1) {
-    throw new CliError(
-      `${reversedPayment?.payment_no || "reversed payment"} allocation reversal linkage is incomplete`,
+  )) {
+    const originalAllocations = (reversedPayment?.allocations || []).filter(
+      (item) =>
+        String(item?.status || "").toUpperCase() === "POSTED" &&
+        item?.reversal_of_allocation_id == null,
     );
+    const linkedReversals = (reversedPayment?.allocations || []).filter(
+      (item) =>
+        String(item?.status || "").toUpperCase() === "REVERSED" &&
+        originalAllocations.some(
+          (original) =>
+            Number(item?.reversal_of_allocation_id) === Number(original.id),
+        ),
+    );
+    if (originalAllocations.length !== 1 || linkedReversals.length !== 1) {
+      throw new CliError(
+        `${reversedPayment?.payment_no || "reversed payment"} allocation reversal linkage is incomplete`,
+      );
+    }
   }
 
   if (financeCreditNotes.length !== FINANCE_CREDIT_NOTE_REFERENCE_COUNT) {
@@ -4902,27 +5302,33 @@ function assertFinancePageReferenceMatrix({
     );
   }
   const creditStatuses = countBy(financeCreditNotes, "status");
-  if (creditStatuses.POSTED !== 2 || creditStatuses.REVERSED !== 1) {
+  if (creditStatuses.POSTED !== 6 || creditStatuses.REVERSED !== 3) {
     throw new CliError(
       `financeCreditNotes status matrix drifted: ${JSON.stringify(creditStatuses)}`,
     );
   }
-  const reversedCredit = financeCreditNotes.find(
+  const reversedCredits = financeCreditNotes.filter(
     (item) => item.status === "REVERSED",
   );
-  const originalCredit = financeCreditNotes.find(
-    (item) =>
-      Number(item.id) === Number(reversedCredit?.reversal_of_credit_note_id),
+  const originalIDs = new Set(
+    reversedCredits.map((item) => Number(item.reversal_of_credit_note_id)),
   );
   const activeCredits = financeCreditNotes.filter(
     (item) =>
       item.status === "POSTED" &&
-      Number(item.id) !== Number(originalCredit?.id),
+      !originalIDs.has(Number(item.id)),
   );
   if (
-    !originalCredit ||
-    originalCredit.status !== "POSTED" ||
-    activeCredits.length !== 1
+    originalIDs.size !== 3 ||
+    activeCredits.length !== 3 ||
+    reversedCredits.some((reversed) => {
+      const original = financeCreditNotes.find(
+        (item) => Number(item.id) === Number(reversed.reversal_of_credit_note_id),
+      );
+      return !original || original.status !== "POSTED" ||
+        original.finance_fact_id !== reversed.finance_fact_id ||
+        original.amount !== reversed.amount || original.currency !== reversed.currency;
+    })
   ) {
     throw new CliError("finance credit-note reversal linkage is incomplete");
   }
@@ -4956,10 +5362,36 @@ export async function applyManualAcceptanceExceptionPageLifecycle({
       specimenKey: "RECEIVABLE-REVERSED",
     });
   }
+  for (const scenario of MANUAL_ACCEPTANCE_PAYMENT_SCENARIOS) {
+    const candidates = stableFinanceRecords(
+      financeFacts,
+      scenario.factType,
+    ).filter(
+      (item) =>
+        ["POSTED", "SETTLED"].includes(item.status) &&
+        BigInt(numeric20Scale6Units(item.amount)) >
+          BigInt(numeric20Scale6Units("1")),
+    );
+    if (candidates.length < 18)
+      throw new CliError(
+        `${scenario.factType} needs eighteen stable posted sources for payment lifecycle samples`,
+      );
+    await ensureFinancePaymentSpecimen({
+      apply,
+      amountOverride: scenario.status === "POSTED" ? undefined : "1",
+      financeFact: candidates[scenario.sourceOffset],
+      plan,
+      post: ["POSTED", "REVERSED"].includes(scenario.status),
+      reverse: scenario.status === "REVERSED",
+      rpc,
+      specimenKey: scenario.key,
+    });
+  }
   const expectedPaymentNos = new Set(
-    Object.values(FINANCE_PAYMENT_NUMBER).map((number) =>
-      shortBusinessNo(plan, number.code, number.sequence),
-    ),
+    [
+      ...Object.values(FINANCE_PAYMENT_NUMBER),
+      ...MANUAL_ACCEPTANCE_PAYMENT_SCENARIOS.map((item) => item.number),
+    ].map((number) => shortBusinessNo(plan, number.code, number.sequence)),
   );
   const financePayments = (
     await listAllFinancePageRecords(rpc, "list_finance_payments", "payments")
@@ -4995,37 +5427,40 @@ async function applyLifecycleSpecimens({
   const reservations = [];
   const shipments = [];
 
-  const closeCandidate = productionReadback[0].order;
-  let closed = closeCandidate;
-  if (String(closed.status).toUpperCase() === "RELEASED" && apply) {
-    await completeExactSourceTask({
-      rpc,
-      taskGroup: "production_scheduling",
-      sourceType: "production-orders",
-      sourceID: closed.id,
-      surfaceKey: "production-scheduling",
-      idempotencyKey: `manual-acceptance:${plan.dataVersion}:production-scheduling:${closed.id}`,
-      feedback: "已完成本批排产确认。",
-    });
-    closed = resultItem(
-      await rpc({
-        domain: "production_order",
-        method: "close_production_order",
-        params: {
-          production_order_id: closed.id,
-          expected_version: closed.version,
-          idempotency_key: `manual-acceptance:${plan.dataVersion}:production-order:close`,
-          reason: "本批完成",
-        },
-      }),
-      "production_order",
-      "close_production_order",
-    );
+  for (const closeCandidate of [0, 10, 11].map(
+    (index) => productionReadback[index].order,
+  )) {
+    let closed = closeCandidate;
+    if (String(closed.status).toUpperCase() === "RELEASED" && apply) {
+      await completeExactSourceTask({
+        rpc,
+        taskGroup: "production_scheduling",
+        sourceType: "production-orders",
+        sourceID: closed.id,
+        surfaceKey: "production-scheduling",
+        idempotencyKey: `manual-acceptance:${plan.dataVersion}:production-scheduling:${closed.id}`,
+        feedback: "已完成本批排产确认。",
+      });
+      closed = resultItem(
+        await rpc({
+          domain: "production_order",
+          method: "close_production_order",
+          params: {
+            production_order_id: closed.id,
+            expected_version: closed.version,
+            idempotency_key: `manual-acceptance:${plan.dataVersion}:production-order:close:${closed.id}`,
+            reason: "本批完成",
+          },
+        }),
+        "production_order",
+        "close_production_order",
+      );
+    }
+    if (String(closed.status).toUpperCase() !== "CLOSED") {
+      throw new CliError("production order CLOSED specimen is missing");
+    }
+    productionOrders.push(closed);
   }
-  if (String(closed.status).toUpperCase() !== "CLOSED") {
-    throw new CliError("production order CLOSED specimen is missing");
-  }
-  productionOrders.push(closed);
   productionOrders.push(
     await ensureProductionOrderSpecimen(
       rpc,
@@ -5107,6 +5542,84 @@ async function applyLifecycleSpecimens({
       apply,
     ),
   );
+  for (const replica of [2, 3]) {
+    productionOrders.push(
+      await ensureProductionOrderSpecimen(
+        rpc,
+        plan,
+        productionPlans[10 + replica],
+        `DRAFT_${replica}`,
+        "DRAFT",
+        apply,
+      ),
+      await ensureProductionOrderSpecimen(
+        rpc,
+        plan,
+        productionPlans[12 + replica],
+        `CANCEL_${replica}`,
+        "CANCELLED",
+        apply,
+      ),
+    );
+    productionFacts.push(
+      await ensureProductionFactSpecimen(
+        rpc,
+        plan,
+        productionReadback[14 + replica].completion,
+        `DRAFT_${replica}`,
+        "DRAFT",
+        apply,
+      ),
+      await ensureProductionFactSpecimen(
+        rpc,
+        plan,
+        productionReadback[16 + replica].completion,
+        `CANCEL_${replica}`,
+        "CANCELLED",
+        apply,
+      ),
+    );
+    reservations.push(
+      await ensureReservationSpecimen(
+        rpc,
+        plan,
+        salesPlans[18 + replica],
+        lotAt(18 + replica),
+        `ACTIVE_${replica}`,
+        "ACTIVE",
+        apply,
+      ),
+      await ensureReservationSpecimen(
+        rpc,
+        plan,
+        salesPlans[20 + replica],
+        lotAt(20 + replica),
+        `RELEASE_${replica}`,
+        "RELEASED",
+        apply,
+      ),
+    );
+    shipments.push(
+      await ensureShipmentSpecimen(
+        rpc,
+        plan,
+        salesPlans[22 + replica],
+        lotAt(22 + replica),
+        `DRAFT_${replica}`,
+        "DRAFT",
+        apply,
+      ),
+      await ensureShipmentSpecimen(
+        rpc,
+        plan,
+        salesPlans[24 + replica],
+        lotAt(24 + replica),
+        `CANCEL_${replica}`,
+        "CANCELLED",
+        apply,
+      ),
+    );
+  }
   return {
     productionOrders,
     productionFacts,
@@ -5140,6 +5653,7 @@ export async function runSourceDrivenFactStage(
       "purchase stage is missing exact posted material stock grains",
     );
   }
+  rpc = await createManualAcceptanceFinanceReadbackRPC(rpc, plan.dataVersion);
   const productionPlans = [];
   const productionReadback = [];
   for (let offset = 0; offset < FACT_RUN_COUNT; offset += 1) {
@@ -5243,8 +5757,21 @@ export async function runSourceDrivenFactStage(
         allowVerifiedPartialResume: true,
         validatePartialRecords: (records) =>
           validateProductionPhasePartialRecords(rpc, sourcePlan, records),
-        readComplete: () =>
-          readProductionPlan(rpc, sourcePlan, completionLotNo),
+        readComplete: async () => {
+          const records = await readProductionPlan(
+            rpc,
+            sourcePlan,
+            completionLotNo,
+          );
+          await ensureSourceDrivenProductionRoute({
+            rpc,
+            plan: sourcePlan,
+            order: records.order,
+            completion: records.completion,
+            apply,
+          });
+          return records;
+        },
       }),
     );
   }
@@ -5338,9 +5865,9 @@ export async function runSourceDrivenFactStage(
     const balance = produced.balances.find(
       (item) => item.lot_id === produced.lot.id,
     );
-    if (!balance || Number(balance.available_quantity) < 1) {
+    if (!balance) {
       throw new CliError(
-        `completion lot ${produced.lot.lot_no} has no available quantity`,
+        `completion lot ${produced.lot.lot_no} has no inventory balance`,
       );
     }
     const sales = {
@@ -5364,13 +5891,22 @@ export async function runSourceDrivenFactStage(
         apply,
         rpc,
         specs: sourceDrivenPhaseIdentitySpecs(sourcePlan, "sales"),
-        mutate: () =>
-          applyPlan(sourcePlan, {
+        mutate: () => {
+          // 已出库记录按事实核对；只有新增出库需要当前可用库存。
+          if (
+            BigInt(numeric20Scale6Units(balance.available_quantity)) <
+            BigInt(numeric20Scale6Units("1"))
+          )
+            throw new CliError(
+              `completion lot ${produced.lot.lot_no} has no available quantity`,
+            );
+          return applyPlan(sourcePlan, {
             rpc,
             confirmation: sourceDrivenFactConfirmation(sourcePlan),
             targetConfirmation,
             targetAttestation,
-          }),
+          });
+        },
         validateRecords: (records) =>
           validateSalesPhaseRecords(sourcePlan, records),
         allowVerifiedPartialResume: true,
@@ -5407,6 +5943,47 @@ export async function runSourceDrivenFactStage(
       production: productionReadback[1],
       apply,
     });
+  const productionExceptionScenarios = [];
+  for (const [stateIndex, targetStatus] of [
+    "SUBMITTED",
+    "APPROVED",
+    "REJECTED",
+    "CANCELLED",
+  ].entries()) {
+    for (let index = 0; index < 3; index += 1)
+      productionExceptionScenarios.push(
+        await ensureManualAcceptanceProductionExceptionApproval({
+          rpc,
+          plan,
+          production: productionReadback[30 + stateIndex * 3 + index],
+          apply,
+          targetStatus,
+          sequence: 1001 + stateIndex * 3 + index,
+        }),
+      );
+  }
+  const wipExceptionScenarios = [];
+  for (const scenario of buildManualAcceptanceWIPExceptionScenarios()) {
+    wipExceptionScenarios.push(
+      await ensureManualAcceptanceWIPExceptionScenario({
+        rpc,
+        plan,
+        production: productionReadback,
+        scenario,
+        apply,
+      }),
+    );
+  }
+  const cashPayments = await ensureManualAcceptanceCashPayments({
+    rpc,
+    plan,
+    sourceReport,
+    apply,
+    readPayments: () =>
+      listAllFinancePageRecords(rpc, "list_finance_payments", "payments"),
+    transitionPayment: (payment, desiredStatus) =>
+      transitionManualAcceptanceFinancePayment({ rpc, payment, desiredStatus }),
+  });
   return {
     exceptionChains,
     plans: {
@@ -5421,17 +5998,23 @@ export async function runSourceDrivenFactStage(
     productionFacts: dedupeByID([
       ...productionReadback.flatMap((item) => item.facts),
       ...lifecycle.productionFacts,
+      ...wipExceptionScenarios.map((item) => item.rework),
     ]),
-    productionExceptions: [productionException],
+    productionExceptions: [
+      productionException,
+      ...productionExceptionScenarios,
+      ...wipExceptionScenarios.map((item) => item.decision),
+    ],
     outsourcingFacts: dedupeByID([
       ...productionReadback.flatMap(
         (item) => item.fabricOutsourcingFacts || [],
       ),
       ...outsourcingReadback.flatMap((item) => item.facts),
     ]),
-    qualityInspections: dedupeByID(
-      outsourcingReadback.map((item) => item.inspection),
-    ),
+    qualityInspections: dedupeByID([
+      ...outsourcingReadback.map((item) => item.inspection),
+      ...wipExceptionScenarios.map((item) => item.inspection),
+    ]),
     inventoryLots: dedupeByID([
       ...productionReadback.map((item) => item.lot),
       ...outsourcingReadback.map((item) => item.lot),
@@ -5459,7 +6042,10 @@ export async function runSourceDrivenFactStage(
       ...lifecycle.shipments,
     ]),
     financeFacts: dedupeByID(lifecycle.financeFacts),
-    financePayments: dedupeByID(exceptionPageLifecycle.financePayments),
+    financePayments: dedupeByID([
+      ...exceptionPageLifecycle.financePayments,
+      ...cashPayments,
+    ]),
     financeCreditNotes: dedupeByID(exceptionPageLifecycle.financeCreditNotes),
   };
 }
@@ -5563,12 +6149,18 @@ function assertReferenceRecords(plan, records) {
     "CANCELLED",
   ]);
   requireStatuses("productionFacts", ["DRAFT", "POSTED", "CANCELLED"]);
-  requireStatuses("productionExceptions", ["APPROVED"]);
+  requireStatuses("productionExceptions", [
+    "SUBMITTED",
+    "APPROVED",
+    "REJECTED",
+    "CANCELLED",
+  ]);
   requireStatuses("stockReservations", ["ACTIVE", "RELEASED"]);
   requireStatuses("shipments", ["DRAFT", "SHIPPED", "CANCELLED"]);
   assertFinancePageReferenceMatrix({
     financeCreditNotes: records.financeCreditNotes,
     financePayments: records.financePayments,
+    includeCash: true,
   });
   const longShipments = records.shipments.filter(
     (shipment) =>
@@ -5591,34 +6183,62 @@ function assertReferenceRecords(plan, records) {
     if (!productionTypes.has(type))
       throw new CliError(`productionFacts is missing ${type}`);
   }
-  const productionException = records.productionExceptions[0];
-  if (
-    records.productionExceptions.length !== 1 ||
-    String(productionException?.decision_type || "").toUpperCase() !==
-      "OVER_ISSUE" ||
-    String(productionException?.execution_status || "").toUpperCase() !==
-      "PENDING" ||
-    Number(productionException?.requested_quantity) !== 1 ||
-    Number(productionException?.approved_quantity) !== 1 ||
-    Number(productionException?.approved_remaining_quantity) !== 1 ||
-    positiveID(
-      productionException?.process_instance_id,
-      "productionException.process_instance_id",
-    ) <= 0 ||
-    positiveID(
-      productionException?.approval_task_id,
-      "productionException.approval_task_id",
-    ) <= 0 ||
-    positiveID(
-      productionException?.approval_process_node_id,
-      "productionException.approval_process_node_id",
-    ) <= 0 ||
-    String(productionException?.approval_task_code || "") !==
-      `PROC-${productionException.process_instance_id}-NODE-${productionException.approval_process_node_id}-A1`
-  ) {
-    throw new CliError(
-      "productionExceptions must contain one approved formal over-issue decision with exact ProcessRuntime anchors",
-    );
+  for (const type of ["OVER_ISSUE", ...MANUAL_ACCEPTANCE_WIP_EXCEPTION_TYPES])
+    for (const status of ["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"]) {
+      if (
+        records.productionExceptions.filter(
+          (item) => item.status === status && item.decision_type === type,
+        ).length < 3
+      )
+        throw new CliError(
+          `productionExceptions needs three ${type}/${status} specimens`,
+        );
+    }
+  for (const item of records.productionExceptions) {
+    const approved = item.status === "APPROVED";
+    if (
+      item.execution_status !== "PENDING" ||
+      Number(item.requested_quantity) !== 1 ||
+      Number(item.approved_quantity) !== (approved ? 1 : 0)
+    )
+      throw new CliError(
+        `${item.decision_no} exception state or quantity drifted`,
+      );
+    if (item.decision_type === "OVER_ISSUE") {
+      if (Number(item.approved_remaining_quantity) !== (approved ? 1 : 0))
+        throw new CliError(`${item.decision_no} over-issue allowance drifted`);
+    } else if (
+      !MANUAL_ACCEPTANCE_WIP_EXCEPTION_TYPES.includes(item.decision_type) ||
+      !Number.isSafeInteger(item.production_wip_batch_id) ||
+      item.production_wip_batch_id <= 0 ||
+      !Number.isSafeInteger(item.quality_inspection_id) ||
+      item.quality_inspection_id <= 0
+    )
+      throw new CliError(`${item.decision_no} WIP source is missing`);
+    if (item.status === "CANCELLED") {
+      if (
+        item.process_instance_id ||
+        item.approval_task_id ||
+        item.approval_task_code ||
+        item.approval_process_node_id
+      )
+        throw new CliError(
+          `${item.decision_no} cancelled before approval but has a process anchor`,
+        );
+    } else if (
+      !Number.isSafeInteger(item.process_instance_id) ||
+      item.process_instance_id <= 0 ||
+      !Number.isSafeInteger(item.approval_task_id) ||
+      item.approval_task_id <= 0 ||
+      !Number.isSafeInteger(item.approval_process_node_id) ||
+      item.approval_process_node_id <= 0 ||
+      item.approval_task_code !==
+        `PROC-${item.process_instance_id}-NODE-${item.approval_process_node_id}-A1`
+    ) {
+      throw new CliError(
+        `${item.decision_no} formal ProcessRuntime anchor is missing`,
+      );
+    }
   }
   const txnTypes = new Set(
     records.inventoryTxns.map((item) =>

@@ -6,6 +6,10 @@ import {
   ensureInventoryAdjustmentChain,
   ensurePurchaseDispositionChain,
   ensureOutsourcingDispositionChain,
+  buildManualAcceptanceWIPExceptionScenarios,
+  ensureManualAcceptanceWIPExceptionScenario,
+  selectManualAcceptanceWIPExceptionInspection,
+  assertManualAcceptanceConcessionResult,
 } from "./manual-acceptance-exception-chain-data.mjs";
 import {
   manualAcceptanceFactRPCCall,
@@ -16,17 +20,358 @@ import {
   manualAcceptanceBusinessNo,
 } from "./manual-acceptance-source-driven-facts.mjs";
 import { exceptionChainFixture } from "./test-fixtures/manual-acceptance-exception-chains.mjs";
+import { requireWorkflowTaskMutationParams } from "../../web/src/erp/utils/workflowTaskMutation.mjs";
+
+test("concession readback preserves remaining frozen gates and resumes from the original rejection", () => {
+  const batch = {
+    id: 1,
+    production_order_operation_id: 2,
+    status: "WAITING_QUALITY",
+  };
+  const original = {
+    id: 3,
+    production_wip_batch_id: 1,
+    gate_code: "FINISHED_GOODS",
+    status: "REJECTED",
+  };
+  const next = {
+    id: 4,
+    production_wip_batch_id: 1,
+    gate_code: "NEEDLE",
+    status: "DRAFT",
+  };
+  const state = {
+    production_wip_batches: [batch],
+    production_order_operations: [
+      { id: 2, required_quality_gates: ["FINISHED_GOODS", "NEEDLE"] },
+    ],
+    quality_inspections: [original, next],
+  };
+  assert.equal(selectManualAcceptanceWIPExceptionInspection(state, 1).id, 3);
+  assertManualAcceptanceConcessionResult(state, batch, original);
+  batch.status = "ACCEPTED";
+  assert.throws(
+    () => assertManualAcceptanceConcessionResult(state, batch, original),
+    /WAITING_QUALITY/u,
+  );
+  batch.status = "WAITING_QUALITY";
+  next.status = "SUBMITTED";
+  assert.throws(
+    () => assertManualAcceptanceConcessionResult(state, batch, original),
+    /untouched/u,
+  );
+  next.status = "CANCELLED";
+  batch.status = "REJECTED";
+  assert.equal(selectManualAcceptanceWIPExceptionInspection(state, 1).id, 3);
+  state.production_order_operations[0].required_quality_gates = [
+    "FINISHED_GOODS",
+  ];
+  batch.status = "ACCEPTED";
+  assertManualAcceptanceConcessionResult(state, batch, original);
+});
+
+test("independent WIP recipes cover every disposition and approval state without exhausting completion stock", async () => {
+  const scenarios = buildManualAcceptanceWIPExceptionScenarios();
+  assert.equal(scenarios.length, 60);
+  assert.equal(new Set(scenarios.map((item) => item.sequence)).size, 60);
+  const counts = new Map();
+  for (const scenario of scenarios) {
+    assert.ok(
+      ![0, 3, 4, 5, 10, 11, 16, 17, 20, 21].includes(scenario.sourceIndex),
+    );
+    counts.set(
+      scenario.sourceIndex,
+      (counts.get(scenario.sourceIndex) || 0) + 1,
+    );
+    assert.equal(
+      scenarios.filter(
+        (item) =>
+          item.type === scenario.type && item.status === scenario.status,
+      ).length,
+      3,
+    );
+  }
+  assert.equal(counts.size, 30);
+  assert.ok([...counts.values()].every((count) => count === 2));
+  const production = Array.from({ length: 45 }, (_, index) => ({
+    order: { id: index + 1, order_no: `MO-${index + 1}` },
+    completion: { id: 100 + index },
+  }));
+  const plan = {
+    dataVersion: "2026.11.07-v9",
+    productionCandidates: production.map((_, index) => ({
+      fabricOutsourcing: { order: { id: 200 + index } },
+    })),
+  };
+  const facts = [],
+    batches = [],
+    inspections = [],
+    decisions = [],
+    tasks = [],
+    processes = new Map();
+  let mutations = 0;
+  const copy = (value) => structuredClone(value);
+  const rpc = async ({ actor, method, params }) => {
+    if (!/^(get_|list_)/u.test(method)) mutations++;
+    const source = production.find(
+      (item) => item.completion.id === params.source_completion_fact_id,
+    );
+    const batch = batches.find(
+      (item) => item.id === params.production_wip_batch_id,
+    );
+    const decision = decisions.find(
+      (item) => item.id === (params.production_exception_id || params.id),
+    );
+    switch (method) {
+      case "list_production_facts":
+        return {
+          production_facts: copy(
+            facts.filter((item) => item.fact_no === params.keyword),
+          ),
+          total: facts.filter((item) => item.fact_no === params.keyword).length,
+        };
+      case "create_production_rework_from_completion": {
+        assert.equal(actor, "production");
+        assert.ok(
+          facts.filter((item) => item.source_id === source.completion.id)
+            .length < 2,
+        );
+        const fact = {
+          id: facts.length + 1,
+          fact_no: params.fact_no,
+          fact_type: "REWORK",
+          source_type: "PRODUCTION_FACT",
+          source_id: source.completion.id,
+          quantity: "1",
+          status: "DRAFT",
+          version: 1,
+          order_id: source.order.id,
+        };
+        facts.push(fact);
+        return { production_fact: copy(fact) };
+      }
+      case "post_production_fact": {
+        assert.equal(actor, "production");
+        const fact = facts.find((item) => item.id === params.id);
+        fact.status = "POSTED";
+        batches.push({
+          id: fact.id,
+          origin_rework_fact_id: fact.id,
+          production_order_id: fact.order_id,
+          production_order_item_id: fact.order_id + 1000,
+          production_order_operation_id: fact.order_id + 2000,
+          quantity: "1",
+          status: "PLANNED",
+          execution_mode: null,
+          version: 1,
+        });
+        return { production_fact: copy(fact) };
+      }
+      case "get_production_wip":
+        return copy({
+          production_wip_batches: batches.filter(
+            (item) => item.production_order_id === params.production_order_id,
+          ),
+          production_order_operations: [
+            {
+              id: params.production_order_id + 2000,
+              production_order_item_id: params.production_order_id + 1000,
+              operation_code: "HANDWORK",
+            },
+            {
+              id: params.production_order_id + 3000,
+              production_order_item_id: params.production_order_id + 1000,
+              operation_code: "FABRIC_PROCESSING",
+            },
+          ],
+          quality_inspections: inspections.filter(
+            (item) =>
+              batches.find((row) => row.id === item.production_wip_batch_id)
+                ?.production_order_id === params.production_order_id,
+          ),
+        });
+      case "execute_production_wip_action":
+        assert.equal(actor, "production");
+        if (params.action === "ASSIGN_EXECUTION")
+          batch.execution_mode = params.execution_mode;
+        else if (params.action === "START_OPERATION")
+          batch.status = "IN_PROGRESS";
+        else if (params.action === "COMPLETE_OPERATION") {
+          batch.status = "AWAITING_QC";
+          inspections.push({
+            id: batch.id,
+            production_wip_batch_id: batch.id,
+            source_type: "PRODUCTION_WIP",
+            source_id: batch.id,
+            status: "DRAFT",
+          });
+        } else assert.fail(`unexpected WIP mutation ${params.action}`);
+        batch.version++;
+        return {};
+      case "get_quality_inspection":
+        return {
+          quality_inspection: copy(
+            inspections.find((item) => item.id === params.id),
+          ),
+        };
+      case "submit_quality_inspection":
+      case "reject_quality_inspection": {
+        assert.equal(actor, "quality");
+        const inspection = inspections.find((item) => item.id === params.id);
+        inspection.status =
+          method === "submit_quality_inspection" ? "SUBMITTED" : "REJECTED";
+        if (inspection.status === "REJECTED")
+          batches.find(
+            (item) => item.id === inspection.production_wip_batch_id,
+          ).status = "REJECTED";
+        return { quality_inspection: copy(inspection) };
+      }
+      case "get_outsourcing_order":
+        return { outsourcing_order: { id: params.id, supplier_id: 700 } };
+      case "list_production_exceptions": {
+        const rows = decisions.filter(
+          (item) => item.production_order_id === params.production_order_id,
+        );
+        return { production_exceptions: copy(rows), total: rows.length };
+      }
+      case "submit_production_exception": {
+        assert.equal(actor, "sales");
+        const row = {
+          ...params,
+          id: decisions.length + 1,
+          status: "SUBMITTED",
+          execution_status: "PENDING",
+          approved_quantity: "0",
+          version: 1,
+        };
+        decisions.push(row);
+        return { production_exception: copy(row) };
+      }
+      case "cancel_production_exception":
+        assert.equal(actor, "sales");
+        assert.ok(!processes.has(decision.id));
+        decision.status = "CANCELLED";
+        decision.version++;
+        return { production_exception: copy(decision) };
+      case "start_production_exception_approval_process": {
+        assert.equal(actor, "sales");
+        const context = {
+          process_instance: {
+            id: decision.id + 10000,
+            business_ref_id: decision.id,
+          },
+          nodes: [
+            {
+              id: decision.id + 20000,
+              process_instance_id: decision.id + 10000,
+              node_key: "production_exception_decision_approval",
+              status: "active",
+            },
+          ],
+        };
+        processes.set(decision.id, context);
+        tasks.push({
+          id: decision.id,
+          source_type: "production_exception_decision",
+          source_id: decision.id,
+          process_instance_id: context.process_instance.id,
+          process_node_instance_id: context.nodes[0].id,
+          owner_role_key: "boss",
+          version: 1,
+          task_code: `PROC-${context.process_instance.id}-NODE-${context.nodes[0].id}-A1`,
+          task_status_key: "ready",
+        });
+        return {};
+      }
+      case "get_production_exception_approval_process":
+        return copy({
+          source_readback: decision,
+          process_context: processes.get(decision.id),
+        });
+      case "list_tasks": {
+        const rows = tasks.filter(
+          (item) => item.source_id === params.source_id,
+        );
+        return { tasks: copy(rows), total: rows.length };
+      }
+      case "complete_task_action":
+      case "reject_task_action": {
+        requireWorkflowTaskMutationParams(
+          method === "reject_task_action" ? "reject" : "complete",
+          params,
+          { requireIdempotencyKey: true },
+        );
+        assert.equal(actor, "boss");
+        const task = tasks.find((item) => item.id === params.task_id);
+        const row = decisions.find((item) => item.id === task.source_id);
+        task.task_status_key =
+          method === "reject_task_action" ? "rejected" : "done";
+        row.status = method === "reject_task_action" ? "REJECTED" : "APPROVED";
+        row.approved_quantity = row.status === "APPROVED" ? "1" : "0";
+        row.version++;
+        processes.get(row.id).nodes[0].status = "completed";
+        return { task: copy(task) };
+      }
+      default:
+        assert.fail(`unexpected RPC ${method}`);
+    }
+  };
+  const run = async (apply) => {
+    const records = [];
+    for (const scenario of scenarios)
+      records.push(
+        await ensureManualAcceptanceWIPExceptionScenario({
+          rpc,
+          plan,
+          production,
+          scenario,
+          apply,
+        }),
+      );
+    return records;
+  };
+  const first = await run(true);
+  assert.equal(
+    new Set(first.map((item) => item.decision.production_wip_batch_id)).size,
+    60,
+  );
+  assert.ok(batches.every((item) => item.status === "REJECTED"));
+  assert.equal(tasks.length, 45);
+  const writes = mutations;
+  assert.deepEqual(await run(false), first);
+  assert.equal(
+    mutations,
+    writes,
+    "verification must not write or execute approved dispositions",
+  );
+  inspections[0].source_id = 9999;
+  await assert.rejects(() => run(true), /source_id/u);
+  assert.equal(
+    mutations,
+    writes,
+    "foreign inspection must fail before a write",
+  );
+});
 
 function outsourcingDispositionFixture({
   genericSupplierType = "material",
   corrupt,
   interruptBeforeExecution = false,
+  stockSourceWIP = false,
 } = {}) {
   const plan = {
-    dataVersion: "2026.09.27-v8",
+    dataVersion: "2026.11.07-v9",
     anchorDate: "2026-10-18T00:00:00Z",
     productWarehouse: { id: 705 },
-    outsourcingCandidates: [{ issue: { order: { id: 500 } } }],
+    outsourcingCandidates: [
+      {
+        issue: { order: { id: 500 } },
+        return: {
+          order: { id: 503 },
+          item: { outsourcingOrderItemId: 602, subjectId: 701, unitId: 703 },
+        },
+      },
+    ],
     productionCandidates: [
       null,
       null,
@@ -78,6 +423,19 @@ function outsourcingDispositionFixture({
     lifecycle_status: "confirmed",
     contract_party_snapshot: { name: "模拟合同主体" },
     supplier_snapshot: { supplier_id: 10 },
+  };
+  const stockContract = {
+    ...sourceContract,
+    id: 503,
+    outsourcing_order_no: "STOCK-503",
+    source_wip_batch_id: stockSourceWIP ? 401 : null,
+  };
+  const stockLine = {
+    id: 602,
+    subject_type: "PRODUCT",
+    product_id: 701,
+    product_sku_id: 702,
+    unit_id: 703,
   };
   let contract, line, decision, process, interrupted;
   const result = (value) => structuredClone(value);
@@ -149,9 +507,11 @@ function outsourcingDispositionFixture({
                   id: 500,
                   supplier_id: genericSupplierType === "material" ? 9 : 10,
                 }
-              : params.id === 501
-                ? sourceContract
-                : contract,
+              : params.id === 503
+                ? stockContract
+                : params.id === 501
+                  ? sourceContract
+                  : contract,
           ),
         };
       case "get_supplier":
@@ -200,7 +560,12 @@ function outsourcingDispositionFixture({
         };
         return { outsourcing_order_id: 502 };
       case "list_outsourcing_order_items":
-        return { outsourcing_order_items: read("lines", [line]), total: 1 };
+        return {
+          outsourcing_order_items: read("lines", [
+            params.outsourcing_order_id === 503 ? stockLine : line,
+          ]),
+          total: 1,
+        };
       case "save_outsourcing_order_with_items":
         assert.deepEqual(
           params.contract_party_snapshot,
@@ -254,6 +619,12 @@ function outsourcingDispositionFixture({
       case "create_outsourcing_return_receipt_from_order": {
         assert.equal(batch.status, "WAITING_QUALITY");
         assert.equal(params.quantity, batch.quantity);
+        assert.equal(
+          params.outsourcing_order_id,
+          503,
+          "stock return must use the standalone product contract",
+        );
+        assert.equal(params.outsourcing_order_item_id, 602);
         const fact = {
           id: 803,
           ...params,
@@ -263,8 +634,8 @@ function outsourcingDispositionFixture({
           product_sku_id: 702,
           unit_id: 703,
           source_type: "OUTSOURCING_ORDER",
-          source_id: contract.id,
-          source_line_id: line.id,
+          source_id: stockContract.id,
+          source_line_id: stockLine.id,
           lot_id: 804,
           status: "DRAFT",
           version: 1,
@@ -328,7 +699,7 @@ function outsourcingDispositionFixture({
         const row = {
           id: 901,
           ...params,
-          production_wip_batch_id: batch.id,
+          production_wip_batch_id: null,
           outsourcing_return_fact_id: facts[0].id,
           status: "DRAFT",
           version: 1,
@@ -368,7 +739,7 @@ function outsourcingDispositionFixture({
             ].includes(key),
             `production exception formal params must include ${key}`,
           );
-        assert.equal(actor, "production");
+        assert.equal(actor, "sales");
         assert.equal(params.decision_type, "REWORK_ORIGINAL");
         assert.equal(
           params.quality_inspection_id,
@@ -536,6 +907,20 @@ test("outsourcing rejection uses the production-bound qualified supplier and app
     writes(),
     written,
     "resume and verify must not replay business writes",
+  );
+});
+
+test("physical return preparation refuses a WIP contract before any stock receipt write", async () => {
+  const fixture = outsourcingDispositionFixture({ stockSourceWIP: true });
+  await assert.rejects(
+    () => ensureOutsourcingDispositionChain({ ...fixture, apply: true }),
+    /must not use a WIP contract/u,
+  );
+  assert.equal(
+    fixture.calls.some(
+      (call) => call.method === "create_outsourcing_return_receipt_from_order",
+    ),
+    false,
   );
 });
 
@@ -726,7 +1111,7 @@ test("outsourcing supplier mixed is supported while verify cannot prepare absent
 
 test("exception outsourcing readbacks use the fact transport strict document params", async () => {
   const plan = {
-    dataVersion: "2026.09.27-v8",
+    dataVersion: "2026.11.07-v9",
     anchorDate: "2026-10-18T00:00:00Z",
     outsourcingCandidates: [{ issue: { order: { id: 501 } } }],
     productionCandidates: [
@@ -873,7 +1258,7 @@ function purchaseDispositionFixture({
   corruptReplacement,
   corruptInspection,
 } = {}) {
-  const plan = { dataVersion: "2026.09.27-v8" };
+  const plan = { dataVersion: "2026.11.07-v9" };
   const purchase = {
     purchaseReceipts: quantities.map((quantity, index) => ({
       id: 10 + index,
@@ -1250,7 +1635,7 @@ test("verify mode refuses missing specimens without calling a write endpoint", a
       total: 0,
     };
   };
-  const plan = { dataVersion: "2026.09.27-v8" };
+  const plan = { dataVersion: "2026.11.07-v9" };
   const receipt = {
     id: 1,
     status: "POSTED",

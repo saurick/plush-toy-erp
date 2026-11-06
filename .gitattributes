@@ -3,5 +3,8 @@ docs/customers/** export-ignore
 scripts/qa/yoyoosun-role-flow-handbook.test.mjs export-ignore
 config/customers/*/assets/** export-ignore
 
+# 固定 PDF 附件保留原始字节，不参与文本换行与合并。
+scripts/qa/fixtures/plush-products/*.pdf binary
+
 # Atlas 校验绑定迁移原始字节，保留已应用脚本的尾部空行。
 server/internal/data/model/migrate/*.sql whitespace=-blank-at-eof

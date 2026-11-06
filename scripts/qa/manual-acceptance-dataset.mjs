@@ -30,6 +30,7 @@ import {
   manualAcceptanceAccountSetForTarget,
   manualAcceptanceAccountProfilesMatch,
 } from "./manual-acceptance-account-identities.mjs";
+import { MANUAL_ACCEPTANCE_PRODUCT_STYLES } from "./manual-acceptance-product-images.mjs";
 import { buildAttachmentFixtures } from "./manual-acceptance-attachment-data.mjs";
 import {
   MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REUSE_STATUS,
@@ -1266,6 +1267,7 @@ function buildManualAcceptanceSemanticPlanWithContract(
     dataVersion: identity.dataVersion,
     runId: identity.runId,
     sourceScaleProfile,
+    productImageCatalog: MANUAL_ACCEPTANCE_PRODUCT_STYLES.map(({ key, name, sha256 }) => ({ key, name, sha256 })),
     productionRecipe: structuredClone(MANUAL_ACCEPTANCE_PRODUCTION_RECIPE),
     dateAnchorUtc: identity.dateAnchorUtc,
     dateAnchorUnix: identity.dateAnchorUnix,
@@ -2056,12 +2058,12 @@ async function prepareManualAcceptanceResume({
       }
       continue;
     }
-    if (!terminalStatus && stage.status === "failed") {
-      terminalStatus = "failed";
+    if (!terminalStatus && ["failed", "running"].includes(stage.status)) {
+      terminalStatus = stage.status;
       failedStage = stage.key;
       continue;
     }
-    if (stage.status === "not_started" && terminalStatus === "failed") {
+    if (stage.status === "not_started" && terminalStatus) {
       continue;
     }
     throw new ManualAcceptanceDatasetError(
@@ -2072,7 +2074,10 @@ async function prepareManualAcceptanceResume({
     (prior.ok === true &&
       (terminalStatus || completedStageKeys.length !== prior.stages.length)) ||
     (prior.ok === false &&
-      (terminalStatus !== "failed" || prior.failedStage !== failedStage))
+      (!terminalStatus ||
+        (terminalStatus === "failed"
+          ? prior.failedStage !== failedStage
+          : prior.failedStage != null)))
   ) {
     throw new ManualAcceptanceDatasetError(
       "resume report completion state is inconsistent",
@@ -2105,6 +2110,7 @@ async function prepareManualAcceptanceResume({
       sourceReportSHA256: createHash("sha256").update(raw).digest("hex"),
       priorSucceeded: prior.ok === true,
       priorFailedStage: prior.failedStage || null,
+      priorInterruptedStage: terminalStatus === "running" ? failedStage : null,
       reusedStages: [...components.keys()],
       businessChainReuse,
       targetAttestationChange,
@@ -2393,6 +2399,9 @@ export async function applyManualAcceptanceDataset(
       stageReport.status = "running";
       stageReport.startedAt = timestampNow(deps);
       const stageStarted = monotonicNow(deps);
+      // Persist before a component can replace its prior receipt. An interrupted
+      // stage is rerun while the completed prefix keeps its original digests.
+      await persistManualAcceptanceDatasetApplyReport(applyReportPath, report);
       try {
         const result = await runStage({
           mode: "apply",

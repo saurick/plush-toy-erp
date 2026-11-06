@@ -150,8 +150,8 @@ test("local and 133 plans share one canonical semantic contract with independent
   assert.equal(local.targetEnvironment, "local-development");
   assert.equal(local.backendURL, SCENARIO_DEMO_ORIGIN);
   assert.equal(local.databaseName, "plush_erp");
-  assert.equal(local.dataVersion, "2026.09.27-v8");
-  assert.equal(local.runId, "20260927-V8");
+  assert.equal(local.dataVersion, "2026.11.07-v9");
+  assert.equal(local.runId, "20261107-V9");
   assert.equal(local.canonicalRunner.stageCount, 9);
   assert.equal(local.canonicalRunner.persistentBaseline, true);
   assert.equal(local.execution.replayMode, SCENARIO_DEMO_REPLAY_MODE);
@@ -237,8 +237,8 @@ test("readback requires every canonical stage and reports target-bound evidence"
     migrationVersion: MIGRATION_VERSION,
     customerConfigRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
     semanticDigest: plan.semanticDigest,
     stageCount: 9,
     sourceDocumentCount: 3,

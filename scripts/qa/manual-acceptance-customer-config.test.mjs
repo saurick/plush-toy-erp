@@ -31,7 +31,7 @@ import {
 
 const CONFIG_HASH = "a".repeat(64);
 const CONFIRMATION =
-  "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.09.27-v8:20260927-V8";
+  "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.11.07-v9:20261107-V9";
 const ATTESTATION = Object.freeze({
   target: CUSTOMER_TRIAL_133_TARGET,
   origin: CUSTOMER_TRIAL_133_ORIGIN,
@@ -291,11 +291,11 @@ test("builds a stable, explicit trial manifest without mutating preview input", 
   );
   assert.equal(manifest.compiled_snapshot.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(manifest.compiled_snapshot.package.status, "draft");
-  assert.equal(CUSTOMER_CONFIG_DATA_VERSION, "2026.09.27-v8");
-  assert.equal(CUSTOMER_CONFIG_RUN_ID, "20260927-V8");
+  assert.equal(CUSTOMER_CONFIG_DATA_VERSION, "2026.11.07-v9");
+  assert.equal(CUSTOMER_CONFIG_RUN_ID, "20261107-V9");
   assert.equal(
     CUSTOMER_CONFIG_PRODUCT_VERSION,
-    "customer-trial-133-test-2026.09.27-v8",
+    "customer-trial-133-test-2026.11.07-v9",
   );
   assert.match(
     CUSTOMER_CONFIG_REVISION,
@@ -434,7 +434,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         dataVersion: "2026.07.15-v1",
         runId: CUSTOMER_CONFIG_RUN_ID,
       }),
-    /dataVersion must be 2026\.09\.27-v8/u,
+    /dataVersion must be 2026\.11\.07-v9/u,
   );
   assert.throws(
     () =>
@@ -442,7 +442,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         dataVersion: CUSTOMER_CONFIG_DATA_VERSION,
         runId: "20260715-V1",
       }),
-    /runId must be 20260927-V8/u,
+    /runId must be 20261107-V9/u,
   );
 
   const currentManifest = buildCustomerTrial133Manifest(previewManifest());
@@ -454,7 +454,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         dataVersion: "2026.07.15-v1",
         runId: "20260715-V1",
       }),
-    /requires dataVersion=2026\.09\.27-v8 and runId=20260927-V8/u,
+    /requires dataVersion=2026\.11\.07-v9 and runId=20261107-V9/u,
   );
   let calls = 0;
 

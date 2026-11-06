@@ -17,14 +17,14 @@ function fixture({
   };
   const order = {
     id: 4,
-    order_no: "YS8-XD-003",
+    order_no: "YS9-XD-003",
     lifecycle_status: "ACTIVE",
     version: 1,
   };
   let bom = {
     id: 3,
     product_id: 1,
-    version: "YS8-BOM-001-2",
+    version: "YS9-BOM-001-2",
     status: "ACTIVE",
     edit_version: 123,
     items: [{ material_id: 9, unit_id: 8, quantity: "0.2", loss_rate: "0" }],
@@ -40,12 +40,12 @@ function fixture({
     source_hash: "a".repeat(64),
   };
   const plan = {
-    prefix: "YS8",
+    prefix: "YS9",
     productionCandidates: [{ salesOrder: { id: 4, orderNo: order.order_no } }],
   };
   const sourceReport = {
     referenceRecords: {
-      products: [{ id: 1, code: "YS8-CP-001" }],
+      products: [{ id: 1, code: "YS9-CP-001" }],
       materials: [{ id: 9, unitId: 8 }],
       bomVersions: missingBOM
         ? []

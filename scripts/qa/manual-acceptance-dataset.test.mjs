@@ -244,14 +244,14 @@ test("default task runner binds the exact same-run source report", async () => {
   const sourceReport = {
     mode: "apply",
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
   };
   const sourceReportPath = path.join(outputRoot, "source-report.json");
   const invocation = {
     businessInput: {
-      dataVersion: "2026.09.27-v8",
-      runId: "20260927-V8",
+      dataVersion: "2026.11.07-v9",
+      runId: "20261107-V9",
       taskScheduleAnchorUtc: GENERATED_AT,
     },
     targetAdapter: {
@@ -303,8 +303,8 @@ test("default task runner binds the exact same-run source report", async () => {
         return {
           mode: "apply",
           datasetKey: "yoyoosun-manual-acceptance",
-          dataVersion: "2026.09.27-v8",
-          runId: "20260927-V8",
+          dataVersion: "2026.11.07-v9",
+          runId: "20261107-V9",
           summary: { persisted: 180 },
         };
       },
@@ -324,14 +324,14 @@ test("persistent task runner uses the long-lived profile and retires snapshot ba
   const sourceReport = {
     mode: "apply",
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
   };
   const sourceReportPath = path.join(outputRoot, "source-report.json");
   const invocation = {
     businessInput: {
-      dataVersion: "2026.09.27-v8",
-      runId: "20260927-V8",
+      dataVersion: "2026.11.07-v9",
+      runId: "20261107-V9",
       taskScheduleAnchorUtc: GENERATED_AT,
     },
     targetAdapter: {
@@ -362,8 +362,8 @@ test("persistent task runner uses the long-lived profile and retires snapshot ba
         return {
           mode: "apply",
           datasetKey: "yoyoosun-manual-acceptance",
-          dataVersion: "2026.09.27-v8",
-          runId: "20260927-V8",
+          dataVersion: "2026.11.07-v9",
+          runId: "20261107-V9",
           taskProfile: plan.taskProfile,
           summary: { persisted: 180 },
         };
@@ -403,7 +403,7 @@ test("persistent task runner uses the long-lived profile and retires snapshot ba
         allowAbsent: true,
       },
       {
-        runId: "20260927-V8",
+        runId: "20261107-V9",
         copyRevision: TASK_COPY_REVISION,
         allowAbsent: true,
       },
@@ -437,7 +437,7 @@ function localApplyArgs() {
     "--database-name",
     LOCAL_APPLY_DATABASE,
     "--run-id",
-    "20260927-V8",
+    "20261107-V9",
     "--confirm",
     plan.target.expectedConfirmation,
   ];
@@ -557,10 +557,10 @@ function trialCoreComponentReport({ businessInput, targetAdapter }) {
       release: targetAdapter.attestation.release,
       migration: targetAdapter.attestation.migration,
     },
-    prefix: "YS8",
+    prefix: "YS9",
     businessCodes: {
       units: CORE_UNIT_CODES,
-      warehouses: ["YS8-CK-01", "YS8-CK-02", "YS8-CK-03", "YS8-CK-04"],
+      warehouses: ["YS9-CK-01", "YS9-CK-02", "YS9-CK-03", "YS9-CK-04"],
     },
     summary: { units: 8, warehouses: 4, seedExecuted: false },
   };
@@ -620,7 +620,7 @@ function trialBaselineFetch(nonEmptyKey = "") {
       };
     } else if (request.method === "list_warehouses") {
       data = {
-        warehouses: ["YS8-CK-01", "YS8-CK-02", "YS8-CK-03", "YS8-CK-04"].map(
+        warehouses: ["YS9-CK-01", "YS9-CK-02", "YS9-CK-03", "YS9-CK-04"].map(
           (code) => ({ code }),
         ),
         total: 4,
@@ -830,7 +830,7 @@ function durableComponentReport({
       configTarget: targetAdapter.policyTarget,
       businessCodes: {
         units: CORE_UNIT_CODES,
-        warehouses: ["YS8-CK-01", "YS8-CK-02", "YS8-CK-03", "YS8-CK-04"],
+        warehouses: ["YS9-CK-01", "YS9-CK-02", "YS9-CK-03", "YS9-CK-04"],
       },
     });
   }
@@ -859,7 +859,7 @@ function durableComponentReport({
         units: CORE_UNIT_CODES.length,
         warehouses: 4,
         unitCodes: [...CORE_UNIT_CODES].sort(),
-        warehouseCodes: ["YS8-CK-01", "YS8-CK-02", "YS8-CK-03", "YS8-CK-04"],
+        warehouseCodes: ["YS9-CK-01", "YS9-CK-02", "YS9-CK-03", "YS9-CK-04"],
       },
       zeroCounts,
       summary: {
@@ -906,7 +906,7 @@ function trialPersistentBaselineComponentReport({
       units: CORE_UNIT_CODES.length,
       warehouses: 4,
       unitCodes: [...CORE_UNIT_CODES].sort(),
-      warehouseCodes: ["YS8-CK-01", "YS8-CK-02", "YS8-CK-03", "YS8-CK-04"],
+      warehouseCodes: ["YS9-CK-01", "YS9-CK-02", "YS9-CK-03", "YS9-CK-04"],
     },
     summary: {
       exactEmptyBusinessBaseline: false,
@@ -1027,31 +1027,31 @@ test("a report without the current production recipe stops resume before any sta
 });
 
 test("dataset identity separates report version from safe script runId", () => {
-  assert.equal(DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION, "2026.09.27-v8");
+  assert.equal(DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION, "2026.11.07-v9");
   assert.equal(
-    normalizeManualAcceptanceDataVersion("2026.09.27-V8"),
-    "2026.09.27-v8",
+    normalizeManualAcceptanceDataVersion("2026.11.07-V9"),
+    "2026.11.07-v9",
   );
   const identity = deriveManualAcceptanceDatasetIdentity();
   assert.deepEqual(identity, {
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
-    dateAnchorUtc: "2026-09-27T12:00:00.000Z",
-    dateAnchorUnix: Date.parse("2026-09-27T12:00:00.000Z") / 1000,
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
+    dateAnchorUtc: "2026-11-07T12:00:00.000Z",
+    dateAnchorUnix: Date.parse("2026-11-07T12:00:00.000Z") / 1000,
     prefixes: {
-      core: "YS8",
-      source: "YS8",
-      task: "SIM-YOYOOSUN-UAT-TASK-20260927-V8",
-      purchaseQuality: "SIM-YOYOOSUN-PQ-20260927-V8",
-      facts: "SIM-YOYOOSUN-UAT-FACT-20260927-V8",
-      attachments: "SIM-YOYOOSUN-UAT-ATT-20260927-V8",
+      core: "YS9",
+      source: "YS9",
+      task: "SIM-YOYOOSUN-UAT-TASK-20261107-V9",
+      purchaseQuality: "SIM-YOYOOSUN-PQ-20261107-V9",
+      facts: "SIM-YOYOOSUN-UAT-FACT-20261107-V9",
+      attachments: "SIM-YOYOOSUN-UAT-ATT-20261107-V9",
     },
   });
 
   assert.throws(
     () => normalizeManualAcceptanceDataVersion("2026.07.15-v1"),
-    /unsupported dataVersion 2026\.07\.15-v1.*current.*2026\.09\.27-v8/u,
+    /unsupported dataVersion 2026\.07\.15-v1.*current.*2026\.11\.07-v9/u,
   );
 
   assert.throws(
@@ -1071,20 +1071,20 @@ test("dataset identity separates report version from safe script runId", () => {
     /YYYY\.MM\.DD-vN/u,
   );
   assert.equal(
-    normalizeManualAcceptanceRunId("2026.09.27-v8", "20260927-V8"),
-    "20260927-V8",
+    normalizeManualAcceptanceRunId("2026.11.07-v9", "20261107-V9"),
+    "20261107-V9",
   );
   assert.throws(
-    () => normalizeManualAcceptanceRunId("2026.09.27-v8", "20260716-V4"),
-    /runId must be 20260927-V8/u,
+    () => normalizeManualAcceptanceRunId("2026.11.07-v9", "20260716-V4"),
+    /runId must be 20261107-V9/u,
   );
   assert.throws(
     () =>
       buildManualAcceptanceSemanticPlan({
-        dataVersion: "2026.09.27-v8",
+        dataVersion: "2026.11.07-v9",
         runId: "20260716-V4",
       }),
-    /runId must be 20260927-V8/u,
+    /runId must be 20261107-V9/u,
   );
 });
 
@@ -1106,8 +1106,8 @@ test("bundle emits persistent local and 133 plans with identical target-free sem
   assert.equal(bundle.dryRun, true);
   assert.equal(bundle.writesBackend, false);
   assert.equal(bundle.datasetKey, "yoyoosun-manual-acceptance");
-  assert.equal(bundle.dataVersion, "2026.09.27-v8");
-  assert.equal(bundle.runId, "20260927-V8");
+  assert.equal(bundle.dataVersion, "2026.11.07-v9");
+  assert.equal(bundle.runId, "20261107-V9");
   assert.match(bundle.semanticDigest, /^[0-9a-f]{64}$/u);
   assert.equal(bundle.cleanup, "retire/forward-only");
   assert.deepEqual(
@@ -1115,7 +1115,7 @@ test("bundle emits persistent local and 133 plans with identical target-free sem
     [PERSISTENT_SCENARIO_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
   );
   assert.equal(bundle.targets[0].target.backendURL, SCENARIO_DEMO_ORIGIN);
-  assert.equal(bundle.targets[0].runId, "20260927-V8");
+  assert.equal(bundle.targets[0].runId, "20261107-V9");
   assert.equal(
     bundle.targets[0].target.databaseName,
     LOCAL_PERSISTENT_DATABASE,
@@ -1181,7 +1181,7 @@ test("bundle emits persistent local and 133 plans with identical target-free sem
 
 test("semantic digest is stable across targets and clocks and legacy versions fail closed", () => {
   const first = buildManualAcceptanceDatasetBundle({
-    dataVersion: "2026.09.27-v8",
+    dataVersion: "2026.11.07-v9",
     generatedAt: "2026-07-15T00:00:00.000Z",
     targetOverrides: {
       [PERSISTENT_SCENARIO_DATASET_TARGET]: {
@@ -1197,7 +1197,7 @@ test("semantic digest is stable across targets and clocks and legacy versions fa
     },
   });
   const second = buildManualAcceptanceDatasetBundle({
-    dataVersion: "2026.09.27-V8",
+    dataVersion: "2026.11.07-V9",
     generatedAt: "2030-01-01T00:00:00.000Z",
     targetOverrides: {
       [PERSISTENT_SCENARIO_DATASET_TARGET]: {
@@ -1217,7 +1217,7 @@ test("semantic digest is stable across targets and clocks and legacy versions fa
     first.targets[0].semanticPlan,
     second.targets[0].semanticPlan,
   );
-  assert.equal(first.targets[0].semanticPlan.runId, "20260927-V8");
+  assert.equal(first.targets[0].semanticPlan.runId, "20261107-V9");
   assert.throws(
     () =>
       buildManualAcceptanceDatasetBundle({
@@ -1365,7 +1365,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
     "--expected-database",
     "plush_erp_acceptance_20260728_delivery_dev",
     "--confirm",
-    "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260728_delivery_dev:2026.09.27-v8:20260927-V8",
+    "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260728_delivery_dev:2026.11.07-v9:20261107-V9",
   ]);
   assert.equal(
     core.targetExecution[CUSTOMER_TRIAL_133_TARGET].seedAllowed,
@@ -1441,9 +1441,9 @@ test("semantic plan locks the nine narrow stage contracts", () => {
     "--target",
     "${TARGET_POLICY_TARGET}",
     "--data-version",
-    "2026.09.27-v8",
+    "2026.11.07-v9",
     "--run-id",
-    "20260927-V8",
+    "20261107-V9",
     "--backend-url",
     "${TARGET_BACKEND_URL}",
     "--audit-minimum",
@@ -1454,7 +1454,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
   assert.equal(source.expected.scale.customers, 60);
   assert.equal(source.expected.scale.products, 20);
   assert.equal(source.expected.scale.salesOrders, 45);
-  assert.ok(source.commands[0].args.includes("20260927-V8"));
+  assert.ok(source.commands[0].args.includes("20261107-V9"));
   assert.equal(
     source.commands[0].args[source.commands[0].args.indexOf("--target") + 1],
     "${TARGET_POLICY_TARGET}",
@@ -1463,12 +1463,12 @@ test("semantic plan locks the nine narrow stage contracts", () => {
     source.commands[0].args[
       source.commands[0].args.indexOf("--data-version") + 1
     ],
-    "2026.09.27-v8",
+    "2026.11.07-v9",
   );
   assert.equal(source.commands[0].args.includes("--source-report"), false);
 
   const taskStage = plan.stages.find((stage) => stage.key === "task");
-  assert.equal(taskStage.expected.tasks, 180);
+  assert.equal(taskStage.expected.tasks, 810);
   assert.equal(
     taskStage.expected.schedulePolicy.anchorSource,
     "fresh-dataset-apply-reused-on-resume",
@@ -1485,7 +1485,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
     taskStage.commands[0].args[
       taskStage.commands[0].args.indexOf("--data-version") + 1
     ],
-    "2026.09.27-v8",
+    "2026.11.07-v9",
   );
   assert.equal(
     taskStage.commands[0].args[
@@ -1532,7 +1532,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
     "scripts/qa/manual-acceptance-fact-data.mjs",
   );
   assert.ok(facts.commands[0].args.includes("--apply"));
-  assert.ok(facts.commands[0].args.includes("2026.09.27-v8"));
+  assert.ok(facts.commands[0].args.includes("2026.11.07-v9"));
   assert.match(
     facts.commands[0].args[facts.commands[0].args.indexOf("--out") + 1],
     /\/facts$/u,
@@ -1572,7 +1572,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
   const readiness = plan.stages.find((stage) => stage.key === "readiness");
   assert.equal(readiness.writesBusinessData, false);
   assert.deepEqual(readiness.expected, {
-    componentDataVersion: "2026.09.27-v8",
+    componentDataVersion: "2026.11.07-v9",
     componentSemanticDigest: "${SEMANTIC_DIGEST}",
     queryChecksPassed: true,
     queryEvidenceComplete: false,
@@ -1901,8 +1901,8 @@ test("CLI defaults to a two-target dry-run and rejects implicit or production ap
   assert.deepEqual(parseManualAcceptanceDatasetArgs([]), {
     apply: false,
     help: false,
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
     target: "",
     backendURL: "",
     databaseName: "",
@@ -1962,21 +1962,21 @@ test("CLI defaults to a two-target dry-run and rejects implicit or production ap
   assert.equal(
     parseManualAcceptanceDatasetArgs([
       "--data-version",
-      "2026.09.27-v8",
+      "2026.11.07-v9",
       "--run-id",
-      "20260927-V8",
+      "20261107-V9",
     ]).runId,
-    "20260927-V8",
+    "20261107-V9",
   );
   assert.throws(
     () =>
       parseManualAcceptanceDatasetArgs([
         "--data-version",
-        "2026.09.27-v8",
+        "2026.11.07-v9",
         "--run-id",
         "20260716-V4",
       ]),
-    /runId must be 20260927-V8/u,
+    /runId must be 20261107-V9/u,
   );
   assert.throws(
     () => parseManualAcceptanceDatasetArgs(["--apply", "--target", "local"]),
@@ -2040,10 +2040,10 @@ test("an executable plan records strict stage receipts serially", async () => {
       },
       onCall(stageKey, invocation) {
         assert.equal(invocation.targetAdapter.alias, "local");
-        assert.equal(invocation.businessInput.dataVersion, "2026.09.27-v8");
+        assert.equal(invocation.businessInput.dataVersion, "2026.11.07-v9");
         assert.equal(
           invocation.businessInput.dateAnchorUtc,
-          "2026-09-27T12:00:00.000Z",
+          "2026-11-07T12:00:00.000Z",
         );
         calls.push(stageKey);
       },
@@ -2854,6 +2854,55 @@ test("failed apply report resumes only after its completed contiguous prefix", a
   }
 });
 
+test("interrupted refresh keeps an atomic running checkpoint and resumes its verified prefix", async () => {
+  const outputRoot = await fs.mkdtemp(path.join(os.tmpdir(), "plush-dataset-running-checkpoint-"));
+  try {
+    const plan = localApplyPlan();
+    const first = await applyManualAcceptanceDataset(plan, localApplyBinding(plan), durableRunnerDeps({ outputRoot }));
+    const fingerprints = resolveManualAcceptanceDatasetStageLogicFingerprints();
+    fingerprints.set("facts", "f".repeat(64));
+    let interruptedCheckpoint;
+    const failed = await applyManualAcceptanceDataset(
+      plan,
+      { ...localApplyBinding(plan), resumeReportPath: first.applyReportPath },
+      durableRunnerDeps({
+        outputRoot, stageLogicFingerprints: fingerprints,
+        override: {
+          facts(invocation) {
+            return { operation: "applied", report: {
+              ...durableComponentReport({ stageKey: "facts", configRevision: "local-config-v5", ...invocation }),
+              refreshedEvidence: true,
+            } };
+          },
+          async readiness() {
+            interruptedCheckpoint = await fs.readFile(first.applyReportPath, "utf8");
+            throw new Error("interrupt after a refreshed component replaced its receipt");
+          },
+        },
+      }),
+    );
+    assert.equal(failed.failedStage, "readiness");
+    const checkpoint = JSON.parse(interruptedCheckpoint);
+    assert.equal(checkpoint.ok, false);
+    assert.equal(checkpoint.failedStage, null);
+    assert.equal(checkpoint.stages.at(-1).status, "running");
+    assert(checkpoint.stages.slice(0, -1).every((stage) => stage.status === "completed"));
+    await fs.writeFile(first.applyReportPath, interruptedCheckpoint);
+    const calls = [];
+    const resumed = await applyManualAcceptanceDataset(
+      plan,
+      { ...localApplyBinding(plan), resumeReportPath: first.applyReportPath },
+      durableRunnerDeps({ outputRoot, stageLogicFingerprints: fingerprints, onCall: (key) => calls.push(key) }),
+    );
+    assert.equal(resumed.ok, true);
+    assert.equal(resumed.resume.priorInterruptedStage, "readiness");
+    assert.equal(resumed.resume.priorFailedStage, null);
+    assert.deepEqual(calls, ["core", "readiness"]);
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+});
+
 test("resume reconciles a valid role receipt missing the current contract operator", async () => {
   const outputRoot = await fs.mkdtemp(
     path.join(os.tmpdir(), "plush-dataset-role-profile-"),
@@ -3427,7 +3476,7 @@ test("apply requires exact target binding and forbids remote core or role seed",
   assert.equal(trialPlan.target.applyReady, true);
   assert.equal(
     trialPlan.target.expectedConfirmation,
-    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.09.27-v8:20260927-V8",
+    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.11.07-v9:20261107-V9",
   );
   await assert.rejects(
     () =>
@@ -3552,8 +3601,8 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     policyTarget: CUSTOMER_TRIAL_133_TARGET,
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
     targetAttestation: trialAttestation(),
     adminPassword: "admin-password",
   };
@@ -3576,7 +3625,7 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
       migration: binding.targetAttestation.migration,
     },
     unitCodes: CORE_UNIT_CODES,
-    warehouseCodes: ["YS8-CK-01", "YS8-CK-02", "YS8-CK-03", "YS8-CK-04"],
+    warehouseCodes: ["YS9-CK-01", "YS9-CK-02", "YS9-CK-03", "YS9-CK-04"],
     summary: { units: 8, warehouses: 4 },
   });
   assert.deepEqual(
@@ -3624,9 +3673,9 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
     () =>
       verifyManualAcceptanceCoreReferences({
         ...binding,
-        fetchImpl: makeFetch("YS8-CK-04"),
+        fetchImpl: makeFetch("YS9-CK-04"),
       }),
-    /YS8-CK-04/u,
+    /YS9-CK-04/u,
   );
   await assert.rejects(
     () =>
@@ -3713,8 +3762,8 @@ test("empty baseline verifier binds runtime and config, proves exact core, and r
     policyTarget: CUSTOMER_TRIAL_133_TARGET,
     databaseName: "plush_erp_demo_v1",
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
     targetAttestation: trialAttestation(),
     adminPassword: "admin-password",
     coreReport: {
@@ -3780,7 +3829,7 @@ test("empty baseline verifier binds runtime and config, proves exact core, and r
         };
       } else if (request.method === "list_warehouses") {
         data = {
-          warehouses: ["YS8-CK-01", "YS8-CK-02", "YS8-CK-03", "YS8-CK-04"].map(
+          warehouses: ["YS9-CK-01", "YS9-CK-02", "YS9-CK-03", "YS9-CK-04"].map(
             (code) => ({ code }),
           ),
           total: 4,
@@ -3818,7 +3867,7 @@ test("empty baseline verifier binds runtime and config, proves exact core, and r
     units: 8,
     warehouses: 4,
     unitCodes: [...CORE_UNIT_CODES].sort(),
-    warehouseCodes: ["YS8-CK-01", "YS8-CK-02", "YS8-CK-03", "YS8-CK-04"],
+    warehouseCodes: ["YS9-CK-01", "YS9-CK-02", "YS9-CK-03", "YS9-CK-04"],
   });
   assert.equal(
     Object.keys(verified.zeroCounts).length,
@@ -3945,8 +3994,8 @@ test("core preflight rejects a shared local database before authentication", asy
         policyTarget: "local-dev",
         databaseName: LOCAL_APPLY_DATABASE,
         datasetKey: "yoyoosun-manual-acceptance",
-        dataVersion: "2026.09.27-v8",
-        runId: "20260927-V8",
+        dataVersion: "2026.11.07-v9",
+        runId: "20261107-V9",
         adminPassword: "admin-password",
         fetchImpl,
       }),
@@ -3963,8 +4012,8 @@ test("core preflight rejects an old readyz-style 200 without the identity proof 
         backendURL: CUSTOMER_TRIAL_133_ORIGIN,
         policyTarget: CUSTOMER_TRIAL_133_TARGET,
         datasetKey: "yoyoosun-manual-acceptance",
-        dataVersion: "2026.09.27-v8",
-        runId: "20260927-V8",
+        dataVersion: "2026.11.07-v9",
+        runId: "20261107-V9",
         targetAttestation: trialAttestation(),
         adminPassword: "admin-password",
         fetchImpl: async (_url, init) => {
@@ -4033,8 +4082,8 @@ test("core preflight uses live debug capabilities and stops before business-code
         backendURL: CUSTOMER_TRIAL_133_ORIGIN,
         policyTarget: CUSTOMER_TRIAL_133_TARGET,
         datasetKey: "yoyoosun-manual-acceptance",
-        dataVersion: "2026.09.27-v8",
-        runId: "20260927-V8",
+        dataVersion: "2026.11.07-v9",
+        runId: "20261107-V9",
         targetAttestation: trialAttestation(),
         adminPassword: "admin-password",
         fetchImpl,
@@ -4082,7 +4131,7 @@ test("CLI apply uses one registry and target-free business inputs for both targe
       "--backend-url",
       CUSTOMER_TRIAL_133_ORIGIN,
       "--data-version",
-      "2026.09.27-v8",
+      "2026.11.07-v9",
       "--confirm",
       trialPlan.target.expectedConfirmation,
       "--target-attestation-json",

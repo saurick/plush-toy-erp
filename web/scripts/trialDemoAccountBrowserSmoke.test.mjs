@@ -463,6 +463,7 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
     '物料清单（BOM）',
     '任务管理',
     '模板打印中心',
+    '历史记录中心',
   ])
   assert.match(
     template.commands.join('\n'),
@@ -840,11 +841,11 @@ test('trial demo account browser smoke source keeps no-write template before run
   assert.match(source, /__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__/u)
   assert.match(source, /verifyEffectiveSessionDiagnostic/u)
   assert.match(source, /verifyRoleGuidedMenuStructure/u)
-  assert.match(source, /findVisibleMenuItem/u)
+  assert.match(source, /page.goto\(new URL\(target.path/u)
   assert.match(source, /legal-notice-gate[\s\S]*?\.ant-modal:visible/u)
   assert.match(source, /legal-notice-acknowledge/u)
   assert.doesNotMatch(source, /legal-notice-gate"\]:visible/u)
-  assert.match(source, /findVisibleBusinessPage/u)
+  assert.doesNotMatch(source, /findVisibleBusinessPage/u)
   assert.match(source, /verifyAllowedRolePages/u)
   assert.match(source, /verifyForbiddenRolePages/u)
   assert.match(source, /actualSidebarLabels,\s*expectedSidebarLabels/u)

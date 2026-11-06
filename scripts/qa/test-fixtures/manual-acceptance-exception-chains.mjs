@@ -189,13 +189,17 @@ export function exceptionChainFixture() {
         production_wip_batch_id: 401,
         outsourcing_order_item_id: 411,
       },
+      wipOutsourcingLine: { id: 411 },
+      stockSourceContract: { id: 430, source_wip_batch_id: null },
+      stockSourceLine: { id: 431 },
       rework: { id: 406, status: "POSTED", fact_type: "REWORK" },
       returnFact: {
         id: 404,
         status: "POSTED",
         lot_id: 410,
         subject_type: "PRODUCT",
-        source_line_id: 411,
+        source_id: 430,
+        source_line_id: 431,
       },
       inspection: {
         id: 405,

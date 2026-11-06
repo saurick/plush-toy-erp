@@ -2235,7 +2235,10 @@ export async function executeProductionWIPAction(rpc, params, operationCode) {
       params.action === "TRANSFER_TO_NEXT_OPERATION") ||
     (operationCode === "FABRIC_PROCESSING" &&
       params.action === "START_OPERATION");
-  const actor = PRODUCTION_WIP_PLANNING_ACTIONS.has(params.action)
+  const productionPlanning =
+    PRODUCTION_WIP_PLANNING_ACTIONS.has(params.action) &&
+    !(operationCode === "PACKAGING" && params.action === "ASSIGN_EXECUTION");
+  const actor = productionPlanning
     ? "production"
     : params.action === "CONFIRM_PACKAGING_MATERIAL"
       ? "sales"
@@ -2544,6 +2547,67 @@ async function advanceProductionWIPRoute({
   }
   const packaging = state.operations.at(-1);
   return exactNormalProductionWIPBatch(state, packaging.id);
+}
+
+export async function ensureSourceDrivenProductionRoute({
+  rpc,
+  plan,
+  order,
+  completion,
+  apply = false,
+}) {
+  const source = plan.phases.production.source;
+  const identity = plan.identities.production;
+  if (
+    completion?.status !== "POSTED" ||
+    Number(completion.source_id) !== Number(order.id)
+  )
+    throw new SourceDrivenFactError(
+      "production route requires its exact posted completion",
+    );
+  const itemID = positiveID(
+    completion.production_order_item_id,
+    "production route completion item",
+  );
+  const state = await readProductionWIP(
+    rpc,
+    positiveID(order.id, "production route order"),
+    itemID,
+    source,
+  );
+  for (const operation of state.operations.slice(0, -1)) {
+    if (
+      exactNormalProductionWIPBatch(state, operation.id).status !== "ACCEPTED"
+    )
+      throw new SourceDrivenFactError(
+        "posted completion has an unfinished upstream operation",
+      );
+  }
+  const packaging = exactNormalProductionWIPBatch(
+    state,
+    state.operations.at(-1).id,
+    { optional: true },
+  );
+  if (packaging?.status === "ACCEPTED") return;
+  if (!apply)
+    throw new SourceDrivenFactError(
+      "production packaging is incomplete after ledger posting",
+    );
+  if (
+    order.status !== "RELEASED" ||
+    (packaging && !["PLANNED", "IN_PROGRESS"].includes(packaging.status))
+  )
+    throw new SourceDrivenFactError(
+      "production packaging cannot safely resume from its current state",
+    );
+  await advanceProductionWIPRoute({
+    rpc,
+    order,
+    item: { id: itemID },
+    source,
+    identity,
+    finishedGoodsReceipt: completion,
+  });
 }
 
 async function applyProduction(plan, rpc) {
@@ -3361,5 +3425,13 @@ if (
 }
 
 function simulatedQualityChecks() {
-  return [{ name: "外观与约定要求", requirement: "符合来源订单及确认样", observation: "模拟逐项检查符合约定", result: "PASS", scope: "FULL" }];
+  return [
+    {
+      name: "外观与约定要求",
+      requirement: "符合来源订单及确认样",
+      observation: "逐项检查符合约定",
+      result: "PASS",
+      scope: "FULL",
+    },
+  ];
 }

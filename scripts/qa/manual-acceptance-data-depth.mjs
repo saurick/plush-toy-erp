@@ -3,6 +3,7 @@
 import { pathToFileURL } from "node:url";
 import { buildAttachmentFixtures } from "./manual-acceptance-attachment-data.mjs";
 import { buildManualAcceptanceSourceDataPlan } from "./manual-acceptance-source-data.mjs";
+import { TOTAL_TASKS } from "./manual-acceptance-task-data.mjs";
 import { buildManualAcceptanceTaskDataPlan } from "./manual-acceptance-task-data.mjs";
 
 export const ATTACHMENT_FIXTURES = Object.freeze(
@@ -30,7 +31,7 @@ export const CAPACITY_PROFILES = Object.freeze({
     purpose: "甲方逐页手工验收",
     sourceDocuments: 45,
     maximumLinesPerDocument: 25,
-    workflowTasks: 180,
+    workflowTasks: TOTAL_TASKS,
     factsPerBusinessPage: 45,
     attachments: 27,
     concurrentUsers: 1,

@@ -1,10 +1,10 @@
 {
   "schemaVersion": "plush.manual-acceptance-contract/v8",
   "datasetKey": "yoyoosun-manual-acceptance",
-  "dataVersion": "2026.09.27-v8",
-  "runId": "20260927-V8",
-  "anchorDateUtc": "2026-09-27T12:00:00.000Z",
-  "visiblePrefix": "YS8",
+  "dataVersion": "2026.11.07-v9",
+  "runId": "20261107-V9",
+  "anchorDateUtc": "2026-11-07T12:00:00.000Z",
+  "visiblePrefix": "YS9",
   "simulatedOnly": true,
   "realCustomerImport": false,
   "sourceNormalization": {
@@ -17,11 +17,26 @@
       "kg": "千克"
     },
     "distinctPairs": [
-      ["个", "套"],
-      ["个", "对"],
-      ["个", "片"],
-      ["个", "条"],
-      ["个", "块"]
+      [
+        "个",
+        "套"
+      ],
+      [
+        "个",
+        "对"
+      ],
+      [
+        "个",
+        "片"
+      ],
+      [
+        "个",
+        "条"
+      ],
+      [
+        "个",
+        "块"
+      ]
     ]
   },
   "primaryUnitKey": "piece",
@@ -86,25 +101,25 @@
   "warehouses": [
     {
       "key": "material",
-      "code": "YS8-CK-01",
+      "code": "YS9-CK-01",
       "name": "原料仓",
       "type": "MATERIAL"
     },
     {
       "key": "product",
-      "code": "YS8-CK-02",
+      "code": "YS9-CK-02",
       "name": "成品仓",
       "type": "FINISHED_GOODS"
     },
     {
       "key": "qualityHold",
-      "code": "YS8-CK-03",
+      "code": "YS9-CK-03",
       "name": "待检仓",
       "type": "MATERIAL"
     },
     {
       "key": "workInProcess",
-      "code": "YS8-CK-04",
+      "code": "YS9-CK-04",
       "name": "在制仓",
       "type": "MATERIAL"
     }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { MANUAL_ACCEPTANCE_TASKS_PER_ROLE } from "./manual-acceptance-task-catalog.mjs";
 import { assertSeedBusinessValues } from "./seed-business-values.mjs";
 import { findSalesOrderAcceptanceExecution } from "./manual-acceptance-sales-order-process.mjs";
 
@@ -46,10 +47,10 @@ export const PREVIOUS_TASK_COPY_REVISION = "PLAIN6";
 export const PREVIOUS_TASK_RUN_ID = "20260815-V6";
 export const PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH2";
 export const PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID = PREVIOUS_TASK_RUN_ID;
-export const LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH3";
+export const LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH4";
 export const LONG_LIVED_WORKBENCH_BATCH_RUN_ID =
   MANUAL_ACCEPTANCE_CORE_CONTRACT.runId;
-export const LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE = 12;
+export const LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE = 30;
 const CURRENT_TASK_PREFIX = `YS-V${CURRENT_CONTRACT_SEQUENCE}`;
 export const TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   boss: `${CURRENT_TASK_PREFIX}-LD`,
@@ -74,15 +75,15 @@ const PREVIOUS_TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   engineering: "YS-V6-GC",
 });
 export const LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
-  boss: "YS-WB3-LD",
-  sales: "YS-WB3-XS",
-  purchase: "YS-WB3-CG",
-  production: "YS-WB3-SC",
-  warehouse: "YS-WB3-CK",
-  finance: "YS-WB3-CW",
-  pmc: "YS-WB3-JH",
-  quality: "YS-WB3-ZJ",
-  engineering: "YS-WB3-GC",
+  boss: "YS-WB4-LD",
+  sales: "YS-WB4-XS",
+  purchase: "YS-WB4-CG",
+  production: "YS-WB4-SC",
+  warehouse: "YS-WB4-CK",
+  finance: "YS-WB4-CW",
+  pmc: "YS-WB4-JH",
+  quality: "YS-WB4-ZJ",
+  engineering: "YS-WB4-GC",
 });
 const PREVIOUS_LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze(
   {
@@ -108,9 +109,8 @@ const TASK_PROFILE_CONTRACTS = Object.freeze({
   [TASK_PROFILE_LONG_LIVED_WORKBENCH]: Object.freeze({
     key: TASK_PROFILE_LONG_LIVED_WORKBENCH,
     copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-    // WORKBENCH3 was first created under this immutable lineage. Current
-    // dataVersion/runId still describe each Scenario run; changing the batch
-    // lineage would orphan the stable YS-WB3-* codes and create duplicates.
+    // Stable workbench codes belong to this frozen batch; replay keeps their
+    // identity and schedule instead of creating duplicate actionable work.
     batchRunId: LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
     visibleCodePrefixByRole: LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE,
     stableActionablePerRole: LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
@@ -149,7 +149,7 @@ export const WORKFLOW_TASK_CAS_MIGRATION = "20260711063237";
 // releases are not incorrectly rejected.
 export const WORKFLOW_TASK_CAS_RELEASE =
   "929ec0b3a563bec0796274d033a97277519bcb51";
-export const TASKS_PER_ROLE = 20;
+export const TASKS_PER_ROLE = MANUAL_ACCEPTANCE_TASKS_PER_ROLE;
 export const TASK_ROLES = Object.freeze([
   "boss",
   "sales",
@@ -215,52 +215,6 @@ const BUSINESS_STATUS_OVERRIDES_BY_ROLE_SCENARIO = Object.freeze({
     exception: "blocked",
   }),
 });
-const TASK_SCENARIO_SCHEDULE_BY_ROLE = Object.freeze({
-  production: Object.freeze([
-    "production_exception",
-    "today_production",
-    "outsourcing_return",
-    "rework",
-    "today_production",
-    "production_exception",
-    "outsourcing_return",
-    "rework",
-    "today_production",
-    "outsourcing_return",
-    "production_exception",
-    "rework",
-    "today_production",
-    "outsourcing_return",
-    "production_exception",
-    "rework",
-    "today_production",
-    "production_exception",
-    "outsourcing_return",
-    "rework",
-  ]),
-  warehouse: Object.freeze([
-    "receiving",
-    "shipping",
-    "inbound",
-    "material_picking",
-    "exception",
-    "receiving",
-    "inbound",
-    "material_picking",
-    "exception",
-    "receiving",
-    "inbound",
-    "exception",
-    "shipping",
-    "receiving",
-    "material_picking",
-    "shipping",
-    "inbound",
-    "material_picking",
-    "shipping",
-    "exception",
-  ]),
-});
 
 export function assertManualAcceptanceTaskTargetCompatibility(
   plan,
@@ -305,22 +259,22 @@ const REJECT_ACTION_ROLES = new Set([
   "quality",
 ]);
 const ACTIONABLE_STATUS_COUNTS = Object.freeze({
-  ready: 12,
-  blocked: 3,
-  done: 3,
-  rejected: 2,
+  ready: 45,
+  blocked: 15,
+  done: 15,
+  rejected: 15,
 });
 const NON_REJECT_STATUS_COUNTS = Object.freeze({
-  ready: 14,
-  blocked: 3,
-  done: 3,
+  ready: 60,
+  blocked: 15,
+  done: 15,
   rejected: 0,
 });
 const BOSS_STATUS_COUNTS = Object.freeze({
-  ready: 15,
-  blocked: 3,
+  ready: 60,
+  blocked: 15,
   done: 0,
-  rejected: 2,
+  rejected: 15,
 });
 
 export function getManualAcceptanceTaskStatusCounts(roleKey) {
@@ -640,7 +594,7 @@ The registered customer trial target additionally requires
 and MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON with exact
 origin/customer/release/migration/debug fields.
 
-Default mode only prints the deterministic 180-task plan. Apply uses the formal
+Default mode only prints the deterministic ${TOTAL_TASKS}-task plan. Apply uses the formal
 workflow JSON-RPC create/action contracts, never writes facts, and never connects
 to SQL directly. Apply requires the schedule anchor captured by the fresh dataset
 run; a same-batch resume must reuse that exact anchor. Apply writes
@@ -1112,21 +1066,6 @@ export function getManualAcceptanceRoleTaskGroups(roleKey) {
 }
 
 export function getManualAcceptanceTaskScenario(roleKey, index) {
-  const schedule = TASK_SCENARIO_SCHEDULE_BY_ROLE[roleKey];
-  if (schedule) {
-    if (schedule.length !== TASKS_PER_ROLE) {
-      throw new CliError(
-        `${roleKey} task scenario schedule must contain ${TASKS_PER_ROLE} items`,
-      );
-    }
-    const scenarioKey = schedule[index - 1];
-    if (!requiredTaskScenarios(roleKey).includes(scenarioKey)) {
-      throw new CliError(
-        `${roleKey} task scenario schedule contains unknown ${scenarioKey}`,
-      );
-    }
-    return scenarioKey;
-  }
   const scenarios = requiredTaskScenarios(roleKey);
   return scenarios[(index - 1) % scenarios.length];
 }
@@ -1167,8 +1106,14 @@ export const TASK_CATALOG_SCENARIO_DIGEST = createHash("sha256")
 function summarizeTaskCoverage(tasks) {
   const taskGroupsByRole = {};
   const scenariosByRoleTaskGroup = {};
+  const scenariosByRoleStatus = {};
   for (const roleKey of TASK_ROLES) {
     const roleTasks = tasks.filter((task) => task.roleKey === roleKey);
+    scenariosByRoleStatus[roleKey] = {};
+    for (const task of roleTasks) {
+      const key = `${task.scenarioKey}:${task.targetStatus}`;
+      scenariosByRoleStatus[roleKey][key] = (scenariosByRoleStatus[roleKey][key] || 0) + 1;
+    }
     const groups = getManualAcceptanceRoleTaskGroups(roleKey);
     taskGroupsByRole[roleKey] = groups;
     scenariosByRoleTaskGroup[roleKey] = {};
@@ -1195,6 +1140,7 @@ function summarizeTaskCoverage(tasks) {
   return {
     taskGroupsByRole,
     scenariosByRoleTaskGroup,
+    scenariosByRoleStatus,
     catalogScenarioDigest: TASK_CATALOG_SCENARIO_DIGEST,
   };
 }
@@ -1621,6 +1567,15 @@ export function validateManualAcceptanceTaskPlan(plan) {
     }
   }
   const expectedCoverage = summarizeTaskCoverage(plan.tasks);
+  for (const roleKey of TASK_ROLES) {
+    for (const scenario of requiredTaskScenarios(roleKey)) {
+      for (const [status, count] of Object.entries(getManualAcceptanceTaskStatusCounts(roleKey))) {
+        if (count > 0 && (expectedCoverage.scenariosByRoleStatus[roleKey][`${scenario}:${status}`] || 0) < 3) {
+          throw new CliError(`${roleKey}/${scenario}/${status} requires at least three task specimens`);
+        }
+      }
+    }
+  }
   if (JSON.stringify(plan.coverage) !== JSON.stringify(expectedCoverage)) {
     throw new CliError(
       "task plan coverage does not match its catalog scenarios",
@@ -2139,7 +2094,7 @@ async function listRoleBatch({ plan, roleKey, account, fetchImpl }) {
     method: "list_tasks",
     params: {
       owner_role_key: roleKey,
-      search: plan.tasks?.find((task) => task.roleKey === roleKey)?.createParams.task_code.slice(0, -2) ||
+      keyword: plan.tasks?.find((task) => task.roleKey === roleKey)?.createParams.task_code.slice(0, -2) ||
         manualAcceptanceLegacyTaskCode(plan, roleKey, 1).slice(0, -2),
       limit: 200,
       offset: 0,

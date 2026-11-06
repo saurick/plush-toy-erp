@@ -1,3 +1,4 @@
+import { MANUAL_ACCEPTANCE_PAYMENT_SCENARIOS } from "./manual-acceptance-finance-scenarios.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -6,6 +7,10 @@ import {
   numeric20Scale6TextFromUnits,
 } from "../../web/src/erp/utils/numeric20Scale6.mjs";
 import { exceptionChainFixture } from "./test-fixtures/manual-acceptance-exception-chains.mjs";
+import {
+  cashPaymentReferences,
+  wipExceptionReferences,
+} from "./test-fixtures/manual-acceptance-state-samples.mjs";
 
 import {
   MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES,
@@ -13,10 +18,12 @@ import {
   SOURCE_DRIVEN_FACT_REPORT_CONTRACT,
   assertManualAcceptanceAdminProfile,
   applyManualAcceptanceFinanceLifecycle,
+  transitionManualAcceptanceFinancePayment,
   applyManualAcceptanceFactPlan,
   buildManualAcceptanceFactPlan,
   ensureManualAcceptanceProductionExceptionApproval,
   ensureReceiptQualities,
+  ensureFinanceCreditNoteSpecimens,
   ensureManualAcceptanceQualityCorrections,
   assertReceiptMatchesPlan,
   manualAcceptanceFactRPCCall,
@@ -38,6 +45,7 @@ import {
   verifyManualAcceptanceFactPlan,
 } from "./manual-acceptance-fact-data.mjs";
 import { MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES } from "./manual-acceptance-source-data.mjs";
+import { requireWorkflowTaskMutationParams } from "../../web/src/erp/utils/workflowTaskMutation.mjs";
 import {
   buildSourceDrivenFactPlan,
   manualAcceptanceBusinessNo,
@@ -55,6 +63,92 @@ const RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
 const DATASET_KEY = "yoyoosun-manual-acceptance";
 const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
 const LOCAL_DATABASE_NAME = "plush_erp_acceptance_local_fixture_dev";
+
+test("finance rejection uses the formal reject payload and does not execute the payment", async () => {
+  const payment = {
+    id: 1,
+    payment_no: "FK-REJECT",
+    status: "DRAFT",
+    version: 1,
+  };
+  const node = {
+    id: 21,
+    process_instance_id: 11,
+    node_key: "finance_payment_approval",
+    status: "active",
+    version: 1,
+  };
+  const task = {
+    id: 31,
+    process_instance_id: 11,
+    process_node_instance_id: 21,
+    task_status_key: "ready",
+    version: 1,
+  };
+  let writes = 0;
+  const rpc = async ({ actor, method, params }) => {
+    if (method === "get_finance_payment_approval_process")
+      return structuredClone({
+        source_readback: payment,
+        process_context: { process_instance: { id: 11 }, nodes: [node] },
+      });
+    if (method === "list_tasks") return { tasks: [structuredClone(task)] };
+    if (method === "reject_task_action") {
+      assert.equal(actor, "boss");
+      requireWorkflowTaskMutationParams("reject", params, {
+        requireIdempotencyKey: true,
+      });
+      assert.equal(params.payload.process_decision, undefined);
+      payment.status = "REJECTED";
+      node.status = "completed";
+      task.task_status_key = "rejected";
+      task.version++;
+      writes++;
+      return { task: structuredClone(task) };
+    }
+    assert.fail(`rejection must not call payment execution: ${method}`);
+  };
+  assert.equal(
+    (
+      await transitionManualAcceptanceFinancePayment({
+        rpc,
+        payment: structuredClone(payment),
+        desiredStatus: "REJECTED",
+      })
+    ).status,
+    "REJECTED",
+  );
+  await transitionManualAcceptanceFinancePayment({
+    rpc,
+    payment: structuredClone(payment),
+    desiredStatus: "REJECTED",
+  });
+  assert.equal(writes, 1);
+});
+
+test("advance and refund posting use the explicit cash-only command and no allocations", async () => {
+  for (const kind of ["ADVANCE", "REFUND"]) {
+    const payment = { id: 1, payment_no: `${kind}-1`, kind, status: "APPROVED", version: 2 };
+    const execution = { id: 22, process_instance_id: 11, node_key: "finance_payment_execution", status: "completed", version: 2 };
+    const post = { id: 23, process_instance_id: 11, node_key: "post_finance_payment", status: "active", version: 1 };
+    let writes = 0;
+    const rpc = async ({ actor, method, params }) => {
+      if (method === "get_finance_payment_approval_process") return structuredClone({ source_readback: payment, process_context: { process_instance: { id: 11 }, nodes: [execution, post] } });
+      if (method === "execute_finance_payment_post") {
+        assert.equal(actor, "finance");
+        assert.equal(params.cash_only, true);
+        assert.deepEqual(params.allocations, []);
+        payment.status = "POSTED"; post.status = "completed"; writes++;
+        return { source_readback: structuredClone(payment) };
+      }
+      if (method === "get_finance_payment") return { payment: structuredClone(payment) };
+      assert.fail(`cash posting must not write a finance fact or allocation: ${method}`);
+    };
+    assert.equal((await transitionManualAcceptanceFinancePayment({ rpc, payment: structuredClone(payment), desiredStatus: "POSTED" })).status, "POSTED");
+    await transitionManualAcceptanceFinancePayment({ rpc, payment: structuredClone(payment), desiredStatus: "POSTED" });
+    assert.equal(writes, 1);
+  }
+});
 
 test("runtime admin guard consumes the formal top-level auth.me profile", () => {
   assert.deepEqual(
@@ -195,7 +289,12 @@ test("RPC does not retry non-throttle HTTP failures", async () => {
 });
 
 function sourceReport({ remote = false } = {}) {
-  const material = { id: 101, code: "MAT-101", name: "米白短毛绒" };
+  const material = {
+    id: 101,
+    code: "MAT-101",
+    name: "米白短毛绒",
+    supplierId: 201,
+  };
   const productionCandidate = {
     salesOrder: {
       id: 501,
@@ -399,7 +498,7 @@ function purchaseStage() {
   ];
   const correctionStatuses = ["DRAFT", "POSTED", "CANCELLED"];
   return {
-    purchaseReceipts: fakeRecords(57, 1000).map((item, offset) => ({
+    purchaseReceipts: fakeRecords(63, 1000).map((item, offset) => ({
       ...item,
       receipt_no: `PR-${offset}`,
       status: receiptStatuses[offset % receiptStatuses.length],
@@ -420,12 +519,12 @@ function purchaseStage() {
         },
       ],
     })),
-    qualityInspections: fakeRecords(63, 4000).map((item, offset) => ({
+    qualityInspections: fakeRecords(75, 4000).map((item, offset) => ({
       ...item,
       inspection_no: `QI-${offset}`,
       status: qualityStatuses[offset % qualityStatuses.length],
       source_type: "PURCHASE_RECEIPT",
-      source_id: 1000 + (offset % 57),
+      source_id: 1000 + (offset % 63),
     })),
     inventoryLots: fakeRecords(45, 5000).map((item, offset) => ({
       ...item,
@@ -562,7 +661,34 @@ function factStage() {
         approval_process_node_id: 430_001,
         approved_remaining_quantity: "1",
       },
-    ],
+      ...["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"].flatMap(
+        (status, group) =>
+          Array.from({ length: 3 }, (_, index) => ({
+            id: 8_002 + group * 3 + index,
+            decision_no: `SCYC-${1001 + group * 3 + index}`,
+            decision_type: "OVER_ISSUE",
+            status,
+            execution_status: "PENDING",
+            production_order_id: 8_010 + group * 3 + index,
+            production_order_item_id: 8_110 + group * 3 + index,
+            production_material_requirement_id: 8_210 + group * 3 + index,
+            requested_quantity: "1",
+            approved_quantity: status === "APPROVED" ? "1" : "0",
+            approved_remaining_quantity: status === "APPROVED" ? "1" : "0",
+            production_order_no: `MO-${index + 2}`,
+            process_instance_id:
+              status === "CANCELLED" ? null : 411_000 + group * 3 + index,
+            approval_task_id:
+              status === "CANCELLED" ? null : 421_000 + group * 3 + index,
+            approval_process_node_id:
+              status === "CANCELLED" ? null : 431_000 + group * 3 + index,
+            approval_task_code:
+              status === "CANCELLED"
+                ? null
+                : `PROC-${411_000 + group * 3 + index}-NODE-${431_000 + group * 3 + index}-A1`,
+          })),
+      ),
+    ].concat(wipExceptionReferences()),
     outsourcingFacts: fakeRecords(90, 11000).map((item, offset) => ({
       ...item,
       fact_no: `OF-${offset + 1}`,
@@ -612,7 +738,7 @@ function factStage() {
       source_type: "SALES_ORDER",
       source_id: 501,
     })),
-    shipments: fakeRecords(47, 18000).map((item, offset) => ({
+    shipments: fakeRecords(51, 18000).map((item, offset) => ({
       ...item,
       shipment_no: `SHP-${offset}`,
       status: shipmentStatuses[offset % shipmentStatuses.length],
@@ -673,7 +799,33 @@ function factStage() {
           },
         ],
       },
-    ],
+      ...MANUAL_ACCEPTANCE_PAYMENT_SCENARIOS.map((sample, index) => ({
+        id: 22_005 + index,
+        payment_no: `${sample.number.code}-${sample.number.sequence}`,
+        status: sample.status,
+        direction: sample.factType === "PAYABLE" ? "DISBURSEMENT" : "RECEIPT",
+        allocations: ["POSTED", "REVERSED"].includes(sample.status)
+          ? [
+              {
+                id: 30_000 + index * 2,
+                status: "POSTED",
+                reversal_of_allocation_id: null,
+              },
+              ...(sample.status === "REVERSED"
+                ? [
+                    {
+                      id: 30_001 + index * 2,
+                      status: "REVERSED",
+                      reversal_of_allocation_id: 30_000 + index * 2,
+                    },
+                  ]
+                : []),
+            ]
+          : [],
+      })),
+    ]
+      .map((item) => ({ ...item, kind: "SETTLEMENT" }))
+      .concat(cashPaymentReferences()),
     financeCreditNotes: [
       {
         id: 24_001,
@@ -693,7 +845,13 @@ function factStage() {
         status: "REVERSED",
         reversal_of_credit_note_id: 24_002,
       },
-    ],
+    ].flatMap((item, index) => Array.from({ length: 3 }, (_, copy) => ({
+      ...item,
+      id: item.id + copy * 3,
+      credit_note_no: `YS-${951 + index + copy * 3}`,
+      reversal_of_credit_note_id: item.reversal_of_credit_note_id == null
+        ? null : item.reversal_of_credit_note_id + copy * 3,
+    }))),
   };
 }
 
@@ -714,10 +872,10 @@ function localMutationGuards(report) {
 
 test("fact plan reserves unposted receipts for correction reinspection", () => {
   const plan = buildManualAcceptanceFactPlan(sourceReport());
-  assert.equal(plan.receipts.length, 57);
+  assert.equal(plan.receipts.length, 63);
   assert.deepEqual(
     plan.qualityCorrections.map((item) => item.status),
-    ["SUBMITTED", "PASSED", "REJECTED"],
+    Array.from({ length: 3 }, () => ["SUBMITTED", "PASSED", "REJECTED"]).flat(),
   );
   for (const [index, correction] of plan.qualityCorrections.entries()) {
     const source = plan.receipts[correction.receiptIndex];
@@ -734,8 +892,8 @@ test("fact plan reserves unposted receipts for correction reinspection", () => {
     );
     assert.ok(correction.reason);
   }
-  assert.equal(plan.expectedMinimums.purchaseReceipts, 57);
-  assert.equal(plan.expectedMinimums.qualityInspections, 63);
+  assert.equal(plan.expectedMinimums.purchaseReceipts, 63);
+  assert.equal(plan.expectedMinimums.qualityInspections, 75);
 });
 
 function qualityCorrectionFixture() {
@@ -833,9 +991,9 @@ test("quality correction seed creates independent pending, passed and rejected r
   );
   assert.deepEqual(
     created.map((row) => row.status),
-    ["SUBMITTED", "PASSED", "REJECTED"],
+    Array.from({ length: 3 }, () => ["SUBMITTED", "PASSED", "REJECTED"]).flat(),
   );
-  assert.equal(rows.size, 6);
+  assert.equal(rows.size, 18);
   for (const child of created) {
     const original = rows.get(child.correction_of_inspection_id);
     assert.equal(original.status, "PASSED");
@@ -855,7 +1013,7 @@ test("quality correction seed creates independent pending, passed and rejected r
   assert.equal(
     calls.filter((call) => call.method === "correct_quality_inspection_result")
       .length,
-    3,
+    9,
   );
   const repeated = await ensureManualAcceptanceQualityCorrections(
     rpc,
@@ -863,7 +1021,7 @@ test("quality correction seed creates independent pending, passed and rejected r
     receipts,
   );
   assert.deepEqual(repeated, created);
-  assert.equal(rows.size, 6);
+  assert.equal(rows.size, 18);
   const before = structuredClone([...rows.values()]);
   calls.length = 0;
   const verified = await ensureManualAcceptanceQualityCorrections(
@@ -939,12 +1097,12 @@ test("quality correction seed refuses posted sources and incomplete recipe cover
       { ...f.plan, qualityCorrections: [] },
       f.receipts,
     ),
-    /three independent/u,
+    /nine independent/u,
   );
   assert.equal(f.calls.length, 0);
 });
 
-test("plan is target-bound, source-driven, and prepares 57 receipts plus 45 fact runs", () => {
+test("plan is target-bound, source-driven, and prepares 63 receipts plus 45 fact runs", () => {
   const plan = buildManualAcceptanceFactPlan(sourceReport());
   assert.equal(plan.datasetKey, DATASET_KEY);
   assert.equal(plan.dataVersion, DATA_VERSION);
@@ -953,7 +1111,7 @@ test("plan is target-bound, source-driven, and prepares 57 receipts plus 45 fact
   assert.equal(plan.semanticDigest, "digest-v2");
   assert.equal(plan.directSQL, false);
   assert.equal(plan.retiredGenericFactWriter, false);
-  assert.equal(plan.receipts.length, 57);
+  assert.equal(plan.receipts.length, 63);
   assert.ok(
     plan.receipts.every(
       (receipt) =>
@@ -996,9 +1154,9 @@ test("plan is target-bound, source-driven, and prepares 57 receipts plus 45 fact
     Array.from({ length: 45 }, (_, offset) => [offset, "3"]),
   );
   assert.equal(plan.outsourcingCandidates.length, 45);
-  assert.equal(plan.expectedMinimums.shipments, 47);
-  assert.equal(plan.expectedMinimums.financePayments, 4);
-  assert.equal(plan.expectedMinimums.financeCreditNotes, 3);
+  assert.equal(plan.expectedMinimums.shipments, 51);
+  assert.equal(plan.expectedMinimums.financePayments, 148);
+  assert.equal(plan.expectedMinimums.financeCreditNotes, 9);
   assert.equal(plan.shipmentLineSample.items.length, 25);
   assert.ok(
     plan.outsourcingCandidates.every(
@@ -1233,7 +1391,7 @@ function productionExceptionApprovalFixture({
       };
     }
     if (key === "operational_fact.submit_production_exception") {
-      assert.equal(actor, "admin");
+      assert.equal(actor, "production");
       assert.equal(params.decision_type, "OVER_ISSUE");
       assert.equal(params.production_order_id, order.id);
       assert.equal(params.production_material_requirement_id, requirement.id);
@@ -1260,7 +1418,7 @@ function productionExceptionApprovalFixture({
       return processData();
     }
     if (key === "customer_config.start_production_exception_approval_process") {
-      assert.equal(actor, "admin");
+      assert.equal(actor, "production");
       instance = {
         id: 81,
         process_key: "production_exception_approval",
@@ -1313,7 +1471,26 @@ function productionExceptionApprovalFixture({
       assert.equal(params.task_group, "production_exception_decision_approval");
       return { tasks: task ? [structuredClone(task)] : [] };
     }
+    if (key === "workflow.reject_task_action") {
+      requireWorkflowTaskMutationParams("reject", params, {
+        requireIdempotencyKey: true,
+      });
+      assert.equal(actor, "boss");
+      task.task_status_key = "rejected";
+      task.version++;
+      nodes[0].status = "completed";
+      nodes[5].status = "completed";
+      nodes[6].status = "completed";
+      instance.status = "completed";
+      decision.status = "REJECTED";
+      decision.version++;
+      mutations++;
+      return { task: structuredClone(task) };
+    }
     if (key === "workflow.complete_task_action") {
+      requireWorkflowTaskMutationParams("complete", params, {
+        requireIdempotencyKey: true,
+      });
       assert.equal(actor, "boss");
       assert.equal(params.task_id, task.id);
       assert.equal(params.reason, params.payload.process_decision.reason);
@@ -1367,6 +1544,31 @@ function productionExceptionApprovalFixture({
     decision: () => decision,
   };
 }
+
+test("over-issue rejection follows the public reject contract and replays without writes", async () => {
+  const f = productionExceptionApprovalFixture();
+  const args = {
+    rpc: f.rpc,
+    plan: { dataVersion: DATA_VERSION },
+    production: { order: f.order, facts: f.facts },
+    targetStatus: "REJECTED",
+  };
+  const result = await ensureManualAcceptanceProductionExceptionApproval({
+    ...args,
+    apply: true,
+  });
+  assert.equal(result.status, "REJECTED");
+  assert.equal(result.approved_quantity, null);
+  assert.equal(f.mutations(), 3);
+  assert.deepEqual(
+    await ensureManualAcceptanceProductionExceptionApproval({
+      ...args,
+      apply: false,
+    }),
+    result,
+  );
+  assert.equal(f.mutations(), 3);
+});
 
 test("production exception fixture completes one formal over-issue approval on an exactly issued direct grain and replays read-only", async () => {
   const fixture = productionExceptionApprovalFixture();
@@ -1545,6 +1747,7 @@ test("receipt quality readback uses the formal quality list instead of an empty 
         purchase_receipt_id: 41,
         source_type: "PURCHASE_RECEIPT",
         inspection_type: "INCOMING",
+        include_superseded: true,
         limit: 200,
         offset: 0,
       },
@@ -2710,7 +2913,18 @@ test("finance lifecycle uses stable business numbers and second apply is a no-op
     return item;
   };
   for (const type of ["PAYABLE", "RECEIVABLE", "INVOICE"]) {
-    for (const suffix of ["04", "01", "03", "02"]) {
+    for (const suffix of [
+      "04",
+      "01",
+      "03",
+      "02",
+      "06",
+      "05",
+      "07",
+      "08",
+      "09",
+      "10",
+    ]) {
       const source = add({
         fact_no: `${type}-${suffix}`,
         fact_type: type,
@@ -2783,6 +2997,7 @@ test("finance lifecycle uses stable business numbers and second apply is a no-op
         version: 1,
         status: "DRAFT",
         payment_no: params.payment_no,
+        kind: "SETTLEMENT",
         direction: params.direction,
         counterparty_type: params.counterparty_type,
         counterparty_id: params.counterparty_id,
@@ -3043,6 +3258,48 @@ test("finance lifecycle uses stable business numbers and second apply is a no-op
   );
 });
 
+test("credit-note samples keep three reversal chains and replay without posting twice", async () => {
+  const records = new Map();
+  let writes = 0;
+  const rpc = async ({ actor, domain, method, params }) => {
+    assert.equal(actor, "finance");
+    assert.equal(domain, "operational_fact");
+    if (method === "list_finance_credit_notes")
+      return { credit_notes: [...records.values()], total: records.size };
+    const original = records.get(params.credit_note_id);
+    if (method === "reverse_finance_credit_note") assert(original);
+    else assert.equal(method, "create_finance_credit_note");
+    const record = {
+      id: records.size + 1,
+      credit_note_no: params.credit_note_no,
+      finance_fact_id: original?.finance_fact_id ?? params.finance_fact_id,
+      status: original ? "REVERSED" : "POSTED",
+      amount: "1",
+      currency: "CNY",
+      reversal_of_credit_note_id: original?.id ?? null,
+    };
+    records.set(record.id, record);
+    writes += 1;
+    return { credit_note: record };
+  };
+  const options = {
+    activeSource: { id: 101 }, reversalSource: { id: 102 },
+    plan: { dataVersion: DATA_VERSION }, rpc,
+  };
+  await assert.rejects(() => ensureFinanceCreditNoteSpecimens({ ...options, apply: false }), /readback/);
+  assert.equal(writes, 0);
+  const first = await ensureFinanceCreditNoteSpecimens({ ...options, apply: true });
+  assert.equal(first.filter((item) => item.status === "POSTED").length, 6);
+  assert.equal(new Set(first.filter((item) => item.status === "REVERSED").map((item) => item.reversal_of_credit_note_id)).size, 3);
+  assert.equal(writes, 9);
+  assert.deepEqual(await ensureFinanceCreditNoteSpecimens({ ...options, apply: true }), first);
+  assert.deepEqual(await ensureFinanceCreditNoteSpecimens({ ...options, apply: false }), first);
+  assert.equal(writes, 9);
+  first.find((item) => item.status === "REVERSED").reversal_of_credit_note_id = 999;
+  await assert.rejects(() => ensureFinanceCreditNoteSpecimens({ ...options, apply: true }), /reversal linkage/);
+  assert.equal(writes, 9);
+});
+
 test("apply emits the exact readiness contract and complete lifecycle matrices", async () => {
   const report = sourceReport();
   const plan = buildManualAcceptanceFactPlan(report);
@@ -3056,7 +3313,7 @@ test("apply emits the exact readiness contract and complete lifecycle matrices",
   assert.equal(result.reportContract, SOURCE_DRIVEN_FACT_REPORT_CONTRACT);
   assert.equal(result.mode, "apply");
   assert.equal(result.semanticDigest, report.semanticDigest);
-  assert.equal(result.referenceRecords.purchaseReceipts.length, 57);
+  assert.equal(result.referenceRecords.purchaseReceipts.length, 63);
   assert.ok(
     result.referenceRecords.purchaseReceiptAdjustments.every(
       (item) =>
@@ -3071,8 +3328,8 @@ test("apply emits the exact readiness contract and complete lifecycle matrices",
     ),
   );
   assert.ok(result.referenceRecords.financeFacts.length >= 180);
-  assert.equal(result.referenceRecords.financePayments.length, 4);
-  assert.equal(result.referenceRecords.financeCreditNotes.length, 3);
+  assert.equal(result.referenceRecords.financePayments.length, 148);
+  assert.equal(result.referenceRecords.financeCreditNotes.length, 9);
   assert.equal(result.financeFieldContract.complete, true);
   assert.equal(result.financeFieldContract.coveragePercent, 100);
   assert.equal(result.summary.financeFieldCoverage, 100);
@@ -3570,4 +3827,87 @@ test("receipt number collisions cannot cross source, supplier, warehouse or item
         { id: 1 },
       ),
     );
+});
+
+test("receipt budgets preserve material ownership and grow beyond fifteen supplier groups", () => {
+  const source = sourceReport();
+  const candidate =
+    source.referenceRecords.sourceDrivenFacts.sourceCandidates
+      .productionCandidates[0];
+  for (let index = 0; index < 16; index += 1) {
+    const materialID = 102 + index;
+    const supplierID = 202 + index;
+    source.referenceRecords.materials.push({
+      id: materialID,
+      code: `MAT-${materialID}`,
+      name: `面料${index + 1}`,
+      supplierId: supplierID,
+    });
+    source.referenceRecords.suppliers.push({
+      id: supplierID,
+      code: `SUP-${supplierID}`,
+      name: `布行${index + 1}`,
+    });
+    candidate.bom.items.push({
+      id: 1200 + index,
+      materialId: materialID,
+      unitId: 1001,
+      quantity: "1",
+      lossRate: "0",
+    });
+  }
+  const plan = buildManualAcceptanceFactPlan(source);
+  const suppliers = new Map(
+    source.referenceRecords.materials.map((item) => [item.id, item.supplierId]),
+  );
+  assert.equal(plan.receipts.length, 65);
+  for (const receipt of plan.receipts.filter(
+    (item) => !item.linkedPurchaseOrder,
+  )) {
+    assert.ok(receipt.items.length > 0);
+    for (const item of receipt.items)
+      assert.equal(suppliers.get(item.materialId), receipt.supplierId);
+  }
+  delete source.referenceRecords.materials[0].supplierId;
+  assert.throws(
+    () => buildManualAcceptanceFactPlan(source),
+    /material.supplierId/u,
+  );
+});
+
+test("incoming quality replay reads superseded originals without losing the corrected verdict", async () => {
+  const original = {
+    id: 101,
+    inspection_no: "IQC-PR-17-ITEM-31",
+    purchase_receipt_id: 17,
+    purchase_receipt_item_id: 31,
+    source_type: "PURCHASE_RECEIPT",
+    inspection_type: "INCOMING",
+    status: "PASSED",
+    superseded_at: 1780000000,
+  };
+  const corrected = {
+    ...original,
+    id: 102,
+    inspection_no: "YS9-ZJ-2001",
+    status: "REJECTED",
+    superseded_at: null,
+    correction_of_inspection_id: 101,
+  };
+  const result = await readPurchaseReceiptQualities(
+    async ({ method, params }) => {
+      assert.equal(method, "list_quality_inspections");
+      assert.equal(params.include_superseded, true);
+      return { quality_inspections: [original, corrected], total: 2 };
+    },
+    { id: 17, items: [{ id: 31 }] },
+  );
+  assert.deepEqual(
+    result.generated.map((row) => row.id),
+    [101],
+  );
+  assert.equal(
+    result.inspections.find((row) => row.id === 102).status,
+    "REJECTED",
+  );
 });

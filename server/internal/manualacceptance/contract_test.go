@@ -54,10 +54,10 @@ func TestValidateAcceptsCoherentNextVersionWithoutCodeChanges(t *testing.T) {
 	next.AnchorDateUTC = "2026-10-01T12:00:00.000Z"
 	next.VisiblePrefix = "YS8"
 	for index := range next.Units {
-		next.Units[index].Code = strings.Replace(next.Units[index].Code, "YS7-", "YS8-", 1)
+		next.Units[index].Code = strings.Replace(next.Units[index].Code, "YS9-", "YS8-", 1)
 	}
 	for index := range next.Warehouses {
-		next.Warehouses[index].Code = strings.Replace(next.Warehouses[index].Code, "YS7-", "YS8-", 1)
+		next.Warehouses[index].Code = strings.Replace(next.Warehouses[index].Code, "YS9-", "YS8-", 1)
 	}
 
 	if err := Validate(next); err != nil {

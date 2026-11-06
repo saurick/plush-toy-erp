@@ -1,4 +1,3 @@
-import { findVisibleBusinessPage } from './businessNavigation.mjs'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -18,6 +17,7 @@ import { navigationItemRegistry } from '../src/erp/config/seedData.mjs'
 import { getRoleDisplayName } from '../src/erp/utils/roleKeys.mjs'
 import { getBusinessModuleGroup } from '../src/erp/utils/businessModuleGroups.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../src/erp/utils/businessSearchScopes.mjs'
+import { getHistoryCenterSources } from '../src/erp/utils/historyRecordCatalog.mjs'
 import {
   buildYoyoosunLocalEntryAudit,
   defaultYoyoosunEntryAuditPorts,
@@ -117,10 +117,16 @@ function expectedMenusForRole(roleKey) {
     (item) => item.roleKey === roleKey
   )
   assert(profile, `missing yoyoosun role projection: ${roleKey}`)
-  return profile.menuSurfaces
+  const labels = profile.menuSurfaces
     .filter((pageKey) => !routeOnlyCustomerMenuKeys.has(pageKey))
     .map((pageKey) => menuLabelByKey.get(pageKey))
     .filter(Boolean)
+  const history = getHistoryCenterSources({
+    visibleMenuPaths: profile.menuSurfaces.map((key) => pageDefinitionByKey.get(key)?.path).filter(Boolean),
+    canReadPermission: (key) => profile.capabilityKeys.includes(key),
+  })
+  if (history.length) labels.push(navigationItemRegistry['history-records'].label)
+  return labels
 }
 
 const desktopAccounts = [
@@ -1420,19 +1426,17 @@ async function verifyDesktopAccount(browser, account) {
       state: 'visible',
       timeout: 15_000,
     })
-    await page
-      .getByRole('button', { name: /^账号菜单：/u })
-      .filter({
-        hasText: account.username,
-      })
-      .waitFor({
-        state: 'visible',
-        timeout: 15_000,
-      })
     const legalNotice = await handleLegalNoticeGate(page, {
       username: account.username,
       legalNoticeState,
     })
+    const accountMenu = page.getByRole('button', { name: /^账号菜单：/u })
+    await accountMenu.waitFor({ state: 'visible', timeout: 15_000 })
+    await accountMenu.click()
+    await page.locator('.erp-account-menu__identity')
+      .getByText(`账号：${account.username}`, { exact: true })
+      .waitFor({ state: 'visible', timeout: 15_000 })
+    await accountMenu.click()
     const expectedVisibleMenus = visibleCustomerMenuLabels(
       account.expectedMenus
     ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
@@ -1479,6 +1483,12 @@ async function verifyDesktopAccount(browser, account) {
         requestTracker
       )
       await verifyForbiddenRolePages(page, routeAccess)
+      if (account.expectedMenus.includes(navigationItemRegistry['history-records'].label)) {
+        pagePerformance.push(...await verifyAllowedRolePages(page, {
+          username: account.username,
+          allowedPages: [pageRouteTarget('history-records')],
+        }, requestTracker))
+      }
     }
     const diagnostic = await verifyEffectiveSessionDiagnostic(page, {
       username: account.username,
@@ -1498,10 +1508,6 @@ async function verifyDesktopAccount(browser, account) {
   } finally {
     await context.close()
   }
-}
-
-async function findVisibleMenuItem(page, label) {
-  return findVisibleBusinessPage(page, label)
 }
 
 async function verifyRoleGuidedMenuStructure(page, username) {
@@ -1563,29 +1569,23 @@ async function verifyRoleGuidedMenuStructure(page, username) {
 async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
   const measurements = []
   for (const target of routeAccess.allowedPages) {
+    await page.goto('about:blank', { waitUntil: 'load' })
     requestTracker.begin({
       username: routeAccess.username,
       label: target.label,
       path: target.path,
     })
-    const menuItem = target.sidebarVisible
-      ? await findVisibleMenuItem(page, target.label)
-      : null
-    if (menuItem) {
-      await menuItem.click()
-    } else {
-      await page.goto(new URL(target.path, `${baseURL}/`).toString(), {
-        waitUntil: 'domcontentloaded',
-      })
-    }
+    // 每页独立加载用于验证岗位访问；侧栏投影在上层单独精确核对。
+    await page.goto(new URL(target.path, `${baseURL}/`).toString(), {
+      waitUntil: 'domcontentloaded',
+    })
     await page.waitForURL((url) => url.pathname === target.path, {
       timeout: 15_000,
     })
     await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 })
-    // A SPA URL can change while the previous page is still visible and its
-    // network-idle lifecycle is satisfied. Require the destination to commit.
-    const pageTitle =
-      target.key === 'production-exceptions' ? '生产记录' : target.title
+    // 数据采样从目标页标题及内容出现后开始，不把 URL 加载当成页面就绪。
+    const group = getBusinessModuleGroup(target.path)
+    const pageTitle = group?.tabs.length > 1 ? group.label : target.title
     const main = page.getByRole('main')
     await main
       .getByRole('heading', { name: pageTitle, exact: true })
@@ -1810,21 +1810,21 @@ async function verifyMobileAccount(browser, { username, roleKey }) {
       state: 'visible',
       timeout: 15_000,
     })
+    const legalNotice = await handleLegalNoticeGate(page, {
+      username,
+      legalNoticeState,
+    })
     const taskTab = page
       .getByTestId('mobile-role-bottom-nav')
       .getByRole('tab', { name: '任务管理', exact: true })
     await taskTab.click()
     assert.equal(await taskTab.getAttribute('aria-selected'), 'true')
     await page
-      .getByRole('radiogroup', { name: '任务状态', exact: true })
+      .getByRole('tablist', { name: '任务状态', exact: true })
       .waitFor({
         state: 'visible',
         timeout: 15_000,
       })
-    const legalNotice = await handleLegalNoticeGate(page, {
-      username,
-      legalNoticeState,
-    })
     await page.screenshot({
       path: path.resolve(outputDir, `${username}-${roleKey}-mobile.png`),
       fullPage: true,

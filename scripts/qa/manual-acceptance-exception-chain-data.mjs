@@ -109,7 +109,15 @@ async function completeHuman(
   rpc,
   plan,
   data,
-  { actor, sourceType, sourceID, nodeKey, decision, apply },
+  {
+    actor,
+    sourceType,
+    sourceID,
+    nodeKey,
+    decision,
+    apply,
+    action = "complete",
+  },
 ) {
   const node = processNode(data, nodeKey);
   const tasks = await list(rpc, actor, "workflow", "list_tasks", "tasks", {
@@ -134,23 +142,37 @@ async function completeHuman(
   );
   if (node.status === "active" && task.task_status_key === "ready" && apply) {
     task = (
-      await call(rpc, actor, "workflow", "complete_task_action", {
-        task_id: task.id,
-        expected_version: task.version,
-        idempotency_key: identity(plan, `${nodeKey}:${task.id}:complete`),
-        action_key: "complete",
-        reason: NOTE,
-        payload: {
-          surface_key: "workflow_business_module",
-          feedback: NOTE,
-          ...(decision
-            ? { process_decision: { reason: NOTE, ...decision } }
-            : {}),
+      await call(
+        rpc,
+        actor,
+        "workflow",
+        action === "reject" ? "reject_task_action" : "complete_task_action",
+        {
+          task_id: task.id,
+          expected_version: task.version,
+          idempotency_key: identity(plan, `${nodeKey}:${task.id}:${action}`),
+          action_key: action,
+          reason: NOTE,
+          payload: {
+            surface_key: "workflow_business_module",
+            ...(action === "complete"
+              ? {
+                  feedback: NOTE,
+                  ...(decision
+                    ? { process_decision: { reason: NOTE, ...decision } }
+                    : {}),
+                }
+              : {}),
+          },
         },
-      })
+      )
     ).task;
   }
-  assert.equal(task.task_status_key, "done", `${nodeKey} task is not done`);
+  assert.equal(
+    task.task_status_key,
+    action === "reject" ? "rejected" : "done",
+    `${nodeKey} task outcome drifted`,
+  );
   return task;
 }
 
@@ -698,6 +720,69 @@ async function wipState(rpc, orderID) {
   });
 }
 
+export function selectManualAcceptanceWIPExceptionInspection(state, batchID) {
+  const active = state.quality_inspections.filter(
+    (item) =>
+      item.production_wip_batch_id === batchID && item.status !== "CANCELLED",
+  );
+  const rejected = active.filter((item) => item.status === "REJECTED");
+  return requireRecord(
+    exact(
+      rejected.length ? rejected : active,
+      "production_wip_batch_id",
+      batchID,
+    ),
+    "WIP disposition inspection",
+  );
+}
+
+export function assertManualAcceptanceConcessionResult(
+  state,
+  batch,
+  inspection,
+) {
+  const operation = requireRecord(
+    state.production_order_operations.find(
+      (item) => item.id === batch.production_order_operation_id,
+    ),
+    "concession operation",
+  );
+  const gates = operation.required_quality_gates;
+  assert.ok(
+    Array.isArray(gates) && gates.length > 0,
+    "concession route gates are missing",
+  );
+  const index = gates.indexOf(inspection.gate_code);
+  assert.ok(
+    index >= 0,
+    "concession inspection gate is not in its frozen route",
+  );
+  const nextGate = gates[index + 1];
+  assert.equal(
+    state.production_wip_batches.find((item) => item.id === batch.id)?.status,
+    nextGate ? "WAITING_QUALITY" : "ACCEPTED",
+  );
+  if (nextGate) {
+    const next = requireRecord(
+      exact(
+        state.quality_inspections.filter(
+          (item) =>
+            item.production_wip_batch_id === batch.id &&
+            item.status !== "CANCELLED",
+        ),
+        "gate_code",
+        nextGate,
+      ),
+      "concession next inspection",
+    );
+    assert.equal(
+      next.status,
+      "DRAFT",
+      "reversal specimen must preserve an untouched next quality gate",
+    );
+  }
+}
+
 async function wipAction(rpc, plan, batch, action, extra = {}) {
   await call(
     rpc,
@@ -790,7 +875,7 @@ async function ensureProductionExceptionExecution({
   let data = await ensureProcess(
     rpc,
     plan,
-    "production",
+    "sales",
     "production_exception",
     "production_exception_id",
     decision.id,
@@ -887,9 +972,8 @@ export async function ensureProductionExceptionChain({
   if (batch.status === "IN_PROGRESS" && apply)
     batch = await wipAction(rpc, plan, batch, "COMPLETE_OPERATION");
   state = await wipState(rpc, orderID);
-  let inspection = exact(
-    state.quality_inspections,
-    "production_wip_batch_id",
+  let inspection = selectManualAcceptanceWIPExceptionInspection(
+    state,
     batch.id,
   );
   inspection = await decideQuality(rpc, inspection, "REJECT", apply);
@@ -917,7 +1001,7 @@ export async function ensureProductionExceptionChain({
       decision = (
         await call(
           rpc,
-          "production",
+          "sales",
           "operational_fact",
           "submit_production_exception",
           {
@@ -959,10 +1043,13 @@ export async function ensureProductionExceptionChain({
     tasks.push(...execution.tasks);
     if (decision.execution_status === "APPLIED" && apply) {
       state = await wipState(rpc, orderID);
-      assert.equal(
-        state.production_wip_batches.find((row) => row.id === batch.id).status,
-        type === "SCRAP" ? "CANCELLED" : "ACCEPTED",
-      );
+      if (type === "SCRAP")
+        assert.equal(
+          state.production_wip_batches.find((row) => row.id === batch.id)
+            .status,
+          "CANCELLED",
+        );
+      else assertManualAcceptanceConcessionResult(state, batch, inspection);
       decision = (
         await call(
           rpc,
@@ -1002,6 +1089,301 @@ function pick(record, keys) {
   return Object.fromEntries(
     keys.filter((key) => record[key] != null).map((key) => [key, record[key]]),
   );
+}
+
+export const MANUAL_ACCEPTANCE_WIP_EXCEPTION_TYPES = Object.freeze([
+  "WIP_CONCESSION",
+  "SCRAP",
+  "REWORK_ORIGINAL",
+  "REWORK_SWITCH",
+  "REMAKE",
+]);
+
+export function buildManualAcceptanceWIPExceptionScenarios() {
+  // 每个已完工批次留两件独立返工；避开关单、已有返工、预留和草稿返工来源。
+  const occupied = new Set([0, 3, 4, 5, 10, 11, 16, 17, 20, 21]);
+  const sources = Array.from({ length: 45 }, (_, i) => i)
+    .filter((i) => !occupied.has(i))
+    .slice(0, 30);
+  return MANUAL_ACCEPTANCE_WIP_EXCEPTION_TYPES.flatMap((type, typeIndex) =>
+    ["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"].flatMap(
+      (status, stateIndex) =>
+        Array.from({ length: 3 }, (_, copy) => {
+          const offset = typeIndex * 12 + stateIndex * 3 + copy;
+          return {
+            type,
+            status,
+            sourceIndex: sources[Math.floor(offset / 2)],
+            sequence: 1201 + offset,
+          };
+        }),
+    ),
+  );
+}
+
+export async function ensureManualAcceptanceWIPExceptionScenario({
+  rpc,
+  plan,
+  production,
+  scenario,
+  apply,
+}) {
+  const { type, status, sourceIndex, sequence } = scenario;
+  assert.ok(MANUAL_ACCEPTANCE_WIP_EXCEPTION_TYPES.includes(type));
+  assert.ok(
+    ["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"].includes(status),
+  );
+  const source = production[sourceIndex];
+  const order = requireRecord(source?.order, "WIP exception source order");
+  const rework = await ensureReworkFact({
+    rpc,
+    plan,
+    completion: requireRecord(
+      source.completion,
+      "WIP exception source completion",
+    ),
+    sequence,
+    apply,
+  });
+  let state = await wipState(rpc, order.id);
+  let batch = requireRecord(
+    exact(state.production_wip_batches, "origin_rework_fact_id", rework.id),
+    "independent rejected WIP",
+  );
+  if (batch.status === "PLANNED" && !batch.execution_mode && apply)
+    batch = await wipAction(rpc, plan, batch, "ASSIGN_EXECUTION", {
+      execution_mode: "IN_HOUSE",
+    });
+  if (batch.status === "PLANNED" && apply)
+    batch = await wipAction(rpc, plan, batch, "START_OPERATION");
+  if (batch.status === "IN_PROGRESS" && apply)
+    batch = await wipAction(rpc, plan, batch, "COMPLETE_OPERATION");
+  state = await wipState(rpc, order.id);
+  const quality = selectManualAcceptanceWIPExceptionInspection(state, batch.id);
+  let inspection = match(
+    (
+      await call(rpc, "quality", "quality", "get_quality_inspection", {
+        id: quality.id,
+      })
+    ).quality_inspection,
+    {
+      production_wip_batch_id: batch.id,
+      source_type: "PRODUCTION_WIP",
+      source_id: batch.id,
+    },
+    "WIP exception inspection source",
+  );
+  inspection = await decideQuality(rpc, inspection, "REJECT", apply);
+  state = await wipState(rpc, order.id);
+  batch = match(
+    state.production_wip_batches.find((item) => item.id === batch.id),
+    { status: "REJECTED", quantity: "1" },
+    "WIP exception batch",
+  );
+  const createsBatch = ["REWORK_ORIGINAL", "REWORK_SWITCH", "REMAKE"].includes(
+    type,
+  );
+  const operation = createsBatch
+    ? requireRecord(
+        state.production_order_operations.find((item) =>
+          type === "REMAKE"
+            ? item.production_order_item_id ===
+                batch.production_order_item_id &&
+              item.operation_code === "FABRIC_PROCESSING"
+            : item.id === batch.production_order_operation_id,
+        ),
+        "WIP exception target operation",
+      )
+    : undefined;
+  let supplierID;
+  if (["REWORK_SWITCH", "REMAKE"].includes(type)) {
+    const contract = (
+      await call(
+        rpc,
+        "production",
+        "outsourcing_order",
+        "get_outsourcing_order",
+        {
+          id: plan.productionCandidates[sourceIndex].fabricOutsourcing.order.id,
+        },
+      )
+    ).outsourcing_order;
+    supplierID = requireRecord(
+      contract,
+      "WIP exception target contract",
+    ).supplier_id;
+    assert.ok(Number.isSafeInteger(supplierID) && supplierID > 0);
+  }
+  const decisionNo = businessNo(plan, "SCYC", sequence);
+  const expected = {
+    decision_no: decisionNo,
+    decision_type: type,
+    production_order_id: order.id,
+    production_order_item_id: batch.production_order_item_id,
+    production_wip_batch_id: batch.id,
+    quality_inspection_id: inspection.id,
+    requested_quantity: batch.quantity,
+    ...(operation ? { target_operation_id: operation.id } : {}),
+    ...(supplierID ? { target_supplier_id: supplierID } : {}),
+  };
+  let decision = exact(
+    await list(
+      rpc,
+      "sales",
+      "operational_fact",
+      "list_production_exceptions",
+      "production_exceptions",
+      { production_order_id: order.id },
+    ),
+    "decision_no",
+    decisionNo,
+  );
+  if (!decision && apply)
+    decision = (
+      await call(
+        rpc,
+        "sales",
+        "operational_fact",
+        "submit_production_exception",
+        {
+          ...expected,
+          reason: NOTE,
+          idempotency_key: identity(plan, decisionNo),
+        },
+      )
+    ).production_exception;
+  match(decision, expected, decisionNo);
+  assert.equal(
+    decision.production_material_requirement_id ?? null,
+    null,
+    "WIP request must not retain a material requirement",
+  );
+  assert.equal(
+    decision.target_operation_id ?? null,
+    operation?.id ?? null,
+    "WIP target operation drifted",
+  );
+  assert.equal(
+    decision.target_supplier_id ?? null,
+    supplierID ?? null,
+    "WIP target supplier drifted",
+  );
+  if (status === "CANCELLED") {
+    if (decision.status === "SUBMITTED" && apply)
+      decision = (
+        await call(
+          rpc,
+          "sales",
+          "operational_fact",
+          "cancel_production_exception",
+          { id: decision.id, expected_version: decision.version, reason: NOTE },
+        )
+      ).production_exception;
+    assert.equal(decision.status, status);
+    const process = await readProcess(
+      rpc,
+      "sales",
+      "production_exception",
+      "production_exception_id",
+      decision.id,
+    );
+    assert.ok(
+      !process.process_context,
+      "withdrawn request must not have a fabricated process",
+    );
+    return {
+      rework,
+      inspection,
+      decision: {
+        ...decision,
+        production_order_no: order.order_no,
+        process_instance_id: null,
+        approval_task_id: null,
+        approval_task_code: null,
+        approval_process_node_id: null,
+      },
+    };
+  }
+  let data = await ensureProcess(
+    rpc,
+    plan,
+    "sales",
+    "production_exception",
+    "production_exception_id",
+    decision.id,
+    apply,
+  );
+  if (["APPROVED", "REJECTED"].includes(status)) {
+    await completeHuman(rpc, plan, data, {
+      actor: "boss",
+      sourceType: "production_exception_decision",
+      sourceID: decision.id,
+      nodeKey: "production_exception_decision_approval",
+      decision:
+        status === "APPROVED" ? { approved_quantity: batch.quantity } : {},
+      action: status === "REJECTED" ? "reject" : "complete",
+      apply,
+    });
+    data = await readProcess(
+      rpc,
+      "sales",
+      "production_exception",
+      "production_exception_id",
+      decision.id,
+    );
+  }
+  decision = match(
+    data.source_readback,
+    { ...expected, status, execution_status: "PENDING" },
+    decisionNo,
+  );
+  const node = processNode(data, "production_exception_decision_approval");
+  const tasks = await list(rpc, "boss", "workflow", "list_tasks", "tasks", {
+    source_type: "production_exception_decision",
+    source_id: decision.id,
+  });
+  const task = requireRecord(
+    exact(
+      tasks.filter(
+        (item) => item.process_instance_id === node.process_instance_id,
+      ),
+      "process_node_instance_id",
+      node.id,
+    ),
+    "WIP exception approval task",
+  );
+  assert.equal(
+    task.task_code,
+    `PROC-${node.process_instance_id}-NODE-${node.id}-A1`,
+  );
+  assert.equal(
+    task.task_status_key,
+    { SUBMITTED: "ready", APPROVED: "done", REJECTED: "rejected" }[status],
+  );
+  state = await wipState(rpc, order.id);
+  assert.equal(
+    state.production_wip_batches.find((item) => item.id === batch.id)?.status,
+    "REJECTED",
+    "approval must leave disposition unapplied",
+  );
+  assert.equal(
+    state.production_wip_batches.filter(
+      (item) => item.origin_exception_decision_id === decision.id,
+    ).length,
+    0,
+  );
+  return {
+    rework,
+    inspection,
+    decision: {
+      ...decision,
+      production_order_no: order.order_no,
+      process_instance_id: node.process_instance_id,
+      approval_task_id: task.id,
+      approval_task_code: task.task_code,
+      approval_process_node_id: node.id,
+    },
+  };
 }
 
 export async function ensureOutsourcingDispositionChain({
@@ -1281,6 +1663,42 @@ export async function ensureOutsourcingDispositionChain({
     batch = await wipAction(rpc, plan, batch, "START_OPERATION");
   if (batch.status === "OUTSOURCED" && apply)
     batch = await wipAction(rpc, plan, batch, "RECEIVE_OUTSOURCING_RETURN");
+  // 工序回货只推进 WIP；库存退货使用独立的产品委外来源，不伪造工序库存回货。
+  const stockSource = plan.outsourcingCandidates[0]?.return;
+  const stockContract = requireRecord(
+    (
+      await call(rpc, "admin", "outsourcing_order", "get_outsourcing_order", {
+        id: requireRecord(
+          stockSource?.order,
+          "product outsourcing return source",
+        ).id,
+      })
+    ).outsourcing_order,
+    "product outsourcing contract",
+  );
+  assert.ok(
+    !stockContract.source_wip_batch_id,
+    "stock return must not use a WIP contract",
+  );
+  const stockLines = await list(
+    rpc,
+    "admin",
+    "outsourcing_order",
+    "list_outsourcing_order_items",
+    "outsourcing_order_items",
+    { outsourcing_order_id: stockContract.id },
+  );
+  const stockLine = match(
+    stockLines.find(
+      (item) => item.id === stockSource.item.outsourcingOrderItemId,
+    ),
+    {
+      subject_type: "PRODUCT",
+      product_id: stockSource.item.subjectId,
+      unit_id: stockSource.item.unitId,
+    },
+    "product outsourcing return line",
+  );
   const factNo = businessNo(plan, "WWHG", 981);
   let returned = exact(
     await list(
@@ -1303,8 +1721,8 @@ export async function ensureOutsourcingDispositionChain({
         "create_outsourcing_return_receipt_from_order",
         {
           fact_no: factNo,
-          outsourcing_order_id: outsourcingOrder.id,
-          outsourcing_order_item_id: line.id,
+          outsourcing_order_id: stockContract.id,
+          outsourcing_order_item_id: stockLine.id,
           warehouse_id: plan.productWarehouse.id,
           quantity: batch.quantity,
           new_lot_no: businessNo(plan, "WWCP", 981),
@@ -1320,13 +1738,13 @@ export async function ensureOutsourcingDispositionChain({
       fact_no: factNo,
       fact_type: "RETURN_RECEIPT",
       subject_type: "PRODUCT",
-      subject_id: sourceItem.product_id,
-      product_sku_id: sourceItem.product_sku_id,
-      unit_id: sourceItem.unit_id,
+      subject_id: stockLine.product_id,
+      product_sku_id: stockLine.product_sku_id ?? null,
+      unit_id: stockLine.unit_id,
       warehouse_id: plan.productWarehouse.id,
       source_type: "OUTSOURCING_ORDER",
-      source_id: outsourcingOrder.id,
-      source_line_id: line.id,
+      source_id: stockContract.id,
+      source_line_id: stockLine.id,
       quantity: batch.quantity,
     },
     factNo,
@@ -1430,7 +1848,7 @@ export async function ensureOutsourcingDispositionChain({
       quality_inspection_id: inspection.id,
       outsourcing_return_fact_id: returned.id,
       disposition_type: "RETURN_TO_VENDOR",
-      production_wip_batch_id: batch.id,
+      production_wip_batch_id: null,
       quantity: batch.quantity,
     },
     dispositionNo,
@@ -1498,7 +1916,7 @@ export async function ensureOutsourcingDispositionChain({
     decision = (
       await call(
         rpc,
-        "production",
+        "sales",
         "operational_fact",
         "submit_production_exception",
         {
@@ -1576,6 +1994,9 @@ export async function ensureOutsourcingDispositionChain({
     supplier,
     productionOrder: order,
     outsourcingOrder,
+    wipOutsourcingLine: line,
+    stockSourceContract: stockContract,
+    stockSourceLine: stockLine,
     rework,
     batch,
     allocation: state.outsourcing_allocations.find(
@@ -1780,8 +2201,18 @@ export function assertManualAcceptanceExceptionChainCoverage(data) {
   );
   assert.equal(
     outsourcing.allocation.outsourcing_order_item_id,
-    outsourcing.returnFact.source_line_id,
+    outsourcing.wipOutsourcingLine.id,
   );
+  assert.equal(
+    outsourcing.returnFact.source_id,
+    outsourcing.stockSourceContract.id,
+  );
+  assert.equal(
+    outsourcing.returnFact.source_line_id,
+    outsourcing.stockSourceLine.id,
+  );
+  assert.ok(!outsourcing.stockSourceContract.source_wip_batch_id);
+  assert.ok(!outsourcing.records[0].production_wip_batch_id);
   assert.equal(outsourcing.returnFact.status, "POSTED");
   assert.equal(outsourcing.inspection.source_id, outsourcing.returnFact.id);
   assert.equal(outsourcing.inspection.source_type, "OUTSOURCING_FACT");

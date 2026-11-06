@@ -125,7 +125,7 @@ test("preserves protocol, release, data format and business versions", () => {
       "PLUSH_SEW_HAND_V1 / route_version=1",
       "BOM V1 and V2",
       "SalesOrdersPage and BUSINESS_ROUTE_PATHS",
-      "2026.09.27-v8 is a frozen simulated dataset identity",
+      "2026.11.07-v9 is a frozen simulated dataset identity",
       "plush.execution-receipt/v3 is a serialized format identifier",
       "decodeEnvelopeV2 and GitLabV4Client are format and external protocol names",
     ].join("\n"),

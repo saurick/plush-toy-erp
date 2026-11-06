@@ -8,6 +8,7 @@ import {
   applySourceDrivenFactPlan,
   buildSourceDrivenFactPlan,
   executeProductionWIPAction,
+  ensureSourceDrivenProductionRoute,
   manualAcceptanceBusinessNo,
   manualAcceptanceRPCParams,
   preflightSourceDrivenFactPlan,
@@ -41,7 +42,11 @@ test("source document request params share strict reads and retain explicit inpu
       }),
       { customer_key: "yoyoosun", id: 7, actor_id: 99 },
     );
-    assert.deepEqual(unexpected, { id: 7, customer_key: "other", actor_id: 99 });
+    assert.deepEqual(unexpected, {
+      id: 7,
+      customer_key: "other",
+      actor_id: 99,
+    });
   }
 });
 
@@ -160,10 +165,12 @@ function createRPC({
   available = "50",
   conflictMethod,
   prepostedCreateMethods = new Set(),
+  interruptBeforePackaging = false,
 } = {}) {
   const calls = [];
   const records = new Map();
   let nextID = 1000;
+  let packagingInterrupted = false;
   let outsourcingQualityInspection;
   let finishedGoodsQualityInspection;
   let shipmentFinanceApprovalTask;
@@ -331,6 +338,15 @@ function createRPC({
         const operation = productionWIPOperations.find(
           (item) => item.id === batch.production_order_operation_id,
         );
+        if (
+          interruptBeforePackaging &&
+          !packagingInterrupted &&
+          operation.operation_code === "PACKAGING" &&
+          params.action === "ASSIGN_EXECUTION"
+        ) {
+          packagingInterrupted = true;
+          throw new Error("packaging interrupted after completion posted");
+        }
         if (params.action === "ASSIGN_EXECUTION") {
           assert.equal(batch.status, "PLANNED");
           if (operation.operation_code === "FABRIC_PROCESSING") {
@@ -434,6 +450,9 @@ function createRPC({
         return createRecord(
           "production_fact",
           {
+            fact_type: "FINISHED_GOODS_RECEIPT",
+            source_id: params.production_order_id,
+            production_order_item_id: params.production_order_item_id,
             production_wip_batch_id: params.production_wip_batch_id ?? null,
             quantity: params.quantity,
           },
@@ -792,6 +811,12 @@ function createRPC({
     calls,
     rpc,
     getDeliveryNodes: () => structuredClone(deliveryNodes || []),
+    getCompletion: () =>
+      structuredClone(
+        [...records.values()].find(
+          (record) => record.item.fact_type === "FINISHED_GOODS_RECEIPT",
+        )?.item,
+      ),
   };
 }
 
@@ -809,6 +834,68 @@ test("plan is no-write and missing source-driven references are explicitly block
     ["production", "outsourcing", "sales"],
   );
   assert.match(plan.blocked[0].reason, /sourceDrivenFacts is missing/u);
+});
+
+test("posted completion resumes unfinished packaging without recreating ledger facts", async () => {
+  const plan = buildSourceDrivenFactPlan(sourceReport(), {
+    enabledPhases: ["production"],
+  });
+  const fixture = createRPC({ interruptBeforePackaging: true });
+  await assert.rejects(
+    () =>
+      applySourceDrivenFactPlan(plan, {
+        rpc: fixture.rpc,
+        confirmation: sourceDrivenFactConfirmation(plan),
+        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+      }),
+    /packaging interrupted/u,
+  );
+  const args = {
+    rpc: fixture.rpc,
+    plan,
+    order: { id: 600, status: "RELEASED" },
+    completion: fixture.getCompletion(),
+  };
+  assert.equal(args.completion.status, "POSTED");
+  const before = fixture.calls.length;
+  await assert.rejects(
+    () => ensureSourceDrivenProductionRoute({ ...args, apply: false }),
+    /packaging is incomplete/u,
+  );
+  assert.ok(
+    fixture.calls
+      .slice(before)
+      .every((call) => /^(?:get_|list_)/u.test(call.method)),
+  );
+  const recoveryStart = fixture.calls.length;
+  await ensureSourceDrivenProductionRoute({ ...args, apply: true });
+  assert.ok(
+    fixture.calls
+      .slice(recoveryStart)
+      .filter((call) => call.method === "execute_production_wip_action")
+      .every((call) => call.actor === "warehouse"),
+  );
+  assert.ok(
+    !fixture.calls
+      .slice(recoveryStart)
+      .some((call) => /^(?:create_|post_)/u.test(call.method)),
+  );
+  const verifiedStart = fixture.calls.length;
+  await ensureSourceDrivenProductionRoute({ ...args, apply: false });
+  assert.ok(
+    fixture.calls
+      .slice(verifiedStart)
+      .every((call) => /^(?:get_|list_)/u.test(call.method)),
+  );
+  await assert.rejects(
+    () =>
+      ensureSourceDrivenProductionRoute({
+        ...args,
+        completion: { ...args.completion, production_order_item_id: 999 },
+        apply: true,
+      }),
+    /exact fixed route/u,
+  );
 });
 
 test("source candidates retain exact blocked readiness without becoming writable facts", () => {
@@ -1011,7 +1098,7 @@ test("phase-scoped apply executes the formal production chain and returns exact 
       "production",
       "warehouse",
       "sales",
-      "production",
+      "warehouse",
       "warehouse",
       "warehouse",
     ],
@@ -1033,7 +1120,7 @@ test("phase-scoped apply executes the formal production chain and returns exact 
   );
 });
 
-test("registered WIP planning actions keep their production actor across operations and reject unknown commands without RPC", async () => {
+test("WIP planning follows packaging assignment ownership and rejects unknown commands without RPC", async () => {
   const requests = [];
   const rpc = async (request) => {
     requests.push(request);
@@ -1058,7 +1145,10 @@ test("registered WIP planning actions keep their production actor across operati
         domain: "production_wip",
         method: "execute_production_wip_action",
         params,
-        actor: "production",
+        actor:
+          operation === "PACKAGING" && action === "ASSIGN_EXECUTION"
+            ? "warehouse"
+            : "production",
       });
     }
   }
@@ -1125,7 +1215,7 @@ test("the full WIP walker records production planning before warehouse packaging
     ["HANDWORK", "COMPLETE_OPERATION", "production"],
     ["HANDWORK", "TRANSFER_TO_NEXT_OPERATION", "warehouse"],
     ["PACKAGING", "CONFIRM_PACKAGING_MATERIAL", "sales"],
-    ["PACKAGING", "ASSIGN_EXECUTION", "production"],
+    ["PACKAGING", "ASSIGN_EXECUTION", "warehouse"],
     ["PACKAGING", "START_OPERATION", "warehouse"],
     ["PACKAGING", "COMPLETE_OPERATION", "warehouse"],
   ]);
@@ -1280,7 +1370,15 @@ test("outsourcing quality apply sends the required approximate defect-rate pair"
     customer_key: "yoyoosun",
     id: report.results.outsourcing.qualityInspection.id,
     result: "PASS",
-    check_items: [{ name: "外观与约定要求", requirement: "符合来源订单及确认样", observation: "模拟逐项检查符合约定", result: "PASS", scope: "FULL" }],
+    check_items: [
+      {
+        name: "外观与约定要求",
+        requirement: "符合来源订单及确认样",
+        observation: "逐项检查符合约定",
+        result: "PASS",
+        scope: "FULL",
+      },
+    ],
     defect_rate_operator: "APPROX",
     defect_rate_percent: "5",
     decision_note: "按订单办理。",

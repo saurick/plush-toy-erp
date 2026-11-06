@@ -40,6 +40,8 @@ import {
   resolveManualAcceptanceRoleCredential,
 } from "./manual-acceptance-account-identities.mjs";
 
+import { MANUAL_ACCEPTANCE_PRODUCT_STYLES, reconcileManualAcceptanceProductImages } from "./manual-acceptance-product-images.mjs";
+
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/source-data";
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT";
@@ -590,7 +592,7 @@ function buildProducts(prefix, count, skusPerProduct) {
       name: animals[offset % animals.length],
       style_no: `${27000 + index}${index % 4 === 0 ? "-1" : "#"}`,
       unitKey: unitKeys[offset % unitKeys.length],
-      isActive: index <= count - 2,
+      isActive: index <= count - Math.min(3, count - 1),
     };
     product.skus = Array.from({ length: skusPerProduct }, (_, skuOffset) => ({
       sku_code: `${prefix}-GG-${pad(index, 3)}-${pad(skuOffset + 1)}`,
@@ -753,14 +755,23 @@ function buildPurchaseOrders(
   anchorDate,
 ) {
   const statuses = ["DRAFT", "SUBMITTED", "APPROVED", "CLOSED", "CANCELED"];
+  const materialsBySupplier = new Map();
+  for (const material of materials.filter((item) => item.isActive)) {
+    const group = materialsBySupplier.get(material.supplierRef) || [];
+    group.push(material);
+    materialsBySupplier.set(material.supplierRef, group);
+  }
+  const purchaseSuppliers = suppliers.filter((item) => item.isActive && ["material", "mixed"].includes(item.supplier_type) && materialsBySupplier.has(item.code));
+  if (!purchaseSuppliers.length) throw new CliError("purchase source has no active supplier with owned materials");
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
-    const supplier = suppliers[offset % Math.min(suppliers.length - 5, 45)];
+    const supplier = purchaseSuppliers[offset % purchaseSuppliers.length];
+    const ownedMaterials = materialsBySupplier.get(supplier.code);
     const lines = Array.from(
       { length: lineCountFor(index) },
       (_, lineOffset) => {
         const material =
-          materials[(offset + lineOffset) % Math.min(materials.length - 6, 74)];
+          ownedMaterials[(Math.floor(offset / purchaseSuppliers.length) + lineOffset) % ownedMaterials.length];
         const quantity =
           lineOffset === 0 && index % 10 === 0
             ? 88888
@@ -840,11 +851,12 @@ function buildOutsourcingOrders(
   const activeProcesses = processes.filter(
     (item) => item.isActive && item.outsourcing_enabled,
   );
+  const outsourcingSuppliers = suppliers.filter((item) => item.isActive && ["outsourcing", "mixed"].includes(item.supplier_type));
   const processingItems = ["本体*1", "耳朵*2", "尾巴*1", "配件*1"];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
     const supplier =
-      suppliers[(offset * 3 + 3) % Math.min(suppliers.length - 5, 45)];
+      outsourcingSuppliers[offset % outsourcingSuppliers.length];
     const supplierContact =
       supplier.contacts.find((contact) => contact.is_primary) ||
       supplier.contacts[0];
@@ -1314,6 +1326,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     sourceScaleProfile,
     scale,
     records,
+    productImageCatalog: MANUAL_ACCEPTANCE_PRODUCT_STYLES.map(({ key, name, sha256 }) => ({ key, name, sha256 })),
     coreSemanticDigest: MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST,
     unitUsage,
     salesOrderAcceptanceReplay,
@@ -1325,6 +1338,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
       sourceScaleProfile,
       scale,
       records,
+      productImageCatalog: MANUAL_ACCEPTANCE_PRODUCT_STYLES.map(({ key, name, sha256 }) => ({ key, name, sha256 })),
       salesOrderAcceptanceReplay,
       unitUsage,
     }),
@@ -4769,6 +4783,11 @@ export async function applyManualAcceptanceSourceData(
     fetchImpl,
     report,
   });
+  report.productImages = await reconcileManualAcceptanceProductImages({
+    products: plan.records.products.map((record) => ({ ...record, id: refs.products.get(record.code)?.id })),
+    apply: true,
+    rpc: ({ domain, method, params }) => rpcCall({ backendURL: plan.backendURL, domain, method, params, token: tokens.seedAdmin || tokens.engineering, fetchImpl }),
+  });
   const sourceDocuments = await createSourceDocuments({
     plan,
     tokens: { ...writeTokens, finance: tokens.finance },
@@ -4853,6 +4872,7 @@ export async function applyManualAcceptanceSourceData(
         code: record.code,
         id: refs.materials.get(record.code).id,
         name: record.name,
+        supplierId: refs.suppliers.get(record.supplierRef).id,
         unitKey: record.unitKey,
         unitId: refs.unitsByKey[record.unitKey].id,
         unitCode: refs.unitsByKey[record.unitKey].code,
@@ -5197,6 +5217,14 @@ export async function verifyManualAcceptanceSourceData(
       (status) => !counts[status],
     );
     const detailErrors = [];
+    if (key === "products") {
+      try {
+        await reconcileManualAcceptanceProductImages({
+          products: plan.records.products.map((record) => ({ ...record, id: items.find((item) => item.code === record.code)?.id })),
+          rpc: ({ domain, method, params }) => rpcCall({ backendURL: plan.backendURL, domain, method, params, token: tokens.engineering, fetchImpl }),
+        });
+      } catch (error) { detailErrors.push(String(error.message).slice(0, 300)); }
+    }
     if (key === "bom_versions") {
       const plannedByVersion = new Map(
         plan.records.bomVersions.map((item) => [`${productIDs.get(item.productRef)}:${item.version}`, item]),

@@ -59,7 +59,7 @@ test("test-data-isolation-boundary: dataset target checks stay atomic and fail c
       ),
     ),
   );
-  assert.equal(CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION, "2026.09.27-v8");
+  assert.equal(CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION, "2026.11.07-v9");
   assert(
     dataset.forbidden.some((rule) =>
       rule.pattern.test('const legacy = "2026.07.15-v1";'),
@@ -122,19 +122,19 @@ CustomerConfigTrialProductVersion = manualAcceptanceContract.CustomerTrial133.Ta
   assert.equal(
     backend.pattern.test(canonical.replace(
       'manualAcceptanceContract.CustomerTrial133.Target + "-test-" + manualAcceptanceContract.DataVersion',
-      '"customer-trial-133-test-2026.09.27-v8"',
+      '"customer-trial-133-test-2026.11.07-v9"',
     )),
     false,
   );
   assert.equal(
     backend.pattern.test(canonical.replace(
       "CustomerConfigTrialDatasetVersion = manualAcceptanceContract.DataVersion",
-      'CustomerConfigTrialDatasetVersion = "2026.09.27-v8"',
+      'CustomerConfigTrialDatasetVersion = "2026.11.07-v9"',
     )),
     false,
   );
   assert.equal(runtime.pattern.test("DatasetVersion   = biz.CustomerConfigTrialDatasetVersion"), true);
-  assert.equal(runtime.pattern.test('DatasetVersion = "2026.09.27-v8"'), false);
+  assert.equal(runtime.pattern.test('DatasetVersion = "2026.11.07-v9"'), false);
 });
 
 test("test-data-isolation-boundary: trial fixture coverage follows behavior, not record IDs", () => {

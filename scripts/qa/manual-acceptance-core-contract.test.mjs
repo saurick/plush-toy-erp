@@ -10,8 +10,8 @@ import {
 } from "./manual-acceptance-core-contract.mjs";
 
 test("canonical units merge spelling aliases and preserve physical units", () => {
-  assert.equal(MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion, "2026.09.27-v8");
-  assert.equal(MANUAL_ACCEPTANCE_CORE_CONTRACT.runId, "20260927-V8");
+  assert.equal(MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion, "2026.11.07-v9");
+  assert.equal(MANUAL_ACCEPTANCE_CORE_CONTRACT.runId, "20261107-V9");
   assert.equal(MANUAL_ACCEPTANCE_CORE_CONTRACT.simulatedOnly, true);
   assert.equal(MANUAL_ACCEPTANCE_CORE_CONTRACT.realCustomerImport, false);
   assert.equal(MANUAL_ACCEPTANCE_CORE_UNITS.length, 8);
@@ -51,10 +51,10 @@ test("core contract accepts a coherent next version without code changes", () =>
   next.anchorDateUtc = "2026-10-01T12:00:00.000Z";
   next.visiblePrefix = "YS8";
   next.units.forEach((unit) => {
-    unit.code = unit.code.replace(/^YS7-/u, "YS8-");
+    unit.code = unit.code.replace(/^YS9-/u, "YS8-");
   });
   next.warehouses.forEach((warehouse) => {
-    warehouse.code = warehouse.code.replace(/^YS7-/u, "YS8-");
+    warehouse.code = warehouse.code.replace(/^YS9-/u, "YS8-");
   });
 
   assert.equal(validateManualAcceptanceCoreContract(next), next);

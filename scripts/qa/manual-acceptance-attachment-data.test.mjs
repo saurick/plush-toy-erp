@@ -5,6 +5,7 @@ import {
   ATTACHMENT_NOTE,
   SOURCE_DRIVEN_FACT_REPORT_CONTRACT,
   assertAttachmentFixtureIntegrity,
+  attachmentWorkflowTaskCodeForReport,
   buildAttachmentFixtures,
   buildAttachmentTargets,
   normalizeLocalBackendURL,
@@ -12,6 +13,7 @@ import {
   selectAttachmentWorkflowTask,
   validateAttachmentReportBatch,
 } from "./manual-acceptance-attachment-data.mjs";
+import { manualAcceptanceTaskBatchIdentity } from "./manual-acceptance-task-data.mjs";
 import {
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
   CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -26,6 +28,29 @@ import {
 const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
 const LOCAL_DATABASE_NAME = "plush_erp_acceptance_local_fixture_dev";
 
+test("attachment task identity uses the registered batch without fabricating a business source", () => {
+  const taskProfile = "long-lived-workbench";
+  const report = {
+    ...manualAcceptanceTaskBatchIdentity(CURRENT_MANUAL_ACCEPTANCE_RUN_ID, {
+      taskProfile,
+    }),
+    taskProfile,
+  };
+  assert.equal(report.sourceType, "");
+  assert.equal(attachmentWorkflowTaskCodeForReport(report), "YS-WB4-JH-01");
+  for (const [key, value] of Object.entries({
+    sourceType: "sales_order",
+    sourceID: 0,
+    prefix: "another-batch",
+    copyRevision: "another-copy",
+    batchRunId: "another-run",
+  }))
+    assert.throws(
+      () => attachmentWorkflowTaskCodeForReport({ ...report, [key]: value }),
+      /task report batch identity drifted/,
+    );
+});
+
 test("attachment copy stays short, ordinary, and free of data-nature copy", () => {
   const fixtures = buildAttachmentFixtures();
   assert.deepEqual(
@@ -33,7 +58,7 @@ test("attachment copy stays short, ordinary, and free of data-nature copy", () =
     [
       "订单要求.pdf",
       "产品正面图.png",
-      "包装唛头.jpg",
+      "产品外观图.jpg",
       "数量交期表.xlsx",
       "补充说明-云朵小熊大号礼盒装数量与交期.xlsx",
     ],
@@ -262,10 +287,10 @@ test("attachment fixtures include multiple formats and one near-limit sample", (
   const png = fixtures.find((item) => item.mime_type === "image/png").content;
   assert.equal(
     png.readUInt32BE(16),
-    640,
-    "PNG sample must contain a visible illustration",
+    1254,
+    "PNG sample must contain the concrete product image",
   );
-  assert.equal(png.readUInt32BE(20), 400);
+  assert.equal(png.readUInt32BE(20), 1254);
   const jpeg = fixtures.find((item) => item.mime_type === "image/jpeg").content;
   assert(
     jpeg.length > 1000,
@@ -526,7 +551,7 @@ test("attachment targets reject legacy generic-method fact reports", () => {
 });
 
 test("attachment workflow target uses only the same-batch ready trial PMC task", () => {
-  const batch = { taskCode: "YS-V8-JH-01" };
+  const batch = { taskCode: "YS-V9-JH-01" };
   const payload = {};
   const tasks = [
     ...[

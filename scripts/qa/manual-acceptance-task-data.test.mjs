@@ -100,8 +100,8 @@ const RUNTIME_ADMIN_ID = 100;
 
 test("manual acceptance runtime source report binds five exact forward-only sales order candidates to the same simulated dataset", () => {
   const plan = buildLocalTaskMutationPlan({
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
   });
   const candidates = Array.from({ length: 5 }, (_, index) => ({
     id: 100 + index,
@@ -566,8 +566,8 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
 
 test("runtime evidence advances five simulated sales orders through the formal process path", async () => {
   const plan = buildLocalTaskMutationPlan({
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
   });
   const sources = Array.from({ length: 5 }, (_, index) => ({
     id: 201 + index,
@@ -909,7 +909,7 @@ function createMockRuntime(options = {}) {
       const matched = [...tasks.values()].filter(
         (task) =>
           task.owner_role_key === params.owner_role_key &&
-          task.task_code.includes(params.search),
+          task.task_code.includes(params.keyword),
       );
       assert.equal(actorRole, params.owner_role_key);
       assert.equal(params.limit, 200);
@@ -1060,7 +1060,7 @@ function createMockRuntime(options = {}) {
   };
 }
 
-test("builds exactly 20 readable tasks for each of nine trial roles", () => {
+test("builds exactly 90 readable tasks for each of nine trial roles", () => {
   const plan = buildManualAcceptanceTaskDataPlan({
     runId: "PLAN-COVERAGE",
     nowSec: NOW_SEC,
@@ -1070,22 +1070,22 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
   assert.equal(plan.datasetKey, MANUAL_ACCEPTANCE_DATASET_KEY);
   assert.equal(plan.dataVersion, "PLAN-COVERAGE");
   assert.equal(plan.tasks.length, TOTAL_TASKS);
-  assert.equal(plan.summary.total, 180);
+  assert.equal(plan.summary.total, 810);
   assert.deepEqual(plan.summary.byStatus, {
-    ready: 121,
-    blocked: 27,
-    done: 24,
-    rejected: 8,
+    ready: 495,
+    blocked: 135,
+    done: 120,
+    rejected: 60,
   });
   assert.deepEqual(plan.summary.dueScenarios, {
-    overdue: 45,
-    due_soon: 45,
-    this_week: 45,
-    later: 45,
+    overdue: 207,
+    due_soon: 207,
+    this_week: 198,
+    later: 198,
   });
-  assert.equal(plan.summary.assigned, 90);
-  assert.equal(plan.summary.ownerPoolOnly, 90);
-  assert.equal(plan.summary.actionCount, 59);
+  assert.equal(plan.summary.assigned, 405);
+  assert.equal(plan.summary.ownerPoolOnly, 405);
+  assert.equal(plan.summary.actionCount, 315);
   const createIdempotencyKeys = plan.tasks.map(
     (task) => task.createParams.idempotency_key,
   );
@@ -1104,13 +1104,13 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     plan.tasks.filter(
       (task) => task.createParams.task_group === "trial_pmc_work",
     ).length,
-    25,
+    113,
   );
   assert.equal(
     plan.tasks.filter(
       (task) => task.createParams.task_group === "trial_production_work",
     ).length,
-    15,
+    67,
   );
   const productionExceptionTopics = plan.tasks
     .filter((task) => task.roleKey === "production")
@@ -1145,26 +1145,26 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     assert.equal(
       tasks.filter((task) => task.targetStatus === "ready").length,
       roleKey === "boss"
-        ? 15
+        ? 60
         : ["warehouse", "finance", "quality"].includes(roleKey)
-          ? 12
-          : 14,
+          ? 45
+          : 60,
     );
     assert.equal(
       tasks.filter((task) => task.targetStatus === "blocked").length,
-      3,
+      15,
     );
     assert.equal(
       tasks.filter((task) => task.targetStatus === "done").length,
-      roleKey === "boss" ? 0 : 3,
+      roleKey === "boss" ? 0 : 15,
     );
     assert.equal(
       tasks.filter((task) => task.targetStatus === "rejected").length,
-      ["boss", "warehouse", "finance", "quality"].includes(roleKey) ? 2 : 0,
+      ["boss", "warehouse", "finance", "quality"].includes(roleKey) ? 15 : 0,
     );
     assert.equal(
       tasks.filter((task) => task.assignmentMode === "role_account").length,
-      10,
+      45,
     );
     assert.equal(
       tasks.every((task) => task.createParams.task_status_key === "ready"),
@@ -1311,7 +1311,7 @@ test("uses short yoyoosun-style copy without data-nature fields or copy", () => 
   }
 });
 
-test("long-lived workbench keeps twelve stable actionable tasks for every role", () => {
+test("long-lived workbench keeps thirty stable actionable tasks for every role", () => {
   const plan = buildManualAcceptanceTaskDataPlan({
     runId: "WORKBENCH-STABLE",
     nowSec: NOW_SEC,
@@ -1323,16 +1323,16 @@ test("long-lived workbench keeps twelve stable actionable tasks for every role",
   assert.equal(plan.batchRunId, LONG_LIVED_WORKBENCH_BATCH_RUN_ID);
   assert.equal(plan.copyRevision, LONG_LIVED_WORKBENCH_TASK_COPY_REVISION);
   assert.deepEqual(plan.summary.dueScenarios, {
-    no_due: 108,
-    overdue: 18,
-    due_soon: 18,
-    this_week: 18,
-    later: 18,
+    no_due: 270,
+    overdue: 135,
+    due_soon: 135,
+    this_week: 135,
+    later: 135,
   });
   assert.deepEqual(plan.summary.workbenchBuckets, {
-    actionable: 108,
-    risk: 40,
-    history: 32,
+    actionable: 270,
+    risk: 360,
+    history: 180,
   });
   for (const roleKey of TASK_ROLES) {
     const roleTasks = plan.tasks.filter((task) => task.roleKey === roleKey);
@@ -1356,10 +1356,10 @@ test("long-lived workbench keeps twelve stable actionable tasks for every role",
       ),
     );
     assert.deepEqual(plan.summary.workbenchBucketsByRole[roleKey], {
-      actionable: 12,
+      actionable: 30,
       risk:
         roleKey === "boss"
-          ? 6
+          ? 45
           : new Set([
                 "sales",
                 "purchase",
@@ -1367,11 +1367,11 @@ test("long-lived workbench keeps twelve stable actionable tasks for every role",
                 "pmc",
                 "engineering",
               ]).has(roleKey)
-            ? 5
-            : 3,
+            ? 45
+            : 30,
       history:
         roleKey === "boss"
-          ? 2
+          ? 15
           : new Set([
                 "sales",
                 "purchase",
@@ -1379,8 +1379,8 @@ test("long-lived workbench keeps twelve stable actionable tasks for every role",
                 "pmc",
                 "engineering",
               ]).has(roleKey)
-            ? 3
-            : 5,
+            ? 15
+            : 30,
     });
   }
   assert(
@@ -1433,17 +1433,17 @@ test("long-lived workbench keeps twelve stable actionable tasks for every role",
 
 test("warehouse scenarios stay in the trial namespace and never fill the formal shipping release page", () => {
   const plan = buildManualAcceptanceTaskDataPlan({
-    runId: "20260927-V8",
-    dataVersion: "2026.09.27-v8",
+    runId: "20261107-V9",
+    dataVersion: "2026.11.07-v9",
     nowSec: NOW_SEC,
   });
   const warehouseTasks = plan.tasks.filter(
     (task) => task.roleKey === "warehouse",
   );
 
-  assert.equal(TASK_COPY_REVISION, "PLAIN8");
-  assert.equal(warehouseTasks.length, 20);
-  assert.equal(plan.summary.byTaskGroup.trial_warehouse_work, 20);
+  assert.equal(TASK_COPY_REVISION, "PLAIN9");
+  assert.equal(warehouseTasks.length, 90);
+  assert.equal(plan.summary.byTaskGroup.trial_warehouse_work, 90);
   assert.equal(plan.summary.byTaskGroup.shipment_finance_approval, undefined);
   assert.equal(plan.summary.byTaskGroup.shipment_release, undefined);
   assert(
@@ -1476,11 +1476,11 @@ test("warehouse scenarios stay in the trial namespace and never fill the formal 
   assert.deepEqual(
     plan.coverage.scenariosByRoleTaskGroup.warehouse.trial_warehouse_work,
     {
-      receiving: 4,
-      inbound: 4,
-      material_picking: 4,
-      shipping: 4,
-      exception: 4,
+      receiving: 18,
+      inbound: 18,
+      material_picking: 18,
+      shipping: 18,
+      exception: 18,
     },
   );
   assert.equal(
@@ -1725,7 +1725,7 @@ test("CLI documents and parses the output report boundary", () => {
     help.stdout,
     /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
-  assert.match(help.stdout, /--run-id 20260927-V8/u);
+  assert.match(help.stdout, /--run-id 20261107-V9/u);
   assert.doesNotMatch(help.stdout, /127\.0\.0\.1:8300/u);
   assert.match(help.stdout, /MANUAL_ACCEPTANCE_ADMIN_PASSWORD/u);
   assert.match(help.stdout, /used only for debug\.capabilities/u);
@@ -1926,7 +1926,7 @@ test("requires the workflow task module before any task read or write", async ()
   );
 });
 
-test("applies and safely resumes the 180-task batch through current CAS action contracts", async () => {
+test("applies and safely resumes the 810-task batch through current CAS action contracts", async () => {
   const plan = buildLocalTaskMutationPlan({
     runId: "APPLY-CONTRACT",
     nowSec: NOW_SEC,
@@ -1949,7 +1949,7 @@ test("applies and safely resumes the 180-task batch through current CAS action c
     }),
   );
 
-  assert.equal(report.summary.persisted, 180);
+  assert.equal(report.summary.persisted, 810);
   assert.equal(report.runId, plan.runId);
   assert.equal(report.batchRunId, plan.batchRunId);
   assert.equal(report.prefix, plan.prefix);
@@ -1957,12 +1957,12 @@ test("applies and safely resumes the 180-task batch through current CAS action c
   assert.equal(report.sourceType, plan.sourceType);
   assert.equal(report.sourceID, plan.sourceID);
   assert.doesNotMatch(JSON.stringify(report), /local-password|admin-password/u);
-  assert.equal(report.summary.created, 178);
+  assert.equal(report.summary.created, 808);
   assert.equal(report.summary.resumed, 1);
   assert.equal(report.summary.reusedFinal, 1);
-  assert.equal(report.summary.actionsApplied, 59);
-  assert.equal(mock.tasks.size, 180);
-  assert.deepEqual(mock.counts(), { createCount: 178, actionCount: 59 });
+  assert.equal(report.summary.actionsApplied, 315);
+  assert.equal(mock.tasks.size, 810);
+  assert.deepEqual(mock.counts(), { createCount: 808, actionCount: 315 });
 
   const mutationCalls = mock.calls.filter(
     (call) =>
@@ -1974,7 +1974,7 @@ test("applies and safely resumes the 180-task batch through current CAS action c
         "reject_task_action",
       ].includes(call.method),
   );
-  assert.equal(mutationCalls.length, 178 + 59);
+  assert.equal(mutationCalls.length, 808 + 315);
   assert.equal(
     mutationCalls.some((call) =>
       [
@@ -2012,7 +2012,7 @@ test("applies and safely resumes the 180-task batch through current CAS action c
   );
   assert.equal(replayReport.summary.created, 0);
   assert.equal(replayReport.summary.resumed, 0);
-  assert.equal(replayReport.summary.reusedFinal, 180);
+  assert.equal(replayReport.summary.reusedFinal, 810);
   assert.equal(replayReport.summary.actionsApplied, 0);
   assert.deepEqual(mock.counts(), countsBeforeReplay);
 
@@ -2035,22 +2035,22 @@ test("applies and safely resumes the 180-task batch through current CAS action c
     source: "persisted_batch_readback",
     requestedAnchorUtc: shiftedPlan.schedule.anchorUtc,
     effectiveAnchorUtc: plan.schedule.anchorUtc,
-    persistedTaskCount: 180,
+    persistedTaskCount: 810,
   });
-  assert.equal(recoveredReport.summary.reusedFinal, 180);
+  assert.equal(recoveredReport.summary.reusedFinal, 810);
   assert.deepEqual(mock.counts(), countsBeforeReplay);
 });
 
 test("long-lived workbench reuses its immutable batch across Scenario run upgrades", async () => {
   const previousPlan = buildLocalTaskMutationPlan({
     runId: LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
-    dataVersion: "2026.09.27-v8",
+    dataVersion: "2026.11.07-v9",
     nowSec: NOW_SEC,
     taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
   });
   const currentPlan = buildLocalTaskMutationPlan({
-    runId: "20260927-V8",
-    dataVersion: "2026.09.27-v8",
+    runId: "20261107-V9",
+    dataVersion: "2026.11.07-v9",
     nowSec: NOW_SEC + 86_400,
     taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
   });
@@ -2151,16 +2151,16 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
   );
 
   assert.deepEqual(report.summary, {
-    total: 180,
+    total: 810,
     absent: false,
-    activeBefore: 148,
+    activeBefore: 630,
     activeAfter: 0,
-    alreadyTerminal: 32,
-    resumed: 27,
-    terminalized: 148,
-    actionsApplied: 175,
-    finalDone: 109,
-    finalRejected: 71,
+    alreadyTerminal: 180,
+    resumed: 135,
+    terminalized: 630,
+    actionsApplied: 765,
+    finalDone: 495,
+    finalRejected: 315,
   });
   assert.equal(report.cleanup.physicalDelete, false);
   assert.equal(report.keepBatch.copyRevision, TASK_COPY_REVISION);
@@ -2172,7 +2172,7 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
     true,
   );
   const countsAfterFirst = mock.counts();
-  assert.deepEqual(countsAfterFirst, { createCount: 0, actionCount: 175 });
+  assert.deepEqual(countsAfterFirst, { createCount: 0, actionCount: 765 });
 
   const replay = await retireLegacyManualAcceptanceTaskBatch(
     keepPlan,
@@ -2189,7 +2189,7 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
     }),
   );
   assert.equal(replay.summary.activeBefore, 0);
-  assert.equal(replay.summary.alreadyTerminal, 180);
+  assert.equal(replay.summary.alreadyTerminal, 810);
   assert.equal(replay.summary.actionsApplied, 0);
   assert.deepEqual(mock.counts(), countsAfterFirst);
 });
@@ -2245,7 +2245,7 @@ test("legacy retirement rebinds the immutable keep batch schedule before validat
 
 test("long-lived workbench supersession is a no-op only when the whole legacy batch is absent", async () => {
   const keepPlan = buildLocalTaskMutationPlan({
-    runId: "20260927-V8",
+    runId: "20261107-V9",
     nowSec: NOW_SEC,
     taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
   });
@@ -2325,7 +2325,7 @@ test("long-lived workbench supersession is a no-op only when the whole legacy ba
 
 test("PLAIN6 legacy references retain the short visible code scheme for future retirement", () => {
   const legacyBatch = buildLegacyManualAcceptanceTaskBatchReference({
-    runId: "20260927-V8",
+    runId: "20261107-V9",
     copyRevision: "PLAIN6",
   });
   assert.equal(legacyBatch.codeScheme, "short-v5");
@@ -2356,8 +2356,8 @@ test("customer-trial-133 task apply binds exact attestation and live debug capab
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
     nowSec: NOW_SEC,
   });
   const mock = createMockRuntime({
@@ -2376,9 +2376,9 @@ test("customer-trial-133 task apply binds exact attestation and live debug capab
 
   assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(report.datasetKey, MANUAL_ACCEPTANCE_DATASET_KEY);
-  assert.equal(report.dataVersion, "2026.09.27-v8");
-  assert.equal(report.runId, "20260927-V8");
-  assert.equal(report.summary.persisted, 180);
+  assert.equal(report.dataVersion, "2026.11.07-v9");
+  assert.equal(report.runId, "20261107-V9");
+  assert.equal(report.summary.persisted, 810);
   assert.deepEqual(report.runtime.targetAttestation, {
     source: "out-of-band",
     release: WORKFLOW_TASK_CAS_RELEASE,
@@ -2396,8 +2396,8 @@ test("customer-trial-133 accepts a later immutable release when the CAS migratio
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
     nowSec: NOW_SEC,
   });
   const laterRelease = "56ecf873796ffafc53f12a3cd5f8b7adb0214581";
@@ -2422,8 +2422,8 @@ test("customer-trial-133 rejects an old Workflow migration before login or write
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.09.27-v8",
-    runId: "20260927-V8",
+    dataVersion: "2026.11.07-v9",
+    runId: "20261107-V9",
     nowSec: NOW_SEC,
   });
   let fetchCount = 0;

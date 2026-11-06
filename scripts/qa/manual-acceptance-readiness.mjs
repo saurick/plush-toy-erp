@@ -4,6 +4,10 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  selectManualAcceptanceSamples,
+  renderManualAcceptanceTestIndex,
+} from "./manual-acceptance-test-index.mjs";
 import { assertManualAcceptanceExceptionChainCoverage } from "./manual-acceptance-exception-chain-data.mjs";
 
 import { requireProgressBoard } from "../../web/src/erp/utils/businessProgress.mjs";
@@ -31,6 +35,8 @@ import { manualAcceptanceOutsourcingInventoryCoverageIsComplete } from "./manual
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import {
   TASK_CATALOG_SCENARIO_DIGEST,
+  TASKS_PER_ROLE,
+  TOTAL_TASKS,
   TASK_SOURCE_TYPE,
   getManualAcceptanceTaskScenario,
   TASK_STATUS_KEYS,
@@ -61,8 +67,8 @@ import {
 
 const CUSTOMER_KEY = "yoyoosun";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/readiness";
-const MOBILE_TASK_TOTAL = 180;
-const MOBILE_TASKS_PER_ROLE = 20;
+const MOBILE_TASK_TOTAL = TOTAL_TASKS;
+const MOBILE_TASKS_PER_ROLE = TASKS_PER_ROLE;
 const QUERY_LIMIT = 200;
 const QUERY_MAX_PAGES = 100;
 const BUSINESS_DASHBOARD_PROJECTION_PROBE_ID = "business-progress";
@@ -315,6 +321,7 @@ const DATASET_BLUEPRINTS = Object.freeze({
     domain: "quality",
     method: "list_quality_inspections",
     listKey: "quality_inspections",
+    params: { include_superseded: true },
     statusField: "status",
     requiredStatuses: ["DRAFT", "SUBMITTED", "PASSED", "REJECTED", "CANCELLED"],
     batchReport: "fact",
@@ -414,7 +421,7 @@ const DATASET_BLUEPRINTS = Object.freeze({
     method: "list_production_exceptions",
     listKey: "production_exceptions",
     statusField: "status",
-    requiredStatuses: ["APPROVED"],
+    requiredStatuses: ["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"],
     secondaryField: "decision_type",
     requiredSecondaryKinds: ["OVER_ISSUE"],
     batchReport: "fact",
@@ -446,7 +453,14 @@ const DATASET_BLUEPRINTS = Object.freeze({
     method: "list_finance_payments",
     listKey: "payments",
     statusField: "status",
-    requiredStatuses: ["APPROVED", "POSTED", "REVERSED"],
+    requiredStatuses: [
+      "DRAFT",
+      "APPROVED",
+      "REJECTED",
+      "POSTED",
+      "REVERSED",
+      "CANCELLED",
+    ],
     batchReport: "fact",
     factReferenceKey: "financePayments",
   },
@@ -635,47 +649,103 @@ function normalizeFactReference(record, key, index) {
         ),
         `${name}.productionOrderItemID`,
       );
-      normalized.production_material_requirement_id = reportPositiveID(
-        reportValue(
-          record,
-          "productionMaterialRequirementID",
-          "production_material_requirement_id",
-        ),
-        `${name}.productionMaterialRequirementID`,
-      );
+      if (normalized.decision_type === "OVER_ISSUE")
+        normalized.production_material_requirement_id = reportPositiveID(
+          reportValue(
+            record,
+            "productionMaterialRequirementID",
+            "production_material_requirement_id",
+          ),
+          `${name}.productionMaterialRequirementID`,
+        );
+      else {
+        normalized.production_wip_batch_id = reportPositiveID(
+          reportValue(
+            record,
+            "productionWIPBatchID",
+            "production_wip_batch_id",
+          ),
+          `${name}.productionWIPBatchID`,
+        );
+        normalized.quality_inspection_id = reportPositiveID(
+          reportValue(record, "qualityInspectionID", "quality_inspection_id"),
+          `${name}.qualityInspectionID`,
+        );
+        nullableID(
+          "target_operation_id",
+          "targetOperationID",
+          "target_operation_id",
+        );
+        nullableID(
+          "target_supplier_id",
+          "targetSupplierID",
+          "target_supplier_id",
+        );
+      }
       textField(
         "requested_quantity",
         "requestedQuantity",
         "requested_quantity",
       );
-      textField("approved_quantity", "approvedQuantity", "approved_quantity");
+      if (normalized.status === "APPROVED")
+        textField("approved_quantity", "approvedQuantity", "approved_quantity");
+      else
+        nullableValue(
+          "approved_quantity",
+          "approvedQuantity",
+          "approved_quantity",
+        );
       textField(
         "production_order_no",
         "productionOrderNo",
         "production_order_no",
       );
-      normalized.process_instance_id = reportPositiveID(
-        reportValue(record, "processInstanceID", "process_instance_id"),
-        `${name}.processInstanceID`,
-      );
-      normalized.approval_task_id = reportPositiveID(
-        reportValue(record, "approvalTaskID", "approval_task_id"),
-        `${name}.approvalTaskID`,
-      );
-      textField("approval_task_code", "approvalTaskCode", "approval_task_code");
-      normalized.approval_process_node_id = reportPositiveID(
-        reportValue(
-          record,
+      if (normalized.status === "CANCELLED") {
+        nullableID(
+          "process_instance_id",
+          "processInstanceID",
+          "process_instance_id",
+        );
+        nullableID("approval_task_id", "approvalTaskID", "approval_task_id");
+        nullableID(
+          "approval_process_node_id",
           "approvalProcessNodeID",
           "approval_process_node_id",
-        ),
-        `${name}.approvalProcessNodeID`,
-      );
-      textField(
-        "approved_remaining_quantity",
-        "approvedRemainingQuantity",
-        "approved_remaining_quantity",
-      );
+        );
+        nullableValue(
+          "approval_task_code",
+          "approvalTaskCode",
+          "approval_task_code",
+        );
+      } else {
+        normalized.process_instance_id = reportPositiveID(
+          reportValue(record, "processInstanceID", "process_instance_id"),
+          `${name}.processInstanceID`,
+        );
+        normalized.approval_task_id = reportPositiveID(
+          reportValue(record, "approvalTaskID", "approval_task_id"),
+          `${name}.approvalTaskID`,
+        );
+        normalized.approval_process_node_id = reportPositiveID(
+          reportValue(
+            record,
+            "approvalProcessNodeID",
+            "approval_process_node_id",
+          ),
+          `${name}.approvalProcessNodeID`,
+        );
+        textField(
+          "approval_task_code",
+          "approvalTaskCode",
+          "approval_task_code",
+        );
+      }
+      if (normalized.decision_type === "OVER_ISSUE")
+        textField(
+          "approved_remaining_quantity",
+          "approvedRemainingQuantity",
+          "approved_remaining_quantity",
+        );
       break;
     case "purchaseReceipts":
       textField("receipt_no", "receiptNo", "receipt_no");
@@ -794,6 +864,7 @@ function normalizeFactReference(record, key, index) {
       break;
     case "financePayments":
       textField("payment_no", "paymentNo", "payment_no");
+      textField("kind", "kind");
       textField("status", "status");
       textField("direction", "direction");
       textField("counterparty_type", "counterpartyType", "counterparty_type");
@@ -808,6 +879,19 @@ function normalizeFactReference(record, key, index) {
       );
       textField("amount", "amount");
       textField("currency", "currency");
+      if (normalized.kind === "ADVANCE") {
+        textField("source_type", "sourceType", "source_type");
+        normalized.source_id = reportPositiveID(
+          reportValue(record, "sourceID", "source_id"),
+          `${name}.sourceID`,
+        );
+      } else if (normalized.kind === "REFUND") {
+        normalized.refund_of_payment_id = reportPositiveID(
+          reportValue(record, "refundOfPaymentID", "refund_of_payment_id"),
+          `${name}.refundOfPaymentID`,
+        );
+      } else if (normalized.kind !== "SETTLEMENT")
+        throw new CliError(`${name}.kind is not registered`, 2);
       break;
     case "financeCreditNotes":
       textField("credit_note_no", "creditNoteNo", "credit_note_no");
@@ -1349,7 +1433,9 @@ function factReferenceEvidence(datasetId, blueprint, factReport) {
   });
   const referenceQueries = records.map((item) => {
     let params;
-    if (referenceKey === "productionExceptions") {
+    if (referenceKey === "financeFacts") {
+      params = { id: item.id };
+    } else if (referenceKey === "productionExceptions") {
       params = {
         production_order_id: item.production_order_id,
         decision_type: item.decision_type,
@@ -1398,9 +1484,16 @@ function factReferenceEvidence(datasetId, blueprint, factReport) {
     }
     return {
       referenceKey: `${item.id}:${item[businessField] || referenceKey}`,
+      ...(referenceKey === "financeFacts"
+        ? { method: "get_finance_fact", itemKey: "finance_fact" }
+        : {}),
       ...(datasetId === "quality-inspections" &&
       item.source_type === "OUTSOURCING_FACT"
         ? { method: "list_outsourcing_return_quality_inspections" }
+        : {}),
+      ...(datasetId === "quality-inspections" &&
+      item.source_type === "PRODUCTION_WIP"
+        ? { method: "list_production_stage_quality_inspections" }
         : {}),
       params,
     };
@@ -1448,11 +1541,34 @@ function sourceWorkflowTaskEvidence(taskGroup, factReport) {
   } else if (taskGroup === "production_exception_decision_approval") {
     sourceType = "production_exception_decision";
     ownerRoleKey = "boss";
-    records = factReport.normalizedReferenceRecords.productionExceptions;
+    records = factReport.normalizedReferenceRecords.productionExceptions.filter(
+      (item) => {
+        if (item.status === "CANCELLED") {
+          if (
+            item.process_instance_id ||
+            item.approval_task_id ||
+            item.approval_task_code
+          )
+            throw new CliError(
+              `撤回的生产异常申请 ${item.decision_no} 不得伪造审批锚点`,
+              2,
+            );
+          return false;
+        }
+        return true;
+      },
+    );
     for (const item of records) {
       if (
-        item.status !== "APPROVED" ||
-        item.decision_type !== "OVER_ISSUE" ||
+        !["SUBMITTED", "APPROVED", "REJECTED"].includes(item.status) ||
+        ![
+          "OVER_ISSUE",
+          "WIP_CONCESSION",
+          "SCRAP",
+          "REWORK_ORIGINAL",
+          "REWORK_SWITCH",
+          "REMAKE",
+        ].includes(item.decision_type) ||
         item.execution_status !== "PENDING" ||
         !Number.isSafeInteger(item.process_instance_id) ||
         item.process_instance_id <= 0 ||
@@ -1469,7 +1585,10 @@ function sourceWorkflowTaskEvidence(taskGroup, factReport) {
         );
       }
     }
-    expectedStatus = () => "done";
+    expectedStatus = (item) =>
+      ({ SUBMITTED: "ready", APPROVED: "done", REJECTED: "rejected" })[
+        item.status
+      ];
   } else if (taskGroup === "shipment_finance_approval") {
     sourceType = "shipment";
     ownerRoleKey = "finance";
@@ -1582,6 +1701,43 @@ function resolveBatchEvidence(datasetId, blueprint, sourceReport, factReport) {
     };
   }
   if (blueprint.batchReport === "source") {
+    if (datasetId === "bom-versions" && sourceReport) {
+      const records = sourceReport.referenceRecords?.bomVersions;
+      if (!Array.isArray(records) || !records.length)
+        return {
+          batchEvidence: "not_proven",
+          batchPrefix: null,
+          batchNotProvenReason: "源数据报告缺少本批 BOM 版本的精确引用。",
+          expectedReferences: [],
+          referenceQueries: [],
+        };
+      const seen = new Set();
+      for (const record of records) {
+        reportPositiveID(record.id, "bomVersions.id");
+        reportPositiveID(record.productId, "bomVersions.productId");
+        if (!String(record.version || "").trim() || seen.has(record.id))
+          throw new CliError("BOM 引用缺少版本或存在重复 ID", 2);
+        seen.add(record.id);
+      }
+      return {
+        batchEvidence: "exact_references",
+        batchPrefix: null,
+        batchNotProvenReason: null,
+        expectedReferences: records.map((item) => ({
+          key: `${item.id}:${item.version}`,
+          id: item.id,
+          businessField: "version",
+          businessNo: item.version,
+          expectedFields: { product_id: item.productId, status: item.status },
+        })),
+        referenceQueries: records.map((item) => ({
+          referenceKey: `${item.id}:${item.version}`,
+          method: "get_bom_version",
+          itemKey: "bom_version",
+          params: { id: item.id },
+        })),
+      };
+    }
     const prefix = String(sourceReport?.prefix || "").trim();
     return prefix
       ? {
@@ -1687,7 +1843,7 @@ function buildDatasetProbes(
     params: {
       ...(taskReport
         ? {
-            search: `${getManualAcceptanceTaskVisibleCodePrefix("boss", taskReport.taskProfile)}-`,
+            keyword: `${getManualAcceptanceTaskVisibleCodePrefix("boss", taskReport.taskProfile)}-`,
             owner_role_key: "boss",
           }
         : {}),
@@ -1734,7 +1890,7 @@ function buildDatasetProbes(
         owner_role_key: roleKey,
         ...(taskReport
           ? {
-              search: `${getManualAcceptanceTaskVisibleCodePrefix(roleKey, taskReport.taskProfile)}-`,
+              keyword: `${getManualAcceptanceTaskVisibleCodePrefix(roleKey, taskReport.taskProfile)}-`,
             }
           : {}),
         limit: QUERY_LIMIT,
@@ -1992,9 +2148,12 @@ function textValueCounts(items, valueAt) {
 }
 
 function taskScenarioForReadinessItem(probe, item) {
-  const suffix = String(item?.task_code || "").slice(`${probe.exactTaskCodePrefix}-`.length);
+  const suffix = String(item?.task_code || "").slice(
+    `${probe.exactTaskCodePrefix}-`.length,
+  );
   const index = Number(suffix);
-  if (!/^[0-9]{2}$/u.test(suffix) || index < 1 || index > MOBILE_TASKS_PER_ROLE) return "unknown_task";
+  if (!/^[0-9]{2}$/u.test(suffix) || index < 1 || index > MOBILE_TASKS_PER_ROLE)
+    return "unknown_task";
   return getManualAcceptanceTaskScenario(probe.exactOwnerRoleKey, index);
 }
 
@@ -2289,9 +2448,8 @@ export function evaluateManualAcceptanceDataset(probe, data) {
     missingTaskGroups.length === 0 && unknownTaskGroups.length === 0;
   const scenarioCounts =
     requiredScenarios.length > 0
-      ? textValueCounts(
-          taskCoverageItems,
-          (item) => taskScenarioForReadinessItem(probe, item),
+      ? textValueCounts(taskCoverageItems, (item) =>
+          taskScenarioForReadinessItem(probe, item),
         )
       : {};
   const missingScenarios = requiredScenarios.filter(
@@ -2335,6 +2493,7 @@ export function evaluateManualAcceptanceDataset(probe, data) {
     expectedExact: probe.expectedExact ?? null,
     actual,
     returned: batchItems.length,
+    samples: selectManualAcceptanceSamples(probe, batchItems),
     responseReturned: items.length,
     responseTotal,
     statusField: probe.statusField || null,
@@ -2565,7 +2724,11 @@ async function readProbeData({ backendURL, probe, token, fetchImpl }) {
   const queries = [
     ...new Map(
       (probe.referenceQueries || []).map((query) => [
-        JSON.stringify(query.params),
+        JSON.stringify({
+          method: query.method || probe.method,
+          itemKey: query.itemKey || null,
+          params: query.params,
+        }),
         query,
       ]),
     ).values(),
@@ -2581,7 +2744,15 @@ async function readProbeData({ backendURL, probe, token, fetchImpl }) {
       token,
       fetchImpl,
     });
-    const items = data?.[probe.listKey];
+    const record = query.itemKey ? data?.[query.itemKey] : null;
+    if (
+      query.itemKey &&
+      (!record || Number(record.id) !== Number(query.params.id))
+    )
+      throw new Error(
+        `${probe.domain}.${query.method} 查询 ${query.referenceKey} 缺少匹配的 ${query.itemKey}`,
+      );
+    const items = query.itemKey ? [record] : data?.[probe.listKey];
     if (!Array.isArray(items)) {
       throw new Error(
         `${probe.domain}.${probe.method} 查询 ${query.referenceKey} 缺少 ${probe.listKey}`,
@@ -3538,7 +3709,15 @@ async function writeReports(outDir, report) {
       ? renderManualAcceptanceReadinessMarkdown(report)
       : "# 全页面手动验收就绪核验计划\n\n默认不连接系统、不写业务数据。\n";
   await writeFile(markdownPath, markdownReport, "utf8");
-  return { jsonPath, markdownPath };
+  const sampleIndexPath =
+    report.mode === "verify" ? path.join(outDir, "手测样本索引.md") : null;
+  if (sampleIndexPath)
+    await writeFile(
+      sampleIndexPath,
+      renderManualAcceptanceTestIndex(report),
+      "utf8",
+    );
+  return { jsonPath, markdownPath, sampleIndexPath };
 }
 
 function helpText() {
