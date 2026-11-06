@@ -29,7 +29,7 @@
 .erp-dev-toolbar-example__feedback,
 .erp-dev-toolbar-example__annotations p {
   margin: 10px 0;
-  color: var(--erp-text-secondary);
+  color: var(--erp-text-muted);
   line-height: 1.6;
 }
 

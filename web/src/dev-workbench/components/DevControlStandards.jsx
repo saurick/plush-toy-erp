@@ -5,7 +5,7 @@ import {
   FilterOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
@@ -940,9 +940,7 @@ export default function DevControlStandards() {
             <section className="erp-control-library-rules">
               <h3>什么时候用，为什么这样设计</h3>
               {['navigation', 'business-toolbar'].includes(current.key) ? (
-                <Link to="/__dev/ui-design?view=specification&read=reference#business-toolbar-composition">
-                  页签层级与上下间距规范
-                </Link>
+                <p>页签层级与上下间距按交互设计样板统一。</p>
               ) : null}
               <div className="erp-control-table-scroll">
                 <table className="erp-control-table" data-table-lines="fixed">

@@ -8,14 +8,16 @@
 | `*.jpg` | 对应款式的产品主图；同款系列共用款式图，主图不宣称覆盖每个 SKU 的颜色 |
 | `cloud_bear.png` | PNG 上传、预览和下载样本 |
 | `order-requirements.pdf` | 可正常阅读的一页中文产品与包装要求，含对应产品图 |
-| `generate-documents.py` | 使用 ReportLab 重建固定 PDF；仅素材维护时使用 |
+| `generate-documents.mjs` | 使用现有 Node / Playwright 渲染 PDF；仅素材维护时使用 |
 
 图片由本轮内置 `image_gen` 分款生成，未使用客户原件或外站商品图片。生成工具实际输出为 **1254×1254**，未放大冒充 4K。原生 PNG 母版保留在生成工具的会话输出目录；仓库 JPEG 输出为 1280×1280，按 82% 质量编码；这一步约 2% 的尺寸变化不增加原生细节。它们不证明真实产品生产、客户样品确认或业务验收。
 
 维护图片时，先核对产品款式，再同步 `catalog.json` 的哈希与提示。source 阶段逻辑指纹包含目录清单和每张 JPEG；附件阶段另登记 PNG/PDF。已有批次发现人工改图或哈希不符会停止，不静默替换已确认资料。一次性占位图修复必须显式传入产品 ID 清单，同时匹配旧生成文件名、固定 SHA-256 和下载内容；上传仍走正式接口，已冻结的工程引用继续阻止替换。
 
-PDF 的重建命令（需要 Python 和 ReportLab）：
+PDF 的重建命令（使用项目已有的 Web 依赖与 Chromium）：
 
 ```bash
-python3 scripts/qa/fixtures/plush-products/generate-documents.py
+node scripts/qa/fixtures/plush-products/generate-documents.mjs --out /tmp/order-requirements.pdf
 ```
+
+输出路径必须是新文件，生成器不会覆盖已固定的附件。先核看新 PDF，再按维护流程替换固定素材并核对受影响批次；普通造数始终读取仓库中的固定 PDF。

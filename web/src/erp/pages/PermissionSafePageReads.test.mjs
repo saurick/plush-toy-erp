@@ -51,7 +51,7 @@ test('master data main reads and optional dictionaries use separate exact permis
 test('inventory optional reference dictionaries cannot fail the whole page for a narrower role', () => {
   assert.match(
     inventoryPage,
-    /if \(!canReadInventory\) \{[\s\S]*setRows\(\[\]\)[\s\S]*return[\s\S]*setLoading\(true\)/u
+    /if \(!canReadInventory\) \{[\s\S]*setRowsByView\(\{\}\)[\s\S]*setTotal\(0\)[\s\S]*setSelectedRow\(null\)[\s\S]*request\.finish\(\)[\s\S]*return[\s\S]*setLoading\(true\)/u
   )
   assert.match(
     inventoryPage,

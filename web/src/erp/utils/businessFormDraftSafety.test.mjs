@@ -62,18 +62,23 @@ test('master-data edit fails closed when dependent contacts cannot be read', () 
     'const openMasterDataRecord ='
   )
 
+  const suspendedBranch = sourceSlice(openEdit, 'if (recordSuspended)', 'setRelatedCreateID(null)')
+  assert.match(suspendedBranch, /setRecordSuspended\(false\)[\s\S]*setRecordModalOpen\(true\)[\s\S]*return/u)
+  assert.doesNotMatch(suspendedBranch, /loadContacts|setEditingRecord|resetFields/u)
+  const freshEdit = openEdit.slice(openEdit.indexOf('setRelatedCreateID(null)'))
+
   assert.match(loadContacts, /加载联系人[\s\S]*?return null/u)
   assert.doesNotMatch(
     loadContacts,
     /if \(!request\.isCurrent\(\)\) \{\s*return \[\]/u
   )
   assert.match(
-    openEdit,
+    freshEdit,
     /!Array\.isArray\(recordContacts\)[\s\S]*?return[\s\S]*?setEditingRecord\(record\)/u
   )
   assert.ok(
-    openEdit.indexOf('setRecordModalOpen(true)') >
-      openEdit.indexOf('!Array.isArray(recordContacts)'),
+    freshEdit.indexOf('setRecordModalOpen(true)') >
+      freshEdit.indexOf('!Array.isArray(recordContacts)'),
     'the editable modal must remain closed after a contact read failure'
   )
 })

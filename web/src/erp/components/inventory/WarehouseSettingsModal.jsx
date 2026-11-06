@@ -99,6 +99,7 @@ export default function WarehouseSettingsModal({ open, onCancel, onSaved }) {
     if (!dirty) { reset(); return }
     if (pendingSwitch.current) return
     pendingSwitch.current = modal.confirm({
+      maskClosable: true,
       title: '放弃未保存的修改？',
       content: '当前仓库的修改尚未保存，放弃后无法恢复。',
       okText: '放弃修改',

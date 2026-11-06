@@ -42,10 +42,10 @@ func TestDefaultCoreDemoReferenceSeedDatasetIsExact(t *testing.T) {
 			{Code: "KG", Name: "千克", Precision: 3},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
-			{Code: "YS8-CK-01", Name: "原料仓", Type: "MATERIAL"},
-			{Code: "YS8-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
-			{Code: "YS8-CK-03", Name: "待检仓", Type: "MATERIAL"},
-			{Code: "YS8-CK-04", Name: "在制仓", Type: "MATERIAL"},
+			{Code: "YS9-CK-01", Name: "原料仓", Type: "MATERIAL"},
+			{Code: "YS9-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
+			{Code: "YS9-CK-03", Name: "待检仓", Type: "MATERIAL"},
+			{Code: "YS9-CK-04", Name: "在制仓", Type: "MATERIAL"},
 		},
 	}
 	got := DefaultCoreDemoReferenceSeedDataset()

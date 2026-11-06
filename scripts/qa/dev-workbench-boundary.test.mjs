@@ -325,6 +325,7 @@ const commonSamplePresentationDependencies = [
 const allowedERPImportsByFile = new Map([
   ["web/src/dev-workbench/components/DevSupplementalHelpExample.jsx", new Set([
     "components/help/BusinessContextHelp",
+    "components/business-list/BusinessTextArea.jsx",
   ])],
   ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.jsx", toolbarSamplePresentationImports],
   ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.test.mjs", new Set([

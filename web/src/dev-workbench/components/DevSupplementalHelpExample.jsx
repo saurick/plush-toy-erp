@@ -4,6 +4,7 @@ import Modal from '@/common/components/modal/AppModal'
 import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import ERPAppearanceHelp from '@/common/components/theme/ERPAppearanceHelp'
 import { BusinessHelpLabel, BusinessPageHelpTrigger } from '@/erp/components/help/BusinessContextHelp'
+import BusinessTextArea from '@/erp/components/business-list/BusinessTextArea.jsx'
 
 export default function DevSupplementalHelpExample() {
   const [draft, setDraft] = useState('保留这段演示草稿')
@@ -13,7 +14,7 @@ export default function DevSupplementalHelpExample() {
       <Form layout="vertical" className="erp-business-action-form erp-supplemental-help-example__fields">
         <Form.Item label="参考编号"><Input aria-label="演示参考编号" placeholder="例如 PO-01" /></Form.Item>
         <Form.Item label={<BusinessHelpLabel label="备注" description="备注补充本次操作的背景，说明的展开和收起不会改变输入。" />}>
-          <Input aria-label="演示备注" value={draft} onChange={(event) => setDraft(event.target.value)} />
+          <BusinessTextArea aria-label="演示备注" value={draft} onChange={(event) => setDraft(event.target.value)} />
         </Form.Item>
       </Form>
       <div className="erp-supplemental-help-example__examples">
@@ -32,7 +33,7 @@ export default function DevSupplementalHelpExample() {
         footer={<Button onClick={() => setOpen(false)}>关闭弹窗</Button>}
       >
         <p>备注 <SupplementalHelp label="弹窗备注" content="这是一段可悬停、聚焦和点按查看的说明。Esc 先收起说明，保留当前弹窗与草稿。" /></p>
-        <Input aria-label="弹窗演示备注" value={draft} onChange={(event) => setDraft(event.target.value)} />
+        <BusinessTextArea aria-label="弹窗演示备注" value={draft} onChange={(event) => setDraft(event.target.value)} />
       </Modal>
     </div>
   )
