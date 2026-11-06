@@ -48,6 +48,7 @@ import SlidingTabList from '../../common/components/navigation/SlidingTabList'
 import SearchInput from '../../common/components/SearchInput'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import ERPPageActions from '../components/ERPPageActions.jsx'
+import { BusinessSplitPageTitle } from '../components/BusinessSplitHeader.jsx'
 import {
   getHelpDocumentKindLabel,
   getHelpReadingCatalog,
@@ -573,7 +574,7 @@ export default function HelpCenterPage() {
               onClick={mobileHelpBack}
             />
           ) : null}
-          <Title level={2}>帮助中心</Title>
+          <Title level={2} aria-label="帮助中心"><BusinessSplitPageTitle title="帮助中心" /></Title>
         </div>
         <div className="erp-help-heading-actions">
           <ERPPageActions />

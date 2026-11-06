@@ -59,11 +59,15 @@
 .erp-business-editor-workspace {
   container: business-editor-workspace / inline-size;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   height: 100%;
   gap: 8px;
+}
+
+.erp-business-editor-workspace[data-has-toolbar='true'] {
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .erp-business-editor-workspace[hidden],

@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import { businessSplitLayoutButton, collapseBusinessSplit } from './businessSplitActions.mjs'
 import { installBOMMaterialMatchingMocks } from './bomMaterialMatchingScenarios.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
@@ -89,15 +90,15 @@ export function createBusinessSplitPerformanceScenarios({ assert, customerRuntim
         const sample = { state, pointerSteps: 60, durationMs: performance.now() - started, changedFrames: frames.slice(1).filter((frame, index) => Math.abs(frame.width - frames[index].width) > 0.5).length, frameCount: frames.length, p95FrameMs: intervals[Math.floor(intervals.length * 0.95)], maxFrameMs: intervals.at(-1), duringWidth, endWidth: (await page.locator('.erp-split-pane--left').boundingBox()).width, taskSeconds: metrics.TaskDuration - previous.TaskDuration, layoutCount: metrics.LayoutCount - previous.LayoutCount, recalcCount: metrics.RecalcStyleCount - previous.RecalcStyleCount }
         evidence.operations.resize ||= []
         evidence.operations.resize.push(sample)
-        await left.getByRole('button', { name: '布局', exact: true }).click()
+        await businessSplitLayoutButton(page).click()
         await page.locator('.erp-split-layout-options input').fill('50')
         await page.locator('.erp-split-layout-options input').blur()
-        await left.getByRole('button', { name: '布局', exact: true }).click()
+        await businessSplitLayoutButton(page).click()
       }
       const open = () => page.getByRole('button', { name: '分栏', exact: true }).first().click()
       const right = page.getByRole('region', { name: '右栏页面', exact: true })
       const left = page.locator('.erp-split-pane--left')
-      const collapse = () => right.getByRole('button', { name: '收起分栏', exact: true }).first().click()
+      const collapse = () => collapseBusinessSplit(page)
       const create = async (pane, name) => {
         await pane.getByRole('button', { name: '新建材料' }).click()
         const editor = pane.locator('.erp-business-form-page:not([hidden])')
@@ -126,10 +127,10 @@ export function createBusinessSplitPerformanceScenarios({ assert, customerRuntim
         await page.waitForLoadState('networkidle')
         await snapshot('two-pages')
         await resizeSample('original-order')
-        await left.getByRole('button', { name: '布局', exact: true }).click()
+        await businessSplitLayoutButton(page).click()
         await page.getByRole('button', { name: '左右互换' }).click()
         await resizeSample('swapped-order')
-        await left.getByRole('button', { name: '布局', exact: true }).click()
+        await businessSplitLayoutButton(page).click()
         await page.getByRole('button', { name: '左右互换' }).click()
         const idleBefore = count('list_materials')
         const idleStart = await snapshot('idle-start')
@@ -164,8 +165,8 @@ export function createBusinessSplitPerformanceScenarios({ assert, customerRuntim
         assert.equal(count('list_materials'), reads, '重复展开收起保留页面，不重复查询')
         evidence.operations.toggleCycles = cycles
         await open()
-        await right.locator('.erp-split-pane__header .ant-select-clear').click()
-        await right.getByText('选择一个页面，或将左侧菜单拖到这里', { exact: true }).waitFor()
+        await right.locator('.erp-split-page-title:visible .ant-select-clear').click()
+        await right.getByText('点击标题选择页面，或将左侧菜单拖到这里', { exact: true }).waitFor()
         await page.waitForLoadState('networkidle')
         await snapshot('right-page-cleared')
         await page.waitForTimeout(1000)

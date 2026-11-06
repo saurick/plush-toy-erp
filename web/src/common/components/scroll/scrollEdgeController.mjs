@@ -53,8 +53,9 @@ function visibleBox(element, view) {
   ) {
     const style = view.getComputedStyle(parent)
     if (
-      !CLIP_OVERFLOW.test(style.overflowX) &&
-      !CLIP_OVERFLOW.test(style.overflowY)
+      style.display === 'contents' ||
+      (!CLIP_OVERFLOW.test(style.overflowX) &&
+        !CLIP_OVERFLOW.test(style.overflowY))
     ) {
       continue
     }

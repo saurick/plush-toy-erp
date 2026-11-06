@@ -42,6 +42,7 @@ export async function exerciseTableScrollPagination(
   page,
   { wrapper, trigger, ready, endpoint, method, offset, shorterPage = false }
 ) {
+  await trigger.scrollIntoViewIfNeeded()
   await page.evaluate(
     () =>
       new Promise((resolve) =>
@@ -233,10 +234,17 @@ export async function tableScrollButtons(page, wrapper) {
 export async function assertTableScrollDockVisible(page, wrapper) {
   const dock = wrapper.locator('.app-table-scroll-dock').first()
   await dock.waitFor()
+  await page.waitForFunction(
+    ({ node, height }) => {
+      const box = node.getBoundingClientRect()
+      return getComputedStyle(node).visibility === 'visible' && box.y >= 0 && box.bottom <= height + 1
+    },
+    { node: await dock.elementHandle(), height: page.viewportSize().height }
+  )
   const box = await dock.boundingBox()
   assert(
     box.y >= 0 && box.y + box.height <= page.viewportSize().height + 1,
-    '长表的拖动条应留在表格可视区域内'
+    `长表的拖动条应留在表格可视区域内: ${JSON.stringify({ box, viewport: page.viewportSize() })}`
   )
   const pagination = wrapper.locator('.ant-pagination')
   if (await pagination.count()) {

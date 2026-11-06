@@ -15,6 +15,7 @@ import {
   DatabaseOutlined,
   FileSearchOutlined,
   HistoryOutlined,
+  HolderOutlined,
   HomeOutlined,
   InboxOutlined,
   InfoCircleOutlined,
@@ -87,6 +88,7 @@ import AccountPasswordModal from './AccountPasswordModal.jsx'
 import AccountIdentity from './AccountIdentity.jsx'
 import ERPPageActions, { ERPPageActionsContext } from './ERPPageActions.jsx'
 import BusinessSplitWorkspace from './BusinessSplitWorkspace.jsx'
+import { BusinessSplitPageTitle } from './BusinessSplitHeader.jsx'
 import {
   getBusinessModule,
   isCustomerBusinessDataPageKey,
@@ -1049,22 +1051,34 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
           icon
         ),
         label: (
-          <span className="erp-split-menu-label" draggable={splitOpen} onDragStart={(event) => splitWorkspace.current?.dragPage(event, item.path)}>
-            {taskEntry ? (
-              <span className="erp-menu-task-label">
-                <span>{item.label}</span>
-                <NavigationCountBadge {...taskCount} />
-              </span>
-            ) : item.label}
+          <span
+            className="erp-split-menu-label"
+            draggable={splitOpen}
+            onDragStart={(event) => {
+              event.currentTarget.dataset.dragging = 'true'
+              splitWorkspace.current?.dragPage(event, item.path)
+            }}
+            onDragEnd={(event) => { delete event.currentTarget.dataset.dragging }}
+          >
+            <span className="erp-split-menu-label__text">
+              {taskEntry ? (
+                <span className="erp-menu-task-label">
+                  <span>{item.label}</span>
+                  <NavigationCountBadge {...taskCount} />
+                </span>
+              ) : item.label}
+            </span>
+            {splitOpen ? <HolderOutlined className="erp-split-menu-grip" aria-hidden="true" /> : null}
           </span>
         ),
         title: taskEntry
           ? `${item.label} · ${navigationCountDescription(taskCount)}`
           : item.label,
         'aria-label': item.label,
-        'aria-description': taskEntry
-          ? navigationCountDescription(taskCount)
-          : undefined,
+        'aria-description': [
+          taskEntry ? navigationCountDescription(taskCount) : null,
+          splitOpen ? '可拖到左栏或右栏打开，点击在当前栏打开' : null,
+        ].filter(Boolean).join('；') || undefined,
       }
     }
     const buildMenuGroup = (section) => ({
@@ -1510,6 +1524,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
     }) || (isLocalCustomerDesktopPreview && LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS.has(resolved.pageKey))
     return {
       allowed: resolved.matched,
+      selfContainedHeader: hasSelfContainedBusinessPageHead(pathname),
       entry: resolved.entry,
       guarded: guarded ? <ProductCoreCapabilityReview currentEntry={resolved.entry} /> : null,
     }
@@ -1653,7 +1668,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
                   <div className="erp-admin-page-head">
                     <div className="erp-admin-page-head__main">
                       <div className="erp-admin-page-head__title">
-                        {currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label}
+                        <BusinessSplitPageTitle title={currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label} />
                       </div>
                     </div>
                     <ERPPageActions />

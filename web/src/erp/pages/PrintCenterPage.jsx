@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import { useSearchParams, useOutletContext } from 'react-router-dom'
 import ERPPageActions from '../components/ERPPageActions.jsx'
+import { BusinessSplitPageTitle } from '../components/BusinessSplitHeader.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { printTemplateCatalog } from '../config/printTemplates.mjs'
@@ -86,12 +87,11 @@ export default function PrintCenterPage() {
       >
         <div className="erp-print-center-section-head">
           <div>
-            <Title level={4} className="erp-print-center-section-title">
-              模板打印中心
+            <Title level={4} className="erp-print-center-section-title" aria-label="模板打印中心">
+              <BusinessSplitPageTitle title="模板打印中心" />
             </Title>
           </div>
           <div className="erp-print-center-heading-actions">
-            <ERPPageActions />
             <Button
               type="primary"
               icon={<PrinterOutlined aria-hidden="true" />}
@@ -99,6 +99,7 @@ export default function PrintCenterPage() {
             >
               打开编辑与打印
             </Button>
+            <ERPPageActions />
           </div>
         </div>
         <div className="erp-print-center-workbench">

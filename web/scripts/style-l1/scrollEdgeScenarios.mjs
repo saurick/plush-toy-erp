@@ -73,11 +73,12 @@ async function assertEdges(page, selector, expected) {
     JSON.stringify(metrics)
   )
   for (const edge of metrics.edges) {
-    if (expected[edge.direction])
+    if (expected[edge.direction]) {
       assert(
         edge.width > 0 && edge.height > 0,
         `提示必须有可见面积: ${JSON.stringify(metrics)}`
       )
+    }
   }
   return metrics
 }
@@ -152,6 +153,29 @@ async function fixtureChecks(page, themeMode, outputDir) {
     return !frame || frame.hidden
   })
   await page.getByRole('button', { name: '切换内容宽度', exact: true }).click()
+  await page.locator('#fixture-dynamic').scrollIntoViewIfNeeded()
+  await assertEdges(page, '#fixture-dynamic', { right: true, bottom: true })
+  await page.locator('#fixture-dynamic').evaluate((node) => {
+    const parent = document.createElement('div')
+    parent.id = 'fixture-boxless-parent'
+    parent.style.cssText = 'display:contents;overflow:hidden'
+    node.before(parent)
+    parent.append(node)
+  })
+  await assertEdges(page, '#fixture-dynamic', { right: true, bottom: true })
+  await page.locator('#fixture-boxless-parent').evaluate((node) => {
+    Object.assign(node.style, { display: 'block', width: '120px', height: '80px' })
+  })
+  await page.locator('#fixture-dynamic').scrollIntoViewIfNeeded()
+  await assertEdges(page, '#fixture-dynamic', { right: true, bottom: true })
+  await page.waitForFunction(() => {
+    const parent = document.querySelector('#fixture-boxless-parent').getBoundingClientRect()
+    const frame = document.querySelector('#fixture-dynamic > .app-scroll-edges').getBoundingClientRect()
+    return frame.right <= parent.right + 1 && frame.bottom <= parent.bottom + 1
+  })
+  await page.locator('#fixture-boxless-parent').evaluate((node) => {
+    Object.assign(node.style, { display: 'contents', width: '', height: '' })
+  })
   await page.locator('#fixture-dynamic').scrollIntoViewIfNeeded()
   await assertEdges(page, '#fixture-dynamic', { right: true, bottom: true })
   const recovery = await page.locator('#fixture-dynamic').evaluate((node) => {
@@ -253,11 +277,11 @@ async function fixtureChecks(page, themeMode, outputDir) {
   await page.locator('#fixture-dynamic').scrollIntoViewIfNeeded()
   await assertEdges(page, '#fixture-dynamic', { right: true, bottom: true })
   const surface = page.locator('#fixture-dynamic > .app-scroll-edges')
-  const originalSurface = await surface.evaluate(node => node.style.getPropertyValue('--scroll-edge-surface'))
-  await page.evaluate(mode => { document.documentElement.dataset.erpTheme = mode }, themeMode === 'dark' ? 'light' : 'dark')
-  await page.waitForFunction(color => document.querySelector('#fixture-dynamic > .app-scroll-edges').style.getPropertyValue('--scroll-edge-surface') !== color, originalSurface)
-  await page.evaluate(mode => { document.documentElement.dataset.erpTheme = mode }, themeMode)
-  await page.waitForFunction(color => document.querySelector('#fixture-dynamic > .app-scroll-edges').style.getPropertyValue('--scroll-edge-surface') === color, originalSurface)
+  const originalSurface = await surface.evaluate((node) => node.style.getPropertyValue('--scroll-edge-surface'))
+  await page.evaluate((mode) => { document.documentElement.dataset.erpTheme = mode }, themeMode === 'dark' ? 'light' : 'dark')
+  await page.waitForFunction((color) => document.querySelector('#fixture-dynamic > .app-scroll-edges').style.getPropertyValue('--scroll-edge-surface') !== color, originalSurface)
+  await page.evaluate((mode) => { document.documentElement.dataset.erpTheme = mode }, themeMode)
+  await page.waitForFunction((color) => document.querySelector('#fixture-dynamic > .app-scroll-edges').style.getPropertyValue('--scroll-edge-surface') === color, originalSurface)
   await page.locator(table).scrollIntoViewIfNeeded()
   await page.screenshot({
     path: path.join(outputDir, `scroll-edges-surfaces-${themeMode}.png`),
@@ -310,7 +334,7 @@ export function createScrollEdgeScenarios(scenarios, { outputDir }) {
       await page.keyboard.press('Tab')
       await page.mouse.move(5, 5)
       for (const selector of [wrapper, content]) {
-        await page.locator(selector).evaluate(node => node.scrollTo({ left: (node.scrollWidth - node.clientWidth) / 2, top: (node.scrollHeight - node.clientHeight) / 2, behavior: 'instant' }))
+        await page.locator(selector).evaluate((node) => node.scrollTo({ left: (node.scrollWidth - node.clientWidth) / 2, top: (node.scrollHeight - node.clientHeight) / 2, behavior: 'instant' }))
       }
       await assertEdges(page, wrapper, { top: true, bottom: true })
       await assertEdges(page, content, { left: true, right: true })

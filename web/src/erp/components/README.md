@@ -15,7 +15,7 @@
 | 分组             | 典型路径                                                                       | 职责                                                           |
 | ---------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------- |
 | 页面壳和通用展示 | `ERPLayout.jsx`、`ERPPageActions.jsx`、`business-list/*` | 布局、列表页头、导航和状态展示；账号固定侧栏底部，刷新与窄屏导航共用页面操作组件 |
-| 桌面分栏与表单身份 | `BusinessSplitWorkspace.jsx`、`business-list/BusinessForm.jsx`、`business-list/BusinessSplitContext.jsx` | 按菜单目录选页，复用同一路由与编辑器，隔离附加页导航、查询、读取反馈和表单 DOM 名称；左右互换保留页面实例，收起保留草稿，保存后重读另一栏已登记数据 |
+| 桌面分栏与表单身份 | `BusinessSplitWorkspace.jsx`、`BusinessSplitHeader.jsx`、`BusinessSplitCollapseButton.jsx`、`business-list/BusinessForm.jsx`、`business-list/BusinessSplitContext.jsx` | 选页、刷新、分栏布局与收起融入已有标题行，附加页下拉框内清空只退出页面并检查草稿，栏右侧叉号在栏内弹窗或抽屉打开时仍可收起并保留输入和浮层，分栏菜单仅保留宽度与互换，编辑时合并重复模块标题；标题上下文单独订阅布局变化，按菜单目录选页并复用原路由和编辑器；隔离查询、读取反馈和表单 DOM 名称，互换与收起保留实例。关联建档只回填发起组，独立建档只更新候选，主数据表单返回后可继续编辑保留的输入；保存后重读另一栏已登记数据 |
 | 账号身份 | `AccountIdentity.jsx`、`accountIdentity.css` | 桌面账号入口和手机“我的”共用的默认文字头像、姓名、账号及实际所属岗位；头像颜色按账号固定，完整岗位在账号卡片换行展示 |
 | 业务列表共享层   | `business-list/*`                                                              | 列表壳、表单弹窗、附件、明细行、列顺序和来源选择 |
 | 工具栏组合样例 | [`DevUIBusinessToolbarExample.jsx`](../../dev-workbench/components/DevUIBusinessToolbarExample.jsx) | 工作台“控件设计 → 业务工具栏组合”直接使用正式工具栏、表格、筛选、详情与列设置；四业务、职责标注及增长场景只处理本地样例，不导入真实页面或调用业务偏好 hook |

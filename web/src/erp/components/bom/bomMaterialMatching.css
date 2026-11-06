@@ -1,3 +1,18 @@
+.erp-bom-material-reference {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-bom-material-reference > .app-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.erp-bom-material-reference > button {
+  flex-shrink: 0;
+}
+
 .erp-bom-material-popup .erp-bom-material-option {
   display: flex;
   align-items: center;

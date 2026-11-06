@@ -3,6 +3,16 @@
   min-height: 0;
 }
 
+/* 拖动预览高于栏内浮层，结束后沿用组件原层级。 */
+.erp-split-panels > .ant-splitter-bar:has(> .ant-splitter-bar-dragger-active) {
+  z-index: 1002;
+}
+
+.erp-split-workspace > .erp-split-panels > .ant-splitter-mask {
+  z-index: 1001;
+  user-select: none;
+}
+
 .erp-split-workspace,
 .erp-split-workspace[data-split-open='false'] > .erp-split-panels,
 .erp-split-workspace[data-split-open='false'] .erp-split-panel--left,
@@ -19,7 +29,42 @@
 }
 
 .erp-split-menu-label[draggable='true'] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   cursor: grab;
+}
+
+.erp-split-menu-label[draggable='true'] > .erp-split-menu-label__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-split-menu-grip {
+  flex: 0 0 14px;
+  color: var(--erp-text-muted);
+  font-size: 14px;
+  opacity: 0;
+}
+
+.erp-split-menu-label[data-dragging='true'] > .erp-split-menu-grip,
+.erp-admin-menu .ant-menu-item:hover .erp-split-menu-grip,
+.erp-admin-menu .ant-menu-item:focus-visible .erp-split-menu-grip {
+  opacity: 1;
+}
+
+.erp-split-menu-label[draggable='true']:active,
+.erp-split-menu-label[draggable='true'][data-dragging='true'] {
+  cursor: grabbing;
+}
+
+.erp-split-workspace .erp-split-pane[data-drop-target='true'] {
+  outline: 2px dashed var(--erp-primary);
+  outline-offset: -4px;
 }
 
 .erp-split-switcher {
@@ -63,22 +108,9 @@
   border-color: var(--erp-primary);
 }
 
-.erp-split-pane__header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-  min-width: 0;
-}
-
-.erp-split-pane__header > span {
-  color: var(--erp-text-secondary);
-  font-size: 12px;
-}
-
-.erp-split-pane__header > .app-select {
-  flex: 1;
-  min-width: 0;
+.erp-split-pane[data-erp-split-pane] .erp-business-module-tabs,
+.erp-split-pane[data-business-form-editing='true'] .erp-business-module-header {
+  display: none;
 }
 
 .erp-split-pane[data-business-form-editing='true'] {
@@ -91,10 +123,23 @@
   gap: 12px;
 }
 
-.erp-split-layout-options > label {
+.erp-split-width-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-split-width-controls > label {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.erp-split-related-create {
+  flex-basis: 100%;
+  color: var(--erp-primary);
+  font-size: 12px;
 }
 
 @media (max-width: 991px) {

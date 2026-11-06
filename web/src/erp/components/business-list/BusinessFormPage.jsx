@@ -2,6 +2,7 @@ import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -14,7 +15,7 @@ import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { message, useModal } from '@/common/utils/antdApp'
 import { hasVisibleOverlayPopup, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
-import { BusinessEditorPaneContext, BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
+import { BusinessEditorPaneContext, BusinessFormDraftContext, BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
 import { ReferenceRecordsFeedback } from '../ReferenceRecordsContext.jsx'
 import { useBusinessSplit } from './BusinessSplitContext.jsx'
 import BusinessFormBody from './BusinessFormBody.jsx'
@@ -22,6 +23,7 @@ import { useBusinessEditorGroup } from './BusinessEditorGroup.jsx'
 import { businessFormReadOnly } from './businessFormReadOnly.mjs'
 import useWorkflowTaskBusinessBusy from '../../hooks/useWorkflowTaskBusinessBusy.js'
 import ERPPageActions from '../ERPPageActions.jsx'
+import { BusinessSplitPageTitle } from '../BusinessSplitHeader.jsx'
 import { useERPTheme } from '@/common/theme/erpThemeContext.jsx'
 import '../../styles/app/business-form-page.css'
 
@@ -107,6 +109,7 @@ export default function BusinessFormPage({
   showCancel = true,
   onOk,
   onCancel,
+  onReturn,
   afterOpenChange,
   container,
   baselineKey,
@@ -115,6 +118,8 @@ export default function BusinessFormPage({
   const modal = useModal()
   const outletContext = useBusinessPageContext()
   const split = useBusinessSplit()
+  // 异步回填属于本次草稿；同一编辑器的显示切换保留其归属。
+  const draftContext = useMemo(() => ({ open, baselineKey, identity: Symbol('business-form-draft') }), [open, baselineKey])
   const { appearance } = useERPTheme()
   const formBodyRef = useRef(null)
   const pane = React.useContext(BusinessEditorPaneContext)
@@ -330,7 +335,7 @@ export default function BusinessFormPage({
       focusedRef.current = false
       return undefined
     }
-    if (pane || taskFocused || loading || baseline === null || focusedRef.current) return undefined
+    if (!visible || (split?.open && split.active === false) || (pane && !pane.autoFocus) || taskFocused || loading || baseline === null || focusedRef.current) return undefined
     // Parent initialization can reset and remount fields; focus only after that baseline exists.
     const frame = window.requestAnimationFrame(() => {
       // A field selected during initialization owns focus; do not redirect typing.
@@ -355,7 +360,7 @@ export default function BusinessFormPage({
       focusedRef.current = true
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [baseline, loading, open, pane, readOnly, taskFocused])
+  }, [baseline, loading, open, pane, readOnly, split?.active, split?.open, taskFocused, visible])
 
   const confirmDiscard = useCallback(async ({ overlay } = {}) => {
     if (currentRef.current.saving) {
@@ -415,6 +420,10 @@ export default function BusinessFormPage({
   }, [busy, dirty, open])
 
   const close = async () => {
+    if (onReturn) {
+      if (!currentRef.current.saving) await onReturn({ dirty: currentRef.current.dirty })
+      return
+    }
     if (await (editorGroup ? editorGroup.confirmLeave() : confirmDiscard())) onCancel?.()
   }
 
@@ -527,7 +536,7 @@ export default function BusinessFormPage({
         </header>
       ) : (
         <header className="erp-business-form-page__header">
-          <h1 tabIndex={-1}>{title}</h1>
+          <h1 tabIndex={-1} aria-label={typeof title === 'string' ? title : undefined}><BusinessSplitPageTitle title={title} /></h1>
           {headerActions}
           {open ? <ERPPageActions showRefresh={false} /> : null}
           {canFullscreen ? (
@@ -550,7 +559,9 @@ export default function BusinessFormPage({
             value={reportPendingAttachments}
           >
             <ReferenceRecordsFeedback active={visible} />
-            {readOnly ? businessFormReadOnly(children) : children}
+            <BusinessFormDraftContext.Provider value={draftContext}>
+              {readOnly ? businessFormReadOnly(children) : children}
+            </BusinessFormDraftContext.Provider>
           </BusinessFormPendingAttachmentsContext.Provider>
         </Spin>
       </BusinessFormBody>

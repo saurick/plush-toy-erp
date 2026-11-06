@@ -44,6 +44,7 @@ import BusinessRecordDetails from './BusinessRecordDetails.jsx'
 import { taskBusinessActionNode } from './taskBusinessActions.mjs'
 import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import ERPPageActions from '../ERPPageActions.jsx'
+import { BusinessSplitPageTitle } from '../BusinessSplitHeader.jsx'
 import useBusinessListStickyHeader from './useBusinessListStickyHeader.js'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -815,7 +816,7 @@ export function PageHeaderCard({
           <div className="erp-business-page-header-card__main erp-business-module-hero__main">
             <div>
               <div className="erp-business-page-header-card__title-row">
-                <h1>{title}</h1>
+                <h1 aria-label={typeof title === 'string' ? title : undefined}><BusinessSplitPageTitle title={title} /></h1>
                 <BusinessPageHelpTrigger pageKey={helpKey} />
               </div>
             </div>

@@ -126,9 +126,19 @@ test('找不到对应物料时仍可直接新建，不自动建档或关联其�
   assert.deepEqual(view.changes, [])
 })
 
+test('行内建档入口不自动选择候选，点击只发起一次建档', async (t) => {
+  const view = await harness(t)
+  const trigger = document.querySelector('[data-bom-material-create-trigger]')
+  assert.equal(Boolean(trigger), true)
+  await view.act(async () => trigger.click())
+  assert.equal(view.creates(), 1)
+  assert.deepEqual(view.changes, [])
+})
+
 test('没有建档权限仍可选择现有物料，隐藏新建入口且不暴露核对按钮', async (t) => {
   const view = await harness(t, { canCreateMaterial: false })
   await view.open()
+  assert.equal(document.querySelector('[data-bom-material-create-trigger]'), null)
   assert.equal(
     [...document.querySelectorAll('button')].some(
       (node) => node.textContent.trim() === '新建物料并使用'

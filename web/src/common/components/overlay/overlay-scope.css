@@ -1,7 +1,5 @@
-.app-overlay-scope {
-  --erp-overlay-width: 100cqw;
-  --erp-overlay-height: 100cqh;
-
+.app-overlay-scope,
+.app-overlay-chrome {
   position: fixed;
   left: var(--app-overlay-left, 0);
   top: var(--app-overlay-top, 0);
@@ -14,13 +12,50 @@
   z-index: 1000;
 }
 
-.app-overlay-scope > :not(.ant-drawer) {
+.app-overlay-scope {
+  --erp-overlay-width: 100cqw;
+  --erp-overlay-height: calc(100cqh - var(--app-overlay-chrome-height, 0px));
+}
+
+.app-overlay-chrome-control {
+  position: absolute;
   pointer-events: auto;
+}
+
+.app-overlay-chrome-control[hidden] {
+  display: none;
+}
+
+.app-overlay-chrome-control > button {
+  width: 100%;
+  height: 100%;
 }
 
 .app-overlay-scope .ant-modal-wrap,
 .app-overlay-scope .ant-drawer-body {
   overscroll-behavior: contain;
+}
+
+.app-overlay-scope .ant-modal-root > .ant-modal-wrap {
+  top: var(--app-overlay-chrome-height, 0px);
+}
+
+.app-overlay-scope .ant-drawer-content-wrapper {
+  max-height: calc(100% - var(--app-overlay-chrome-height, 0px));
+}
+
+.app-overlay-scope .ant-drawer-left > .ant-drawer-content-wrapper,
+.app-overlay-scope .ant-drawer-right > .ant-drawer-content-wrapper {
+  top: var(--app-overlay-chrome-height, 0px);
+  height: calc(100% - var(--app-overlay-chrome-height, 0px));
+}
+
+.app-overlay-scope .ant-drawer-top > .ant-drawer-content-wrapper {
+  top: var(--app-overlay-chrome-height, 0px);
+}
+
+.app-overlay-scope > :not(.ant-drawer) {
+  pointer-events: auto;
 }
 
 .app-overlay-scope .ant-select-dropdown,

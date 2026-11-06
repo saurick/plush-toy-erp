@@ -121,23 +121,24 @@ export default function BOMMaterialSelect({
     [canCreateMaterial, popupKeys, focusSelect, onCreateMaterial]
   )
   return (
-    <RemoteReferenceSelect
-      referenceType="materials"
-      presentation="reference"
-      {...props}
-      disabled={disabled}
-      ref={selectRef}
-      open={open}
-      onOpenChange={setOpen}
-      options={options.map((option) => {
+    <div className="erp-bom-material-reference">
+      <RemoteReferenceSelect
+        referenceType="materials"
+        presentation="reference"
+        {...props}
+        disabled={disabled}
+        ref={selectRef}
+        open={open}
+        onOpenChange={setOpen}
+        options={options.map((option) => {
         const material = materialByID.get(Number(option.value))
         return material ? { ...option, ...optionFor(material) } : option
       })}
-      mapOption={optionFor}
-      onChange={(id, option) =>
+        mapOption={optionFor}
+        onChange={(id, option) =>
         apply(option?.record || materialByID.get(Number(id)), option)
       }
-      onInputKeyDown={(event) => {
+        onInputKeyDown={(event) => {
         if (open && canCreateMaterial && event.key === 'Tab' && !event.shiftKey) {
           // Tab 进入建档按钮，避免候选列表同时执行选中。
           event.preventDefault()
@@ -145,10 +146,12 @@ export default function BOMMaterialSelect({
           createRef.current?.focus()
         }
       }}
-      optionRender={renderOption}
-      popupRender={renderPopup}
-      emptyDescription="暂无可选物料"
-      filteredEmptyDescription="未找到对应物料"
-    />
+        optionRender={renderOption}
+        popupRender={renderPopup}
+        emptyDescription="暂无可选物料"
+        filteredEmptyDescription="未找到对应物料"
+      />
+      {canCreateMaterial ? <Button type="link" disabled={disabled} aria-label="新建物料" data-bom-material-create-trigger onClick={() => { setOpen(false); onCreateMaterial() }}>＋ 新建物料</Button> : null}
+    </div>
   )
 }

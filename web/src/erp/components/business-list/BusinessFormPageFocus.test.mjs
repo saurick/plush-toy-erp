@@ -37,6 +37,72 @@ test('task form owns its footer without duplicate page actions or focus jumps, a
   assert.deepEqual(changes, [true, false])
 })
 
+test('a retained editor only takes initial focus when its pane is active and visible', async (t) => {
+  const ui = await createReactTestHarness(t)
+  const [{ ERPThemeProvider }, { createMemoryRouter, RouterProvider }, { default: Page }, { BusinessEditorPane }, { BusinessSplitContext }, { Form, Input }] = await Promise.all([
+    import('../../../common/theme/erpTheme.jsx'), import('react-router-dom'), import('./BusinessFormPage.jsx'), import('./BusinessEditorWorkspace.jsx'), import('./BusinessSplitContext.jsx'), import('antd'),
+  ])
+  let updateVisibility
+  let form
+  const trigger = document.createElement('button')
+  document.body.append(trigger)
+  t.after(() => trigger.remove())
+  trigger.focus()
+  function Harness() {
+    const [visible, setVisible] = useState(false)
+    updateVisibility = setVisible
+    const [recordForm] = Form.useForm()
+    form = recordForm
+    return createElement(BusinessSplitContext.Provider, { value: { open: true, visible, handlingNavigation: true } }, createElement(BusinessEditorPane, { value: 'record', label: '保留的材料编辑区', active: visible, autoFocus: true }, createElement(Page, { open: true, form: recordForm, title: '新建材料档案' }, createElement(Form, { form: recordForm, initialValues: { name: '保留的材料输入' } }, createElement(Form.Item, { name: 'name' }, createElement(Input))))))
+  }
+  const router = createMemoryRouter([{ path: '*', element: createElement(Harness) }])
+  t.after(() => router.dispose())
+  await ui.render(createElement(ERPThemeProvider, null, createElement(RouterProvider, { router, future: { v7_startTransition: true } })))
+  const frames = () => ui.act(() => new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))))
+  await frames()
+  assert.equal(document.activeElement === trigger, true, 'hidden retained forms do not take focus')
+  await ui.act(async () => updateVisibility(true))
+  await frames()
+  assert.equal(ui.container.querySelector('.erp-business-form-page').contains(document.activeElement), true, 'the receiving editor can focus when revealed')
+  await ui.act(async () => updateVisibility(false))
+  trigger.focus()
+  await frames()
+  assert.equal(document.activeElement === trigger, true)
+  assert.equal(form.getFieldValue('name'), '保留的材料输入')
+})
+
+test('an explicit return receives the current dirty state without dropping leave protection', async (t) => {
+  const ui = await createReactTestHarness(t)
+  const [{ ERPThemeProvider }, { createMemoryRouter, RouterProvider }, { default: Page }, { Form, Input }] = await Promise.all([
+    import('../../../common/theme/erpTheme.jsx'), import('react-router-dom'), import('./BusinessFormPage.jsx'), import('antd'),
+  ])
+  const returns = []
+  let form
+  let discarded = 0
+  function Harness() {
+    const [recordForm] = Form.useForm()
+    form = recordForm
+    return createElement(Page, { open: true, form: recordForm, title: '材料输入', onReturn: ({ dirty }) => returns.push(dirty), onCancel: () => { discarded += 1 } }, createElement(Form, { form: recordForm, initialValues: { name: '原材料名' } }, createElement(Form.Item, { name: 'name' }, createElement(Input))))
+  }
+  const router = createMemoryRouter([{ path: '*', element: createElement(Harness) }])
+  t.after(() => router.dispose())
+  await ui.render(createElement(ERPThemeProvider, null, createElement(RouterProvider, { router, future: { v7_startTransition: true } })))
+  const frames = () => ui.act(() => new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))))
+  await frames()
+  const back = () => [...ui.container.querySelectorAll('button')].find((node) => node.textContent === '返回列表')
+  await ui.act(async () => back().click())
+  assert.deepEqual(returns, [false])
+  await ui.act(async () => form.setFieldValue('name', '修改后的材料名'))
+  await frames()
+  await ui.act(async () => back().click())
+  assert.deepEqual(returns, [false, true])
+  assert.equal(discarded, 0)
+  assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
+  const unload = new window.Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(unload)
+  assert.equal(unload.defaultPrevented, true, 'the retained dirty form still protects browser leave')
+})
+
 test('batch save can validate another draft before the current invalid form and still focus its error', async (t) => {
   const ui = await createReactTestHarness(t)
   const { ERPThemeProvider } = await import('../../../common/theme/erpTheme.jsx')

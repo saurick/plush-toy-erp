@@ -393,10 +393,24 @@
 
 .erp-page-actions {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   margin-inline-start: auto;
+}
+
+.erp-page-actions__refresh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-page-actions__refresh-hint {
+  color: var(--erp-text-secondary);
+  font-size: var(--erp-font-small);
 }
 
 .erp-page-actions__navigation.ant-btn {

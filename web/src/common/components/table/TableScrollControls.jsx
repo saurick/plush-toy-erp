@@ -77,14 +77,11 @@ export default function TableScrollControls({
 
     const ancestors = []
     for (let node = scroller; node; node = node.parentElement) {
-      const style = getComputedStyle(node)
-      const clipX = /auto|scroll|hidden|clip/.test(style.overflowX)
-      const clipY = /auto|scroll|hidden|clip/.test(style.overflowY)
-      // 弹窗挂载时样式可能尚未生效，受控容器仍须直接监听滚动。
-      if (node === scroller || clipX || clipY) ancestors.push({ node, clipX, clipY })
+      // 分栏切换会改变现有祖先的滚动方式，监听随页面保留的全部祖先。
+      ancestors.push(node)
     }
     const scrollTops = new Map(
-      ancestors.map(({ node }) => [node, node.scrollTop])
+      ancestors.map((node) => [node, node.scrollTop])
     )
     scrollTops.set(window, window.scrollY)
     let frame = 0
@@ -139,9 +136,14 @@ export default function TableScrollControls({
       )
       let left = Math.max(0, box.left)
       let right = Math.min(innerWidth, box.left + scroller.clientWidth)
-      ancestors.forEach(({ node, clipX, clipY }) => {
+      ancestors.forEach((node) => {
         // The dock sits outside Ant's horizontal scroller, inside the same card.
         if (node === scroller && isAntTable) return
+        const style = getComputedStyle(node)
+        if (style.display === 'contents') return
+        const clipX = /auto|scroll|hidden|clip/.test(style.overflowX)
+        const clipY = /auto|scroll|hidden|clip/.test(style.overflowY)
+        if (!clipX && !clipY) return
         const rect = node.getBoundingClientRect()
         if (clipY) {
           top = Math.max(top, rect.top + node.clientTop)
@@ -222,7 +224,7 @@ export default function TableScrollControls({
     ;[wrapper, scroller, table, bottomHost, topHost].forEach((node) =>
       observer.observe(node)
     )
-    ancestors.forEach(({ node }) =>
+    ancestors.forEach((node) =>
       node.addEventListener('scroll', onScroll, { passive: true })
     )
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -231,7 +233,7 @@ export default function TableScrollControls({
       cancelAnimationFrame(frame)
       clearTimeout(settleTimer)
       observer.disconnect()
-      ancestors.forEach(({ node }) =>
+      ancestors.forEach((node) =>
         node.removeEventListener('scroll', onScroll)
       )
       window.removeEventListener('scroll', onScroll)

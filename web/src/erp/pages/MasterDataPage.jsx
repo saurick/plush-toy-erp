@@ -13,7 +13,7 @@ import {
   PlusOutlined,
   StopOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Popconfirm, Space } from 'antd'
+import { Alert, Button, Form, Popconfirm, Space } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -39,6 +39,8 @@ import {
 import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormSection from '../components/business-list/BusinessFormSection.jsx'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
+import BusinessEditorWorkspace, { BusinessEditorPane } from '../components/business-list/BusinessEditorWorkspace.jsx'
+import { useBusinessSplit } from '../components/business-list/BusinessSplitContext.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import {
@@ -108,6 +110,7 @@ import {
 import BusinessForm from '../components/business-list/BusinessForm.jsx'
 
 export default function MasterDataPage({ type }) {
+  const split = useBusinessSplit()
   const isProductCatalogPage = type === 'product_skus'
   const outletContext = useOutletContext()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -200,6 +203,9 @@ export default function MasterDataPage({ type }) {
   const [units, setUnits] = useState([])
   const [unitLoading, setUnitLoading] = useState(false)
   const [recordModalOpen, setRecordModalOpen] = useState(false)
+  const [recordSuspended, setRecordSuspended] = useState(false)
+  const [relatedCreateID, setRelatedCreateID] = useState(null)
+  const openedRelatedCreate = useRef(null)
   const [editingRecord, setEditingRecord] = useState(null)
   const [detailRecord, setDetailRecord] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -669,7 +675,14 @@ export default function MasterDataPage({ type }) {
     [canReadProductSKUs, canReadProducts, searchParams, setSearchParams]
   )
 
-  const openCreateRecord = () => {
+  const relatedCreate = effectiveType === 'materials' && split?.relatedCreate?.id === relatedCreateID ? split.relatedCreate : null
+  const openCreateRecord = useCallback((request) => {
+    const related = request?.path === '/erp/master/materials' ? request : null
+    if (recordSuspended && !related) {
+      setRecordSuspended(false)
+      setRecordModalOpen(true)
+      return
+    }
     setEditingRecord(null)
     setContacts([])
     recordForm.resetFields()
@@ -704,10 +717,27 @@ export default function MasterDataPage({ type }) {
     if (effectiveType === 'suppliers') {
       createDefaults.default_payment_term_days = 0
     }
+    if (related) Object.assign(createDefaults, related.initialValues)
     if (Object.keys(createDefaults).length > 0) {
       recordForm.setFieldsValue(createDefaults)
     }
     setRecordModalOpen(true)
+    setRecordSuspended(false)
+    setRelatedCreateID(related?.id || null)
+  }, [config, effectiveType, recordForm, records, recordSuspended, showContactForm, unitOptions])
+
+  useEffect(() => {
+    const request = split?.relatedCreate
+    if (effectiveType !== 'materials' || !canCreate || !request || request.id === openedRelatedCreate.current) return
+    openedRelatedCreate.current = request.id
+    openCreateRecord(request)
+  }, [canCreate, effectiveType, openCreateRecord, split?.relatedCreate])
+
+  const discardRecordDraft = () => {
+    split?.cancelRelatedCreate?.(relatedCreateID)
+    setRelatedCreateID(null)
+    setRecordSuspended(false)
+    setRecordModalOpen(false)
   }
 
   useEffect(() => {
@@ -742,6 +772,12 @@ export default function MasterDataPage({ type }) {
 
   const openEditRecord = async (record) => {
     if (!record?.id) return
+    if (recordSuspended) {
+      setRecordSuspended(false)
+      setRecordModalOpen(true)
+      return
+    }
+    setRelatedCreateID(null)
     setSelectedRecord(record)
     recordForm.resetFields()
     const recordContacts = showContactForm ? await loadContacts(record) : []
@@ -770,6 +806,11 @@ export default function MasterDataPage({ type }) {
 
   const saveRecord = async () => {
     const values = await recordForm.validateFields()
+    const conflict = relatedCreate?.validate?.(values)
+    if (conflict) {
+      recordForm.setFields([{ name: 'name', errors: [conflict] }])
+      return
+    }
     const isCreatingRecord = !editingRecord?.id
     const shouldShowCreatedRecordOnFirstPage =
       isCreatingRecord && effectiveType !== 'processes'
@@ -793,8 +834,13 @@ export default function MasterDataPage({ type }) {
         : editingRecord?.id
           ? await config.update(params)
           : await config.create(params)
-      message.success(editingRecord?.id ? `${entityLabel}已更新` : `${entityLabel}已创建`)
+      const applied = relatedCreate && saved?.id
+        ? await split.completeRelatedCreate(relatedCreate.id, saved)
+        : null
+      message.success(relatedCreate ? applied ? '物料已保存并用于当前 BOM 物料组' : '物料已保存，原物料组有变化，请从 BOM 候选中选择' : editingRecord?.id ? `${entityLabel}已更新` : `${entityLabel}已创建`)
       setRecordModalOpen(false)
+      setRecordSuspended(false)
+      setRelatedCreateID(null)
       setSelectedRecord(saved || selectedRecord)
       if (Array.isArray(savedData?.contacts)) {
         setContacts(savedData.contacts)
@@ -899,6 +945,10 @@ export default function MasterDataPage({ type }) {
         title={config.title}
         helpKey={isProductCatalogPage ? 'products' : moduleKey}
       />
+
+      {recordSuspended ? (
+        <Alert type="info" message="有未保存的资料输入" action={<Space wrap><Button size="small" onClick={() => { setRecordSuspended(false); setRecordModalOpen(true) }}>继续编辑</Button><Button size="small" onClick={discardRecordDraft}>放弃修改</Button></Space>} />
+      ) : null}
 
       <BusinessOperationPanel
         compact
@@ -1133,46 +1183,56 @@ export default function MasterDataPage({ type }) {
           }}
         />
       ) : (
-        <BusinessFormPage
-          form={recordForm}
-          title={
+        <BusinessEditorWorkspace open={recordModalOpen}>
+          <BusinessEditorPane value="master-data-record" label={`${entityLabel}编辑区`} active={recordModalOpen} autoFocus>
+            <BusinessFormPage
+              form={recordForm}
+              title={
             editingRecord?.id
               ? `编辑${entityLabel}`
               : `新建${config.createTitleLabel || config.title}`
           }
-          open={recordModalOpen}
-          onOk={saveRecord}
-          onCancel={() => {
+              open={recordModalOpen || recordSuspended}
+              headerActions={relatedCreate ? <span className="erp-split-related-create">用于当前 BOM 物料组，保存后自动选回。</span> : null}
+              okText={relatedCreate ? '保存并使用' : '保存'}
+              onReturn={split?.open ? ({ dirty }) => {
+                if (saving || contactLoading) return
+                if (!dirty) { discardRecordDraft(); return }
+                setRecordSuspended(true)
+                setRecordModalOpen(false)
+              } : undefined}
+              onOk={saveRecord}
+              onCancel={() => {
             if (saving || contactLoading) return
-                  setRecordModalOpen(false)
+            discardRecordDraft()
           }}
-          confirmLoading={saving}
-          loading={
+              confirmLoading={saving}
+              loading={
             contactLoading || (needsUnitDictionary(effectiveType) && unitLoading)
           }
-        >
-          <BusinessForm
-            form={recordForm}
-            layout="vertical"
-            className="erp-business-action-form"
-            onValuesChange={handleRecordValuesChange}
-          >
-            <MasterDataFormFields
-              form={recordForm}
-              type={effectiveType}
-              isEditing={Boolean(editingRecord?.id)}
-              products={productReferences}
-              productOptions={productOptions}
-              unitOptions={unitOptions}
-              unitLoading={unitLoading}
-              materialCategoryOptions={materialCategoryOptions}
-              materialColorOptions={materialColorOptions}
-              processNameOptions={processNameOptions}
-              processCategoryOptions={processCategoryOptions}
-              supplierProcessOptions={supplierProcessOptions}
-              canEditSupplierProcesses={canReadProcesses}
-              supplierTypeOptions={SUPPLIER_TYPE_OPTIONS}
-              contactSection={
+            >
+              <BusinessForm
+                form={recordForm}
+                layout="vertical"
+                className="erp-business-action-form"
+                onValuesChange={handleRecordValuesChange}
+              >
+                <MasterDataFormFields
+                  form={recordForm}
+                  type={effectiveType}
+                  isEditing={Boolean(editingRecord?.id)}
+                  products={productReferences}
+                  productOptions={productOptions}
+                  unitOptions={unitOptions}
+                  unitLoading={unitLoading}
+                  materialCategoryOptions={materialCategoryOptions}
+                  materialColorOptions={materialColorOptions}
+                  processNameOptions={processNameOptions}
+                  processCategoryOptions={processCategoryOptions}
+                  supplierProcessOptions={supplierProcessOptions}
+                  canEditSupplierProcesses={canReadProcesses}
+                  supplierTypeOptions={SUPPLIER_TYPE_OPTIONS}
+                  contactSection={
                 showContactForm ? (
                   <BusinessFormSection
                     title="联系人"
@@ -1186,10 +1246,12 @@ export default function MasterDataPage({ type }) {
                   </BusinessFormSection>
                 ) : null
               }
-            />
+                />
 
-          </BusinessForm>
-        </BusinessFormPage>
+              </BusinessForm>
+            </BusinessFormPage>
+          </BusinessEditorPane>
+        </BusinessEditorWorkspace>
 
       )}
 

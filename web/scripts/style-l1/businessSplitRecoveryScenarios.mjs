@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { expect } from 'playwright/test'
+import { businessSplitLayoutButton } from './businessSplitActions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createBusinessSplitRecoveryScenarios({ assert, customerRuntimeEffectiveSession, outputDir }) {
@@ -50,7 +51,7 @@ export function createBusinessSplitRecoveryScenarios({ assert, customerRuntimeEf
         await page.locator('.ant-select-dropdown:visible').getByText('任务管理', { exact: true }).click()
         const trigger = secondary.getByRole('button', { name: '查看模拟分栏任务 1详情', exact: true })
         await trigger.waitFor()
-        await primary.getByRole('button', { name: '布局', exact: true }).click()
+        await businessSplitLayoutButton(page).click()
         await page.getByRole('button', { name: '左右互换' }).click()
         await expect(secondary).toHaveAttribute('aria-label', '左栏页面')
         await primary.locator('.ant-table-tbody > tr.ant-table-row').first().dblclick()
@@ -114,7 +115,7 @@ export function createBusinessSplitRecoveryScenarios({ assert, customerRuntimeEf
         await page.waitForLoadState('networkidle')
         await expect(primary.getByRole('button', { name: '刷新当前页', exact: true })).not.toHaveClass(/ant-btn-loading/u)
         await expect(primary.locator('.ant-spin-spinning')).toHaveCount(0)
-        await expect(primary.getByRole('textbox', { name: /可搜索：入库单号/u })).toHaveAttribute('title', /来源产品名称或编号/u)
+        await expect(primary.getByRole('textbox', { name: /可搜索：入库单号/u })).toHaveAttribute('aria-label', /来源产品名称或编号/u)
         evidence.restored = await snapshot('all-overlays-closed')
         await page.screenshot({ path: `${outputDir}/business-split-recovery-${themeMode}-restored.png`, fullPage: true })
       } finally {

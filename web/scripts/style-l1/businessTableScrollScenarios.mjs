@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { collapseBusinessSplit } from './businessSplitActions.mjs'
 import {
   exerciseTableScrollControls,
   exerciseTableScrollPagination,
+  exerciseTableScrollSettling,
   assertTableScrollDockVisible,
   assertSingleTableScrollbar,
 } from './tableScrollControlAssertions.mjs'
@@ -64,10 +66,21 @@ async function measureScroll(page) {
   })
 }
 
+async function isTouchWebKit(page) {
+  return page.context().browser()?.browserType().name() === 'webkit' &&
+    page.evaluate(() => matchMedia('(pointer: coarse)').matches)
+}
+
 async function scrollToTableEnd(page) {
   const wrapper = page.locator(tableSelector)
   await wrapper.hover()
-  await page.mouse.wheel(0, 10000)
+  if (await isTouchWebKit(page)) {
+    await wrapper.evaluate((wrapper) => {
+      const node = wrapper.closest('.erp-business-data-table-card--sticky')
+        ? wrapper.closest('.erp-admin-content') : wrapper
+      node.scrollTo({ top: node.scrollHeight, behavior: 'instant' })
+    })
+  } else await page.mouse.wheel(0, 10000)
   await page.waitForFunction((selector) => {
     const wrapper = document.querySelector(selector)
     const node = wrapper.closest('.erp-business-data-table-card--sticky')
@@ -195,7 +208,9 @@ export function createBusinessTableScrollScenarios({
         }
       })
       await page.mouse.move(wheelPoint.x, wheelPoint.y)
-      await page.mouse.wheel(10000, 0)
+      if (await isTouchWebKit(page)) {
+        await page.locator(tableSelector).locator(contentSelector).evaluate((node) => node.scrollTo({ left: node.scrollWidth, behavior: 'instant' }))
+      } else await page.mouse.wheel(10000, 0)
       await page.waitForFunction((selector) => {
         const content = document.querySelector(selector).querySelector('.ant-table-content, .ant-table-body')
         return (
@@ -219,6 +234,18 @@ export function createBusinessTableScrollScenarios({
         await page.screenshot({
           path: path.join(outputDir, 'business-table-single-scrollbar-end.png'),
         })
+        const wrapper = page.locator(tableSelector)
+        const original = await wrapper.elementHandle()
+        await page.getByRole('button', { name: '分栏', exact: true }).first().click()
+        const pane = page.locator('.erp-split-pane--left')
+        await exerciseTableScrollSettling(page, wrapper, wrapper.locator(contentSelector))
+        const bounds = await pane.boundingBox()
+        const dock = await wrapper.locator('.app-table-scroll-dock').boundingBox()
+        assert(dock.x >= bounds.x - 1 && dock.x + dock.width <= bounds.x + bounds.width + 1 && dock.y >= bounds.y - 1 && dock.y + dock.height <= bounds.y + bounds.height + 1, '分栏中的横向条仍须留在所属栏可见区域')
+        await collapseBusinessSplit(page)
+        await assertTableScrollDockVisible(page, wrapper)
+        assert.equal(await wrapper.evaluate((node, original) => node === original, original), true, '展开和收起分栏保留同一表格')
+        await original.dispose()
       }
       const paging = await exerciseTableScrollPagination(page, {
         wrapper: page.locator(tableSelector),
@@ -252,7 +279,7 @@ export function createBusinessTableScrollScenarios({
       await writeFile(
         path.join(outputDir, `business-table-scroll-${mode}.json`),
         JSON.stringify(
-          { initial, bottom, right, paging, secondPage, empty, restored },
+          { gestureDriver: await isTouchWebKit(page) ? 'webkit-dom-scroll' : 'native-wheel', initial, bottom, right, paging, secondPage, empty, restored },
           null,
           2
         )

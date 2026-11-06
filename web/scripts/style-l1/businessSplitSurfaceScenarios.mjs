@@ -1,4 +1,5 @@
 import { expect } from 'playwright/test'
+import { businessSplitLayoutButton, collapseBusinessSplit } from './businessSplitActions.mjs'
 import { installBOMMaterialMatchingMocks } from './bomMaterialMatchingScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
@@ -49,7 +50,7 @@ path: '/erp/sales/project-orders/sales-orders',
         await left.getByRole('button', { name: /新建订单$/u }).click()
         const editor = left.locator('.erp-business-form-page:not([hidden])')
         await page.setViewportSize({ width: 1024, height: 900 })
-        await left.getByRole('button', { name: '布局', exact: true }).click()
+        await businessSplitLayoutButton(page).click()
         await page.getByRole('spinbutton', { name: '左栏宽度百分比' }).fill('32')
         await page.keyboard.press('Escape')
         await expect(editor.locator('[aria-label="编辑页显示"]')).toHaveCount(0)
@@ -93,8 +94,7 @@ beforeNavigate: installBOMMaterialMatchingMocks,
       verify: async (page) => {
         const { left, right } = await open(page, '权限管理')
         await right.locator('.erp-role-template-card').filter({ hasText: '财务' }).click()
-        const details = right.getByRole('button', { name: '查看功能明细', exact: true })
-        if (await details.count()) await details.click()
+        await right.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         await right.getByRole('button', { name: '全屏编辑', exact: true }).click()
         const panel = right.getByRole('dialog', { name: '财务岗位设置', exact: true })
         await within(right, panel, '岗位设置全屏范围')
@@ -106,11 +106,11 @@ beforeNavigate: installBOMMaterialMatchingMocks,
         await expect(panel).toBeVisible()
         assert.equal(await page.locator('body').evaluate((node) => node.style.overflow), '')
         const identity = await panel.elementHandle()
-        await left.getByRole('button', { name: '布局', exact: true }).click()
+        await businessSplitLayoutButton(page).click()
         await page.getByRole('button', { name: '左右互换' }).click()
         await within(right, panel, '互换后的岗位设置')
         assert.equal(await panel.evaluate((node, original) => node === original, identity), true)
-        await left.getByRole('button', { name: '收起分栏', exact: true }).first().click()
+        await collapseBusinessSplit(page)
         await expect(panel).toBeHidden()
         assert.equal(await page.locator('body').evaluate((node) => node.style.overflow), '')
         await page.getByRole('button', { name: '分栏', exact: true }).first().click()

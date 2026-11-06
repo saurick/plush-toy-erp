@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import { businessSplitLayoutButton, collapseBusinessSplit } from './businessSplitActions.mjs'
 import { createTaskItemSemanticsScenarios } from './taskItemSemanticsScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
@@ -81,10 +82,10 @@ export function createWorkCenterSplitWidthScenarios({ assert, outputDir }) {
         await right.locator('.erp-work-center-table tr[data-task-id]').first().waitFor()
         for (const ratio of [0.32, 0.68, 0.4, 0.32]) await resize(ratio, 'original')
         await page.screenshot({ path: `${outputDir}/work-center-split-width-${kind}-${themeMode}-narrow.png`, fullPage: false })
-        await left.getByRole('button', { name: '布局', exact: true }).click()
+        await businessSplitLayoutButton(page).click()
         await page.getByRole('button', { name: '左右互换' }).click()
         for (const ratio of [0.32, 0.68, 0.5]) await resize(ratio, 'swapped')
-        await left.getByRole('button', { name: '收起分栏', exact: true }).first().click()
+        await collapseBusinessSplit(page)
         await measure('collapsed')
         assert.equal(await left.locator('.erp-work-center-table').evaluate((node, original) => node === original, original), true, '调宽、互换及收起均保留表格实例')
         await original.dispose()

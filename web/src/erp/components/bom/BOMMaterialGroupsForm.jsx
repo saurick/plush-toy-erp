@@ -1,5 +1,6 @@
 import React, {
   useEffect,
+  useContext,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -18,6 +19,8 @@ import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTable.jsx'
 import { message } from '@/common/utils/antdApp'
 import BOMMaterialCreateModal from './BOMMaterialCreateModal.jsx'
+import { useBusinessSplit } from '../business-list/BusinessSplitContext.jsx'
+import { BusinessFormDraftContext } from '../business-list/BusinessFormPageContext.js'
 import BOMMaterialSelect from './BOMMaterialSelect.jsx'
 import { bomMaterialConflictText, buildBOMMaterialCreateDefaults, readBOMMaterialSource } from '../../utils/bomMaterialMatching.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
@@ -238,6 +241,8 @@ export default function BOMMaterialGroupsForm({
   notice,
   onItemsChange,
 }) {
+  const split = useBusinessSplit()
+  const formDraft = useContext(BusinessFormDraftContext)
   // Group structure changes on material/unit selection or row insertion/removal.
   Form.useWatch(
     (values) =>
@@ -253,6 +258,21 @@ export default function BOMMaterialGroupsForm({
   const disclosure = useBusinessLineItemGroups({ form, groups: groups.map((group) => ({ id: group.key, indexes: group.indexes })) })
   const materials = useMemo(() => [...materialByID.values()], [materialByID])
   const [creatingFor, setCreatingFor] = useState(null)
+  const relatedCreateRelease = useRef(null)
+  const materialCreateCurrent = useRef(null)
+  const materialCreateMounted = useRef(true)
+  const lineKeys = useRef([])
+  useEffect(() => () => {
+    relatedCreateRelease.current?.()
+    relatedCreateRelease.current = null
+  }, [formDraft?.identity])
+  useEffect(() => {
+    materialCreateMounted.current = true
+    return () => {
+      materialCreateMounted.current = false
+      relatedCreateRelease.current?.()
+    }
+  }, [])
   const [focusRequest, setFocusRequest] = useState(null)
   const rowRefs = useRef(new Map())
   const materialRefs = useRef(new Map())
@@ -309,6 +329,56 @@ export default function BOMMaterialGroupsForm({
     updateMaterialGroup(indexes, (item) => bindBOMMaterialReference(item, material))
     setFocusRequest({ index: indexes[0], material: true })
   }
+  materialCreateCurrent.current = { canEdit, canCreateMaterial, materialConflict, onMaterialCreated, changeMaterial, formDraft }
+
+  const openMaterialCreate = async (indexes) => {
+    if (!canEdit || !canCreateMaterial) return
+    if (!split?.open || !split.openRelatedCreate) {
+      setCreatingFor(indexes)
+      return
+    }
+    const rows = form.getFieldValue('items') || []
+    const draftIdentity = formDraft?.identity
+    // 跟随 Form.List 行身份，插入或移除部位不能把结果带到另一组。
+    const ownerKeys = new Set(indexes.map((index) => lineKeys.current[index]))
+    const original = { materialID: rows[indexes[0]].material_id, unitID: rows[indexes[0]].unit_id }
+    const targetIndexes = () => {
+      const latest = form.getFieldValue('items') || []
+      const targets = lineKeys.current.flatMap((key, index) => ownerKeys.has(key) ? [index] : [])
+      if (!targets.length || !targets.every((index) => latest[index]?.material_id === original.materialID && latest[index]?.unit_id === original.unitID)) return []
+      const group = groupBOMMaterials(latest).find((entry) => entry.indexes.includes(targets[0]))
+      return group && targets.every((index) => group.indexes.includes(index)) ? group.indexes : []
+    }
+    const validate = (material) => {
+      const { current } = materialCreateCurrent
+      const targets = targetIndexes()
+      if (!materialCreateMounted.current || current.formDraft?.open === false || current.formDraft?.identity !== draftIdentity || !current.canEdit || !current.canCreateMaterial || !targets.length) return '原 BOM 物料组已变化，请返回物料组重新发起新建'
+      return current.materialConflict(targets, material)
+    }
+    const release = await split.openRelatedCreate({
+      path: '/erp/master/materials',
+      initialValues: buildBOMMaterialCreateDefaults(rows[indexes[0]], unitOptions),
+      validate,
+      onCreated: (material) => {
+        if (!materialCreateMounted.current) return false
+        const { current } = materialCreateCurrent
+        if (current.formDraft?.open === false || current.formDraft?.identity !== draftIdentity) return false
+        current.onMaterialCreated(material)
+        const targets = targetIndexes()
+        if (!current.canEdit || !current.canCreateMaterial || !targets.length || current.materialConflict(targets, material)) return false
+        current.changeMaterial(targets, material)
+        return true
+      },
+    })
+    if (release === null) {
+      setCreatingFor(indexes)
+      return
+    }
+    if (!release) return
+    if (!materialCreateMounted.current) { release(); return }
+    relatedCreateRelease.current?.()
+    relatedCreateRelease.current = release
+  }
 
   const pasteParts = (event, index, column, add) => {
     const text = event.clipboardData.getData('text/plain')
@@ -346,6 +416,7 @@ export default function BOMMaterialGroupsForm({
       <Form.List name="items">
         {(fields, { add, remove }) => (
           <BOMSelectionScope>{({ selection, setSelection }) => {
+          lineKeys.current = fields.map((field) => field.key)
           const selectedIndex = fields.findIndex((field) => field.key === selection?.key)
           const selectedGroup = groups.find((group) => group.indexes.includes(selectedIndex))
           const selectedVisible = selectedGroup && !(groups.length > 1 && disclosure.isCollapsed(selectedGroup.key))
@@ -499,6 +570,7 @@ export default function BOMMaterialGroupsForm({
                           const source = items[itemIndex]?._import_source
                           const selectObject = (event) => {
                             if (!canEdit || !event.currentTarget.contains(event.target)) return
+                            if (event.target.closest('[data-bom-material-create-trigger]')) return
                             const materialCell = event.target.closest?.('.erp-bom-material-cell')
                             setSelection({ type: materialCell ? 'material' : 'part', key: materialCell ? field.key : partField.key })
                           }
@@ -560,9 +632,7 @@ export default function BOMMaterialGroupsForm({
                                         canCreateMaterial={
                                           canEdit && canCreateMaterial
                                         }
-                                        onCreateMaterial={() =>
-                                          setCreatingFor(group.indexes)
-                                        }
+                                        onCreateMaterial={() => openMaterialCreate(group.indexes)}
                                         showSearch
                                         allowClear
                                         optionFilterProp="label"

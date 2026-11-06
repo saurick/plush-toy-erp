@@ -44,12 +44,14 @@ export function BusinessModuleViewTabs({ navigation, onPendingChange }) {
 }
 
 export default function BusinessModuleTabs({ workspace, cache, onNavigate, helpKey }) {
+  const split = useBusinessSplit()
   if (!workspace || workspace.tabs.length === 0) return null
+  const activeTab = workspace.tabs.find((tab) => tab.key === workspace.activeKey)
   return (
     <PageHeaderCard
       compact
       className="erp-business-module-header"
-      title={workspace.group.label}
+      title={split?.open ? activeTab?.label || workspace.group.label : workspace.group.label}
       helpKey={helpKey || workspace.activeKey}
       viewSwitch={
         workspace.tabs.length > 1 || workspace.group.key !== 'production' ? (

@@ -1,8 +1,8 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BusinessEditorPaneContext } from './BusinessFormPageContext.js'
 
-export function BusinessEditorPane({ value, label, active, children }) {
-  const presentation = useMemo(() => ({ active, value }), [active, value])
+export function BusinessEditorPane({ value, label, active, autoFocus = false, children }) {
+  const presentation = useMemo(() => ({ active, value, autoFocus }), [active, value, autoFocus])
   return (
     <BusinessEditorPaneContext.Provider value={presentation}>
       <section aria-label={label} hidden={!active} data-business-editor-pane={value}>
@@ -29,7 +29,7 @@ export default function BusinessEditorWorkspace({ open, toolbar, children }) {
     return () => resize.disconnect()
   }, [open])
   return (
-    <div ref={rootRef} className="erp-business-editor-workspace" data-business-editor-workspace hidden={!open} style={{ '--erp-editor-workspace-top': `${top}px` }}>
+    <div ref={rootRef} className="erp-business-editor-workspace" data-business-editor-workspace data-has-toolbar={Boolean(toolbar)} hidden={!open} style={{ '--erp-editor-workspace-top': `${top}px` }}>
       {toolbar ? (
         <div className="erp-business-editor-workspace__navigation" data-business-editor-navigation>
           {toolbar}

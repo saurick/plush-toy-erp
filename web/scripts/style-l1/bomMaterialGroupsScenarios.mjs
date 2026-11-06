@@ -75,9 +75,9 @@ export async function verifyBOMMaterialGroups(
   await assertBOMEditorDensity(modal)
   await assertLineItemGroupHeaderInteraction(page, modal)
   assert.equal(
-    await page.getByRole('button', { name: /^新建物料/ }).count(),
-    0,
-    'material creation is only offered inside the open material dropdown'
+    await modal.getByRole('button', { name: '新建物料', exact: true }).count(),
+    await modal.getByRole('combobox', { name: /^物料名称 /u }).count(),
+    '每个可见物料选择旁保留一个明确的新建入口'
   )
   assert.equal(
     await modal.getByText('生产工序归属', { exact: true }).count(),
