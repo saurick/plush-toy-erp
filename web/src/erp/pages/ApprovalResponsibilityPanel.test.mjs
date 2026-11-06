@@ -68,8 +68,7 @@ test('approval responsibility panel exposes only the three configurable approval
 test('approval responsibility table explains condition and responsibility headers', () => {
   assert.match(source, /title: approvalColumnTitle\(\s*'审批条件'/)
   assert.match(source, /title: approvalColumnTitle\(\s*'责任顺序'/)
-  assert.match(source, /aria-label=\{ariaLabel\}/)
-  assert.match(source, /trigger=\{\['hover', 'focus'\]\}/)
+  assert.match(source, /<SupplementalHelp label=\{label\} aria-label=\{ariaLabel\} content=\{help\}/)
   assert.match(source, /同币种金额低于门槛免审/)
   assert.match(source, /不是多人逐级会签/)
 })

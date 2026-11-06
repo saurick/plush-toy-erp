@@ -262,6 +262,9 @@ const businessSamplePresentationImports = new Set([
   "components/business-list/SourceImportPickerModal.jsx",
 ]);
 const businessSampleFormStateDependencies = [
+  "components/BusinessSplitHeader.jsx",
+  "components/BusinessSplitCollapseButton.jsx",
+  "components/businessSplitHeader.css",
   "components/business-list/BusinessForm.jsx",
   "components/business-list/BusinessSplitContext.jsx",
   "components/ReferenceRecordsContext.jsx",
@@ -320,6 +323,9 @@ const commonSamplePresentationDependencies = [
   "server/internal/unitpolicy/units.json",
 ];
 const allowedERPImportsByFile = new Map([
+  ["web/src/dev-workbench/components/DevSupplementalHelpExample.jsx", new Set([
+    "components/help/BusinessContextHelp",
+  ])],
   ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.jsx", toolbarSamplePresentationImports],
   ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.test.mjs", new Set([
     "components/ERPPageActions.jsx", "hooks/useBusinessPageContext.js",
@@ -517,6 +523,13 @@ function isAllowedERPImport(file, specifier) {
     allowedERPImportsByFile.get(file)?.has(module) === true
   );
 }
+
+test("supplemental help example only imports the registered presentation helper", () => {
+  const specifier = "@/erp/components/help/BusinessContextHelp";
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/components/DevSupplementalHelpExample.jsx", specifier), true);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", specifier), false);
+  assert.doesNotMatch(read("web/src/erp/components/help/BusinessContextHelp.jsx"), /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+});
 
 test("role responsibilities reuse the pure policy adapter only in relationship models", () => {
   const adapter = "../../erp/utils/rolePermissionPolicy.mjs";

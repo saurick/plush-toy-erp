@@ -46,7 +46,6 @@ test('purchase receipt actions keep a permission-stable DOM across record states
   for (const actionKey of [
     'related-records',
     'view-details',
-    'exception-records',
     'create-return',
     'create-adjustment',
     'view-payable',
@@ -67,6 +66,8 @@ test('purchase receipt actions keep a permission-stable DOM across record states
     source,
     /\{can(?:CreateReturn|CreateAdjustment|ViewPayable|CreatePayable|Post)\s*&&\s*\(!selectedRow/u
   )
+  assert.match(source, /key: 'exception-records',[\s\S]*?label: <span[\s\S]*?>退货与调整记录<\/span>/u)
+  assert.match(source, /key === 'exception-records'[\s\S]*?\(canReadReturn \|\| canReadAdjustment\) && !saving[\s\S]*?setReceiptExceptionRecordsOpen\(true\)/u)
   assert.match(source, /selectedRow\.status !== 'POSTED'/u)
   assert.match(source, /已取消入库记录不能再次取消/u)
 })

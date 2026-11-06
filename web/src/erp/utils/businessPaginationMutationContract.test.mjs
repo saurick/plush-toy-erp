@@ -146,7 +146,7 @@ test('purchase edit refresh preserves pagination while refreshing purchase follo
   assert.doesNotMatch(refresh, /setPagination|resetBusinessPaginationCurrent/u)
 })
 
-test('outsourcing create resets only the order page while edit refreshes the current page and workflow tasks', () => {
+test('outsourcing create resets only the order page while edit refreshes the current page', () => {
   const mutation = sourceSlice(
     outsourcingOrderEditor,
     'const submitForm = async () => {',
@@ -163,12 +163,12 @@ test('outsourcing create resets only the order page while edit refreshes the cur
     createBranch,
     /setPagination\(\(current\) => \(\{ \.\.\.current, current: 1 \}\)\)/u
   )
-  assert.match(createBranch, /await loadWorkflowTasks\(\)/u)
+  assert.doesNotMatch(outsourcingOrderEditor, /\bloadWorkflowTasks\b/u)
   assert.match(createBranch, /return/u)
   assert.doesNotMatch(createBranch, /loadOrders\(\)/u)
   assert.match(
     editTail,
-    /await Promise\.all\(\[loadOrders\(\), loadWorkflowTasks\(\)\]\)/u
+    /await loadOrders\(\)/u
   )
   assert.doesNotMatch(editTail, /setPagination/u)
 })

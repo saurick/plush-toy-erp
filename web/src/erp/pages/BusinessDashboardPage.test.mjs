@@ -152,7 +152,7 @@ test('progress lists and details share independently previewable product identit
 test('business product images share the standard size and retain compact controls', () => {
   assert.match(
     taskImageStyles,
-    /\.erp-task-product-image \{[\s\S]*?width: 64px;/u
+    /\.erp-task-product-image \{[\s\S]*?width: var\(--erp-task-product-image-size, 64px\);/u
   )
   assert.doesNotMatch(
     productIdentityStyles,

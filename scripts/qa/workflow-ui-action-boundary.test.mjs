@@ -1007,7 +1007,7 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
     "outsourcing order page must derive create/update through projected action helper",
   );
   assert(
-    pageSource.includes("primaryAction={\n              canCreate ? (") &&
+    /primaryAction=\{\s*canCreate \? \(/u.test(pageSource) &&
       pageSource.includes("{canUpdate ? (") &&
       /disabled=\{\s*!selectedRow\s*\|\|\s*!canEditOutsourcingOrder\(selectedRow\)\s*\|\|\s*itemsLoading\s*\}/u.test(
         pageSource,

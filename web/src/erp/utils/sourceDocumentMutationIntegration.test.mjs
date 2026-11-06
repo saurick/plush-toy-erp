@@ -45,7 +45,7 @@ const pageSources = [
     editBindCall: /setEditingOrder\(record\)/u,
     editModalCall: /setModalOpen\(true\)/u,
     recordOpenCall:
-      /onOpenRecord=\{\s*recordActionBusy \? undefined : openPurchaseOrderRecord\s*\}/u,
+      /onOpenRecord=\{\s*recordActionBusy \? undefined : \(record\) => openPurchaseOrderRecordRef\.current\(record\)\s*\}/u,
     detailsOpenStart: 'const openPurchaseOrderDetails = (record) => {',
     detailsOpenEnd: 'const openPurchaseOrderRecord = (record) => {',
     detailsModalEnd: '{columnOrderModal}',
@@ -110,6 +110,10 @@ function functionSlice(source, start, end) {
 
 for (const page of pageSources) {
   test(`${page.name} opens editing only after the full item read succeeds`, () => {
+    if (page.name === 'purchase order') {
+      assert.match(page.source, /useRef\(openPurchaseOrderRecord\)/u)
+      assert.match(page.source, /openPurchaseOrderRecordRef\.current = openPurchaseOrderRecord/u)
+    }
     const openEdit = functionSlice(
       page.editorSource || page.source,
       page.openStart,
