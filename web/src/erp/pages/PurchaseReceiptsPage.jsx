@@ -342,8 +342,6 @@ export default function PurchaseReceiptsPage() {
     BUSINESS_ROUTE_PATHS.qualityInspections
   )
   const canOpenInventory = canOpenRelatedPath(BUSINESS_ROUTE_PATHS.inventory)
-  const hasRelatedCapability =
-    canOpenPurchaseOrders || canOpenQualityInspections || canOpenInventory
   const relatedMenuItems = useMemo(() => {
     const items = []
     if (selectedRow?.purchase_order_id && canOpenPurchaseOrders) {
@@ -355,15 +353,25 @@ export default function PurchaseReceiptsPage() {
     if (canOpenInventory) {
       items.push({ key: 'inventory', label: '库存台账' })
     }
+    if (canReadReturn || canReadAdjustment) {
+      items.push({
+        key: 'exception-records',
+        label: <span title={saving ? '当前操作完成后可查看记录' : undefined}>退货与调整记录</span>,
+        disabled: saving,
+      })
+    }
     return items
   }, [
     canOpenInventory,
     canOpenPurchaseOrders,
     canOpenQualityInspections,
+    canReadReturn,
+    canReadAdjustment,
+    saving,
     selectedRow?.purchase_order_id,
   ])
   const relatedActionAvailability = resolveRelatedRecordActionAvailability({
-    authorized: hasRelatedCapability,
+    authorized: relatedMenuItems.length > 0,
     record: selectedRow,
     itemCount: relatedMenuItems.length,
   })
@@ -483,6 +491,12 @@ export default function PurchaseReceiptsPage() {
   )
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
+    if (key === 'exception-records') {
+      if ((canReadReturn || canReadAdjustment) && !saving) {
+        setReceiptExceptionRecordsOpen(true)
+      }
+      return
+    }
     const pathByKey = {
       'purchase-orders': relatedDocumentRoute(
         BUSINESS_ROUTE_PATHS.purchaseOrders,
@@ -1374,24 +1388,6 @@ export default function PurchaseReceiptsPage() {
             disabledReason="请先选择一条入库记录"
             buttonProps={{ 'data-business-action-key': 'attachments' }}
           />
-          {canReadReturn || canReadAdjustment ? (
-            <BusinessActionTooltip
-              disabled={!selectedRow || saving}
-              disabledReason={
-                saving ? '当前操作完成后可查看记录' : '请先选择一条入库记录'
-              }
-            >
-              <Button
-                data-business-action-key="exception-records"
-                data-business-action-role="related"
-                size="small"
-                disabled={!selectedRow || saving}
-                onClick={() => setReceiptExceptionRecordsOpen(true)}
-              >
-                退货与调整记录
-              </Button>
-            </BusinessActionTooltip>
-          ) : null}
           {canCreateReturn ? (
             <BusinessActionTooltip
               visible={!selectedRow || selectedRow.status === PurchaseReceiptStatus.POSTED}

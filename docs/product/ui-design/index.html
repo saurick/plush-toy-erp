@@ -5436,11 +5436,12 @@
       const group=(html,priority,category='业务办理',pinned=false)=>`<div class="business-action-group" data-action-priority="${priority}" data-action-group="${category}" ${pinned?'data-action-pinned':''}>${html}</div>`;
       const basics=`${detail?'':group(`<button class="btn" data-action="open-selected" ${disabled}>查看详情</button>`,60,'查看与关联')}${!row||canEditRecord(config,row)||(config.key==='bom'&&row.status==='active')?group(`<button class="btn" data-action="business-record-action" data-operation="edit" ${attrs} ${disabled}>${config.key==='bom'?(row?.status==='active'?bomRevisionActionLabel(row):'编辑 BOM'):'编辑'}</button>`,80):''}`;
       const collaboration=tasksVisible?group(`<button class="btn task-collaboration-entry" data-action="open-related-tasks" ${attrs} ${disabled}>${pending?`任务协作 ${pending}`:'任务协作'}</button>`,120,'任务协作',true):'';
-      const related=row?group(`<button class="btn" data-action="${row.previewOnly?'inspect-record':'business-record-action'}" ${row.previewOnly?'data-value="related"':'data-operation="related"'} ${attrs}>相关单据</button>`,30,'查看与关联'):'';
+      const relatedButton=`<button class="btn" data-action="${row?.previewOnly?'inspect-record':'business-record-action'}" ${row?.previewOnly?'data-value="related"':'data-operation="related"'} ${attrs}>${config.key==='inbound'&&!row?.previewOnly?'来源与下游单据':'相关单据'}</button>`;
+      const related=row?group(config.key==='inbound'&&!row.previewOnly?renderBusinessActionMenu(`${relatedButton}<button class="btn" data-action="business-record-action" data-operation="records" ${attrs}>退货与调整记录</button>`,'相关单据'):relatedButton,30,'查看与关联'):'';
       const inspections=row?.previewOnly?[
         ['lines','查看完整产品明细与数量'],['related','查看来源与下游关联单据'],['history','查看全部操作记录与反馈'],['attachments','查看包装资料及客户确认附件'],['copy','复制完整业务编号与客户单号']
       ].map(([key,label])=>group(`<button class="btn" data-action="inspect-record" data-value="${key}" ${attrs}>${label}</button>`,25,'查看与关联')).join(''):'';
-      const specs=businessRecordActions[config.key].filter(spec=>(!row||!spec.states||spec.states.includes(row.status))&&!(config.key==='bom'&&spec.id==='copy-version'&&row?.status==='active'));
+      const specs=businessRecordActions[config.key].filter(spec=>(!row||!spec.states||spec.states.includes(row.status))&&!(config.key==='bom'&&spec.id==='copy-version'&&row?.status==='active')&&!(config.key==='inbound'&&spec.id==='records'));
       const auxiliary=spec=>['cancel','close','archive','copy-version','records','reverse'].includes(spec.id)||spec.template;
       const candidates=specs.filter(spec=>!auxiliary(spec));
       const primary=candidates.find(spec=>spec.primary)||candidates.find(spec=>['submit','pass','release','approval','allocate','completion','disposition'].includes(spec.id));
@@ -5455,8 +5456,8 @@
       for(const bar of adaptiveActionBars)if(!bar.isConnected){adaptiveActionObserver.unobserve(bar);adaptiveActionBars.delete(bar);}
       for(const bar of document.querySelectorAll('[data-adaptive-actions]')){
         if(!adaptiveActionBars.has(bar)){adaptiveActionBars.add(bar);adaptiveActionObserver.observe(bar);}
-        const visible=bar.querySelector('.business-action-visible'),menu=bar.querySelector('.business-action-menu'),options=menu.querySelector('.task-copy-options'),rail=bar.querySelector('.business-action-measure > div');
-        if(menu.open||(bar._actionMeasured&&(state.overlay||state.drawer)))continue;
+        const visible=bar.querySelector('.business-action-visible'),menu=bar.querySelector(':scope > .business-action-menu'),options=menu.querySelector('.task-copy-options'),rail=bar.querySelector('.business-action-measure > div');
+        if(bar.querySelector('details[open]')||(bar._actionMeasured&&(state.overlay||state.drawer)))continue;
         const groups=[...visible.querySelectorAll('.business-action-group'),...options.querySelectorAll('.business-action-group')];
         groups.forEach((node,index)=>{node._actionOrder??=index;});
         groups.sort((a,b)=>Number(a.dataset.actionPriority==='10')-Number(b.dataset.actionPriority==='10')||a._actionOrder-b._actionOrder);
@@ -5480,14 +5481,14 @@
         }
         const currentOverflow=[...options.querySelectorAll('.business-action-group')];
         if(overflow.some((node,index)=>currentOverflow[index]!==node)||currentOverflow.length!==overflow.length){
-          const sections=labels.map(label=>{const nodes=overflow.filter(node=>node.dataset.actionGroup===label);if(!nodes.length)return null;const section=document.createElement('section');section.className='business-action-section';section.setAttribute('aria-label',label);const heading=document.createElement('h4');heading.textContent=label;section.append(heading,...nodes);return section;}).filter(Boolean);
+          const sections=labels.map(label=>{const nodes=overflow.filter(node=>node.dataset.actionGroup===label);if(!nodes.length)return null;const section=document.createElement('section');section.className='business-action-section';section.setAttribute('aria-label',label);if(new Set(overflow.map(node=>node.dataset.actionGroup)).size>1){const heading=document.createElement('h4');heading.textContent=label;section.append(heading);}section.append(...nodes);return section;}).filter(Boolean);
           options.replaceChildren(...sections);
         }
         menu.hidden=overflow.length===0;
         bar._actionMeasured=true;
       }
     }
-    document.addEventListener('toggle',event=>{if(event.target.matches?.('[data-adaptive-actions] > details')&&!event.target.open)requestAnimationFrame(syncBusinessActionSpace);},true);
+    document.addEventListener('toggle',event=>{if(event.target.matches?.('[data-adaptive-actions] details')&&!event.target.open)requestAnimationFrame(syncBusinessActionSpace);},true);
     function recordBusinessOperation(row,label,note='') {
       row.operations=row.operations||[];row.operations.unshift({label,note,time:'刚刚 · 当前账号'});
       row.progress=label;
@@ -13971,7 +13972,7 @@ return {orders,financeCustomers};})();
         ],
         [
           "拒收、退货与调整",
-          "首次未入库拒收按来源行办理退厂或补换；已入库后的退货和更正使用对应正式动作，保留原单与反向记录。"
+          "首次未入库拒收按来源行办理退厂或补换；已入库后的退货和更正使用对应正式动作，从相关单据查看退货与调整记录，保留原单与反向记录。"
         ]
       ]
     },

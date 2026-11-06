@@ -511,7 +511,7 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
       >
         {overflowGroups.map((group) => (
           <section key={group.key} className="erp-business-selection-action-menu__group" aria-label={group.label}>
-            <div className="erp-business-selection-action-menu__heading">{group.label}</div>
+            {overflowGroups.length > 1 ? <div className="erp-business-selection-action-menu__heading">{group.label}</div> : null}
             {group.actions.map(({ node: action, index }) => (
               <div
                 key={action?.key || `selection-overflow-action-${index}`}

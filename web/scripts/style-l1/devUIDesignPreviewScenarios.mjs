@@ -34,6 +34,36 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
   }
   return [
     {
+      name: 'dev-ui-design-inbound-related-actions',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const frame = await waitReady(page)
+        await page.getByRole('button', { name: /全屏预览/u }).click()
+        await frame.locator('.nav-item[data-page="warehouse-hub"]').click()
+        await frame.locator('.table-wrap [data-action="select-row"][data-id="inbound-1"]').check()
+        const actions = frame.locator('.operation-surface .business-record-actions')
+        for (const width of [1920, 1024]) {
+          await page.setViewportSize({ width, height: 1080 })
+          const related = actions.getByRole('button', { name: '相关单据', exact: true })
+          if (!(await related.isVisible())) {
+            await actions.getByRole('button', { name: '更多操作', exact: true }).click()
+          }
+          await related.click()
+          const records = actions.getByRole('button', { name: '退货与调整记录', exact: true })
+          assert.equal(await records.count(), 1, '记录入口只保留在相关单据菜单')
+          assert.equal(await records.evaluate((node) => node.closest('details').querySelector('summary').getAttribute('aria-label')), '相关单据')
+          assert.equal(await actions.evaluate((node) => node.scrollWidth - node.clientWidth <= 1), true, '关联菜单不挤压操作区')
+          await records.click()
+          const dialog = frame.getByRole('dialog', { name: '退货与调整记录', exact: true })
+          await dialog.waitFor({ state: 'visible' })
+          await dialog.getByRole('button', { name: '返回', exact: true }).click()
+          await dialog.waitFor({ state: 'hidden' })
+        }
+      },
+    },
+    {
       name: 'dev-ui-design-form-navigation',
       path: '/__dev/ui-design',
       viewport: { width: 1920, height: 1080 },

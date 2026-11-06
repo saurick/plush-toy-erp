@@ -5,6 +5,7 @@ import { createBusinessAttachmentAssertions } from './businessAttachmentAssertio
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertBusinessSectionInteractions } from './businessFormSectionAssertions.mjs'
 import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
+import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
 
 export function createPurchaseReceiptScenarios(deps) {
   const {
@@ -593,7 +594,9 @@ export function createPurchaseReceiptScenarios(deps) {
       verify: async (page) => {
         await page.locator('.erp-business-module-view-tabs [role="tab"][aria-selected="true"]').filter({ hasText: '采购收货' }).waitFor()
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
-        await clickSelectionAction(page, '退货与调整记录')
+        assert.equal(await page.getByRole('button', { name: '退货与调整记录', exact: true }).count(), 0, '退货与调整记录不再占用独立按钮或更多操作入口')
+        await clickSelectionAction(page, /相关单据/u)
+        await page.getByRole('menuitem', { name: '退货与调整记录', exact: true }).click()
 
         const modal = page
           .getByRole('dialog', {
@@ -674,6 +677,45 @@ export function createPurchaseReceiptScenarios(deps) {
         }
       },
     },
+    ...[
+      { key: 'return', permission: PermissionCode.PURCHASE_RETURN_READ, tab: /采购退货/u },
+      { key: 'adjustment', permission: PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_READ, tab: /入库调整/u },
+      { key: 'no-records' },
+    ].map(({ key, permission, tab }) => {
+      const permissions = [PermissionCode.PURCHASE_RECEIPT_READ, permission].filter(Boolean)
+      return {
+        name: `purchase-receipt-related-${key}-readonly`,
+        path: '/erp/warehouse/inbound?warehouse_view=purchase',
+        auth: 'admin',
+        adminProfile: { username: 'style-l1-receipt-reader', is_super_admin: false, permissions },
+        effectiveSession: { ...customerRuntimeEffectiveSession, pages: ['inbound'], actions: permissions },
+        viewport: { width: 1440, height: 900 },
+        verify: async (page) => {
+          await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
+          const related = page.getByRole('button', { name: /相关单据/u })
+          if (!permission) {
+            assert.equal(await related.count(), 0, '没有可读关联时隐藏空入口')
+            return
+          }
+          await clickSelectionAction(page, /相关单据/u)
+          const records = page.getByRole('menuitem', { name: '退货与调整记录', exact: true })
+          assert.equal(await records.count(), 1, '仅有记录读取权限时保留唯一关联入口')
+          for (const label of ['采购订单', '来料质检', '库存台账']) {
+            assert.equal(await page.getByRole('menuitem', { name: label, exact: true }).count(), 0, `未开放关联页面：${label}`)
+          }
+          await records.click()
+          const modal = page.getByRole('dialog', { name: /退货与调整记录/u })
+          await modal.waitFor({ state: 'visible' })
+          assert.equal(await modal.getByRole('tab').count(), 1, '只展示授权的记录类别')
+          assert.equal(await modal.getByRole('tab', { name: tab }).count(), 1)
+          assert.equal(await modal.getByRole('button', { name: /^(确认|取消并恢复库存|作废草稿)$/u }).count(), 0, '记录读取权限不开放办理动作')
+          await modal.getByRole('button', { name: '关闭', exact: true }).click()
+          await modal.waitFor({ state: 'hidden' })
+          await clickSelectionAction(page, /相关单据/u)
+          assert.equal(await records.isVisible(), true, '关闭后可以从原关联入口再次打开')
+        },
+      }
+    }),
     {
       name: 'purchase-receipt-source-generated-boundary-dark-desktop',
       path: '/erp/warehouse/inbound',

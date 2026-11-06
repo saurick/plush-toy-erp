@@ -378,6 +378,7 @@ test('共享订单动作随状态归类，直接入口与更多菜单保留主�
       const host = width === 180
         ? document.querySelector('.erp-business-selection-action-menu')
         : container.querySelector('.erp-business-selection-action-bar__compact-visible')
+      if (width === 180) assert.equal(host.querySelectorAll('.erp-business-selection-action-menu__heading').length, 0, '单一类别的更多菜单不重复显示标题')
       const primary = host.querySelector('[data-business-action-key="lifecycle-primary"]')
       const secondary = host.querySelector(`[data-business-action-key="lifecycle-${key}"]`)
       for (const button of [primary, secondary]) {
@@ -898,6 +899,11 @@ test('动作增长到 9、18、30 项时任务协作直达，分类完整且缩�
     assert.equal(menu.querySelectorAll('[data-growth-action]').length, count)
     assert.deepEqual([...menu.querySelectorAll('section')].map((section) => section.getAttribute('aria-label')),
       ['业务办理', '查看与关联', '打印与输出', '单据处理', '其他操作'])
+    assert.deepEqual(
+      [...menu.querySelectorAll('.erp-business-selection-action-menu__heading')].map((heading) => heading.textContent),
+      ['业务办理', '查看与关联', '打印与输出', '单据处理', '其他操作'],
+      '多个类别仍保留分类标题'
+    )
     const last = menu.querySelector(`[data-growth-action="${count - 1}"]`)
     menu.getBoundingClientRect = () => new dom.runtimeWindow.DOMRect(0, 0, 240, 120)
     last.getBoundingClientRect = () => new dom.runtimeWindow.DOMRect(0, 310, 80, 32)
