@@ -617,10 +617,26 @@ func TestProductionWIPUsecaseExposesGetCancelAndCanonicalTransfer(t *testing.T) 
 }
 
 func TestProductionWIPPackagingPlanningPreservesAssignmentPermission(t *testing.T) {
-	aggregate := &ProductionWIPAggregate{Batches: []*ProductionWIPBatch{{ID: 1, ProductionOrderOperationID: 2}}, Operations: []*ProductionOrderOperation{{ID: 2, OperationCode: ProductionWIPOperationPackaging}}}
-	for _, action := range []string{ProductionWIPActionSplitBatch, ProductionWIPActionAssignExecution, ProductionWIPActionCancelBatch} {
-		if got := ProductionWIPActionPermission(&ProductionWIPAction{BatchID: 1, Action: action}, aggregate, PermissionProductionWIPAssign); got != PermissionProductionWIPAssign {
-			t.Fatalf("planning %s permitted as %s", action, got)
+	aggregate := &ProductionWIPAggregate{Batches: []*ProductionWIPBatch{{ID: 1, ProductionOrderOperationID: 2}, {ID: 3, ProductionOrderOperationID: 4}}, Operations: []*ProductionOrderOperation{{ID: 2, OperationCode: ProductionWIPOperationPackaging}, {ID: 4, OperationCode: ProductionWIPOperationSewing}}}
+	for _, tc := range []struct {
+		action string
+		batch  int
+		want   string
+	}{
+		{ProductionWIPActionAssignExecution, 1, PermissionWarehousePackagingExecute},
+		{ProductionWIPActionAssignExecution, 3, PermissionProductionWIPAssign},
+		{ProductionWIPActionSplitBatch, 1, PermissionProductionWIPAssign},
+		{ProductionWIPActionCancelBatch, 1, PermissionProductionWIPAssign},
+		{ProductionWIPActionAssignExecution, 99, PermissionProductionWIPAssign},
+	} {
+		if got := ProductionWIPActionPermission(&ProductionWIPAction{BatchID: tc.batch, Action: tc.action}, aggregate, PermissionProductionWIPAssign); got != tc.want {
+			t.Fatalf("%s batch %d permitted as %s, want %s", tc.action, tc.batch, got, tc.want)
 		}
+	}
+	if got := ProductionWIPActionPermission(nil, aggregate, PermissionProductionWIPAssign); got != PermissionProductionWIPAssign {
+		t.Fatalf("nil action changed base permission: %s", got)
+	}
+	if got := ProductionWIPActionPermission(&ProductionWIPAction{Action: ProductionWIPActionAssignExecution}, nil, PermissionProductionWIPAssign); got != PermissionProductionWIPAssign {
+		t.Fatalf("missing aggregate changed base permission: %s", got)
 	}
 }

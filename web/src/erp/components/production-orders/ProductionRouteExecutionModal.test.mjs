@@ -1,11 +1,40 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { runInNewContext } from 'node:vm'
 import { readContractSource as readFileSync } from '../../../../scripts/test/publicContractSource.mjs'
 
 const source = readFileSync(
   new URL('./ProductionRouteExecutionModal.jsx', import.meta.url),
   'utf8'
 )
+
+test('packaging assignment uses warehouse permission and preserves production planning boundaries', () => {
+  const match = source.match(/const canRunAction = useCallback\(\s*([\s\S]*?),\s*\[\s*assignmentOnly,/u)
+  assert(match)
+  const actions = Object.fromEntries(['ASSIGN_EXECUTION', 'SPLIT_BATCH', 'CANCEL_BATCH', 'CONFIRM_PACKAGING_MATERIAL'].map((key) => [key, key]))
+  const check = (operation, canAssign, canWarehousePackaging, readOnly = false) => runInNewContext(`(${match[1]})`, {
+    PRODUCTION_WIP_ACTION: actions,
+    assignmentOnly: false,
+    readOnly,
+    currentOperation: { operation_code: operation },
+    canAssign,
+    canWarehousePackaging,
+    canConfirmPackaging: false,
+    canIssueCutting: false,
+    canReceiveReturn: false,
+    canExecute: false,
+  })
+  const warehouse = check('PACKAGING', false, true)
+  assert.equal(warehouse(actions.ASSIGN_EXECUTION), true)
+  assert.equal(warehouse(actions.SPLIT_BATCH), false)
+  assert.equal(warehouse(actions.CANCEL_BATCH), false)
+  assert.equal(check('SEWING', false, true)(actions.ASSIGN_EXECUTION), false)
+  assert.equal(check('SEWING', true, false)(actions.ASSIGN_EXECUTION), true)
+  assert.equal(check('PACKAGING', true, false)(actions.ASSIGN_EXECUTION), false)
+  assert.equal(check('PACKAGING', true, false)(actions.SPLIT_BATCH), true)
+  assert.equal(check('PACKAGING', true, false)(actions.CANCEL_BATCH), true)
+  assert.equal(check('PACKAGING', false, true, true)(actions.ASSIGN_EXECUTION), false)
+})
 
 test('production route modal is a self-contained production-order surface', () => {
   assert.match(source, /BusinessFormModal/u)

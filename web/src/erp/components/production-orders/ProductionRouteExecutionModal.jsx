@@ -523,6 +523,7 @@ export default function ProductionRouteExecutionModal({
       if (action === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL) {
         return canConfirmPackaging
       }
+      if (action === PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION && currentOperation?.operation_code === 'PACKAGING') return canWarehousePackaging
       if (
         [
           PRODUCTION_WIP_ACTION.SPLIT_BATCH,

@@ -221,7 +221,7 @@ type ProductionWIPReceiptSummary struct {
 
 // Permissions follow the actual operation, never a caller-supplied role or label.
 func ProductionWIPActionPermission(in *ProductionWIPAction, aggregate *ProductionWIPAggregate, base string) string {
-	if in == nil || aggregate == nil || base == PermissionProductionWIPAssign {
+	if in == nil || aggregate == nil || (base == PermissionProductionWIPAssign && in.Action != ProductionWIPActionAssignExecution) {
 		return base
 	}
 	for _, batch := range aggregate.Batches {

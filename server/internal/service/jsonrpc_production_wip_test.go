@@ -20,6 +20,31 @@ type productionWIPJSONRPCRepo struct {
 	actionCall *biz.ProductionWIPCommand
 }
 
+func TestProductionWIPPackagingAssignExecutionPermissionBoundary(t *testing.T) {
+	for _, operation := range []string{biz.ProductionWIPOperationPackaging, biz.ProductionWIPOperationSewing} {
+		t.Run(operation, func(t *testing.T) {
+			aggregate := productionWIPJSONRPCAggregate()
+			aggregate.Operations[0].OperationCode = operation
+			repo := &productionWIPJSONRPCRepo{aggregate: aggregate}
+			d := newProductionWIPJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionProductionWIPRead, biz.PermissionWarehousePackagingExecute))
+			_, result, err := d.handleProductionWIP(workflowJSONRPCAdminContext(), "execute_production_wip_action", "packaging-permission", mustJSONRPCStruct(t, map[string]any{
+				"action": biz.ProductionWIPActionAssignExecution, "production_order_id": 1, "production_wip_batch_id": 201, "expected_version": 3,
+				"execution_mode": biz.ProductionWIPExecutionInHouse, "idempotency_key": "packaging-assignment-permission",
+			}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if operation == biz.ProductionWIPOperationPackaging {
+				if result.Code != errcode.OK.Code || repo.actionCall == nil {
+					t.Fatalf("packaging assignment rejected: %d %s", result.Code, result.Message)
+				}
+			} else if result.Code != errcode.PermissionDenied.Code || repo.actionCall != nil {
+				t.Fatalf("production assignment leaked: %d", result.Code)
+			}
+		})
+	}
+}
+
 func (r *productionWIPJSONRPCRepo) GetProductionWIP(context.Context, int) (*biz.ProductionWIPAggregate, error) {
 	return r.aggregate, r.err
 }
