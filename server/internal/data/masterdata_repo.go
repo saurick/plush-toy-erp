@@ -1146,7 +1146,7 @@ func (r *masterDataRepo) DisableContact(ctx context.Context, id int) (*biz.Conta
 }
 
 func createCustomerWithClient(ctx context.Context, client *ent.Client, sqlDialect string, in *biz.CustomerMutation) (*ent.Customer, error) {
-	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod); err != nil {
+	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod, nil); err != nil {
 		return nil, err
 	}
 
@@ -1166,7 +1166,14 @@ func createCustomerWithClient(ctx context.Context, client *ent.Client, sqlDialec
 }
 
 func updateCustomerWithClient(ctx context.Context, client *ent.Client, sqlDialect string, id int, in *biz.CustomerMutation) (*ent.Customer, error) {
-	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod); err != nil {
+	previous, err := client.Customer.Get(ctx, id)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrCustomerNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod, previous.DefaultPaymentMethod); err != nil {
 		return nil, err
 	}
 
@@ -1229,7 +1236,7 @@ func updateCustomerWithClient(ctx context.Context, client *ent.Client, sqlDialec
 }
 
 func createSupplierWithClient(ctx context.Context, client *ent.Client, sqlDialect string, in *biz.SupplierMutation) (*ent.Supplier, error) {
-	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod); err != nil {
+	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod, nil); err != nil {
 		return nil, err
 	}
 
@@ -1252,7 +1259,14 @@ func createSupplierWithClient(ctx context.Context, client *ent.Client, sqlDialec
 }
 
 func updateSupplierWithClient(ctx context.Context, client *ent.Client, sqlDialect string, id int, in *biz.SupplierMutation) (*ent.Supplier, error) {
-	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod); err != nil {
+	previous, err := client.Supplier.Get(ctx, id)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrSupplierNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := recordPaymentMethodUse(ctx, client, sqlDialect, in.DefaultPaymentMethod, previous.DefaultPaymentMethod); err != nil {
 		return nil, err
 	}
 

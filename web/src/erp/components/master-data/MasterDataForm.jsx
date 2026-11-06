@@ -239,6 +239,7 @@ export function MasterDataFormFields({
   canEditSupplierProcesses = true,
   supplierTypeOptions = [],
   contactSection,
+  compact = false,
 }) {
   const productSKUParentField = productSKUParentFieldContract(isEditing)
   const defaultInvoiceRequired = Form.useWatch('default_invoice_required', form)
@@ -510,7 +511,7 @@ export function MasterDataFormFields({
 
   return (
     <>
-      <BusinessFormSection fieldLayout="adaptive" title="基本资料">
+      <BusinessFormSection fieldLayout="adaptive" title="基本资料" showHeading={!compact}>
         <Form.Item
           className="erp-business-action-form__field"
           label={type === 'materials' ? '系统物料编号（自动）' : '编号（自动）'}
@@ -749,7 +750,7 @@ export function MasterDataFormFields({
         </>
       ) : null}
       {type === 'materials' ? (
-        <BusinessFormSection fieldLayout="adaptive" title="采购与库存">
+        <BusinessFormSection fieldLayout="adaptive" title="采购与库存" showHeading={!compact}>
           <MaterialStockFields form={form} />
           <Form.Item
             className="erp-business-action-form__field erp-business-action-form__field--wide"
@@ -773,13 +774,13 @@ export function MasterDataFormFields({
           </Form.Item>
         </BusinessFormSection>
       ) : null}
-      <BusinessFormSection title="备注">
+      <BusinessFormSection title="备注" showHeading={!compact}>
         <Form.Item
           className="erp-business-action-form__field erp-business-action-form__field--full"
           label="备注"
           name="note"
         >
-          <BusinessTextArea minRows={2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
+          <BusinessTextArea minRows={compact ? 1 : 2} allowClear showCount maxLength={BusinessTextPolicy.noteMaxCharacters} />
         </Form.Item>
       </BusinessFormSection>
     </>

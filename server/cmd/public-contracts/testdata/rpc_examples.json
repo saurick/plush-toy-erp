@@ -14317,6 +14317,7 @@
   "masterdata.list_payment_method_options": {
     "basis": "handler-fixture",
     "data": {
+      "can_delete": false,
       "has_more": false,
       "items": [
         {

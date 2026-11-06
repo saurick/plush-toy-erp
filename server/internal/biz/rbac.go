@@ -44,6 +44,7 @@ const (
 	PermissionSupplierUpdate                    = "supplier.update"
 	PermissionSupplierDisable                   = "supplier.disable"
 	PermissionPaymentMethodManage               = "payment_method.manage"
+	PermissionPaymentMethodDelete               = "payment_method.delete"
 	PermissionMaterialRead                      = "material.read"
 	PermissionMaterialCreate                    = "material.create"
 	PermissionMaterialUpdate                    = "material.update"
@@ -336,7 +337,8 @@ var builtinPermissions = withBuiltinPermissionMetadata([]PermissionDefinition{
 	{Key: PermissionSupplierCreate, Name: "创建供应商主数据", Module: "masterdata", Action: "create", Resource: "supplier", Builtin: true},
 	{Key: PermissionSupplierUpdate, Name: "更新供应商主数据", Module: "masterdata", Action: "update", Resource: "supplier", Builtin: true},
 	{Key: PermissionSupplierDisable, Name: "启停供应商主数据", Module: "masterdata", Action: "disable", Resource: "supplier", Builtin: true},
-	{Key: PermissionPaymentMethodManage, Name: "维护付款方式", Description: "新增、改名、启停公司共用付款方式，删除未使用项；不修改档案和订单快照。", Module: "masterdata", Action: "manage", Resource: "payment_method", Builtin: true},
+	{Key: PermissionPaymentMethodManage, Name: "维护付款方式", Description: "查看、新增、改名、启停公司共用付款方式；不修改档案和订单快照。", Module: "masterdata", Action: "manage", Resource: "payment_method", Builtin: true},
+	{Key: PermissionPaymentMethodDelete, Name: "删除未使用付款方式", Description: "在维护权限基础上删除从未使用且无业务引用的付款方式；默认岗位不授予。", Module: "masterdata", Action: "delete", Resource: "payment_method", Builtin: true},
 	{Key: PermissionMaterialRead, Name: "查看材料主数据", Module: "masterdata", Action: "read", Resource: "material", Builtin: true},
 	{Key: PermissionMaterialCreate, Name: "创建材料主数据", Module: "masterdata", Action: "create", Resource: "material", Builtin: true},
 	{Key: PermissionMaterialUpdate, Name: "更新材料主数据", Module: "masterdata", Action: "update", Resource: "material", Builtin: true},

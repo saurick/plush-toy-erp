@@ -275,10 +275,13 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 
 	// Master data. Method names are explicit; no permission suffix inference is used.
 	paymentMethodSurfaces := make([]PermissionUsageSurface, 0, 4)
+	paymentMethodDeleteSurfaces := make([]PermissionUsageSurface, 0, 4)
 	for _, menuKey := range []string{"customers", "suppliers", "sales-orders", "accessories-purchase"} {
-		paymentMethodSurfaces = append(paymentMethodSurfaces, menuPermissionSurface(menuKey, "payment-conditions", "付款条件", "manage-payment-methods", "维护付款方式", permissionControlButton, "允许新增、改名、启停和删除未使用项", permissionMethods("masterdata", "list_payment_method_options", "create_payment_method", "update_payment_method", "delete_payment_method"), []string{"公司共用选项；不修改档案、订单快照或付款周期，已使用项只能停用"}))
+		paymentMethodSurfaces = append(paymentMethodSurfaces, menuPermissionSurface(menuKey, "payment-conditions", "付款条件", "manage-payment-methods", "维护付款方式", permissionControlButton, "允许新增、改名和启停", permissionMethods("masterdata", "list_payment_method_options", "create_payment_method", "update_payment_method"), []string{"公司共用选项；不修改档案、订单快照或付款周期"}))
+		paymentMethodDeleteSurfaces = append(paymentMethodDeleteSurfaces, menuPermissionSurface(menuKey, "payment-conditions", "付款条件", "delete-payment-method", "删除未使用付款方式", permissionControlButton, "允许删除未使用项", permissionMethods("masterdata", "delete_payment_method"), []string{"同时需要维护付款方式权限；默认岗位不授予；已使用或存在业务引用的选项不可删除"}))
 	}
 	add(PermissionPaymentMethodManage, paymentMethodSurfaces...)
+	add(PermissionPaymentMethodDelete, paymentMethodDeleteSurfaces...)
 	addCRUD(PermissionCustomerRead, PermissionCustomerCreate, PermissionCustomerUpdate, PermissionCustomerDisable, "customers", "customers", "客户档案", "客户", "masterdata", []string{"get_customer", "list_customers"}, []string{"create_customer", "save_customer_with_contacts"}, []string{"update_customer", "save_customer_with_contacts"}, []string{"set_customer_active"})
 	addCRUD(PermissionSupplierRead, PermissionSupplierCreate, PermissionSupplierUpdate, PermissionSupplierDisable, "suppliers", "suppliers", "供应商与加工厂", "供应商", "masterdata", []string{"get_supplier", "list_suppliers"}, []string{"create_supplier", "save_supplier_with_contacts"}, []string{"update_supplier", "save_supplier_with_contacts"}, []string{"set_supplier_active"})
 	addCRUD(PermissionMaterialRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionMaterialDisable, "materials", "materials", "材料档案", "材料", "masterdata", []string{"get_material", "list_materials", "list_material_warehouses"}, []string{"create_material"}, []string{"update_material"}, []string{"set_material_active"})

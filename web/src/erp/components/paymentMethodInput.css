@@ -1,6 +1,9 @@
+.erp-payment-method-field .ant-form-item-label > label {
+  width: 100%;
+}
+
 .erp-payment-method-field__label {
   width: 100%;
-  margin-bottom: var(--erp-form-label-gap, 5px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -45,12 +48,6 @@
   min-width: 0;
 }
 
-.erp-payment-method-input__new-option {
-  display: flex;
-  flex-direction: column;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
 
 .erp-payment-method-input__feedback,
 .erp-payment-method-input__popup-actions {
@@ -70,10 +67,24 @@
   overflow-wrap: anywhere;
 }
 
+.erp-payment-method-modal .ant-modal-content {
+  height: 520px;
+}
+
+.erp-payment-method-manager {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 8px;
+}
+
+.erp-payment-method-manager__toolbar,
+.erp-payment-method-manager__search,
 .erp-payment-method-manager__notice,
-.erp-payment-method-manager__row,
 .erp-payment-method-manager__identity,
 .erp-payment-method-manager__footer,
+.erp-payment-method-manager__footer-meta,
 .erp-payment-method-quick-create__label {
   display: flex;
   gap: 12px;
@@ -81,21 +92,40 @@
   justify-content: space-between;
 }
 
-.erp-payment-method-manager__search,
-.erp-payment-method-manager__notice {
-  margin-bottom: 8px;
+.erp-payment-method-manager__toolbar,
+.erp-payment-method-manager__footer-meta {
+  flex-wrap: wrap;
+}
+
+.erp-payment-method-manager__search {
+  flex: 1;
+  min-width: 200px;
+  gap: 8px;
+}
+
+.erp-payment-method-manager__create {
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.erp-payment-method-manager__toolbar,
+.erp-payment-method-manager__editor-field,
+.erp-payment-method-manager__notice,
+.erp-payment-method-manager > .ant-typography,
+.erp-payment-method-manager > .ant-alert {
+  flex: none;
 }
 
 .erp-payment-method-manager__editor-field {
-  flex: 1;
+  display: grid;
+  gap: 6px;
   min-width: 0;
 }
 
-.erp-payment-method-manager__row > .ant-space,
-.erp-payment-method-manager__pager,
-.erp-payment-method-manager__page,
-.erp-payment-method-manager__usage {
-  flex: none;
+.erp-payment-method-manager__list {
+  flex: 1;
+  min-height: 112px;
+  overflow: auto;
 }
 
 .erp-payment-method-manager__identity {
@@ -108,13 +138,9 @@
   overflow-wrap: anywhere;
 }
 
-.erp-payment-method-manager__row {
-  padding-block: 8px;
-  border-bottom: 1px solid var(--ant-color-border-secondary);
-}
-
-.erp-payment-method-manager__row--editing {
-  padding-bottom: 12px;
+.erp-payment-method-manager__usage,
+.erp-payment-method-manager__page {
+  flex: none;
 }
 
 .erp-payment-method-manager__loading {
@@ -129,12 +155,9 @@
   gap: 8px;
 }
 
-.erp-payment-method-manager__hint {
-  flex: 1 1 200px;
-}
-
-.erp-payment-method-manager__pager {
-  margin-inline-end: auto;
+.erp-payment-method-manager__footer-actions {
+  margin-inline-start: auto;
+  justify-content: flex-end;
 }
 
 .erp-payment-method-quick-create__label {
@@ -142,17 +165,27 @@
 }
 
 @media (max-width: 520px) {
-  .erp-payment-method-manager__row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 4px;
+  .erp-payment-method-manager__search {
+    flex-basis: 100%;
+    min-width: 0;
   }
 
-  .erp-payment-method-manager__row > .ant-space {
-    align-self: flex-end;
+  .erp-payment-method-manager__identity {
+    flex-wrap: wrap;
+    gap: 4px 8px;
   }
+}
 
-  .erp-payment-method-manager__editor-field {
-    width: 100%;
-  }
+.erp-payment-method-input__popup-actions {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.erp-payment-method-quick-create__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 }

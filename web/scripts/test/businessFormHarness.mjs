@@ -33,6 +33,10 @@ export async function businessFormHarness(t, { rpc } = {}) {
     dom.restore()
   })
   const field = (label) => {
+    const labelledControl = [...document.querySelectorAll('input[aria-labelledby], textarea[aria-labelledby], select[aria-labelledby]')].find((item) =>
+      item.getAttribute('aria-labelledby').trim().split(/\s+/u).map((id) => document.getElementById(id)?.textContent.trim() || '').join(' ') === label
+    )
+    if (labelledControl) return labelledControl
     const node = [...document.querySelectorAll('label')].find(
       (item) => item.textContent.trim() === label
     )

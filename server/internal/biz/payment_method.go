@@ -10,6 +10,7 @@ import (
 const PaymentMethodSuggestionLimit = 50
 
 var (
+	ErrPaymentMethodUnavailable     = errors.New("payment method is not an active shared choice")
 	ErrPaymentMethodNotFound        = errors.New("payment method not found")
 	ErrPaymentMethodVersionConflict = errors.New("payment method version conflict")
 	ErrPaymentMethodExists          = errors.New("payment method already exists")

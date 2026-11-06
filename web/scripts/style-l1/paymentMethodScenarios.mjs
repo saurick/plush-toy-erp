@@ -2,6 +2,7 @@ import { expect } from 'playwright/test'
 import path from 'node:path'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflow, outputDir, customerRuntimeEffectiveSession }) {
   const inputScenarios = [
@@ -37,29 +38,27 @@ export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflo
         const method = form.locator(`#${methodField}`)
         const days = form.locator(`#${daysField}`)
         await method.waitFor({ state: 'visible' })
-        await expect(method).toHaveAttribute('maxlength', '128')
+        await expect(method).toHaveAttribute('role', 'combobox')
         if (key === 'supplier-dark') {
-          await expect(page.getByText('付款方式读取失败，仍可直接输入')).toBeVisible()
+          await expect(page.getByText('付款方式读取失败，请重试')).toBeVisible()
           failRead = false
           await page.getByRole('button', { name: '重试', exact: true }).click()
         }
         await days.fill('45')
-        await method.click()
+        if (await method.getAttribute('aria-expanded') !== 'true') await method.press('ArrowDown')
         await expect(page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: /^跨页历史方式$/u })).toBeVisible()
         await method.fill('商业承兑')
         const savedOption = page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: /^商业承兑$/u })
         await savedOption.click()
-        await expect(method).toHaveValue('商业承兑')
+        await expectPaymentValue(method, '商业承兑')
         await expect(days).toHaveValue('45')
         await method.fill('信用证示例')
-        await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: '使用「信用证示例」' }).click()
-        await expect(method).toHaveValue('信用证示例')
-        await expect(days).toHaveValue('45')
-        await method.fill('')
-        await expect(method).toHaveValue('')
+        await expect(page.getByText('没有匹配的公司共用付款方式', { exact: true })).toBeVisible()
+        await expectPaymentValue(method, '商业承兑')
         await expect(days).toHaveValue('45')
         await method.fill('双方约定的超长付款方式名称'.repeat(7))
-        await expect(page.locator('.ant-select-dropdown:visible .erp-payment-method-input__new-option')).toBeVisible()
+        await expect(page.locator('.ant-select-dropdown:visible')).not.toContainText('仅本次使用')
+        await expectPaymentValue(method, '商业承兑')
         await days.fill('0')
         await days.press('Tab')
         await expect(days).toHaveValue('0')
@@ -116,7 +115,7 @@ export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflo
             if (pendingRead) await pendingRead
             if (failRead) { failRead = false; return reply({}, 50000, '服务暂不可用') }
             const matches = [...catalogue.values()].filter((item) => item.is_active === params.is_active && item.method.includes(params.keyword))
-            return reply({ items: matches.slice(params.offset, params.offset + params.limit), has_more: matches.length > params.offset + params.limit })
+            return reply({ items: matches.slice(params.offset, params.offset + params.limit), has_more: matches.length > params.offset + params.limit, can_delete: !reader })
           }
           if (body.method === 'update_payment_method') {
             mutations += 1
@@ -148,17 +147,17 @@ export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflo
         const form = page.locator('.erp-business-form-page:not([hidden])')
         const method = form.locator(`#${methodField}`)
         const days = form.locator(`#${daysField}`)
-        await method.fill('aa')
+        await choosePaymentMethod(page, method, 'aa')
         await days.fill('45')
         const quote = form.locator('#price_condition_note')
         if (await quote.count()) await quote.fill('返回后应保留的报价草稿')
         if (reader) {
-          await expect(form.getByRole('button', { name: '维护选项', exact: true })).toHaveCount(0)
-          await expect(method).toHaveValue('aa')
+          await expect(form.getByRole('button', { name: '管理付款方式', exact: true })).toHaveCount(0)
+          await expectPaymentValue(method, 'aa')
           assert.equal(mutations, 0)
           return
         }
-        const manage = form.getByRole('button', { name: '维护选项', exact: true })
+        const manage = form.getByRole('button', { name: '管理付款方式', exact: true })
         await expect(manage).toBeVisible()
         const metrics = await method.evaluate((input) => {
           const row = input.closest('.erp-payment-method-field')
@@ -178,6 +177,7 @@ export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflo
         await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0)
         await form.screenshot({ path: path.join(outputDir, `payment-management-${key}-entry.png`) })
         await method.fill('快捷新增模拟')
+        await expect(page.locator('.ant-select-dropdown:visible').getByRole('button', { name: '管理付款方式', exact: true })).toHaveCount(0)
         await page.getByRole('button', { name: '新增并选用「快捷新增模拟」', exact: true }).click()
         const quick = page.getByRole('dialog', { name: '新增付款方式', exact: true })
         await expect(quick).toBeVisible()
@@ -185,33 +185,45 @@ export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflo
         await expect(quick.getByRole('textbox', { name: '新增名称', exact: true })).toHaveValue('快捷新增模拟')
         await expect(quick.getByRole('tab')).toHaveCount(0)
         await expect(quick.getByRole('textbox', { name: '搜索付款方式' })).toHaveCount(0)
+        await assertPaymentModalCentered(page, quick, assert, `${key}-quick`)
         const quickSize = await quick.boundingBox()
         assert(quickSize.width <= 480 && quickSize.height < 300, `快捷新增应为紧凑单任务窗口 ${JSON.stringify(quickSize)}`)
         await quick.getByRole('button', { name: '取消', exact: true }).click()
         await expect(quick).toHaveCount(0)
+        await waitForFiniteAnimations(page)
         await expect(method).toBeFocused()
-        await expect(method).toHaveValue('快捷新增模拟')
+        await expectPaymentValue(method, 'aa')
         await expect(days).toHaveValue('45')
-        await method.click()
+        if (await method.getAttribute('aria-expanded') !== 'true') await method.press('ArrowDown')
         await method.fill('')
         await method.fill('快捷新增模拟')
+        await expect(page.getByRole('button', { name: '新增并选用「快捷新增模拟」', exact: true })).toBeVisible()
+        await waitForFiniteAnimations(page)
         await page.getByRole('button', { name: '新增并选用「快捷新增模拟」', exact: true }).click()
         await quick.getByRole('button', { name: '新增并选用', exact: true }).click()
         await expect(quick).toHaveCount(0)
         await expect(method).toBeFocused()
-        await expect(method).toHaveValue('快捷新增模拟')
+        await expectPaymentValue(method, '快捷新增模拟')
         await expect(days).toHaveValue('45')
         if (await quote.count()) await expect(quote).toHaveValue('返回后应保留的报价草稿')
-        await method.fill('aa')
+        await choosePaymentMethod(page, method, 'aa')
         await method.press('Escape')
         await manage.click()
-        const dialog = page.getByRole('dialog', { name: '维护付款方式' })
+        const dialog = page.getByRole('dialog', { name: '管理付款方式' })
         await expect(dialog).toBeVisible()
+        await expect(dialog.getByRole('button', { name: '改名付款方式', exact: true })).toBeDisabled()
+        assert.equal(await dialog.locator('th.ant-table-selection-column').innerText(), '')
+        assert.equal(await dialog.locator('tbody button').count(), 0)
         if (key === 'customer-dark') {
           await expect(dialog.getByText('付款方式读取失败，请重试')).toBeVisible()
           await dialog.getByRole('button', { name: '重试', exact: true }).click()
         }
+        await selectPaymentRow(dialog, 'aa')
         await expect(dialog.getByRole('button', { name: '停用 aa', exact: true })).toBeEnabled()
+        await assertPaymentModalCentered(page, dialog, assert, `${key}-manager`)
+        const createPosition = await dialog.evaluate((node) => { const toolbar = node.querySelector('.erp-payment-method-manager__toolbar').getBoundingClientRect(); const button = node.querySelector('.erp-payment-method-manager__create').getBoundingClientRect(); const search = node.querySelector('.erp-payment-method-manager__search').getBoundingClientRect(); return { toolbar: toolbar.toJSON(), button: button.toJSON(), search: search.toJSON(), inFooter: !!node.querySelector('.ant-modal-footer [aria-label="新增付款方式"]') } })
+        assert(!createPosition.inFooter && Math.abs(createPosition.button.right - createPosition.toolbar.right) <= 1, '新增入口应位于检索工具行右侧')
+        if (width >= 680) assert(Math.abs(createPosition.button.y + createPosition.button.height / 2 - createPosition.search.y - createPosition.search.height / 2) <= 1, '宽屏新增与搜索同行居中')
         const assertRefreshStable = async (state) => {
           await expect(dialog).toHaveCSS('transform', 'none')
           await expect(dialog).toHaveCSS('opacity', '1')
@@ -243,14 +255,17 @@ export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflo
         await expect(dialog.getByText('没有停用的付款方式', { exact: true })).toBeVisible()
         await assertRefreshStable('空结果')
         await dialog.getByRole('tab', { name: '启用', exact: true }).click()
+        await selectPaymentRow(dialog, 'aa')
         await expect(dialog.getByRole('button', { name: '停用 aa', exact: true })).toBeEnabled()
         const search = dialog.getByRole('textbox', { name: '搜索付款方式', exact: true })
         await expect(search.locator('..')).toHaveClass(/erp-search-input/u)
         await search.fill('aa')
         await search.press('Enter')
         await expect(dialog.getByRole('button', { name: '停用 银行转账', exact: true })).toHaveCount(0)
+        await selectPaymentRow(dialog, 'aa')
         await expect(dialog.getByRole('button', { name: '停用 aa', exact: true })).toBeEnabled()
         await dialog.getByRole('button', { name: '清除搜索', exact: true }).click()
+        await selectPaymentRow(dialog, '银行转账')
         await expect(dialog.getByRole('button', { name: '停用 银行转账', exact: true })).toBeEnabled()
         const searchLayout = await dialog.locator('.erp-payment-method-manager__search').evaluate((node) => {
           const bounds = node.getBoundingClientRect()
@@ -261,82 +276,152 @@ export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflo
         })
         assert(searchLayout.every((box) => box.contained), '付款方式搜索和刷新按钮不得超出弹窗内容')
         if (key === 'sales') {
+          await selectPaymentRow(dialog, 'aa')
           await dialog.getByRole('button', { name: '停用 aa', exact: true }).click()
           await expect(dialog.getByText('付款方式已被其他操作更新，请刷新后重试')).toBeVisible()
           await dialog.getByRole('button', { name: '刷新', exact: true }).click()
+          await selectPaymentRow(dialog, 'aa')
           await expect(dialog.getByRole('button', { name: '停用 aa', exact: true })).toBeEnabled()
         }
+        await selectPaymentRow(dialog, 'aa')
         await dialog.getByRole('button', { name: '停用 aa', exact: true }).click()
         await expect(dialog.getByRole('button', { name: '停用 aa', exact: true })).toHaveCount(0)
         await dialog.getByRole('button', { name: '撤销', exact: true }).click()
+        await selectPaymentRow(dialog, 'aa')
         await expect(dialog.getByRole('button', { name: '停用 aa', exact: true })).toBeEnabled()
+        await selectPaymentRow(dialog, 'aa')
         await dialog.getByRole('button', { name: '停用 aa', exact: true }).click()
         await expect(dialog.getByRole('button', { name: '停用 aa', exact: true })).toHaveCount(0)
         await verifyMobileNavigationMotion(page, assert, '.erp-payment-method-manager .erp-sliding-tabs', 1)
+        await selectPaymentRow(dialog, 'aa')
         await expect(dialog.getByRole('button', { name: '启用 aa', exact: true })).toBeEnabled()
         await dialog.screenshot({ path: path.join(outputDir, `payment-management-${key}-hidden.png`) })
         await dialog.getByRole('button', { name: '返回填写', exact: true }).click()
         await expect(dialog).toHaveCount(0)
-        await expect(method).toHaveValue('aa')
+        await expectPaymentValue(method, 'aa')
         await expect(days).toHaveValue('45')
         if (await quote.count()) await expect(quote).toHaveValue('返回后应保留的报价草稿')
-        await method.click()
+        if (await method.getAttribute('aria-expanded') !== 'true') await method.press('ArrowDown')
         await method.fill('')
         await method.fill('aa')
-        await expect(page.getByText('保存不会重新启用')).toBeVisible()
-        const popup = await page.locator('.ant-select-dropdown:visible').boundingBox()
+        await expect(page.getByText('没有匹配的公司共用付款方式', { exact: true })).toBeVisible()
+        const dropdown = page.locator('.ant-select-dropdown:visible')
         const anchor = await method.evaluate((input) => input.closest('.ant-select').getBoundingClientRect().toJSON())
+        await expect.poll(async () => Math.abs((await dropdown.boundingBox()).x - anchor.x)).toBeLessThan(2)
+        const popup = await dropdown.boundingBox()
         assert(Math.abs(popup.x - anchor.x) < 2, `payment dropdown detached horizontally ${JSON.stringify({ popup, anchor })}`)
         assert(Math.abs(popup.y - anchor.bottom) < 16 || Math.abs(popup.y + popup.height - anchor.y) < 16, `payment dropdown detached vertically ${JSON.stringify({ popup, anchor })}`)
         await method.press('Escape')
         await manage.click()
         await expect(dialog.getByRole('tab', { name: '启用', exact: true })).toHaveAttribute('aria-selected', 'true')
         await verifyMobileNavigationMotion(page, assert, '.erp-payment-method-manager .erp-sliding-tabs', 1, true)
+        await selectPaymentRow(dialog, 'aa')
         await dialog.getByRole('button', { name: '启用 aa', exact: true }).click()
         await expect(dialog.getByRole('button', { name: '启用 aa', exact: true })).toHaveCount(0)
         await dialog.getByRole('button', { name: '返回填写', exact: true }).click()
-        await expect(method).toHaveValue('aa')
+        await expectPaymentValue(method, 'aa')
         await expect(days).toHaveValue('45')
         if (key === 'sales') {
           await manage.click()
+          await selectPaymentRow(dialog, '银行转账')
           await expect(dialog.getByRole('button', { name: '删除 银行转账', exact: true })).toBeDisabled()
           await dialog.getByRole('button', { name: '新增付款方式', exact: true }).click()
           await assertPaymentEditorLayout(dialog, assert)
           await dialog.getByRole('textbox', { name: '新增名称', exact: true }).fill('支票模拟')
           await dialog.getByRole('button', { name: '新增并选用', exact: true }).click()
+          await selectPaymentRow(dialog, '支票模拟')
           await expect(dialog.getByRole('button', { name: '改名 支票模拟', exact: true })).toBeEnabled()
+          await expect(dialog.locator('.ant-modal-footer [aria-label="loading"]')).toHaveCount(0)
+          await selectPaymentRow(dialog, '支票模拟')
           await dialog.getByRole('button', { name: '改名 支票模拟', exact: true }).click()
           await dialog.getByRole('textbox', { name: '修改名称', exact: true }).fill('支票改名')
           await dialog.getByRole('button', { name: '保存名称', exact: true }).click()
+          await selectPaymentRow(dialog, '支票改名')
           await expect(dialog.getByRole('button', { name: '改名 支票改名', exact: true })).toBeEnabled()
+          await expect(dialog.locator('.ant-modal-footer [aria-label="loading"]')).toHaveCount(0)
           await dialog.getByRole('button', { name: '返回填写', exact: true }).click()
-          await expect(method).toHaveValue('支票模拟')
+          await expectPaymentValue(method, '支票模拟')
           await form.getByRole('button', { name: '本单也使用新名称', exact: true }).click()
-          await expect(method).toHaveValue('支票改名')
+          await expectPaymentValue(method, '支票改名')
           await manage.click()
+          await selectPaymentRow(dialog, '支票改名')
           await dialog.getByRole('button', { name: '删除 支票改名', exact: true }).click()
-          await page.locator('.ant-popconfirm').getByRole('button', { name: '删除', exact: true }).click()
+          await dialog.getByRole('button', { name: '确认删除', exact: true }).click()
           await expect(dialog.getByRole('button', { name: '改名 支票改名', exact: true })).toHaveCount(0)
+          await expect(dialog.locator('.ant-modal-footer [aria-label="loading"]')).toHaveCount(0)
           await dialog.getByRole('button', { name: '返回填写', exact: true }).click()
-          await expect(method).toHaveValue('支票改名')
+          await expectPaymentValue(method, '支票改名')
           if (await quote.count()) await expect(quote).toHaveValue('返回后应保留的报价草稿')
         }
         await assertNoHorizontalOverflow(page)
       },
     }
   })
-  return [...inputScenarios, ...managementScenarios, ...createPaymentGrowthScenarios({ assert, assertNoHorizontalOverflow, outputDir, customerRuntimeEffectiveSession })]
+  const maintenanceOnly = {
+    name: 'payment-maintainer-without-delete',
+    path: '/erp/master/partners/customers',
+    auth: 'admin',
+    adminProfile: { is_super_admin: false, permissions: ['customer.read', 'payment_method.manage'], roles: [{ role_key: 'boss', name: '维护者' }] },
+    effectiveSession: { ...customerRuntimeEffectiveSession, actions: [...customerRuntimeEffectiveSession.actions.filter((action) => action !== 'payment_method.delete'), 'payment_method.manage'] },
+    viewport: { width: 1440, height: 900 },
+    beforeNavigate: async (page) => {
+      await page.route('**/rpc/masterdata', async (route) => {
+        const body = route.request().postDataJSON() || {}
+        let data
+        if (body.method === 'list_payment_methods') data = { methods: ['现金'], has_more: false, keyword_exists: false, keyword_inactive: false, can_manage: true }
+        else if (body.method === 'list_payment_method_options') data = { items: [{ id: 1, method: '现金', is_active: true, has_been_used: false, version: 1 }], has_more: false, can_delete: false }
+        else return route.fallback()
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { code: 0, message: 'OK', data } }) })
+      })
+    },
+    verify: async (page) => {
+      await page.getByRole('button', { name: '管理付款方式', exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: '管理付款方式', exact: true })
+      await selectPaymentRow(dialog, '现金')
+      await expect(dialog.getByRole('button', { name: /删除/u })).toHaveCount(0)
+      await expect(dialog.getByRole('button', { name: '新增付款方式', exact: true })).toBeEnabled()
+      await expect(dialog.getByRole('button', { name: '改名 现金', exact: true })).toBeEnabled()
+      await expect(dialog.getByRole('button', { name: '停用 现金', exact: true })).toBeEnabled()
+      await dialog.screenshot({ path: path.join(outputDir, 'payment-maintainer-without-delete.png') })
+    },
+  }
+  return [...inputScenarios, ...managementScenarios, maintenanceOnly, ...createPaymentGrowthScenarios({ assert, assertNoHorizontalOverflow, outputDir, customerRuntimeEffectiveSession })]
+}
+
+async function assertPaymentModalCentered(page, dialog, assert, label) {
+  await waitForFiniteAnimations(page, '.erp-payment-method-modal, .erp-payment-method-quick-create')
+  const metrics = await dialog.evaluate((node) => {
+    const modal = node.getBoundingClientRect()
+    const wrap = node.closest('.ant-modal-wrap')
+    const bounds = wrap.getBoundingClientRect()
+    return {
+      centered: wrap.classList.contains('ant-modal-centered'),
+      offsetX: modal.x + modal.width / 2 - bounds.x - bounds.width / 2,
+      offsetY: modal.y + modal.height / 2 - bounds.y - bounds.height / 2,
+      fits: modal.left >= bounds.left - 1 && modal.right <= bounds.right + 1 && modal.top >= bounds.top - 1 && modal.bottom <= bounds.bottom + 1,
+    }
+  })
+  assert(metrics.centered && Math.abs(metrics.offsetX) <= 1 && Math.abs(metrics.offsetY) <= 1 && metrics.fits, `${label} 应在所属工作区居中且保持可见 ${JSON.stringify(metrics)}`)
+}
+
+async function selectPaymentRow(dialog, name) {
+  const radio = dialog.getByRole('radio', { name: `选择 ${name}`, exact: true })
+  await expect(radio).toBeEnabled()
+  await radio.locator('xpath=ancestor::tr').getByRole('cell').last().click()
+  await expect(radio).toBeChecked()
 }
 
 async function assertPaymentEditorLayout(dialog, assert) {
-  const metrics = await dialog.getByRole('textbox', { name: /^(新增|修改)名称$/u }).locator('..').locator('..').evaluate((row) => {
-    const input = row.querySelector('input').getBoundingClientRect()
-    const buttons = [...row.querySelectorAll('button')].map((button) => button.getBoundingClientRect().toJSON())
-    return { input: input.toJSON(), buttons }
+  const metrics = await dialog.evaluate((node) => {
+    const input = node.querySelector('.erp-payment-method-manager__editor-field input').getBoundingClientRect()
+    const footer = node.querySelector('.erp-payment-method-manager__footer')
+    const buttons = [...footer.querySelectorAll('button')].map((button) => button.getBoundingClientRect().toJSON())
+    return { input: input.toJSON(), buttons, footer: footer.getBoundingClientRect().toJSON() }
   })
+  assert.equal(metrics.buttons.length, 2, '编辑操作集中在底部取消与保存')
   for (const button of metrics.buttons) {
-    assert(Math.abs(button.top - metrics.input.top) <= 1 && Math.abs(button.bottom - metrics.input.bottom) <= 1, `行内输入与按钮须对齐 ${JSON.stringify(metrics)}`)
-    assert(button.left >= metrics.input.right, `行内输入与按钮不得重叠 ${JSON.stringify(metrics)}`)
+    assert(button.top >= metrics.input.bottom, `保存操作应位于输入下方的固定底栏 ${JSON.stringify(metrics)}`)
+    assert(button.left >= metrics.footer.left - 1 && button.right <= metrics.footer.right + 1, '编辑操作不得撑出底栏')
   }
 }
 
@@ -365,25 +450,26 @@ function createPaymentGrowthScenarios({ assert, assertNoHorizontalOverflow, outp
           if (body.method !== 'list_payment_method_options') return route.fallback()
           reads.push({ ...params })
           const matches = catalogue.filter((item) => item.is_active === params.is_active && item.method.includes(params.keyword))
-          return reply({ items: matches.slice(params.offset, params.offset + params.limit), has_more: matches.length > params.offset + params.limit })
+          return reply({ items: matches.slice(params.offset, params.offset + params.limit), has_more: matches.length > params.offset + params.limit, can_delete: true })
         })
       },
       verify: async (page) => {
-        await page.getByRole('button', { name: '付款方式', exact: true }).click()
-        const dialog = page.getByRole('dialog', { name: '维护付款方式', exact: true })
+        await page.getByRole('button', { name: '管理付款方式', exact: true }).click()
+        const dialog = page.getByRole('dialog', { name: '管理付款方式', exact: true })
         const rows = dialog.locator('.erp-payment-method-manager__row')
         await expect(dialog).toHaveCSS('transform', 'none')
         await expect(dialog).toHaveCSS('opacity', '1')
         await expect(rows).toHaveCount(20)
         assert.equal(reads.at(-1).limit, 20)
+        await assertPaymentModalCentered(page, dialog, assert, `${key}-long-list`)
         const regions = await dialog.evaluate((node) => {
           const body = node.querySelector('.ant-modal-body')
           const footer = node.querySelector('.erp-payment-method-manager__footer')
-          return { footerInBody: body.contains(footer), bodyOverflow: getComputedStyle(body).overflowY, bodyScrolls: body.scrollHeight > body.clientHeight, scrollWidth: node.scrollWidth, width: node.clientWidth, box: node.getBoundingClientRect().toJSON(), overflows: [...node.querySelectorAll('*')].filter((child) => child.scrollWidth > child.clientWidth + 1).slice(0, 12).map((child) => ({ className: child.className, width: child.clientWidth, scrollWidth: child.scrollWidth, whiteSpace: getComputedStyle(child).whiteSpace })) }
+          return { footerInBody: body.contains(footer), bodyOverflow: getComputedStyle(body).overflowY, listScrolls: node.querySelector('.erp-payment-method-manager__list').scrollHeight > node.querySelector('.erp-payment-method-manager__list').clientHeight, scrollWidth: node.scrollWidth, width: node.clientWidth, box: node.getBoundingClientRect().toJSON(), overflows: [...node.querySelectorAll('*')].filter((child) => child.scrollWidth > child.clientWidth + 1).slice(0, 12).map((child) => ({ className: child.className, width: child.clientWidth, scrollWidth: child.scrollWidth, whiteSpace: getComputedStyle(child).whiteSpace })) }
         })
         assert.equal(regions.footerInBody, false)
         assert.equal(regions.bodyOverflow, 'auto')
-        assert.equal(regions.bodyScrolls, true)
+        assert.equal(regions.listScrolls, true)
         assert(regions.scrollWidth <= regions.width + 1, `长名称不得撑宽弹窗 ${JSON.stringify(regions)}`)
         await dialog.getByRole('button', { name: '下一页', exact: true }).click()
         await expect(dialog.getByText('第 2 页', { exact: true })).toBeVisible()
@@ -400,8 +486,7 @@ function createPaymentGrowthScenarios({ assert, assertNoHorizontalOverflow, outp
         await search.fill('模拟方式0799')
         await search.press('Enter')
         await expect(rows).toHaveCount(1)
-        await expect(dialog.getByText('第 1 页', { exact: true })).toBeVisible()
-        await expect(dialog.getByRole('button', { name: '下一页', exact: true })).toBeDisabled()
+        await expect(dialog.getByRole('button', { name: '下一页', exact: true })).toHaveCount(0)
         await dialog.getByRole('button', { name: '清除搜索', exact: true }).click()
         await expect(rows).toHaveCount(20)
         await dialog.getByRole('button', { name: '新增付款方式', exact: true }).click()
@@ -415,12 +500,18 @@ function createPaymentGrowthScenarios({ assert, assertNoHorizontalOverflow, outp
         await dialog.getByRole('button', { name: '取消', exact: true }).click()
         if (width < 520) {
           await page.setViewportSize({ width: 360, height: 320 })
+          await assertPaymentModalCentered(page, dialog, assert, `${key}-short-viewport`)
           await expect(dialog.getByRole('button', { name: '关闭', exact: true })).toBeInViewport()
           await expect(dialog.getByRole('button', { name: '下一页', exact: true })).toBeInViewport()
           await dialog.getByRole('button', { name: '下一页', exact: true }).click()
           await expect(dialog.getByText('第 2 页', { exact: true })).toBeVisible()
           const body = dialog.locator('.ant-modal-body')
-          await body.evaluate((node) => { node.scrollTop = node.scrollHeight })
+          assert(await dialog.locator('.erp-payment-method-manager__list').evaluate((node) => node.clientHeight >= 100), '低窗口仍须保留可操作的列表区域')
+          const bodyBox = await body.boundingBox()
+          await page.mouse.move(bodyBox.x + bodyBox.width / 2, bodyBox.y + 8)
+          await page.mouse.wheel(0, 600)
+          await selectPaymentRow(dialog, '模拟方式0020')
+          await expect(dialog.getByRole('button', { name: '改名 模拟方式0020', exact: true })).toBeEnabled()
           await expect(dialog.getByRole('button', { name: '关闭', exact: true })).toBeInViewport()
           await dialog.screenshot({ path: path.join(outputDir, `payment-growth-${key}-short.png`) })
           await page.setViewportSize({ width, height: 900 })
@@ -433,4 +524,15 @@ function createPaymentGrowthScenarios({ assert, assertNoHorizontalOverflow, outp
       },
     }
   })
+}
+
+async function expectPaymentValue(control, value) {
+  await expect.poll(() => control.evaluate((input) => input.closest('.ant-select')?.querySelector('.ant-select-selection-item')?.textContent || '')).toBe(value)
+}
+
+async function choosePaymentMethod(page, control, value) {
+  if (await control.getAttribute('aria-expanded') !== 'true') await control.press('ArrowDown')
+  await control.fill(value)
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: value }).click()
+  await expectPaymentValue(control, value)
 }

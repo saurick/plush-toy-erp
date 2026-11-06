@@ -190,6 +190,9 @@ func (d *jsonrpcDispatcher) salesOrderErrorResult(ctx context.Context, err error
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
+	if result := paymentMethodSelectionErrorResult(err); result != nil {
+		return result
+	}
 	l := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrForbidden):

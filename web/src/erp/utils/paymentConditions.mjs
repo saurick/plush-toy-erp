@@ -12,9 +12,7 @@ function buildPaymentMethodOptions(methods = [], keyword = '') {
   const options = values
     .filter((value) => value.toLowerCase().includes(query.toLowerCase()))
     .map((value) => ({ value, label: value }))
-  if (query && !values.includes(query)) {
-    options.push({ value: query, isNew: true })
-  }
+
   return options
 }
 

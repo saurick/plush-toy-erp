@@ -8,12 +8,9 @@ test('payment method candidates trim and deduplicate names without attaching a p
   assert.equal(options.every((option) => !Object.hasOwn(option, 'payment_term_days')), true)
 })
 
-test('payment method search preserves a freely typed value without merging similar names', () => {
-  assert.deepEqual(buildPaymentMethodOptions(['Wire'], ' wire '), [
-    { value: 'Wire', label: 'Wire' },
-    { value: 'wire', isNew: true },
-  ])
-  assert.deepEqual(buildPaymentMethodOptions([], '商业承兑'), [{ value: '商业承兑', isNew: true }])
+test('payment method search offers maintained names only and never publishes typed text', () => {
+  assert.deepEqual(buildPaymentMethodOptions(['Wire'], ' wire '), [{ value: 'Wire', label: 'Wire' }])
+  assert.deepEqual(buildPaymentMethodOptions([], '商业承兑'), [])
   assert.deepEqual(buildPaymentMethodOptions(['商业承兑'], ' 商业承兑 '), [{ value: '商业承兑', label: '商业承兑' }])
 })
 

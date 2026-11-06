@@ -46,7 +46,7 @@ func (r *purchaseOrderRepo) CreatePurchaseOrder(ctx context.Context, in *biz.Pur
 		return nil, err
 	}
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
-	if err := recordPaymentMethodUse(ctx, tx.Client(), r.data.sqlDialect, in.PaymentMethod); err != nil {
+	if err := recordPaymentMethodUse(ctx, tx.Client(), r.data.sqlDialect, in.PaymentMethod, nil); err != nil {
 		return nil, err
 	}
 
@@ -84,7 +84,14 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrder(ctx context.Context, id int, in 
 		return nil, err
 	}
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
-	if err := recordPaymentMethodUse(ctx, tx.Client(), r.data.sqlDialect, in.PaymentMethod); err != nil {
+	previous, err := tx.Client().PurchaseOrder.Get(ctx, id)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrPurchaseOrderNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := recordPaymentMethodUse(ctx, tx.Client(), r.data.sqlDialect, in.PaymentMethod, previous.PaymentMethod); err != nil {
 		return nil, err
 	}
 	update := tx.PurchaseOrder.UpdateOneID(id).
@@ -1008,7 +1015,18 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			rollbackEntTx(ctx, tx, r.log)
 		}
 	}()
-	if err := recordPaymentMethodUse(ctx, tx.Client(), r.data.sqlDialect, in.PaymentMethod); err != nil {
+	var previousMethod *string
+	if id > 0 {
+		previous, err := tx.Client().PurchaseOrder.Get(ctx, id)
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseOrderNotFound
+		}
+		if err != nil {
+			return nil, err
+		}
+		previousMethod = previous.PaymentMethod
+	}
+	if err := recordPaymentMethodUse(ctx, tx.Client(), r.data.sqlDialect, in.PaymentMethod, previousMethod); err != nil {
 		return nil, err
 	}
 

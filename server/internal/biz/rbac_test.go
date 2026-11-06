@@ -43,6 +43,24 @@ func TestAdminHasPermissionSuperAdminHasAllPermissions(t *testing.T) {
 	}
 }
 
+func TestPaymentMethodDeletionRequiresAnExplicitSeparatePermission(t *testing.T) {
+	for _, role := range BuiltinRoles() {
+		assertPermissionSetOmits(t, PermissionKeySet(role.Permissions), PermissionPaymentMethodDelete)
+	}
+	admin := &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	if !AdminHasPermission(admin, PermissionPaymentMethodDelete) {
+		t.Fatal("super administrator must have the separate delete permission")
+	}
+	manager := &AdminUser{ID: 2, Permissions: []string{PermissionPaymentMethodManage}}
+	if AdminHasPermission(manager, PermissionPaymentMethodDelete) {
+		t.Fatal("maintenance permission must not imply deletion")
+	}
+	manager.Permissions = append(manager.Permissions, PermissionPaymentMethodDelete)
+	if !AdminHasPermission(manager, PermissionPaymentMethodDelete) {
+		t.Fatal("explicit RBAC grant must remain supported")
+	}
+}
+
 func TestAdminHasPermissionDisabledAdminHasNoPermissions(t *testing.T) {
 	admin := &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true, Disabled: true}
 

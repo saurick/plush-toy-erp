@@ -3729,22 +3729,30 @@
 </style>
 <style>
 .payment-method-control { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.payment-method-control input { flex:1; min-width:0; }
+.payment-method-control input,.payment-method-control ui-select { flex:1; min-width:0; }
 .payment-method-label { display:flex; gap:8px; align-items:center; justify-content:space-between; margin-bottom:8px; }
 .payment-method-control [hidden] { display:none; }
 .payment-catalogue-modal { width:min(680px,100%); }
 .payment-catalogue-modal--quick { width:min(480px,100%); }
 .payment-catalogue-modal--quick [data-payment-edit] { width:100%; }
-.payment-catalogue-toolbar,.payment-catalogue-row,.payment-catalogue-identity,.payment-catalogue-actions,.payment-catalogue-footer { display:flex; align-items:center; gap:8px; }
-.payment-catalogue-toolbar { justify-content:space-between; margin-bottom:8px; }
-.payment-catalogue-search input,.payment-catalogue-row > input { min-width:0; flex:1; }
-.payment-catalogue-row { justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); }
-.payment-catalogue-identity { min-width:0; }
+.payment-catalogue-toolbar,.payment-catalogue-search,.payment-catalogue-selection,.payment-catalogue-identity,.payment-catalogue-actions,.payment-catalogue-footer { display:flex; align-items:center; gap:8px; }
+.payment-catalogue-toolbar,.payment-catalogue-selection { justify-content:space-between; flex-wrap:wrap; margin-bottom:8px; }
+.payment-catalogue-search { flex:1; min-width:200px; }
+.payment-catalogue-search input { min-width:0; flex:1; }
+.payment-catalogue-selection { padding:8px; border:1px solid var(--line); border-radius:6px; }
+.payment-catalogue-selection > span { min-width:0; flex:1 1 140px; overflow-wrap:anywhere; }
+.payment-catalogue-editor { display:grid; gap:6px; margin-bottom:8px; }
+.payment-catalogue-table { width:100%; table-layout:fixed; border-collapse:collapse; }
+.payment-catalogue-table th,.payment-catalogue-table td { padding:8px; border-bottom:1px solid var(--line); text-align:left; }
+.payment-catalogue-table th:first-child { width:52px; }
+.payment-catalogue-table th:last-child { width:80px; }
+.payment-catalogue-table tr[aria-selected=true] { background:var(--brand-softer); }
+.payment-catalogue-identity { min-width:0; flex-wrap:wrap; }
 .payment-catalogue-identity > span { min-width:0; overflow-wrap:anywhere; }
-.payment-catalogue-identity small,.payment-catalogue-actions { flex:none; }
-.payment-catalogue-footer { flex-wrap:wrap; justify-content:space-between; }
-.payment-catalogue-footer .data-note { margin:0; flex:1 1 200px; }
-@media(max-width:520px){ .payment-catalogue-row { flex-wrap:wrap; } .payment-catalogue-row > input,.payment-catalogue-identity { flex-basis:100%; } .payment-catalogue-row > .payment-catalogue-actions { margin-left:auto; } }
+.payment-catalogue-identity small { flex:none; }
+.payment-catalogue-actions,.payment-catalogue-footer { flex-wrap:wrap; }
+.payment-catalogue-footer { justify-content:space-between; }
+@media(max-width:520px){ .payment-catalogue-search { flex-basis:100%; min-width:0; } .payment-catalogue-selection > .payment-catalogue-actions { margin-left:auto; } }
 
 </style>
 <style id="bom-selection-toolbar-style">
@@ -12664,7 +12672,7 @@ return {orders,financeCustomers};})();
         ],
         [
           "付款条件",
-          "付款方式可选择或直接输入；手输仅保存当前记录。维护者可点标签行“维护选项”新增、改名、启停或删除未使用项，也可从客户列表“付款方式”集中维护；历史记录保持原文。核对默认付款方式与付款周期，二者需配套填写；0 天是明确约定，空白表示未设置。新订单带值后仍须复核。"
+          "付款方式从公司共用目录选择；搜索词不作为单据值保存。维护者可点标签行“管理付款方式”；窗口搜索行右侧新增，点击整行选中后从顶部改名或启停；删除未使用项需独立授权，默认仅超级管理员可用，也可从客户列表“管理付款方式”集中维护；历史记录保持原文。核对默认付款方式与付款周期，二者需配套填写；0 天是明确约定，空白表示未设置。新订单带值后仍须复核。"
         ]
       ]
     },
@@ -12777,7 +12785,7 @@ return {orders,financeCustomers};})();
         ],
         [
           "结算与发票",
-          "默认付款方式可选择或手输，周期独立填写。维护者可从标签行“维护选项”或供应商列表“付款方式”新增、改名、启停并删除未使用项；手输不自动加入共用目录，也不恢复停用项。需要发票时选择发票类别，不需要时不保留不适用的类别。"
+          "默认付款方式从启用的共用目录选择，周期独立填写。维护者可从字段标签或供应商列表“管理付款方式”新增、改名或启停；删除未使用项需独立授权，默认仅超级管理员可用；新方式须先加入公司共用目录，不能直接填写未建档或已停用的方式。需要发票时选择发票类别，不需要时不保留不适用的类别。"
         ],
         [
           "加工能力",
@@ -13178,7 +13186,7 @@ return {orders,financeCustomers};})();
         ],
         [
           "结算与报价",
-          "付款方式和付款周期配套填写；方式可选或手输，选择方式不覆盖账期。维护者可点标签行“维护选项”新增、改名或启停，未使用项可删除；返回保留付款条件和报价备注，采用新名须明确选择。核对计税方式、税率、报价是否含运费及报价运费。空白账期不能当成 0 天。"
+          "付款方式和付款周期配套填写；方式只从启用共用项选择，选择方式不覆盖账期。维护者可点字段标签“管理付款方式”新增、改名或启停；删除未使用项需独立授权，默认仅超级管理员可用；返回保留付款条件和报价备注，采用新名须明确选择。核对计税方式、税率、报价是否含运费及报价运费。空白账期不能当成 0 天。"
         ],
         [
           "订货明细",
@@ -13629,7 +13637,7 @@ return {orders,financeCustomers};})();
         ],
         [
           "结算与订购方",
-          "付款方式可选或手输，周期独立填写。维护者可从标签行“维护选项”新增、改名、启停或删除未使用项；手输不自动发布，目录变更不改写历史订单。核对发票要求与类别，以及订购单位、订购人、电话、地址和签字人。"
+          "付款方式从启用的公司共用项选择，周期独立填写。维护者可从字段标签“管理付款方式”新增、改名或启停；删除未使用项需独立授权，默认仅超级管理员可用；搜索不改动当前值，目录变更不改写历史订单。核对发票要求与类别，以及订购单位、订购人、电话、地址和签字人。"
         ]
       ]
     },
@@ -13800,6 +13808,10 @@ return {orders,financeCustomers};})();
         [
           "查询追踪",
           "先看余额，再按同一对象查批次和变动记录，回正式来源单核对数量。"
+        ],
+        [
+          "仓库设置",
+          "有管理权限时从列表工具进入；点击整行选中仓库，再点顶部“编辑”。搜索行右侧可新增，底部保存或取消；取消、新建和关闭前会确认未保存修改，翻页会清空选择。已有库存或默认仓关联时，用途变更和停用仍受限制。"
         ],
         [
           "盘点 / 调拨 / 人工调整",
@@ -17188,39 +17200,85 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="compact-contacts"><table aria-label="联系人"><colgroup><col class="contact-col-sequence" />${fields.map(([key])=>`<col class="contact-col-${key}" />`).join('')}${multiple?'<col class="contact-col-primary" />':''}<col class="contact-col-actions" /></colgroup><thead><tr><th class="contact-cell-sequence" scope="col">序号</th>${fields.map(([key,label])=>`<th scope="col">${key==='name'?'<span class="required">*</span>':''}${label}</th>`).join('')}${multiple?'<th scope="col">主联系人</th>':''}<th scope="col">操作</th></tr></thead>${rows.map((row,index)=>`<tbody class="compact-contact-row editable-line-group"><tr class="compact-contact-fields"><td class="contact-cell-sequence" aria-label="第 ${index+1} 位联系人" rowspan="2"><span class="editable-line-number">${index+1}</span></td>${fields.map(([key,label])=>`<td class="contact-cell-${key}"><label class="compact-contact-label" for="contact-${index}-${key}">${key==='name'?'<span class="required" aria-hidden="true">*</span>':''}${label}</label><input id="contact-${index}-${key}" data-form-field="contact-${index}-${key}" type="${key==='email'?'email':['mobile','phone'].includes(key)?'tel':'text'}" ${key==='name'?'required':''} value="${escapeHTML(row[key])}" /></td>`).join('')}${multiple?`<td class="contact-cell-primary"><label><span class="compact-contact-label">主联系人</span><input type="radio" name="contact-primary" data-form-field="contact-${index}-primary" data-contact-primary="${index}" aria-label="设为主联系人 ${index+1}" ${row.primary?'checked':''} /></label></td>`:''}<td class="contact-cell-actions"><button type="button" class="btn tiny" data-action="contact-copy" data-index="${index}" aria-label="复制联系人 ${index+1}">复制</button><button type="button" class="btn tiny" data-action="contact-remove" data-index="${index}" aria-label="移除联系人 ${index+1}" ${multiple?'':'disabled'}>移除</button></td></tr><tr class="compact-contact-note" id="contact-note-${index}"><td colspan="${multiple?7:6}"><label for="contact-${index}-note">备注</label><textarea id="contact-${index}-note" data-form-field="contact-${index}-note" rows="2" maxlength="2000" data-remark-input>${escapeHTML(row.note)}</textarea></td></tr></tbody>`).join('')}</table><div class="compact-contacts-footer"><button type="button" class="btn line-add-button" data-action="contact-add">${icon('plus')}添加联系人</button><span>已录入 ${rows.length} 人</span></div></div>`;
     }
 
+    const warehouseSettingsDesign = {
+      rows:[{id:1,code:'WH-MAIN',name:'样例主料仓',type:'主料仓',active:true},{id:2,code:'WH-FG',name:'样例成品仓',type:'成品仓',active:true}],
+      selected:null,editor:null,error:'',discard:false,query:''
+    };
+    function readWarehouseSettingsDesign() {
+      const editor=warehouseSettingsDesign.editor;if(!editor)return;
+      for(const key of ['code','name','type']){const input=document.querySelector(`[data-warehouse-edit="${key}"]`);if(input)editor[key]=input.value;}
+      const active=document.querySelector('[data-warehouse-edit="active"]');if(active)editor.active=active.checked;
+    }
+    function showWarehouseSettingsDesign() {
+      const s=warehouseSettingsDesign,selected=s.rows.find(row=>row.id===s.selected),editor=s.editor,locked=Boolean(editor);
+      const disabled=locked||!selected?'disabled':'';
+      const toolbar=`<div class="payment-catalogue-selection"><span>${selected?escapeHTML(selected.code+' · '+selected.name):'请选择一个仓库'}</span><div class="payment-catalogue-actions"><button class="text-btn" data-action="warehouse-clear" ${disabled}>取消选择</button><button class="btn" data-action="warehouse-edit" ${disabled}>编辑</button></div></div>`;
+      const table=`<table class="payment-catalogue-table"><thead><tr><th></th><th>编号</th><th>仓库名称</th><th>用途</th><th>状态</th></tr></thead><tbody>${s.rows.filter(row=>[row.code,row.name,row.type].some(value=>value.toLowerCase().includes(s.query.toLowerCase()))).map(row=>`<tr data-action="warehouse-select" data-id="${row.id}" aria-selected="${row.id===s.selected}"><td><input type="radio" name="warehouse-directory" aria-label="选择仓库 ${escapeHTML(row.code+' · '+row.name)}" ${row.id===s.selected?'checked':''} ${locked?'disabled':''}/></td><td>${escapeHTML(row.code)}</td><td>${escapeHTML(row.name)}</td><td>${escapeHTML(row.type)}</td><td>${row.active?'启用':'停用'}</td></tr>`).join('')}</tbody></table>`;
+      const form=editor?`<div class="warehouse-settings-design-form"><div class="field"><label>仓库编号</label><input data-warehouse-edit="code" maxlength="64" value="${escapeHTML(editor.code)}"/></div><div class="field"><label>仓库名称</label><input data-warehouse-edit="name" maxlength="128" value="${escapeHTML(editor.name)}"/></div><div class="field"><label>仓库用途</label><ui-select data-warehouse-edit="type"><option value="">请选择仓库用途</option>${['主料仓','辅料仓','包材仓','其他材料仓','原辅料综合仓','成品仓'].map(type=>`<option ${editor.type===type?'selected':''}>${type}</option>`).join('')}</ui-select></div><label><input type="checkbox" data-warehouse-edit="active" ${editor.active?'checked':''}/>启用</label></div>`:'';
+      const error=s.error?`<p role="alert">${escapeHTML(s.error)}</p>`:'';
+      const footer=s.discard?'<span>放弃未保存的修改？</span><div class="payment-catalogue-actions"><button class="btn" data-action="warehouse-continue">继续编辑</button><button class="btn" data-action="warehouse-discard">放弃修改</button></div>':editor?`<span>${editor.id?'编辑仓库':'新建仓库'}</span><div class="payment-catalogue-actions"><button class="btn" data-action="warehouse-cancel">取消</button><button class="btn primary" data-action="warehouse-save">${editor.id?'保存修改':'保存仓库'}</button></div>`:`<span>共 ${s.rows.length} 个仓库</span><div class="payment-catalogue-actions"><button class="btn" data-action="close-overlay">关闭</button></div>`;
+      state.infoModal={kind:'warehouse-settings',title:'仓库设置',html:`<p class="data-note">样例仓库；实际用途及停用限制由后端校验。</p><div class="payment-catalogue-toolbar"><div class="payment-catalogue-search"><input data-warehouse-query aria-label="搜索仓库" placeholder="搜索编号、名称或用途" value="${escapeHTML(s.query)}" ${locked?'disabled':''}/><button class="btn" data-action="warehouse-search" ${locked?'disabled':''}>搜索</button></div><button class="btn primary" data-action="warehouse-new" ${locked?'disabled':''}>新增仓库</button></div>${toolbar}${table}${form}${error}`,footer};state.overlay='info';renderFloating();
+    }
+    function warehouseSettingsDesignAction(action,target) {
+      const s=warehouseSettingsDesign;readWarehouseSettingsDesign();
+      if(action==='warehouse-search'&&!s.editor){s.query=document.querySelector('[data-warehouse-query]').value.trim();s.selected=null;}
+      else if(action==='warehouse-select'&&!s.editor)s.selected=Number(target.dataset.id);
+      else if(action==='warehouse-clear'&&!s.editor)s.selected=null;
+      else if(action==='warehouse-edit'&&!s.editor){const row=s.rows.find(row=>row.id===s.selected);if(row)s.editor={...row};}
+      else if(action==='warehouse-new'){s.selected=null;s.editor={id:null,code:'',name:'',type:'',active:true};}
+      else if(action==='warehouse-cancel'){
+        const original=s.editor?.id?s.rows.find(row=>row.id===s.editor.id):{code:'',name:'',type:'',active:true};
+        if(['code','name','type','active'].some(key=>s.editor[key]!==original[key]))s.discard=true;else s.editor=null;
+      }else if(action==='warehouse-continue')s.discard=false;
+      else if(action==='warehouse-discard'){s.discard=false;s.editor=null;s.error='';}
+      else if(action==='warehouse-save'){
+        if(!s.editor.code.trim()||!s.editor.name.trim()||!s.editor.type){s.error='请填写仓库编号、名称和用途';showWarehouseSettingsDesign();return;}
+        const row={...s.editor,code:s.editor.code.trim(),name:s.editor.name.trim(),id:s.editor.id||Math.max(0,...s.rows.map(row=>row.id))+1};
+        s.rows=s.editor.id?s.rows.map(item=>item.id===row.id?row:item):[row,...s.rows];s.selected=row.id;s.editor=null;s.error='';
+      }
+      showWarehouseSettingsDesign();
+    }
+
     const paymentMethodDesignChoices = new Map(['银行转账','现金','银行承兑','aa'].map(name=>[name,{active:true,used:name!=='aa'}]));
     let paymentMethodDesignEditor = null;
+    let paymentMethodDesignSelection = null;
+    const paymentMethodDesignAccess = {canDelete:true};
     let paymentMethodDesignDelete = null;
     let paymentMethodDesignLastChange = null;
     let paymentMethodDesignError = '';
     function paymentMethodDesignOptions() {
-      return [...paymentMethodDesignChoices].filter(([,choice])=>choice.active).map(([name])=>`<option value="${escapeHTML(name)}"></option>`).join('');
+      return [...paymentMethodDesignChoices].filter(([,choice])=>choice.active).map(([name])=>`<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`).join('');
     }
     let paymentMethodDesignQuick = false;
+    let paymentMethodDesignQuickDraft = null;
     let paymentMethodDesignView = 'active';
     const paymentMethodDesignQueries = {active:'',inactive:''};
     const paymentMethodDesignPages = {active:0,inactive:0};
     function renderPaymentMethodField(label) {
-      return `<div class="field"><div class="payment-method-label"><label>${label}</label><button type="button" class="text-btn" data-action="manage-payment-methods">维护选项</button></div><div class="payment-method-control"><input data-form-field="payment" list="payment-method-names" maxlength="128" placeholder="选择或输入付款方式" /><button type="button" class="text-btn" data-action="quick-payment-choice" data-payment-publish hidden>新增并选用</button></div><datalist id="payment-method-names">${paymentMethodDesignOptions()}</datalist></div>`;
+      return `<div class="field"><div class="payment-method-label"><label>${label}</label><button type="button" class="text-btn" data-action="manage-payment-methods">管理付款方式</button></div><div class="payment-method-control"><ui-select data-form-field="payment" data-payment-select><option value="">请选择付款方式</option>${paymentMethodDesignOptions()}</ui-select><button type="button" class="text-btn" data-action="quick-payment-choice">新增付款方式</button></div></div>`;
     }
     function showPaymentMethodDesignManager() {
       const editor=paymentMethodDesignEditor;
-      const editing=Boolean(editor),disabled=editing?'disabled':'';
+      const editing=Boolean(editor),locked=editing||Boolean(paymentMethodDesignDelete),disabled=locked?'disabled':'';
       const input=editor?`<input data-payment-edit aria-label="${editor.original?'修改名称':'新增名称'}" maxlength="128" value="${escapeHTML(editor.name)}" placeholder="输入付款方式名称" />`:'';
       const editorActions=`<div class="payment-catalogue-actions"><button class="btn" data-action="cancel-payment-choice">取消</button><button class="btn primary" data-action="save-payment-choice">${editor?.original?'保存名称':'新增并选用'}</button></div>`;
       const view=paymentMethodDesignView,query=paymentMethodDesignQueries[view],page=paymentMethodDesignPages[view];
       const matches=[...paymentMethodDesignChoices].filter(([name,choice])=>choice.active===(view==='active')&&name.includes(query));
       if(page>0&&page*20>=matches.length){paymentMethodDesignPages[view]-=1;showPaymentMethodDesignManager();return;}
       const rows=matches.slice(page*20,(page+1)*20);
-      const renderRow=([name,choice])=>`<div class="payment-catalogue-row">${editor?.original===name?input+editorActions:`<div class="payment-catalogue-identity"><span>${escapeHTML(name)}</span><small>${choice.used?'已使用':'未使用'}</small></div><div class="payment-catalogue-actions"><button class="text-btn" data-action="rename-payment-choice" data-method="${escapeHTML(name)}" ${disabled}>改名</button><button class="text-btn" data-action="toggle-payment-choice" data-method="${escapeHTML(name)}" ${disabled}>${choice.active?'停用':'启用'}</button><button class="text-btn" data-action="delete-payment-choice" data-method="${escapeHTML(name)}" ${editing||choice.used?'disabled':''}>删除</button></div>`}</div>`;
-      const notice=paymentMethodDesignLastChange?'<p role="status">已修改 <button class="text-btn" data-action="undo-payment-choice">撤销</button></p>':'';
-      const deletion=paymentMethodDesignDelete?`<p>删除尚未使用的「${escapeHTML(paymentMethodDesignDelete)}」？ <button class="btn" data-action="confirm-delete-payment-choice">确定删除</button><button class="btn" data-action="cancel-delete-payment-choice">取消</button></p>`:'';
+      if(!rows.some(([name])=>name===paymentMethodDesignSelection))paymentMethodDesignSelection=null;
+      const selected=paymentMethodDesignChoices.get(paymentMethodDesignSelection),method=escapeHTML(paymentMethodDesignSelection||''),actionDisabled=locked||!selected?'disabled':'';
+      const selection=`<div class="payment-catalogue-selection" role="group" aria-label="选中付款方式操作"><span role="status">${selected?escapeHTML(paymentMethodDesignSelection):'请选择一条付款方式'}</span><div class="payment-catalogue-actions"><button class="text-btn" data-action="clear-payment-selection" ${actionDisabled}>取消选择</button><button class="btn" data-action="rename-payment-choice" data-method="${method}" ${actionDisabled}>改名</button><button class="btn" data-action="toggle-payment-choice" data-method="${method}" ${actionDisabled}>${selected&&!selected.active?'启用':'停用'}</button><button class="btn" data-action="delete-payment-choice" data-method="${method}" ${locked||!selected||selected.used||!paymentMethodDesignAccess.canDelete?'disabled':''}>删除</button></div></div>`;
+      const renderRow=([name,choice])=>`<tr data-action="select-payment-choice" data-method="${escapeHTML(name)}" aria-selected="${paymentMethodDesignSelection===name}"><td><input type="radio" name="payment-catalogue-selection" aria-label="选择 ${escapeHTML(name)}" ${paymentMethodDesignSelection===name?'checked':''} ${disabled}/></td><td><div class="payment-catalogue-identity"><span>${escapeHTML(name)}</span><small>${choice.used?'已使用':'未使用'}</small></div></td><td>${choice.active?'启用':'已停用'}</td></tr>`;
+      const notice=paymentMethodDesignLastChange?`<p role="status">已修改 <button class="text-btn" data-action="undo-payment-choice" ${disabled}>撤销</button></p>`:'';
+      const deletion=paymentMethodDesignDelete?`<p role="alert">删除尚未使用的「${escapeHTML(paymentMethodDesignDelete)}」？</p>`:'';
       const error=paymentMethodDesignError?`<p role="alert">${escapeHTML(paymentMethodDesignError)}</p>`:'';
-      const manager=`<div class="payment-catalogue-toolbar"><div class="segment" role="tablist">${[['active','启用'],['inactive','已停用']].map(([key,label])=>`<button role="tab" aria-selected="${key===view}" class="${key===view?'active':''}" data-action="payment-choice-view" data-view="${key}" ${disabled}>${label}</button>`).join('')}</div><div class="payment-catalogue-actions"><button class="btn" data-action="refresh-payment-choice" ${disabled}>刷新</button><button class="btn primary" data-action="new-payment-choice" ${disabled}>新增</button></div></div><div class="payment-catalogue-toolbar payment-catalogue-search"><input data-payment-query aria-label="搜索付款方式" value="${escapeHTML(query)}" placeholder="搜索付款方式" ${disabled}/><button class="btn" data-action="search-payment-choice" ${disabled}>搜索</button>${query?`<button class="text-btn" data-action="clear-payment-choice" ${disabled}>清除</button>`:''}</div>${notice}${deletion}${editor&&!editor.original?`<div class="payment-catalogue-row">${input}${editorActions}</div>`:''}${rows.map(renderRow).join('')}${!rows.length&&!editor?'<p class="data-note">没有匹配的付款方式</p>':''}${error}`;
-      const footer=`<p class="data-note">公司共用；历史不变，已使用项不可删除。</p><div class="payment-catalogue-actions"><button class="btn" aria-label="上一页" data-action="page-payment-choice" data-step="-1" ${editing||page===0?'disabled':''}>‹</button><span>第 ${page+1} 页</span><button class="btn" aria-label="下一页" data-action="page-payment-choice" data-step="1" ${editing||(page+1)*20>=matches.length?'disabled':''}>›</button></div><button class="btn" data-action="close-overlay">返回填写</button>`;
-      state.infoModal={kind:'payment-methods',quick:paymentMethodDesignQuick,title:paymentMethodDesignQuick?'新增付款方式':'维护付款方式',html:paymentMethodDesignQuick?`<div class="payment-method-label"><label>名称</label><small>公司共用选项</small></div>${input}${error}`:manager,footer:paymentMethodDesignQuick?editorActions:footer};
+      const manager=`<p class="data-note">公司共用；删除需独立授权，已使用项不可删除。</p><div class="payment-catalogue-toolbar"><div class="segment" role="tablist">${[['active','启用'],['inactive','已停用']].map(([key,label])=>`<button role="tab" aria-selected="${key===view}" class="${key===view?'active':''}" data-action="payment-choice-view" data-view="${key}" ${disabled}>${label}</button>`).join('')}</div><div class="payment-catalogue-search"><input data-payment-query aria-label="搜索付款方式" value="${escapeHTML(query)}" placeholder="搜索付款方式" ${disabled}/><button class="btn" data-action="search-payment-choice" ${disabled}>搜索</button>${query?`<button class="text-btn" data-action="clear-payment-choice" ${disabled}>清除</button>`:''}<button class="btn" data-action="refresh-payment-choice" ${disabled}>刷新</button></div><button class="btn primary" data-action="new-payment-choice" ${disabled}>新增付款方式</button></div>${selection}${editor?`<div class="payment-catalogue-editor"><label>${editor.original?'修改名称':'新增名称'}</label>${input}</div>`:''}${notice}${deletion}${error}<table class="payment-catalogue-table"><thead><tr><th></th><th>付款方式</th><th>状态</th></tr></thead><tbody>${rows.map(renderRow).join('')}</tbody></table>${!rows.length&&!editor?'<p class="data-note">没有匹配的付款方式</p>':''}`;
+      const pager=matches.length>20?`<div class="payment-catalogue-actions"><button class="btn" aria-label="上一页" data-action="page-payment-choice" data-step="-1" ${page===0?'disabled':''}>‹</button><span>第 ${page+1} 页</span><button class="btn" aria-label="下一页" data-action="page-payment-choice" data-step="1" ${(page+1)*20>=matches.length?'disabled':''}>›</button></div>`:'';
+      const footer=editing?`<span>${editor.original?'正在改名':'正在新增'}</span>${editorActions}`:paymentMethodDesignDelete?'<span>确认删除未使用项</span><div class="payment-catalogue-actions"><button class="btn" data-action="cancel-delete-payment-choice">取消</button><button class="btn" data-action="confirm-delete-payment-choice">确认删除</button></div>':`<span>共 ${matches.length} 项</span>${pager}<div class="payment-catalogue-actions">${paymentMethodDesignQuickDraft!==null?'<button class="text-btn" data-action="return-payment-create">返回新增</button>':''}<button class="btn" data-action="close-overlay">返回填写</button></div>`;
+      state.infoModal={kind:'payment-methods',quick:paymentMethodDesignQuick,title:paymentMethodDesignQuick?'新增付款方式':'管理付款方式',html:paymentMethodDesignQuick?`<div class="payment-method-label"><label>名称</label><small>公司共用选项</small></div>${input}${error}`:manager,footer:paymentMethodDesignQuick?`<button class="text-btn" data-action="manage-payment-methods">管理付款方式</button>${editorActions}`:footer};
       state.overlay='info';renderFloating();
-      document.querySelectorAll('#payment-method-names').forEach(node=>{node.innerHTML=paymentMethodDesignOptions();});
+      document.querySelectorAll('[data-payment-select]').forEach(node=>{const current=node.value;node.innerHTML='<option value="">请选择付款方式</option>'+paymentMethodDesignOptions();node.value=current;});
       document.querySelector('[data-payment-edit]')?.focus();
     }
     function savePaymentMethodDesignChoice() {
@@ -17233,16 +17291,16 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(editor.original)paymentMethodDesignChoices.delete(editor.original);
       paymentMethodDesignChoices.set(name,previous||{active:true,used:false});
       paymentMethodDesignLastChange=editor.original?{oldName:editor.original,newName:name,previous}:null;
-      if(!editor.original){const input=document.querySelector('[data-form-field="payment"]');if(input){input.value=name;input.dispatchEvent(new Event('input',{bubbles:true}));}}
+      if(!editor.original){const input=document.querySelector('[data-payment-select]');if(input){input.innerHTML='<option value="">请选择付款方式</option>'+paymentMethodDesignOptions();input.value=name;input.dispatchEvent(new Event('input',{bubbles:true}));}paymentMethodDesignQuickDraft=null;}
       paymentMethodDesignEditor=null;paymentMethodDesignError='';
       if(paymentMethodDesignQuick){state.overlay=null;renderFloating();return;}
       paymentMethodDesignView=previous&&!previous.active?'inactive':'active';paymentMethodDesignQueries[paymentMethodDesignView]=name;paymentMethodDesignPages[paymentMethodDesignView]=0;showPaymentMethodDesignManager();
     }
     document.addEventListener('input',event=>{
       if(event.target.matches('[data-payment-edit]')&&paymentMethodDesignEditor)paymentMethodDesignEditor.name=event.target.value;
-      if(event.target.matches('[data-form-field="payment"]')){const name=event.target.value.trim(),button=event.target.parentElement.querySelector('[data-payment-publish]');if(button){button.hidden=!name||paymentMethodDesignChoices.has(name);button.textContent=`新增并选用「${name}」`;}}
+
     });
-    document.addEventListener('keydown',event=>{if(event.key!=='Enter'||event.isComposing)return;if(event.target.matches('[data-payment-query]')){event.preventDefault();paymentMethodDesignQueries[paymentMethodDesignView]=event.target.value.trim();paymentMethodDesignPages[paymentMethodDesignView]=0;showPaymentMethodDesignManager();}else if(event.target.matches('[data-payment-edit]')){event.preventDefault();savePaymentMethodDesignChoice();}});
+    document.addEventListener('keydown',event=>{if(event.key!=='Enter'||event.isComposing)return;if(event.target.matches('[data-payment-query]')){event.preventDefault();paymentMethodDesignSelection=null;paymentMethodDesignQueries[paymentMethodDesignView]=event.target.value.trim();paymentMethodDesignPages[paymentMethodDesignView]=0;showPaymentMethodDesignManager();}else if(event.target.matches('[data-payment-edit]')){event.preventDefault();savePaymentMethodDesignChoice();}});
 
     function renderMasterDataForm(config) {
       const isEdit = state.formMode === 'edit';
@@ -18992,7 +19050,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
     function renderInfoModal() {
       const info = state.infoModal || { title: '交互说明', body: '这是本地交互演示，不会写入真实业务数据。' };
-      if(info.kind==='payment-methods') return `<div class="overlay" data-action="overlay-bg"><section class="modal payment-catalogue-modal ${info.quick?'payment-catalogue-modal--quick':''}" role="dialog" aria-modal="true" aria-label="${info.title}"><header class="modal-head"><strong>${info.title}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body">${info.html}</div><footer class="modal-foot payment-catalogue-footer">${info.footer}</footer></section></div>`;
+      if(info.kind==='payment-methods'||info.kind==='warehouse-settings') return `<div class="overlay" data-action="overlay-bg"><section class="modal payment-catalogue-modal ${info.kind==='warehouse-settings'?'warehouse-settings-design':''} ${info.quick?'payment-catalogue-modal--quick':''}" role="dialog" aria-modal="true" aria-label="${info.title}"><header class="modal-head"><strong>${info.title}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body">${info.html}</div><footer class="modal-foot payment-catalogue-footer">${info.footer}</footer></section></div>`;
       if(info.kind==='progress') {
         const row=mobileProgressRows.find(item=>item.id===info.progressId)||mobileProgressRows[0];
         const sourceKey=row.view==='production'?'production':'sales',source=listConfig[sourceKey].rows.find(item=>item.no===row.no);
@@ -19548,7 +19606,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'mobile-return-list') returnToMobileList();
       else if (action === 'mobile-attachments') { const task=getMobileTask();openAttachmentManager('business',task?.source||'当前移动任务'); }
       else if (action === 'sales-view') switchBusinessView('salesView',target.dataset.value);
-      else if (action === 'warehouse-settings') { state.infoModal = { title: '仓库设置', html: `<table><thead><tr><th>仓库名称</th><th>状态</th></tr></thead><tbody>${listConfig.inventory.sampleParties.map(name=>`<tr><td>${escapeHTML(name)}</td><td>启用</td></tr>`).join('')}</tbody></table><p class="data-note">这里展示样例仓库；正式页面按仓库管理权限提供新增、编辑与启停。</p>` }; state.overlay='info'; renderFloating(); }
+      else if (action === 'warehouse-settings') { warehouseSettingsDesign.selected=null;warehouseSettingsDesign.editor=null;warehouseSettingsDesign.error='';warehouseSettingsDesign.discard=false;showWarehouseSettingsDesign(); }
+      else if (['warehouse-search','warehouse-select','warehouse-clear','warehouse-edit','warehouse-new','warehouse-cancel','warehouse-save','warehouse-continue','warehouse-discard'].includes(action)) warehouseSettingsDesignAction(action,target);
       else if (action === 'inventory-display') switchBusinessView('inventoryDisplay',target.dataset.value);
       else if (action === 'inventory-warehouse') { state.inventoryDisplay='list';state.search=target.dataset.value;state.pageNo=1;renderView(); }
       else if (action === 'delivery-filter') { state.deliveryFilter=target.dataset.value;refreshVisual(); }
@@ -19626,20 +19685,23 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'product-image-zoom') { const direction=target.dataset.value;state.productImageScale=direction==='reset'?1:Math.max(1,Math.min(3,state.productImageScale+(direction==='in'?0.25:-0.25)));renderFloating(); }
       else if (action === 'task-create-continue') { state.overlay='task-create';renderFloating(); }
       else if (action === 'task-create-discard') { state.taskCreateValues={};closeLinkedDrawer(); }
-      else if (action === 'manage-payment-methods') {paymentMethodDesignQuick=false;paymentMethodDesignEditor=null;paymentMethodDesignError='';showPaymentMethodDesignManager();}
-      else if (action === 'quick-payment-choice') {paymentMethodDesignQuick=true;paymentMethodDesignEditor={original:null,name:document.querySelector('[data-form-field="payment"]')?.value||''};paymentMethodDesignError='';showPaymentMethodDesignManager();}
-      else if (action === 'payment-choice-view') {paymentMethodDesignView=target.dataset.view;showPaymentMethodDesignManager();}
-      else if (action === 'search-payment-choice'||action === 'clear-payment-choice') {paymentMethodDesignQueries[paymentMethodDesignView]=action==='clear-payment-choice'?'':document.querySelector('[data-payment-query]').value.trim();paymentMethodDesignPages[paymentMethodDesignView]=0;showPaymentMethodDesignManager();}
-      else if (action === 'page-payment-choice') {paymentMethodDesignPages[paymentMethodDesignView]+=Number(target.dataset.step);showPaymentMethodDesignManager();}
-      else if (action === 'refresh-payment-choice') showPaymentMethodDesignManager();
+      else if (action === 'manage-payment-methods') {if(paymentMethodDesignQuick&&paymentMethodDesignEditor)paymentMethodDesignQuickDraft=paymentMethodDesignEditor.name;paymentMethodDesignQuick=false;paymentMethodDesignEditor=null;paymentMethodDesignSelection=null;paymentMethodDesignDelete=null;paymentMethodDesignError='';showPaymentMethodDesignManager();}
+      else if (action === 'return-payment-create') {paymentMethodDesignQuick=true;paymentMethodDesignEditor={original:null,name:paymentMethodDesignQuickDraft||''};showPaymentMethodDesignManager();}
+      else if (action === 'quick-payment-choice') {paymentMethodDesignQuick=true;paymentMethodDesignEditor={original:null,name:''};paymentMethodDesignError='';showPaymentMethodDesignManager();}
+      else if (action === 'select-payment-choice') {if(!paymentMethodDesignEditor&&!paymentMethodDesignDelete)paymentMethodDesignSelection=target.dataset.method;showPaymentMethodDesignManager();}
+      else if (action === 'clear-payment-selection') {paymentMethodDesignSelection=null;showPaymentMethodDesignManager();}
+      else if (action === 'payment-choice-view') {paymentMethodDesignSelection=null;paymentMethodDesignView=target.dataset.view;showPaymentMethodDesignManager();}
+      else if (action === 'search-payment-choice'||action === 'clear-payment-choice') {paymentMethodDesignSelection=null;paymentMethodDesignQueries[paymentMethodDesignView]=action==='clear-payment-choice'?'':document.querySelector('[data-payment-query]').value.trim();paymentMethodDesignPages[paymentMethodDesignView]=0;showPaymentMethodDesignManager();}
+      else if (action === 'page-payment-choice') {paymentMethodDesignSelection=null;paymentMethodDesignPages[paymentMethodDesignView]+=Number(target.dataset.step);showPaymentMethodDesignManager();}
+      else if (action === 'refresh-payment-choice') {paymentMethodDesignSelection=null;showPaymentMethodDesignManager();}
       else if (action === 'new-payment-choice') { paymentMethodDesignQuick=false;paymentMethodDesignEditor={original:null,name:''};paymentMethodDesignError='';showPaymentMethodDesignManager(); }
       else if (action === 'rename-payment-choice') { paymentMethodDesignEditor={original:target.dataset.method,name:target.dataset.method};paymentMethodDesignError='';showPaymentMethodDesignManager(); }
       else if (action === 'cancel-payment-choice') { paymentMethodDesignEditor=null;paymentMethodDesignError='';if(paymentMethodDesignQuick){state.overlay=null;renderFloating();}else showPaymentMethodDesignManager(); }
       else if (action === 'save-payment-choice') savePaymentMethodDesignChoice();
       else if (action === 'toggle-payment-choice') { const name=target.dataset.method;const choice=paymentMethodDesignChoices.get(name);paymentMethodDesignLastChange={oldName:name,newName:name,previous:{...choice}};choice.active=!choice.active;showPaymentMethodDesignManager(); }
-      else if (action === 'delete-payment-choice') { if(!paymentMethodDesignChoices.get(target.dataset.method)?.used)paymentMethodDesignDelete=target.dataset.method;showPaymentMethodDesignManager(); }
+      else if (action === 'delete-payment-choice') { if(paymentMethodDesignAccess.canDelete&&!paymentMethodDesignChoices.get(target.dataset.method)?.used)paymentMethodDesignDelete=target.dataset.method;showPaymentMethodDesignManager(); }
       else if (action === 'cancel-delete-payment-choice') { paymentMethodDesignDelete=null;showPaymentMethodDesignManager(); }
-      else if (action === 'confirm-delete-payment-choice') { if(!paymentMethodDesignChoices.get(paymentMethodDesignDelete)?.used)paymentMethodDesignChoices.delete(paymentMethodDesignDelete);paymentMethodDesignDelete=null;paymentMethodDesignLastChange=null;showPaymentMethodDesignManager(); }
+      else if (action === 'confirm-delete-payment-choice') { if(paymentMethodDesignAccess.canDelete&&!paymentMethodDesignChoices.get(paymentMethodDesignDelete)?.used)paymentMethodDesignChoices.delete(paymentMethodDesignDelete);paymentMethodDesignDelete=null;paymentMethodDesignLastChange=null;showPaymentMethodDesignManager(); }
       else if (action === 'undo-payment-choice') { if(paymentMethodDesignLastChange){const change=paymentMethodDesignLastChange;paymentMethodDesignChoices.delete(change.newName);paymentMethodDesignChoices.set(change.oldName,change.previous);paymentMethodDesignQueries[paymentMethodDesignView]=change.oldName;paymentMethodDesignPages[paymentMethodDesignView]=0;paymentMethodDesignLastChange=null;}showPaymentMethodDesignManager(); }
       else if (action === 'close-overlay') dismissOverlay();
       else if (action === 'overlay-bg' && event.target === target) dismissOverlay();

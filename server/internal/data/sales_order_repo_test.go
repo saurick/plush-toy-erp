@@ -141,6 +141,7 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	plannedDate := orderDate.AddDate(0, 0, 14)
 	customerOrderNo := "PO-001"
 	paymentMethod := "60天月结"
+	createTestPaymentMethodChoice(t, ctx, client, paymentMethod)
 	paymentTermDays := 60
 	priceConditionNote := "原始报价"
 	taxMode := biz.SalesOrderTaxModeNone

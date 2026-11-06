@@ -88,6 +88,7 @@ func prepareMaterialRequestFixtureWithDemand(t *testing.T, ctx context.Context, 
 	order := client.SalesOrder.Create().SetOrderNo(key).SetCustomerID(customer.ID).SetOrderDate(time.Now()).SetCurrency("CNY").SaveX(ctx)
 	line := client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetUnitID(unit.ID).SetCustomerProductNo(key + "-STYLE").SetRequestedProductName("定制玩偶").SetOrderedQuantity(decimal.RequireFromString(demand.ordered)).SetPreShipmentSampleQuantity(decimal.RequireFromString(demand.samples)).SaveX(ctx)
 	bom := client.BOMHeader.Create().SetProductID(product.ID).SetVersion("V1").SaveX(ctx)
+	createTestPaymentMethodChoice(t, ctx, client, "货到付款")
 	for i := 0; i < 2; i++ {
 		vendor := client.Supplier.Create().SetCode(fmt.Sprintf("%s-V%d", key, i)).SetName(fmt.Sprintf("材料厂%d", i)).SetDefaultPaymentMethod("货到付款").SetDefaultInvoiceRequired(false).SaveX(ctx)
 		material := client.Material.Create().SetCode(fmt.Sprintf("%s-M%d", key, i)).SetName("短绒").SetDefaultUnitID(materialUnit.ID).SetSupplierID(vendor.ID).SetSupplierItemNo("A10").SetColor("01").SaveX(ctx)
@@ -132,6 +133,31 @@ func financeMaterialRequestInput(request *biz.EngineeringMaterialRequest) *biz.E
 	in := &biz.EngineeringMaterialReview{ID: request.ID, ExpectedVersion: request.Version, ActorID: 33, Action: "FINANCE_APPROVE"}
 	return in
 }
+
+func TestEngineeringMaterialRequestPaymentMethodDirectoryGuardRollsBackApproval(t *testing.T) {
+	ctx := context.Background()
+	_, client := openSalesOrderRepoTest(t, "material_request_payment_directory")
+	defer mustCloseEntClient(t, client)
+	f := prepareMaterialRequestFixture(t, ctx, &Data{postgres: client}, "REQUEST-PAYMENT")
+	request := submitMaterialRequestFixture(t, ctx, f)
+	boss, err := f.uc.ReviewEngineeringMaterialRequest(ctx, &biz.EngineeringMaterialReview{ID: request.ID, ExpectedVersion: request.Version, ActorID: 22, Action: "BOSS_APPROVE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.PaymentMethodPreference.Update().SetIsRecommended(false).SaveX(ctx)
+	if _, err := f.uc.ReviewEngineeringMaterialRequest(ctx, financeMaterialRequestInput(boss)); !errors.Is(err, biz.ErrPaymentMethodUnavailable) {
+		t.Fatalf("disabled supplier default generated a new purchase order: %v", err)
+	}
+	stored := client.EngineeringMaterialRequest.GetX(ctx, request.ID)
+	if stored.Status != biz.MaterialRequestBossApproved || stored.Version != boss.Version || client.PurchaseOrder.Query().CountX(ctx) != 0 {
+		t.Fatal("rejected directory choice left approval or purchase changes")
+	}
+	client.PaymentMethodPreference.Update().SetIsRecommended(true).SaveX(ctx)
+	if _, err := f.uc.ReviewEngineeringMaterialRequest(ctx, financeMaterialRequestInput(boss)); err != nil {
+		t.Fatalf("retry after restoring the shared choice: %v", err)
+	}
+}
+
 func TestEngineeringMaterialRequestApprovalAndPurchaseGeneration(t *testing.T) {
 	ctx := context.Background()
 	_, client := openSalesOrderRepoTest(t, "material_request_flow")

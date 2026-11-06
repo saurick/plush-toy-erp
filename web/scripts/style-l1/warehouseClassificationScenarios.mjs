@@ -1,4 +1,6 @@
+import { expect } from 'playwright/test'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
 
 export function createWarehouseClassificationScenarios(deps) {
   let calls; let warehouses; let
@@ -187,15 +189,20 @@ materials
           .filter({ hasText: '仓库设置' })
           .last()
         await modal.getByText('模拟主料仓', { exact: true }).waitFor()
+        await assertCompactSettingsModal(page, modal, deps.assert, { label: 'warehouse-desktop' })
+        const createPosition = await modal.evaluate((node) => { const toolbar = node.querySelector('.erp-warehouse-settings-toolbar').getBoundingClientRect(); const button = node.querySelector('.erp-warehouse-settings-toolbar > button').getBoundingClientRect(); return { toolbar: toolbar.toJSON(), button: button.toJSON(), footerButtons: [...node.querySelectorAll('.ant-modal-footer button')].map((item) => item.textContent) } })
+        deps.assert(Math.abs(createPosition.button.right - createPosition.toolbar.right) <= 1 && !createPosition.footerButtons.includes('新增仓库'), '仓库新增入口应位于搜索行右侧')
         await page.screenshot({
           path: `${deps.outputDir}/warehouse-settings-initial.png`,
           fullPage: true,
         })
-        await modal
-          .locator('tbody tr')
-          .filter({ hasText: '模拟主料仓' })
-          .getByRole('button', { name: /编\s*辑/ })
-          .click()
+        await expect(modal.getByRole('button', { name: '编辑', exact: true })).toBeDisabled()
+        deps.assert.equal(await modal.locator('th.ant-table-selection-column').innerText(), '')
+        await expect(modal.getByRole('columnheader', { name: '操作', exact: true })).toHaveCount(0)
+        deps.assert.equal(await modal.locator('tbody button').count(), 0)
+        await modal.locator('tbody tr').filter({ hasText: '模拟主料仓' }).getByRole('cell').last().click()
+        await expect(modal.getByRole('radio', { name: '选择仓库 WH-MAIN · 模拟主料仓', exact: true })).toBeChecked()
+        await modal.getByRole('button', { name: '编辑', exact: true }).click()
         await modal
           .getByLabel('仓库名称', { exact: true })
           .fill('模拟主料仓 A区')
@@ -236,6 +243,82 @@ materials
           path: `${deps.outputDir}/inventory-auxiliary-filter.png`,
           fullPage: true,
         })
+      },
+    },
+    {
+      name: 'warehouse-settings-selection-growth',
+      path: '/erp/warehouse/inventory',
+      auth: 'admin',
+      effectiveSession: deps.customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await install(page)
+        warehouses.push(...Array.from({ length: 14 }, (_, index) => ({ id: index + 4, code: `WH-EXTRA-${index}`, name: index === 0 ? '模拟长名称仓库'.repeat(16) : `模拟扩展仓库${index}`, type: 'MAIN_MATERIAL', is_active: true })))
+      },
+      verify: async (page) => {
+        await page.getByRole('button', { name: '仓库设置', exact: true }).click()
+        const modal = page.getByRole('dialog').filter({ hasText: '仓库设置' }).last()
+        const rows = modal.locator('tbody .ant-table-row')
+        await expect(rows).toHaveCount(5)
+        const first = modal.getByRole('radio', { name: '选择仓库 WH-MAIN · 模拟主料仓', exact: true })
+        await first.press('Space')
+        await expect(first).toBeChecked()
+        await expect(modal.getByRole('button', { name: '编辑', exact: true })).toBeEnabled()
+        await modal.locator('.ant-pagination-next button').click()
+        await expect(modal.getByRole('button', { name: '编辑', exact: true })).toBeDisabled()
+        await expect(first).toHaveCount(0)
+        await modal.locator('.ant-pagination-prev button').click()
+        await expect(modal.getByRole('button', { name: '编辑', exact: true })).toBeDisabled()
+        const long = modal.getByRole('radio', { name: `选择仓库 WH-EXTRA-0 · ${'模拟长名称仓库'.repeat(16)}`, exact: true })
+        await long.locator('xpath=ancestor::tr').getByRole('cell').last().click()
+        await expect(long).toBeChecked()
+        const geometry = await modal.evaluate((node) => ({ width: node.clientWidth, scrollWidth: node.scrollWidth, toolbarWidth: node.querySelector('.erp-maintenance-selection-bar').clientWidth, toolbarScrollWidth: node.querySelector('.erp-maintenance-selection-bar').scrollWidth }))
+        deps.assert(geometry.scrollWidth <= geometry.width + 1 && geometry.toolbarScrollWidth <= geometry.toolbarWidth + 1, `长选中名称不得撑宽维护弹窗 ${JSON.stringify(geometry)}`)
+        await modal.screenshot({ path: `${deps.outputDir}/warehouse-settings-selection-growth.png` })
+        await modal.getByRole('button', { name: '关闭', exact: true }).click()
+        deps.assert.equal(calls.some((call) => ['create_warehouse', 'update_warehouse'].includes(call.method)), false)
+      },
+    },
+    {
+      name: 'warehouse-settings-compact-narrow',
+      path: '/erp/warehouse/inventory',
+      auth: 'admin',
+      effectiveSession: deps.customerRuntimeEffectiveSession,
+      themeMode: 'dark',
+      viewport: { width: 390, height: 720 },
+      beforeNavigate: install,
+      verify: async (page) => {
+        await page.getByRole('button', { name: '仓库设置', exact: true }).click()
+        const modal = page.getByRole('dialog').filter({ hasText: '仓库设置' }).last()
+        await modal.getByText('模拟主料仓', { exact: true }).waitFor()
+        await assertCompactSettingsModal(page, modal, deps.assert, { label: 'warehouse-narrow' })
+        await modal.locator('tbody tr').filter({ hasText: '模拟主料仓' }).getByRole('cell').last().click()
+        await modal.getByRole('button', { name: '编辑', exact: true }).click()
+        await expect(modal.getByLabel('仓库编号', { exact: true })).toHaveValue('WH-MAIN')
+        await modal.getByLabel('仓库名称', { exact: true }).fill('未保存的模拟仓库修改')
+        await modal.getByRole('button', { name: '新增仓库', exact: true }).click()
+        const discard = page.locator('.ant-modal-confirm:visible')
+        await discard.getByRole('button', { name: '继续编辑', exact: true }).click()
+        await expect(discard).toBeHidden()
+        await expect(modal.getByLabel('仓库名称', { exact: true })).toHaveValue('未保存的模拟仓库修改')
+        await modal.getByRole('button', { name: '新增仓库', exact: true }).click()
+        await discard.getByRole('button', { name: '放弃修改', exact: true }).click()
+        await expect(discard).toBeHidden()
+        await expect(modal.getByLabel('仓库编号', { exact: true })).toHaveValue('')
+        await expect(modal.getByLabel('启用', { exact: true })).toBeChecked()
+        await page.setViewportSize({ width: 360, height: 320 })
+        await assertCompactSettingsModal(page, modal, deps.assert, { label: 'warehouse-short' })
+        await modal.getByRole('button', { name: '保存仓库', exact: true }).click()
+        await expect(modal.getByText('请输入仓库编号', { exact: true })).toBeVisible()
+        await expect(modal.getByLabel('仓库编号', { exact: true })).toBeFocused()
+        await modal.screenshot({ path: `${deps.outputDir}/warehouse-settings-short.png` })
+        await modal.getByRole('button', { name: '取消', exact: true }).click()
+        await expect(modal.getByRole('button', { name: '编辑', exact: true })).toBeDisabled()
+        const restored = await modal.evaluate((node) => ({ bodyTop: node.querySelector('.ant-modal-body').getBoundingClientRect().top, toolbarTop: node.querySelector('.erp-warehouse-settings-toolbar').getBoundingClientRect().top }))
+        deps.assert(restored.toolbarTop >= restored.bodyTop, '取消编辑后应返回顶部检索和新增入口')
+        await modal.getByRole('button', { name: '关闭', exact: true }).click()
+        await expect(modal).toBeHidden()
+        deps.assert.equal(calls.filter((call) => ['update_warehouse', 'create_warehouse'].includes(call.method)).length, 0)
       },
     },
     {

@@ -8,6 +8,7 @@ import (
 	"io"
 	"reflect"
 	"server/internal/biz"
+	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/paymentmethodpreference"
 	"server/internal/data/model/ent/runtimeauditevent"
 	"sync"
@@ -213,20 +214,159 @@ func TestPaymentMethodPostgresConcurrentChangesAndAudit(t *testing.T) {
 	if client.PaymentMethodPreference.GetX(ctx, item.ID).Method != name {
 		t.Fatal("PG audit failure was not atomic")
 	}
+	item, err = uc.UpdatePaymentMethod(ctx, actor, biz.PaymentMethodOptionChange{ID: item.ID, Method: name, IsActive: true, ExpectedVersion: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// The business writer holds the same lock until commit, so delete must observe first use.
 	tx, err := client.Tx(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := recordPaymentMethodUse(ctx, tx.Client(), data.sqlDialect, &name); err != nil {
+	if err := recordPaymentMethodUse(ctx, tx.Client(), data.sqlDialect, &name, nil); err != nil {
 		t.Fatal(err)
 	}
 	deletion := make(chan error, 1)
-	go func() { deletion <- uc.DeletePaymentMethod(ctx, actor, item.ID, 2) }()
+	go func() { deletion <- uc.DeletePaymentMethod(ctx, actor, item.ID, item.Version) }()
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
 	if err := <-deletion; !errors.Is(err, biz.ErrPaymentMethodInUse) {
 		t.Fatalf("first use/delete race: %v", err)
+	}
+}
+
+func TestPaymentMethodSharedDirectorySelectionRules(t *testing.T) {
+	fixture, cleanup := newBusinessAttachmentRepoTest(t, "payment_selection_rules")
+	defer cleanup()
+	ctx := context.Background()
+	client := fixture.data.postgres
+	active := client.PaymentMethodPreference.Create().SetMethod("Wire").SaveX(ctx)
+	client.PaymentMethodPreference.Create().SetMethod("OldWire").SetIsRecommended(false).SaveX(ctx)
+	for _, tc := range []struct {
+		name            string
+		value, previous *string
+		ok              bool
+	}{
+		{"empty", nil, nil, true}, {"unlisted", paymentSelectionTestPtr("未建档"), nil, false}, {"inactive", paymentSelectionTestPtr("OldWire"), nil, false}, {"active", paymentSelectionTestPtr("wire"), nil, true}, {"unchanged inactive", paymentSelectionTestPtr("OldWire"), paymentSelectionTestPtr("OldWire"), true}, {"unchanged historical text", paymentSelectionTestPtr("过去的约定"), paymentSelectionTestPtr("过去的约定"), true}, {"changed historical text", paymentSelectionTestPtr("新乱填"), paymentSelectionTestPtr("过去的约定"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tx, err := client.Tx(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = recordPaymentMethodUse(ctx, tx.Client(), fixture.data.sqlDialect, tc.value, tc.previous)
+			_ = tx.Rollback()
+			if tc.ok && err != nil {
+				t.Fatal(err)
+			}
+			if !tc.ok && !errors.Is(err, biz.ErrPaymentMethodUnavailable) {
+				t.Fatalf("selection accepted: %v", err)
+			}
+			if tc.name == "active" && *tc.value != "Wire" {
+				t.Fatal("noncanonical name retained")
+			}
+		})
+	}
+	repo := NewMasterDataRepo(fixture.data, log.NewStdLogger(io.Discard))
+	days := 30
+	name := "Wire"
+	saved, err := repo.CreateCustomer(ctx, &biz.CustomerMutation{Code: "PAY-C", Name: "模拟客户", DefaultPaymentMethod: &name, DefaultPaymentTermDays: &days})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.PaymentMethodPreference.UpdateOneID(active.ID).SetIsRecommended(false).SaveX(ctx)
+	if _, err := repo.UpdateCustomer(ctx, saved.ID, &biz.CustomerMutation{Code: "PAY-C", Name: "已修改名称", DefaultPaymentMethod: &name, DefaultPaymentTermDays: &days}); err != nil {
+		t.Fatal("unchanged stopped snapshot blocked", err)
+	}
+	bad := "不存在"
+	if _, err := repo.UpdateCustomer(ctx, saved.ID, &biz.CustomerMutation{Code: "PAY-C", Name: "不得保存", DefaultPaymentMethod: &bad, DefaultPaymentTermDays: &days}); !errors.Is(err, biz.ErrPaymentMethodUnavailable) {
+		t.Fatal(err)
+	}
+	if client.Customer.GetX(ctx, saved.ID).Name != "已修改名称" {
+		t.Fatal("failed write was not rolled back")
+	}
+
+}
+
+func paymentSelectionTestPtr(value string) *string { return &value }
+
+func createTestPaymentMethodChoice(t *testing.T, ctx context.Context, client *ent.Client, name string) {
+	t.Helper()
+	if client.PaymentMethodPreference.Query().Where(paymentmethodpreference.MethodEqualFold(name)).ExistX(ctx) {
+		return
+	}
+	client.PaymentMethodPreference.Create().SetMethod(name).SaveX(ctx)
+}
+
+func TestPaymentMethodDocumentWritersKeepHistoryAndRejectUnlistedSelections(t *testing.T) {
+	fixture, cleanup := newBusinessAttachmentRepoTest(t, "payment_document_selection")
+	defer cleanup()
+	ctx := context.Background()
+	client := fixture.data.postgres
+	logger := log.NewStdLogger(io.Discard)
+	master := NewMasterDataRepo(fixture.data, logger)
+	sales := NewSalesOrderRepo(fixture.data, logger)
+	purchase := NewPurchaseOrderRepo(fixture.data, logger)
+	days := 30
+	bad := "未维护的名称"
+	if _, err := master.CreateSupplier(ctx, &biz.SupplierMutation{Code: "PAY-S-BAD", Name: "模拟供应商", DefaultPaymentMethod: &bad, DefaultPaymentTermDays: days}); !errors.Is(err, biz.ErrPaymentMethodUnavailable) {
+		t.Fatalf("supplier create: %v", err)
+	}
+	client.PaymentMethodPreference.Create().SetMethod("Wire").SaveX(ctx)
+	method := "wire"
+	supplier, err := master.CreateSupplier(ctx, &biz.SupplierMutation{Code: "PAY-S", Name: "模拟供应商", DefaultPaymentMethod: &method, DefaultPaymentTermDays: days})
+	if err != nil || supplier.DefaultPaymentMethod == nil || *supplier.DefaultPaymentMethod != "Wire" {
+		t.Fatalf("supplier canonical selection: %+v %v", supplier, err)
+	}
+	customer := client.Customer.Create().SetCode("PAY-DOC-C").SetName("模拟客户").SaveX(ctx)
+	so := &biz.SalesOrderMutation{OrderNo: "PAY-SO", CustomerID: customer.ID, OrderDate: time.Now(), Currency: "CNY", PaymentMethod: &bad, PaymentTermDays: &days}
+	po := &biz.PurchaseOrderMutation{PurchaseOrderNo: "PAY-PO", SupplierID: supplier.ID, PurchaseDate: time.Now(), Currency: "CNY", PaymentMethod: &bad, PaymentTermDays: &days}
+	for _, write := range []struct {
+		name string
+		run  func() error
+	}{
+		{"sales create", func() error { _, err := sales.CreateSalesOrder(ctx, so); return err }},
+		{"sales aggregate create", func() error { _, err := sales.SaveSalesOrderWithItems(ctx, 0, so, nil); return err }},
+		{"purchase create", func() error { _, err := purchase.CreatePurchaseOrder(ctx, po); return err }},
+		{"purchase aggregate create", func() error { _, err := purchase.SavePurchaseOrderWithItems(ctx, 0, po, nil); return err }},
+	} {
+		if err := write.run(); !errors.Is(err, biz.ErrPaymentMethodUnavailable) {
+			t.Fatalf("%s: %v", write.name, err)
+		}
+	}
+	if client.SalesOrder.Query().CountX(ctx) != 0 || client.PurchaseOrder.Query().CountX(ctx) != 0 {
+		t.Fatal("rejected create left a document")
+	}
+	legacy := "历史未建档约定"
+	savedSO := client.SalesOrder.Create().SetOrderNo(so.OrderNo).SetCustomerID(customer.ID).SetOrderDate(so.OrderDate).SetPaymentMethod(legacy).SetPaymentTermDays(days).SetLifecycleStatus(biz.SalesOrderStatusDraft).SaveX(ctx)
+	savedPO := client.PurchaseOrder.Create().SetPurchaseOrderNo(po.PurchaseOrderNo).SetSupplierID(supplier.ID).SetPurchaseDate(po.PurchaseDate).SetPaymentMethod(legacy).SetPaymentTermDays(days).SetLifecycleStatus(biz.PurchaseOrderStatusDraft).SaveX(ctx)
+	so.PaymentMethod, po.PaymentMethod = &legacy, &legacy
+	so.ExpectedVersion, po.ExpectedVersion = savedSO.Version, savedPO.Version
+	if _, err := sales.UpdateSalesOrder(ctx, savedSO.ID, so); err != nil {
+		t.Fatalf("sales historical update: %v", err)
+	}
+	if _, err := purchase.UpdatePurchaseOrder(ctx, savedPO.ID, po); err != nil {
+		t.Fatalf("purchase historical update: %v", err)
+	}
+	if _, err := sales.SaveSalesOrderWithItems(ctx, savedSO.ID, so, nil); err != nil {
+		t.Fatalf("sales historical aggregate: %v", err)
+	}
+	if _, err := purchase.SavePurchaseOrderWithItems(ctx, savedPO.ID, po, nil); err != nil {
+		t.Fatalf("purchase historical aggregate: %v", err)
+	}
+	so.PaymentMethod, po.PaymentMethod = &bad, &bad
+	if _, err := sales.SaveSalesOrderWithItems(ctx, savedSO.ID, so, nil); !errors.Is(err, biz.ErrPaymentMethodUnavailable) {
+		t.Fatalf("sales changed legacy selection: %v", err)
+	}
+	if _, err := purchase.SavePurchaseOrderWithItems(ctx, savedPO.ID, po, nil); !errors.Is(err, biz.ErrPaymentMethodUnavailable) {
+		t.Fatalf("purchase changed legacy selection: %v", err)
+	}
+	client.PaymentMethodPreference.Update().SetIsRecommended(false).SaveX(ctx)
+	if _, err := master.UpdateSupplier(ctx, supplier.ID, &biz.SupplierMutation{Code: supplier.Code, Name: supplier.Name, DefaultPaymentMethod: supplier.DefaultPaymentMethod, DefaultPaymentTermDays: days}); err != nil {
+		t.Fatalf("supplier unchanged inactive selection: %v", err)
+	}
+	if *client.SalesOrder.GetX(ctx, savedSO.ID).PaymentMethod != legacy || *client.PurchaseOrder.GetX(ctx, savedPO.ID).PaymentMethod != legacy {
+		t.Fatal("rejected changes rewrote historical snapshots")
 	}
 }

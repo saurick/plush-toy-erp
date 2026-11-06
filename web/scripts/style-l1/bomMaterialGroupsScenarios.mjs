@@ -1,5 +1,6 @@
 import { expect as expectLocator } from 'playwright/test'
 import { setERPFormDisplay } from './themeAssertions.mjs'
+import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
 import { createBOMToolbarScenarios } from './bomToolbarScenarios.mjs'
 import { clickBOMMaterialAction, clickBOMPartAction } from './bomToolbarActions.mjs'
 import {
@@ -1329,6 +1330,8 @@ export function createBOMMaterialGroupsScenarios(deps) {
           .filter({ hasText: '新建物料并使用' })
           .last()
         await create.waitFor({ state: 'visible' })
+        await assertCompactSettingsModal(page, create, deps.assert, { label: 'material-create-desktop' })
+        deps.assert.equal(await create.getByRole('heading').count(), 0, '快捷建档保持平铺字段')
         await dropdown.waitFor({ state: 'hidden' })
         await create.getByRole('button', { name: '新建并使用', exact: true }).click()
         await create.getByText('请填写名称', { exact: true }).waitFor()
@@ -1477,6 +1480,38 @@ export function createBOMMaterialGroupsScenarios(deps) {
           saves[0].items.filter((item) => item.material_id !== 77).length,
           2
         )
+      },
+    },
+    {
+      ...scenarios[0],
+      name: 'bom-material-create-compact-narrow',
+      themeMode: 'dark',
+      viewport: { width: 390, height: 720 },
+      verify: async (page) => {
+        await page.getByText('BOM-STYLE-DRAFT', { exact: true }).dblclick()
+        const editor = page.locator('.erp-business-form-page:not([hidden])').last()
+        const material = editor.getByRole('combobox', { name: '物料名称 1', exact: true })
+        await material.press('ArrowDown')
+        await page.locator('.ant-select-dropdown:visible').getByRole('button', { name: '新建物料并使用', exact: true }).click()
+        const create = page.getByRole('dialog').filter({ hasText: '新建物料并使用' }).last()
+        const metrics = await assertCompactSettingsModal(page, create, deps.assert, { label: 'material-create-narrow' })
+        deps.assert.equal(metrics.fields, 11, '快捷新建保留完整物料字段')
+        deps.assert.equal(await create.getByRole('heading').count(), 0)
+        await create.getByLabel('名称', { exact: true }).fill('尚未保存的窄屏物料')
+        await page.setViewportSize({ width: 360, height: 320 })
+        await assertCompactSettingsModal(page, create, deps.assert, { label: 'material-create-short' })
+        await expectLocator(create.getByRole('button', { name: '新建并使用', exact: true })).toBeInViewport()
+        await create.getByLabel('厂商料号', { exact: true }).fill('LONG-SUPPLIER-'.repeat(10))
+        await expectLocator(create.getByRole('button', { name: '取消', exact: true })).toBeInViewport()
+        await create.screenshot({ path: `${deps.outputDir}/bom-material-create-short.png` })
+        await create.getByRole('button', { name: '取消', exact: true }).click()
+        const discard = page.locator('.ant-modal-confirm:visible')
+        await discard.getByRole('button', { name: '继续编辑', exact: true }).click()
+        await expectLocator(create.getByLabel('名称', { exact: true })).toHaveValue('尚未保存的窄屏物料')
+        await create.getByRole('button', { name: '取消', exact: true }).click()
+        await discard.getByRole('button', { name: '放弃修改', exact: true }).click()
+        await expectLocator(create).toBeHidden()
+        await expectLocator(editor).toBeVisible()
       },
     },
     {

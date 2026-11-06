@@ -151,6 +151,9 @@ func (d *jsonrpcDispatcher) purchaseOrderErrorResult(ctx context.Context, err er
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
+	if result := paymentMethodSelectionErrorResult(err); result != nil {
+		return result
+	}
 	l := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrPurchaseOrderMaterialSupplierMismatch):

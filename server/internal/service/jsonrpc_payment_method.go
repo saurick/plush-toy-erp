@@ -25,6 +25,11 @@ func (d *jsonrpcDispatcher) handlePaymentMethodSuggestions(ctx context.Context, 
 	if res := d.RequireAdminPermission(ctx, biz.PermissionPaymentMethodManage); res != nil {
 		return id, res, nil
 	}
+	if method == "delete_payment_method" {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPaymentMethodDelete); res != nil {
+			return id, res, nil
+		}
+	}
 	if method == "list_payment_method_options" {
 		active, valid := getRequiredJSONRPCBool(pm, "is_active")
 		if !valid {
@@ -46,7 +51,11 @@ func (d *jsonrpcDispatcher) handlePaymentMethodSuggestions(ctx context.Context, 
 		for _, item := range items {
 			values = append(values, paymentMethodOptionToAny(item))
 		}
-		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"items": values, "has_more": more})}, nil
+		canDelete, res := d.AdminHasPermission(ctx, biz.PermissionPaymentMethodDelete)
+		if res != nil {
+			return id, res, nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"items": values, "has_more": more, "can_delete": canDelete})}, nil
 	}
 	operator, res := d.CurrentAdmin(ctx)
 	if res != nil {

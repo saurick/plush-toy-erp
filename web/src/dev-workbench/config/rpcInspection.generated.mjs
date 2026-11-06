@@ -315,7 +315,7 @@ export const RpcInspection = Object.freeze({
         name: 'role_keys[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 708,
+          line: 710,
           path: 'server/internal/biz/rbac.go',
         }),
         type: 'string',
@@ -9267,7 +9267,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 59,
+          line: 68,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'string',
@@ -9276,7 +9276,7 @@ export const RpcInspection = Object.freeze({
         expression: '"item": paymentMethodOptionToAny(*item)',
         name: 'result.data.item',
         source: Object.freeze({
-          line: 87,
+          line: 96,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
@@ -9895,7 +9895,7 @@ export const RpcInspection = Object.freeze({
         name: 'expected_version',
         required: '必填',
         source: Object.freeze({
-          line: 65,
+          line: 74,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'integer',
@@ -9905,7 +9905,7 @@ export const RpcInspection = Object.freeze({
         name: 'id',
         required: '必填',
         source: Object.freeze({
-          line: 61,
+          line: 70,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'integer',
@@ -9914,7 +9914,7 @@ export const RpcInspection = Object.freeze({
         expression: '"deleted_id": optionID',
         name: 'result.data.deleted_id',
         source: Object.freeze({
-          line: 74,
+          line: 83,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
@@ -10750,7 +10750,7 @@ export const RpcInspection = Object.freeze({
         name: 'is_active',
         required: '必填',
         source: Object.freeze({
-          line: 29,
+          line: 34,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'boolean',
@@ -10761,7 +10761,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 37,
+          line: 42,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'string',
@@ -10772,7 +10772,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 37,
+          line: 42,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'integer',
@@ -10783,16 +10783,24 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 33,
+          line: 38,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'integer',
       })]),
       response: Object.freeze([Object.freeze({
+        expression: '"can_delete": canDelete',
+        name: 'result.data.can_delete',
+        source: Object.freeze({
+          line: 58,
+          path: 'server/internal/service/jsonrpc_payment_method.go',
+        }),
+        type: '待核对',
+      }), Object.freeze({
         expression: '"has_more": more',
         name: 'result.data.has_more',
         source: Object.freeze({
-          line: 49,
+          line: 58,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
@@ -10800,7 +10808,7 @@ export const RpcInspection = Object.freeze({
         expression: '"items": values',
         name: 'result.data.items',
         source: Object.freeze({
-          line: 49,
+          line: 58,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
@@ -13249,7 +13257,7 @@ export const RpcInspection = Object.freeze({
         name: 'expected_version',
         required: '必填',
         source: Object.freeze({
-          line: 65,
+          line: 74,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'integer',
@@ -13259,7 +13267,7 @@ export const RpcInspection = Object.freeze({
         name: 'id',
         required: '必填',
         source: Object.freeze({
-          line: 61,
+          line: 70,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'integer',
@@ -13269,7 +13277,7 @@ export const RpcInspection = Object.freeze({
         name: 'is_active',
         required: '必填',
         source: Object.freeze({
-          line: 76,
+          line: 85,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'boolean',
@@ -13280,7 +13288,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 80,
+          line: 89,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: 'string',
@@ -13289,7 +13297,7 @@ export const RpcInspection = Object.freeze({
         expression: '"item": paymentMethodOptionToAny(*item)',
         name: 'result.data.item',
         source: Object.freeze({
-          line: 87,
+          line: 96,
           path: 'server/internal/service/jsonrpc_payment_method.go',
         }),
         type: '待核对',
@@ -24512,7 +24520,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(item)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 202,
+          line: 205,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -24606,7 +24614,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(item)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 202,
+          line: 205,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -24740,7 +24748,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(item)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 202,
+          line: 205,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -24768,7 +24776,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(item)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 202,
+          line: 205,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -25531,7 +25539,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(result.Order)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 217,
+          line: 220,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -25539,7 +25547,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order_items": purchaseOrderItemsToAny(result.Items)',
         name: 'result.data.purchase_order_items',
         source: Object.freeze({
-          line: 218,
+          line: 221,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -25662,7 +25670,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(item)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 202,
+          line: 205,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -27375,7 +27383,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order": salesOrderToMap(item)',
         name: 'result.data.sales_order',
         source: Object.freeze({
-          line: 291,
+          line: 294,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',
@@ -27469,7 +27477,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order": salesOrderToMap(item)',
         name: 'result.data.sales_order',
         source: Object.freeze({
-          line: 291,
+          line: 294,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',
@@ -27793,7 +27801,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order": salesOrderToMap(item)',
         name: 'result.data.sales_order',
         source: Object.freeze({
-          line: 291,
+          line: 294,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',
@@ -28942,7 +28950,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order": salesOrderToMap(result.Order)',
         name: 'result.data.sales_order',
         source: Object.freeze({
-          line: 306,
+          line: 309,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',
@@ -28950,7 +28958,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order_items": salesOrderItemsToAny(result.Items)',
         name: 'result.data.sales_order_items',
         source: Object.freeze({
-          line: 307,
+          line: 310,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',

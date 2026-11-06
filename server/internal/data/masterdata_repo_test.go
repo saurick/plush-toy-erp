@@ -32,6 +32,7 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 
 	shortName := "成品客户"
 	defaultPaymentMethod := "30天月结"
+	createTestPaymentMethodChoice(t, ctx, client, defaultPaymentMethod)
 	defaultPaymentTermDays := 30
 	countryRegion := "中国"
 	deliveryRecipient := "王小明"
@@ -105,6 +106,7 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	address := "测试工业园 1 号"
 	supplierPaymentTermDays := 30
 	supplierPaymentMethod := "银行转账"
+	createTestPaymentMethodChoice(t, ctx, client, supplierPaymentMethod)
 	defaultInvoiceRequired := true
 	defaultInvoiceCategory := biz.FinanceInvoiceCategoryVATSpecial13
 	processRow, err := client.Process.Create().

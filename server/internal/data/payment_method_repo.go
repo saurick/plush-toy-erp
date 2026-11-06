@@ -93,16 +93,29 @@ func paymentMethodInUse(ctx context.Context, client *ent.Client, method string) 
 	return false, nil
 }
 
-// Called inside the owning business transaction. It never publishes free text
-// as a common option and never resets the lifetime guard when a source changes.
-func recordPaymentMethodUse(ctx context.Context, client *ent.Client, sqlDialect string, method *string) error {
+// Business writes validate new selections and record lifetime use in the same
+// transaction as the document. Unchanged saved text remains a document snapshot.
+func recordPaymentMethodUse(ctx context.Context, client *ent.Client, sqlDialect string, method, previous *string) error {
 	if method == nil || strings.TrimSpace(*method) == "" {
 		return nil
 	}
 	if err := lockPaymentMethodCatalogue(ctx, client, sqlDialect); err != nil {
 		return err
 	}
-	return client.PaymentMethodPreference.Update().Where(paymentmethodpreference.MethodEqualFold(strings.TrimSpace(*method)), paymentmethodpreference.HasBeenUsed(false)).SetHasBeenUsed(true).Exec(ctx)
+	name := strings.TrimSpace(*method)
+	unchanged := previous != nil && name == strings.TrimSpace(*previous)
+	if !unchanged {
+		row, err := client.PaymentMethodPreference.Query().Where(paymentmethodpreference.MethodEqualFold(name), paymentmethodpreference.IsRecommended(true)).Only(ctx)
+		if ent.IsNotFound(err) {
+			return biz.ErrPaymentMethodUnavailable
+		}
+		if err != nil {
+			return err
+		}
+		*method = row.Method
+		name = row.Method
+	}
+	return client.PaymentMethodPreference.Update().Where(paymentmethodpreference.MethodEqualFold(name), paymentmethodpreference.HasBeenUsed(false)).SetHasBeenUsed(true).Exec(ctx)
 }
 
 func paymentMethodAuditSnapshot(row *ent.PaymentMethodPreference) map[string]any {

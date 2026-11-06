@@ -33,6 +33,7 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	warehouse := createTestWarehouse(t, ctx, client, "WH-PO-001")
 	supplier := createPurchaseOrderTestSupplier(t, ctx, client, "SUP-PO-001", true)
 	supplierPaymentMethod := "银行转账"
+	createTestPaymentMethodChoice(t, ctx, client, supplierPaymentMethod)
 	defaultInvoiceCategory := biz.FinanceInvoiceCategoryVATSpecial13
 	if _, err := client.Supplier.UpdateOneID(supplier.ID).
 		SetDefaultPaymentTermDays(30).
@@ -101,6 +102,7 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	}
 	updatedTermDays := 60
 	updatedPaymentMethod := "信用证"
+	createTestPaymentMethodChoice(t, ctx, client, updatedPaymentMethod)
 	updatedInvoiceRequired := false
 	updatedConfirmedArrival := purchaseDate.AddDate(0, 0, 10)
 	updatedDeliveryAddress := "香港中转仓"

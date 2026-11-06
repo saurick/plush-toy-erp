@@ -124,7 +124,7 @@ const validPaymentMethodOption = (item) => item && Number.isSafeInteger(item.id)
 
 export async function listPaymentMethodOptions(params, options = {}) {
   const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.LIST_PAYMENT_METHOD_OPTIONS, params, options))
-  if (!Array.isArray(data?.items) || !data.items.every(validPaymentMethodOption) || typeof data.has_more !== 'boolean') throw new Error('付款方式读取失败，请重试')
+  if (!Array.isArray(data?.items) || !data.items.every(validPaymentMethodOption) || typeof data.has_more !== 'boolean' || typeof data.can_delete !== 'boolean') throw new Error('付款方式读取失败，请重试')
   return data
 }
 

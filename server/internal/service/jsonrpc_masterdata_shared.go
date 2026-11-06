@@ -91,6 +91,13 @@ func masterDataFilterFromParams(pm map[string]any) (biz.MasterDataFilter, bool) 
 	}, true
 }
 
+func paymentMethodSelectionErrorResult(err error) *v1.JsonrpcResult {
+	if errors.Is(err, biz.ErrPaymentMethodUnavailable) {
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请选择已启用的公司共用付款方式；新增方式请先在付款方式管理中建档"}
+	}
+	return nil
+}
+
 func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *v1.JsonrpcResult {
 	if result := canceledRequestResult(ctx, err); result != nil {
 		return result
@@ -99,6 +106,9 @@ func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *
 		return result
 	}
 	if result := warehouseClassificationError(err); result != nil {
+		return result
+	}
+	if result := paymentMethodSelectionErrorResult(err); result != nil {
 		return result
 	}
 	l := d.log.WithContext(ctx)

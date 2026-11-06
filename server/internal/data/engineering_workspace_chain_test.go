@@ -28,6 +28,7 @@ func TestEngineeringWorkspaceFromCustomerDemandToMaterialSubmission(t *testing.T
 	customer := createSalesOrderTestCustomer(t, ctx, client, "WORKSPACE-C", true)
 	unit := createSalesOrderTestUnit(t, ctx, client, "WORKSPACE-PCS", true)
 	unit = client.Unit.UpdateOneID(unit.ID).SetPrecision(6).SaveX(ctx)
+	createTestPaymentMethodChoice(t, ctx, client, "货到付款")
 	supplier := client.Supplier.Create().SetCode("WORKSPACE-S").SetName("模拟材料厂").SetDefaultPaymentMethod("货到付款").SetDefaultInvoiceRequired(false).SaveX(ctx)
 	str := func(s string) *string { return &s }
 	weight := decimal.RequireFromString("125.125")

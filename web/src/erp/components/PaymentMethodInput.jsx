@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { DownOutlined } from '@ant-design/icons'
-import { AutoComplete, Button, Form, Space, Spin, Typography } from 'antd'
+import { Button, Form, Space, Spin, Typography } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { listPaymentMethods } from '../api/masterDataOrderApi.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
@@ -14,8 +15,7 @@ export function PaymentMethodField({ label = '付款方式', inputProps, classNa
   const controlId = inputProps?.id || (Array.isArray(fieldProps.name) ? fieldProps.name.join('_') : fieldProps.name) || `${labelId}-input`
   const registerManagement = useCallback((value) => setManagement(value), [])
   return (
-    <Form.Item className={[className, 'erp-payment-method-field'].filter(Boolean).join(' ')}>
-      <div className="erp-payment-method-field__label"><label id={labelId} htmlFor={controlId}>{label}</label>{management?.canManage ? <span className="erp-payment-method-field__action"><Button type="link" size="small" onClick={() => management.open()}>维护选项</Button></span> : null}</div>
+    <Form.Item className={[className, 'erp-payment-method-field'].filter(Boolean).join(' ')} htmlFor={controlId} label={<span className="erp-payment-method-field__label"><span id={labelId}>{label}</span>{management?.canManage ? <span className="erp-payment-method-field__action"><Button type="link" size="small" onClick={() => management.open()}>管理付款方式</Button></span> : null}</span>}>
       <Form.Item {...fieldProps} noStyle>
         <PaymentMethodInput {...inputProps} id={controlId} aria-labelledby={labelId} registerManagement={registerManagement} />
       </Form.Item>
@@ -27,7 +27,7 @@ export function PaymentMethodEntry() {
   return <PaymentMethodInput managementOnly />
 }
 
-export default function PaymentMethodInput({ value, onChange, onBlur, disabled, registerManagement, managementOnly = false, placeholder = '选择或输入付款方式', ...props }) {
+export default function PaymentMethodInput({ value, onChange, onBlur, disabled, registerManagement, managementOnly = false, placeholder = '搜索并选择付款方式', ...props }) {
   const context = useBusinessPageContext()
   const scope = JSON.stringify(context?.adminProfile || null)
   const [access, setAccess] = useState({ scope: null, canManage: false })
@@ -75,7 +75,7 @@ export default function PaymentMethodInput({ value, onChange, onBlur, disabled, 
       } catch (error) {
         if (controller.signal.aborted || sequence !== generation.current || isRpcAbortError(error)) return
         accessScope.current = scope
-        setAccess({ scope, canManage: false })
+        setAccess((previous) => previous.scope === scope ? previous : { scope, canManage: false })
         setResult({ methods: [], hasMore: false, scope })
         setStatus('error')
       }
@@ -93,7 +93,7 @@ export default function PaymentMethodInput({ value, onChange, onBlur, disabled, 
       {canCreate ? <div className="erp-payment-method-input__popup-actions"><Button type="link" onMouseDown={(event) => event.preventDefault()} onClick={() => openManager(newName)}>新增并选用「{newName}」</Button></div> : null}
     </>
   ), [canCreate, newName, openManager, result.hasMore, status])
-  const options = useMemo(() => buildPaymentMethodOptions(result.scope === scope ? result.methods : [], keyword).map((option) => option.isNew ? { ...option, label: <div className="erp-payment-method-input__new-option"><span>仅本次使用「{option.value}」</span><Typography.Text type="secondary">{currentResult && result.keywordInactive ? '此方式已停用；保存不会重新启用' : '随当前记录保存，不加入公司共用选项'}</Typography.Text></div> } : option), [currentResult, keyword, result, scope])
+  const options = useMemo(() => buildPaymentMethodOptions(result.scope === scope ? result.methods : [], keyword), [keyword, result, scope])
   const changed = (change) => {
     setRetry((previous) => previous + 1)
     if (change.type === 'delete') setRenameOffer((previous) => previous?.id === change.before.id ? null : previous)
@@ -106,35 +106,37 @@ export default function PaymentMethodInput({ value, onChange, onBlur, disabled, 
   }
   const managerElement = canManage && manager?.scope === scope ? <PaymentMethodManager key={scope} initialName={manager.name} onClose={() => { restoreFocus.current = true; setManager(null) }} onChanged={changed} onCreated={onChange ? (item) => { onChange(item.method); setKeyword('') } : undefined} /> : null
 
-  if (managementOnly) return <>{canManage ? <Button disabled={disabled} onClick={() => openManager()}>付款方式</Button> : null}{managerElement}</>
+  if (managementOnly) return <>{canManage ? <Button disabled={disabled} onClick={() => openManager()}>管理付款方式</Button> : null}{managerElement}</>
 
   return (
     <div className="erp-payment-method-input">
-      <AutoComplete
+      <Select
         {...props}
         ref={control}
         className={['erp-payment-method-input__control', props.className].filter(Boolean).join(' ')}
         allowClear
-        autoComplete="off"
         disabled={disabled}
         filterOption={false}
-        maxLength={128}
+        showSearch
+        searchValue={keyword}
+        notFoundContent={status === 'loading' ? null : '没有匹配的公司共用付款方式'}
         open={open && !disabled}
         options={options}
         placeholder={placeholder}
+        popupMatchSelectWidth
         suffixIcon={<DownOutlined />}
         value={value}
-        onChange={onChange}
-        onSearch={setKeyword}
+        onChange={(next) => { onChange?.(next ?? ''); setKeyword('') }}
+        onSearch={(next) => setKeyword(next.slice(0, 128))}
         onInputKeyDown={(event) => { props.onInputKeyDown?.(event); if (event.key === 'Escape' && open && !event.nativeEvent?.isComposing) { event.preventDefault(); setOpen(false) } }}
         onFocus={() => { setKeyword(''); setOpen(true) }}
         onOpenChange={setOpen}
-        onBlur={(event) => { setOpen(false); onBlur?.(event) }}
+        onBlur={(event) => { setOpen(false); setKeyword(''); onBlur?.(event) }}
         popupRender={renderPopup}
       />
-      {!registerManagement && canManage ? <Button type="link" disabled={disabled} onClick={() => openManager()}>维护选项</Button> : null}
+      {!registerManagement && canManage ? <Button type="link" disabled={disabled} onClick={() => openManager()}>管理付款方式</Button> : null}
       {renameOffer?.scope === scope && value === renameOffer.before ? <Space className="erp-payment-method-input__rename" wrap role="status"><span>选项已改名为「{renameOffer.after}」，当前记录保留原值。</span><Button size="small" disabled={disabled} onClick={() => { onChange?.(renameOffer.after); setRenameOffer(null) }}>本单也使用新名称</Button><Button size="small" onClick={() => setRenameOffer(null)}>保留原值</Button></Space> : null}
-      {status === 'error' && result.scope === scope ? <Space className="erp-payment-method-input__error" wrap role="status"><Typography.Text type="secondary">付款方式读取失败，仍可直接输入</Typography.Text><Button size="small" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => { control.current?.focus(); setOpen(true); setRetry((current) => current + 1) }}>重试</Button></Space> : null}
+      {status === 'error' && result.scope === scope ? <Space className="erp-payment-method-input__error" wrap role="status"><Typography.Text type="secondary">付款方式读取失败，请重试</Typography.Text><Button size="small" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => { control.current?.focus(); setOpen(true); setRetry((current) => current + 1) }}>重试</Button></Space> : null}
       {managerElement}
     </div>
   )

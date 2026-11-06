@@ -477,7 +477,7 @@ func (r *salesOrderRepo) generateMaterialPurchaseOrders(ctx context.Context, cli
 			return err
 		}
 		lines := groups[supplierID]
-		if err := recordPaymentMethodUse(ctx, client, r.data.sqlDialect, s.DefaultPaymentMethod); err != nil {
+		if err := recordPaymentMethodUse(ctx, client, r.data.sqlDialect, s.DefaultPaymentMethod, nil); err != nil {
 			return err
 		}
 		po, err := client.PurchaseOrder.Create().SetEngineeringMaterialRequestID(request.ID).SetPurchaseOrderNo(fmt.Sprintf("PO-MR-%d-%d", request.ID, supplierID)).SetSupplierID(supplierID).SetCurrency("CNY").SetPaymentTermDays(s.DefaultPaymentTermDays).SetNillablePaymentMethod(s.DefaultPaymentMethod).SetNillableInvoiceRequired(s.DefaultInvoiceRequired).SetNillableInvoiceCategory(s.DefaultInvoiceCategory).SetSupplierSnapshot(map[string]any{"name": s.Name, "code": s.Code}).SetPurchaseDate(time.Now()).SetLifecycleStatus(biz.PurchaseOrderStatusApproved).SetNote("工程用料审批：" + request.OrderNo).Save(ctx)

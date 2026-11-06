@@ -53,7 +53,7 @@ func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrde
 		return nil, err
 	}
 	defer tx.rollback(ctx, r.log)
-	if err := recordPaymentMethodUse(ctx, tx.Client, r.data.sqlDialect, in.PaymentMethod); err != nil {
+	if err := recordPaymentMethodUse(ctx, tx.Client, r.data.sqlDialect, in.PaymentMethod, nil); err != nil {
 		return nil, err
 	}
 	goodsAmount, taxAmount, orderTotal, err := biz.CalculateSalesOrderAmounts(
@@ -112,7 +112,14 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 		return nil, err
 	}
 	defer tx.rollback(ctx, r.log)
-	if err := recordPaymentMethodUse(ctx, tx.Client, r.data.sqlDialect, in.PaymentMethod); err != nil {
+	previous, err := tx.SalesOrder.Get(ctx, id)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrSalesOrderNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := recordPaymentMethodUse(ctx, tx.Client, r.data.sqlDialect, in.PaymentMethod, previous.PaymentMethod); err != nil {
 		return nil, err
 	}
 	amounts, err := salesOrderOpenItemAmounts(ctx, tx.Client, id)
@@ -1177,7 +1184,18 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			tx.rollback(ctx, r.log)
 		}
 	}()
-	if err := recordPaymentMethodUse(ctx, tx.Client, r.data.sqlDialect, in.PaymentMethod); err != nil {
+	var previousMethod *string
+	if id > 0 {
+		previous, err := tx.SalesOrder.Get(ctx, id)
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderNotFound
+		}
+		if err != nil {
+			return nil, err
+		}
+		previousMethod = previous.PaymentMethod
+	}
+	if err := recordPaymentMethodUse(ctx, tx.Client, r.data.sqlDialect, in.PaymentMethod, previousMethod); err != nil {
 		return nil, err
 	}
 

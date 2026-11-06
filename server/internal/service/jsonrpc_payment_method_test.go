@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
 	"strings"
@@ -73,6 +74,7 @@ func TestJSONRPCPaymentMethodManagementPermissionAndContract(t *testing.T) {
 		{name: "reader", permissions: []string{biz.PermissionCustomerRead}, want: errcode.PermissionDenied.Code},
 		{name: "customer config denies", role: biz.SalesRoleKey, permissions: []string{biz.PermissionPaymentMethodManage}, want: errcode.PermissionDenied.Code},
 		{name: "manager", permissions: []string{biz.PermissionPaymentMethodManage}, want: errcode.OK.Code},
+		{name: "delete without maintenance", permissions: []string{biz.PermissionPaymentMethodDelete}, want: errcode.PermissionDenied.Code},
 		{name: "super admin", super: true, want: errcode.OK.Code},
 		{name: "disabled", permissions: []string{biz.PermissionPaymentMethodManage}, disabled: true, want: errcode.AdminDisabled.Code},
 	} {
@@ -89,11 +91,22 @@ func TestJSONRPCPaymentMethodManagementPermissionAndContract(t *testing.T) {
 			d := newMasterDataJSONRPCTestData(t, base, admin)
 			d.masterDataUC = biz.NewMasterDataUsecase(repo)
 			for _, method := range []string{"list_payment_method_options", "create_payment_method", "update_payment_method", "delete_payment_method"} {
+				want := tc.want
+				if method == "delete_payment_method" && want == errcode.OK.Code && !tc.super {
+					want = errcode.PermissionDenied.Code
+				}
+				before := repo.calls
 				_, res, err := d.handleMasterData(ctx, method, "catalogue", mustJSONRPCStruct(t, map[string]any{"id": 1, "method": " aa ", "is_active": false, "expected_version": 1, "keyword": "aa", "operator_id": 999}))
-				if err != nil || res.Code != tc.want {
+				if err != nil || res.Code != want {
 					t.Fatalf("%s: %+v %v", method, res, err)
 				}
-				if tc.want == errcode.OK.Code && method != "list_payment_method_options" && repo.audit.Payload["actor"].(map[string]any)["id"] != admin.ID {
+				if want != errcode.OK.Code && repo.calls != before {
+					t.Fatal("denied action reached repository")
+				}
+				if want == errcode.OK.Code && method == "list_payment_method_options" && res.Data.AsMap()["can_delete"] != tc.super {
+					t.Fatal("delete access must be returned by the backend")
+				}
+				if want == errcode.OK.Code && method != "list_payment_method_options" && repo.audit.Payload["actor"].(map[string]any)["id"] != admin.ID {
 					t.Fatal("client forged actor")
 				}
 			}
@@ -107,6 +120,29 @@ func TestJSONRPCPaymentMethodManagementPermissionAndContract(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestJSONRPCPaymentMethodDeletionKeepsUsedItemAndVersionGuards(t *testing.T) {
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Role: biz.RoleAdmin})
+	base := &stubMasterDataJSONRPCRepo{}
+	repo := &paymentMethodJSONRPCRepo{stubMasterDataJSONRPCRepo: base}
+	admin := workflowJSONRPCAdmin(nil)
+	admin.IsSuperAdmin = true
+	d := newMasterDataJSONRPCTestData(t, base, admin)
+	d.masterDataUC = biz.NewMasterDataUsecase(repo)
+	for _, entry := range []struct {
+		err  error
+		code int32
+	}{
+		{biz.ErrPaymentMethodInUse, errcode.BusinessRuleViolation.Code},
+		{biz.ErrPaymentMethodVersionConflict, errcode.ResourceVersionConflict.Code},
+	} {
+		repo.err = entry.err
+		_, res, err := d.handleMasterData(ctx, "delete_payment_method", "delete", mustJSONRPCStruct(t, map[string]any{"id": 1, "expected_version": 1}))
+		if err != nil || res.Code != entry.code {
+			t.Fatalf("delete guard: %+v %v", res, err)
+		}
 	}
 }
 
@@ -177,6 +213,15 @@ func TestJSONRPCPaymentMethodRejectsMalformedAndMapsLifecycleErrors(t *testing.T
 		_, res, err := d.handleMasterData(ctx, "update_payment_method", "failed", mustJSONRPCStruct(t, map[string]any{"id": 1, "method": "aa", "is_active": false, "expected_version": 1}))
 		if err != nil || res.Code != entry.code || strings.Contains(res.Message, "internal SQL") {
 			t.Fatalf("error mapping: %+v %v", res, err)
+		}
+	}
+}
+
+func TestPaymentMethodSelectionErrorAcrossDocumentWriters(t *testing.T) {
+	d := &jsonrpcDispatcher{}
+	for _, result := range []*v1.JsonrpcResult{d.mapMasterDataError(context.Background(), biz.ErrPaymentMethodUnavailable), d.salesOrderErrorResult(context.Background(), biz.ErrPaymentMethodUnavailable), d.purchaseOrderErrorResult(context.Background(), biz.ErrPaymentMethodUnavailable)} {
+		if result == nil || result.Code != errcode.BusinessRuleViolation.Code || !strings.Contains(result.Message, "公司共用付款方式") {
+			t.Fatal("directory validation must be actionable across document writers")
 		}
 	}
 }

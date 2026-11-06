@@ -59,7 +59,8 @@ export default function BOMMaterialCreateModal({
       dirty={dirty}
       title="新建物料并使用"
       className="erp-bom-material-create-modal"
-      description="厂商、料号、色号、规格和单位在这里维护一次，部位和用量在材料明细表填写。"
+      description="保存后建立共用物料档案，并带回当前物料行。"
+      width={800}
       onOk={save}
       okText="新建并使用"
       onCancel={saving ? undefined : onCancel}
@@ -78,6 +79,7 @@ export default function BOMMaterialCreateModal({
         <MasterDataFormFields
           form={form}
           type="materials"
+          compact
           unitOptions={unitOptions}
         />
       </BusinessForm>
