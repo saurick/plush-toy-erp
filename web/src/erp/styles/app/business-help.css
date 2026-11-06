@@ -210,24 +210,6 @@
   gap: 2px;
 }
 
-.erp-business-inline-help-trigger.ant-btn {
-  width: max(28px, var(--erp-touch-target, 0px));
-  min-width: max(28px, var(--erp-touch-target, 0px));
-  height: max(28px, var(--erp-touch-target, 0px));
-  padding: 0;
-  color: var(--erp-text-muted, #64748b);
-}
-
-.erp-business-inline-help-trigger.ant-btn:hover,
-.erp-business-inline-help-trigger.ant-btn:focus-visible {
-  color: var(--erp-primary, #2b8a3e);
-  background: var(--erp-interactive-bg-hover, #edf7ef);
-}
-
-.erp-business-inline-help-popover {
-  max-width: min(420px, calc(100vw - 32px));
-}
-
 .erp-business-inline-help-popover .erp-business-help-explanation {
   border: 0;
   background: transparent;

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
-  QuestionCircleOutlined,
   ReloadOutlined,
   SaveOutlined,
 } from '@ant-design/icons'
@@ -12,13 +11,12 @@ import {
   Form,
   InputNumber,
   Radio,
-  Popover,
   Space,
   Switch,
   Tag,
-  Tooltip,
   Typography,
 } from 'antd'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
@@ -91,15 +89,7 @@ function approvalColumnTitle(label, help, ariaLabel) {
   return (
     <Space size={4}>
       <span>{label}</span>
-      <Tooltip title={help} trigger={['hover', 'focus']}>
-        <Button
-          type="text"
-          shape="circle"
-          size="small"
-          icon={<QuestionCircleOutlined aria-hidden="true" />}
-          aria-label={ariaLabel}
-        />
-      </Tooltip>
+      <SupplementalHelp label={label} aria-label={ariaLabel} content={help} />
     </Space>
   )
 }
@@ -999,9 +989,10 @@ export default function ApprovalResponsibilityPanel({
                       ? '有未生效调整'
                       : '已生效'}
               </Tag>
-              <Popover
+              <SupplementalHelp
+                label="审批责任"
+                aria-label="审批责任说明"
                 placement="bottomRight"
-                trigger={['hover', 'focus', 'click']}
                 content={
                   <div className="erp-approval-responsibility__help">
                     <Text strong>这里设置何时审批、由谁审批</Text>
@@ -1016,14 +1007,7 @@ export default function ApprovalResponsibilityPanel({
                     </Text>
                   </div>
                 }
-              >
-                <Button
-                  type="text"
-                  shape="circle"
-                  icon={<QuestionCircleOutlined />}
-                  aria-label="审批责任说明"
-                />
-              </Popover>
+              />
             </Space>
           </div>
 

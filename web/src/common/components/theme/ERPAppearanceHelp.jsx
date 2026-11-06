@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { InfoCircleOutlined } from '@ant-design/icons'
-import { Button, Popover, theme } from 'antd'
+import React from 'react'
+import SupplementalHelp from '../help/SupplementalHelp'
 import './erpAppearanceHelp.css'
 
 const helpText = {
@@ -84,136 +83,18 @@ export function ERPAppearanceHelpContent({ kind }) {
 
 export default function ERPAppearanceHelp({ kind, open, onOpenChange }) {
   const { label } = helpText[kind]
-  const { token } = theme.useToken()
-  const id = useId()
-  const triggerRef = useRef(null)
-  const contentRef = useRef(null)
-  const pinned = useRef(false)
-  const restoringFocus = useRef(false)
-  // Escape 后的焦点恢复不能立即重开；新的悬停、点按或键盘输入才解除。
-  const explicitlyClosed = useRef(false)
-  const [layout, setLayout] = useState({ placement: 'rightTop', maxHeight: 400, shiftX: 0, narrow: false })
-
-  const updateLayout = useCallback(() => {
-    const box = triggerRef.current?.getBoundingClientRect()
-    if (!box) return
-    const narrow = window.innerWidth <= 767
-    const below = window.innerHeight - box.bottom - 16
-    const above = box.top - 16
-    const placement = narrow ? (below >= above ? 'bottom' : 'top') : 'rightTop'
-    const maxHeight = Math.max(80, Math.min(400, (narrow ? Math.max(above, below) : window.innerHeight - 48) - 64))
-    const popupWidth = Math.min(380, window.innerWidth - 32)
-    const centeredLeft = box.left + box.width / 2 - popupWidth / 2
-    const shiftX = narrow ? Math.max(16, Math.min(window.innerWidth - popupWidth - 16, centeredLeft)) - centeredLeft : 0
-    setLayout((previous) => previous.placement === placement && previous.maxHeight === maxHeight && previous.shiftX === shiftX && previous.narrow === narrow ? previous : { placement, maxHeight, shiftX, narrow })
-  }, [])
-  const changeOpen = (nextOpen) => {
-    if (nextOpen) updateLayout()
-    onOpenChange(nextOpen)
-  }
-
-  useLayoutEffect(() => {
-    if (!open) {
-      pinned.current = false
-      return undefined
-    }
-    updateLayout()
-    window.addEventListener('resize', updateLayout)
-    window.addEventListener('scroll', updateLayout, true)
-    return () => {
-      window.removeEventListener('resize', updateLayout)
-      window.removeEventListener('scroll', updateLayout, true)
-    }
-  }, [open, updateLayout])
-
-  useEffect(() => {
-    if (!open) return undefined
-    const outside = (event) => {
-      if (triggerRef.current?.contains(event.target) || contentRef.current?.closest('.ant-popover')?.contains(event.target)) return
-      pinned.current = false
-      onOpenChange(false)
-    }
-    const escape = (event) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      event.stopPropagation()
-      explicitlyClosed.current = true
-      pinned.current = false
-      if (contentRef.current?.contains(document.activeElement)) {
-        restoringFocus.current = true
-        triggerRef.current?.focus({ preventScroll: true })
-        restoringFocus.current = false
-      }
-      onOpenChange(false)
-    }
-    document.addEventListener('pointerdown', outside, true)
-    document.addEventListener('keydown', escape, true)
-    return () => {
-      document.removeEventListener('pointerdown', outside, true)
-      document.removeEventListener('keydown', escape, true)
-    }
-  }, [open, onOpenChange])
-
   return (
-    <Popover
-      open={open}
-      trigger="hover"
-      destroyOnHidden
-      placement={layout.placement}
-      align={layout.narrow ? {
-        offset: [layout.shiftX, (token.marginXXS + token.sizePopupArrow / 2) * (layout.placement === 'top' ? -1 : 1)],
-      } : undefined}
-      classNames={{ root: 'erp-appearance-help-popover' }}
+    <SupplementalHelp
+      label={label}
       title={label}
-      onOpenChange={(nextOpen) => {
-        if (nextOpen && explicitlyClosed.current) return
-        if (!nextOpen && (pinned.current || contentRef.current?.contains(document.activeElement))) return
-        changeOpen(nextOpen)
-      }}
-      content={
-        <div ref={contentRef} id={id} className="erp-appearance-help-content" style={{ maxHeight: layout.maxHeight }}>
-          <ERPAppearanceHelpContent kind={kind} />
-        </div>
-      }
-    >
-      <Button
-        ref={triggerRef}
-        type="text"
-        size="small"
-        className="erp-appearance-help-trigger"
-        icon={<InfoCircleOutlined />}
-        aria-label={`查看${label}说明`}
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
-        onMouseEnter={() => { explicitlyClosed.current = false }}
-        onPointerDown={() => { explicitlyClosed.current = false }}
-        onFocus={(event) => {
-          if (!restoringFocus.current && event.currentTarget.matches(':focus-visible')) {
-            explicitlyClosed.current = false
-            changeOpen(true)
-          }
-        }}
-        onBlur={(event) => {
-          explicitlyClosed.current = false
-          if (!contentRef.current?.contains(event.relatedTarget)) {
-            pinned.current = false
-            onOpenChange(false)
-          }
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            explicitlyClosed.current = false
-            event.stopPropagation()
-          }
-        }}
-        onClick={(event) => {
-          event.stopPropagation()
-          const nextOpen = !open || !pinned.current
-          explicitlyClosed.current = !nextOpen
-          pinned.current = nextOpen
-          changeOpen(nextOpen)
-        }}
-      />
-    </Popover>
+      width={380}
+      open={open}
+      onOpenChange={onOpenChange}
+      placement="rightTop"
+      className="erp-appearance-help-trigger"
+      popoverClassName="erp-appearance-help-popover"
+      contentClassName="erp-appearance-help-content"
+      content={<ERPAppearanceHelpContent kind={kind} />}
+    />
   )
 }

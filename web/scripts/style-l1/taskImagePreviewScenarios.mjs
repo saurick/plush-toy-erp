@@ -189,21 +189,21 @@ async function assertPreview(
   await dialog
     .getByRole('button', { name: '关闭图片预览', exact: true })
     .hover()
-  const help = dialog.locator('.erp-task-image-preview__help > summary')
-  assert.equal(await dialog.locator('.erp-task-image-preview__help').getAttribute('open'), null, '看图帮助默认收起')
+  const help = dialog.getByRole('button', { name: '查看看图操作帮助', exact: true })
+  assert.equal(await help.getAttribute('aria-expanded'), 'false', '看图帮助默认收起')
   const footerBeforeHelp = await dialog.locator('.erp-task-image-preview__footer').boundingBox()
   await help.click()
   if (touch) {
-    await dialog
+    await page
       .getByText('双指缩放 · 放大后拖动', { exact: true })
       .waitFor({ state: 'visible' })
   } else {
-    await dialog.getByText('滚轮缩放 · 拖动查看', { exact: true }).waitFor({ state: 'visible' })
+    await page.getByText('滚轮缩放 · 拖动查看', { exact: true }).waitFor({ state: 'visible' })
   }
   const footerWithHelp = await dialog.locator('.erp-task-image-preview__footer').boundingBox()
   assert.ok(Math.abs(footerBeforeHelp.height - footerWithHelp.height) <= 1, '按需帮助不增加底栏高度')
   await help.press('Escape')
-  assert.equal(await dialog.locator('.erp-task-image-preview__help').getAttribute('open'), null)
+  assert.equal(await help.getAttribute('aria-expanded'), 'false')
   assert.equal(await dialog.isVisible(), true, 'Escape 先关闭帮助，保留图片预览')
   await page.screenshot({ path: path.join(outputDir, `${name}-open.png`) })
   assert.equal(

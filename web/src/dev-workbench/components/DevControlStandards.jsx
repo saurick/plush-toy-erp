@@ -26,6 +26,7 @@ import DevUIPaginationExample from './DevUIPaginationExample.jsx'
 import DevUIPageStateExamples from './DevUIPageStateExamples.jsx'
 import { BasicInputExample, DateInputExample, GroupedSelectExample } from './DevUIInputExamples.jsx'
 import DevSelectValueExample from './DevSelectValueExample.jsx'
+import DevSupplementalHelpExample from './DevSupplementalHelpExample.jsx'
 import {
   PROGRESS_SCOPE_OPTIONS,
   progressQueryFromURL,
@@ -175,6 +176,24 @@ const TOPICS = [
     checks: ['修改名称和类别，核对当前结果；输入多行备注，观察字数和高度。', '清空内容，再恢复初始值。', '切换禁用与错误，核对值保留、计数和状态外观。'],
     source: 'antd: Button / Input · BusinessTextArea · common/components/select · common/theme/erpAntdTheme.mjs · erp/styles/app/control-*.css',
     consumer: { ...MATERIAL_PAGE, task: '打开新建或编辑，核对字段输入、选择、清空与禁用；取消返回。' },
+  },
+  {
+    key: 'help',
+    title: '补充说明',
+    summary: '信息图标、悬停、键盘与点按',
+    description: '直接操作统一说明气泡，比较短说明、效果示意与完整页面帮助。',
+    rules: [
+      ['字段、选项、口径与范围', 'ⓘ 补充说明', '悬停或键盘聚焦查看，点击固定；再次点击、外部点击或 Esc 收起，同一时刻只显示一处。'],
+      ['短说明与效果比较', '同一气泡，按内容组织', '短说明只放文字，需要比较时才给示意；查看说明不修改字段或保存外观。'],
+      ['页面帮助与警告', '保留完整帮助和原有反馈', '页面帮助继续打开完整说明，警告保持可见；补充说明的 Esc 不关闭外层弹窗。'],
+    ],
+    checks: [
+      '悬停或 Tab 聚焦备注旁的 ⓘ，点击固定后再点一次收起。',
+      '切换查看密度示意；在弹窗中打开说明，按 Esc，核对弹窗和草稿保留。',
+      '打开页面帮助，核对完整内容；警告不随说明开关隐藏。',
+    ],
+    source: 'SupplementalHelp · BusinessHelpLabel · ERPAppearanceHelp；规范：交互设计说明 #input-hints',
+    consumer: { ...TASK_PAGE, task: '在任务详情查看进度或处理记录的范围说明，再核对字段说明、完整页面帮助和原有警告。' },
   },
   {
     key: 'grouped-select',
@@ -871,7 +890,9 @@ export default function DevControlStandards() {
                   workbench
                   className="erp-control-library-stage"
                 >
-                  {current.key === 'counts' ? (
+                  {current.key === 'help' ? (
+                    <DevSupplementalHelpExample />
+                  ) : current.key === 'counts' ? (
                     <CountExample />
                   ) : current.key === 'feedback' ? (
                     <DevUIFeedbackExamples />

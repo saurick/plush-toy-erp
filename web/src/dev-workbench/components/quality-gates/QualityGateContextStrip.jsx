@@ -1,6 +1,6 @@
 import React from 'react'
-import { InfoCircleOutlined } from '@ant-design/icons'
-import { Button, Popover, Tag } from 'antd'
+import { Button, Tag } from 'antd'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import { WorkbenchFacts, WorkbenchNotice, WorkbenchSection } from '../WorkbenchPattern.jsx'
 import DevTimestamp from '../DevTimestamp.jsx'
 import { getQualityGateStatusMeta } from '../../config/devQualityGates.mjs'
@@ -48,9 +48,7 @@ export function ContextStrip({
         ]}
         />
         {flat && !blocked ? (
-          <Popover content={notice} trigger="click" placement="bottomLeft" classNames={{ root: 'erp-dev-quality-context-help' }}>
-            <Button type="text" size="small" icon={<InfoCircleOutlined aria-hidden="true" />} aria-label="工作区判断依据" />
-          </Popover>
+          <SupplementalHelp label="工作区判断依据" aria-label="工作区判断依据" width={620} content={notice} placement="bottomLeft" popoverClassName="erp-dev-quality-context-help" />
         ) : null}
         {view !== 'run' && summary?.currentOperation?.profile === 'strict' ? (
           <Button type="link" onClick={onReturnLocal}>

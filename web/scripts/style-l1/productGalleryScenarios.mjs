@@ -220,7 +220,7 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
         assert.equal(await buttons.count(), 8)
         const footer = page.locator('.erp-task-image-preview__footer')
         const height = (await footer.boundingBox()).height
-        const help = page.locator('.erp-task-image-preview__help > summary')
+        const help = page.getByRole('button', { name: '查看看图操作帮助', exact: true })
         await help.click()
         await page.getByText(viewport.width <= 600 ? '双指缩放 · 放大后拖动' : '滚轮缩放 · 拖动查看', { exact: true }).waitFor({ state: 'visible' })
         assert.ok(Math.abs((await footer.boundingBox()).height - height) <= 1)

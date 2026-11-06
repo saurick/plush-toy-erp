@@ -3,7 +3,6 @@ import { Alert, Button, Popover, Spin, Tag } from 'antd'
 import {
   ArrowRightOutlined,
   FilterOutlined,
-  InfoCircleOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
@@ -11,6 +10,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
@@ -378,8 +378,9 @@ export default function BusinessDashboardPage() {
                   筛选{filterCount ? ` · ${filterCount}` : ''}
                 </Button>
               </Popover>
-              <Popover
-                trigger="click"
+              <SupplementalHelp
+                label="进度计算"
+                aria-label="查看进度计算说明"
                 title="进度如何计算"
                 content={
                   <div className="erp-progress-help">
@@ -394,13 +395,7 @@ export default function BusinessDashboardPage() {
                     </p>
                   </div>
                 }
-              >
-                <Button
-                  type="text"
-                  icon={<InfoCircleOutlined />}
-                  aria-label="查看进度计算说明"
-                />
-              </Popover>
+              />
               <div className="erp-progress-freshness">
                 {data
                   ? `更新于 ${dayjs(data.snapshot_at).format('HH:mm')}`

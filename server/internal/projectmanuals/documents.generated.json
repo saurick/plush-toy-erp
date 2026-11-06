@@ -3,7 +3,7 @@
     "id": "handbook:start",
     "book": "business",
     "title": "开始使用",
-    "source_hash": "46df2d6136848432020e28f8105f178025a3fca88f0107c15ce891f72ad10a56",
+    "source_hash": "4bc97b9e06882aefbc4f60d6c9541f8028eb07dd7bbe240dde8969bf10116a6d",
     "path": "",
     "roles": [],
     "supplement": true
@@ -30,7 +30,7 @@
     "id": "handbook:entry",
     "book": "business",
     "title": "填写、保存与状态",
-    "source_hash": "210a2ac9d8909e30c0bb903a166aec789c3db41d8adb8eb0dfb50d1b7e62b12a",
+    "source_hash": "253b1a564095efda2a472ff6ace99228accdaf6dd23d3c404c95d08603bf84df",
     "path": "",
     "roles": [],
     "supplement": true

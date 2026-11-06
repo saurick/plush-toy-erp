@@ -121,6 +121,7 @@ import { createFormDensityScenarios } from './formDensityScenarios.mjs'
 import { createTableDensityScenarios } from './tableDensityScenarios.mjs'
 import { createTableLinesScenarios } from './tableLinesScenarios.mjs'
 import { createAccountAppearanceScenarios } from './accountAppearanceScenarios.mjs'
+import { createSupplementalHelpScenarios } from './supplementalHelpScenarios.mjs'
 import { createBusinessFormDisplayScenarios } from './businessFormDisplayScenarios.mjs'
 import { createDevWorkbenchThemeScenarios } from './devWorkbenchThemeScenarios.mjs'
 import { createDevWorkbenchThemeAuditScenarios } from './devWorkbenchThemeAuditScenarios.mjs'
@@ -432,6 +433,7 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
     ...createTableLinesScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createSupplementalHelpScenarios({ customerRuntimeEffectiveSession, outputDir }),
     ...createAccountAppearanceScenarios({
       ...deps,
       customerRuntimeEffectiveSession,

@@ -7,7 +7,7 @@ import {
   Tag,
 } from 'antd'
 import React, { useState } from 'react'
-import { QuestionCircleOutlined } from '@ant-design/icons'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
@@ -184,22 +184,16 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
       <div className="erp-role-effective-access__summary">
         <div className="erp-role-effective-access__source">
           <Text type="secondary">{sourceLabel}</Text>
-          <Popover
+          <SupplementalHelp
+            label="页面访问"
+            aria-label="页面访问说明"
             title="页面访问说明"
             content={
               <div className="erp-permission-help">
                 岗位授权与公司启用范围共同决定能否进入页面；页面内的操作还会单独校验。
               </div>
             }
-            trigger={['hover', 'focus', 'click']}
-          >
-            <Button
-              type="text"
-              size="small"
-              icon={<QuestionCircleOutlined />}
-              aria-label="页面访问说明"
-            />
-          </Popover>
+          />
           {access?.is_preview === true ? (
             <Text type="secondary">当前调整保存后生效</Text>
           ) : null}

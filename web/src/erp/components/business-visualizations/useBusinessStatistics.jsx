@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Popover, Tag, Tooltip } from 'antd'
-import { ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { Alert, Button, Tag, Tooltip } from 'antd'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
@@ -425,8 +426,9 @@ export default function useBusinessStatistics({
           options={reportOptions}
           onChange={switchReport}
         />
-        <Popover
-          trigger="click"
+        <SupplementalHelp
+          label="统计口径"
+          aria-label="查看统计口径"
           title="统计口径"
           content={
             <div className="erp-statistics-help">
@@ -448,13 +450,7 @@ export default function useBusinessStatistics({
               </p>
             </div>
           }
-        >
-          <Button
-            type="text"
-            icon={<InfoCircleOutlined />}
-            aria-label="查看统计口径"
-          />
-        </Popover>
+        />
       </div>
       {!ages && (
         <>

@@ -19,7 +19,7 @@ export default function WorkflowTaskScopeHelp({ kind, orderView = false, scope =
             <Button
               type="text"
               size="small"
-              className="erp-business-inline-help-trigger"
+              className="erp-supplemental-help-dismiss"
               icon={<CloseOutlined aria-hidden="true" />}
               aria-label={`关闭${label}说明`}
               onClick={(event) => { event.stopPropagation(); closeHelp() }}

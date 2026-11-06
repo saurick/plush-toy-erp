@@ -184,12 +184,14 @@ test('businessUsabilityCatalog: 专属与共享页面都接入同一页内帮助
   )
 })
 
-test('businessUsabilityCatalog: 关键字段问号可悬停、聚焦和点击且移动弹窗可滚动并恢复焦点', () => {
+test('businessUsabilityCatalog: 关键字段说明复用共享气泡且页面帮助保留完整弹窗', () => {
   const componentSource = read(
     'web/src/erp/components/help/BusinessContextHelp.jsx'
   )
-  assert.match(componentSource, /trigger=\{description \? 'click' : \['hover', 'click'\]\}/u)
-  assert.match(componentSource, /onFocus=/u)
+  assert.match(componentSource, /<SupplementalHelp/u)
+  const sharedHelp = read('web/src/common/components/help/SupplementalHelp.jsx')
+  assert.match(sharedHelp, /trigger="hover"/u)
+  assert.match(sharedHelp, /onFocus=/u)
   assert.match(componentSource, /aria-label=\{`查看\$\{label\}说明`\}/u)
   assert.match(componentSource, /focusTriggerAfterClose/u)
   assert.match(componentSource, /keyboard/u)

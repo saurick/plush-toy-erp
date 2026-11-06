@@ -121,6 +121,9 @@
   gap: 8px;
   padding: 10px 12px 8px;
 }
+.erp-statistics-result-head > .ant-select {
+  min-width: 120px;
+}
 .erp-statistics-result-head > strong {
   min-width: 0;
   overflow: hidden;

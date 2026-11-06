@@ -5,12 +5,12 @@ import {
   LeftOutlined,
   RightOutlined,
   PictureOutlined,
-  QuestionCircleOutlined,
   ReloadOutlined,
   ZoomInOutlined,
   ZoomOutOutlined,
 } from '@ant-design/icons'
 import { Image, Spin } from 'antd'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import { useOverlayContainer, useOverlayDialog } from '@/common/components/overlay/ScopedOverlayDialog.jsx'
 import { canRestoreOverlayFocus } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import './workflowTaskImagePreview.css'
@@ -249,23 +249,22 @@ export default function WorkflowTaskImagePreview({
                         <ZoomInOutlined aria-hidden="true" />
                       </button>
                     </div>
-                    <details
+                    <SupplementalHelp
+                      label="看图操作"
+                      aria-label="查看看图操作帮助"
+                      title="看图操作"
+                      width={300}
+                      placement="topRight"
                       className="erp-task-image-preview__help"
-                      onKeyDownCapture={(event) => {
-                        if (event.key === 'Escape' && event.currentTarget.open) {
-                          event.preventDefault()
-                          event.stopPropagation()
-                          event.currentTarget.open = false
-                        }
-                      }}
-                    >
-                      <summary aria-label="查看看图操作帮助"><QuestionCircleOutlined aria-hidden="true" /></summary>
-                      <div className="erp-task-image-preview__help-content">
-                        <span className="erp-task-image-preview__hint erp-task-image-preview__hint--mouse">滚轮缩放 · 拖动查看</span>
-                        <span className="erp-task-image-preview__hint erp-task-image-preview__hint--touch">双指缩放 · 放大后拖动</span>
-                        <span>Esc 关闭说明，再按退出预览</span>
-                      </div>
-                    </details>
+                      contentClassName="erp-task-image-preview__help-content"
+                      content={(
+                        <>
+                          <span className="erp-task-image-preview__hint erp-task-image-preview__hint--mouse">滚轮缩放 · 拖动查看</span>
+                          <span className="erp-task-image-preview__hint erp-task-image-preview__hint--touch">双指缩放 · 放大后拖动</span>
+                          <span>Esc 关闭说明，再按退出预览</span>
+                        </>
+                      )}
+                    />
                   </div>
                 </div>
               </>,

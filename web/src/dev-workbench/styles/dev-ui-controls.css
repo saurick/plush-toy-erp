@@ -441,3 +441,22 @@
   flex-wrap: wrap;
   gap: 16px;
 }
+.erp-supplemental-help-example {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-supplemental-help-example__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.erp-supplemental-help-example__examples,
+.erp-supplemental-help-example__examples > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

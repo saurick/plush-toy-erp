@@ -221,7 +221,19 @@ export function createTaskFlowRecordScenarios({
             await trigger.click()
             await help.waitFor()
             await help.getByRole('button', { name: `关闭${label}说明`, exact: true }).focus()
-            await detail.getByRole('heading', { name: task.task_name, exact: true }).click()
+            const outside = await detail.evaluate((node) => {
+              const popup = document.querySelector('.erp-supplemental-help-popover:not(.ant-popover-hidden)')
+              const box = node.getBoundingClientRect()
+              for (let y = Math.max(16, box.top + 12); y < Math.min(innerHeight - 16, box.bottom); y += 32) {
+                for (const x of [Math.max(16, box.left + 12), (box.left + box.right) / 2]) {
+                  const hit = document.elementFromPoint(x, y)
+                  if (hit && node.contains(hit) && !popup?.contains(hit) && !hit.closest('button, a, input, summary, select, textarea, [role="button"]')) return { x, y }
+                }
+              }
+              throw new Error('任务详情中没有可用于收起说明的可见背景')
+            })
+            if (mobile) await page.touchscreen.tap(outside.x, outside.y)
+            else await page.mouse.click(outside.x, outside.y)
             await help.waitFor({ state: 'hidden' })
             assert.equal(await detail.isVisible(), true, '点击说明外的任务内容只关闭说明')
           }

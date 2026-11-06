@@ -1873,16 +1873,6 @@
   }
 }
 
-.erp-permission-help-trigger.ant-btn {
-  color: var(--erp-text-muted);
-}
-
-.erp-permission-help-trigger.ant-btn:hover,
-.erp-permission-help-trigger.ant-btn:focus-visible {
-  color: var(--erp-text);
-  background: var(--erp-interactive-bg-hover);
-}
-
 .erp-permission-help {
   display: grid;
   gap: 8px;

@@ -1,29 +1,3 @@
-.erp-appearance-help-trigger.ant-btn {
-  flex: none;
-  width: max(28px, var(--erp-touch-target, 0px));
-  min-width: max(28px, var(--erp-touch-target, 0px));
-  height: max(28px, var(--erp-touch-target, 0px));
-  padding: 0;
-  color: var(--erp-text-muted);
-}
-
-.erp-appearance-help-trigger.ant-btn:hover,
-.erp-appearance-help-trigger.ant-btn:focus-visible {
-  color: var(--erp-primary);
-  background: var(--erp-interactive-bg-hover);
-}
-
-.erp-appearance-help-popover {
-  width: min(380px, calc(100vw - 32px));
-  max-width: calc(100vw - 32px);
-}
-
-.erp-appearance-help-content {
-  overflow: auto;
-  overscroll-behavior: contain;
-  color: var(--erp-text);
-}
-
 .erp-appearance-help-compare {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

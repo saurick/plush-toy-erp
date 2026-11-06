@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { InfoCircleOutlined, QuestionCircleOutlined } from '@ant-design/icons'
-import { Button, Popover, Tag, Typography } from 'antd'
+import React, { useRef, useState } from 'react'
+import { QuestionCircleOutlined } from '@ant-design/icons'
+import { Button, Tag, Typography } from 'antd'
 import Link from '../business-list/BusinessLink.jsx'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import { getHelpCenterHref } from '../../config/helpManualCatalog.mjs'
 import { getBusinessPageHelpScenario } from '../../config/helpScenarios.mjs'
 import HelpScenarioContent from './HelpScenarioContent.jsx'
@@ -167,131 +168,19 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
 }
 
 export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', description = '', iconOnly = false, renderContent }) {
-  const [open, setOpen] = useState(false)
-  const triggerRef = useRef(null)
-  const contentRef = useRef(null)
-  // 关闭后的焦点恢复与待执行悬停不能重开说明；新输入才解除关闭意图。
-  const explicitlyClosed = useRef(false)
   const item = getBusinessHelpItem(pageKey, itemKey)
-  useEffect(() => {
-    if (!open) return undefined
-    const closeOnEscape = (event) => {
-      if (event.key !== 'Escape' || event.isComposing || !triggerRef.current?.getClientRects().length) return
-      event.preventDefault()
-      event.stopPropagation()
-      explicitlyClosed.current = true
-      triggerRef.current?.focus({ preventScroll: true })
-      setOpen(false)
-    }
-    document.addEventListener('keydown', closeOnEscape, true)
-    return () => document.removeEventListener('keydown', closeOnEscape, true)
-  }, [open])
   if (!item && !description && !renderContent) return iconOnly ? null : label
-  const closeHelp = () => {
-    explicitlyClosed.current = true
-    triggerRef.current?.focus({ preventScroll: true })
-    setOpen(false)
-  }
-
   return (
     <span className="erp-business-help-label">
       {iconOnly ? null : <span>{label}</span>}
-      <Popover
-        destroyOnHidden
-        trigger={description ? 'click' : ['hover', 'click']}
-        open={open}
-        onOpenChange={(nextOpen, event) => {
-          if (nextOpen && explicitlyClosed.current) return
-          if (
-            nextOpen ||
-            event?.type === 'click' ||
-            event?.type === 'mousedown' ||
-            event?.type === 'pointerdown' ||
-            !contentRef.current?.contains(document.activeElement)
-          ) {
-            setOpen(nextOpen)
-          }
-        }}
-        placement="top"
-        classNames={{ root: 'erp-business-inline-help-popover' }}
-        content={
-          <div
-            ref={contentRef}
-            onBlur={(event) => {
-              if (
-                !event.currentTarget.contains(event.relatedTarget) &&
-                event.relatedTarget !== triggerRef.current
-              ) {
-                setOpen(false)
-              }
-            }}
-            onKeyDown={(event) => {
-              if (
-                event.key === 'Escape' ||
-                (event.key === 'Tab' && event.shiftKey)
-              ) {
-                event.preventDefault()
-                event.stopPropagation()
-                if (event.key === 'Escape') closeHelp()
-                else triggerRef.current?.focus()
-              }
-            }}
-          >
-            {renderContent ? renderContent(closeHelp) : description ? <p>{description}</p> : <ExplanationDetails item={item} pageKey={pageKey} />}
-          </div>
-        }
-      >
-        <Button
-          ref={triggerRef}
-          type="text"
-          size="small"
-          className="erp-business-inline-help-trigger"
-          disabled={false}
-          icon={<InfoCircleOutlined />}
-          aria-label={`查看${label}说明`}
-          aria-expanded={open}
-          onMouseEnter={() => { explicitlyClosed.current = false }}
-          onPointerDown={() => { explicitlyClosed.current = false }}
-          onFocus={(event) => {
-            // 键盘聚焦打开说明；触控留给点击，避免同一手势先打开再关闭。
-            if (!explicitlyClosed.current && event.currentTarget.matches(':focus-visible')) setOpen(true)
-          }}
-          onBlur={(event) => {
-            explicitlyClosed.current = false
-            if (!contentRef.current?.contains(event.relatedTarget)) {
-              setOpen(false)
-            }
-          }}
-          onClick={(event) => {
-            const reopen = explicitlyClosed.current
-            explicitlyClosed.current = false
-            if (reopen) setOpen(true)
-            event.stopPropagation()
-          }}
-          onKeyDownCapture={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') explicitlyClosed.current = false
-            if (open && event.key === 'Escape') {
-              event.preventDefault()
-              event.stopPropagation()
-              closeHelp()
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.stopPropagation()
-            } else if (event.key === 'Tab' && !event.shiftKey && open) {
-              const link = contentRef.current?.querySelector('a')
-              if (link) {
-                event.preventDefault()
-                link.focus()
-              }
-            } else if (event.key === 'Escape') {
-              event.stopPropagation()
-              closeHelp()
-            }
-          }}
-        />
-      </Popover>
+      <SupplementalHelp
+        label={label}
+        aria-label={`查看${label}说明`}
+        width={420}
+        className="erp-business-inline-help-trigger"
+        popoverClassName="erp-business-inline-help-popover"
+        renderContent={(closeHelp) => renderContent ? renderContent(closeHelp) : description ? <p>{description}</p> : <ExplanationDetails item={item} pageKey={pageKey} />}
+      />
     </span>
   )
 }

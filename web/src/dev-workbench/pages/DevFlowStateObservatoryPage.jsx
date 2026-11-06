@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
-  InfoCircleOutlined,
   PartitionOutlined,
   DownOutlined,
   ExportOutlined,
@@ -11,12 +10,12 @@ import {
   Button,
   Drawer,
   Dropdown,
-  Popover,
   Space,
   Spin,
   Tag,
 } from 'antd'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { message } from '@/common/utils/antdApp'
 import Modal from '@/common/components/modal/AppModal'
@@ -380,22 +379,16 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
           </Text>
         </div>
         <Space size={8} wrap>
-          <Popover
+          <SupplementalHelp
+            label="搜索范围"
+            aria-label="可以搜什么"
             placement="bottomRight"
-            trigger="click"
             open={searchGuideOpen}
             title="这个框可以搜什么"
             content={searchGuide}
             onOpenChange={setSearchGuideOpen}
-          >
-            <Button
-              icon={<InfoCircleOutlined />}
-              aria-expanded={searchGuideOpen}
-              aria-controls="dev-flow-definition-search-guide"
-            >
-              可以搜什么
-            </Button>
-          </Popover>
+          >可以搜什么
+          </SupplementalHelp>
           <Button onClick={openTaskLookup}>去查真实任务</Button>
         </Space>
       </div>

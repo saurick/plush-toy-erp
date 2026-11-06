@@ -77,9 +77,9 @@
 
 ## 展示说明的按需查看
 
-`BusinessHelpLabel` 优先读取原有岗位帮助条目，也可用 `description` 承载当前组件已有的补充说明；后者点击打开并保持可读，Escape 关闭帮助，不能触发外层表单返回。业务详情只有显式设置 `descriptionInHelp` 才将通用查看教程移到标题帮助，默认继续显示原说明，权限与业务后果不自动隐藏。
+`BusinessHelpLabel` 优先读取原有岗位帮助条目，也可用 `description` 承载当前组件已有的补充说明；两者均通过共享 `SupplementalHelp` 提供 ⓘ、悬停 / 聚焦查看、点击固定及再次点按 / 外部点击 / Escape 收起；Escape 只关闭说明，不能触发外层表单返回。业务详情只有显式设置 `descriptionInHelp` 才将通用查看教程移到标题帮助，默认继续显示原说明，权限与业务后果不自动隐藏。
 
-图解说明通过 `renderContent(closeHelp)` 复用相同的问号、悬停、键盘和点按行为；关闭动作调用 `closeHelp` 并回到问号。任务详情的 [WorkflowTaskScopeHelp](workflow/WorkflowTaskScopeHelp.jsx) 负责解释相关任务、整单进度和两档处理记录的范围，图示只说明查询范围，不读取数据或授予权限。
+图解说明通过 `renderContent(closeHelp)` 复用相同的 ⓘ、悬停、键盘和点按行为；关闭动作调用 `closeHelp` 并回到 ⓘ。任务详情的 [WorkflowTaskScopeHelp](workflow/WorkflowTaskScopeHelp.jsx) 负责解释相关任务、整单进度和两档处理记录的范围，图示只说明查询范围，不读取数据或授予权限。
 
 采购明细通过 `BusinessLineItemsSection.headerActions` 复用现有标题操作区；原手工添加、页脚统计和其他调用方的标题内容保持原合同。
 

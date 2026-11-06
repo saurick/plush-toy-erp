@@ -1,7 +1,6 @@
-import { Typography, Alert, Button, Card, Popover, Tag } from 'antd'
+import { Typography, Alert, Button, Card, Tag } from 'antd'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  QuestionCircleOutlined,
   ReloadOutlined,
   SaveOutlined,
   BankOutlined,
@@ -10,6 +9,7 @@ import {
   FullscreenOutlined,
   FullscreenExitOutlined,
 } from '@ant-design/icons'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import BusinessModal from '../business-list/BusinessModal.jsx'
@@ -773,11 +773,13 @@ export function usePermissionRoleSettings({
                 <div className="erp-role-center-detail__identity">
                   <Title level={5}>{getRoleVisibleName(selectedRole)}</Title>
                   <Text type="secondary">{getRoleTypeLabel(selectedRole)}</Text>
-                  <Popover
+                  <SupplementalHelp
+                    label="菜单与操作"
+                    aria-label="菜单与操作说明"
+                    className="erp-permission-help-trigger"
                     {...popoverProps('help')}
                     placement="bottomRight"
-                    trigger={['hover', 'focus']}
-                    rootClassName="erp-permission-help-popover"
+                    popoverClassName="erp-permission-help-popover"
                     content={
                       <div className="erp-permission-help">
                         <Text strong>菜单与操作</Text>
@@ -803,15 +805,7 @@ export function usePermissionRoleSettings({
                         </Text>
                       </div>
                     }
-                  >
-                    <Button
-                      type="text"
-                      shape="circle"
-                      icon={<QuestionCircleOutlined />}
-                      aria-label="菜单与操作说明"
-                      className="erp-permission-help-trigger"
-                    />
-                  </Popover>
+                  />
                 </div>
                 <div
                   className="erp-role-center-tools"
@@ -991,17 +985,12 @@ export function usePermissionRoleSettings({
                       >
                         岗位导航
                       </Button>
-                      <Popover
+                      <SupplementalHelp
+                        label="页面入口"
+                        aria-label="页面入口说明"
                         {...popoverProps('entry')}
                         content="页面入口按最终可访问范围显示；隐藏菜单不会撤销权限。"
-                        trigger={['hover', 'focus']}
-                      >
-                        <Button
-                          type="text"
-                          icon={<QuestionCircleOutlined />}
-                          aria-label="页面入口说明"
-                        />
-                      </Popover>
+                      />
                     </div>
                   </div>
                 </div>

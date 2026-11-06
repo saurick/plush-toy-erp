@@ -160,10 +160,6 @@
   gap: 12px;
 }
 
-.erp-dev-quality-context-help {
-  max-width: min(620px, calc(100vw - 32px));
-}
-
 .erp-dev-quality-actions__ready.ant-typography {
   color: var(--erp-primary);
 }
