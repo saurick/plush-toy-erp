@@ -60,7 +60,7 @@ export function createWarehouseEntryStabilityScenarios({
                 errors: sample.errors.length,
               })
               if (!loadedAt && sample.frames.at(-1).rowCount === 47)
-                loadedAt = performance.now()
+                { loadedAt = performance.now() }
               if (
                 (loadedAt && performance.now() - loadedAt > 5000) ||
                 performance.now() - start > 24000
@@ -173,10 +173,22 @@ export function createWarehouseEntryStabilityScenarios({
           1
         )
         for (const key of ['header', 'command', 'nav', 'actions', 'table'])
-          assert.ok(
+          { assert.ok(
             variants[key].length <= 1,
             `冷进入后 ${key} 持续抖动: ${JSON.stringify(variants[key])}`
-          )
+          ) }
+        await page.locator('.erp-admin-content').evaluate((element) => { element.scrollTop = 600 })
+        await page.waitForFunction(() => {
+          const toolbar = document.querySelector('.erp-business-toolbar-workspace > .erp-business-operation-panel')
+          const header = document.querySelector('.erp-business-data-table-card--sticky .ant-table-sticky-holder')
+          return toolbar && header && Math.abs(toolbar.getBoundingClientRect().bottom - header.getBoundingClientRect().top) <= 1
+        })
+        const sticky = await page.locator('.erp-business-toolbar-workspace').evaluate((workspace) => {
+          const toolbar = workspace.querySelector('.erp-business-operation-panel')
+          const header = workspace.querySelector('.ant-table-sticky-holder')
+          return { toolbar: toolbar.getBoundingClientRect().toJSON(), header: header.getBoundingClientRect().toJSON() }
+        })
+        await writeFile(path.join(outputDir, 'warehouse-toolbar-sticky-ownership.json'), JSON.stringify(sticky, null, 2))
       },
     },
   ]

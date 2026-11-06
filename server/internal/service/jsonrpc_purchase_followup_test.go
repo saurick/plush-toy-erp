@@ -39,7 +39,7 @@ func TestPurchaseFollowupsRPCEnforcesSourceAndCategoryPermissions(t *testing.T) 
 			d := newPurchaseOrderJSONRPCTestData(t, repo.stubPurchaseOrderJSONRPCRepo, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, tc.permissions...))
 			d.purchaseOrderUC = biz.NewPurchaseOrderUsecase(repo)
 			d.adminManageUC = newAllWarehouseScopeAdminUsecase()
-			_, res, err := d.handlePurchaseOrder(workflowJSONRPCAdminContext(), "list_purchase_followups", "followup", mustJSONRPCStruct(t, map[string]any{"view": "exceptions", "kind": tc.kind}))
+			_, res, err := d.handlePurchaseOrder(workflowJSONRPCAdminContext(), "list_purchase_followups", "followup", mustJSONRPCStruct(t, map[string]any{"kind": tc.kind}))
 			if err != nil || res.Code != tc.want || repo.calls != tc.calls {
 				t.Fatalf("result=%+v err=%v calls=%d", res, err, repo.calls)
 			}

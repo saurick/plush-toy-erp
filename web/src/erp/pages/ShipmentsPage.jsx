@@ -1674,10 +1674,11 @@ export default function ShipmentsPage() {
   }
 
   return (
-    <BusinessPageLayout className="erp-shipments-page">
+    <BusinessPageLayout inWorkspace className="erp-shipments-page">
       <PageHeaderCard compact helpKey="shipments" title="出货单" />
 
       <BusinessOperationPanel
+        inWorkspace
         compact
         onClearFilters={clearFilters}
         activeFilterCount={activeFilterCount}

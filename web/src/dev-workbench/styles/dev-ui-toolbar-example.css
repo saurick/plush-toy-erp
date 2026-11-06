@@ -1,0 +1,69 @@
+.erp-dev-toolbar-example,
+.erp-dev-toolbar-example__page {
+  min-width: 0;
+}
+
+.erp-dev-toolbar-example__page[hidden] {
+  display: none;
+}
+
+.erp-dev-toolbar-example__settings,
+.erp-dev-toolbar-example__legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-dev-toolbar-example__scenario {
+  width: 220px;
+  max-width: 100%;
+}
+
+.erp-dev-toolbar-example__classification {
+  width: 200px;
+  max-width: 100%;
+}
+
+.erp-dev-toolbar-example__explanation,
+.erp-dev-toolbar-example__feedback,
+.erp-dev-toolbar-example__annotations p {
+  margin: 10px 0;
+  color: var(--erp-text-secondary);
+  line-height: 1.6;
+}
+
+.erp-dev-toolbar-example__annotations {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px dashed var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-dev-toolbar-example__part {
+  min-width: 0;
+}
+
+.erp-dev-toolbar-example__part--query {
+  flex: 1;
+}
+
+.erp-dev-toolbar-example__part[data-highlighted='true'] {
+  outline: 2px dashed var(--erp-primary);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.erp-dev-toolbar-example__calendar {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(250px, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+@media (max-width: 1280px) {
+  .erp-dev-toolbar-example__calendar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

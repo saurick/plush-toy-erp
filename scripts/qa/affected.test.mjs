@@ -22,6 +22,39 @@ function ids(plan) {
   return plan.commands.map((item) => item.id);
 }
 
+test("composed business toolbars select shared tests and both-engine consumer regression", () => {
+  for (const file of ["web/src/erp/components/business-list/BusinessListLayout.jsx", "web/src/erp/components/business-list/useBusinessListStickyHeader.js", "web/src/erp/pages/WarehouseHandlingPage.jsx", "web/src/erp/pages/PurchaseOrdersPage.jsx", "web/src/erp/pages/HistoryRecordsPage.jsx", "web/scripts/style-l1/businessToolbarCompositionScenarios.mjs"]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const followUp = plan.followUps.find(({ id }) => id === "business-toolbar-composition-browser");
+    assert.ok(followUp, file);
+    for (const expected of ["business-toolbar-composition-purchase", "business-toolbar-composition-history", "business-toolbar-dynamic-options-growth", "warehouse-layout-dark-split", "WebKit", "Chromium"]) assert.ok(followUp.text.includes(expected), `${file}: ${expected}`);
+    assert.ok(plan.commands.some(({ args }) => args?.includes("web/src/erp/components/business-list/BusinessToolbarWorkspace.test.mjs")), file);
+  }
+});
+
+test("business tab placement selects content, independent-entry and spacing regression", () => {
+  for (const file of ["web/src/erp/pages/MasterDataPage.jsx", "web/src/erp/pages/OutsourcingOrdersPage.jsx", "web/src/erp/pages/OperationalFactsPage.jsx", "web/src/erp/components/outsourcing-orders/OutsourcingOrderSummaryPanel.jsx", "web/src/erp/styles/app/business-tables.css", "web/scripts/style-l1/pageHeaderScenarios.mjs"]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const followUp = plan.followUps.find(({ id }) => id === "business-tab-levels-browser");
+    assert.ok(followUp, file);
+    for (const expected of ["page-tabs-content-products", "page-tabs-content-outsourcing", "page-tabs-content-receivables", "page-tabs-content-payables", "page-tabs-independent-entries", "page-header-business-spacing", "outsourcing-summary-readonly-tablet", "WebKit", "Chromium"]) {
+      assert.ok(followUp.text.includes(expected), `${file}: ${expected}`);
+    }
+  }
+});
+
+test("toolbar design samples retain focused both-engine growth and isolation checks", () => {
+  for (const file of ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.jsx", "web/src/dev-workbench/styles/dev-ui-toolbar-example.css", "web/src/dev-workbench/config/devToolbarExample.mjs", "web/scripts/style-l1/devToolbarExampleScenarios.mjs", "web/src/erp/components/business-list/ColumnOrderModal.jsx"]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const followUp = plan.followUps.find(({ id }) => id === "dev-toolbar-composition-browser");
+    assert.ok(followUp, file);
+    for (const expected of ["dev-ui-toolbar-composition", "dev-ui-toolbar-category-growth", "dev-ui-toolbar-data-growth", "WebKit", "Chromium", "零业务请求"]) assert.ok(followUp.text.includes(expected), `${file}: ${expected}`);
+    assert.ok(plan.commands.some(({ args }) => args?.includes("web/src/dev-workbench/components/DevUIBusinessToolbarExample.test.mjs")), file);
+    assert(!ids(plan).includes("full"), file);
+  }
+  assert.equal(buildAffectedPlan(["web/src/erp/utils/paymentConditions.mjs"], { root: ROOT }).followUps.some(({ id }) => id === "dev-toolbar-composition-browser"), false);
+});
+
 test("warehouse and shared navigation changes retain both-engine category regression", () => {
   for (const file of ["web/src/erp/components/BusinessModuleTabs.jsx", "web/src/erp/components/businessModuleTabs.css", "web/src/common/components/navigation/SlidingTabList.jsx", "web/src/common/components/navigation/useSlidingIndicator.js", "web/src/erp/styles/app/control-affordance.css", "web/scripts/style-l1/warehouseNavigationActions.mjs"]) {
     const text = buildAffectedPlan([file], { root: ROOT }).followUps.find(({ id }) => id === "warehouse-navigation-browser")?.text || "";

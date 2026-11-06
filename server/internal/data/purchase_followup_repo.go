@@ -205,11 +205,6 @@ func purchaseFollowupQuery(q biz.PurchaseFollowupQuery, sqlDialect string) (stri
  GROUP BY r.receipt_id,r.receipt_no,r.supplier_id,r.supplier_name HAVING SUM(CASE WHEN r.progress='posted' THEN 1 ELSE 0 END)>0 AND SUM(CASE WHEN r.progress NOT IN ('posted','disposed') THEN 1 ELSE 0 END)=0
 ), scoped AS (SELECT * FROM candidates WHERE `
 	conditions := []string{"1=1"}
-	if q.View == "arrival" {
-		conditions = append(conditions, "kind IN ('overdue','due_soon','unscheduled','scheduled')")
-	} else {
-		conditions = append(conditions, "kind NOT IN ('due_soon','scheduled')")
-	}
 	if q.SupplierID > 0 {
 		conditions = append(conditions, "supplier_id="+bind(q.SupplierID))
 	}

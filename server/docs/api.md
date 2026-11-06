@@ -1447,7 +1447,7 @@ approval 完成后自动执行 `sales_order.activate_after_approval`，在同一
 | `cancel_purchase_order` | 取消采购订单 | 按当前状态和关联约束取消采购订单，保留业务追溯。 |
 | `close_purchase_order` | 关闭采购订单 | 关闭采购订单，用于采购订单的对应办理或核对。 |
 | `update_purchase_order_delivery` | 维护采购交期 | 独立维护已审核订单的整单及明细交期，无需补齐价格。 |
-| `list_purchase_followups` | 查询采购跟进 | 按实际到货、质检与入库事实分页查询到货提醒及异常，返回同范围计数与日历。 |
+| `list_purchase_followups` | 查询采购跟进 | 按实际到货、质检与入库事实分页查询统一的采购跟进事项，返回同范围计数与日历。 |
 | `complete_purchase_order_terms` | 补齐采购订单条款 | 补齐采购订单条款，用于采购订单的对应办理或核对。 |
 | `get_purchase_order` | 查看采购订单 | 读取采购订单详情，供业务核对。 |
 | `get_purchase_order_receipt_progress` | 查看采购订单收货进度 | 读取采购订单收货进度详情，供业务核对。 |
@@ -1467,13 +1467,13 @@ approval 完成后自动执行 `sales_order.activate_after_approval`，在同一
 
 `update_purchase_order_delivery` 复用上述版本和幂等合同，要求 `purchase.order.read + purchase.order.update`，仅允许 `approved`。每行只接受 `id / expected_arrival_date`，拒绝传入单价（包括 `null`）；缺价仍保持缺价，已知价格与收货快照不变。事务写入独立的 `update_delivery` 回执，不作为晚补价确认依据。
 
-`list_purchase_followups` 要求采购订单读取及收货读取（或仓库入库读取）权限，相关模块须可读。参数为 `view=arrival|exceptions`、`kind`、`keyword`、`supplier_id`、`order_id`、`confirmation=all|confirmed|unconfirmed`、`start_date`、`selected_date`、`limit`（默认 25，最多 200）和 `offset`。日历日期使用 `YYYY-MM-DD`，以服务端上海业务日判定逾期和含今天的七天窗口。`kind` 可为 `all / overdue / due_soon / unscheduled / scheduled / period / date / pending_inspection / rejected / ready_inbound / missing_price / unsettled`。`period` 为 `start_date` 起 14 天，`date` 必须提供 `selected_date`。
+`list_purchase_followups` 要求采购订单读取及收货读取（或仓库入库读取）权限，相关模块须可读。参数为 `kind`、`keyword`、`supplier_id`、`order_id`、`confirmation=all|confirmed|unconfirmed`、`start_date`、`selected_date`、`limit`（默认 25，最多 200）和 `offset`。日历日期使用 `YYYY-MM-DD`，以服务端上海业务日判定逾期和含今天的七天窗口。`kind` 可为 `all / overdue / due_soon / unscheduled / scheduled / period / date / pending_inspection / rejected / ready_inbound / missing_price / unsettled`。`period` 为 `start_date` 起 14 天，`date` 必须提供 `selected_date`。
 
 返回 `rows / total / counts / days / as_of_date / access / limit / offset`。计数、日历和分页在同一只读快照内完成；`counts` 是相同查询范围、未应用 `kind` 筛选的事项数，`total` 为当前筛选总数，日历按采购明细计数。明细交期优先，其次供应商确认交期、整单预计日期。只有已审核、未关闭且尚需到货的明细参与提醒，已入库数量（含有效数量调整）和未入库但仍占用收货额度的登记数量均扣除；草稿、取消、已关闭及全部到货不产生逾期。退货不自动重开采购额度，拒收处置后的剩余采购额度沿用收货进度规则。
 
 提醒在页面打开、筛选或刷新时查询，不另建提醒表、定时任务或消息推送。列表按服务端筛选后分页，导出复用完整分页读取并检查重复、缺页和总数变化；分页限制返回量，不表示汇总只扫描当前页，也不承诺多次导出请求之间的同一快照。
 
-异常汇总包括逾期、未排交期、待检、拒收待处理、待入库、缺价和待核对应付。同一明细可有多项待办，不跨单位相加。质检类须有质检读取权限；缺价须有采购商业字段权限；应付核对还须有应付读取权限及财务模块可读。收货事项沿用整单仓库范围校验，混合可见/不可见仓库的收货整单隐藏；无权类别不返回计数，显式筛选拒绝。`unsettled` 只表示入库/拒收处置已完成且无有效应付，办理时仍由原结算入口核对价格、付款条件和可结算金额。
+采购跟进在同一查询中包含逾期、近期到货、后续到货、未排交期、待检、拒收待处理、待入库、缺价和待核对应付；不再按到货与异常拆分视图。日历只计尚需到货的明细，其他岗位进度不计入到货日期数量。同一明细可有多项待办，不跨单位相加。质检类须有质检读取权限；缺价须有采购商业字段权限；应付核对还须有应付读取权限及财务模块可读。收货事项沿用整单仓库范围校验，混合可见/不可见仓库的收货整单隐藏；无权类别不返回计数，显式筛选拒绝。`unsettled` 只表示入库/拒收处置已完成且无有效应付，办理时仍由原结算入口核对价格、付款条件和可结算金额。
 
 采购整单保存、提交和审核会核对材料所属供应商：已绑定厂商的材料只能向该厂商采购，未绑定的通用材料仍可使用；供应商切换不能保留其他厂商材料。`masterdata.list_materials` 支持 `purchase_supplier_id` 正整数筛选，在分页前保留指定厂商及未绑定厂商的材料。
 
@@ -53947,7 +53947,6 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `selected_date` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:28`。 |
 | `start_date` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:28`。 |
 | `supplier_id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, key, 0, 0)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:35`。 |
-| `view` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:28`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -53956,8 +53955,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
   "jsonrpc": "2.0",
   "method": "list_purchase_followups",
   "params": {
-    "kind": "all",
-    "view": "exceptions"
+    "kind": "all"
   },
   "id": "rpc-demo-purchase_order.list_purchase_followups"
 }

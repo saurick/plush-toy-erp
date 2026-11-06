@@ -1144,7 +1144,7 @@ export default function PurchaseReceiptsPage() {
   ])
 
   return (
-    <BusinessPageLayout className="erp-purchase-receipts-page">
+    <BusinessPageLayout inWorkspace className="erp-purchase-receipts-page">
       <PageHeaderCard compact helpKey="inbound" title="采购入库" />
       <SourceActionAccessNotice access={receiptSourceAccess} />
       <SourceActionAccessNotice access={payableSourceAccess} />
@@ -1152,6 +1152,7 @@ export default function PurchaseReceiptsPage() {
       <SourceActionAccessNotice access={adjustmentSourceAccess} />
 
       <BusinessOperationPanel
+        inWorkspace
         compact
         onClearFilters={clearFilters}
         activeFilterCount={activeFilterCount}

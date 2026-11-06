@@ -16,23 +16,6 @@
   display: none;
 }
 
-.erp-business-module-subnavigation {
-  display: flex;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  align-items: center;
-  gap: 12px;
-}
-
-.erp-business-module-subnavigation::before {
-  content: '';
-  flex: 0 0 1px;
-  width: 1px;
-  height: 20px;
-  background: var(--erp-border);
-}
-
 .erp-business-module-view-tabs {
   min-width: 0;
   max-width: 100%;

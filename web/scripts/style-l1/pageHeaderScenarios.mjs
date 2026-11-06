@@ -136,5 +136,76 @@ export function createPageHeaderScenarios({ customerRuntimeEffectiveSession, ass
       await writeFile(`${outputDir}/page-header-spacing-${key}.json`, JSON.stringify(results, null, 2))
     },
   }))
-  return [...headers, ...spacing]
+  const contentViews = [
+    ['products', '/erp/master/products', ['产品基础信息', '产品规格']],
+    ['outsourcing', '/erp/purchase/processing-contracts', ['加工合同', '加工明细']],
+    ['receivables', '/erp/finance/receivables', ['账款列表', '到期顺序']],
+    ['payables', '/erp/finance/payables', ['账款列表', '到期顺序']],
+  ].map(([key, route, labels]) => ({
+    name: `page-tabs-content-${key}`,
+    path: route,
+    auth: 'admin',
+    effectiveSession: customerRuntimeEffectiveSession,
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
+    verify: async (page) => {
+      const navigation = page.locator('.erp-business-operation-panel__content-switch').getByRole('tablist')
+      await navigation.getByRole('tab', { name: labels[0], exact: true }).waitFor()
+      const navigationNode = await navigation.elementHandle()
+      const results = []
+      for (const width of [1920, 1280, 390]) {
+        await page.setViewportSize({ width, height: 1080 })
+        for (const label of [labels[1], labels[0]]) {
+          await navigation.getByRole('tab', { name: label, exact: true }).click()
+          await navigation.getByRole('tab', { name: label, exact: true, selected: true }).waitFor()
+          assert.equal(await navigationNode.evaluate((node) => node.isConnected), true, '内容切换保持同一查询区分类条')
+          assert.equal(await navigation.getAttribute('class').then((value) => value.includes('erp-navigation-chips')), true)
+          assert.equal(await page.locator('.erp-business-page-header-card--secondary').count(), 0, '页内分类不在模块页头下重复创建标题卡')
+          await page.locator('.erp-business-operation-panel__search input').first().waitFor()
+          const metrics = await measureHeaderSpacing(page)
+          assert.ok(metrics.gap !== null && Math.abs(metrics.gap - metrics.expectedGap) <= 0.5, `${key}/${label}: ${JSON.stringify(metrics)}`)
+          await assertNoHorizontalOverflow(page)
+          results.push({ width, label, ...metrics })
+        }
+        if (width === 1920 || width === 390) {
+          await page.screenshot({ path: `${outputDir}/page-tabs-${key}-${width}.png` })
+        }
+        if (width === 1920) {
+          const heading = await page.locator('.erp-business-page-header-card:not(.erp-business-page-header-card--secondary)').first().boundingBox()
+          const command = await page.locator('.erp-business-operation-panel__command').first().boundingBox()
+          await page.screenshot({ path: `${outputDir}/page-tabs-${key}-header.png`, clip: { x: heading.x, y: heading.y, width: heading.width, height: command.y + command.height - heading.y } })
+        }
+      }
+      await writeFile(`${outputDir}/page-tabs-${key}.json`, JSON.stringify(results, null, 2))
+    },
+  }))
+  const primaryNavigation = {
+    name: 'page-tabs-independent-entries',
+    path: '/erp/dashboard',
+    auth: 'admin',
+    effectiveSession: customerRuntimeEffectiveSession,
+    viewport: { width: 1920, height: 1080 },
+    verify: async (page) => {
+      const results = []
+      for (const [route, selector, labels] of [
+        ['/erp/dashboard', '.erp-business-page-header-card', ['待办', '业务汇总']],
+        ['/erp/task-board?mode=todo', '.erp-task-management-header', ['待我处理', '待我审批', '流程跟踪']],
+        ['/erp/business-dashboard', '.erp-business-page-header-card', ['订单交付', '生产执行', '经营统计']],
+        ['/erp/production/progress', '.erp-business-module-header', ['生产订单', '生产执行', '生产记录', '异常处理']],
+        ['/erp/finance/payments', '.erp-business-page-header-card', ['收付款记录', '账款调整', '期间对账']],
+        ['/erp/system/permissions', '.erp-business-page-header-card', ['岗位设置', '员工账号', '岗位导航']],
+        ['/erp/help-center', '.erp-help-navigation-header', ['操作图解', '业务使用手册']],
+      ]) {
+        await page.goto(new URL(route, page.url()).href)
+        for (const label of labels) {
+          const tab = page.getByRole('tab', { name: label, exact: true })
+          await tab.waitFor()
+          assert.equal(await tab.evaluate((node, headerSelector) => Boolean(node.closest(headerSelector)), selector), true, `${route}: ${label} 属于标题区的独立业务入口`)
+        }
+        results.push({ route, labels })
+      }
+      await writeFile(`${outputDir}/page-tabs-independent.json`, JSON.stringify(results, null, 2))
+    },
+  }
+  return [...headers, ...spacing, ...contentViews, primaryNavigation]
 }

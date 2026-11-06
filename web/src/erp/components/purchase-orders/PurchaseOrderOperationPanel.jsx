@@ -137,6 +137,7 @@ export default function PurchaseOrderOperationPanel({
 
   return (
     <BusinessOperationPanel
+      inWorkspace
       compact
       onClearFilters={clearFilters}
       activeFilterCount={[

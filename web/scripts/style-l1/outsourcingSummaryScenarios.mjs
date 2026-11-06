@@ -137,6 +137,7 @@ export function createOutsourcingSummaryScenarios({
       verify: async (page) => {
         await page.getByRole('tab', { name: '加工明细', exact: true }).click()
         const region = page.getByRole('region', { name: '委外加工明细汇总' })
+        const toolbar = page.locator('.erp-business-toolbar-workspace > .erp-business-operation-panel')
         await region.getByText('模拟产品 1', { exact: true }).waitFor()
         const countBeforeRefresh = calls.length
         const refreshed = page.waitForResponse(
@@ -161,14 +162,14 @@ export function createOutsourcingSummaryScenarios({
             .count(),
           0
         )
-        await region.getByRole('button', { name: '列设置', exact: true }).click()
+        await toolbar.getByRole('button', { name: '列设置', exact: true }).click()
         const settings = page.getByRole('dialog', { name: /^列设置/u })
         await settings.waitFor()
         assert.equal(await settings.getByRole('checkbox', { name: '委托方电话', exact: true }).count(), readOnly ? 0 : 1, '列设置沿用委外字段权限')
         assert(!(await settings.getByRole('checkbox', { name: '行备注', exact: true }).isChecked()))
         if (!readOnly) {
           await settings.getByRole('button', { name: '全部显示', exact: true }).click()
-          const saved = page.waitForResponse(response => response.url().includes('/rpc/admin') && response.request().postDataJSON()?.method === 'set_erp_column_order')
+          const saved = page.waitForResponse((response) => response.url().includes('/rpc/admin') && response.request().postDataJSON()?.method === 'set_erp_column_order')
           await settings.getByRole('button', { name: /^完\s*成$/u }).click()
           await saved
           await settings.waitFor({ state: 'hidden' })
@@ -194,7 +195,7 @@ export function createOutsourcingSummaryScenarios({
         assert.equal(calls.at(-1).offset, 20)
         const [fullDownload] = await Promise.all([
           page.waitForEvent('download'),
-          region
+          toolbar
             .getByRole('button', { name: '导出加工明细', exact: true })
             .click(),
         ])
@@ -209,7 +210,7 @@ export function createOutsourcingSummaryScenarios({
         assert.equal(fullCSV.includes('委托方电话'), !readOnly)
         assert.equal(fullCSV.includes('单价'), !readOnly)
         assert.equal(fullCSV.includes('020-00000000'), !readOnly)
-        const search = region.getByRole('textbox', { name: '搜索加工明细' })
+        const search = toolbar.getByRole('textbox', { name: '搜索加工明细' })
         await search.fill('耳*2')
         await search.press('Enter')
         await region.getByText('模拟筛选布料', { exact: true }).waitFor()
@@ -218,7 +219,7 @@ export function createOutsourcingSummaryScenarios({
         await region.getByText('已取消', { exact: true }).waitFor()
         const [filteredDownload] = await Promise.all([
           page.waitForEvent('download'),
-          region
+          toolbar
             .getByRole('button', { name: '导出加工明细', exact: true })
             .click(),
         ])
@@ -230,13 +231,13 @@ export function createOutsourcingSummaryScenarios({
           filteredCSV.includes('MAT-SUM-205') &&
             !filteredCSV.includes('模拟产品 1')
         )
-        const directClear = region.getByRole('button', { name: '清空筛选', exact: true })
+        const directClear = toolbar.getByRole('button', { name: '清空筛选', exact: true })
         assert.equal(await directClear.count(), 0, '仅搜索不显示额外条件清空入口')
-        await region.getByRole('button', { name: '筛选', exact: true }).click()
+        await toolbar.getByRole('button', { name: '筛选', exact: true }).click()
         const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
         await filters.getByRole('group', { name: '明细合同状态', exact: true }).getByRole('button', { name: '已取消', exact: true }).click()
         await filters.getByRole('button', { name: '完成', exact: true }).click()
-        assert.equal(await region.getByRole('button', { name: '筛选，已应用 1 项', exact: true }).count(), 1)
+        assert.equal(await toolbar.getByRole('button', { name: '筛选，已应用 1 项', exact: true }).count(), 1)
         await directClear.click()
         await region.getByText('模拟筛选布料', { exact: true }).waitFor()
         await page.getByRole('dialog', { name: '筛选条件', exact: true }).waitFor({ state: 'hidden' })
@@ -244,7 +245,7 @@ export function createOutsourcingSummaryScenarios({
         assert.equal(await search.inputValue(), '耳*2', '清空额外条件保留搜索')
         assert.equal(await directClear.count(), 0)
         assert.equal(await page.getByRole('dialog', { name: '筛选条件', exact: true }).isVisible(), false)
-        assert.equal(await region.locator('button[aria-haspopup="dialog"]').evaluate((node) => node === document.activeElement), true)
+        assert.equal(await toolbar.locator('button[aria-haspopup="dialog"]').evaluate((node) => node === document.activeElement), true)
         await region
           .getByRole('button', {
             name: 'SIM-OUTSOURCE-CONTRACT-L1',
@@ -281,7 +282,7 @@ export function createOutsourcingSummaryScenarios({
           )
         }
         assert.equal(
-          await region
+          await toolbar
             .getByRole('button', { name: '导出加工明细', exact: true })
             .isDisabled(),
           true

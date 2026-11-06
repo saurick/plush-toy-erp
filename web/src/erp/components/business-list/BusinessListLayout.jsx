@@ -60,6 +60,7 @@ const { Text } = Typography
 export const SelectionActionOverlayContext = React.createContext(null)
 const BusinessFilterPanelContext = React.createContext(false)
 const BusinessSelectionAvailabilityContext = React.createContext(null)
+const BusinessToolbarContext = React.createContext(null)
 
 const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
 const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 160
@@ -763,7 +764,8 @@ function resolveBusinessTableRowSelection(rowSelection) {
   }
 }
 
-export function BusinessPageLayout({ children, className = '' }) {
+export function BusinessPageLayout({ children, className = '', inWorkspace = false }) {
+  const toolbar = React.useContext(BusinessToolbarContext)
   const [selectionAvailability, setSelectionAvailability] = React.useState({ visible: false, loading: false })
   const selectionContext = React.useMemo(
     () => ({ ...selectionAvailability, setSelectionAvailability }),
@@ -771,7 +773,7 @@ export function BusinessPageLayout({ children, className = '' }) {
   )
   return (
     <BusinessSelectionAvailabilityContext.Provider value={selectionContext}>
-      <div className={joinClassNames('erp-business-page-layout', className)} data-table-scroll-scope>
+      <div className={joinClassNames('erp-business-page-layout', className)} data-table-scroll-scope={inWorkspace && toolbar ? undefined : true}>
         {children}
       </div>
     </BusinessSelectionAvailabilityContext.Provider>
@@ -1029,9 +1031,36 @@ export function BusinessListToolbar({ stats = [], actions = null }) {
   )
 }
 
+// 分类条由父工作区持续挂载，切换的业务页只向同一工具栏提供查询和操作。
+export function BusinessToolbarWorkspace({ contentSwitch, children, compact = true }) {
+  const { taskBusiness } = useBusinessPageContext() || {}
+  const toolbarRef = React.useRef(null)
+  const [commandHost, setCommandHost] = React.useState(null)
+  const [selectionHost, setSelectionHost] = React.useState(null)
+  const hosts = React.useMemo(() => ({ commandHost, selectionHost, toolbarRef }), [commandHost, selectionHost])
+  if (taskBusiness) return children
+
+  return (
+    <BusinessToolbarContext.Provider value={hosts}>
+      <div className="erp-business-toolbar-workspace" data-page-table-region data-table-scroll-scope>
+        <Card ref={toolbarRef} className={joinClassNames('erp-business-operation-panel', compact && 'erp-business-operation-panel--compact')}>
+          <div className="erp-business-operation-panel__command">
+            {contentSwitch ? <div className="erp-business-operation-panel__content-switch" role="group" aria-label="内容分类">{contentSwitch}</div> : null}
+            <div className="erp-business-operation-panel__command-host" ref={setCommandHost} />
+          </div>
+          <div className="erp-business-operation-panel__selection-host" ref={setSelectionHost} />
+        </Card>
+        {children}
+      </div>
+    </BusinessToolbarContext.Provider>
+  )
+}
+
 export function BusinessOperationPanel({
   filters,
+  contentSwitch,
   viewSwitch,
+  inWorkspace = false,
   hidden = false,
   actions = null,
   primaryAction = null,
@@ -1044,6 +1073,8 @@ export function BusinessOperationPanel({
   onFiltersOpenChange,
 }) {
   const { taskBusiness, taskCommand } = useBusinessPageContext() || {}
+  const workspace = React.useContext(BusinessToolbarContext)
+  const toolbar = inWorkspace ? workspace : null
   const selectionAvailability = React.useContext(BusinessSelectionAvailabilityContext)
   const hasToolbar = Boolean(actions || primaryAction)
   const hasClearFilters = typeof onClearFilters === 'function'
@@ -1087,6 +1118,183 @@ export function BusinessOperationPanel({
     (child) => child !== primarySearch && !child.props?.inline
   )
   const quickFilters = filterControls.filter((child) => child.props?.inline)
+  const command = (
+    <>
+      {contentSwitch ? <div className="erp-business-operation-panel__content-switch" role="group" aria-label="内容分类">{contentSwitch}</div> : null}
+      {viewSwitch ? <div className="erp-business-operation-panel__view-switch" role="group" aria-label="展示方式">{viewSwitch}</div> : null}
+      {quickFilters.length ? (
+        <div className="erp-business-operation-panel__quick" role="group" aria-label="快捷筛选">
+          {quickFilters}
+        </div>
+      ) : null}
+      {primarySearch ? (
+        <div className="erp-business-operation-panel__search">
+          {searchControls}
+        </div>
+      ) : null}
+      {additionalFilters.length > 0 ? (
+        <Space.Compact
+          className="erp-business-filter-trigger-group"
+          role="group"
+          aria-label="筛选操作"
+        >
+          <Popover
+            trigger="click"
+            placement="bottomLeft"
+            align={{ overflow: { adjustX: true, adjustY: true, shiftY: true } }}
+            open={filtersOpen}
+            onOpenChange={setFiltersOpen}
+            classNames={{ root: 'erp-business-filter-popover' }}
+            afterOpenChange={(open) => {
+              // Opening motion must not take focus back from a field already in use.
+              if (
+                open &&
+                (document.activeElement === filterTriggerRef.current ||
+                  document.activeElement === document.body)
+              ) {
+                filterPanelRef.current?.focus({ preventScroll: true })
+              }
+            }}
+            content={
+              <section
+                className="erp-business-filter-popover__content"
+                aria-label="筛选条件"
+                role="dialog"
+                id={filterPanelId}
+                ref={filterPanelRef}
+                tabIndex={-1}
+                onKeyDownCapture={(event) => {
+                  if (
+                    event.defaultPrevented ||
+                    hasVisibleOverlayPopup(overlay)
+                  ) {
+                    return
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    closeFilters()
+                  }
+                  if (event.key === 'Tab') {
+                    const controls = [
+                      ...event.currentTarget.querySelectorAll(
+                        'button:not(:disabled), input:not(:disabled), [tabindex="0"]'
+                      ),
+                    ].filter((node) => node.getClientRects().length)
+                    const first = controls[0]
+                    const last = controls.at(-1)
+                    if (
+                      event.shiftKey &&
+                      (document.activeElement === first ||
+                        document.activeElement === event.currentTarget)
+                    ) {
+                      event.preventDefault()
+                      last?.focus()
+                    } else if (
+                      !event.shiftKey &&
+                      document.activeElement === last
+                    ) {
+                      event.preventDefault()
+                      first?.focus()
+                    }
+                  }
+                }}
+              >
+                <header>
+                  <strong>筛选条件</strong>
+                  {hasClearFilters ? (
+                    <Button
+                      aria-label="清空筛选"
+                      size="small"
+                      type="text"
+                      disabled={!hasActiveFilters}
+                      icon={<RollbackOutlined />}
+                      onClick={() => {
+                        onClearFilters()
+                        filterPanelRef.current?.focus({ preventScroll: true })
+                      }}
+                    >
+                      清空筛选
+                    </Button>
+                  ) : null}
+                </header>
+                <div className="erp-business-operation-panel__filters">
+                  <BusinessFilterPanelContext.Provider value>
+                    {additionalFilters}
+                  </BusinessFilterPanelContext.Provider>
+                </div>
+                <footer>
+                  <Button type="primary" onClick={closeFilters}>
+                    完成
+                  </Button>
+                </footer>
+              </section>
+            }
+          >
+            <Button
+              ref={filterTriggerRef}
+              icon={<FilterOutlined aria-hidden />}
+              aria-label={hasActiveFilters ? `筛选，已应用 ${activeFilterCount} 项` : '筛选'}
+              aria-haspopup="dialog"
+              aria-controls={filtersOpen ? filterPanelId : undefined}
+              aria-expanded={filtersOpen}
+              className={
+                hasActiveFilters ? 'erp-business-filter-trigger--active' : ''
+              }
+            >
+              筛选{hasActiveFilters ? ` · ${activeFilterCount}` : ''}
+            </Button>
+          </Popover>
+          {hasActiveFilters && hasClearFilters ? (
+            <Tooltip title="清空额外条件，保留搜索与快捷筛选">
+              <Button
+                className="erp-business-filter-clear"
+                aria-label="清空筛选"
+                icon={<CloseOutlined aria-hidden />}
+                onClick={() => {
+                  onClearFilters()
+                  closeFilters()
+                }}
+              />
+            </Tooltip>
+          ) : null}
+        </Space.Compact>
+      ) : null}
+      {!actions ? <span data-table-scroll-toolbar /> : null}
+      {hasToolbar ? (
+        <div className="erp-business-operation-panel__toolbar">
+          {actions ? (
+            <div className="erp-business-operation-panel__actions" role="group" aria-label="列表工具">
+              {actions}
+              <span data-table-scroll-toolbar />
+            </div>
+          ) : null}
+          {primaryAction ? (
+            <div className="erp-business-operation-panel__primary" role="group" aria-label="页面主操作">
+              {hasSelectedRecord ? deEmphasizeCreation(primaryAction) : primaryAction}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  )
+  const selection = showSelection && childActions.length > 0 ? (
+    <div
+      className="erp-business-operation-panel__selection"
+      hidden={!hasVisibleChildren}
+      style={hasVisibleChildren ? undefined : { display: 'none' }}
+    >
+      {childActions}
+    </div>
+  ) : null
+  if (toolbar) {
+    return (
+      <>
+        {toolbar.commandHost ? createPortal(command, toolbar.commandHost) : null}
+        {toolbar.selectionHost ? createPortal(selection, toolbar.selectionHost) : null}
+      </>
+    )
+  }
   return (
     <Card
       className={joinClassNames(
@@ -1095,172 +1303,8 @@ export function BusinessOperationPanel({
         hasRecordActions ? 'erp-business-operation-panel--record-actions' : ''
       )}
     >
-      <div className="erp-business-operation-panel__command">
-        {viewSwitch ? <div className="erp-business-operation-panel__view-switch">{viewSwitch}</div> : null}
-        {quickFilters.length ? (
-          <div className="erp-business-operation-panel__quick">
-            {quickFilters}
-          </div>
-        ) : null}
-        {primarySearch ? (
-          <div className="erp-business-operation-panel__search">
-            {searchControls}
-          </div>
-        ) : null}
-        {additionalFilters.length > 0 ? (
-          <Space.Compact
-            className="erp-business-filter-trigger-group"
-            role="group"
-            aria-label="筛选操作"
-          >
-            <Popover
-              trigger="click"
-              placement="bottomLeft"
-              align={{ overflow: { adjustX: true, adjustY: true, shiftY: true } }}
-              open={filtersOpen}
-              onOpenChange={setFiltersOpen}
-              classNames={{ root: 'erp-business-filter-popover' }}
-              afterOpenChange={(open) => {
-                // Opening motion must not take focus back from a field already in use.
-                if (
-                  open &&
-                  (document.activeElement === filterTriggerRef.current ||
-                    document.activeElement === document.body)
-                ) {
-                  filterPanelRef.current?.focus({ preventScroll: true })
-                }
-              }}
-              content={
-                <section
-                  className="erp-business-filter-popover__content"
-                  aria-label="筛选条件"
-                  role="dialog"
-                  id={filterPanelId}
-                  ref={filterPanelRef}
-                  tabIndex={-1}
-                  onKeyDownCapture={(event) => {
-                    if (
-                      event.defaultPrevented ||
-                      hasVisibleOverlayPopup(overlay)
-                    ) {
-                      return
-                    }
-                    if (event.key === 'Escape') {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      closeFilters()
-                    }
-                    if (event.key === 'Tab') {
-                      const controls = [
-                        ...event.currentTarget.querySelectorAll(
-                          'button:not(:disabled), input:not(:disabled), [tabindex="0"]'
-                        ),
-                      ].filter((node) => node.getClientRects().length)
-                      const first = controls[0]
-                      const last = controls.at(-1)
-                      if (
-                        event.shiftKey &&
-                        (document.activeElement === first ||
-                          document.activeElement === event.currentTarget)
-                      ) {
-                        event.preventDefault()
-                        last?.focus()
-                      } else if (
-                        !event.shiftKey &&
-                        document.activeElement === last
-                      ) {
-                        event.preventDefault()
-                        first?.focus()
-                      }
-                    }
-                  }}
-                >
-                  <header>
-                    <strong>筛选条件</strong>
-                    {hasClearFilters ? (
-                      <Button
-                        aria-label="清空筛选"
-                        size="small"
-                        type="text"
-                        disabled={!hasActiveFilters}
-                        icon={<RollbackOutlined />}
-                        onClick={() => {
-                          onClearFilters()
-                          filterPanelRef.current?.focus({ preventScroll: true })
-                        }}
-                      >
-                        清空筛选
-                      </Button>
-                    ) : null}
-                  </header>
-                  <div className="erp-business-operation-panel__filters">
-                    <BusinessFilterPanelContext.Provider value>
-                      {additionalFilters}
-                    </BusinessFilterPanelContext.Provider>
-                  </div>
-                  <footer>
-                    <Button type="primary" onClick={closeFilters}>
-                      完成
-                    </Button>
-                  </footer>
-                </section>
-              }
-            >
-              <Button
-                ref={filterTriggerRef}
-                icon={<FilterOutlined aria-hidden />}
-                aria-label={hasActiveFilters ? `筛选，已应用 ${activeFilterCount} 项` : '筛选'}
-                aria-haspopup="dialog"
-                aria-controls={filtersOpen ? filterPanelId : undefined}
-                aria-expanded={filtersOpen}
-                className={
-                  hasActiveFilters ? 'erp-business-filter-trigger--active' : ''
-                }
-              >
-                筛选{hasActiveFilters ? ` · ${activeFilterCount}` : ''}
-              </Button>
-            </Popover>
-            {hasActiveFilters && hasClearFilters ? (
-              <Tooltip title="清空额外条件，保留搜索与快捷筛选">
-                <Button
-                  className="erp-business-filter-clear"
-                  aria-label="清空筛选"
-                  icon={<CloseOutlined aria-hidden />}
-                  onClick={() => {
-                    onClearFilters()
-                    closeFilters()
-                  }}
-                />
-              </Tooltip>
-            ) : null}
-          </Space.Compact>
-        ) : null}
-        {!actions ? <span data-table-scroll-toolbar /> : null}
-        {hasToolbar ? (
-          <div className="erp-business-operation-panel__toolbar">
-            {actions ? (
-              <div className="erp-business-operation-panel__actions">
-                {actions}
-                <span data-table-scroll-toolbar />
-              </div>
-            ) : null}
-            {primaryAction ? (
-              <div className="erp-business-operation-panel__primary">
-                {hasSelectedRecord ? deEmphasizeCreation(primaryAction) : primaryAction}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-      {showSelection && childActions.length > 0 ? (
-        <div
-          className="erp-business-operation-panel__selection"
-          hidden={!hasVisibleChildren}
-          style={hasVisibleChildren ? undefined : { display: 'none' }}
-        >
-          {childActions}
-        </div>
-      ) : null}
+      <div className="erp-business-operation-panel__command">{command}</div>
+      {selection}
     </Card>
   )
 }
@@ -1684,6 +1728,7 @@ export function BusinessDataTable({
   taskDetailColumns = columns,
   emptyDescription = '暂无匹配记录',
 }) {
+  const toolbar = React.useContext(BusinessToolbarContext)
   const pageContext = useBusinessPageContext() || {}
   const { taskBusiness } = pageContext
   const informationSnapshot = React.useRef(null)
@@ -1696,7 +1741,7 @@ export function BusinessDataTable({
     return undefined
   })
   const tableCardRef = React.useRef(null)
-  const sticky = useBusinessListStickyHeader(tableCardRef, !taskBusiness && !scroll?.y)
+  const sticky = useBusinessListStickyHeader(tableCardRef, !taskBusiness && !scroll?.y, toolbar?.toolbarRef)
   const selectionContext = React.useContext(BusinessSelectionAvailabilityContext)
   const setSelectionAvailability = selectionContext?.setSelectionAvailability
   const selectionOwner = React.useId()

@@ -387,7 +387,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	// Purchase, outsourcing and inbound.
 	purchaseOrderReceiptProgressMethods := permissionMethods("purchase_order", "get_purchase_order_receipt_progress")
 	add(PermissionPurchaseOrderRead,
-		menuPermissionSurface("accessories-purchase", "purchase-orders", "采购订单", "purchase-followups", "到货计划与异常汇总", permissionControlPage, "按原单据、仓库范围及类别权限读取跟进事项", permissionMethods("purchase_order", "list_purchase_followups"), businessUsageConditions),
+		menuPermissionSurface("accessories-purchase", "purchase-orders", "采购订单", "purchase-followups", "采购跟进", permissionControlPage, "按原单据、仓库范围及类别权限读取跟进事项", permissionMethods("purchase_order", "list_purchase_followups"), businessUsageConditions),
 		menuPermissionSurface("accessories-purchase", "purchase-orders", "采购订单", "purchase-order-list", "采购订单列表和详情", permissionControlPage, "允许进入并查看", append(permissionMethods("purchase_order", "get_purchase_order", "list_purchase_orders", "list_purchase_order_items"), purchaseOrderReceiptProgressMethods...), businessUsageConditions),
 		menuPermissionSurface("inbound", "purchase-order-source", "采购订单来源", "purchase-receipt-source-reference", "采购入库可读取的采购订单与明细", permissionControlSection, "允许查看", append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item", "post_purchase_rejection_disposition"), permissionMethods("customer_config", "start_material_supply_purchase_order_process")...), businessUsageConditions),
 	)

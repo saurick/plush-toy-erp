@@ -96,6 +96,10 @@
   gap: 24px;
 }
 
+.erp-control-library-layout--toolbar {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .erp-control-library-demo {
   min-width: 0;
   overflow: hidden;

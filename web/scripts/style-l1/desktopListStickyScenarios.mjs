@@ -1,7 +1,7 @@
-import { selectWarehouseView } from './warehouseNavigationActions.mjs'
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { selectWarehouseView } from './warehouseNavigationActions.mjs'
 import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
 import { createOutsourcingSummaryScenarios } from './outsourcingSummaryScenarios.mjs'
 import { createWorkbenchSummaryScenarios } from './workbenchSummaryScenarios.mjs'
@@ -20,7 +20,7 @@ const extraViews = [
   { key: 'inventory-lots', path: '/erp/warehouse/inventory', tab: '库存批次' },
   { key: 'inventory-transactions', path: '/erp/warehouse/inventory', tab: '库存变动记录' },
   { key: 'finance-credit-notes', path: '/erp/finance/payments', tab: '红冲记录' },
-  { key: 'purchase-arrival', path: '/erp/purchase/accessories', tab: '到货计划' },
+  { key: 'purchase-arrival', path: '/erp/purchase/accessories', tab: '采购跟进' },
   { key: 'product-specifications', path: '/erp/master/products?catalog=product_skus' },
   { key: 'product-catalog', path: '/erp/master/products?catalog=products' },
   { key: 'permission-accounts', path: '/erp/system/permissions?tab=admins' },

@@ -25,6 +25,11 @@
   display: none;
 }
 
+.erp-business-toolbar-workspace[data-business-form-editing='true']
+  > .erp-business-operation-panel {
+  display: none;
+}
+
 .erp-business-form-page {
   container: business-editor / inline-size;
   --erp-control-height: max(34px, var(--erp-touch-field-height, 0px));

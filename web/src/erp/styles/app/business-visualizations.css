@@ -6,10 +6,6 @@
   padding: 0;
 }
 
-.erp-inventory-ledger-page {
-  --erp-business-search-min-width: 180px;
-}
-
 .erp-inventory-operation-filters {
   display: flex;
   min-width: 0;

@@ -15,7 +15,7 @@ import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
-import Tabs from '@/common/components/navigation/SlidingTabs'
+import { BusinessViewSwitch } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { useOutsourcingOrderLifecycle } from '../components/outsourcing-orders/useOutsourcingOrderLifecycle.jsx'
 import { useOutsourcingOrderEditor } from '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs'
@@ -34,6 +34,7 @@ import {
   BusinessLifecyclePrimaryAction,
   BusinessOperationPanel,
   BusinessPageLayout,
+  BusinessToolbarWorkspace,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -664,383 +665,389 @@ export default function OutsourcingOrdersPage() {
       busyReason: '委外记录加载完成后可继续',
     })
 
+  const outsourcingViewSwitch = (
+    <BusinessViewSwitch
+      appearance="chips"
+      aria-label="委外订单内容分类"
+      value={summaryVisible ? 'items' : 'contracts'}
+      options={[
+        { value: 'contracts', label: '加工合同' },
+        ...(canRead ? [{ value: 'items', label: '加工明细' }] : []),
+      ]}
+      onChange={(view) => {
+        const next = new URLSearchParams(searchParams)
+        if (view === 'items') next.set('view', 'items')
+        else next.delete('view')
+        setSearchParams(next, { replace: true })
+      }}
+    />
+  )
+
   return (
     <BusinessPageLayout className="erp-outsourcing-orders-page">
       <PageHeaderCard
         compact
         helpKey="processing-contracts"
         title="委外订单"
-        viewSwitch={
-          <Tabs
-            activeKey={searchParams.get('view') === 'items' ? 'items' : 'contracts'}
-            items={[
-              { key: 'contracts', label: '加工合同' },
-              ...(canRead ? [{ key: 'items', label: '加工明细' }] : []),
-            ]}
-            onChange={(view) => {
-              const next = new URLSearchParams(searchParams)
-              if (view === 'items') next.set('view', 'items')
-              else next.delete('view')
-              setSearchParams(next, { replace: true })
+      />
+      <BusinessToolbarWorkspace contentSwitch={outsourcingViewSwitch}>
+        {summaryVisible ? (
+          <OutsourcingOrderSummaryPanel
+            ref={summaryRef}
+            adminProfile={adminProfile}
+            supplierOptions={supplierOptions}
+            processOptions={processOptions}
+            onOpenContract={(row) => {
+              const next = clearLinkedDocumentParams(searchParams)
+              next.delete('view')
+              next.delete('outsourcing_fact_id')
+              next.set('outsourcing_order_id', String(row.outsourcing_order_id))
+              setLifecycleScope('all')
+              setStatusFilter('')
+              setSearchParams(withLifecycleScopeSearchParam(next, 'all'))
             }}
           />
-        }
-      />
-      {summaryVisible ? (
-        <OutsourcingOrderSummaryPanel
-          ref={summaryRef}
-          adminProfile={adminProfile}
-          supplierOptions={supplierOptions}
-          processOptions={processOptions}
-          onOpenContract={(row) => {
-            const next = clearLinkedDocumentParams(searchParams)
-            next.delete('view')
-            next.delete('outsourcing_fact_id')
-            next.set('outsourcing_order_id', String(row.outsourcing_order_id))
-            setLifecycleScope('all')
-            setStatusFilter('')
-            setSearchParams(withLifecycleScopeSearchParam(next, 'all'))
-          }}
-        />
-      ) : (
-        <>
-          <BusinessOperationPanel
-            compact
-            onClearFilters={clearFilters}
-            activeFilterCount={activeFilterCount}
-            filters={
-              <>
-                <SearchInput
-                  value={resolvedLinkedKeyword || linkedKeyword || keyword}
-                  {...BUSINESS_SEARCH_SCOPES.outsourcing}
-                  onSearch={(value) => {
-                    if (
-                      linkedKeyword ||
-                      routeOutsourcingOrderID ||
-                      routeOutsourcingFactID
-                    ) {
-                      clearRouteContext()
-                    }
-                    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                    setKeyword(value)
-                  }}
-                />
-                <LifecycleScopeFilter
-                  value={lifecycleScope}
-                  onChange={(nextScope) => {
-                    setLifecycleScope(nextScope)
-                    if (
-                      !lifecycleScopeIncludesStatus(nextScope, statusFilter, [
-                        'closed',
-                        'canceled',
-                      ])
-                    ) {
-                      setStatusFilter('')
-                    }
-                    const nextParams = clearLinkedDocumentParams(searchParams)
-                    nextParams.delete('outsourcing_order_id')
-                    nextParams.delete('outsourcing_fact_id')
-                    setSearchParams(
-                      withLifecycleScopeSearchParam(nextParams, nextScope),
-                      { replace: true }
-                    )
-                    setResolvedLinkedContext({ routeKey: '', keyword: '' })
-                    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                  }}
-                />
-                <BusinessStatusFilter
-                  inline
-                  aria-label="委外订单状态"
-                  counts={statusCounts}
-                  loading={loading}
-                  exact={Boolean(
-                    routeOutsourcingOrderID || routeOutsourcingFactID
-                  )}
-                  className="erp-business-filter-control--status"
-                  value={statusFilter}
-                  options={lifecycleStatusOptions}
-                  onChange={(value) => {
-                    setStatusFilter(value)
-                    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                  }}
-                />
-                <SelectFilter
-                  aria-label="加工厂"
-                  className="erp-business-filter-control--status"
-                  value={supplierFilter}
-                  options={[
-                    { label: '全部加工厂', value: '' },
-                    ...supplierOptions,
-                  ]}
-                  placeholder="加工厂"
-                  showSearch
-                  optionFilterProp="label"
-                  onChange={(value) => {
-                    setSupplierFilter(value || '')
-                    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                  }}
-                />
-                <DateRangeFilter
-                  options={OUTSOURCING_ORDER_DATE_FILTER_OPTIONS}
-                  value={dateField}
-                  onTypeChange={(value) => {
-                    setDateField(value || 'order_date')
-                    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                  }}
-                  startValue={dateRange?.[0] || ''}
-                  endValue={dateRange?.[1] || ''}
-                  onStartChange={(value) => {
-                    setDateRange((current) => [value, current?.[1] || ''])
-                    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                  }}
-                  onEndChange={(value) => {
-                    setDateRange((current) => [current?.[0] || '', value])
-                    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                  }}
-                />
-                <SelectFilter
-                  emptyValue="updated_at:desc"
-                  aria-label="排序方式"
-                  className="erp-business-filter-control--sort"
-                  value={sortValue}
-                  options={OUTSOURCING_ORDER_SORT_OPTIONS}
-                  onChange={(value) => {
-                    setSortValue(value)
-                    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                  }}
-                />
-              </>
-            }
-            actions={
-              <Space wrap>
-                <BusinessListToolbarActions
-                  onExport={exportOrders}
-                  exportDisabled={loading || exporting || total === 0}
-                  exportDisabledReason={exporting ? '正在准备导出，请稍候' : ''}
-                  onOpenColumnOrder={openColumnOrder}
-                />
-              </Space>
-            }
-            primaryAction={
-              canCreate ? (
-                <ToolbarButton
-                  type="primary"
-                  className="erp-business-list-toolbar__primary-action"
-                  icon={<PlusOutlined />}
-                  onClick={openCreate}
-                >
-                  新建加工合同
-                </ToolbarButton>
-              ) : null
-            }
-          >
-            <SelectionActionBar
-              embedded
-              selectedCount={selectedRow ? 1 : 0}
-              selectedLabel={selectedLabel}
-              selectedItems={selectedItems}
-              summaryItems={
-                selectedRow
-                  ? [
-                      {
-                        key: 'status',
-                        label: '状态',
-                        value: statusText(
-                          selectedRow.lifecycle_status,
-                          OUTSOURCING_ORDER_STATUS_LABELS,
-                          '委外订单状态'
-                        ),
-                      },
-                    ]
-                  : []
+        ) : (
+          <>
+            <BusinessOperationPanel
+              inWorkspace
+              compact
+              onClearFilters={clearFilters}
+              activeFilterCount={activeFilterCount}
+              filters={
+                <>
+                  <SearchInput
+                    value={resolvedLinkedKeyword || linkedKeyword || keyword}
+                    {...BUSINESS_SEARCH_SCOPES.outsourcing}
+                    onSearch={(value) => {
+                      if (
+                        linkedKeyword ||
+                        routeOutsourcingOrderID ||
+                        routeOutsourcingFactID
+                      ) {
+                        clearRouteContext()
+                      }
+                      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+                      setKeyword(value)
+                    }}
+                  />
+                  <LifecycleScopeFilter
+                    value={lifecycleScope}
+                    onChange={(nextScope) => {
+                      setLifecycleScope(nextScope)
+                      if (
+                        !lifecycleScopeIncludesStatus(nextScope, statusFilter, [
+                          'closed',
+                          'canceled',
+                        ])
+                      ) {
+                        setStatusFilter('')
+                      }
+                      const nextParams = clearLinkedDocumentParams(searchParams)
+                      nextParams.delete('outsourcing_order_id')
+                      nextParams.delete('outsourcing_fact_id')
+                      setSearchParams(
+                        withLifecycleScopeSearchParam(nextParams, nextScope),
+                        { replace: true }
+                      )
+                      setResolvedLinkedContext({ routeKey: '', keyword: '' })
+                      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+                    }}
+                  />
+                  <BusinessStatusFilter
+                    inline
+                    aria-label="委外订单状态"
+                    counts={statusCounts}
+                    loading={loading}
+                    exact={Boolean(
+                      routeOutsourcingOrderID || routeOutsourcingFactID
+                    )}
+                    className="erp-business-filter-control--status"
+                    value={statusFilter}
+                    options={lifecycleStatusOptions}
+                    onChange={(value) => {
+                      setStatusFilter(value)
+                      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+                    }}
+                  />
+                  <SelectFilter
+                    aria-label="加工厂"
+                    className="erp-business-filter-control--status"
+                    value={supplierFilter}
+                    options={[
+                      { label: '全部加工厂', value: '' },
+                      ...supplierOptions,
+                    ]}
+                    placeholder="加工厂"
+                    showSearch
+                    optionFilterProp="label"
+                    onChange={(value) => {
+                      setSupplierFilter(value || '')
+                      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+                    }}
+                  />
+                  <DateRangeFilter
+                    options={OUTSOURCING_ORDER_DATE_FILTER_OPTIONS}
+                    value={dateField}
+                    onTypeChange={(value) => {
+                      setDateField(value || 'order_date')
+                      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+                    }}
+                    startValue={dateRange?.[0] || ''}
+                    endValue={dateRange?.[1] || ''}
+                    onStartChange={(value) => {
+                      setDateRange((current) => [value, current?.[1] || ''])
+                      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+                    }}
+                    onEndChange={(value) => {
+                      setDateRange((current) => [current?.[0] || '', value])
+                      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+                    }}
+                  />
+                  <SelectFilter
+                    emptyValue="updated_at:desc"
+                    aria-label="排序方式"
+                    className="erp-business-filter-control--sort"
+                    value={sortValue}
+                    options={OUTSOURCING_ORDER_SORT_OPTIONS}
+                    onChange={(value) => {
+                      setSortValue(value)
+                      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+                    }}
+                  />
+                </>
               }
-              boundaryText="确认下单只确认加工合同，不会同时完成发料、回货、质检或应付；这些事项请到对应页面继续办理。"
+              actions={
+                <Space wrap>
+                  <BusinessListToolbarActions
+                    onExport={exportOrders}
+                    exportDisabled={loading || exporting || total === 0}
+                    exportDisabledReason={exporting ? '正在准备导出，请稍候' : ''}
+                    onOpenColumnOrder={openColumnOrder}
+                  />
+                </Space>
+              }
+              primaryAction={
+                canCreate ? (
+                  <ToolbarButton
+                    type="primary"
+                    className="erp-business-list-toolbar__primary-action"
+                    icon={<PlusOutlined />}
+                    onClick={openCreate}
+                  >
+                    新建加工合同
+                  </ToolbarButton>
+                ) : null
+              }
             >
-              <SelectionClearAction
+              <SelectionActionBar
+                embedded
                 selectedCount={selectedRow ? 1 : 0}
-                selectionLabel="加工合同"
-                label="清空"
-                onClear={() => setSelectedRow(null)}
-              />
-              {canUpdate ? (
-                <BusinessActionTooltip
-                  visible={!selectedRow || canEditOutsourcingOrder(selectedRow)}
-                  disabled={
-                    !selectedRow ||
-                    !canEditOutsourcingOrder(selectedRow) ||
-                    itemsLoading
-                  }
-                  disabledReason={
-                    !selectedRow
-                      ? '请先选择一条加工合同'
-                      : !canEditOutsourcingOrder(selectedRow)
-                        ? '只有草稿加工合同可以编辑'
-                        : itemsLoading
-                          ? '合同明细加载完成后可编辑'
-                          : ''
-                  }
-                >
-                  <Button
-                    data-business-action-key="outsourcing-edit"
-                    data-business-action-role="edit"
-                    size="small"
-                    icon={<EditOutlined />}
-                    loading={itemsLoading}
+                selectedLabel={selectedLabel}
+                selectedItems={selectedItems}
+                summaryItems={
+                  selectedRow
+                    ? [
+                        {
+                          key: 'status',
+                          label: '状态',
+                          value: statusText(
+                            selectedRow.lifecycle_status,
+                            OUTSOURCING_ORDER_STATUS_LABELS,
+                            '委外订单状态'
+                          ),
+                        },
+                      ]
+                    : []
+                }
+                boundaryText="确认下单只确认加工合同，不会同时完成发料、回货、质检或应付；这些事项请到对应页面继续办理。"
+              >
+                <SelectionClearAction
+                  selectedCount={selectedRow ? 1 : 0}
+                  selectionLabel="加工合同"
+                  label="清空"
+                  onClear={() => setSelectedRow(null)}
+                />
+                {canUpdate ? (
+                  <BusinessActionTooltip
+                    visible={!selectedRow || canEditOutsourcingOrder(selectedRow)}
                     disabled={
                       !selectedRow ||
                       !canEditOutsourcingOrder(selectedRow) ||
                       itemsLoading
                     }
-                    onClick={() => openEdit(selectedRow)}
+                    disabledReason={
+                      !selectedRow
+                        ? '请先选择一条加工合同'
+                        : !canEditOutsourcingOrder(selectedRow)
+                          ? '只有草稿加工合同可以编辑'
+                          : itemsLoading
+                            ? '合同明细加载完成后可编辑'
+                            : ''
+                    }
                   >
-                    编辑
-                  </Button>
-                </BusinessActionTooltip>
-              ) : null}
-              <BusinessActionTooltip
-                disabled={!selectedRow || itemsLoading}
-                disabledReason={
-                  itemsLoading
-                    ? '合同资料加载完成后可查看'
-                    : '请先选择一条加工合同'
-                }
-              >
-                <Button
-                  data-business-action-key="outsourcing-details"
-                  data-business-action-role="view"
-                  size="small"
-                  icon={<EyeOutlined />}
+                    <Button
+                      data-business-action-key="outsourcing-edit"
+                      data-business-action-role="edit"
+                      size="small"
+                      icon={<EditOutlined />}
+                      loading={itemsLoading}
+                      disabled={
+                        !selectedRow ||
+                        !canEditOutsourcingOrder(selectedRow) ||
+                        itemsLoading
+                      }
+                      onClick={() => openEdit(selectedRow)}
+                    >
+                      编辑
+                    </Button>
+                  </BusinessActionTooltip>
+                ) : null}
+                <BusinessActionTooltip
                   disabled={!selectedRow || itemsLoading}
-                  onClick={() => openOutsourcingOrderDetails(selectedRow)}
-                >
-                  查看详情
-                </Button>
-              </BusinessActionTooltip>
-              {canHandleOutsourcingLines && !outletContext?.taskBusiness ? (
-                <BusinessActionTooltip
-                  disabled={!selectedRow || saving || itemsLoading}
-                  disabledReason={!selectedRow ? '请先选择一条加工合同' : '合同资料处理完成后可办理'}
+                  disabledReason={
+                    itemsLoading
+                      ? '合同资料加载完成后可查看'
+                      : '请先选择一条加工合同'
+                  }
                 >
                   <Button
-                    data-business-action-key="outsourcing-handle-items"
-                    data-business-action-role="action"
+                    data-business-action-key="outsourcing-details"
+                    data-business-action-role="view"
                     size="small"
+                    icon={<EyeOutlined />}
+                    disabled={!selectedRow || itemsLoading}
+                    onClick={() => openOutsourcingOrderDetails(selectedRow)}
+                  >
+                    查看详情
+                  </Button>
+                </BusinessActionTooltip>
+                {canHandleOutsourcingLines && !outletContext?.taskBusiness ? (
+                  <BusinessActionTooltip
                     disabled={!selectedRow || saving || itemsLoading}
-                    onClick={(event) => {
-                      // 鼠标点击不自动聚焦的浏览器也须保留返回入口。
-                      event.currentTarget.focus({ preventScroll: true })
-                      setHandlingOpen(true)
-                    }}
+                    disabledReason={!selectedRow ? '请先选择一条加工合同' : '合同资料处理完成后可办理'}
                   >
-                    办理明细
-                  </Button>
-                </BusinessActionTooltip>
-              ) : null}
-              {relatedOutsourcingFactsAvailability.visible ? (
+                    <Button
+                      data-business-action-key="outsourcing-handle-items"
+                      data-business-action-role="action"
+                      size="small"
+                      disabled={!selectedRow || saving || itemsLoading}
+                      onClick={(event) => {
+                        // 鼠标点击不自动聚焦的浏览器也须保留返回入口。
+                        event.currentTarget.focus({ preventScroll: true })
+                        setHandlingOpen(true)
+                      }}
+                    >
+                      办理明细
+                    </Button>
+                  </BusinessActionTooltip>
+                ) : null}
+                {relatedOutsourcingFactsAvailability.visible ? (
+                  <BusinessActionTooltip
+                    disabled={relatedOutsourcingFactsAvailability.disabled}
+                    disabledReason={
+                      relatedOutsourcingFactsAvailability.disabledReason
+                    }
+                  >
+                    <Button
+                      data-business-action-key="related-outsourcing-facts"
+                      data-business-action-role={canHandleOutsourcingRecords ? 'action' : 'related'}
+                      size="small"
+                      disabled={relatedOutsourcingFactsAvailability.disabled}
+                      loading={returnRecordsLoading}
+                      onClick={() => openRelatedReturnRecords(selectedRow)}
+                    >
+                      委外记录
+                    </Button>
+                  </BusinessActionTooltip>
+                ) : null}
+                {renderPrimaryLifecycleAction()}
                 <BusinessActionTooltip
-                  disabled={relatedOutsourcingFactsAvailability.disabled}
+                  disabled={!selectedRow || printingAction !== ''}
                   disabledReason={
-                    relatedOutsourcingFactsAvailability.disabledReason
+                    !selectedRow
+                      ? '请先选择一条加工合同'
+                      : '当前打印任务完成后可继续'
                   }
                 >
                   <Button
-                    data-business-action-key="related-outsourcing-facts"
-                    data-business-action-role={canHandleOutsourcingRecords ? 'action' : 'related'}
+                    data-business-action-key="processing-contract-print"
+                    data-business-action-role="output"
                     size="small"
-                    disabled={relatedOutsourcingFactsAvailability.disabled}
-                    loading={returnRecordsLoading}
-                    onClick={() => openRelatedReturnRecords(selectedRow)}
+                    icon={<PrinterOutlined />}
+                    disabled={!selectedRow || printingAction !== ''}
+                    loading={printingAction === PROCESSING_CONTRACT_TEMPLATE_KEY}
+                    onClick={openProcessingContractPrint}
                   >
-                    委外记录
+                    加工合同打印
                   </Button>
                 </BusinessActionTooltip>
-              ) : null}
-              {renderPrimaryLifecycleAction()}
-              <BusinessActionTooltip
-                disabled={!selectedRow || printingAction !== ''}
-                disabledReason={
-                  !selectedRow
-                    ? '请先选择一条加工合同'
-                    : '当前打印任务完成后可继续'
-                }
-              >
-                <Button
-                  data-business-action-key="processing-contract-print"
-                  data-business-action-role="output"
-                  size="small"
-                  icon={<PrinterOutlined />}
+                <BusinessActionTooltip
                   disabled={!selectedRow || printingAction !== ''}
-                  loading={printingAction === PROCESSING_CONTRACT_TEMPLATE_KEY}
-                  onClick={openProcessingContractPrint}
-                >
-                  加工合同打印
-                </Button>
-              </BusinessActionTooltip>
-              <BusinessActionTooltip
-                disabled={!selectedRow || printingAction !== ''}
-                disabledReason={
-                  !selectedRow
-                    ? '请先选择一条加工合同'
-                    : '当前打印任务完成后可继续'
-                }
-              >
-                <Button
-                  data-business-action-key="work-instruction-print"
-                  data-business-action-role="output"
-                  size="small"
-                  icon={<PrinterOutlined />}
-                  disabled={!selectedRow || printingAction !== ''}
-                  loading={printingAction === WORK_INSTRUCTION_TEMPLATE_KEY}
-                  onClick={openWorkInstructionPrint}
-                >
-                  作业指导书打印
-                </Button>
-              </BusinessActionTooltip>
-              {secondaryLifecycleActions.map((action) => (
-                <BusinessLifecycleSecondaryAction
-                  key={action.key}
-                  action={action}
-                  disabled={lifecycleActionStates[action.key]?.disabled}
                   disabledReason={
-                    lifecycleActionStates[action.key]?.disabledReason
+                    !selectedRow
+                      ? '请先选择一条加工合同'
+                      : '当前打印任务完成后可继续'
                   }
-                  onAction={runLifecycleAction}
-                />
-              ))}
-              <BusinessTaskActions sourceType="outsourcing_order" record={selectedRow} adminProfile={adminProfile} disabled={saving} />
-            </SelectionActionBar>
-          </BusinessOperationPanel>
+                >
+                  <Button
+                    data-business-action-key="work-instruction-print"
+                    data-business-action-role="output"
+                    size="small"
+                    icon={<PrinterOutlined />}
+                    disabled={!selectedRow || printingAction !== ''}
+                    loading={printingAction === WORK_INSTRUCTION_TEMPLATE_KEY}
+                    onClick={openWorkInstructionPrint}
+                  >
+                    作业指导书打印
+                  </Button>
+                </BusinessActionTooltip>
+                {secondaryLifecycleActions.map((action) => (
+                  <BusinessLifecycleSecondaryAction
+                    key={action.key}
+                    action={action}
+                    disabled={lifecycleActionStates[action.key]?.disabled}
+                    disabledReason={
+                      lifecycleActionStates[action.key]?.disabledReason
+                    }
+                    onAction={runLifecycleAction}
+                  />
+                ))}
+                <BusinessTaskActions sourceType="outsourcing_order" record={selectedRow} adminProfile={adminProfile} disabled={saving} />
+              </SelectionActionBar>
+            </BusinessOperationPanel>
 
-          <BusinessDataTable
-            rowKey="id"
-            columns={columns}
-            dataSource={rows}
-            loading={loading}
-            rowSelection={{
-              type: 'radio',
-              selectedRowKeys: selectedRow ? [selectedRow.id] : [],
-              onChange: (_keys, selectedRows) =>
-                setSelectedRow(selectedRows[0] || null),
-            }}
-            rowClassName={(record) =>
-              record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
-            }
-            onRow={(record) => ({
-              onClick: () => setSelectedRow(record),
-            })}
-            onOpenRecord={openOutsourcingOrderRecord}
-            emptyDescription="暂无加工合同"
-            pagination={createBusinessTablePagination({
-              pagination,
-              total,
-              onChange: (current, pageSize) =>
-                setPagination({ current, pageSize }),
-            })}
-            scroll={{ x: 1220 }}
-          />
-        </>
-      )}
+            <BusinessDataTable
+              rowKey="id"
+              columns={columns}
+              dataSource={rows}
+              loading={loading}
+              rowSelection={{
+                type: 'radio',
+                selectedRowKeys: selectedRow ? [selectedRow.id] : [],
+                onChange: (_keys, selectedRows) =>
+                  setSelectedRow(selectedRows[0] || null),
+              }}
+              rowClassName={(record) =>
+                record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
+              }
+              onRow={(record) => ({
+                onClick: () => setSelectedRow(record),
+              })}
+              onOpenRecord={openOutsourcingOrderRecord}
+              emptyDescription="暂无加工合同"
+              pagination={createBusinessTablePagination({
+                pagination,
+                total,
+                onChange: (current, pageSize) =>
+                  setPagination({ current, pageSize }),
+              })}
+              scroll={{ x: 1220 }}
+            />
+          </>
+        )}
 
+      </BusinessToolbarWorkspace>
       {outletContext?.taskBusiness ? (
         <MobileOutsourcingTaskActions record={selectedRow} load={loadOutsourcingOrderDetailsItems} getItemFields={getOutsourcingHandlingItemFields} refreshKey={outletContext.workflowTaskNavigation?.businessReceipt} />
       ) : null}

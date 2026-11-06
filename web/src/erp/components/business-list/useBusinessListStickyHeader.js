@@ -2,13 +2,16 @@ import { useLayoutEffect, useState } from 'react'
 
 // The page remains the vertical scroller; Ant Table owns column alignment and
 // horizontal header/body synchronization. Dialog and bounded tables stay local.
-export default function useBusinessListStickyHeader(cardRef, enabled) {
+export default function useBusinessListStickyHeader(cardRef, enabled, toolbarRef) {
   const [sticky, setSticky] = useState(false)
 
   useLayoutEffect(() => {
     const card = cardRef.current
-    const page = card?.closest('[data-page-table-region], .erp-business-page-layout')
-    const toolbar = page?.querySelector('[data-page-table-toolbar], :scope > .erp-business-operation-panel')
+    const scope = card?.closest('[data-table-scroll-scope]')
+    const workspace = scope?.matches('.erp-business-toolbar-workspace') ? scope : null
+    const sharedToolbar = workspace && toolbarRef?.current
+    const page = sharedToolbar ? workspace : card?.closest('[data-page-table-region], .erp-business-page-layout')
+    const toolbar = sharedToolbar || page?.querySelector('[data-page-table-toolbar], :scope > .erp-business-operation-panel')
     const container = page?.closest('.erp-admin-content')
     if (!enabled || !toolbar || !container) {
       setSticky((current) => current === false ? current : false)
@@ -41,7 +44,7 @@ export default function useBusinessListStickyHeader(cardRef, enabled) {
       desktop.removeEventListener('change', measure)
       page.style.removeProperty('--erp-list-scroll-padding')
     }
-  }, [cardRef, enabled])
+  }, [cardRef, enabled, toolbarRef])
 
   return sticky
 }

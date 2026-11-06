@@ -324,7 +324,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'purchase_to_inventory',
     '采购下单到入库应付',
     'primary',
-    '用料生成的采购单已经批准，独立人工单另行审批；采购独立维护交期、补齐缺价，到货提醒与异常汇总读取原单事实。仓库点数、IQC 检验、仓库入库各自办理，生成应付前核对价格依据。',
+    '用料生成的采购单已经批准，独立人工单另行审批；采购独立维护交期、补齐缺价，采购跟进读取原单事实。仓库点数、IQC 检验、仓库入库各自办理，生成应付前核对价格依据。',
     [
       chainNode('purchase_order', '采购订单与订单行', 'source_document', {
         machineKeys: ['source.purchase_order', 'source.order_item'],

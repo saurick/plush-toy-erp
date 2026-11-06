@@ -27,12 +27,10 @@ test('filter changes reset paging while next page keeps the server filter', () =
   })
   assert.equal(next.page, 1)
   const params = purchaseFollowupParams(
-    'exceptions',
     { ...next, page: 2 },
     { supplierID: '8', keyword: '测试', orderID: '4' }
   )
   assert.deepEqual(params, {
-    view: 'exceptions',
     kind: 'pending_inspection',
     confirmation: 'all',
     start_date: '',
@@ -43,4 +41,35 @@ test('filter changes reset paging while next page keeps the server filter', () =
     limit: 25,
     offset: 25,
   })
+})
+
+test('closing the calendar clears hidden date filters and keeps unrelated followups', () => {
+  const dateState = {
+    calendarOpen: true,
+    filter: 'date',
+    selectedDate: '2026-11-06',
+    confirmation: 'confirmed',
+    page: 4,
+  }
+  const closed = purchaseFollowupPageChange(dateState, { calendarOpen: false })
+  assert.equal(closed.filter, 'all')
+  assert.equal(closed.selectedDate, '')
+  assert.equal(closed.confirmation, 'all')
+  assert.equal(closed.page, 1)
+  const rejected = purchaseFollowupPageChange(dateState, { filter: 'rejected' })
+  assert.equal(rejected.confirmation, 'all')
+  assert.equal(rejected.selectedDate, '')
+  assert.equal(
+    purchaseFollowupPageChange(rejected, { calendarOpen: false }).filter,
+    'rejected'
+  )
+  assert.equal(
+    purchaseFollowupParams({ confirmation: 'confirmed' }).confirmation,
+    'all'
+  )
+  assert.equal(
+    purchaseFollowupParams({ calendarOpen: true, confirmation: 'confirmed' })
+      .confirmation,
+    'confirmed'
+  )
 })

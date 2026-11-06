@@ -157,6 +157,12 @@ Workflow 计划还核对老板阻塞 / 完成 / 退回、跨角色催办、reaso
 
 仓储历史回归在延迟列表响应的夹具下，等待目标查询响应、实际行和关联名称显示，再连续五轮后退、前进与刷新，并输出 `inventory-history-refresh.json`。SPA 历史切换不能以文档此前的 `networkidle` 状态作为新视图完成的证据；旧文档卸载期间才发起的 fetch 即使已被捕获，WebKit 仍可能通过自动化通道报告访问控制错误。场景继续保留所有 `pageerror`、控制台错误和失败请求的检查。
 
+`business-toolbar-composition-purchase|sales|history` 核对业务内容分类与查询组合、导航持续挂载、已提交查询恢复、工具菜单及 1920 / 1366 / 820 / 390px 布局。`business-toolbar-form-entry` 检查仓储整页编辑隐藏父工具栏、返回后恢复原分类条；`business-toolbar-dynamic-options-growth` 以 30 个模拟仓库验证可搜索名单不会增加内容分类。它们与仓储分类、分栏、工作台对照、表头吸顶和历史刷新场景分别在 WebKit 与 Chromium 执行；职责说明只在交互设计中表达，不进入业务工具栏。模拟规模只证明对应界面与查询合同，不代表生产容量或业务验收。
+
+`dev-ui-toolbar-composition`、`dev-ui-toolbar-category-growth`、`dev-ui-toolbar-data-growth` 对工作台真实组件组合样例做浅色桌面回归，分别在 Chromium / WebKit 核对四业务往返、未提交搜索、筛选 / 分页 / 选择、职责标注开关、真实详情和列设置、本地 CSV、假设分类与 30 项数据名单，以及 1920 / 1366px 下的工具栏边界。业务请求从初始导航起记录并要求为零；高权限与任务上下文隔离另由 `DevUIBusinessToolbarExample.test.mjs` 守住，不以该样例代替业务页面权限或事实写入验收。
+
+独立工作台的 `test:workbench` 同时执行 `dev-ui-toolbar-composition`，核对固定构建制品中的按需加载、四业务组合、详情、列设置和本地下载；普通 Vite 验证与制品浏览器证据分别保留。
+
 默认第 1 页切换库存视图时，每次操作只发起一次列表查询；`warehouse-inventory-pagination-view-reset` 另用 51 条批次核对第 2 页保持可用，切换到库存变动记录后按第 1 页读取。
 
 `businessFormalScenarios.mjs` 组合主数据、订单、库存、生产、出货及附件恢复的领域场景；共享断言位于 `businessFormalAssertions.mjs`。跨业务页的 `businessCorePagesScenarios.mjs` 按固定顺序调用各领域的 `businessCore*Checks.mjs`，请求记录与局部夹具归对应检查持有，保留场景名称、顺序、分页及权限断言。

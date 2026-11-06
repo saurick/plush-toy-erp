@@ -135,14 +135,14 @@ for (const pageCase of [
   })
 }
 
-test('purchase edit refresh preserves pagination while refreshing the arrival view', () => {
+test('purchase edit refresh preserves pagination while refreshing purchase followups', () => {
   const refresh = sourceSlice(
     purchaseOrderSource,
     'const refreshPageData = useCallback',
     'registerPageRefresh?.(refreshPageData)'
   )
   assert.match(refresh, /loadOrders\(\)/u)
-  assert.match(refresh, /if \(contentView !== 'list'\) reloadArrivalData\(\)/u)
+  assert.match(refresh, /if \(contentView === 'followup'\) reloadFollowupData\(\)/u)
   assert.doesNotMatch(refresh, /setPagination|resetBusinessPaginationCurrent/u)
 })
 

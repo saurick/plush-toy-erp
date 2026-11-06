@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Space, Tag } from 'antd'
+import { Alert, Button, Tag } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -75,14 +75,6 @@ function formatHistoryTime(value, { emptyText = '-' } = {}) {
   const timestamp = Number(value || 0)
   if (!Number.isFinite(timestamp) || timestamp <= 0) return emptyText
   return new Date(timestamp * 1000).toLocaleString('zh-CN', { hour12: false })
-}
-
-function HistoryQueryFilters({ children }) {
-  return (
-    <Space wrap size={8}>
-      {children}
-    </Space>
-  )
 }
 
 export default function HistoryRecordsPage() {
@@ -310,39 +302,41 @@ export default function HistoryRecordsPage() {
       <PageHeaderCard compact title="历史记录中心" />
       <BusinessOperationPanel
         compact
+        contentSwitch={
+          <SelectFilter
+            aria-label="历史记录类型"
+            prefix="记录类型"
+            value={activeSource?.key}
+            options={sourceOptions}
+            showSearch
+            placeholder="选择记录类型"
+            disabled={!availableSources.length}
+            onChange={(nextSourceKey) =>
+              updateQuery({
+                source: nextSourceKey,
+                keyword: '',
+                status: '',
+                page: '',
+              })
+            }
+          />
+        }
         filters={
           <>
-            <HistoryQueryFilters inline>
-              <SelectFilter
-                aria-label="历史记录类型"
-                prefix="记录类型"
-                value={activeSource?.key}
-                options={sourceOptions}
-                placeholder="选择记录类型"
-                disabled={!availableSources.length}
-                onChange={(nextSourceKey) =>
-                  updateQuery({
-                    source: nextSourceKey,
-                    keyword: '',
-                    status: '',
-                    page: '',
-                  })
+            {activeSource?.historyStatusOptions?.length > 1 ? (
+              <BusinessStatusFilter
+                inline
+                allLabel="全部历史状态"
+                counts={statusCounts}
+                loading={loading}
+                aria-label="历史状态"
+                value={status}
+                options={activeSource.historyStatusOptions}
+                onChange={(nextStatus) =>
+                  updateQuery({ status: nextStatus || '', page: '' })
                 }
               />
-              {activeSource?.historyStatusOptions?.length > 1 ? (
-                <BusinessStatusFilter
-                  allLabel="全部历史状态"
-                  counts={statusCounts}
-                  loading={loading}
-                  aria-label="历史状态"
-                  value={status}
-                  options={activeSource.historyStatusOptions}
-                  onChange={(nextStatus) =>
-                    updateQuery({ status: nextStatus || '', page: '' })
-                  }
-                />
-              ) : null}
-            </HistoryQueryFilters>
+            ) : null}
             <SearchInput
               resetKey={sourceKey}
               value={keyword}

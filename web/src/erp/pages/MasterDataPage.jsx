@@ -18,7 +18,7 @@ import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
-import Tabs from '@/common/components/navigation/SlidingTabs'
+import { BusinessViewSwitch } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../utils/warehouseClassification.mjs'
 import { DEFAULT_DELIVERY_COUNTRY } from '../utils/deliveryAddress.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -898,20 +898,19 @@ export default function MasterDataPage({ type }) {
         compact
         title={config.title}
         helpKey={isProductCatalogPage ? 'products' : moduleKey}
-        viewSwitch={
-          isProductCatalogPage ? (
-            <Tabs
-              aria-label="产品档案视图"
-              activeKey={effectiveType}
-              onChange={handleProductCatalogTabChange}
-              items={productCatalogTabItems}
-            />
-          ) : null
-        }
       />
 
       <BusinessOperationPanel
         compact
+        contentSwitch={isProductCatalogPage ? (
+          <BusinessViewSwitch
+            appearance="chips"
+            aria-label="产品档案视图"
+            value={effectiveType}
+            onChange={handleProductCatalogTabChange}
+            options={productCatalogTabItems.map(({ key, label }) => ({ value: key, label }))}
+          />
+        ) : null}
         onClearFilters={clearFilters}
         activeFilterCount={activeFilterCount}
         filters={

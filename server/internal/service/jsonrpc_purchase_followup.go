@@ -20,11 +20,11 @@ func (d *jsonrpcDispatcher) handlePurchaseFollowups(ctx context.Context, id stri
 	if res := d.requireCustomerConfigModulesReadable(ctx, "purchase_orders", "purchase_receipts"); res != nil {
 		return id, res, nil
 	}
-	if !sourceOrderAllowsOnly(pm, "view", "kind", "keyword", "confirmation", "start_date", "selected_date", "supplier_id", "order_id", "limit", "offset") {
+	if !sourceOrderAllowsOnly(pm, "kind", "keyword", "confirmation", "start_date", "selected_date", "supplier_id", "order_id", "limit", "offset") {
 		return id, invalidParamResult(), nil
 	}
 	q := biz.PurchaseFollowupQuery{}
-	for key, dest := range map[string]*string{"view": &q.View, "kind": &q.Kind, "keyword": &q.Keyword, "confirmation": &q.Confirmation, "start_date": &q.StartDate, "selected_date": &q.SelectedDate} {
+	for key, dest := range map[string]*string{"kind": &q.Kind, "keyword": &q.Keyword, "confirmation": &q.Confirmation, "start_date": &q.StartDate, "selected_date": &q.SelectedDate} {
 		value, res := getOptionalWorkflowTaskBoardString(pm, key, 100)
 		if res != nil {
 			return id, res, nil

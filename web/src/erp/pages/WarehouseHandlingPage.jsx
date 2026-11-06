@@ -13,6 +13,8 @@ import { sourceActionAccess } from '../utils/sourceActionAccess.mjs'
 import SourceActionAccessNotice from '../components/SourceActionAccessNotice.jsx'
 import { resolveWarehouseView } from '../utils/warehouseViews.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import { BusinessPageLayout, BusinessToolbarWorkspace } from '../components/business-list/BusinessListLayout.jsx'
+import { BusinessModuleViewTabs } from '../components/BusinessModuleTabs.jsx'
 
 export default function WarehouseHandlingPage({ direction }) {
   const { adminProfile = {} } = useBusinessPageContext() || {}
@@ -24,7 +26,7 @@ export default function WarehouseHandlingPage({ direction }) {
     [active.view]: { title: active.label, listParams: active.factType ? { fact_type: active.factType } : {} },
   } : {}, [active])
   return (
-    <>
+    <BusinessPageLayout className="erp-warehouse-handling-page">
       {direction === 'inbound' && !hasActionPermission(adminProfile, PermissionCode.PURCHASE_RECEIPT_READ) && (
         <>
           <SourceActionAccessNotice access={sourceActionAccess(adminProfile, PurchaseSourceActions.receiptReturn)} />
@@ -32,12 +34,14 @@ export default function WarehouseHandlingPage({ direction }) {
         </>
       )}
       {active ? (
-        <BusinessPageStateScopeProvider key={active.key} value={`warehouse-${active.key}`}>
-          {active.key === 'purchase' ? <PurchaseReceiptsPage />
-          : active.key === 'shipment' ? <ShipmentsPage />
-            : <OperationalFactWorkspace pageTitle={active.label} toolbarModuleKey={direction} initialActiveKey={active.view} enabledViews={enabledViews} viewOverrides={viewOverrides} showTabs={false} />}
-        </BusinessPageStateScopeProvider>
+        <BusinessToolbarWorkspace contentSwitch={<BusinessModuleViewTabs navigation={navigation} />}>
+          <BusinessPageStateScopeProvider key={active.key} value={`warehouse-${active.key}`}>
+            {active.key === 'purchase' ? <PurchaseReceiptsPage />
+            : active.key === 'shipment' ? <ShipmentsPage />
+              : <OperationalFactWorkspace pageTitle={active.label} toolbarModuleKey={direction} initialActiveKey={active.view} enabledViews={enabledViews} viewOverrides={viewOverrides} showTabs={false} />}
+          </BusinessPageStateScopeProvider>
+        </BusinessToolbarWorkspace>
       ) : <Empty description="当前账号没有可办理的仓库业务" />}
-    </>
+    </BusinessPageLayout>
   )
 }

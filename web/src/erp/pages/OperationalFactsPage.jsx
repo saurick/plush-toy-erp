@@ -851,6 +851,7 @@ export function OperationalFactWorkspace({
     ) : null
   const contentViewSwitch = isFinanceDuePage ? (
     <BusinessViewSwitch
+      appearance="chips"
       value={contentView}
       options={[
         { value: 'list', label: '账款列表' },
@@ -889,7 +890,7 @@ export function OperationalFactWorkspace({
     : BusinessPageLayout
   const layoutProps = productionRecordsWorkspace
     ? {}
-    : { className: 'erp-operational-fact-page' }
+    : { className: 'erp-operational-fact-page', inWorkspace: true }
 
   return (
     <LayoutRoot {...layoutProps}>
@@ -903,9 +904,10 @@ export function OperationalFactWorkspace({
       )}
 
       <BusinessOperationPanel
+        inWorkspace
         hidden={contentView === 'process'}
         compact
-        viewSwitch={contentViewSwitch}
+        contentSwitch={contentViewSwitch}
         onClearFilters={() => clearFilters(resolvedRouteKeyword || linkedKeyword || keyword)}
         activeFilterCount={activeFilterCount}
         filters={

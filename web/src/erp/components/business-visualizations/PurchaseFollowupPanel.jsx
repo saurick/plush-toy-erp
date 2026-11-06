@@ -84,9 +84,8 @@ const columns = [
   },
 ]
 
-export default function PurchaseArrivalCalendar({
+export default function PurchaseFollowupPanel({
   board,
-  view = 'arrival',
   loading,
   error,
   onRetry,
@@ -100,7 +99,7 @@ export default function PurchaseArrivalCalendar({
   onSupplierChange,
   queryParams,
 }) {
-  const arrival = view === 'arrival'
+  const calendarOpen = Boolean(viewState.calendarOpen)
   const today = board?.as_of_date || currentBusinessDate()
   const startDate = viewState.startDate || today
   const endDate = moveBusinessDate(startDate, 13)
@@ -124,17 +123,16 @@ export default function PurchaseArrivalCalendar({
     columns,
     recordLabel: '采购跟进事项',
   })
-  const kinds = arrival
-    ? ['overdue', 'due_soon', 'unscheduled', 'scheduled']
-    : [
-        'overdue',
-        'unscheduled',
-        ...(board?.access?.quality
-          ? ['pending_inspection', 'rejected', 'ready_inbound']
-          : []),
-        ...(board?.access?.commercial ? ['missing_price'] : []),
-        ...(board?.access?.finance ? ['unsettled'] : []),
-      ]
+  const kinds = [
+    'overdue',
+    'due_soon',
+    'unscheduled',
+    ...(board?.access?.quality ? ['rejected'] : []),
+    ...(board?.access?.commercial ? ['missing_price'] : []),
+    'scheduled',
+    ...(board?.access?.quality ? ['pending_inspection', 'ready_inbound'] : []),
+    ...(board?.access?.finance ? ['unsettled'] : []),
+  ]
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0)
   const actionColumns = [
     ...columns,
@@ -153,6 +151,7 @@ export default function PurchaseArrivalCalendar({
   return (
     <>
       <BusinessOperationPanel
+        inWorkspace
         filters={
           <>
             <SearchInput
@@ -182,11 +181,20 @@ export default function PurchaseArrivalCalendar({
         }
       />
       <BusinessVisualizationFrame
-        title={arrival ? '采购到货计划' : '采购异常汇总'}
+        title="采购跟进"
         className="erp-arrival-calendar"
         loading={loading}
         error={error}
-        metricsLabel={arrival ? '待到货明细' : '需跟进事项'}
+        metricsLabel="跟进事项"
+        toolbar={
+          <Button
+            aria-expanded={calendarOpen}
+            aria-controls="purchase-followup-calendar"
+            onClick={() => change({ calendarOpen: !calendarOpen })}
+          >
+            {calendarOpen ? '收起日历' : '到货日历'}
+          </Button>
+        }
         countUnit="项"
         metrics={[
           { key: 'all', label: '全部', value: total },
@@ -203,8 +211,11 @@ export default function PurchaseArrivalCalendar({
           onClick: () => change({ filter: metric.key, selectedDate: '' }),
         }))}
       >
-        {arrival && (
-          <div className="erp-arrival-calendar__toolbar">
+        {calendarOpen && (
+          <div
+            id="purchase-followup-calendar"
+            className="erp-arrival-calendar__toolbar"
+          >
             <div className="erp-arrival-calendar__period">
               <Button
                 aria-label="前 14 天"
@@ -289,7 +300,7 @@ export default function PurchaseArrivalCalendar({
         <VisualizationState loading={loading} error={error} onRetry={onRetry} />
         {!loading && !error && (
           <>
-            {arrival && (
+            {calendarOpen && (
               <div className="erp-arrival-calendar__calendar">
                 <div
                   className="erp-arrival-calendar__days"
@@ -330,8 +341,7 @@ export default function PurchaseArrivalCalendar({
                 <strong>
                   {filter === 'date'
                     ? viewState.selectedDate
-                    : PURCHASE_FOLLOWUP_LABELS[filter] ||
-                      (arrival ? '到货安排' : '采购异常')}{' '}
+                    : PURCHASE_FOLLOWUP_LABELS[filter] || '全部跟进事项'}{' '}
                   · {board?.total || 0} 项
                 </strong>
                 <Button
@@ -358,9 +368,7 @@ export default function PurchaseArrivalCalendar({
                 emptyDescription="当前范围没有需要跟进的事项"
               />
               <p className="erp-arrival-calendar__note">
-                {arrival
-                  ? '只提醒已审核且尚需到货的明细。已登记待检与已入库数量均扣除；明细交期优先，其次供应商确认交期、整单预计日期。'
-                  : '按原单据事实汇总，同一明细可有多项待办。仅显示有权查看的事项；待核对应付不表示已满足结算条件。'}
+                同一明细可有多项跟进事项，按所列岗位办理。到货日历只计尚需到货的明细；待核对应付仍须核对结算条件。
               </p>
             </div>
           </>

@@ -26,6 +26,7 @@ import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js
 
 import InventoryOperationDetails from '../components/inventory/InventoryOperationDetails.jsx'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import { BusinessModuleViewTabs } from '../components/BusinessModuleTabs.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import { canReadReference } from '../utils/remoteReferences.mjs'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
@@ -1386,6 +1387,7 @@ export default function InventoryLedgerPage() {
         <>
           <BusinessOperationPanel
             compact
+            contentSwitch={outletContext?.moduleWorkspace?.secondaryNavigation?.items.length ? <BusinessModuleViewTabs navigation={outletContext.moduleWorkspace.secondaryNavigation} /> : null}
             viewSwitch={activeView === VIEW_BALANCES ? inventoryBalanceSwitch : null}
             onClearFilters={clearFilters}
             activeFilterCount={activeFilterCount}
@@ -1625,7 +1627,7 @@ export default function InventoryLedgerPage() {
                 />
               </Space>
         }
-            primaryAction={canCreateInventoryOperation || canApproveInventoryOperation ? (
+            primaryAction={!outletContext?.moduleWorkspace && (canCreateInventoryOperation || canApproveInventoryOperation) ? (
               <Button data-business-action-key="inventory-operation-records" onClick={() => navigate('/erp/warehouse/inventory?workspace=operations')}>
                 库存作业
               </Button>

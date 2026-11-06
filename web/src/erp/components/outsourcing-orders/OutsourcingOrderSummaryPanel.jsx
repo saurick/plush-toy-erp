@@ -276,6 +276,7 @@ export default forwardRef((
   return (
     <section aria-label="委外加工明细汇总" data-page-table-region>
       <BusinessOperationPanel
+        inWorkspace
         compact
         activeFilterCount={[
           filters.supplier_id,

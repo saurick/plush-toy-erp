@@ -20055,8 +20055,7 @@
     },
     "message": "OK",
     "params": {
-      "kind": "all",
-      "view": "exceptions"
+      "kind": "all"
     },
     "test": "TestPurchaseFollowupsRPCEnforcesSourceAndCategoryPermissions"
   },

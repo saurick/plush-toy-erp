@@ -23,9 +23,11 @@ export function purchaseFollowupFixture(
   )
   const counts = {}
   const days = {}
+  const isArrival = (row) =>
+    ['overdue', 'due_soon', 'scheduled'].includes(row.kind)
   for (const row of scoped) {
     counts[row.kind] = (counts[row.kind] || 0) + 1
-    if (row.due_date >= start && row.due_date <= end) {
+    if (isArrival(row) && row.due_date >= start && row.due_date <= end) {
       days[row.due_date] = (days[row.due_date] || 0) + 1
     }
   }
@@ -34,9 +36,9 @@ export function purchaseFollowupFixture(
       !params.kind ||
       params.kind === 'all' ||
       (params.kind === 'date'
-        ? row.due_date === params.selected_date
+        ? isArrival(row) && row.due_date === params.selected_date
         : params.kind === 'period'
-          ? row.due_date >= start && row.due_date <= end
+          ? isArrival(row) && row.due_date >= start && row.due_date <= end
           : row.kind === params.kind)
   )
   const limit = params.limit || 25

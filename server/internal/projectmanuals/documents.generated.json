@@ -21,7 +21,7 @@
     "id": "handbook:roles",
     "book": "business",
     "title": "岗位责任与交接",
-    "source_hash": "b84d529cc8137d55d5a8401899ac8108e2babb67732e3c702cb391b2548c003e",
+    "source_hash": "bcb5d51388e9675812c9fcbcdc80a0efbdb240d63586b7b60254b9bc69cfce85",
     "path": "",
     "roles": [],
     "supplement": true
@@ -349,7 +349,7 @@
     "id": "accessories-purchase",
     "book": "business",
     "title": "采购订单怎么用",
-    "source_hash": "f05b4231c8b81c68e3809d194b50bb1466c399b6fe75d967296407706e880ff2",
+    "source_hash": "40f6d77d779a5b15cad4bdd35f695bc58e513261bbfb0af420cc90474d278795",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"
@@ -360,7 +360,7 @@
     "id": "accessories-purchase:purchase-commitment",
     "book": "business",
     "title": "采购订单为什么不是入库单",
-    "source_hash": "0428017a1c2128f0a4f39aaf31a11d2eec3f6a15d81d7f3cef4acb3739dd1391",
+    "source_hash": "0e2d3e3fefe7d1381f79bed0b62413118d4c6ee2e288a3cfa0b2f117fabf5927",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"
@@ -371,7 +371,7 @@
     "id": "accessories-purchase:purchase-line-amount",
     "book": "business",
     "title": "采购金额怎么算",
-    "source_hash": "913a79e73f51131316a624c8d253e8b5b85702dafdc56e5577183a59ddfeaf55",
+    "source_hash": "6c9ae2a8aa4e2ccd946afa8b288add8040cc269980366884bd9b200df6ae4133",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"
@@ -382,7 +382,7 @@
     "id": "accessories-purchase:supplier-material-source",
     "book": "business",
     "title": "供应商和材料从哪里来",
-    "source_hash": "c20736e45176f49896ca51e27da628e42a048fb77deeda33e8c8114cc58aab2e",
+    "source_hash": "abfa0276fade3fc5e4d2799ed47d9ac22bce46848070e5d2409f2d738ef2b159",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"
@@ -393,7 +393,7 @@
     "id": "accessories-purchase:purchase-action-disabled",
     "book": "business",
     "title": "为什么不能提交、审核或登记到货",
-    "source_hash": "896136bdc1b534b7774a5d0c031a0bf074e7007c572a42a290ed7220b1ecca99",
+    "source_hash": "ceacb5b2b45ab13d8e2da2987144709e0a542e6c3bcca25ced4a3c480866baf9",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"
@@ -1379,7 +1379,7 @@
     "id": "guide:accessories-purchase",
     "book": "business",
     "title": "办理采购订单",
-    "source_hash": "ef5c7bcb9c85c339d0e76d3936e41789fb761bdca04e2394b4a7b8776a9349ea",
+    "source_hash": "c3623f31854c1ec7844e7ca659bf6fd7b9c83c30f99c4dab56a2cef8c157e887",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"

@@ -24891,16 +24891,6 @@ export const RpcInspection = Object.freeze({
           path: 'server/internal/service/jsonrpc_purchase_followup.go',
         }),
         type: 'integer',
-      }), Object.freeze({
-        description: '解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。',
-        expression: 'getOptionalWorkflowTaskBoardString(pm, key, 100)',
-        name: 'view',
-        required: '可选',
-        source: Object.freeze({
-          line: 28,
-          path: 'server/internal/service/jsonrpc_purchase_followup.go',
-        }),
-        type: 'string',
       })]),
       response: Object.freeze([]),
     }),

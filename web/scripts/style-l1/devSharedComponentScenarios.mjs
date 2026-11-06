@@ -1,8 +1,9 @@
-import { BusinessTextPolicy } from '../../src/common/consts/policies.generated.mjs'
 import { readFile, writeFile } from 'node:fs/promises'
+import { BusinessTextPolicy } from '../../src/common/consts/policies.generated.mjs'
 import { assertControlPreviewThemeIsolation } from './controlThemeAssertions.mjs'
 import { createDevPaginationScenarios } from './devPaginationScenarios.mjs'
 import { createDevBusinessComponentScenarios } from './devBusinessComponentScenarios.mjs'
+import { createDevToolbarExampleScenarios } from './devToolbarExampleScenarios.mjs'
 import { createSelectOverflowScenarios } from './selectOverflowScenarios.mjs'
 import { createGroupedSelectScenarios } from './groupedSelectScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
@@ -88,6 +89,7 @@ export function createDevSharedComponentScenarios({
     ...createGroupedSelectScenarios({ assert, assertNoHorizontalOverflow, outputDir }),
     ...createDevPaginationScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevBusinessComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
+    ...createDevToolbarExampleScenarios({ assert, assertNoHorizontalOverflow, outputDir }),
     {
       name: 'dev-ui-shared-component-catalog',
       path: '/__dev/ui-design?page=controls&control=components',

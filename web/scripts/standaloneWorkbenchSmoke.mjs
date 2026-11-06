@@ -16,6 +16,8 @@ import { assertButtonSpacing } from './style-l1/buttonSpacingAssertions.mjs'
 import { assertControlPreviewThemeIsolation } from './style-l1/controlThemeAssertions.mjs'
 import { openERPAppearance } from './style-l1/themeAssertions.mjs'
 import { waitForFiniteAnimations } from './style-l1/browserReadiness.mjs'
+import { createDevToolbarExampleScenarios } from './style-l1/devToolbarExampleScenarios.mjs'
+import { assertNoHorizontalOverflow } from './style-l1/pageAssertions.mjs'
 import {
   assertRepositoryIdentityEqual,
   readRepositoryIdentity,
@@ -226,6 +228,17 @@ try {
   const previewEvidence = await assertControlPreviewThemeIsolation(page)
   await writeFile(path.join(output, 'control-preview-theme.json'), JSON.stringify(previewEvidence, null, 2))
   checks.push('built standalone isolates preview controls and portals across all root/local theme combinations')
+
+  const toolbarExample = createDevToolbarExampleScenarios({ assert, assertNoHorizontalOverflow, outputDir: output })
+    .find(({ name }) => name === 'dev-ui-toolbar-composition')
+  await toolbarExample.beforeNavigate(page)
+  try {
+    await page.goto(`${origin}${toolbarExample.path}`)
+    await toolbarExample.verify(page)
+  } finally {
+    await page.unroute('**/rpc/**')
+  }
+  checks.push('built standalone reuses the four-business toolbar, details and column settings with local-only state and downloads')
 
   await page.goto(
     `${origin}/__dev/business-topics?flow_topic=purchase_to_inventory&flow_topic_node=purchase_quality&flow_topic_step=purchase_quality%3Aposts_fact%3Apurchase_accepted`

@@ -5,7 +5,7 @@ import {
   FilterOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
@@ -34,6 +34,9 @@ import '../styles/dev-ui-controls.css'
 
 const DevUIBusinessExamples = lazyWithDynamicImportRetry(
   () => import('./DevUIBusinessExamples.jsx')
+)
+const DevUIBusinessToolbarExample = lazyWithDynamicImportRetry(
+  () => import('./DevUIBusinessToolbarExample.jsx')
 )
 const PURCHASE_PAGE = getBusinessPagePresentation('accessories-purchase')
 const MATERIAL_PAGE = getBusinessPagePresentation('materials')
@@ -114,6 +117,26 @@ const TOPICS = [
     ],
     source: 'SourceImportPickerModal · BusinessModal · SearchInput · AppTable · AppPagination；远程消费者：RemoteReferencePicker / RemoteReferenceSelect',
     consumer: { ...PURCHASE_PAGE, task: '进入编辑页的“从材料库添加”，核对远程搜索、跨页选择与清空；取消返回，不提交业务数据。' },
+  },
+  {
+    key: 'business-toolbar',
+    title: '业务工具栏组合',
+    summary: '四种业务、职责标注与增长场景',
+    description: '用真实工具栏、查询、表格和列设置比较库存、采购、待办与历史记录；布局原则共用，业务分类按任务决定。',
+    rules: [
+      ['入口层级', '独立办理入口靠标题，同业务分类靠查询', '按办理对象和工作范围判断，位置复用正式页签分层规范。'],
+      ['内容分类', '少量稳定分类直达，较多分类搜索选择', '内容由业务决定；页内分类使用查询区左侧的圆角分类条，切换保持挂载。'],
+      ['同范围展示', '明细 / 分布、列表 / 日历按需出现', '展示方式与业务内容分类、快捷条件分开。'],
+      ['查询、工具与主动作', '共用插槽与交互，按任务组合', '保留搜索提交、筛选、列设置和选中操作；职责名称只在设计中标注。'],
+      ['功能与数据增长', '分别切换两种假设场景', '扩展分类是假设，30 个数据选项进入搜索筛选，不自动变成导航。'],
+    ],
+    checks: [
+      '往返四种业务：搜索草稿、筛选、分页与选择各自保留。',
+      '切换两种增长场景，搜索分类或第 30 个数据选项；关闭职责标注比较实际布局。',
+      '选记录查看详情、翻页、调整列和导出；恢复示例后回到初始状态。',
+    ],
+    source: 'BusinessToolbarWorkspace · BusinessOperationPanel · BusinessDataTable · BusinessViewSwitch · BusinessStatusFilter · ColumnOrderModal；规范：交互设计说明 #business-toolbar-composition',
+    consumer: { ...PURCHASE_PAGE, task: '对照库存查询、采购订单、工作台和历史记录；此样例仅使用本地虚构数据，业务权限与提交由真实页面负责。' },
   },
   {
     key: 'pagination',
@@ -210,22 +233,24 @@ const TOPICS = [
     title: '页签与视图',
     summary: '切换内容，保留当前对象',
     description:
-      '内容导航使用下划线，工作方式、显示模式和筛选选项使用分段按钮。手机任务、进度与流程跟踪同样按内容导航处理。',
+      '先区分独立业务入口、页内查询分类、详情分区和展示设置，再选导航位置与样式；正式规则与业务工具栏组合共用。',
     rules: [
-      ['待办 / 已办 / 流程跟踪、订单交付 / 生产执行、电脑待办列表 / 日历', '内容页签', '切换不同工作内容，使用下划线。'],
+      ['独立办理入口或工作范围', '标题附近的主导航', '生产订单 / 执行 / 异常处理、任务范围及不同进度工作区保持各自层级。'],
+      ['同业务的资料分类、整单 / 明细、列表 / 到期顺序', '查询区左侧的圆角分类条', '产品基础信息 / 规格、加工合同 / 明细等与搜索组合，切换保持同一分类条。'],
+      ['详情中的并列内容', '详情内的内容页签', '同一订单的产品明细与关联任务保留对象身份，使用下划线区分当前内容。'],
       ['电脑 / 手机、表格 / 图形、主题与密度', '分段按钮', '选择运行模式、显示方式或设置值，使用底轨和选中滑块。'],
-      ['内容页签当前项', '主题色 + 2px 下划线', '透明底与中性基线，主题线标明当前位置；两种状态均使用 500 字重，保持选项宽度。'],
+      ['主导航和详情页签当前项', '主题色 + 2px 下划线', '透明底与中性基线，主题线标明当前位置；两种状态均使用 500 字重，保持选项宽度。'],
       ['同页两条切换', '按职责区分', '登录页上方选择电脑或手机，下方切换密码或短信内容；选项少不等于分段按钮。'],
       ['手机顶部', '层间留白 4–8px', '主次页签间 4px、页签至搜索 6px、搜索至状态 8px；触摸区域至少 44px。'],
       ['管理员查看岗位', '我的 → 管理员视角', '保留所选岗位与查看权限，任务、风险和进度顶部不重复岗位栏。'],
-      ['内容切换', '导航持续挂载', '指示条连续移动，不随正文重新出现。'],
+      ['内容切换', '导航持续挂载', '主导航的指示条连续移动，查询分类保留选中态与位置，不随正文重新出现。'],
     ],
     checks: [
       '切到关联任务：订单身份保持不变。',
       '快速反向切换：下划线或滑块从当前位置继续。',
       '用方向键切换，核对禁用项与减少动态效果。',
     ],
-    source: 'SlidingTabs · SlidingSegmented · SlidingTabList · control-affordance.css',
+    source: 'SlidingTabs · SlidingSegmented · SlidingTabList · control-affordance.css；规范：交互设计说明 #business-toolbar-composition',
     consumer: { ...TASK_PAGE, task: '切换待办、已办和流程跟踪，核对页签保持挂载及当前内容。' },
   },
   {
@@ -830,7 +855,7 @@ export default function DevControlStandards() {
           <DevSharedComponentGuide topics={TOPICS} />
         ) : (
           <>
-            <div className="erp-control-library-layout">
+            <div className={`erp-control-library-layout${current.key === 'business-toolbar' ? ' erp-control-library-layout--toolbar' : ''}`}>
               <section
                 className="erp-control-library-demo"
                 aria-label="交互样例"
@@ -866,6 +891,10 @@ export default function DevControlStandards() {
                     <DateInputExample />
                   ) : current.key === 'pagination' ? (
                     <DevUIPaginationExample />
+                  ) : current.key === 'business-toolbar' ? (
+                    <Suspense fallback={<Loading title="正在加载组件示例" />}>
+                      <DevUIBusinessToolbarExample />
+                    </Suspense>
                   ) : current.key === 'business-form' || current.key === 'source-picker' ? (
                     <Suspense fallback={<Loading title="正在加载组件示例" />}>
                       <DevUIBusinessExamples key={current.key} type={current.key} />
@@ -889,6 +918,11 @@ export default function DevControlStandards() {
             </div>
             <section className="erp-control-library-rules">
               <h3>什么时候用，为什么这样设计</h3>
+              {['navigation', 'business-toolbar'].includes(current.key) ? (
+                <Link to="/__dev/ui-design?view=specification&read=reference#business-toolbar-composition">
+                  页签层级与上下间距规范
+                </Link>
+              ) : null}
               <div className="erp-control-table-scroll">
                 <table className="erp-control-table" data-table-lines="fixed">
                   <thead>

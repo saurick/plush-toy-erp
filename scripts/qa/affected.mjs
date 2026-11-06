@@ -886,6 +886,24 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
+    if (/DevUIBusinessToolbarExample|devToolbarExample|dev-ui-toolbar-example\.css|DevControlStandards\.jsx|dev-ui-controls\.css|business-list\/(?:BusinessListLayout|BusinessListToolbarActions|BusinessStatusFilter|ColumnOrderModal|BusinessDetailsModal)\.jsx|BusinessVisualizationFrame\.jsx|common\/components\/SearchInput\.jsx/u.test(file)) {
+      addNodeTests(state, [
+        "scripts/qa/dev-workbench-boundary.test.mjs",
+        "web/src/dev-workbench/config/devToolbarExample.test.mjs",
+        "web/src/dev-workbench/components/DevUIBusinessToolbarExample.test.mjs",
+      ], file, "T5");
+      addFollowUp(state, "dev-toolbar-composition-browser", "T5",
+        "运行 STYLE_L1_SCENARIOS=dev-ui-toolbar-composition,dev-ui-toolbar-category-growth,dev-ui-toolbar-data-growth pnpm --dir web style:l1，分别使用 Chromium 与 WebKit 核对四业务组合、职责标注、分类增长与 30 项名单、查询草稿和选择恢复、真实详情与列设置、本地导出及零业务请求；工作台样例采用浅色桌面轻量验收。", file);
+    }
+    if (/BusinessListLayout\.jsx|BusinessFormPage\.jsx|business-form-page\.css|BusinessToolbarWorkspace\.test\.mjs|useBusinessListStickyHeader\.js|BusinessVisualizationFrame\.jsx|(?:WarehouseHandling|PurchaseOrders|SalesOrders|HistoryRecords)Page\.jsx|businessToolbarCompositionScenarios\.mjs/u.test(file)) {
+      addNodeTests(state, ["web/src/erp/components/business-list/BusinessToolbarWorkspace.test.mjs", "web/src/erp/components/business-list/BusinessSelectionActionBar.test.mjs", "web/src/erp/utils/businessModuleGroups.test.mjs"], file, "T5");
+      addFollowUp(state, "business-toolbar-composition-browser", "T5",
+        "运行 STYLE_L1_SCENARIOS=business-toolbar-composition-purchase,business-toolbar-composition-sales,business-toolbar-composition-history,business-toolbar-dynamic-options-growth,business-toolbar-form-entry,warehouse-layout-all-views,warehouse-layout-dark-split,warehouse-workbench-control-parity,warehouse-outbound-cold-entry-stability,inventory-visible-copy-desktop pnpm --dir web style:l1，并分别验证 WebKit 与 Chromium；核对职责分组、稳定挂载、查询恢复、动态名单增长、窄屏、工具菜单、分栏与表头吸顶，设计标注不得进入业务页面。", file);
+    }
+    if (/(?:MasterData|OutsourcingOrders|OperationalFacts)Page\.jsx|OutsourcingOrderSummaryPanel\.jsx|business-tables\.css|pageHeaderScenarios\.mjs/u.test(file)) {
+      addFollowUp(state, "business-tab-levels-browser", "T5",
+        "运行 STYLE_L1_SCENARIOS=page-tabs-content-products,page-tabs-content-outsourcing,page-tabs-content-receivables,page-tabs-content-payables,page-tabs-independent-entries,page-header-business-spacing-desktop,page-header-business-spacing-narrow-dark pnpm --dir web style:l1，并分别使用 Chromium 与 WebKit；核对页内分类位于查询区、独立办理入口位于标题区、分类条持续挂载、查询恢复、统一上下间距和窄屏溢出。委外另跑 outsourcing-summary-desktop,outsourcing-summary-readonly-tablet 验证完整导出、权限与失败恢复。", file);
+    }
     if (/BusinessModuleTabs\.jsx|businessModuleTabs\.css|common\/components\/navigation\/(?:SlidingTabList\.jsx|useSlidingIndicator\.js)|styles\/app\/control-affordance\.css|warehouseNavigationActions\.mjs/u.test(file)) {
       addFollowUp(state, "warehouse-navigation-browser", "T5",
         "运行 STYLE_L1_SCENARIOS=warehouse-category-chip-navigation,warehouse-workbench-control-parity,warehouse-outbound-cold-entry-stability,warehouse-layout-all-views,warehouse-layout-dark-split,inventory-visible-copy-desktop pnpm --dir web style:l1，并分别验证 WebKit 与 Chromium，核对分类展开、键盘与动效、窄屏滚动、默认工作台隔离、首次加载和历史刷新。", file);
@@ -1003,7 +1021,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         "web/src/dev-workbench/config/devVerificationEvidence.test.mjs",
       ], file, "T5");
     }
-    if (/standaloneWorkbench|standalone\.jsx|vite\.workbench|workbench\.html|DevTestingPage|DevQualityGatesPage|DevVerificationEvidence/u.test(file)) {
+    if (/standaloneWorkbench|standalone\.jsx|vite\.workbench|workbench\.html|DevTestingPage|DevQualityGatesPage|DevVerificationEvidence|DevUIBusinessToolbarExample|devToolbarExample|dev-ui-toolbar-example\.css/u.test(file)) {
       addFollowUp(state, "workbench-artifact-browser", "T5",
         "在固定候选目录先运行 pnpm --dir web build:workbench，再运行 pnpm --dir web test:workbench；用独立制品核对登录、深链接、服务器验证、诊断历史与禁用动作。测试仅使用回环服务和隔离夹具，不连接目标环境。", file);
     }

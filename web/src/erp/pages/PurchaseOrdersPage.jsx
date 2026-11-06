@@ -25,6 +25,7 @@ import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js
 import {
   BusinessDataTable,
   BusinessPageLayout,
+  BusinessToolbarWorkspace,
   PageHeaderCard,
 } from '../components/business-list/BusinessListLayout.jsx'
 import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
@@ -62,7 +63,7 @@ import {
 } from '../components/purchase-orders/purchaseOrderPageConfig.mjs'
 import { usePurchaseOrderContractPrint } from '../components/purchase-orders/usePurchaseOrderContractPrint.mjs'
 import { usePurchaseOrderInboundDraft } from '../components/purchase-orders/usePurchaseOrderInboundDraft.mjs'
-import PurchaseArrivalCalendar from '../components/business-visualizations/PurchaseArrivalCalendar.jsx'
+import PurchaseFollowupPanel from '../components/business-visualizations/PurchaseFollowupPanel.jsx'
 import {
   BusinessViewSurface,
   BusinessViewSwitch,
@@ -227,11 +228,11 @@ export default function PurchaseOrdersPage() {
     'updated_at:desc'
   )
   const [contentView, setContentView] = useBusinessPageState(
-    'contentView',
+    'purchaseView',
     'list'
   )
-  const [arrivalViewState, setArrivalViewState] = useBusinessPageState(
-    'arrivalViewState',
+  const [followupViewState, setFollowupViewState] = useBusinessPageState(
+    'followupViewState',
     {}
   )
   const [pagination, setPagination] = useBusinessPageState('pagination', {
@@ -419,14 +420,12 @@ export default function PurchaseOrdersPage() {
     supplierFilter,
   ])
 
-  const [exceptionViewState, setExceptionViewState] = useBusinessPageState('exceptionViewState', { filter: 'all', page: 1 })
-  const followupViewState = contentView === 'exceptions' ? exceptionViewState : arrivalViewState
-  const followupParams = purchaseFollowupParams(contentView === 'exceptions' ? 'exceptions' : 'arrival', followupViewState, { keyword: linkedKeyword || keyword, supplierID: supplierFilter, orderID: routePurchaseOrderID })
-  const arrivalData = usePurchaseFollowups({
-    enabled: canReadFollowups && contentView !== 'list',
+  const followupParams = purchaseFollowupParams(followupViewState, { keyword: linkedKeyword || keyword, supplierID: supplierFilter, orderID: routePurchaseOrderID })
+  const followupData = usePurchaseFollowups({
+    enabled: canReadFollowups && contentView === 'followup',
     params: followupParams,
   })
-  const reloadArrivalData = arrivalData.reload
+  const reloadFollowupData = followupData.reload
   useEffect(() => {
     if (!canReadFollowups && contentView !== 'list') setContentView('list')
   }, [canReadFollowups, contentView, setContentView])
@@ -532,7 +531,7 @@ export default function PurchaseOrdersPage() {
   }, [loadOrders])
 
   const refreshPageData = useCallback(async () => {
-    if (contentView !== 'list') reloadArrivalData()
+    if (contentView === 'followup') reloadFollowupData()
     const [ordersOK, referencesOK, inboundReferencesOK] =
       await Promise.all([
         loadOrders(),
@@ -549,7 +548,7 @@ export default function PurchaseOrdersPage() {
     loadInboundReferenceData,
     loadOrders,
     loadReferenceData,
-    reloadArrivalData,
+    reloadFollowupData,
   ])
 
   useEffect(() => {
@@ -890,7 +889,7 @@ export default function PurchaseOrdersPage() {
       }
       await reportBusinessResult(attachmentSaved ? '采购订单已保存' : '采购订单已保存，部分附件尚未上传', saved)
       if (isCreatingOrder) {
-        reloadArrivalData()
+        reloadFollowupData()
         setPagination((current) => ({ ...current, current: 1 }))
       } else {
         const refreshEffect =
@@ -1299,12 +1298,12 @@ export default function PurchaseOrdersPage() {
 
   const purchaseViewSwitch = (
     <BusinessViewSwitch
+      appearance="chips"
       value={contentView}
       options={[
         { value: 'list', label: '订单列表' },
         ...(canReadFollowups ? [
-          { value: 'arrival', label: '到货计划' },
-          { value: 'exceptions', label: '异常汇总' },
+          { value: 'followup', label: '采购跟进' },
         ] : []),
       ]}
       onChange={(view) => {
@@ -1323,183 +1322,183 @@ export default function PurchaseOrdersPage() {
   return (
     <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ suppliers: mergeSuppliers, materials: mergeMaterials }} className="erp-purchase-orders-page">
       <PageHeaderCard
-        viewSwitch={purchaseViewSwitch}
         helpKey="accessories-purchase"
         title="采购订单"
         compact
       />
 
       <SourceActionAccessNotice access={receiptSourceAccess} />
-      {contentView === 'list' && <PurchaseOrderOperationPanel
-        showListTools={contentView === 'list'}
-        adminProfile={adminProfile}
-        statusCounts={statusCounts}
-        statusLoading={loading}
-        exactStatusContext={Boolean(routePurchaseOrderID)}
-        applySelectedRowKeys={applySelectedRowKeys}
-        canCreate={canCreate}
-        canCreateInboundDraftAction={canCreatePurchaseReceipt}
-        canUpdate={canUpdate}
-        canCompleteTerms={canUpdate && hasActionPermission(adminProfile, PermissionCode.FIELD_PROCUREMENT_COMMERCIAL_READ)}
-        openTermsModal={setTermsOrder}
-        openDeliveryModal={setDeliveryOrder}
-        referenceDataReady={referenceDataState === 'ready'}
-        canGenerateInboundDraft={canGenerateInboundDraft}
-        hasInboundWarehouse={hasInboundWarehouse}
-        inboundReferenceDataState={inboundReferenceDataState}
-        clearFilters={clearFilters}
-        dateFilterEnd={dateFilterEnd}
-        dateFilterField={dateFilterField}
-        dateFilterStart={dateFilterStart}
-        exportDisabled={loading || exporting || total === 0}
-        exporting={exporting}
-        exportOrders={exportOrders}
-        generatingInboundDraft={generatingInboundDraft}
-        itemsLoading={itemsLoading}
-        keyword={resolvedRouteKeyword || linkedKeyword || keyword}
-        lifecycleScope={lifecycleScope}
-        onLifecycleScopeChange={(nextScope) => {
-          setLifecycleScope(nextScope)
-          if (
-            !lifecycleScopeIncludesStatus(nextScope, status, [
-              'closed',
-              'canceled',
-            ])
-          ) {
-            setStatus('')
-          }
-          const nextParams = clearLinkedDocumentParams(searchParams)
-          nextParams.delete('purchase_order_id')
-          setSearchParams(
-            withLifecycleScopeSearchParam(nextParams, nextScope),
-            { replace: true }
-          )
-          setPagination((current) => ({ ...current, current: 1 }))
-        }}
-        showLifecyclePrimary={showLifecyclePrimary}
-        openCreateModal={openCreateModal}
-        openEditModal={openEditModal}
-        openDetails={openPurchaseOrderDetails}
-        openInboundDraftModal={openInboundDraftModal}
-        openRelatedTable={openRelatedTable}
-        relatedMenuItems={relatedMenuItems}
-        orders={orders}
-        primaryLifecycleAction={primaryLifecycleAction}
-        lifecycleActionStates={lifecycleActionStates}
-        printPurchaseContract={printPurchaseContract}
-        printPurchaseContracts={printPurchaseContracts}
-        printingContract={printingContract}
-        requestLifecycleAction={requestLifecycleAction}
-        saving={saving}
-        secondaryLifecycleActions={secondaryLifecycleActions}
-        selectedItems={selectedItems}
-        selectedOrders={selectedOrders}
-        selectedOrderCanEdit={selectedOrderCanEdit}
-        selectedOrderDisplayText={selectedOrderDisplayText}
-        selectedRowKeys={selectedRowKeys}
-        setColumnOrderOpen={openColumnOrder}
-        setDateFilterEnd={setDateFilterEnd}
-        setDateFilterField={setDateFilterField}
-        setDateFilterStart={setDateFilterStart}
-        setKeyword={(nextKeyword) => {
-          if (linkedKeyword || routePurchaseOrderID) {
-            clearRouteContext()
-          }
-          setKeyword(nextKeyword)
-        }}
-        setPagination={setPagination}
-        setSelectedOrder={setSelectedOrder}
-        setSortValue={setSortValue}
-        setStatus={setStatus}
-        setSupplierFilter={setSupplierFilter}
-        singleSelectedOrder={singleSelectedOrder}
-        sortValue={sortValue}
-        status={status}
-        supplierFilter={supplierFilter}
-        supplierOptions={supplierOptions}
-      />}
+      <BusinessToolbarWorkspace contentSwitch={purchaseViewSwitch}>
+        {contentView === 'list' && <PurchaseOrderOperationPanel
+          showListTools={contentView === 'list'}
+          adminProfile={adminProfile}
+          statusCounts={statusCounts}
+          statusLoading={loading}
+          exactStatusContext={Boolean(routePurchaseOrderID)}
+          applySelectedRowKeys={applySelectedRowKeys}
+          canCreate={canCreate}
+          canCreateInboundDraftAction={canCreatePurchaseReceipt}
+          canUpdate={canUpdate}
+          canCompleteTerms={canUpdate && hasActionPermission(adminProfile, PermissionCode.FIELD_PROCUREMENT_COMMERCIAL_READ)}
+          openTermsModal={setTermsOrder}
+          openDeliveryModal={setDeliveryOrder}
+          referenceDataReady={referenceDataState === 'ready'}
+          canGenerateInboundDraft={canGenerateInboundDraft}
+          hasInboundWarehouse={hasInboundWarehouse}
+          inboundReferenceDataState={inboundReferenceDataState}
+          clearFilters={clearFilters}
+          dateFilterEnd={dateFilterEnd}
+          dateFilterField={dateFilterField}
+          dateFilterStart={dateFilterStart}
+          exportDisabled={loading || exporting || total === 0}
+          exporting={exporting}
+          exportOrders={exportOrders}
+          generatingInboundDraft={generatingInboundDraft}
+          itemsLoading={itemsLoading}
+          keyword={resolvedRouteKeyword || linkedKeyword || keyword}
+          lifecycleScope={lifecycleScope}
+          onLifecycleScopeChange={(nextScope) => {
+            setLifecycleScope(nextScope)
+            if (
+              !lifecycleScopeIncludesStatus(nextScope, status, [
+                'closed',
+                'canceled',
+              ])
+            ) {
+              setStatus('')
+            }
+            const nextParams = clearLinkedDocumentParams(searchParams)
+            nextParams.delete('purchase_order_id')
+            setSearchParams(
+              withLifecycleScopeSearchParam(nextParams, nextScope),
+              { replace: true }
+            )
+            setPagination((current) => ({ ...current, current: 1 }))
+          }}
+          showLifecyclePrimary={showLifecyclePrimary}
+          openCreateModal={openCreateModal}
+          openEditModal={openEditModal}
+          openDetails={openPurchaseOrderDetails}
+          openInboundDraftModal={openInboundDraftModal}
+          openRelatedTable={openRelatedTable}
+          relatedMenuItems={relatedMenuItems}
+          orders={orders}
+          primaryLifecycleAction={primaryLifecycleAction}
+          lifecycleActionStates={lifecycleActionStates}
+          printPurchaseContract={printPurchaseContract}
+          printPurchaseContracts={printPurchaseContracts}
+          printingContract={printingContract}
+          requestLifecycleAction={requestLifecycleAction}
+          saving={saving}
+          secondaryLifecycleActions={secondaryLifecycleActions}
+          selectedItems={selectedItems}
+          selectedOrders={selectedOrders}
+          selectedOrderCanEdit={selectedOrderCanEdit}
+          selectedOrderDisplayText={selectedOrderDisplayText}
+          selectedRowKeys={selectedRowKeys}
+          setColumnOrderOpen={openColumnOrder}
+          setDateFilterEnd={setDateFilterEnd}
+          setDateFilterField={setDateFilterField}
+          setDateFilterStart={setDateFilterStart}
+          setKeyword={(nextKeyword) => {
+            if (linkedKeyword || routePurchaseOrderID) {
+              clearRouteContext()
+            }
+            setKeyword(nextKeyword)
+          }}
+          setPagination={setPagination}
+          setSelectedOrder={setSelectedOrder}
+          setSortValue={setSortValue}
+          setStatus={setStatus}
+          setSupplierFilter={setSupplierFilter}
+          singleSelectedOrder={singleSelectedOrder}
+          sortValue={sortValue}
+          status={status}
+          supplierFilter={supplierFilter}
+          supplierOptions={supplierOptions}
+        />}
 
-      <BusinessViewSurface
-        activeView={contentView}
-        loading={contentView === 'list' ? loading : arrivalData.loading}
-      >
-        {contentView !== 'list' ? (
-          <PurchaseArrivalCalendar
-            queryParams={followupParams}
-            view={contentView === 'exceptions' ? 'exceptions' : 'arrival'}
-            viewState={followupViewState}
-            onViewStateChange={contentView === 'exceptions' ? setExceptionViewState : setArrivalViewState}
-            board={arrivalData.board}
-            loading={arrivalData.loading}
-            error={arrivalData.error}
-            onRetry={arrivalData.reload}
-            keyword={linkedKeyword || keyword}
-            onKeywordChange={(value) => { clearRouteContext(); setKeyword(value) }}
-            supplierFilter={supplierFilter}
-            supplierOptions={supplierOptions}
-            onSupplierChange={setSupplierFilter}
-            onOpen={(row) => {
-              if (row.source_type === 'purchase_order') {
-                setContentView('list')
-                setSearchParams({ purchase_order_id: String(row.source_id) })
-              } else {
-                navigate(`/erp/warehouse/inbound?receipt_id=${row.source_id}`)
-              }
-            }}
-          />
-        ) : (
-          <BusinessDataTable
-            loading={loading}
-            rowKey="id"
-            columns={columns}
-            dataSource={orders}
-            rowSelection={{
-              type: 'checkbox',
-              selectedRowKeys,
-              getCheckboxProps: () => ({ disabled: recordActionBusy }),
-              onChange: (nextKeys, nextRows) => {
-                if (recordActionBusy) return
-                applySelectedRowKeys(nextKeys)
-                const nextSingle = nextKeys.length === 1 ? nextRows[0] : null
-                if (nextSingle?.id) {
-                  setSelectedOrder(nextSingle)
+        <BusinessViewSurface
+          activeView={contentView}
+          loading={contentView === 'list' ? loading : followupData.loading}
+        >
+          {contentView !== 'list' ? (
+            <PurchaseFollowupPanel
+              queryParams={followupParams}
+              viewState={followupViewState}
+              onViewStateChange={setFollowupViewState}
+              board={followupData.board}
+              loading={followupData.loading}
+              error={followupData.error}
+              onRetry={followupData.reload}
+              keyword={linkedKeyword || keyword}
+              onKeywordChange={(value) => { clearRouteContext(); setKeyword(value) }}
+              supplierFilter={supplierFilter}
+              supplierOptions={supplierOptions}
+              onSupplierChange={setSupplierFilter}
+              onOpen={(row) => {
+                if (row.source_type === 'purchase_order') {
+                  setContentView('list')
+                  setSearchParams({ purchase_order_id: String(row.source_id) })
                 } else {
-                  setSelectedOrder(null)
+                  navigate(`/erp/warehouse/inbound?receipt_id=${row.source_id}`)
                 }
-              },
-            }}
-            rowClassName={(record) =>
-              selectedRowKeys.includes(record?.id)
-                ? 'ant-table-row-selected'
-                : ''
-            }
-            onRow={(record) => ({
-              onClick: (event) => {
-                if (recordActionBusy) return
-                if (
-                  event.target?.closest?.(
-                    '.ant-checkbox-wrapper, .ant-checkbox, .ant-radio-wrapper, .ant-radio, .ant-table-selection-column'
-                  )
-                ) {
-                  return
-                }
-                applySelectedRowKeys([record.id])
-                setSelectedOrder(record)
-              },
-            })}
-            onOpenRecord={
-              recordActionBusy ? undefined : openPurchaseOrderRecord
-            }
-            pagination={createBusinessTablePagination({
-              pagination,
-              total,
-              onChange: (current, pageSize) =>
-                setPagination({ current, pageSize }),
-            })}
-            emptyDescription="暂无采购订单"
-          />
-        )}
-      </BusinessViewSurface>
+              }}
+            />
+          ) : (
+            <BusinessDataTable
+              loading={loading}
+              rowKey="id"
+              columns={columns}
+              dataSource={orders}
+              rowSelection={{
+                type: 'checkbox',
+                selectedRowKeys,
+                getCheckboxProps: () => ({ disabled: recordActionBusy }),
+                onChange: (nextKeys, nextRows) => {
+                  if (recordActionBusy) return
+                  applySelectedRowKeys(nextKeys)
+                  const nextSingle = nextKeys.length === 1 ? nextRows[0] : null
+                  if (nextSingle?.id) {
+                    setSelectedOrder(nextSingle)
+                  } else {
+                    setSelectedOrder(null)
+                  }
+                },
+              }}
+              rowClassName={(record) =>
+                selectedRowKeys.includes(record?.id)
+                  ? 'ant-table-row-selected'
+                  : ''
+              }
+              onRow={(record) => ({
+                onClick: (event) => {
+                  if (recordActionBusy) return
+                  if (
+                    event.target?.closest?.(
+                      '.ant-checkbox-wrapper, .ant-checkbox, .ant-radio-wrapper, .ant-radio, .ant-table-selection-column'
+                    )
+                  ) {
+                    return
+                  }
+                  applySelectedRowKeys([record.id])
+                  setSelectedOrder(record)
+                },
+              })}
+              onOpenRecord={
+                recordActionBusy ? undefined : openPurchaseOrderRecord
+              }
+              pagination={createBusinessTablePagination({
+                pagination,
+                total,
+                onChange: (current, pageSize) =>
+                  setPagination({ current, pageSize }),
+              })}
+              emptyDescription="暂无采购订单"
+            />
+          )}
+        </BusinessViewSurface>
+      </BusinessToolbarWorkspace>
 
       <BusinessDetailsModal
         descriptionInHelp

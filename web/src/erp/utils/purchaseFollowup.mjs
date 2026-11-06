@@ -20,11 +20,10 @@ export const PURCHASE_FOLLOWUP_NEXT_ACTIONS = {
   missing_price: '采购 · 补齐价格',
   unsettled: '财务 · 核对价格、付款条件及可结算金额',
 }
-export function purchaseFollowupParams(view, state = {}, query = {}) {
+export function purchaseFollowupParams(state = {}, query = {}) {
   return {
-    view,
     kind: state.filter || 'all',
-    confirmation: view === 'arrival' ? state.confirmation || 'all' : 'all',
+    confirmation: state.calendarOpen ? state.confirmation || 'all' : 'all',
     start_date: state.startDate || '',
     selected_date: state.selectedDate || '',
     keyword: query.keyword || '',
@@ -35,5 +34,26 @@ export function purchaseFollowupParams(view, state = {}, query = {}) {
   }
 }
 export function purchaseFollowupPageChange(state, patch) {
-  return { ...state, page: 1, ...patch }
+  const next = { ...state, page: 1, ...patch }
+  if (patch.filter && !['date', 'period'].includes(patch.filter)) {
+    next.selectedDate = ''
+  }
+  if (
+    patch.filter &&
+    [
+      'pending_inspection',
+      'rejected',
+      'ready_inbound',
+      'missing_price',
+      'unsettled',
+    ].includes(patch.filter)
+  ) {
+    next.confirmation = 'all'
+  }
+  if (patch.calendarOpen === false) {
+    next.confirmation = 'all'
+    next.selectedDate = ''
+    if (['date', 'period'].includes(next.filter)) next.filter = 'all'
+  }
+  return next
 }

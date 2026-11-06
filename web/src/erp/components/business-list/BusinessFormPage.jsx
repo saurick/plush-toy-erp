@@ -292,6 +292,7 @@ export default function BusinessFormPage({
     triggerRef.current = document.activeElement
     const scroller = pageRef.current?.closest('[data-erp-split-pane], .ant-drawer-body, .erp-admin-content, .mobile-business-layout__content, .mobile-role-tasks-page__detail-main')
     const layout = pageRef.current?.closest('.erp-business-page-layout')
+    const toolbarWorkspace = layout?.closest('.erp-business-toolbar-workspace')
     const taskLayout = pageRef.current?.closest('.mobile-task-business, .workflow-task-business-workspace')
     scrollPositionRef.current = scroller
       ? { node: scroller, top: scroller.scrollTop }
@@ -299,11 +300,13 @@ export default function BusinessFormPage({
     // Bind the editor layout once per open, avoiding ancestor :has() invalidation on input.
     scroller?.setAttribute('data-business-form-editing', 'true')
     layout?.setAttribute('data-business-form-editing', 'true')
+    toolbarWorkspace?.setAttribute('data-business-form-editing', 'true')
     taskLayout?.setAttribute('data-business-form-editing', 'true')
     if (scroller) scroller.scrollTop = 0
     return () => {
       scroller?.removeAttribute('data-business-form-editing')
       layout?.removeAttribute('data-business-form-editing')
+      toolbarWorkspace?.removeAttribute('data-business-form-editing')
       taskLayout?.removeAttribute('data-business-form-editing')
       if (leavingRef.current) return
       const position = scrollPositionRef.current

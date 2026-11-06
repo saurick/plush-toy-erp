@@ -1533,6 +1533,7 @@ export default function SalesOrdersPage() {
   }
   const salesViewSwitch = (
     <BusinessViewSwitch
+      appearance="chips"
       value={contentView}
       options={[
         { value: 'list', label: '订单列表' },
@@ -1552,10 +1553,10 @@ export default function SalesOrdersPage() {
         compact
         helpKey="sales-orders"
         title="销售订单"
-        viewSwitch={salesViewSwitch}
       />
 
       <BusinessOperationPanel
+        contentSwitch={salesViewSwitch}
         showSelection={contentView === 'list'}
         compact
         onClearFilters={clearFilters}

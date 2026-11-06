@@ -1,6 +1,7 @@
-import { createWarehouseEntryStabilityScenarios } from './warehouseEntryStabilityScenarios.mjs'
-import { selectWarehouseView } from './warehouseNavigationActions.mjs'
 import { writeFile } from 'node:fs/promises'
+import { createWarehouseEntryStabilityScenarios } from './warehouseEntryStabilityScenarios.mjs'
+import { createBusinessToolbarCompositionScenarios } from './businessToolbarCompositionScenarios.mjs'
+import { selectWarehouseView } from './warehouseNavigationActions.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
@@ -18,6 +19,7 @@ export function createInventoryPresentationScenarios(deps) {
     customerRuntimeEffectiveSession,
   } = deps
   return [
+    ...createBusinessToolbarCompositionScenarios(deps),
     ...createWarehouseEntryStabilityScenarios(deps),
     {
       name: 'warehouse-workbench-control-parity',
@@ -55,6 +57,7 @@ export function createInventoryPresentationScenarios(deps) {
       verify: async (page) => {
         const selector = '.erp-business-module-view-tabs'
         const navigation = page.locator(selector)
+        await navigation.getByRole('tab', { name: '销售出货', exact: true, selected: true }).waitFor()
         assert.deepEqual(await navigation.getByRole('tab').allTextContents(), ['销售出货', '生产领料', '委外发料', '库存预留'])
         const motion = await verifySlidingMotion(page, assert, selector, 1)
         await verifySlidingMotion(page, assert, selector, 0, true)
@@ -71,11 +74,11 @@ export function createInventoryPresentationScenarios(deps) {
         await page.waitForFunction((selector) => {
           const root = document.querySelector(selector)
           const selected = root.querySelector('[aria-selected="true"]')
-          const transform = getComputedStyle(root, '::before').transform
+          const { transform } = getComputedStyle(root, '::before')
           return Math.abs(new DOMMatrixReadOnly(transform === 'none' ? undefined : transform).m41 - selected.offsetLeft) < 1
         }, selector)
         await page.locator('.erp-business-module-header').screenshot({ path: path.join(outputDir, 'warehouse-category-chips-header.png') })
-        await page.locator('.erp-business-module-subnavigation').screenshot({ path: path.join(outputDir, 'warehouse-category-chips.png') })
+        await navigation.screenshot({ path: path.join(outputDir, 'warehouse-category-chips.png') })
         await page.setViewportSize({ width: 390, height: 844 })
         await navigation.getByRole('tab', { name: '生产领料', exact: true }).focus()
         await page.keyboard.press('End')
@@ -110,9 +113,10 @@ export function createInventoryPresentationScenarios(deps) {
       verify: async (page) => {
         const header = page.locator('.erp-business-module-header')
         const primary = header.locator('.erp-business-module-tabs')
-        const secondary = header.locator('.erp-business-module-view-tabs')
+        const secondary = page.locator('.erp-business-operation-panel__content-switch .erp-business-module-view-tabs')
         const evidence = []
         const inspect = async (label, width) => {
+          await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
           const metrics = await page.locator('.erp-admin-outlet--module').first().evaluate((root) => {
             const header = root.querySelector('.erp-business-module-header')
             const panel = root.querySelector('.erp-business-operation-panel')
@@ -120,7 +124,7 @@ export function createInventoryPresentationScenarios(deps) {
             const box = (node) => node?.getBoundingClientRect().toJSON()
             const headerBox = box(header)
             const commandBox = box(command)
-            const controls = command ? [...command.children].map(box).filter((item) => item.width > 1) : []
+            const controls = command ? [...command.children].flatMap((node) => node.classList.contains('erp-business-operation-panel__command-host') ? [...node.children] : [node]).map(box).filter((item) => item.width > 1) : []
             return {
               header: headerBox,
               command: commandBox,
@@ -128,14 +132,17 @@ export function createInventoryPresentationScenarios(deps) {
               controls,
               gap: commandBox ? box(panel).top - headerBox.bottom : null,
               duplicateHeaders: root.querySelectorAll('.erp-business-page-header-card--secondary').length,
-              subnavigationInHeader: Boolean(header.querySelector('.erp-business-module-subnavigation')),
+              classificationInHeader: Boolean(header.querySelector('.erp-business-module-view-tabs')),
+              classificationInToolbar: Boolean(command?.querySelector('.erp-business-module-view-tabs')),
             }
           })
           assert.ok(metrics.command, `${label} 应复用业务工具栏`)
           assert.equal(metrics.duplicateHeaders, 0, `${label} 不增加独立子页头`)
+          assert.equal(metrics.classificationInHeader, false, `${label} 主入口与内容分类分层`)
+          assert.equal(metrics.classificationInToolbar, !label.startsWith('库存作业'), `${label} 内容分类属于查询工具栏`)
           if (width >= 1366) {
-            assert.ok(metrics.header.height <= 56, `${label} 模块及分类应同行: ${JSON.stringify(metrics)}`)
-            assert.ok(metrics.command.height <= 56, `${label} 查询工具栏应同行: ${JSON.stringify(metrics)}`)
+            assert.ok(metrics.header.height <= 56, `${label} 模块入口保持一行: ${JSON.stringify(metrics)}`)
+            assert.ok(metrics.command.height <= (width >= 1920 ? 56 : 100), `${label} 查询工具栏按实际可用宽度紧凑排列: ${JSON.stringify(metrics)}`)
             assert.ok(metrics.gap <= 8, `${label} 只保留一次模块间距`)
           }
           for (const box of metrics.controls) {
@@ -151,6 +158,7 @@ export function createInventoryPresentationScenarios(deps) {
         ]) {
           await primary.getByRole('tab', { name: group, exact: true }).click()
           await primary.getByRole('tab', { name: group, exact: true, selected: true }).waitFor()
+          await secondary.getByRole('tab', { name: views[0], exact: true }).waitFor()
           assert.deepEqual(await secondary.getByRole('tab').allTextContents(), views)
           await secondary.evaluate((node) => { window.__warehouseNavigation = node })
           for (const [index, view] of views.entries()) {
@@ -255,12 +263,14 @@ export function createInventoryPresentationScenarios(deps) {
           ['出库办理', ['销售出货', '生产领料', '委外发料', '库存预留']],
         ]) {
           await header.getByRole('tab', { name: group, exact: true }).click()
-          const navigation = header.locator('.warehouse-navigation')
+          const navigation = frame.locator('.operation-surface .warehouse-navigation')
           assert.deepEqual(await navigation.getByRole('tab').allTextContents(), views)
+          if (group === '库存查询') assert.equal(await frame.locator('.command-row').getByRole('button', { name: '新建库存操作', exact: true }).count(), 0, '查询工具栏不重复提供库存作业入口')
           await navigation.getByRole('tab', { name: views.at(-1), exact: true }).click()
-          assert.equal(await header.locator('.warehouse-navigation').getByRole('tab', { selected: true }).innerText(), views.at(-1))
+          assert.equal(await frame.locator('.operation-surface .warehouse-navigation').getByRole('tab', { selected: true }).innerText(), views.at(-1))
         }
-        assert.equal(await frame.locator('.command-row').getByRole('tab').count(), 0, '设计源的分类也应并入模块页头')
+        assert.equal(await header.locator('.warehouse-navigation').count(), 0, '设计源主入口与内容分类分别组织')
+        assert.equal(await frame.locator('.command-row .warehouse-navigation').count(), 1, '设计源内容分类位于查询工具栏')
         await page.screenshot({ path: path.join(outputDir, 'warehouse-design-sync-4k.png') })
       },
     },
@@ -294,7 +304,7 @@ export function createInventoryPresentationScenarios(deps) {
               secondaryHeaders: document.querySelectorAll('.erp-inventory-ledger-page .erp-business-page-header-card--secondary').length,
             }
           })
-          assert.equal(metrics.secondaryHeaders, 0, '库存分类并入模块页头，不另设二级页头')
+          assert.equal(metrics.secondaryHeaders, 0, '库存分类与查询组合，不另设二级页头')
           assert.ok(metrics.controls.every((box) => box.left >= metrics.bounds.left && box.right <= metrics.bounds.right + 1), `库存工具栏控件须位于自身边界内: ${JSON.stringify(metrics)}`)
           for (let i = 0; i < metrics.controls.length; i += 1) {
             for (const peer of metrics.controls.slice(i + 1)) {
@@ -307,10 +317,10 @@ export function createInventoryPresentationScenarios(deps) {
           assert.equal(metrics.searchMaxWidth, 'none', '库存搜索应与共享工具栏一样利用剩余宽度')
           if (width >= 1440) {
             assert.ok(metrics.bounds.height <= 56, `宽屏库存工具栏应保持单行: ${JSON.stringify(metrics)}`)
-            assert.ok(metrics.searchWidth >= 180, `库存搜索框须保持共享的最小可用宽度: ${JSON.stringify(metrics)}`)
+            assert.ok(metrics.searchWidth >= 268, `库存搜索框须保持共享的最小可用宽度: ${JSON.stringify(metrics)}`)
             const centers = metrics.controls.map((box) => box.top + box.height / 2)
             assert.ok(Math.max(...centers) - Math.min(...centers) <= 1, '宽屏分类、视图与查询操作应垂直居中对齐')
-            assert.ok(metrics.headerHeight <= 56, `宽屏分类须与模块导航同行: ${JSON.stringify(metrics)}`)
+            assert.ok(metrics.headerHeight <= 56, `宽屏模块导航保持单行: ${JSON.stringify(metrics)}`)
             assert.ok(metrics.headerGap <= 8, '模块导航和查询栏之间只保留一次共享间隔')
           }
           if (width === 1920) assert.ok(metrics.searchWidth > 400, `宽屏库存搜索须利用原先留白: ${JSON.stringify(metrics)}`)
@@ -340,7 +350,8 @@ export function createInventoryPresentationScenarios(deps) {
         await verifySlidingMotion(page, assert, '.erp-inventory-ledger-page .erp-sliding-segmented', 1)
         await page.getByRole('region', { name: '仓库库存分布', exact: true }).waitFor()
         await verifySlidingMotion(page, assert, '.erp-inventory-ledger-page .erp-sliding-segmented', 0, true)
-        await command.getByRole('button', { name: '库存作业', exact: true }).click()
+        assert.equal(await command.getByRole('button', { name: '库存作业', exact: true }).count(), 0, '查询区不重复模块入口')
+        await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '库存作业', exact: true }).click()
         await page.waitForURL('**/erp/warehouse/inventory?workspace=operations')
         await expectHeading(page, '库存作业')
       },

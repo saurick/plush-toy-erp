@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { currentBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { purchaseFollowupFixture } from './purchaseFollowupFixtures.mjs'
 
 async function respond(route, payload, data) {
   return route.fulfill({
@@ -349,9 +350,9 @@ export function createPurchaseFollowupScenarios({
         })
       },
       verify: async (page) => {
-        await page.getByText('到货计划', { exact: true }).click()
+        await page.getByText('采购跟进', { exact: true }).click()
         const panel = page.getByRole('region', {
-          name: '采购到货计划',
+          name: '采购跟进',
           exact: true,
         })
         await panel.getByRole('button', { name: /^全部\s*51/u }).waitFor()
@@ -407,21 +408,23 @@ export function createPurchaseFollowupScenarios({
           .getByRole('button', { name: '重新加载', exact: true })
           .click()
         await panel.getByRole('button', { name: /^全部\s*51/u }).waitFor()
-        await page.getByText('异常汇总', { exact: true }).click()
-        const exceptions = page.getByRole('region', {
-          name: '采购异常汇总',
-          exact: true,
-        })
-        await exceptions.getByRole('button', { name: /^全部\s*51/u }).waitFor()
+        assert.equal(
+          await page.getByText('到货计划', { exact: true }).count(),
+          0
+        )
+        assert.equal(
+          await page.getByText('异常汇总', { exact: true }).count(),
+          0
+        )
         for (const label of ['缺少单价', '待核对应付', '拒收待处理']) {
           assert.equal(
-            await exceptions
+            await panel
               .getByRole('button', { name: new RegExp(label) })
               .count(),
             0
           )
         }
-        assert.equal(boardCalls.at(-1).view, 'exceptions')
+        assert.equal(boardCalls.at(-1).view, undefined)
         for (const width of [1440, 768]) {
           await page.setViewportSize({ width, height: 1000 })
           assert.equal(
@@ -431,6 +434,160 @@ export function createPurchaseFollowupScenarios({
             false
           )
         }
+      },
+    },
+    {
+      ...common,
+      name: 'purchase-followup-unified-kinds',
+      path: '/erp/purchase/accessories',
+      effectiveSession: customerRuntimeEffectiveSession,
+      beforeNavigate: async (page) => {
+        boardCalls = []
+        const rows = [
+          ...followups,
+          {
+            ...followups[0],
+            key: 'due_soon:purchase_order:93001:52',
+            kind: 'due_soon',
+            line_id: 52,
+            material_code: 'MAT-SOON',
+            material_name: '近期到货材料',
+          },
+          {
+            ...followups[0],
+            key: 'missing_price:purchase_order:93001:1',
+            kind: 'missing_price',
+            material_code: 'MAT-PRICE',
+            material_name: '待补价材料',
+          },
+          {
+            ...followups[0],
+            key: 'rejected:purchase_receipt:93002:1',
+            kind: 'rejected',
+            source_type: 'purchase_receipt',
+            source_id: 93002,
+            source_no: 'PR-FOLLOWUP',
+            due_date: '',
+            material_code: 'MAT-REJECT',
+            material_name: '拒收材料',
+          },
+        ]
+        await page.route('**/rpc/purchase_order', async (route) => {
+          const p = route.request().postDataJSON()
+          if (p.method !== 'list_purchase_followups') return route.fallback()
+          boardCalls.push(p.params)
+          return respond(
+            route,
+            p,
+            purchaseFollowupFixture(rows, p.params, today)
+          )
+        })
+      },
+      verify: async (page) => {
+        await page.getByRole('tab', { name: '采购跟进', exact: true }).click()
+        const panel = page.getByRole('region', {
+          name: '采购跟进',
+          exact: true,
+        })
+        await panel.getByRole('button', { name: /^全部\s*54/u }).waitFor()
+        assert.equal(
+          await panel.locator('.erp-arrival-calendar__day').count(),
+          0,
+          '跟进默认显示清单'
+        )
+        assert.equal(
+          await panel.getByRole('button', { name: /^已逾期\s*51/u }).count(),
+          1,
+          '合并后逾期只出现一次'
+        )
+        await panel.getByRole('button', { name: /^7 天内到货\s*1/u }).click()
+        await panel
+          .getByText('MAT-SOON · 近期到货材料', { exact: true })
+          .waitFor()
+        await panel.getByRole('button', { name: /^缺少单价\s*1/u }).click()
+        await panel
+          .getByText('MAT-PRICE · 待补价材料', { exact: true })
+          .waitFor()
+        assert.equal(await panel.locator('tr[data-row-key]').count(), 1)
+        assert.equal(boardCalls.at(-1).kind, 'missing_price')
+        await panel
+          .getByRole('button', { name: '到货日历', exact: true })
+          .click()
+        await panel
+          .getByRole('button', {
+            name: `${today}，52 条待到货明细`,
+            exact: true,
+          })
+          .click()
+        await panel
+          .locator('.erp-arrival-calendar__detail-head')
+          .filter({ hasText: '52 项' })
+          .waitFor()
+        assert.equal(boardCalls.at(-1).kind, 'date')
+        assert.equal(
+          await panel
+            .getByText('MAT-PRICE · 待补价材料', { exact: true })
+            .count(),
+          0,
+          '日历不把同日缺价事项重复计作到货'
+        )
+        await panel.getByRole('button', { name: /^拒收待处理\s*1/u }).click()
+        await panel
+          .getByText('MAT-REJECT · 拒收材料', { exact: true })
+          .waitFor()
+        assert.equal(boardCalls.at(-1).confirmation, 'all')
+        await panel
+          .getByRole('button', { name: '收起日历', exact: true })
+          .click()
+        assert.equal(
+          await panel.locator('.erp-arrival-calendar__day').count(),
+          0
+        )
+        await page.getByRole('tab', { name: '订单列表', exact: true }).click()
+        await page.getByRole('tab', { name: '采购跟进', exact: true }).click()
+        await panel
+          .getByText('MAT-REJECT · 拒收材料', { exact: true })
+          .waitFor()
+        assert.equal(
+          await panel
+            .getByRole('button', { name: /^拒收待处理/u })
+            .getAttribute('aria-pressed'),
+          'true'
+        )
+        assert.equal(
+          await panel
+            .getByRole('button', { name: '打开收货单', exact: true })
+            .count(),
+          1
+        )
+        await panel
+          .getByRole('button', { name: '到货日历', exact: true })
+          .click()
+        await panel.getByRole('button', { name: '今天', exact: true }).click()
+        await panel
+          .getByRole('button', { name: '收起日历', exact: true })
+          .click()
+        await panel.getByRole('button', { name: /^全部\s*54/u }).waitFor()
+        assert.equal(boardCalls.at(-1).kind, 'all', '收起日历清除隐藏日期条件')
+        await waitForFiniteAnimations(page)
+        await page.screenshot({
+          path: path.join(outputDir, 'purchase-followup-unified-4k.png'),
+        })
+        for (const width of [1440, 768, 390]) {
+          await page.setViewportSize({ width, height: 1000 })
+          assert.equal(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth > window.innerWidth
+            ),
+            false
+          )
+        }
+        await page.setViewportSize({ width: 1440, height: 1000 })
+        await page.goto(new URL('/erp/production/progress', page.url()).href)
+        const productionNavigation = page.getByLabel('生产管理页面', { exact: true })
+        await productionNavigation.getByRole('tab', { name: '异常处理', exact: true }).click()
+        await productionNavigation.getByRole('tab', { name: '异常处理', selected: true }).waitFor()
+        await page.locator('.erp-business-operation-panel').first().waitFor()
       },
     },
   ]

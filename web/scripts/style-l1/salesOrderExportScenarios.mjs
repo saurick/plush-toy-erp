@@ -126,8 +126,8 @@ export function createSalesOrderExportScenarios({ assert, customerRuntimeEffecti
         assert.equal(row['收货地址'], "'-", '真实横杠保留并继续执行 CSV 公式防护')
         await page.getByText('已导出 1 条采购订单', { exact: true }).waitFor()
         page.purchaseExportRows[0] = { ...page.purchaseExportRows[0], supplier_id: 0, supplier_snapshot: {} }
-        await page.getByText('到货计划', { exact: true }).click()
-        await page.getByRole('region', { name: '采购到货计划' }).getByText('PO-EXPORT-EMPTY', { exact: true }).waitFor()
+        await page.getByText('采购跟进', { exact: true }).click()
+        await page.getByRole('region', { name: '采购跟进' }).getByText('PO-EXPORT-EMPTY', { exact: true }).waitFor()
         const arrivalDownloadPromise = page.waitForEvent('download')
         await page.getByRole('button', { name: '导出当前结果', exact: true }).click()
         const arrivalDownload = await arrivalDownloadPromise

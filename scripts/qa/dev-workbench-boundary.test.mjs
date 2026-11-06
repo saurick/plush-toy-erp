@@ -284,6 +284,17 @@ const selectValueSamplePresentationImports = new Set([
   "components/master-data/productIdentity.css",
   "utils/referenceSelectOptions.mjs",
 ]);
+const toolbarSamplePresentationImports = new Set([
+  "components/business-list/BusinessListLayout.jsx",
+  "components/business-list/BusinessStatusFilter.jsx",
+  "components/business-list/BusinessListToolbarActions.jsx",
+  "components/business-list/ColumnOrderModal.jsx",
+  "components/business-list/BusinessDetailsModal.jsx",
+  "components/business-visualizations/BusinessVisualizationFrame.jsx",
+  "components/ERPPageActions.jsx",
+  "hooks/useBusinessPageContext.js",
+  "utils/moduleTableColumns.mjs",
+]);
 const commonSamplePresentationDependencies = [
   "web/src/common/components/overlay/OverlayScopeContext.mjs",
   "web/src/common/components/navigation/SlidingSegmented.jsx",
@@ -309,6 +320,10 @@ const commonSamplePresentationDependencies = [
   "server/internal/unitpolicy/units.json",
 ];
 const allowedERPImportsByFile = new Map([
+  ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.jsx", toolbarSamplePresentationImports],
+  ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.test.mjs", new Set([
+    "components/ERPPageActions.jsx", "hooks/useBusinessPageContext.js",
+  ])],
   ["web/src/dev-workbench/components/DevUIEmptyExamples.jsx", new Set([
     "components/business-list/BusinessFormSection.jsx",
     "components/business-list/BusinessCompactFieldTable.jsx",
@@ -731,6 +746,23 @@ test("business component samples retain a closed presentation dependency graph",
   }
   for (const module of ["pages/PurchaseOrdersPage.jsx", "api/masterDataOrderApi.mjs", "config/businessModules.mjs", "config/commandCenter.mjs"]) {
     assert.equal(isAllowedERPImport(sample, `@/erp/${module}`), false);
+  }
+});
+
+test("toolbar sample reuses callback-driven exports within an isolated local context", () => {
+  const file = "web/src/dev-workbench/components/DevUIBusinessToolbarExample.jsx";
+  const source = read(file);
+  for (const module of toolbarSamplePresentationImports) {
+    assert.equal(isAllowedERPImport(file, `@/erp/${module}`), true);
+    assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", `@/erp/${module}`), false);
+  }
+  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|useBusinessColumnOrder)\b|\/api\//u);
+  const tools = source.match(/import\s*\{([^}]+)\}\s*from\s*['"]@\/erp\/components\/business-list\/BusinessListToolbarActions\.jsx['"]/u);
+  assert.deepEqual(tools[1].split(',').map((value) => value.trim()).filter(Boolean).sort(), ['BusinessListToolbarActions', 'downloadBusinessListCSV']);
+  assert.match(source, /adminProfile: null,\s*moduleWorkspace: null/u);
+  assert.match(source, /ERPPageActionsContext\.Provider value=\{null\}/u);
+  for (const specifier of ['api/masterDataOrderApi.mjs', 'api/erpPreferenceApi.mjs', 'pages/InventoryLedgerPage.jsx', 'components/workflow/WorkflowTaskCalendar.jsx']) {
+    assert.equal(isAllowedERPImport(file, `@/erp/${specifier}`), false);
   }
 });
 
