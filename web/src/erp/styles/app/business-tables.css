@@ -398,7 +398,7 @@
   gap: 0;
 }
 
-.erp-business-toolbar-workspace > .erp-business-page-layout {
+.erp-business-toolbar-workspace > .erp-business-switch-content > .erp-business-view-panel > .erp-business-page-layout {
   min-height: 0;
 }
 

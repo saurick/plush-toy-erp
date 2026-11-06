@@ -8,6 +8,7 @@ export default function SlidingTabList({
   options,
   value,
   onChange,
+  onReselect,
   appearance = 'tabs',
   block = false,
   disabled = false,
@@ -28,6 +29,7 @@ export default function SlidingTabList({
       className={[appearance === 'chips' ? 'erp-filter-chip' : '', option.className].filter(Boolean).join(' ')}
       onClick={() => {
         if (option.value !== value) onChange?.(option.value)
+        else onReselect?.(option.value)
       }}
     >
       {option.icon && <span aria-hidden="true">{option.icon}</span>}

@@ -529,8 +529,9 @@ export function OperationalFactWorkspace({
     }
   }
 
-  const columns = applyBusinessColumnSorters(
-    buildOperationalFactColumns(currentActiveKey, activeFinanceFactType)
+  const columns = useMemo(
+    () => applyBusinessColumnSorters(buildOperationalFactColumns(currentActiveKey, activeFinanceFactType)),
+    [currentActiveKey, activeFinanceFactType]
   )
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
@@ -1731,6 +1732,7 @@ export function OperationalFactWorkspace({
 
       <BusinessViewSurface
         activeView={contentView}
+        preserveViews={isProductionRecordsPage && !outletContext?.taskBusiness ? ['list', 'process'] : undefined}
         loading={
           loading ||
           financeDueData.loading ||

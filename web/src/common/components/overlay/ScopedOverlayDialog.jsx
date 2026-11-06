@@ -93,7 +93,7 @@ export function useOverlayContainer(open, explicitContainer) {
   const scope = useOverlayScope()
   const previous = useRef({ open: false, target: undefined, scoped: false })
   if (open && !previous.current.open) {
-    const scoped = scope && (scope.enabled || !scope.visible)
+    const scoped = scope && (scope.portalScoped || scope.enabled || !scope.visible)
     previous.current.target = scoped ? scope.host : scope ? document.body : undefined
     previous.current.scoped = Boolean(scoped)
   }

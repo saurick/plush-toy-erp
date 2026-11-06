@@ -5,12 +5,12 @@ import ScopedOverlayDialog from './ScopedOverlayDialog.jsx'
 import { createCenteredModalApi } from '../../utils/antdApp.js'
 import './overlay-scope.css'
 
-export default function OverlayScopeProvider({ enabled, visible, containerRef, layoutKey, scopeKey, onInteract, onGuardChange, children }) {
+export default function OverlayScopeProvider({ enabled, visible, portalScoped = false, containerRef, layoutKey, scopeKey, onInteract, onGuardChange, children }) {
   const parent = useContext(ConfigProvider.ConfigContext)
   const inheritedPopup = parent.getPopupContainer
   const [host] = useState(() => document.createElement('div'))
   const latest = useRef(null)
-  latest.current = { enabled, visible, onInteract, onGuardChange }
+  latest.current = { enabled, visible, portalScoped, onInteract, onGuardChange }
   const [nativeModal, holder] = Modal.useModal()
   const handles = useRef(new Set())
   const guards = useRef(new Map())
@@ -40,9 +40,9 @@ export default function OverlayScopeProvider({ enabled, visible, containerRef, l
   const getPopupContainer = useCallback((...args) => {
     const [trigger] = args
     const pane = containerRef.current
-    if ((latest.current.enabled || !latest.current.visible) && (!trigger || pane?.contains(trigger) || host.contains(trigger))) return host
+    if ((portalScoped || latest.current.enabled || !latest.current.visible) && (!trigger || pane?.contains(trigger) || host.contains(trigger))) return host
     return inheritedPopup?.(trigger) || document.body
-  }, [containerRef, host, inheritedPopup])
+  }, [containerRef, host, inheritedPopup, portalScoped])
   useLayoutEffect(() => {
     host.className = 'app-overlay-scope'
     document.body.append(host)
@@ -106,7 +106,7 @@ export default function OverlayScopeProvider({ enabled, visible, containerRef, l
   useLayoutEffect(() => { measureGeometry.current?.() }, [layoutKey])
   const modal = useMemo(() => createCenteredModalApi(Object.fromEntries([
     ...['confirm', 'info', 'success', 'warning', 'error'].map((method) => [method, (config = {}) => {
-      const scoped = (latest.current.enabled || !latest.current.visible) && config.getContainer === undefined
+      const scoped = (latest.current.portalScoped || latest.current.enabled || !latest.current.visible) && config.getContainer === undefined
       const trigger = document.activeElement
       const instance = nativeModal[method]({
         ...config,
@@ -128,7 +128,7 @@ export default function OverlayScopeProvider({ enabled, visible, containerRef, l
     ['destroyAll', () => { handles.current.forEach((instance) => instance.destroy()); handles.current.clear() }],
   ])), [host, nativeModal])
   useEffect(() => () => modal.destroyAll(), [modal, scopeKey])
-  const value = useMemo(() => ({ enabled, visible, containerRef, host, modal, registerGuard, scopeKey }), [enabled, visible, containerRef, host, modal, registerGuard, scopeKey])
+  const value = useMemo(() => ({ enabled, visible, portalScoped, containerRef, host, modal, registerGuard, scopeKey }), [enabled, visible, portalScoped, containerRef, host, modal, registerGuard, scopeKey])
   const modalConfig = useMemo(() => enabled ? ({
     ...parent.modal,
     style: { ...parent.modal?.style, maxWidth: 'calc(var(--erp-overlay-width, 100vw) - 32px)' },

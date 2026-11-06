@@ -185,6 +185,10 @@ happy-dom 的文本框 computed style 会将 `none` / `hidden` 边框宽度保�
 
 `global-tab-sliding-light` / `global-tab-sliding-dark` 检查共享页签的逐帧滑动、快速反向切换、尺寸变化、面板重新打开、键盘、禁用项与减少动态效果设置。
 
+`business-tab-reuse-production`、`business-tab-reuse-purchase` 和 `business-tab-reuse-inventory` 在真实调用页面检查已访问表体的节点复用、隐藏时的操作与横向控件隔离，以及再次打开后的恢复。`BusinessViewPanels.test.mjs` 补充最新数据／权限、弹窗草稿、背景释放及提交保护；复用范围只限页面内声明的分类，刷新读取和后端事实不由该缓存替代。
+
+`business-tab-response-production`、`business-tab-response-purchase` 和 `business-tab-response-inventory` 检查下一帧先反馈页签选择、旧内容暂停操作、导航位置稳定及快速返回当前页；`business-tab-response-slow-route` 阻塞首次模块加载，验证仍可改选及浏览器历史恢复；`business-tab-response-leave-guard` 在真实整页表单中检查确认前保持高亮、继续编辑保留输入及放弃后正常导航。`useResponsiveSwitch.test.mjs` 覆盖离开保护、确认结果过期、未提交内容、同一分类内的外部位置变化和卸载；`BusinessSwitchContent.test.mjs` 检查操作及浮层隔离、恢复以及取消已确认的排队切换后重新保护草稿。这些场景不写业务数据。
+
 场景通过浏览器拦截加载 `test/SlidingTabsFixture.jsx`，复用真实组件和样式，不添加产品路由或写入业务数据；输出 `global-tab-sliding-*-frames.json` 留存中间位置。
 
 可用 `STYLE_L1_SCENARIOS=global-tab-sliding-light,global-tab-sliding-dark pnpm style:l1` 定向运行。

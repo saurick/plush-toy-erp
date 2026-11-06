@@ -27,6 +27,8 @@
 | 付款方式录入与目录维护 | [`PaymentMethodInput.jsx`](PaymentMethodInput.jsx)、[`PaymentMethodManager.jsx`](PaymentMethodManager.jsx) | `PaymentMethodField` 供四类表单搜索选择及标签行管理入口；`PaymentMethodEntry` 供基础资料列表集中维护。字段标签与新增窗保留“管理付款方式”入口，下拉只保留候选及查无匹配时的新增并选用，取消仅本次使用；快捷新增可切换管理并返回保留名称，成功后选用并返回；维护窗口整行单选、选择列表头留空；顶部集中改名、启停及删除，未选择时禁用，切换查询 / 状态 / 页码或刷新清空选择；搜索行右侧新增，底部编辑保存 / 取消、删除确认及返回固定可达，单页隐藏翻页。按状态保留搜索与页码，每页只挂载 20 项。支持启停、撤销；删除未使用项由独立 payment_method.delete 授权，默认仅超级管理员可用，返回保留草稿；历史快照和付款周期独立 |
 | 仓库设置与物料快捷建档 | [`inventory/WarehouseSettingsModal.jsx`](inventory/WarehouseSettingsModal.jsx)、[`bom/BOMMaterialCreateModal.jsx`](bom/BOMMaterialCreateModal.jsx) | 复用居中、限高和固定底部的局部表单弹窗。仓库先整行选中，再从顶部编辑；按编号 / 名称 / 用途提交式搜索，新增位于工具行右侧，编辑保存 / 取消在底部，编辑期间锁定目录选择。每页 5 项，翻页清选，保护未保存修改；物料快捷建档通过 `MasterDataFormFields` 的 `compact` 呈现保留同一字段与校验，完整档案页继续使用默认分区 |
 | 委外明细办理 | [`outsourcing-orders/OutsourcingOrderHandlingItems.jsx`](outsourcing-orders/OutsourcingOrderHandlingItems.jsx) | 合同的整页“办理明细”和手机任务共用明细读取、完整性检查、取消及重试；详情字段只展示信息，办理字段按原权限和状态追加动作 |
+| 页内视图与滚动恢复 | `business-visualizations/BusinessVisualizationFrame.jsx` | `BusinessViewPanels` 按有限分类保留已访问的界面，隐藏视图及浮层不可交互，返回应用最新数据和权限；`BusinessViewSurface` 同时管理当前分类的滚动恢复。生命周期与隔离复用共享 overlay scope，数据读取和业务写入仍由页面原有主路径管理 |
+| 页签响应与内容等待 | `BusinessSwitchContent.jsx`、共享 `useResponsiveSwitch` | 普通模块导航、采购列表／跟进和库存分类先完成离开保护，再反馈选择并在下一帧之后提交内容更新；后续选择替换待提交目标。等待内容保留节点并隔离操作及浮层，路由或页面状态提交后恢复；分栏沿用各栏原有保护与导航 |
 | 事实和质量       | `operational-facts/*`、`quality-inspections/*`、`shipments/*`                  | Operational Fact、质检、出货相关展示和表单入口                 |
 | 库存台账 | `inventory/inventoryLedgerPresentation.jsx`、`useInventoryReferences.js` | 列配置和只读显示规则、按有效权限读取参考资料；页面管理筛选、选择和业务动作 |
 | 质检参考资料 | `quality-inspections/useQualityInspectionReferences.js` | 按有效权限读取来源选项，统一处理取消、失效响应、失败清空和重试 |

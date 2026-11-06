@@ -21,6 +21,6 @@
   max-width: 100%;
 }
 
-.erp-admin-outlet--module > .erp-business-page-layout {
+.erp-admin-outlet--module > .erp-business-switch-content > .erp-business-view-panel > .erp-business-page-layout {
   min-height: 0;
 }

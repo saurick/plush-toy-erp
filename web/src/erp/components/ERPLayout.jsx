@@ -41,6 +41,8 @@ import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import WorkflowTaskBusinessWorkspace from './workflow/WorkflowTaskBusinessWorkspace.jsx'
 import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import BusinessModuleTabs from './BusinessModuleTabs.jsx'
+import BusinessSwitchContent from './BusinessSwitchContent.jsx'
+import useResponsiveSwitch from '@/common/components/navigation/useResponsiveSwitch.js'
 import {
   getBusinessModuleSidebarKey,
   getBusinessModuleTabs,
@@ -1171,6 +1173,13 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
     () => getBusinessModuleTabs(location.pathname, visibleSections, { search: location.search, adminProfile }),
     [location.pathname, location.search, visibleSections, adminProfile]
   )
+  const routeSwitch = useResponsiveSwitch(`${location.pathname}${location.search}${location.hash}`)
+  const pendingModuleWorkspace = useMemo(() => {
+    if (!routeSwitch.pending) return moduleWorkspace
+    const target = new URL(routeSwitch.selected, window.location.origin)
+    return getBusinessModuleTabs(target.pathname, visibleSections, { search: target.search, adminProfile }) || moduleWorkspace
+  }, [routeSwitch.pending, routeSwitch.selected, moduleWorkspace, visibleSections, adminProfile])
+  const confirmPageLeave = useCallback(() => pageLeaveGuard?.() ?? true, [pageLeaveGuard])
   useEffect(() => {
     if (!currentPageShouldRedirect) {
       rememberBusinessModuleLocation(pageUIState.values, location)
@@ -1186,6 +1195,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
       profileSyncCompleted,
       refreshAdminProfile: loadProfile,
       registerPageLeaveGuard,
+      confirmPageLeave,
       registerPageRefresh,
       updateAdminERPPreferences,
       pageUIState,
@@ -1199,6 +1209,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
       profileSyncCompleted,
       loadProfile,
       registerPageLeaveGuard,
+      confirmPageLeave,
       registerPageRefresh,
       updateAdminERPPreferences,
       pageUIState,
@@ -1260,14 +1271,16 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
       setActiveSplitSide(splitOpen ? 'left' : 'right')
     } : null,
     splitOpen,
-  }), [handleRefreshCurrentPage, pageRefreshHandler, refreshingCurrentPage, renderSplitPage, splitOpen])
+    switching: routeSwitch.pending,
+  }), [handleRefreshCurrentPage, pageRefreshHandler, refreshingCurrentPage, renderSplitPage, splitOpen, routeSwitch.pending])
 
-  const handleNavigate = async (nextPath, navigateOptions) => {
+  const handleNavigate = async (nextPath, navigateOptions, defer = false) => {
     if (!nextPath) {
       setMobileNavOpen(false)
       return
     }
     if (splitOpen || splitWorkspace.current?.ownsNavigation) {
+      routeSwitch.cancel()
       await splitWorkspace.current.navigate(nextPath, navigateOptions)
       setMobileNavOpen(false)
       return
@@ -1276,16 +1289,16 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
       !navigateOptions?.state?.workflowTaskReturn &&
       nextPath === `${location.pathname}${location.search}${location.hash}`
     ) {
+      routeSwitch.cancel()
+      // A newer selection can return to the currently committed page while another route is pending.
+      if (routeSwitch.pending) navigate(nextPath, { ...navigateOptions, replace: true })
       setMobileNavOpen(false)
       return
     }
-
-    if (pageLeaveGuard && !(await pageLeaveGuard())) {
-      return
-    }
-
-    navigate(nextPath, navigateOptions)
-    setMobileNavOpen(false)
+    return routeSwitch.request(nextPath, () => {
+      splitWorkspace.current.navigateAfterLeaveConfirmation(nextPath, navigateOptions)
+      setMobileNavOpen(false)
+    }, { before: confirmPageLeave, defer })
   }
 
   const handleModuleMenuNavigate = (key) => {
@@ -1658,9 +1671,9 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
                 >
                   {!shouldBlockOutlet && !shouldGuardProductCoreBusinessData && !taskNavigation ? (
                     <BusinessModuleTabs
-                      workspace={moduleWorkspace}
+                      workspace={pendingModuleWorkspace}
                       cache={pageUIState.values}
-                      onNavigate={handleNavigate}
+                      onNavigate={(path) => handleNavigate(path, undefined, true)}
                       helpKey={currentEntry?.pageKey || currentEntry?.key}
                     />
                 ) : null}
@@ -1680,18 +1693,20 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
                 ) : shouldGuardProductCoreBusinessData ? (
                   <ProductCoreCapabilityReview currentEntry={currentEntry} />
                 ) : (
-                  <Suspense
-                    key={location.pathname}
-                    fallback={
-                      <Loading
-                        className="erp-route-loading"
-                        title={`正在加载${currentEntry?.label || '页面'}`}
-                        description={null}
-                      />
+                  <BusinessSwitchContent pending={routeSwitch.pending} scopeKey={`${location.pathname}${location.search}`}>
+                    <Suspense
+                      key={location.pathname}
+                      fallback={
+                        <Loading
+                          className="erp-route-loading"
+                          title={`正在加载${currentEntry?.label || '页面'}`}
+                          description={null}
+                        />
                     }
-                  >
-                    <Outlet context={outletContext} key={businessPageGeneration} />
-                  </Suspense>
+                    >
+                      <Outlet context={outletContext} key={businessPageGeneration} />
+                    </Suspense>
+                  </BusinessSwitchContent>
                 )}
                 </div>
               </BusinessSplitWorkspace>

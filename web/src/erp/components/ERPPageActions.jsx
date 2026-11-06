@@ -21,6 +21,7 @@ export default function ERPPageActions({ showRefresh = true }) {
         <Button
           icon={<ReloadOutlined />}
           loading={actions.refreshing}
+          disabled={actions.switching}
           onClick={actions.onRefresh}
           aria-label="刷新当前页"
         >
@@ -31,6 +32,7 @@ export default function ERPPageActions({ showRefresh = true }) {
         <Button
           icon={<LayoutOutlined />}
           onClick={actions.onSplit}
+          disabled={actions.switching}
           aria-pressed={actions.splitOpen}
           aria-label={actions.splitOpen ? '收起分栏' : '分栏'}
         >

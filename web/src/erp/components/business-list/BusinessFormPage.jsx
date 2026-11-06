@@ -12,7 +12,7 @@ import { useBlocker, useLocation, } from 'react-router-dom'
 import { revealBusinessLineItemErrors } from './businessLineItemDisclosure.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { message, useModal } from '@/common/utils/antdApp'
-import { hasVisibleOverlayPopup } from '@/common/components/overlay/OverlayScopeContext.mjs'
+import { hasVisibleOverlayPopup, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
 import { BusinessEditorPaneContext, BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
 import { ReferenceRecordsFeedback } from '../ReferenceRecordsContext.jsx'
@@ -169,6 +169,11 @@ export default function BusinessFormPage({
   const triggerRef = useRef(null)
   const scrollPositionRef = useRef(null)
   const leavingRef = useRef(false)
+  const overlayVisible = useOverlayScope()?.visible
+  useLayoutEffect(() => {
+    // Returning to an editor after a cancelled switch restores browser leave protection.
+    if (overlayVisible !== false) leavingRef.current = false
+  }, [overlayVisible])
   const confirmingRef = useRef(false)
   const submittingRef = useRef(false)
   const currentRef = useRef(null)

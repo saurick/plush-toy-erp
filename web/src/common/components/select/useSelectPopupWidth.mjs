@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 
-export function useSelectPopupWidth(selectRef, mode, showSearch, hasIdentity) {
+export function useSelectPopupWidth(selectRef, mode, showSearch, hasIdentity, open) {
   const [width, setWidth] = useState()
   const measure = useCallback(() => {
     const element = selectRef.current?.nativeElement
@@ -11,8 +11,10 @@ export function useSelectPopupWidth(selectRef, mode, showSearch, hasIdentity) {
       : undefined)
   }, [selectRef, mode, showSearch, hasIdentity])
 
-  useLayoutEffect(() => { measure() })
+  // Closed controls, including those in unopened forms, do not need popup geometry.
+  useLayoutEffect(() => { if (open) measure() })
   useEffect(() => {
+    if (!open) return undefined
     const element = selectRef.current?.nativeElement
     if (!element || (mode && !hasIdentity)) return undefined
     let frame
@@ -28,6 +30,6 @@ export function useSelectPopupWidth(selectRef, mode, showSearch, hasIdentity) {
       resize.disconnect()
       window.removeEventListener('resize', schedule)
     }
-  }, [selectRef, mode, hasIdentity, measure])
+  }, [selectRef, mode, hasIdentity, measure, open])
   return width
 }

@@ -15,7 +15,7 @@ export function useOverlayPopupAlign(align) {
 
 export function hasVisibleOverlayPopup(scope) {
   if (typeof document === 'undefined') return false
-  const root = scope && (scope.enabled || !scope.visible) ? scope.host : document
+  const root = scope && (scope.portalScoped || scope.enabled || !scope.visible) ? scope.host : document
   return [...root.querySelectorAll('.ant-select-dropdown:not(.ant-select-dropdown-hidden), .ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')]
     .some((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden')
 }

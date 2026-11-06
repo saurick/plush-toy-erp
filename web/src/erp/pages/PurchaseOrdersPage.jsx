@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Form } from 'antd'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useResponsiveSwitch from '@/common/components/navigation/useResponsiveSwitch.js'
 import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 
@@ -231,6 +232,7 @@ export default function PurchaseOrdersPage() {
     'purchaseView',
     'list'
   )
+  const purchaseViewTransition = useResponsiveSwitch(contentView, searchParams.toString())
   const [followupViewState, setFollowupViewState] = useBusinessPageState(
     'followupViewState',
     {}
@@ -716,6 +718,11 @@ export default function PurchaseOrdersPage() {
     }
     openPurchaseOrderDetails(record)
   }
+
+  const openPurchaseOrderRecordRef = useRef(openPurchaseOrderRecord)
+  useLayoutEffect(() => {
+    openPurchaseOrderRecordRef.current = openPurchaseOrderRecord
+  })
 
   const resolveSupplierSnapshot = useCallback(
     async (supplier, options = {}) => {
@@ -1296,10 +1303,71 @@ export default function PurchaseOrdersPage() {
     actionStates: lifecycleActionStates,
   } = lifecycleActions
 
+  // View changes reuse the table props; record actions read the latest committed state.
+  const purchaseTable = useMemo(
+    () => (
+      <BusinessDataTable
+        loading={loading}
+        rowKey="id"
+        columns={columns}
+        dataSource={orders}
+        rowSelection={{
+          type: 'checkbox',
+          selectedRowKeys,
+          getCheckboxProps: () => ({ disabled: recordActionBusy }),
+          onChange: (nextKeys, nextRows) => {
+            if (recordActionBusy) return
+            applySelectedRowKeys(nextKeys)
+            const nextSingle = nextKeys.length === 1 ? nextRows[0] : null
+            if (nextSingle?.id) {
+              setSelectedOrder(nextSingle)
+            } else {
+              setSelectedOrder(null)
+            }
+          },
+        }}
+        rowClassName={(record) =>
+          selectedRowKeys.includes(record?.id)
+            ? 'ant-table-row-selected'
+            : ''
+        }
+        onRow={(record) => ({
+          onClick: (event) => {
+            if (recordActionBusy) return
+            if (
+              event.target?.closest?.(
+                '.ant-checkbox-wrapper, .ant-checkbox, .ant-radio-wrapper, .ant-radio, .ant-table-selection-column'
+              )
+            ) {
+              return
+            }
+            applySelectedRowKeys([record.id])
+            setSelectedOrder(record)
+          },
+        })}
+        onOpenRecord={
+          recordActionBusy ? undefined : (record) => openPurchaseOrderRecordRef.current(record)
+        }
+        pagination={createBusinessTablePagination({
+          pagination,
+          total,
+          onChange: (current, pageSize) =>
+            setPagination({ current, pageSize }),
+        })}
+        emptyDescription="暂无采购订单"
+      />
+    ),
+    [applySelectedRowKeys, columns, loading, orders, pagination, recordActionBusy, selectedRowKeys, setPagination, setSelectedOrder, total]
+  )
+
   const purchaseViewSwitch = (
     <BusinessViewSwitch
       appearance="chips"
-      value={contentView}
+      value={purchaseViewTransition.selected}
+      onReselect={(view) => {
+        if (purchaseViewTransition.pending) purchaseViewTransition.request(view, () => setContentView(view), { before: () => !recordActionBusy })
+        else purchaseViewTransition.cancel()
+      }}
       options={[
         { value: 'list', label: '订单列表' },
         ...(canReadFollowups ? [
@@ -1307,10 +1375,11 @@ export default function PurchaseOrdersPage() {
         ] : []),
       ]}
       onChange={(view) => {
-        if (recordActionBusy) return
-        applySelectedRowKeys([])
-        setSelectedOrder(null)
-        setContentView(view)
+        purchaseViewTransition.request(view, () => {
+          if (selectedRowKeysRef.current.length) applySelectedRowKeys([])
+          setSelectedOrder(null)
+          setContentView(view)
+        }, { before: () => !recordActionBusy })
       }}
     />
   )
@@ -1328,7 +1397,7 @@ export default function PurchaseOrdersPage() {
       />
 
       <SourceActionAccessNotice access={receiptSourceAccess} />
-      <BusinessToolbarWorkspace contentSwitch={purchaseViewSwitch}>
+      <BusinessToolbarWorkspace contentSwitch={purchaseViewSwitch} switching={purchaseViewTransition.pending}>
         {contentView === 'list' && <PurchaseOrderOperationPanel
           showListTools={contentView === 'list'}
           adminProfile={adminProfile}
@@ -1420,6 +1489,7 @@ export default function PurchaseOrdersPage() {
 
         <BusinessViewSurface
           activeView={contentView}
+          preserveViews={outletContext?.taskBusiness ? undefined : ['list', 'followup']}
           loading={contentView === 'list' ? loading : followupData.loading}
         >
           {contentView !== 'list' ? (
@@ -1446,56 +1516,7 @@ export default function PurchaseOrdersPage() {
               }}
             />
           ) : (
-            <BusinessDataTable
-              loading={loading}
-              rowKey="id"
-              columns={columns}
-              dataSource={orders}
-              rowSelection={{
-                type: 'checkbox',
-                selectedRowKeys,
-                getCheckboxProps: () => ({ disabled: recordActionBusy }),
-                onChange: (nextKeys, nextRows) => {
-                  if (recordActionBusy) return
-                  applySelectedRowKeys(nextKeys)
-                  const nextSingle = nextKeys.length === 1 ? nextRows[0] : null
-                  if (nextSingle?.id) {
-                    setSelectedOrder(nextSingle)
-                  } else {
-                    setSelectedOrder(null)
-                  }
-                },
-              }}
-              rowClassName={(record) =>
-                selectedRowKeys.includes(record?.id)
-                  ? 'ant-table-row-selected'
-                  : ''
-              }
-              onRow={(record) => ({
-                onClick: (event) => {
-                  if (recordActionBusy) return
-                  if (
-                    event.target?.closest?.(
-                      '.ant-checkbox-wrapper, .ant-checkbox, .ant-radio-wrapper, .ant-radio, .ant-table-selection-column'
-                    )
-                  ) {
-                    return
-                  }
-                  applySelectedRowKeys([record.id])
-                  setSelectedOrder(record)
-                },
-              })}
-              onOpenRecord={
-                recordActionBusy ? undefined : openPurchaseOrderRecord
-              }
-              pagination={createBusinessTablePagination({
-                pagination,
-                total,
-                onChange: (current, pageSize) =>
-                  setPagination({ current, pageSize }),
-              })}
-              emptyDescription="暂无采购订单"
-            />
+            purchaseTable
           )}
         </BusinessViewSurface>
       </BusinessToolbarWorkspace>

@@ -87,6 +87,7 @@ const AppTable = React.forwardRef(
           tableRef={tableRef}
           revision={scrollRevision}
           loading={props.loading}
+          hasRows={Boolean(props.dataSource?.length)}
           useToolbar={scrollToolbar}
           allowEmpty={scrollControlsOnEmpty}
         />

@@ -27,6 +27,7 @@ import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js
 import InventoryOperationDetails from '../components/inventory/InventoryOperationDetails.jsx'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import { BusinessModuleViewTabs } from '../components/BusinessModuleTabs.jsx'
+import BusinessSwitchContent from '../components/BusinessSwitchContent.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import { canReadReference } from '../utils/remoteReferences.mjs'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
@@ -154,6 +155,9 @@ import {
 } from '../utils/sourceBusinessAction.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
+import { BusinessViewPanels } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
+
+const EMPTY_INVENTORY_ROWS = Object.freeze([])
 
 const INVENTORY_OPERATION_SESSION_PREFIX =
   'plush-erp:inventory-operation:last:v1:'
@@ -190,7 +194,8 @@ export default function InventoryLedgerPage() {
     'list'
   )
   const [statusCounts, setStatusCounts] = useState(null)
-  const [rows, setRows] = useState([])
+  const [rowsByView, setRowsByView] = useState({})
+  const [viewSwitchPending, setViewSwitchPending] = useState(false)
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useBusinessPageState('keyword', '')
   const [subjectType, setSubjectType] = useBusinessPageState('subjectType', '')
@@ -240,6 +245,7 @@ export default function InventoryLedgerPage() {
   const activeView = Object.hasOwn(VIEW_LABELS, routeView)
     ? routeView
     : VIEW_BALANCES
+  const rows = rowsByView[activeView] || EMPTY_INVENTORY_ROWS
   const previousView = useRef(activeView)
   const routeLotID = taskStock?.lot_id || searchParamPositiveInt(searchParams, 'lot_id')
   const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
@@ -462,7 +468,7 @@ export default function InventoryLedgerPage() {
     setStatusCounts(null)
     if (!canReadInventory) {
       if (request.isCurrent()) {
-        setRows([])
+        setRowsByView({})
         setTotal(0)
         setSelectedRow(null)
       }
@@ -477,7 +483,7 @@ export default function InventoryLedgerPage() {
       }
       setStatusCounts(activeView === VIEW_LOTS ? resolveBusinessStatusCounts(data) : null)
       const nextRows = getRowsFromData(activeView, data)
-      setRows(nextRows)
+      setRowsByView((current) => ({ ...current, [activeView]: nextRows }))
       setSelectedRecords((current) => taskStock
         ? nextRows.filter((item) => item.lot_id === taskStock.lot_id && item.warehouse_id === taskStock.warehouse_id).slice(0, 1)
         : nextRows.filter((item) => current.some((selected) => selected.id === item.id)))
@@ -1387,7 +1393,8 @@ export default function InventoryLedgerPage() {
         <>
           <BusinessOperationPanel
             compact
-            contentSwitch={outletContext?.moduleWorkspace?.secondaryNavigation?.items.length ? <BusinessModuleViewTabs navigation={outletContext.moduleWorkspace.secondaryNavigation} /> : null}
+            switching={viewSwitchPending}
+            contentSwitch={outletContext?.moduleWorkspace?.secondaryNavigation?.items.length ? <BusinessModuleViewTabs navigation={outletContext.moduleWorkspace.secondaryNavigation} onPendingChange={setViewSwitchPending} /> : null}
             viewSwitch={activeView === VIEW_BALANCES ? inventoryBalanceSwitch : null}
             onClearFilters={clearFilters}
             activeFilterCount={activeFilterCount}
@@ -1724,52 +1731,56 @@ export default function InventoryLedgerPage() {
             </SelectionActionBar>
           </BusinessOperationPanel>
 
-          <Card ref={tableCardRef} className={`erp-business-data-table-card erp-business-module-table-card${sticky ? ' erp-business-data-table-card--sticky' : ''}`} onClickCapture={inventoryRecordOpen.onClickCapture} onDoubleClickCapture={inventoryRecordOpen.onDoubleClickCapture}>
-            {activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? (
-              <InventoryDistributionOverview
-                balances={distributionData.rows}
-                warehouses={warehouses}
-                loading={distributionData.loading}
-                error={distributionData.error}
-                onRetry={distributionData.reload}
-                onSelectWarehouse={(warehouse) => {
-              if (warehouse.warehouseID <= 0) return
-              setWarehouseID(warehouse.warehouseID)
-              setBalanceDisplay('list')
-              resetCurrentPage()
-            }}
-              />
-        ) : (
-          <InventoryTable
-            widthMode="columns"
-            tableLayout="fixed"
-            scrollToolbar
-            sticky={sticky}
-            rowKey={(record) => `${activeView}-${record.id}`}
-            loading={loading}
-            dataSource={rows}
-            columns={copyableTableColumns}
-            pagination={createBusinessTablePagination({
-              pagination,
-              total,
-              onChange: (current, pageSize) =>
-                setPagination({ current, pageSize }),
-            })}
-            rowSelection={{
-              type: activeView === VIEW_BALANCES ? 'checkbox' : 'radio',
-              selectedRowKeys: selectedRecords.map((row) => `${activeView}-${row.id}`),
-              onChange: (_keys, nextSelected) => setSelectedRecords(nextSelected),
-            }}
-            rowClassName={(record) =>
-              selectedRecords.some((row) => row.id === record.id) ? 'ant-table-row-selected' : ''
-            }
-            onRow={inventoryRecordOpen.onRow}
-            locale={{
-              emptyText: <Empty description={`暂无${activeLabel}`} />,
-            }}
-          />
-        )}
-          </Card>
+          <BusinessSwitchContent pending={viewSwitchPending}>
+            <Card ref={tableCardRef} className={`erp-business-data-table-card erp-business-module-table-card${sticky ? ' erp-business-data-table-card--sticky' : ''}`} onClickCapture={inventoryRecordOpen.onClickCapture} onDoubleClickCapture={inventoryRecordOpen.onDoubleClickCapture}>
+              <BusinessViewPanels activeView={activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? 'distribution' : activeView} views={outletContext?.taskBusiness ? [] : [VIEW_BALANCES, VIEW_LOTS, VIEW_TXNS, 'distribution']}>
+                {activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? (
+                  <InventoryDistributionOverview
+                    balances={distributionData.rows}
+                    warehouses={warehouses}
+                    loading={distributionData.loading}
+                    error={distributionData.error}
+                    onRetry={distributionData.reload}
+                    onSelectWarehouse={(warehouse) => {
+                if (warehouse.warehouseID <= 0) return
+                setWarehouseID(warehouse.warehouseID)
+                setBalanceDisplay('list')
+                resetCurrentPage()
+              }}
+                  />
+          ) : (
+            <InventoryTable
+              widthMode="columns"
+              tableLayout="fixed"
+              scrollToolbar
+              sticky={sticky}
+              rowKey={(record) => `${activeView}-${record.id}`}
+              loading={loading}
+              dataSource={canReadInventory ? rows : EMPTY_INVENTORY_ROWS}
+              columns={copyableTableColumns}
+              pagination={createBusinessTablePagination({
+                pagination,
+                total,
+                onChange: (current, pageSize) =>
+                  setPagination({ current, pageSize }),
+              })}
+              rowSelection={{
+                type: activeView === VIEW_BALANCES ? 'checkbox' : 'radio',
+                selectedRowKeys: selectedRecords.map((row) => `${activeView}-${row.id}`),
+                onChange: (_keys, nextSelected) => setSelectedRecords(nextSelected),
+              }}
+              rowClassName={(record) =>
+                selectedRecords.some((row) => row.id === record.id) ? 'ant-table-row-selected' : ''
+              }
+              onRow={inventoryRecordOpen.onRow}
+              locale={{
+                emptyText: <Empty description={`暂无${activeLabel}`} />,
+              }}
+            />
+          )}
+              </BusinessViewPanels>
+            </Card>
+          </BusinessSwitchContent>
         </>
       ) : operationsOnly && !taskOperation ? (
         <InventoryOperationRecordsModal inline open refreshKey={`${operationRecordsRevision}:${currentOperation?.id || 0}:${currentOperation?.version || 0}`} currentAdminID={currentAdminID} canCreate={canCreateInventoryOperation} onCreate={canCreateInventoryOperation ? () => navigate('/erp/warehouse/inventory') : null} onSelect={async (record) => { const recovered = await recoverInventoryOperation(record.id); if (recovered?.id) setOperationDetailsOpen(true) }} onEdit={openInventoryOperationEdit} />

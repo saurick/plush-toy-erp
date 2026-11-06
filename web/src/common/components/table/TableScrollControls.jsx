@@ -4,15 +4,19 @@ import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import { Button, Space } from 'antd'
 import './table-scroll-controls.css'
 import { findTableScrollToolbar } from './tableScrollToolbar.mjs'
+import { useOverlayScope } from '../overlay/OverlayScopeContext.mjs'
 
 export default function TableScrollControls({
   tableRef,
   revision,
   loading = false,
+  hasRows,
   useToolbar = false,
   allowEmpty = false,
 }) {
   const id = useId()
+  const visible = useOverlayScope()?.visible !== false
+  const visibleRef = useRef(visible)
   const [hosts, setHosts] = useState(null)
   const [position, setPosition] = useState(null)
   const [verticalScrolling, setVerticalScrolling] = useState(false)
@@ -25,6 +29,7 @@ export default function TableScrollControls({
   // Row and loading updates reuse the same hosts. Rebind only when React
   // replaces the actual table or its toolbar, and measure before painting.
   useLayoutEffect(() => {
+    visibleRef.current = visible
     loadingRef.current = busy
     const wrapper = tableRef.current?.nativeElement || tableRef.current
     const isAntTable = wrapper?.matches('.ant-table-wrapper')
@@ -100,8 +105,7 @@ export default function TableScrollControls({
     }
     const measure = () => {
       frame = 0
-      syncLoadingHeight()
-      if (loadingRef.current) return
+      if (loadingRef.current || !visibleRef.current) return
       // Keep the separate header's scroll range equal to the body. WebKit can
       // reserve native scrollbar space that Ant's mount-time probe omits.
       scroller.classList.add('app-table-scroll-enhanced')
@@ -183,9 +187,19 @@ export default function TableScrollControls({
       )
     }
     const schedule = () => {
-      if (!frame && !settleTimer) frame = requestAnimationFrame(measure)
+      if (visibleRef.current && !frame && !settleTimer) frame = requestAnimationFrame(measure)
+    }
+    const refresh = () => {
+      if (!visibleRef.current) {
+        cancelAnimationFrame(frame)
+        frame = 0
+        return
+      }
+      syncLoadingHeight()
+      if (!frame) frame = requestAnimationFrame(measure)
     }
     const onScroll = (event) => {
+      if (!visibleRef.current) return
       const node = event.currentTarget
       const top = node === window ? window.scrollY : node.scrollTop
       if (top !== scrollTops.get(node)) {
@@ -237,12 +251,12 @@ export default function TableScrollControls({
       toolbar,
       allowEmpty,
       dispose,
-      // Data changes must update the occupied space before paint, even while
-      // vertical scrolling keeps the dock hidden until the idle timer ends.
-      refresh: measure,
+      // Preserve loading height immediately; coalesce data and observer updates
+      // after the table's DOM and layout effects have finished changing it.
+      refresh,
     }
-    measure()
-  }, [tableRef, revision, useToolbar, allowEmpty, id, busy])
+    refresh()
+  }, [tableRef, revision, useToolbar, allowEmpty, id, busy, visible])
 
   useLayoutEffect(
     () => () => {
@@ -252,7 +266,7 @@ export default function TableScrollControls({
     []
   )
 
-  if (!hosts || !position) return null
+  if (!visible || !hosts || !position || (!busy && hasRows === false && !allowEmpty)) return null
   const scroll = (direction) =>
     scrollerRef.current?.scrollBy({
       left: direction * position.step,

@@ -1,0 +1,23 @@
+.erp-business-switch-content {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: inherit;
+  min-width: 0;
+  min-height: 0;
+}
+
+.erp-business-switch-content > [data-switch-pending] {
+  visibility: hidden;
+}
+
+.erp-business-switch-content__feedback {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.erp-business-operation-panel [data-business-switch-paused] {
+  visibility: hidden;
+}

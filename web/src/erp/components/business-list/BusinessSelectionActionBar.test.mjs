@@ -321,7 +321,10 @@ test('放得下时完整展示动作，按钮颜色和临时忙碌不改变分�
   const direct = () => [...container.querySelectorAll('.erp-business-selection-action-bar__record-actions button')].map((button) => button.textContent.replace(/\s+/gu, ''))
   await render()
   assert.deepEqual(direct(), ['编辑', '判定合格', '判定不合格', '查看', '打印', '重新读取'])
-  assert.deepEqual([...container.querySelectorAll('.erp-business-selection-action-bar__group-heading')].map((node) => node.textContent), ['业务办理', '查看与关联', '其他操作'])
+  assert.deepEqual([...container.querySelectorAll('.erp-business-selection-action-bar__compact-visible .erp-business-selection-action-bar__group-heading')].map((node) => node.textContent), ['业务办理', '查看与关联', '其他操作'])
+  const measurement = container.querySelector('.erp-business-selection-action-bar__measure')
+  assert.equal(measurement.getAttribute('aria-hidden'), 'true')
+  assert.equal(measurement.hasAttribute('inert'), true, '测量副本不参与焦点与操作')
   busy = true
   await render()
   assert.deepEqual(direct(), ['编辑', '判定合格', '判定不合格', '查看', '打印', '重新读取'])

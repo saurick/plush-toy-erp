@@ -9,7 +9,6 @@ export default function useSlidingIndicator({
   revealSelected = false,
 }) {
   const rootRef = useRef(null)
-  const measureRef = useRef(null)
 
   useLayoutEffect(() => {
     const root = rootRef.current
@@ -66,7 +65,7 @@ export default function useSlidingIndicator({
 
     const resizeObserver = new ResizeObserver(measure)
     resizeObserver.observe(container)
-    const refresh = () => {
+    const refresh = (records) => {
       const items = new Set(container.querySelectorAll(itemSelector))
       observedItems.forEach((item) => {
         if (!items.has(item)) {
@@ -80,7 +79,7 @@ export default function useSlidingIndicator({
           observedItems.add(item)
         }
       })
-      measure()
+      if (!records || records.some((record) => record.type === 'childList') || container.querySelector(selectedSelector) !== previousItem) measure()
     }
     const mutationObserver = new MutationObserver(refresh)
     mutationObserver.observe(container, {
@@ -89,19 +88,13 @@ export default function useSlidingIndicator({
       childList: true,
       subtree: true,
     })
-    measureRef.current = refresh
     refresh()
 
     return () => {
       mutationObserver.disconnect()
       resizeObserver.disconnect()
-      measureRef.current = null
     }
   }, [containerSelector, itemSelector, selectedSelector, revealSelected])
-
-  useLayoutEffect(() => {
-    measureRef.current?.()
-  })
 
   return rootRef
 }

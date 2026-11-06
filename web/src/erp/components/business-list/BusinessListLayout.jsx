@@ -37,6 +37,7 @@ import Table, { TABLE_SELECTION_COLUMN_WIDTH } from '@/common/components/table/A
 import SharedSearchInput from '@/common/components/SearchInput'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import FilterChip from '@/common/components/navigation/FilterChip'
+import BusinessSwitchContent from '../BusinessSwitchContent.jsx'
 import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
 import './businessFilterChoices.css'
 import BusinessRecordDetails from './BusinessRecordDetails.jsx'
@@ -354,42 +355,53 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
     const root = actionsRef.current
     const rail = measureItemsRef.current
     if (!root || !rail) return undefined
-    let frame
+    let frame = 0
     let stopped = false
+    let templates = []
+    let clones = []
+    let headings = []
     const measure = () => {
+      frame = 0
       if (stopped || !root.isConnected) return
       const { width } = root.getBoundingClientRect()
       if (width <= 0) return
       const gap = Number.parseFloat(getComputedStyle(root).columnGap) || 8
+      const contextWidth = contextRef.current?.getBoundingClientRect().width || 0
+      const moreWidth = Math.ceil(measureMoreRef.current.getBoundingClientRect().width)
+      const groupGap = Number.parseFloat(getComputedStyle(visibleActionsRef.current).columnGap) || gap
       const nodes = [
         ...visibleActionsRef.current.querySelectorAll('[data-selection-action-index]'),
         ...(moreActionsListRef.current?.querySelectorAll('[data-selection-action-index]') || []),
       ]
       // Measure inert DOM copies in toolbar styles, including actions in the hidden menu.
       // Business components are never duplicated just to discover their natural width.
-      const clones = nodes.map((node) => {
-        const clone = node.cloneNode(true)
-        clone.className = 'erp-business-selection-action-bar__measure-item'
-        clone.querySelectorAll('[id]').forEach((item) => item.removeAttribute('id'))
-        clone.querySelectorAll('[data-business-action-key]').forEach((item) => item.removeAttribute('data-business-action-key'))
-        clone.querySelectorAll('.ant-btn-loading-icon').forEach((item) => item.remove())
-        clone.querySelectorAll('button').forEach((button) => {
-          const item = document.createElement('span')
-          item.className = button.className
-          item.style.cssText = button.style.cssText
-          item.append(...button.childNodes)
-          button.replaceWith(item)
+      const nextTemplates = nodes.map((node) => node.outerHTML)
+      if (nextTemplates.length !== templates.length || nextTemplates.some((value, index) => value !== templates[index])) {
+        templates = nextTemplates
+        clones = nodes.map((node) => {
+          const clone = node.cloneNode(true)
+          clone.className = 'erp-business-selection-action-bar__measure-item'
+          clone.querySelectorAll('[id]').forEach((item) => item.removeAttribute('id'))
+          clone.querySelectorAll('[data-business-action-key]').forEach((item) => item.removeAttribute('data-business-action-key'))
+          clone.querySelectorAll('.ant-btn-loading-icon').forEach((item) => item.remove())
+          clone.querySelectorAll('button').forEach((button) => {
+            const item = document.createElement('span')
+            item.className = button.className
+            item.style.cssText = button.style.cssText
+            item.append(...button.childNodes)
+            button.replaceWith(item)
+          })
+          return clone
         })
-        return clone
-      })
-      const headings = Object.entries(SELECTION_ACTION_GROUPS).map(([key, label]) => {
-        const heading = document.createElement('span')
-        heading.className = 'erp-business-selection-action-bar__group-heading'
-        heading.dataset.actionGroup = key
-        heading.textContent = label
-        return heading
-      })
-      rail.replaceChildren(...clones, ...headings)
+        headings = Object.entries(SELECTION_ACTION_GROUPS).map(([key, label]) => {
+          const heading = document.createElement('span')
+          heading.className = 'erp-business-selection-action-bar__group-heading'
+          heading.dataset.actionGroup = key
+          heading.textContent = label
+          return heading
+        })
+        rail.replaceChildren(...clones, ...headings)
+      }
       const widths = Object.fromEntries(clones.map((node) => [
         node.dataset.selectionActionIndex,
         Math.ceil(node.getBoundingClientRect().width),
@@ -397,28 +409,25 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
       const groupMinWidths = Object.fromEntries(headings.map((heading) => [
         heading.dataset.actionGroup, Math.ceil(heading.getBoundingClientRect().width),
       ]))
-      rail.replaceChildren()
-      const contextWidth = contextRef.current?.getBoundingClientRect().width || 0
       const next = {
         availableWidth: Math.floor(width - contextWidth - (contextWidth ? gap : 0)),
-        moreWidth: Math.ceil(measureMoreRef.current.getBoundingClientRect().width),
+        moreWidth,
         gap,
-        groupGap: Number.parseFloat(getComputedStyle(visibleActionsRef.current).columnGap) || gap,
+        groupGap,
         groupMinWidths,
         widths,
       }
       setSpace((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next)
     }
     const schedule = () => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(measure)
+      if (!frame) frame = requestAnimationFrame(measure)
     }
-    measure()
+    schedule()
     const resizeObserver = new ResizeObserver(schedule)
     resizeObserver.observe(root)
     resizeObserver.observe(visibleActionsRef.current)
     const mutationObserver = new MutationObserver(schedule)
-    const options = { childList: true, subtree: true, characterData: true }
+    const options = { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] }
     mutationObserver.observe(visibleActionsRef.current, options)
     if (moreActionsListRef.current) mutationObserver.observe(moreActionsListRef.current, options)
     window.addEventListener('resize', schedule)
@@ -431,7 +440,7 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
       window.removeEventListener('resize', schedule)
       document.fonts?.removeEventListener('loadingdone', schedule)
     }
-  }, [children, measurementRevision, overflow.length, visible.length])
+  }, [measurementRevision])
   const closeMoreActions = React.useCallback(() => {
     setMoreActionsOpen(false)
   }, [])
@@ -604,7 +613,7 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
             </Button>
           </Dropdown>
         ) : null}
-        <div className="erp-business-selection-action-bar__measure" aria-hidden="true">
+        <div className="erp-business-selection-action-bar__measure" aria-hidden="true" inert="" data-scroll-edges="off">
           <Button ref={measureMoreRef} href="#" tabIndex={-1} size="small" className="erp-action-button">{mobile ? <EllipsisOutlined aria-hidden="true" /> : <>更多操作 <DownOutlined /></>}</Button>
           <div ref={measureItemsRef} />
         </div>
@@ -1040,7 +1049,7 @@ export function BusinessListToolbar({ stats = [], actions = null }) {
 }
 
 // 分类条由父工作区持续挂载，切换的业务页只向同一工具栏提供查询和操作。
-export function BusinessToolbarWorkspace({ contentSwitch, children, compact = true }) {
+export function BusinessToolbarWorkspace({ contentSwitch, children, compact = true, switching = false }) {
   const { taskBusiness } = useBusinessPageContext() || {}
   const toolbarRef = React.useRef(null)
   const [commandHost, setCommandHost] = React.useState(null)
@@ -1054,11 +1063,11 @@ export function BusinessToolbarWorkspace({ contentSwitch, children, compact = tr
         <Card ref={toolbarRef} className={joinClassNames('erp-business-operation-panel', compact && 'erp-business-operation-panel--compact')}>
           <div className="erp-business-operation-panel__command">
             {contentSwitch ? <div className="erp-business-operation-panel__content-switch" role="group" aria-label="内容分类">{contentSwitch}</div> : null}
-            <div className="erp-business-operation-panel__command-host" ref={setCommandHost} />
+            <div className="erp-business-operation-panel__command-host" ref={setCommandHost} inert={switching ? '' : undefined} aria-hidden={switching || undefined} data-business-switch-paused={switching || undefined} />
           </div>
-          <div className="erp-business-operation-panel__selection-host" ref={setSelectionHost} />
+          <div className="erp-business-operation-panel__selection-host" ref={setSelectionHost} inert={switching ? '' : undefined} aria-hidden={switching || undefined} data-business-switch-paused={switching || undefined} />
         </Card>
-        {children}
+        <BusinessSwitchContent pending={switching}>{children}</BusinessSwitchContent>
       </div>
     </BusinessToolbarContext.Provider>
   )
@@ -1077,6 +1086,7 @@ export function BusinessOperationPanel({
   children,
   showSelection = true,
   compact = false,
+  switching = false,
   filtersOpen: controlledFiltersOpen,
   onFiltersOpenChange,
 }) {
@@ -1286,9 +1296,16 @@ export function BusinessOperationPanel({
       ) : null}
     </>
   )
+  const pausedCommand = React.Children.map(command.props.children, (child) => {
+    if (!React.isValidElement(child) || child.props.className?.includes('erp-business-operation-panel__content-switch')) return child
+    return React.cloneElement(child, { inert: switching ? '' : undefined, 'aria-hidden': switching || undefined, 'data-business-switch-paused': switching || undefined })
+  })
   const selection = showSelection && childActions.length > 0 ? (
     <div
       className="erp-business-operation-panel__selection"
+      inert={switching ? '' : undefined}
+      aria-hidden={switching || undefined}
+      data-business-switch-paused={switching || undefined}
       hidden={!hasVisibleChildren}
       style={hasVisibleChildren ? undefined : { display: 'none' }}
     >
@@ -1298,7 +1315,7 @@ export function BusinessOperationPanel({
   if (toolbar) {
     return (
       <>
-        {toolbar.commandHost ? createPortal(command, toolbar.commandHost) : null}
+        {toolbar.commandHost ? createPortal(pausedCommand, toolbar.commandHost) : null}
         {toolbar.selectionHost ? createPortal(selection, toolbar.selectionHost) : null}
       </>
     )
@@ -1311,7 +1328,7 @@ export function BusinessOperationPanel({
         hasRecordActions ? 'erp-business-operation-panel--record-actions' : ''
       )}
     >
-      <div className="erp-business-operation-panel__command">{command}</div>
+      <div className="erp-business-operation-panel__command">{pausedCommand}</div>
       {selection}
     </Card>
   )
@@ -1800,30 +1817,8 @@ export function BusinessDataTable({
   }, [resolvedColumns, resolvedRowSelection, scroll])
   const { onRow: resolvedOnRow, onClickCapture: captureRowClick } = useBusinessTableRecordOpen({ dataSource, rowKey, onRow, onOpenRecord })
 
-  if (taskBusiness) {
-    if (taskBusiness.mode === 'bom' && taskBusiness.information) return null
-    const selectedKeys = rowSelection?.selectedRowKeys || []
-    const selected = (dataSource || []).find((row) => selectedKeys.includes(typeof rowKey === 'function' ? rowKey(row) : row[rowKey || 'id']))
-    const sourceDetails = (
-      <section className="mobile-task-business-source" data-testid="mobile-task-business-source" data-record-id={selected?.id} aria-busy={busy}>
-        <Spin spinning={busy && Boolean(selected)}>
-          {selected ? (
-            <><BusinessRecordDetails columns={taskDetailColumns} record={selected} presentation="mobile-task" title={isTerminalWorkflowTask(taskBusiness.task) ? '来源业务当前资料' : '本次业务资料'} />{taskSourceDetails}</>
-          ) : <Empty state={busy ? 'loading' : 'empty'} description={busy ? '正在读取任务业务资料' : '未读取到任务对应单据，请返回任务后重新读取。'} />}
-        </Spin>
-      </section>
-    )
-    informationSnapshot.current = <BusinessPageContext.Provider value={pageContext}>{sourceDetails}</BusinessPageContext.Provider>
-    return taskBusiness.information
-      ? taskBusiness.information.host ? createPortal(sourceDetails, taskBusiness.information.host) : null
-      : sourceDetails
-  }
-
-  return (
-    <Card ref={tableCardRef} className={joinClassNames('erp-business-data-table-card erp-business-module-table-card', sticky && 'erp-business-data-table-card--sticky')} onClickCapture={captureRowClick} onDoubleClickCapture={captureRowClick}>
-      {tableHeader ? (
-        <div className="erp-business-data-table-card__header">{tableHeader}</div>
-      ) : null}
+  const renderedTable = React.useMemo(
+    () => (
       <Table
         widthMode="columns"
         scrollToolbar
@@ -1848,6 +1843,35 @@ export function BusinessDataTable({
           emptyText: <Empty description={emptyDescription} />,
         }}
       />
+    ),
+    [sticky, loading, rowKey, resolvedColumns, dataSource, tableLayout, expandable, resolvedScroll, resolvedRowSelection, rowClassName, resolvedOnRow, onChange, pagination, hasPageLocalSorter, emptyDescription]
+  )
+
+  if (taskBusiness) {
+    if (taskBusiness.mode === 'bom' && taskBusiness.information) return null
+    const selectedKeys = rowSelection?.selectedRowKeys || []
+    const selected = (dataSource || []).find((row) => selectedKeys.includes(typeof rowKey === 'function' ? rowKey(row) : row[rowKey || 'id']))
+    const sourceDetails = (
+      <section className="mobile-task-business-source" data-testid="mobile-task-business-source" data-record-id={selected?.id} aria-busy={busy}>
+        <Spin spinning={busy && Boolean(selected)}>
+          {selected ? (
+            <><BusinessRecordDetails columns={taskDetailColumns} record={selected} presentation="mobile-task" title={isTerminalWorkflowTask(taskBusiness.task) ? '来源业务当前资料' : '本次业务资料'} />{taskSourceDetails}</>
+          ) : <Empty state={busy ? 'loading' : 'empty'} description={busy ? '正在读取任务业务资料' : '未读取到任务对应单据，请返回任务后重新读取。'} />}
+        </Spin>
+      </section>
+    )
+    informationSnapshot.current = <BusinessPageContext.Provider value={pageContext}>{sourceDetails}</BusinessPageContext.Provider>
+    return taskBusiness.information
+      ? taskBusiness.information.host ? createPortal(sourceDetails, taskBusiness.information.host) : null
+      : sourceDetails
+  }
+
+  return (
+    <Card ref={tableCardRef} className={joinClassNames('erp-business-data-table-card erp-business-module-table-card', sticky && 'erp-business-data-table-card--sticky')} onClickCapture={captureRowClick} onDoubleClickCapture={captureRowClick}>
+      {tableHeader ? (
+        <div className="erp-business-data-table-card__header">{tableHeader}</div>
+      ) : null}
+      {renderedTable}
     </Card>
   )
 }

@@ -67,6 +67,8 @@ export function createBusinessFormFullscreenScenarios({ assert, outputDir }, sce
         await page.locator('.ant-picker-dropdown:visible').waitFor()
         await start.press('Escape')
         await page.locator('.ant-picker-dropdown:visible').waitFor({ state: 'hidden' })
+        // Escape restores focus after the closing motion before another popup can open.
+        await page.waitForFunction(() => document.activeElement?.id === 'planned_start_at')
         await assertFull(editor)
         const product = editor.locator('.erp-production-order-line').first().getByRole('combobox', { name: '* 产品', exact: true })
         await product.click()

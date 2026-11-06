@@ -22,6 +22,10 @@
   margin-top: var(--erp-page-gap);
 }
 
+.erp-business-view-panel:not([hidden]) {
+  display: contents;
+}
+
 .erp-business-view-surface__toolbar {
   position: relative;
   z-index: 1;
@@ -41,12 +45,18 @@
 }
 
 .erp-business-view-surface > .erp-business-data-table-card.ant-card,
-.erp-business-view-surface > .erp-business-visual-frame {
+.erp-business-view-surface > .erp-business-visual-frame,
+.erp-business-view-surface > .erp-business-view-panel > .erp-business-data-table-card.ant-card,
+.erp-business-view-surface > .erp-business-view-panel > .erp-business-visual-frame {
   flex: 1;
   border-radius: 10px;
 }
 
 .erp-business-view-surface
+  > .erp-business-data-table-card.ant-card
+  > .ant-card-body,
+.erp-business-view-surface
+  > .erp-business-view-panel
   > .erp-business-data-table-card.ant-card
   > .ant-card-body {
   padding-top: 0;

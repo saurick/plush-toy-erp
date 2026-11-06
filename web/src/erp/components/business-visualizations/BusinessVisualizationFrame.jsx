@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, } from 'react-router-dom'
 import { Button } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
@@ -6,6 +6,58 @@ import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Pagination from '@/common/components/pagination/AppPagination'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import FilterChip from '@/common/components/navigation/FilterChip'
+import OverlayScopeProvider from '@/common/components/overlay/OverlayScopeProvider.jsx'
+import { useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
+
+export function BusinessViewPanel({ active, viewKey, pending = false, markView = true, children }) {
+  const parent = useOverlayScope()
+  const rootRef = useRef(null)
+  const owner = useRef(Symbol('business-view')).current
+  const releaseGuard = useRef(null)
+  const registerParentGuard = parent?.registerGuard
+  const onGuardChange = useCallback((guard) => {
+    releaseGuard.current?.()
+    releaseGuard.current = guard ? registerParentGuard?.(owner, guard) : null
+  }, [owner, registerParentGuard])
+  useEffect(() => () => releaseGuard.current?.(), [])
+  const visible = parent?.visible !== false && active && !pending
+  return (
+    <OverlayScopeProvider enabled={parent?.enabled === true} visible={visible} portalScoped containerRef={parent?.containerRef || rootRef} scopeKey={viewKey} onGuardChange={onGuardChange}>
+      <div ref={rootRef} className="erp-business-view-panel" data-business-view-panel={markView ? viewKey : undefined} hidden={!active} inert={!visible ? '' : undefined} aria-hidden={pending || undefined} data-switch-pending={pending || undefined} data-scroll-edges={!visible ? 'off' : undefined}>
+        {children}
+      </div>
+    </OverlayScopeProvider>
+  )
+}
+
+export function BusinessViewPanels({ activeView, views, children }) {
+  const enabled = views.includes(activeView)
+  const cached = useRef(new Map())
+  const [visited, setVisited] = useState(() => new Set(enabled ? [activeView] : []))
+  useLayoutEffect(() => {
+    if (!enabled) {
+      cached.current.clear()
+      setVisited((current) => current.size ? new Set() : current)
+      return
+    }
+    cached.current.set(activeView, children)
+    for (const key of cached.current.keys()) {
+      if (!views.includes(key)) cached.current.delete(key)
+    }
+    setVisited((current) => {
+      const keys = [...current].filter((key) => views.includes(key))
+      return current.has(activeView) && keys.length === current.size
+        ? current
+        : new Set([...keys, activeView])
+    })
+  }, [activeView, children, enabled, views])
+  if (!enabled) return children
+  return views.filter((key) => key === activeView || visited.has(key)).map((key) => (
+    <BusinessViewPanel key={key} viewKey={key} active={key === activeView}>
+      {key === activeView ? children : cached.current.get(key)}
+    </BusinessViewPanel>
+  ))
+}
 
 export function VisualizationPagination({ pagination, onChange }) {
   return (
@@ -21,7 +73,7 @@ export function VisualizationPagination({ pagination, onChange }) {
   )
 }
 
-export function BusinessViewSwitch({ value, onChange, options, appearance = 'tabs', 'aria-label': ariaLabel = '页面展示方式' }) {
+export function BusinessViewSwitch({ value, onChange, onReselect, options, appearance = 'tabs', 'aria-label': ariaLabel = '页面展示方式' }) {
   return (
     <div className="erp-business-visual-switch">
       <SlidingTabList
@@ -30,6 +82,7 @@ export function BusinessViewSwitch({ value, onChange, options, appearance = 'tab
         value={value}
         options={options}
         onChange={onChange}
+        onReselect={onReselect}
       />
     </div>
   )
@@ -41,6 +94,7 @@ export function BusinessViewSurface({
   className = '',
   activeView,
   loading = false,
+  preserveViews,
 }) {
   const rootRef = useRef(null)
   const context = useBusinessPageContext()
@@ -51,10 +105,11 @@ export function BusinessViewSurface({
     const root = rootRef.current
     if (!root || !activeView || loading) return undefined
     const key = `${pathname}:scroll:${activeView}`
+    const activeRoot = root.querySelector(':scope > [data-business-view-panel]:not([hidden])') || root
     const targets = [
       document.scrollingElement,
       root.closest('.erp-admin-content'),
-      ...root.querySelectorAll('.ant-table-body, .ant-table-content'),
+      ...activeRoot.querySelectorAll('.ant-table-body, .ant-table-content'),
     ].filter(Boolean)
     const saved = positions.get(key)
     if (saved) {
@@ -86,7 +141,7 @@ export function BusinessViewSurface({
       {switcher ? (
         <div className="erp-business-view-surface__toolbar">{switcher}</div>
       ) : null}
-      {children}
+      {preserveViews ? <BusinessViewPanels activeView={activeView} views={preserveViews}>{children}</BusinessViewPanels> : children}
     </div>
   )
 }

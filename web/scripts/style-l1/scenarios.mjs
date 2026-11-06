@@ -45,6 +45,8 @@ import { createHistoryRecordScenarios } from './historyRecordScenarios.mjs'
 import { createTabMotionScenarios } from './tabMotionScenarios.mjs'
 import { createTableAlignmentScenarios } from './tableAlignmentScenarios.mjs'
 import { createBusinessTableScrollScenarios } from './businessTableScrollScenarios.mjs'
+import { createBusinessTabReuseScenarios } from './businessTabReuseScenarios.mjs'
+import { createBusinessTabResponseScenarios } from './businessTabResponseScenarios.mjs'
 import { createBusinessListStickyScenarios } from './businessListStickyScenarios.mjs'
 import { createDesktopListStickyScenarios } from './desktopListStickyScenarios.mjs'
 import { createWorkCenterTableScenarios } from './workCenterTableScenarios.mjs'
@@ -613,6 +615,8 @@ export function createStyleL1Scenarios(deps) {
       gotoScenarioPath,
       assertLineItemsUnifiedHorizontalScroll,
     }),
+    ...createBusinessTabReuseScenarios({ customerRuntimeEffectiveSession }),
+    ...createBusinessTabResponseScenarios({ customerRuntimeEffectiveSession, outputDir }),
     ...createBusinessTableScrollScenarios({
       outputDir,
       customerRuntimeEffectiveSession,

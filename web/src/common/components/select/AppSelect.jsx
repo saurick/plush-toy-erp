@@ -4,7 +4,7 @@ import { CheckOutlined } from '@ant-design/icons'
 import Empty from '../empty/AppEmpty.jsx'
 import { useSelectPopupWidth } from './useSelectPopupWidth.mjs'
 import SelectPresentationContext from './SelectPresentationContext.jsx'
-import { useOverlayPopupAlign } from '../overlay/OverlayScopeContext.mjs'
+import { useOverlayPopupAlign, useOverlayScope } from '../overlay/OverlayScopeContext.mjs'
 import './app-select.css'
 
 const GROUPED_SELECTED_ICON = <CheckOutlined />
@@ -45,6 +45,7 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
   // 显式受控空值保持受控，省略 value 的输入仍使用 defaultValue。
   const selectValue = Object.hasOwn(inputProps, 'value') && value === undefined ? null : value
   const inheritedPresentation = useContext(SelectPresentationContext)
+  const visible = useOverlayScope()?.visible !== false
   const { identities, displayOptions, hasOptionGroups } = useMemo(() => {
     const result = new Map()
     let grouped = false
@@ -67,11 +68,12 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
   const controlled = Object.hasOwn(inputProps, 'value')
   const [uncontrolledValue, setUncontrolledValue] = useState(props.defaultValue)
   const [searchKeyword, setSearchKeyword] = useState('')
+  const [popupOpen, setPopupOpen] = useState(props.defaultOpen ?? false)
   const currentValue = controlled ? value : uncontrolledValue
   const selectRef = useRef(null)
   useImperativeHandle(ref, () => selectRef.current)
   const basePrefix = prefix ?? (label && hasSelectValue(currentValue) ? <span className="app-select__label">{label}</span> : undefined)
-  const popupWidth = useSelectPopupWidth(selectRef, props.mode, props.showSearch, referenceLayout || identities.size > 0)
+  const popupWidth = useSelectPopupWidth(selectRef, props.mode, props.showSearch, referenceLayout || identities.size > 0, visible && (props.open ?? popupOpen))
   const dropdownAlign = useOverlayPopupAlign(props.dropdownAlign)
   const select = (
     <Select
@@ -89,6 +91,7 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
         props.onSearch?.(keyword)
       } : undefined}
       onOpenChange={(open) => {
+        setPopupOpen(open)
         if (!open) setSearchKeyword('')
         props.onOpenChange?.(open)
       }}

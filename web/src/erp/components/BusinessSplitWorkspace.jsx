@@ -155,7 +155,7 @@ function BusinessSplitWorkspace({
       if (typeof to === 'number') { navigate(to); return }
       const target = resolvePath(to, state.location.pathname)
       if (!(await (!target.pathname.startsWith('/erp/') ? confirmAll() : state.leftGuard?.() ?? true))) return
-      state.permitted = createPath(target)
+      current.current.permitted = createPath(target)
       navigate(to, options)
       return
     }
@@ -166,7 +166,7 @@ function BusinessSplitWorkspace({
     if (!target) return
     if (!target.pathname.startsWith('/erp/') || target.pathname.startsWith('/erp/print-workspace/')) {
       if (await confirmAll()) {
-        state.permitted = createPath(target)
+        current.current.permitted = createPath(target)
         navigate(target, options)
       }
       return
@@ -274,6 +274,11 @@ rightAllowed: rightAccess?.allowed,
   useImperativeHandle(ref, () => ({
     ownsNavigation,
     navigate: (to, options) => navigatePane(open ? focus.current : 'left', to, options),
+    navigateAfterLeaveConfirmation: (to, options) => {
+      // A leave dialog can register an overlay guard while its confirmation is pending.
+      if (ownsNavigation) current.current.permitted = createPath(resolvePath(to, current.current.location.pathname))
+      navigate(to, options)
+    },
     confirmLeaveAll: async (options) => {
       const allowed = await confirmAll(options)
       if (allowed) current.current.permitted = '*'
@@ -282,7 +287,7 @@ rightAllowed: rightAccess?.allowed,
     dragPage: (event, path) => event.dataTransfer.setData(SPLIT_PAGE_DRAG_TYPE, path),
     refresh: (side = 'left') => refreshPane(side, true),
     navigateMenu: (item) => navigatePane('right', resolveBusinessModuleMenuTarget(item, current.current.rightLocation || current.current.location, rightUIState.values, outletContext.visibleMenuPaths)),
-  }), [confirmAll, navigatePane, open, ownsNavigation, refreshPane, rightUIState, outletContext.visibleMenuPaths])
+  }), [confirmAll, navigatePane, navigate, open, ownsNavigation, refreshPane, rightUIState, outletContext.visibleMenuPaths])
   const rightNavigator = useMemo(() => ({
     createHref: createPath,
     encodeLocation: (to) => resolvePath(to, current.current.rightLocation?.pathname),
