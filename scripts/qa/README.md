@@ -743,7 +743,7 @@ LOCAL_ACCEPTANCE_DATABASE_BASE_URL='postgres://<user>:<password>@192.168.0.133:5
 
 下面的组件命令只用于分段诊断；它们不替代统一生命周期和自动清理。
 
-两端完整顺序固定为 `fresh database → migration → first admin → exact formal account bootstrap → customer config apply/readback → exact core bootstrap → dataset runner → browser`。
+fresh 初始化顺序固定为 `fresh database → migration → first admin → exact formal account bootstrap → customer config apply/readback → exact core bootstrap → dataset runner → browser`。长期库沿用已有数据库和管理员，核对 migration、账号、配置与 core 后续跑同一 runner，不因执行数据准备而自动重建数据库。
 
 formal account bootstrap 必须先于带审批责任岗位的客户配置发布，并由后续 role stage 再次读回；133 使用镜像内 `/app/bootstrap-manual-acceptance-core`，详见 [Compose 部署说明](../../server/deploy/compose/prod/README.md)。
 
@@ -805,12 +805,12 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<8-to-20-character-admin-password>' \
 
 探针会把声明与当前容器 `GIT_SHA`、实际连接库和 Atlas 最新 revision 做只读核对；未冻结并部署同一代码版本时不得写入。
 
-远端执行顺序固定为：
+远端常规准备保留既有历史；fresh 验收须另行取得数据库重建授权。执行顺序为：
 
 1. 通过 `demo-133` 的受控 preflight 与 runtime identity 证明 Compose、端口、数据库、release、migration 和公网入口。
 2. 若要求 fresh，先完成 `demo-133` database rebuild，并取得原子保存的 passed receipt；receipt 必须绑定备份恢复、旧/新 PostgreSQL generation 与 rollback point。
 3. 用内部 `customer-trial-133` target 依次完成正式账号、客户配置、镜像内 core bootstrap 和唯一顶层 dataset runner。
-4. runner 仍在任何业务写入前通过正式 API 证明受管业务对象为零，并核对当前 release、migration、逻辑数据库与物理 generation。
+4. runner 在任何业务写入前核对当前 release、migration、数据库、客户配置和 core。长期库使用 persistent baseline，按当前批次精确新建或读回；提供重建回执的 fresh 模式才额外要求受管业务对象精确为零，并核对物理 generation。
 5. 总回执固定保存于 `output/qa/manual-acceptance/datasets/2026.11.07-v9/customer-trial-133/dataset/apply-report.json`；不得跳过总回执拼接分阶段报告。
 
 客户配置必须先独立应用并读回为 active；凭据和完整 attestation 只从受控进程环境传入，不写入命令或回执：
@@ -832,6 +832,10 @@ MANUAL_ACCEPTANCE_UAT_PASSWORD='<different-demo-password>' \
     --out output/qa/manual-acceptance/datasets/2026.11.07-v9/customer-trial-133/customer-config
 ```
 
+长期库优先通过 `node scripts/qa/scenario-demo-data.mjs --target customer-trial-133 --source-scale-profile volume` 取得只读计划。将计划字段代入 `SCENARIO_DEMO_CONFIRM=APPLY_SCENARIO_DEMO:customer-trial-133:<databaseName>:<dataVersion>:<runId>:<planDigest>`，随后向同一命令追加 `--apply --expected-plan-digest <planDigest>`；远端 attestation 与独立账号仍须符合该入口合同，不传数据库重建回执。
+
+下面是另行授权的 fresh 验收示例；它要求对应重建回执，不用于长期库常规补数：
+
 ```bash
 node scripts/qa/manual-acceptance-dataset.mjs \
   --apply \
@@ -846,7 +850,7 @@ node scripts/qa/manual-acceptance-dataset.mjs \
 
 133 模拟配置使用 `yoyoosun-customer-trial-133.<内容摘要>`，包含财务核对采购退货与入库调整所需的只读权限。它通过正式配置协议发布、检查切换、激活并读回；当前 revision 从生成的 manifest 或目标 policy 读取，不复制固定值。配置修订与数据批次独立；目标是否写入本轮数据，以另行授权的执行和实际回执为准，配置修订不代表重置业务数据。
 
-登录输入只从受控进程环境或凭据合同进入，不写进命令示例、仓库或回执。历史回执、错误 SHA、相同 system identifier 或当前非空都会停止。长期 scenario-demo 可按其既有长期库语义保留历史，但不能冒充 fresh full acceptance。
+登录输入只从受控进程环境或凭据合同进入，不写进命令示例、仓库或回执。错误 SHA 或范围漂移在各模式都停止；fresh 模式还会拒绝历史重建回执、未变化的 system identifier 或非空业务基线。长期 scenario-demo 保留历史，不能冒充 fresh full acceptance。
 
 首次执行前，该目标的规范总回执必须不存在。若某阶段失败，或完整成功后需要证明同批幂等重放，保留原回执，并在相同目标范围、版本、批次和后端后追加 `--resume-report output/qa/manual-acceptance/datasets/2026.11.07-v9/<target>/dataset/apply-report.json`。
 
