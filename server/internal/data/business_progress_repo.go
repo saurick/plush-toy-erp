@@ -40,11 +40,8 @@ func (r *businessProgressRepo) ListBusinessProgress(ctx context.Context, q biz.B
 	err := r.read(ctx, func(tx *stdsql.Tx) error {
 		cte, args := progressQuery(q, r.data.sqlDialect)
 		err := tx.QueryRowContext(ctx, cte+progressCountsSQL(q), args...).
-			Scan(&result.Counts.Total, &result.Counts.Overdue, &result.Counts.DueSoon, &result.Counts.Undated, &result.Counts.Blocked, &result.Counts.Unlinked)
+			Scan(&result.Counts.Total, &result.Counts.Overdue, &result.Counts.DueSoon, &result.Counts.Undated, &result.Counts.Blocked, &result.Counts.Unlinked, &result.Total)
 		if err != nil {
-			return err
-		}
-		if err = tx.QueryRowContext(ctx, cte+" SELECT COUNT(*) FROM filtered"+(" WHERE "+progressFilterCondition(q)), args...).Scan(&result.Total); err != nil {
 			return err
 		}
 		result.Rows, err = loadBusinessProgressRows(ctx, tx, q, cte, args)

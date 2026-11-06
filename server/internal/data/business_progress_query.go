@@ -298,6 +298,7 @@ func progressCountsSQL(q biz.BusinessProgressQuery) string {
 		}
 		columns = append(columns, "COALESCE(SUM(CASE WHEN "+progressFilterCondition(candidate)+" THEN 1 ELSE 0 END),0)")
 	}
+	columns = append(columns, "COALESCE(SUM(CASE WHEN "+progressFilterCondition(q)+" THEN 1 ELSE 0 END),0)")
 	return " SELECT " + strings.Join(columns, ",") + " FROM filtered"
 }
 
