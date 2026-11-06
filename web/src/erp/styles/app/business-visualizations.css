@@ -19,7 +19,6 @@
   flex-direction: column;
   flex: 1;
   min-width: 0;
-  margin-top: var(--erp-page-gap);
 }
 
 .erp-business-view-panel:not([hidden]) {

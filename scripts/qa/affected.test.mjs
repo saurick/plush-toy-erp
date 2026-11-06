@@ -43,6 +43,15 @@ test("business tab placement selects content, independent-entry and spacing regr
   }
 });
 
+test("shared list spacing owners retain geometry and recovery browser coverage", () => {
+  for (const file of ["web/src/erp/components/business-list/BusinessListLayout.jsx", "web/src/erp/components/BusinessSwitchContent.jsx", "web/src/erp/components/businessSwitchContent.css", "web/src/erp/components/business-visualizations/BusinessVisualizationFrame.jsx", "web/src/erp/styles/app/business-tables.css", "web/src/erp/styles/app/business-visualizations.css", "web/scripts/style-l1/businessTableAssertions.mjs", "web/scripts/style-l1/businessToolbarCompositionScenarios.mjs"]) {
+    const followUp = buildAffectedPlan([file], { root: ROOT }).followUps.find(({ id }) => id === "business-list-surface-spacing-browser");
+    assert.ok(followUp, file);
+    for (const expected of ["business-list-surface-spacing-light", "business-list-surface-spacing-dark-narrow", "business-list-surface-spacing-phone-width", "business-list-surface-spacing-recovery", "business-toolbar-form-entry", "warehouse-outbound-cold-entry-stability", "WebKit", "Chromium"]) assert.ok(followUp.text.includes(expected), `${file}: ${expected}`);
+  }
+  assert.equal(buildAffectedPlan(["web/src/erp/utils/paymentConditions.mjs"], { root: ROOT }).followUps.some(({ id }) => id === "business-list-surface-spacing-browser"), false);
+});
+
 test("toolbar design samples retain focused both-engine growth and isolation checks", () => {
   for (const file of ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.jsx", "web/src/dev-workbench/styles/dev-ui-toolbar-example.css", "web/src/dev-workbench/config/devToolbarExample.mjs", "web/scripts/style-l1/devToolbarExampleScenarios.mjs", "web/src/erp/components/business-list/ColumnOrderModal.jsx"]) {
     const plan = buildAffectedPlan([file], { root: ROOT });

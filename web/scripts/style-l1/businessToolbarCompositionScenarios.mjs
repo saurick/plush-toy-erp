@@ -1,7 +1,11 @@
 import { writeFile } from 'node:fs/promises'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { assertBusinessListSurfaceSpacing } from './businessTableAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { INVENTORY_VIEWS, WAREHOUSE_HANDLING_VIEWS } from '../../src/erp/utils/warehouseViews.mjs'
+import { createOutsourcingSummaryScenarios } from './outsourcingSummaryScenarios.mjs'
 
-export function createBusinessToolbarCompositionScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession, outputDir, path }) {
+export function createBusinessToolbarCompositionScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession, gotoScenarioPath, outputDir, path }) {
   const session = { ...customerRuntimeEffectiveSession, pages: [...new Set([...customerRuntimeEffectiveSession.pages, 'history-records'])] }
   async function inspect(page, label, width) {
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
@@ -79,6 +83,86 @@ deviceScaleFactor: 2,
   }))
   return [
     ...orderExamples,
+    ...[
+      { key: 'light', width: 1920 },
+      { key: 'dark-narrow', width: 1024, themeMode: 'dark' },
+      { key: 'phone-width', width: 390 },
+    ].map(({ key, width, themeMode = 'light' }) => ({
+      name: `business-list-surface-spacing-${key}`,
+      path: '/erp/purchase/processing-contracts',
+      auth: 'admin',
+      effectiveSession: session,
+      themeMode,
+      viewport: { width, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: createOutsourcingSummaryScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession, outputDir })[0].beforeNavigate,
+      verify: async (page) => {
+        const entries = [
+          { key: 'outsourcing', path: '/erp/purchase/processing-contracts', navigation: '委外订单内容分类', labels: ['加工合同', '加工明细'] },
+          ...Object.entries(WAREHOUSE_HANDLING_VIEWS).map(([direction, views]) => ({ key: direction, path: `/erp/warehouse/${direction}`, navigation: direction === 'inbound' ? '入库办理分类' : '出库办理分类', labels: views.map(({ label }) => label) })),
+          { key: 'inventory', path: '/erp/warehouse/inventory', navigation: '库存查询分类', labels: INVENTORY_VIEWS.map(({ label }) => label) },
+          { key: 'purchase', path: '/erp/purchase/accessories', navigation: '页面展示方式', labels: ['订单列表', '采购跟进'] },
+          { key: 'sales', path: '/erp/sales/project-orders/sales-orders', navigation: '页面展示方式', labels: ['订单列表', '交付进度'] },
+        ]
+        const evidence = []
+        for (const entry of entries) {
+          if (new URL(page.url()).pathname !== entry.path) await gotoScenarioPath(page, entry.path, { waitUntil: 'domcontentloaded' })
+          const navigation = page.getByRole('tablist', { name: entry.navigation, exact: true })
+          await navigation.waitFor()
+          // 往返后重新测量，保留已加载样式及共享工具栏。
+          for (const label of [...entry.labels, entry.labels[0]]) {
+            await navigation.getByRole('tab', { name: label, exact: true }).click()
+            await navigation.getByRole('tab', { name: label, selected: true, exact: true }).waitFor()
+            await page.locator('.erp-business-operation-panel__search input').first().waitFor()
+            await waitForFiniteAnimations(page)
+            await page.locator('.erp-admin-content').evaluate((node) => { node.scrollTop = 0 })
+            evidence.push(await assertBusinessListSurfaceSpacing(page, `${entry.key}-${label}-${key}`, { tableView: !['采购跟进', '交付进度'].includes(label) }))
+            await assertNoHorizontalOverflow(page, `${entry.key}-${label}-${key}`)
+          }
+          if (['outsourcing', 'inbound', 'outbound'].includes(entry.key)) await page.screenshot({ path: path.join(outputDir, `list-spacing-${entry.key}-${key}.png`) })
+        }
+        await writeFile(path.join(outputDir, `list-spacing-${key}.json`), JSON.stringify(evidence, null, 2))
+      },
+    })),
+    {
+      name: 'business-list-surface-spacing-recovery',
+      path: '/erp/purchase/processing-contracts',
+      auth: 'admin',
+      effectiveSession: session,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/outsourcing_order', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_outsourcing_orders' || params.keyword !== 'SPACING-NO-RESULT') return route.fallback()
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+          await route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(stylePaginatedRpcData([], 'outsourcing_orders', params)) } })
+        })
+      },
+      verify: async (page) => {
+        const evidence = []
+        const rows = page.locator('.erp-outsourcing-orders-page .erp-business-data-table-card tbody tr.ant-table-row')
+        await rows.first().waitFor()
+        await rows.first().click()
+        await page.locator('.erp-outsourcing-orders-page tr.ant-table-row-selected').waitFor()
+        await waitForFiniteAnimations(page)
+        evidence.push(await assertBusinessListSurfaceSpacing(page, '已选择当前记录'))
+        const search = page.locator('.erp-business-operation-panel__search input').first()
+        await search.fill('SPACING-NO-RESULT')
+        await search.press('Enter')
+        await page.locator('.erp-business-data-table-card .ant-spin-spinning').waitFor()
+        evidence.push(await assertBusinessListSurfaceSpacing(page, '列表加载中'))
+        await page.getByText('暂无加工合同', { exact: true }).waitFor()
+        evidence.push(await assertBusinessListSurfaceSpacing(page, '空结果'))
+        await search.fill('')
+        await search.press('Enter')
+        await rows.first().waitFor()
+        await waitForFiniteAnimations(page)
+        evidence.push(await assertBusinessListSurfaceSpacing(page, '清空搜索后恢复'))
+        await page.screenshot({ path: path.join(outputDir, 'list-spacing-recovery-4k.png') })
+        await writeFile(path.join(outputDir, 'list-spacing-recovery.json'), JSON.stringify(evidence, null, 2))
+      },
+    },
     {
       name: 'business-toolbar-form-entry',
 path: '/erp/warehouse/outbound?warehouse_view=shipment',

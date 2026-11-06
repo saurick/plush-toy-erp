@@ -1,5 +1,32 @@
 import assert from 'node:assert/strict'
 
+export async function assertBusinessListSurfaceSpacing(page, label, { tableView = true } = {}) {
+  const metrics = await page.locator('.erp-admin-outlet').first().evaluate((root) => {
+    const visible = (node) => node.getBoundingClientRect().height > 1
+    const toolbar = [...root.querySelectorAll('.erp-business-operation-panel')].find(visible)
+    const surface = [...root.querySelectorAll('.erp-business-view-surface, .erp-business-data-table-card, .erp-business-visual-frame')].find(visible)
+    if (!toolbar || !surface) return { found: false }
+    const toolbarBox = toolbar.getBoundingClientRect()
+    const surfaceBox = surface.getBoundingClientRect()
+    const table = [...root.querySelectorAll('.erp-business-data-table-card')].find(visible)
+    return {
+      found: true,
+      expected: Number.parseFloat(getComputedStyle(toolbar).getPropertyValue('--erp-page-gap')),
+      actual: surfaceBox.top - toolbarBox.bottom,
+      tableGap: table ? table.getBoundingClientRect().top - toolbarBox.bottom : null,
+      toolbar: toolbarBox.toJSON(),
+      surface: surfaceBox.toJSON(),
+    }
+  })
+  assert.equal(metrics.found, true, `${label}: 应有真实工具栏和列表内容`)
+  assert.ok(Math.abs(metrics.actual - metrics.expected) <= 1, `${label}: 工具栏与内容只保留一份全局间距: ${JSON.stringify(metrics)}`)
+  if (tableView) {
+    assert.notEqual(metrics.tableGap, null, `${label}: 应有真实列表表格`)
+    assert.ok(Math.abs(metrics.tableGap - metrics.expected) <= 1, `${label}: 嵌套表格不能遗漏或重复间距: ${JSON.stringify(metrics)}`)
+  }
+  return { label, ...metrics }
+}
+
 export async function assertTableSemanticAlignment(
   scope,
   { scenarioName, expected, tableSelector = '.app-table' }

@@ -900,6 +900,10 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       addFollowUp(state, "business-toolbar-composition-browser", "T5",
         "运行 STYLE_L1_SCENARIOS=business-toolbar-composition-purchase,business-toolbar-composition-sales,business-toolbar-composition-history,business-toolbar-dynamic-options-growth,business-toolbar-form-entry,warehouse-layout-all-views,warehouse-layout-dark-split,warehouse-workbench-control-parity,warehouse-outbound-cold-entry-stability,inventory-visible-copy-desktop pnpm --dir web style:l1，并分别验证 WebKit 与 Chromium；核对职责分组、稳定挂载、查询恢复、动态名单增长、窄屏、工具菜单、分栏与表头吸顶，设计标注不得进入业务页面。", file);
     }
+    if (/BusinessListLayout\.jsx|BusinessSwitchContent\.jsx|businessSwitchContent\.css|BusinessVisualizationFrame\.jsx|business-(?:tables|visualizations)\.css|businessTableAssertions\.mjs|businessToolbarCompositionScenarios\.mjs/u.test(file)) {
+      addFollowUp(state, "business-list-surface-spacing-browser", "T5",
+        "运行 STYLE_L1_SCENARIOS=business-list-surface-spacing-light,business-list-surface-spacing-dark-narrow,business-list-surface-spacing-phone-width,business-list-surface-spacing-recovery,page-header-business-spacing-desktop,page-header-business-spacing-narrow-dark,business-toolbar-form-entry,warehouse-outbound-cold-entry-stability pnpm --dir web style:l1，分别使用 Chromium 与 WebKit；核对共享容器统一间距、委外和仓库全部分类、相邻采购与销售视图、选择／加载／空结果／恢复、整页编辑返回与吸顶，避免漏距和双倍留白。", file);
+    }
     if (/(?:MasterData|OutsourcingOrders|OperationalFacts)Page\.jsx|OutsourcingOrderSummaryPanel\.jsx|business-tables\.css|pageHeaderScenarios\.mjs/u.test(file)) {
       addFollowUp(state, "business-tab-levels-browser", "T5",
         "运行 STYLE_L1_SCENARIOS=page-tabs-content-products,page-tabs-content-outsourcing,page-tabs-content-receivables,page-tabs-content-payables,page-tabs-independent-entries,page-header-business-spacing-desktop,page-header-business-spacing-narrow-dark pnpm --dir web style:l1，并分别使用 Chromium 与 WebKit；核对页内分类位于查询区、独立办理入口位于标题区、分类条持续挂载、查询恢复、统一上下间距和窄屏溢出。委外另跑 outsourcing-summary-desktop,outsourcing-summary-readonly-tablet 验证完整导出、权限与失败恢复。", file);
