@@ -7,6 +7,7 @@ export default function BusinessStatusFilter({
   value = '',
   options = [],
   counts = null,
+  allCount,
   loading = false,
   exact = false,
   removable = true,
@@ -25,7 +26,11 @@ export default function BusinessStatusFilter({
       aria-busy={loading}
     >
       {statusOptions.map((option) => {
-        const count = loading ? null : businessStatusCount(counts, option.value)
+        const count = loading
+          ? null
+          : option.value === '' && allCount !== undefined
+            ? allCount
+            : businessStatusCount(counts, option.value)
         const text = option.value === '' ? allLabel : option.label
         const countText = count === null ? '—' : count.toLocaleString('zh-CN')
         return (

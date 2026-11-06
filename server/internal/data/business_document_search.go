@@ -42,6 +42,8 @@ func businessDocumentKeyword(kind, keyword string) func(*sql.Selector) {
 			match = b.quality(c)
 		case "production_fact":
 			match = b.productionFact(c)
+		case "production_exception":
+			match = b.productionException(c)
 		case "outsourcing_fact":
 			match = b.outsourcingFact(c)
 		case "finance":
@@ -297,6 +299,16 @@ func (b *businessSearch) quality(c searchColumns) *sql.Predicate {
 func (b *businessSearch) productionFact(c searchColumns) *sql.Predicate {
 	return sql.Or(b.text(c, "fact_no", "note"), b.subject(c), b.warehouse(c), b.lot(c("lot_id")), b.wip(c("production_wip_batch_id")), b.productionFactSource(c),
 		sql.And(sql.EQ(c("source_type"), "PRODUCTION_FACT"), b.byID("production_facts", c("source_id"), func(f searchColumns) *sql.Predicate { return b.text(f, "fact_no") })))
+}
+
+func (b *businessSearch) productionException(c searchColumns) *sql.Predicate {
+	return sql.Or(b.text(c, "decision_no", "reason", "decision_reason", "execution_reason", "reverse_reason"),
+		b.byID("production_orders", c("production_order_id"), func(order searchColumns) *sql.Predicate {
+			return b.production(order, c("production_order_item_id"))
+		}), b.wip(c("production_wip_batch_id")),
+		b.byID("quality_inspections", c("quality_inspection_id"), func(inspection searchColumns) *sql.Predicate {
+			return b.text(inspection, "inspection_no")
+		}))
 }
 
 func (b *businessSearch) productionFactSource(c searchColumns) *sql.Predicate {

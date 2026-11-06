@@ -36,6 +36,7 @@ import {
   SelectionActionBar,
   SelectionClearAction,
   SelectFilter,
+  SearchInput,
 } from '../business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -45,6 +46,7 @@ import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { canReadProductionExceptionDecisions, productionExceptionSummary } from '../../utils/productionRecordViews.mjs'
 import ProductionRecordDrawer from '../production-records/ProductionRecordDrawer.jsx'
 import useBusinessPageState from '../../hooks/useBusinessPageState.js'
+import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 import { resolveProductionExceptionActionAvailability } from '../../utils/operationalActionAvailability.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
@@ -56,6 +58,7 @@ import {
 import {
   buildProductionExceptionListQuery,
   productionExceptionHandlingKey,
+  productionExceptionApprovalCounts,
   PRODUCTION_EXCEPTION_HANDLING_OPTIONS,
   reconcileProductionExceptionPage,
   requireProductionExceptionPage,
@@ -86,13 +89,6 @@ const TYPE_FILTER_OPTIONS = [
   ...['SCRAP', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE'].map((value) => ({ label: TYPE_LABELS[value], value })),
   { label: TYPE_LABELS.OVER_ISSUE, value: 'OVER_ISSUE' },
   { label: TYPE_LABELS.WIP_CONCESSION, value: 'WIP_CONCESSION' },
-]
-const STATUS_FILTER_OPTIONS = [
-  { label: '全部审批状态', value: '' },
-  { label: STATUS_LABELS.SUBMITTED, value: ProductionExceptionStatus.SUBMITTED },
-  { label: STATUS_LABELS.APPROVED, value: ProductionExceptionStatus.APPROVED },
-  { label: STATUS_LABELS.REJECTED, value: ProductionExceptionStatus.REJECTED },
-  { label: STATUS_LABELS.CANCELLED, value: ProductionExceptionStatus.CANCELLED },
 ]
 const EXECUTION_FILTER_OPTIONS = [
   { label: '全部业务状态', value: '' },
@@ -151,9 +147,9 @@ export default function ProductionExceptionDecisionPanel({
   const linkedDetailOpenedRef = useRef(0)
   const [reason, setReason] = useState('')
   const [decisionTypeFilter, setDecisionTypeFilter] = useBusinessPageState('exceptionType', '')
+  const [keyword, setKeyword] = useBusinessPageState('exceptionKeyword', '')
   const [statusCounts, setStatusCounts] = useState(null)
   const [handlingStatus, setHandlingStatus] = useBusinessPageState('exceptionHandlingStatus', '')
-  const [statusFilter, setStatusFilter] = useBusinessPageState('exceptionStatus', '')
   const [executionStatusFilter, setExecutionStatusFilter] = useBusinessPageState('exceptionExecutionStatus', '')
   const canRead = canReadProductionExceptionDecisions(adminProfile)
   const canDecide = !taskBusiness && hasActionPermission(
@@ -178,7 +174,7 @@ export default function ProductionExceptionDecisionPanel({
     Number.isSafeInteger(routeProductionOrderID) && routeProductionOrderID > 0
   )
   const hasListFilters = Boolean(
-    handlingStatus || decisionTypeFilter || statusFilter || executionStatusFilter
+    keyword || handlingStatus || decisionTypeFilter || executionStatusFilter
   )
   const hasExactContext = Boolean(
     !hasListFilters &&
@@ -187,7 +183,6 @@ export default function ProductionExceptionDecisionPanel({
   )
   const activeFilterCount = [
     decisionTypeFilter,
-    statusFilter,
     executionStatusFilter,
     hasRouteProductionOrder,
     hasExactContext,
@@ -199,11 +194,11 @@ export default function ProductionExceptionDecisionPanel({
       return
     }
     setHandlingStatus('')
+    setKeyword('')
     setDecisionTypeFilter('')
-    setStatusFilter('')
     setExecutionStatusFilter('')
     resetBusinessPaginationCurrent(setPagination)
-  }, [linkedProductionExceptionID, setHandlingStatus, setDecisionTypeFilter, setStatusFilter, setExecutionStatusFilter, setPagination])
+  }, [linkedProductionExceptionID, setHandlingStatus, setKeyword, setDecisionTypeFilter, setExecutionStatusFilter, setPagination])
 
   const load = useCallback(async () => {
     const request = beginLatestRequest('production-exception-decisions')
@@ -244,9 +239,9 @@ export default function ProductionExceptionDecisionPanel({
       }
 
       const query = buildProductionExceptionListQuery({
+        keyword,
         handlingStatus,
         decisionType: decisionTypeFilter,
-        status: statusFilter,
         executionStatus: executionStatusFilter,
         productionOrderID: hasRouteProductionOrder
           ? routeProductionOrderID
@@ -300,6 +295,7 @@ export default function ProductionExceptionDecisionPanel({
       }
     }
   }, [
+    keyword,
     handlingStatus,
     beginLatestRequest,
     canRead,
@@ -312,7 +308,6 @@ export default function ProductionExceptionDecisionPanel({
     linkedProductionExceptionID,
       pagination,
     routeProductionOrderID,
-    statusFilter,
   ])
   useEffect(() => {
     onRefreshReady?.(load)
@@ -585,7 +580,6 @@ export default function ProductionExceptionDecisionPanel({
   }
   const clearFilters = () => {
     setDecisionTypeFilter('')
-    setStatusFilter('')
     setExecutionStatusFilter('')
     setSelectedID(null)
     const nextParams = new URLSearchParams(searchParams)
@@ -618,9 +612,9 @@ export default function ProductionExceptionDecisionPanel({
           <>
             <BusinessStatusFilter
               inline
-              aria-label="异常办理状态"
+              aria-label="异常审批状态"
               value={handlingStatus}
-              counts={statusCounts}
+              counts={productionExceptionApprovalCounts(statusCounts)}
               loading={loading}
               exact={hasExactContext}
               options={PRODUCTION_EXCEPTION_HANDLING_OPTIONS}
@@ -630,22 +624,24 @@ export default function ProductionExceptionDecisionPanel({
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
+            <SearchInput
+              value={keyword}
+              {...BUSINESS_SEARCH_SCOPES.production_exception}
+              onSearch={(value) => {
+                setKeyword(value)
+                setSelectedID(null)
+                const nextParams = new URLSearchParams(searchParams)
+                nextParams.delete('production_exception_id')
+                setSearchParams(nextParams, { replace: true })
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
             <SelectFilter
               aria-label="异常类型"
               value={decisionTypeFilter}
               options={TYPE_FILTER_OPTIONS}
               onChange={(value) => {
                 setDecisionTypeFilter(value || '')
-                setSelectedID(null)
-                resetBusinessPaginationCurrent(setPagination)
-              }}
-            />
-            <SelectFilter
-              aria-label="审批状态"
-              value={statusFilter}
-              options={STATUS_FILTER_OPTIONS}
-              onChange={(value) => {
-                setStatusFilter(value || '')
                 setSelectedID(null)
                 resetBusinessPaginationCurrent(setPagination)
               }}

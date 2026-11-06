@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -46,6 +47,9 @@ func assertBusinessSearchQueries(t *testing.T, client *ent.Client) {
 		},
 		"production_fact": func() (int, error) {
 			return client.ProductionFact.Query().Where(businessDocumentKeyword("production_fact", "产品")).Count(ctx)
+		},
+		"production_exception": func() (int, error) {
+			return client.ProductionExceptionDecision.Query().Where(businessDocumentKeyword("production_exception", "产品")).Count(ctx)
 		},
 		"outsourcing_fact": func() (int, error) {
 			return client.OutsourcingFact.Query().Where(businessDocumentKeyword("outsourcing_fact", "产品")).Count(ctx)
@@ -277,5 +281,44 @@ func TestProductionAndStockSearchUsesLinkedIdentity(t *testing.T) {
 	count, err := f.client.InventoryBalance.Query().Where(businessDocumentKeyword("balance", "POR-M")).Count(ctx)
 	if err != nil || count != 0 {
 		t.Fatalf("a product's BOM material is not its stock identity: %d %v", count, err)
+	}
+}
+
+func TestProductionExceptionSearchUsesExactSourceLineAndServerPagination(t *testing.T) {
+	ctx := context.Background()
+	f := openProductionOrderRepoTest(t, "production_exception_search")
+	order, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: f.draft("EX-SEARCH-MO", 10), ActorID: f.actorID, IdempotencyKey: "exception-search-order"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.client.ProductionOrderItem.Create().SetProductionOrderID(order.Order.ID).SetLineNo(2).
+		SetProductID(f.productID).SetUnitID(f.unitID).SetPlannedQuantity(decimal.NewFromInt(5)).SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).
+		SetProductNameSnapshot("其他明细产品").SetProductCodeSnapshot("SIBLING-ONLY").SaveX(ctx)
+	exception := f.client.ProductionExceptionDecision.Create().SetDecisionNo("PE-SEARCH-EXACT").SetDecisionType(biz.ProductionExceptionScrap).
+		SetProductionOrderID(order.Order.ID).SetProductionOrderItemID(order.Items[0].ID).SetProductionWipBatchID(9001).SetQualityInspectionID(9001).
+		SetRequestedQuantity(decimal.NewFromInt(1)).SetReason("仅此申请的颜色差异").SetIdempotencyKey("exception-search").SetIdempotencyPayloadHash(strings.Repeat("a", 64)).SetRequestedBy(f.actorID).SaveX(ctx)
+	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard)))
+	for _, keyword := range []string{" pe-search-exact ", "EX-SEARCH-MO", "POR-P", "POR-SO", "仅此申请的颜色差异"} {
+		filter := biz.ProductionExceptionFilter{Keyword: keyword, Limit: 1}
+		rows, total, err := uc.ListProductionExceptions(ctx, filter)
+		if err != nil || total != 1 || len(rows) != 1 || rows[0].ID != exception.ID {
+			t.Fatalf("keyword %q: rows=%v total=%d err=%v", keyword, rows, total, err)
+		}
+		filter.Offset = 1
+		rows, total, err = uc.ListProductionExceptions(ctx, filter)
+		if err != nil || total != 1 || len(rows) != 0 {
+			t.Fatalf("pagination %q: rows=%v total=%d err=%v", keyword, rows, total, err)
+		}
+		counts, err := uc.CountProductionExceptionsByStatus(ctx, filter)
+		assertBusinessCounts(t, counts, err, map[string]int{"SUBMITTED": 1})
+	}
+	for _, keyword := range []string{"SIBLING-ONLY", "其他明细产品", "不存在的记录"} {
+		filter := biz.ProductionExceptionFilter{Keyword: keyword, Limit: 1}
+		rows, total, err := uc.ListProductionExceptions(ctx, filter)
+		if err != nil || total != 0 || len(rows) != 0 {
+			t.Fatalf("unrelated keyword %q: rows=%v total=%d err=%v", keyword, rows, total, err)
+		}
+		counts, err := uc.CountProductionExceptionsByStatus(ctx, filter)
+		assertBusinessCounts(t, counts, err, map[string]int{})
 	}
 }

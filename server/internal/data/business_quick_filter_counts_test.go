@@ -175,9 +175,21 @@ func TestBusinessQuickCountsExceptionHandlingProjection(t *testing.T) {
 			t.Fatalf("handling %s returned %s", key, actual)
 		}
 	}
+	rows, total, err = uc.ListProductionExceptions(ctx, biz.ProductionExceptionFilter{HandlingStatus: "APPROVED", Limit: 10})
+	if err != nil || total != 3 || len(rows) != 3 {
+		t.Fatalf("approval grouping rows=%v total=%d err=%v", rows, total, err)
+	}
+	got, err = uc.CountProductionExceptionsByStatus(ctx, biz.ProductionExceptionFilter{HandlingStatus: "APPROVED", Keyword: " quick-ex-2 "})
+	assertBusinessCounts(t, got, err, map[string]int{"APPROVED:APPLIED": 1})
+	rows, total, err = uc.ListProductionExceptions(ctx, biz.ProductionExceptionFilter{HandlingStatus: "APPROVED", Keyword: " quick-ex-2 ", Limit: 1})
+	if err != nil || total != 1 || len(rows) != 1 || rows[0].ExecutionStatus != "APPLIED" {
+		t.Fatalf("keyword before pagination rows=%v total=%d err=%v", rows, total, err)
+	}
 	for _, excluded := range []biz.ProductionExceptionFilter{
 		{HandlingStatus: "APPROVED:PENDING", ProductionOrderID: 2},
 		{HandlingStatus: "APPROVED:PENDING", ProductionOrderID: 1, DecisionType: biz.ProductionExceptionOverIssue},
+		{HandlingStatus: "APPROVED", Keyword: "missing"},
+		{HandlingStatus: "APPROVED", Keyword: "QUICK-EX-2", ExecutionStatus: "PENDING"},
 	} {
 		got, err = uc.CountProductionExceptionsByStatus(ctx, excluded)
 		assertBusinessCounts(t, got, err, map[string]int{})

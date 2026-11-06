@@ -748,6 +748,9 @@ func (r *operationalFactRepo) GetProductionException(ctx context.Context, id int
 }
 func (r *operationalFactRepo) productionExceptionListQuery(filter biz.ProductionExceptionFilter) *ent.ProductionExceptionDecisionQuery {
 	query := r.data.postgres.ProductionExceptionDecision.Query()
+	if filter.Keyword != "" {
+		query.Where(businessDocumentKeyword("production_exception", filter.Keyword))
+	}
 	if filter.HandlingStatus != "" {
 		status, execution, _ := biz.ProductionExceptionHandlingFilter(filter.HandlingStatus)
 		query.Where(productionexceptiondecision.Status(status))

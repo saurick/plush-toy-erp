@@ -2,12 +2,16 @@ import React, { useMemo, useRef } from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { Button, Tag } from 'antd'
 import Select from '@/common/components/select/AppSelect'
-import SearchInput from '@/common/components/SearchInput'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
-import FilterChip from '@/common/components/navigation/FilterChip'
+import {
+  BusinessOperationPanel,
+  SearchInput,
+} from '../business-list/BusinessListLayout.jsx'
+import BusinessStatusFilter from '../business-list/BusinessStatusFilter.jsx'
 import { paginateVisualizationRows } from '../../utils/businessVisualizationModels.mjs'
 import {
   buildProductionProcessWorkspace,
+  buildProductionProcessFilters,
   filterProductionProcessItems,
 } from '../../utils/productionProcessWorkspace.mjs'
 import {
@@ -86,9 +90,22 @@ export default function ProductionProcessProgress({
   )
   const filter = viewState.filter || 'all'
   const layout = viewState.layout === 'matrix' ? 'matrix' : 'current'
-  const filtered = filterProductionProcessItems(model.items, {
-    filter,
+  const searchMatches = filterProductionProcessItems(model.items, {
     query: viewState.query,
+  })
+  const filters = buildProductionProcessFilters(searchMatches)
+  const counts = Object.fromEntries(
+    filters
+      .filter((entry) => entry.key !== 'all')
+      .map((entry) => [entry.key, entry.count])
+  )
+  // Product lines can have parallel matters; the all count is not their sum.
+  const statusOptions = filters.map((entry) => ({
+    value: entry.key === 'all' ? '' : entry.key,
+    label: entry.label,
+  }))
+  const filtered = filterProductionProcessItems(searchMatches, {
+    filter,
   })
   const pagination = paginateVisualizationRows(filtered, viewState.page)
   const selectedItem = model.items.find((item) => item.id === viewState.itemID)
@@ -142,14 +159,54 @@ export default function ProductionProcessProgress({
     </Button>
   )
   return (
-    <BusinessVisualizationFrame
+    <section
       className="erp-production-process"
-      switcher={switcher}
-      title="生产执行"
-      loading={loading}
-      error={error}
-      toolbar={
-        <div className="erp-production-process__toolbar">
+      aria-label="生产执行"
+      aria-busy={loading || undefined}
+    >
+      {switcher}
+      <BusinessOperationPanel
+        compact
+        filters={
+          <>
+            <BusinessStatusFilter
+              inline
+              aria-label="本单产品事项"
+              value={filter === 'all' ? '' : filter}
+              options={statusOptions}
+              counts={counts}
+              allCount={searchMatches.length}
+              allLabel="全部产品"
+              loading={loading || Boolean(error)}
+              onChange={(value) => change({ filter: value || 'all', page: 1 })}
+            />
+            <SearchInput
+              aria-label="搜索生产产品或规格"
+              placeholder="搜本单产品或规格"
+              searchHint="可搜索：本单产品、规格编码"
+              allowClear
+              value={viewState.query || ''}
+              onSearch={(value) => change({ query: value, page: 1 })}
+            />
+          </>
+        }
+        actions={
+          <div className="erp-business-visual-switch erp-production-process__layout">
+            <Segmented
+              hierarchy="secondary"
+              aria-label="生产执行展示方式"
+              options={VIEWS}
+              value={layout}
+              onChange={(value) => change({ layout: value })}
+            />
+          </div>
+        }
+      >
+        <div
+          className="erp-production-process__order-context"
+          role="group"
+          aria-label="当前生产订单"
+        >
           <div className="erp-production-process__order-picker">
             <label htmlFor="production-process-order">生产订单</label>
             <Select
@@ -164,201 +221,183 @@ export default function ProductionProcessProgress({
               onChange={(value) => onSelectOrder?.(value ?? null)}
             />
           </div>
-          <div
-            className="erp-production-process__chips"
-            aria-label="生产事项筛选"
-          >
-            {model.filters.map((entry) => (
-              <FilterChip
-                key={entry.key}
-                selected={filter === entry.key}
-                count={loading || error ? '—' : entry.count}
-                disabled={loading || Boolean(error)}
-                onClick={() => change({ filter: entry.key, page: 1 })}
-              >
-                {entry.label}
-              </FilterChip>
-            ))}
-          </div>
-          <SearchInput
-            className="erp-production-process__search"
-            aria-label="搜索生产产品或规格"
-            placeholder="搜本单产品或规格"
-            searchHint="可搜索：本单产品、规格编码"
-            allowClear
-            value={viewState.query || ''}
-            onSearch={(value) => change({ query: value, page: 1 })}
-          />
-          <div className="erp-business-visual-switch erp-production-process__layout">
-            <Segmented
-              hierarchy="secondary"
-              aria-label="生产执行展示方式"
-              options={VIEWS}
-              value={layout}
-              onChange={(value) => change({ layout: value })}
-            />
-          </div>
         </div>
-      }
-    >
-      <VisualizationState
+      </BusinessOperationPanel>
+      <BusinessVisualizationFrame
+        title="本单生产进度"
         loading={loading}
         error={error}
-        empty={!loading && !error && options.length === 0}
-        onRetry={onRetry}
-      />
-      {!loading && !error && options.length > 0 && !aggregate ? (
-        <div className="erp-business-visual-state">请选择可查看的生产订单</div>
-      ) : null}
-      {!loading && !error && aggregate && !model.initialized ? (
-        <div className="erp-business-visual-state">
-          当前订单尚未形成在制工序；请先到生产订单办理工序安排。
-        </div>
-      ) : null}
-      {!loading && !error && model.initialized ? (
-        <>
-          <VisualizationState empty={filtered.length === 0} />
-          {layout === 'current' && pagination.rows.length > 0 ? (
-            <div className="erp-production-process__current">
-              <table data-table-lines="appearance" aria-label="当前生产事项">
-                <thead>
-                  <tr>
-                    <th>产品 / 规格</th>
-                    <th>当前工序</th>
-                    <th>进度 / 数量</th>
-                    <th>当前事项 / 负责岗位</th>
-                    <th>办理入口</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagination.rows.map((item) => (
-                    <tr
-                      key={item.id}
-                      data-product-id={item.id}
-                      data-selected={selectedItem?.id === item.id}
-                    >
-                      <td>
-                        <ProcessProduct
-                          item={item}
-                          onOpen={(event) => open(item, undefined, event)}
-                        />
-                      </td>
-                      <td data-label="当前工序">
-                        {item.currentStep?.name || '工序待核对'}
-                      </td>
-                      <td data-label="进度 / 数量">
-                        <Tag
-                          color={item.current?.color || item.currentStep?.color}
-                        >
-                          {item.current?.state ||
-                            item.currentStep?.state.label ||
-                            '待核对'}
-                        </Tag>
-                        <small>
-                          {item.current
-                            ? `${item.current.quantity} ${item.unitName}`
-                            : '查看工序结果'}
-                        </small>
-                      </td>
-                      <td data-label="当前事项">
-                        <span>
-                          {item.current?.title ||
-                            (item.steps.every(
-                              (step) => step.state.key === 'done'
-                            )
-                              ? '本产品工序已完成'
-                              : '等待前道移交，暂未形成当前批次')}
-                        </span>
-                        <small>
-                          {item.current
-                            ? `负责岗位：${item.current.owner}`
-                            : '检验与成品入库分别核对'}
-                          {item.matters.length > 1
-                            ? ` · 另有 ${item.matters.length - 1} 项待跟进`
-                            : ''}
-                        </small>
-                      </td>
-                      <td>{rowAction(item)}</td>
+      >
+        <VisualizationState
+          loading={loading}
+          error={error}
+          empty={!loading && !error && options.length === 0}
+          onRetry={onRetry}
+        />
+        {!loading && !error && options.length > 0 && !aggregate ? (
+          <div className="erp-business-visual-state">
+            请选择可查看的生产订单
+          </div>
+        ) : null}
+        {!loading && !error && aggregate && !model.initialized ? (
+          <div className="erp-business-visual-state">
+            当前订单尚未形成在制工序；请先到生产订单办理工序安排。
+          </div>
+        ) : null}
+        {!loading && !error && model.initialized ? (
+          <>
+            <VisualizationState empty={filtered.length === 0} />
+            {layout === 'current' && pagination.rows.length > 0 ? (
+              <div className="erp-production-process__current">
+                <table data-table-lines="appearance" aria-label="当前生产事项">
+                  <thead>
+                    <tr>
+                      <th>产品 / 规格</th>
+                      <th>当前工序</th>
+                      <th>进度 / 数量</th>
+                      <th>当前事项 / 负责岗位</th>
+                      <th>办理入口</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-          {layout === 'matrix' ? (
-            <div className="erp-production-process__lanes">
-              {pagination.rows.length > 0 ? (
-                <div className="erp-production-process__head">
-                  <span>产品 / 规格</span>
-                  <div className="erp-production-process__steps">
-                    {pagination.rows[0].steps.map((step) => (
-                      <strong key={step.id}>{step.name}</strong>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {pagination.rows.map((item) => (
-                <section className="erp-production-process__lane" key={item.id}>
-                  <div className="erp-production-process__identity">
-                    <ProcessProduct
-                      item={item}
-                      onOpen={(event) => open(item, undefined, event)}
-                    />
-                  </div>
-                  <div className="erp-production-process__steps">
-                    {item.steps.map((step) => (
-                      <button
-                        type="button"
-                        aria-label={`查看${item.productName}的${step.name}`}
-                        onClick={(event) => open(item, step, event)}
-                        key={step.id}
-                        className={`erp-production-process__step erp-production-process__step--${step.state.key}`}
+                  </thead>
+                  <tbody>
+                    {pagination.rows.map((item) => (
+                      <tr
+                        key={item.id}
+                        data-product-id={item.id}
+                        data-selected={selectedItem?.id === item.id}
                       >
-                        <strong className="erp-production-process__step-name">
-                          {step.name}
-                        </strong>
-                        <b>{step.state.label}</b>
-                        {step.batchSummary || step.state.key !== 'waiting' ? (
+                        <td>
+                          <ProcessProduct
+                            item={item}
+                            onOpen={(event) => open(item, undefined, event)}
+                          />
+                        </td>
+                        <td data-label="当前工序">
+                          {item.currentStep?.name || '工序待核对'}
+                        </td>
+                        <td data-label="进度 / 数量">
+                          <Tag
+                            color={
+                              item.current?.color || item.currentStep?.color
+                            }
+                          >
+                            {item.current?.state ||
+                              item.currentStep?.state.label ||
+                              '待核对'}
+                          </Tag>
                           <small>
-                            {step.batchSummary || '暂无在制批次'}
-                            {step.executionText
-                              ? ` · ${step.executionText}`
+                            {item.current
+                              ? `${item.current.quantity} ${item.unitName}`
+                              : '查看工序结果'}
+                          </small>
+                        </td>
+                        <td data-label="当前事项">
+                          <span>
+                            {item.current?.title ||
+                              (item.steps.every(
+                                (step) => step.state.key === 'done'
+                              )
+                                ? '本产品工序已完成'
+                                : '等待前道移交，暂未形成当前批次')}
+                          </span>
+                          <small>
+                            {item.current
+                              ? `负责岗位：${item.current.owner}`
+                              : '检验与成品入库分别核对'}
+                            {item.matters.length > 1
+                              ? ` · 另有 ${item.matters.length - 1} 项待跟进`
                               : ''}
                           </small>
-                        ) : null}
-                      </button>
+                        </td>
+                        <td>{rowAction(item)}</td>
+                      </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            {layout === 'matrix' ? (
+              <div className="erp-production-process__lanes">
+                {pagination.rows.length > 0 ? (
+                  <div className="erp-production-process__head">
+                    <span>产品 / 规格</span>
+                    <div className="erp-production-process__steps">
+                      {pagination.rows[0].steps.map((step) => (
+                        <strong key={step.id}>{step.name}</strong>
+                      ))}
+                    </div>
                   </div>
-                </section>
-              ))}
-            </div>
-          ) : null}
-          <VisualizationPagination
-            pagination={pagination}
-            onChange={(page) => change({ page })}
-          />
-        </>
-      ) : null}
-      <ProductionProcessDrawer
-        item={selectedItem}
-        step={selectedStep}
-        aggregate={aggregate}
-        orderNo={model.order?.orderNo}
-        open={Boolean(selectedStep) && !loading && !error}
-        onClose={() => change({ stepID: null, itemID: null })}
-        afterOpenChange={(isOpen) => {
-          if (!isOpen && returnFocus.current?.isConnected) {
-            returnFocus.current.focus({ preventScroll: true })
+                ) : null}
+                {pagination.rows.map((item) => (
+                  <section
+                    className="erp-production-process__lane"
+                    key={item.id}
+                  >
+                    <div className="erp-production-process__identity">
+                      <ProcessProduct
+                        item={item}
+                        onOpen={(event) => open(item, undefined, event)}
+                      />
+                    </div>
+                    <div className="erp-production-process__steps">
+                      {item.steps.map((step) => (
+                        <button
+                          type="button"
+                          aria-label={`查看${item.productName}的${step.name}`}
+                          onClick={(event) => open(item, step, event)}
+                          key={step.id}
+                          className={`erp-production-process__step erp-production-process__step--${step.state.key}`}
+                        >
+                          <strong className="erp-production-process__step-name">
+                            {step.name}
+                          </strong>
+                          <b>{step.state.label}</b>
+                          {step.batchSummary || step.state.key !== 'waiting' ? (
+                            <small>
+                              {step.batchSummary || '暂无在制批次'}
+                              {step.executionText
+                                ? ` · ${step.executionText}`
+                                : ''}
+                            </small>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : null}
+            <VisualizationPagination
+              pagination={pagination}
+              onChange={(page) => change({ page })}
+            />
+          </>
+        ) : null}
+        <ProductionProcessDrawer
+          item={selectedItem}
+          step={selectedStep}
+          aggregate={aggregate}
+          orderNo={model.order?.orderNo}
+          open={Boolean(selectedStep) && !loading && !error}
+          onClose={() => change({ stepID: null, itemID: null })}
+          afterOpenChange={(isOpen) => {
+            if (!isOpen && returnFocus.current?.isConnected) {
+              returnFocus.current.focus({ preventScroll: true })
+            }
+          }}
+          onSelectStep={(stepID) => change({ stepID })}
+          available={available}
+          onAction={act}
+          onOpenInspection={
+            onOpenInspection
+              ? (inspectionID) => {
+                  change({ stepID: null })
+                  onOpenInspection(inspectionID)
+                }
+              : undefined
           }
-        }}
-        onSelectStep={(stepID) => change({ stepID })}
-        available={available}
-        onAction={act}
-        onOpenInspection={onOpenInspection ? (inspectionID) => {
-          change({ stepID: null })
-          onOpenInspection(inspectionID)
-        } : undefined}
-      />
-    </BusinessVisualizationFrame>
+        />
+      </BusinessVisualizationFrame>
+    </section>
   )
 }

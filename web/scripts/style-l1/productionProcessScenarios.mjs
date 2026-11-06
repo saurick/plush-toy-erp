@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { assertBusinessViewMotion } from './businessViewDetailAssertions.mjs'
+import { styleRpcResult } from './rpcMockResult.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createProductionProcessScenarios({
   common,
@@ -18,6 +20,43 @@ export function createProductionProcessScenarios({
   }
   let aggregateResponse
   return [
+    ...[false, true].map((onlyClosed) => ({
+      ...base,
+      name: onlyClosed ? 'production-execution-closed-orders-no-default' : 'production-execution-prefers-current-order',
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/production_order', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_production_orders') return route.fallback()
+          const orders = [
+            { id: 72, version: 1, item_count: 1, order_no: 'MO-CLOSED-RECENT', status: 'CLOSED' },
+            ...(!onlyClosed ? [{ id: 71, version: 1, item_count: 1, order_no: 'MO-ACTIVE-EARLIER', status: 'RELEASED' }] : []),
+          ]
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ production_orders: orders, total: orders.length, limit: Number(params.limit || 50), offset: Number(params.offset || 0) }) } })
+        })
+      },
+      verify: async (page) => {
+        const panel = page.getByRole('region', { name: '生产执行', exact: true })
+        const picker = panel.locator('.erp-production-process__order-picker')
+        if (onlyClosed) {
+          await panel.getByText('请选择可查看的生产订单', { exact: true }).waitFor()
+          assert.equal(await picker.locator('.ant-select-selection-item').count(), 0)
+          assert.equal(await panel.getByRole('button', { name: '打开生产订单', exact: true }).count(), 0)
+        } else {
+          await picker.getByText('MO-ACTIVE-EARLIER · 生产中', { exact: true }).waitFor()
+          await panel.getByRole('table', { name: '当前生产事项' }).waitFor()
+          const query = panel.getByRole('textbox', { name: '搜索生产产品或规格' })
+          const context = await panel.locator('.erp-production-process__order-context').elementHandle()
+          await query.fill('不存在的产品')
+          await query.press('Enter')
+          await panel.getByRole('button', { name: '全部产品，共 0 条', exact: true }).waitFor()
+          assert.equal(await panel.getByRole('table', { name: '当前生产事项' }).count(), 0)
+          await query.fill('')
+          await query.press('Enter')
+          await panel.getByRole('table', { name: '当前生产事项' }).waitFor()
+          assert.equal(await context.evaluate((node) => node.isConnected), true, '结果为空和恢复时订单上下文持续挂载')
+        }
+      },
+    })),
     {
       ...base,
       name: 'production-process-stage-names-and-batch-results',
@@ -119,7 +158,7 @@ result: 'REJECT',
         await query.fill('SKU-STYLE-L1-LONG')
         const pending = panel.getByRole('button', { name: /^待办理/u })
         await pending.click()
-        const toolbar = panel.locator('.erp-production-process__toolbar')
+        const toolbar = panel.locator('.erp-business-operation-panel')
         const originalToolbar = await toolbar.elementHandle()
         await assertBusinessViewMotion(
           page,
@@ -173,7 +212,7 @@ result: 'REJECT',
               panelWidth: element.closest('.erp-production-process')
                 .clientWidth,
               toolbar: box(element),
-              controls: [...element.children].map((target) => ({
+              controls: [...element.querySelector('.erp-business-operation-panel__command').children, element.querySelector('.erp-production-process__order-context')].map((target) => ({
                 className: target.className,
                 ...box(target),
               })),
@@ -181,12 +220,14 @@ result: 'REJECT',
           })
           measurements.push({ width, ...geometry })
           if (geometry.panelWidth > 1280) {
-            const centers = geometry.controls.map((control) => control.centerY)
+            const centers = geometry.controls.slice(0, -1).map((control) => control.centerY)
             assert.ok(
               Math.max(...centers) - Math.min(...centers) <= 1,
               `${width}px 宽屏工具栏保持同一行并居中对齐`
             )
           }
+          const context = geometry.controls.at(-1)
+          assert.ok(geometry.controls.slice(0, -1).every((control) => control.bottom <= context.top + 1), '订单上下文不与查询控件混排')
           for (const control of geometry.controls) {
             assert.ok(
               control.left >= geometry.toolbar.left - 1 &&
@@ -300,8 +341,8 @@ result: 'REJECT',
           0,
           '刷新不自动选回生产订单'
         )
+        await search.click()
         await search.fill('仅搜索，未选订单')
-        await search.press('Enter')
         await picker.hover()
         await picker.locator('.ant-select-clear').click()
         assert.equal(
@@ -310,12 +351,25 @@ result: 'REJECT',
           '未选订单时也可清空搜索文字'
         )
         await empty.waitFor()
+        await search.click()
         await search.fill('MO-STYLE')
-        await search.press('Enter')
-        await page
+        await waitForFiniteAnimations(page)
+        const option = page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
           .filter({ hasText: selected })
-          .click()
+        await option.waitFor()
+        const popupHit = await option.evaluate((node) => {
+          const rect = node.getBoundingClientRect()
+          const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
+          const ancestors = []
+          for (let element = node; element && ancestors.length < 8; element = element.parentElement) {
+            const style = getComputedStyle(element)
+            ancestors.push({ tag: element.tagName, className: element.className, zIndex: style.zIndex, position: style.position, contain: style.contain, containerType: style.containerType, transform: style.transform })
+          }
+          return { reachable: node.contains(hit), hit: hit?.className, ancestors }
+        })
+        assert.equal(popupHit.reachable, true, `订单候选必须可直接点选：${JSON.stringify(popupHit)}`)
+        await option.click()
         await table.waitFor()
         assert.equal(
           await picker.locator('.ant-select-selection-item').innerText(),

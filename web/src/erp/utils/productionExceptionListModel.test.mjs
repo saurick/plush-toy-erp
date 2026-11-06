@@ -7,29 +7,95 @@ import {
   requireProductionExceptionPage,
   requireProductionExceptionRecord,
   productionExceptionHandlingKey,
+  productionExceptionApprovalCounts,
   PRODUCTION_EXCEPTION_HANDLING_OPTIONS,
 } from './productionExceptionListModel.mjs'
 
-test('exception quick filters keep approval and execution distinct and preserve detailed filters', () => {
-  const expected = ['SUBMITTED', 'APPROVED:PENDING', 'APPROVED:APPLIED', 'APPROVED:REVERSED', 'REJECTED', 'CANCELLED']
-  assert.deepEqual(PRODUCTION_EXCEPTION_HANDLING_OPTIONS.map(({ value }) => value), expected)
-  for (const key of expected) {
+test('exception quick filters group approval without treating approval as execution', () => {
+  const expected = ['SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED']
+  assert.deepEqual(
+    PRODUCTION_EXCEPTION_HANDLING_OPTIONS.map(({ value }) => value),
+    expected
+  )
+  for (const key of [
+    'SUBMITTED',
+    'APPROVED:PENDING',
+    'APPROVED:APPLIED',
+    'APPROVED:REVERSED',
+    'REJECTED',
+    'CANCELLED',
+  ]) {
     const [status, execution_status = 'PENDING'] = key.split(':')
-    assert.equal(productionExceptionHandlingKey({ status, execution_status }), key)
+    assert.equal(
+      productionExceptionHandlingKey({ status, execution_status }),
+      key
+    )
   }
-  assert.deepEqual(buildProductionExceptionListQuery({
-    handlingStatus: 'APPROVED:PENDING',
+  assert.deepEqual(
+    buildProductionExceptionListQuery({
+      handlingStatus: 'APPROVED:PENDING',
+      status: 'APPROVED',
+      executionStatus: 'PENDING',
+      decisionType: 'OVER_ISSUE',
+      productionOrderID: 42,
+      pagination: { current: 2, pageSize: 50 },
+    }),
+    {
+      handling_status: 'APPROVED:PENDING',
+      status: 'APPROVED',
+      execution_status: 'PENDING',
+      decision_type: 'OVER_ISSUE',
+      production_order_id: 42,
+      limit: 50,
+      offset: 50,
+    }
+  )
+  const cleared = buildProductionExceptionListQuery({
+    handlingStatus: '',
     status: 'APPROVED',
-    executionStatus: 'PENDING',
-    decisionType: 'OVER_ISSUE',
     productionOrderID: 42,
-    pagination: { current: 2, pageSize: 50 },
-  }), { handling_status: 'APPROVED:PENDING', status: 'APPROVED', execution_status: 'PENDING', decision_type: 'OVER_ISSUE', production_order_id: 42, limit: 50, offset: 50 })
-  const cleared = buildProductionExceptionListQuery({ handlingStatus: '', status: 'APPROVED', productionOrderID: 42 })
+  })
   assert.equal(Object.hasOwn(cleared, 'handling_status'), false)
   assert.equal(cleared.status, 'APPROVED')
   assert.equal(cleared.production_order_id, 42)
   assert.equal(productionExceptionHandlingKey(null), '')
+  assert.deepEqual(
+    productionExceptionApprovalCounts({
+      SUBMITTED: 2,
+      'APPROVED:PENDING': 3,
+      'APPROVED:APPLIED': 5,
+      'APPROVED:REVERSED': 7,
+      REJECTED: 1,
+    }),
+    { SUBMITTED: 2, APPROVED: 15, REJECTED: 1 }
+  )
+  assert.equal(productionExceptionApprovalCounts(null), null)
+  assert.deepEqual(productionExceptionApprovalCounts({}), {})
+})
+
+test('exception keyword is trimmed before server pagination and omitted when cleared', () => {
+  assert.deepEqual(
+    buildProductionExceptionListQuery({
+      keyword: '  PE-SEARCH  ',
+      handlingStatus: 'APPROVED',
+      executionStatus: 'PENDING',
+      pagination: { current: 3, pageSize: 50 },
+    }),
+    {
+      keyword: 'PE-SEARCH',
+      handling_status: 'APPROVED',
+      execution_status: 'PENDING',
+      limit: 50,
+      offset: 100,
+    }
+  )
+  assert.equal(
+    Object.hasOwn(
+      buildProductionExceptionListQuery({ keyword: '  ' }),
+      'keyword'
+    ),
+    false
+  )
 })
 
 test('production exception query sends filters, order context and page offset', () => {

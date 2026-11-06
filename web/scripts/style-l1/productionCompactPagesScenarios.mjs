@@ -85,7 +85,10 @@ export function createProductionCompactPagesScenarios({
         const query = page.locator(
           '.erp-business-operation-panel__search input'
         )
+        const searched = page.waitForResponse((response) => response.url().endsWith('/rpc/operational_fact') && response.request().postDataJSON()?.method === 'list_production_facts' && response.request().postDataJSON().params.keyword === 'PROD-FACT')
         await query.fill('PROD-FACT')
+        await query.press('Enter')
+        await searched
         await row.click()
         await page
           .locator('[data-business-action-key="operational-fact-details"]')
@@ -143,15 +146,33 @@ export function createProductionCompactPagesScenarios({
           reason: '布料加工检验不合格，核对后按批准方案处理。',
           decision_reason: '已核对品质意见',
         }
+        const records = [
+          record,
+          { ...record, id: 8802, decision_no: 'PE-APPLIED', execution_status: 'APPLIED' },
+          { ...record, id: 8803, decision_no: 'PE-REVERSED', execution_status: 'REVERSED' },
+          { ...record, id: 8804, decision_no: 'PE-SUBMITTED', status: 'SUBMITTED' },
+        ]
         await page.route('**/rpc/operational_fact', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
           if (method !== 'list_production_exceptions') return route.fallback()
+          const scoped = records.filter((item) =>
+            (!params.keyword || `${item.decision_no} ${item.reason}`.toLowerCase().includes(params.keyword.toLowerCase())) &&
+            (!params.decision_type || item.decision_type === params.decision_type) &&
+            (!params.execution_status || item.execution_status === params.execution_status) &&
+            (!params.production_order_id || item.production_order_id === params.production_order_id)
+          )
+          const status_counts = {}
+          scoped.forEach((item) => {
+            const key = item.status === 'APPROVED' ? `${item.status}:${item.execution_status}` : item.status
+            status_counts[key] = (status_counts[key] || 0) + 1
+          })
+          const filtered = scoped.filter((item) => !params.handling_status || item.status === params.handling_status)
           return route.fulfill({
             json: {
               jsonrpc: '2.0',
               id,
               result: styleRpcResult(
-                stylePaginatedRpcData([record], 'production_exceptions', params)
+                { ...stylePaginatedRpcData(filtered, 'production_exceptions', params), status_counts }
               ),
             },
           })
@@ -181,11 +202,12 @@ export function createProductionCompactPagesScenarios({
           .getByRole('button', { name: '返回列表', exact: true })
           .click()
         await drawer.waitFor({ state: 'hidden' })
+        await page.getByRole('group', { name: '异常审批状态' }).getByRole('button', { name: /^已批准/u }).click()
         await page.getByRole('button', { name: '筛选', exact: true }).click()
         const filters = page.getByRole('dialog', { name: '筛选条件' })
         await filters
-          .getByRole('group', { name: '审批状态', exact: true })
-          .getByRole('button', { name: '已批准', exact: true })
+          .getByRole('group', { name: '业务状态', exact: true })
+          .getByRole('button', { name: '待办理 / 额度生效', exact: true })
           .click()
         await filters.getByRole('button', { name: '完成', exact: true }).click()
         await page.getByRole('tab', { name: '生产订单', exact: true }).click()
@@ -198,17 +220,19 @@ export function createProductionCompactPagesScenarios({
           .getByRole('button', { name: '筛选，已应用 1 项', exact: true })
           .click()
         await filters
-          .getByRole('group', { name: '审批状态', exact: true })
-          .getByRole('button', { name: '已批准', exact: true })
+          .getByRole('group', { name: '业务状态', exact: true })
+          .getByRole('button', { name: '待办理 / 额度生效', exact: true })
           .waitFor()
         assert.equal(
           await filters
-            .getByRole('group', { name: '审批状态', exact: true })
-            .getByRole('button', { name: '已批准', exact: true })
+            .getByRole('group', { name: '业务状态', exact: true })
+            .getByRole('button', { name: '待办理 / 额度生效', exact: true })
             .getAttribute('aria-pressed'),
           'true'
         )
         await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.waitFor({ state: 'hidden' })
+        await page.screenshot({ path: path.join(outputDir, 'production-exception-query-4k.png'), scale: 'device' })
         for (const width of [1440, 1024, 768]) {
           await page.setViewportSize({ width, height: 1000 })
           await assertNoHorizontalOverflow(
@@ -221,6 +245,51 @@ export function createProductionCompactPagesScenarios({
   ]
   return [
     ...scenarios,
+    {
+      ...base,
+      name: 'production-exception-query-consistency',
+      path: '/erp/production/exceptions',
+      beforeNavigate: scenarios[2].beforeNavigate,
+      verify: async (page) => {
+        const statuses = page.getByRole('group', { name: '异常审批状态' })
+        await statuses.getByRole('button', { name: '已批准，共 3 条', exact: true }).waitFor()
+        await statuses.getByRole('button', { name: '不限状态，共 4 条', exact: true }).waitFor()
+        await statuses.getByRole('button', { name: /^已批准/u }).click()
+        await page.locator('.ant-table-tbody tr[data-row-key="8804"]').waitFor({ state: 'hidden' })
+        assert.equal(await page.locator('.ant-table-tbody tr[data-row-key]').count(), 3, '批准筛选同时保留未执行、已执行和已冲正记录')
+        const query = page.locator('.erp-business-operation-panel__search input')
+        const request = page.waitForRequest((request) => request.url().endsWith('/rpc/operational_fact') && request.postDataJSON()?.method === 'list_production_exceptions' && request.postDataJSON().params.keyword === 'PE-COMPACT')
+        await query.fill('PE-COMPACT')
+        await query.press('Enter')
+        const params = (await request).postDataJSON().params
+        assert.equal(params.offset, 0)
+        assert.equal(params.handling_status, 'APPROVED')
+        await statuses.getByRole('button', { name: '已批准，共 1 条', exact: true }).waitFor()
+        await page.getByRole('button', { name: '筛选', exact: true }).click()
+        const filters = page.getByRole('dialog', { name: '筛选条件' })
+        assert.equal(await filters.getByRole('group', { name: '审批状态', exact: true }).count(), 0, '筛选内不重复主审批条件')
+        await filters.getByRole('group', { name: '异常类型' }).getByRole('button', { name: '放弃本批（报废）', exact: true }).click()
+        await filters.getByRole('button', { name: '清空筛选', exact: true }).click()
+        assert.equal(await query.inputValue(), 'PE-COMPACT')
+        assert.equal(await statuses.getByRole('button', { name: /^已批准/u }).getAttribute('aria-pressed'), 'true')
+        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.waitFor({ state: 'hidden' })
+        await query.fill('不存在的异常')
+        await query.press('Enter')
+        await statuses.getByRole('button', { name: '不限状态，共 0 条', exact: true }).waitFor()
+        assert.equal(await page.locator('.ant-table-tbody tr[data-row-key]').count(), 0)
+        await query.fill('')
+        await query.press('Enter')
+        await statuses.getByRole('button', { name: '已批准，共 3 条', exact: true }).waitFor()
+        await clickERPThemeOption(page, '暗色')
+        for (const width of [1920, 1440, 1024, 768, 390]) {
+          await page.setViewportSize({ width, height: 1080 })
+          await assertNoHorizontalOverflow(page, `production-exception-query-${width}`)
+        }
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await page.screenshot({ path: path.join(outputDir, 'production-exception-query-dark-4k.png'), scale: 'device' })
+      },
+    },
     {
       ...base,
       name: 'production-exception-source-details',

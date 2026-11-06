@@ -89,6 +89,7 @@ type ProductionExceptionMutation struct {
 	Reason                       string
 }
 type ProductionExceptionFilter struct {
+	Keyword                               string
 	HandlingStatus                        string
 	Status, ExecutionStatus, DecisionType string
 	ProductionOrderID                     int
@@ -280,6 +281,7 @@ func normalizeProductionExceptionFilter(filter ProductionExceptionFilter) (Produ
 		return ProductionExceptionFilter{}, ErrBadParam
 	}
 	filter.HandlingStatus = strings.ToUpper(strings.TrimSpace(filter.HandlingStatus))
+	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	if _, _, err := ProductionExceptionHandlingFilter(filter.HandlingStatus); err != nil {
 		return ProductionExceptionFilter{}, err
 	}
@@ -295,7 +297,7 @@ func ProductionExceptionHandlingFilter(value string) (string, string, error) {
 		return "", "", nil
 	}
 	switch value {
-	case ProductionExceptionSubmitted, ProductionExceptionRejected, ProductionExceptionCancelled:
+	case ProductionExceptionSubmitted, ProductionExceptionApproved, ProductionExceptionRejected, ProductionExceptionCancelled:
 		return value, "", nil
 	}
 	for _, execution := range []string{ProductionExceptionExecutionPending, ProductionExceptionExecutionApplied, ProductionExceptionExecutionReversed} {

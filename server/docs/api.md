@@ -52,9 +52,11 @@ HTTP 路由：
 | `operational_fact.list_production_facts` | 按 `status` 分组，仅生产记录的草稿、已过账、已取消状态 |
 | `operational_fact.list_stock_reservations` | 按预留 `status` 分组，关联销售单和库存资料的搜索继续受读取权限约束 |
 | `bom.list_bom_versions` | 按 `status` 分组，保留产品与当前／历史范围 |
-| `operational_fact.list_production_exceptions` | 使用下述审批与执行状态组合；保留额外审批、执行、异常类型及生产单条件 |
+| `operational_fact.list_production_exceptions` | 主查询按审批状态分组；执行结果、异常类型与生产单条件独立组合，关键词在分页前检索并用于同范围统计 |
 
-生产异常的可选 `handling_status` 接受 `SUBMITTED / APPROVED:PENDING / APPROVED:APPLIED / APPROVED:REVERSED / REJECTED / CANCELLED`；`status_counts` 使用相同键。统计只去掉 `handling_status`，保留原 `status / execution_status` 精细条件。该组合是只读查询投影，不新增持久化状态；`APPROVED:PENDING` 对超额领料表示额度生效，对需执行的异常表示待办理。批准、实际业务执行与冲正仍是不同事实。
+生产异常的可选 `handling_status` 接受 `SUBMITTED / APPROVED / APPROVED:PENDING / APPROVED:APPLIED / APPROVED:REVERSED / REJECTED / CANCELLED`；`APPROVED` 汇总全部已批准记录，`status_counts` 仍按审批与执行组合键返回，页面按审批状态汇总显示。统计只去掉 `handling_status`，保留 `keyword / status / execution_status / decision_type / production_order_id` 条件。该组合是只读查询投影，不新增持久化状态；`APPROVED:PENDING` 对超额领料表示额度生效，对需执行的异常表示待办理。批准、实际业务执行与冲正仍是不同事实。
+
+生产异常的 `keyword` 检索异常申请单号、来源生产单号、对应生产明细的产品与销售来源、生产批次、质检单号以及申请、审批、执行和冲正原因；复用业务单据检索的冻结快照及历史缺值规则，不因同单的其他产品匹配而带出无关异常。搜索、分页总数与状态数量在同一服务端范围计算，不在当前页截取后筛选。当前使用关联查询，未宣称大数据量检索容量；若实际查询延迟不能满足岗位使用，应先测量查询计划再评估索引。
 
 ## 工作中心分页
 
@@ -43287,6 +43289,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `execution_status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "execution_status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:136`。 |
 | `handling_status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "handling_status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:136`。 |
 | `include_status_counts` | boolean &#124; null | 可选 | 解析器 `getOptionalJSONRPCBool`；调用 `getOptionalJSONRPCBool(params, "include_status_counts")`。 依据：`server/internal/service/jsonrpc_business_status_counts.go:7`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:136`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:136`。 |
 | `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:136`。 |
 | `production_order_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "production_order_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:136`。 |
@@ -43299,8 +43302,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
   "jsonrpc": "2.0",
   "method": "list_production_exceptions",
   "params": {
-    "handling_status": "APPROVED:PENDING",
+    "handling_status": "APPROVED",
     "include_status_counts": true,
+    "keyword": "PE-DEMO",
     "limit": 20
   },
   "id": "rpc-demo-operational_fact.list_production_exceptions"

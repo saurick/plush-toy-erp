@@ -17628,6 +17628,17 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'boolean',
       }), Object.freeze({
+        description: '解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。',
+        expression: 'getString(pm, "keyword")',
+        name: 'keyword',
+        nullable: true,
+        required: '按业务条件',
+        source: Object.freeze({
+          line: 136,
+          path: 'server/internal/service/jsonrpc_operational_fact_exception.go',
+        }),
+        type: 'string',
+      }), Object.freeze({
         description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
         expression: 'getInt(pm, "limit", 50)',
         name: 'limit',

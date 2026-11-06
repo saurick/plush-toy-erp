@@ -638,68 +638,20 @@
 }
 
 .erp-production-process {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
   container: production-process / inline-size;
 }
 
-.erp-production-process__toolbar {
-  display: grid;
+.erp-production-process__order-context {
+  display: flex;
   min-width: 0;
-  grid-template-areas: 'order open filters search layout';
-  grid-template-columns:
-    minmax(280px, 360px) max-content max-content minmax(200px, 1fr)
-    max-content;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px 8px;
   width: 100%;
-}
-
-.erp-production-process__toolbar > .erp-production-process__layout {
-  grid-area: layout;
-  justify-self: end;
-}
-
-.erp-production-process__open-order {
-  grid-area: open;
-  justify-self: start;
-}
-
-.erp-production-process .erp-business-visual-metrics:empty {
-  display: none;
-}
-
-.erp-production-process__chips {
-  display: flex;
-  min-width: 0;
-  grid-area: filters;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.erp-production-process__search {
-  min-width: 0;
-  grid-area: search;
-}
-
-@container production-process (max-width: 1280px) {
-  .erp-production-process__toolbar {
-    grid-template-areas: 'order open layout' 'filters filters search';
-    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) 240px;
-  }
-}
-
-@container production-process (max-width: 700px) {
-  .erp-production-process__toolbar {
-    grid-template-areas: 'order order' 'open layout' 'filters filters' 'search search';
-    grid-template-columns: minmax(0, 1fr) max-content;
-  }
-}
-
-@container production-process (max-width: 380px) {
-  .erp-production-process__toolbar {
-    grid-template-areas: 'order' 'open' 'filters' 'search' 'layout';
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .erp-production-process__current table {
@@ -943,7 +895,8 @@
 .erp-production-process__order-picker {
   display: flex;
   min-width: 0;
-  grid-area: order;
+  flex: 0 1 440px;
+  max-width: 100%;
   align-items: center;
   gap: 8px;
 }
@@ -954,7 +907,7 @@
   font-size: var(--erp-font-small);
 }
 
-.erp-production-process__toolbar .ant-select {
+.erp-production-process__order-picker .ant-select {
   min-width: 0;
   flex: 1;
 }

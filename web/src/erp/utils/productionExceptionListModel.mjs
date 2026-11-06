@@ -1,5 +1,8 @@
-import { ProductionExceptionStatus, ProductionExceptionExecutionStatus } from '../../common/consts/statuses.generated.mjs'
-import { getBusinessPaginationParams, normalizeBusinessPageSize } from './businessPagination.mjs'
+import { ProductionExceptionStatus } from '../../common/consts/statuses.generated.mjs'
+import {
+  getBusinessPaginationParams,
+  normalizeBusinessPageSize,
+} from './businessPagination.mjs'
 
 function invalidProductionExceptionResponse() {
   return Object.assign(new Error('生产异常记录返回不完整'), {
@@ -13,6 +16,7 @@ function positiveInteger(value) {
 }
 
 export function buildProductionExceptionListQuery({
+  keyword = '',
   handlingStatus = '',
   decisionType = '',
   status = '',
@@ -22,6 +26,8 @@ export function buildProductionExceptionListQuery({
 } = {}) {
   const { limit, offset } = getBusinessPaginationParams(pagination)
   const query = { limit, offset }
+  const normalizedKeyword = String(keyword || '').trim()
+  if (normalizedKeyword) query.keyword = normalizedKeyword
   if (handlingStatus) query.handling_status = handlingStatus
   const normalizedDecisionType = String(decisionType || '').trim()
   const normalizedStatus = String(status || '').trim()
@@ -93,8 +99,7 @@ export function reconcileProductionExceptionPage({
 } = {}) {
   const pageSize = normalizeBusinessPageSize(pagination.pageSize)
   const current = positiveInteger(pagination.current) || 1
-  const normalizedTotal =
-    Number.isSafeInteger(total) && total >= 0 ? total : 0
+  const normalizedTotal = Number.isSafeInteger(total) && total >= 0 ? total : 0
   const lastPage = Math.max(Math.ceil(normalizedTotal / pageSize), 1)
   if (current > lastPage) {
     return {
@@ -124,9 +129,17 @@ export function productionExceptionHandlingKey(record) {
 }
 export const PRODUCTION_EXCEPTION_HANDLING_OPTIONS = [
   { value: ProductionExceptionStatus.SUBMITTED, label: '待审批' },
-  { value: `${ProductionExceptionStatus.APPROVED}:${ProductionExceptionExecutionStatus.PENDING}`, label: '待办理／额度生效' },
-  { value: `${ProductionExceptionStatus.APPROVED}:${ProductionExceptionExecutionStatus.APPLIED}`, label: '业务已执行' },
-  { value: `${ProductionExceptionStatus.APPROVED}:${ProductionExceptionExecutionStatus.REVERSED}`, label: '业务已冲正' },
+  { value: ProductionExceptionStatus.APPROVED, label: '已批准' },
   { value: ProductionExceptionStatus.REJECTED, label: '已拒绝' },
   { value: ProductionExceptionStatus.CANCELLED, label: '已取消' },
 ]
+
+export function productionExceptionApprovalCounts(counts) {
+  if (!counts) return null
+  const result = {}
+  for (const [key, count] of Object.entries(counts)) {
+    const status = key.split(':')[0]
+    result[status] = (result[status] || 0) + count
+  }
+  return result
+}

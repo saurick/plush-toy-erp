@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   buildProductionProcessWorkspace,
+  buildProductionProcessFilters,
   filterProductionProcessItems,
 } from './productionProcessWorkspace.mjs'
 import { PRODUCTION_WIP_ROUTE_CODE } from './productionWipModel.mjs'
@@ -62,7 +63,10 @@ test('plain operation names retain the actual craft snapshot only for trace', ()
   assert.equal(model.items[0].current.action, 'ASSIGN_EXECUTION')
   assert.equal(model.items[0].current.quantity, '30')
   assert.equal(model.items[0].current.owner, '生产安排')
-  assert.equal(model.items[0].steps[0].activeBatches[0].executionLabel, '未安排加工方式')
+  assert.equal(
+    model.items[0].steps[0].activeBatches[0].executionLabel,
+    '未安排加工方式'
+  )
 })
 
 test('saving an arrangement does not imply that the batch has started', () => {
@@ -73,7 +77,11 @@ test('saving an arrangement does not imply that the batch has started', () => {
   assert.equal(matter.state, '待开工')
   assert.equal(matter.owner, '仓库')
   assert.equal(matter.label, '领料并开工')
-  assert.equal(buildProductionProcessWorkspace(data).items[0].steps[0].activeBatches[0].executionLabel, '本厂生产')
+  assert.equal(
+    buildProductionProcessWorkspace(data).items[0].steps[0].activeBatches[0]
+      .executionLabel,
+    '本厂生产'
+  )
 })
 
 test('outsourced batches go to warehouse return receipt instead of in-house completion', () => {
@@ -86,7 +94,11 @@ test('outsourced batches go to warehouse return receipt instead of in-house comp
   assert.equal(matter.action, 'RECEIVE_OUTSOURCING_RETURN')
   assert.equal(matter.owner, '仓库')
   assert.equal(matter.label, '登记外发回货')
-  assert.equal(buildProductionProcessWorkspace(data).items[0].steps[0].activeBatches[0].executionLabel, '外发加工')
+  assert.equal(
+    buildProductionProcessWorkspace(data).items[0].steps[0].activeBatches[0]
+      .executionLabel,
+    '外发加工'
+  )
 })
 
 test('quality draft, submitted and absent records keep distinct next steps', () => {
@@ -143,7 +155,11 @@ test('parallel batch issues remain visible and filtering picks the matching issu
 
 test('mixed results describe rejected batches without marking every batch or downstream stage as rejected', () => {
   const data = fixture()
-  const base = { ...data.batches[0], production_order_operation_id: 43, quantity: '10' }
+  const base = {
+    ...data.batches[0],
+    production_order_operation_id: 43,
+    quantity: '10',
+  }
   data.batches = [
     { ...base, id: 51, status: 'ACCEPTED' },
     { ...base, id: 52, status: 'REJECTED' },
@@ -152,19 +168,35 @@ test('mixed results describe rejected batches without marking every batch or dow
     { ...base, id: 55, status: 'CANCELLED' },
   ]
   data.qualityInspections = [
-    { id: 61, production_wip_batch_id: 51, status: 'PASSED', gate_code: 'FINISHED_GOODS' },
-    { id: 62, production_wip_batch_id: 52, status: 'REJECTED', gate_code: 'FINISHED_GOODS' },
+    {
+      id: 61,
+      production_wip_batch_id: 51,
+      status: 'PASSED',
+      gate_code: 'FINISHED_GOODS',
+    },
+    {
+      id: 62,
+      production_wip_batch_id: 52,
+      status: 'REJECTED',
+      gate_code: 'FINISHED_GOODS',
+    },
   ]
   const { steps } = buildProductionProcessWorkspace(data).items[0]
   const handwork = steps[2]
   assert.equal(handwork.state.label, '有不合格批次')
-  assert.deepEqual(handwork.problemBatches.map((batch) => batch.id), [52])
+  assert.deepEqual(
+    handwork.problemBatches.map((batch) => batch.id),
+    [52]
+  )
   assert.equal(handwork.activeBatches.length, 3)
   assert.equal(handwork.quantity, '30')
   assert.match(handwork.batchSummary, /1 批检验合格/u)
   assert.match(handwork.batchSummary, /1 批检验不合格/u)
   assert.doesNotMatch(handwork.batchSummary, /取消/u)
-  assert.deepEqual(handwork.inspections.map((inspection) => inspection.batchID), [51, 52])
+  assert.deepEqual(
+    handwork.inspections.map((inspection) => inspection.batchID),
+    [51, 52]
+  )
   assert.equal(steps[3].state.key, 'done')
   assert.equal(data.batches[3].status, 'ACCEPTED')
 })
@@ -272,4 +304,27 @@ test('unloaded aggregate does not fabricate products, owners or progress', () =>
   assert.equal(model.items.length, 0)
   assert.equal(model.initialized, false)
   assert.ok(model.filters.every((entry) => entry.count === 0))
+})
+
+test('product counts follow the search scope and parallel matters do not inflate all products', () => {
+  const data = fixture()
+  data.batches[0].status = 'REJECTED'
+  data.batches.push({
+    ...data.batches[0],
+    id: 52,
+    production_order_operation_id: 42,
+    status: 'WAITING_QUALITY',
+  })
+  const { items } = buildProductionProcessWorkspace(data)
+  const counts = buildProductionProcessFilters(
+    filterProductionProcessItems(items, { query: '小熊' })
+  )
+  assert.equal(counts.find(({ key }) => key === 'all').count, 1)
+  assert.equal(counts.find(({ key }) => key === 'quality').count, 1)
+  assert.equal(counts.find(({ key }) => key === 'exception').count, 1)
+  assert.ok(
+    buildProductionProcessFilters(
+      filterProductionProcessItems(items, { query: '不存在' })
+    ).every(({ count }) => count === 0)
+  )
 })

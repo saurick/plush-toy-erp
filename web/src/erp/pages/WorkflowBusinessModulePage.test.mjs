@@ -203,11 +203,11 @@ test('production exception applications use server-backed filters and a selected
   assert.match(productionExceptionPanel, /<SelectionActionBar/u)
   assert.match(productionExceptionPanel, /<SelectionClearAction/u)
   assert.match(productionExceptionPanel, /aria-label="异常类型"/u)
-  assert.match(productionExceptionPanel, /aria-label="审批状态"/u)
+  assert.match(productionExceptionPanel, /aria-label="异常审批状态"/u)
   assert.match(productionExceptionPanel, /aria-label="业务状态"/u)
   assert.match(productionExceptionPanel, /buildProductionExceptionListQuery/u)
   assert.match(productionExceptionPanel, /decisionType:\s*decisionTypeFilter/u)
-  assert.match(productionExceptionPanel, /status:\s*statusFilter/u)
+  assert.match(productionExceptionPanel, /handlingStatus,/u)
   assert.match(productionExceptionPanel, /executionStatus:\s*executionStatusFilter/u)
   assert.match(productionExceptionPanel, /productionOrderID:/u)
   assert.match(productionExceptionPanel, /createBusinessTablePagination/u)
@@ -223,7 +223,8 @@ test('production exception applications use server-backed filters and a selected
     assert.match(productionExceptionPanel, new RegExp(actionLabel, 'u'))
   }
   assert.doesNotMatch(productionExceptionPanel, /title:\s*'办理'/u)
-  assert.doesNotMatch(productionExceptionPanel, /SearchInput|keyword/u)
+  assert.match(productionExceptionPanel, /<SearchInput/u)
+  assert.match(productionExceptionPanel, /keyword,/u)
 })
 
 test('production exception tabs keep column order controls without exposing data export', () => {

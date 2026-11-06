@@ -4369,7 +4369,7 @@
       }),
       exceptions: defineListPage('exceptions', '生产管理', '异常处理', '异常处置', '异常来源', '类型与对象', {
         kind: '工作流入口', icon: 'bell', prefix: 'PE', dateLabel: '申请时间', metricLabel: '影响数量', metricType: 'quantity', unit: '个', primary: null, workflow: true, rowAction: '进入处理',
-        statuses: makeStatuses([['pending', '待审批', 5], ['blocked', '阻塞', 2], ['approved', '已批准', 8], ['executed', '已执行', 6], ['reversed', '已冲正', 1]], 22),
+        statuses: makeStatuses([['pending', '待审批', 5], ['approved', '已批准', 15], ['rejected', '已拒绝', 1], ['cancelled', '已取消', 1]], 22),
         sampleParties: ['生产报废', '在制让步', '超领申请', '返工处置'], sampleItems: ['WIP-20260925-018 · 皮套', 'QI-20260924-019 · 色差', 'MO-20260922-026 · 短毛绒', 'PF-20260923-014 · 成品'],
         boundary: '来源异常直达对应详情，先核对审批结论、业务状态和下一步；审批统一在任务管理。批准后仍需确认业务执行，超领按正式领料额度办理。'
       }),
@@ -4422,6 +4422,8 @@
         boundary: '有资料或订单维护、财务核对、监督或排产管理职责且有可读来源时显示历史中心；原模块历史查询保留。本页只读，不提供通用恢复或物理删除。'
       })
     });
+
+    listConfig.exceptions.rows.forEach((row,index)=>{row.executionState=row.status==='approved'?['pending','applied','reversed'][index%3]:'pending';row.executionResult={pending:'待办理 / 额度生效',applied:'业务已执行',reversed:'业务已冲正'}[row.executionState];});
 
     const moduleHubs = {
       'master-hub': {
@@ -5088,6 +5090,7 @@
       visibleColumns: new Set(['gallery', 'no', 'party', 'status', 'date', 'metric', 'owner', 'risk']),
       columnDraft: null,
       columnOrder: ['gallery', 'no', 'party', 'status', 'date', 'metric', 'owner', 'progress', 'risk'],
+      exceptionType: 'all', exceptionExecution: 'all',
       filterParty: '', filterOwner: 'all', filterRisk: 'all', filterIncludeEnded: true, filterDateFrom: '', filterDateTo: '',
       historySource: '客户档案',
       overlay: null, drawer: null, taskStep: 1, taskMaxStep: 1, taskAction: 'complete', boardStatus: 'all', boardPage: 1, boardPageSize: 20, boardMode: taskHandlingPreview ? 'todo' : 'all', boardSearch: '', boardRole: 'all', trackingFilters: {}, trackingPageSizes: {},
@@ -5636,10 +5639,12 @@
     }
 
     function activeFilterCount() {
+      if(currentPageConfig()?.key==='exceptions')return Number(state.exceptionType!=='all')+Number(state.exceptionExecution!=='all');
       return [state.filterParty.trim(), state.filterOwner !== 'all', state.filterRisk !== 'all', !state.filterIncludeEnded, state.filterDateFrom || state.filterDateTo].filter(Boolean).length;
     }
 
     function resetListFilters() {
+      state.exceptionType='all';state.exceptionExecution='all';
       state.filterParty = '';
       state.filterOwner = 'all';
       state.filterRisk = 'all';
@@ -6508,6 +6513,7 @@ active = new Set()
       const endedStatuses = new Set(['done','completed','settled','shipped','closed','canceled','cancelled','archived','inactive','obsolete','reversed']);
       let rows = config.rows.filter(row => {
         const statusOk = ignoreStatus || state.status === 'all' || row.status === state.status;
+        const exceptionOk = config.key!=='exceptions'||((state.exceptionType==='all'||row.party===state.exceptionType)&&(state.exceptionExecution==='all'||row.executionState===state.exceptionExecution));
         const hay = Object.values(row).join(' ').toLowerCase();
         const partyOk = !partyQuery || `${rowParty(row, config)} ${rowItem(row, config)}`.toLowerCase().includes(partyQuery);
         const historySourceOk = config.key !== 'history' || rowParty(row, config) === state.historySource;
@@ -6517,7 +6523,7 @@ active = new Set()
         const date = isoDay(rowDate(row));
         const fromOk = !state.filterDateFrom || (date && date >= state.filterDateFrom);
         const toOk = !state.filterDateTo || (date && date <= state.filterDateTo);
-        return statusOk && (!q || hay.includes(q)) && partyOk && historySourceOk && ownerOk && riskOk && endedOk && fromOk && toOk;
+        return exceptionOk && statusOk && (!q || hay.includes(q)) && partyOk && historySourceOk && ownerOk && riskOk && endedOk && fromOk && toOk;
       });
       rows = rows.slice().sort((a, b) => {
         const av = getSortValue(a, state.sortKey, config);
@@ -7061,11 +7067,11 @@ active = new Set()
       const attention=row=>row.processes.some(stage=>['blocked','review'].includes(stage.state))||['blocked','review'].includes(row.quality.state);
       const filtered=orderRows.filter(row=>state.productionRouteFilter==='all'||attention(row)),p=visualPage(filtered,config.key);
       const orders=[...new Set(productionRouteRows.map(row=>row.order))],layout=state.productionRouteLayout||'current';
-      const chips=visualChip('production-route-filter','all','全部',orderRows.length,state.productionRouteFilter==='all')+visualChip('production-route-filter','attention','需跟进',orderRows.filter(attention).length,state.productionRouteFilter==='attention');
+      const chips=visualChip('production-route-filter','all','全部产品',orderRows.length,state.productionRouteFilter==='all')+visualChip('production-route-filter','attention','需跟进',orderRows.filter(attention).length,state.productionRouteFilter==='attention');
       const operation=renderHubTabsRow(hub,config),empty=visibleDataState(operation,'生产执行');if(empty)return empty;
       const current=`<div class="table-wrap"><table class="process-current-table" aria-label="当前生产事项"><thead><tr><th>产品 / 规格</th><th>当前工序</th><th>进度 / 数量</th><th>当前事项 / 负责岗位</th><th>办理入口</th></tr></thead><tbody>${p.rows.map(row=>{const index=productionCurrentStage(row),stage=row.processes[index];return `<tr><td><strong>${escapeHTML(row.product)}</strong><small>${row.sku} · 计划 ${row.quantity}</small></td><td>${productionRouteStages[index][1]}</td><td>${stage.status}<small>${stage.meta}</small></td><td>${stage.detail}<small>${stage.owner}</small></td><td><button class="btn" data-action="production-stage-open" data-id="${row.id}" data-index="${index}">查看当前事项</button></td></tr>`;}).join('')}</tbody></table></div>`;
       const matrix=`<div class="production-route-scroll"><div class="production-route-matrix" style="--stage-count:${productionRouteStages.length}"><div class="production-route-head"><div class="production-route-product">产品 / SKU</div>${productionRouteStages.map(([no,label])=>`<div><span>${label}</span></div>`).join('')}<div class="process-milestones">独立结果</div></div>${p.rows.map((row,index)=>`<div class="production-route-row"><div class="production-route-product"><div class="product-cell">${renderProductThumb(index,row.product)}<span><strong title="${escapeHTML(row.product)}">${escapeHTML(row.product)}</strong><span>${row.sku} · ${row.quantity}</span></span></div><span>${row.owner}</span></div>${row.processes.map((stage,index)=>`<button class="production-stage-cell ${stage.state}" data-action="production-stage-open" data-id="${row.id}" data-index="${index}"><strong>${stage.status}</strong><span>${stage.meta}</span><small>${stage.owner}</small></button>`).join('')}<div class="process-milestones">${[['quality','质检',row.quality],['inbound','成品入库',row.inbound]].map(([key,label,result])=>`<button class="milestone-result ${result.state}" data-action="production-milestone-open" data-id="${row.id}" data-value="${key}"><span>${label}</span><strong>${result.status}</strong></button>`).join('')}</div></div>`).join('')||'<div class="empty">没有匹配的产品工序</div>'}</div></div>`;
-      return `${operation}<section class="surface data-surface production-route-surface"><div class="process-order-bar"><label>生产订单 <ui-select id="production-route-order" data-required-selection>${orders.map(order=>`<option ${order===state.productionRouteOrder?'selected':''}>${order}</option>`).join('')}</ui-select></label><div class="segment" role="group" aria-label="生产执行展示方式">${[['current','当前事项'],['matrix','工序对照']].map(([key,label])=>`<button aria-pressed="${layout===key}" class="${layout===key?'active':''}" data-action="production-route-layout" data-value="${key}">${label}</button>`).join('')}</div></div><div class="process-order-bar"><div class="visual-chips">${chips}</div><label class="search">${icon('search')}<input id="list-search" aria-label="搜索生产产品或规格" placeholder="搜索产品、编码或规格" value="${escapeHTML(state.search)}" /></label></div>${layout==='matrix'?matrix:current}${renderVisualPager(p,config.key)}</section>`;
+      return `${operation}<section class="surface operation-surface"><div class="command-row"><div class="visual-chips">${chips}</div><label class="search">${icon('search')}<input id="list-search" aria-label="搜索生产产品或规格" placeholder="搜本单产品或规格编码" value="${escapeHTML(state.search)}" /></label><div class="segment" role="group" aria-label="生产执行展示方式">${[['current','当前事项'],['matrix','工序对照']].map(([key,label])=>`<button aria-pressed="${layout===key}" class="${layout===key?'active':''}" data-action="production-route-layout" data-value="${key}">${label}</button>`).join('')}</div></div><div class="record-row process-order-bar"><label>生产订单 <ui-select id="production-route-order" data-required-selection>${orders.map(order=>`<option ${order===state.productionRouteOrder?'selected':''}>${order}</option>`).join('')}</ui-select></label></div></section><section class="surface data-surface production-route-surface">${layout==='matrix'?matrix:current}${renderVisualPager(p,config.key)}</section>`;
     }
     function renderPurchaseArrivalPlan(config) {
       const all=visualRows(config.key).filter(item=>state.arrivalFilter==='all'||(state.arrivalFilter==='confirmed'?item.confirmed:!item.confirmed));
@@ -18622,6 +18628,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
     function renderFilterPopover() {
       const config = currentPageConfig();
+      if(config?.key==='exceptions')return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>筛选条件</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid">${renderDirectFilterChoices('异常类型',state.exceptionType,[['all','全部异常类型'],...config.sampleParties.map(type=>[type,type])],'demo-filter-choice','exceptionType')}${renderDirectFilterChoices('业务状态',state.exceptionExecution,[['all','全部业务状态'],['pending','待办理 / 额度生效'],['applied','业务已执行'],['reversed','业务已冲正']],'demo-filter-choice','exceptionExecution')}</div><div class="popover-foot"><button class="btn" data-action="clear-filter">清空筛选</button><button class="btn" data-action="close-overlay">完成</button></div></div>`;
       const party = config?.party || '业务对象';
       const dateLabel = config?.dateLabel || '业务日期';
       return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid"><div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><ui-select id="filter-owner" data-empty-value="all"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</ui-select></div>${renderDirectFilterChoices('业务提醒',state.filterRisk,[['all','全部'],['正常','正常'],['near','临近日期'],['已逾期','已逾期'],['blocked','阻塞']],'demo-filter-choice','filterRisk')}${renderDirectFilterChoices('包含结束记录',state.filterIncludeEnded?'yes':'no',[['no','否'],['yes','是']],'demo-filter-choice','filterIncludeEnded')}<div class="field span-2"><label>${dateLabel}范围</label><div class="date-range-control" role="group" aria-label="${dateLabel}范围"><input id="filter-date-from" aria-label="开始日期" type="date" value="${state.filterDateFrom}" max="${state.filterDateTo}"/><span aria-hidden="true">至</span><input id="filter-date-to" aria-label="结束日期" type="date" value="${state.filterDateTo}" min="${state.filterDateFrom}"/></div></div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn" data-action="close-overlay">关闭</button></div></div>`;
@@ -19983,7 +19990,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     const scrollContexts = new Map();
     const visualRecords = new Map();
     const formDrafts = new Map();
-    const sharedContextFields = ['status','search','pageNo','sortKey','sortDir','filterParty','filterOwner','filterRisk','filterIncludeEnded','filterDateFrom','filterDateTo','summaryOpen'];
+    const sharedContextFields = ['exceptionType','exceptionExecution','status','search','pageNo','sortKey','sortDir','filterParty','filterOwner','filterRisk','filterIncludeEnded','filterDateFrom','filterDateTo','summaryOpen'];
     const viewFields = {
       sales:['salesView','deliveryFilter'], purchase:['purchaseView','arrivalSelected','arrivalFilter','arrivalStart'],
       'production-records':['productionRecordsView','productionRouteOrder','productionRouteFilter','productionRouteLayout'],
@@ -20031,7 +20038,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
     function restoreEntity(key) {
       const saved=entityContexts.get(state.previewState==='stress'?`stress:${key}`:key);
-      Object.assign(state,{status:'all',search:'',pageNo:1,sortKey:'date',sortDir:'asc',filterParty:'',filterOwner:'all',filterRisk:'all',filterIncludeEnded:true,filterDateFrom:'',filterDateTo:'',summaryOpen:false});
+      Object.assign(state,{exceptionType:'all',exceptionExecution:'all',status:'all',search:'',pageNo:1,sortKey:'date',sortDir:'asc',filterParty:'',filterOwner:'all',filterRisk:'all',filterIncludeEnded:true,filterDateFrom:'',filterDateTo:'',summaryOpen:false});
       (viewFields[key]||[]).forEach(field=>state[field]=viewDefaults[field]);
       state.selected=new Set();
       if(saved){[...sharedContextFields,...(viewFields[key]||[])].forEach(field=>state[field]=saved[field]);state.selected=new Set(saved.selected);state.visibleColumns=new Set(saved.visibleColumns);state.columnOrder=[...saved.columnOrder];}

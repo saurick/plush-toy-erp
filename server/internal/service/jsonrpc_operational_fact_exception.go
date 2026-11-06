@@ -130,10 +130,10 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 		}
 		item, err = d.operationalFactUC.GetProductionException(ctx, getInt(pm, "id", 0))
 	case "list_production_exceptions":
-		if !productionCompletionAllowsOnly(pm, "include_status_counts", "handling_status", "customer_key", "status", "execution_status", "decision_type", "production_order_id", "limit", "offset") {
+		if !productionCompletionAllowsOnly(pm, "keyword", "include_status_counts", "handling_status", "customer_key", "status", "execution_status", "decision_type", "production_order_id", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
-		filter := biz.ProductionExceptionFilter{HandlingStatus: getString(pm, "handling_status"), Status: getString(pm, "status"), ExecutionStatus: getString(pm, "execution_status"), DecisionType: getString(pm, "decision_type"), ProductionOrderID: getInt(pm, "production_order_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}
+		filter := biz.ProductionExceptionFilter{Keyword: getString(pm, "keyword"), HandlingStatus: getString(pm, "handling_status"), Status: getString(pm, "status"), ExecutionStatus: getString(pm, "execution_status"), DecisionType: getString(pm, "decision_type"), ProductionOrderID: getInt(pm, "production_order_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}
 		statusCounts, countErr := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
 			return d.operationalFactUC.CountProductionExceptionsByStatus(ctx, filter)
 		})

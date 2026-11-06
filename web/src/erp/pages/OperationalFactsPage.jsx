@@ -387,10 +387,10 @@ export function OperationalFactWorkspace({
       ) {
         return preferredProcessOrderID
       }
-      // null 表示主动清空；0 表示尚未选择，首次进入仍默认选中首单。
+      // null 表示主动清空；0 表示首次进入，只默认定位生产中的订单。
       if (current === null) return null
       if (current && availableIDs.has(current)) return current
-      return Number(processOrdersData.rows[0]?.id || 0)
+      return Number(processOrdersData.rows.find((order) => order.status === StockReservationStatus.RELEASED)?.id || 0)
     })
   }, [
     contentView,

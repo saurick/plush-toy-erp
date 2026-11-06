@@ -16635,7 +16635,8 @@
     },
     "message": "OK",
     "params": {
-      "handling_status": "APPROVED:PENDING",
+      "handling_status": "APPROVED",
+      "keyword": "PE-DEMO",
       "include_status_counts": true,
       "limit": 20
     },

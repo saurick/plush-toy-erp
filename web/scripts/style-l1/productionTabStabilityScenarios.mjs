@@ -171,20 +171,23 @@ export function createProductionTabStabilityScenarios({
       verify: async (page) => {
         const execution = page.getByRole('region', { name: '生产执行', exact: true })
         await execution.getByRole('table', { name: '当前生产事项' }).waitFor()
-        assert.equal(await page.locator('.erp-business-operation-panel:visible').count(), 0)
+        assert.equal(await execution.locator('.erp-business-operation-panel:visible').count(), 1)
         const metrics = await execution.evaluate((node) => ({
           viewport: [innerWidth, innerHeight],
 dpr: devicePixelRatio,
           rows: [...node.querySelectorAll('.erp-production-process__current tbody tr')].map((row) => row.getBoundingClientRect().height),
           firstRowTop: node.querySelector('.erp-production-process__current tbody tr').getBoundingClientRect().top,
-          toolbarCenter: (() => { const box = node.querySelector('.erp-production-process__toolbar').getBoundingClientRect(); return box.top + box.height / 2 })(),
+          toolbarCenter: (() => { const box = node.querySelector('.erp-business-operation-panel__command').getBoundingClientRect(); return box.top + box.height / 2 })(),
           switchCenter: (() => { const box = node.querySelector('.erp-production-process__layout').getBoundingClientRect(); return box.top + box.height / 2 })(),
+          contextTop: node.querySelector('.erp-production-process__order-context').getBoundingClientRect().top,
+          commandBottom: node.querySelector('.erp-business-operation-panel__command').getBoundingClientRect().bottom,
         }))
         assert.deepEqual(metrics.viewport, [1920, 1080])
         assert.equal(metrics.dpr, 2)
         assert.ok(metrics.rows.every((height) => height <= 80), JSON.stringify(metrics))
         assert.ok(metrics.firstRowTop <= 260, JSON.stringify(metrics))
-        assert.ok(Math.abs(metrics.toolbarCenter - metrics.switchCenter) <= 1, '订单选择和展示切换共用一行')
+        assert.ok(Math.abs(metrics.toolbarCenter - metrics.switchCenter) <= 1, '事项筛选、搜索和展示切换共用查询行')
+        assert.ok(metrics.contextTop >= metrics.commandBottom, '订单选择归属独立的当前对象行')
         await assertNoHorizontalOverflow(page, 'production-execution-4k')
         await writeFile(path.join(outputDir, 'production-execution-metrics.json'), JSON.stringify(metrics, null, 2))
         await page.screenshot({ path: path.join(outputDir, 'production-execution-4k.png'), scale: 'device' })

@@ -308,7 +308,10 @@ export function buildProductionProcessWorkspace(aggregate) {
     (aggregate?.batches || []).map((batch) => [batch.id, batch])
   )
   const inspections = new Map(
-    (aggregate?.qualityInspections || []).map((inspection) => [inspection.id, inspection])
+    (aggregate?.qualityInspections || []).map((inspection) => [
+      inspection.id,
+      inspection,
+    ])
   )
   const items = model.items.map((item) => {
     const steps = item.steps.map((step) => {
@@ -351,7 +354,10 @@ export function buildProductionProcessWorkspace(aggregate) {
         .filter((batch) => !INACTIVE.has(batch.statusKey))
         .map((batch) => ({
           ...batch,
-          executionLabel: PRODUCTION_WIP_EXECUTION_MODE_META[batches.get(batch.id)?.execution_mode]?.label || '未安排加工方式',
+          executionLabel:
+            PRODUCTION_WIP_EXECUTION_MODE_META[
+              batches.get(batch.id)?.execution_mode
+            ]?.label || '未安排加工方式',
         }))
       const problemBatches = activeBatches.filter(
         (batch) => batch.statusKey === ProductionWIPStatus.REJECTED
@@ -373,7 +379,9 @@ export function buildProductionProcessWorkspace(aggregate) {
         primary,
         activeBatches,
         problemBatches,
-        batchSummary: [...counts].map(([label, count]) => `${count} 批${label}`).join(' · '),
+        batchSummary: [...counts]
+          .map(([label, count]) => `${count} 批${label}`)
+          .join(' · '),
         inspections: step.inspections.map((inspection) => ({
           ...inspection,
           batchID: inspections.get(inspection.id)?.production_wip_batch_id,
@@ -409,38 +417,42 @@ export function buildProductionProcessWorkspace(aggregate) {
   return {
     ...model,
     items,
-    filters: [
-      { key: 'all', label: '全部', count: items.length },
-      {
-        key: 'ready',
-        label: '待办理',
-        count: items.filter((item) =>
-          item.matters.some((matter) => matter.key === 'ready')
-        ).length,
-      },
-      {
-        key: 'quality',
-        label: '待质检',
-        count: items.filter((item) =>
-          item.matters.some((matter) => matter.key === 'quality')
-        ).length,
-      },
-      {
-        key: 'exception',
-        label: '异常',
-        count: items.filter((item) =>
-          item.matters.some((matter) => matter.key === 'exception')
-        ).length,
-      },
-      {
-        key: 'inbound',
-        label: '待入库',
-        count: items.filter((item) =>
-          item.matters.some((matter) => matter.key === 'inbound')
-        ).length,
-      },
-    ],
+    filters: buildProductionProcessFilters(items),
   }
+}
+
+export function buildProductionProcessFilters(items) {
+  return [
+    { key: 'all', label: '全部', count: items.length },
+    {
+      key: 'ready',
+      label: '待办理',
+      count: items.filter((item) =>
+        item.matters.some((matter) => matter.key === 'ready')
+      ).length,
+    },
+    {
+      key: 'quality',
+      label: '待质检',
+      count: items.filter((item) =>
+        item.matters.some((matter) => matter.key === 'quality')
+      ).length,
+    },
+    {
+      key: 'exception',
+      label: '异常',
+      count: items.filter((item) =>
+        item.matters.some((matter) => matter.key === 'exception')
+      ).length,
+    },
+    {
+      key: 'inbound',
+      label: '待入库',
+      count: items.filter((item) =>
+        item.matters.some((matter) => matter.key === 'inbound')
+      ).length,
+    },
+  ]
 }
 
 export function filterProductionProcessItems(
