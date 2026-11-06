@@ -1,3 +1,4 @@
+import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
 import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
@@ -92,7 +93,7 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
           const detail = page.locator('.erp-business-form-page:visible')
           await detail.getByRole('heading', { name: '查看 BOM 版本 · 已启用 · 只读', exact: true }).waitFor()
           assert.equal(await detail.locator('#version').inputValue(), 'V1')
-          assert.equal(await detail.locator('#version').isDisabled(), true)
+          assert.notEqual(await detail.locator('#version').getAttribute('readonly'), null)
           assert.equal(await detail.getByRole('button', { name: '保存草稿', exact: true }).count(), 0)
         }
         const action = page.locator('button[data-business-action-key="revise-bom"]:visible')
@@ -102,6 +103,7 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
         await action.click()
         const dialog = page.getByRole('dialog')
         await dialog.waitFor()
+        await assertCompactSettingsModal(page, dialog, assert, { label: `bom-revision-${mode}`, maxWidth: 480 })
         await dialog.getByText('当前查看：V1 · 已启用（只读）', { exact: true }).waitFor()
         assert.equal(writes.length, 0, '查看修订选项不能修改已启用版本或创建草稿')
         if (mode === 'create') {
@@ -149,7 +151,8 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
         const editor = page.locator('.erp-business-form-page:visible')
         await editor.waitFor()
         await editor.getByRole('heading', { name: '编辑 BOM 草稿 · 未生效', exact: true }).waitFor()
-        assert.equal(await editor.locator('#version').isDisabled(), true)
+        assert.notEqual(await editor.locator('#version').getAttribute('readonly'), null)
+        await editor.getByLabel('BOM 版本', { exact: true }).getByText(existingDraft ? 'V3' : 'V10', { exact: true }).waitFor()
         assert.equal(await editor.locator('#version').inputValue(), existingDraft ? 'V3' : 'V10')
         assert.equal(await editor.locator('.erp-bom-material-group').count(), 1)
         assert.deepEqual(records[0], original, '编辑新版本不能修改原 BOM')

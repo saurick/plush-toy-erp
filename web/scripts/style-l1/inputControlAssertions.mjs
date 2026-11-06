@@ -523,7 +523,8 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
       if (dateRange instanceof HTMLElement) return dateRange
       const select = node.closest('.ant-select')
       const selector = select?.querySelector('.ant-select-selector')
-      if (selector instanceof HTMLElement) return selector
+      // AutoComplete renders its custom Input as the visible border owner.
+      if (selector instanceof HTMLElement && !select.matches('.ant-select-auto-complete.ant-select-customize-input')) return selector
       const compactGroup = node.parentElement?.matches('.ant-space-compact')
         ? node.parentElement
         : null
@@ -669,7 +670,7 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
       seenOwners.add(owner)
       node.focus({ preventScroll: true })
       await new Promise((resolve) => requestAnimationFrame(resolve))
-      await Promise.all(owner.getAnimations()
+      await Promise.all(owner.getAnimations({ subtree: true })
         .filter((animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations !== Infinity)
         .map((animation) => animation.finished.catch(() => {})))
       if (
@@ -783,7 +784,8 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
     const controlSelector = [
       '.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)',
       'input.ant-input:not([type="hidden"]):not(.erp-item-field-unit-suffix)',
-      '.ant-select-single .ant-select-selector',
+      // Custom Input supplies AutoComplete's typography and border; inspect that Input below.
+      '.ant-select-single:not(.ant-select-auto-complete.ant-select-customize-input) .ant-select-selector',
     ].join(',')
 
     const numberFromPx = (value) => {
@@ -1126,13 +1128,27 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
           probe.setAttribute('aria-hidden', 'true')
           probe.tabIndex = -1
           Object.assign(probe.style, {
-            position: 'absolute', visibility: 'hidden', pointerEvents: 'none',
-            width: style.width, height: '0px', minHeight: '0px', maxHeight: 'none',
-            boxSizing: style.boxSizing, borderWidth: style.borderWidth, borderStyle: 'solid',
-            font: style.font, letterSpacing: style.letterSpacing, textIndent: style.textIndent,
-            whiteSpace: style.whiteSpace, wordBreak: style.wordBreak, overflowWrap: style.overflowWrap,
-            paddingLeft: style.paddingLeft, paddingRight: style.paddingRight,
-            paddingTop: '0px', paddingBottom: '0px', overflow: 'hidden',
+            position: 'absolute',
+visibility: 'hidden',
+pointerEvents: 'none',
+            width: style.width,
+height: '0px',
+minHeight: '0px',
+maxHeight: 'none',
+            boxSizing: style.boxSizing,
+borderWidth: style.borderWidth,
+borderStyle: 'solid',
+            font: style.font,
+letterSpacing: style.letterSpacing,
+textIndent: style.textIndent,
+            whiteSpace: style.whiteSpace,
+wordBreak: style.wordBreak,
+overflowWrap: style.overflowWrap,
+            paddingLeft: style.paddingLeft,
+paddingRight: style.paddingRight,
+            paddingTop: '0px',
+paddingBottom: '0px',
+overflow: 'hidden',
           })
           probe.value = node.value || node.placeholder || ''
           document.body.append(probe)

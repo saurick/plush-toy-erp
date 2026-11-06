@@ -1,6 +1,7 @@
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
+import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
 
 export function createQualitySourceActionScenarios(deps) {
   const {
@@ -83,7 +84,9 @@ export function createQualitySourceActionScenarios(deps) {
       ].map((record) => ({ ...record, source_type: 'PURCHASE_RECEIPT', source_id: 601, source_no: 'PR-RESULT-STYLE', purchase_receipt_id: 601, purchase_receipt_item_id: 602, inventory_lot_id: 401, inspection_type: 'INCOMING', subject_type: 'MATERIAL', subject_id: 1, material_id: 1, warehouse_id: 1, unit_id: 1, unit_name: '米' }))
       return {
         ...appearance,
-        path: '/erp/production/quality-inspections', auth: 'admin', effectiveSession: customerRuntimeEffectiveSession,
+        path: '/erp/production/quality-inspections',
+auth: 'admin',
+effectiveSession: customerRuntimeEffectiveSession,
         beforeNavigate: async (page) => {
           reads = []
           await page.route('**/rpc/quality', async (route) => {
@@ -163,6 +166,33 @@ export function createQualitySourceActionScenarios(deps) {
         },
       }
     }),
+    {
+      name: 'quality-correction-compact-desktop',
+      path: '/erp/production/quality-inspections',
+auth: 'admin',
+effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1280, height: 720 },
+      beforeNavigate: async (page) => {
+        const inspection = { id: 9790, inspection_no: 'QI-COMPACT-STYLE', source_type: 'SHIPMENT', source_id: 1, inspection_type: 'FINISHED_GOODS', subject_type: 'PRODUCT', subject_id: 1, inventory_lot_id: 401, warehouse_id: 1, unit_id: 1, unit_name: '个', status: 'PASSED', result: 'PASS' }
+        await page.route('**/rpc/quality', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_quality_inspections') return route.fallback()
+          await route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(stylePaginatedRpcData([inspection], 'quality_inspections', params)) } })
+        })
+      },
+      verify: async (page) => {
+        await selectRow(page, 'QI-COMPACT-STYLE')
+        await clickSelectionAction(page, '发起纠正复检')
+        const modal = page.getByRole('dialog', { name: '发起纠正复检', exact: true })
+        await assertCompactSettingsModal(page, modal, assert, { label: 'quality-correction', maxWidth: 480 })
+        await modal.getByRole('button', { name: '发起复检', exact: true }).click()
+        await modal.getByText('请填写纠正原因', { exact: true }).waitFor()
+        await assertCompactSettingsModal(page, modal, assert, { label: 'quality-correction-validation', maxWidth: 480 })
+        await modal.screenshot({ path: path.join(outputDir, 'quality-correction-compact.png') })
+        await modal.getByRole('button', { name: '返回办理', exact: true }).click()
+        await modal.waitFor({ state: 'hidden' })
+      },
+    },
     ...[{ name: 'quality-evidence-history-desktop', width: 3840, height: 2160 }, { name: 'quality-evidence-history-narrow', width: 1280, height: 900 }].map((viewport) => {
       let calls
       let writes
@@ -173,15 +203,23 @@ export function createQualitySourceActionScenarios(deps) {
         ['PRODUCTION_STAGE', '生产分段质检', 'list_production_stage_quality_inspections'],
       ]
       const records = types.map(([inspection_type], index) => ({
-        id: 9800 + index, inspection_no: `QI-EVIDENCE-${index}`, inspection_type,
-        status: 'SUBMITTED', source_type: ['PURCHASE_RECEIPT', 'OUTSOURCING_FACT', 'SHIPMENT', 'PRODUCTION_WIP'][index],
-        source_id: 9800 + index, source_no: `SOURCE-${index}`,
-        subject_type: index === 3 ? 'WIP' : 'PRODUCT', subject_id: 1,
+        id: 9800 + index,
+inspection_no: `QI-EVIDENCE-${index}`,
+inspection_type,
+        status: 'SUBMITTED',
+source_type: ['PURCHASE_RECEIPT', 'OUTSOURCING_FACT', 'SHIPMENT', 'PRODUCTION_WIP'][index],
+        source_id: 9800 + index,
+source_no: `SOURCE-${index}`,
+        subject_type: index === 3 ? 'WIP' : 'PRODUCT',
+subject_id: 1,
         production_wip_batch_id: index === 3 ? 9803 : null,
         gate_code: index === 3 ? 'NEEDLE' : null,
         purchase_receipt_item_id: index === 0 ? 9800 : null,
         wip_batch_no: index === 3 ? 'WIP-EVIDENCE' : null,
-        batch_quantity: '12', product_name: '质检示例产品', unit_name: '件', unit_precision: 0,
+        batch_quantity: '12',
+product_name: '质检示例产品',
+unit_name: '件',
+unit_precision: 0,
       }))
       const old = { ...records[0], id: 9890, inspection_no: 'QI-HISTORY-OLD', status: 'REJECTED', result: 'REJECT', inspector_id: 7, inspector_name: '质检员陈', superseded_at: 1790000000, superseded_reason: '仪器校准后重新检查', corrected_inspection_id: 9891, corrected_inspection_no: 'QI-HISTORY-NEW' }
       const current = { ...records[0], id: 9891, inspection_no: 'QI-HISTORY-NEW', status: 'PASSED', result: 'PASS', inspector_id: 8, inspector_name: '复检员林', correction_of_inspection_id: 9890, correction_of_inspection_no: 'QI-HISTORY-OLD' }
@@ -192,8 +230,11 @@ export function createQualitySourceActionScenarios(deps) {
         await filters.getByRole('button', { name: '完成', exact: true }).click()
       }
       return {
-        name: viewport.name, path: '/erp/production/quality-inspections', auth: 'admin',
-        effectiveSession: customerRuntimeEffectiveSession, viewport: { width: viewport.width, height: viewport.height },
+        name: viewport.name,
+path: '/erp/production/quality-inspections',
+auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession,
+viewport: { width: viewport.width, height: viewport.height },
         beforeNavigate: async (page) => {
           calls = []; writes = []
           await page.route('**/rpc/quality', async (route) => {
@@ -1755,6 +1796,7 @@ export function createQualitySourceActionScenarios(deps) {
             .filter({ hasText: '发起委外回货质检' })
             .last()
           await qualityModal.waitFor({ state: 'visible', timeout: 10_000 })
+          await assertCompactSettingsModal(page, qualityModal, assert, { label: 'outsourcing-return-quality', maxWidth: 480 })
           const modalText = String((await qualityModal.innerText()) || '')
             .replace(/\s+/gu, ' ')
             .trim()

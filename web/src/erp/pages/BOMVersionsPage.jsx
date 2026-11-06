@@ -1171,6 +1171,7 @@ export default function BOMVersionsPage() {
 
       <BusinessModal
         title="BOM 草稿已保存"
+        size="confirm"
         open={Boolean(savedRevision)}
         closable={!saving}
         maskClosable={!saving}

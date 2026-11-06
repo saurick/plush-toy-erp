@@ -2,8 +2,9 @@ import path from 'node:path'
 import { BUSINESS_SEARCH_SCOPES } from '../../src/erp/utils/businessSearchScopes.mjs'
 import { getBusinessModule } from '../../src/erp/config/businessModules.mjs'
 
-import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
 
 export function createFinanceBusinessSourceScenarios(deps) {
   const {
@@ -62,8 +63,9 @@ export function createFinanceBusinessSourceScenarios(deps) {
   ) => {
     const modal = page.getByRole('dialog', { name: title }).last()
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
+    await assertCompactSettingsModal(page, modal, assert, { label: title, maxWidth: 480 })
     await modal.getByLabel('业务编号').waitFor({ state: 'visible' })
-    await modal.getByLabel('发生时间').waitFor({ state: 'visible' })
+    if (reconciliation) await modal.getByLabel('发生时间').waitFor({ state: 'visible' })
     const modalText = String((await modal.innerText()) || '').replace(
       /\s+/gu,
       ' '
@@ -83,8 +85,8 @@ export function createFinanceBusinessSourceScenarios(deps) {
       .allTextContents()
     assert.deepEqual(
       formLabels.map((label) => label.trim()),
-      ['业务编号', '发生时间', '备注'],
-      `${title} 只允许岗位人员填写三个业务字段`
+      reconciliation ? ['业务编号', '发生时间', '备注'] : ['业务编号', '备注'],
+      `${title} 只允许填写当前来源的业务字段`
     )
     const noteInput = modal.getByLabel('备注')
     await noteInput.scrollIntoViewIfNeeded()
@@ -200,6 +202,33 @@ export function createFinanceBusinessSourceScenarios(deps) {
 
   return [
     {
+      name: 'finance-source-adjustment-compact-desktop',
+      path: '/erp/finance/payments',
+auth: 'admin',
+      effectiveSession: { ...customerRuntimeEffectiveSession, pages: [...customerRuntimeEffectiveSession.pages, 'finance-payments'], actions: [...customerRuntimeEffectiveSession.actions, 'finance.payable.read', 'finance.credit_note.create', 'purchase_receipt.read', 'purchase_return.read', 'purchase_receipt_adjustment.read'] },
+      viewport: { width: 1280, height: 720 },
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/operational_fact', async (route) => {
+          const { id, method } = route.request().postDataJSON()
+          if (method !== 'list_finance_source_adjustments') return route.fallback()
+          await route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ adjustments: [{ source_type: 'PURCHASE_RETURN', source_id: 81, source_no: 'RET-COMPACT-STYLE', finance_fact_no: 'AP-COMPACT-STYLE', counterparty_name: '模拟供应商', balance_direction: 'DECREASE', amount: '5', outstanding_amount: '10', currency: 'CNY' }], total: 1 }) } })
+        })
+      },
+      verify: async (page) => {
+        await page.getByRole('tab', { name: '采购待调整', exact: true }).click()
+        await page.getByRole('button', { name: '确认差额', exact: true }).click()
+        const modal = page.getByRole('dialog', { name: '确认采购应付差额', exact: true })
+        await assertCompactSettingsModal(page, modal, assert, { label: 'finance-source-adjustment', maxWidth: 480 })
+        await modal.getByLabel('调整原因', { exact: true }).fill('')
+        await modal.getByRole('button', { name: '确认调整', exact: true }).click()
+        await modal.getByText('请填写调整原因', { exact: true }).waitFor()
+        await assertCompactSettingsModal(page, modal, assert, { label: 'finance-source-adjustment-validation', maxWidth: 480 })
+        await modal.screenshot({ path: path.join(deps.outputDir, 'finance-source-adjustment-compact.png') })
+        await modal.getByRole('button', { name: '取消', exact: true }).click()
+        await modal.waitFor({ state: 'hidden' })
+      },
+    },
+    {
       name: 'finance-shipment-receivable-invoice-source-desktop',
       path: '/erp/warehouse/shipments',
       auth: 'admin',
@@ -267,6 +296,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
         await clickSelectionAction(page, '生成应收')
         let modal = page.getByRole('dialog', { name: '生成应收' }).last()
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        await assertCompactSettingsModal(page, modal, assert, { label: 'shipment-receivable', maxWidth: 480 })
         let modalText = String((await modal.innerText()) || '').replace(
           /\s+/gu,
           ' '
@@ -289,6 +319,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
         await clickSelectionAction(page, '生成开票记录')
         modal = page.getByRole('dialog', { name: '生成开票记录' }).last()
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        await assertCompactSettingsModal(page, modal, assert, { label: 'shipment-invoice', maxWidth: 480 })
         modalText = String((await modal.innerText()) || '').replace(
           /\s+/gu,
           ' '
@@ -521,7 +552,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '采购入库')
+        await page.getByRole('tab', { name: '采购收货', exact: true, selected: true }).waitFor()
         await selectRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, '生成应付')
         const modal = await assertFinanceSourceModal(page, {
@@ -686,7 +717,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
       },
       verify: async (page) => {
         await openPayableSource(page, 'AP-RELATED-PR-L1')
-        await expectHeading(page, '采购入库')
+        await page.getByRole('tab', { name: '采购收货', exact: true, selected: true }).waitFor()
         await expectText(page, 'PR-STYLE-L1')
         const search = page.getByPlaceholder('搜单号、供应商、材料、产品')
         assert.equal(await search.inputValue(), 'PR-STYLE-L1')
@@ -939,7 +970,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
         await modal.getByLabel('备注').fill('客户应收单笔核对')
         await assertBusinessModalViewport(page, modal, {
           label: 'finance-source-local-form-narrow',
-          maxWidth: 860,
+          maxWidth: 480,
         })
         await modal.getByRole('button', { name: '生成核对草稿' }).click()
         await expectText(page, '单笔核对草稿已生成，请到对账管理核对并确认')

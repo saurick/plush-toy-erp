@@ -80,7 +80,7 @@ export default function QualityInspectionCorrectionModal({ inspection, customerK
     }
   }
   return (
-    <BusinessModal title="发起纠正复检" open={Boolean(inspection)} form={form} confirmLoading={loading} onCancel={async () => { if (await confirmLeave()) onClose() }} onOk={create} okText={pending ? '确认原复检结果' : '发起复检'} cancelText="返回办理" cancelButtonProps={{ disabled: Boolean(pending) }} closable={!pending} keyboard={!pending} maskClosable={!pending}>
+    <BusinessModal size="confirm" title="发起纠正复检" open={Boolean(inspection)} form={form} confirmLoading={loading} onCancel={async () => { if (await confirmLeave()) onClose() }} onOk={create} okText={pending ? '确认原复检结果' : '发起复检'} cancelText="返回办理" cancelButtonProps={{ disabled: Boolean(pending) }} closable={!pending} keyboard={!pending} maskClosable={!pending}>
       <p>原质检单：{inspection?.inspection_no}</p>
       <p>原判定或依据有误时保留原证据并生成待检单；已有生效下游业务时不能纠正，正常不合格按原处置流程办理。</p>
       {pending ? <Alert type="warning" showIcon message="结果暂时无法确认，已保留原内容；请重试确认，避免重复发起。" /> : null}

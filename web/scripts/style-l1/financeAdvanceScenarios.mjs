@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 export function createFinanceAdvanceScenarios({
@@ -285,6 +286,7 @@ export function createFinanceAdvanceScenarios({
           exact: true,
         })
         await choose('已抵扣记录', `AR-ADVANCE-01 · ${amount} CNY`)
+        await assertCompactSettingsModal(page, reversal, assert, { label: 'finance-allocation-reversal', maxWidth: 480 })
         await reversal.getByLabel('撤销原因').fill('调整抵扣批次')
         await reversal
           .getByRole('button', { name: '确认撤销抵扣', exact: true })

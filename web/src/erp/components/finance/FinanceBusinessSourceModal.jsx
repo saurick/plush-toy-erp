@@ -140,7 +140,7 @@ export default function FinanceBusinessSourceModal({
       form={form}
       title={config.title}
       open={open}
-      size="localAction"
+      size="confirm"
       okText={config.okText}
       cancelText="取消"
       confirmLoading={loading}

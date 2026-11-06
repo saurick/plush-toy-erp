@@ -873,6 +873,7 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
       expectHeading,
       expectText,
+      outputDir,
     }),
     ...createPerformanceReferenceScenarios({ customerRuntimeEffectiveSession }),
     ...createProductPaginationScenarios({

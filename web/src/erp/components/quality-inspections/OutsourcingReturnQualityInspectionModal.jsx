@@ -64,7 +64,7 @@ export default function OutsourcingReturnQualityInspectionModal({
       className="erp-outsourcing-return-quality-modal"
       title="发起委外回货质检"
       open={open}
-      size="localAction"
+      size="confirm"
       okText="生成质检草稿"
       cancelText="取消"
       confirmLoading={loading}

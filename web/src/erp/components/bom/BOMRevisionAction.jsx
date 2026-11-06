@@ -169,6 +169,7 @@ export default function BOMRevisionAction({ record, canCreate, disabled, onEdit 
         {actionLabel}
       </Button>
       <BusinessModal
+        size="confirm"
         title={drafts.length ? '选择要编辑的 BOM 草稿' : '创建 BOM 修订草稿'}
         open={open}
         destroyOnHidden

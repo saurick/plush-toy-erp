@@ -61,8 +61,10 @@ export default function ProductionOutsourcingPrepareModal({
   return (
     <BusinessFormModal
       title="按加工安排生成委外草稿"
+      size="confirm"
       description="生产负责人选择外发材料和加工厂，系统带入工序、数量与单位。"
       open={open}
+      form={form}
       onCancel={() => {
         if (!saving) onCancel()
       }}
@@ -78,7 +80,7 @@ export default function ProductionOutsourcingPrepareModal({
         disabled={saving}
         className="erp-business-action-form"
       >
-        <p>
+        <p className="erp-business-inline-note erp-business-source-summary">
           加工工序：{operation?.process_name_snapshot} · 批次数量：
           {batch?.quantity}
         </p>

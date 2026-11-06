@@ -44,7 +44,8 @@ export default function ShipmentFinanceSourceModal({
 
   return (
     <BusinessModal
-      size="localAction"
+      size="confirm"
+      form={form}
       title={config.title}
       open={open}
       okText={config.okText}

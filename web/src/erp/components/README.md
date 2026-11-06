@@ -56,7 +56,7 @@
 - 业务列表、弹窗明细与研发工作台的 Ant Design 表格共用 [`AppTable`](../../common/components/table/AppTable.jsx)；列对齐和序号规则见[表格对齐](../../../../docs/engineering/前端实现与交互约定.md#表格对齐--table-alignment)。
 - 业务弹窗通过 `business-list/BusinessModal.jsx` 共享尺寸、滚动和浮层离开守卫，`BusinessFormModal` 在其上保留表单标题、真实脏状态及焦点恢复。抽屉使用通用层 [`AppDrawer`](../../common/components/drawer/AppDrawer.jsx)，命令式确认使用 `useModal()`；分栏内沿用同一编辑器并在所属栏展示，见[分栏浮层规则](../../../../docs/engineering/前端实现与交互约定.md#desktop-split-workspace)。
 
-  尺寸取 [`modalSizes.mjs`](../utils/modalSizes.mjs)：`confirm` 用于简短确认与原因（480px），`localAction` 用于局部表单（最大 860px），`recordDetails` 用于复杂表单与摘要详情（最大 1120px），`columnOrder` 用于列排序与图片预览（最大 960px）。
+  尺寸取 [`modalSizes.mjs`](../utils/modalSizes.mjs)：`confirm` 用于简短确认、原因及少量字段（480px），`localAction` 用于需要较宽上下文的局部表单（最大 860px），`recordDetails` 用于复杂表单与摘要详情（最大 1120px），`columnOrder` 用于列排序与图片预览（最大 640px）。BOM 修订与保存回执、生成委外草稿、纠正复检、回货送检、财务来源建草稿、出货建账草稿、质检办理确认、采购应付差额和撤销抵扣共用紧凑档位；保留必要的来源、业务后果及验证错误。明细表、复杂处置和图片标注按内容保留较宽档位。所有档位默认居中，超出可用高度时只滚动正文，底部操作保持可达；分栏内相对所属工作区居中，手机整页办理保持独立布局。
 
   采购到货、多条退货或调整、材料汇总、完整单据明细、业务记录和生产工序使用 `lineItems`：窗口的 94%，最大 1800px，两侧至少留 16px。各入口使用尺寸名称；只有手机全屏或调用方已提供共享尺寸时传入 `width`。
 - 未收到用户明确的尺寸调整要求时，页面重设计沿用原有尺寸档位；表格改卡片、减少默认字段或当前只有一条明细均不构成降档理由，也不得为新实现放宽既有尺寸验收。采购到货的浏览器回归独立验证 `min(1800px, 94vw, calc(100vw - 32px))` 的实际宽度，覆盖单条、多条、窄屏、超宽屏和暗色。

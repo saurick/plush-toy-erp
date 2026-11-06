@@ -1,5 +1,7 @@
+import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
 import { createTaskBusinessReturnScenarios } from './taskBusinessReturnScenarios.mjs'
 import { createProductionTaskHandlingScenarios } from './productionTaskHandlingScenarios.mjs'
+import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 function productionWipPermissions() {
   return [
@@ -143,6 +145,15 @@ export function createProductionWipScenarios(deps) {
       effectiveSession,
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
+        await page.route('**/rpc/masterdata', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_suppliers') return route.fallback()
+          await route.fulfill({ json: { jsonrpc: '2.0',
+id,
+result: styleRpcResult(stylePaginatedRpcData([
+            { id: 44, code: 'SUP-OUTSOURCE-STYLE', name: '模拟外发加工厂', supplier_type: 'outsourcing', is_active: true },
+          ], 'suppliers', params)) } })
+        })
         await page.route('**/rpc/production_wip', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
           if (method !== 'prepare_production_outsourcing_order') {
@@ -150,7 +161,7 @@ export function createProductionWipScenarios(deps) {
           }
           assert.ok(params.production_wip_batch_id > 0)
           assert.ok(params.supplier_id > 0)
-          assert.equal(params.expected_return_date, '2026-10-01')
+          assert.equal(params.expected_return_date, new Date().toLocaleDateString('sv-SE'))
           assert.ok(!Object.hasOwn(params, 'quantity'))
           await route.fulfill({
             status: 200,
@@ -189,16 +200,14 @@ export function createProductionWipScenarios(deps) {
           .getByRole('dialog')
           .filter({ hasText: '生成委外草稿' })
           .last()
+        await assertCompactSettingsModal(page, modal, assert, { label: 'production-outsourcing-prepare', maxWidth: 480 })
         await modal.getByLabel('加工厂', { exact: true }).click()
         await page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
           .first()
           .click()
         await modal.getByLabel('预计回厂日期', { exact: true }).click()
-        await page
-          .locator('.ant-picker-dropdown:visible')
-          .getByTitle('2026-10-01')
-          .click()
+        await page.locator('.ant-picker-dropdown:visible').getByText('今天', { exact: true }).click()
         await page.screenshot({
           path: path.join(outputDir, 'production-outsourcing-prepare.png'),
           fullPage: true,

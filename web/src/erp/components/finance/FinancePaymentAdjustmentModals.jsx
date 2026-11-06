@@ -18,6 +18,8 @@ export function FinanceAllocationReversalModal({
   return (
     <BusinessFormModal
       title="撤销抵扣"
+      size="confirm"
+      form={unallocateForm}
       open={unallocateOpen}
       confirmLoading={loading}
       onCancel={() => !loading && setUnallocateOpen(false)}

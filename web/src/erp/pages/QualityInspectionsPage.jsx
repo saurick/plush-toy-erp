@@ -1972,6 +1972,7 @@ export default function QualityInspectionsPage() {
       <BusinessModal
         taskInline
         title="办理本次质检"
+        size="confirm"
         open={qualityTaskFocusOpen}
         onCancel={saving ? undefined : () => setQualityTaskFocusOpen(false)}
         footer={
