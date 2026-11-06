@@ -8,6 +8,8 @@ import { IncomingCheckItemsForm } from './IncomingCheckItems.jsx'
 import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
+import FilterChip from '@/common/components/navigation/FilterChip'
+import { QUALITY_CONCESSION_HELP, QUALITY_RESULT_OPTIONS } from './qualityInspectionResultOptions.mjs'
 import {
   compactParams,
   trimOptional,
@@ -20,12 +22,26 @@ import {
 } from '../../utils/qualityDefectRate.mjs'
 import BusinessForm from '../business-list/BusinessForm.jsx'
 
-const RESULT_DECISION_OPTIONS = [
-  { label: '合格', value: 'PASS' },
-  { label: '让步接收', value: 'CONCESSION' },
-]
-
-const STRICT_RESULT_DECISION_OPTIONS = [{ label: '合格', value: 'PASS' }]
+function QualityResultChoices({ value, onChange, allowConcession, disabled, ...fieldProps }) {
+  return (
+    <div {...fieldProps} className="erp-business-filter-choices" role="group" aria-label="判定结果">
+      {QUALITY_RESULT_OPTIONS.filter((option) => option.value === 'PASS' || allowConcession && option.value === 'CONCESSION').map((option) => (
+        <FilterChip
+          key={option.value}
+          selected={value === option.value}
+          disabled={disabled}
+          help={option.help ? (
+            <BusinessHelpLabel iconOnly label={option.label} renderContent={() => <p>{option.help}</p>} />
+          ) : null}
+          helpLabel={option.label}
+          onClick={() => onChange?.(option.value)}
+        >
+          {option.label}
+        </FilterChip>
+      ))}
+    </div>
+  )
+}
 
 export function positiveInt(value) {
   const numeric = Number(value || 0)
@@ -159,15 +175,9 @@ export function QualityInspectionDecisionForm({
           label="判定结果"
           name="result"
           rules={[{ required: true, message: '请选择判定结果' }]}
+          extra={result === 'CONCESSION' ? QUALITY_CONCESSION_HELP : undefined}
         >
-          <Select
-            placeholder="请选择判定结果"
-            options={
-              allowConcession
-                ? RESULT_DECISION_OPTIONS
-                : STRICT_RESULT_DECISION_OPTIONS
-            }
-          />
+          <QualityResultChoices allowConcession={allowConcession} disabled={disabled} />
         </Form.Item>
       ) : null}
       {mode !== 'cancel' ? (
@@ -237,7 +247,7 @@ export function QualityInspectionDecisionForm({
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="判定备注"
         name="decision_note"
-        extra={reasonRequired ? '不合格或让步接收须填写原因。' : undefined}
+        extra={reasonRequired ? result === 'CONCESSION' ? '说明已知偏差及本次同意接收的依据。' : '请填写不合格原因。' : undefined}
         rules={reasonRequired ? [{ required: true, whitespace: true, message: '请填写异常或让步理由' }] : []}
       >
         <BusinessTextArea maxLength={BusinessTextPolicy.noteMaxCharacters} showCount minRows={2} />

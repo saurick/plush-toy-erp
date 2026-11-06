@@ -46,7 +46,7 @@ import ERPPageActions from '../ERPPageActions.jsx'
 import useBusinessListStickyHeader from './useBusinessListStickyHeader.js'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
-import { BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
+import { BusinessHelpLabel, BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
 import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
 import { formatPaginationTotal } from '@/common/utils/pagination.mjs'
 import { filterBusinessListColumns } from '../../utils/moduleTableColumns.mjs'
@@ -961,6 +961,14 @@ export function SelectFilter({
               key={option.value ?? '__all'}
               selected={(allowClear && isEmptyFilterValue(value, emptyValue) ? emptyValue : value) === option.value}
               disabled={restProps.disabled || restProps.loading || option.disabled}
+              help={option.help ? (
+                <BusinessHelpLabel
+                  iconOnly
+                  label={option.label}
+                  renderContent={() => <p>{option.help}</p>}
+                />
+              ) : null}
+              helpLabel={option.label}
               onClick={() => onChange?.(option.value, option)}
             >
               {option.label}

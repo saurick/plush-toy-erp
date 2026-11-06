@@ -73,3 +73,43 @@ test('固定单选按选项直接选择、清空和禁用，显式搜索与排�
   assert.ok([...group.querySelectorAll('button')].every((button) => button.disabled))
   assert.ok([...sourceGroup.querySelectorAll('button')].every((button) => button.disabled))
 })
+
+test('质检让步接收的按钮内说明不改变筛选，禁用与清空仍独立生效', async (t) => {
+  const ui = await businessFormHarness(t)
+  const [{ BusinessOperationPanel, SelectFilter }, { QUALITY_RESULT_FILTER_OPTIONS }] = await Promise.all([
+    import('./BusinessListLayout.jsx'),
+    import('../quality-inspections/qualityInspectionColumns.jsx'),
+  ])
+  const changes = []
+  function Example({ disabled = false }) {
+    const [value, setValue] = React.useState('')
+    return createElement(BusinessOperationPanel, {
+      filtersOpen: true,
+      filters: createElement(SelectFilter, {
+        'aria-label': '检验结果',
+        value,
+        disabled,
+        options: QUALITY_RESULT_FILTER_OPTIONS,
+        onChange: (next) => { changes.push(next); setValue(next) },
+      }),
+    })
+  }
+  await ui.render(createElement(Example))
+  const group = document.querySelector('[role="group"][aria-label="检验结果"]')
+  const help = group.querySelector('[aria-label="查看让步接收说明"]')
+  assert.ok(help.closest('.erp-filter-chip--with-help'))
+  assert.equal(group.querySelector('button button'), null)
+  await ui.click(help)
+  assert.equal(help.getAttribute('aria-expanded'), 'true')
+  assert.deepEqual(changes, [])
+  await ui.click(ui.button('让步接收'))
+  assert.deepEqual(changes, ['CONCESSION'])
+  assert.equal(help.closest('.erp-filter-chip--with-help').getAttribute('data-selected'), 'true')
+  await ui.click(help)
+  assert.deepEqual(changes, ['CONCESSION'])
+  await ui.click(ui.button('不限'))
+  assert.deepEqual(changes, ['CONCESSION', ''])
+  await ui.render(createElement(Example, { disabled: true }))
+  assert.ok([...group.querySelectorAll('button')].every((button) => button.disabled || Boolean(button.closest('fieldset[disabled]'))))
+  assert.equal(help.closest('fieldset').disabled, true)
+})

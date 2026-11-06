@@ -382,6 +382,7 @@ export default function QualityInspectionsPage() {
     'purchase_receipt_item_id',
     inspectionForm
   )
+  const decisionResult = Form.useWatch('result', decisionForm)
 
   const qualitySourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.quality)
   const canReadInspectionList = hasActionPermission(adminProfile, PermissionCode.QUALITY_INSPECTION_READ) && (
@@ -1271,7 +1272,7 @@ export default function QualityInspectionsPage() {
 
   const modalOkText = {
     create: '生成草稿',
-    pass: '确认合格',
+    pass: decisionResult === 'CONCESSION' ? '确认让步接收' : '确认合格',
     reject: '确认不合格',
     cancel: '确认取消',
   }[inspectionModal?.mode || 'create']

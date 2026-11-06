@@ -2,6 +2,7 @@ import React from 'react'
 import { Space, Tag, Typography } from 'antd'
 import { QualityInspectionStatus } from '../../../common/consts/statuses.generated.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { QUALITY_RESULT_OPTIONS } from './qualityInspectionResultOptions.mjs'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
@@ -23,9 +24,7 @@ export const QUALITY_STATUS_OPTIONS = [
 
 export const QUALITY_RESULT_FILTER_OPTIONS = [
   { label: '全部结果', value: '' },
-  { label: '合格', value: 'PASS' },
-  { label: '让步接收', value: 'CONCESSION' },
-  { label: '不合格', value: 'REJECT' },
+  ...QUALITY_RESULT_OPTIONS,
 ]
 
 export const QUALITY_INSPECTION_TYPE_FILTER_OPTIONS = [

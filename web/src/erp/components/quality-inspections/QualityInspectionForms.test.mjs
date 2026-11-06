@@ -90,6 +90,5 @@ test('quality decision form offers accessible presets and clears stale custom in
   assert.match(decisionForm, /不需要逐件计数/u)
   assert.match(decisionForm, /不会自动换算成退货数量/u)
   assert.match(decisionForm, /allowConcession = true/u)
-  assert.match(decisionForm, /STRICT_RESULT_DECISION_OPTIONS/u)
-  assert.match(decisionForm, /allowConcession\s*\?/u)
+  assert.match(decisionForm, /<QualityResultChoices allowConcession=\{allowConcession\}/u)
 })

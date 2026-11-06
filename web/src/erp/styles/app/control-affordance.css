@@ -234,6 +234,7 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
 
 .erp-filter-chip {
   --erp-filter-chip-background: var(--erp-control-surface);
+  --erp-filter-chip-text: var(--erp-control-text);
   position: relative;
   display: inline-flex;
   min-height: 32px;
@@ -245,7 +246,7 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   border: 1px solid var(--erp-control-tab-border);
   border-radius: 8px;
   background: var(--erp-filter-chip-background);
-  color: var(--erp-control-text);
+  color: var(--erp-filter-chip-text);
   font: inherit;
   font-size: var(--erp-font-small);
   font-weight: 500;
@@ -274,11 +275,45 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   font-size: 12px;
 }
 
-.erp-filter-chip[aria-pressed='true'] {
+.erp-filter-chip[aria-pressed='true'],
+.erp-filter-chip[data-selected='true'] {
   --erp-filter-chip-background: var(--erp-control-selected);
+  --erp-filter-chip-text: var(--erp-control-selected-text);
   border-color: var(--erp-control-tab-border);
-  color: var(--erp-control-selected-text);
   box-shadow: none;
+}
+
+.erp-filter-chip--with-help {
+  min-inline-size: 0;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.erp-filter-chip__control {
+  display: inline-flex;
+  min-width: 0;
+  align-self: stretch;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 4px 5px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: inherit;
+}
+
+.erp-filter-chip__help {
+  --erp-supplemental-help-color: var(--erp-filter-chip-text);
+  display: inline-flex;
+  align-items: center;
+}
+
+.erp-filter-chip--with-help:disabled .erp-filter-chip__help {
+  pointer-events: none;
 }
 
 .erp-navigation-chips {

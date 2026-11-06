@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { InfoCircleOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { Button, Popover, Tag, Typography } from 'antd'
 import Link from '../business-list/BusinessLink.jsx'
@@ -173,6 +173,19 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', descripti
   // 关闭后的焦点恢复与待执行悬停不能重开说明；新输入才解除关闭意图。
   const explicitlyClosed = useRef(false)
   const item = getBusinessHelpItem(pageKey, itemKey)
+  useEffect(() => {
+    if (!open) return undefined
+    const closeOnEscape = (event) => {
+      if (event.key !== 'Escape' || event.isComposing || !triggerRef.current?.getClientRects().length) return
+      event.preventDefault()
+      event.stopPropagation()
+      explicitlyClosed.current = true
+      triggerRef.current?.focus({ preventScroll: true })
+      setOpen(false)
+    }
+    document.addEventListener('keydown', closeOnEscape, true)
+    return () => document.removeEventListener('keydown', closeOnEscape, true)
+  }, [open])
   if (!item && !description && !renderContent) return iconOnly ? null : label
   const closeHelp = () => {
     explicitlyClosed.current = true

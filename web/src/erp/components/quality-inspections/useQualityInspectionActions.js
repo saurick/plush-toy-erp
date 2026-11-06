@@ -143,7 +143,9 @@ export default function useQualityInspectionActions({
     try {
       let action = passQualityInspection
       let params = buildDecisionParams(inspection.id, values)
-      let successText = '质量检验已判定合格'
+      let successText = values.result === 'CONCESSION'
+        ? '质量检验已记录为让步接收'
+        : '质量检验已判定合格'
       if (inspectionModal?.mode === 'reject') {
         action = rejectQualityInspection
         params = buildDecisionParams(inspection.id, values, 'REJECT')

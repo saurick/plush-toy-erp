@@ -1,3 +1,4 @@
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 
@@ -68,6 +69,100 @@ export function createQualitySourceActionScenarios(deps) {
   }
 
   return [
+    ...[
+      { name: 'quality-result-help-desktop', viewport: { width: 3840, height: 2160 } },
+      { name: 'quality-result-help-dark', viewport: { width: 1280, height: 800 }, themeMode: 'dark' },
+      { name: 'quality-result-help-mobile', viewport: { width: 390, height: 844 } },
+    ].map((appearance) => {
+      let reads = []
+      const records = [
+        { id: 9891, inspection_no: 'QI-RESULT-PASS', status: 'PASSED', result: 'PASS' },
+        { id: 9892, inspection_no: 'QI-RESULT-CONCESSION', status: 'PASSED', result: 'CONCESSION', decision_note: '已确认色差，本批仅用于内衬' },
+        { id: 9893, inspection_no: 'QI-RESULT-REJECT', status: 'REJECTED', result: 'REJECT' },
+        { id: 9894, inspection_no: 'QI-RESULT-PENDING', status: 'SUBMITTED', result: null },
+      ].map((record) => ({ ...record, source_type: 'PURCHASE_RECEIPT', source_id: 601, source_no: 'PR-RESULT-STYLE', purchase_receipt_id: 601, purchase_receipt_item_id: 602, inventory_lot_id: 401, inspection_type: 'INCOMING', subject_type: 'MATERIAL', subject_id: 1, material_id: 1, warehouse_id: 1, unit_id: 1, unit_name: '米' }))
+      return {
+        ...appearance,
+        path: '/erp/production/quality-inspections', auth: 'admin', effectiveSession: customerRuntimeEffectiveSession,
+        beforeNavigate: async (page) => {
+          reads = []
+          await page.route('**/rpc/quality', async (route) => {
+            const { id, method, params = {} } = route.request().postDataJSON()
+            if (method !== 'list_quality_inspections') return route.fallback()
+            reads.push(params)
+            const rows = records.filter((row) => !params.result || row.result === params.result)
+            await route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(stylePaginatedRpcData(rows, 'quality_inspections', params)) } })
+          })
+        },
+        verify: async (page) => {
+          await page.getByText('QI-RESULT-PASS', { exact: true }).waitFor()
+          await page.getByRole('button', { name: /^筛选/u }).click()
+          const filter = page.getByRole('dialog', { name: '筛选条件', exact: true })
+          const results = filter.getByRole('group', { name: '检验结果', exact: true })
+          const help = results.getByRole('button', { name: '查看让步接收说明', exact: true })
+          const concession = results.getByRole('button', { name: '让步接收', exact: true })
+          assert.equal(await help.locator('[data-icon="info-circle"]').count(), 1, '筛选说明使用统一信息图标')
+          assert.equal(await help.locator('[data-icon="question-circle"]').count(), 0)
+          const readCount = reads.length
+          await waitForFiniteAnimations(page)
+          const boxBefore = await results.boundingBox()
+          assert.equal(await help.evaluate((node) => Boolean(node.closest('.erp-filter-chip--with-help'))), true)
+          assert.equal(await results.locator('button button').count(), 0)
+          if (appearance.name.endsWith('mobile')) await help.tap()
+          else await help.hover()
+          const popup = page.locator('.erp-business-inline-help-popover:visible')
+          await popup.waitFor()
+          await popup.getByText(/存在已知偏差/u).waitFor()
+          assert.match(await popup.innerText(), /不会自动完成入库、生产或出货/u)
+          assert.equal(reads.length, readCount, '查看说明不重新查询或改变筛选')
+          const geometry = await help.evaluate((button) => {
+            const outer = button.closest('.erp-filter-chip').getBoundingClientRect()
+            const rect = button.getBoundingClientRect()
+            return { inside: rect.left >= outer.left && rect.right <= outer.right && rect.top >= outer.top && rect.bottom <= outer.bottom, width: rect.width, height: rect.height }
+          })
+          assert.equal(geometry.inside, true, '说明图标位于选项外框内')
+          if (appearance.name.endsWith('mobile')) {
+            assert.ok(geometry.width >= 44 && geometry.height >= 44, '手机说明入口保留独立触区')
+          }
+          await page.keyboard.press('Escape')
+          await popup.waitFor({ state: 'hidden' })
+          assert.equal(await filter.isVisible(), true, '关闭说明保留筛选面板')
+          await concession.click()
+          await page.getByText('QI-RESULT-PASS', { exact: true }).waitFor({ state: 'hidden' })
+          await page.getByText('QI-RESULT-CONCESSION', { exact: true }).waitFor()
+          assert.equal(reads.at(-1).result, 'CONCESSION')
+          assert.equal(await concession.getAttribute('aria-pressed'), 'true')
+          await waitForFiniteAnimations(page)
+          const boxAfter = await results.boundingBox()
+          assert.ok(Math.abs(boxBefore.width - boxAfter.width) <= 1 && Math.abs(boxBefore.height - boxAfter.height) <= 1, `选中状态不改变选项组几何: ${JSON.stringify({ boxBefore, boxAfter })}`)
+          await results.getByRole('button', { name: '不合格', exact: true }).click()
+          await page.getByText('QI-RESULT-REJECT', { exact: true }).waitFor()
+          assert.equal(reads.at(-1).result, 'REJECT')
+          await results.getByRole('button', { name: '不限', exact: true }).click()
+          await page.getByText('QI-RESULT-PASS', { exact: true }).waitFor()
+          await filter.getByRole('button', { name: '完成', exact: true }).click()
+          await assertNoHorizontalOverflow(page, appearance.name)
+          await selectRow(page, 'QI-RESULT-PENDING')
+          await clickSelectionAction(page, '判定合格')
+          const modal = page.getByRole('dialog').filter({ has: page.getByText('判定合格', { exact: true }) })
+          const checks = modal.locator('tbody[aria-label^="检查项目"]')
+          for (const check of await checks.all()) {
+            await check.getByLabel('实际情况', { exact: true }).fill('已核对本项偏差及本批接收条件')
+            await check.locator('.ant-form-item').filter({ hasText: /^检查结果/u }).locator('.ant-select-selector').click()
+            await page.locator('.ant-select-dropdown:visible').getByText('异常', { exact: true }).click()
+            await check.locator('.ant-form-item').filter({ hasText: /^检查范围/u }).locator('.ant-select-selector').click()
+            await page.locator('.ant-select-dropdown:visible').getByText('全检', { exact: true }).click()
+          }
+          const judgement = modal.getByRole('group', { name: '判定结果', exact: true })
+          await judgement.getByRole('button', { name: '让步接收', exact: true }).click()
+          assert.equal(await judgement.getByRole('button', { name: '让步接收', exact: true }).getAttribute('aria-pressed'), 'true')
+          assert.equal(await modal.getByLabel('判定备注', { exact: true }).getAttribute('aria-required'), 'true')
+          assert.equal(await modal.getByRole('button', { name: '确认让步接收', exact: true }).isVisible(), true)
+          await modal.getByText(/说明已知偏差及本次同意接收的依据/u).waitFor()
+          await page.screenshot({ path: path.join(outputDir, `${appearance.name}.png`) })
+        },
+      }
+    }),
     ...[{ name: 'quality-evidence-history-desktop', width: 3840, height: 2160 }, { name: 'quality-evidence-history-narrow', width: 1280, height: 900 }].map((viewport) => {
       let calls
       let writes

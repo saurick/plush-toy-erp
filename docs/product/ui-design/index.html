@@ -3725,6 +3725,9 @@
     .document-line-details-toggle { min-width:22px; padding:3px; }
     @media(max-width:720px){ .document-line-details-toggle { display:none; } }
 
+    .filter-choice-options > .filter-chip--with-help { display:inline-flex; align-items:center; gap:0; padding:0; }
+    .filter-chip--with-help[data-selected="true"] { background:var(--brand-soft); color:var(--brand-strong); }
+    .filter-chip-control { display:inline-flex; align-items:center; align-self:stretch; padding:5px 4px 5px 10px; border:0; border-radius:7px; background:transparent; color:inherit; font:inherit; cursor:pointer; }
 </style>
 <style>
 .payment-method-control { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -4284,6 +4287,7 @@
         rowAction: options.rowAction || '查看'
       };
       config.rows = makeGenericRows(config);
+      if(key==='quality') config.rows.forEach((row,index)=>{row.result=row.status==='passed'?(index%2?'PASS':'CONCESSION'):row.status==='rejected'?'REJECT':'';});
       return config;
     }
 
@@ -5640,7 +5644,7 @@
 
     function activeFilterCount() {
       if(currentPageConfig()?.key==='exceptions')return Number(state.exceptionType!=='all')+Number(state.exceptionExecution!=='all');
-      return [state.filterParty.trim(), state.filterOwner !== 'all', state.filterRisk !== 'all', !state.filterIncludeEnded, state.filterDateFrom || state.filterDateTo].filter(Boolean).length;
+      return [currentPageConfig()?.key==='quality'&&state.qualityResult, state.filterParty.trim(), state.filterOwner !== 'all', state.filterRisk !== 'all', !state.filterIncludeEnded, state.filterDateFrom || state.filterDateTo].filter(Boolean).length;
     }
 
     function resetListFilters() {
@@ -5649,6 +5653,7 @@
       state.filterOwner = 'all';
       state.filterRisk = 'all';
       state.filterIncludeEnded = true;
+      state.qualityResult = '';
       state.filterDateFrom = '';
       state.filterDateTo = '';
       state.pageNo = 1;
@@ -6513,6 +6518,7 @@ active = new Set()
       const endedStatuses = new Set(['done','completed','settled','shipped','closed','canceled','cancelled','archived','inactive','obsolete','reversed']);
       let rows = config.rows.filter(row => {
         const statusOk = ignoreStatus || state.status === 'all' || row.status === state.status;
+        const qualityOk = config.key!=='quality'||!state.qualityResult||row.result===state.qualityResult;
         const exceptionOk = config.key!=='exceptions'||((state.exceptionType==='all'||row.party===state.exceptionType)&&(state.exceptionExecution==='all'||row.executionState===state.exceptionExecution));
         const hay = Object.values(row).join(' ').toLowerCase();
         const partyOk = !partyQuery || `${rowParty(row, config)} ${rowItem(row, config)}`.toLowerCase().includes(partyQuery);
@@ -6523,7 +6529,7 @@ active = new Set()
         const date = isoDay(rowDate(row));
         const fromOk = !state.filterDateFrom || (date && date >= state.filterDateFrom);
         const toOk = !state.filterDateTo || (date && date <= state.filterDateTo);
-        return exceptionOk && statusOk && (!q || hay.includes(q)) && partyOk && historySourceOk && ownerOk && riskOk && endedOk && fromOk && toOk;
+        return qualityOk && exceptionOk && statusOk && (!q || hay.includes(q)) && partyOk && historySourceOk && ownerOk && riskOk && endedOk && fromOk && toOk;
       });
       rows = rows.slice().sort((a, b) => {
         const av = getSortValue(a, state.sortKey, config);
@@ -16361,7 +16367,11 @@ return {orders,financeCustomers};})();
     }
 
     function renderDirectFilterChoices(label, value, options, action, field, disabled=false) {
-      return `<div class="filter-choice-field"><span>${label}</span><div class="filter-choice-options" role="group" aria-label="${label}">${options.map(([key,text])=>`<button class="filter-chip" data-action="${action}" data-field="${field}" data-value="${key}" aria-pressed="${String(value||'')===String(key)}" ${disabled?'disabled':''}>${text}</button>`).join('')}</div></div>`;
+      return `<div class="filter-choice-field"><span>${label}</span><div class="filter-choice-options" role="group" aria-label="${label}">${options.map(([key,text,help])=>{
+        const selected=String(value||'')===String(key);
+        const button=`<button class="${help?'filter-chip-control':'filter-chip'}" data-action="${action}" data-field="${field}" data-value="${key}" aria-pressed="${selected}" ${disabled?'disabled':''}>${text}</button>`;
+        return help?`<span class="filter-chip filter-chip--with-help" data-selected="${selected}">${button}<button type="button" data-appearance-help="${help}" aria-label="查看${text}说明" ${disabled?'disabled':''}>${icon('info')}</button></span>`:button;
+      }).join('')}</div></div>`;
     }
     function renderFilterTrigger(count, openAction='open-task-filter', clearAction='task-filter-clear-direct') {
       const active=count>0;
@@ -18642,9 +18652,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderFilterPopover() {
       const config = currentPageConfig();
       if(config?.key==='exceptions')return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>筛选条件</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid">${renderDirectFilterChoices('异常类型',state.exceptionType,[['all','全部异常类型'],...config.sampleParties.map(type=>[type,type])],'demo-filter-choice','exceptionType')}${renderDirectFilterChoices('业务状态',state.exceptionExecution,[['all','全部业务状态'],['pending','待办理 / 额度生效'],['applied','业务已执行'],['reversed','业务已冲正']],'demo-filter-choice','exceptionExecution')}</div><div class="popover-foot"><button class="btn" data-action="clear-filter">清空筛选</button><button class="btn" data-action="close-overlay">完成</button></div></div>`;
+      const qualityResults = config?.key==='quality' ? renderDirectFilterChoices('检验结果',state.qualityResult||'',[['','不限'],['PASS','合格'],['CONCESSION','让步接收','quality-concession'],['REJECT','不合格']],'demo-filter-choice','qualityResult') : '';
       const party = config?.party || '业务对象';
       const dateLabel = config?.dateLabel || '业务日期';
-      return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid"><div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><ui-select id="filter-owner" data-empty-value="all"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</ui-select></div>${renderDirectFilterChoices('业务提醒',state.filterRisk,[['all','全部'],['正常','正常'],['near','临近日期'],['已逾期','已逾期'],['blocked','阻塞']],'demo-filter-choice','filterRisk')}${renderDirectFilterChoices('包含结束记录',state.filterIncludeEnded?'yes':'no',[['no','否'],['yes','是']],'demo-filter-choice','filterIncludeEnded')}<div class="field span-2"><label>${dateLabel}范围</label><div class="date-range-control" role="group" aria-label="${dateLabel}范围"><input id="filter-date-from" aria-label="开始日期" type="date" value="${state.filterDateFrom}" max="${state.filterDateTo}"/><span aria-hidden="true">至</span><input id="filter-date-to" aria-label="结束日期" type="date" value="${state.filterDateTo}" min="${state.filterDateFrom}"/></div></div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn" data-action="close-overlay">关闭</button></div></div>`;
+      return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid">${qualityResults}<div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><ui-select id="filter-owner" data-empty-value="all"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</ui-select></div>${renderDirectFilterChoices('业务提醒',state.filterRisk,[['all','全部'],['正常','正常'],['near','临近日期'],['已逾期','已逾期'],['blocked','阻塞']],'demo-filter-choice','filterRisk')}${renderDirectFilterChoices('包含结束记录',state.filterIncludeEnded?'yes':'no',[['no','否'],['yes','是']],'demo-filter-choice','filterIncludeEnded')}<div class="field span-2"><label>${dateLabel}范围</label><div class="date-range-control" role="group" aria-label="${dateLabel}范围"><input id="filter-date-from" aria-label="开始日期" type="date" value="${state.filterDateFrom}" max="${state.filterDateTo}"/><span aria-hidden="true">至</span><input id="filter-date-to" aria-label="结束日期" type="date" value="${state.filterDateTo}" min="${state.filterDateFrom}"/></div></div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn" data-action="close-overlay">关闭</button></div></div>`;
     }
 
     function renderColumnsModal() {
@@ -19022,6 +19033,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function renderAppearanceHelpContent(kind) {
+      if(kind==='quality-concession')return '<strong>让步接收</strong><p>存在已知质量偏差，经确认允许本次继续办理，须记录原因。后续入库、生产或出货仍需另行操作。</p>';
       const rows='<thead><tr><th>单号</th><th>状态</th></tr></thead><tbody><tr><td>PO-01</td><td>待收货</td></tr><tr><td>PO-02</td><td>待收货</td></tr><tr><td>PO-03</td><td>已完成</td></tr></tbody>';
       const table=(caption,cls='')=>`<figure><figcaption>${caption}</figcaption><table class="appearance-setting-help-table ${cls}" aria-label="${caption}效果示意">${rows}</table></figure>`;
       const placeholder='<div class="appearance-setting-help-placeholder"></div>';

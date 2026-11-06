@@ -108,6 +108,25 @@ test('missing receipt read blocks inspection creation before requesting a write'
   assert.equal(view.calls.length, 0)
 })
 
+test('concession retains its result in the write and the business completion feedback', async (t) => {
+  const accepted = { id: 7, status: 'PASSED', result: 'CONCESSION' }
+  const view = await actionsHarness(t, () => ({ code: 0, data: { quality_inspection: accepted } }), {
+    decisionForm: {
+      validateFields: async () => ({
+        result: 'CONCESSION',
+        defect_rate_selection: 'APPROX:10',
+        decision_note: '已知色差，本批仅作内衬',
+        check_items: [{ name: '外观', requirement: '符合封样', observation: '已确认色差', result: 'FAIL', scope: 'FULL' }],
+      }),
+    },
+  })
+  await view.act(() => view.current.handleDecision())
+  assert.equal(view.calls.length, 1)
+  assert.equal(view.calls[0].params.result, 'CONCESSION')
+  assert.equal(view.reports[0][0], '质量检验已记录为让步接收')
+  assert.equal(view.selected[0].result, 'CONCESSION')
+})
+
 test('inspection creation permission denial closes and clears the source editor', async (t) => {
   const view = await actionsHarness(t, () => ({ code: RpcErrorCode.PERMISSION_DENIED, message: '权限不足' }))
   let cleared = 0
