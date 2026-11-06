@@ -66,7 +66,7 @@ export default function PaymentMethodInput({ value, onChange, onBlur, disabled, 
     setStatus('loading')
     const timer = setTimeout(async () => {
       try {
-        const data = await listPaymentMethods({ keyword }, { signal: controller.signal })
+        const data = await listPaymentMethods({ keyword }, { signal: controller.signal, readScope: JSON.stringify([scope, retry]) })
         if (controller.signal.aborted || sequence !== generation.current) return
         accessScope.current = scope
         setAccess({ scope, canManage: data.can_manage })

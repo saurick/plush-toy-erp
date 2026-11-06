@@ -30,6 +30,29 @@ async function paymentForm(t, rpc, profile = {}) {
   return { ui, form: () => form, setProfile: async (next) => { currentProfile = next; await render(); await settleSearch() } }
 }
 
+test('a payment catalogue response cannot publish permissions after the login session changes', async (t) => {
+  const response = deferredFormRequest()
+  let reads = 0
+  const { ui } = await paymentForm(t, () => { reads++; return response.promise }, { is_super_admin: true })
+  const { getToken, setToken, AUTH_SCOPE } = await import('../../common/auth/auth.js')
+  const { ADMIN_TOKEN_ISSUER, ADMIN_TOKEN_AUDIENCE, ADMIN_TOKEN_SUBJECT } = await import('../../common/auth/adminTokenContract.mjs')
+  const original = getToken(AUTH_SCOPE.ADMIN)
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const session = 'payment-read-session'
+  const replacement = `${Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url')}.${Buffer.from(JSON.stringify({ uid: 42, auth_version: 1, sid: session, jti: session, iss: ADMIN_TOKEN_ISSUER, aud: [ADMIN_TOKEN_AUDIENCE], sub: ADMIN_TOKEN_SUBJECT, iat: issuedAt, exp: issuedAt + 3600 })).toString('base64url')}.signature`
+  try {
+    await act(async () => setToken(replacement, AUTH_SCOPE.ADMIN))
+    assert.equal(getToken(AUTH_SCOPE.ADMIN), replacement)
+    response.resolve({ data: { methods: ['旧方式'], has_more: false, keyword_exists: false, keyword_inactive: false } })
+    await settleSearch()
+    assert.equal(reads, 1)
+    assert.equal(Boolean(ui.button('管理付款方式')), false)
+    assert.equal(document.body.textContent.includes('旧方式'), false)
+  } finally {
+    await act(async () => setToken(original, AUTH_SCOPE.ADMIN))
+  }
+})
+
 test('payment methods select maintained choices and keep search text separate from the draft', async (t) => {
   const choices = ['银行转账', '商业承兑', '跨页历史方式']
   const { ui, form } = await paymentForm(t, (_method, params) => ({ data: { methods: choices.filter((value) => value.includes(params.keyword)), has_more: false, keyword_exists: choices.includes(params.keyword), keyword_inactive: false } }))

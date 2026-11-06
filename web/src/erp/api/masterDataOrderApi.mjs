@@ -1,5 +1,5 @@
 import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
-import { AUTH_SCOPE } from '@/common/auth/auth'
+import { AUTH_SCOPE, getToken } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
 
@@ -14,6 +14,7 @@ import {
 import { validatePurchaseOrderReceiptProgress } from '../utils/purchaseOrderInboundPreview.mjs'
 import { validateSalesOrderExport } from '../utils/salesOrderExport.mjs'
 import { notifyReferenceRecordsChanged } from '../utils/referenceRecordChanges.mjs'
+import { createPaymentMethodReadLoader } from '../utils/paymentMethodReads.mjs'
 
 function savedReference(type, record) {
   notifyReferenceRecordsChanged(type, record?.id)
@@ -112,12 +113,27 @@ export async function listCustomers(params = {}, options = {}) {
   return dataOf(result)
 }
 
+const paymentMethodReads = createPaymentMethodReadLoader()
+
 export async function listPaymentMethods(params = {}, options = {}) {
-  const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.LIST_PAYMENT_METHODS, params, options))
-  if (!Array.isArray(data?.methods) || data.methods.some((method) => typeof method !== 'string') || typeof data.has_more !== 'boolean' || typeof data.keyword_exists !== 'boolean' || typeof data.keyword_inactive !== 'boolean' || typeof data.can_manage !== 'boolean') {
-    throw new Error('付款方式读取失败，请重试')
+  const { readScope, ...rpcOptions } = options
+  const shared = typeof readScope === 'string'
+  const token = shared ? getToken(AUTH_SCOPE.ADMIN) : null
+  const requireCurrentSession = () => {
+    if (shared && getToken(AUTH_SCOPE.ADMIN) !== token) throw new DOMException('登录状态已变化', 'AbortError')
   }
-  return data
+  const read = async (signal) => {
+    requireCurrentSession()
+    const data = dataOf(await masterDataRpc.call(RpcMethod.masterdata.LIST_PAYMENT_METHODS, params, { ...rpcOptions, signal }))
+    requireCurrentSession()
+    if (!Array.isArray(data?.methods) || data.methods.some((method) => typeof method !== 'string') || typeof data.has_more !== 'boolean' || typeof data.keyword_exists !== 'boolean' || typeof data.keyword_inactive !== 'boolean' || typeof data.can_manage !== 'boolean') {
+      throw new Error('付款方式读取失败，请重试')
+    }
+    return data
+  }
+  if (!shared) return read(rpcOptions.signal)
+  const key = JSON.stringify([token, readScope, params, rpcOptions.receiveError === true, rpcOptions.withAuth !== false])
+  return paymentMethodReads(key, read, rpcOptions.signal)
 }
 
 const validPaymentMethodOption = (item) => item && Number.isSafeInteger(item.id) && item.id > 0 && typeof item.method === 'string' && item.method.trim() !== '' && typeof item.is_active === 'boolean' && typeof item.has_been_used === 'boolean' && Number.isSafeInteger(item.version) && item.version > 0
