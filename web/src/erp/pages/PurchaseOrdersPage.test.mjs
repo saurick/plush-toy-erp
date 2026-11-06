@@ -127,7 +127,6 @@ test('purchase refresh reports failure and open forms remain disabled until thei
     'ordersOK !== false',
     'referencesOK !== false',
     'inboundReferencesOK !== false',
-    "workflowResult?.status !== 'error'",
   ]) {
     assert.match(refresh, new RegExp(result.replaceAll('?', '\\?'), 'u'))
   }

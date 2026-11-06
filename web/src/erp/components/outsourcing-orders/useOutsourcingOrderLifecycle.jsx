@@ -21,7 +21,6 @@ export function useOutsourcingOrderLifecycle({
   activeCustomerKey,
   setSelectedRow,
   loadOrders,
-  loadWorkflowTasks,
   loadOrderItems,
   openEdit,
   onChanged,
@@ -56,7 +55,7 @@ export function useOutsourcingOrderLifecycle({
         onChanged?.(updated)
         reportBusinessResult(`${action.label}成功`, updated)
         message.success(`${action.label}成功`)
-        await Promise.all([loadOrders(), loadWorkflowTasks()])
+        await loadOrders()
       } catch (error) {
         const resultUnknown = lifecycleAttempt
           ? lifecycleAttemptsRef.current.settle(

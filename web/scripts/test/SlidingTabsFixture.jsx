@@ -201,11 +201,6 @@ function Fixture() {
           />
         </section>
         <CustomTabs
-          id="collaboration"
-          className="erp-business-collaboration-task-panel__tabs erp-navigation-tabs"
-          itemClass="erp-business-collaboration-task-panel__tab"
-        />
-        <CustomTabs
           id="workflow"
           className="erp-task-action-drawer__guide-steps"
           itemClass="erp-task-action-drawer__step"

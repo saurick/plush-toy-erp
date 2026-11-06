@@ -17,7 +17,7 @@
 | 页面壳和通用展示 | `ERPLayout.jsx`、`ERPPageActions.jsx`、`business-list/*` | 布局、列表页头、导航和状态展示；账号固定侧栏底部，刷新与窄屏导航共用页面操作组件 |
 | 桌面分栏与表单身份 | `BusinessSplitWorkspace.jsx`、`business-list/BusinessForm.jsx`、`business-list/BusinessSplitContext.jsx` | 按菜单目录选页，复用同一路由与编辑器，隔离附加页导航、查询、读取反馈和表单 DOM 名称；左右互换保留页面实例，收起保留草稿，保存后重读另一栏已登记数据 |
 | 账号身份 | `AccountIdentity.jsx`、`accountIdentity.css` | 桌面账号入口和手机“我的”共用的默认文字头像、姓名、账号及实际所属岗位；头像颜色按账号固定，完整岗位在账号卡片换行展示 |
-| 业务列表共享层   | `business-list/*`                                                              | 列表壳、表单弹窗、附件、明细行、列顺序、协同任务面板和来源选择 |
+| 业务列表共享层   | `business-list/*`                                                              | 列表壳、表单弹窗、附件、明细行、列顺序和来源选择 |
 | 关联资料选择与更新 | `RemoteReferenceSelect.jsx`、`ReferenceRecordsContext.jsx` | 远程搜索、分页与已选资料回显；物料保存后按权限定点重读，`BusinessFormPage` 承接可重试的读取提示，保留表单草稿与冻结快照 |
 | 产品图片图集 | `business-list/BusinessProductGallery.jsx`、`BusinessDocumentProductGallery.jsx`、`workflow/WorkflowTaskImagePreview.jsx` | 单据列表以主图缩略图和去重款数打开全部关联产品；预览采用常驻产品条与合并操作行，选中边框与底衬跟随主题色，切换不改变尺寸。单图收起翻页，帮助按需展开；单品身份共用主辅图、缩放、失败重试和关闭恢复。批量摘要仅支持正式关联，物料和未关联需求不借图 |
 | 业务日期输入和范围筛选 | [`business-list/BusinessDateInputs.jsx`](business-list/BusinessDateInputs.jsx) | `DateInput`、`DateTimeInput`、`DateRangeFilter` 共用格式与范围约束；`InheritedDateInput` 供销售、采购、委外明细显示整单交期，单独改期后保存行值，清空恢复沿用。采购优先沿用供应商确认日期 |
@@ -112,8 +112,8 @@ STYLE_L1_SCENARIOS=business-core-pages-desktop pnpm --dir web style:l1
 
   `HelpManualDirectory` 提供三册统一章节目录，`HelpProjectManualContent` 安全渲染受控的管理与运维 Markdown。三册手册入口见[项目手册](../../../../docs/manuals/README.md)。
 - `permission-center/` 的 `usePermissionCenterData` 负责账号与岗位加载，`usePermissionRoleSettings` 负责岗位草稿和权限预览，`PermissionAdminAccounts` 自持账号表单与弹窗；页面只协调页签与未保存提醒。
-- `workflow/useSourceOrderWorkflowActions.mjs` 统一采购和委外源单的 Workflow 动作；页面提供场景标识。
-- `outsourcing-orders/` 的 `useOutsourcingOrder*` 按查询、编辑、协同任务和生命周期动作管理状态；`useOutsourcingSourceFacts` 管理委外来源事实与回货质检，应付操作由专用 Hook 管理。
+- `workflow/useSourceOrderWorkflowActions.mjs` 供来源单据的“任务协作”入口统一办理 Workflow 动作；入口提供场景标识。
+- `outsourcing-orders/` 的 `useOutsourcingOrder*` 按查询、编辑和生命周期动作管理状态；`useOutsourcingSourceFacts` 管理委外来源事实与回货质检，应付操作由专用 Hook 管理。
 - `operational-facts/useOperationalFactQuery` 负责来源筛选、分页、详情与导出查询，`useOperationalFactMutations` 负责过账、结清和取消；页面消费这些状态与动作。
 - `production-orders/useProductionFactActions.mjs` 与 `finance/useFinanceReconciliationAction.mjs` 管理事实工作台对应操作的表单状态、请求失效和重试。
 - 采购、加工及工程打印共用 `print/PrintEditableText.jsx`，草稿监听继续复用 `usePrintEditableDraftSync.js`；模板保留各自的文本规范化、富文本清理和焦点规则。采购合同纸面与静态预览共用 `MaterialContractMetaPair.jsx` 的元信息双列布局。工程打印的基础编辑组件及三类纸面也位于 `print/`；页面保留窗口草稿和工具栏编排，业务数据仍只读。

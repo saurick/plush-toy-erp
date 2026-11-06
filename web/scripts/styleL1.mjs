@@ -8,10 +8,6 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { chromium, webkit } from 'playwright'
 import { createBusinessActionAssertions } from './style-l1/businessActionAssertions.mjs'
 import { createBusinessListAssertions } from './style-l1/businessListAssertions.mjs'
-import {
-  seedBusinessCollaborationOverflowTasks,
-  assertBusinessCollaborationPanelCollapsedByDefault,
-} from './style-l1/collaborationAssertions.mjs'
 import { createDashboardAssertions } from './style-l1/dashboardAssertions.mjs'
 import {
   assertPermissionSectionVisualSeparation,
@@ -303,7 +299,6 @@ function getScenarios() {
     assertAdminLoginSmsHintLayout,
     assertAdminRoleModalLayout,
     assertAppAlertDialogLayout,
-    assertBusinessCollaborationPanelCollapsedByDefault,
     assertBusinessHeaderHasNoSectionTitle,
     assertBusinessHeaderCompact,
     assertBusinessListEmptySearchState,
@@ -374,7 +369,6 @@ function getScenarios() {
     isLightSurfaceColor,
     outputDir,
     path,
-    seedBusinessCollaborationOverflowTasks,
     selectPurchaseReceiptRow,
     verifyBusinessActionFormModal,
     verifyBusinessModuleColumnOrderDialog,

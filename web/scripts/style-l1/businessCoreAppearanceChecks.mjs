@@ -16,7 +16,6 @@ export async function verifyBusinessCoreAppearance(page, deps) {
     verifyBusinessActionFormModal,
   } = deps
   const {
-    assertBusinessCollaborationPanelAbsent,
     assertUnifiedListToolbarShell,
   } = createBusinessFormalAssertions(deps)
   await clickERPThemeOption(page, '暗色')
@@ -53,11 +52,6 @@ export async function verifyBusinessCoreAppearance(page, deps) {
   const exceptionsTab = productionTabs.getByRole('tab', { name: '异常处理', exact: true })
   assert.equal(await exceptionsTab.getAttribute('aria-selected'), 'true')
   assert.equal(await page.getByRole('tab', { name: '待审批', exact: true }).count(), 0)
-
-  await assertBusinessCollaborationPanelAbsent(
-    page,
-    'business-workflow-production-exceptions-dark'
-  )
 
   await assertTextAbsent(page, '登记异常协同')
 

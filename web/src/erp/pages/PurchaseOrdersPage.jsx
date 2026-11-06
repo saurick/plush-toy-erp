@@ -24,7 +24,6 @@ import { currentBusinessDate } from '../utils/businessDate.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessDataTable,
-  CollaborationTaskPanel,
   BusinessPageLayout,
   PageHeaderCard,
 } from '../components/business-list/BusinessListLayout.jsx'
@@ -63,7 +62,6 @@ import {
 } from '../components/purchase-orders/purchaseOrderPageConfig.mjs'
 import { usePurchaseOrderContractPrint } from '../components/purchase-orders/usePurchaseOrderContractPrint.mjs'
 import { usePurchaseOrderInboundDraft } from '../components/purchase-orders/usePurchaseOrderInboundDraft.mjs'
-import { useSourceOrderWorkflowActions } from '../components/workflow/useSourceOrderWorkflowActions.mjs'
 import PurchaseArrivalCalendar from '../components/business-visualizations/PurchaseArrivalCalendar.jsx'
 import {
   BusinessViewSurface,
@@ -72,7 +70,6 @@ import {
 import usePurchaseFollowups from '../hooks/usePurchaseFollowups.js'
 import { purchaseFollowupParams } from '../utils/purchaseFollowup.mjs'
 import { withoutBlankPurchaseOrderDraftLines } from '../utils/businessLineItems.mjs'
-import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   BUSINESS_ROUTE_PATHS,
   buildSequentialDraftCode,
@@ -96,10 +93,6 @@ import {
   buildSupplierSnapshotWithContacts,
   SUPPLIER_CONTACT_OWNER_TYPE,
 } from '../utils/sourcePartySnapshots.mjs'
-import {
-  filterBusinessCollaborationTasksBySource,
-  loadBusinessCollaborationTasksForSource,
-} from '../utils/businessCollaborationTasks.mjs'
 import {
   commitSourceDocumentSaveResult,
   createSourceDocumentOpenEditController,
@@ -180,26 +173,10 @@ export default function PurchaseOrdersPage() {
   )
   const receiptSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.receipt)
   const canCreatePurchaseReceipt = receiptSourceAccess.allowed
-  const canReadWorkflowTasks = hasActionPermission(
-    adminProfile,
-    PermissionCode.WORKFLOW_TASK_READ
-  )
-  const canUpdateWorkflowTasks = hasActionPermission(
-    adminProfile,
-    PermissionCode.WORKFLOW_TASK_UPDATE
-  )
-  const canCompleteWorkflowTasks = hasActionPermission(
-    adminProfile,
-    PermissionCode.WORKFLOW_TASK_COMPLETE
-  )
-
   const [loading, setLoading] = useState(false)
   const [itemsLoading, setItemsLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   useWorkflowTaskBusinessBusy(saving)
-  const [workflowTasks, setWorkflowTasks] = useState([])
-  const [workflowTaskLoadState, setWorkflowTaskLoadState] = useState('idle')
-  const workflowTaskSourceIDRef = useRef(0)
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
   const [statusCounts, setStatusCounts] = useState(null)
@@ -528,39 +505,6 @@ export default function PurchaseOrdersPage() {
     routePurchaseOrderID,
   ])
 
-  const loadWorkflowTasks = useCallback(
-    (sourceID) => {
-      const requestedSourceID = Number(
-        sourceID ?? workflowTaskSourceIDRef.current ?? 0
-      )
-      return loadBusinessCollaborationTasksForSource({
-        beginLatestRequest,
-        canRead: canReadWorkflowTasks,
-        isAbortError: isRpcAbortError,
-        isCurrentSource: (candidateSourceID) =>
-          candidateSourceID === workflowTaskSourceIDRef.current,
-        listTasks: listWorkflowTasks,
-        onError: (error) =>
-          showPageLoadError(error, '加载当前采购订单任务失败'),
-        setLoadState: setWorkflowTaskLoadState,
-        setTasks: setWorkflowTasks,
-        sourceID: requestedSourceID,
-        sourceType: PURCHASE_ORDERS_MODULE_KEY,
-      })
-    },
-    [beginLatestRequest, canReadWorkflowTasks]
-  )
-  const {
-    blockWorkflowTask,
-    completeWorkflowTask,
-    rejectWorkflowTask,
-    resumeWorkflowTask,
-    urgeSourceWorkflowTask: urgePurchaseWorkflowTask,
-  } = useSourceOrderWorkflowActions({
-    loadWorkflowTasks,
-    surfaceKey: 'purchase_orders',
-  })
-
   const loadOrderItems = useCallback(async (order, options = {}) => {
     if (!order?.id) {
       throw new Error('缺少采购订单，无法加载明细')
@@ -589,25 +533,22 @@ export default function PurchaseOrdersPage() {
 
   const refreshPageData = useCallback(async () => {
     if (contentView !== 'list') reloadArrivalData()
-    const [ordersOK, referencesOK, inboundReferencesOK, workflowResult] =
+    const [ordersOK, referencesOK, inboundReferencesOK] =
       await Promise.all([
         loadOrders(),
         loadReferenceData(),
         loadInboundReferenceData(),
-        loadWorkflowTasks(),
       ])
     return (
       ordersOK !== false &&
       referencesOK !== false &&
-      inboundReferencesOK !== false &&
-      workflowResult?.status !== 'error'
+      inboundReferencesOK !== false
     )
   }, [
     contentView,
     loadInboundReferenceData,
     loadOrders,
     loadReferenceData,
-    loadWorkflowTasks,
     reloadArrivalData,
   ])
 
@@ -1172,17 +1113,6 @@ export default function PurchaseOrdersPage() {
     selectedOrders,
     selectedRowKeys,
   })
-  useEffect(() => {
-    const sourceID = Number(singleSelectedOrder?.id || 0)
-    workflowTaskSourceIDRef.current = sourceID
-    loadWorkflowTasks(sourceID)
-  }, [loadWorkflowTasks, singleSelectedOrder?.id])
-  useEffect(
-    () => () => {
-      workflowTaskSourceIDRef.current = 0
-    },
-    []
-  )
   const purchasePrintTemplateDefaults = useMemo(
     () =>
       getEffectivePrintTemplateDefaults(
@@ -1266,18 +1196,6 @@ export default function PurchaseOrdersPage() {
     hasInboundWarehouse,
     inboundReferenceDataReady,
   ])
-  const selectedOrderWorkflowTasks = useMemo(
-    () =>
-      singleSelectedOrder?.id
-        ? filterBusinessCollaborationTasksBySource({
-            tasks: workflowTasks,
-            sourceType: PURCHASE_ORDERS_MODULE_KEY,
-            sourceIDs: [singleSelectedOrder.id],
-          })
-        : [],
-    [singleSelectedOrder, workflowTasks]
-  )
-
   const selectedOrderDisplayText = selectedPurchaseOrderDisplayText({
     resolveSupplierName,
     selectedOrders,
@@ -1607,26 +1525,6 @@ export default function PurchaseOrdersPage() {
         record={detailOrder}
         title="采购订单详情"
         onClose={() => setDetailOrder(null)}
-      />
-
-      <CollaborationTaskPanel
-        tasks={
-          canReadWorkflowTasks && workflowTaskLoadState === 'ready'
-            ? selectedOrderWorkflowTasks
-            : []
-        }
-        selectedRecordLabel={singleSelectedOrder?.purchase_order_no || ''}
-        adminProfile={adminProfile}
-        onOpenTaskBoard={() => navigate('/erp/task-board')}
-        onCompleteTask={
-          canCompleteWorkflowTasks ? completeWorkflowTask : undefined
-        }
-        onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
-        onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
-        onResumeTask={canUpdateWorkflowTasks ? resumeWorkflowTask : undefined}
-        onUrgeTask={
-          canUpdateWorkflowTasks ? urgePurchaseWorkflowTask : undefined
-        }
       />
 
       {columnOrderModal}

@@ -16,7 +16,6 @@ export async function verifyBusinessCoreProduction(page, deps) {
   } = deps
   const {
     findSelectionActionButton,
-    assertBusinessCollaborationPanelAbsent,
     assertUnifiedListToolbarShell,
   } = createBusinessFormalAssertions(deps)
   const verifyWorkflowPage = async ({
@@ -32,7 +31,6 @@ export async function verifyBusinessCoreProduction(page, deps) {
     })
     await expectHeading(page, heading)
     await assertTextAbsent(page, '业务处理分开完成')
-    await assertBusinessCollaborationPanelAbsent(page, scenarioName)
     for (const text of absentTexts) {
       await assertTextAbsent(page, text)
     }
@@ -136,7 +134,6 @@ export async function verifyBusinessCoreProduction(page, deps) {
   await assertTextAbsent(page, '异常记录')
   await assertTextAbsent(page, '当前显示')
   assert.equal(await page.getByLabel('搜索待办任务').count(), 0, '异常工作区只展示正式申请，不挂载第二份任务筛选区')
-  await assertBusinessCollaborationPanelAbsent(page, 'business-production-exceptions')
   await expectButton(page, '列设置')
   await expectNoButton(page, '导出筛选结果')
   const approvalEntry = page.getByRole('button', { name: '去任务中心审批', exact: true })
@@ -165,7 +162,6 @@ export async function verifyBusinessCoreProduction(page, deps) {
   await productionExceptionTab.click()
   await expectText(page, '暂无生产异常处置申请')
   assert.equal(await productionExceptionTab.getAttribute('aria-selected'), 'true', '从生产记录返回后恢复异常工作区')
-  await assertBusinessCollaborationPanelAbsent(page, 'business-production-exceptions-return')
   await expectButton(page, '列设置')
   await expectNoButton(page, '导出筛选结果')
   await page.getByRole('button', { name: '刷新当前页' }).click()

@@ -27,7 +27,6 @@ export async function verifyBusinessCoreMasterData(page, deps) {
     assertBusinessViewTabSelectedStyle,
     waitForMasterDataRequest,
     assertNoMasterDataRequest,
-    assertBusinessCollaborationPanelAbsent,
     assertNoListDeleteTrashToolbar,
     assertCurrentOperationBarCompact,
   } = createBusinessFormalAssertions(deps)
@@ -41,11 +40,6 @@ export async function verifyBusinessCoreMasterData(page, deps) {
   await assertCurrentOperationBarCompact(page, {
     scenarioName: 'business-formal-suppliers',
   })
-
-  await assertBusinessCollaborationPanelAbsent(
-    page,
-    'business-formal-suppliers'
-  )
 
   await assertBusinessPageRefreshEntrypoint(page, {
     scenarioName: 'business-formal-suppliers',
@@ -114,11 +108,6 @@ export async function verifyBusinessCoreMasterData(page, deps) {
   })
 
   await expectText(page, '暗色客户')
-
-  await assertBusinessCollaborationPanelAbsent(
-    page,
-    'business-formal-customers'
-  )
 
   await assertBusinessPageRefreshEntrypoint(page, {
     scenarioName: 'business-formal-customers',
@@ -218,11 +207,6 @@ export async function verifyBusinessCoreMasterData(page, deps) {
   await assertCurrentOperationBarCompact(page, {
     scenarioName: 'business-standard-products',
   })
-
-  await assertBusinessCollaborationPanelAbsent(
-    page,
-    'business-standard-products'
-  )
 
   await assertBusinessPageRefreshEntrypoint(page, {
     scenarioName: 'business-standard-products',

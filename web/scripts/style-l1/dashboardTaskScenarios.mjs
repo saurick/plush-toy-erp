@@ -2729,11 +2729,6 @@ export function createDashboardTaskScenarios({
           .filter({ hasText: '暗色客户' })
           .first()
           .click()
-        assert.equal(
-          await page.locator('.erp-business-collaboration-task-panel').count(),
-          0,
-          'business-module-dark-customers-desktop 客户档案不应展示空的任务面板'
-        )
         await assertDarkThemeContrast(page, {
           scenarioName: 'business-module-dark-customers-desktop',
           selector: '.erp-business-page-layout',

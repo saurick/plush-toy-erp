@@ -25,7 +25,6 @@ export async function verifyBusinessCoreProcurement(page, deps) {
     findSelectionActionButton,
     assertLineItemSectionTitleBold,
     assertNonItemTextareaFullRow,
-    assertBusinessCollaborationPanelAbsent,
     assertUnifiedListToolbarShell,
     assertNoListDeleteTrashToolbar,
     assertCurrentOperationBarCompact,
@@ -113,11 +112,6 @@ export async function verifyBusinessCoreProcurement(page, deps) {
 
   await assertTextAbsent(page, '判定结果回质检模块')
 
-  await assertBusinessCollaborationPanelAbsent(
-    page,
-    'business-formal-processing-contracts-unselected'
-  )
-
   await assertCurrentOperationBarCompact(page, {
     scenarioName: 'business-formal-processing-contracts',
   })
@@ -166,11 +160,6 @@ export async function verifyBusinessCoreProcurement(page, deps) {
   await processingContractRow
     .and(page.locator('.ant-table-row-selected'))
     .waitFor({ state: 'visible' })
-
-  await assertBusinessCollaborationPanelAbsent(
-    page,
-    'business-formal-processing-contracts-selected-without-tasks'
-  )
 
   assert.equal(
     await page

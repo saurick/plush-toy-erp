@@ -362,10 +362,6 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
     erpSourceRoot,
     "pages/WorkflowBusinessModulePage.jsx",
   );
-  const collaborationPanelPath = path.join(
-    erpSourceRoot,
-    "components/business-list/CollaborationTaskPanel.jsx",
-  );
   const actionDrawerPath = path.join(
     erpSourceRoot,
     "components/workflow/WorkflowTaskActionDrawer.jsx",
@@ -373,7 +369,6 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
   const taskBoardPath = path.join(erpSourceRoot, "utils/workflowTaskBoard.mjs");
   const dashboardSource = readFileSync(dashboardPath, "utf8");
   const workflowBusinessSource = readFileSync(workflowBusinessPath, "utf8");
-  const collaborationPanelSource = readFileSync(collaborationPanelPath, "utf8");
   const actionDrawerSource = readFileSync(actionDrawerPath, "utf8");
   const taskBoardSource = readFileSync(taskBoardPath, "utf8");
 
@@ -422,33 +417,6 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
   assert(
     !workflowBusinessSource.includes("getTaskOwnerRoleKey(selectedTask) ||"),
     "workflow business selected action summary must not fall back to raw owner_role_key",
-  );
-  assert.match(
-    collaborationPanelSource,
-    /<Tag>\{getWorkflowTaskOwnerRoleLabel\(task\)\}<\/Tag>/u,
-  );
-  assert(
-    !collaborationPanelSource.includes("roleLabelMap") &&
-      !collaborationPanelSource.includes("roleLabels.get(task.owner_role_key)"),
-    "collaboration task panel must not keep page-level owner role label maps",
-  );
-  assert.match(
-    collaborationPanelSource,
-    /getWorkflowTaskStatusMeta\(task\)\.label/u,
-  );
-  assert.match(
-    collaborationPanelSource,
-    /getBusinessCollaborationTaskReasonLabel\(task\)/u,
-  );
-  assert(
-    !collaborationPanelSource.includes("阻塞原因：{taskReason}"),
-    "collaboration task panel must not label rejected reasons as blocked reasons",
-  );
-  assert(
-    !collaborationPanelSource.includes(
-      "statusLabels.get(taskStatusKey) || taskStatusKey",
-    ),
-    "collaboration task panel must not render raw task_status_key fallback",
   );
   assert.match(
     actionDrawerSource,
@@ -887,126 +855,6 @@ test("workflow urge payloads do not replay frontend task source fields", () => {
   }
 });
 
-test("business collaboration panel delegates mutation verification to action-owning handlers", () => {
-  const panelPath = path.join(
-    erpSourceRoot,
-    "components/business-list/CollaborationTaskPanel.jsx",
-  );
-  const source = readFileSync(panelPath, "utf8");
-  const actionHandlerIndex = source.indexOf(
-    "const confirmedTask = await actionHandler(actionDrawerTask",
-  );
-
-  assert.doesNotMatch(
-    source,
-    /verifyWorkflowTaskActionAccessBeforeSubmit/u,
-    "collaboration panel must not repeat the action handler preflight and block an exact receipt replay",
-  );
-  assert(
-    !source.includes("canRunWorkflowTaskAction"),
-    "collaboration panel list actions must not use local workflow action fallback as executable proof",
-  );
-  assert(
-    !source.includes("openActionDrawer(task, 'complete')") &&
-      !source.includes("openActionDrawer(task, 'block')") &&
-      !source.includes("openActionDrawer(task, 'reject')") &&
-      !source.includes("openActionDrawer(task, 'urge')"),
-    "collaboration panel list must open the drawer without preselecting an action; backend explain decides available actions",
-  );
-  assert(
-    source.includes("onClick={() => openActionDrawer(task)}"),
-    "collaboration panel list must expose a neutral processing entry before backend explain returns action choices",
-  );
-  assert(
-    actionHandlerIndex >= 0 &&
-      source.includes("if (confirmedTask === false) return"),
-    "collaboration panel must keep the drawer open when an action-owning handler rejects a new attempt",
-  );
-});
-
-test("business collaboration panel is limited to selected purchase and outsourcing records", () => {
-  const excludedPagePaths = [
-    "web/src/erp/pages/MasterDataPage.jsx",
-    "web/src/erp/pages/SalesOrdersPage.jsx",
-    "web/src/erp/pages/BOMVersionsPage.jsx",
-    "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
-  ];
-  for (const relativePath of excludedPagePaths) {
-    const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
-    assert.doesNotMatch(
-      source,
-      /<CollaborationTaskPanel\b/u,
-      `${relativePath} must not mount an empty or duplicate collaboration panel`,
-    );
-  }
-
-  const contextualPagePaths = [
-    "web/src/erp/pages/PurchaseOrdersPage.jsx",
-    "web/src/erp/pages/OutsourcingOrdersPage.jsx",
-  ];
-  for (const relativePath of contextualPagePaths) {
-    const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
-    const taskSource = relativePath.endsWith("OutsourcingOrdersPage.jsx")
-      ? readFileSync(
-          path.join(
-            erpSourceRoot,
-            "components/outsourcing-orders/useOutsourcingOrderTasks.mjs",
-          ),
-          "utf8",
-        )
-      : source;
-    assert.match(
-      taskSource,
-      /loadBusinessCollaborationTasksForSource\(\{[\s\S]*?canRead:\s*canReadWorkflowTasks,[\s\S]*?listTasks:\s*listWorkflowTasks,[\s\S]*?sourceID:\s*requestedSourceID,[\s\S]*?sourceType:/u,
-      `${relativePath} must delegate a permission-gated current-record task request to the shared loader`,
-    );
-    assert.match(
-      source,
-      /<CollaborationTaskPanel[\s\S]*?workflowTaskLoadState === 'ready'[\s\S]*?onOpenTaskBoard=\{\(\) => navigate\('\/erp\/task-board'\)\}/u,
-      `${relativePath} must render only ready current-record tasks and keep the global task-board exit`,
-    );
-  }
-
-  const collaborationTaskSource = readFileSync(
-    path.join(erpSourceRoot, "utils/businessCollaborationTasks.mjs"),
-    "utf8",
-  );
-  assert.match(
-    collaborationTaskSource,
-    /listAllPaginatedRecords\(\s*listTasks,\s*\{\s*source_type:\s*canonicalSourceType\(sourceType\),\s*source_id:\s*requestedSourceID,?\s*\},\s*['"]tasks['"],\s*\{\s*signal:\s*request\.signal\s*\}/u,
-    "shared collaboration loader must exhaust every page for the exact current source record and preserve request cancellation",
-  );
-  assert.doesNotMatch(
-    collaborationTaskSource,
-    /source_id:\s*requestedSourceID,[\s\S]{0,120}?limit:\s*200/u,
-    "shared collaboration loader must not truncate the selected record to the old fixed 200-task window",
-  );
-
-  const panelSource = readFileSync(
-    path.join(
-      erpSourceRoot,
-      "components/business-list/CollaborationTaskPanel.jsx",
-    ),
-    "utf8",
-  );
-  assert(
-    panelSource.includes("<strong>当前记录任务</strong>") &&
-      panelSource.includes("label: '当前记录'") &&
-      panelSource.includes("label: '阻塞异常'") &&
-      panelSource.includes("任务中心") &&
-      panelSource.includes('aria-label="当前记录任务分类"') &&
-      panelSource.includes(
-        "if (!hasFocusedRecord || taskPanelModel.activeTaskCount === 0) return null",
-      ),
-    "collaboration panel must stay current-record-only and hide zero-task placeholders",
-  );
-  assert.doesNotMatch(
-    panelSource,
-    /label:\s*'本页待办'|selectedTasks/u,
-    "collaboration panel must not reintroduce page-wide or duplicate selected-task inputs",
-  );
-});
-
 test("sales order page keeps write buttons behind projected actions", () => {
   const pagePath = path.join(erpSourceRoot, "pages/SalesOrdersPage.jsx");
   const modalPath = path.join(
@@ -1128,20 +976,10 @@ test("purchase order page keeps write buttons behind projected actions", () => {
       modalSource.includes("canWithdraw={canUpdate}"),
     "purchase order modal attachments must use projected create/update permissions",
   );
-  assert(
-    pageSource.includes(
-      "canUpdateWorkflowTasks ? blockWorkflowTask : undefined",
-    ) &&
-      pageSource.includes(
-        "canUpdateWorkflowTasks ? rejectWorkflowTask : undefined",
-      ) &&
-      pageSource.includes(
-        "canUpdateWorkflowTasks ? urgePurchaseWorkflowTask : undefined",
-      ) &&
-      pageSource.includes(
-        "canCompleteWorkflowTasks ? completeWorkflowTask : undefined",
-      ),
-    "purchase collaboration actions must remain behind workflow task action permissions",
+  assert.match(
+    panelSource,
+    /<BusinessTaskActions sourceType="purchase_order"[\s\S]*?adminProfile=\{adminProfile\}/u,
+    "purchase related tasks must retain the shared permission-gated entry",
   );
 });
 
@@ -1184,20 +1022,10 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
     ),
     "outsourcing lifecycle actions must require both action projection and lifecycle state",
   );
-  assert(
-    pageSource.includes(
-      "canUpdateWorkflowTasks ? blockWorkflowTask : undefined",
-    ) &&
-      pageSource.includes(
-        "canUpdateWorkflowTasks ? rejectWorkflowTask : undefined",
-      ) &&
-      pageSource.includes(
-        "canUpdateWorkflowTasks ? urgeOutsourcingWorkflowTask : undefined",
-      ) &&
-      pageSource.includes(
-        "canCompleteWorkflowTasks ? completeWorkflowTask : undefined",
-      ),
-    "outsourcing collaboration actions must remain behind workflow task action permissions",
+  assert.match(
+    pageSource,
+    /<BusinessTaskActions sourceType="outsourcing_order"[\s\S]*?adminProfile=\{adminProfile\}/u,
+    "outsourcing related tasks must retain the shared permission-gated entry",
   );
   assert(
     pageSource.includes("if (initialDraft.lines.length === 0)") &&

@@ -19,7 +19,6 @@ import Tabs from '@/common/components/navigation/SlidingTabs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { useOutsourcingOrderLifecycle } from '../components/outsourcing-orders/useOutsourcingOrderLifecycle.jsx'
 import { useOutsourcingOrderEditor } from '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs'
-import { useOutsourcingOrderTasks } from '../components/outsourcing-orders/useOutsourcingOrderTasks.mjs'
 import { useOutsourcingOrderQuery } from '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs'
 import { useOutsourcingSourceFacts } from '../components/outsourcing-orders/useOutsourcingSourceFacts.jsx'
 import MobileOutsourcingTaskActions from '../mobile/components/MobileOutsourcingTaskActions.jsx'
@@ -35,7 +34,6 @@ import {
   BusinessLifecyclePrimaryAction,
   BusinessOperationPanel,
   BusinessPageLayout,
-  CollaborationTaskPanel,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -177,22 +175,6 @@ export default function OutsourcingOrdersPage() {
     clearRouteContext,
     clearFilters,
   } = useOutsourcingOrderQuery({ adminProfile })
-  const {
-    workflowTaskLoadState,
-    canReadWorkflowTasks,
-    loadWorkflowTasks,
-    blockWorkflowTask,
-    completeWorkflowTask,
-    rejectWorkflowTask,
-    resumeWorkflowTask,
-    urgeOutsourcingWorkflowTask,
-    selectedWorkflowTasks,
-  } = useOutsourcingOrderTasks({
-    adminProfile,
-    beginLatestRequest,
-    selectedRow,
-  })
-
   const activeCustomerKey = useMemo(
     () => adminProfile?.effective_session?.customer?.key || '',
     [adminProfile]
@@ -245,7 +227,6 @@ export default function OutsourcingOrdersPage() {
     setSelectedRow,
     setSaving,
     setPagination,
-    loadWorkflowTasks,
     loadOrders,
   })
 
@@ -313,15 +294,6 @@ export default function OutsourcingOrdersPage() {
     (canCreatePayable ||
       hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYABLE_READ)) &&
     canOpenRelatedPath(BUSINESS_ROUTE_PATHS.payables)
-
-  const canUpdateWorkflowTasks = hasActionPermission(
-    adminProfile,
-    PermissionCode.WORKFLOW_TASK_UPDATE
-  )
-  const canCompleteWorkflowTasks = hasActionPermission(
-    adminProfile,
-    PermissionCode.WORKFLOW_TASK_COMPLETE
-  )
 
   const {
     sourceFactOpen,
@@ -392,8 +364,8 @@ export default function OutsourcingOrdersPage() {
     if (summaryVisible) {
       return summaryRef.current?.refresh() ?? false
     }
-    await Promise.all([loadOrders(), loadWorkflowTasks()])
-  }, [loadOrders, loadWorkflowTasks, summaryVisible])
+    await loadOrders()
+  }, [loadOrders, summaryVisible])
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(refreshPageData)
@@ -406,7 +378,6 @@ export default function OutsourcingOrdersPage() {
     activeCustomerKey,
     setSelectedRow,
     loadOrders,
-    loadWorkflowTasks,
     loadOrderItems,
     openEdit,
     onChanged: closeModal,
@@ -1206,28 +1177,6 @@ export default function OutsourcingOrdersPage() {
         loading={financeSourceLoading}
         onCancel={closeOutsourcingReturnPayable}
         onSubmit={submitOutsourcingReturnPayable}
-      />
-
-      <CollaborationTaskPanel
-        tasks={
-          canReadWorkflowTasks && workflowTaskLoadState === 'ready'
-            ? selectedWorkflowTasks
-            : []
-        }
-        selectedRecordLabel={
-          selectedRow ? getOutsourcingOrderDisplayNo(selectedRow) : ''
-        }
-        adminProfile={adminProfile}
-        onOpenTaskBoard={() => navigate('/erp/task-board')}
-        onCompleteTask={
-          canCompleteWorkflowTasks ? completeWorkflowTask : undefined
-        }
-        onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
-        onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
-        onResumeTask={canUpdateWorkflowTasks ? resumeWorkflowTask : undefined}
-        onUrgeTask={
-          canUpdateWorkflowTasks ? urgeOutsourcingWorkflowTask : undefined
-        }
       />
 
       {columnOrderModal}

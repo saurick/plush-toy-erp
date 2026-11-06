@@ -303,14 +303,6 @@ export function createBusinessFormalAssertions(deps) {
     )
   }
 
-  const assertBusinessCollaborationPanelAbsent = async (page, scenarioName) => {
-    assert.equal(
-      await page.locator('.erp-business-collaboration-task-panel').count(),
-      0,
-      `${scenarioName} 不应展示空面板或重复的当前记录任务面板`
-    )
-  }
-
   const assertUnifiedListToolbarShell = async (
     page,
     {
@@ -653,7 +645,6 @@ export function createBusinessFormalAssertions(deps) {
     waitForMasterDataRequest,
     assertNoMasterDataRequest,
     waitForCapturedMethods,
-    assertBusinessCollaborationPanelAbsent,
     assertUnifiedListToolbarShell,
     assertWorkflowDueDateRangeFilterLayout,
     assertNoListDeleteTrashToolbar,

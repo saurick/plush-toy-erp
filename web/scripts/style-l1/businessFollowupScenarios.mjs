@@ -416,16 +416,20 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
     ['sales', 'sales_order', '/erp/sales/project-orders/sales-orders'],
     ['purchase', 'purchase_order', '/erp/purchase/accessories'],
     ['outsourcing', 'outsourcing_order', '/erp/purchase/processing-contracts'],
+    ['purchase-mobile', 'purchase_order', '/erp/purchase/accessories', { width: 390, height: 844 }],
+    ['outsourcing-mobile', 'outsourcing_order', '/erp/purchase/processing-contracts', { width: 390, height: 844 }],
     ['production', 'production_order', '/erp/production/orders'],
     ['shipment', 'shipment', '/erp/warehouse/shipments'],
-  ].map(([key, sourceType, pagePath]) => {
+  ].map(([key, sourceType, pagePath, viewport = { width: 1920, height: 1080 }]) => {
     let sourceID = null
+    let taskListRequests = 0
+    const sourceOrder = ['purchase_order', 'outsourcing_order'].includes(sourceType)
     return {
       name: `business-task-entry-${key}`,
       path: pagePath,
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
-      viewport: { width: 1920, height: 1080 },
+      viewport,
       deviceScaleFactor: 2,
       beforeNavigate: async (page) => {
         await page.route('**/rpc/workflow', async (route) => {
@@ -439,6 +443,7 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
           if (method !== 'list_tasks' || !params.source_id || params.source_type !== sourceType) return route.fallback()
           assert.equal(params.source_type, sourceType)
           assert(Number.isSafeInteger(params.source_id) && params.source_id > 0)
+          taskListRequests += 1
           sourceID = params.source_id
           await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data: { tasks: [], total: 0 } } }) })
         })
@@ -448,7 +453,12 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await rowSelector.check()
         const entry = page.locator('[data-business-action-key="related-tasks"]').first()
         assert.equal(await entry.isVisible(), true, `${key} 的任务协作应直接可见`)
-        if (key === 'sales') {
+        if (sourceOrder) {
+          assert.equal(await page.getByText('当前记录任务', { exact: true }).count(), 0, `${key} 列表不应重复展示底部任务栏`)
+          assert.equal(taskListRequests, 0, `${key} 选中记录时不应提前读取相关任务`)
+          await assertNoHorizontalOverflow(page, `business-task-entry-${key}-selected`)
+          await page.screenshot({ path: path.join(outputDir, `business-task-entry-${key}-list.png`), animations: 'disabled' })
+        } else if (key === 'sales') {
           await page.screenshot({ path: path.join(outputDir, 'compact-sales-toolbar-4k.png'), animations: 'disabled' })
         }
         assert.equal(await page.locator('[data-business-action-key="create-followup"]:visible').count(), 0)
@@ -456,12 +466,34 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await entry.click()
         const related = page.getByRole('dialog', { name: '相关任务', exact: true })
         await related.getByText('当前单据暂无可见任务', { exact: true }).waitFor()
+        if (sourceOrder) {
+          assert.equal(taskListRequests, 1, `${key} 应只按打开操作读取一次相关任务`)
+          await related.getByRole('button', { name: '关闭', exact: true }).click()
+          await related.waitFor({ state: 'hidden' })
+          assert.equal(await rowSelector.isChecked(), true, `${key} 关闭任务窗口后应保留当前记录`)
+          assert.equal(taskListRequests, 1, `${key} 关闭任务窗口不应重新读取任务`)
+          await entry.click()
+          await related.getByText('当前单据暂无可见任务', { exact: true }).waitFor()
+          assert.equal(taskListRequests, 2, `${key} 再次打开时应读取最新任务`)
+        }
         await related.locator('[data-business-action-key="create-followup"]').waitFor()
         await related.getByRole('button', { name: '流程跟踪', exact: true }).waitFor()
         const bounds = await related.evaluate((node) => ({ width: node.clientWidth, scrollWidth: node.scrollWidth }))
         assert(bounds.scrollWidth <= bounds.width + 1, `${key} 任务面板不能横向溢出`)
         await page.screenshot({ path: path.join(outputDir, `business-task-entry-${key}-panel.png`), animations: 'disabled' })
+        const sourceURL = page.url()
         await related.getByRole('button', { name: '流程跟踪', exact: true }).click()
+        const tracking = page.getByRole('dialog', { name: '流程跟踪', exact: true })
+        await tracking.getByText('当前单据暂无可见流程', { exact: true }).waitFor()
+        await related.waitFor({ state: 'hidden' })
+        assert.equal(page.url(), sourceURL, `${key} 查看流程时保留当前单据页面`)
+        await tracking.locator('.erp-workflow-tracking-footer-actions').getByRole('button', { name: '返回相关任务', exact: true }).click()
+        await tracking.waitFor({ state: 'hidden' })
+        await related.waitFor()
+        assert.equal(await rowSelector.isChecked(), true, `${key} 返回相关任务时保留当前记录`)
+        await related.getByRole('button', { name: '流程跟踪', exact: true }).click()
+        await tracking.getByText('当前单据暂无可见流程', { exact: true }).waitFor()
+        await tracking.getByRole('link', { name: '打开任务管理', exact: true }).click()
         await page.waitForURL('**/erp/task-board?*')
         assert.equal(new URL(page.url()).searchParams.get('track_source_type'), sourceType)
         assert.equal(new URL(page.url()).searchParams.get('track_source_id'), String(sourceID))

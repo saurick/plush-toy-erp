@@ -295,7 +295,7 @@ export function createTabMotionScenarios({ outputDir }) {
           await assertSegmentAffordance(page.locator(`#${id} .ant-segmented`))
         }
         await assertTabsAffordance(page.locator('#ant-tabs .ant-tabs'))
-        for (const id of ['option-tabs', 'login', 'progress-detail', 'collaboration', 'images', 'card-tabs']) {
+        for (const id of ['option-tabs', 'login', 'progress-detail', 'images', 'card-tabs']) {
           await assertContentTabAffordance(page.locator(`#${id} .erp-sliding-segmented, #${id} .erp-sliding-tab-list, #${id} .erp-sliding-tabs`))
         }
         const optionTabs = page.getByRole('tablist', { name: '受控内容导航' })
@@ -331,7 +331,6 @@ export function createTabMotionScenarios({ outputDir }) {
           'dev-reader',
           'dev-nav',
           'dev-journey',
-          'collaboration',
           'workflow',
           'images',
         ]) {

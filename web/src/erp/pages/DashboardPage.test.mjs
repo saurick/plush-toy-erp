@@ -10,15 +10,6 @@ const source = readFileSync(
   fileURLToPath(new URL('./DashboardPage.jsx', import.meta.url)),
   'utf8'
 )
-const collaborationPanelSource = readFileSync(
-  fileURLToPath(
-    new URL(
-      '../components/business-list/CollaborationTaskPanel.jsx',
-      import.meta.url
-    )
-  ),
-  'utf8'
-)
 const desktopTaskActionSource = readFileSync(
   fileURLToPath(
     new URL('../utils/desktopWorkflowTaskAction.mjs', import.meta.url)
@@ -60,8 +51,6 @@ test('task board alone injects the controlled assignment action into the shared 
   assert.match(source, /assignmentAccessSnapshot\.stale/u)
   assert.match(source, /assignmentAccess=\{assignmentAccess\}/u)
   assert.match(source, /onAssignmentTargetChange=\{setAssignmentTarget\}/u)
-  assert.doesNotMatch(collaborationPanelSource, /assignmentAccess=/u)
-  assert.doesNotMatch(collaborationPanelSource, /allowedActionModes=.*assign/u)
 })
 
 test('desktop task board preserves the drawer decision and refuses to invent approval payloads', () => {
@@ -103,27 +92,6 @@ test('desktop task board preserves the canonical mutation result as the shared d
   assert.doesNotMatch(
     source,
     /closeSubmittedTaskDrawer\(\)\s*message\.success\(actionMetaSnapshot\.successMessage\)/u
-  )
-})
-
-test('embedded collaboration drawers preserve the canonical task while the result receipt is open', () => {
-  assert.match(collaborationPanelSource, /actionDrawerReceipt/u)
-  assert.match(
-    collaborationPanelSource,
-    /if \(!actionDrawerTask \|\| actionDrawerSaving \|\| actionDrawerReceipt\) return/u
-  )
-  assert.match(
-    collaborationPanelSource,
-    /const confirmedTask = await actionHandler/u
-  )
-  assert.match(
-    collaborationPanelSource,
-    /setActionDrawerTask\(confirmedTask\)/u
-  )
-  assert.match(collaborationPanelSource, /setActionDrawerReceipt\(\{/u)
-  assert.match(
-    collaborationPanelSource,
-    /actionReceipt=\{actionDrawerReceipt\}/u
   )
 })
 

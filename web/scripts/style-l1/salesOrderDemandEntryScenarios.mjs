@@ -32,7 +32,6 @@ export function createSalesOrderDemandEntryVerifier(deps) {
     assertLineQuantityUnitSuffix,
     assertLineSourceSummaryReadableUnit,
     assertNonItemTextareaFullRow,
-    assertBusinessCollaborationPanelAbsent,
     assertNoListDeleteTrashToolbar,
     assertCurrentOperationBarCompact,
   } = createBusinessFormalAssertions(deps)
@@ -47,10 +46,6 @@ export function createSalesOrderDemandEntryVerifier(deps) {
       scenarioName: 'business-formal-sales-orders',
     })
     await page.getByText('SO-STYLE-L1', { exact: true }).first().waitFor()
-    await assertBusinessCollaborationPanelAbsent(
-      page,
-      'business-formal-sales-orders'
-    )
     await assertNoListDeleteTrashToolbar(page)
     await assertBusinessMainTableInitialSelectionEmpty(page, {
       scenarioName: 'business-formal-sales-orders',

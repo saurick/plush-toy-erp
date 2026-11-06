@@ -65,7 +65,6 @@ export function useOutsourcingOrderEditor({
   setSelectedRow,
   setSaving,
   setPagination,
-  loadWorkflowTasks,
   loadOrders,
 }) {
   const [form] = Form.useForm()
@@ -630,17 +629,16 @@ export function useOutsourcingOrderEditor({
         async () => {
           if (isCreatingOrder) {
             setPagination((current) => ({ ...current, current: 1 }))
-            await loadWorkflowTasks()
             return
           }
-          await Promise.all([loadOrders(), loadWorkflowTasks()])
+          await loadOrders()
         }
       )
       if (refreshEffect.status === 'rejected') {
         message.warning(
           getActionErrorMessage(
             refreshEffect.error,
-            '刷新加工合同列表和相关任务'
+            '刷新加工合同列表'
           )
         )
       }

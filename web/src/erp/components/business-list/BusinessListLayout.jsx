@@ -61,10 +61,6 @@ export const SelectionActionOverlayContext = React.createContext(null)
 const BusinessFilterPanelContext = React.createContext(false)
 const BusinessSelectionAvailabilityContext = React.createContext(null)
 
-export {
-  CollaborationPanelResizeHandle,
-  CollaborationTaskPanel,
-} from './CollaborationTaskPanel.jsx'
 const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
 const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 160
 const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 88

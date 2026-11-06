@@ -36,10 +36,6 @@ export function createBusinessFormInteractionScenarios({
   assertOutsourcingProcessSelectOptions,
   path,
   outputDir,
-  seedBusinessCollaborationOverflowTasks,
-  assertOrderLifecycleActionsConsolidated,
-  assertBusinessCollaborationPanelCollapsedByDefault,
-  gotoScenarioPath,
   assertERPThemeMode,
   verifyBusinessModuleColumnOrderDialog,
   assertAntdModalCentered,
@@ -1343,123 +1339,6 @@ export function createBusinessFormInteractionScenarios({
       },
     },
     {
-      name: 'business-collaboration-supplier-desktop',
-      path: '/erp/master/partners/suppliers',
-      auth: 'admin',
-      effectiveSession: customerRuntimeEffectiveSession,
-      viewport: { width: 1440, height: 900 },
-      verify: async (page) => {
-        await expectHeading(page, '供应商与加工厂')
-        assert.equal(
-          await page.locator('.erp-business-collaboration-task-panel').count(),
-          0,
-          'business-collaboration-supplier-desktop 未选中记录时不应展示空的任务面板'
-        )
-        await page
-          .locator('.ant-table-row')
-          .filter({ hasText: '样式供应商' })
-          .first()
-          .getByRole('radio')
-          .check()
-        assert.equal(
-          await page.locator('.erp-business-collaboration-task-panel').count(),
-          0,
-          'business-collaboration-supplier-desktop 选中供应商后也不应展示无真实任务来源的面板'
-        )
-        await assertNoHorizontalOverflow(
-          page,
-          'business-collaboration-supplier-desktop'
-        )
-      },
-    },
-    {
-      name: 'business-collaboration-purchase-selected-desktop',
-      path: '/erp/purchase/accessories',
-      auth: 'admin',
-      effectiveSession: {
-        ...customerRuntimeEffectiveSession,
-        actions: [
-          ...customerRuntimeEffectiveSession.actions,
-          'workflow.task.create',
-          'workflow.task.read',
-          'workflow.task.update',
-        ],
-        workflow_visible_owner_role_keys_by_capability: {
-          'workflow.task.read': ['purchase', 'finance'],
-          'workflow.task.update': ['purchase', 'finance'],
-        },
-      },
-      viewport: { width: 1440, height: 900 },
-      verify: async (page) => {
-        await seedBusinessCollaborationOverflowTasks(page, {
-          sourceType: 'accessories-purchase',
-          currentSourceID: 1,
-        })
-        await page.reload({ waitUntil: 'domcontentloaded' })
-        await expectHeading(page, '采购订单')
-        assert.equal(
-          await page.locator('.erp-business-collaboration-task-panel').count(),
-          0,
-          'business-collaboration-purchase-selected-desktop 未选中采购订单时不应展示任务面板'
-        )
-        const purchaseOrderRow = page
-          .locator('.erp-business-data-table-card .ant-table-tbody tr')
-          .filter({ hasText: 'PO-STYLE-L1' })
-          .first()
-        await purchaseOrderRow.click()
-        await assertOrderLifecycleActionsConsolidated(page, {
-          scenarioName: 'business-collaboration-purchase-selected-desktop',
-          primaryActionLabel: '提交订单',
-          menuActionLabels: ['取消'],
-          absentButtonLabels: ['审核', '关闭', '取消'],
-        })
-        await assertBusinessCollaborationPanelCollapsedByDefault(page, {
-          scenarioName: 'business-collaboration-purchase-selected-desktop',
-          checkDesktopResize: false,
-          checkResizeHandleHover: false,
-          expectedOverflowNote: '仅显示前 6 条，还有 2 条',
-          expectedTabTexts: ['当前记录8', '阻塞异常3'],
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'business-collaboration-purchase-selected-desktop'
-        )
-
-        await seedBusinessCollaborationOverflowTasks(page, {
-          sourceType: 'processing-contracts',
-          currentSourceID: 1,
-          currentSourceNo: 'SIM-OUTSOURCE-CONTRACT-L1',
-          currentTaskLabel: '当前加工合同',
-        })
-        await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
-          waitUntil: 'domcontentloaded',
-        })
-        await expectHeading(page, '委外订单')
-        assert.equal(
-          await page.locator('.erp-business-collaboration-task-panel').count(),
-          0,
-          'business-collaboration-purchase-selected-desktop 未选中加工合同时不应展示任务面板'
-        )
-        await page
-          .locator('.erp-business-data-table-card .ant-table-tbody tr')
-          .filter({ hasText: 'SIM-OUTSOURCE-CONTRACT-L1' })
-          .first()
-          .click()
-        await assertBusinessCollaborationPanelCollapsedByDefault(page, {
-          scenarioName:
-            'business-collaboration-processing-contract-selected-desktop',
-          checkDesktopResize: false,
-          checkResizeHandleHover: false,
-          expectedOverflowNote: '仅显示前 6 条，还有 2 条',
-          expectedTabTexts: ['当前记录8', '阻塞异常3'],
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'business-collaboration-processing-contract-selected-desktop'
-        )
-      },
-    },
-    {
       name: 'shipment-date-filter-desktop',
       path: '/erp/warehouse/shipments',
       auth: 'admin',
@@ -1549,62 +1428,6 @@ export function createBusinessFormInteractionScenarios({
           `shipment-date-filter-mobile 日期输入不应裁切: ${JSON.stringify(metrics)}`
         )
         await assertNoHorizontalOverflow(page, 'shipment-date-filter-mobile')
-      },
-    },
-    {
-      name: 'business-collaboration-mobile',
-      path: '/erp/purchase/accessories',
-      auth: 'admin',
-      effectiveSession: {
-        ...customerRuntimeEffectiveSession,
-        actions: [
-          ...customerRuntimeEffectiveSession.actions,
-          'workflow.task.create',
-          'workflow.task.read',
-          'workflow.task.update',
-        ],
-        workflow_visible_owner_role_keys_by_capability: {
-          'workflow.task.read': ['purchase', 'finance'],
-          'workflow.task.update': ['purchase', 'finance'],
-        },
-      },
-      viewport: { width: 390, height: 844 },
-      verify: async (page) => {
-        await seedBusinessCollaborationOverflowTasks(page, {
-          sourceType: 'accessories-purchase',
-          currentSourceID: 1,
-        })
-        await page.reload({ waitUntil: 'domcontentloaded' })
-        await expectHeading(page, '采购订单')
-        assert.equal(
-          await page.locator('.erp-business-collaboration-task-panel').count(),
-          0,
-          'business-collaboration-mobile 未选中采购订单时不应展示任务面板'
-        )
-        const purchaseOrderRow = page
-          .locator('.erp-business-data-table-card .ant-table-tbody tr')
-          .filter({ hasText: 'PO-STYLE-L1' })
-          .first()
-        await purchaseOrderRow.getByRole('checkbox').check()
-        await purchaseOrderRow.waitFor({ state: 'visible', timeout: 10_000 })
-        assert(
-          String((await purchaseOrderRow.getAttribute('class')) || '').includes(
-            'ant-table-row-selected'
-          ),
-          'business-collaboration-mobile 选择采购订单后主表应进入选中态'
-        )
-        await assertBusinessCollaborationPanelCollapsedByDefault(page, {
-          scenarioName: 'business-collaboration-mobile',
-          checkDesktopResize: false,
-          checkResizeHandleHover: false,
-          expectedOverflowNote: '仅显示前 6 条，还有 2 条',
-          expectedTabTexts: ['当前记录8', '阻塞异常3'],
-        })
-        await assertResponsiveSelectionActionBar(page, {
-          scenarioName: 'business-collaboration-mobile',
-          maxVisibleActions: 1,
-        })
-        await assertNoHorizontalOverflow(page, 'business-collaboration-mobile')
       },
     },
     {
