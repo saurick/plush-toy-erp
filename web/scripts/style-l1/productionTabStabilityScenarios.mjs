@@ -184,7 +184,7 @@ dpr: devicePixelRatio,
         assert.equal(metrics.dpr, 2)
         assert.ok(metrics.rows.every((height) => height <= 80), JSON.stringify(metrics))
         assert.ok(metrics.firstRowTop <= 260, JSON.stringify(metrics))
-        assert.ok(Math.abs(metrics.toolbarCenter - metrics.switchCenter) <= 1, '订单选择、打开订单和展示切换共用一行')
+        assert.ok(Math.abs(metrics.toolbarCenter - metrics.switchCenter) <= 1, '订单选择和展示切换共用一行')
         await assertNoHorizontalOverflow(page, 'production-execution-4k')
         await writeFile(path.join(outputDir, 'production-execution-metrics.json'), JSON.stringify(metrics, null, 2))
         await page.screenshot({ path: path.join(outputDir, 'production-execution-4k.png'), scale: 'device' })

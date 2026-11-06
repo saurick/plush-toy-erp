@@ -71,7 +71,8 @@ export function createUnifiedInteractionScenarios({
         await panel.getByRole('table', { name: '当前生产事项' }).waitFor()
         await assertBusinessViewMotion(page, 'production-execution', outputDir, { presentationSelector: '.erp-production-process__layout .ant-segmented-group' })
         await panel.locator('.erp-production-process__lane').first().waitFor()
-        assert.equal(await page.locator('.erp-business-operation-panel__selection').count(), 0)
+        assert.equal(await panel.getByRole('combobox', { name: '选择生产订单', exact: true }).count(), 1)
+        assert.equal(await panel.getByRole('button', { name: '打开生产订单', exact: true }).count(), 0)
         assert.equal(await page.getByRole('button', { name: /列设置|新建生产订单/ }).count(), 0)
         const orderRefresh = page.waitForResponse((response) => {
           if (!response.url().endsWith('/rpc/production_order')) return false
@@ -88,6 +89,11 @@ export function createUnifiedInteractionScenarios({
           await captureBusinessView(page, panel, 'production-execution', width, outputDir)
         }
         await clickERPThemeOption(page, '暗色')
+        const navigationDrawer = page.locator('.erp-admin-drawer:visible')
+        if (await navigationDrawer.count()) {
+          await page.keyboard.press('Escape')
+          await navigationDrawer.waitFor({ state: 'hidden' })
+        }
         await captureBusinessView(page, panel, 'production-execution-dark', 390, outputDir)
         await navigation.getByRole('tab', { name: '生产记录', exact: true }).click()
         await page.locator('.erp-production-record-workspace .ant-table-wrapper').waitFor()
@@ -95,9 +101,7 @@ export function createUnifiedInteractionScenarios({
         await navigation.getByRole('tab', { name: '生产执行', exact: true }).click()
         await panel.locator('.erp-production-process__lane').first().waitFor()
         assert.equal(await strip.evaluate((node) => node.isConnected), true)
-        await panel.getByRole('button', { name: '打开生产订单', exact: true }).click()
-        await page.waitForURL((url) => url.pathname === '/erp/production/orders' && url.searchParams.get('production_order_id') === '71')
-        await page.getByRole('heading', { name: '生产管理', exact: true }).waitFor()
+        assert.equal(await panel.getByRole('button', { name: '打开生产订单', exact: true }).count(), 0)
       },
     },
     {

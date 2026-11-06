@@ -164,17 +164,6 @@ export default function ProductionProcessProgress({
               onChange={(value) => onSelectOrder?.(value ?? null)}
             />
           </div>
-          <Button
-            className="erp-production-process__open-order"
-            type="link"
-            size="small"
-            disabled={!selectedOrderID || !onOpenOrder}
-            onClick={() => onOpenOrder?.(selectedOrderID)}
-            icon={<ArrowRightOutlined aria-hidden="true" />}
-            iconPosition="end"
-          >
-            打开生产订单
-          </Button>
           <div
             className="erp-production-process__chips"
             aria-label="生产事项筛选"

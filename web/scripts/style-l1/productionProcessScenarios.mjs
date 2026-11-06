@@ -276,9 +276,9 @@ result: 'REJECT',
         assert.equal(await table.count(), 0, '清空订单后不保留原订单生产事项')
         assert.equal(
           await panel
-            .getByRole('button', { name: '打开生产订单' })
-            .isDisabled(),
-          true
+            .getByRole('button', { name: '打开生产订单', exact: true })
+            .count(),
+          0
         )
         const refreshed = page.waitForResponse(
           (response) =>
@@ -339,8 +339,10 @@ result: 'REJECT',
         )
         const query = panel.getByRole('textbox', { name: '搜索生产产品或规格' })
         await query.fill('不存在的产品')
+        await query.press('Enter')
         await panel.getByText('当前筛选暂无数据', { exact: true }).waitFor()
         await query.fill('SKU-STYLE-L1-LONG')
+        await query.press('Enter')
         await table.waitFor()
         await table
           .locator('[data-product-id="7102"]')
