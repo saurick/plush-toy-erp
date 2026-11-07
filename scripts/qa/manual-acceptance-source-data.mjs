@@ -4684,6 +4684,46 @@ export async function prepareManualAcceptanceSourceWrite({
   }
 }
 
+export async function prepareManualAcceptancePaymentMethods(plan, rpc) {
+  const names = [...new Set([
+    ...plan.records.customers.map((record) => record.default_payment_method),
+    ...plan.records.suppliers.map((record) => record.default_payment_method),
+    ...plan.records.salesOrders.map((record) => record.payment_method),
+    ...plan.records.purchaseOrders.map((record) => record.payment_method),
+  ].filter(Boolean))].sort();
+  const read = async (name) => {
+    const result = await rpc("list_payment_methods", { keyword: name });
+    if (
+      typeof result?.keyword_exists !== "boolean" ||
+      typeof result.keyword_inactive !== "boolean" ||
+      !Array.isArray(result.methods)
+    ) {
+      throw new CliError(`payment method ${name} catalogue readback is invalid`, 2);
+    }
+    if (result.keyword_inactive) {
+      throw new CliError(`payment method ${name} is disabled in the company catalogue`, 2);
+    }
+    if (result.keyword_exists !== result.methods.includes(name)) {
+      throw new CliError(`payment method ${name} does not match the company catalogue`, 2);
+    }
+    return result.keyword_exists;
+  };
+  const existing = new Map();
+  for (const name of names) existing.set(name, await read(name));
+  const result = [];
+  for (const name of names) {
+    const reused = existing.get(name);
+    if (!reused) {
+      await rpc("create_payment_method", { method: name });
+      if (!(await read(name))) {
+        throw new CliError(`payment method ${name} is missing after creation`, 2);
+      }
+    }
+    result.push({ method: name, operation: reused ? "reuse" : "create" });
+  }
+  return result;
+}
+
 export async function applyManualAcceptanceSourceData(
   plan,
   {
@@ -4774,6 +4814,17 @@ export async function applyManualAcceptanceSourceData(
     fetchImpl,
     sourceReportPath,
   });
+  report.paymentMethods = await prepareManualAcceptancePaymentMethods(
+    plan,
+    (method, params) => rpcCall({
+      backendURL: plan.backendURL,
+      domain: "masterdata",
+      method,
+      params,
+      token: tokens.seedAdmin,
+      fetchImpl,
+    }),
+  );
   const writeTokens = Object.fromEntries(
     Object.keys(tokens).map((roleKey) => [roleKey, tokens.seedAdmin]),
   );

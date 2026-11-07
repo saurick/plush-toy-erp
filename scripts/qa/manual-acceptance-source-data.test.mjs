@@ -24,6 +24,7 @@ import {
   buildSourceDrivenFactReferences,
   listAll,
   planBOMItemReconciliation,
+  prepareManualAcceptancePaymentMethods,
   prepareManualAcceptanceSourceWrite,
   parseManualAcceptanceSourceDataArgs,
   requireLifecycleMutationStatus,
@@ -56,6 +57,39 @@ const LOCAL_ACCEPTANCE_BACKEND_URL = "http://127.0.0.1:8310";
 const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_local_fixture_dev";
 const forbiddenVisibleCopy =
   /\b(?:workflow|fact|json-rpc|rbac|usecase|schema|api|debugrunid|raw id)\b|甲方/iu;
+
+test("fresh source data prepares the shared payment choices and reuses them on replay", async () => {
+  const plan = buildLocalSourceMutationPlan();
+  const catalogue = new Set();
+  const created = [];
+  const rpc = async (method, params) => {
+    if (method === "list_payment_methods") {
+      const exists = catalogue.has(params.keyword);
+      return { methods: exists ? [params.keyword] : [], keyword_exists: exists, keyword_inactive: false };
+    }
+    assert.equal(method, "create_payment_method");
+    assert.ok(!catalogue.has(params.method));
+    catalogue.add(params.method);
+    created.push(params.method);
+  };
+  const first = await prepareManualAcceptancePaymentMethods(plan, rpc);
+  assert.deepEqual(new Set(created), new Set(["月结", "银行转账"]));
+  assert.ok(first.every((row) => row.operation === "create"));
+  const replay = await prepareManualAcceptancePaymentMethods(plan, rpc);
+  assert.equal(created.length, 2);
+  assert.ok(replay.every((row) => row.operation === "reuse"));
+});
+
+test("source data leaves an intentionally disabled payment choice unchanged", async () => {
+  const plan = buildLocalSourceMutationPlan();
+  await assert.rejects(
+    () => prepareManualAcceptancePaymentMethods(plan, async (method, { keyword }) => {
+      assert.equal(method, "list_payment_methods");
+      return { methods: [], keyword_exists: keyword === "银行转账", keyword_inactive: keyword === "银行转账" };
+    }),
+    /银行转账 is disabled/u,
+  );
+});
 
 function assertOutsourcingSourceOrder(order, plan) {
   const sourceOrder = plan.records.salesOrders.find(
