@@ -1406,6 +1406,7 @@ export default function PurchaseReceiptsPage() {
             >
               <Button
                 data-business-action-key="create-return"
+                data-business-action-placement="more"
                 data-business-action-role="secondary"
                 data-business-action-group="business"
                 size="small"

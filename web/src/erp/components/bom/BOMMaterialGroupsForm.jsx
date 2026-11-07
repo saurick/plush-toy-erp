@@ -8,6 +8,7 @@ import React, {
 } from 'react'
 import { Button, Form, Input, Popconfirm } from 'antd'
 import { CloseOutlined } from '@ant-design/icons'
+import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
 import useBusinessLineItemGroups from '../business-list/useBusinessLineItemGroups.js'
 import BusinessLineItemGroupControls from '../business-list/BusinessLineItemGroupControls.jsx'
 import { BusinessLineItemGroupHeading } from '../business-list/BusinessLineItemsTable.jsx'
@@ -206,21 +207,19 @@ function BOMSelectionActions({ selection, target, onClear, onCopy, onRemovePart,
             okButtonProps={{ danger: true }}
             onConfirm={onRemoveMaterial}
           >
-            <Button size="middle" type="text" danger>移除物料</Button>
+            <BusinessLineItemActionButton action="remove">移除物料</BusinessLineItemActionButton>
           </Popconfirm>
         </React.Fragment>
       ) : (
         <React.Fragment key={`part:${target?.key ?? 'none'}`}>
-          <Button size="middle" disabled={!target || limitReached} onClick={onCopy}>复制部位</Button>
-          <Button
-            size="middle"
-            type="text"
-            danger
+          <BusinessLineItemActionButton action="copy" disabled={!target || limitReached} onClick={onCopy}>复制部位</BusinessLineItemActionButton>
+          <BusinessLineItemActionButton
+            action="remove"
             disabled={!target || target.group.indexes.length === 1}
             title={target?.group.indexes.length === 1 ? '仅剩一个部位，请选择物料后移除整组' : undefined}
             onClick={onRemovePart}
           >移除部位
-          </Button>
+          </BusinessLineItemActionButton>
         </React.Fragment>
       )}
     </div>

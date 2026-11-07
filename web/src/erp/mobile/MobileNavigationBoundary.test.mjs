@@ -20,11 +20,12 @@ async function mount(t, entries, adminID = null) {
   }
   const [{ createRoot }, router, { default: Boundary }] = await runtime
   let location
+  let navigate
   const desktopMounts = []
   function Page() {
     const currentLocation = router.useLocation()
     location = currentLocation
-    const navigate = router.useNavigate()
+    navigate = router.useNavigate()
     React.useEffect(() => {
       if (currentLocation.pathname.startsWith('/erp')) desktopMounts.push(currentLocation.pathname)
     }, [currentLocation.pathname])
@@ -40,6 +41,9 @@ async function mount(t, entries, adminID = null) {
   return {
     location: () => location,
     desktopMounts,
+    go: async (target, options) => {
+      await act(async () => navigate(target, options))
+    },
     click: async (label) => {
       const button = [...container.querySelectorAll('button, a')].find((node) => node.textContent === label)
       assert.equal(Boolean(button), true)
@@ -119,7 +123,7 @@ test('phone browser back cannot restore an earlier desktop page', async (t) => {
   assert.deepEqual(page.desktopMounts, [])
 })
 
-test('only work-entry selection permits switching from the phone flow to desktop', async (t) => {
+test('ordinary phone navigation must use work-entry selection to switch to desktop', async (t) => {
   const page = await mount(t, ['/m/sales/tasks'])
   await page.click('选择电脑版')
   assert.equal(page.location().pathname, '/m/sales/tasks')
@@ -137,6 +141,37 @@ test('re-authentication cannot silently turn a phone flow into desktop', async (
   await page.click('选择电脑版')
   assert.equal(page.location().pathname, '/m/sales/tasks')
   assert.deepEqual(page.desktopMounts, [])
+})
+
+test('a completed desktop login releases the phone flow once, including across later history visits', async (t) => {
+  const page = await mount(t, ['/m/sales/tasks'])
+  const desktopLogin = () => page.go('/erp/dashboard', {
+    replace: true,
+    state: { desktopLoginFrom: page.location().key },
+  })
+
+  await desktopLogin()
+  assert.equal(page.location().pathname, '/m/sales/tasks')
+  await page.click('重新登录')
+  await desktopLogin()
+  assert.equal(page.location().pathname, '/erp/dashboard')
+
+  await page.click('返回')
+  assert.equal(page.location().pathname, '/m/sales/tasks')
+  await page.go(1)
+  assert.equal(page.location().pathname, '/m/sales/tasks')
+  assert.deepEqual(page.desktopMounts, ['/erp/dashboard'])
+})
+
+test('a completed desktop login can resume a shared task on desktop', async (t) => {
+  const page = await mount(t, ['/m/sales/tasks'])
+  await page.click('重新登录')
+  await page.go('/task-link/42', {
+    replace: true,
+    state: { desktopLoginFrom: page.location().key },
+  })
+  assert.equal(page.location().pathname, '/erp/task-board')
+  assert.equal(page.location().search, '?mode=all&link_task=42')
 })
 
 test('an explicit desktop deep link remains available in a fresh flow', async (t) => {

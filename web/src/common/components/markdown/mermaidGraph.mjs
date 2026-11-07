@@ -17,6 +17,37 @@ export const escapeBusinessGraphLabel = (value) =>
       })[character]
   )
 
+const labelSegments = new Intl.Segmenter('zh-CN', { granularity: 'grapheme' })
+
+// Wrap before escaping so entities and grapheme clusters remain intact.
+export function formatBusinessGraphLabel(value) {
+  const lines = String(value ?? '').split('\n').flatMap((line) => {
+    const segments = [...labelSegments.segment(line)].map(({ segment }) => ({
+      segment,
+      advance: segment.codePointAt(0) <= 0xff ? 1 : 2,
+    }))
+    const total = segments.reduce((width, item) => width + item.advance, 0)
+    let remaining = total
+    let lineWidth = Math.ceil(remaining / Math.max(1, Math.ceil(remaining / 10)))
+    const wrapped = []
+    let text = ''
+    let width = 0
+    for (const { segment, advance } of segments) {
+      if (text && width + advance > lineWidth) {
+        wrapped.push(text)
+        remaining -= width
+        lineWidth = Math.ceil(remaining / Math.max(1, Math.ceil(remaining / 10)))
+        text = ''
+        width = 0
+      }
+      text += segment
+      width += advance
+    }
+    return [...wrapped, text]
+  })
+  return escapeBusinessGraphLabel(lines.join('\n'))
+}
+
 export function businessFlowEdges(flow) {
   const keys = new Set(flow.nodes.map((node) => node.key))
   const edges = flow.edges.map((edge) => ({
@@ -44,8 +75,11 @@ export function splitBusinessFlowForPrint(flow, maxEdges = 3) {
   const edges = businessFlowEdges(flow)
   const parts = []
   const used = new Set()
-  for (let offset = 0; offset < edges.length; offset += maxEdges) {
-    const selected = edges.slice(offset, offset + maxEdges)
+  let selected = []
+  const sources = new Set()
+  const targets = new Set()
+  const appendPart = () => {
+    if (!selected.length) return
     const keys = new Set(selected.flatMap((edge) => [edge.from, edge.to]))
     keys.forEach((key) => used.add(key))
     parts.push({
@@ -55,7 +89,18 @@ export function splitBusinessFlowForPrint(flow, maxEdges = 3) {
       nodes: flow.nodes.filter((node) => keys.has(node.key)),
       edges: selected,
     })
+    selected = []
+    sources.clear()
+    targets.clear()
   }
+  for (const edge of edges) {
+    // Forks and joins need separate diagrams to keep long conditions distinct.
+    if (selected.length === maxEdges || sources.has(edge.from) || targets.has(edge.to)) appendPart()
+    selected.push(edge)
+    sources.add(edge.from)
+    targets.add(edge.to)
+  }
+  appendPart()
   const isolated = flow.nodes.filter((node) => !used.has(node.key))
   for (let offset = 0; offset < isolated.length; offset += 6)
     { parts.push({
@@ -77,7 +122,9 @@ export function buildBusinessFlowMermaid(
   const labelByKey = new Map(
     flow.nodes.map((node) => [node.key, node.label || node.key])
   )
-  const lines = [flow.direction === 'LR' ? 'flowchart LR' : 'flowchart TB']
+  const vertical = flow.direction === 'TB' || flow.direction === 'TD' || (!flow.direction && edges.length === 0)
+  const curve = flow.curve === 'basis' ? 'basis' : 'step'
+  const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 28', '    rankSpacing: 24', '    padding: 12', `    curve: ${curve}`, '---', vertical ? 'flowchart TB' : 'flowchart LR']
   const layerLabels = {
     source_document: '单据',
     masterdata_lifecycle: '基础资料',
@@ -98,7 +145,7 @@ export function buildBusinessFlowMermaid(
         ].filter(Boolean)
       ),
     ].join(' · ')
-    const label = escapeBusinessGraphLabel(
+    const label = formatBusinessGraphLabel(
       [node.label || node.key, subtitle].filter(Boolean).join('\n')
     )
     return `  ${ids.get(node.key)}${node.terminal || node.kind === 'terminal' ? `(["${label}"])` : `["${label}"]`}`
@@ -131,7 +178,7 @@ export function buildBusinessFlowMermaid(
     const id = `E${index}`
     const edgeLabel = edge.label || (edge.condition ? '办理条件' : '')
     lines.push(
-      `  ${ids.get(edge.from)} ${id}@${branch ? '-.->' : '-->'}${edgeLabel ? `|"${escapeBusinessGraphLabel(edgeLabel)}"|` : ''} ${ids.get(edge.to)}`
+      `  ${ids.get(edge.from)} ${id}@${branch ? '-.->' : '-->'}${edgeLabel ? `|"${formatBusinessGraphLabel(edgeLabel)}"|` : ''} ${ids.get(edge.to)}`
     )
     if (/^#[\da-f]{3,8}$/iu.test(edge.stroke || '')) {
       lines.push(`  linkStyle ${index} stroke:${edge.stroke}`)

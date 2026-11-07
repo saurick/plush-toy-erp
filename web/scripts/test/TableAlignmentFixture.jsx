@@ -8,6 +8,7 @@ import { ERPThemeProvider, useERPTheme } from '../../src/common/theme/erpTheme'
 import { createERPAntdTheme } from '../../src/common/theme/erpAntdTheme.mjs'
 import { BusinessDataTable } from '../../src/erp/components/business-list/BusinessListLayout'
 import { ColumnOrderModal } from '../../src/erp/components/business-list/ColumnOrderModal'
+import BusinessTextArea from '../../src/erp/components/business-list/BusinessTextArea'
 import BusinessLineItemsTable, {
   BusinessLineItemRow,
 } from '../../src/erp/components/business-list/BusinessLineItemsTable'
@@ -123,6 +124,8 @@ function Fixture() {
   const [empty, setEmpty] = useState(false)
   const [order, setOrder] = useState(columns.map((column) => column.key))
   const [columnPanelOpen, setColumnPanelOpen] = useState(false)
+  const [textAreaState, setTextAreaState] = useState(0)
+  const [textAreaPlaceholder, setTextAreaPlaceholder] = useState(false)
   const [selected, setSelected] = useState([])
   const [radioSelected, setRadioSelected] = useState([])
   const [opened, setOpened] = useState('')
@@ -345,6 +348,28 @@ function Fixture() {
           <h2>联系人明细</h2>
           <Form form={contactForm} initialValues={{ contacts: [{ name: '模拟联系人', is_primary: true }] }}>
             <ContactFormList form={contactForm} entityLabel="模拟客户" />
+          </Form>
+        </section>
+        <section id="textarea-controls" style={{ minWidth: 0, maxWidth: 640 }}>
+          <h2>文本域行高</h2>
+          <Button id="textarea-state-toggle" onClick={() => setTextAreaState((state) => (state + 1) % 3)}>切换文本域状态</Button>
+          <Button id="textarea-placeholder-toggle" onClick={() => setTextAreaPlaceholder((visible) => !visible)}>切换文本域提示</Button>
+          <output id="textarea-state">{['可编辑', '只读', '禁用'][textAreaState]}</output>
+          <Form layout="vertical" className="erp-business-form" disabled={textAreaState === 2}>
+            <Form.Item label="单行基准"><Input aria-label="文本域单行基准" /></Form.Item>
+            {['plain', 'clear', 'count'].flatMap((variant) => [1, 2, 3].map((minRows) => (
+              <Form.Item key={`${variant}-${minRows}`} name={`textarea-${variant}-${minRows}`} label={`${{ plain: '普通', clear: '可清空', count: '带计数' }[variant]} ${minRows} 行`}>
+                <BusinessTextArea
+                  aria-label={`${variant}-${minRows}`}
+                  minRows={minRows}
+                  allowClear={variant !== 'plain'}
+                  showCount={variant === 'count'}
+                  maxLength={2000}
+                  readOnly={textAreaState === 1}
+                  placeholder={textAreaPlaceholder ? '请保留完整加工说明\n长提示应随屏宽自然换行\n逐项核对后继续办理' : ''}
+                />
+              </Form.Item>
+            )))}
           </Form>
         </section>
         <section id="dev-native-table" style={{ minWidth: 0 }}>

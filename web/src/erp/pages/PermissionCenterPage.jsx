@@ -96,8 +96,6 @@ export default function PermissionCenterPage() {
     adminRpc,
     loadData,
     onOpenRoleAccounts,
-    onOpenNavigation: () =>
-      setActiveTabKey(PERMISSION_CENTER_TAB_KEYS.NAVIGATION),
     navigationMode: activeTabKey === PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
     settingsVisible: activeTabKey === PERMISSION_CENTER_TAB_KEYS.ROLES,
     searchKeyword: permissionSearch,

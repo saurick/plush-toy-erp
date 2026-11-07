@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { clickLineItemAction } from './lineEditorActions.mjs'
-import { assertLineItemGroupHeaderInteraction } from './businessLineItemDisclosureAssertions.mjs'
+import { clickLineItemAction, revealLineItemDetails } from './lineEditorActions.mjs'
+import { assertCompactLineNoteDisclosure, assertLineItemGroupHeaderInteraction } from './businessLineItemDisclosureAssertions.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertNoHorizontalOverflow } from './pageAssertions.mjs'
 import { clickERPThemeOption } from './themeAssertions.mjs'
@@ -121,6 +121,7 @@ async function verifyArrival(page, { outputDir }) {
     () => document.activeElement?.getAttribute('aria-label') === '第1条实点数量'
   )
   await assertLineItemGroupHeaderInteraction(page, dialog)
+  await assertCompactLineNoteDisclosure(page, dialog, { persistentSelectors: ['input[aria-label="第1条实点数量"]', 'input[aria-label="第1条入库仓库"]'] })
 
   for (const viewport of [
     { width: 1920, height: 1080 },
@@ -192,7 +193,9 @@ async function verifyArrival(page, { outputDir }) {
     name: '第2条到货记录',
     exact: true,
   })
-  assert.ok(await second.getByRole('textbox', { name: '第2条说明' }).isVisible(), '每条到货记录直接展示补充说明')
+  assert.equal(await second.getByRole('textbox', { name: '第2条说明' }).isVisible(), false, '桌面新增记录的补充说明默认收起')
+  await revealLineItemDetails(second)
+  assert.equal(await second.getByRole('textbox', { name: '第2条说明' }).isVisible(), true, '行号箭头展开本条补充说明')
   await second
     .getByRole('textbox', { name: '第2条说明' })
     .fill('模拟卷包说明，需要逐卷核对数量。'.repeat(12))

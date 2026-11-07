@@ -526,6 +526,8 @@ func collectCatalog(root string, review bool) (catalog, error) {
 		}
 	}
 	for _, source := range []struct{ path, prefix, export string }{
+		{"biz/warehouse_production_work.go", "WarehouseProductionKind", "WarehouseProductionKind"},
+		{"biz/warehouse_production_work.go", "WarehouseProductionStage", "WarehouseProductionStage"},
 		{"biz/bom_source_snapshot.go", "BOMLossSource", "BOMLossSource"},
 		{"core/status/sales_order.go", "SalesOrder", "SalesOrderStatus"},
 		{"core/status/sales_order.go", "SalesOrderItem", "SalesOrderItemStatus"},
@@ -583,6 +585,7 @@ func collectCatalog(root string, review bool) (catalog, error) {
 		return out, err
 	}
 	limits := map[string]string{"BusinessAttachmentMaxBytes": "maxBytes", "BusinessAttachmentMaxJSONRPCBodyBytes": "maxJSONRPCBodyBytes", "BusinessAttachmentRequestTimeoutSeconds": "requestTimeoutSeconds", "BusinessAttachmentProductImageMaxBytes": "productImageMaxBytes", "BusinessAttachmentProductImageMaxWidth": "productImageMaxWidth", "BusinessAttachmentProductImageMaxHeight": "productImageMaxHeight"}
+	limits["BusinessAttachmentProductImageSupplementalMaxCount"] = "productImageSupplementalMaxCount"
 	err = declarations(attachment, token.CONST, func(name string, expr ast.Expr) error {
 		label, ok := limits[name]
 		if !ok {
@@ -615,6 +618,11 @@ func collectCatalog(root string, review bool) (catalog, error) {
 	if len(out.Attachments) != len(limits)+len(maps) {
 		return out, fmt.Errorf("missing attachment declaration")
 	}
+	imageSlots, err := namedStringConstants(attachment, "BusinessAttachmentProductImageSlot", []string{"Supplemental"})
+	if err != nil {
+		return out, err
+	}
+	out.Attachments["productImageSupplementalSlot"] = imageSlots["SUPPLEMENTAL"]
 	productPreview, err := parse(root, "server/internal/biz/document_product_preview.go")
 	if err != nil {
 		return out, err

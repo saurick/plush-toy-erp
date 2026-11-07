@@ -16,9 +16,8 @@ test('收付款筛选传到服务端，失败时不保留上一筛选的金额�
   } })
   const [{ MemoryRouter }, { default: useRecords }, { default: useLatestRequestCoordinator }] = await Promise.all([import('react-router-dom'), import('./useFinancePaymentRecords.mjs'), import('../../hooks/useLatestRequestCoordinator.js')])
   let controls
-  const setActiveTab = () => {}
   function Records() {
-    controls = useRecords({ beginLatestRequest: useLatestRequestCoordinator(), setActiveTab })
+    controls = useRecords({ beginLatestRequest: useLatestRequestCoordinator() })
     return null
   }
   await ui.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Records)))
@@ -51,10 +50,9 @@ test('收付款重读失败保留对象与恢复提示，重试成功后回到�
     import('react-router-dom'), import('./useFinancePaymentRecords.mjs'), import('../../hooks/useLatestRequestCoordinator.js'),
   ])
   let controls
-  const setActiveTab = () => {}
   function Records() {
     const beginLatestRequest = useLatestRequestCoordinator()
-    controls = useRecords({ beginLatestRequest, setActiveTab })
+    controls = useRecords({ beginLatestRequest })
     return null
   }
   await ui.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Records)))
@@ -70,4 +68,29 @@ test('收付款重读失败保留对象与恢复提示，重试成功后回到�
   assert.equal(controls.currentPayment.status, 'POSTED')
   assert.equal(controls.currentPayment.version, 2)
   assert.deepEqual(reads, [17, 17])
+})
+
+test('账款调整独立加载和刷新，候选账款按读取权限查询', async (t) => {
+  const calls = []
+  const ui = await businessFormHarness(t, { rpc(method, params) {
+    calls.push({ method, params })
+    if (method === 'list_finance_credit_notes') return { data: { credit_notes: [], total: 0 } }
+    assert.equal(method, 'list_finance_facts')
+    return { data: { finance_facts: [], total: 0 } }
+  } })
+  const [{ MemoryRouter }, { default: useRecords }, { default: useLatestRequestCoordinator }] = await Promise.all([
+    import('react-router-dom'), import('./useFinancePaymentRecords.mjs'), import('../../hooks/useLatestRequestCoordinator.js'),
+  ])
+  let controls
+  const financeFactTypes = ['PAYABLE']
+  function Records() {
+    controls = useRecords({ beginLatestRequest: useLatestRequestCoordinator(), recordType: 'credits', financeFactTypes })
+    return null
+  }
+  await ui.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Records)))
+  await act(async () => controls.loadReferences())
+  assert.deepEqual(calls.map((call) => call.method), ['list_finance_credit_notes', 'list_finance_credit_notes'])
+  await act(async () => controls.loadFinanceFactReferences())
+  assert.equal(calls.at(-1).params.fact_type, 'PAYABLE')
+  assert.equal(calls.filter((call) => call.method === 'list_finance_facts').length, 1)
 })

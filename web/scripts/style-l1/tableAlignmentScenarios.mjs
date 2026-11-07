@@ -4,6 +4,8 @@ import path from 'node:path'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { businessModuleDefinitions } from '../../src/erp/config/businessModules.mjs'
 import { assertLineItemGrouping } from './lineItemGroupingAssertions.mjs'
+import { assertVisibleBusinessFormControlHeight } from './inputControlAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import {
   assertTableHeaderControlsFit,
   assertTableSemanticAlignment,
@@ -419,6 +421,82 @@ export function createTableAlignmentScenarios({
   }))
   return [
     ...fixtures,
+    {
+      name: 'business-textarea-height-responsive',
+      path: '/scripts/test/TableAlignmentFixture.html',
+      viewport: { width: 390, height: 1000 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const stage = page.locator('#textarea-controls')
+        await stage.waitFor()
+        await page.locator('#contact-table').screenshot({ path: path.join(outputDir, 'textarea-contact-default.png') })
+        await stage.screenshot({ path: path.join(outputDir, 'textarea-minimum-rows.png') })
+        const evidence = []
+        const measure = async (state) => {
+          await waitForFiniteAnimations(page)
+          await assertVisibleBusinessFormControlHeight(page, `文本域-${state}`)
+          const metrics = await stage.locator('textarea').evaluateAll((nodes) => nodes.map((node) => {
+            const style = getComputedStyle(node)
+            const owner = node.closest('.ant-input-textarea-affix-wrapper') || node
+            return {
+              label: node.getAttribute('aria-label'),
+              value: node.value,
+              height: owner.getBoundingClientRect().height,
+              lineHeight: style.lineHeight,
+              padding: style.padding,
+              overflow: node.scrollHeight - node.clientHeight,
+              disabled: node.disabled,
+              readOnly: node.readOnly,
+            }
+          }))
+          assert.equal(metrics.length, 9)
+          assert(metrics.every((item) => item.overflow <= 1), JSON.stringify(metrics))
+          evidence.push({ state, viewport: page.viewportSize(), metrics })
+          return metrics
+        }
+        const initial = await measure('手机初始')
+        const longValue = '包装要求与分批安排，每项都应完整显示。\n'.repeat(8)
+        for (const label of ['plain-1', 'clear-2', 'count-3']) {
+          const control = stage.getByRole('textbox', { name: label, exact: true })
+          const original = initial.find((item) => item.label === label)
+          await control.fill(longValue)
+          const expanded = await measure(`${label}-长文本`)
+          assert(expanded.find((item) => item.label === label).height > original.height)
+          await control.fill('短说明')
+          const shortened = await measure(`${label}-改短`)
+          assert(Math.abs(shortened.find((item) => item.label === label).height - original.height) <= 1)
+          if (label.startsWith('plain')) await control.fill('')
+          else await control.locator('..').getByRole('button', { name: 'close-circle', exact: true }).click()
+          assert.equal(await control.inputValue(), '')
+          await measure(`${label}-清空`)
+        }
+        await stage.getByRole('textbox', { name: 'count-2', exact: true }).fill('切换状态保留这段说明')
+        for (const [state, disabled, readOnly] of [['只读', false, true], ['禁用', true, false], ['可编辑', false, false]]) {
+          await page.locator('#textarea-state-toggle').click()
+          assert.equal(await page.locator('#textarea-state').textContent(), state)
+          const metrics = await measure(state)
+          assert(metrics.every((item) => item.disabled === disabled && item.readOnly === readOnly))
+          assert.equal(metrics.find((item) => item.label === 'count-2').value, '切换状态保留这段说明')
+          assert.equal(await stage.locator('.ant-input-data-count').count(), state === '可编辑' ? 3 : 0)
+        }
+        await stage.getByRole('textbox', { name: 'count-2', exact: true }).fill('')
+        await page.locator('#textarea-placeholder-toggle').click()
+        await measure('多行提示')
+        await page.locator('#textarea-placeholder-toggle').click()
+        await measure('提示清空')
+        for (const width of [360, 768, 1440, 390]) {
+          await page.setViewportSize({ width, height: 1000 })
+          await measure(`屏宽-${width}`)
+        }
+        await page.locator('#toggle-theme').click()
+        await measure('手机深色')
+        await stage.screenshot({ path: path.join(outputDir, 'textarea-mobile-dark.png') })
+        await page.locator('#toggle-theme').click()
+        await measure('手机浅色恢复')
+        await stage.screenshot({ path: path.join(outputDir, 'textarea-mobile-light.png') })
+        await writeFile(path.join(outputDir, 'business-textarea-height-responsive.json'), JSON.stringify(evidence, null, 2))
+      },
+    },
     ...groupingFixtures,
     ...groupedDocuments,
     {

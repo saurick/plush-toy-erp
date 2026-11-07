@@ -87,6 +87,7 @@ function ArrivalRecord({
       identity={row.material}
       lineItemIndex={field.name}
       hidden={hidden}
+      detailsToggleLabel="补充说明"
       actions={
         <Popconfirm
           title="移除这条到货记录？"
@@ -531,6 +532,7 @@ export default function PurchaseOrderInboundDraftModal({
                                   scrollControlsInToolbar
                                   stickyHeader={false}
                                   showSequence
+                                  expandableDetails
                                   label={`${row.material}到货记录`}
                                   className="erp-purchase-arrival__table"
                                   columns={[

@@ -10,7 +10,7 @@ import { compareNumeric20Scale6Units, numeric20Scale6Units, isPositiveNumeric20S
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
 import BusinessForm from '../business-list/BusinessForm.jsx'
 
-export default function FinanceSourceAdjustmentsPanel({ customerKey, canCreate, attemptsRef, onChanged }) {
+export default function FinanceSourceAdjustmentsPanel({ customerKey, canCreate, attemptsRef, onChanged, inWorkspace = false }) {
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -69,7 +69,7 @@ export default function FinanceSourceAdjustmentsPanel({ customerKey, canCreate, 
   ]
   return (
     <>
-      <BusinessOperationPanel actions={<Button onClick={load} loading={loading}>刷新待调整</Button>} />
+      <BusinessOperationPanel inWorkspace={inWorkspace} compact actions={<Button onClick={load} loading={loading}>刷新待调整</Button>} />
       <p className="erp-business-inline-note">应付形成后的采购退货和数量变化在此确认。差额来自已过账来源；已付部分先撤销核销，再冲减应付并登记实际退款。原应付已包含的来源不重复调整。</p>
       {error ? <Alert type="error" message={error} showIcon /> : null}
       <BusinessDataTable columns={columns} dataSource={rows} rowKey={(row) => `${row.source_type}:${row.source_id}`} loading={loading} pagination={{ current: page, pageSize: 20, total, showSizeChanger: false, onChange: setPage }} emptyDescription="暂无采购待调整差额" scroll={{ x: 1125 }} />

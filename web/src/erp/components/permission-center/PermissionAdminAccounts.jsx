@@ -1292,7 +1292,6 @@ export default function PermissionAdminAccounts({
               ? `${formatAdminIdentity(statusActionAdmin)} 将立即无法继续访问后台`
               : `${formatAdminIdentity(statusActionAdmin)} 将恢复登录和原有岗位功能`
           }
-          style={{ marginBottom: 16 }}
         />
         <BusinessForm form={statusForm} layout="vertical" onFinish={applyAdminStatus}>
           <Form.Item
@@ -1336,7 +1335,6 @@ export default function PermissionAdminAccounts({
           showIcon
           message={`将正式注销 ${formatAdminIdentity(revokingAdmin)}`}
           description="账号和历史操作记录会保留，未完成的个人待办将退回原负责岗位，供该岗位其他人员继续处理。注销不可恢复；如需该人员重新使用系统，必须创建新账号。"
-          style={{ marginBottom: 16 }}
         />
         <BusinessForm form={revokeForm} layout="vertical" onFinish={revokeAdminAccount}>
           <Form.Item

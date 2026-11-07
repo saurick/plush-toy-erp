@@ -10,6 +10,7 @@ import { getRoleHelpScenarios } from '../../erp/config/helpScenarios.mjs'
 import { ROLE_HELP_GUIDES } from '../../erp/config/roleHelpContent.mjs'
 import { HELP_REFERENCE_PAGES } from '../../erp/config/helpManualCatalog.mjs'
 import { printTemplateCatalog } from '../../erp/config/printTemplates.mjs'
+import { BOM_IMPORT_FORMAT_GUIDE } from '../../erp/data/bomImportFormat.mjs'
 import {
   getBusinessHandbookIntroductions,
   getBusinessPageHandbookSections,
@@ -210,6 +211,18 @@ test('print center design descriptions follow the formal template catalog', () =
   )
 })
 
+test('numbered region prototypes use the shared geometry and Excel region definitions', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const geometry = html.match(/\/\/ BEGIN SHARED DOCUMENT GUIDE GEOMETRY\n([\s\S]*?)\n {6}\/\/ END SHARED DOCUMENT GUIDE GEOMETRY/u)
+  assert.ok(geometry)
+  const actual = geometry[1].replace(/^ {6}/gmu, '').trimEnd()
+  const expected = read('web/src/erp/components/documentGuideGeometry.mjs').replace(/export function /gu, 'function ').trimEnd()
+  assert.equal(actual, expected, '图示范围与编号避让算法须与共享组件同步')
+  const parts = html.match(/function renderBOMImportFormat\(\) \{\n {6}const parts = (\[[^\n]+\])/u)
+  assert.ok(parts)
+  assert.deepEqual(JSON.parse(parts[1]), BOM_IMPORT_FORMAT_GUIDE)
+})
+
 test('help design snapshot follows the current formal role and scenario content', () => {
   const { roles } = helpDefinition('catalog')
   assert.deepEqual(
@@ -295,6 +308,39 @@ test('help design uses the same complete handbook introductions and role respons
       ])
     )
   )
+})
+
+test('help directory coalesces size notifications and redraws outside observer delivery', () => {
+  const source = read(UI_DESIGN_ASSET.path).match(/function scheduleDirectoryLayout\(\) \{[\s\S]*?\n {4}\}/u)?.[0]
+  assert.ok(source)
+  const frames = []
+  const rendered = []
+  let element = { clientWidth: 800 }
+  const context = {
+    directoryLayoutFrame: 0,
+    directoryLayoutWidth: 1000,
+    root: () => element,
+    renderManual: () => rendered.push(element.clientWidth),
+    requestAnimationFrame: (callback) => { frames.push(callback); return frames.length },
+  }
+  const schedule = runInNewContext(`(${source})`, context)
+  schedule()
+  schedule()
+  assert.equal(rendered.length, 0, '尺寸通知中不改写手册 DOM')
+  assert.equal(frames.length, 1, '同一帧只安排一次读取')
+  element.clientWidth = 600
+  frames.shift()()
+  assert.deepEqual(rendered, [600], '重绘使用当帧最新可见宽度')
+  schedule()
+  frames.shift()()
+  assert.equal(rendered.length, 1, '只有高度变化时不重复重绘')
+  element.clientWidth = 0
+  schedule()
+  frames.shift()()
+  assert.equal(context.directoryLayoutWidth, 600, '隐藏期间保留阅读布局基线')
+  element = null
+  schedule()
+  assert.doesNotThrow(() => frames.shift()())
 })
 
 test('every help scenario has an overview and valid exception return steps', () => {

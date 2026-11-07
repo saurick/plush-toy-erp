@@ -49,7 +49,6 @@ const targetPageSources = Object.freeze({
   'processing-contracts': 'web/src/erp/pages/OutsourcingOrdersPage.jsx',
   'production-orders': 'web/src/erp/pages/ProductionOrdersPage.jsx',
   shipments: 'web/src/erp/pages/ShipmentsPage.jsx',
-  'finance-payments': 'web/src/erp/pages/FinancePaymentsPage.jsx',
 })
 
 test('businessUsabilityCatalog: 从正式页面目录派生并覆盖现有业务页面', () => {
@@ -169,6 +168,14 @@ test('businessUsabilityCatalog: 专属与共享页面都接入同一页内帮助
   )
   assert.match(
     read('web/src/erp/pages/WorkflowBusinessModulePage.jsx'),
+    /helpKey=\{moduleKey\}/u
+  )
+  assert.match(
+    read('web/src/erp/pages/FinancePaymentsPage.jsx'),
+    /<FinanceWorkspace moduleKey="finance-payments"/u
+  )
+  assert.match(
+    read('web/src/erp/components/finance/FinanceWorkspace.jsx'),
     /helpKey=\{moduleKey\}/u
   )
   const productionLayout = read(

@@ -839,7 +839,7 @@ func TestJsonrpcDispatcher_AdminSetRoleSettingsIsAtomicAndVersioned(t *testing.T
 	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Username: "operator", Role: biz.RoleAdmin})
 	validParams := map[string]any{
 		"role_key":        biz.WarehouseRoleKey,
-		"permission_keys": toAnySliceString(biz.RolePermissionPolicyFor(repo.roleByKey(biz.WarehouseRoleKey)).Required),
+		"permission_keys": toAnySliceString(biz.RolePermissionPolicyFor(repo.roleByKey(biz.WarehouseRoleKey)).Defaults),
 		"data_scopes": []any{
 			map[string]any{
 				"resource_type": biz.DataScopeResourceWarehouse,
@@ -875,7 +875,7 @@ func TestJsonrpcDispatcher_AdminSetRoleSettingsIsAtomicAndVersioned(t *testing.T
 		t.Run(tt.name, func(t *testing.T) {
 			payload := map[string]any{
 				"role_key":             biz.WarehouseRoleKey,
-				"permission_keys":      toAnySliceString(biz.RolePermissionPolicyFor(repo.roleByKey(biz.WarehouseRoleKey)).Required),
+				"permission_keys":      toAnySliceString(biz.RolePermissionPolicyFor(repo.roleByKey(biz.WarehouseRoleKey)).Defaults),
 				"data_scopes":          validParams["data_scopes"],
 				"navigation_mode":      string(biz.RoleNavigationModeRecommended),
 				"primary_menu_paths":   []any{},
@@ -1221,7 +1221,7 @@ func TestJsonrpcDispatcher_AdminEffectiveRoleAccessPreviewsPermissionDraftWithou
 		return nil
 	}
 
-	core := biz.RolePermissionPolicyFor(repo.roleByKey(biz.FinanceRoleKey)).Required
+	core := []string{biz.PermissionFinancePayableRead}
 	coreOnly := previewPrint(core...)
 	if coreOnly["rbac_granted"] != false {
 		t.Fatalf("core-only print entry decision = %#v", coreOnly)

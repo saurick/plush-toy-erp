@@ -74,14 +74,8 @@ export function createPermissionUnifiedScenarios({
     const core = [...document.querySelectorAll('.erp-permission-row')]
       .filter((row) => row.querySelector('input')?.checked)
       .map((row) => row.querySelector('[data-permission-key]')?.dataset.permissionKey)
-    const optional = [...document.querySelectorAll('.erp-role-policy__option input:checked')]
-      .map((input) => input.dataset.permissionKey)
-    return [...core, ...optional].filter(Boolean).sort()
+    return core.filter(Boolean).sort()
   })
-  const expandCore = async (page) => {
-    const button = page.getByRole('button', { name: '查看功能明细', exact: true })
-    if (await button.count()) await button.click()
-  }
   return [
     {
       name: 'permission-center-toolbar-density',
@@ -91,7 +85,7 @@ export function createPermissionUnifiedScenarios({
       deviceScaleFactor: 2,
       themeMode: 'light',
       verify: async (page) => {
-        await expandCore(page)
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         await page.getByRole('table', { name: '岗位功能权限' }).waitFor()
         const workspace = page.locator('.erp-role-center-detail')
         const readGeometry = () => workspace.evaluate((root) => {
@@ -198,7 +192,7 @@ export function createPermissionUnifiedScenarios({
           .locator('.erp-role-template-card')
           .filter({ hasText: '财务' })
           .click()
-        await expandCore(page)
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         const table = page.locator('.erp-role-policy')
         const search = page.getByRole('textbox', { name: '搜索功能或页面' })
         const enter = page.getByRole('button', {
@@ -432,12 +426,9 @@ export function createPermissionUnifiedScenarios({
         assert.deepEqual(await readSelection(page), changed)
         assert.equal(await save.isDisabled(), true)
 
-        // Leaving for the role navigation releases background locks.
-        await page
-          .locator('.erp-role-settings-row')
-          .getByRole('button', { name: '岗位导航', exact: true })
-          .click()
+        await exit.click()
         await fullscreen.waitFor({ state: 'hidden' })
+        await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
         assert.equal(
           await page
             .locator('.erp-role-center-sidebar')
@@ -569,7 +560,7 @@ export function createPermissionUnifiedScenarios({
           .locator('.erp-role-template-card')
           .filter({ hasText: '财务' })
           .click()
-        await expandCore(page)
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         const matrix = page.getByRole('table', { name: '岗位功能权限' })
         await matrix.waitFor()
         if (variant.viewport.width > 800) {
@@ -600,7 +591,7 @@ export function createPermissionUnifiedScenarios({
                   document.querySelector('.erp-admin-content').scrollTop,
                 save: box('.erp-role-center-actions'),
                 search: box('.erp-permission-checklist-toolbar'),
-                settings: box('.erp-role-settings-row'),
+                workspace: box('.erp-role-settings-workspace'),
                 viewport: innerHeight,
               }
             })
@@ -630,7 +621,7 @@ export function createPermissionUnifiedScenarios({
           assert.equal(afterScroll.save.y, beforeScroll.save.y)
           assert(afterScroll.search.y < beforeScroll.search.y, '明细随正文滚动，保存入口保持固定')
           assert(
-            afterScroll.settings.bottom <= afterScroll.viewport,
+            afterScroll.workspace.bottom <= afterScroll.viewport,
             JSON.stringify(afterScroll)
           )
           await page.locator('.erp-role-policy').evaluate((table) => {
@@ -682,12 +673,10 @@ export function createPermissionUnifiedScenarios({
           0,
           '仓库范围默认不应常驻页面'
         )
-        const settingsHeight = await page
-          .locator('.erp-role-settings-row')
-          .evaluate((node) => node.getBoundingClientRect().height)
-        assert(
-          settingsHeight <= (variant.viewport.width < 800 ? 130 : 54),
-          `底部设置不应挤占权限表：${settingsHeight}px`
+        assert.equal(
+          await page.getByRole('group', { name: '岗位页面入口' }).count(),
+          0,
+          '岗位设置底部不再重复显示页面访问与岗位导航入口'
         )
         const inputs = await page
           .locator('.erp-permission-row [data-permission-key]')
@@ -744,10 +733,12 @@ export function createPermissionUnifiedScenarios({
           exact: true,
         })
         assert.equal(await target.isChecked(), true)
-        assert.equal(await target.isDisabled(), true, '核心功能不可撤销')
-        await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).uncheck()
-        const changed = before.filter((key) => key !== 'erp.business_dashboard.read')
-        await page.getByText('待关闭', { exact: true }).waitFor()
+        assert.equal(await target.isEnabled(), true, '预设业务功能可调整')
+        const targetKey = await target.evaluate((input) => input.closest('.erp-permission-row').querySelector('[data-permission-key]').dataset.permissionKey)
+        assert.equal(targetKey, 'finance.reconciliation.confirm')
+        await target.uncheck()
+        const changed = before.filter((key) => key !== targetKey)
+        await page.getByText('有未保存调整', { exact: true }).waitFor()
         await search.fill('')
         await search.press('Enter')
         assert.deepEqual(
@@ -1043,7 +1034,7 @@ export function createPermissionUnifiedScenarios({
           .locator('.erp-role-template-card')
           .filter({ hasText: '财务' })
           .click()
-        await expandCore(page)
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         const search = page.getByRole('textbox', { name: '搜索功能或页面' })
         await search.waitFor()
         await page.screenshot({
@@ -1072,7 +1063,7 @@ export function createPermissionUnifiedScenarios({
             matrixColumns: document.querySelectorAll(
               '.erp-permission-matrix thead th'
             ).length,
-            settings: box('.erp-role-settings-row'),
+            workspace: box('.erp-role-settings-workspace'),
             viewport: innerHeight,
             outerHeight: document.documentElement.scrollHeight,
           }
@@ -1088,7 +1079,7 @@ export function createPermissionUnifiedScenarios({
             geometry.tools.bottom <= geometry.head.bottom &&
             geometry.toolbar.y >= geometry.head.bottom &&
             Math.abs(geometry.toolbar.bottom - geometry.groups.y) <= 1 &&
-            geometry.settings.bottom <= geometry.viewport,
+            geometry.workspace.bottom <= geometry.viewport,
           JSON.stringify(geometry)
         )
         assert.equal(await page.locator('.erp-role-policy-tabs').count(), 0)
@@ -1127,13 +1118,15 @@ export function createPermissionUnifiedScenarios({
         const clear = page
           .locator('.erp-permission-checklist__section')
           .getByRole('button', { name: '清空结果', exact: true })
-        assert.equal(await clear.isEnabled(), false, '筛选不能解除核心职责')
+        assert.equal(await clear.isEnabled(), true, '筛选结果中的预设功能允许清空')
+        await clear.click()
         await search.fill('')
         await search.press('Enter')
-        assert.deepEqual(await readSelection(page), before)
+        const cleared = before.filter((key) => !matchingKeys.includes(key))
+        assert.deepEqual(await readSelection(page), cleared, '清空当前结果保留隐藏功能')
         await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).uncheck()
-        const expected = before.filter((key) => key !== 'erp.business_dashboard.read')
-        assert.deepEqual(await readSelection(page), expected, '辅助选择不得影响核心职责')
+        const expected = cleared.filter((key) => key !== 'erp.business_dashboard.read')
+        assert.deepEqual(await readSelection(page), expected, '单项调整保留其余功能')
         await page
           .getByRole('button', { name: '全部收起', exact: true })
           .click()
@@ -1163,7 +1156,7 @@ export function createPermissionUnifiedScenarios({
           true
         )
         await page.getByRole('tab', { name: /岗位设置/ }).click()
-        await expandCore(page)
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         assert.deepEqual(
           await readSelection(page),
           expected,
@@ -1173,7 +1166,7 @@ export function createPermissionUnifiedScenarios({
         const confirm = page.getByRole('dialog').filter({ hasText: '未保存' })
         await confirm.waitFor()
         await confirm.getByRole('button', { name: /继续/ }).click()
-        await expandCore(page)
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         await page.getByRole('textbox', { name: '搜索功能或页面' }).waitFor()
         await page.getByRole('tab', { name: /员工账号/ }).click()
         await page
@@ -1181,7 +1174,7 @@ export function createPermissionUnifiedScenarios({
           .click()
         await page.getByRole('textbox', { name: '搜索员工账号' }).waitFor()
         await observeSlidingNav(page, '.erp-permission-tabs', 0)
-        await expandCore(page)
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         await page.getByRole('textbox', { name: '搜索功能或页面' }).waitFor()
         await page.emulateMedia({ reducedMotion: 'reduce' })
         await observeSlidingNav(page, '.erp-permission-tabs', 1, {

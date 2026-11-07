@@ -64,7 +64,6 @@ export default function ShipmentFinanceSourceModal({
       <Descriptions
         size="small"
         column={1}
-        style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           {
             key: 'shipment',

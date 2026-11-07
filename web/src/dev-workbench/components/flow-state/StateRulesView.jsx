@@ -157,6 +157,8 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
     [flow]
   )
   const graph = useMemo(() => ({
+    direction: flow.transitions.length > 0 ? 'LR' : 'TB',
+    curve: 'basis',
     entryNodeKeys: flow.initialStates,
     nodes: flow.states.map((item) => ({ ...item, kind: flow.terminalStates.includes(item.key) ? 'terminal' : 'state' })),
     edges: flow.transitions.map((item) => { const { group } = getDevFlowStateTransitionPresentation(flow, item); return { ...item, label: getDevFlowStateTransitionDiagramLabel(item), condition: item.guard, stroke: group.diagramStroke, dasharray: group.diagramStrokeDasharray } }),

@@ -2,6 +2,73 @@ import assert from 'node:assert/strict'
 import { expect as expectLocator } from 'playwright/test'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertTableStickyHeaderAlignment } from './tableStickyHeaderAssertions.mjs'
+import { clickLineItemAction } from './lineEditorActions.mjs'
+
+export async function assertIndependentLineDetails(page, editor, row) {
+  const toggle = row.locator('.erp-line-editor__details-toggle')
+  if (!(await toggle.count())) return
+  const table = row.locator('xpath=ancestor::table[1]')
+  assert.deepEqual((await table.locator('thead th').allTextContents()).slice(0, 2), ['补充', '序号'])
+  assert.equal((await toggle.innerText()).trim(), '', '展开按钮不再包含序号')
+  const host = editor.locator('.erp-line-editor__action-host').first()
+  const selected = await host.locator('[data-line-editor-selected="true"]').innerText()
+  const panelID = await toggle.getAttribute('aria-controls')
+  const panel = row.locator(`[id=${JSON.stringify(panelID)}]`)
+  const initial = await toggle.getAttribute('aria-expanded')
+  await toggle.focus()
+  assert.equal(await host.locator('[data-line-editor-selected="true"]').innerText(), selected, '聚焦展开按钮不切换操作对象')
+  await toggle.press('Space')
+  await waitForFiniteAnimations(page)
+  assert.equal(await toggle.getAttribute('aria-expanded'), initial === 'true' ? 'false' : 'true')
+  assert.equal(await panel.isVisible(), initial !== 'true')
+  assert.equal(await host.locator('[data-line-editor-selected="true"]').innerText(), selected, '键盘展开不切换顶部操作对象')
+  await toggle.click()
+  await waitForFiniteAnimations(page)
+  assert.equal(await toggle.getAttribute('aria-expanded'), initial)
+  assert.equal(await host.locator('[data-line-editor-selected="true"]').innerText(), selected, '鼠标收起不切换顶部操作对象')
+  const geometry = await toggle.evaluate((button) => {
+    const arrow = button.querySelector('.anticon-right')
+    const cell = button.closest('td')
+    const sequence = cell.nextElementSibling
+    return { cellIndex: cell.cellIndex, sequence: sequence.querySelector('.erp-editable-line-group__number')?.textContent, width: cell.getBoundingClientRect().width, sequenceWidth: sequence.getBoundingClientRect().width, arrowSize: arrow && parseFloat(getComputedStyle(arrow).fontSize), buttonWidth: button.getBoundingClientRect().width, buttonHeight: button.getBoundingClientRect().height }
+  })
+  assert.equal(geometry.cellIndex, 0)
+  assert.ok(Math.abs(geometry.width - 44) <= 1 && Math.abs(geometry.sequenceWidth - 44) <= 1, `补充与序号各占窄列 ${JSON.stringify(geometry)}`)
+  assert.equal(geometry.arrowSize, 12, '展开使用现有 Ant 小箭头')
+  assert.ok(geometry.sequence && geometry.buttonWidth >= 32 && geometry.buttonHeight >= 32, JSON.stringify(geometry))
+}
+
+export async function assertCompactLineNoteDisclosure(page, editor, { persistentSelectors = [] } = {}) {
+  await waitForFiniteAnimations(page)
+  const row = editor.locator('.erp-compact-field-table__row:visible').first()
+  const note = row.locator('textarea').first()
+  const compact = await row.evaluate((node) => node.closest('.erp-line-editor')?.dataset.lineEditorCompact === 'true')
+  for (const selector of persistentSelectors) assert.equal(await row.locator(selector).isVisible(), true, '办理字段保持可见')
+  if (compact) {
+    assert.equal(await note.isVisible(), true, '窄区域直接展示备注')
+    assert.equal(await row.locator('.erp-line-editor__details-toggle').count(), 0)
+    return
+  }
+  const toggle = row.locator('.erp-line-editor__details-toggle')
+  assert.equal(await toggle.getAttribute('aria-expanded'), 'false', '桌面备注默认收起')
+  assert.equal(await note.isVisible(), false)
+  const node = await note.elementHandle()
+  const original = await note.inputValue()
+  await toggle.press('Enter')
+  await waitForFiniteAnimations(page)
+  assert.equal(await note.isVisible(), true, '行号箭头支持键盘展开')
+  await note.fill('核对后保留的明细说明')
+  await waitForFiniteAnimations(page)
+  await toggle.click()
+  assert.equal(await note.isVisible(), false)
+  assert.equal(await note.inputValue(), '核对后保留的明细说明', '收起保留草稿')
+  for (const selector of persistentSelectors) assert.equal(await row.locator(selector).isVisible(), true, '收起不隐藏办理字段')
+  await toggle.click()
+  assert.equal(await note.evaluate((current, previous) => current === previous, node), true, '展开不重建备注字段')
+  await note.fill(original)
+  await toggle.click()
+  await node.dispose()
+}
 
 export async function assertLineItemToolbarLayout(page, editor) {
   const controls = editor.locator('.erp-line-item-group-controls:visible').first()
@@ -85,7 +152,8 @@ export async function assertLineItemGroupHeaderInteraction(page, editor) {
       return null
     }, area)
     assert.ok(point, '标题有可点击的业务名称')
-    await page.mouse.click(point.x, point.y)
+    const bounds = await toggle.boundingBox()
+    await toggle.click({ position: { x: point.x - bounds.x, y: point.y - bounds.y } })
   }
   await clickAt('title')
   await expectLocator(toggle).toHaveAttribute('aria-expanded', changed)
@@ -145,7 +213,7 @@ export async function assertBusinessLineItemDisclosure(page, editor) {
   assert.equal(overflow, 0, '分组标题和操作不造成整页横向溢出')
   await editor.getByRole('button', { name: '全部展开', exact: true }).click()
   for (let index = target; index >= 3; index -= 1) {
-    await editor.getByRole('button', { name: `移除第 ${index} 条明细`, exact: true }).click()
+    await clickLineItemAction(rows.nth(index - 1), `移除第 ${index} 条明细`)
   }
   assert.equal(await rows.count(), 2)
   assert.equal(await first.inputValue(), '短毛绒')

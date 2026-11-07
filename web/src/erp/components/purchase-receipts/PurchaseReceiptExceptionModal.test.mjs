@@ -30,12 +30,13 @@ test('purchase exception create modal keeps source fields derived and operator f
   }
 })
 
-test('purchase exception create modal freezes editing and closing while its request is pending', () => {
+test('purchase exception draft uses the shared page with source identity and submission protection', () => {
+  assert.match(source, /<BusinessFormPage/u)
+  assert.match(source, /form=\{form\}/u)
+  assert.match(source, /baselineKey=/u)
   assert.match(source, /confirmLoading=\{loading\}/u)
   assert.match(source, /disabled=\{loading\}/u)
-  assert.match(source, /closable=\{!loading\}/u)
-  assert.match(source, /keyboard=\{!loading\}/u)
-  assert.match(source, /maskClosable=\{!loading\}/u)
+  assert.doesNotMatch(source, /<BusinessModal\b/u)
   assert.match(source, /if \(!loading\) onCancel\?\.\(\)/u)
 })
 

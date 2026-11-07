@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { assertLineItemGroupHeaderInteraction } from './businessLineItemDisclosureAssertions.mjs'
+import { parseRgb } from './colorAssertions.mjs'
+import { assertVisibleRoundedInputWrapperClipping } from './inputControlAssertions.mjs'
 
 const pageTitles = new Set([
   '新建客户档案', '编辑客户',
@@ -10,6 +12,11 @@ const pageTitles = new Set([
   '新建生产订单', '编辑生产订单', '查看生产订单',
   '生成来料质检草稿', '登记收付款', '登记红冲',
   '编辑生产领料草稿', '核对成品收仓草稿', '编辑返工草稿',
+  '从入库单生成采购退货', '登记采购入库调整',
+  '登记库存盘点', '编辑盘点草稿',
+  '登记库存调拨', '编辑调拨草稿',
+  '登记人工库存调整', '编辑人工调整草稿',
+  '委外发料', '登记回货', '编辑委外发料草稿', '编辑委外回货草稿',
   '创建员工账号',
   '新建销售订单',
   '编辑销售订单',
@@ -33,6 +40,7 @@ export function isBusinessFormPageTitle(title) {
 
 export async function assertBusinessFormPage(page, editor) {
   await assertFormInputsExposed(editor)
+  await assertVisibleRoundedInputWrapperClipping(page, '业务编辑页')
   await assertBusinessNoteTextAreas(editor)
   await assertEditorTableHeadersCentered(editor)
   assert.equal(await editor.getByRole('button', { name: '刷新当前页', exact: true }).count(), 0, '整页表单不提供会丢弃编辑内容的常驻刷新')
@@ -148,6 +156,70 @@ export async function assertEditorTableHeadersCentered(editor) {
     assert.ok(Math.abs(header.verticalOffset) <= 2, `列名、必填标记和帮助入口整体上下居中：${detail}`)
   }
   if (headers.length) console.log(`[style:l1] editor-table-headers=${JSON.stringify({ columns: headers.length, tables: [...new Set(headers.map((header) => header.table))], maxHorizontalOffset: Math.max(...headers.map((header) => Math.abs(header.horizontalOffset))), maxVerticalOffset: Math.max(...headers.map((header) => Math.abs(header.verticalOffset))) })}`)
+}
+
+export async function assertSharedLineTableSurface(editor) {
+  const surface = await editor.evaluate((root) => {
+    const candidates = [...root.querySelectorAll('table[data-table-lines="fixed"], .erp-contact-editor__table')].filter((table) => !table.closest('[data-table-sticky-header]') && !table.classList.contains('erp-bom-parts-table'))
+    return {
+      cards: root.querySelectorAll('.erp-task-line-cards').length,
+      empty: root.querySelectorAll('.erp-line-items-empty').length,
+      tables: candidates.map((table) => {
+        const frame = getComputedStyle(table.parentElement)
+        const region = table.parentElement.closest('.app-table-sticky-region') || table.parentElement
+        const heading = region.previousElementSibling
+        const headerGap = heading?.classList.contains('erp-sales-order-lines-form__head') && heading.getClientRects().length ? region.getBoundingClientRect().top - heading.getBoundingClientRect().bottom : null
+        const headers = [...table.querySelectorAll('thead th')].filter((cell) => getComputedStyle(cell).display === 'table-cell' && cell.getBoundingClientRect().width > 0)
+        return {
+          headerGap,
+          shared: table.hasAttribute('data-business-line-table'),
+          label: table.getAttribute('aria-label') || table.closest('[data-form-section]')?.dataset.formSection,
+          frame: { border: frame.borderTopWidth, radius: frame.borderTopLeftRadius },
+          headers: headers.map((cell) => {
+            const style = getComputedStyle(cell)
+            const caption = style.getPropertyValue('--erp-font-caption').trim()
+            const expectedFontSize = caption.endsWith('rem') ? `${parseFloat(caption) * parseFloat(getComputedStyle(document.documentElement).fontSize)}px` : caption
+            return { text: cell.textContent.trim(), height: cell.getBoundingClientRect().height, background: style.backgroundColor, expectedBackground: style.getPropertyValue('--erp-surface-bg-muted').trim(), border: style.borderBottomWidth, fontSize: style.fontSize, expectedFontSize, padding: style.padding }
+          }),
+        }
+      }),
+    }
+  })
+  assert.ok(surface.tables.length || surface.cards || surface.empty, '明细外观回归必须识别共享表格、手机卡片或明确空态')
+  for (const table of surface.tables) assert.equal(table.shared, true, `可编辑明细必须通过 BusinessLineTable：${JSON.stringify(table)}`)
+  const tables = surface.tables.filter((table) => table.headers.length)
+  for (const table of tables) {
+    assert.deepEqual(table.frame, { border: '1px', radius: '6px' }, `明细共用圆角细边框：${JSON.stringify(table)}`)
+    if (table.headerGap !== null) assert.ok(table.headerGap <= 1, `标题与明细表直接贴合，不叠加容器间距：${JSON.stringify(table)}`)
+    for (const header of table.headers) {
+      const detail = JSON.stringify({ table: table.label, ...header })
+      assert.deepEqual(parseRgb(header.background), parseRgb(header.expectedBackground), `普通与紧凑明细共用中性列头底色：${detail}`)
+      assert.equal(header.border, '1px', `列头保留底部分隔线：${detail}`)
+      assert.ok(header.height >= 40, `列头保留相同最小高度：${detail}`)
+      assert.equal(header.fontSize, header.expectedFontSize, `列头沿用所属主题的统一说明字号：${detail}`)
+      assert.equal(header.padding, '8px 6px', `列头沿用统一内边距：${detail}`)
+    }
+  }
+  return tables
+}
+
+export async function assertSharedLineActions(editor) {
+  const actions = await editor.evaluate((root) => [...root.querySelectorAll('button[data-line-item-action], .erp-line-editor__action-host button')].filter((node) => /复制|移除/u.test(node.textContent) && node.getClientRects().length).map((node) => ({
+    label: node.textContent.trim(),
+    kind: node.dataset.lineItemAction,
+    outlined: node.classList.contains('ant-btn-default'),
+    danger: node.classList.contains('ant-btn-dangerous'),
+    height: node.getBoundingClientRect().height,
+    touch: innerWidth < 768,
+  })))
+  assert.ok(actions.length, '行操作回归必须识别至少一个复制或移除按钮')
+  for (const action of actions) {
+    const kind = /移除/u.test(action.label) ? 'remove' : 'copy'
+    assert.equal(action.kind, kind, `行操作复用共享按钮：${JSON.stringify(action)}`)
+    assert.equal(action.outlined, true, `行操作使用统一描边规格：${JSON.stringify(action)}`)
+    assert.equal(action.danger, kind === 'remove', `仅移除使用危险色：${JSON.stringify(action)}`)
+    assert.ok(action.height >= (action.touch ? 44 : 32), `行操作保留标准触区：${JSON.stringify(action)}`)
+  }
 }
 
 export async function assertBusinessNoteTextAreas(root) {

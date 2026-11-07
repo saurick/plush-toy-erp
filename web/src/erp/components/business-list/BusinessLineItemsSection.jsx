@@ -38,6 +38,12 @@ export default function BusinessLineItemsSection({
               ? footerProps(context)
               : footerProps
 
+          const header = (
+            <BusinessLineItemsHeader title={title} description={description} notice={headerNotice} scrollControls>
+              {headerActions ?? normalizedFooterProps?.children}
+            </BusinessLineItemsHeader>
+          )
+
           return (
             <>
               {renderBeforeHeader ? renderBeforeHeader(context) : null}
@@ -58,13 +64,13 @@ export default function BusinessLineItemsSection({
                 </BusinessGroupedLineItems>
               ) : (
                 <BusinessLineEditor>
-                  <BusinessLineItemsHeader title={title} description={description} notice={headerNotice} scrollControls>
-                    {headerActions ?? normalizedFooterProps?.children}
-                  </BusinessLineItemsHeader>
                   {fields.length === 0 ? (
-                    <BusinessLineItemsEmpty>{emptyDescription}</BusinessLineItemsEmpty>
+                    <>
+                      {header}
+                      <BusinessLineItemsEmpty>{emptyDescription}</BusinessLineItemsEmpty>
+                    </>
                   ) : (
-                    <BusinessLineItemsTable columns={columns} label={addLineAriaLabel || title} scrollControlsInToolbar>
+                    <BusinessLineItemsTable header={header} columns={columns} label={addLineAriaLabel || title} scrollControlsInToolbar>
                       {fields.map((field, index) => renderRow({ ...context, field, index }))}
                     </BusinessLineItemsTable>
                   )}

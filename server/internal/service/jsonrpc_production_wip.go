@@ -26,6 +26,8 @@ func (d *jsonrpcDispatcher) handleProductionWIP(ctx context.Context, method, id 
 	}
 
 	switch method {
+	case "list_warehouse_production_work":
+		return id, d.listWarehouseProductionWork(ctx, pm), nil
 	case "prepare_production_outsourcing_order":
 		return id, d.prepareProductionOutsourcing(ctx, pm), nil
 	case "get_production_wip":

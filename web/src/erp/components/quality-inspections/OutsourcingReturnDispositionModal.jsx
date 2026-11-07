@@ -249,7 +249,6 @@ export default function OutsourcingReturnDispositionModal({
           type="info"
           showIcon
           message="品质尚未生成该委外回货的不合格处置草稿。"
-          style={{ marginTop: 12 }}
         />
       ) : null}
       <BusinessForm
@@ -257,7 +256,6 @@ export default function OutsourcingReturnDispositionModal({
         name="outsourcing-return-disposition"
         layout="vertical"
         disabled={loading || readOnly}
-        style={{ marginTop: 12 }}
       >
         {canCreate && sourceInspectionID ? (
           <>

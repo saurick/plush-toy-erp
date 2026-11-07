@@ -257,6 +257,10 @@ const businessSamplePresentationImports = new Set([
   "components/business-list/BusinessFormSection.jsx",
   "components/business-list/BusinessLineItemsSection.jsx",
   "components/business-list/BusinessLineItemsTable.jsx",
+  "components/business-list/BusinessLineItemActionButton.jsx",
+  "components/business-list/BusinessCompactFieldTable.jsx",
+  "components/business-list/BusinessGroupedLineItems.jsx",
+  "components/master-data/ContactFormList.jsx",
   "components/business-list/BusinessTextArea.jsx",
   "components/business-list/BusinessDateInputs.jsx",
   "components/business-list/SourceImportPickerModal.jsx",
@@ -273,8 +277,14 @@ const businessSampleFormStateDependencies = [
   "components/business-list/businessLineItemDisclosure.mjs",
   "components/business-list/BusinessLineItemDisclosureContext.js",
   "components/business-list/useBusinessLineItemGroups.js",
-  "components/business-list/BusinessGroupedLineItems.jsx",
   "components/business-list/BusinessLineItemGroupControls.jsx",
+  "components/business-list/BusinessLineTable.jsx",
+  "components/business-list/BusinessLineItemDetails.jsx",
+  "components/business-list/useLineItemAppendScroll.mjs",
+  "components/business-list/businessLineTable.css",
+  "components/master-data/contactFormRows.mjs",
+  "components/master-data/contactFormList.css",
+  "utils/contactValidation.mjs",
   "components/business-list/BusinessLineEditor.jsx",
   "components/business-list/businessLineEditor.css",
   "utils/adjacentLineItemRuns.mjs",
@@ -319,6 +329,7 @@ const commonSamplePresentationDependencies = [
   "web/src/common/theme/erpThemeMode.mjs",
   "web/src/common/consts/numeric.generated.mjs",
   "web/src/common/consts/statuses.generated.mjs",
+  "web/src/common/consts/policies.generated.mjs",
   "server/internal/biz/admin_erp_appearance.json",
   "server/internal/unitpolicy/units.json",
 ];
@@ -326,6 +337,12 @@ const allowedERPImportsByFile = new Map([
   ["web/src/dev-workbench/components/DevSupplementalHelpExample.jsx", new Set([
     "components/help/BusinessContextHelp",
     "components/business-list/BusinessTextArea.jsx",
+  ])],
+  ["web/src/dev-workbench/components/DevUIBusinessTabComparison.jsx", new Set([
+    "components/business-list/BusinessListLayout.jsx",
+    "components/business-list/BusinessDetailsModal.jsx",
+    "components/business-visualizations/BusinessVisualizationFrame.jsx",
+    "components/ERPPageActions.jsx", "hooks/useBusinessPageContext.js",
   ])],
   ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.jsx", toolbarSamplePresentationImports],
   ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.test.mjs", new Set([
@@ -477,7 +494,12 @@ const allowedERPImportsByFile = new Map([
   ],
   [
     "web/src/dev-workbench/config/devUIDesign.test.mjs",
-    new Set(["config/helpScenarios.mjs", "config/helpManualCatalog.mjs", "config/businessHandbook.mjs"]),
+    new Set([
+      "config/helpScenarios.mjs",
+      "config/helpManualCatalog.mjs",
+      "config/businessHandbook.mjs",
+      "data/bomImportFormat.mjs",
+    ]),
   ],
   [
     "web/src/dev-workbench/pages/customer-config/AssetsPanel.jsx",
@@ -663,6 +685,9 @@ test("shared component consumers read only page presentation metadata", () => {
       assert.equal(isAllowedERPImport(file, `${prefix}config/businessUsabilityCatalog.mjs`), true);
     }
   }
+  const guide = read("web/src/dev-workbench/components/DevSharedComponentGuide.jsx");
+  assert.doesNotMatch(guide, /target="_blank"|PLUSH_WORKBENCH_BUSINESS_ORIGIN|DevUIConsumerLink/u);
+  assert.doesNotMatch(read("web/vite.workbench.config.mjs"), /PLUSH_WORKBENCH_BUSINESS_ORIGIN/u);
 });
 
 function assertBusinessSamplePresentationGraph(readSource = read) {
@@ -780,8 +805,20 @@ test("toolbar sample reuses callback-driven exports within an isolated local con
   }
 });
 
+test("purchase and production tab comparison only consumes isolated presentation components", () => {
+  const file = "web/src/dev-workbench/components/DevUIBusinessTabComparison.jsx";
+  const source = read(file);
+  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+  assert.match(source, /adminProfile: null,\s*moduleWorkspace: null/u);
+  assert.match(source, /ERPPageActionsContext\.Provider value=\{null\}/u);
+  for (const specifier of ["api/masterDataOrderApi.mjs", "pages/PurchaseOrdersPage.jsx", "pages/ProductionExceptionsPage.jsx", "utils/businessModuleGroups.mjs"]) {
+    assert.equal(isAllowedERPImport(file, `@/erp/${specifier}`), false);
+  }
+});
+
 test("business form presentation dependencies reject unregistered imports", () => {
   for (const file of [
+    ...[...businessSamplePresentationImports].map((module) => `web/src/erp/${module}`),
     ...businessSampleFormStateDependencies.map((module) => `web/src/erp/${module}`),
     ...commonSamplePresentationDependencies.filter((module) => /\.[cm]?[jt]sx?$/u.test(module)),
     "web/src/erp/components/workflow/WorkflowTaskImagePlaceholder.jsx",
@@ -804,6 +841,7 @@ test("business form presentation dependencies reject unregistered imports", () =
 
 test("business form presentation dependencies reject business I/O and persistence", () => {
   for (const file of [
+    ...[...businessSamplePresentationImports].map((module) => `web/src/erp/${module}`),
     ...businessSampleFormStateDependencies.map((module) => `web/src/erp/${module}`),
     ...commonSamplePresentationDependencies.filter((module) => /\.[cm]?[jt]sx?$/u.test(module)),
     "web/src/erp/components/workflow/WorkflowTaskImagePlaceholder.jsx",

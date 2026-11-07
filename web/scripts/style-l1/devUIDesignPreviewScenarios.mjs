@@ -63,6 +63,161 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         }
       },
     },
+    ...['customers', 'suppliers'].map((key) => ({
+      name: `dev-ui-design-contact-sidebar-${key}`,
+      path: '/__dev/ui-design',
+      viewport: { width: 1300, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const frame = await waitReady(page)
+        await page.getByRole('button', { name: /全屏预览/u }).click()
+        await frame.locator('.nav-item[data-page="master-hub"]').click()
+        await frame.locator(`[data-action="module-tab"][data-value="${key}"]`).click()
+        const iframe = await page.locator(frameSelector).elementHandle()
+        const documentFrame = await iframe.contentFrame()
+        await iframe.dispose()
+        const viewportWidth = await documentFrame.evaluate(() => innerWidth)
+        const sidebar = frame.locator('#sidebar [data-action="toggle-sidebar"]')
+        await sidebar.click()
+        await waitForFiniteAnimations(documentFrame)
+        await frame.locator('[data-action="new-record"]').click()
+        await waitForFiniteAnimations(documentFrame)
+        const contacts = frame.locator('.compact-contacts')
+        const fields = contacts.locator('.compact-contact-fields').first()
+        const name = contacts.locator('[data-form-field="contact-0-name"]')
+        const note = contacts.locator('[data-form-field="contact-0-note"]')
+        const toggle = contacts.locator('.document-line-details-toggle').first()
+        const toolbar = frame.locator('.form-view .line-editor-toolbar')
+        const inlineActions = contacts.locator('.contact-cell-actions').first()
+        const nameNode = await name.elementHandle()
+        const noteNode = await note.elementHandle()
+        await name.fill('侧栏布局核对联系人')
+        const assertLayout = async (compact, noteVisible) => {
+          await waitForFiniteAnimations(documentFrame)
+          assert.equal(await documentFrame.evaluate(() => innerWidth), viewportWidth, '侧栏操作不改变预览视口')
+          assert.equal(await fields.evaluate((node) => getComputedStyle(node).display === 'grid'), compact)
+          assert.equal(await note.isVisible(), noteVisible, '备注跟随容器布局并保留桌面展开状态')
+          assert.equal(await toggle.isVisible(), !compact)
+          assert.equal(await toolbar.isVisible(), !compact)
+          assert.equal(await inlineActions.isVisible(), compact, '行操作与联系人字段布局同步')
+          assert.equal(await name.evaluate((node, previous) => node === previous, nameNode), true)
+          assert.equal(await note.evaluate((node, previous) => node === previous, noteNode), true)
+          assert.equal(await name.inputValue(), '侧栏布局核对联系人')
+        }
+        await assertLayout(false, false)
+        await sidebar.click()
+        await assertLayout(true, true)
+        const value = '侧栏切换保留的联系人说明\n'.repeat(12)
+        await note.fill(value)
+        await sidebar.click()
+        await assertLayout(false, false)
+        await toggle.click()
+        await assertLayout(false, true)
+        for (const compact of [true, false]) {
+          await sidebar.click()
+          await assertLayout(compact, true)
+          assert.equal(await note.inputValue(), value)
+          assert.ok(await note.evaluate((node) => node.scrollHeight <= node.clientHeight + 1), '容器变窄后长备注完整增高')
+        }
+        await nameNode.dispose()
+        await noteNode.dispose()
+        await page.screenshot({ path: path.join(outputDir, `prototype-${key}-contact-sidebar.png`) })
+      },
+    })),
+    ...['customers', 'suppliers'].map((key) => ({
+      name: `dev-ui-design-contact-notes-${key}`,
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const frame = await waitReady(page)
+        await page.getByRole('button', { name: /全屏预览/u }).click()
+        await frame.locator('.nav-item[data-page="master-hub"]').click()
+        await frame.locator(`[data-action="module-tab"][data-value="${key}"]`).click()
+        await frame.locator('[data-action="new-record"]').click()
+        const contacts = frame.locator('.compact-contacts')
+        const note = contacts.locator('[data-form-field="contact-0-note"]')
+        const toggle = contacts.locator('.document-line-details-toggle').first()
+        assert.equal(await note.isVisible(), false, '桌面联系人备注默认收起')
+        await toggle.click()
+        const value = '联系人交付与联络说明\n'.repeat(10)
+        await note.fill(value)
+        const original = await note.elementHandle()
+        const resize = async (width, visible) => {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 1080 })
+          await waitForFiniteAnimations(page)
+          await note.waitFor({ state: visible ? 'visible' : 'hidden' })
+          assert.equal(await note.inputValue(), value)
+          assert.equal(await note.evaluate((node, previous) => node === previous, original), true, '宽窄切换保留原备注字段')
+          assert.equal(await toggle.isVisible(), width === 1920, '联系人按实际字段布局提供展开入口')
+          if (visible) assert.ok(await note.evaluate((node) => node.scrollHeight <= node.clientHeight + 1), '备注随可用宽度增高，内容不截断')
+        }
+        for (const width of [1000, 390, 1920]) await resize(width, true)
+        assert.equal(await toggle.getAttribute('aria-expanded'), 'true', '返回桌面保留已展开状态')
+        assert.equal(await toggle.getAttribute('aria-label'), '收起第 1 行备注')
+        await toggle.click()
+        for (const width of [1000, 390, 1920]) await resize(width, width !== 1920)
+        assert.equal(await toggle.getAttribute('aria-expanded'), 'false', '窄屏强制展示不改变桌面收起状态')
+        await original.dispose()
+        await page.setViewportSize({ width: 390, height: 844 })
+        await contacts.getByRole('button', { name: '添加联系人', exact: true }).click()
+        const notes = contacts.locator('.compact-contact-note textarea')
+        assert.equal(await notes.count(), 2)
+        assert.equal(await notes.first().isVisible(), true, '窄屏重新渲染联系人时直接显示备注')
+        assert.equal(await notes.nth(1).isVisible(), true, '窄屏新增联系人可直接填写备注')
+        assert.equal(await notes.first().inputValue(), value)
+        await notes.nth(1).fill('窄区域新增的联系人备注')
+        await page.screenshot({ path: path.join(outputDir, `prototype-${key}-contact-notes-narrow.png`) })
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await waitForFiniteAnimations(page)
+        const first = contacts.locator('.compact-contact-row').first()
+        await first.locator('.document-line-details-toggle').click()
+        const columns = await contacts.locator('thead th').count()
+        const fixedSpans = await first.locator('.compact-contact-fields > .document-line-disclosure, .compact-contact-fields > .contact-cell-sequence').evaluateAll((cells) => cells.map((cell) => cell.rowSpan))
+        assert.deepEqual(fixedSpans, [2, 2], '补充和序号两列覆盖整条展开的联系人')
+        assert.equal(await first.locator('.compact-contact-note td').getAttribute('colspan'), String(columns - fixedSpans.length), '备注跨列避让补充和序号列')
+        assert.equal(await first.locator('.contact-cell-sequence').getAttribute('rowspan'), '2')
+        assert.equal(await notes.first().inputValue(), value)
+        assert.equal(await notes.nth(1).inputValue(), '窄区域新增的联系人备注')
+        await page.screenshot({ path: path.join(outputDir, `prototype-${key}-contact-notes-4k.png`), scale: 'device' })
+      },
+    })),
+    {
+      name: 'dev-ui-design-production-line-notes',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const frame = await waitReady(page)
+        await frame.getByRole('button', { name: '生产管理', exact: true }).click()
+        await frame.getByRole('button', { name: '新建生产单', exact: true }).click()
+        const editor = frame.locator('.form-view')
+        const row = editor.locator('tbody[data-form-row="0"]')
+        const note = row.locator('textarea[data-form-field="line-note-0"]')
+        const toggle = row.locator('[data-action="line-details"]')
+        assert.equal(await note.isVisible(), false)
+        assert.equal(await row.locator('[data-form-field="route-0"]').isVisible(), true)
+        assert.equal(await row.locator('[data-form-field="inspection-0"]').isVisible(), true)
+        await toggle.click()
+        await note.fill('原型备注折叠后保留')
+        const original = await note.elementHandle()
+        await toggle.click()
+        assert.equal(await note.isVisible(), false)
+        assert.equal(await note.inputValue(), '原型备注折叠后保留')
+        for (const width of [390, 1920]) {
+          await page.setViewportSize({ width, height: 1080 })
+          await waitForFiniteAnimations(page)
+          assert.equal(await note.isVisible(), width === 390, '窄区域直接展示，桌面恢复原折叠状态')
+          assert.equal(await note.evaluate((node, previous) => node === previous, original), true)
+        }
+        const columns = await row.locator('xpath=ancestor::table[1]').locator('thead th').count()
+        const fixedSpans = await row.locator(':scope > tr:first-child > .document-line-disclosure, :scope > tr:first-child > .document-line-sequence').evaluateAll((cells) => cells.map((cell) => cell.rowSpan))
+        assert.deepEqual(fixedSpans, [2, 2], '补充和序号列保留生产办理字段的整条归属')
+        assert.equal(await row.locator('.document-line-more > td').getAttribute('colspan'), String(columns - fixedSpans.length))
+        await page.screenshot({ path: path.join(outputDir, 'prototype-production-line-notes.png') })
+        await original.dispose()
+      },
+    },
     {
       name: 'dev-ui-design-form-navigation',
       path: '/__dev/ui-design',
@@ -73,6 +228,23 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await frame.getByRole('button', { name: '销售管理', exact: true }).click()
         await frame.getByRole('button', { name: '新建订单', exact: true }).click()
         const editor = frame.locator('.form-view')
+        await editor.getByRole('button', { name: '添加订货明细', exact: true }).click()
+        await waitForFiniteAnimations(page)
+        const tableStyle = await editor.locator('.line-editor-simplified table').first().evaluate((table) => {
+          const cell = table.querySelector('th')
+          const style = getComputedStyle(cell)
+          const frame = getComputedStyle(table.parentElement)
+          return { height: cell.getBoundingClientRect().height, border: style.borderBottomWidth, fontSize: style.fontSize, padding: style.padding, frameBorder: frame.borderTopWidth, radius: frame.borderRadius }
+        })
+        assert.ok(tableStyle.height >= 40, JSON.stringify(tableStyle))
+        assert.equal(tableStyle.border, '1px')
+        assert.equal(tableStyle.fontSize, '12px')
+        assert.equal(tableStyle.padding, '8px 6px')
+        assert.equal(tableStyle.frameBorder, '1px')
+        assert.equal(tableStyle.radius, '6px')
+        const rowActions = editor.locator('.line-editor-toolbar [data-design-line-command]')
+        assert.ok(await rowActions.count(), '独立交互稿保留行操作入口')
+        assert.equal(await rowActions.evaluateAll((nodes) => nodes.every((node) => node.classList.contains('btn') && !node.classList.contains('text-btn'))), true, '独立交互稿行操作使用统一描边按钮')
         assert.equal(await editor.locator('[aria-label="编辑页显示"]').count(), 0, '原型编辑页沿用账号设置，标题栏不重复提供显示切换')
         const chooseDisplay = async (label) => {
           await frame.locator('[data-action="open-account"]').click()

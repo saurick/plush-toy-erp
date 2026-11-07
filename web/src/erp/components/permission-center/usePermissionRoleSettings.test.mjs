@@ -25,7 +25,7 @@ const roles = [
   { role_key: 'finance', name: '财务', permissions: ['sales_order.read'] },
 ].map((role) => ({
   ...role,
-  permission_policy: { template_key: role.role_key, registered: true, required_permissions: role.permissions.filter((key) => key !== 'erp.print_template.read'), optional_permissions: ['erp.print_template.read'] },
+  permission_policy: { template_key: role.role_key, registered: true, default_permissions: role.permissions, assignable_permissions: permissions.map((item) => item.permission_key) },
   version: 1,
   role_type: 'business_default',
   permissions_editable_by_current_admin: true,
@@ -63,7 +63,6 @@ async function mountSettings(t, overrides = {}) {
     loadData: async () => true,
     setSaving() {},
     onOpenRoleAccounts() {},
-    onOpenNavigation() {},
     saving: false,
     ...overrides,
   }
@@ -277,4 +276,34 @@ test('missing server responsibility policy keeps permissions and data scopes rea
   const save = findElement(view.state.roleTemplateTab, (node) => node.props.children === '保存岗位设置')
   assert.equal(save.props.disabled, true)
   assert.equal(view.state.roleConfigurationDirty, false)
+})
+
+test('removing a default or adding another business function creates the exact draft and save payload', async (t) => {
+  const writes = []
+  const view = await mountSettings(t, {
+    adminRpc: { call: async (method, params) => {
+      if (method === 'set_role_settings') {
+        writes.push(params)
+        return { data: { role: { version: params.expected_version + 1 } } }
+      }
+      return { data: {} }
+    } },
+  })
+  await view.render({ permissions, roles })
+  await act(async () => checklist(view).onChange(['sales_order.read']))
+  assert.deepEqual(checklist(view).value, ['sales_order.read'])
+  const save = findElement(view.state.roleTemplateTab, (node) => node.props.children === '保存岗位设置')
+  assert.equal(save.props.disabled, false)
+  await act(async () => save.props.onClick())
+  assert.deepEqual(writes[0].permission_keys, ['sales_order.read'])
+  assert.equal(writes[0].expected_version, 1)
+  await view.render({ roles: [{ ...roles[0], permissions: ['sales_order.read'], version: 2 }, roles[1]] })
+  assert.equal(view.state.roleConfigurationDirty, false)
+  await act(async () => checklist(view).onChange([]))
+  assert.deepEqual(checklist(view).value, [])
+  const clearSave = findElement(view.state.roleTemplateTab, (node) => node.props.children === '保存岗位设置')
+  assert.equal(clearSave.props.disabled, false)
+  await act(async () => clearSave.props.onClick())
+  assert.deepEqual(writes[1].permission_keys, [])
+  assert.equal(writes[1].expected_version, 2)
 })

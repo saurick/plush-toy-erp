@@ -1,5 +1,6 @@
 import { expect } from 'playwright/test'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
+import { switchMermaidLayout } from './mermaidViewerAssertions.mjs'
 import { DEV_FLOW_STATE_CATALOG as catalog } from '../../src/dev-workbench/config/devFlowStateCatalog.mjs'
 
 async function choose(page, label, text) {
@@ -20,7 +21,7 @@ export function createDevBusinessRulesScenarios({ assert, assertNoHorizontalOver
       await page.route('**/__dev/api/qa/coverage{,/snapshot}', (route) => route.fulfill({ json: { status: 'missing', report: null } }))
     },
     verify: async (page) => {
-      const origin = new URL(page.url()).origin
+      const { origin } = new URL(page.url())
       await page.goto(`${origin}/__dev/ui-design?page=workbench`)
       await expect(page.getByRole('heading', { name: '交互设计', exact: true })).toBeVisible()
       await page.goto(`${origin}/__dev/business-rules?flow=master.lifecycle&rule_action=material`)
@@ -93,6 +94,7 @@ export function createDevBusinessRulesScenarios({ assert, assertNoHorizontalOver
       await expect(reader.getByRole('group', { name: '状态转换筛选', exact: true })).toHaveCount(0)
       await expect(reader.getByRole('combobox', { name: '聚焦状态', exact: true })).toHaveCount(0)
       await expect(graph).toHaveAttribute('data-graph-status', 'rendered')
+      await expect(graph.locator('.erp-markdown-mermaid')).toHaveAttribute('data-mermaid-direction', 'LR')
       await expect(graph.locator('[data-graph-node]')).toHaveCount(5)
       await expect(graph.locator('[data-graph-wire]')).toHaveCount(6)
       await graph.locator('[data-graph-node="active"]').click()
@@ -125,6 +127,7 @@ export function createDevBusinessRulesScenarios({ assert, assertNoHorizontalOver
         await expect(record.locator('[data-graph-wire]')).toHaveCount(1)
         await expect(record.locator('[data-graph-wire]')).toHaveAttribute('data-from', 'REVERSED')
         await expect(record.locator('[data-graph-wire]')).toHaveAttribute('data-to', 'POSTED')
+        await expect(record.locator('.erp-markdown-mermaid')).toHaveAttribute('data-mermaid-direction', 'LR')
         await expect(record.locator('.erp-dev-flow-transition-toolbar')).toHaveCount(0)
         await expect(record).toContainText('不修改原行状态')
         await record.locator('[data-graph-node="REVERSED"]').click()
@@ -138,6 +141,25 @@ export function createDevBusinessRulesScenarios({ assert, assertNoHorizontalOver
       const materialsGraph = materials.locator('[data-business-flow]')
       await expect(materialsGraph.locator('[data-graph-node]')).toHaveCount(4)
       await expect(materialsGraph.locator('[data-graph-wire]')).toHaveCount(4)
+      const materialsViewer = materialsGraph.locator('.erp-markdown-mermaid')
+      await expect(materialsViewer).toHaveAttribute('data-mermaid-direction', 'LR')
+      const mainPath = ['SUBMITTED', 'BOSS_APPROVED', 'APPROVED']
+      const centers = () => materialsGraph.evaluate((root, keys) => keys.map((key) => {
+        const box = root.querySelector(`[data-graph-node="${key}"]`).getBoundingClientRect()
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+      }), mainPath)
+      const horizontal = await centers()
+      assert(horizontal.every((point, index) => index === 0 || point.x > horizontal[index - 1].x), '审批主线首次从左到右阅读')
+      await switchMermaidLayout(page, materialsViewer, assert)
+      await expect(materialsGraph).toHaveAttribute('data-graph-status', 'rendered')
+      await expect(materialsViewer).toHaveAttribute('data-mermaid-direction', 'TB')
+      const vertical = await centers()
+      assert(vertical.every((point, index) => index === 0 || point.y > vertical[index - 1].y), '手动切换后主线自上而下，状态与关系保持完整')
+      await expect(materialsGraph.locator('[data-graph-node]')).toHaveCount(4)
+      await expect(materialsGraph.locator('[data-graph-wire]')).toHaveCount(4)
+      await switchMermaidLayout(page, materialsViewer, assert)
+      await expect(materialsGraph).toHaveAttribute('data-graph-status', 'rendered')
+      await expect(materialsViewer).toHaveAttribute('data-mermaid-direction', 'LR')
       for (const name of ['老板批准用料', '老板退回用料', '财务批准采购', '财务退回用料']) await expect(materialsGraph).toContainText(name)
       await materialsGraph.locator('[data-graph-node="BOSS_APPROVED"]').click()
       await expect(materials.locator('[data-transition-key]')).toHaveCount(3)
@@ -186,6 +208,22 @@ export function createDevBusinessRulesScenarios({ assert, assertNoHorizontalOver
       await page.goto(`${origin}/__dev/status-flows?view=states&flow=source.sales_order&state=active`)
       await expect(page.locator('[data-selected-flow="source.sales_order"]')).toBeVisible()
       assert.equal(new URL(page.url()).pathname, '/__dev/business-rules', '规则深链落在唯一入口')
+      await tabs.getByRole('tab', { name: '事实规则', exact: true }).click()
+      const factGraph = page.locator('[data-selected-fact] [data-business-flow]')
+      await expect(factGraph).toHaveAttribute('data-graph-status', 'rendered')
+      await expect(factGraph.locator('.erp-markdown-mermaid')).toHaveAttribute('data-mermaid-direction', 'LR')
+      await expect(factGraph.locator('[data-graph-node]')).toHaveCount(5)
+      await expect(factGraph.locator('[data-graph-wire]')).toHaveCount(4)
+      await assertNoHorizontalOverflow(page, '事实来源、凭证与纠正关系')
+      await page.screenshot({ path: path.join(outputDir, 'business-rules-fact-relations-4k.png'), fullPage: false })
+      await tabs.getByRole('tab', { name: '状态流转', exact: true }).click()
+      await choose(page, '选择状态对象', catalog.flows.find((flow) => flow.lifecycleRules.length).label)
+      const lifecycleGraph = page.locator('[data-master-lifecycle-rules] [data-business-flow]')
+      await expect(lifecycleGraph).toHaveAttribute('data-graph-status', 'rendered')
+      await expect(lifecycleGraph.locator('.erp-markdown-mermaid')).toHaveAttribute('data-mermaid-direction', 'LR')
+      await expect(lifecycleGraph.locator('[data-graph-node]')).toHaveCount(3)
+      await expect(lifecycleGraph.locator('[data-graph-wire]')).toHaveCount(3)
+      await assertNoHorizontalOverflow(page, '启停与历史引用关系')
       await page.goto(`${origin}/__dev/business-rules?flow=unknown-rule`)
       await expect(page.getByRole('alert')).toContainText('无效或过期深链接')
       await expect(page.locator('[data-selected-flow]')).toHaveCount(0)

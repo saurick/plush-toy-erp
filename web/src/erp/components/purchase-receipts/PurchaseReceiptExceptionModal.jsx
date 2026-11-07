@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo } from 'react'
-import { Alert, Button, Form, Input, Space } from 'antd'
-import { MinusCircleOutlined } from '@ant-design/icons'
+import { Alert, Descriptions, Form, Input, Space } from 'antd'
+import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
+
 import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
-import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCompactFieldTable, {
@@ -73,6 +74,7 @@ export default function PurchaseReceiptExceptionModal({
       })),
     [materialOptions, receipt?.items]
   )
+  const firstSourceItemID = itemOptions[0]?.value
 
   useEffect(() => {
     if (!open) return
@@ -81,12 +83,12 @@ export default function PurchaseReceiptExceptionModal({
       [isReturn ? 'returned_at' : 'adjusted_at']: localDateTimeValue(),
       items: [
         {
-          purchase_receipt_item_id: itemOptions[0]?.value,
+          purchase_receipt_item_id: firstSourceItemID,
           ...(isReturn ? {} : { adjust_type: 'QUANTITY_DECREASE' }),
         },
       ],
     })
-  }, [form, isReturn, itemOptions, open, receipt?.id])
+  }, [firstSourceItemID, form, isReturn, open, receipt?.id])
 
   const submit = async () => {
     const values = await form.validateFields()
@@ -94,23 +96,23 @@ export default function PurchaseReceiptExceptionModal({
   }
 
   return (
-    <BusinessModal
+    <BusinessFormPage
       form={form}
+      baselineKey={`${mode}:${receipt?.id || 0}`}
       title={isReturn ? '从入库单生成采购退货' : '登记采购入库调整'}
       open={open}
-      size="lineItems"
       okText={isReturn ? '生成退货草稿' : '生成调整草稿'}
-      cancelText="取消"
       confirmLoading={loading}
-      closable={!loading}
-      destroyOnHidden
-      keyboard={!loading}
-      maskClosable={!loading}
       onCancel={() => {
         if (!loading) onCancel?.()
       }}
       onOk={submit}
     >
+      <Descriptions
+        column={1}
+        size="small"
+        items={[{ key: 'receipt', label: '原采购收货单', children: receipt?.receipt_no || '收货来源待核对' }]}
+      />
       <Alert
         type="warning"
         showIcon
@@ -120,7 +122,7 @@ export default function PurchaseReceiptExceptionModal({
             : '调整会保留原入库记录并生成差额调整记录，不会改写原入库明细。'
         }
       />
-      <BusinessForm form={form} className="erp-business-action-form" layout="vertical" preserve={false} disabled={loading}>
+      <BusinessForm name="purchase-receipt-exception" form={form} className="erp-business-action-form" layout="vertical" preserve={false} disabled={loading}>
         <BusinessFormSection title="整单信息" layout="content">
           <Space size={16} style={{ width: '100%' }} align="start">
             <Form.Item
@@ -162,6 +164,7 @@ export default function PurchaseReceiptExceptionModal({
                   tableProps={{
                     label: detailTitle,
                     showSequence: true,
+                    expandableDetails: true,
                     columns: [
                     { label: '来源明细', required: true },
                     ...(!isReturn
@@ -185,6 +188,7 @@ export default function PurchaseReceiptExceptionModal({
                         className="erp-purchase-receipt-exception-row"
                         label={`${isReturn ? '退货' : '调整'}明细 ${index + 1}`}
                         sequence={index + 1}
+                        detailsToggleLabel="明细备注"
                         cells={[
                           <Form.Item
                             {...field}
@@ -308,15 +312,13 @@ export default function PurchaseReceiptExceptionModal({
                       ].filter(Boolean)}
                         actions={
                         fields.length > 1 ? (
-                          <Button
-                            type="text"
-                            danger
+                          <BusinessLineItemActionButton
+                            action="remove"
                             aria-label={`移除明细 ${index + 1}`}
-                            icon={<MinusCircleOutlined />}
                             onClick={() => remove(field.name)}
                           >
                             移除行
-                          </Button>
+                          </BusinessLineItemActionButton>
                         ) : null
                       }
                       >
@@ -353,6 +355,6 @@ export default function PurchaseReceiptExceptionModal({
           </Form.Item>
         </BusinessFormSection>
       </BusinessForm>
-    </BusinessModal>
+    </BusinessFormPage>
   )
 }

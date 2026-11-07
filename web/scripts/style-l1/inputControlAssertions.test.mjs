@@ -1,7 +1,47 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
-import { assertVisibleBusinessFormControlHeight } from './inputControlAssertions.mjs'
+import {
+  assertVisibleBusinessFormControlHeight,
+  assertVisibleRoundedInputWrapperClipping,
+} from './inputControlAssertions.mjs'
+
+test('select containers leave rounded panels unobscured in business forms and portals', async (t) => {
+  const browser = await chromium.launch({ headless: true })
+  t.after(() => browser.close())
+  const page = await browser.newPage()
+  const css = await Promise.all(['control-foundation.css', 'business-modals.css']
+    .map((file) => readFile(new URL(`../../src/erp/styles/app/${file}`, import.meta.url), 'utf8')))
+  const controls = `
+    <div class="ant-select ant-select-single"><div class="ant-select-selector">含税价</div></div>
+    <div class="ant-select ant-select-multiple"><div class="ant-select-selector">多选</div></div>
+    <div class="ant-select ant-select-disabled"><div class="ant-select-selector">禁用值</div></div>
+    <div class="ant-select ant-select-status-error"><div class="ant-select-selector">错误值</div></div>
+    <div class="ant-select ant-select-auto-complete ant-select-customize-input"><div class="ant-select-selector"><input class="ant-input" value="自动补全"></div></div>`
+  await page.setContent(`<!doctype html><style>${css.join('\n')}
+    .ant-select { display: inline-block; width: 240px; min-height: 34px; }
+    .ant-select-selector { min-height: 34px; border: 1px solid; }
+  </style><div id="root"><form class="erp-business-action-form">${controls}</form></div>
+  <div class="ant-modal"><form class="erp-business-action-form">${controls}</form></div>
+  <div hidden><div class="ant-select" style="background: white">隐藏选择框</div></div>
+  <div class="ant-select-dropdown"><div class="ant-select" style="background: white">浮层内容</div></div>`)
+  const check = () => assertVisibleRoundedInputWrapperClipping(page, '选择框背景层级')
+  assert.equal(await page.locator('.ant-select-selector').count(), 10)
+  await check()
+  const control = page.locator('#root .ant-select-single')
+  for (const paint of [
+    'background: white',
+    'background: rgb(255 255 255 / 20%)',
+    'background-image: linear-gradient(white, white)',
+    'box-shadow: inset 0 1px 0 rgb(15 23 42 / 2%)',
+  ]) {
+    await control.evaluate((node, value) => { node.style.cssText = value }, paint)
+    await assert.rejects(check(), /select-container-paint/u)
+    await control.evaluate((node) => { node.style.cssText = '' })
+  }
+  await check()
+})
 
 test('form height checks accept complete wrapped references and reject clipping or arbitrary size drift', async (t) => {
   const browser = await chromium.launch({ headless: true })

@@ -1,4 +1,5 @@
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import { WarehouseProductionKind } from '../../common/consts/statuses.generated.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 
 export const INVENTORY_VIEWS = [
@@ -10,8 +11,9 @@ export const INVENTORY_VIEWS = [
 export const WAREHOUSE_HANDLING_VIEWS = {
   inbound: [
     { key: 'purchase', label: '采购收货', permission: PermissionCode.PURCHASE_RECEIPT_READ },
-    { key: 'completion', label: '成品入库', permission: PermissionCode.PRODUCTION_FACT_READ, view: 'production', factType: 'FINISHED_GOODS_RECEIPT' },
+    { key: 'completion', label: '成品入库', permission: PermissionCode.PRODUCTION_FACT_READ, workKind: WarehouseProductionKind.RECEIPT },
     { key: 'outsourcing-return', label: '委外回货', permission: PermissionCode.OUTSOURCING_FACT_READ, view: 'outsourcing', factType: 'RETURN_RECEIPT' },
+    { key: 'process-return', label: '工序回货', permission: PermissionCode.PRODUCTION_WIP_READ, workKind: WarehouseProductionKind.RETURN },
   ],
   outbound: [
     { key: 'shipment', label: '销售出货', permission: PermissionCode.SHIPMENT_READ },

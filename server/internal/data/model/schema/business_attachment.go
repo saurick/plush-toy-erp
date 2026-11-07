@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"server/internal/biz"
@@ -19,6 +20,7 @@ type BusinessAttachment struct {
 }
 
 func (BusinessAttachment) Annotations() []schema.Annotation {
+	productImageSlots := append([]string{biz.BusinessAttachmentProductImageSlotPrimary, biz.BusinessAttachmentProductImageSlotSecondary}, biz.BusinessAttachmentProductImageSupplementalSlots()...)
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
@@ -28,7 +30,7 @@ func (BusinessAttachment) Annotations() []schema.Annotation {
 				"business_attachments_object_key_shape":       "length(object_key) IN (44, 76) AND substr(object_key, 1, 12) = 'attachments/' AND object_key = lower(object_key)",
 				"business_attachments_product_image_size_max": "attachment_type <> 'product_image' OR file_size <= 5242880",
 				"business_attachments_sha256_lower_hex":       "length(sha256) = 64 AND sha256 = lower(sha256)",
-				"business_attachments_product_image_contract": "((owner_type = 'product' AND attachment_type = 'product_image' AND slot_key IS NOT NULL AND slot_key IN ('primary', 'secondary') AND mime_type IN ('image/png', 'image/jpeg', 'image/webp')) OR (owner_type <> 'product' AND attachment_type <> 'product_image'))",
+				"business_attachments_product_image_contract": fmt.Sprintf("((owner_type = 'product' AND attachment_type = 'product_image' AND slot_key IS NOT NULL AND slot_key IN ('%s') AND mime_type IN ('image/png', 'image/jpeg', 'image/webp')) OR (owner_type <> 'product' AND attachment_type <> 'product_image'))", strings.Join(productImageSlots, "', '")),
 				"business_attachments_withdrawal_contract":    "((withdrawn_at IS NULL AND withdrawn_by IS NULL AND withdrawal_reason IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND withdrawn_by > 0 AND withdrawal_reason IS NOT NULL AND length(trim(withdrawal_reason)) BETWEEN 1 AND 255 AND owner_type <> 'product' AND attachment_type <> 'product_image'))",
 			},
 		},

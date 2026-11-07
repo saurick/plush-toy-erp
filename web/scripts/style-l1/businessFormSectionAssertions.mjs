@@ -10,7 +10,7 @@ export async function assertBusinessSectionTitleBands(editor) {
   await waitForFiniteAnimations(editor.page())
   const coverage = await editor.evaluate((root) => [...root.querySelectorAll('[data-form-section]')].filter((section) => section.getClientRects().length).map((section) => ({
     title: section.dataset.formSection,
-    headings: [...section.querySelectorAll('.erp-business-form-heading, .erp-line-editor__heading[data-line-items-title="true"]')].filter((heading) => heading.closest('[data-form-section]') === section).map((heading) => heading.querySelector('.erp-business-action-form__section-title-text, h2, strong[role="heading"]')?.textContent.trim()),
+    headings: [...section.querySelectorAll('.erp-business-form-heading')].filter((heading) => heading.closest('[data-form-section]') === section).map((heading) => heading.querySelector('.erp-business-action-form__section-title-text, h2, strong[role="heading"]')?.textContent.trim()),
   })))
   for (const section of coverage) {
     assert.ok(section.headings.includes(section.title), `every visible section retains its shared title in this mode: ${JSON.stringify(section)}`)
@@ -31,6 +31,7 @@ export async function assertBusinessSectionTitleBands(editor) {
         return {
           text: (label || node).textContent.trim().slice(0, 80),
           height: node.getBoundingClientRect().height,
+          overflow: node.scrollWidth - node.clientWidth,
           minimumHeight: style.minHeight,
           background: style.backgroundColor,
           foreground: style.color,
@@ -52,6 +53,7 @@ export async function assertBusinessSectionTitleBands(editor) {
   for (const heading of headings) {
     const detail = JSON.stringify(heading)
     assert.equal(heading.minimumHeight, '32px', `section titles use the compact shared band: ${detail}`)
+    assert.ok(heading.overflow <= 1, `section titles and actions wrap within their own region: ${detail}`)
     assert.ok(heading.background && !['transparent', 'rgba(0, 0, 0, 0)'].includes(heading.background), `section title is distinct from input and table borders: ${detail}`)
     assert.ok(!['none', 'normal'].includes(heading.marker.content) && heading.marker.width === '3px' && heading.marker.height === '14px', `section titles retain their short marker: ${detail}`)
     assert.ok(heading.labelLeft >= 11 && heading.labelLeft <= 13, `title and marker stay aligned when actions wrap: ${detail}`)
@@ -67,18 +69,6 @@ export async function assertBusinessSectionTitleBands(editor) {
     assert.equal(heading.divider, 'none', `section titles do not retain the decorative long divider: ${detail}`)
     if (heading.singleLineLabel) assert.ok(heading.height >= 32 && heading.height <= 34, `a single-line title stays compact: ${detail}`)
   }
-  const editors = await editor.locator('.erp-line-editor__heading[data-line-items-title="true"]').evaluateAll((nodes) => nodes.filter((node) => node.getClientRects().length).map((node) => ({
-    title: node.querySelector('strong[role="heading"]')?.textContent.trim(),
-    height: node.getBoundingClientRect().height,
-    overflow: node.scrollWidth - node.clientWidth,
-    color: getComputedStyle(node).color,
-    background: getComputedStyle(node).backgroundColor,
-  })))
-  for (const heading of editors) {
-    assert.ok(heading.title, `明细工具栏保留可识别标题：${JSON.stringify(heading)}`)
-    assert.ok(heading.height >= 32 && heading.overflow <= 1, `明细标题与动作自然换行：${JSON.stringify(heading)}`)
-    assert.ok(getContrastRatio(parseRgb(heading.color), parseRgb(heading.background)) >= 4.5, `中性明细标题保持可读对比度：${JSON.stringify(heading)}`)
-  }
 }
 
 export async function assertCurrentBusinessSection(page, editor, title) {
@@ -90,8 +80,6 @@ export async function assertCurrentBusinessSection(page, editor, title) {
     return {
     background: getComputedStyle(node).backgroundColor,
     border: getComputedStyle(node).borderTopWidth,
-    borderColor: getComputedStyle(node).borderTopColor,
-    neutralTitle: Boolean(node.querySelector('.erp-line-editor__heading[data-line-items-title="true"]')) && !node.querySelector('.erp-business-form-heading'),
     titleBand: node.querySelector('.erp-business-form-heading') ? getComputedStyle(node.querySelector('.erp-business-form-heading')).backgroundColor : null,
     otherBands: [...root.querySelectorAll('[data-form-section]:not([data-current-form-section="true"]) .erp-business-form-heading')].filter((heading) => heading.getClientRects().length).map((heading) => getComputedStyle(heading).backgroundColor),
     otherBackgrounds: [...root.querySelectorAll('[data-form-section]:not([data-current-form-section="true"])')].filter((section) => section.getClientRects().length).map((section) => ({ title: section.dataset.formSection, background: getComputedStyle(section).backgroundColor, border: getComputedStyle(section).borderTopColor })),
@@ -99,13 +87,7 @@ export async function assertCurrentBusinessSection(page, editor, title) {
   })
   assert.equal(metrics.border, '1px', JSON.stringify(metrics))
   assert.ok(metrics.background && !['transparent', 'rgba(0, 0, 0, 0)'].includes(metrics.background), JSON.stringify(metrics))
-  if (metrics.neutralTitle) {
-    const edge = parseRgb(metrics.borderColor)
-    const fill = parseRgb(metrics.background)
-    assert.ok(edge && fill && edge[3] > 0 && Math.max(...edge.slice(0, 3).map((channel, index) => Math.abs(channel - fill[index]))) >= 8, `中性明细标题通过本分区边框与底色明确当前位置：${JSON.stringify(metrics)}`)
-  }
   for (const otherBand of metrics.otherBands) {
-    if (metrics.neutralTitle) continue
     const current = parseRgb(metrics.titleBand)
     const other = parseRgb(otherBand)
     assert.ok(current && other && Math.max(...current.slice(0, 3).map((channel, index) => Math.abs(channel - other[index]))) >= 20, `the current section is visibly distinct from ordinary title bands: ${JSON.stringify(metrics)}`)
@@ -116,8 +98,57 @@ export async function assertCurrentBusinessSection(page, editor, title) {
   }
 }
 
+export async function assertBusinessLineItemsFooterSpacing(editor) {
+  await waitForFiniteAnimations(editor.page())
+  const metrics = await editor.evaluate((root) => {
+    const visible = (node) => {
+      const box = node.getBoundingClientRect()
+      return box.width > 0 && box.height > 0 && getComputedStyle(node).visibility !== 'hidden'
+    }
+    return [...root.querySelectorAll('.erp-line-items-form__footer')].filter(visible).map((footer) => {
+      let block = footer
+      let previous = null
+      while (block && block !== root) {
+        previous = block.previousElementSibling
+        while (previous && !visible(previous)) previous = previous.previousElementSibling
+        if (previous) break
+        block = block.parentElement
+      }
+      const box = footer.getBoundingClientRect()
+      const style = getComputedStyle(footer)
+      const button = footer.querySelector('.erp-line-items-form__add-button')
+      return {
+        label: button?.textContent.trim() || '明细统计',
+        gapAbove: previous ? box.top - previous.getBoundingClientRect().bottom : null,
+        paddingTop: style.paddingTop,
+        paddingBottom: style.paddingBottom,
+        buttonInset: button ? button.getBoundingClientRect().top - box.top - parseFloat(style.borderTopWidth) : null,
+        overflow: footer.scrollWidth - footer.clientWidth,
+      }
+    })
+  })
+  assert.ok(metrics.length > 0, '实际展示共享明细底栏后核对间距')
+  for (const metric of metrics) {
+    const detail = JSON.stringify(metric)
+    assert.ok(metric.gapAbove !== null && Math.abs(metric.gapAbove - 12) <= 1, `明细与底栏分隔线保留 12px，已有间距不重复叠加: ${detail}`)
+    assert.equal(metric.paddingTop, '10px', `底栏分隔线内侧保持 10px 留白: ${detail}`)
+    assert.equal(metric.paddingBottom, '10px', `底栏下侧保持 10px 留白: ${detail}`)
+    if (metric.buttonInset !== null) assert.ok(metric.buttonInset >= 9, `添加按钮与分隔线不贴边: ${detail}`)
+    assert.ok(metric.overflow <= 1, `明细底栏内容保留在所属区域内: ${detail}`)
+  }
+  if (process.env.STYLE_L1_OUTPUT_DIR) {
+    await appendFile(`${process.env.STYLE_L1_OUTPUT_DIR}/line-items-footer-spacing.jsonl`, `${JSON.stringify({
+      path: new URL(editor.page().url()).pathname,
+      viewport: editor.page().viewportSize(),
+      footers: metrics,
+    })}\n`)
+  }
+  return metrics
+}
+
 export async function assertBusinessSectionSpacing(editor, previous) {
   await waitForFiniteAnimations(editor.page())
+  if (await editor.locator('.erp-line-items-form__footer:visible').count()) await assertBusinessLineItemsFooterSpacing(editor)
   const layout = await editor.evaluate((root) => [...root.querySelectorAll('[data-form-section]')]
     .filter((node) => node.getClientRects().length && !node.parentElement.closest('[data-form-section]'))
     .map((node) => {

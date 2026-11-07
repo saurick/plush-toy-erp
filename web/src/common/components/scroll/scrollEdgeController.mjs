@@ -253,7 +253,11 @@ export function mountScrollEdges(doc = document) {
 
   function update() {
     animationFrame = 0
-    pending.forEach(discover)
+    pending.forEach((root) => {
+      let parent = root.parentElement
+      while (parent && !pending.has(parent)) parent = parent.parentElement
+      if (!parent) discover(root)
+    })
     pending.clear()
     inspect(doc.scrollingElement)
     sticky.forEach((node) => {

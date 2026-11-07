@@ -88,12 +88,91 @@
   margin-block: 8px;
 }
 
-.product-image-slot__meta .ant-typography:first-child {
+.product-image-slot__meta .ant-typography:first-child,
+.product-image-supplemental__caption .ant-typography:first-child {
   min-width: 0;
 }
 
 .product-image-slot__actions {
   min-height: 24px;
+}
+
+.product-image-supplemental {
+  container: product-image-supplemental / inline-size;
+  min-width: 0;
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--product-image-border, #e2e8f0);
+  display: grid;
+  gap: 8px;
+}
+
+.product-image-supplemental__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.product-image-supplemental__count {
+  margin-inline-start: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.product-image-supplemental__feedback {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.product-image-supplemental__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.product-image-supplemental__item {
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid var(--product-image-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--product-image-card, #f8fafc);
+}
+
+.product-image-supplemental__preview {
+  display: grid;
+  place-items: center;
+  inline-size: 100%;
+  aspect-ratio: 3 / 2;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--product-image-border, #e2e8f0);
+  border-radius: 5px;
+  background: var(--product-image-preview, #fff);
+}
+
+.product-image-supplemental__preview > img {
+  inline-size: 100%;
+  block-size: 100%;
+  min-block-size: 0;
+  object-fit: contain;
+}
+
+.product-image-supplemental__caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  padding-block-start: 4px;
+}
+
+@container product-image-supplemental (max-width: 560px) {
+  .product-image-supplemental__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .product-image-slots__modal-preview {
@@ -115,6 +194,9 @@
 }
 
 [data-erp-theme='dark'] .product-image-slots {
+  --product-image-border: #334155;
+  --product-image-card: #111c30;
+  --product-image-preview: #020617;
   border-color: #475569;
   background: #0f172a;
 }

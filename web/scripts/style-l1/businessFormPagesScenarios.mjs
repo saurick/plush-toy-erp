@@ -136,6 +136,7 @@ export function createBusinessFormPagesScenarios(deps) {
         deps.assert.deepEqual(
           headers.map((value) => value.replace(/\*|\s/gu, '')),
           [
+            '补充',
             '序号',
             '加工品类/对象',
             '加工项目/工序',

@@ -7,6 +7,38 @@ import {
   createReactTestHarness,
 } from '../../../../scripts/test/reactRuntime.mjs'
 
+test('an editor temporarily hidden for a nested form restores its original list trigger', async (t) => {
+  const ui = await createReactTestHarness(t)
+  const [{ createMemoryRouter, RouterProvider }, { ERPThemeProvider }, { default: Page }, { BusinessEditorPaneContext }] = await Promise.all([
+    import('react-router-dom'), import('../../../common/theme/erpTheme.jsx'), import('./BusinessFormPage.jsx'), import('./BusinessFormPageContext.js'),
+  ])
+  const trigger = document.createElement('button')
+  const nested = document.createElement('button')
+  document.body.append(trigger, nested)
+  t.after(() => { trigger.remove(); nested.remove() })
+  trigger.focus()
+  let setVisible
+  function Harness() {
+    const [open, setOpen] = useState(true)
+    const [active, setActive] = useState(true)
+    setVisible = setActive
+    return createElement(BusinessEditorPaneContext.Provider, { value: { active, autoFocus: false } }, createElement(Page, { open, title: '合同办理', onCancel: () => setOpen(false) }))
+  }
+  const router = createMemoryRouter([{ path: '*', element: createElement(Harness) }])
+  t.after(() => router.dispose())
+  await ui.render(createElement(ERPThemeProvider, null, createElement(RouterProvider, { router, future: { v7_startTransition: true } })))
+  const frames = () => ui.act(() => new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))))
+  await frames()
+  await ui.act(async () => setVisible(false))
+  nested.focus()
+  await ui.act(async () => setVisible(true))
+  await frames()
+  const back = [...ui.container.querySelectorAll('button')].find((button) => button.textContent === '返回列表')
+  await ui.act(async () => back.click())
+  await frames()
+  assert.equal(document.activeElement === trigger, true)
+})
+
 test('task form owns its footer without duplicate page actions or focus jumps, and closed sibling forms do not clear editing', async (t) => {
   const ui = await createReactTestHarness(t)
   const { ERPThemeProvider } = await import('../../../common/theme/erpTheme.jsx')

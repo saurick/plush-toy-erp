@@ -58,6 +58,8 @@ test('点击或聚焦明细直接选行，顶部操作跟随当前行且保留�
   await ui.fill(name, '本单面料')
   assert.equal(selected().textContent.includes('第 1 行 · 本单面料'), true, '键盘进入字段后操作对象跟随所在行')
   await ui.click(second.querySelector('button[aria-controls]'))
+  assert.equal(selected().textContent.includes('第 1 行 · 本单面料'), true, '展开另一行保持原操作对象')
+  await act(() => note.focus())
   await ui.fill(note, '保留当前行备注')
   assert.equal(selected().textContent.includes('第 2 行 · 填充棉'), true)
   assert.equal(row(0).querySelector('[id$="name"]') === name, true)

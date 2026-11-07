@@ -59,6 +59,8 @@
 
 :is(.erp-business-form, .erp-business-action-form) :where(.ant-input-textarea-affix-wrapper),
 :where(#root, .ant-modal, .ant-drawer) .erp-business-textarea.ant-input-textarea-affix-wrapper {
+  --erp-textarea-border-block: 0px;
+
   height: auto;
   min-height: var(--erp-control-height, var(--erp-form-control-height, 36px));
   padding-block: 0;
@@ -66,10 +68,13 @@
 
 :is(.erp-business-form, .erp-business-action-form) :where(textarea.ant-input),
 :where(#root, .ant-modal, .ant-drawer) :is(textarea.erp-business-textarea, .erp-business-textarea textarea) {
+  --erp-textarea-padding-block: max(0px, calc((var(--erp-control-height, var(--erp-form-control-height, 36px)) - 2px - 1lh) / 2));
+  --erp-textarea-min-height: calc(var(--erp-textarea-rows, 2) * 1lh + var(--erp-textarea-padding-block) + var(--erp-textarea-padding-bottom, var(--erp-textarea-padding-block)) + var(--erp-textarea-border-block, 2px));
+
   height: auto;
-  min-height: calc(var(--erp-control-height, var(--erp-form-control-height, 36px)) + (var(--erp-textarea-rows, 2) - 1) * 1lh);
-  /* 一行留白消费标准框高，换行后的增高继续由 TextArea 测量。 */
-  padding-block: max(0px, calc((var(--erp-control-height, var(--erp-form-control-height, 36px)) - 2px - 1lh) / 2));
+  /* 最小行数直接使用实际行高，避免逐行取整累积；外壳边框只计一次。 */
+  min-height: var(--erp-textarea-min-height);
+  padding-block: var(--erp-textarea-padding-block) var(--erp-textarea-padding-bottom, var(--erp-textarea-padding-block));
 }
 
 .erp-business-date-input.ant-picker {
@@ -108,13 +113,15 @@
 }
 
 .ant-input-textarea-show-count {
+  --erp-textarea-padding-bottom: max(30px, 1.8em);
+
   position: relative;
   display: block;
 }
 
 .ant-input-textarea-show-count > textarea.ant-input,
 .ant-input-textarea-show-count .ant-input-textarea-affix-wrapper {
-  padding-block-end: max(30px, 1.8em);
+  padding-block-end: var(--erp-textarea-padding-bottom);
 }
 
 .ant-input-textarea-show-count .ant-input-data-count {
@@ -492,6 +499,7 @@ body :is(.ant-modal, .erp-task-action-drawer) .erp-business-form textarea.ant-in
   transition-property: color, background-color, border-color, box-shadow;
 }
 
+.erp-task-line-card .ant-select-single,
 .erp-task-line-card .ant-select-single .ant-select-selector {
   min-height: 44px;
 }

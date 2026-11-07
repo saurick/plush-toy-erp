@@ -172,6 +172,10 @@ export default function BusinessFormPage({
   const openRef = useRef(open)
   openRef.current = open
   const triggerRef = useRef(null)
+  const triggerCapturedRef = useRef(false)
+  useLayoutEffect(() => {
+    if (!open) triggerCapturedRef.current = false
+  }, [open])
   const scrollPositionRef = useRef(null)
   const leavingRef = useRef(false)
   const overlayVisible = useOverlayScope()?.visible
@@ -299,7 +303,11 @@ export default function BusinessFormPage({
     focusedRef.current = false
     if (!visible) return undefined
     leavingRef.current = false
-    triggerRef.current = document.activeElement
+    // Hiding an editor for a nested form keeps its original return target.
+    if (!triggerCapturedRef.current) {
+      triggerRef.current = document.activeElement
+      triggerCapturedRef.current = true
+    }
     const scroller = pageRef.current?.closest('[data-erp-split-pane], .ant-drawer-body, .erp-admin-content, .mobile-business-layout__content, .mobile-role-tasks-page__detail-main')
     const layout = pageRef.current?.closest('.erp-business-page-layout')
     const toolbarWorkspace = layout?.closest('.erp-business-toolbar-workspace')

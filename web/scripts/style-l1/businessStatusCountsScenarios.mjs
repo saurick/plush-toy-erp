@@ -368,8 +368,9 @@ viewport: { width: 1440, height: 900 },
             await page.keyboard.press('Escape')
           }
           if (label === '收付款状态') {
-            await page.getByRole('tab', { name: '红冲记录', exact: true }).click()
-            await ready(page, 0, '红冲状态')
+            await page.getByRole('tab', { name: '应收', exact: true }).click()
+            await page.getByRole('tab', { name: '账款调整', exact: true }).click()
+            await ready(page, 0, '账款调整状态')
           }
           await assertNoHorizontalOverflow(page, url)
         }

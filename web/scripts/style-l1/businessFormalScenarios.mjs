@@ -1,6 +1,8 @@
 import { createBusinessFormPagesScenarios } from './businessFormPagesScenarios.mjs'
 import { createSalesOrderSubmissionScenarios } from './salesOrderSubmissionScenarios.mjs'
 import { createWarehouseClassificationScenarios } from './warehouseClassificationScenarios.mjs'
+import { createWarehouseProductionWorkScenarios } from './warehouseProductionWorkScenarios.mjs'
+import { createWarehouseDraftPageScenarios } from './warehouseDraftPageScenarios.mjs'
 import { createOrderEngineeringScenarios } from './orderEngineeringScenarios.mjs'
 import { createBOMTaskActionsScenarios } from './bomTaskActionsScenarios.mjs'
 import { createBOMRevisionScenarios } from './bomRevisionScenarios.mjs'
@@ -55,6 +57,8 @@ export function createBusinessFormalScenarios(deps) {
     ...createPurchaseLineDetailsScenarios(deps),
     ...createLineEditorsToolbarScenarios(deps),
     ...createWarehouseClassificationScenarios(deps),
+    ...createWarehouseProductionWorkScenarios(deps),
+    ...createWarehouseDraftPageScenarios(deps),
     ...createOrderEngineeringScenarios(deps),
     ...createOutsourcingSourceFactScenarios(deps),
     ...createProductionSourceInboundLotScenarios(deps),

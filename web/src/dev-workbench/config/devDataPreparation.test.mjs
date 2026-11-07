@@ -1158,7 +1158,7 @@ test('page defaults to the latest business-chain regression while retaining dail
 })
 
 test('incremental data flow stays reviewable and synchronized with the workbench design', () => {
-  assert.match(DEV_DATA_PREPARATION_INCREMENTAL_FLOW, /^flowchart TD/u)
+  assert.match(DEV_DATA_PREPARATION_INCREMENTAL_FLOW, /^flowchart LR/u)
   assert.match(
     DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
     /业务数据摘要或阶段逻辑指纹变化/u

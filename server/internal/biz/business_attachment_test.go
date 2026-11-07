@@ -46,7 +46,7 @@ func (r *stubBusinessAttachmentRepo) CreateBusinessAttachment(_ context.Context,
 	}, nil
 }
 
-func (r *stubBusinessAttachmentRepo) ClearProductImage(_ context.Context, productID int, slotKey string) error {
+func (r *stubBusinessAttachmentRepo) ClearProductImage(_ context.Context, productID int, slotKey string, _ int) error {
 	r.clearCalls++
 	r.clearProduct = productID
 	r.clearSlot = slotKey
@@ -460,13 +460,13 @@ func TestBusinessAttachmentPrintAppendixContract(t *testing.T) {
 func TestBusinessAttachmentClearProductImageNormalizesAndRestrictsSlot(t *testing.T) {
 	repo := &stubBusinessAttachmentRepo{ownerExists: true}
 	uc := NewBusinessAttachmentUsecase(repo)
-	if err := uc.ClearProductImage(context.Background(), 7, " SECONDARY "); err != nil {
+	if err := uc.ClearProductImage(context.Background(), 7, " SECONDARY ", 0); err != nil {
 		t.Fatalf("clear product image: %v", err)
 	}
 	if repo.clearCalls != 1 || repo.clearProduct != 7 || repo.clearSlot != BusinessAttachmentProductImageSlotSecondary {
 		t.Fatalf("unexpected clear call: calls=%d product=%d slot=%q", repo.clearCalls, repo.clearProduct, repo.clearSlot)
 	}
-	if err := uc.ClearProductImage(context.Background(), 7, "gallery"); !errors.Is(err, ErrBadParam) {
+	if err := uc.ClearProductImage(context.Background(), 7, "gallery", 0); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("invalid clear slot error = %v, want bad param", err)
 	}
 	if repo.clearCalls != 1 {

@@ -53,6 +53,24 @@ test('production draft edit emits only CAS and operator-owned fields', () => {
   assert.equal(request.new_lot_no, 'FG-NEW-01')
 })
 
+test('material issue drafts use their existing-lot field without an inbound-only mode selector', () => {
+  for (const action of [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE, OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_MATERIAL_ISSUE]) {
+    const values = { warehouse_id: 7, lot_id: 5, quantity: '3', occurred_at: '2026-08-09T09:30' }
+    const request = buildOperationalFactDraftSavePayload(action, values, original)
+    assert.equal(request.lot_id, 5)
+    assert.equal(Object.hasOwn(request, 'lot_selection'), false)
+    assert.throws(() => buildOperationalFactDraftSavePayload(action, { ...values, lot_id: undefined }, original), /批次/u)
+    assert.throws(() => buildOperationalFactDraftSavePayload(action, { ...values, new_lot_no: 'NOT-AN-OUTBOUND-LOT' }, original), /批次/u)
+    assert.throws(() => buildOperationalFactDraftSavePayload(action, { ...values, lot_id: undefined, new_lot_no: 'NOT-AN-OUTBOUND-LOT' }, original), /批次/u)
+  }
+})
+
+test('inbound drafts still require the explicit existing or new lot selection', () => {
+  for (const action of [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION, OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_RETURN_RECEIPT]) {
+    assert.throws(() => buildOperationalFactDraftSavePayload(action, { warehouse_id: 7, lot_id: 5, quantity: '3', occurred_at: '2026-08-09T09:30' }, original), /批次/u)
+  }
+})
+
 test('rework draft edit preserves source identity outside the request', () => {
   const action =
     OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION

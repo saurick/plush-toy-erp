@@ -5,6 +5,7 @@ import {
 } from './devBusinessChainProjection.mjs'
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { buildFulfillmentOverview } from './devFulfillmentPresentation.mjs'
+import { formatBusinessGraphLabel, splitBusinessFlowForPrint } from '../../common/components/markdown/mermaidGraph.mjs'
 
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED = '当前正式合同未定义'
 
@@ -170,14 +171,6 @@ function nodeNext(chain, node) {
   ).join('；')
 }
 
-function escapeMermaid(value) {
-  return String(value || '')
-    .trim()
-    .replaceAll('\\', '\\\\')
-    .replaceAll('"', '\\"')
-    .replaceAll('\n', ' ')
-}
-
 function isAttentionEdge(chain, edge) {
   return (
     ATTENTION_EDGE_KINDS.has(edge.kind) ||
@@ -215,19 +208,20 @@ function appendDiagramStyles(lines) {
   )
 }
 
-function buildChainDiagram(chain, steps) {
+function buildChainDiagramSource(chain, steps, positions) {
   const ids = new Map(
     chain.nodes.map((node, index) => [node.key, `N${index + 1}`])
   )
-  const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 24', '    rankSpacing: 24', '---', 'flowchart TB']
-  chain.nodes.forEach((node, index) => {
+  const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 24', '    rankSpacing: 24', '---', 'flowchart LR']
+  chain.nodes.forEach((node) => {
+    const index = positions.get(node.key)
     lines.push(
-      `  ${ids.get(node.key)}["${index + 1}. ${escapeMermaid(node.label)}<br/>${escapeMermaid(steps[index].responsibleRole)}"]`
+      `  ${ids.get(node.key)}["${formatBusinessGraphLabel(`${index + 1}. ${node.label}\n${steps[index].responsibleRole}`)}"]`
     )
   })
   chain.edges.forEach((edge, index) => {
     lines.push(
-      `  ${ids.get(edge.from)} -->|"${escapeMermaid(edge.label)}"| ${ids.get(edge.to)}`
+      `  ${ids.get(edge.from)} -->|"${formatBusinessGraphLabel(edge.label)}"| ${ids.get(edge.to)}`
     )
     if (isAttentionEdge(chain, edge)) {
       lines.push(
@@ -241,10 +235,19 @@ function buildChainDiagram(chain, steps) {
       `  class ${ids.get(node.key)} ${diagramToneForNode(chain, node)}`
     )
   })
+  return lines.join('\n')
+}
+
+function buildChainDiagram(chain, steps) {
+  const positions = new Map(chain.nodes.map((node, index) => [node.key, index]))
+  const parts = splitBusinessFlowForPrint(chain).map((part, index) => Object.freeze({
+    key: `${chain.key}:${index + 1}`,
+    mermaidSource: buildChainDiagramSource(part, steps, positions),
+  }))
   return Object.freeze({
     title: '流程关系',
-    description: '按箭头看主路径；有分支时按箭头文字选择去向。',
-    mermaidSource: lines.join('\n'),
+    description: '按箭头看主路径；跨段按同编号、同名节点衔接，有分支时按箭头文字选择去向。',
+    parts: Object.freeze(parts),
     legend: DIAGRAM_LEGEND,
   })
 }

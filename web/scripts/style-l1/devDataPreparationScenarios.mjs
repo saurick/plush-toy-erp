@@ -323,6 +323,17 @@ export function createDevDataPreparationScenarios({
       verify: async (page) => {
         await expectHeading(page, '选择要准备的数据')
         await page.getByText('数据目标：本地开发库', { exact: true }).waitFor()
+        const contractDisclosure = page.getByText('环境与数据合同', { exact: true })
+        await contractDisclosure.click()
+        const contract = page.getByRole('region', { name: '统一数据合同' })
+        const batchLabel = contract.getByText(/^\d{1,2} 月 \d{1,2} 日手测数据（YS\d+）$/u)
+        await batchLabel.waitFor()
+        assert.equal(await batchLabel.count(), 1)
+        assert.ok((await batchLabel.innerText()).endsWith(`（${MANUAL_ACCEPTANCE_CORE_CONTRACT.visiblePrefix}）`))
+        for (const raw of [MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion, MANUAL_ACCEPTANCE_CORE_CONTRACT.runId]) {
+          assert.equal(await contract.getByText(raw, { exact: true }).count(), 0)
+        }
+        await contractDisclosure.click()
         assert.equal(
           await page
             .getByRole('radio', { name: '长期业务场景数据', exact: true })
@@ -470,7 +481,17 @@ export function createDevDataPreparationScenarios({
         validateDevDataPreparationOperation(fixture.operation)
         fixture.summary.currentOperations = [fixture.operation]
         await page.getByRole('button', { name: '重新检查', exact: true }).click()
-        await page.getByRole('region', { name: '本次回执', exact: true }).waitFor()
+        const receipt = page.getByRole('region', { name: '本次回执', exact: true })
+        await receipt.waitFor()
+        const technical = receipt.locator('.erp-dev-data-operation-technical')
+        assert.equal(await technical.getByText('数据合同标识', { exact: true }).isVisible(), false)
+        await technical.locator('summary').click()
+        await technical.getByText('执行编号', { exact: true }).waitFor()
+        await technical.getByText(
+          `${MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion} / ${MANUAL_ACCEPTANCE_CORE_CONTRACT.runId}`,
+          { exact: true }
+        ).waitFor()
+        await technical.locator('summary').click()
         assert.equal(new URL(page.url()).searchParams.get('view'), 'receipts')
         await page.getByText('本地与服务器记录', { exact: true }).waitFor()
         assert.equal(await page.getByRole('tab', { name: '当前批次', exact: true }).count(), 0)

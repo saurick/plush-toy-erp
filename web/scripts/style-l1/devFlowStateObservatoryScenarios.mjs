@@ -28,7 +28,7 @@ export function createDevFlowStateObservatoryScenarios(deps) {
       const guide = page.locator('#task-fulfillment-guide')
       await expect(guide.locator('[data-chain-stage]')).toHaveCount(17)
       await guide.getByRole('button', { name: '11 皮套检验', exact: true }).click()
-      await expect(guide.locator('[data-stage-normal="shell_quality"] [data-business-flow]')).toHaveAttribute('data-graph-status', 'rendered')
+      await expect(guide.locator('[data-stage-normal="shell_quality"]').getByRole('region', { name: '皮套检验流程图', exact: true })).toHaveAttribute('data-graph-status', 'rendered')
       await expect(page.getByRole('link', { name: '业务规则', exact: true })).toBeVisible()
       await assertNoHorizontalOverflow(page)
       assert.deepEqual(writes.get(page), [], '结构页面保持只读')

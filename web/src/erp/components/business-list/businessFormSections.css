@@ -130,6 +130,13 @@
   padding: 10px 12px;
 }
 
+.erp-business-form-section__content:has(> .erp-line-items-form__footer),
+.erp-business-form-section__fields:has(> .erp-line-items-form__footer) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
 .erp-business-form-section[data-heading='inline'] > :is(.erp-business-form-section__fields, .erp-business-form-section__content) {
   padding: 0;
 }

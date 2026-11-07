@@ -139,7 +139,7 @@ export function createPermissionRoleSwitchScenarios() {
         ].map((role) => ({
           ...role,
           permission_policy: { template_key: role.role_key, registered: true,
-            required_permissions: ['customer.read', 'sales_order.read'], optional_permissions: ['erp.business_dashboard.read'] },
+            default_permissions: ['customer.read', 'sales_order.read'], assignable_permissions: permissions.map((item) => item.permission_key) },
           role_type: 'business_default',
           version: 1,
           navigation_mode: 'custom',

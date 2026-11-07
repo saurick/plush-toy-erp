@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import { createBusinessFormPagesScenarios } from './businessFormPagesScenarios.mjs'
-import { assertEditorTableHeadersCentered } from './businessFormPageAssertions.mjs'
+import { assertEditorTableHeadersCentered, assertSharedLineTableSurface, assertSharedLineActions } from './businessFormPageAssertions.mjs'
+import { assertBusinessLineItemsFooterSpacing, assertBusinessSectionTitleBands, assertCurrentBusinessSection } from './businessFormSectionAssertions.mjs'
 import { clickLineItemAction, revealLineItemDetails, selectLineItem } from './lineEditorActions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { assertCompactLineNoteDisclosure, assertIndependentLineDetails } from './businessLineItemDisclosureAssertions.mjs'
+import { assertVisibleControlPlaceholdersFit } from './inputControlAssertions.mjs'
 
 const editors = [
   ['sales', '新建订单', '新建销售订单', '添加订货明细', '.erp-sales-order-lines-form__row', '订单数量'],
@@ -33,6 +36,17 @@ export function createLineEditorsToolbarScenarios(deps) {
       else await editor.getByRole('heading', { name: title, exact: true }).waitFor()
       const rows = editor.locator(rowSelector)
       while (await rows.count() < 2) await editor.getByRole('button', { name: add, exact: true }).click()
+      await waitForFiniteAnimations(page)
+      await assertBusinessLineItemsFooterSpacing(editor)
+      await assertSharedLineTableSurface(editor)
+      await assertSharedLineActions(editor)
+      if (key === 'production') {
+        await assertCompactLineNoteDisclosure(page, editor, { persistentSelectors: ['input[id$="_route_code"]', 'button[id$="_customer_inspection_required"]'] })
+        await assertSharedLineTableSurface(editor)
+        await editor.getByLabel('计划数量', { exact: true }).first().focus()
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: `${deps.outputDir}/production-order-shared-header-default.png` })
+      }
       const first = rows.first()
       const scope = first.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " erp-line-editor ")][1]')
       await page.waitForFunction((node) => node.dataset.lineEditorCompact === 'false', await scope.elementHandle())
@@ -51,11 +65,33 @@ export function createLineEditorsToolbarScenarios(deps) {
       const fields = first.getByLabel(fieldLabel, { exact: true })
       const value = ['customers', 'suppliers', 'quality'].includes(key) ? '操作区核对条目' : '12'
       await fields.fill(value)
+      if (key === 'sales') {
+        const amount = first.locator('.erp-line-item-field--money input[readonly]')
+        assert.equal(await amount.getAttribute('placeholder'), '待核对', '金额栏使用短状态提示')
+        await first.getByText('请先选择已配置精度的单位', { exact: true }).waitFor()
+        await assertVisibleControlPlaceholdersFit(page, 'line-editor-toolbar-sales-invalid-unit')
+        const unitSelector = first.getByLabel('单位', { exact: true }).locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+        await unitSelector.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option[title="个"]').click()
+        await first.getByText('请先选择已配置精度的单位', { exact: true }).waitFor({ state: 'hidden' })
+        await first.getByLabel('单价', { exact: true }).fill('2.5')
+        assert.equal(await amount.getAttribute('placeholder'), '自动计算')
+        assert.equal(Number(await amount.inputValue()), 30, '补齐合法单位后仍按原数量和单价计算金额')
+      }
+      if (key === 'quality') {
+        await assertVisibleControlPlaceholdersFit(page, 'line-editor-toolbar-quality-empty-fields')
+        await first.getByLabel('实际情况', { exact: true }).fill('样品无明显色差')
+        const scopeSelector = first.getByLabel('检查范围', { exact: true }).locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+        await scopeSelector.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^全检$/u }).click()
+        assert.equal(await scopeSelector.locator('.ant-select-selection-item').innerText(), '全检')
+      }
       const fieldNode = await fields.elementHandle()
       await selectLineItem(first)
       const host = scope.locator('.erp-line-editor__action-host')
       assert.equal(await scope.locator('.erp-line-editor__row-marker input').count(), 0, '行选择不增加圆圈或独立控件')
       assert.match(await host.locator('[data-line-editor-selected="true"]').innerText(), /第 1 行/u)
+      await assertIndependentLineDetails(page, editor, rows.nth(1))
       await revealLineItemDetails(rows.nth(1))
       await selectLineItem(rows.nth(1))
       assert.match(await host.locator('[data-line-editor-selected="true"]').innerText(), /第 2 行/u, '点击另一行后操作跟随所在行')
@@ -83,6 +119,11 @@ export function createLineEditorsToolbarScenarios(deps) {
       })
       assert.equal(await host.locator('[data-line-editor-selected="true"]').count(), 0, '移除后清空选择')
       assert.equal(await fields.inputValue(), value)
+      if (key === 'quality') {
+        assert.equal(await first.getByLabel('实际情况', { exact: true }).inputValue(), '样品无明显色差')
+        const scopeSelector = first.getByLabel('检查范围', { exact: true }).locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+        assert.equal(await scopeSelector.locator('.ant-select-selection-item').innerText(), '全检', '移除相邻检查项后保留原检查范围')
+      }
       assert.equal(await fields.evaluate((node, previous) => node === previous, fieldNode), true)
       if (key === 'purchase') {
         assert.equal(await rows.last().locator('.erp-purchase-line-summary').count(), 0, '插入复制行后空白行不串用相邻摘要')
@@ -95,8 +136,15 @@ export function createLineEditorsToolbarScenarios(deps) {
         await selectLineItem(rows.nth(2))
         await scope.locator('.erp-line-editor__heading').scrollIntoViewIfNeeded()
       } else await selectLineItem(first)
+      if (key === 'production') {
+        await fields.focus()
+        await assertCurrentBusinessSection(page, editor, '生产明细')
+      }
       await waitForFiniteAnimations(page)
+      await assertBusinessSectionTitleBands(editor)
+      await assertBusinessLineItemsFooterSpacing(editor)
       await assertEditorTableHeadersCentered(editor)
+      await assertSharedLineTableSurface(editor)
       const geometry = await editor.evaluate((node) => ({ overflow: node.scrollWidth - node.clientWidth, scopeOverflow: node.querySelector('.erp-line-editor').scrollWidth - node.querySelector('.erp-line-editor').clientWidth }))
       assert.ok(geometry.overflow <= 1 && geometry.scopeOverflow <= 1, JSON.stringify(geometry))
       const mode = await page.locator('[data-erp-theme="dark"]').count() ? 'dark' : 'light'
@@ -127,5 +175,36 @@ export function createLineEditorsToolbarScenarios(deps) {
       await page.screenshot({ path: `${deps.outputDir}/line-editor-fixed-finance-narrow.png` })
     },
   }
-  return [...scenarios, { ...purchase, name: 'line-editor-toolbar-dark', themeMode: 'dark', deviceScaleFactor: 1 }, finance]
+  const salesMobile = {
+    ...bases.find((item) => item.name === 'business-form-page-sales-desktop'),
+    name: 'line-editor-toolbar-sales-mobile',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await page.getByRole('button', { name: '新建订单', exact: false }).click()
+      const editor = page.locator('.erp-business-form-page:not([hidden])')
+      await editor.getByRole('button', { name: '添加订货明细', exact: true }).click()
+      await editor.getByRole('button', { name: '添加订货明细', exact: true }).click()
+      const expand = editor.getByRole('button', { name: '全部展开', exact: true })
+      if (await expand.count()) await expand.click()
+      const cards = editor.locator('.erp-task-line-card')
+      assert.equal(await cards.count(), 2)
+      const field = cards.first().locator('textarea').first()
+      await field.fill('手机订货要求')
+      const original = await field.elementHandle()
+      await cards.first().getByRole('button', { name: /^复制/u }).click()
+      assert.equal(await cards.count(), 3)
+      await cards.nth(1).getByRole('button', { name: /移除/u }).click()
+      assert.equal(await cards.count(), 2)
+      assert.equal(await field.inputValue(), '手机订货要求')
+      assert.equal(await field.evaluate((node, previous) => node === previous, original), true)
+      await assertBusinessSectionTitleBands(editor)
+      await assertBusinessLineItemsFooterSpacing(editor)
+      await assertSharedLineTableSurface(editor)
+      await assertSharedLineActions(editor)
+      await deps.assertNoHorizontalOverflow(page, 'line-editor-toolbar-sales-mobile')
+      await page.screenshot({ path: `${deps.outputDir}/line-editor-toolbar-sales-mobile.png` })
+      await original.dispose()
+    },
+  }
+  return [...scenarios, { ...purchase, name: 'line-editor-toolbar-dark', themeMode: 'dark', deviceScaleFactor: 1 }, finance, salesMobile]
 }

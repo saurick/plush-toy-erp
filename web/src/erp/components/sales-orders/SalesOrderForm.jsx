@@ -1,16 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from 'react'
-import {
-  CopyOutlined,
-  DeleteOutlined,
-} from '@ant-design/icons'
-import {
-  AutoComplete,
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  Space,
-} from 'antd'
+
+import { AutoComplete, Form, Input, InputNumber, Space } from 'antd'
+import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
@@ -705,11 +696,9 @@ export function SalesOrderItemsFormSection({
                           size={4}
                           wrap
                         >
-                          <Button
+                          <BusinessLineItemActionButton
+                            action="copy"
                             aria-label={`复制第 ${index + 1} 行`}
-                            size="small"
-                            type="text"
-                            icon={<CopyOutlined />}
                             disabled={!canCreateItem}
                             onClick={() => {
                               const currentLines =
@@ -726,16 +715,14 @@ export function SalesOrderItemsFormSection({
                             }}
                           >
                             复制行
-                          </Button>
-                          <Button
-                            danger
-                            size="small"
-                            icon={<DeleteOutlined />}
+                          </BusinessLineItemActionButton>
+                          <BusinessLineItemActionButton
+                            action="remove"
                             disabled={!canRemoveLine}
                             onClick={() => remove(field.name)}
                           >
                             移除行
-                          </Button>
+                          </BusinessLineItemActionButton>
                         </Space>
                       }
                       hiddenFields={
@@ -919,12 +906,7 @@ export function SalesOrderItemsFormSection({
                                   placeholder={
                                     quantityValid
                                       ? '自动计算'
-                                      : unitPrecisionErrorMessage(
-                                          unitPrecisionFromOptions(
-                                            unitOptions,
-                                            line?.unit_id
-                                          )
-                                        )
+                                      : '待核对'
                                   }
                                 />
                               </Form.Item>

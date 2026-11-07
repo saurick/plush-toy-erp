@@ -85,7 +85,7 @@ export function createDevSharedComponentScenarios({
         await writeFile(`${outputDir}/control-preview-theme.json`, JSON.stringify(evidence, null, 2))
       },
     },
-    ...createSelectOverflowScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createSelectOverflowScenarios({ assert, assertNoHorizontalOverflow, outputDir }),
     ...createGroupedSelectScenarios({ assert, assertNoHorizontalOverflow, outputDir }),
     ...createDevPaginationScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevBusinessComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
@@ -132,11 +132,14 @@ export function createDevSharedComponentScenarios({
         }
         const sampleLinks = catalog.getByRole('region', { name: '组件样例与真实页面', exact: true })
         for (const row of await sampleLinks.locator('tbody tr').all()) {
-          const links = row.getByRole('link')
-          assert.equal(await links.count(), 2)
-          assert((await links.nth(0).getAttribute('href')).startsWith('/__dev/ui-design?page=controls&control='))
-          assert(/^\/erp\//u.test(await links.nth(1).getAttribute('href')), '真实入口必须指向正式业务路径')
+          const sample = row.getByRole('link')
+          assert.equal(await sample.count(), 1, '目录提供当前组件样例入口')
+          assert((await sample.getAttribute('href')).startsWith('/__dev/ui-design?page=controls&control='))
+          const consumer = row.locator('td').nth(1)
+          assert.ok((await consumer.locator('span').first().innerText()).trim(), '保留真实消费者名称')
+          assert.ok((await consumer.locator('p').innerText()).trim(), '保留对应业务核对任务')
         }
+        assert.equal(await catalog.locator('a[href^="/erp/"], a[target="_blank"]').count(), 0, '设计目录沿用工作台规范，不附加业务快捷跳转')
         const designLink = catalog.getByRole('link', { name: '下拉选择与清空', exact: true })
         assert((await designLink.getAttribute('href')).startsWith('/__dev/docs?path='), '嵌入文档沿用项目阅读器解析相对链接')
         const search = page.getByLabel('搜索控件设计', { exact: true })
@@ -153,15 +156,12 @@ export function createDevSharedComponentScenarios({
         await page.reload()
         await catalog.waitFor()
         assert.equal(await search.inputValue(), 'PrintEditableText')
-        const printLink = catalog.getByRole('link', {
-          name: '查看打印组件与输出边界',
-          exact: true,
-        })
-        await printLink.click()
+        await designLink.click()
         await page.waitForURL(
           (url) =>
             url.pathname === '/__dev/docs' &&
-            url.searchParams.get('path') === 'docs/打印模板实现原理.md'
+            url.searchParams.get('path') === 'docs/product/ui-design/交互设计说明.md' &&
+            decodeURIComponent(url.hash.slice(1)) === 'select-controls'
         )
         await page.goBack()
         await catalog.waitFor()

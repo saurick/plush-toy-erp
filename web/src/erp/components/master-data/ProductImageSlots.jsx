@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessImage from '../business-list/BusinessImage.jsx'
+import { fingerprintBusinessAttachmentFile } from '../../utils/businessAttachmentFiles.mjs'
 import { isUsableImageDimensions } from '../../utils/imageDisplay.mjs'
 
 import { message } from '@/common/utils/antdApp'
@@ -32,22 +33,35 @@ import {
   PRODUCT_IMAGE_SNAPSHOT_MAX_BYTES,
   PRODUCT_IMAGE_ACCEPT,
   PRODUCT_IMAGE_SLOT_DEFINITIONS,
+  PRODUCT_IMAGE_SUPPLEMENTAL_LIMIT,
+  PRODUCT_IMAGE_SUPPLEMENTAL_SLOT,
   buildOptimizedProductImageFileName,
   buildProductImageMutationPlan,
   calculateProductImageSnapshotSize,
+  confirmProductImageMutation,
   createProductImageSession,
-  inferProductImageMimeType,
+  isSupplementalProductImage,
+  readProductImageMimeType,
+  reconcileSupplementalProductImages,
   resetProductImageSession,
   selectSavedProductImages,
+  selectSavedSupplementalProductImages,
   stageProductImageClear,
   stageProductImageSelection,
+  stageSupplementalProductImageRemoval,
+  stageSupplementalProductImage,
   shouldOptimizeProductImageSnapshot,
+  supplementalProductImageOverflow,
   validateProductImageFile,
+  undoSupplementalProductImageRemoval,
+  visibleSupplementalProductImages,
 } from '../../utils/productImageSlots.mjs'
 
 const PRODUCT_IMAGE_SNAPSHOT_QUALITY_STEPS = [0.9, 0.78, 0.66, 0.56]
 const PRODUCT_IMAGE_SNAPSHOT_SCALE_STEP = 0.78
 const PRODUCT_IMAGE_SNAPSHOT_MAX_ATTEMPTS = 7
+const PRODUCT_IMAGE_PREPARATION_KEYS = [...PRODUCT_IMAGE_SLOT_DEFINITIONS.map(({ key }) => key), PRODUCT_IMAGE_SUPPLEMENTAL_SLOT]
+const supplementalImageKey = (image) => image.pendingKey || `supplemental-${image.id}`
 
 function createProductImageAbortError() {
   return new DOMException('图片处理已取消', 'AbortError')
@@ -149,6 +163,7 @@ async function createOptimizedProductImageBlob(image, signal) {
     throw new Error('浏览器暂不支持当前图片处理能力')
   }
 
+  let encoding = 'image/webp'
   try {
     for (
       let attempt = 0;
@@ -161,16 +176,21 @@ async function createOptimizedProductImageBlob(image, signal) {
       context.clearRect(0, 0, width, height)
       context.drawImage(image, 0, 0, width, height)
 
-      for (const quality of PRODUCT_IMAGE_SNAPSHOT_QUALITY_STEPS) {
+      const qualities = encoding === 'image/webp' ? PRODUCT_IMAGE_SNAPSHOT_QUALITY_STEPS : [undefined]
+      for (const quality of qualities) {
         if (signal?.aborted) throw createProductImageAbortError()
-        const blob = await canvasToBlob(canvas, 'image/webp', quality)
+        const blob = await canvasToBlob(canvas, encoding, quality)
         if (signal?.aborted) throw createProductImageAbortError()
-        if (blob.type !== 'image/webp') {
-          throw new Error('当前浏览器不支持生成 WEBP 产品图片')
+        // Canvas returns PNG when it cannot encode WebP. Keep transparency and
+        // use the same size budget; only shrink further if lossless PNG needs it.
+        if (encoding === 'image/webp' && blob.type === 'image/png') encoding = 'image/png'
+        if (blob.type !== encoding || !blob.size) {
+          throw new Error('浏览器无法生成可保存的产品图片')
         }
         if (blob.size <= PRODUCT_IMAGE_SNAPSHOT_MAX_BYTES) {
           return blob
         }
+        if (encoding === 'image/png') break
       }
 
       width = Math.max(1, Math.floor(width * PRODUCT_IMAGE_SNAPSHOT_SCALE_STEP))
@@ -187,7 +207,9 @@ async function createOptimizedProductImageBlob(image, signal) {
   }
 }
 
-async function prepareProductImage(file, signal) {
+async function prepareProductImage(file, signal, includeFingerprint = false) {
+  const sourceMimeType = await readProductImageMimeType(file)
+  if (signal?.aborted) throw createProductImageAbortError()
   const sourcePreviewURL = URL.createObjectURL(file)
   let image = null
   try {
@@ -200,28 +222,20 @@ async function prepareProductImage(file, signal) {
       width: image.naturalWidth,
       height: image.naturalHeight,
     })
-    if (!shouldOptimize) {
-      const contentBase64 = await readFileAsBase64(file, signal)
-      return {
-        file_name: file.name,
-        mime_type: inferProductImageMimeType(file),
-        file_size: file.size,
-        content_base64: contentBase64,
-        preview_url: `data:${inferProductImageMimeType(file)};base64,${contentBase64}`,
-        optimized: false,
-      }
-    }
-
-    const snapshot = await createOptimizedProductImageBlob(image, signal)
+    const snapshot = shouldOptimize ? await createOptimizedProductImageBlob(image, signal) : file
+    const mimeType = shouldOptimize ? snapshot.type : sourceMimeType
+    // Compare the bytes sent to the server, including after optimization.
+    const fingerprint = includeFingerprint ? await fingerprintBusinessAttachmentFile(snapshot) : ''
     const contentBase64 = await readFileAsBase64(snapshot, signal)
     return {
-      file_name: buildOptimizedProductImageFileName(file.name),
-      mime_type: 'image/webp',
+      file_name: shouldOptimize ? buildOptimizedProductImageFileName(file.name, mimeType) : file.name,
+      mime_type: mimeType,
       file_size: snapshot.size,
       content_base64: contentBase64,
-      preview_url: `data:image/webp;base64,${contentBase64}`,
-      optimized: true,
-      source_file_size: file.size,
+      preview_url: `data:${mimeType};base64,${contentBase64}`,
+      optimized: shouldOptimize,
+      ...(shouldOptimize ? { source_file_size: file.size } : {}),
+      ...(fingerprint ? { sha256: fingerprint } : {}),
     }
   } finally {
     if (image) image.src = ''
@@ -255,20 +269,13 @@ function formatFileSize(bytes) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
-function revokeSessionImageURLs(session) {
-  const revoked = new Set()
-  for (const { key } of PRODUCT_IMAGE_SLOT_DEFINITIONS) {
-    for (const image of [
-      session?.slots?.[key]?.pending,
-      session?.slots?.[key]?.saved,
-    ]) {
-      const previewURL = image?.preview_url
-      if (previewURL?.startsWith('blob:') && !revoked.has(previewURL)) {
-        revokeObjectURL(previewURL)
-        revoked.add(previewURL)
-      }
-    }
-  }
+function sessionImageURLs(session) {
+  const images = PRODUCT_IMAGE_SLOT_DEFINITIONS.flatMap(({ key }) => [
+    session.slots[key].pending,
+    session.slots[key].saved,
+  ])
+  const { saved, pending, undo } = session.supplemental
+  return new Set([...images, ...saved, ...pending, undo?.item].map((item) => item?.preview_url).filter((url) => url?.startsWith('blob:')))
 }
 
 function revokeAttachmentPreviewURLs(attachments) {
@@ -287,7 +294,7 @@ const ProductImageSlots = forwardRef(
     const inputRefs = useRef({})
     const requestSequenceRef = useRef(0)
     const previewRequestSequenceRef = useRef(0)
-    const fileReadSequenceRef = useRef({ primary: 0, secondary: 0 })
+    const fileReadSequenceRef = useRef(Object.fromEntries(PRODUCT_IMAGE_PREPARATION_KEYS.map((key) => [key, 0])))
     const filePreparationPromisesRef = useRef({})
     const filePreparationAbortControllersRef = useRef({})
     const activeProductIDRef = useRef(Number(productId || 0))
@@ -302,6 +309,7 @@ const ProductImageSlots = forwardRef(
     const [preparingSlotKey, setPreparingSlotKey] = useState('')
     const [previewingSlotKey, setPreviewingSlotKey] = useState('')
     const [preview, setPreview] = useState(null)
+    const [supplementalFeedback, setSupplementalFeedback] = useState(null)
     const reportPendingChanges = useContext(BusinessFormPendingAttachmentsContext)
     useEffect(() => {
       reportPendingChanges?.(
@@ -311,6 +319,10 @@ const ProductImageSlots = forwardRef(
     useEffect(() => () => reportPendingChanges?.(0), [reportPendingChanges])
 
     const setCurrentSession = useCallback((nextSession) => {
+      const keep = sessionImageURLs(nextSession)
+      for (const url of sessionImageURLs(sessionRef.current)) {
+        if (!keep.has(url)) revokeObjectURL(url)
+      }
       sessionRef.current = nextSession
       if (mountedRef.current) setSession(nextSession)
     }, [])
@@ -345,7 +357,7 @@ const ProductImageSlots = forwardRef(
     }, [])
 
     const abortAllFilePreparations = useCallback(() => {
-      for (const { key } of PRODUCT_IMAGE_SLOT_DEFINITIONS) {
+      for (const key of PRODUCT_IMAGE_PREPARATION_KEYS) {
         abortFilePreparation(key)
       }
     }, [abortFilePreparation])
@@ -353,44 +365,44 @@ const ProductImageSlots = forwardRef(
     const applySavedAttachments = useCallback(
       (attachments) => {
         closePreview()
-        revokeSessionImageURLs(sessionRef.current)
         setCurrentSession(
-          createProductImageSession(selectSavedProductImages(attachments))
+          createProductImageSession(selectSavedProductImages(attachments), selectSavedSupplementalProductImages(attachments))
         )
       },
       [closePreview, setCurrentSession]
     )
 
-    const loadSavedAttachments = useCallback(async (targetProductID) => {
+    const loadSavedAttachments = useCallback(async (targetProductID, { supplementalOnly = false, knownSupplemental = [] } = {}) => {
       const attachments = await listProductImages({
         product_id: targetProductID,
       })
       const listedAttachments = Array.isArray(attachments) ? attachments : []
-      const selected = selectSavedProductImages(listedAttachments)
-      const downloaded = await Promise.all(
-        Object.values(selected)
-          .filter(Boolean)
-          .map(async (metadata) => {
-            try {
-              const attachment = await downloadBusinessAttachment({
-                id: metadata.id,
-              })
-              if (!attachment?.content_base64) {
-                throw new Error('empty product image')
-              }
-              return {
-                ...metadata,
-                file_name: attachment.file_name || metadata.file_name,
-                mime_type: attachment.mime_type || metadata.mime_type,
-                file_size: attachment.file_size || metadata.file_size,
-                preview_url: base64ToDataURL(attachment),
-                preview_load_failed: false,
-              }
-            } catch {
-              return { ...metadata, preview_load_failed: true }
-            }
+      const selected = supplementalOnly ? [] : Object.values(selectSavedProductImages(listedAttachments)).filter(Boolean)
+      const loadPreview = async (metadata, thumbnail = false) => {
+        try {
+          const attachment = await downloadBusinessAttachment({
+            id: metadata.id,
+            ...(thumbnail ? { variant: 'thumbnail' } : {}),
           })
+          if (!attachment?.content_base64) throw new Error('empty product image')
+          return { ...metadata, preview_url: base64ToDataURL(attachment), preview_load_failed: false }
+        } catch {
+          return { ...metadata, preview_load_failed: true }
+        }
+      }
+      const downloaded = await Promise.all(
+        selected.map((metadata) => loadPreview(metadata))
       )
+      const supplemental = selectSavedSupplementalProductImages(listedAttachments)
+      const knownByID = new Map(knownSupplemental.map((image) => [image.id, image]))
+      for (let index = 0; index < supplemental.length; index += 2) {
+        downloaded.push(...await Promise.all(supplemental.slice(index, index + 2).map((metadata) => {
+          const known = knownByID.get(metadata.id)
+          return known?.preview_url
+            ? { ...metadata, preview_url: known.preview_url }
+            : loadPreview(metadata, true)
+        })))
+      }
       const downloadedByID = new Map(
         downloaded.map((attachment) => [Number(attachment.id), attachment])
       )
@@ -406,12 +418,14 @@ const ProductImageSlots = forwardRef(
         requestSequenceRef.current = requestSequence
         activeProductIDRef.current = targetProductID
         needsReadback.current = false
-        for (const { key } of PRODUCT_IMAGE_SLOT_DEFINITIONS) {
+        for (const key of PRODUCT_IMAGE_PREPARATION_KEYS) {
           fileReadSequenceRef.current[key] += 1
         }
         abortAllFilePreparations()
         filePreparationPromisesRef.current = {}
         setPreparingSlotKey('')
+        setSaving(false)
+        setSupplementalFeedback(null)
         applySavedAttachments([])
         setLoadFailed(false)
         if (targetProductID <= 0) {
@@ -461,17 +475,17 @@ const ProductImageSlots = forwardRef(
 
     const cancelSession = useCallback(() => {
       requestSequenceRef.current += 1
-      for (const { key } of PRODUCT_IMAGE_SLOT_DEFINITIONS) {
+      for (const key of PRODUCT_IMAGE_PREPARATION_KEYS) {
         fileReadSequenceRef.current[key] += 1
       }
       abortAllFilePreparations()
       filePreparationPromisesRef.current = {}
       closePreview()
-      revokeSessionImageURLs(sessionRef.current)
       setCurrentSession(resetProductImageSession(sessionRef.current))
       setLoading(false)
       setLoadFailed(false)
       setPreparingSlotKey('')
+      setSupplementalFeedback(null)
       setPreviewingSlotKey('')
     }, [abortAllFilePreparations, closePreview, setCurrentSession])
 
@@ -491,19 +505,45 @@ const ProductImageSlots = forwardRef(
           return { mutationsApplied: false, reloaded: false }
         }
 
-        requestSequenceRef.current += 1
+        const requestSequence = ++requestSequenceRef.current
+        const isCurrent = () => mountedRef.current && requestSequenceRef.current === requestSequence
+        const refreshSupplemental = async () => {
+          try {
+            const attachments = await loadSavedAttachments(targetProductID, {
+              supplementalOnly: true,
+              knownSupplemental: sessionRef.current.supplemental.saved,
+            })
+            if (!isCurrent()) return false
+            closePreview()
+            setCurrentSession(reconcileSupplementalProductImages(sessionRef.current, attachments))
+            setSupplementalFeedback(null)
+            return true
+          } catch {
+            return false
+          }
+        }
         activeProductIDRef.current = targetProductID
         setSaving(true)
         try {
+          let writingSupplemental = false
           try {
             const preparationResults = await Promise.all(pendingPreparations)
-            if (preparationResults.some((prepared) => prepared === false)) {
+            if (!isCurrent() || preparationResults.some((prepared) => prepared === false)) {
               return { mutationsApplied: false, reloaded: false }
+            }
+            if (supplementalProductImageOverflow(sessionRef.current)) {
+              await refreshSupplemental()
+              if (!isCurrent()) return { mutationsApplied: false, reloaded: false }
+              if (supplementalProductImageOverflow(sessionRef.current)) {
+                return { mutationsApplied: false, reloaded: false, supplementalOverflow: true }
+              }
             }
             plan = buildProductImageMutationPlan(sessionRef.current)
             for (const change of plan) {
-              if (change.type === 'upload') {
-                const uploaded = await uploadProductImage({
+              writingSupplemental = change.type === 'append' || change.type === 'remove'
+              let uploaded
+              if (change.image) {
+                uploaded = await uploadProductImage({
                   product_id: targetProductID,
                   slot_key: change.slotKey,
                   file_name: change.image.file_name,
@@ -511,40 +551,49 @@ const ProductImageSlots = forwardRef(
                   file_size: change.image.file_size,
                   content_base64: change.image.content_base64,
                 })
-                const { current } = sessionRef
-                const slot = current.slots[change.slotKey]
-                setCurrentSession({ ...current, slots: { ...current.slots, [change.slotKey]: { ...slot, pending: null, cleared: false, saved: { ...uploaded, preview_url: slot.pending?.preview_url } } } })
-                needsReadback.current = true
-                continue
+                if (change.type === 'append' && !isSupplementalProductImage(uploaded)) {
+                  throw new Error('补充图片保存结果不完整，请重试')
+                }
+              } else {
+                await clearProductImage({
+                  product_id: targetProductID,
+                  ...(change.type === 'remove' ? { id: change.id } : { slot_key: change.slotKey }),
+                })
               }
-              const cleared = await clearProductImage({
-                product_id: targetProductID,
-                slot_key: change.slotKey,
-              })
-              if (!cleared) throw new Error('clear product image failed')
-              const { current } = sessionRef
-              setCurrentSession({ ...current, slots: { ...current.slots, [change.slotKey]: { ...current.slots[change.slotKey], saved: null, pending: null, cleared: false } } })
+              if (!isCurrent()) return { mutationsApplied: false, reloaded: false }
+              setCurrentSession(confirmProductImageMutation(sessionRef.current, change, uploaded))
               needsReadback.current = true
             }
           } catch (error) {
-            message.error(getActionErrorMessage(error, '更新产品图片'))
-            return { mutationsApplied: false, reloaded: false }
+            const refreshed = writingSupplemental && isCurrent() && await refreshSupplemental()
+            if (!isCurrent()) return { mutationsApplied: false, reloaded: false }
+            if (refreshed && supplementalProductImageOverflow(sessionRef.current)) {
+              return { mutationsApplied: false, reloaded: false, supplementalOverflow: true }
+            }
+            if (!refreshed || buildProductImageMutationPlan(sessionRef.current).length) {
+              message.error(getActionErrorMessage(error, '更新产品图片'))
+              return { mutationsApplied: false, reloaded: false }
+            }
+            needsReadback.current = true
           }
 
           try {
-            applySavedAttachments(await loadSavedAttachments(targetProductID))
+            const attachments = await loadSavedAttachments(targetProductID)
+            if (!isCurrent()) return { mutationsApplied: true, reloaded: false }
+            applySavedAttachments(attachments)
             needsReadback.current = false
             return { mutationsApplied: true, reloaded: true }
           } catch {
             return { mutationsApplied: true, reloaded: false }
           }
         } finally {
-          if (mountedRef.current) setSaving(false)
+          if (isCurrent()) setSaving(false)
         }
       },
       [
         applySavedAttachments,
         canEdit,
+        closePreview,
         setCurrentSession,
         loadSavedAttachments,
         productId,
@@ -570,7 +619,7 @@ const ProductImageSlots = forwardRef(
         mountedRef.current = false
         requestSequenceRef.current += 1
         previewRequestSequenceRef.current += 1
-        for (const { key } of PRODUCT_IMAGE_SLOT_DEFINITIONS) {
+        for (const key of PRODUCT_IMAGE_PREPARATION_KEYS) {
           fileReadSequence[key] += 1
         }
         abortAllFilePreparations()
@@ -579,7 +628,7 @@ const ProductImageSlots = forwardRef(
         if (currentPreview?.ownedObjectURL && currentPreview.url) {
           revokeObjectURL(currentPreview.url)
         }
-        revokeSessionImageURLs(sessionRef.current)
+        for (const url of sessionImageURLs(sessionRef.current)) revokeObjectURL(url)
       }
     }, [abortAllFilePreparations])
 
@@ -588,12 +637,15 @@ const ProductImageSlots = forwardRef(
     }, [beginSession, open, productId])
 
     function handleFileChange(slotKey, event) {
-      const [file] = Array.from(event.target.files || [])
+      const supplemental = slotKey === PRODUCT_IMAGE_SUPPLEMENTAL_SLOT
+      const files = Array.from(event.target.files || []).slice(0, supplemental ? undefined : 1)
       event.target.value = ''
-      if (!file) return
-      const validationMessage = validateProductImageFile(file)
+      if (!files.length) return
+      if (supplemental) setSupplementalFeedback(null)
+      const validationMessage = files.map(validateProductImageFile).find(Boolean)
       if (validationMessage) {
-        message.warning(validationMessage)
+        if (supplemental) setSupplementalFeedback({ error: true, text: validationMessage })
+        else message.warning(validationMessage)
         return
       }
 
@@ -605,31 +657,52 @@ const ProductImageSlots = forwardRef(
         preparationAbortController
       setPreparingSlotKey(slotKey)
       const preparationPromise = (async () => {
-        let pending = null
+        const { current } = sessionRef
+        let next = current
+        let duplicates = 0
+        let restored = 0
+        let fileName = ''
         try {
-          pending = await prepareProductImage(
-            file,
-            preparationAbortController.signal
-          )
-          if (fileReadSequenceRef.current[slotKey] !== readSequence) {
-            revokeObjectURL(pending.preview_url)
-            return false
+          for (const [index, file] of files.entries()) {
+            fileName = file.name
+            const pending = await prepareProductImage(file, preparationAbortController.signal, supplemental)
+            if (fileReadSequenceRef.current[slotKey] !== readSequence) return false
+            if (!supplemental) {
+              closePreview()
+              setCurrentSession(stageProductImageSelection(sessionRef.current, slotKey, pending))
+              return true
+            }
+            const selection = stageSupplementalProductImage(next, { ...pending, pendingKey: `pending-${readSequence}-${index}` })
+            if (selection.outcome === 'full') {
+              const remaining = PRODUCT_IMAGE_SUPPLEMENTAL_LIMIT - visibleSupplementalProductImages(current).length
+              setSupplementalFeedback({
+                error: true,
+                text: `还可添加 ${remaining} 张，本次选图去重后仍超出上限，请减少选择后重试。`,
+              })
+              return false
+            }
+            if (selection.outcome === 'duplicate') duplicates += 1
+            if (selection.outcome === 'restored') restored += 1
+            next = selection.session
           }
-          closePreview()
-          const currentPreviewURL =
-            sessionRef.current?.slots?.[slotKey]?.pending?.preview_url
-          revokeObjectURL(currentPreviewURL)
-          setCurrentSession(
-            stageProductImageSelection(sessionRef.current, slotKey, pending)
-          )
+          if (next !== current) {
+            closePreview()
+            setCurrentSession({ ...sessionRef.current, supplemental: next.supplemental })
+          }
+          const notice = [
+            duplicates ? `已跳过 ${duplicates} 张重复图片。` : '',
+            restored ? `已恢复 ${restored} 张原图片。` : '',
+          ].join('')
+          if (notice) setSupplementalFeedback({ text: notice })
           return true
         } catch (error) {
-          revokeObjectURL(pending?.preview_url)
           if (error?.name === 'AbortError') {
             return false
           }
           if (fileReadSequenceRef.current[slotKey] === readSequence) {
-            message.error(getActionErrorMessage(error, '读取产品图片'))
+            const hint = getActionErrorMessage(error, '读取产品图片')
+            if (supplemental) setSupplementalFeedback({ error: true, text: fileName ? `「${fileName}」：${hint}` : hint })
+            else message.error(hint)
           }
           return false
         } finally {
@@ -656,9 +729,6 @@ const ProductImageSlots = forwardRef(
       delete filePreparationPromisesRef.current[slotKey]
       setPreparingSlotKey((current) => (current === slotKey ? '' : current))
       closePreview()
-      const currentPreviewURL =
-        sessionRef.current?.slots?.[slotKey]?.pending?.preview_url
-      revokeObjectURL(currentPreviewURL)
       setCurrentSession(stageProductImageClear(sessionRef.current, slotKey))
     }
 
@@ -672,24 +742,29 @@ const ProductImageSlots = forwardRef(
       )
     }
 
-    async function handlePreview(slotKey) {
+    function handlePreview(slotKey) {
       const slot = sessionRef.current?.slots?.[slotKey]
       const item = slot?.pending || (!slot?.cleared ? slot?.saved : null)
+      return previewImage(item, slotKey)
+    }
+
+    async function previewImage(item, key, thumbnail = false) {
       if (!item) return
-      if (item.preview_url) {
+      if (item.preview_url && !thumbnail) {
         previewRequestSequenceRef.current += 1
         setPreviewingSlotKey('')
         showPreview({
           fileName: item.file_name,
           url: item.preview_url,
           ownedObjectURL: false,
+          key,
         })
         return
       }
 
       const previewRequestSequence = previewRequestSequenceRef.current + 1
       previewRequestSequenceRef.current = previewRequestSequence
-      setPreviewingSlotKey(slotKey)
+      setPreviewingSlotKey(key)
       try {
         const attachment = await downloadBusinessAttachment({ id: item.id })
         if (previewRequestSequenceRef.current !== previewRequestSequence) {
@@ -703,6 +778,7 @@ const ProductImageSlots = forwardRef(
           fileName: attachment.file_name || item.file_name || '产品图片预览',
           url: base64ToObjectURL(attachment),
           ownedObjectURL: true,
+          key,
         })
       } catch (error) {
         if (previewRequestSequenceRef.current === previewRequestSequence) {
@@ -715,7 +791,12 @@ const ProductImageSlots = forwardRef(
       }
     }
 
-    const controlsDisabled = loading || loadFailed || saving || !canEdit
+    const controlsDisabled = loading || loadFailed || saving || !canEdit || preparingSlotKey === PRODUCT_IMAGE_SUPPLEMENTAL_SLOT
+    const supplementalImages = visibleSupplementalProductImages(session)
+    const supplementalFull = supplementalImages.length >= PRODUCT_IMAGE_SUPPLEMENTAL_LIMIT
+    const supplementalOverflow = supplementalProductImageOverflow(session)
+    const supplementalPreviewIndex = supplementalImages.findIndex((item) => supplementalImageKey(item) === preview?.key)
+    const previewSupplemental = (item) => previewImage(item, supplementalImageKey(item), !item.pendingKey)
 
     return (
       <section className="product-image-slots" aria-label="产品图片">
@@ -841,10 +922,115 @@ const ProductImageSlots = forwardRef(
           })}
         </div>
 
+        <section className="product-image-supplemental" aria-label="补充图片">
+          <div className="product-image-supplemental__header">
+            <div>
+              <Typography.Text strong>补充图片</Typography.Text>
+              <Typography.Text type="secondary" className="product-image-supplemental__count" role="status">
+                {supplementalImages.length} / {PRODUCT_IMAGE_SUPPLEMENTAL_LIMIT}
+              </Typography.Text>
+              <div><Typography.Text type="secondary">仅在产品档案查看。</Typography.Text></div>
+            </div>
+            {canEdit ? (
+              <Button
+                size="small"
+                icon={<UploadOutlined />}
+                loading={preparingSlotKey === PRODUCT_IMAGE_SUPPLEMENTAL_SLOT}
+                disabled={controlsDisabled || Boolean(preparingSlotKey) || supplementalFull}
+                onClick={() => inputRefs.current[PRODUCT_IMAGE_SUPPLEMENTAL_SLOT]?.click()}
+              >
+                {supplementalFull ? '已达上限' : '添加补充图片'}
+              </Button>
+            ) : null}
+            <input
+              ref={(node) => { inputRefs.current[PRODUCT_IMAGE_SUPPLEMENTAL_SLOT] = node }}
+              hidden
+              type="file"
+              multiple
+              disabled={controlsDisabled || Boolean(preparingSlotKey) || supplementalFull}
+              accept={PRODUCT_IMAGE_ACCEPT}
+              aria-label="选择多张补充图片"
+              onChange={(event) => handleFileChange(PRODUCT_IMAGE_SUPPLEMENTAL_SLOT, event)}
+            />
+          </div>
+          {supplementalOverflow > 0 ? (
+            <Typography.Text className="product-image-supplemental__feedback" type="danger" role="alert">
+              已读取最新补充图。含待保存图片超出上限 {supplementalOverflow} 张，请移除后再保存。
+            </Typography.Text>
+          ) : supplementalFeedback ? (
+            <Typography.Text
+              className="product-image-supplemental__feedback"
+              type={supplementalFeedback.error ? 'danger' : 'secondary'}
+              role={supplementalFeedback.error ? 'alert' : 'status'}
+            >
+              {supplementalFeedback.text}
+            </Typography.Text>
+          ) : null}
+          {supplementalImages.length ? (
+            <ul className="product-image-supplemental__grid">
+              {supplementalImages.map((image) => (
+                <li className="product-image-supplemental__item" key={supplementalImageKey(image)}>
+                  <button
+                    type="button"
+                    className="product-image-supplemental__preview"
+                    aria-label={`预览：${image.file_name}`}
+                    aria-busy={previewingSlotKey === supplementalImageKey(image)}
+                    disabled={saving}
+                    onClick={() => previewSupplemental(image)}
+                  >
+                    <BusinessImage src={image.preview_url} alt="" compact loadFailed={image.preview_load_failed} />
+                  </button>
+                  <div className="product-image-supplemental__caption">
+                    <Typography.Text ellipsis title={image.file_name}>{image.file_name}</Typography.Text>
+                    {canEdit ? (
+                      <Button
+                        type="text"
+                        size="small"
+                        aria-label={`移除：${image.file_name}`}
+                        disabled={controlsDisabled}
+                        onClick={() => {
+                          closePreview()
+                          setSupplementalFeedback(null)
+                          setCurrentSession(stageSupplementalProductImageRemoval(sessionRef.current, image))
+                        }}
+                      >
+                        移除
+                      </Button>
+                    ) : null}
+                  </div>
+                  {supplementalOverflow > 0 && image.pendingKey ? <Typography.Text type="secondary">待保存</Typography.Text> : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {canEdit && session.supplemental.undo ? (
+            <Space size={6} wrap>
+              <Typography.Text type="secondary" role="status">已移除「{session.supplemental.undo.item.file_name}」</Typography.Text>
+              <Button
+                type="text"
+                size="small"
+                disabled={controlsDisabled || supplementalFull}
+                onClick={() => {
+                  setSupplementalFeedback(null)
+                  setCurrentSession(undoSupplementalProductImageRemoval(sessionRef.current))
+                }}
+              >
+                撤销
+              </Button>
+            </Space>
+          ) : null}
+        </section>
+
         <BusinessModal
           open={Boolean(preview)}
           title={preview?.fileName || '产品图片预览'}
-          footer={null}
+          footer={supplementalPreviewIndex >= 0 && supplementalImages.length > 1 ? (
+            <Space>
+              <Button size="small" disabled={Boolean(previewingSlotKey) || supplementalPreviewIndex === 0} onClick={() => previewSupplemental(supplementalImages[supplementalPreviewIndex - 1])}>上一张</Button>
+              <Typography.Text type="secondary">{supplementalPreviewIndex + 1} / {supplementalImages.length}</Typography.Text>
+              <Button size="small" disabled={Boolean(previewingSlotKey) || supplementalPreviewIndex === supplementalImages.length - 1} onClick={() => previewSupplemental(supplementalImages[supplementalPreviewIndex + 1])}>下一张</Button>
+            </Space>
+          ) : null}
           size="columnOrder"
           destroyOnHidden
           onCancel={closePreview}

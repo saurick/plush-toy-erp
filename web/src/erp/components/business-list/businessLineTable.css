@@ -1,0 +1,79 @@
+.erp-business-line-table {
+  min-width: 0;
+}
+
+/* 明细随编辑页纵向展开，宽表只在整块明细区横向滚动。 */
+.erp-sales-order-lines-form__list {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
+  border-radius: 6px;
+  container-type: inline-size;
+}
+
+.erp-line-item-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.erp-line-item-table th,
+.erp-line-item-table td {
+  padding: 8px 6px;
+  overflow-wrap: anywhere;
+}
+
+.erp-line-item-table td {
+  padding-block: var(--erp-table-cell-padding-block);
+  text-align: left;
+  vertical-align: top;
+}
+
+.erp-line-item-table th,
+.erp-line-item-table th.erp-line-item-table__actions {
+  height: 40px;
+  text-align: center;
+  vertical-align: middle;
+  color: var(--erp-text-muted);
+  background: var(--erp-surface-bg-muted);
+  border-bottom: 1px solid var(--erp-border-strong);
+  font-size: var(--erp-font-caption);
+  font-weight: var(--erp-line-header-weight, 650);
+}
+
+.erp-line-item-table th:not(:last-child) {
+  --erp-table-column-shadow: none;
+
+  border-inline-end: var(--erp-line-header-divider-width, 1px) solid var(--erp-border-strong);
+}
+
+.erp-line-item-table__required {
+  color: var(--erp-danger, #d43838);
+}
+
+.erp-line-item-table[data-line-details-column='true'] {
+  --erp-line-item-disclosure-width: 44px;
+  --erp-line-item-sequence-width: 44px;
+}
+
+.erp-line-item-table .erp-line-item-table__disclosure {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 2;
+  text-align: center;
+}
+
+.erp-line-item-table td.erp-line-item-table__disclosure {
+  padding-inline: 0;
+  background: var(--erp-line-group-bg, var(--erp-surface-bg));
+}
+
+.erp-line-item-table .erp-line-item-table__index,
+.erp-line-item-table[data-line-details-column='true'] .erp-editable-line-group__sequence {
+  position: sticky;
+  inset-inline-start: var(--erp-line-item-disclosure-width, 0px);
+  z-index: 2;
+}

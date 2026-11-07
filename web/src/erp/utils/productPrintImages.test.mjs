@@ -79,6 +79,15 @@ test('productPrintImages: only primary and secondary product image slots become 
       file_name: 'other-product.png',
       mime_type: 'image/png',
     },
+    {
+      id: 105,
+      owner_type: 'product',
+      owner_id: 17,
+      attachment_type: 'product_image',
+      slot_key: 'supplemental_1',
+      file_name: 'detail-not-for-print.png',
+      mime_type: 'image/png',
+    },
   ]
   assert.deepEqual(
     Object.fromEntries(

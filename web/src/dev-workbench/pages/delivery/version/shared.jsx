@@ -52,7 +52,7 @@ export const OPERATION_HISTORY_TARGET_OPTIONS = [
   { label: '历史目标 test-133', value: 'test-133' },
 ]
 
-export const GIT_INDEX_LOCK_RECOVERY_FLOW = `flowchart TD
+export const GIT_INDEX_LOCK_RECOVERY_FLOW = `flowchart LR
   B{"准备暂存或提交：index.lock 是否存在"}
   B -->|否| C["按精确文件或 hunk 写入 index<br/>启用 PID 旁车"]
   B -->|是| D["只读检查 HEAD、当前 index、锁与 PID 旁车"]
@@ -70,7 +70,7 @@ export const GIT_INDEX_LOCK_RECOVERY_FLOW = `flowchart TD
   L --> C
   C --> M["继续原授权的暂存、提交与推送"]`
 
-export const AUTOMATION_EXECUTION_HANDOFF_FLOW = `flowchart TD
+export const AUTOMATION_EXECUTION_HANDOFF_FLOW = `flowchart LR
   A["等待其他项目会话结束"] --> B["心跳每 10 分钟只读重查会话与后台 writer"]
   B --> C{"全部结束且写入已停止？"}
   C -->|否| B

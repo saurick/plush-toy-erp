@@ -15,12 +15,12 @@ const fixture = () => {
     permission_policy: {
       template_key: key,
       registered: true,
-      required_permissions: [
+      default_permissions: [
         key === 'warehouse'
           ? 'warehouse.inbound.confirm'
           : 'quality.inspection.update',
       ],
-      optional_permissions: ['erp.print_template.read'],
+      assignable_permissions: ['warehouse.inbound.confirm', 'quality.inspection.update', 'erp.print_template.read'],
     },
   }))
   return {
@@ -55,10 +55,10 @@ const fixture = () => {
   }
 }
 
-test('responsibilities resolve canonical conditions, preserve optional ungranted abilities and expose staffing gaps', () => {
+test('responsibilities resolve canonical conditions and expose staffing gaps', () => {
   const model = buildRoleResponsibilityModel(fixture())
   assert.equal(model.registered, true)
-  assert.equal(model.roles[0].optional[0].status, '未启用')
+  assert.equal(model.roles[0].additional.length, 0)
   const inbound = model.duties.find(
     (duty) => duty.stageKey === 'incoming_quality'
   )
@@ -88,12 +88,12 @@ test('stale, preview, disabled and multi-role evidence cannot be presented as ex
     Object.assign(input.accessByRoleKey.warehouse, patch)
     const model = buildRoleResponsibilityModel(input)
     assert.equal(model.context.ready, false)
-    assert.equal(model.roles[0].core[0].status, '待核对')
+    assert.equal(model.roles[0].defaults[0].status, '待核对')
   }
   const disabled = fixture()
   disabled.roles[0].disabled = true
   assert.equal(
-    buildRoleResponsibilityModel(disabled).roles[0].core[0].status,
+    buildRoleResponsibilityModel(disabled).roles[0].defaults[0].status,
     '已停用'
   )
   const multiple = fixture()
@@ -110,6 +110,16 @@ test('stale, preview, disabled and multi-role evidence cannot be presented as ex
     ...fixture(),
     moduleKey: 'finance',
   })
-  assert.equal(empty.roles[0].core.length, 0)
+  assert.equal(empty.roles[0].defaults.length, 0)
   assert.equal(empty.duties.length, 0)
+})
+
+test('customized grants do not become missing-duty gaps and additional grants retain customer restrictions', () => {
+  const input = fixture()
+  input.roles[0].permissions = ['erp.print_template.read']
+  input.accessByRoleKey.warehouse.permissions = [{ permission_key: 'erp.print_template.read', effective: false }]
+  const model = buildRoleResponsibilityModel(input)
+  assert.equal(model.roles[0].defaults[0].status, '未启用')
+  assert.equal(model.roles[0].additional[0].key, 'erp.print_template.read')
+  assert.deepEqual(model.gaps.find((gap) => gap.key === 'warehouse').reasons, ['1 项功能受客户设置限制'])
 })

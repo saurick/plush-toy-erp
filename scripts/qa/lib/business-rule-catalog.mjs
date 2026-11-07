@@ -843,7 +843,7 @@ export const BUSINESS_RULE_DIAGRAMS = Object.freeze({
   },
   growth: {
     label: "有界读取与完整快照",
-    chart: `flowchart TD
+    chart: `flowchart LR
   request["筛选范围与稳定排序"] --> admission["有界准入与准备期限"]
   admission --> snapshot["同一只读快照核对集合与预算"]
   snapshot --> limit{"行数与数据体积在预算内"}
@@ -854,7 +854,7 @@ export const BUSINESS_RULE_DIAGRAMS = Object.freeze({
   },
   boundary: {
     label: '协同办理与事实过账边界',
-    chart: `flowchart TD
+    chart: `flowchart LR
   request["办理请求"] --> type{"动作归属"}
   type -->|协同任务| workflow["校验职责、权限、版本与幂等"]
   workflow --> event["记录任务状态与事件"]
@@ -865,7 +865,7 @@ export const BUSINESS_RULE_DIAGRAMS = Object.freeze({
   },
   transaction: {
     label: '原子写入与失败恢复',
-    chart: `flowchart TD
+    chart: `flowchart LR
   request["受控业务操作"] --> tx["开启事务并校验来源"]
   tx --> write["写入约定事实与审计"]
   write --> result{"全部成功"}
@@ -877,7 +877,7 @@ export const BUSINESS_RULE_DIAGRAMS = Object.freeze({
   },
   quantity: {
     label: '数量真源与最终对账',
-    chart: `flowchart TD
+    chart: `flowchart LR
   input["来源数量与单位精度"] --> rule["按正式业务口径计算"]
   rule --> check{"精度与累计上限有效"}
   check -->|否| reject["拒绝并保持原事实"]
@@ -889,7 +889,7 @@ export const BUSINESS_RULE_DIAGRAMS = Object.freeze({
   },
   concurrency: {
     label: '并发、版本冲突与幂等重放',
-    chart: `flowchart TD
+    chart: `flowchart LR
   intent["请求身份与业务意图"] --> guard["锁、版本及唯一约束"]
   guard --> replay{"已有同键结果"}
   replay -->|同意图| original["返回原结果"]

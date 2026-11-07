@@ -141,6 +141,7 @@ export function OperationalFactWorkspace({
   const outletContext = useBusinessPageContext()
   const productionRecordsWorkspace =
     outletContext?.productionRecordsWorkspace || null
+  const financeWorkspace = outletContext?.financeWorkspace || null
   const navigate = useBusinessNavigate()
   const location = useLocation()
   const [searchParams] = useBusinessSearchParams()
@@ -164,7 +165,7 @@ export function OperationalFactWorkspace({
         canReadProductionProcess(adminProfile)
         ? 'process'
         : 'list'
-      : savedContentView
+      : financeWorkspace?.contentView || savedContentView
   const {
     setActiveKey,
     keyword,
@@ -850,7 +851,7 @@ export function OperationalFactWorkspace({
         items={tabItems}
       />
     ) : null
-  const contentViewSwitch = isFinanceDuePage ? (
+  const contentViewSwitch = isFinanceDuePage && !financeWorkspace ? (
     <BusinessViewSwitch
       appearance="chips"
       value={contentView}
@@ -895,7 +896,7 @@ export function OperationalFactWorkspace({
 
   return (
     <LayoutRoot {...layoutProps}>
-      {productionRecordsWorkspace ? null : (
+      {productionRecordsWorkspace || financeWorkspace ? null : (
         <PageHeaderCard
           compact
           title={pageTitle}

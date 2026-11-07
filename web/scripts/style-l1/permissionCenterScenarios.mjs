@@ -90,12 +90,14 @@ export function createPermissionCenterScenarios({
       if (body?.method === 'set_role_settings') writes.push(body.params)
     })
     await expectHeading(page, '权限管理')
+    let roleAccessRead = page.waitForResponse((response) => response.url().includes('/rpc/admin') && response.request().postDataJSON()?.method === 'effective_role_access' && response.request().postDataJSON()?.params?.role_key === 'sales')
     await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
+    await roleAccessRead
     const save = page.getByRole('button', { name: '保存岗位设置', exact: true })
     const preview = page.getByRole('region', { name: '岗位实际菜单' })
     await preview.waitFor()
     assert.equal(await save.isDisabled(), true)
-    assert.deepEqual(await preview.locator('.erp-role-navigation-preview__group > .ant-typography').allTextContents(), ['工作中心', '业务模块', '工具与查询', '系统与帮助'])
+    assert.deepEqual(await preview.locator('.erp-role-navigation-preview__group > .ant-typography').allTextContents(), ['工作中心', '业务模块', '系统与帮助'])
     assert.equal(await page.getByRole('tab', { name: '菜单排列', exact: true }).count(), 0)
     assert.equal(await page.locator('.erp-role-navigation-editor').count(), 0)
     await assertTextAbsent(preview, '常用工作')
@@ -138,7 +140,9 @@ export function createPermissionCenterScenarios({
     assert.equal(writes[0].permission_keys.includes(PermissionCode.SALES_ORDER_READ), true)
     assert.equal(await save.isDisabled(), true)
     await page.reload()
+    roleAccessRead = page.waitForResponse((response) => response.url().includes('/rpc/admin') && response.request().postDataJSON()?.method === 'effective_role_access' && response.request().postDataJSON()?.params?.role_key === 'sales')
     await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
+    await roleAccessRead
     await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
     await preview.waitFor()
     assert.equal(await preview.getByText('业务进度', { exact: true }).count(), 0)
@@ -809,7 +813,7 @@ export function createPermissionCenterScenarios({
         await expectHeading(page, '权限管理')
         await expectText(page, '岗位设置')
         await expectText(page, '员工账号')
-        await expectText(page, '核心职责')
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         await expectText(page, '数据范围')
         await expectText(page, '敏感字段')
         await expectText(page, '岗位导航')
@@ -837,7 +841,6 @@ export function createPermissionCenterScenarios({
           .filter({ hasText: '财务' })
           .click()
         await financeEffectiveAccessRead
-        await page.getByRole('button', { name: '查看功能明细', exact: true }).click()
         await page.evaluate(
           () =>
             new Promise((resolve) =>
@@ -867,6 +870,7 @@ export function createPermissionCenterScenarios({
           )
         )
         await permissionHelpTrigger.focus()
+        await permissionHelpTrigger.press('Enter')
         await page.waitForFunction(() => {
           const popovers = [
             ...document.querySelectorAll('.erp-permission-help-popover'),
@@ -904,6 +908,7 @@ export function createPermissionCenterScenarios({
           path: 'output/playwright/style-l1/permission-center-help-popover.png',
           fullPage: false,
         })
+        await permissionHelpTrigger.press('Escape')
         await permissionHelpTrigger.blur()
         await page.mouse.move(20, 20)
         await permissionHelpPopover.waitFor({
@@ -928,6 +933,8 @@ export function createPermissionCenterScenarios({
         await associatedAccounts
           .getByRole('button', { name: '去员工账号管理' })
           .click()
+        await associatedAccounts.waitFor({ state: 'hidden' })
+        await expectText(page, '命中 3/7 个员工账号')
         const filteredAdminSearch =
           page.getByPlaceholder('搜员工')
         assert.equal(
@@ -935,7 +942,6 @@ export function createPermissionCenterScenarios({
           '财务',
           '从岗位详情进入员工账号时应按当前岗位筛选'
         )
-        await expectText(page, '命中 3/7 个员工账号')
         await page.getByRole('tab', { name: /岗位设置/u }).click()
         await page.getByRole('tab', { name: /岗位设置/u }).click()
         assert.equal(
@@ -949,7 +955,7 @@ export function createPermissionCenterScenarios({
         await selectedOnlySwitch.click()
         assert.equal(
           await page.locator('.erp-permission-checklist__section').count(),
-          3,
+          4,
           '只看已选保留已选功能所在业务域'
         )
         await selectedOnlySwitch.click()
@@ -993,10 +999,10 @@ export function createPermissionCenterScenarios({
         await expectText(financePermissionSection, '确认应收')
         const confirmReceivable = page.getByRole('checkbox', { name: '确认应收', exact: true })
         assert.equal(await confirmReceivable.isChecked(), true)
-        assert.equal(await confirmReceivable.isDisabled(), true)
-        assert.equal(await page.locator('.erp-permission-row input:not(:disabled)').count(), 0)
+        assert.equal(await confirmReceivable.isEnabled(), true)
+        assert.ok(await page.locator('.erp-permission-row input:not(:disabled)').count() > 0)
         await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).uncheck()
-        await page.getByText('待关闭', { exact: true }).waitFor()
+        await page.getByText('有未保存调整', { exact: true }).waitFor()
         await selectedOnlySwitch.click()
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'auto' }))
         await page.waitForTimeout(400)
@@ -1009,12 +1015,14 @@ export function createPermissionCenterScenarios({
           fullPage: false,
         })
         await selectedOnlySwitch.click()
+        const salesAccessRead = page.waitForResponse((response) => response.url().includes('/rpc/admin') && response.request().postDataJSON()?.method === 'effective_role_access' && response.request().postDataJSON()?.params?.role_key === 'sales')
         await page
           .locator('.erp-role-template-card')
           .filter({ hasText: '业务' })
           .click()
         await expectText(page, '放弃未保存的岗位调整？')
         await page.getByRole('button', { name: '放弃修改' }).click()
+        await salesAccessRead
         await page.getByRole('tab', { name: /岗位设置/u }).click()
         assert.equal(
           await page.getByRole('combobox', { name: '仓库范围模式' }).count(),
@@ -1054,7 +1062,7 @@ export function createPermissionCenterScenarios({
         await expectText(page, '侧栏入口')
         await expectText(page, '工作中心')
         await assertTextAbsent(page, '常用工作')
-        await expectText(page, '工具与查询')
+        await assertTextAbsent(page.getByRole('region', { name: '岗位实际菜单' }), '工具与查询')
         await expectText(page, '系统与帮助')
         await assertTextAbsent(page, '更多功能')
         await expectText(page, '工作台')
@@ -1062,13 +1070,15 @@ export function createPermissionCenterScenarios({
         await expectText(page, '基础资料')
         await expectText(page, '销售管理')
         await expectText(page, '仓储管理')
-        await expectText(page, '历史记录中心')
+        await assertTextAbsent(page.getByRole('region', { name: '岗位实际菜单' }), '历史记录中心')
         await expectText(page, '帮助中心')
         await pageAccessTab.click()
         await expectText(page, '已按公司当前启用配置核对')
         const accessHelp = page.getByRole('button', { name: '页面访问说明', exact: true })
         await accessHelp.focus()
+        await accessHelp.press('Enter')
         await expectText(page, '页面内的操作还会单独校验')
+        await accessHelp.press('Escape')
         await accessHelp.blur()
         await expectText(page, '显示')
         const permissionMapMetrics = await page.evaluate(() => {
@@ -1110,7 +1120,7 @@ export function createPermissionCenterScenarios({
         })
         assert(
           navigationPreviewMetrics.hasPreview &&
-            navigationPreviewMetrics.groupCount === 4 &&
+            navigationPreviewMetrics.groupCount === 3 &&
             navigationPreviewMetrics.columns.split(' ').length === 4 &&
             navigationPreviewMetrics.scrollWidth <=
               navigationPreviewMetrics.clientWidth + 1,
@@ -1129,7 +1139,6 @@ export function createPermissionCenterScenarios({
         await expectText(page, '可进入')
         await expectText(page, '不可进入')
         await page.getByRole('tab', { name: /岗位设置/u }).click()
-        await page.getByRole('button', { name: '查看功能明细', exact: true }).click()
         await assertTextAbsent(page, '当前角色权限尚未保存')
         await assertTextAbsent(page, '角色名称可按岗位调整，职责权限保持统一')
         await assertTextAbsent(page, 'system.role.permission.manage')
@@ -1323,7 +1332,7 @@ export function createPermissionCenterScenarios({
         await expectText(page, '创建员工账号')
         await expectText(page, '初始密码')
         await expectText(page, '岗位')
-        await expectText(page, '选择一个或多个岗位')
+        await expectText(page, '选择岗位')
         await assertAdminRoleModalLayout(page, {
           scenarioName: 'permission-center-create-modal',
           title: '创建员工账号',

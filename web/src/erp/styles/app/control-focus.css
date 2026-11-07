@@ -1,5 +1,5 @@
 /* 只在外观所属节点绘制焦点；body 同时覆盖应用根与 AntD portal。
-   Select 沿用 AntD outlined 的 disabled/customize/pagination 条件。 */
+   Select 的 outlined 与 borderless 外框共用焦点规则，保留 disabled/customize/pagination 条件。 */
 body
   :is(
     .ant-input:not(
@@ -17,7 +17,7 @@ body
     .ant-checkbox-wrapper:focus-within .ant-checkbox-inner
   ),
 body
-  .ant-select-outlined:not(.ant-select-disabled):not(
+  :is(.ant-select-outlined, .ant-select-borderless):not(.ant-select-disabled):not(
     .ant-select-customize-input
   ):not(.ant-pagination-size-changer):is(:focus-within, .ant-select-open)
   > .ant-select-selector,
@@ -37,7 +37,7 @@ body
 /* Ant status styles are injected after the app stylesheet. The focused
    control keeps the shared focus border and inset ring as the active state. */
 body
-  .ant-select.ant-select-outlined:not(.ant-select-disabled):not(
+  .ant-select:is(.ant-select-outlined, .ant-select-borderless):not(.ant-select-disabled):not(
     .ant-select-customize-input
   ):not(.ant-pagination-size-changer):is(
     :focus-within,

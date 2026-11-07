@@ -45,7 +45,7 @@ export function BusinessLineItemsHeader({ title, description, notice, children, 
   useTableStickyToolbar(headerRef, Boolean(groupActions || scrollControls), 'var(--erp-form-reading-top, 0px)')
   return (
     <>
-      <div ref={headerRef} className={`${editor ? 'erp-line-editor__heading ' : title ? 'erp-business-form-heading ' : ''}erp-sales-order-lines-form__head`} data-line-items-title={title ? 'true' : 'false'} data-line-items-toolbar={groupActions || scrollControls ? 'true' : 'false'}>
+      <div ref={headerRef} className={classNames(editor && 'erp-line-editor__heading', title && 'erp-business-form-heading', 'erp-sales-order-lines-form__head')} data-line-items-title={title ? 'true' : 'false'} data-line-items-toolbar={groupActions || scrollControls ? 'true' : 'false'}>
         <div className="erp-line-items-form__head-identity">
           {title ? (
             <strong role="heading" aria-level={3} tabIndex={-1}>

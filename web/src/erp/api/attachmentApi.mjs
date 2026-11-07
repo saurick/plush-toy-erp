@@ -1,4 +1,5 @@
 import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
+import { AttachmentPolicy } from '../../common/consts/attachments.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import {
@@ -82,7 +83,9 @@ export async function uploadProductImage(params = {}) {
     owner_id: productID,
     attachment_type: 'product_image',
   })
-  notifyProductImagesChanged(productID)
+  if (rest.slot_key !== AttachmentPolicy.productImageSupplementalSlot) {
+    notifyProductImagesChanged(productID)
+  }
   return image
 }
 
@@ -98,6 +101,6 @@ export async function clearProductImage(params = {}) {
     error.isInvalidResponse = true
     throw error
   }
-  notifyProductImagesChanged(productID)
+  if (!rest.id) notifyProductImagesChanged(productID)
   return true
 }

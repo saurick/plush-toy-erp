@@ -310,7 +310,7 @@ export default function SalesOrderBatchImportEditor({
       onOk={saveAll}
       onCancel={onClose}
     >
-      <Space wrap style={{ marginBottom: 16 }}>
+      <Space wrap>
         <Button
           disabled={saving || index === 0}
           onClick={() => selectOrder(index - 1)}
@@ -355,7 +355,6 @@ export default function SalesOrderBatchImportEditor({
           type="warning"
           message={statusLabels[current.status]}
           description={current.errors.join('；')}
-          style={{ marginBottom: 16 }}
         />
       ) : null}
       <Typography.Paragraph type="secondary">
@@ -368,7 +367,6 @@ export default function SalesOrderBatchImportEditor({
           type="warning"
           message="原表有内容需要核对"
           description={current.review.warnings.join('；')}
-          style={{ marginBottom: 16 }}
         />
       ) : null}
       <BusinessForm

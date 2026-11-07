@@ -2,9 +2,29 @@ export const BOM_IMPORT_EXAMPLE_FILENAME = 'BOM-材料分析示例.xlsx'
 export const BOM_IMPORT_EXAMPLE_SHEET = '材料分析明细表-1'
 
 export const BOM_IMPORT_FORMAT_GUIDE = [
-  { title: '产品与订单', description: '核对产品、订单和数量；导入明细时保留当前表头。', marker: { x: 7, y: 27 } },
-  { title: '材料与部位', description: '保留“物料名称”“单位用量”表头，按部位填写；示例使用码／千克，保存前关联材料和单位。', marker: { x: 7, y: 64 } },
-  { title: '图片与附件', description: '右上为产品图，色卡和工艺图可留在原页。图片需另行添加为附件。', marker: { x: 90, y: 18 } },
+  {
+    title: '产品与订单',
+    description: '核对产品、订单和数量；导入明细时保留当前表头。',
+    region: { left: 2, right: 80, top: 20, bottom: 35, side: 'left' },
+  },
+  {
+    title: '材料与部位',
+    description:
+      '保留“物料名称”“单位用量”表头，按部位填写；示例使用码／千克，保存前关联材料和单位。',
+    region: { left: 2, right: 100, top: 36, bottom: 80, side: 'left' },
+  },
+  {
+    title: '图片与附件',
+    description: '右上为产品图，色卡和工艺图可留在原页。图片需另行添加为附件。',
+    region: {
+      left: 81,
+      right: 93,
+      top: 4,
+      bottom: 28,
+      side: 'right',
+      kind: 'point',
+    },
+  },
 ]
 
 export const BOM_IMPORT_EXAMPLE_CONTEXT = {

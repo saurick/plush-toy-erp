@@ -1,6 +1,9 @@
 import { assertBusinessLineItemDisclosure } from './businessLineItemDisclosureAssertions.mjs'
-import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
+import { assertBusinessNoteTextAreas, assertSharedLineTableSurface, assertSharedLineActions } from './businessFormPageAssertions.mjs'
+import { clickLineItemAction, revealLineItemDetails } from './lineEditorActions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { BusinessTextPolicy } from '../../src/common/consts/policies.generated.mjs'
+import { getBusinessPagePresentation } from '../../src/erp/config/businessUsabilityCatalog.mjs'
 import { WORKBENCH_APPEARANCE_STORAGE_KEY, normalizeERPAccountAppearance } from '../../src/common/theme/erpAppearance.mjs'
 
 export function createDevBusinessComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }) {
@@ -15,6 +18,8 @@ export function createDevBusinessComponentScenarios({ assert, assertNoHorizontal
     await stage.getByRole('radio', { name: '首次失败后重试', exact: true }).locator('..').click()
     await stage.getByRole('button', { name: '编辑演示草稿', exact: true }).click()
     await editor.waitFor()
+    const tableSurfaces = await assertSharedLineTableSurface(editor)
+    if (page.viewportSize().width >= 1440) assert.equal(tableSurfaces.length, 1, '交互设计保留普通明细样例')
     await assertBusinessNoteTextAreas(editor)
     const headerNote = editor.getByLabel('整单备注', { exact: true })
     const headerCount = headerNote.locator('..').locator('.ant-input-data-count')
@@ -28,8 +33,9 @@ export function createDevBusinessComponentScenarios({ assert, assertNoHorizontal
     await subject.fill('多行材料演示')
     await editor.getByRole('button', { name: '添加明细', exact: true }).click()
     await editor.getByLabel('第 2 条材料名称', { exact: true }).fill('加长材料名称\n补充规格与颜色')
-    const second = editor.getByRole('rowgroup', { name: '第 2 条明细', exact: true })
-    assert.ok(await second.getByLabel('第 2 条备注', { exact: true }).isVisible(), '新增明细备注直接可填')
+    const second = editor.locator('.erp-editable-line-group[aria-label="第 2 条明细"]')
+    await revealLineItemDetails(second)
+    assert.ok(await second.getByLabel('第 2 条备注', { exact: true }).isVisible(), '展开补充资料后备注可实际填写')
     const note = editor.getByLabel('第 2 条备注', { exact: true })
     await assertBusinessNoteTextAreas(editor)
     const initialNoteHeight = (await note.boundingBox()).height
@@ -42,6 +48,7 @@ export function createDevBusinessComponentScenarios({ assert, assertNoHorizontal
     await page.waitForFunction(({ selector, height }) => Math.abs(document.querySelector(selector).getBoundingClientRect().height - height) <= 1, { selector: 'textarea[aria-label="第 2 条备注"]', height: initialNoteHeight })
     await assertBusinessNoteTextAreas(editor)
     await note.fill(longNote)
+    await editor.getByRole('button', { name: '分组显示', exact: true }).click()
     await assertBusinessLineItemDisclosure(page, editor)
 
     if (page.viewportSize().width >= 768) {
@@ -52,20 +59,24 @@ export function createDevBusinessComponentScenarios({ assert, assertNoHorizontal
       await editor.getByRole('button', { name: '全屏编辑', exact: true }).waitFor()
       assert.equal(await note.inputValue(), longNote, '退出全屏保留明细与输入')
     }
-    await editor.getByRole('button', { name: '移除第 2 条明细', exact: true }).click()
-    await editor.getByRole('button', { name: '移除第 1 条明细', exact: true }).click()
+    await clickLineItemAction(second, '移除第 2 条明细')
+    await clickLineItemAction(editor.locator('.erp-editable-line-group[aria-label="第 1 条明细"]'), '移除第 1 条明细')
     await editor.getByText('暂无演示明细，可添加一条继续操作', { exact: true }).waitFor()
     await editor.getByRole('button', { name: '添加明细', exact: true }).click()
     await editor.getByLabel('第 1 条材料名称', { exact: true }).fill('恢复后的演示材料')
     await editor.getByRole('button', { name: '返回列表', exact: true }).click()
     const confirm = page.getByRole('dialog').filter({ hasText: '放弃未保存的修改？' })
-    await confirm.getByRole('button', { name: '继续编辑', exact: true }).click()
-    await confirm.waitFor({ state: 'hidden' })
+    const decideLeave = async (name) => {
+      await confirm.waitFor()
+      await waitForFiniteAnimations(page, { selector: '.ant-modal' })
+      await confirm.getByRole('button', { name, exact: true }).click()
+      await confirm.waitFor({ state: 'hidden' })
+    }
+    await decideLeave('继续编辑')
     assert.equal(await subject.inputValue(), '多行材料演示')
     assert.equal(await headerNote.inputValue(), '首批按确认样交付\n余量另行安排', '取消离开保留整单备注')
     await page.getByRole('navigation', { name: '控件设计目录' }).getByRole('button', { name: /来源选择/u }).click()
-    await confirm.getByRole('button', { name: '继续编辑', exact: true }).click()
-    await confirm.waitFor({ state: 'hidden' })
+    await decideLeave('继续编辑')
     assert.equal(new URL(page.url()).searchParams.get('control'), 'business-form', '目录切换也受未保存保护')
     await editor.getByRole('button', { name: '保存', exact: true }).click()
     await editor.getByRole('alert').filter({ hasText: '演示保存失败' }).waitFor()
@@ -74,17 +85,58 @@ export function createDevBusinessComponentScenarios({ assert, assertNoHorizontal
     await editor.getByRole('button', { name: '保存', exact: true }).click()
     await editor.waitFor({ state: 'hidden' })
     assert.equal(await stage.getByLabel('业务表单示例结果').innerText(), '演示草稿已保存：多行材料演示，1 条明细')
-    await stage.getByRole('button', { name: '编辑演示草稿', exact: true }).click()
+    const reopen = stage.getByRole('button', { name: '编辑演示草稿', exact: true })
+    // Focus restoration follows keyboard activation, independent of mouse-focus policy.
+    await reopen.focus()
+    await reopen.press('Enter')
     assert.equal(await subject.inputValue(), '毛绒材料采购', '重开演示恢复初始草稿')
     await subject.fill('待放弃修改')
     await editor.getByRole('button', { name: '返回列表', exact: true }).click()
-    await confirm.getByRole('button', { name: '放弃修改', exact: true }).click()
+    await decideLeave('放弃修改')
     await editor.waitFor({ state: 'hidden' })
     await page.waitForFunction(() => document.activeElement?.textContent === '编辑演示草稿')
     assert(await stage.getByRole('button', { name: '编辑演示草稿', exact: true }).evaluate((node) => node === document.activeElement), '返回恢复入口焦点')
     assert.deepEqual(businessRequests, [], '表单演示不读取或写入业务数据')
+    await stage.getByRole('radio', { name: '紧凑字段明细', exact: true }).locator('..').click()
     await stage.getByRole('button', { name: '编辑演示草稿', exact: true }).click()
     await editor.waitFor()
+    await editor.getByLabel('紧凑明细数量', { exact: true }).fill('25')
+    assert.equal(await editor.getByLabel('紧凑明细数量', { exact: true }).inputValue(), '25')
+    const compactSurfaces = await assertSharedLineTableSurface(editor)
+    if (page.viewportSize().width >= 1440) assert.equal(compactSurfaces.length, 1, '交互设计可切换为紧凑字段明细样例')
+    await editor.getByLabel('紧凑明细材料名称', { exact: true }).fill('')
+    await editor.getByRole('button', { name: '保存', exact: true }).click()
+    await editor.getByText('请填写材料名称', { exact: true }).waitFor()
+    assert.equal(await editor.getByLabel('紧凑明细数量', { exact: true }).inputValue(), '25', '紧凑明细校验失败保留已填数量')
+    await editor.getByLabel('紧凑明细材料名称', { exact: true }).fill('短毛绒')
+    await editor.getByRole('button', { name: '返回列表', exact: true }).click()
+    await decideLeave('放弃修改')
+    await editor.waitFor({ state: 'hidden' })
+    await stage.getByRole('radio', { name: '联系人', exact: true }).locator('..').click()
+    await stage.getByRole('button', { name: '编辑演示草稿', exact: true }).click()
+    await editor.waitFor()
+    const contacts = editor.locator('.erp-master-contact-list__row')
+    const contactName = contacts.first().getByLabel('联系人', { exact: true })
+    await contactName.fill('演示主联系人')
+    const contactNode = await contactName.elementHandle()
+    await editor.getByRole('button', { name: '添加联系人', exact: true }).click()
+    await contacts.nth(1).getByLabel('联系人', { exact: true }).fill('演示备用联系人')
+    await editor.getByRole('radio', { name: '设为主联系人 2', exact: true }).check()
+    await assertSharedLineTableSurface(editor)
+    await assertSharedLineActions(editor)
+    await clickLineItemAction(contacts.nth(1), '复制联系人条目 2')
+    assert.equal(await contacts.count(), 3)
+    assert.equal(await editor.getByRole('radio', { name: '设为主联系人 2', exact: true }).isChecked(), true)
+    assert.equal(await editor.getByRole('radio', { name: '设为主联系人 3', exact: true }).isChecked(), false, '复制联系人不复制主联系人身份')
+    await clickLineItemAction(contacts.nth(2), '移除联系人条目 3')
+    await clickLineItemAction(contacts.nth(1), '移除联系人条目 2')
+    assert.equal(await contacts.count(), 1)
+    assert.equal(await contacts.first().locator('input[type="checkbox"]').isChecked(), true, '移除主联系人后保留有效主联系人')
+    assert.equal(await contactName.inputValue(), '演示主联系人')
+    assert.equal(await contactName.evaluate((node, previous) => node === previous, contactNode), true)
+    await contactNode.dispose()
+    if (page.viewportSize().width >= 1440) assert.equal((await assertSharedLineTableSurface(editor)).length, 1, '交互设计覆盖第三种真实表格入口')
+    assert.deepEqual(businessRequests, [], '普通明细、紧凑明细与联系人均只使用本地演示数据')
     await assertNoHorizontalOverflow(page)
   }
 
@@ -100,8 +152,10 @@ export function createDevBusinessComponentScenarios({ assert, assertNoHorizontal
     const hint = dialog.locator('.erp-source-import-picker__footer [role="status"]')
     const rows = dialog.locator('tbody tr.ant-table-row')
     const result = stage.getByLabel('来源选择示例结果', { exact: true })
-    await trigger.click()
+    await trigger.focus()
+    await trigger.press('Enter')
     await dialog.waitFor()
+    await waitForFiniteAnimations(page, { selector: '.erp-source-import-picker-modal' })
     assert(await confirm.isDisabled())
     assert.equal(await hint.innerText(), '请先选择来源')
     const hintBox = await hint.boundingBox()
@@ -129,6 +183,8 @@ export function createDevBusinessComponentScenarios({ assert, assertNoHorizontal
     await confirm.click()
     await dialog.waitFor({ state: 'hidden' })
     assert.equal(await result.innerText(), '已添加 2 条：短毛绒、演示材料 6')
+    await waitForFiniteAnimations(page, { selector: '.ant-modal' })
+    await page.waitForFunction(() => document.activeElement?.textContent === '选择演示材料')
     assert(await trigger.evaluate((node) => node === document.activeElement), '关闭弹窗恢复入口焦点')
     await trigger.click()
     await dialog.waitFor()
@@ -203,34 +259,34 @@ export function createDevBusinessComponentScenarios({ assert, assertNoHorizontal
     ]),
     {
       name: 'dev-ui-shared-consumer-entry',
-      path: '/__dev/ui-design?page=controls&control=business-form',
+      path: getBusinessPagePresentation('accessories-purchase').path,
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1920, height: 1080 },
       verify: async (page) => {
-        const link = page.getByRole('link', { name: '采购订单', exact: true })
-        const href = await link.getAttribute('href')
-        assert.equal(await link.getAttribute('target'), '_blank', '真实入口保留演示现场')
-        assert.equal(href, '/erp/purchase/accessories')
         const writes = []
         page.on('request', (request) => {
           if (!new URL(request.url()).pathname.startsWith('/rpc/') || request.method() !== 'POST') return
           const method = request.postDataJSON()?.method || ''
           if (/^(?:save|create|update|delete|post|submit|confirm|cancel|complete)_/u.test(method)) writes.push(method)
         })
-        await page.goto(new URL(href, page.url()).href)
         await page.getByRole('heading', { name: '采购订单', exact: true }).waitFor()
         const create = page.getByRole('button', { name: /新建采购订单/u })
         await create.waitFor()
         await create.click()
         const editor = page.getByRole('region', { name: '新建采购订单', exact: true })
         await editor.waitFor()
-        await editor.getByRole('button', { name: '从材料库添加', exact: true }).click()
+        const source = editor.getByRole('button', { name: '从材料库添加', exact: true })
+        assert.equal(await source.isDisabled(), true, '真实消费者先选择供应商，再按其材料范围导入')
+        await editor.getByLabel('供应商', { exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '样式供应商' }).first().click()
+        await source.click()
         const picker = page.getByRole('dialog').filter({ hasText: '从材料库添加' })
         await picker.locator('tbody tr.ant-table-row').first().waitFor()
         await picker.getByRole('button', { name: '取消', exact: true }).click()
         await picker.waitFor({ state: 'hidden' })
         await editor.getByRole('button', { name: '返回列表', exact: true }).click()
+        await page.getByRole('dialog').filter({ hasText: '放弃未保存的修改？' }).getByRole('button', { name: '放弃修改', exact: true }).click()
         await editor.waitFor({ state: 'hidden' })
         assert.deepEqual(writes, [], '真实消费者核对只读加载与取消，不提交业务数据')
         await assertNoHorizontalOverflow(page)

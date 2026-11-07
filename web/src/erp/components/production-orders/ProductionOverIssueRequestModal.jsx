@@ -145,7 +145,6 @@ export default function ProductionOverIssueRequestModal({
       <Descriptions
         size="small"
         column={{ xs: 1, sm: 2 }}
-        style={{ marginTop: 16 }}
         items={[
           {
             key: 'order',
@@ -184,7 +183,6 @@ export default function ProductionOverIssueRequestModal({
         layout="vertical"
         disabled={loading}
         preserve={false}
-        style={{ marginTop: 12 }}
       >
         <Form.Item
           name="decision_no"

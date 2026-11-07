@@ -33,12 +33,15 @@ import {
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
 
+const DEFAULT_FINANCE_FACT_TYPES = ['RECEIVABLE', 'PAYABLE']
+
 export default function useFinancePaymentRecords({
   outletContext,
   storageKey,
   linkedFinancePaymentID,
-  setActiveTab,
   beginLatestRequest,
+  recordType = 'payments',
+  financeFactTypes = DEFAULT_FINANCE_FACT_TYPES,
 }) {
   const [currentPayment, setCurrentPayment] = useState(null)
   const [paymentRecovery, setPaymentRecovery] = useState(null)
@@ -220,6 +223,8 @@ export default function useFinancePaymentRecords({
       )
     } catch (error) {
       if (!request.isCurrent() || isRpcAbortError(error)) return
+      setCreditNotes([])
+      setCreditTotal(0)
       showPageLoadError(error, '加载红冲记录')
     } finally {
       if (request.isCurrent()) {
@@ -274,7 +279,7 @@ export default function useFinancePaymentRecords({
     async ({ factType, counterpartyID, currency } = {}) => {
       const request = beginLatestRequest('finance-fact-references')
       setReferenceLoading(true)
-      const factTypes = factType ? [factType] : ['RECEIVABLE', 'PAYABLE']
+      const factTypes = factType ? [factType] : financeFactTypes
       try {
         const results = await Promise.all(
           factTypes.map((currentFactType) =>
@@ -307,43 +312,41 @@ export default function useFinancePaymentRecords({
         request.finish()
       }
     },
-    [beginLatestRequest]
+    [beginLatestRequest, financeFactTypes]
   )
 
   const loadReferences = useCallback(
     () =>
-      Promise.allSettled([
-        loadPaymentRows(),
-        loadCreditRows(),
-        loadPartyReferences(),
-      ]),
-    [loadCreditRows, loadPartyReferences, loadPaymentRows]
+      Promise.allSettled(recordType === 'credits'
+        ? [loadCreditRows()]
+        : [loadPaymentRows(), loadPartyReferences()]),
+    [loadCreditRows, loadPartyReferences, loadPaymentRows, recordType]
   )
 
   useEffect(() => {
-    loadPaymentRows()
-  }, [loadPaymentRows])
+    if (recordType === 'payments') loadPaymentRows()
+  }, [loadPaymentRows, recordType])
 
   useEffect(() => {
-    loadCreditRows()
-  }, [loadCreditRows])
+    if (recordType === 'credits') loadCreditRows()
+  }, [loadCreditRows, recordType])
 
   useEffect(() => {
-    loadPartyReferences()
-  }, [loadPartyReferences])
+    if (recordType === 'payments') loadPartyReferences()
+  }, [loadPartyReferences, recordType])
 
   useEffect(() => {
+    if (recordType !== 'payments') return
     if (
       Number.isSafeInteger(linkedFinancePaymentID) &&
       linkedFinancePaymentID > 0
     ) {
-      setActiveTab('payments')
       recoverPayment(linkedFinancePaymentID)
     } else if (storageKey) {
       const paymentID = Number(window.sessionStorage.getItem(storageKey) || 0)
       if (paymentID > 0) recoverPayment(paymentID, true)
     }
-  }, [linkedFinancePaymentID, recoverPayment, setActiveTab, storageKey])
+  }, [linkedFinancePaymentID, recoverPayment, storageKey, recordType])
 
   useEffect(
     () => outletContext?.registerPageRefresh?.(loadReferences),

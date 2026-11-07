@@ -8,6 +8,17 @@ import {
 } from './businessActionAvailability.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 
+test('low-frequency actions stay in more and reserve the trigger width', () => {
+  const descriptors = [
+    { index: 0, actionable: true, width: 80, group: 'business', score: 50 },
+    { index: 1, actionable: true, width: 80, group: 'business', score: 40 },
+    { index: 2, actionable: true, width: 100, group: 'business', moreOnly: true },
+  ]
+  assert.deepEqual(selectStableBusinessActionIndexes(descriptors, { availableWidth: 1000, moreWidth: 50 }), [0, 1])
+  assert.deepEqual(selectStableBusinessActionIndexes(descriptors, { availableWidth: 210, moreWidth: 50 }), [0])
+  assert.deepEqual(selectStableBusinessActionIndexes(descriptors.slice(0, 2), { availableWidth: 210, moreWidth: 50 }), [0, 1])
+})
+
 test('业务动作可用性：无权限、不适用和完成后隐藏，前置条件不足和忙碌保留原因', () => {
   assert.deepEqual(
     resolveBusinessActionAvailability({

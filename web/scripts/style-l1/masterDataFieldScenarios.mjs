@@ -8,6 +8,7 @@ import { BOM_IMPORT_EXAMPLE_CONTEXT, BOM_IMPORT_EXAMPLE_FILENAME, BOM_IMPORT_EXA
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertImportUndoPlacement } from './importUndoAssertions.mjs'
 import { createPaymentMethodScenarios } from './paymentMethodScenarios.mjs'
+import { assertDocumentGuide } from './documentGuideAssertions.mjs'
 
 export function createMasterDataFieldScenarios(deps) {
   const {
@@ -545,7 +546,7 @@ export function createMasterDataFieldScenarios(deps) {
         assert.equal(await parts.count(), 3, '取消预览应保留原有明细')
         const append = await openPreview()
         await append.getByText('保留当前订单数量 50（原表 100），总用量按当前数量计算。', { exact: true }).waitFor()
-        for (const width of [1024, 390]) {
+        for (const width of [1024, 390, 320]) {
           await page.setViewportSize({ width, height: 900 })
           const metrics = await append.evaluate((node) => {
             const box = node.getBoundingClientRect()
@@ -761,20 +762,14 @@ export function createMasterDataFieldScenarios(deps) {
           const box = await format.boundingBox()
           assert(box && box.x >= 0 && box.x + box.width <= width, `格式说明应在 ${width}px 内完整显示`)
           await assertNoHorizontalOverflow(page, `bom-excel-format-${width}`)
+          await assertDocumentGuide(format.locator('.erp-document-guide'), { rangeCount: 2 })
           const metrics = await format.evaluate((node) => {
             const figure = node.querySelector('.erp-document-guide__figure').getBoundingClientRect()
             const parts = node.querySelector('.erp-document-guide__parts').getBoundingClientRect()
-            const image = node.querySelector('.erp-bom-excel-guide__preview').getBoundingClientRect()
-            const markers = [...node.querySelectorAll('.erp-bom-excel-guide__marker')].map((marker) => {
-              const rect = marker.getBoundingClientRect()
-              return { number: marker.textContent.trim(), fits: rect.left >= image.left - 1 && rect.right <= image.right + 1 && rect.top >= image.top - 1 && rect.bottom <= image.bottom + 1 }
-            })
             const download = node.querySelector('a[download]').getBoundingClientRect()
-            return { sideBySide: parts.left >= figure.right, stacked: parts.top >= figure.bottom, markers, footerVisible: download.top >= 0 && download.bottom <= window.innerHeight }
+            return { sideBySide: parts.left >= figure.right, stacked: parts.top >= figure.bottom, footerVisible: download.top >= 0 && download.bottom <= window.innerHeight }
           })
           assert.equal(width > 540 ? metrics.sideBySide : metrics.stacked, true, `图示与短说明应适应 ${width}px: ${JSON.stringify(metrics)}`)
-          assert.deepEqual(metrics.markers.map((marker) => marker.number), ['1', '2', '3'])
-          assert(metrics.markers.every((marker) => marker.fits), `区域编号应留在图示内: ${JSON.stringify(metrics)}`)
           assert(metrics.footerVisible, '窄屏下载和关闭操作应留在可见区域')
           if (width === 390) await page.screenshot({ path: path.join(outputDir, 'bom-excel-guide-390.png'), fullPage: true })
         }
@@ -869,6 +864,34 @@ export function createMasterDataFieldScenarios(deps) {
       },
     },
     {
+      name: 'bom-excel-format-guide-regions',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await page.getByRole('button', { name: '新建 BOM' }).click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        const quantity = editor.getByLabel('订单数量', { exact: true })
+        await quantity.fill('88')
+        await editor.getByRole('button', { name: '查看 Excel 格式', exact: true }).click()
+        const format = page.getByRole('dialog', { name: 'Excel 格式说明', exact: true })
+        await page.waitForFunction(() => document.querySelector('.erp-bom-excel-guide__preview > img')?.naturalWidth > 0)
+        for (const width of [1024, 390, 320]) {
+          await page.setViewportSize({ width, height: 900 })
+          await waitForFiniteAnimations(page)
+          await assertDocumentGuide(format.locator('.erp-document-guide'), { rangeCount: 2 })
+          await assertNoHorizontalOverflow(page, `bom-excel-format-guide-regions-${width}`)
+        }
+        await page.setViewportSize({ width: 1440, height: 900 })
+        const [download] = await Promise.all([page.waitForEvent('download'), format.getByRole('link', { name: '下载示例 Excel', exact: true }).click()])
+        assert.equal(download.suggestedFilename(), BOM_IMPORT_EXAMPLE_FILENAME)
+        assert((await readFile(await download.path())).equals(await readFile(new URL('../../src/erp/data/bom-import-example.xlsx', import.meta.url))))
+        await format.getByRole('button', { name: '关闭', exact: true }).click()
+        assert.equal(await quantity.inputValue(), '88', '查看与操作图示保留编辑中的表头')
+      },
+    },
+    {
       name: 'bom-excel-format-guide-dark',
       path: '/erp/purchase/material-bom',
       auth: 'admin',
@@ -882,6 +905,7 @@ export function createMasterDataFieldScenarios(deps) {
         await format.getByRole('img', { name: 'Excel 材料分析明细表示意图', exact: true }).waitFor()
         await page.waitForFunction(() => document.querySelector('.erp-bom-excel-guide__preview > img')?.naturalWidth > 0)
         await waitForFiniteAnimations(page)
+        await assertDocumentGuide(format.locator('.erp-document-guide'), { rangeCount: 2 })
         assert.equal(await page.evaluate(() => document.documentElement.dataset.erpTheme), 'dark')
         assert.equal(await format.locator('.erp-document-guide__parts li').count(), 3)
         await assertNoHorizontalOverflow(page, 'bom-excel-format-guide-dark')
@@ -904,7 +928,7 @@ export function createMasterDataFieldScenarios(deps) {
         await page.getByRole('menuitem', { name: '查看 Excel 格式', exact: true }).click()
         const format = page.getByRole('dialog', { name: 'Excel 格式说明', exact: true })
         await format.getByText('图片加载失败', { exact: true }).waitFor()
-        assert.equal(await format.locator('.erp-bom-excel-guide__marker:visible').count(), 0, '图片失败时不保留失去对应区域的编号')
+        assert.equal(await format.locator('.erp-document-guide__marker:visible').count(), 0, '图片失败时不保留失去对应区域的编号')
         assert.equal(await format.locator('.erp-document-guide__parts li').count(), 3)
         const [download] = await Promise.all([page.waitForEvent('download'), format.getByRole('link', { name: '下载示例 Excel', exact: true }).click()])
         assert.equal(download.suggestedFilename(), BOM_IMPORT_EXAMPLE_FILENAME)
@@ -958,6 +982,30 @@ export function createMasterDataFieldScenarios(deps) {
       },
     },
     {
+      name: 'dev-ui-design-document-guide',
+      path: '/__dev/ui-design',
+      viewport: { width: 1440, height: 1000 },
+      verify: async (page) => {
+        await page.getByRole('button', { name: /全屏预览/u }).click()
+        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        await frame.locator('.nav-item[data-page="engineering-hub"]').click()
+        await frame.getByLabel('更多新建方式', { exact: true }).click()
+        await frame.getByRole('button', { name: '查看 Excel 格式', exact: true }).click()
+        const format = frame.getByRole('dialog', { name: 'Excel 格式说明', exact: true })
+        await format.locator('.document-guide-marker').nth(2).waitFor()
+        assert.equal(await format.locator('.document-guide-marker').count(), 3)
+        assert.equal(await format.locator('.document-guide-range').count(), 2)
+        await format.locator('.document-guide-marker').nth(2).press('Enter')
+        assert.equal(await format.locator('.document-guide-part').nth(2).getAttribute('aria-pressed'), 'true')
+        await format.locator('.document-guide-part').nth(0).click()
+        assert.equal(await format.locator('.document-guide-marker').nth(0).getAttribute('aria-pressed'), 'true')
+        const [download] = await Promise.all([page.waitForEvent('download'), format.getByRole('link', { name: '下载示例 Excel', exact: true }).click()])
+        assert((await readFile(await download.path())).equals(await readFile(new URL('../../src/erp/data/bom-import-example.xlsx', import.meta.url))))
+        await format.locator('.modal-foot').getByRole('button', { name: '关闭', exact: true }).click()
+        assert.equal(await format.count(), 0)
+      },
+    },
+    {
       name: 'dev-ui-design-bom-import-entry',
       path: '/__dev/ui-design',
       viewport: { width: 1440, height: 1000 },
@@ -982,7 +1030,11 @@ export function createMasterDataFieldScenarios(deps) {
         await editor.getByRole('button', { name: '查看 Excel 格式', exact: true }).click()
         const format = frame.getByRole('dialog', { name: 'Excel 格式说明', exact: true })
         await format.getByRole('img', { name: 'Excel 材料分析明细表示意图', exact: true }).waitFor()
-        assert.equal(await format.locator('.bom-excel-guide-marker').count(), 3)
+        await format.locator('.document-guide-marker').nth(2).waitFor()
+        assert.equal(await format.locator('.document-guide-marker').count(), 3)
+        assert.equal(await format.locator('.document-guide-range').count(), 2)
+        await format.locator('.document-guide-marker').nth(2).click()
+        assert.equal(await format.locator('.document-guide-part').nth(2).getAttribute('aria-pressed'), 'true')
         assert.equal(await format.getByRole('table').count(), 0)
         const [download] = await Promise.all([page.waitForEvent('download'), format.getByRole('link', { name: '下载示例 Excel', exact: true }).click()])
         const downloaded = await readFile(await download.path())

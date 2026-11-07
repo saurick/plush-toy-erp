@@ -22,12 +22,12 @@ function fixture() {
     class: 'business',
     assignable: true,
   }))
-  const role = (key, name, required) => ({
+  const role = (key, name, defaults) => ({
     role_key: key,
     name,
     role_type: 'business_default',
     version: 1,
-    permissions: [...required, 'erp.print_template.read'],
+    permissions: [...defaults, 'erp.print_template.read'],
     permissions_editable_by_current_admin: true,
     assignable_by_current_admin: true,
     description:
@@ -40,13 +40,8 @@ function fixture() {
     permission_policy: {
       template_key: key,
       registered: true,
-      required_permissions: required,
-      optional_permissions: [
-        'erp.print_template.read',
-        'erp.business_dashboard.read',
-      ],
-      missing_required_permissions: [],
-      outside_template_permissions: [],
+      default_permissions: defaults,
+      assignable_permissions: permissions.map((item) => item.permission_key),
     },
   })
   const roles = [
@@ -101,10 +96,10 @@ function fixture() {
   return { permissions, roles, accounts, access }
 }
 
-async function install(page, { drift = false, restricted = false, activeConcurrent = false } = {}) {
+async function install(page, { customized = false, restricted = false, activeConcurrent = false } = {}) {
   const data = fixture()
   if (activeConcurrent) data.accounts[1].account_status = 'active'
-  if (drift)
+  if (customized)
     { data.roles[0].permissions = [
       'warehouse.inventory.read',
       'erp.print_template.read',
@@ -160,19 +155,8 @@ async function install(page, { drift = false, restricted = false, activeConcurre
       const role = data.roles.find((item) => item.role_key === params.role_key)
       assert.equal(params.expected_version, role.version)
       assert.ok(
-        role.permission_policy.required_permissions.every((key) =>
-          params.permission_keys.includes(key)
-        ),
-        'must preserve duties'
-      )
-      assert.ok(
-        params.permission_keys.every((key) =>
-          [
-            ...role.permission_policy.required_permissions,
-            ...role.permission_policy.optional_permissions,
-          ].includes(key)
-        ),
-        'must not widen template'
+        params.permission_keys.every((key) => role.permission_policy.assignable_permissions.includes(key)),
+        'only registered business permissions are assignable'
       )
       writes.push(params)
       role.permissions = params.permission_keys
@@ -202,7 +186,7 @@ deviceScaleFactor: 2,
         await results.getByText('确认入库', { exact: true }).waitFor()
         await results.getByText('当前客户未启用库存查询', { exact: true }).waitFor()
         assert.equal(await page.locator('main').getByRole('tab').count(), 3, '保留三个核对视图')
-        assert.equal(await page.locator('main').getByText('可选辅助', { exact: true }).count(), 0, '完整职责按需查看')
+        assert.equal(await page.locator('main').getByText('另外授权', { exact: true }).count(), 0, '完整职责按需查看')
         const search = page.getByRole('textbox', { name: '搜索功能', exact: true })
         await search.fill('更新质检'); await search.press('Enter')
         await results.getByText('未授予', { exact: true }).waitFor()
@@ -218,7 +202,7 @@ deviceScaleFactor: 2,
         await page.keyboard.press('Escape'); await drawer.waitFor({ state: 'hidden' })
         assert.equal(page.url(), query)
         await page.getByRole('button', { name: '岗位职责', exact: true }).click()
-        await drawer.getByText('可选辅助', { exact: true }).waitFor()
+        await drawer.getByText('另外授权', { exact: true }).waitFor()
         await drawer.getByText('查看打印模板', { exact: true }).waitFor()
         await drawer.getByRole('region', { name: '职责关联详情', exact: true }).waitFor()
         await drawer.locator('.erp-dev-role-responsibilities__core summary').click()
@@ -281,7 +265,7 @@ deviceScaleFactor: 2,
         const qualityRole = drawer.locator('.erp-dev-role-responsibilities__role').filter({ has: page.getByText('品质', { exact: true }) })
         await qualityRole.getByRole('button', { name: '配置此岗位', exact: true }).click()
         await page.waitForURL('**/erp/system/permissions?tab=roles&role=quality')
-        await page.getByRole('region', { name: '核心职责', exact: true }).waitFor()
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         assert.equal(state.writes.length, 0)
         const responsibilityURL = new URL(originalURL)
         responsibilityURL.searchParams.set('panel', 'responsibilities')
@@ -339,7 +323,7 @@ deviceScaleFactor: 2,
         assert.equal(new URL(page.url()).searchParams.get('activity'), source.searchParams.get('activity'))
         await drawer.getByRole('button', { name: '配置此岗位', exact: true }).click()
         await page.waitForURL('**/erp/system/permissions?tab=roles&role=warehouse')
-        await page.getByRole('region', { name: '核心职责', exact: true }).waitFor()
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
         assert.equal(state.writes.length, 0)
         await page.goBack(); await page.waitForURL(originalURL)
         await drawer.getByRole('region', { name: '职责关联详情', exact: true }).getByText(label, { exact: true }).waitFor()
@@ -373,35 +357,18 @@ deviceScaleFactor: 2,
         state = await install(page)
       },
       verify: async (page) => {
-        const core = page.getByRole('region', { name: '核心职责', exact: true })
-        await core.waitFor()
+        const matrix = page.getByRole('table', { name: '岗位功能权限', exact: true })
+        await matrix.waitFor()
+        assert.equal(await page.getByRole('button', { name: /(?:查看|收起)功能明细/u }).count(), 0)
         await page.getByRole('button', { name: '全屏编辑', exact: true }).click()
         await page.getByRole('dialog', { name: '仓库岗位设置', exact: true }).waitFor()
         await page.getByRole('button', { name: '退出全屏', exact: true }).click()
-        assert.equal(
-          await core.getByRole('checkbox').count(),
-          0,
-          'core details are progressive disclosure'
-        )
-        await core
-          .getByRole('button', { name: '查看功能明细', exact: true })
-          .click()
-        const confirm = core.getByRole('checkbox', {
-          name: '确认入库',
-          exact: true,
-        })
+        const confirm = page.getByRole('checkbox', { name: '确认入库', exact: true })
         assert.equal(await confirm.isChecked(), true)
-        assert.equal(await confirm.isDisabled(), true)
-        await core
-          .getByRole('button', { name: '收起功能明细', exact: true })
-          .click()
-        const optional = page.getByRole('region', {
-          name: '可选辅助',
-          exact: true,
-        })
-        await optional
-          .getByRole('checkbox', { name: '查看打印模板', exact: true })
-          .uncheck()
+        assert.equal(await confirm.isEnabled(), true)
+        await confirm.uncheck()
+        await page.getByRole('checkbox', { name: '更新质检', exact: true }).check()
+        await page.getByRole('checkbox', { name: '查看打印模板', exact: true }).uncheck()
         await page.getByText('有未保存调整', { exact: true }).waitFor()
         await page
           .getByRole('button', { name: '保存岗位设置', exact: true })
@@ -416,31 +383,26 @@ deviceScaleFactor: 2,
           state.writes[0].permission_keys.includes('purchase_order.read'),
           true
         )
+        assert.equal(state.writes[0].permission_keys.includes('warehouse.inbound.confirm'), false)
+        assert.equal(state.writes[0].permission_keys.includes('quality.inspection.update'), true)
         await assertNoHorizontalOverflow(page)
       },
     })),
     {
-      name: 'role-policy-explicit-repair',
+      name: 'role-policy-customized-grants',
       path: '/erp/system/permissions?tab=roles&role=warehouse',
       auth: 'admin',
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
-        state = await install(page, { drift: true })
+        state = await install(page, { customized: true })
       },
       verify: async (page) => {
-        await page
-          .getByText('当前配置与岗位职责不一致', { exact: true })
-          .waitFor()
+        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
+        assert.equal(await page.getByText('当前配置与岗位职责不一致', { exact: true }).count(), 0)
+        assert.equal(await page.getByRole('button', { name: '按模板整理', exact: true }).count(), 0)
         assert.equal(state.writes.length, 0)
-        assert.equal(
-          await page
-            .getByRole('button', { name: '保存岗位设置', exact: true })
-            .isDisabled(),
-          true
-        )
-        await page
-          .getByRole('button', { name: '按模板整理', exact: true })
-          .click()
+        assert.equal(await page.getByRole('button', { name: '保存岗位设置', exact: true }).isDisabled(), true)
+        await page.getByRole('checkbox', { name: '确认入库', exact: true }).check()
         await page.getByText('有未保存调整', { exact: true }).waitFor()
         assert.equal(state.writes.length, 0)
         await page
@@ -469,7 +431,7 @@ viewport: { width: 390, height: 844 },
         await assertNoHorizontalOverflow(page)
         await page.getByRole('button', { name: '岗位职责', exact: true }).click()
         const drawer = page.getByRole('dialog')
-        await drawer.getByText('可选辅助', { exact: true }).waitFor()
+        await drawer.getByText('另外授权', { exact: true }).waitFor()
         await assertNoHorizontalOverflow(page)
         await page.keyboard.press('Escape'); await drawer.waitFor({ state: 'hidden' })
         await page.getByRole('button', { name: '查看依据', exact: true }).click()

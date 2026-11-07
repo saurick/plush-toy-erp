@@ -1,16 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react'
-import { DeleteOutlined, FolderOpenOutlined } from '@ant-design/icons'
-import {
-  Alert,
-  AutoComplete,
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  Space,
-  Tag,
-  Typography,
-} from 'antd'
+import { FolderOpenOutlined } from '@ant-design/icons'
+import { Alert, AutoComplete, Button, Form, Input, InputNumber, Space, Tag, Typography } from 'antd'
+import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import TaskSourceFacts from '../business-list/TaskSourceFacts.jsx'
@@ -892,15 +883,13 @@ function ShipmentEditableLines({
           index={index}
           rowRef={(node) => registerLineItemRow(index, node)}
           actions={
-            <Button
-              danger
-              size="small"
-              icon={<DeleteOutlined />}
+            <BusinessLineItemActionButton
+              action="remove"
               disabled={fields.length <= 1}
               onClick={() => { remove(field.name); requestLineItemScroll(Math.min(index, fields.length - 2), { focusField: false }) }}
             >
               移除明细
-            </Button>
+            </BusinessLineItemActionButton>
           }
           field={field}
           form={form}

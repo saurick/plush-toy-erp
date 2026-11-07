@@ -81,7 +81,6 @@ export function usePermissionRoleSettings({
   adminRpc,
   loadData,
   onOpenRoleAccounts,
-  onOpenNavigation,
   navigationMode = false,
   settingsVisible = true,
   searchKeyword = '',
@@ -213,7 +212,7 @@ export function usePermissionRoleSettings({
   const selectedRolePermissionKeys =
     currentRoleDraft?.permissionKeys ?? selectedRoleSavedPermissionKeys
   const draftPolicy = readRolePermissionPolicy({ ...selectedRole, permissions: selectedRolePermissionKeys })
-  const rolePolicyInvalid = draftPolicy.registered && (draftPolicy.missing.length > 0 || draftPolicy.outside.length > 0)
+  const rolePolicyInvalid = draftPolicy.registered && draftPolicy.outside.length > 0
   const selectedWarehouseScopeMode =
     currentRoleDraft?.warehouseScopeMode ??
     selectedRoleSavedWarehouseScope.mode
@@ -306,20 +305,6 @@ export function usePermissionRoleSettings({
     ? permissionDraftAccessLoading && !matchingPermissionDraftAccess
     : effectiveRoleAccessLoading
 
-  const effectiveRolePageCount = useMemo(() => {
-    if (
-      roleAccessForCurrentDraft?.is_final !== true ||
-      roleAccessForCurrentDraftLoading
-    ) {
-      return null
-    }
-    return (
-      Array.isArray(roleAccessForCurrentDraft?.pages)
-        ? roleAccessForCurrentDraft.pages
-        : []
-    ).filter((page) => page?.effective === true).length
-  }, [roleAccessForCurrentDraft, roleAccessForCurrentDraftLoading])
-
   const roleNavigationPlacement = useMemo(
     () =>
       buildPermissionNavigationPlacement({ access: roleAccessForCurrentDraft }),
@@ -390,7 +375,7 @@ export function usePermissionRoleSettings({
     selectedRole || {},
     { isProduction: IS_PRODUCTION_BUILD, currentAdmin }
   ) || (selectedRole && !draftPolicy.registered
-    ? '岗位职责模板尚未核对，暂不支持调整。请刷新后重试。'
+    ? '岗位权限模板尚未核对，暂不支持调整。请刷新后重试。'
     : '')
 
   const selectedRoleReadOnly = Boolean(selectedRoleReadOnlyReason)
@@ -954,44 +939,6 @@ export function usePermissionRoleSettings({
                       }
                       onChange={changeSelectedRolePermissions}
                     />
-                  </div>
-                  <div
-                    className="erp-role-settings-row"
-                    role="group"
-                    aria-label="岗位页面入口"
-                  >
-                    <div className="erp-role-settings-links">
-                      <Button
-                        type="link"
-                        onClick={() => {
-                          setRoleNavigationViewKey(
-                            ROLE_NAVIGATION_VIEW_KEYS.ACCESS
-                          )
-                          onOpenNavigation?.()
-                        }}
-                      >
-                        {effectiveRolePageCount === null
-                          ? '页面访问待核对'
-                          : `可访问 ${effectiveRolePageCount} 页`}
-                      </Button>
-                      <Button
-                        type="link"
-                        onClick={() => {
-                          setRoleNavigationViewKey(
-                            ROLE_NAVIGATION_VIEW_KEYS.MENU
-                          )
-                          onOpenNavigation?.()
-                        }}
-                      >
-                        岗位导航
-                      </Button>
-                      <SupplementalHelp
-                        label="页面入口"
-                        aria-label="页面入口说明"
-                        {...popoverProps('entry')}
-                        content="页面入口按最终可访问范围显示；隐藏菜单不会撤销权限。"
-                      />
-                    </div>
                   </div>
                 </div>
               )}

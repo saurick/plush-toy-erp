@@ -167,7 +167,6 @@ export default function SalesOrderReservationModal({
       <Descriptions
         size="small"
         column={1}
-        style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           { key: 'order', label: '销售订单', children: order?.order_no || '-' },
           {

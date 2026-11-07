@@ -192,7 +192,7 @@ export function createPageHeaderScenarios({ customerRuntimeEffectiveSession, ass
         ['/erp/task-board?mode=todo', '.erp-task-management-header', ['待我处理', '待我审批', '流程跟踪']],
         ['/erp/business-dashboard', '.erp-business-page-header-card', ['订单交付', '生产执行', '经营统计']],
         ['/erp/production/progress', '.erp-business-module-header', ['生产订单', '生产执行', '生产记录', '异常处理']],
-        ['/erp/finance/payments', '.erp-business-page-header-card', ['收付款记录', '账款调整', '期间对账']],
+        ['/erp/finance/payments', '.erp-business-page-header-card', ['应收', '应付', '收付款', '对账', '发票']],
         ['/erp/system/permissions', '.erp-business-page-header-card', ['岗位设置', '员工账号', '岗位导航']],
         ['/erp/help-center', '.erp-help-navigation-header', ['操作图解', '业务使用手册']],
       ]) {

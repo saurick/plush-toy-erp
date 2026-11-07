@@ -129,7 +129,7 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
       ],
       [
         '产品图片与规格附件',
-        '产品基础信息可设置 0–2 张产品图，只有一张放“产品图 1”，支持 PNG、JPEG、WEBP，保存产品后生效。产品规格附件另行保存样品、包装或款式确认资料。',
+        '可设置主图、辅图和最多 8 张补充图。点“添加补充图片”可多选 PNG、JPEG、WEBP；相同补充图会跳过，不占名额。可逐张预览或移除，保存产品后生效。补充图仅在产品档案查看；具体规格的样品、包装或款式确认资料放在产品规格附件。',
       ],
     ],
     actions: [
@@ -161,7 +161,7 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
       ],
       [
         '产品已保存，但图片没有更新',
-        '按页面提示重新打开产品，核对已保存图片，只重选未完成的图片；不要重复创建产品。',
+        '留在当前表单，查看“产品图片”里的提示。图片尚未保存时可重试；若提示补充图超量，先移除不需要的图片再保存。已经确认保存的图无需重传。',
       ],
       [
         '出货没有算出净重',
@@ -452,12 +452,14 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
   },
   inbound: {
     sources: [
+      'web/src/erp/pages/WarehouseProductionWorkPage.jsx',
+      'web/src/erp/components/production-orders/ProductionRouteExecutionModal.jsx',
       'web/src/erp/pages/PurchaseReceiptsPage.jsx',
       'web/src/erp/components/purchase-orders/PurchaseOrderInboundDraftModal.jsx',
       'web/src/erp/components/purchase-receipts/PurchaseReceiptExceptionModal.jsx',
     ],
     before:
-      '从已审核采购订单登记本次到货；准备送货凭据、实际点数、仓库与批次，不脱离采购来源重复建立入库。',
+      '先选择采购收货、成品入库、委外回货或工序回货；核对本次来源、实物数量、仓库与批次。采购到货从已审核采购订单登记。',
     fields: [
       [
         '来源与行',
@@ -483,8 +485,11 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
       ],
       [
         '拒收、退货与调整',
-        '首次未入库拒收按来源行办理退厂或补换；已入库后的退货和更正使用对应正式动作，从相关单据查看退货与调整记录，保留原单与反向记录。',
+        '首次未入库拒收按来源行办理退厂或补换；已入库后，从原收货单的更多操作生成采购退货，从相关单据查看退货与调整记录，保留原单与反向记录。',
       ],
+      ['工序回货', '按外发在制批次填写仓库实点数量，数量一致后交品质检验；少收、多收先核对，不增加成品库存。'],
+      ['成品入库', '在成品入库选择收仓单，核对仓库实收数量、仓库和批次后确认；数量有差异先编辑收仓草稿。入库后保留待检、待包装限制。'],
+      ['查货包装', '从待查货包装的成品收仓记录继续办理，绑定确切收仓单；业务确认包装资料、质量条件满足后分别安排、开始及完成包装。包装不重复增加库存。'],
     ],
     problems: [
       [
@@ -938,6 +943,8 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
     sources: [
       'web/src/erp/pages/OperationalFactsPage.jsx',
       'web/src/erp/components/finance/FinanceBusinessSourceModal.jsx',
+      'web/src/erp/components/finance/FinanceWorkspace.jsx',
+      'web/src/erp/components/finance/FinanceCreditNotesPanel.jsx',
     ],
     before:
       '先确认出货单已实际出货，核对本次客户、币种、金额与已生成的应收，避免重复。',
@@ -958,7 +965,7 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
       ],
       [
         '收款与更正',
-        '实际收款到“收付款与核销”登记并核销；差额按对应红冲或冲正动作办理，结清依据正式结果更新。',
+        '实际收款到“收付款与核销”登记并核销；“账款调整”查看应收与应付的完整调整记录，可登记红冲或冲回，保留来源、原金额和原因。',
       ],
       [
         '取消',
@@ -980,6 +987,9 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
     sources: [
       'web/src/erp/pages/OperationalFactsPage.jsx',
       'web/src/erp/components/finance/FinanceBusinessSourceModal.jsx',
+      'web/src/erp/components/finance/FinanceWorkspace.jsx',
+      'web/src/erp/components/finance/FinanceCreditNotesPanel.jsx',
+      'web/src/erp/components/finance/FinanceSourceAdjustmentsPanel.jsx',
     ],
     before:
       '准备已过账采购入库，或已过账且完成合格 / 允许让步质检的委外回货；确认本笔应付尚未重复生成。',
@@ -1000,7 +1010,7 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
       ],
       [
         '付款与更正',
-        '真实付款在“收付款与核销”登记，核对同一往来方和币种后核销；差异按正式更正动作处理。',
+        '真实付款在“收付款与核销”登记并核销；“账款调整”查询完整调整记录、登记红冲或冲回。“采购待调整”确认已过账退货或入库数量变化形成的应付差额。',
       ],
       ['取消', '按状态与依赖检查取消，不抹掉原入库、回货或已发生的实际付款。'],
     ],
@@ -1020,7 +1030,6 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
       'web/src/erp/pages/FinancePaymentsPage.jsx',
       'web/src/erp/components/finance/FinancePaymentEditor.jsx',
       'web/src/erp/components/finance/FinanceAllocationEditor.jsx',
-      'web/src/erp/components/finance/FinanceCreditEditor.jsx',
       'web/src/erp/components/finance/FinancePaymentSourceFields.jsx',
       'web/src/erp/components/finance/useFinancePaymentCreation.mjs',
       'web/src/erp/components/finance/useFinancePaymentAllocation.mjs',
@@ -1039,10 +1048,6 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
       [
         '核销明细',
         '只选择同一往来方、同一币种的应收或应付，逐笔核对未核销余额。结算款核销合计须等于本笔金额；已确认预收 / 预付款按可用余额分批抵扣同一订单账款。',
-      ],
-      [
-        '红冲',
-        '选择来源应收 / 应付，填写红冲单号、金额和原因；红冲、实际收付款与冲销是不同业务记录。',
       ],
     ],
     actions: [
@@ -1063,8 +1068,8 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
         '对已过账的错误收付按正式冲销入口填写原因，核对反向记录和核销余额恢复。',
       ],
       [
-        '红冲及撤销',
-        '按实际差异登记红冲；撤销使用独立反向记录，保留原单与原因。',
+        '账款差额与对账',
+        '账款调整从应收、应付进入，采购待调整归应付；期间对账和单笔核对到“对账”。仅开放收付款页面的岗位在查询区保留已授权的原有内容。',
       ],
     ],
     problems: [
@@ -1084,14 +1089,17 @@ export const BUSINESS_HANDBOOK_OPERATIONS = {
   },
   reconciliation: {
     sources: [
+      'web/src/erp/components/finance/FinanceWorkspace.jsx',
+      'web/src/erp/components/finance/FinanceStatementPanel.jsx',
       'web/src/erp/pages/OperationalFactsPage.jsx',
       'web/src/erp/components/finance/useFinanceReconciliationAction.mjs',
     ],
-    before: '确定要核对的单笔已过账应收、应付或发票，以及可对照的业务凭据。',
+    before: '期间对账准备往来方、币种和日期；单笔核对准备已过账应收、应付或发票及业务凭据。',
     fields: [
+      ['期间与余额', '“期间对账”按客户或供应商、币种和记账日期汇总期初、本期增加、本期减少与期末余额，可导出完整明细。'],
       [
         '核对来源',
-        '核对来源类型、业务编号、往来方、币种与金额；本页是单笔业务核对，不是银行流水自动对账。',
+        '“单笔核对”核对来源类型、业务编号、往来方、币种与金额；每条记录对应一笔业务，不自动匹配银行流水。',
       ],
       [
         '核对内容',

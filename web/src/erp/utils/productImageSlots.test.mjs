@@ -8,17 +8,27 @@ import {
   PRODUCT_IMAGE_SNAPSHOT_MAX_EDGE,
   PRODUCT_IMAGE_SNAPSHOT_MAX_PIXELS,
   PRODUCT_IMAGE_SLOT_DEFINITIONS,
+  PRODUCT_IMAGE_SUPPLEMENTAL_LIMIT,
   buildOptimizedProductImageFileName,
   buildProductImageMutationPlan,
   calculateProductImageSnapshotSize,
+  confirmProductImageMutation,
   createProductImageSession,
   inferProductImageMimeType,
+  readProductImageMimeType,
+  reconcileSupplementalProductImages,
   resetProductImageSession,
   selectSavedProductImages,
+  selectSavedSupplementalProductImages,
   stageProductImageClear,
   stageProductImageSelection,
+  stageSupplementalProductImageRemoval,
+  stageSupplementalProductImage,
   shouldOptimizeProductImageSnapshot,
+  supplementalProductImageOverflow,
   validateProductImageFile,
+  undoSupplementalProductImageRemoval,
+  visibleSupplementalProductImages,
 } from './productImageSlots.mjs'
 
 function attachment(slotKey, id, attachmentType = 'product_image') {
@@ -29,6 +39,7 @@ function attachment(slotKey, id, attachmentType = 'product_image') {
     file_name: `${slotKey}-${id}.png`,
     mime_type: 'image/png',
     file_size: 128,
+    sha256: String(id).padStart(64, '0'),
   }
 }
 
@@ -70,6 +81,79 @@ test('product image slots map the 0, 1 and 2 image states by fixed business posi
     { primary, secondary: null },
     'the newest fixed-slot image wins and ordinary attachments stay separate'
   )
+})
+
+test('supplemental drafts keep fixed image roles, restore an individual removal and retry unfinished changes only', () => {
+  const primary = attachment('primary', 11)
+  const extras = selectSavedSupplementalProductImages([
+    attachment('supplemental_1', 34),
+    attachment('supplemental_2', 22),
+    primary,
+    attachment('supplemental_9', 35),
+  ])
+  assert.deepEqual(extras.map(({ id }) => id), [22, 34])
+  const original = createProductImageSession({ primary }, extras)
+  const removed = stageSupplementalProductImageRemoval(original, extras[0])
+  assert.deepEqual(visibleSupplementalProductImages(undoSupplementalProductImageRemoval(removed)), extras)
+  const files = Array.from({ length: PRODUCT_IMAGE_SUPPLEMENTAL_LIMIT - 1 }, (_, index) => ({
+    ...pending(`detail-${index}.png`), pendingKey: `detail-${index}`, sha256: String(index + 50).padStart(64, '0'),
+  }))
+  const staged = files.reduce((draft, file) => stageSupplementalProductImage(draft, file).session, removed)
+  assert.equal(visibleSupplementalProductImages(staged).length, PRODUCT_IMAGE_SUPPLEMENTAL_LIMIT)
+  const overflow = stageSupplementalProductImage(staged, { ...files[0], sha256: 'a'.repeat(64) })
+  assert.equal(overflow.outcome, 'full')
+  assert.equal(overflow.session, staged)
+  const duplicateAtLimit = stageSupplementalProductImage(staged, { ...files[0], file_name: 'renamed.png' })
+  assert.equal(duplicateAtLimit.outcome, 'duplicate')
+  assert.equal(duplicateAtLimit.session, staged)
+  const plan = buildProductImageMutationPlan(staged)
+  assert.deepEqual(plan[0], { type: 'remove', id: 22 })
+  assert.equal(plan[1].slotKey, 'supplemental')
+  const afterRemoval = confirmProductImageMutation(staged, plan[0])
+  const afterAppend = confirmProductImageMutation(afterRemoval, plan[1], attachment('supplemental_2', 46))
+  assert.deepEqual(buildProductImageMutationPlan(afterAppend), plan.slice(2))
+  assert.deepEqual(visibleSupplementalProductImages(resetProductImageSession(afterAppend)).map(({ id }) => id), [34, 46])
+  assert.equal(afterAppend.slots.primary.saved, primary)
+})
+
+test('supplemental selection compares saved and pending content without reserving space for a duplicate', () => {
+  const primary = attachment('primary', 11)
+  const saved = attachment('supplemental_1', 24)
+  const initial = createProductImageSession({ primary }, [saved])
+  const file = { ...pending(saved.file_name), pendingKey: 'selected', sha256: primary.sha256 }
+  const sameName = stageSupplementalProductImage(initial, file)
+  assert.equal(sameName.outcome, 'added', 'same name or content matching the main slot must not block supplemental selection')
+  const duplicateOfSaved = stageSupplementalProductImage(sameName.session, {
+    ...file, file_name: 'renamed.png', sha256: saved.sha256,
+  })
+  assert.equal(duplicateOfSaved.outcome, 'duplicate')
+  assert.equal(duplicateOfSaved.session, sameName.session)
+  const duplicateOfPending = stageSupplementalProductImage(sameName.session, { ...file, pendingKey: 'copy' })
+  assert.equal(duplicateOfPending.outcome, 'duplicate')
+  assert.equal(visibleSupplementalProductImages(duplicateOfPending.session).length, 2)
+  const removed = stageSupplementalProductImageRemoval(initial, saved)
+  const reselected = stageSupplementalProductImage(removed, { ...file, sha256: saved.sha256 })
+  assert.equal(reselected.outcome, 'restored')
+  assert.deepEqual(visibleSupplementalProductImages(reselected.session), [saved])
+  assert.deepEqual(buildProductImageMutationPlan(reselected.session), [])
+})
+
+test('supplemental readback settles matching uploads and removals by ID without dropping other drafts', () => {
+  const previous = attachment('supplemental_1', 23)
+  const replacement = attachment('supplemental_1', 24)
+  const uploaded = attachment('supplemental_2', 25)
+  const confirmed = { ...pending('confirmed.png'), pendingKey: 'confirmed', sha256: uploaded.sha256 }
+  const unsent = { ...pending('unsent.png'), pendingKey: 'unsent', sha256: 'a'.repeat(64) }
+  const initial = createProductImageSession({ primary: attachment('primary', 11) }, [previous])
+  let draft = stageProductImageSelection(initial, 'primary', pending('new-primary.png'))
+  draft = stageSupplementalProductImageRemoval(draft, previous)
+  draft = stageSupplementalProductImage(draft, confirmed).session
+  draft = stageSupplementalProductImage(draft, unsent).session
+  const refreshed = reconcileSupplementalProductImages(draft, [uploaded, replacement])
+  assert.equal(refreshed.slots, draft.slots)
+  assert.deepEqual(visibleSupplementalProductImages(refreshed), [replacement, uploaded, unsent])
+  assert.deepEqual(buildProductImageMutationPlan(refreshed).map(({ type }) => type), ['upload', 'append'])
+  assert.equal(supplementalProductImageOverflow(refreshed), 0)
 })
 
 test('product image edits create upload or clear plans and cancel restores backend state', () => {
@@ -149,6 +233,16 @@ test('product image validation accepts PNG, JPEG and WEBP source files without a
   )
 })
 
+test('product image preparation rejects a readable file renamed to a different format', async () => {
+  const pngHeader = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
+  const expected = new File([pngHeader], 'product.PNG', { type: 'application/octet-stream' })
+  assert.equal(await readProductImageMimeType(expected), 'image/png')
+  const disguised = new File([pngHeader], 'product.jpg', { type: 'image/jpeg' })
+  await assert.rejects(readProductImageMimeType(disguised), /图片实际格式与扩展名不符/u)
+  const noExtension = new File([pngHeader], 'product', { type: 'image/png' })
+  assert.match(validateProductImageFile(noExtension), /格式不支持/u)
+})
+
 test('product image snapshot sizing keeps print images inside the browser storage budget', () => {
   assert.deepEqual(calculateProductImageSnapshotSize(1600, 900), {
     width: 1600,
@@ -179,10 +273,11 @@ test('product image snapshot sizing keeps print images inside the browser storag
     false
   )
   assert.equal(
-    buildOptimizedProductImageFileName('毛绒主图.PNG'),
+    buildOptimizedProductImageFileName('毛绒主图.PNG', 'image/webp'),
     '毛绒主图.webp'
   )
-  assert.equal(buildOptimizedProductImageFileName(''), '产品图片.webp')
+  assert.equal(buildOptimizedProductImageFileName('', 'image/webp'), '产品图片.webp')
+  assert.equal(buildOptimizedProductImageFileName('毛绒主图.jpeg', 'image/png'), '毛绒主图.png')
 })
 
 test('product page integrates dedicated slots without changing SKU attachment semantics', () => {
@@ -220,8 +315,8 @@ test('product page integrates dedicated slots without changing SKU attachment se
   )
   assert.match(
     componentSource,
-    /setSaving\(true\)\s*try \{[\s\S]*?return \{ mutationsApplied: false, reloaded: false \}[\s\S]*?\} finally \{\s*if \(mountedRef\.current\) setSaving\(false\)/u,
-    'every failed preparation or mutation return must release the image saving state'
+    /setSaving\(true\)\s*try \{[\s\S]*?return \{ mutationsApplied: false, reloaded: false \}[\s\S]*?\} finally \{\s*if \(isCurrent\(\)\) setSaving\(false\)/u,
+    'every failed preparation or mutation must release saving for the active editor'
   )
   assert.match(componentSource, /cancelSession/u)
   assert.match(

@@ -153,7 +153,7 @@ export function createInventoryPresentationScenarios(deps) {
         }
         for (const [group, views] of [
           ['库存查询', ['库存余额', '库存批次', '库存变动记录']],
-          ['入库办理', ['采购收货', '成品入库', '委外回货']],
+          ['入库办理', ['采购收货', '成品入库', '委外回货', '工序回货']],
           ['出库办理', ['销售出货', '生产领料', '委外发料', '库存预留']],
         ]) {
           await primary.getByRole('tab', { name: group, exact: true }).click()

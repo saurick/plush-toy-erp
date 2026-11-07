@@ -27,9 +27,10 @@ export default function BusinessFlowDiagram({
   const printGraphs = useMemo(
     () =>
       printing
-        ? splitBusinessFlowForPrint(flow).map((part) =>
-            buildBusinessFlowMermaid(part, { role, matchingKeys, runtimeKey })
-          )
+        ? splitBusinessFlowForPrint(flow).map((part) => {
+            const graph = buildBusinessFlowMermaid(part, { role, matchingKeys, runtimeKey })
+            return { ...graph, printKey: JSON.stringify([graph.chart, part.nodes.map((node) => node.key), part.edges.map((edge) => edge.key)]) }
+          })
         : [],
     [printing, flow, role, matchingKeys, runtimeKey]
   )
@@ -55,7 +56,7 @@ export default function BusinessFlowDiagram({
       data-business-flow
       data-graph-status={
         printing
-          ? printGraphs.every((part) => printStatus[part.chart] === 'rendered')
+          ? printGraphs.every((part) => printStatus[part.printKey] === 'rendered')
             ? 'rendered'
             : 'loading'
           : status
@@ -71,7 +72,7 @@ export default function BusinessFlowDiagram({
       {printing ? (
         printGraphs.map((part, index) => (
           <section
-            key={part.chart}
+            key={part.printKey}
             className="erp-dev-business-flow__print-part"
             data-flow-print-part
           >
@@ -90,9 +91,9 @@ export default function BusinessFlowDiagram({
               selectedNodeId={part.ids.get(selected)}
               onStatusChange={(next) =>
                 setPrintStatus((previous) =>
-                  previous[part.chart] === next
+                  previous[part.printKey] === next
                     ? previous
-                    : { ...previous, [part.chart]: next }
+                    : { ...previous, [part.printKey]: next }
                 )
               }
             />

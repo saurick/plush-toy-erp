@@ -85,7 +85,6 @@ export default function QualityInspectionPurchaseReturnModal({
       <Descriptions
         size="small"
         column={{ xs: 1, sm: 2 }}
-        style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           {
             key: 'inspection',

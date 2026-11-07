@@ -74,6 +74,7 @@ export default function TableScrollControls({
     setHosts({ top: topHost, bottom: bottomHost })
     setVerticalScrolling(false)
     scrollerRef.current = scroller
+    scroller.classList.add('app-table-scroll-enhanced')
 
     const ancestors = []
     for (let node = scroller; node; node = node.parentElement) {
@@ -95,24 +96,30 @@ export default function TableScrollControls({
       if (!loadingContainer) return
       // Some lists clear rows while fetching. Keep their scroll extent until
       // the response arrives so the browser does not clamp the page to the top.
-      loadingContainer.style.minHeight =
+      const height =
         loadingRef.current && contentHeight
           ? `${contentHeight}px`
           : originalMinHeight
+      if (loadingContainer.style.minHeight !== height) loadingContainer.style.minHeight = height
+    }
+    const syncHeaderGap = (gap) => {
+      if (gap !== undefined && wrapper.style.getPropertyValue('--app-table-header-scroll-gap') !== `${gap}px`) {
+        wrapper.style.setProperty('--app-table-header-scroll-gap', `${gap}px`)
+      }
     }
     const measure = () => {
       frame = 0
       if (loadingRef.current || !visibleRef.current) return
       // Keep the separate header's scroll range equal to the body. WebKit can
       // reserve native scrollbar space that Ant's mount-time probe omits.
-      scroller.classList.add('app-table-scroll-enhanced')
+      let headerGap
       if (isAntTable) {
         const header = scroller.parentElement?.querySelector(':scope > .ant-table-header')
         const reserved = header?.querySelector('.ant-table-cell-scrollbar')?.getBoundingClientRect().width || 0
         const style = getComputedStyle(scroller)
         const gutter = scroller.offsetWidth - scroller.clientWidth - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth)
         const gap = header ? Math.max(0, gutter - reserved) : 0
-        wrapper.style.setProperty('--app-table-header-scroll-gap', `${gap}px`)
+        headerGap = gap
       }
       const maxLeft = scroller.scrollWidth - scroller.clientWidth
       const row = table.querySelector(
@@ -121,6 +128,7 @@ export default function TableScrollControls({
       const enabled = maxLeft > 2 && (row || allowEmpty) && scroller.clientWidth
       contentHeight = loadingContainer?.scrollHeight || 0
       if (!enabled) {
+        syncHeaderGap(headerGap)
         setPosition(null)
         return
       }
@@ -181,6 +189,7 @@ export default function TableScrollControls({
         ),
         dockVisible: bottom - top > dockHeight + 16 && right - left > 80,
       }
+      syncHeaderGap(headerGap)
       setPosition((previous) =>
         previous &&
         Object.keys(next).every((key) => previous[key] === next[key])

@@ -2552,6 +2552,7 @@ function normalizeChain(rawChain, flowByKey, processByKey, factKeys) {
   )
   const normalized = Object.freeze({
     ...rawChain,
+    direction: 'LR',
     entryNodeKeys,
     nodes,
     edges,

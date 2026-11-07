@@ -43,7 +43,7 @@ test('inventory operation records ignore stale reads and keep business actions e
 })
 
 test('inventory operation create and edit share one business form field tree', () => {
-  assert.match(editorSource, /BusinessFormModal/u)
+  assert.match(editorSource, /<BusinessFormPage/u)
   assert.match(editorSource, /mode = 'create'/u)
   assert.match(editorSource, /const isEdit = mode === 'edit'/u)
   assert.match(editorSource, /<Form\.List name="items">/u)

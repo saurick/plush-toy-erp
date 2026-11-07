@@ -1,30 +1,9 @@
-.erp-compact-field-table {
-  width: 100%;
-  min-width: 0;
-  container-type: inline-size;
-}
-
 .erp-compact-field-table > table {
-  width: 100%;
   min-width: 0;
-  table-layout: fixed;
-  border-collapse: collapse;
-}
-
-.erp-compact-field-table th {
-  padding: 7px 6px;
-  background: var(--erp-sales-order-lines-bg, #f8fbf9);
-  color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-small);
-  font-weight: var(--erp-line-header-weight, 600);
-  text-align: center;
-  vertical-align: middle;
 }
 
 .erp-compact-field-table td {
   min-width: 0;
-  padding: 8px 6px;
-  vertical-align: top;
 }
 
 .erp-compact-field-table .ant-form-item {
@@ -40,11 +19,6 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-.erp-compact-field-table__required {
-  margin-right: 4px;
-  color: var(--erp-danger, #dc2626);
 }
 
 .erp-compact-field-table__actions {
@@ -169,7 +143,7 @@
     align-items: start;
   }
 
-  .erp-compact-field-table__details {
+  .erp-compact-field-table__details:not([hidden]) {
     display: block;
     padding-bottom: 10px;
   }
@@ -184,10 +158,6 @@
 .erp-production-order-line__supplement {
   grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr);
   gap: 8px 16px;
-}
-
-.erp-production-order-line__note {
-  grid-column: 1 / -1;
 }
 
 @container (max-width: 520px) {

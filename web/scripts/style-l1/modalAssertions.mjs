@@ -424,10 +424,9 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
           }
         : null,
       formItemCount: formItems.length,
-      hasRoleSelect: Boolean(
-        [...node.querySelectorAll('.ant-select-selection-placeholder')].some(
-          (item) => item.textContent?.includes('选择一个或多个岗位')
-        )
+      hasRoleSelect: formItems.some((item) =>
+        item.querySelector('.ant-form-item-label label')?.textContent?.trim() === '岗位' &&
+        Boolean(item.querySelector('.ant-select-multiple input[role="combobox"]'))
       ),
       controls,
     }

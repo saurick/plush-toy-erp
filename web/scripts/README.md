@@ -35,6 +35,8 @@ node ../scripts/qa/run-test-gate.mjs --kind node --label web-test-runner -- node
 
 ## 常用命令
 
+区域提示间距由 [alertSpacingScenarios.mjs](style-l1/alertSpacingScenarios.mjs) 的 `alert-spacing-desktop`、`alert-spacing-dark`、`alert-spacing-mobile` 和 `alert-spacing-mobile-dark` 回归，使用真实采购退货编辑器及共享业务弹窗，实测相邻区块的 12px 间距、加载容器、关闭和恢复、输入保留与既有纵向布局不叠加。采购入库的退货、调整快速加行场景同时核对正式页面中的提示间距。
+
 字段提示回归由 [inputHintScenarios.mjs](style-l1/inputHintScenarios.mjs) 提供 `input-hints-purchase`、`input-hints-purchase-narrow`、`input-hints-outsourcing` 和 `input-hints-products`，覆盖短占位、规则常显、输入清空与 ⓘ 关闭恢复。共享几何检查按实际字体和可用宽度核对可见的单行输入、搜索与下拉提示，不设置统一字数阈值；备注等多行输入按原换行合同验收。
 
 ```bash
@@ -69,6 +71,8 @@ pnpm preview:yoyoosun
 默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
 
 `STYLE_L1_BROWSER=chromium|webkit` 选择浏览器引擎，默认 `chromium`，结果 JSON 标记实际引擎。宽度不超过 600px 的场景默认启用移动设备和触摸模拟，可由场景显式覆盖。WebKit 首次运行前执行 `pnpm exec playwright install webkit`；剪贴板场景使用既有受控探针，不能据此确认 iPhone 系统剪贴板权限。
+
+`business-split-cpu-4x` / `business-split-cpu-6x` 仅使用 Chromium CDP 降低 CPU 速度，分别记录拖动中和松手后的帧间隔、主线程、布局及样式计算，并覆盖左右互换与草稿保留。性能比较使用固定源码生产构建、每栏 50 条模拟材料、相同视口与同一驱动，通过 `STYLE_L1_BASE_URL` 指向各自预览服务；预热与轨迹采样不计入常规三次重复。报告保存原始样本，6 倍场景另保存性能轨迹。降速不模拟低配设备的内存、显卡和存储，不能据此承诺具体机型表现。
 
 共享下拉刷新和图片多指处理在 Chromium 使用原生 CDP 触摸，在 WebKit 使用 DOM 事件验证处理逻辑；报告的 `gestureDriver` 分别标记 `chromium-native-cdp` / `webkit-dom-touch-events`。
 
@@ -160,6 +164,10 @@ Workflow 计划还核对老板阻塞 / 完成 / 退回、跨角色催办、reaso
 `business-toolbar-composition-purchase|sales|history` 核对业务内容分类与查询组合、导航持续挂载、已提交查询恢复、工具菜单及 1920 / 1366 / 820 / 390px 布局。`business-toolbar-form-entry` 检查仓储整页编辑隐藏父工具栏、返回后恢复原分类条；`business-toolbar-dynamic-options-growth` 以 30 个模拟仓库验证可搜索名单不会增加内容分类。它们与仓储分类、分栏、工作台对照、表头吸顶和历史刷新场景分别在 WebKit 与 Chromium 执行；职责说明只在交互设计中表达，不进入业务工具栏。模拟规模只证明对应界面与查询合同，不代表生产容量或业务验收。
 
 `dev-ui-toolbar-composition`、`dev-ui-toolbar-category-growth`、`dev-ui-toolbar-data-growth` 对工作台真实组件组合样例做浅色桌面回归，分别在 Chromium / WebKit 核对四业务往返、未提交搜索、筛选 / 分页 / 选择、职责标注开关、真实详情和列设置、本地 CSV、假设分类与 30 项数据名单，以及 1920 / 1366px 下的工具栏边界。业务请求从初始导航起记录并要求为零；高权限与任务上下文隔离另由 `DevUIBusinessToolbarExample.test.mjs` 守住，不以该样例代替业务页面权限或事实写入验收。
+
+`dev-ui-shared-component-catalog` 核对组件目录中的样例链接、真实消费者名称和核对任务、规范文档读取及查询返回恢复；目录与控件说明按工作台规范保留上下文，不附加业务快捷跳转。`dev-ui-shared-consumer-entry` 通过 `getBusinessPagePresentation` 取得采购正式路由，独立验证新建页的来源选择与取消，不依赖设计目录中的业务链接，也不提交业务数据。共享明细表、补充资料、联系人及行操作的依赖精确登记到样例闭包，并覆盖非法导入、业务 I/O 与存储注入。
+
+`help-manual-design-prototype` 同时核对客户、供应商、销售和采购的付款帮助，确认共用目录选择规则实际可读，并与 `project-manuals.mjs --check` 和完整帮助快照合同一起防止过期说明回到原型。缩窄窗口时保持阅读及目录返回可用，严格检查 WebKit 的 ResizeObserver 错误；目录重绘由下一帧合并执行，单元检查同时覆盖通知合并、隐藏与移除。
 
 独立工作台的 `test:workbench` 同时执行 `dev-ui-toolbar-composition`，核对固定构建制品中的按需加载、四业务组合、详情、列设置和本地下载；普通 Vite 验证与制品浏览器证据分别保留。
 

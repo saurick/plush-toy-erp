@@ -46,7 +46,8 @@ export function usePermissionFullscreen({ enabled, dismissPopup }) {
     const table = workspace.querySelector('.erp-role-policy, .erp-permission-checklist')
     const scrollPositions = scrollPositionsRef.current
     const boundary = overlay?.enabled ? overlay.containerRef.current : document.body
-    const releases = [isolateOverlaySiblings(workspace, boundary), lockOverlayScroll(boundary)]
+    const isolationBoundary = overlay?.enabled ? boundary : document.getElementById('root')
+    const releases = [isolateOverlaySiblings(workspace, isolationBoundary), lockOverlayScroll(boundary)]
     // Body portals stay available to the data-scope modal and its selectors.
     for (
       let node = workspace;
@@ -65,6 +66,8 @@ export function usePermissionFullscreen({ enabled, dismissPopup }) {
       if (overlay?.enabled && !workspace.contains(event.target) && !overlay.host.contains(event.target)) return
       // Nested Ant Design dialogs own their keyboard handling and focus trap.
       if (event.target.closest?.('.ant-modal-wrap')) return
+      // Help clears its hover and pinned state when it handles Escape itself.
+      if (event.key === 'Escape' && workspace.querySelector('.erp-supplemental-help-trigger[aria-expanded="true"]')) return
       if (event.key === 'Escape') {
         event.preventDefault()
         if (!dismissPopupRef.current?.()) setOpen(false)

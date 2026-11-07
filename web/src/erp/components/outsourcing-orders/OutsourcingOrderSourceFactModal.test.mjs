@@ -60,8 +60,10 @@ test('outsourcing source fact modal only edits operator-owned business fields', 
   ]) {
     assert.doesNotMatch(source, new RegExp(`name="${serverDerivedField}"`, 'u'))
   }
-  assert.match(source, /destroyOnHidden/u)
-  assert.match(source, /afterOpenChange=\{initializeOpenForm\}/u)
+  assert.match(source, /<BusinessFormPage/u)
+  assert.match(source, /baselineKey=\{sourceContextKey\}/u)
+  assert.doesNotMatch(source, /<BusinessModal\b/u)
+  assert.match(source, /\[form, open, sourceContextKey\]/u)
   assert.match(source, /form\.resetFields\(\)/u)
   assert.match(source, /disabled=\{loading\}/u)
 })

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { Alert, Button, Form, Input, Space, Switch, Tag } from 'antd'
-import { DeleteOutlined } from '@ant-design/icons'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
+import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
@@ -359,57 +359,57 @@ function RowReference({
 ]}
       actions={
         onRemove ? (
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
+          <BusinessLineItemActionButton
+            action="remove"
             aria-label={`移除明细 ${index + 1}`}
             onClick={onRemove}
           >
             移除行
-          </Button>
+          </BusinessLineItemActionButton>
         ) : null
+      }
+      detailsToggleLabel="明细备注"
+      persistentFields={
+        <div className="erp-compact-field-table__supplement erp-production-order-line__supplement">
+          <Form.Item
+            name={[field.name, 'route_code']}
+            label={<BusinessHelpLabel label="生产路线" description="布料加工 → 车缝 → 手工 → 包装；车缝和手工分别决定本厂或外发。" />}
+            rules={[{ required: true, message: '请选择生产路线' }]}
+          >
+            <Select
+              placeholder="请选择生产路线"
+              disabled={readOnly}
+              options={[
+                {
+                  value: PRODUCTION_WIP_ROUTE_CODE,
+                  label: '毛绒标准路线（先车缝、后手工）',
+                },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item
+            name={[field.name, 'customer_inspection_required']}
+            label="客户验货"
+            valuePropName="checked"
+          >
+            <Switch
+              disabled={readOnly || routeCode !== PRODUCTION_WIP_ROUTE_CODE}
+              checkedChildren="需要"
+              unCheckedChildren="不需要"
+            />
+          </Form.Item>
+        </div>
       }
     >
       <Form.Item name={[field.name, 'line_no']} hidden>
         <Input />
       </Form.Item>
-      <div className="erp-compact-field-table__supplement erp-production-order-line__supplement">
-        <Form.Item
-          name={[field.name, 'route_code']}
-          label={<BusinessHelpLabel label="生产路线" description="布料加工 → 车缝 → 手工 → 包装；车缝和手工分别决定本厂或外发。" />}
-          rules={[{ required: true, message: '请选择生产路线' }]}
-        >
-          <Select
-            placeholder="请选择生产路线"
-            disabled={readOnly}
-            options={[
-              {
-                value: PRODUCTION_WIP_ROUTE_CODE,
-                label: '毛绒标准路线（先车缝、后手工）',
-              },
-            ]}
-          />
-        </Form.Item>
-        <Form.Item
-          name={[field.name, 'customer_inspection_required']}
-          label="客户验货"
-          valuePropName="checked"
-        >
-          <Switch
-            disabled={readOnly || routeCode !== PRODUCTION_WIP_ROUTE_CODE}
-            checkedChildren="需要"
-            unCheckedChildren="不需要"
-          />
-        </Form.Item>
-        <Form.Item
-          className="erp-production-order-line__note"
-          name={[field.name, 'note']}
-          label="明细备注"
-        >
-          <BusinessTextArea disabled={readOnly} maxLength={BusinessTextPolicy.noteMaxCharacters} />
-        </Form.Item>
-      </div>
+      <Form.Item
+        name={[field.name, 'note']}
+        label="明细备注"
+      >
+        <BusinessTextArea disabled={readOnly} maxLength={BusinessTextPolicy.noteMaxCharacters} />
+      </Form.Item>
     </BusinessCompactFieldRow>
   )
 }
@@ -516,11 +516,7 @@ export default function ProductionOrderEditor({
         >
           <Form.List name="items">
             {(fields, { add, remove }) => (
-              <Space
-                direction="vertical"
-                size="middle"
-                style={{ width: '100%' }}
-              >
+              <div className="erp-sales-order-lines-form erp-line-editor-surface">
                 <BusinessGroupedLineItems
                   title="生产明细"
                   description="发布后固定生产路线；客户验货仅在订单明确要求时开启，不能替代系统验收。"
@@ -534,6 +530,7 @@ export default function ProductionOrderEditor({
                   tableProps={{
                     label: '生产明细',
                     showSequence: true,
+                    expandableDetails: true,
                     columns: [
 { label: '销售订单行' },
 { label: '产品', required: true, width: '28%' },
@@ -582,7 +579,7 @@ export default function ProductionOrderEditor({
                     ]}
                   />
                 ) : null}
-              </Space>
+              </div>
             )}
           </Form.List>
         </BusinessFormSection>

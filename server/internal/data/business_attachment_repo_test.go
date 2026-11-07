@@ -464,7 +464,7 @@ func TestBusinessAttachmentRepoClearProductImageLocksOwnerAndDeletesExactSlot(t 
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	if err := repo.ClearProductImage(context.Background(), 7, " SECONDARY "); err != nil {
+	if err := repo.ClearProductImage(context.Background(), 7, " SECONDARY ", 0); err != nil {
 		t.Fatalf("clear product image: %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -660,7 +660,7 @@ func TestBusinessAttachmentReferencedImageCannotBeReplacedOrCleared(t *testing.T
 		if replace {
 			_, err = repo.CreateBusinessAttachment(context.Background(), productImageAttachmentCreate(7, biz.BusinessAttachmentProductImageSlotPrimary))
 		} else {
-			err = repo.ClearProductImage(context.Background(), 7, biz.BusinessAttachmentProductImageSlotPrimary)
+			err = repo.ClearProductImage(context.Background(), 7, biz.BusinessAttachmentProductImageSlotPrimary, 0)
 		}
 		if !errors.Is(err, biz.ErrBusinessAttachmentReferenced) {
 			t.Fatalf("replace=%v err=%v", replace, err)

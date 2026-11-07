@@ -196,9 +196,13 @@ export function buildOperationalFactDraftSavePayload(
       reason: values.reason,
     })
   }
-  const lotFields = buildSourceInboundLotFields(values, {
-    allowNew: isInboundAction(action),
-  })
+  // Outbound forms only select an existing lot; the mode selector belongs to inbound forms.
+  const lotFields = isInboundAction(action)
+    ? buildSourceInboundLotFields(values)
+    : normalizeSourceInboundLotRequestFields(
+        { lot_id: values.lot_id, new_lot_no: values.new_lot_no },
+        { allowNew: false }
+      )
   const request = {
     ...payload,
     warehouse_id: values.warehouse_id,

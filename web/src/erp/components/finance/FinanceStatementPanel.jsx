@@ -19,7 +19,7 @@ const columns = [
   { title: '往来余额', dataIndex: 'balance', width: 150, align: 'right' },
 ]
 
-export default function FinanceStatementPanel({ canReadReceivables, canReadPayables }) {
+export default function FinanceStatementPanel({ canReadReceivables, canReadPayables, inWorkspace = false }) {
   const today = currentBusinessDate()
   const [filter, setFilter] = useState({ counterparty_type: canReadReceivables ? 'CUSTOMER' : 'SUPPLIER', currency: 'CNY', date_from: `${today.slice(0, 7)}-01`, date_to: today })
   const [parties, setParties] = useState({ CUSTOMER: [], SUPPLIER: [] })
@@ -96,6 +96,8 @@ export default function FinanceStatementPanel({ canReadReceivables, canReadPayab
   return (
     <>
       <BusinessOperationPanel
+        inWorkspace={inWorkspace}
+        compact
         filters={(
           <>
             <SelectFilter aria-label="对账往来类型" allowClear={false /* 不可清空：查询须明确客户或供应商 */} value={filter.counterparty_type} options={options} onChange={(value) => change({ counterparty_type: value, counterparty_id: undefined })} />

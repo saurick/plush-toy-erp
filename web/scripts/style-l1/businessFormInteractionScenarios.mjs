@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { clickLineItemAction } from './lineEditorActions.mjs'
+import { clickLineItemAction, revealLineItemDetails } from './lineEditorActions.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { withDeadline } from './boundedWait.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
@@ -7,10 +7,10 @@ import { verifyPurchaseArrivalRedesign, verifyPurchaseArrivalGroupHeaders } from
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
-import { assertBusinessModalViewport } from './modalAssertions.mjs'
-import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
+import { assertBusinessFormPage, assertBusinessNoteTextAreas, closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertImportUndoPlacement } from './importUndoAssertions.mjs'
+import { assertCompactLineNoteDisclosure } from './businessLineItemDisclosureAssertions.mjs'
 
 export function createBusinessFormInteractionScenarios({
   customerRuntimeEffectiveSession,
@@ -1559,6 +1559,7 @@ export function createBusinessFormInteractionScenarios({
           expectedTexts: ['备注', '联系人', '添加联系人'],
           expectContactItemsLayout: true,
           beforeMeasure: async (modal) => {
+            await revealLineItemDetails(modal.locator('.erp-master-contact-list__row').first())
             await modal
               .locator('.erp-contact-editor__note-editor textarea')
               .first()
@@ -1592,15 +1593,13 @@ export function createBusinessFormInteractionScenarios({
         await cycleCountButton.waitFor({ state: 'visible', timeout: 10_000 })
         await cycleCountButton.click()
         await page
-          .getByRole('dialog')
+          .locator('.erp-business-form-page:not([hidden])')
           .getByText('登记库存盘点', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '范围为本次选中的库存行。盘点须由另一人复核后过账；零差异也留存记录。库存变化会阻止过账，须重新盘点。')
-        await assertBusinessModalViewport(page, page.getByRole('dialog'), {
-          label: 'inventory-local-form-dark',
-          maxWidth: 860,
-        })
-        await assertBusinessNoteTextAreas(page.getByRole('dialog'))
+        await assertBusinessFormPage(page, page.locator('.erp-business-form-page:not([hidden])'))
+        await assertBusinessNoteTextAreas(page.locator('.erp-business-form-page:not([hidden])'))
+        await assertCompactLineNoteDisclosure(page, page.locator('.erp-business-form-page:not([hidden])'))
         await page.screenshot({
           path: path.join(
             outputDir,
@@ -1617,9 +1616,10 @@ export function createBusinessFormInteractionScenarios({
           page,
           'exception-inventory-operation-dark-desktop'
         )
-        const dialog = page.getByRole('dialog')
+        const dialog = page.locator('.erp-business-form-page:not([hidden])')
         await dialog.getByLabel('实盘数量', { exact: true }).fill('12')
         const note = dialog.getByLabel('明细备注', { exact: true })
+        await revealLineItemDetails(dialog.locator('.erp-compact-field-table__row').first())
         await note.fill('核对后保留的说明')
         assert.match(await note.inputValue(), /核对后保留/)
         for (const [type, title, field, value] of [
@@ -1631,7 +1631,7 @@ export function createBusinessFormInteractionScenarios({
             '-2',
           ],
         ]) {
-          await closeBusinessFormModal(page, dialog)
+          await closeBusinessFormPage(page, dialog)
           const action = page.locator(
             `button[data-business-action-key="inventory-${type}"]:visible`
           )

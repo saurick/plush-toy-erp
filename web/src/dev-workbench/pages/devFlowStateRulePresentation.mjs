@@ -145,6 +145,7 @@ export function buildDevFlowRecordRelationship(flow) {
   const reversal = flow.states.find((item) => item.key === 'REVERSED')
   if (!original || !reversal || flow.transitions.length > 0) return null
   return {
+    direction: 'LR',
     nodes: [
       { ...original, label: '原记录', role: original.label, kind: 'fact_ledger', summary: '已过账的原记录继续留存，不能更新或删除。' },
       { ...reversal, label: reversal.label, kind: 'fact_ledger', summary: '另建反向记录，引用原记录并保留纠正依据。' },

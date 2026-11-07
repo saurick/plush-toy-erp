@@ -107,7 +107,8 @@ export default function ProductRecordEditor({ type = 'products', open, record, f
       if (type === 'products') {
         const result = await images.current?.flushChanges(saved.id)
         if (result?.mutationsApplied !== true || result?.reloaded !== true) {
-          setError(result?.mutationsApplied ? '产品和产品图片已保存，图片状态尚未确认，请保留当前内容重试读取。' : '产品已保存，图片尚未全部确认，请保留当前内容重试。')
+          if (result?.supplementalOverflow) setError('产品已保存，补充图片超出上限。请在「产品图片」调整后再保存。')
+          else setError(result?.mutationsApplied ? '产品和产品图片已保存，图片状态尚未确认，请保留当前内容重试读取。' : '产品已保存，图片尚未全部确认，请保留当前内容重试。')
           return false
         }
       } else if ((await attachment.current?.flushPendingAttachments(saved.id)) === false) {

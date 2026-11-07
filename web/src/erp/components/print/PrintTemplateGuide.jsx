@@ -1,11 +1,14 @@
-import React, { useLayoutEffect, useRef, useState } from 'react'
+import React, { memo, useLayoutEffect, useRef, useState } from 'react'
+import { Button } from 'antd'
+import { MinusOutlined, PlusOutlined } from '@ant-design/icons'
 import MaterialPurchaseContractPaper from './MaterialPurchaseContractPaper.jsx'
 import ProcessingContractPaper from './ProcessingContractPaper.jsx'
 import { MaterialDetailPaper } from './MaterialDetailPaper.jsx'
 import { ColorCardPaper } from './ColorCardPaper.jsx'
 import { WorkInstructionPaper } from './WorkInstructionPaper.jsx'
 import { computeMaterialPurchaseTotals } from '../../utils/materialPurchaseContractEditor.mjs'
-import DocumentGuide from '../DocumentGuide.jsx'
+import DocumentGuide, { DocumentGuideAnnotations } from '../DocumentGuide.jsx'
+import { measureDocumentGuideRegion } from '../documentGuideGeometry.mjs'
 
 const engineeringPapers = {
   'engineering-material-detail': MaterialDetailPaper,
@@ -41,10 +44,13 @@ function TemplatePaper({ template }) {
   )
 }
 
+const TemplatePaperPreview = memo(TemplatePaper)
+
 export default function PrintTemplateGuide({ template }) {
   const viewportRef = useRef(null)
   const paperRef = useRef(null)
   const [layout, setLayout] = useState(null)
+  const [zoom, setZoom] = useState(null)
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current
@@ -52,27 +58,35 @@ export default function PrintTemplateGuide({ template }) {
     const updateLayout = () => {
       const width = paper.offsetWidth
       const height = paper.offsetHeight
-      if (!width || !height || viewport.clientWidth <= 36) return
-      const scale = Math.min(
-        (viewport.clientWidth - 36) / width,
-        480 / height,
-        1
-      )
+      const style = getComputedStyle(viewport.firstElementChild)
+      const availableWidth =
+        viewport.clientWidth -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight)
+      const availableHeight =
+        viewport.clientHeight -
+        parseFloat(style.paddingTop) -
+        parseFloat(style.paddingBottom)
+      if (!width || !height || availableWidth <= 0 || availableHeight <= 0) {
+        return
+      }
+      const scale =
+        zoom ?? Math.min(availableWidth / width, availableHeight / height, 1)
       const paperRect = paper.getBoundingClientRect()
-      const markers = template.guide.map(({ selector }) => {
-        const target = paper.querySelector(selector)
-        if (!target) return null
-        const rect = target.getBoundingClientRect()
-        return (
-          ((rect.top + rect.height / 2 - paperRect.top) / paperRect.height) *
-          100
+      const regions = template.guide.map(({ selector, separateTargets }) =>
+        measureDocumentGuideRegion(
+          paperRect,
+          [...paper.querySelectorAll(selector)].map((target) =>
+            target.getBoundingClientRect()
+          ),
+          separateTargets
         )
-      })
+      )
       setLayout({
         width: width * scale,
         height: height * scale,
         scale,
-        markers,
+        regions,
       })
     }
     updateLayout()
@@ -80,55 +94,98 @@ export default function PrintTemplateGuide({ template }) {
     observer.observe(viewport)
     observer.observe(paper)
     template.guide.forEach(({ selector }) => {
-      const target = paper.querySelector(selector)
-      if (target) observer.observe(target)
+      paper
+        .querySelectorAll(selector)
+        .forEach((target) => observer.observe(target))
     })
     return () => observer.disconnect()
-  }, [template])
+  }, [template, zoom])
+
+  useLayoutEffect(() => {
+    viewportRef.current.scrollTo(0, 0)
+  }, [template, zoom])
+
+  const changeZoom = (direction) => {
+    const current = layout?.scale ?? 1
+    const step =
+      direction > 0
+        ? Math.floor(current * 4 + 0.001) + 1
+        : Math.ceil(current * 4 - 0.001) - 1
+    setZoom(Math.min(1.5, Math.max(0.25, step / 4)))
+  }
 
   return (
     <section
       className="erp-template-guide"
       aria-label={`${template.title}模板说明`}
     >
-      <h3 className="erp-template-guide__title">{template.title}</h3>
-      <p className="erp-template-guide__purpose">{template.summary}</p>
-      <DocumentGuide parts={template.guide} figureRef={viewportRef} caption="版式示意">
-        <div
-          className="erp-template-guide__thumbnail"
-          style={
-            layout
-              ? { width: layout.width, height: layout.height }
-              : undefined
-          }
-        >
-          {/* 复用正式纸面；inert 同时禁止鼠标、键盘和上传入口进入预览。 */}
-          <div
-            ref={paperRef}
-            className="erp-template-guide__paper"
-            inert=""
-            aria-hidden="true"
-            style={{
-              transform: `scale(${layout?.scale ?? 1})`,
-              visibility: layout ? 'visible' : 'hidden',
-            }}
-          >
-            <TemplatePaper template={template} />
-          </div>
-          {template.guide.map((part, index) =>
-            layout?.markers[index] != null ? (
-              <span
-                className="erp-template-guide__marker erp-document-guide__number"
-                key={part.title}
-                style={{ top: `${layout.markers[index]}%` }}
-                aria-hidden="true"
-                data-guide-target={part.selector}
-              >
-                {index + 1}
-              </span>
-            ) : null
-          )}
+      <div className="erp-template-guide__toolbar">
+        <div className="erp-template-guide__heading">
+          <h3 className="erp-template-guide__title">{template.title}</h3>
+          <span>版式示意</span>
         </div>
+        <div
+          className="erp-template-guide__zoom-controls"
+          role="group"
+          aria-label="纸面缩放"
+        >
+          <Button
+            icon={<MinusOutlined aria-hidden="true" />}
+            aria-label="缩小纸面"
+            disabled={!layout || layout.scale <= 0.25}
+            onClick={() => changeZoom(-1)}
+          />
+          <output aria-label="纸面缩放比例">
+            {Math.round((layout?.scale ?? 1) * 100)}%
+          </output>
+          <Button
+            icon={<PlusOutlined aria-hidden="true" />}
+            aria-label="放大纸面"
+            disabled={!layout || layout.scale >= 1.5}
+            onClick={() => changeZoom(1)}
+          />
+          <Button aria-pressed={zoom === null} onClick={() => setZoom(null)}>
+            适合整页
+          </Button>
+        </div>
+      </div>
+      <DocumentGuide fill parts={template.guide} summary={template.summary}>
+        {({ activeIndex, onSelect }) => (
+          <div className="erp-template-guide__viewport" ref={viewportRef}>
+            <div className="erp-document-guide__frame">
+              <div
+                className="erp-template-guide__thumbnail"
+                style={
+                  layout
+                    ? { width: layout.width, height: layout.height }
+                    : undefined
+                }
+              >
+                {/* 复用正式纸面；inert 同时禁止鼠标、键盘和上传入口进入预览。 */}
+                <div
+                  ref={paperRef}
+                  className="erp-template-guide__paper"
+                  inert=""
+                  aria-hidden="true"
+                  style={{
+                    transform: `scale(${layout?.scale ?? 1})`,
+                    visibility: layout ? 'visible' : 'hidden',
+                  }}
+                >
+                  <TemplatePaperPreview template={template} />
+                </div>
+                {layout && (
+                  <DocumentGuideAnnotations
+                    parts={template.guide}
+                    regions={layout.regions}
+                    activeIndex={activeIndex}
+                    onSelect={onSelect}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </DocumentGuide>
     </section>
   )

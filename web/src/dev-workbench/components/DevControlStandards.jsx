@@ -89,15 +89,18 @@ const TOPICS = [
     rules: [
       ['完整单据编辑', 'BusinessFormPage / BusinessFormSection', '保留输入、分区与返回上下文；局部专项动作使用 BusinessFormModal。'],
       ['草稿明细', 'BusinessLineItemsSection / BusinessGroupedLineItems / BusinessLineItemRow', '共享业务归组、展开收起、增删与错误定位；折叠保留整单字段，来源、校验与保存由调用方负责。'],
+      ['明细表头', 'BusinessLineTable', '普通明细、紧凑字段明细与联系人共用列头、必填标记、列宽、滚动和圆角外框；业务组件仅维护字段布局。'],
+      ['行操作', 'BusinessLineItemActionButton', '复制和移除使用同一标准描边规格，移除使用危险色；权限、禁用、确认及回调继续由业务组件负责。'],
       ['备注', 'BusinessTextArea', '所有备注至少两行起步、随内容增高，明细同样适用；普通表单显示已输入字数与字段上限，查看时不显示计数。'],
       ['失败与离开', '原表单继续编辑', '失败保留输入；未保存离开须确认。演示保存只更新内存，不代表业务提交或过账。'],
     ],
     checks: [
       '打开草稿，核对整单与明细备注至少两行；输入多行再清空，检查高度和计数恢复。清空名称保存，核对字段错误。',
+      '关闭草稿后切换普通明细、紧凑字段明细与联系人，核对表头、外框、复制与移除规格；联系人复制不复制主联系人身份。',
       '移除明细查看空态，再添加；修改后返回列表，先继续编辑，再放弃修改。',
       '选择首次失败后重试，编辑并保存；核对输入保留及重试结果。',
     ],
-    source: 'BusinessFormPage · BusinessFormSection · BusinessLineItemsSection · BusinessLineItemRow · BusinessTextArea · DateInput',
+    source: 'BusinessFormPage · BusinessFormSection · BusinessLineItemsSection · BusinessLineItemRow · BusinessLineTable · BusinessLineItemActionButton · ContactFormList · BusinessTextArea · DateInput',
     consumer: { ...PURCHASE_PAGE, task: '打开新建或编辑，核对整页表单、材料明细与返回列表；浏览验证无需保存真实单据。' },
   },
   {
@@ -122,19 +125,19 @@ const TOPICS = [
   {
     key: 'business-toolbar',
     title: '业务工具栏组合',
-    summary: '四种业务、职责标注与增长场景',
-    description: '用真实工具栏、查询、表格和列设置比较库存、采购、待办与历史记录；布局原则共用，业务分类按任务决定。',
+    summary: '采购与生产对照、职责标注与增长场景',
+    description: '先操作采购与生产的并排样例，比较查看角度与办理职责如何决定页签位置；再核对库存、采购、待办与历史的工具栏组合。',
     rules: [
-      ['入口层级', '独立办理入口靠标题，同业务分类靠查询', '按办理对象和工作范围判断，位置复用正式页签分层规范。'],
+      ['入口层级', '独立办理入口靠标题，同业务分类靠查询', '采购在同一批订单中切换列表与跟进；生产切换计划、执行、记录与处置，各自有业务对象、职责和操作。'],
       ['内容分类', '少量稳定分类直达，较多分类搜索选择', '内容由业务决定；页内分类使用查询区左侧的圆角分类条，切换保持挂载。'],
       ['同范围展示', '明细 / 分布、列表 / 日历按需出现', '展示方式与业务内容分类、快捷条件分开。'],
       ['查询、工具与主动作', '共用插槽与交互，按任务组合', '保留搜索提交、筛选、列设置和选中操作；职责名称只在设计中标注。'],
       ['功能与数据增长', '分别切换两种假设场景', '扩展分类是假设，30 个数据选项进入搜索筛选，不自动变成导航。'],
     ],
     checks: [
-      '往返四种业务：搜索草稿、筛选、分页与选择各自保留。',
+      '对照采购与生产：切换全部页签、搜索并查看记录，核对导航位置、办理职责与各视图的搜索恢复。',
       '切换两种增长场景，搜索分类或第 30 个数据选项；关闭职责标注比较实际布局。',
-      '选记录查看详情、翻页、调整列和导出；恢复示例后回到初始状态。',
+      '往返四种业务，查看详情、翻页、调整列和导出；恢复示例后回到初始状态。',
     ],
     source: 'BusinessToolbarWorkspace · BusinessOperationPanel · BusinessDataTable · BusinessViewSwitch · BusinessStatusFilter · ColumnOrderModal；规范：交互设计说明 #business-toolbar-composition',
     consumer: { ...PURCHASE_PAGE, task: '对照库存查询、采购订单、工作台和历史记录；此样例仅使用本地虚构数据，业务权限与提交由真实页面负责。' },
@@ -926,7 +929,7 @@ export default function DevControlStandards() {
                 </ERPThemeScope>
               </section>
               <aside className="erp-control-library-checks">
-                <h3>按这 3 步核对</h3>
+                <h3>按这 {current.checks.length} 步核对</h3>
                 <ol>
                   {current.checks.map((check) => (
                     <li key={check}>{check}</li>

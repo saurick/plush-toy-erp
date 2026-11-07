@@ -80,5 +80,5 @@ export function buildFulfillmentExceptionGraph(guide, { planKey, originStage, pr
     edges.push({ from: 'approval', to: 'end:rejected', label: '未通过' })
   }
   const split = policy.reentry ? steps.findIndex((step) => step.key === policy.reentry.before_step) : steps.length
-  return { invalid: false, guide, plan, steps, branchSteps: steps.slice(0, split), nodes, edges, origin: origin.stage, returnStage, reentryStage }
+  return { direction: 'LR', invalid: false, guide, plan, steps, branchSteps: steps.slice(0, split), nodes, edges, origin: origin.stage, returnStage, reentryStage }
 }

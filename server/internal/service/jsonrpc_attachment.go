@@ -123,11 +123,13 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
 		}
-		if username := strings.TrimSpace(uploadedByUsername); item != nil && username != "" {
-			item.UploadedByUsername = &username
-		}
-		if displayName := strings.TrimSpace(uploadedByDisplayName); item != nil && displayName != "" {
-			item.UploadedByDisplayName = &displayName
+		if item != nil && item.UploadedBy != nil && *item.UploadedBy == uploadedBy {
+			if username := strings.TrimSpace(uploadedByUsername); username != "" {
+				item.UploadedByUsername = &username
+			}
+			if displayName := strings.TrimSpace(uploadedByDisplayName); displayName != "" {
+				item.UploadedByDisplayName = &displayName
+			}
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"attachment": businessAttachmentToAny(item, false),
@@ -139,7 +141,15 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), biz.BusinessAttachmentOwnerProduct); res != nil {
 			return id, res, nil
 		}
-		if err := d.attachmentUC.ClearProductImage(ctx, getInt(pm, "owner_id", 0), getString(pm, "slot_key")); err != nil {
+		attachmentID := 0
+		if _, present := pm["id"]; present {
+			var ok bool
+			attachmentID, ok = positiveSafeIntegerParam(pm, "id")
+			if !ok {
+				return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+			}
+		}
+		if err := d.attachmentUC.ClearProductImage(ctx, getInt(pm, "owner_id", 0), getString(pm, "slot_key"), attachmentID); err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
@@ -597,6 +607,8 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: "文件存储暂不可用，请稍后重试；重复上传前请先查看附件列表"}
 	case errors.Is(err, biz.ErrBusinessAttachmentProductImageTooLarge):
 		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "产品图片超过 5MB，请更换或压缩后重试"}
+	case errors.Is(err, biz.ErrBusinessAttachmentProductImageSupplementalLimit):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: fmt.Sprintf("每款最多 %d 张补充图片。请重新读取后，移除不需要的图片再添加。", biz.BusinessAttachmentProductImageSupplementalMaxCount)}
 	case errors.Is(err, biz.ErrBusinessAttachmentTooLarge):
 		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: fmt.Sprintf("附件超过 %dMB，请压缩后再上传", biz.BusinessAttachmentMaxBytes/(1024*1024))}
 	case errors.Is(err, biz.ErrBusinessAttachmentReferenced):

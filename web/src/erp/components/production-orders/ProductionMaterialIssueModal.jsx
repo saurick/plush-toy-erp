@@ -118,7 +118,6 @@ export default function ProductionMaterialIssueModal({
         <Alert
           type="warning"
           showIcon
-          style={{ marginTop: 12 }}
           message={lotsLoading ? '正在读取可用材料批次' : '暂无可用材料批次'}
           description={
             lotsLoading
@@ -130,7 +129,6 @@ export default function ProductionMaterialIssueModal({
       <Descriptions
         size="small"
         column={{ xs: 1, sm: 2, lg: editing ? 3 : 2 }}
-        style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           {
             key: 'order',

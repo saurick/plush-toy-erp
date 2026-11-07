@@ -47,6 +47,7 @@ import { BusinessListToolbarActions, useBusinessColumnOrder } from '../component
 import { createBusinessTablePagination } from '../utils/businessPagination.mjs'
 
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
+import { BusinessEditorPaneContext } from '../components/business-list/BusinessFormPageContext.js'
 import BusinessFormSection from '../components/business-list/BusinessFormSection.jsx'
 import BusinessRecordDetails from '../components/business-list/BusinessRecordDetails.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
@@ -657,6 +658,7 @@ export default function OutsourcingOrdersPage() {
     canCreateQualityInspection || canCreatePayable
   const canHandleOutsourcingLines = canRead && (canCreateMaterialIssue ||
     canCreateReturnReceipt || canReadWIP || canCreateStagePayable || canViewPayable)
+  const handlingPanePresentation = useMemo(() => ({ active: !sourceFactOpen, autoFocus: true }), [sourceFactOpen])
   const relatedOutsourcingFactsAvailability =
     resolveContextualBusinessActionAvailability({
       authorized: canReadOutsourcingFacts,
@@ -1051,33 +1053,35 @@ export default function OutsourcingOrdersPage() {
       {outletContext?.taskBusiness ? (
         <MobileOutsourcingTaskActions record={selectedRow} load={loadOutsourcingOrderDetailsItems} getItemFields={getOutsourcingHandlingItemFields} refreshKey={outletContext.workflowTaskNavigation?.businessReceipt} />
       ) : null}
-      <BusinessFormPage
-        open={handlingOpen && Boolean(selectedRow) && canHandleOutsourcingLines}
-        title={`办理明细 · ${getOutsourcingOrderDisplayNo(selectedRow)}`}
-        className="erp-outsourcing-handling-page"
-        processing={sourceFactLoading || financeSourceLoading}
-        onCancel={() => setHandlingOpen(false)}
-        footer={(
-          <div className="erp-business-form-page__actions">
-            <Button disabled={sourceFactLoading || financeSourceLoading} onClick={() => setHandlingOpen(false)}>返回列表</Button>
-          </div>
+      <BusinessEditorPaneContext.Provider value={handlingPanePresentation}>
+        <BusinessFormPage
+          open={handlingOpen && Boolean(selectedRow) && canHandleOutsourcingLines}
+          title={`办理明细 · ${getOutsourcingOrderDisplayNo(selectedRow)}`}
+          className="erp-outsourcing-handling-page"
+          processing={(!sourceFactOpen && sourceFactLoading) || financeSourceLoading}
+          onCancel={() => setHandlingOpen(false)}
+          footer={(
+            <div className="erp-business-form-page__actions">
+              <Button disabled={sourceFactLoading || financeSourceLoading} onClick={() => setHandlingOpen(false)}>返回列表</Button>
+            </div>
         )}
-      >
-        {handlingOpen && selectedRow && canHandleOutsourcingLines ? (
-          <>
-            <BusinessFormSection title="合同信息" layout="content">
-              <BusinessRecordDetails columns={detailColumns} record={selectedRow} />
-            </BusinessFormSection>
-            <BusinessFormSection title="办理明细" layout="content">
-              <OutsourcingOrderHandlingItems
-                record={selectedRow}
-                load={loadOutsourcingOrderDetailsItems}
-                getItemFields={getOutsourcingHandlingItemFields}
-              />
-            </BusinessFormSection>
-          </>
+        >
+          {handlingOpen && selectedRow && canHandleOutsourcingLines ? (
+            <>
+              <BusinessFormSection title="合同信息" layout="content">
+                <BusinessRecordDetails columns={detailColumns} record={selectedRow} />
+              </BusinessFormSection>
+              <BusinessFormSection title="办理明细" layout="content">
+                <OutsourcingOrderHandlingItems
+                  record={selectedRow}
+                  load={loadOutsourcingOrderDetailsItems}
+                  getItemFields={getOutsourcingHandlingItemFields}
+                />
+              </BusinessFormSection>
+            </>
         ) : null}
-      </BusinessFormPage>
+        </BusinessFormPage>
+      </BusinessEditorPaneContext.Provider>
       <BusinessDetailsModal
         descriptionInHelp
         columns={detailColumns}

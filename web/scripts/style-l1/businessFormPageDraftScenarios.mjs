@@ -146,7 +146,7 @@ export function createBusinessFormPageDraftScenarios(deps) {
     ...draftScenarios,
     {
       name: 'business-form-page-credit-registration',
-      path: '/erp/finance/payments',
+      path: '/erp/finance/receivables',
       auth: 'admin',
       effectiveSession,
       viewport: { width: 1440, height: 900 },
@@ -163,7 +163,7 @@ export function createBusinessFormPageDraftScenarios(deps) {
         await editor.locator('textarea').fill('红冲登记未保存')
         await closeBusinessFormPage(page, editor)
         await page
-          .getByRole('tab', { name: '收付款记录', exact: true })
+          .getByRole('tab', { name: '收付款', exact: true })
           .click()
         await page.getByRole('button', { name: '登记收付款' }).click()
         await editor

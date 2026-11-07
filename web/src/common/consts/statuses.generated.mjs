@@ -241,6 +241,22 @@ export const StockReservationStatus = Object.freeze({
   RELEASED: 'RELEASED',
 })
 
+export const WarehouseProductionKind = Object.freeze({
+  RECEIPT: 'RECEIPT',
+  RETURN: 'RETURN',
+})
+
+export const WarehouseProductionStage = Object.freeze({
+  CANCELLED: 'CANCELLED',
+  COMPLETED: 'COMPLETED',
+  INBOUND: 'AWAITING_INBOUND',
+  PACKAGING: 'AWAITING_PACKAGING',
+  QUALITY: 'AWAITING_QUALITY',
+  READY: 'READY',
+  REJECTED: 'REJECTED',
+  RETURN: 'AWAITING_RETURN',
+})
+
 export const WorkflowBusinessStatus = Object.freeze({
   BLOCKED: 'blocked',
   CANCELLED: 'cancelled',

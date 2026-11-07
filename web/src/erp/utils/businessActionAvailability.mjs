@@ -132,7 +132,9 @@ export function selectStableBusinessActionIndexes(
   descriptors = [],
   { availableWidth = Infinity, moreWidth = 0, gap = 8, groupGap = gap, groupMinWidths = {} } = {}
 ) {
-  const actions = descriptors.filter((item) => item?.actionable && item.width > 0)
+  const allActions = descriptors.filter((item) => item?.actionable && item.width > 0)
+  const hasMoreOnly = allActions.some((item) => item.moreOnly)
+  const actions = allActions.filter((item) => !item.moreOnly)
   const grouped = new Set(actions.map((item) => item.group || '')).size > 1
   const widthOf = (items) => {
     const widths = new Map()
@@ -144,7 +146,7 @@ export function selectStableBusinessActionIndexes(
       Math.max(width, grouped ? groupMinWidths[key] || 0 : 0), 0) +
       Math.max(0, widths.size - 1) * groupGap
   }
-  if (widthOf(actions) <= availableWidth) return actions.map((item) => item.index)
+  if (widthOf(actions) + (hasMoreOnly ? gap + moreWidth : 0) <= availableWidth) return actions.map((item) => item.index)
 
   const selected = []
   return [...actions]

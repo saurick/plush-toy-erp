@@ -15,6 +15,7 @@ import { resolveWarehouseView } from '../utils/warehouseViews.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import { BusinessPageLayout, BusinessToolbarWorkspace } from '../components/business-list/BusinessListLayout.jsx'
 import { BusinessModuleViewTabs } from '../components/BusinessModuleTabs.jsx'
+import WarehouseProductionWorkPage from './WarehouseProductionWorkPage.jsx'
 
 export default function WarehouseHandlingPage({ direction }) {
   const { adminProfile = {} } = useBusinessPageContext() || {}
@@ -36,7 +37,8 @@ export default function WarehouseHandlingPage({ direction }) {
       {active ? (
         <BusinessToolbarWorkspace contentSwitch={<BusinessModuleViewTabs navigation={navigation} />}>
           <BusinessPageStateScopeProvider key={active.key} value={`warehouse-${active.key}`}>
-            {active.key === 'purchase' ? <PurchaseReceiptsPage />
+            {active.workKind ? <WarehouseProductionWorkPage kind={active.workKind} />
+            : active.key === 'purchase' ? <PurchaseReceiptsPage />
             : active.key === 'shipment' ? <ShipmentsPage />
               : <OperationalFactWorkspace pageTitle={active.label} toolbarModuleKey={direction} initialActiveKey={active.view} enabledViews={enabledViews} viewOverrides={viewOverrides} showTabs={false} />}
           </BusinessPageStateScopeProvider>

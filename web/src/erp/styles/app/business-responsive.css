@@ -854,9 +854,6 @@ body
   .erp-permission-checklist {
     overflow: visible;
   }
-  .erp-role-settings-row {
-    align-items: flex-start;
-  }
   .erp-role-center-actions {
     grid-column: 1;
     grid-row: 2;

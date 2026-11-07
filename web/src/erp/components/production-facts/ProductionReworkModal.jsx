@@ -98,7 +98,6 @@ export default function ProductionReworkModal({
       <Descriptions
         size="small"
         column={{ xs: 1, sm: 2 }}
-        style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           {
             key: 'completion',

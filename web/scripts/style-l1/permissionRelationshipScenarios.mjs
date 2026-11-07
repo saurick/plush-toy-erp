@@ -552,8 +552,8 @@ export function createPermissionRelationshipScenarios({
         fixture.roles[0].permission_policy = {
           registered: true,
           template_key: 'sales',
-          required_permissions: ['sales.order.read'],
-          optional_permissions: ['erp.print_template.read'],
+          default_permissions: ['sales.order.read'],
+          assignable_permissions: [...fixture.permissions.map((item) => item.permission_key), 'erp.print_template.read'],
         }
         fixture.permissions.push({
           permission_key: 'erp.print_template.read',
@@ -574,9 +574,8 @@ export function createPermissionRelationshipScenarios({
           .getByRole('button', { name: '岗位职责', exact: true })
           .click()
         const drawer = page.getByRole('dialog')
-        await drawer.getByText('可选辅助', { exact: true }).waitFor()
-        await drawer.getByText('查看打印模板', { exact: true }).waitFor()
-        await drawer.getByText('未启用', { exact: true }).waitFor()
+        await drawer.getByText('预设功能 · 1 项', { exact: true }).waitFor()
+        assert.equal(await drawer.getByText('查看打印模板', { exact: true }).count(), 0, '未授权的额外功能不应冒充当前岗位职责')
         const duties = drawer
           .getByRole('region', { name: '岗位与业务职责', exact: true })
           .locator('button[aria-pressed]')
@@ -598,7 +597,7 @@ export function createPermissionRelationshipScenarios({
         await drawer.waitFor({ state: 'hidden' })
         await page
           .getByRole('region', { name: '功能与可用结果', exact: true })
-          .getByText('核心职责', { exact: true })
+          .getByText('预设功能', { exact: true })
           .waitFor()
         assert.equal(
           new URL(page.url()).pathname,

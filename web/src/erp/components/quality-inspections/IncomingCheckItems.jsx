@@ -1,6 +1,7 @@
 import React from 'react'
-import { Button, Form, Input, Space, Typography } from 'antd'
-import { DeleteOutlined } from '@ant-design/icons'
+import { Form, Input, Space, Typography } from 'antd'
+import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
+
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessLineEditor from '../business-list/BusinessLineEditor.jsx'
@@ -26,12 +27,12 @@ export function IncomingCheckItemsForm() {
       <Form.List name="check_items">
         {(fields, { add, remove }) => (
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            <BusinessLineItemsHeader
-              title="检查项目"
-              scrollControls
-              description="全检与抽检分别记录，未检不视为合格。"
-            />
             <BusinessCompactFieldTable
+              header={<BusinessLineItemsHeader
+                title="检查项目"
+                scrollControls
+                description="全检与抽检分别记录，未检不视为合格。"
+              />}
               label="质检检查项"
               scrollControlsInToolbar
               showSequence
@@ -90,7 +91,7 @@ export function IncomingCheckItemsForm() {
                       name={[name, 'observation']}
                       label="实际情况"
                     >
-                      <Input maxLength={255} placeholder="填写观察或测量结果" />
+                      <Input maxLength={255} placeholder="观察或测量" />
                     </Form.Item>,
                     <Form.Item
                       {...rest}
@@ -99,7 +100,7 @@ export function IncomingCheckItemsForm() {
                     >
                       <Select
                         allowClear
-                        placeholder="选择检查范围"
+                        placeholder="选择"
                         options={[
                           { value: 'FULL', label: '全检' },
                           { value: 'SAMPLE', label: '抽检' },
@@ -118,15 +119,13 @@ export function IncomingCheckItemsForm() {
                     </Form.Item>,
                   ]}
                   actions={
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
+                    <BusinessLineItemActionButton
+                      action="remove"
                       aria-label={`移除此检查项 ${name + 1}`}
                       onClick={() => remove(name)}
                     >
                       移除行
-                    </Button>
+                    </BusinessLineItemActionButton>
                   }
                 />
               ))}

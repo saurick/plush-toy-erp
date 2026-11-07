@@ -131,7 +131,7 @@ export function createTransactionFormRecoveryScenarios({
           .filter({ hasText: /盘\s*点/u })
           .first()
           .click()
-        const dialog = page.getByRole('dialog').filter({
+        const dialog = page.locator('.erp-business-form-page:not([hidden])').filter({
           has: page.getByText('登记库存盘点', { exact: true }),
         })
         await dialog.waitFor()

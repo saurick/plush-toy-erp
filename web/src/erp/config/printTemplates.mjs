@@ -68,7 +68,8 @@ export const printTemplateCatalog = [
       {
         title: '条款与签字',
         description: '确认来货、结算等约定，打印后由双方签字。',
-        selector: '.erp-material-contract-signature',
+        selector:
+          '.erp-material-contract-clauses, .erp-material-contract-signature',
       },
     ],
     sourceFiles: [
@@ -206,7 +207,8 @@ export const printTemplateCatalog = [
       {
         title: '条款与签字',
         description: '确认加工、交货和结算约定，打印后由双方签字。',
-        selector: '.erp-processing-contract-signature',
+        selector:
+          '.erp-processing-contract-clauses, .erp-processing-contract-signature',
       },
     ],
     runtime: {
@@ -392,11 +394,14 @@ export const printTemplateCatalog = [
       {
         title: '作业步骤',
         description: '按顺序填写要求；步骤可配图、添加说明或标注距离。',
-        selector: '.erp-work-instruction-paper__step-row--text',
+        separateTargets: true,
+        selector:
+          '.erp-work-instruction-paper__step-row--text, .erp-work-instruction-paper__step-row--image',
       },
       {
         title: '注意事项',
         description: '补充操作要点和质量要求，可增删标题、编号和文字行。',
+        separateTargets: true,
         selector: '.erp-work-instruction-paper__text-row',
       },
     ],

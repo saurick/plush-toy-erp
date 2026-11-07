@@ -10,10 +10,7 @@ export function FinancePaymentDetails({
   canWithdrawEvidence = false,
   paymentDetail,
   setPaymentDetail,
-  creditDetail,
-  setCreditDetail,
   paymentColumns,
-  creditColumns,
 }) {
   const paymentDetailLineItems = {
     title: '核销明细',
@@ -67,27 +64,25 @@ export function FinancePaymentDetails({
   }
 
   return (
-    <>
-      <BusinessDetailsModal
-        descriptionInHelp
-        open={Boolean(paymentDetail)}
-        title="收付款详情"
-        description="收付款来源、核销明细与当前状态均以系统最新记录为准。"
-        record={paymentDetail}
-        columns={paymentColumns}
-        lineItems={paymentDetailLineItems}
-        onClose={() => setPaymentDetail(null)}
-      >
-        {paymentDetail?.id ? <BusinessAttachmentPanel ownerType="finance_payment" ownerId={paymentDetail.id} canUpload={canUploadEvidence} canWithdraw={canWithdrawEvidence} title="收付款凭据" /> : null}
-      </BusinessDetailsModal>
-      <BusinessDetailsModal
-        open={Boolean(creditDetail)}
-        title="账款调整详情"
-        description="调整保留来源应收或应付、原金额、调整方向和当前未核销金额。"
-        record={creditDetail}
-        columns={creditColumns}
-        onClose={() => setCreditDetail(null)}
-      />
-    </>
+    <BusinessDetailsModal
+      descriptionInHelp
+      open={Boolean(paymentDetail)}
+      title="收付款详情"
+      description="收付款来源、核销明细与当前状态均以系统最新记录为准。"
+      record={paymentDetail}
+      columns={paymentColumns}
+      lineItems={paymentDetailLineItems}
+      onClose={() => setPaymentDetail(null)}
+    >
+      {paymentDetail?.id ? (
+        <BusinessAttachmentPanel
+          ownerType="finance_payment"
+          ownerId={paymentDetail.id}
+          canUpload={canUploadEvidence}
+          canWithdraw={canWithdrawEvidence}
+          title="收付款凭据"
+        />
+      ) : null}
+    </BusinessDetailsModal>
   )
 }

@@ -39,6 +39,26 @@ globalThis.MessageChannel = class TestMessageChannel extends (
   }
 }
 registerJSXTestLoader()
+
+test('low-frequency wrapped actions stay in the shared more menu on wide pages', async (t) => {
+  installActionSpace(t, 1600)
+  const [{ MemoryRouter, Routes, Route, Outlet }, { SelectionActionBar, BusinessActionTooltip }, { Button }] = await Promise.all([import('react-router-dom'), import('./BusinessListLayout.jsx'), import('antd')])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  let returned = 0
+  function Frame() { return createElement(Outlet, { context: {} }) }
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  await act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Routes, null, createElement(Route, { element: createElement(Frame) }, createElement(Route, { path: '*', element: createElement(SelectionActionBar, { selectedCount: 1 }, createElement(Button, null, '查看入库结果'), createElement(BusinessActionTooltip, { disabled: false }, createElement(Button, { 'data-business-action-placement': 'more', onClick: () => { returned += 1 } }, '生成采购退货'))) }))))))
+  assert.doesNotMatch(container.querySelector('.erp-business-selection-action-bar__compact-visible')?.textContent || '', /生成采购退货/u)
+  const more = container.querySelector('.erp-business-selection-action-bar__compact-more')
+  assert.ok(Boolean(more))
+  await act(async () => more.click())
+  const returnAction = [...document.querySelectorAll('.erp-business-selection-action-menu button')].find((button) => button.textContent.includes('生成采购退货'))
+  assert.ok(Boolean(returnAction))
+  await act(async () => returnAction.click())
+  assert.equal(returned, 1)
+})
 after(() => {
   dom.restore()
   // rc-overflow 的浏览器调度通道在 Node 中需要显式释放句柄。

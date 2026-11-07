@@ -155,6 +155,7 @@ function inspectSelectionAction(action) {
   const nestedScore = nestedActions.length ? Math.max(...nestedActions.map((item) => item.score)) : 30
   return {
     actionable,
+    moreOnly: action.props['data-business-action-placement'] === 'more' || nestedActions.some((item) => item.moreOnly),
     group,
     authoring: ['edit', 'create'].includes(role) || action.type?.taskHandlingKind === 'authoring' || (nestedActions.length > 0 && nestedActions.every((item) => item.authoring)),
     pinned: role === 'collaboration' || nestedActions.some((item) => item.pinned),
@@ -207,7 +208,7 @@ function partitionSelectionActions(children, space, mobile = false) {
     ? selectStableBusinessActionIndexes(actions.map((item) => ({
       ...item, width: space.widths[item.index],
     })), space)
-    : actions.map((item) => item.index))
+    : actions.filter((item) => !item.moreOnly).map((item) => item.index))
 
   return {
     context: descriptors
@@ -1821,7 +1822,6 @@ export function BusinessDataTable({
   const renderedTable = React.useMemo(
     () => (
       <Table
-        widthMode="columns"
         scrollToolbar
         sticky={sticky}
         size="small"

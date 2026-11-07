@@ -701,8 +701,8 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 		l.Warnf("[admin] permission not delegable err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "该权限不能分配给业务角色"}
 	case errors.Is(err, biz.ErrRolePermissionPolicy):
-		l.Warnf("[admin] role responsibility template rejected err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "岗位功能须符合已登记模板：保留核心能力，只能选用模板内的辅助功能"}
+		l.Warnf("[admin] unregistered role permission template err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "该岗位尚未登记权限模板，请先核对岗位设置"}
 	case errors.Is(err, biz.ErrDebugRoleProductionForbidden):
 		l.Warnf("[admin] debug role rejected by environment err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "当前环境不能分配调试角色"}

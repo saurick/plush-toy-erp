@@ -136,14 +136,10 @@ export default function PrintCenterPage() {
           </nav>
           <div className="erp-print-center-preview-panel">
             <PrintTemplateGuide
-              key={activeTemplate.key}
               template={activeTemplate}
             />
           </div>
         </div>
-        <p className="erp-template-center__note">
-          此处为示例；真实内容请从对应业务页面打开。
-        </p>
       </Card>
     </div>
   )

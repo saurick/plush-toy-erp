@@ -44,12 +44,14 @@
 - `workflow/WorkflowTaskImagePlaceholder.jsx` 只按传入状态展示产品／物料的无图、加载、失败或无权限占位，供真实图片组件和工作台样例共用；附件读取、权限判断、缓存、预览与重试仍由 `WorkflowTaskProductImage.jsx` 和 `master-data/ProductIdentity.jsx` 负责。表单通过 `common/theme/erpThemeContext.jsx` 读取外层主题上下文，偏好加载与保存归主题 Provider。
 - 业务导航共用 `../hooks/useBusinessNavigate.js` 与 `business-list/BusinessLink.jsx`；链接和对象式路径在手机中保留当前岗位、查询、锚点及返回原任务的上下文，桌面路径沿用桌面壳。
 - 菜单主列表的整页编辑复用 `business-list/BusinessFormPage.jsx`，统一管理保存、离开保护及桌面可选全屏。默认保存前校验当前表单；采购需先清理纯空白新行、批量导入需预检全部草稿时，使用 `validateOnSave={false}` 交给保存器整理后校验，仍须调用所属 form 的 `validateFields`；校验失败通过 `errorFields` 复用分区展开和字段聚焦。容器与恢复合同见[桌面业务编辑](../../../../docs/engineering/前端实现与交互约定.md#桌面业务编辑与弹窗约定)。
+- `PurchaseReceiptExceptionModal`、`InventoryOperationModal` 和 `OutsourcingOrderSourceFactModal` 使用整页骨架填写业务草稿；调用页保留列表与来源上下文，异步候选名称刷新不重置输入。委外来源编辑与合同办理页互斥显示，任务中的同一表单继续复用任务底栏。
 - 局部弹窗由 `BusinessFormSectionScope` 提供独立聚焦范围；整页表单仍由 `BusinessFormBody` 提供目录、阅读位置及焦点，已有字段和浮层不重建。已有分组使用 `BusinessFormSection`，普通子标题继续使用 `BusinessFormSectionTitle`；查看、复制、导入及加载 / 空态 / 错误分支均保留标题。
 - 分区定位与聚焦复用 `BusinessFormBody`、`BusinessFormSection`；普通分区及 BOM 标题共用 `business-list/businessFormSections.css` 的 32px 紧凑标题带，以短竖线、主题文字和淡主题色底区分表头及只读框，当前分区底色加深。外观与当前分区不派生业务状态，不改变输入、明细行组或整单保存语义。
 - `BusinessFormBody` 共用“目录 / 页签”导航：目录连续展示整单，页签用 `SlidingTabList` 保持横向导航可见，任务共用滚动区时吸顶；窄屏横滑页签。切换保留字段挂载、阅读位置与整单校验，显示方式统一在账号“外观与密度”中设置，编辑页标题栏不重复提供入口。
 - `BusinessFormSection` 的 `fieldLayout="adaptive"` 按字段内容换行，`erp-business-action-form__field--short` / `__field--wide` 只控制字段区域预算；`fieldLayout="support"` 组织备注与附件，窄区域顺排。默认栅格及 Excel 明细结构保留，样式集中在 `businessFormSections.css`。
 - `BusinessLineItemsTable` 保持同一表头与滚动区域；`BusinessLineItemGroupHeading` 统一提供整条标题点击、箭头状态及键盘展开收起，保留标题内图片预览的独立操作。出货页用它归组相邻产品身份，`BusinessLineItemRow` 仍逐条维护字段、序号与浮层焦点，不改变 `Form.List` 的顺序和 key。业务归组适用范围见[编辑页归组](../../../../docs/product/ui-design/交互设计说明.md#editor-line-grouping)。
 - 明细标题、组数、批量展开、横向查看和来源操作统一交给 `BusinessLineItemsHeader`；`BusinessGroupedLineItems` 通过 `title`、`headerActions` 接入，BOM 与采购到货保留自身字段结构并复用同一标题组件。滚动入口仅挂入所属明细工具栏，布局与恢复合同见[明细录入](../../../../docs/engineering/前端实现与交互约定.md#明细录入)。
+- 明细与底栏直接放在 `BusinessFormSection` 正文时，由 `businessFormSections.css` 统一提供单列布局；底栏间距与已有容器的复用边界见同一[明细录入合同](../../../../docs/engineering/前端实现与交互约定.md#明细录入)。
 - 非 BOM 明细通过 `business-list/BusinessLineEditor.jsx` 提供独立 form 范围的单行选择及顶部操作槽，`BusinessLineEditorRowControls` 将原按钮投射到该槽，保持权限、确认与回调；`actions` 只放行操作，业务字段留在 `cells` 或资料区。桌面选择与输入焦点分开，切换选中对象会重建动作浮层而不重建业务字段；手机与窄区域保留就近操作。`BusinessCompactFieldTable` 用列的 `actions: true` 标记操作列，宽区域不再显示该列；固定来源无动作时不增加选择。多个来源表可用 `scrollControlsInToolbar` 共用顶部横向查看入口，`stickyHeader` 单独决定是否吸顶列名。
 - BOM 的 `BOMMaterialGroupsForm` 保留专用物料 / 部位表格，通过 `BOMSelectionScope` 在所属 Form.List 生命周期内维护两层单选；按稳定 field key 定位当前对象，使用原 add / remove 和复制快照清理规则。顶部动作区不套用普通明细的中性外观，原字段列序、合并单元格、组尾汇总、精确计算及只读行为保持；移除整组需要确认部位数，表单重置或所选组收起时清除选择。
 - `BusinessGroupedLineItems` 桌面默认平铺，按需启用分组；手机保留原分组。`BusinessLineItemRow` 的资料默认收起，行号旁箭头控制可见性，字段保持挂载；原同步错误展开链路继续使用。采购 `PurchaseOrderLineSummary` 只读取下单名称和颜色，数量与单位共享一列但保留独立字段、精度及快照。生产路线等必要信息及 BOM 编辑器保持原边界。
@@ -76,6 +78,7 @@
 - 任务来源资料共用 `business-list/BusinessRecordDetails.jsx` 的紧凑布局：`taskDetailRole` 将单据身份、状态和图片分组，`taskDetailOrder` 排列其余字段，未配置的有值字段继续保留；容器宽度决定标签和值同行或上下排列，复制、图片预览和业务入口沿用原实现。普通选填空值省略，来源列的 `taskDetailEmptyValue(record)` 在真实缺值时返回提示、已有原因和 `tone`，有值时返回 `null`。缺值使用同字号、中等字重的原位文字，需补齐或确认用深橙色，暂未生成和历史未记录用灰色；不使用 Tag，响应未返回的字段不计缺失。资料区不追加办理按钮，沿用任务原有入口，详见[前端实现约定](../../../../docs/engineering/前端实现与交互约定.md)。
 - 列配置、表单默认值、来源选择、导出 / 打印字段涉及业务字段链路时，必须检查新建、编辑、切换来源、清空来源、列表、详情、打印 / 导出和旧数据回补路径。
 - 打印组件只负责预览和模板渲染；打印留档、合同事实、采购 / 委外 / 出货 / 财务状态仍由后端和正式文档定义。
+- 打印模板与 Excel 格式图示共用 [`DocumentGuide.jsx`](DocumentGuide.jsx) 的编号、范围线、短引线和点击联动；可选 `summary` 展示在说明列顶部。打印中心将模板名与缩放工具条合为一行，启用 `fill`，默认按可用宽高适合整页，提供 25%–150% 页内缩放、比例显示与自动适配恢复，放大后只滚动纸面区域，切换模板保留缩放模式；纸面上下留白各 16px，窄屏说明移到下方，其他图示保持自然布局与原有留白。几何测量与窄图编号避让由 [`documentGuideGeometry.mjs`](documentGuideGeometry.mjs) 维护，标注样式只在 `documentGuide.css` 定义。边界见[图示标注规则](../../../../docs/engineering/可视化表达规范.md#验证与维护--validation)。
 - 合同条款共用 `print/ContractClauseTools.jsx`，支持分组增删、名称编辑与排序，以及组内条目操作；分组名称的左侧和纸面入口写入同一份有序草稿。明细和工程行共用 `PrintWorkspaceTools.jsx` 的调序与清空工具。结构操作只修改窗口草稿，清空保留条目，删除才移除条目；空组标题及编号规则见[打印字段与编辑清单](../../../../docs/打印模板字段与编辑行为清单.md#条目编辑)。工具和留白导航不进入纸面输出。
 - Workflow 组件只消费 `explain_action_access`、`explain_task_assignment` 和受控 action API；不能重新直连 raw workflow 写入口或把 task done 当成 Fact posted。
 

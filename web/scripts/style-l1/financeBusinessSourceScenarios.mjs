@@ -203,8 +203,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
   return [
     {
       name: 'finance-source-adjustment-compact-desktop',
-      path: '/erp/finance/payments',
-auth: 'admin',
+      path: '/erp/finance/payables', auth: 'admin',
       effectiveSession: { ...customerRuntimeEffectiveSession, pages: [...customerRuntimeEffectiveSession.pages, 'finance-payments'], actions: [...customerRuntimeEffectiveSession.actions, 'finance.payable.read', 'finance.credit_note.create', 'purchase_receipt.read', 'purchase_return.read', 'purchase_receipt_adjustment.read'] },
       viewport: { width: 1280, height: 720 },
       beforeNavigate: async (page) => {
@@ -717,7 +716,7 @@ auth: 'admin',
       },
       verify: async (page) => {
         await openPayableSource(page, 'AP-RELATED-PR-L1')
-        await page.getByRole('tab', { name: '采购收货', exact: true, selected: true }).waitFor()
+        await expectHeading(page, '采购入库')
         await expectText(page, 'PR-STYLE-L1')
         const search = page.getByPlaceholder('搜单号、供应商、材料、产品')
         assert.equal(await search.inputValue(), 'PR-STYLE-L1')
@@ -959,7 +958,7 @@ auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectHeading(page, '应收管理')
+        await page.getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
         await selectRow(page, 'AR-STYLE-L1')
         await clickSelectionAction(page, '单笔核对')
         const modal = await assertFinanceSourceModal(page, {

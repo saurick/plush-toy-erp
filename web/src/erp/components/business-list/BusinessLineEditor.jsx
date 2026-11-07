@@ -91,7 +91,7 @@ export function useBusinessLineEditorRow({ actions, hidden = false, rowRef, onFo
   }, [clear, hidden, id, selectable])
   const select = (event) => {
     // 顶部动作和字段浮层通过 portal 冒泡时，不将其误认作点击原行。
-    if (selectable && event.currentTarget.contains(event.target)) editor.select(id)
+    if (selectable && event.currentTarget.contains(event.target) && !event.target.closest?.('.erp-line-editor__details-toggle')) editor.select(id)
   }
   return {
     editor,
@@ -105,6 +105,7 @@ export function useBusinessLineEditorRow({ actions, hidden = false, rowRef, onFo
       'data-line-editor-row-selected': selected ? 'true' : undefined,
       onClick: selectable ? select : undefined,
       onFocusCapture: (event) => {
+        if (event.target.closest?.('.erp-line-editor__details-toggle')) return
         onFocus?.(event)
         if (event.target !== event.currentTarget) select(event)
       },
@@ -136,7 +137,7 @@ export function BusinessLineEditorRowControls({ selection, index, identity, acti
           <span className="erp-line-editor__selected-label" role="status">
             {selected ? <>第 {index + 1} 行{identity ? <> · {identity}</> : null}</> : '点击明细后操作'}
           </span>
-          {selected ? <Button type="text" size="small" disabled={false} aria-label="清空明细选择" icon={<CloseOutlined />} onClick={() => { editor.select(null); selection.focus() }} /> : null}
+          {selected ? <Button type="text" disabled={false} aria-label="清空明细选择" icon={<CloseOutlined />} onClick={() => { editor.select(null); selection.focus() }} /> : null}
           {/* 切换操作对象时关闭原动作浮层，业务字段仍留在原行。 */}
           <fieldset key={selected ? 'selected' : 'unselected'} disabled={!selected} aria-disabled={!selected} className="erp-line-editor__action-content" onClickCapture={blockUnselected}>
             {actions}

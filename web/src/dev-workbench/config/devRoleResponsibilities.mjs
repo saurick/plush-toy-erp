@@ -62,8 +62,11 @@ export function buildRoleResponsibilityModel({
                 ? '可用'
                 : '受限',
     })
-    const core = policy.required.filter(inModule).map(describe)
-    const optional = policy.optional.filter(inModule).map(describe)
+    const defaults = policy.defaults.filter(inModule).map(describe)
+    const additional = (role.permissions || [])
+      .filter((permissionKey) => !policy.defaults.includes(permissionKey))
+      .filter(inModule)
+      .map(describe)
     const duties = stages.flatMap(({ stage, actions }) => {
       const matching = actions.filter(
         (action) =>
@@ -86,8 +89,8 @@ export function buildRoleResponsibilityModel({
       name: getPermissionCenterRoleName(role),
       description: role.description,
       policy,
-      core,
-      optional,
+      defaults,
+      additional,
       duties,
       activeAccounts: activeAccounts(contextInput.accounts || [], key).length,
     }
@@ -108,17 +111,14 @@ export function buildRoleResponsibilityModel({
     else if (!activeAccounts(contextInput.accounts || [], key).length) {
       reasons.push('未分配启用账号')
     }
-    if (policy.missing.length) {
-      reasons.push(`缺少 ${policy.missing.length} 项核心功能`)
-    }
     if (policy.outside.length) {
-      reasons.push(`${policy.outside.length} 项功能超出模板`)
+      reasons.push(`${policy.outside.length} 项功能不可分配`)
     }
     if (!role.disabled) {
       if (!access || access.is_final !== true || access.is_preview === true) {
         reasons.push('最终权限尚待核对')
       } else {
-        const restricted = policy.required.filter(
+        const restricted = (role.permissions || []).filter(
           (permissionKey) =>
             role.permissions.includes(permissionKey) &&
             access.permissions?.find(
@@ -126,7 +126,7 @@ export function buildRoleResponsibilityModel({
             )?.effective !== true
         )
         if (restricted.length) {
-          reasons.push(`${restricted.length} 项核心功能受客户设置限制`)
+          reasons.push(`${restricted.length} 项功能受客户设置限制`)
         }
       }
     }

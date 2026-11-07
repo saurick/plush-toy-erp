@@ -34,7 +34,7 @@ export function createBusinessSplitRecoveryScenarios({ assert, customerRuntimeEf
       payload: { product_name: '模拟云朵小熊', product_code: 'STYLE-PRODUCT-01' },
     })),
     verify: async (page) => {
-      const evidence = { cycles: [], geometryMutations: 0 }
+      const evidence = { cycles: [], openDrags: [], geometryMutations: 0 }
       const session = page.context().browser().browserType().name() === 'chromium' ? await page.context().newCDPSession(page) : null
       const snapshot = async (label) => {
         await session?.send('HeapProfiler.collectGarbage')
@@ -78,6 +78,46 @@ export function createBusinessSplitRecoveryScenarios({ assert, customerRuntimeEf
           await expect(drawer).toHaveClass(/ant-drawer-open/u)
           const drawerNode = await drawer.elementHandle()
           await waitForFiniteAnimations(page)
+          if (index === 0) {
+            for (const ratio of [0.45, 0.6]) {
+              const bounds = await panels.boundingBox()
+              const bar = await panels.locator(':scope > .ant-splitter-bar .ant-splitter-bar-dragger').boundingBox()
+              const start = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.getAttribute('class'), { x: bar.x + bar.width / 2, y: bar.y + bar.height / 2 })
+              await page.evaluate(() => window.getSelection()?.removeAllRanges())
+              await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2)
+              await page.mouse.down()
+              await page.mouse.move(bounds.x + bounds.width * ratio, bar.y + bar.height / 2, { steps: 8 })
+              const probe = await panels.locator(':scope > .ant-splitter-bar .ant-splitter-bar-preview').evaluate((node) => {
+                const rect = node.getBoundingClientRect()
+                const pointerOwner = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)?.getAttribute('class')
+                const previous = node.style.pointerEvents
+                const masks = [...document.querySelectorAll('.ant-splitter-mask')].map((mask) => [mask, mask.style.pointerEvents])
+                masks.forEach(([mask]) => { mask.style.pointerEvents = 'none' })
+                node.style.pointerEvents = 'auto'
+                const top = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
+                node.style.pointerEvents = previous
+                masks.forEach(([mask, value]) => { mask.style.pointerEvents = value })
+                const stack = []
+                for (let parent = node; parent && stack.length < 12; parent = parent.parentElement) {
+                  const style = getComputedStyle(parent)
+                  stack.push({ class: parent.getAttribute('class'), position: style.position, z: style.zIndex, contain: style.contain, containerType: style.containerType, isolation: style.isolation, transform: style.transform })
+                }
+                return { x: rect.x, width: rect.width, offset: node.style.getPropertyValue('--ant-splitter-bar-preview-offset'), paintedAbove: top === node, blocker: top?.getAttribute('class'), pointerOwner, selectionCollapsed: window.getSelection()?.isCollapsed !== false, stack }
+              })
+              evidence.openDrags.push({ ratio, start, probe })
+              assert.ok(Math.abs(Number.parseFloat(probe.offset)) > 40, `浮层打开时拖动必须更新预览位置：${JSON.stringify(probe)}`)
+              assert.equal(probe.paintedAbove, true, `拖动预览线必须显示在浮层上方：${JSON.stringify(probe)}`)
+              assert.match(probe.pointerOwner || '', /ant-splitter-mask/u)
+              assert.equal(probe.selectionCollapsed, true, '拖动分隔条不能选择抽屉中的文字')
+              await page.screenshot({ path: `${outputDir}/business-split-open-drag-${themeMode}-${ratio === 0.45 ? 'left' : 'right'}.png`, fullPage: true })
+              await page.mouse.up()
+              await expect.poll(async () => (await secondary.boundingBox()).width / bounds.width).toBeCloseTo(ratio, 2)
+              await expect(panels.locator(':scope > .ant-splitter-bar')).toHaveCSS('z-index', 'auto')
+              await expect(panels.locator(':scope > .ant-splitter-mask')).toHaveCount(0)
+              await expect(drawer).toHaveClass(/ant-drawer-open/u)
+              await expect(detail).toBeVisible()
+            }
+          }
           if (index === 0) await page.screenshot({ path: `${outputDir}/business-split-recovery-${themeMode}-both-open.png`, fullPage: true })
           if (index % 3 === 1) {
             await drawer.getByRole('button', { name: '返回列表', exact: true }).focus()

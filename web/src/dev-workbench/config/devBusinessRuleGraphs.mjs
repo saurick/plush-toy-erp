@@ -1,6 +1,7 @@
 // Read-only diagrams project the selected rule; they never define executable transitions.
 export function buildMasterLifecycleGraph(rule) {
   return {
+    direction: 'LR',
     nodes: [
       { key: 'active', label: '启用', summary: rule.condition },
       { key: 'inactive', label: '停用', summary: rule.effect },
@@ -32,6 +33,7 @@ export function buildMasterLifecycleGraph(rule) {
 
 export function buildFactRuleGraph(fact) {
   return {
+    direction: 'LR',
     nodes: [
       { key: 'source', label: '来源单据', summary: fact.sourceDocument },
       { key: 'fact', label: fact.label, summary: fact.occurrenceCondition },

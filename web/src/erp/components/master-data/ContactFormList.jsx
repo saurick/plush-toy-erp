@@ -1,8 +1,9 @@
-import React, { useId, useState } from 'react'
-import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Form, Input, Radio, Space } from 'antd'
+import React, { useId } from 'react'
+import { ConfigProvider, Form, Input, Radio, Space } from 'antd'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
-import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
+import BusinessLineTable, { useBusinessLineTable } from '../business-list/BusinessLineTable.jsx'
+import BusinessLineItemDetailsToggle, { useBusinessLineItemDetails } from '../business-list/BusinessLineItemDetails.jsx'
+import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessLineItemsFooter, {
   BusinessLineItemsHeader,
@@ -33,6 +34,26 @@ const contactFields = [
   { name: 'email', label: '邮箱', rules: [optionalContactEmailRule()] },
 ]
 
+function ContactTable({ multiple, label, children }) {
+  const editor = useBusinessLineEditor()
+  const columns = [
+    { key: 'sequence', label: '序号', colClassName: 'erp-contact-editor__sequence-column', className: 'erp-contact-editor__sequence' },
+    ...contactFields.map(({ name, label: fieldLabel, rules }) => ({
+      key: name,
+      label: fieldLabel,
+      required: rules?.some((rule) => rule.required),
+      colClassName: ['mobile', 'phone'].includes(name) ? 'erp-contact-editor__phone-column' : undefined,
+    })),
+    ...(multiple ? [{ key: 'primary', label: '主联系人', colClassName: 'erp-contact-editor__primary-column' }] : []),
+    ...(editor?.compact ? [{ key: 'actions', label: '操作', colClassName: 'erp-contact-editor__actions-column' }] : []),
+  ]
+  return (
+    <BusinessLineTable className="erp-master-contact-list__items" tableClassName="erp-contact-editor__table" label={label} columns={columns} expandableDetails={!editor?.compact} header={<BusinessLineItemsHeader title="联系人" scrollControls />} scrollControlsInToolbar>
+      {children}
+    </BusinessLineTable>
+  )
+}
+
 function ContactRow({
   field,
   index,
@@ -46,14 +67,13 @@ function ContactRow({
   onRemove,
 }) {
   const editor = useBusinessLineEditor()
-  const [noteOpen, setNoteOpen] = useState(false)
-  const noteID = useId()
-  const showNote = editor?.compact || noteOpen
-  const columns = (multiple ? 7 : 6) + Number(Boolean(editor?.compact))
+  const table = useBusinessLineTable()
+  const details = useBusinessLineItemDetails({ index, collapsible: !editor?.compact })
+  const showNote = details.visible
   const actions = (
     <Space size={0}>
-      <Button type="text" size="small" icon={<CopyOutlined />} aria-label={`复制联系人条目 ${index + 1}`} onClick={onCopy}>复制行</Button>
-      <Button type="text" size="small" danger icon={<DeleteOutlined />} aria-label={`移除联系人条目 ${index + 1}`} disabled={disabled || !multiple} onClick={onRemove}>移除行</Button>
+      <BusinessLineItemActionButton action="copy" aria-label={`复制联系人条目 ${index + 1}`} onClick={onCopy} />
+      <BusinessLineItemActionButton action="remove" aria-label={`移除联系人条目 ${index + 1}`} disabled={disabled || !multiple} onClick={onRemove} />
     </Space>
   )
   const selection = useBusinessLineEditorRow({ actions, rowRef: registerRow })
@@ -65,13 +85,18 @@ function ContactRow({
       {...selection.rowProps}
     >
       <tr className="erp-contact-editor__fields">
+        {table?.expandableDetails ? (
+          <td className="erp-line-item-table__disclosure" rowSpan={showNote ? 2 : 1}>
+            <BusinessLineItemDetailsToggle index={index} label="备注" details={details} />
+          </td>
+        ) : null}
         <td
           className="erp-contact-editor__sequence erp-editable-line-group__sequence"
           rowSpan={showNote ? 2 : 1}
           aria-label={`第 ${index + 1} 位`}
         >
           <BusinessLineEditorRowControls selection={selection} index={index} identity={row?.name} actions={actions}>
-            {!editor?.compact ? <Button type="text" className="erp-line-editor__details-toggle" disabled={false} aria-expanded={noteOpen} aria-controls={noteID} aria-label={`${noteOpen ? '收起' : '展开'}第 ${index + 1} 行备注`} onClick={() => setNoteOpen((open) => !open)}><span aria-hidden="true">{noteOpen ? '⌄' : '›'}</span><span className="erp-editable-line-group__number">{index + 1}</span></Button> : <span className="erp-editable-line-group__number">{index + 1}</span>}
+            <span className="erp-editable-line-group__number">{index + 1}</span>
           </BusinessLineEditorRowControls>
         </td>
         {contactFields.map(({ name, label, rules }) => (
@@ -108,8 +133,8 @@ function ContactRow({
         ) : null}
         <BusinessLineEditorInlineActions><td className="erp-contact-editor__actions">{actions}</td></BusinessLineEditorInlineActions>
       </tr>
-      <tr id={noteID} className="erp-contact-editor__note-editor" hidden={!showNote}>
-        <td colSpan={columns - 1}>
+      <tr id={details.id} className="erp-contact-editor__note-editor" hidden={!showNote}>
+        <td colSpan={table.columnCount - 1 - Number(table.expandableDetails)}>
           <Form.Item label="备注" name={[field.name, 'note']}>
             <BusinessTextArea
               allowClear
@@ -152,58 +177,18 @@ export default function ContactFormList({ form, entityLabel }) {
     >
       {(fields, { add, remove }, { errors }) => (
         <BusinessLineEditor className="erp-master-contact-list erp-contact-editor" compactThreshold={820} data-table-scroll-scope>
-          <BusinessLineItemsHeader title="联系人" scrollControls />
-          <TableScrollRegion className="erp-master-contact-list__items" useToolbar stickyHeader>
-            <table
-              className="erp-contact-editor__table"
-              data-table-lines="fixed"
-              aria-label={`${entityLabel}联系人`}
-            >
-              <colgroup>
-                <col className="erp-contact-editor__sequence-column" />
-                <col />
-                <col />
-                <col className="erp-contact-editor__phone-column" />
-                <col className="erp-contact-editor__phone-column" />
-                <col />
-                {fields.length > 1 ? (
-                  <col className="erp-contact-editor__primary-column" />
-                ) : null}
-                <BusinessLineEditorInlineActions><col className="erp-contact-editor__actions-column" /></BusinessLineEditorInlineActions>
-              </colgroup>
-              <thead>
-                <tr>
-                  <th className="erp-contact-editor__sequence" scope="col">
-                    序号
-                  </th>
-                  {contactFields.map(({ name, label, rules }) => (
-                    <th key={name} scope="col">
-                      {rules?.some((rule) => rule.required) ? (
-                        <span
-                          className="erp-contact-editor__required"
-                          aria-hidden="true"
-                        >
-                          *
-                        </span>
-                      ) : null}
-                      {label}
-                    </th>
-                  ))}
-                  {fields.length > 1 ? <th scope="col">主联系人</th> : null}
-                  <BusinessLineEditorInlineActions><th scope="col">操作</th></BusinessLineEditorInlineActions>
-                </tr>
-              </thead>
-              {fields.map((field, index) => (
-                <ContactRow
-                  key={field.key}
-                  field={field}
-                  index={index}
-                  row={rows[field.name]}
-                  multiple={fields.length > 1}
-                  disabled={componentDisabled}
-                  primaryGroup={primaryGroup}
-                  registerRow={(node) => registerLineItemRow(index, node)}
-                  onPrimary={() =>
+          <ContactTable multiple={fields.length > 1} label={`${entityLabel}联系人`}>
+            {fields.map((field, index) => (
+              <ContactRow
+                key={field.key}
+                field={field}
+                index={index}
+                row={rows[field.name]}
+                multiple={fields.length > 1}
+                disabled={componentDisabled}
+                primaryGroup={primaryGroup}
+                registerRow={(node) => registerLineItemRow(index, node)}
+                onPrimary={() =>
                     form.setFieldsValue({
                       contacts: withPrimaryContact(
                         form.getFieldValue('contacts') || [],
@@ -211,7 +196,7 @@ export default function ContactFormList({ form, entityLabel }) {
                       ),
                     })
                   }
-                  onCopy={() => {
+                onCopy={() => {
                     const currentRow =
                       form.getFieldValue(['contacts', field.name]) || {}
                     add(
@@ -220,17 +205,16 @@ export default function ContactFormList({ form, entityLabel }) {
                     )
                     requestLineItemScroll(index + 1)
                   }}
-                  onRemove={() => {
+                onRemove={() => {
                     const next = (form.getFieldValue('contacts') || []).filter(
                       (_, i) => i !== field.name
                     )
                     remove(field.name)
                     form.setFieldsValue({ contacts: withPrimaryContact(next) })
                   }}
-                />
+              />
               ))}
-            </table>
-          </TableScrollRegion>
+          </ContactTable>
           <BusinessLineItemsFooter
             addLabel="添加联系人"
             addDisabled={componentDisabled}

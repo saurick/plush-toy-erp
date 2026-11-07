@@ -1,5 +1,6 @@
 /* eslint-disable no-bitwise -- ZIP flags and CRC32 require bit operations. */
 import { AttachmentPolicy } from '../../common/consts/attachments.generated.mjs'
+import { rasterImageMimeType } from './rasterImageType.mjs'
 
 export const MAX_XLSX_FILE_BYTES = AttachmentPolicy.maxBytes
 
@@ -575,7 +576,7 @@ export async function readXlsxWorkbook(
     if (!zip.entries.has(name)) return null
     if (imageCache.has(name)) return imageCache.get(name)
     const bytes = await extractZipEntry(zip, name)
-    const mimeType = rasterMimeType(bytes)
+    const mimeType = rasterImageMimeType(bytes)
     if (!mimeType) return null
     const image = { bytes, mimeType, name }
     imageCache.set(name, image)
@@ -684,17 +685,6 @@ function resolvePartTarget(part, target) {
   }
   if (parts[0] !== 'xl') fail('Excel 图片路径越界', 'invalid_relationship')
   return parts.join('/')
-}
-
-function rasterMimeType(bytes) {
-  if ([137, 80, 78, 71, 13, 10, 26, 10].every((value, i) => bytes[i] === value))
-    { return 'image/png' }
-  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255)
-    { return 'image/jpeg' }
-  const header = String.fromCharCode(...bytes.slice(0, 12))
-  if (/^GIF8[79]a/u.test(header)) return 'image/gif'
-  if (header.startsWith('RIFF') && header.endsWith('WEBP')) return 'image/webp'
-  return ''
 }
 
 function crc32(bytes) {

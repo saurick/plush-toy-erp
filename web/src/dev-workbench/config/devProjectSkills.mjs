@@ -21,7 +21,7 @@ function diagramLabel(value) {
 export function buildProjectSkillDiagram(skill, skills) {
   if (!skill) return ''
   const lines = [
-    'flowchart TB',
+    'flowchart LR',
     `task[${diagramLabel(skill.title)}] -->|适用任务| entry[${diagramLabel(`$${skill.name}`)}]`,
     `entry -->|引用依据| source[${diagramLabel(`入口原文 · ${skill.references.length} 项 Markdown 引用`)}]`,
   ]

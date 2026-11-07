@@ -388,12 +388,10 @@ func adminRoleToMap(item biz.AdminRole, includePermissions bool) map[string]any 
 
 func rolePermissionPolicyToMap(policy biz.RolePermissionPolicy) map[string]any {
 	return map[string]any{
-		"template_key":                 policy.TemplateKey,
-		"registered":                   policy.Registered,
-		"required_permissions":         toAnySliceString(policy.Required),
-		"optional_permissions":         toAnySliceString(policy.Optional),
-		"missing_required_permissions": toAnySliceString(policy.MissingRequired),
-		"outside_template_permissions": toAnySliceString(policy.OutsideTemplate),
+		"template_key":           policy.TemplateKey,
+		"registered":             policy.Registered,
+		"default_permissions":    toAnySliceString(policy.Defaults),
+		"assignable_permissions": toAnySliceString(policy.Assignable),
 	}
 }
 

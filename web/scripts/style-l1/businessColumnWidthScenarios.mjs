@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
@@ -14,19 +14,24 @@ async function grid(page) {
   return page
     .locator(`${card} .ant-table-wrapper`)
     .first()
-    .evaluate((root) => {
+    .evaluate(async (root) => {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       const head = [...root.querySelectorAll('thead')].find(
         (node) =>
           node.getBoundingClientRect().height > 0 &&
           getComputedStyle(node).visibility !== 'hidden'
       )
       const body = root.querySelector('tbody tr[data-row-key]')
+      const content = root.querySelector('.ant-table-body, .ant-table-content')
       return {
+        availableWidth: root.parentElement.clientWidth,
         width: root.getBoundingClientRect().width,
+        headerWidth: head.closest('table').getBoundingClientRect().width,
         tableWidth: root
           .querySelector('tbody')
           .closest('table')
           .getBoundingClientRect().width,
+        horizontalRange: content.scrollWidth - content.clientWidth,
         columns: [...head.querySelectorAll('th')].map((cell, index) => ({
           label: cell.textContent.trim(),
           width: cell.getBoundingClientRect().width,
@@ -47,6 +52,22 @@ function assertStableGrid(before, after) {
     )
 }
 function assertAlignedGrid(result) {
+  assert.ok(
+    Math.abs(result.width - result.availableWidth) <= 1,
+    `表格外框应铺满容器: ${JSON.stringify(result)}`
+  )
+  assert.ok(
+    result.tableWidth >= result.width - 1,
+    `数据行至少铺满表格外框: ${JSON.stringify(result)}`
+  )
+  assert.ok(
+    Math.abs(result.headerWidth - result.tableWidth) <= 1,
+    `表头与数据行应共用横向边界: ${JSON.stringify(result)}`
+  )
+  assert.ok(
+    Math.abs(result.columns[0].width - 52) <= 1,
+    `选择列保持固定宽度: ${JSON.stringify(result.columns[0])}`
+  )
   for (const column of result.columns)
     if (column.bodyWidth)
       assert.ok(
@@ -71,6 +92,35 @@ export function createBusinessColumnWidthScenarios({
     deviceScaleFactor: 2,
   }
   return [
+    {
+      ...common,
+      name: 'business-column-width-bom-fill',
+      path: '/erp/purchase/material-bom',
+      verify: async (page) => {
+        await page.locator(rowSelector).first().waitFor()
+        const evidence = []
+        for (const width of [1920, 2560, 1440, 1024, 390]) {
+          await page.setViewportSize({ width, height: 1080 })
+          const result = await grid(page)
+          assertAlignedGrid(result)
+          assert.equal(
+            result.horizontalRange > 1,
+            result.tableWidth > result.width + 1,
+            `仅在列宽超过容器时横向滚动: ${JSON.stringify(result)}`
+          )
+          await assertNoHorizontalOverflow(page, `BOM 横向铺满 ${width}`)
+          evidence.push({ viewport: width, ...result })
+          if (width === 1920) await page.screenshot({
+            path: path.join(outputDir, 'bom-table-fill-4k.png'),
+            animations: 'disabled',
+          })
+        }
+        await writeFile(
+          path.join(outputDir, 'bom-table-fill.json'),
+          JSON.stringify(evidence, null, 2)
+        )
+      },
+    },
     {
       ...common,
       name: 'business-column-width-empty-recovery',
@@ -109,9 +159,10 @@ export function createBusinessColumnWidthScenarios({
       },
       verify: async (page) => {
         await page.locator(rowSelector).first().waitFor()
-        for (const width of [1920, 1440, 390]) {
+        for (const width of [1920, 2560, 1440, 390]) {
           await page.setViewportSize({ width, height: 1080 })
           const before = await grid(page)
+          assertAlignedGrid(before)
           const search = page
             .locator('.erp-business-operation-panel__search input')
             .first()
@@ -123,11 +174,15 @@ export function createBusinessColumnWidthScenarios({
           await search.press('Enter')
           await page.locator(`${card} .ant-spin-spinning`).waitFor()
           await held
-          assertStableGrid(before, await grid(page))
+          const loading = await grid(page)
+          assertStableGrid(before, loading)
+          assertAlignedGrid(loading)
           page.columnWidthProbe.hold = false
           page.columnWidthProbe.release()
           await page.locator(`${card} .ant-table-placeholder`).waitFor()
-          assertStableGrid(before, await grid(page))
+          const empty = await grid(page)
+          assertStableGrid(before, empty)
+          assertAlignedGrid(empty)
           await search.fill('')
           await search.press('Enter')
           await page.locator(rowSelector).first().waitFor()
@@ -158,7 +213,6 @@ export function createBusinessColumnWidthScenarios({
       verify: async (page) => {
         await page.locator(rowSelector).first().waitFor()
         const initial = await grid(page)
-        assert.ok(initial.tableWidth <= 1696)
         assertAlignedGrid(initial)
         const labels = initial.columns.map((column) => column.label)
         for (const label of [
@@ -209,7 +263,6 @@ export function createBusinessColumnWidthScenarios({
       verify: async (page) => {
         await page.locator(rowSelector).first().waitFor()
         const balances = await grid(page)
-        assert.ok(balances.tableWidth <= 1696)
         assertAlignedGrid(balances)
         const identity = page
           .locator(`${rowSelector} .erp-product-identity`)
@@ -290,10 +343,6 @@ export function createBusinessColumnWidthScenarios({
         await selectWarehouseView(page, '库存变动记录')
         await page.locator(rowSelector).first().waitFor()
         const transactions = await grid(page)
-        assert.ok(
-          transactions.tableWidth <= 1696,
-          `库存变动按列预算滚动: ${transactions.tableWidth}`
-        )
         assertAlignedGrid(transactions)
         await page.screenshot({
           path: path.join(outputDir, 'inventory-transactions-defaults-4k.png'),

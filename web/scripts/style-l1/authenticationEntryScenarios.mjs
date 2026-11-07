@@ -828,6 +828,60 @@ export function createAuthenticationEntryScenarios({
       },
     },
     {
+      name: 'admin-relogin-expired-mobile-entry-choice',
+      path: '/m/boss/tasks',
+      auth: 'admin',
+      customerKey: 'yoyoosun',
+      adminProfile: customerRoleAdminProfile('boss', 'style-l1-relogin'),
+      effectiveSession: customerRoleRuntimeSession(
+        ['boss'],
+        'style-l1-mobile-relogin'
+      ),
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        const mobileNavigation = page.getByTestId('mobile-role-bottom-nav')
+        const expireTaskRead = async (route) => {
+          const { id, method, params } = route.request().postDataJSON() || {}
+          if (method !== 'list_role_tasks' || params?.view_key !== 'risk') {
+            return route.fallback()
+          }
+          await route.fulfill({
+            json: {
+              jsonrpc: '2.0',
+              id,
+              result: { code: RpcErrorCode.AUTH_REQUIRED, message: '未登录' },
+            },
+          })
+        }
+
+        for (const [entry, destination] of [
+          ['手机版', '/m/boss/tasks'],
+          ['电脑版', '/erp/dashboard'],
+        ]) {
+          await mobileNavigation.waitFor({ state: 'visible', timeout: 10_000 })
+          await page.route('**/rpc/workflow', expireTaskRead)
+          try {
+            await page.getByTestId('mobile-role-nav-messages').click()
+            await waitForPath(page, '/admin-login')
+            await expectAdminLoginHeading(page)
+            assert.equal(
+              await page.evaluate(() => history.state?.usr?.from?.pathname),
+              '/m/boss/tasks'
+            )
+          } finally {
+            await page.unroute('**/rpc/workflow', expireTaskRead)
+          }
+
+          await page.getByText(entry, { exact: true }).click()
+          await page.getByLabel('账号').fill('style-l1-relogin')
+          await page.locator('#password').fill('style-l1-password')
+          await page.getByRole('button', { name: /^登\s*录$/ }).click()
+          await waitForPath(page, destination)
+        }
+        await expectHeading(page, '工作台')
+      },
+    },
+    {
       name: 'entry-multi-role-login-direct',
       path: '/admin-login',
       mockAdminRpc: true,

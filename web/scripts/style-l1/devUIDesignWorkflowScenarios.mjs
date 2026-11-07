@@ -140,6 +140,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
       verify: async (page) => {
         const frame = await open(page)
         await frame.getByRole('button', { name: '模板打印中心', exact: true }).click()
+        assert.equal(await frame.getByText('此处为示例；真实内容请从对应业务页面打开。', { exact: true }).count(), 0)
         const directory = frame.getByRole('navigation', { name: '打印模板目录' })
         const guide = frame.getByRole('region', { name: '当前模板说明' })
         const choice = (key) => directory.locator(`[data-value="${key}"]`)
@@ -154,33 +155,63 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
           assert.equal(await directory.locator('[aria-pressed="true"]').count(), 1)
           assert.equal(await guide.locator('h3').innerText(), template.title)
           assert.equal(await guide.locator('.print-template-purpose').innerText(), template.summary)
-          assert.deepEqual(await guide.locator('.print-template-parts h4').allTextContents(), template.guide.map((part) => part.title))
-          assert.deepEqual(await guide.locator('.print-template-parts p').allTextContents(), template.guide.map((part) => part.description))
-          assert.deepEqual(await guide.locator('.print-guide-number').allTextContents(), ['1', '2', '3'])
+          assert.deepEqual(await guide.locator('.document-guide-part-title').allTextContents(), template.guide.map((part) => part.title))
+          assert.deepEqual(await guide.locator('.document-guide-part-description').allTextContents(), template.guide.map((part) => part.description))
+          await guide.locator('.document-guide-marker').nth(2).waitFor()
+          assert.deepEqual(await guide.locator('.print-template-parts .print-guide-number').allTextContents(), ['1', '2', '3'])
           const metrics = await guide.evaluate((node) => {
             const paper = node.querySelector('.print-guide-paper')
+            const canvas = node.querySelector('.document-guide-canvas').getBoundingClientRect()
+            const viewport = node.querySelector('.print-guide-viewport')
+            const view = viewport.getBoundingClientRect()
             const figure = node.querySelector('figure').getBoundingClientRect()
             return {
               inert: paper.inert,
+              paperWidth: canvas.width,
+              paperHeight: canvas.height,
+              compactHeading: Boolean(node.querySelector('.print-guide-toolbar h3')),
+              summaryInDetails: Boolean(node.querySelector('.document-guide-details > .print-template-purpose')),
+              framePadding: getComputedStyle(viewport.firstElementChild).paddingBlock,
+              wholePaper: viewport.scrollWidth <= viewport.clientWidth + 1 && viewport.scrollHeight <= viewport.clientHeight + 1 && canvas.top >= view.top - 1 && canvas.bottom <= view.bottom + 1 && canvas.left >= view.left - 1 && canvas.right + 52 <= view.right + 1,
+              highlightsClear: [...node.querySelectorAll('.document-guide-highlights rect')].every((rect) => getComputedStyle(rect).stroke === 'none'),
               editableCount: paper.querySelectorAll('input, textarea, button, [contenteditable="true"]').length,
-              regions: [...paper.querySelectorAll('[data-guide-region]')].map((region) => {
-                const marker = region.querySelector('.print-guide-marker')
+              regions: [...node.querySelectorAll('.document-guide-marker')].map((marker) => {
+                const region = paper.querySelector(`[data-guide-region="${Number(marker.dataset.documentGuidePart) + 1}"]`)
                 const box = marker.getBoundingClientRect()
                 const target = region.getBoundingClientRect()
+                const range = marker.parentElement.querySelector('.document-guide-range').getBoundingClientRect()
                 return {
                   number: marker.textContent,
                   region: region.dataset.guideRegion,
-                  aligned: Math.abs(box.y + box.height / 2 - target.y - target.height / 2) < 1,
+                  aligned: Math.abs(range.top - target.top) < 1 && Math.abs(range.bottom - target.bottom) < 1,
                   fits: box.right <= figure.right + 1,
                 }
               }),
             }
           })
           assert.equal(metrics.inert, true)
+          assert.equal(metrics.compactHeading, true)
+          assert.equal(metrics.summaryInDetails, true)
+          assert.equal(metrics.framePadding, '16px')
+          assert.equal(metrics.highlightsClear, true, '高亮不能继承图标描边遮住纸面文字')
+          assert(metrics.paperWidth > 150 && metrics.paperHeight > 200 && metrics.wholePaper, `交互稿默认无需滚动看全纸面: ${JSON.stringify(metrics)}`)
           assert.equal(metrics.editableCount, 0)
           assert.equal(metrics.regions.length, 3)
           assert(metrics.regions.every((part) => part.number === part.region && part.aligned && part.fits), JSON.stringify(metrics))
+          await guide.locator('.document-guide-marker').nth(1).press('Enter')
+          assert.equal(await guide.locator('.document-guide-part').nth(1).getAttribute('aria-pressed'), 'true')
+          await guide.locator('.document-guide-part').nth(2).click()
+          assert.equal(await guide.locator('.document-guide-marker').nth(2).getAttribute('aria-pressed'), 'true')
         }
+        const zoomIn = guide.getByRole('button', { name: '放大纸面', exact: true })
+        const zoomValue = () => guide.getByLabel('纸面缩放比例', { exact: true }).innerText()
+        for (let i = 0; i < 6 && parseInt(await zoomValue(), 10) < 125; i += 1) await zoomIn.click()
+        assert.equal(await zoomValue(), '125%')
+        await choice('engineering-color-card').click()
+        assert.equal(await zoomValue(), '125%', '交互稿切换模板保留比例')
+        assert.equal(await guide.locator('.print-guide-viewport').evaluate((node) => node.scrollHeight > node.clientHeight), true)
+        await guide.getByRole('button', { name: '适合整页', exact: true }).click()
+        assert.equal(await guide.getByRole('button', { name: '适合整页', exact: true }).getAttribute('aria-pressed'), 'true')
         await choice('engineering-color-card').dblclick()
         await frame.locator('.print-paper').waitFor()
         assert.match(await frame.locator('.print-controls').innerText(), /模板样张 · 色卡/)
@@ -244,7 +275,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
               stacked: parts.top >= figure.bottom - 1,
               noOverflow: view.scrollWidth <= view.clientWidth + 1,
               parts: [...node.querySelectorAll('li')].every((part) => part.scrollWidth <= part.clientWidth + 1),
-              markersFit: [...node.querySelectorAll('.print-guide-marker')].every((marker) => marker.getBoundingClientRect().right <= figure.right + 1),
+              markersFit: node.querySelectorAll('.document-guide-marker').length === 3 && [...node.querySelectorAll('.document-guide-marker')].every((marker) => marker.getBoundingClientRect().left >= figure.left - 1 && marker.getBoundingClientRect().right <= figure.right + 1),
             }
           })
           assert.deepEqual(layout, { stacked: true, noOverflow: true, parts: true, markersFit: true }, `${width}px: ${JSON.stringify(layout)}`)
@@ -365,17 +396,47 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         await frame.locator('.table-wrap [data-action="select-row"]').first().check()
         const selected = frame.locator('.table-wrap tr.selected')
         const sourceId = await selected.getAttribute('data-row')
+        const receivable = frame.getByRole('dialog', { name: '应收单详情', exact: true })
+        const readOutstanding = async () => Number(
+          (await receivable.locator('dt').filter({ hasText: /^未结金额$/u }).locator('+ dd').innerText())
+            .replace(/[^\d.-]/gu, '')
+        )
+        await selected.locator('[data-action="open-detail"]').click()
+        const outstandingBefore = await readOutstanding()
+        assert.ok(outstandingBefore >= 100, '本次收款有足够的未结应收金额')
+        await receivable.getByRole('button', { name: '返回原视图', exact: true }).click()
         await action('payment').click()
         await frame.locator('#business-amount').fill('100')
         await confirm()
         const payment = frame.getByRole('dialog', { name: '收付款单详情', exact: true })
         await payment.locator('.modal-head').getByText('待审批', { exact: true }).waitFor()
+        assert.equal(await payment.locator('[data-operation="allocate"]').count(), 0, '审批通过前不提供核销操作')
         await payment.locator('[data-operation="approval"]').click()
-        await frame.locator('[data-action="task-next"]').click()
-        await frame.locator('[data-action="task-next"]').click()
-        await frame.locator('#task-note').fill('款项与银行记录已核对。')
-        await frame.locator('[data-action="task-next"]').click()
-        await frame.getByRole('dialog', { name: '任务办理回执', exact: true }).getByRole('button', { name: '关闭', exact: true }).last().click()
+        const approval = frame.locator('.drawer[role="dialog"]')
+        const receiptStep = approval.locator('.task-steps [data-value="3"]')
+        await approval.locator('.drawer-head').getByText('任务信息', { exact: true }).waitFor()
+        assert.equal(await receiptStep.isDisabled(), true, '办理前不能查看结果回执')
+        await approval.locator('.drawer-foot').getByRole('button', { name: '任务办理', exact: true }).click()
+        await approval.getByRole('button', { name: '审批通过', exact: true }).click()
+        await approval.getByRole('button', { name: '确认办理', exact: true }).click()
+        await approval.getByText('请填写审批意见', { exact: true }).waitFor()
+        assert.equal(await receiptStep.isDisabled(), true, '缺少审批意见时保留待办')
+        await approval.getByLabel('审批意见 *', { exact: true }).fill('款项与银行记录已核对。')
+        await approval.getByRole('button', { name: '确认办理', exact: true }).click()
+        await approval.locator('.task-step[aria-current="step"]').getByText('结果回执', { exact: true }).waitFor()
+        await approval.getByRole('heading', { name: '审批通过', exact: true }).waitFor()
+        await approval.getByText('款项与银行记录已核对。', { exact: true }).waitFor()
+        await approval.locator('.drawer-foot').getByRole('button', { name: '返回列表', exact: true }).click()
+        await payment.locator('.modal-head').getByText('已批准待核销', { exact: true }).waitFor()
+        const readPaymentSourceOutstanding = async () => {
+          await payment.locator('.detail-tabs').getByRole('button', { name: '关联单据', exact: true }).click()
+          await payment.locator(`[data-action="open-linked-record"][data-page="receivables"][data-id="${sourceId}"]`).click()
+          const outstanding = await readOutstanding()
+          await receivable.getByRole('button', { name: '返回原视图', exact: true }).click()
+          await payment.locator('.detail-tabs').getByRole('button', { name: '基本信息', exact: true }).click()
+          return outstanding
+        }
+        assert.equal(await readPaymentSourceOutstanding(), outstandingBefore, '审批通过不改变应收未结金额')
         await payment.locator('[data-operation="allocate"]').click()
         await chooseSelectOption(frame.locator('#business-fact'), `receivables:${sourceId}`)
         await frame.locator('#business-amount').fill('101')
@@ -384,10 +445,12 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         await frame.locator('#business-amount').fill('100')
         await confirm()
         await payment.locator('.modal-head').getByText('已核销', { exact: true }).waitFor()
+        assert.equal(await readPaymentSourceOutstanding(), outstandingBefore - 100, '核销只扣减本次收款金额')
         await payment.locator('[data-operation="reverse"]').click()
         await frame.locator('#business-reason').fill('演示原核销金额恢复。')
         await confirm()
         await payment.locator('.modal-head').getByText('已冲销', { exact: true }).waitFor()
+        assert.equal(await readPaymentSourceOutstanding(), outstandingBefore, '冲销恢复原应收未结金额')
         await page.screenshot({ path: path.join(outputDir, 'business-finance-result-4k.png'), scale: 'device' })
         await closeDetails()
         await frame.locator('.nav-item[data-page="warehouse-hub"]').click()

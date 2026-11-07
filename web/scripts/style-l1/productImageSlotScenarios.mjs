@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { rasterImageMimeType } from '../../src/erp/utils/rasterImageType.mjs'
 import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
 import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 
@@ -13,6 +15,15 @@ function createOversizedProductImageSourceBuffer() {
     Buffer.from(PRODUCT_IMAGE_PNG_BASE64, 'base64'),
     Buffer.alloc(PRODUCT_IMAGE_LEGACY_MAX_BYTES),
   ])
+}
+
+function readProductImageCanvasMimeType(page) {
+  return page.evaluate(() => new Promise((resolve) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 2
+    canvas.height = 2
+    canvas.toBlob((blob) => resolve(blob?.type || ''), 'image/webp', 0.9)
+  }))
 }
 
 function createDeferred() {
@@ -46,6 +57,8 @@ function createProductImageMockState() {
     nextID: 103,
     calls: [],
     failList: false,
+    failUploadFile: '',
+    failAfterUploadFile: '',
     nextWriteGate: null,
     attachments: [
       productImageAttachment('primary', 101, '产品主图.png', nowUnix),
@@ -81,6 +94,11 @@ async function installProductImageAttachmentMocks(page, state) {
       await route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 50000, message: '读取失败' } } })
       return
     }
+    if (method === 'upload_attachment' && state.failUploadFile && params.file_name === state.failUploadFile) {
+      state.failUploadFile = ''
+      await route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 50000, message: '图片暂未保存' } } })
+      return
+    }
     if (
       state.nextWriteGate &&
       ['upload_attachment', 'clear_product_image'].includes(method)
@@ -104,11 +122,18 @@ async function installProductImageAttachmentMocks(page, state) {
     } else if (method === 'list_attachments') {
       data = { attachments: state.attachments.map((item) => ({ ...item })) }
     } else if (method === 'upload_attachment') {
+      const slot = params.slot_key === 'supplemental'
+        ? Array.from({ length: 8 }, (_, index) => `supplemental_${index + 1}`).find((key) => !state.attachments.some((item) => item.slot_key === key))
+        : params.slot_key
+      if (!slot) {
+        await route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 50000, message: '补充图片已达上限' } } })
+        return
+      }
       const replacedAttachments = state.attachments.filter(
-        (item) => item.slot_key === params.slot_key
+        (item) => item.slot_key === slot
       )
       const attachment = productImageAttachment(
-        params.slot_key,
+        slot,
         state.nextID,
         params.file_name,
         Math.floor(Date.now() / 1000)
@@ -116,6 +141,7 @@ async function installProductImageAttachmentMocks(page, state) {
       state.nextID += 1
       attachment.mime_type = params.mime_type
       attachment.file_size = Number(params.file_size || 0)
+      attachment.sha256 = createHash('sha256').update(Buffer.from(params.content_base64, 'base64')).digest('hex')
       for (const replaced of replacedAttachments) {
         state.attachmentContents.delete(replaced.id)
       }
@@ -123,18 +149,24 @@ async function installProductImageAttachmentMocks(page, state) {
       state.attachments = [
         attachment,
         ...state.attachments.filter(
-          (item) => item.slot_key !== params.slot_key
+          (item) => item.slot_key !== slot
         ),
       ]
+      if (params.file_name === state.failAfterUploadFile) {
+        state.failAfterUploadFile = ''
+        await route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 50000, message: '保存结果未确认' } } })
+        return
+      }
       data = { attachment }
     } else if (method === 'clear_product_image') {
+      const matches = (item) => params.id ? item.id === params.id : item.slot_key === params.slot_key
       for (const cleared of state.attachments.filter(
-        (item) => item.slot_key === params.slot_key
+        matches
       )) {
         state.attachmentContents.delete(cleared.id)
       }
       state.attachments = state.attachments.filter(
-        (item) => item.slot_key !== params.slot_key
+        (item) => !matches(item)
       )
       data = { cleared: true }
     } else if (method === 'download_attachment') {
@@ -218,7 +250,19 @@ export function createProductImageSlotScenarios(deps) {
 
   let desktopState = createProductImageMockState()
   let mobileState = createProductImageMockState()
+  let concurrentState = createProductImageMockState()
   let bomPrintState = createProductImageMockState()
+
+  function addConcurrentSupplemental(slot, name) {
+    const bytes = Buffer.concat([Buffer.from(PRODUCT_IMAGE_PNG_BASE64, 'base64'), Buffer.from([slot])])
+    const row = productImageAttachment(`supplemental_${slot}`, concurrentState.nextID, name, Math.floor(Date.now() / 1000))
+    concurrentState.nextID += 1
+    row.sha256 = createHash('sha256').update(bytes).digest('hex')
+    row.file_size = bytes.length
+    concurrentState.attachments.push(row)
+    concurrentState.attachmentContents.set(row.id, bytes.toString('base64'))
+    return row
+  }
 
   return [
     ...[
@@ -491,15 +535,16 @@ export function createProductImageSlotScenarios(deps) {
         const catalogImage = page
           .locator('.ant-table-tbody .erp-product-identity img')
           .first()
-        await page.waitForFunction(() =>
+        const snapshotMimeType = await readProductImageCanvasMimeType(page)
+        assert.ok(['image/webp', 'image/png'].includes(snapshotMimeType))
+        const optimizedFileName = `超大新主图.${snapshotMimeType.split('/')[1]}`
+        await page.waitForFunction((mimeType) =>
           document
             .querySelector('.ant-table-tbody .erp-product-identity img')
             ?.getAttribute('src')
-            ?.startsWith('data:image/webp;')
-        )
-        assert.match(
-          await catalogImage.getAttribute('src'),
-          /^data:image\/webp;/,
+            ?.startsWith(`data:${mimeType};`), snapshotMimeType)
+        assert.ok(
+          (await catalogImage.getAttribute('src')).startsWith(`data:${snapshotMimeType};`),
           'saving the replacement must refresh the catalog thumbnail'
         )
 
@@ -537,10 +582,10 @@ export function createProductImageSlotScenarios(deps) {
         )
         assert.equal(
           uploadCall.params.file_name,
-          '超大新主图.webp',
-          '超过旧 5MiB 限制的源图应转为 WEBP 保存'
+          optimizedFileName,
+          '优化后文件名必须匹配当前浏览器实际输出的格式'
         )
-        assert.equal(uploadCall.params.mime_type, 'image/webp')
+        assert.equal(uploadCall.params.mime_type, snapshotMimeType)
         assert(
           Number(uploadCall.params.file_size || 0) > 0 &&
             Number(uploadCall.params.file_size || 0) <= 1024 * 1024,
@@ -556,18 +601,13 @@ export function createProductImageSlotScenarios(deps) {
           '上传声明大小必须与实际解码内容一致'
         )
         assert.equal(
-          uploadedImageBytes.subarray(0, 4).toString('ascii'),
-          'RIFF',
-          '自动优化内容必须是 WEBP RIFF 容器'
-        )
-        assert.equal(
-          uploadedImageBytes.subarray(8, 12).toString('ascii'),
-          'WEBP',
-          '自动优化内容必须包含 WEBP 标识'
+          rasterImageMimeType(uploadedImageBytes),
+          snapshotMimeType,
+          '上传内容的文件签名必须匹配声明格式'
         )
 
         modal = await openProductEditModal(page, assert)
-        await modal.getByText('超大新主图.webp', { exact: true }).waitFor()
+        await modal.getByText(optimizedFileName, { exact: true }).waitFor()
         metrics = await readProductImageSlotMetrics(modal)
         assert.equal(
           metrics.effectiveImageCount,
@@ -589,6 +629,169 @@ export function createProductImageSlotScenarios(deps) {
         )
         await closeBusinessFormModal(page, modal)
         await assertNoHorizontalOverflow(page, 'product-image-slots-desktop')
+      },
+    },
+    {
+      name: 'product-image-supplemental',
+      path: '/erp/master/products',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1180, height: 760 },
+      beforeNavigate: async (page) => {
+        desktopState = createProductImageMockState()
+        await installProductImageAttachmentMocks(page, desktopState)
+      },
+      verify: async (page) => {
+        await expectHeading(page, '产品档案')
+        let form = await openProductEditModal(page, assert)
+        await form.getByText('产品主图.png', { exact: true }).waitFor()
+        let extra = form.getByRole('region', { name: '补充图片' })
+        const files = Array.from({ length: 9 }, (_, index) => ({
+          name: `补充图${index === 7 ? 7 : index + 1}.png`,
+          mimeType: 'image/png',
+          buffer: index === 0
+            ? createOversizedProductImageSourceBuffer()
+            : Buffer.concat([Buffer.from(PRODUCT_IMAGE_PNG_BASE64, 'base64'), Buffer.from([index])]),
+        }))
+        const optimizedCopy = { ...files[0], name: '不同文件名.png', buffer: Buffer.concat([files[0].buffer, Buffer.from([1])]) }
+        const choose = async (selection) => {
+          const event = page.waitForEvent('filechooser')
+          await extra.getByRole('button', { name: '添加补充图片' }).click()
+          const chooser = await event
+          assert.equal(chooser.isMultiple(), true)
+          await chooser.setFiles(selection)
+        }
+        await choose(files)
+        await extra.getByRole('alert').getByText('还可添加 8 张，本次选图去重后仍超出上限，请减少选择后重试。').waitFor()
+        await extra.getByText('0 / 8', { exact: true }).waitFor()
+        await choose([files[1], { name: '损坏.png', mimeType: 'image/png', buffer: Buffer.from('not an image') }])
+        await extra.getByRole('alert').getByText(/损坏\.png/u).waitFor()
+        await extra.getByText('0 / 8', { exact: true }).waitFor()
+        await choose([files[1], { ...files[0], name: '错标格式.jpg', mimeType: 'image/jpeg' }])
+        await extra.getByRole('alert').getByText(/错标格式\.jpg.*实际格式与扩展名不符/u).waitFor()
+        await extra.getByText('0 / 8', { exact: true }).waitFor()
+        await choose(files.slice(0, 7))
+        await extra.getByText('7 / 8', { exact: true }).waitFor()
+        await choose([optimizedCopy, files[7], { ...files[7], name: '同批重复.png' }])
+        await extra.getByText('8 / 8', { exact: true }).waitFor()
+        await extra.getByText('已跳过 2 张重复图片。', { exact: true }).waitFor()
+        assert.equal(await extra.getByRole('button', { name: '预览：补充图7.png', exact: true }).count(), 2)
+        assert.equal(await extra.getByRole('button', { name: '已达上限' }).isDisabled(), true)
+        assert.equal(desktopState.calls.some((call) => call.method === 'upload_attachment'), false)
+        await extra.getByRole('button', { name: '移除：补充图2.png' }).click()
+        await extra.getByText('7 / 8', { exact: true }).waitFor()
+        await choose([files[1], files[8]])
+        await extra.getByRole('alert').getByText(/还可添加 1 张/u).waitFor()
+        await extra.getByRole('button', { name: '撤销', exact: true }).click()
+        await extra.getByText('8 / 8', { exact: true }).waitFor()
+        assert.equal(await extra.getByRole('alert').count(), 0)
+        desktopState.failUploadFile = '补充图2.png'
+        await form.getByRole('button', { name: '保存产品', exact: true }).click()
+        await form.getByRole('button', { name: '重试保存', exact: true }).waitFor()
+        assert.equal(desktopState.attachments.filter((item) => item.slot_key.startsWith('supplemental_')).length, 1)
+        await form.getByRole('button', { name: '重试保存', exact: true }).click()
+        await form.waitFor({ state: 'hidden', timeout: 15000 })
+        const snapshotMimeType = await readProductImageCanvasMimeType(page)
+        assert.ok(['image/webp', 'image/png'].includes(snapshotMimeType))
+        const optimizedFileName = `补充图1.${snapshotMimeType.split('/')[1]}`
+        const optimizedWrites = desktopState.calls.filter((call) => call.method === 'upload_attachment' && call.params.file_name === optimizedFileName)
+        assert.equal(optimizedWrites.length, 1)
+        const optimizedParams = optimizedWrites[0].params
+        const optimizedBytes = Buffer.from(optimizedParams.content_base64, 'base64')
+        assert.equal(optimizedParams.mime_type, snapshotMimeType)
+        assert.equal(rasterImageMimeType(optimizedBytes), snapshotMimeType)
+        assert.equal(optimizedParams.file_size, optimizedBytes.length)
+        assert.ok(optimizedBytes.length > 0 && optimizedBytes.length <= 1024 * 1024)
+        assert.equal(desktopState.attachments.length, 10)
+        form = await openProductEditModal(page, assert)
+        extra = form.getByRole('region', { name: '补充图片' })
+        await extra.getByText('8 / 8', { exact: true }).waitFor()
+        const existing = desktopState.attachments.find((item) => item.file_name === '补充图2.png')
+        assert.equal(desktopState.calls.some((call) => call.method === 'download_attachment' && call.params.id === existing.id && call.params.variant === 'thumbnail'), true)
+        assert.equal(desktopState.calls.some((call) => call.method === 'download_attachment' && call.params.id === existing.id && !call.params.variant), false)
+        await extra.getByRole('button', { name: '预览：补充图2.png' }).click()
+        const preview = page.getByRole('dialog', { name: '补充图2.png' })
+        await preview.waitFor()
+        assert.equal(desktopState.calls.some((call) => call.method === 'download_attachment' && call.params.id === existing.id && !call.params.variant), true)
+        await preview.locator('.ant-modal-close').press('Escape')
+        await preview.waitFor({ state: 'hidden' })
+        await page.setViewportSize({ width: 393, height: 700 })
+        await extra.getByRole('button', { name: '移除：补充图2.png' }).click()
+        await extra.getByText('7 / 8', { exact: true }).waitFor()
+        const writes = desktopState.calls.filter((call) => ['clear_product_image', 'upload_attachment'].includes(call.method)).length
+        await choose([optimizedCopy, { ...files[1], name: '重选原图.png' }])
+        await extra.getByText('已跳过 1 张重复图片。已恢复 1 张原图片。', { exact: true }).waitFor()
+        await extra.getByText('8 / 8', { exact: true }).waitFor()
+        assert.equal(desktopState.calls.filter((call) => ['clear_product_image', 'upload_attachment'].includes(call.method)).length, writes)
+        await extra.getByRole('button', { name: '移除：补充图2.png' }).click()
+        await extra.getByText('7 / 8', { exact: true }).waitFor()
+        await assertNoHorizontalOverflow(page, 'product-image-supplemental-narrow')
+        await form.getByRole('button', { name: '保存产品', exact: true }).click()
+        await form.waitFor({ state: 'hidden', timeout: 15000 })
+        assert.equal(desktopState.calls.some((call) => call.method === 'clear_product_image' && call.params.id === existing.id && !call.params.slot_key), true)
+        assert.equal(desktopState.attachments.find((item) => item.slot_key === 'primary').id, 101)
+        assert.equal(desktopState.attachments.find((item) => item.slot_key === 'secondary').id, 102)
+      },
+    },
+    {
+      name: 'product-image-supplemental-concurrency',
+      path: '/erp/master/products',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1180, height: 760 },
+      beforeNavigate: async (page) => {
+        concurrentState = createProductImageMockState()
+        for (let slot = 1; slot <= 7; slot += 1) addConcurrentSupplemental(slot, `旧补充图${slot}.png`)
+        await installProductImageAttachmentMocks(page, concurrentState)
+      },
+      verify: async (page) => {
+        await expectHeading(page, '产品档案')
+        let form = await openProductEditModal(page, assert)
+        let extra = form.getByRole('region', { name: '补充图片' })
+        await extra.getByText('7 / 8', { exact: true }).waitFor()
+        await extra.getByLabel('选择多张补充图片').setInputFiles({
+          name: '当前窗口.png',
+          mimeType: 'image/png',
+          buffer: Buffer.concat([Buffer.from(PRODUCT_IMAGE_PNG_BASE64, 'base64'), Buffer.from([99])]),
+        })
+        await extra.getByText('8 / 8', { exact: true }).waitFor()
+        const other = addConcurrentSupplemental(8, '另一窗口.png')
+        const replaced = concurrentState.attachments.find((item) => item.slot_key === 'supplemental_7')
+        const uploadCalls = () => concurrentState.calls.filter((call) => call.method === 'upload_attachment' && call.params.file_name === '当前窗口.png')
+        await form.getByRole('button', { name: '保存产品', exact: true }).click()
+        await extra.getByRole('alert').getByText(/含待保存图片超出上限 1 张/u).waitFor()
+        await extra.getByText('9 / 8', { exact: true }).waitFor()
+        await extra.getByText('另一窗口.png', { exact: true }).waitFor()
+        await extra.locator('.product-image-supplemental__item').filter({ hasText: '当前窗口.png' }).getByText('待保存', { exact: true }).waitFor()
+        assert.equal(uploadCalls().length, 1)
+        const lists = concurrentState.calls.filter((call) => call.method === 'list_attachments').length
+        const reread = page.waitForResponse((response) => response.url().endsWith('/rpc/attachment') && response.request().method() === 'POST' && response.request().postDataJSON()?.method === 'list_attachments')
+        await form.getByRole('button', { name: '重试保存', exact: true }).click()
+        await reread
+        await form.getByRole('button', { name: '重试保存', exact: true }).waitFor()
+        assert.equal(concurrentState.calls.filter((call) => call.method === 'list_attachments').length, lists + 1)
+        assert.equal(uploadCalls().length, 1, 'over-limit retry only reads the current gallery')
+        await page.setViewportSize({ width: 393, height: 700 })
+        await assertNoHorizontalOverflow(page, 'product-image-supplemental-conflict')
+        const fitsGallery = await extra.evaluate((section) => section.scrollWidth <= section.clientWidth + 1)
+        assert.equal(fitsGallery, true, 'the refreshed gallery and quota warning fit inside the narrow editor')
+        await extra.getByRole('alert').scrollIntoViewIfNeeded()
+        await page.screenshot({ path: path.join(outputDir, 'product-image-supplemental-conflict.png') })
+        await extra.getByRole('button', { name: '移除：旧补充图7.png' }).click()
+        await extra.getByText('8 / 8', { exact: true }).waitFor()
+        concurrentState.failAfterUploadFile = '当前窗口.png'
+        await form.getByRole('button', { name: '保存产品', exact: true }).click()
+        await form.waitFor({ state: 'hidden', timeout: 15000 })
+        assert.equal(uploadCalls().length, 2, 'the confirmed attachment must not be uploaded again after readback')
+        assert.equal(concurrentState.attachments.some((item) => item.id === other.id), true)
+        assert.equal(concurrentState.attachments.some((item) => item.id === replaced.id), false)
+        assert.equal(concurrentState.calls.filter((call) => call.method === 'clear_product_image' && call.params.id === replaced.id).length, 1)
+        form = await openProductEditModal(page, assert)
+        extra = form.getByRole('region', { name: '补充图片' })
+        await extra.getByText('8 / 8', { exact: true }).waitFor()
+        await extra.getByText('当前窗口.png', { exact: true }).waitFor()
+        await extra.getByText('另一窗口.png', { exact: true }).waitFor()
+        await closeBusinessFormModal(page, form)
       },
     },
     {

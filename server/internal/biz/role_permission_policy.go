@@ -2,32 +2,22 @@ package biz
 
 import "errors"
 
-var ErrRolePermissionPolicy = errors.New("role permissions do not match the registered responsibility template")
+var ErrRolePermissionPolicy = errors.New("role has no registered permission template")
 
-// RolePermissionPolicy describes the product-owned boundary of a role. It is
-// derived from the registered role, never from the permissions being edited.
-// Customer entitlements and domain guards continue to narrow these abilities.
+// RolePermissionPolicy separates a role's initial grants from the business
+// permissions an administrator may assign. Customer entitlements and domain
+// guards continue to narrow the saved grants.
 type RolePermissionPolicy struct {
-	TemplateKey     string
-	Registered      bool
-	Required        []string
-	Optional        []string
-	MissingRequired []string
-	OutsideTemplate []string
-}
-
-// These presentation capabilities do not authorize source documents or facts.
-// Source reads required by a role's duties stay in the required set.
-var optionalRoleAssistance = []string{
-	PermissionERPPrintTemplateRead,
-	PermissionERPBusinessDashboardRead,
+	TemplateKey string
+	Registered  bool
+	Defaults    []string
+	Assignable  []string
 }
 
 func RolePermissionPolicyFor(role AdminRole) RolePermissionPolicy {
 	out := RolePermissionPolicy{
 		TemplateKey: NormalizeRoleKey(role.Key),
-		Required:    []string{}, Optional: []string{},
-		MissingRequired: []string{}, OutsideTemplate: []string{},
+		Defaults:    []string{}, Assignable: []string{},
 	}
 	if IsSystemManagedRole(role) {
 		return out
@@ -37,37 +27,22 @@ func RolePermissionPolicyFor(role AdminRole) RolePermissionPolicy {
 			continue
 		}
 		out.Registered = true
-		out.Optional = append(out.Optional, optionalRoleAssistance...)
-		optional := PermissionKeySet(out.Optional)
-		for _, key := range definition.Permissions {
-			if _, ok := optional[key]; !ok {
-				out.Required = append(out.Required, key)
-			}
-		}
+		out.Defaults = NormalizePermissionKeys(definition.Permissions)
 		break
 	}
-	out.Required = NormalizePermissionKeys(out.Required)
-	out.Optional = NormalizePermissionKeys(out.Optional)
-	granted := PermissionKeySet(role.Permissions)
-	allowed := PermissionKeySet(append(append([]string{}, out.Required...), out.Optional...))
-	for _, key := range out.Required {
-		if _, ok := granted[key]; !ok {
-			out.MissingRequired = append(out.MissingRequired, key)
-		}
-	}
-	for _, key := range role.Permissions {
-		if _, ok := allowed[key]; !ok {
-			out.OutsideTemplate = append(out.OutsideTemplate, key)
+	if out.Registered {
+		for _, definition := range BuiltinPermissions() {
+			if definition.Class == PermissionClassBusiness && definition.Assignable && !definition.NonProductionOnly {
+				out.Assignable = append(out.Assignable, definition.Key)
+			}
 		}
 	}
 	return out
 }
 
 func ValidateRolePermissionPolicy(role AdminRole, permissionKeys []string) error {
-	role.Permissions = permissionKeys
-	policy := RolePermissionPolicyFor(role)
-	if !policy.Registered || len(policy.MissingRequired) > 0 || len(policy.OutsideTemplate) > 0 {
+	if !RolePermissionPolicyFor(role).Registered {
 		return ErrRolePermissionPolicy
 	}
-	return nil
+	return ValidateAssignablePermissionKeys(permissionKeys)
 }

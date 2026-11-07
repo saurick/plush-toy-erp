@@ -789,6 +789,243 @@ export function createPrintWorkspaceScenarios({
       gotoScenarioPath,
     }),
     {
+      name: 'print-center-inline-zoom',
+      path: '/erp/print-center',
+      auth: 'admin',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const guide = page.locator('.erp-template-guide')
+        const viewport = guide.locator('.erp-template-guide__viewport')
+        const fit = guide.getByRole('button', { name: '适合整页', exact: true })
+        const zoomIn = guide.getByRole('button', { name: '放大纸面', exact: true })
+        const zoomOut = guide.getByRole('button', { name: '缩小纸面', exact: true })
+        const percentage = () =>
+          guide.getByLabel('纸面缩放比例', { exact: true }).innerText()
+        const measure = () =>
+          guide.evaluate((node) => {
+            const box = (element) => {
+              const r = element.getBoundingClientRect()
+              return {
+                top: r.top,
+                bottom: r.bottom,
+                left: r.left,
+                right: r.right,
+                width: r.width,
+                height: r.height,
+              }
+            }
+            const viewport = node.querySelector('.erp-template-guide__viewport')
+            const paper = node.querySelector('.erp-template-guide__paper')
+            const thumbnail = node.querySelector('.erp-template-guide__thumbnail')
+            const main = document.querySelector('.erp-admin-content')
+            const frameStyle = getComputedStyle(viewport.firstElementChild)
+            return {
+              guide: box(node),
+              toolbar: box(node.querySelector('.erp-template-guide__toolbar')),
+              title: box(node.querySelector('.erp-template-guide__title')),
+              summary: box(node.querySelector('.erp-document-guide__summary')),
+              details: box(node.querySelector('.erp-document-guide__details')),
+              framePadding: [frameStyle.paddingTop, frameStyle.paddingBottom],
+              viewport: box(viewport),
+              thumbnail: box(thumbnail),
+              parts: box(node.querySelector('.erp-document-guide__parts')),
+              page: box(document.querySelector('.erp-template-center')),
+              mainOverflow: main.scrollHeight - main.clientHeight,
+              overflowX: viewport.scrollWidth - viewport.clientWidth,
+              overflowY: viewport.scrollHeight - viewport.clientHeight,
+              scrollTop: viewport.scrollTop,
+              scale: thumbnail.getBoundingClientRect().width / paper.offsetWidth,
+              ratio: paper.offsetWidth / paper.offsetHeight,
+              aligned: [
+                ...node.querySelectorAll('.erp-document-guide__marker'),
+              ].every((marker) => {
+                const targets = [
+                  ...paper.querySelectorAll(marker.dataset.guideTarget),
+                ]
+                  .map((target) => target.getBoundingClientRect())
+                  .filter((r) => r.width && r.height)
+                const lines = [
+                  ...marker.parentElement.querySelectorAll('[data-guide-range]'),
+                ].map((line) => line.getBoundingClientRect())
+                return (
+                  Math.abs(
+                    Math.min(...targets.map((r) => r.top)) -
+                      Math.min(...lines.map((r) => r.top))
+                  ) < 2 &&
+                  Math.abs(
+                    Math.max(...targets.map((r) => r.bottom)) -
+                      Math.max(...lines.map((r) => r.bottom))
+                  ) < 2
+                )
+              }),
+            }
+          })
+        const waitForFit = () =>
+          page.waitForFunction(() => {
+            const viewport = document.querySelector('.erp-template-guide__viewport')
+            const paper = document.querySelector('.erp-template-guide__paper')
+            const thumbnail = document.querySelector(
+              '.erp-template-guide__thumbnail'
+            )
+            const style = getComputedStyle(viewport.firstElementChild)
+            const scale = Math.min(
+              (viewport.clientWidth -
+                parseFloat(style.paddingLeft) -
+                parseFloat(style.paddingRight)) /
+                paper.offsetWidth,
+              (viewport.clientHeight -
+                parseFloat(style.paddingTop) -
+                parseFloat(style.paddingBottom)) /
+                paper.offsetHeight,
+              1
+            )
+            return (
+              scale > 0 &&
+              Math.abs(
+                thumbnail.getBoundingClientRect().height -
+                  paper.offsetHeight * scale
+              ) < 1
+            )
+          })
+        const assertWholePaper = (current) => {
+          assert(
+            current.overflowX <= 1 && current.overflowY <= 1,
+            `默认纸面区域无需滚动: ${JSON.stringify(current)}`
+          )
+          assert(
+            current.thumbnail.top >= current.viewport.top - 1 &&
+              current.thumbnail.bottom <= current.viewport.bottom + 1 &&
+              current.thumbnail.left >= current.viewport.left - 1 &&
+              current.thumbnail.right + 52 <= current.viewport.right + 1,
+            `整张纸面和编号应完整可见: ${JSON.stringify(current)}`
+          )
+          assert(
+            Math.abs(
+              current.thumbnail.width / current.thumbnail.height - current.ratio
+            ) < 0.002,
+            '纸面保持原比例'
+          )
+        }
+        await waitForFit()
+        await assertPrintTemplateGuide(page)
+        await assertTextAbsent(page, '此处为示例；真实内容请从对应业务页面打开。')
+        const initial = await measure()
+        assertWholePaper(initial)
+        assert(
+          initial.title.top >= initial.toolbar.top - 1 &&
+            initial.title.bottom <= initial.toolbar.bottom + 1 &&
+            initial.viewport.top - initial.guide.top <= 48,
+          `模板名与缩放应合为一行，将高度留给纸面: ${JSON.stringify(initial)}`
+        )
+        assert(
+          initial.summary.left >= initial.details.left - 1 &&
+            initial.summary.right <= initial.details.right + 1 &&
+            initial.summary.bottom <= initial.parts.top,
+          '用途说明应位于右侧分区说明上方'
+        )
+        assert.deepEqual(initial.framePadding, ['16px', '16px'])
+        assert(
+          initial.mainOverflow <= 1,
+          `默认桌面页面无需上下滚动: ${JSON.stringify(initial)}`
+        )
+        assert(
+          initial.parts.width >= 300 &&
+            initial.parts.width <= 340 &&
+            initial.parts.left >= initial.viewport.right - 1,
+          '说明保持紧凑右栏'
+        )
+        assert.equal(await fit.getAttribute('aria-pressed'), 'true')
+        await page.screenshot({
+          path: path.join(outputDir, 'print-center-fit-page-4k.png'),
+          scale: 'device',
+        })
+        for (let i = 0; i < 6 && parseInt(await percentage(), 10) < 125; i += 1) {
+          await zoomIn.click()
+        }
+        assert.equal(await percentage(), '125%')
+        assert.equal(await fit.getAttribute('aria-pressed'), 'false')
+        const enlarged = await measure()
+        assert(
+          enlarged.thumbnail.height > initial.thumbnail.height &&
+            enlarged.overflowY > 100,
+          '放大后在纸面区域查看细节'
+        )
+        assert(
+          enlarged.mainOverflow <= 1 &&
+            Math.abs(enlarged.page.height - initial.page.height) < 1,
+          '缩放不能撑高整页'
+        )
+        assert(enlarged.aligned, '放大后范围线仍对齐内容')
+        await viewport.evaluate((node) =>
+          node.scrollTo(node.scrollWidth, node.scrollHeight)
+        )
+        assert((await measure()).scrollTop > 100, '放大后纸面末尾可滚动到达')
+        await page.screenshot({
+          path: path.join(outputDir, 'print-center-zoom-125-4k.png'),
+          scale: 'device',
+        })
+        await page
+          .locator('.erp-print-center-template-list')
+          .getByRole('button', { name: '加工合同', exact: true })
+          .click()
+        assert.equal(await percentage(), '125%', '切换模板保留手动比例')
+        await page.setViewportSize({ width: 1440, height: 900 })
+        assert.equal(await percentage(), '125%', '手动比例不随窗口变化')
+        await zoomIn.click()
+        assert.equal(await percentage(), '150%')
+        assert.equal(await zoomIn.isDisabled(), true)
+        await zoomOut.click()
+        assert.equal(await percentage(), '125%')
+        for (let i = 0; i < 5 && !(await zoomOut.isDisabled()); i += 1)
+          await zoomOut.click()
+        assert.equal(await percentage(), '25%')
+        assert.equal(await zoomOut.isDisabled(), true)
+        await fit.click()
+        await waitForFit()
+        assert.equal(await fit.getAttribute('aria-pressed'), 'true')
+        assertWholePaper(await measure())
+        assert.equal((await measure()).scrollTop, 0, '恢复整页时回到完整纸面')
+        await page
+          .locator('.erp-print-center-template-list')
+          .getByRole('button', { name: '采购合同', exact: true })
+          .click()
+        const sizes = [
+          { width: 1920, height: 815 },
+          { width: 1920, height: 560 },
+          { width: 1440, height: 900 },
+          { width: 968, height: 534 },
+          { width: 390, height: 844 },
+          { width: 1920, height: 1080 },
+        ]
+        for (const size of sizes) {
+          await page.setViewportSize(size)
+          await waitForFit()
+          assertWholePaper(await measure())
+          await assertPrintTemplateGuide(page)
+          await assertNoHorizontalOverflow(
+            page,
+            `print-center-zoom-${size.width}-${size.height}`
+          )
+          if (size.width > 1100) {
+            const current = await measure()
+            assert(
+              current.mainOverflow <= 1,
+              `桌面默认无需滚动看纸面: ${JSON.stringify({ size, current })}`
+            )
+          } else {
+            const lastPart = guide.locator('.erp-document-guide__part').last()
+            await lastPart.scrollIntoViewIfNeeded()
+            const footer = await lastPart.boundingBox()
+            assert(
+              footer.y >= -1 && footer.y + footer.height <= size.height + 1,
+              '窄屏仍能到达完整说明末尾'
+            )
+          }
+        }
+      },
+    },
+    {
       name: 'print-center-desktop',
       path: '/erp/print-center',
       auth: 'admin',

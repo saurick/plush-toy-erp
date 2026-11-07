@@ -66,18 +66,23 @@ function ChainContent({ chain }) {
   const conditions = [...new Map(chain.steps.flatMap((step) => step.actionOutcomes.filter((action) => action.condition).map((action) => [action.key, action]))).values()]
   return (
     <main data-customer-review-chain>
-      <section className="erp-dev-flow-customer-review__diagram" data-customer-review-diagram>
-        <MermaidDiagram
-          chart={chain.diagram.mermaidSource}
-          label={`${chain.chainName}流程图`}
-          showSourceOnError={false}
-          themeMode="light"
-          flowchartHtmlLabels={false}
-        />
-        <ul className="erp-dev-flow-customer-review__legend" aria-label="图例">
-          {chain.diagram.legend.map((item) => <li key={item.tone} data-diagram-tone={item.tone}>{item.label}</li>)}
-        </ul>
-      </section>
+      {chain.diagram.parts.map((part, index) => (
+        <section className="erp-dev-flow-customer-review__diagram" data-customer-review-diagram key={part.key}>
+          {chain.diagram.parts.length > 1 ? <p>第 {index + 1} / {chain.diagram.parts.length} 段 · 按同编号、同名节点衔接</p> : null}
+          <MermaidDiagram
+            chart={part.mermaidSource}
+            label={`${chain.chainName}流程图第${index + 1}段`}
+            showSourceOnError={false}
+            themeMode="light"
+            flowchartHtmlLabels={false}
+          />
+          {index === chain.diagram.parts.length - 1 ? (
+            <ul className="erp-dev-flow-customer-review__legend" aria-label="图例">
+              {chain.diagram.legend.map((item) => <li key={item.tone} data-diagram-tone={item.tone}>{item.label}</li>)}
+            </ul>
+          ) : null}
+        </section>
+      ))}
       {conditions.length > 0 ? (
         <section className="erp-dev-flow-customer-review__conditions" data-customer-review-conditions>
           <h2>关键条件</h2>

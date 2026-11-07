@@ -37,7 +37,7 @@ export default function DevRoleResponsibilityGraph({
               </div>
               <Text type="secondary">
                 {role.policy.registered
-                  ? `核心职责 · ${role.core.length} 项功能`
+                  ? `预设功能 · ${role.defaults.length} 项`
                   : '未登记职责模板，请在明细核对已授予功能'}
               </Text>
               <div className="erp-dev-role-responsibilities__nodes">
@@ -59,10 +59,10 @@ export default function DevRoleResponsibilityGraph({
                   当前范围没有登记的业务链动作，可在明细核对中查看功能。
                 </Text>
               ) : null}
-              {role.optional.length ? (
+              {role.additional.length ? (
                 <div className="erp-dev-role-responsibilities__optional">
-                  <Text type="secondary">可选辅助</Text>
-                  {role.optional.map((item) => (
+                  <Text type="secondary">另外授权</Text>
+                  {role.additional.map((item) => (
                     <div key={item.key}>
                       <span>{item.label}</span>
                       <Tag color={statusColor(item.status)}>{item.status}</Tag>
@@ -71,8 +71,8 @@ export default function DevRoleResponsibilityGraph({
                 </div>
               ) : null}
               <details className="erp-dev-role-responsibilities__core">
-                <summary>核心功能与当前可用情况</summary>
-                {role.core.map((item) => (
+                <summary>预设功能与当前可用情况</summary>
+                {role.defaults.map((item) => (
                   <div key={item.key}>
                     <span>{item.label}</span>
                     <Tag color={statusColor(item.status)}>{item.status}</Tag>
@@ -130,7 +130,7 @@ export default function DevRoleResponsibilityGraph({
             : '未发现岗位配置缺口'}
         </Text>
         <p>
-          检查全部已登记岗位的启用、账号分配和核心功能。此处不判定某张单据可由谁办理，审批责任请在依据中查看。
+          检查全部已登记岗位的启用、账号分配和当前授权。未选用预设功能不算配置缺口；审批责任请在依据中查看。
         </p>
         {model.gaps.map((gap) => (
           <div key={gap.key}>

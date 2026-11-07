@@ -1233,7 +1233,9 @@ export async function installOrderRpcMocks(page, context) {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method, params = {} } = body
     let data
-    if (
+    if (method === 'list_warehouse_production_work') {
+      data = { items: [], total: 0, counts: {} }
+    } else if (
       !Number.isSafeInteger(params.production_order_id) ||
       params.production_order_id !== productionOrder.id
     ) {

@@ -168,7 +168,6 @@ export default function ProductionExceptionRequestModal({
         name="production-exception-request"
         layout="vertical"
         disabled={loading || !context}
-        style={{ marginTop: 12 }}
       >
         <Form.Item
           name="decision_no"

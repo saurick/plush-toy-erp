@@ -737,6 +737,19 @@ export function createHelpCenterScenarios({
         await search.clear()
         await search.press('Enter')
         await selectRole('系统管理员')
+        for (const [key, instruction] of [
+          ['customers', '付款方式从公司共用目录选择；搜索词不作为单据值保存'],
+          ['suppliers', '默认付款方式从启用的共用目录选择'],
+          ['sales-orders', '方式只从启用共用项选择'],
+          ['accessories-purchase', '付款方式从启用的公司共用项选择'],
+        ]) {
+          const entry = root.getByRole('navigation', { name: '参考目录', exact: true }).locator(`button[data-manual-reference="${key}"]`)
+          if (!await entry.isVisible()) await entry.locator('..').locator('summary').click()
+          await entry.click()
+          const content = await root.innerText()
+          assert.ok(content.includes(instruction), `${key} 的付款帮助沿用当前共用目录规则`)
+          assert.ok(!/付款方式可选或手输|付款方式可选择或直接输入|默认付款方式可选择或手输/u.test(content), `${key} 不展示旧的手输说明`)
+        }
         assert.equal(await root.getByRole('navigation', { name: '参考目录' }).getByRole('button', { includeHidden:true }).count(), HELP_REFERENCE_PAGES.length + 6)
         await root.getByRole('navigation', { name:'帮助内容', exact:true }).getByRole('tab', { name:'管理员与实施手册', exact:true }).click()
         await root.getByRole('navigation', { name:'参考目录', exact:true }).getByRole('button', { name:'员工账号', exact:true }).click()

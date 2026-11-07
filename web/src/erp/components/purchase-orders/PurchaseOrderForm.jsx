@@ -1,10 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  CopyOutlined,
-  DeleteOutlined,
-  FolderOpenOutlined,
-} from '@ant-design/icons'
+import { FolderOpenOutlined } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Space, Typography } from 'antd'
+import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
 import PurchaseMaterialSnapshotFields from './PurchaseMaterialSnapshotFields.jsx'
 import PurchaseOrderLineSummary from './PurchaseOrderLineSummary.jsx'
 import './purchaseOrderForm.css'
@@ -472,10 +469,9 @@ export function PurchaseOrderFormFields({
                   size={4}
                   wrap
                 >
-                  <Button
+                  <BusinessLineItemActionButton
+                    action="copy"
                     aria-label={`复制第 ${index + 1} 行`}
-                    type="text"
-                    icon={<CopyOutlined />}
                     onClick={() => {
                       const currentLines = form.getFieldValue('items') || []
                       const sourceLine =
@@ -485,16 +481,14 @@ export function PurchaseOrderFormFields({
                     }}
                   >
                     复制行
-                  </Button>
-                  <Button
-                    danger
-                    type="text"
-                    icon={<DeleteOutlined />}
+                  </BusinessLineItemActionButton>
+                  <BusinessLineItemActionButton
+                    action="remove"
                     disabled={!canEdit || !referenceDataReady || saving || fields.length <= 1}
                     onClick={() => remove(field.name)}
                   >
                     移除行
-                  </Button>
+                  </BusinessLineItemActionButton>
                 </Space>
               }
               hiddenFields={

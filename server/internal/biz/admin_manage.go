@@ -1024,7 +1024,7 @@ func (uc *AdminManageUsecase) roleAccessForOperator(role AdminRole, operator *Ad
 	case !operator.IsSuperAdmin && AdminHasRole(operator, role.Key):
 		access.PermissionsEditBlockedReason = "当前登录账号正在使用该角色"
 	case !RolePermissionPolicyFor(role).Registered:
-		access.PermissionsEditBlockedReason = "该岗位尚未登记职责模板，不能自行组合功能"
+		access.PermissionsEditBlockedReason = "该岗位尚未登记权限模板"
 	default:
 		access.PermissionsEditable = true
 	}
@@ -1034,7 +1034,7 @@ func (uc *AdminManageUsecase) roleAccessForOperator(role AdminRole, operator *Ad
 func adminRoleAssignmentBlockedReason(err error) string {
 	switch {
 	case errors.Is(err, ErrRolePermissionPolicy):
-		return "岗位功能不符合已登记职责模板，请先核对岗位设置"
+		return "该岗位尚未登记权限模板，请先核对岗位设置"
 	case errors.Is(err, ErrRoleNotFound):
 		return "角色已停用或资料不完整"
 	case errors.Is(err, ErrPrivilegedRoleAssignmentForbidden):

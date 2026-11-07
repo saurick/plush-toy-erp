@@ -191,7 +191,6 @@ export default function ProductionCompletionModal({
         <Alert
           type="warning"
           showIcon
-          style={{ marginTop: 12 }}
           message="部分路线明细暂不可登记"
           description={blockedItems
             .slice(0, 3)
@@ -210,7 +209,6 @@ export default function ProductionCompletionModal({
       <Descriptions
         size="small"
         column={editing ? { xs: 1, sm: 2, lg: 3 } : 1}
-        style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           { key: 'order', label: '生产订单', children: order?.order_no || '-' },
           ...(selectedChoice?.item?.product_id

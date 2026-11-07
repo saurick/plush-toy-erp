@@ -3,7 +3,7 @@ import test from 'node:test'
 import React, { act, createElement as h } from 'react'
 import { businessFormHarness } from '../../../../scripts/test/businessFormHarness.mjs'
 
-test('自适应列不生成 NaN，明细宽度只预算业务列与选行序号', async (t) => {
+test('自适应列不生成 NaN，明细宽度预算业务列、补充与序号', async (t) => {
   const harness = await businessFormHarness(t)
   const { default: Table } = await import('./BusinessLineItemsTable.jsx')
   const diagnostics = []
@@ -13,14 +13,15 @@ test('自适应列不生成 NaN，明细宽度只预算业务列与选行序号'
     originalError(...args)
   })
   await harness.render(h(Table, { columns: [{ label: '自适应名称' }, { label: '数量', width: 120 }] }))
-  assert.equal(document.querySelector('.erp-line-item-table').style.minWidth, '202px')
+  assert.equal(document.querySelector('.erp-line-item-table').style.minWidth, '208px')
+  assert.deepEqual([...document.querySelectorAll('thead th')].slice(0, 2).map((cell) => cell.textContent), ['补充', '序号'])
   await harness.render(h(Table, {
     columns: [{ label: '手机字段', width: 60 }],
     desktopColumns: [{ label: '桌面名称', width: 180 }, { label: '桌面补充资料' }],
   }))
-  assert.equal(document.querySelector('.erp-line-item-table').style.minWidth, '262px', '桌面只预算 desktopColumns 和选行列')
+  assert.equal(document.querySelector('.erp-line-item-table').style.minWidth, '268px', '桌面预算 desktopColumns 和两个辅助列')
   await harness.render(h(Table, { columns: [{ label: '名称', width: 180 }, { label: '数量', width: 120 }] }))
-  assert.equal(document.querySelector('.erp-line-item-table').style.minWidth, '382px', '原业务列宽保留，右侧操作列预算移除')
+  assert.equal(document.querySelector('.erp-line-item-table').style.minWidth, '388px', '原业务列宽保留，右侧操作列预算移除')
   assert.equal(document.querySelectorAll('.erp-line-item-table__actions').length, 0)
   assert.equal(diagnostics.some((message) => /NaN[\s\S]*minWidth/u.test(message)), false, '不得向 React 样式传递 NaN')
 })

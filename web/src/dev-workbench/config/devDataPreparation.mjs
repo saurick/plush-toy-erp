@@ -15,7 +15,7 @@ export const DEV_DATA_PREPARATION_SOURCE_PATH =
 
 // Static explanation only. Runtime status and refresh decisions still come
 // from the backend dataset contracts and persisted operation receipts.
-export const DEV_DATA_PREPARATION_INCREMENTAL_FLOW = String.raw`flowchart TD
+export const DEV_DATA_PREPARATION_INCREMENTAL_FLOW = String.raw`flowchart LR
   A["读取目标、当前合同与上一批回执"] --> B{"目标身份与组件回执有效"}
   B -- "否" --> X["停止复用和写入，重新生成计划"]
   B -- "是" --> C{"本次变化属于哪一类"}
@@ -343,6 +343,19 @@ const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 50
 const SCENARIO_DEMO_CATALOG_READY_COUNT = 40
 const SCENARIO_DEMO_BROWSER_CHECKS_PENDING = 10
 const ACCEPTANCE_EXECUTION_SCOPE = 'all_registered_chains'
+
+export function dataPreparationBatchLabel(dataVersion, datasetRunId) {
+  if (
+    dataVersion === SCENARIO_DEMO_DATA_VERSION &&
+    datasetRunId === SCENARIO_DEMO_RUN_ID
+  ) {
+    const [, month, day] = manualAcceptanceContract.anchorDateUtc
+      .slice(0, 10)
+      .split('-')
+    return `${Number(month)} 月 ${Number(day)} 日手测数据（${manualAcceptanceContract.visiblePrefix}）`
+  }
+  return dataVersion || datasetRunId || null
+}
 
 function assertObject(value, field) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {

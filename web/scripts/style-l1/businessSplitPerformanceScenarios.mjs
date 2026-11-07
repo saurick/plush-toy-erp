@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import { businessSplitLayoutButton, collapseBusinessSplit } from './businessSplitActions.mjs'
 import { installBOMMaterialMatchingMocks } from './bomMaterialMatchingScenarios.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { createBusinessSplitCpuScenarios } from './businessSplitCpuScenarios.mjs'
 
 export function createBusinessSplitPerformanceScenarios({ assert, customerRuntimeEffectiveSession, outputDir }) {
   const calls = []
@@ -177,5 +178,5 @@ export function createBusinessSplitPerformanceScenarios({ assert, customerRuntim
         await session?.detach()
       }
     },
-  }]
+  }, ...createBusinessSplitCpuScenarios({ assert, customerRuntimeEffectiveSession, outputDir })]
 }

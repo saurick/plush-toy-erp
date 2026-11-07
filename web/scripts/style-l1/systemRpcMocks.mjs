@@ -58,10 +58,8 @@ export async function installSystemRpcMocks(page, context) {
     pmcRole,
     adminRole,
   ].filter(Boolean)
-  // The fixture declares a bounded template once, before drafts mutate grants.
-  // Complete product role templates are exercised by the backend policy tests.
+  // Defaults stay independent of drafts; the editable catalog follows permission metadata.
   for (const role of availableRoles.filter((item) => item.role_type !== 'system')) {
-    const optional = ['erp.print_template.read', 'erp.business_dashboard.read']
     if (role.role_key === 'finance') {
       role.permissions = [...new Set([
         ...role.permissions,
@@ -71,8 +69,8 @@ export async function installSystemRpcMocks(page, context) {
     }
     role.permission_policy = {
       template_key: role.role_key, registered: true,
-      required_permissions: role.permissions.filter((key) => !optional.includes(key)),
-      optional_permissions: optional,
+      default_permissions: [...role.permissions],
+      assignable_permissions: mockPermissions.filter((item) => item.permission_class === 'business' && item.assignable && !item.non_production_only).map((item) => item.permission_key),
     }
     role.permissions = [...new Set([...role.permissions, 'erp.business_dashboard.read'])]
   }

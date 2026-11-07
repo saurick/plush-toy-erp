@@ -17,6 +17,7 @@ import { assertControlPreviewThemeIsolation } from './style-l1/controlThemeAsser
 import { openERPAppearance } from './style-l1/themeAssertions.mjs'
 import { waitForFiniteAnimations } from './style-l1/browserReadiness.mjs'
 import { createDevToolbarExampleScenarios } from './style-l1/devToolbarExampleScenarios.mjs'
+import { createDevSharedComponentScenarios } from './style-l1/devSharedComponentScenarios.mjs'
 import { assertNoHorizontalOverflow } from './style-l1/pageAssertions.mjs'
 import {
   assertRepositoryIdentityEqual,
@@ -232,16 +233,23 @@ try {
   await writeFile(path.join(output, 'control-preview-theme.json'), JSON.stringify(previewEvidence, null, 2))
   checks.push('built standalone isolates preview controls and portals across all root/local theme combinations')
 
-  const toolbarExample = createDevToolbarExampleScenarios({ assert, assertNoHorizontalOverflow, outputDir: output })
-    .find(({ name }) => name === 'dev-ui-toolbar-composition')
-  await toolbarExample.beforeNavigate(page)
-  try {
-    await page.goto(`${origin}${toolbarExample.path}`)
-    await toolbarExample.verify(page)
-  } finally {
-    await page.unroute('**/rpc/**')
+  for (const scenario of createDevToolbarExampleScenarios({ assert, assertNoHorizontalOverflow, outputDir: output })
+    .filter(({ name }) => ['dev-ui-toolbar-composition', 'dev-ui-purchase-production-tabs'].includes(name))) {
+    await scenario.beforeNavigate(page)
+    try {
+      await page.goto(`${origin}${scenario.path}`)
+      await scenario.verify(page)
+    } finally {
+      await page.unroute('**/rpc/**')
+    }
   }
-  checks.push('built standalone reuses the four-business toolbar, details and column settings with local-only state and downloads')
+  checks.push('built standalone compares purchase/production tab responsibilities and reuses the four-business toolbar with local-only state and downloads')
+
+  const componentCatalog = createDevSharedComponentScenarios({ assert, assertNoHorizontalOverflow, outputDir: output })
+    .find(({ name }) => name === 'dev-ui-shared-component-catalog')
+  await page.goto(`${origin}${componentCatalog.path}`)
+  await componentCatalog.verify(page)
+  checks.push('built component catalog retains local sample links, consumer guidance and document return state without business shortcuts')
 
   await page.goto(
     `${origin}/__dev/business-topics?flow_topic=purchase_to_inventory&flow_topic_node=purchase_quality&flow_topic_step=purchase_quality%3Aposts_fact%3Apurchase_accepted`

@@ -52,24 +52,27 @@ export default function BusinessGroupedLineItems({
 
   return (
     <BusinessLineEditor className="erp-line-item-disclosures" rowActions={Table === BusinessLineItemsTable || actionColumns > 0} data-table-scroll-scope ref={controller.rootRef} onFocusCapture={controller.onFocusCapture}>
-      {title || fields.length > 0 || headerActions ? (
-        <BusinessLineItemsHeader
-          title={title}
-          description={description}
-          notice={notice}
-          groupCount={grouped ? groups.length : undefined}
-          groupActions={canGroup ? (
-            <Space size={4} wrap>
-              {!mobile ? <Button type="text" disabled={false} onClick={() => setGroupView((current) => !current)}>{groupView ? '取消归组' : '分组显示'}</Button> : null}
-              {grouped ? <BusinessLineItemGroupControls controller={controller} form={form} label={label} /> : null}
-            </Space>
+      <Table
+        {...tableProps}
+        scrollControlsInToolbar
+        header={title || fields.length > 0 || headerActions ? (
+          <BusinessLineItemsHeader
+            title={title}
+            description={description}
+            notice={notice}
+            groupCount={grouped ? groups.length : undefined}
+            groupActions={canGroup ? (
+              <Space size={4} wrap>
+                {!mobile ? <Button type="text" disabled={false} onClick={() => setGroupView((current) => !current)}>{groupView ? '取消归组' : '分组显示'}</Button> : null}
+                {grouped ? <BusinessLineItemGroupControls controller={controller} form={form} label={label} /> : null}
+              </Space>
           ) : null}
-          scrollControls
-        >
-          {headerActions}
-        </BusinessLineItemsHeader>
+            scrollControls
+          >
+            {headerActions}
+          </BusinessLineItemsHeader>
       ) : notice}
-      <Table {...tableProps} scrollControlsInToolbar>
+      >
         {fields.map((field, index) => {
           const group = rows.get(field.name)
           const heading = headings.get(index)

@@ -54,6 +54,7 @@ function ProcessDefinitionCard({ definition }) {
   const selected = nodeByKey.get(selectedKey)
   const flow = useMemo(
     () => ({
+      direction: 'LR',
       entryNodeKeys: [definition.initial],
       nodes: definition.nodes.map((node) => ({
         ...node,

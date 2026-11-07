@@ -479,7 +479,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     ],
   }),
   reconciliation: guide({
-    task: '核对一笔已过账财务记录，保留核对结果。',
+    task: '按往来方和期间核对余额，或保留单笔业务核对结果。',
     completion:
       '当前对账记录已完成核对，来源和核对结果可查；不表示已收款或付款。',
     handoff: '金额或来源有差异找来源岗位；需要收付款仍到收付款页面办理。',
@@ -490,6 +490,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
       BUSINESS_HELP_TYPES.DISABLED,
     ],
     flowSteps: [
+      '期间对账选择客户或供应商、币种和日期，查询并导出本期发生与余额。',
       '从一笔已过账应收、应付或发票记录生成对账草稿。',
       '核对来源、往来方、币种和金额，填写必要说明后确认过账。',
       '核对清楚后点“完成核对”；发现差异先联系来源岗位，不直接改余额。',
@@ -505,7 +506,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
         BUSINESS_HELP_TYPES.SOURCE,
         'reconciliation-source',
         '当前核对多少笔记录',
-        '每张对账记录对应一笔已过账财务来源，不是多单汇总或银行流水自动匹配。'
+        '期间对账按往来方和期间汇总；单笔核对中每张记录对应一笔已过账财务来源，两者都不自动匹配银行流水。'
       ),
       helpItem(
         BUSINESS_HELP_TYPES.DISABLED,
@@ -732,9 +733,9 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
   }),
   inbound: guide({
     completion:
-      '选择采购收货、成品入库或委外回货，核对来源、实收数量、检验要求、仓库、批次和状态；采购部分入库逐行核对，成品入库仍保留待检和待包装限制。',
+      '选择采购收货、成品入库、委外回货或工序回货，核对来源、实收数量、仓库、批次与当前去向；成品入库后可接续查货包装，待检或待包装仍禁止发货。',
     handoff:
-      '需要检验的先交品质判定；合格或允许接收后由仓库确认过账，过账结果再供库存和财务查询。',
+      '采购材料按质量关口确认入库；成品可先正式入库，再完成检验与查货包装；工序回货只点数后交品质，不增加成品库存。',
     requiredHelpTypes: [
       BUSINESS_HELP_TYPES.TERM,
       BUSINESS_HELP_TYPES.SOURCE,
@@ -1042,7 +1043,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     completion:
       '收付款单号、方向、往来方、币种、金额、核销明细和状态都能查到；只有过账后才真正减少对应应收或应付的未核销金额。',
     handoff:
-      '过账结果交财务继续对账；发现业务来源、往来方、币种或金额不一致时，停止核销并退回对应来源岗位核对。',
+      '期间汇总和单笔核对到“对账”；账款调整到“应收 / 应付”，采购差额到“应付”的“采购待调整”。来源或金额不一致时先停止核销。',
     requiredHelpTypes: [
       BUSINESS_HELP_TYPES.TERM,
       BUSINESS_HELP_TYPES.FORMULA,

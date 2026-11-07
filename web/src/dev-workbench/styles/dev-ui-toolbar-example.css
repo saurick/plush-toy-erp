@@ -62,6 +62,54 @@
   gap: 16px;
 }
 
+.erp-dev-tab-comparison {
+  margin-bottom: 20px;
+}
+
+.erp-dev-tab-comparison__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-dev-tab-comparison__heading h3,
+.erp-dev-tab-comparison__case h4 {
+  margin: 0;
+}
+
+.erp-dev-tab-comparison__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.erp-dev-tab-comparison__case {
+  min-width: 0;
+}
+
+.erp-dev-tab-comparison__reason,
+.erp-dev-tab-comparison__responsibility {
+  margin: 8px 0;
+  color: var(--erp-text-secondary);
+  line-height: 1.6;
+}
+
+.erp-dev-tab-comparison__module-tabs {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.erp-dev-tab-comparison__records {
+  margin-top: var(--erp-page-gap);
+  overflow: hidden;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
+}
+
 @media (max-width: 1280px) {
   .erp-dev-toolbar-example__calendar {
     grid-template-columns: minmax(0, 1fr);

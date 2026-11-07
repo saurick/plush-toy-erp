@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { expect } from 'playwright/test'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBOMEditorDensity } from './bomEditorDensityAssertions.mjs'
+import { assertBusinessLineItemsFooterSpacing } from './businessFormSectionAssertions.mjs'
 
 export function createBOMToolbarScenarios(deps, base) {
   const scenarios = [
@@ -24,12 +25,16 @@ export function createBOMToolbarScenarios(deps, base) {
       await owner.getByRole('button', { name: '全部展开', exact: true }).click()
       assert.equal(await groups.count(), 3)
       await assertBOMEditorDensity(editor)
+      await assertBusinessLineItemsFooterSpacing(editor)
       const headers = await owner.locator('.erp-bom-parts-table > thead th').allTextContents()
       assert.equal(headers.includes('操作'), false)
       assert.equal(await owner.locator('.erp-bom-part-actions, .erp-bom-col-actions').count(), 0)
       assert.equal(headers.length, 12)
       assert.equal(await owner.locator('input[type="radio"], .erp-bom-selection-cell').count(), 0)
       assert.deepEqual(headers.slice(0, 6), ['物料名称', '厂商料号', '规格', '单位', '组装部位', '片数'])
+      const clearSelection = toolbar.getByRole('button', { name: '清空 BOM 选择', exact: true })
+      if (await clearSelection.count()) await clearSelection.click()
+      await expect(toolbar.getByRole('status')).toHaveText('点击物料或部位后操作')
       assert.equal(await toolbar.getByRole('button', { name: '复制部位', exact: true }).isDisabled(), true)
       const first = groups.first()
       const rows = first.locator('tr[data-bom-part-index]')
@@ -116,6 +121,7 @@ export function createBOMToolbarScenarios(deps, base) {
       await expect(groups).toHaveCount(2)
       await expect(toolbar.getByRole('status')).toHaveText('点击物料或部位后操作')
       assert.equal(await editor.evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true)
+      await assertBusinessLineItemsFooterSpacing(editor)
       await originalMaterial.dispose()
       await positionNode.dispose()
     },

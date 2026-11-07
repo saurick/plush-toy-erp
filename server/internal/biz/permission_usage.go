@@ -538,6 +538,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionPMCPlanCreate, "production-orders", "production-orders", "生产订单", "create-production-order", "新建生产订单", permissionControlButton, "显示并允许创建", permissionMethods("production_order", "create_production_order"), businessUsageConditions)
 	addMenu(PermissionPMCPlanUpdate, "production-orders", "production-order-actions", "生产动作", "update-production-order", "编辑、发布、关闭或取消生产订单", permissionControlForm, "显示并允许处理", permissionMethods("production_order", "save_production_order", "release_production_order", "close_production_order", "cancel_production_order"), businessUsageConditions)
 	add(PermissionProductionFactRead,
+		menuPermissionSurface("inbound", "warehouse-production-work", "成品入库与查货包装", "warehouse-receipt-work", "按成品收仓记录查询检验与包装进度", permissionControlSection, "允许查看", permissionMethods("production_wip", "list_warehouse_production_work"), businessUsageConditions),
 		menuPermissionSurface("inbound", "completion", "成品入库", "completion-list", "成品入库记录", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_production_facts"), businessUsageConditions),
 		menuPermissionSurface("outbound", "material-issue", "生产领料", "material-issue-list", "生产领料记录", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_production_facts"), businessUsageConditions),
 		menuPermissionSurface("production-orders", "production-related-records", "关联生产记录", "production-fact-reference", "查看订单关联生产记录", permissionControlSection, "允许查看", append(permissionMethods("operational_fact", "list_production_facts"), permissionMethods("customer_config", "execute_production_exception_process")...), businessUsageConditions),
@@ -549,7 +550,10 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		permissionMethods("production_wip", "get_production_wip")...,
 	)
 	productionWIPReadMethods = append(productionWIPReadMethods, permissionMethods("customer_config", "start_production_exception_approval_process", "get_production_exception_approval_process", "execute_production_exception_process")...)
-	addMenu(PermissionProductionWIPRead, "production-orders", "production-wip", "工序办理", "view-production-wip", "查看生产订单、路线、在制批次和质量关口", permissionControlSection, "允许查看", productionWIPReadMethods, businessUsageConditions)
+	add(PermissionProductionWIPRead,
+		menuPermissionSurface("production-orders", "production-wip", "工序办理", "view-production-wip", "查看生产订单、路线、在制批次和质量关口", permissionControlSection, "允许查看", productionWIPReadMethods, businessUsageConditions),
+		menuPermissionSurface("inbound", "warehouse-production-work", "工序回货", "warehouse-return-work", "按在制批次查询工序回货及检验去向", permissionControlSection, "允许查看", permissionMethods("production_wip", "list_warehouse_production_work"), businessUsageConditions),
+	)
 	addMenu(PermissionProductionWIPAssign, "production-orders", "production-wip", "工序办理", "assign-production-wip", "拆分、取消批次并安排本厂或外发", permissionControlButton, "显示并允许安排", permissionMethods("production_wip", "execute_production_wip_action", "prepare_production_outsourcing_order"), businessUsageConditions)
 	addMenu(PermissionProductionWIPExecute, "production-orders", "production-wip", "工序办理", "execute-production-wip", "开始、完工、外发回仓和车间移交", permissionControlButton, "显示并允许办理", permissionMethods("production_wip", "execute_production_wip_action"), businessUsageConditions)
 	addMenu(PermissionWarehousePackagingExecute, "production-orders", "production-wip", "成品查货包装", "execute-warehouse-packaging", "选择已入库成品、查货并完成包装", permissionControlButton, "显示并允许办理", permissionMethods("production_wip", "execute_production_wip_action"), businessUsageConditions)

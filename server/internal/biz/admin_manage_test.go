@@ -984,7 +984,7 @@ func TestAdminManageUsecase_SetRoleSettingsRecordsOneAggregateAudit(t *testing.T
 	updated, err := uc.SetRoleSettings(
 		ctx,
 		WarehouseRoleKey,
-		RolePermissionPolicyFor(role).Required,
+		RolePermissionPolicyFor(role).Defaults,
 		[]RoleDataScope{{
 			ResourceType: DataScopeResourceWarehouse,
 			Mode:         DataScopeModeNone,
@@ -1057,7 +1057,7 @@ func TestAdminManageUsecase_GetRoleForAccessPreviewIsValidatedAndReadOnly(t *tes
 	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
 	before := append([]string(nil), repo.roleByKey(FinanceRoleKey).Permissions...)
 
-	wanted := append(RolePermissionPolicyFor(repo.roleByKey(FinanceRoleKey)).Required, PermissionERPPrintTemplateRead)
+	wanted := append(RolePermissionPolicyFor(repo.roleByKey(FinanceRoleKey)).Defaults, PermissionERPPrintTemplateRead)
 	preview, err := uc.GetRoleForAccessPreview(ctx, FinanceRoleKey, append(append([]string{}, wanted...), wanted[0]))
 	if err != nil {
 		t.Fatalf("GetRoleForAccessPreview() error = %v", err)
@@ -1315,7 +1315,7 @@ func TestAdminManageUsecase_SetRoleSettingsPersistsBothMenuOrders(t *testing.T) 
 	updated, err := uc.SetRoleSettings(
 		ctx,
 		FinanceRoleKey,
-		RolePermissionPolicyFor(financeRole).Required,
+		RolePermissionPolicyFor(financeRole).Defaults,
 		[]RoleDataScope{{
 			ResourceType: DataScopeResourceWarehouse,
 			Mode:         DataScopeModeAll,

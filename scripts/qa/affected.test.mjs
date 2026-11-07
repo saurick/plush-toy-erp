@@ -22,6 +22,16 @@ function ids(plan) {
   return plan.commands.map((item) => item.id);
 }
 
+test("warehouse draft page consumers select source and recovery regression", () => {
+  for (const file of ["web/src/erp/components/purchase-receipts/PurchaseReceiptExceptionModal.jsx", "web/src/erp/components/inventory/InventoryOperationModal.jsx", "web/src/erp/components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx"]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const followUp = plan.followUps.find(({ id }) => id === "warehouse-draft-form-pages-browser");
+    assert.ok(followUp, file);
+    for (const scenario of ["warehouse-draft-page-cycle_count", "warehouse-draft-page-transfer", "warehouse-draft-page-manual_adjustment", "outsourcing-material-draft-form-page", "outsourcing-return-draft-form-page", "purchase-receipt-return-rapid-add", "WebKit", "Chromium"]) assert.ok(followUp.text.includes(scenario), `${file}: ${scenario}`);
+    assert.ok(plan.commands.some(({ args }) => args?.includes("web/src/erp/components/inventory/InventoryOperationModal.behavior.test.mjs")), file);
+  }
+});
+
 test("composed business toolbars select shared tests and both-engine consumer regression", () => {
   for (const file of ["web/src/erp/components/business-list/BusinessListLayout.jsx", "web/src/erp/components/business-list/useBusinessListStickyHeader.js", "web/src/erp/pages/WarehouseHandlingPage.jsx", "web/src/erp/pages/PurchaseOrdersPage.jsx", "web/src/erp/pages/HistoryRecordsPage.jsx", "web/scripts/style-l1/businessToolbarCompositionScenarios.mjs"]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
@@ -52,12 +62,22 @@ test("shared list spacing owners retain geometry and recovery browser coverage",
   assert.equal(buildAffectedPlan(["web/src/erp/utils/paymentConditions.mjs"], { root: ROOT }).followUps.some(({ id }) => id === "business-list-surface-spacing-browser"), false);
 });
 
+test("component contracts retain the presentation graph and independent consumer regression", () => {
+  for (const file of ["scripts/qa/dev-workbench-boundary.test.mjs", "web/src/dev-workbench/components/DevSharedComponentGuide.jsx", "web/src/erp/components/business-list/BusinessLineTable.jsx", "web/src/erp/components/master-data/ContactFormList.jsx", "web/scripts/style-l1/devSharedComponentScenarios.mjs"]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const followUp = plan.followUps.find(({ id }) => id === "workbench-component-contracts-browser");
+    assert.ok(followUp, file);
+    for (const expected of ["dev-ui-shared-component-catalog", "dev-ui-shared-business-form", "dev-ui-shared-source-picker", "dev-ui-shared-consumer-entry", "WebKit", "Chromium", "test:workbench"]) assert.ok(followUp.text.includes(expected), `${file}: ${expected}`);
+    assert.ok(plan.commands.some(({ args }) => args?.includes("scripts/qa/dev-workbench-boundary.test.mjs")), file);
+  }
+});
+
 test("toolbar design samples retain focused both-engine growth and isolation checks", () => {
-  for (const file of ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.jsx", "web/src/dev-workbench/styles/dev-ui-toolbar-example.css", "web/src/dev-workbench/config/devToolbarExample.mjs", "web/scripts/style-l1/devToolbarExampleScenarios.mjs", "web/src/erp/components/business-list/ColumnOrderModal.jsx"]) {
+  for (const file of ["web/src/dev-workbench/components/DevUIBusinessToolbarExample.jsx", "web/src/dev-workbench/components/DevUIBusinessTabComparison.jsx", "web/src/dev-workbench/styles/dev-ui-toolbar-example.css", "web/src/dev-workbench/config/devToolbarExample.mjs", "web/scripts/style-l1/devToolbarExampleScenarios.mjs", "web/src/erp/components/business-list/ColumnOrderModal.jsx"]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const followUp = plan.followUps.find(({ id }) => id === "dev-toolbar-composition-browser");
     assert.ok(followUp, file);
-    for (const expected of ["dev-ui-toolbar-composition", "dev-ui-toolbar-category-growth", "dev-ui-toolbar-data-growth", "WebKit", "Chromium", "零业务请求"]) assert.ok(followUp.text.includes(expected), `${file}: ${expected}`);
+    for (const expected of ["dev-ui-purchase-production-tabs", "dev-ui-toolbar-composition", "dev-ui-toolbar-category-growth", "dev-ui-toolbar-data-growth", "WebKit", "Chromium", "零业务请求"]) assert.ok(followUp.text.includes(expected), `${file}: ${expected}`);
     assert.ok(plan.commands.some(({ args }) => args?.includes("web/src/dev-workbench/components/DevUIBusinessToolbarExample.test.mjs")), file);
     assert(!ids(plan).includes("full"), file);
   }

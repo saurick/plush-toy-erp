@@ -444,7 +444,6 @@ export default function PurchaseReceiptExceptionRecordsModal({
         type="info"
         showIcon
         message="草稿可直接作废且不更新库存；确认草稿后库存会同步更新；取消已确认记录时会保留原记录，并将库存恢复到操作前。"
-        style={{ marginBottom: 16 }}
       />
       {tabItems.length > 0 ? (
         <Tabs activeKey={activeKey} items={tabItems} onChange={setActiveKey} />

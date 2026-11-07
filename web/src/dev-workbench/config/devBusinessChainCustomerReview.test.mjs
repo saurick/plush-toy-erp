@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { Window } from 'happy-dom'
 
 import { DEV_FLOW_STATE_CATALOG } from './devFlowStateCatalog.mjs'
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
@@ -61,8 +62,41 @@ function reviewProjectionText(review) {
 }
 
 function customerDiagramSources(review) {
-  return [review.chain?.diagram].filter(Boolean).map((diagram) => diagram.mermaidSource)
+  return (review.chain?.diagram.parts || []).map((part) => part.mermaidSource)
 }
+
+test('customer review paper parts preserve every relationship and original node number', async () => {
+  const window = new Window()
+  Object.assign(globalThis, { window, document: window.document, Element: window.Element, SVGElement: window.SVGElement })
+  try {
+    const { default: mermaid } = await import('mermaid')
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' })
+    for (const chain of DEV_FLOW_STATE_CATALOG.businessChains) {
+      const review = buildDevBusinessChainCustomerReview({ catalog: DEV_FLOW_STATE_CATALOG, chainKey: chain.key, generatedAt })
+      let relationships = 0
+      const numbers = new Set()
+      const endpoints = []
+      for (const source of customerDiagramSources(review)) {
+        const diagram = await mermaid.mermaidAPI.getDiagramFromText(source)
+        assert(diagram.db.getEdges().length <= 3, chain.key)
+        assert(diagram.db.getVertices().size <= 6, chain.key)
+        relationships += diagram.db.getEdges().length
+        const definitions = [...source.matchAll(/^\s*(N\d+)\["(\d+)\. /gmu)]
+        assert.equal(definitions.length, diagram.db.getVertices().size, chain.key)
+        const keys = new Map(definitions.map(([, id, number]) => [id, chain.nodes[Number(number) - 1].key]))
+        definitions.forEach(([, , number]) => numbers.add(Number(number)))
+        const pairs = diagram.db.getEdges().map((edge) => JSON.stringify([keys.get(edge.start), keys.get(edge.end)]))
+        assert.equal(new Set(pairs).size, pairs.length, chain.key)
+        assert.equal(new Set(diagram.db.getEdges().map((edge) => edge.start)).size, pairs.length, chain.key)
+        assert.equal(new Set(diagram.db.getEdges().map((edge) => edge.end)).size, pairs.length, chain.key)
+        endpoints.push(...pairs)
+      }
+      assert.equal(relationships, chain.edges.length, chain.key)
+      assert.deepEqual(endpoints.sort(), chain.edges.map((edge) => JSON.stringify([edge.from, edge.to])).sort(), chain.key)
+      assert.deepEqual([...numbers].sort((a, b) => a - b), chain.nodes.map((_, index) => index + 1), chain.key)
+    }
+  } finally { await window.happyDOM.close() }
+})
 
 test('customer review exports only the selected business chain with complete business questions', () => {
   const review = buildDevBusinessChainCustomerReview({
@@ -94,7 +128,7 @@ test('customer review exports only the selected business chain with complete bus
 
   for (const step of review.chain.steps) {
     assert(step.number > 0)
-    assert(review.chain.diagram.mermaidSource.includes(step.responsibleRole), '单链流程图直接保留岗位，避免另表重复节点')
+    assert(customerDiagramSources(review).join('\n').replaceAll('<br/>', '').includes(step.responsibleRole), '单链流程图直接保留岗位，避免另表重复节点')
     for (const field of [
       'name',
       'action',
@@ -113,7 +147,7 @@ test('customer review exports only the selected business chain with complete bus
     assert(step.personAction.length <= 24, `${step.name}/personAction too long`)
     assert(step.completion.length <= 120, `${step.name}/completion too long`)
     assert(
-      review.chain.diagram.mermaidSource.includes(
+      customerDiagramSources(review).join('\n').replaceAll('<br/>', '').includes(
         `${step.number}. ${step.name}`
       ),
       `diagram missing ${step.name}`

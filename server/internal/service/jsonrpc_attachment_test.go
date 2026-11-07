@@ -23,19 +23,20 @@ import (
 const testAttachmentProofSHA256 = "c1cda26362828b69266512052b97cb3729e3b052e4ade47c0a1e3383defe73c7"
 
 type stubAttachmentJSONRPCRepo struct {
-	created       *biz.BusinessAttachmentCreate
-	current       *biz.BusinessAttachment
-	ownerExists   bool
-	createCalls   int
-	listCalls     int
-	getCalls      int
-	contentCalls  int
-	withdrawCalls int
-	withdrawn     *biz.BusinessAttachmentWithdraw
-	withdrawErr   error
-	clearCalls    int
-	clearProduct  int
-	clearSlot     string
+	created           *biz.BusinessAttachmentCreate
+	current           *biz.BusinessAttachment
+	ownerExists       bool
+	createCalls       int
+	listCalls         int
+	getCalls          int
+	contentCalls      int
+	withdrawCalls     int
+	withdrawn         *biz.BusinessAttachmentWithdraw
+	withdrawErr       error
+	clearCalls        int
+	clearProduct      int
+	clearSlot         string
+	clearAttachmentID int
 }
 
 func newAttachmentJSONRPCTestDispatcher(t *testing.T, repo *stubAttachmentJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
@@ -111,10 +112,11 @@ func (r *stubAttachmentJSONRPCRepo) ListBusinessAttachments(_ context.Context, o
 	}, nil
 }
 
-func (r *stubAttachmentJSONRPCRepo) ClearProductImage(_ context.Context, productID int, slotKey string) error {
+func (r *stubAttachmentJSONRPCRepo) ClearProductImage(_ context.Context, productID int, slotKey string, attachmentID int) error {
 	r.clearCalls++
 	r.clearProduct = productID
 	r.clearSlot = slotKey
+	r.clearAttachmentID = attachmentID
 	return nil
 }
 
@@ -440,6 +442,32 @@ func TestJsonrpcDispatcher_ClearProductImageUsesControlledProductBoundary(t *tes
 	}
 	if readOnlyRepo.clearCalls != 0 {
 		t.Fatalf("unauthorized clear must not reach repo, got %d calls", readOnlyRepo.clearCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_ClearSupplementalProductImageByID(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	repo := &stubAttachmentJSONRPCRepo{}
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.EngineeringRoleKey}, biz.PermissionProductUpdate,
+	))
+	params := map[string]any{"owner_id": 7, "id": 102}
+	_, res, err := dispatcher.handleBusinessAttachment(ctx, "clear_product_image", "clear-supplemental", mustJSONRPCStruct(t, params))
+	if err != nil || res == nil || res.Code != errcode.OK.Code || repo.clearCalls != 1 || repo.clearAttachmentID != 102 || repo.clearSlot != "" {
+		t.Fatalf("clear supplemental image: result=%v err=%v calls=%d attachment=%d slot=%q", res, err, repo.clearCalls, repo.clearAttachmentID, repo.clearSlot)
+	}
+	for _, id := range []any{0, 1.5, "102"} {
+		params["id"] = id
+		_, res, err = dispatcher.handleBusinessAttachment(ctx, "clear_product_image", "invalid-supplemental", mustJSONRPCStruct(t, params))
+		if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || repo.clearCalls != 1 {
+			t.Fatalf("invalid attachment id %v reached clear: result=%v err=%v", id, res, err)
+		}
+	}
+	params["id"] = 102
+	params["slot_key"] = "primary"
+	_, res, err = dispatcher.handleBusinessAttachment(ctx, "clear_product_image", "ambiguous-supplemental", mustJSONRPCStruct(t, params))
+	if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || repo.clearCalls != 1 {
+		t.Fatalf("ambiguous clear: result=%v err=%v", res, err)
 	}
 }
 

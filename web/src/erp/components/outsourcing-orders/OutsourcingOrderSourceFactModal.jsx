@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import { Alert, Descriptions, Form, Input, Radio } from 'antd'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import Select from '@/common/components/select/AppSelect'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
-import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
@@ -77,6 +77,7 @@ export default function OutsourcingOrderSourceFactModal({
   const lotSelection = Form.useWatch('lot_selection', form)
   const copy = actionCopy(actionType)
   const returnReceipt = actionType === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
+  const sourceContextKey = `${mode}:${actionType}:${record?.id || item?.id || 0}`
   const warehouseOptions = useMemo(
     () =>
       (Array.isArray(warehouses) ? warehouses : [])
@@ -118,32 +119,35 @@ export default function OutsourcingOrderSourceFactModal({
     '加工厂已关联'
   )
 
-  const initializeOpenForm = (visible) => {
-    if (!visible) return
-    const initialLotSelection = returnReceipt
-      ? sourceInboundLotSelectionForOptions(lotOptions)
-      : SOURCE_INBOUND_LOT_SELECTION.EXISTING
-    form.resetFields()
-    form.setFieldsValue({
-      warehouse_id: initialValues?.warehouse_id || warehouseOptions[0]?.value,
-      lot_selection: initialValues?.lot_selection || initialLotSelection,
-      lot_id:
-        initialValues?.lot_id ||
-        (initialLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
-          ? lotOptions[0]?.value
-          : undefined),
-      new_lot_no: initialValues?.new_lot_no,
-      quantity:
-        initialValues?.quantity ||
-        (isPositiveNumeric20Scale6Units(
-          numeric20Scale6Units(quantitySummary.remaining)
-        )
-          ? quantitySummary.remaining
-          : ''),
-      occurred_at: initialValues?.occurred_at || localDateTimeValue(),
-      note: initialValues?.note || '',
-    })
+  const initialLotSelection = returnReceipt
+    ? sourceInboundLotSelectionForOptions(lotOptions)
+    : SOURCE_INBOUND_LOT_SELECTION.EXISTING
+  const openDefaultsRef = useRef(null)
+  openDefaultsRef.current = {
+    warehouse_id: initialValues?.warehouse_id || warehouseOptions[0]?.value,
+    lot_selection: initialValues?.lot_selection || initialLotSelection,
+    lot_id:
+      initialValues?.lot_id ||
+      (initialLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+        ? lotOptions[0]?.value
+        : undefined),
+    new_lot_no: initialValues?.new_lot_no,
+    quantity:
+      initialValues?.quantity ||
+      (isPositiveNumeric20Scale6Units(
+        numeric20Scale6Units(quantitySummary.remaining)
+      )
+        ? quantitySummary.remaining
+        : ''),
+    occurred_at: initialValues?.occurred_at || localDateTimeValue(),
+    note: initialValues?.note || '',
   }
+  useEffect(() => {
+    if (!open) return
+    // Lookup refreshes must not replace input in an already opened source context.
+    form.resetFields()
+    form.setFieldsValue(openDefaultsRef.current)
+  }, [form, open, sourceContextKey])
 
   const submit = async () => {
     try {
@@ -155,19 +159,14 @@ export default function OutsourcingOrderSourceFactModal({
   }
 
   return (
-    <BusinessModal
-      taskInline
+    <BusinessFormPage
       form={form}
+      baselineKey={sourceContextKey}
       className="erp-outsourcing-source-fact-modal"
-      title={editing ? `编辑${copy.title}草稿` : copy.title}
+      title={editing ? (returnReceipt ? '编辑委外回货草稿' : '编辑委外发料草稿') : copy.title}
       open={open}
       okText={editing ? '保存草稿' : `确认${copy.title}`}
-      cancelText="取消"
       confirmLoading={loading}
-      maskClosable={!loading}
-      destroyOnHidden
-      size="localAction"
-      afterOpenChange={initializeOpenForm}
       onCancel={onCancel}
       onOk={submit}
     >
@@ -184,7 +183,6 @@ export default function OutsourcingOrderSourceFactModal({
         <Alert
           type="warning"
           showIcon
-          style={{ marginTop: 12 }}
           message={
             returnReceipt ? '暂无匹配的已有产品批次' : '暂无可用材料批次'
           }
@@ -198,7 +196,6 @@ export default function OutsourcingOrderSourceFactModal({
       <Descriptions
         size="small"
         column={{ xs: 1, sm: 2 }}
-        style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           {
             key: 'order',
@@ -387,6 +384,6 @@ export default function OutsourcingOrderSourceFactModal({
           </Form.Item>
         </BusinessFormSection>
       </BusinessForm>
-    </BusinessModal>
+    </BusinessFormPage>
   )
 }

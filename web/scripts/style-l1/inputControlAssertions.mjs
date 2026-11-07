@@ -421,6 +421,26 @@ async function assertVisibleRoundedInputWrapperClipping(page, scenarioName) {
     }
 
     const failures = []
+    // Select 的圆角面板在 selector 上；容器刷底色会填满圆角外侧。
+    for (const select of document.querySelectorAll('.ant-select')) {
+      if (!isVisible(select) || select.closest(ignoredAncestorSelector)) continue
+      const style = window.getComputedStyle(select)
+      if (
+        !isTransparentBackground(style.backgroundColor) ||
+        style.backgroundImage !== 'none' ||
+        style.boxShadow !== 'none'
+      ) {
+        failures.push(
+          describe(select, {
+            reason: 'select-container-paint',
+            backgroundColor: style.backgroundColor,
+            backgroundImage: style.backgroundImage,
+            boxShadow: style.boxShadow,
+            borderRadius: style.borderRadius,
+          })
+        )
+      }
+    }
     const wrappers = Array.from(document.querySelectorAll(wrapperSelector))
     for (const wrapper of wrappers) {
       if (!(wrapper instanceof HTMLElement)) continue
@@ -1129,26 +1149,26 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
           probe.tabIndex = -1
           Object.assign(probe.style, {
             position: 'absolute',
-visibility: 'hidden',
-pointerEvents: 'none',
+            visibility: 'hidden',
+            pointerEvents: 'none',
             width: style.width,
-height: '0px',
-minHeight: '0px',
-maxHeight: 'none',
+            height: '0px',
+            minHeight: '0px',
+            maxHeight: 'none',
             boxSizing: style.boxSizing,
-borderWidth: style.borderWidth,
-borderStyle: 'solid',
+            borderWidth: style.borderWidth,
+            borderStyle: 'solid',
             font: style.font,
-letterSpacing: style.letterSpacing,
-textIndent: style.textIndent,
+            letterSpacing: style.letterSpacing,
+            textIndent: style.textIndent,
             whiteSpace: style.whiteSpace,
-wordBreak: style.wordBreak,
-overflowWrap: style.overflowWrap,
+            wordBreak: style.wordBreak,
+            overflowWrap: style.overflowWrap,
             paddingLeft: style.paddingLeft,
-paddingRight: style.paddingRight,
+            paddingRight: style.paddingRight,
             paddingTop: '0px',
-paddingBottom: '0px',
-overflow: 'hidden',
+            paddingBottom: '0px',
+            overflow: 'hidden',
           })
           probe.value = node.value || node.placeholder || ''
           document.body.append(probe)

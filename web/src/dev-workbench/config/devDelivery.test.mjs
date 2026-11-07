@@ -1209,7 +1209,7 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /删除失败时不得开始写入、Git 或部署动作/u)
   assert.match(source, /Git 索引锁怎么处理/u)
   assert.match(source, /GIT_INDEX_LOCK_RECOVERY_FLOW/u)
-  assert.match(source, /flowchart TD/u)
+  assert.match(source, /flowchart LR/u)
   assert.match(source, /有活动 owner、仓库 Git 进程/u)
   assert.match(source, /同盘隔离锁与 PID 旁车/u)
   assert.match(source, /候选不同或损坏/u)

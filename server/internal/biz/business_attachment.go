@@ -51,10 +51,12 @@ const (
 )
 
 const (
-	BusinessAttachmentTypeProductImage          = "product_image"
-	BusinessAttachmentTypePrintAppendix         = "print_appendix"
-	BusinessAttachmentProductImageSlotPrimary   = "primary"
-	BusinessAttachmentProductImageSlotSecondary = "secondary"
+	BusinessAttachmentTypeProductImage                 = "product_image"
+	BusinessAttachmentTypePrintAppendix                = "print_appendix"
+	BusinessAttachmentProductImageSlotPrimary          = "primary"
+	BusinessAttachmentProductImageSlotSecondary        = "secondary"
+	BusinessAttachmentProductImageSlotSupplemental     = "supplemental"
+	BusinessAttachmentProductImageSupplementalMaxCount = 8
 )
 
 var (
@@ -80,6 +82,7 @@ var (
 
 	ErrBusinessAttachmentProductImageContentInvalid    = fmt.Errorf("product image content invalid: %w", ErrBusinessAttachmentContentInvalid)
 	ErrBusinessAttachmentProductImageMimeNotAllowed    = fmt.Errorf("product image mime type not allowed: %w", ErrBusinessAttachmentMimeNotAllowed)
+	ErrBusinessAttachmentProductImageSupplementalLimit = errors.New("product supplemental image limit reached")
 	ErrBusinessAttachmentProductImageTooLarge          = fmt.Errorf("product image too large: %w", ErrBusinessAttachmentTooLarge)
 	ErrBusinessAttachmentProductImageDimensionsInvalid = fmt.Errorf(
 		"product image dimensions invalid: %w",
@@ -230,7 +233,7 @@ type BusinessAttachmentRepo interface {
 	ListProductImageReferences(ctx context.Context, productIDs []int) (map[int]int, error)
 	CreateBusinessAttachment(ctx context.Context, in *BusinessAttachmentCreate) (*BusinessAttachment, error)
 	WithdrawBusinessAttachment(ctx context.Context, in *BusinessAttachmentWithdraw) (time.Time, error)
-	ClearProductImage(ctx context.Context, productID int, slotKey string) error
+	ClearProductImage(ctx context.Context, productID int, slotKey string, attachmentID int) error
 	ListBusinessAttachments(ctx context.Context, ownerType string, ownerID int) ([]*BusinessAttachment, error)
 	GetBusinessAttachmentMetadata(ctx context.Context, id int) (*BusinessAttachment, error)
 	GetBusinessAttachmentContent(ctx context.Context, id int, ownerType string, ownerID int) ([]byte, error)
@@ -288,6 +291,32 @@ func NormalizeBusinessAttachmentWithdrawalReason(raw string) (string, error) {
 func IsBusinessAttachmentProductImageSlotAllowed(slotKey string) bool {
 	_, ok := allowedBusinessAttachmentProductImageSlots[NormalizeBusinessAttachmentProductImageSlot(slotKey)]
 	return ok
+}
+
+func IsBusinessAttachmentProductImageUploadSlot(slotKey string) bool {
+	return slotKey == BusinessAttachmentProductImageSlotSupplemental || IsBusinessAttachmentProductImageSlotAllowed(slotKey)
+}
+
+func BusinessAttachmentProductImageSupplementalSlots() []string {
+	slots := make([]string, BusinessAttachmentProductImageSupplementalMaxCount)
+	for i := range slots {
+		slots[i] = fmt.Sprintf("%s_%d", BusinessAttachmentProductImageSlotSupplemental, i+1)
+	}
+	return slots
+}
+
+func IsBusinessAttachmentProductImageSupplementalSlot(slotKey string) bool {
+	for _, slot := range BusinessAttachmentProductImageSupplementalSlots() {
+		if slot == slotKey {
+			return true
+		}
+	}
+	return false
+}
+
+func IsBusinessAttachmentProductImageClearTarget(slotKey string, attachmentID int) bool {
+	return (attachmentID == 0 && IsBusinessAttachmentProductImageSlotAllowed(slotKey)) ||
+		(attachmentID > 0 && slotKey == "")
 }
 
 func (uc *BusinessAttachmentUsecase) UploadBusinessAttachment(ctx context.Context, in *BusinessAttachmentUploadInput) (*BusinessAttachment, error) {
@@ -366,15 +395,15 @@ func (uc *BusinessAttachmentUsecase) ListBusinessAttachments(ctx context.Context
 	return uc.repo.ListBusinessAttachments(ctx, normalizedOwnerType, ownerID)
 }
 
-func (uc *BusinessAttachmentUsecase) ClearProductImage(ctx context.Context, productID int, slotKey string) error {
+func (uc *BusinessAttachmentUsecase) ClearProductImage(ctx context.Context, productID int, slotKey string, attachmentID int) error {
 	if uc == nil || uc.repo == nil || productID <= 0 {
 		return ErrBadParam
 	}
 	normalizedSlotKey := NormalizeBusinessAttachmentProductImageSlot(slotKey)
-	if !IsBusinessAttachmentProductImageSlotAllowed(normalizedSlotKey) {
+	if !IsBusinessAttachmentProductImageClearTarget(normalizedSlotKey, attachmentID) {
 		return ErrBadParam
 	}
-	return uc.repo.ClearProductImage(ctx, productID, normalizedSlotKey)
+	return uc.repo.ClearProductImage(ctx, productID, normalizedSlotKey, attachmentID)
 }
 
 func (uc *BusinessAttachmentUsecase) WithdrawBusinessAttachment(
@@ -525,7 +554,7 @@ func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (B
 
 	in.MimeType = strings.ToLower(strings.TrimSpace(in.MimeType))
 	if isProductImage {
-		if in.SlotKey == nil || !IsBusinessAttachmentProductImageSlotAllowed(*in.SlotKey) {
+		if in.SlotKey == nil || !IsBusinessAttachmentProductImageUploadSlot(*in.SlotKey) {
 			return in, ErrBadParam
 		}
 		if !isBusinessAttachmentProductImageFileTypeAllowed(in.FileName, in.MimeType) {

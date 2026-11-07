@@ -1,4 +1,5 @@
 import { DEV_STATUS_FLOWS_ROUTE } from './devRoutes.mjs'
+import { formatBusinessGraphLabel } from '../../common/components/markdown/mermaidGraph.mjs'
 
 export const DEV_CHAIN_AUDIT_API = '/__dev/api/qa/business-chain-audit'
 export const CHAIN_AUDIT_BATCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/u
@@ -272,28 +273,21 @@ export function buildChainAuditDiagram(diagram) {
   )
     { return '' }
   const ids = new Map(diagram.nodes.map((node, i) => [node.id, `n${i}`]))
-  const escape = (value) =>
-    String(value ?? '').replace(
-      /[&<>"#\n\r]/gu,
-      (char) =>
-        ({
-          '&': '#38;',
-          '<': '#60;',
-          '>': '#62;',
-          '"': '#quot;',
-          '#': '#35;',
-          '\n': ' ',
-          '\r': ' ',
-        })[char]
-    )
   const lines = [
+    '---',
+    'config:',
+    '  flowchart:',
+    '    nodeSpacing: 28',
+    '    rankSpacing: 24',
+    '    padding: 12',
+    '---',
     'flowchart LR',
     'classDef danger fill:#fff1f0,stroke:#cf1322,color:#a8071a',
     'classDef success fill:#f6ffed,stroke:#389e0d,color:#135200',
   ]
   diagram.nodes.forEach((node) => {
     lines.push(
-      `${ids.get(node.id)}["${escape(node.label)} · ${escape(node.detail)}"]`
+      `${ids.get(node.id)}["${formatBusinessGraphLabel([node.label, node.detail].filter(Boolean).join('\n'))}"]`
     )
     if (['danger', 'success'].includes(node.kind))
       { lines.push(`class ${ids.get(node.id)} ${node.kind}`) }
@@ -301,7 +295,7 @@ export function buildChainAuditDiagram(diagram) {
   diagram.edges.forEach(([from, to, label]) => {
     if (ids.has(from) && ids.has(to))
       { lines.push(
-        `${ids.get(from)} -->|"${escape(label || ' ')}"| ${ids.get(to)}`
+        `${ids.get(from)} -->|"${formatBusinessGraphLabel(label || ' ')}"| ${ids.get(to)}`
       ) }
   })
   return lines.join('\n')

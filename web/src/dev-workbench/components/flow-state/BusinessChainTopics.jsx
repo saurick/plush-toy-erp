@@ -99,6 +99,7 @@ export default function BusinessChainTopics({
       ...edges.flatMap((edge) => [edge.from, edge.to]),
     ])
     return {
+      direction: 'LR',
       entryNodeKeys: [focus.key],
       nodes: catalog.businessChains
         .filter((chain) => keys.has(chain.key))

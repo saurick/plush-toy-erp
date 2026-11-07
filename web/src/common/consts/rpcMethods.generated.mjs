@@ -293,6 +293,7 @@ export const RpcMethod = Object.freeze({
   production_wip: Object.freeze({
     EXECUTE_PRODUCTION_WIP_ACTION: 'execute_production_wip_action',
     GET_PRODUCTION_WIP: 'get_production_wip',
+    LIST_WAREHOUSE_PRODUCTION_WORK: 'list_warehouse_production_work',
     PREPARE_PRODUCTION_OUTSOURCING_ORDER: 'prepare_production_outsourcing_order',
   }),
   purchase: Object.freeze({

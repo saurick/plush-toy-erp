@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 
 export function createDevToolbarExampleScenarios({ assert, assertNoHorizontalOverflow, outputDir }) {
   const requests = new WeakMap()
@@ -37,6 +38,113 @@ export function createDevToolbarExampleScenarios({ assert, assertNoHorizontalOve
   }
   const base = { path, viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2, beforeNavigate: begin }
   return [
+    {
+      ...base,
+      name: 'dev-ui-purchase-production-tabs',
+      verify: async (page) => {
+        const comparison = page.getByRole('region', { name: '采购与生产页签位置对照', exact: true })
+        const purchase = comparison.getByRole('region', { name: '采购页签位置对照', exact: true })
+        const production = comparison.getByRole('region', { name: '生产页签位置对照', exact: true })
+        const purchaseSearch = purchase.getByRole('textbox', { name: '采购对照搜索', exact: true })
+        const productionSearch = production.getByRole('textbox', { name: '生产对照搜索', exact: true })
+        const waitForSearch = (name, value) => page.waitForFunction((expected) => document.querySelector(`input[aria-label="${expected.name}"]`)?.value === expected.value, { name, value })
+        await purchaseSearch.waitFor()
+        const purchaseInput = await purchaseSearch.elementHandle()
+        const productionInput = await productionSearch.elementHandle()
+        const purchaseNumbers = await purchase.locator('tbody tr.ant-table-row td:first-child').allTextContents()
+        await purchaseSearch.fill('PO-DEMO-001')
+        assert.equal(await purchase.locator('tbody tr.ant-table-row').count(), 2, '输入仍是草稿')
+        await purchaseSearch.press('Enter')
+        assert.equal(await purchase.locator('tbody tr.ant-table-row').count(), 1)
+        await purchase.getByRole('tab', { name: '采购跟进', exact: true }).click()
+        assert.deepEqual(await purchase.locator('tbody tr.ant-table-row td:first-child').allTextContents(), purchaseNumbers, '采购跟进仍围绕同一批单据')
+        await purchaseSearch.fill('没有匹配内容')
+        await purchaseSearch.press('Enter')
+        await purchase.getByText('暂无匹配记录', { exact: true }).waitFor()
+        await purchase.getByRole('button', { name: '清除搜索', exact: true }).click()
+        assert.equal(await purchase.locator('tbody tr.ant-table-row').count(), 2)
+        await purchase.getByRole('button', { name: '查看跟进', exact: true }).first().click()
+        const followupDetail = page.getByRole('dialog').filter({ hasText: '采购对照 · 查看跟进' })
+        await followupDetail.getByText('示例供应商甲', { exact: true }).waitFor()
+        await followupDetail.getByRole('button', { name: '关闭', exact: true }).click()
+        await followupDetail.waitFor({ state: 'hidden' })
+        await purchase.getByRole('tab', { name: '订单列表', exact: true }).click()
+        await waitForSearch('采购对照搜索', 'PO-DEMO-001')
+        assert.equal(await purchaseSearch.inputValue(), 'PO-DEMO-001')
+        assert.equal(await purchase.locator('tbody tr.ant-table-row').count(), 1)
+        await purchaseSearch.fill('未提交草稿')
+        await purchase.getByRole('tab', { name: '采购跟进', exact: true }).click()
+        await waitForSearch('采购对照搜索', '')
+        assert.equal(await purchaseSearch.inputValue(), '', '不同视图不串用未提交草稿')
+
+        for (const [label, object, action] of [
+          ['生产订单', '生产单', '查看计划'],
+          ['生产执行', '执行批次', '查看批次'],
+          ['生产记录', '生产记录', '查看记录'],
+          ['异常处理', '处置申请', '查看处置'],
+        ]) {
+          await production.getByRole('tab', { name: label, exact: true }).click()
+          await production.getByRole('columnheader', { name: object, exact: true }).waitFor()
+          await production.getByRole('button', { name: action, exact: true }).first().click()
+          const detail = page.getByRole('dialog').filter({ hasText: `生产对照 · ${action}` })
+          await detail.getByText('本地虚构样例，仅演示查看，不办理真实业务。', { exact: true }).waitFor()
+          await detail.getByRole('button', { name: '关闭', exact: true }).click()
+          await detail.waitFor({ state: 'hidden' })
+        }
+        await production.getByRole('tab', { name: '生产执行', exact: true }).click()
+        await productionSearch.fill('WIP-DEMO-001')
+        await productionSearch.press('Enter')
+        assert.equal(await production.locator('tbody tr.ant-table-row').count(), 1)
+        await production.getByRole('tab', { name: '异常处理', exact: true }).click()
+        await waitForSearch('生产对照搜索', '')
+        assert.equal(await productionSearch.inputValue(), '')
+        await production.getByRole('tab', { name: '生产执行', exact: true }).click()
+        await waitForSearch('生产对照搜索', 'WIP-DEMO-001')
+        assert.equal(await productionSearch.inputValue(), 'WIP-DEMO-001')
+        await production.getByRole('tab', { name: '生产执行', exact: true }).press('ArrowRight')
+        assert.equal(await production.getByRole('tab', { name: '生产记录', exact: true }).getAttribute('aria-selected'), 'true')
+        assert.equal(await purchaseSearch.evaluate((node, previous) => node === previous, purchaseInput), true)
+        assert.equal(await productionSearch.evaluate((node, previous) => node === previous, productionInput), true)
+
+        const geometry = []
+        for (const width of [1920, 1280]) {
+          await page.setViewportSize({ width, height: 1080 })
+          await comparison.scrollIntoViewIfNeeded()
+          for (const [business, region] of [['purchase', purchase], ['production', production]]) {
+            const bounds = await region.evaluate((root) => {
+              const nav = root.querySelector('[role="tablist"]')
+              const header = root.querySelector('.erp-business-page-header-card')
+              const toolbar = root.querySelector('.erp-business-operation-panel')
+              const box = nav.getBoundingClientRect()
+              const parent = (header.contains(nav) ? header : toolbar).getBoundingClientRect()
+              return { inHeader: header.contains(nav), inToolbar: toolbar.contains(nav), left: box.left, right: box.right, top: box.top, bottom: box.bottom, parentLeft: parent.left, parentRight: parent.right, parentTop: parent.top, parentBottom: parent.bottom }
+            })
+            assert.equal(bounds.inHeader, business === 'production')
+            assert.equal(bounds.inToolbar, business === 'purchase')
+            assert(bounds.left >= bounds.parentLeft - 1 && bounds.right <= bounds.parentRight + 1, JSON.stringify(bounds))
+            assert(bounds.top >= bounds.parentTop - 1 && bounds.bottom <= bounds.parentBottom + 1, JSON.stringify(bounds))
+            geometry.push({ width, business, ...bounds })
+          }
+          await assertNoHorizontalOverflow(page, `purchase-production-tabs-${width}`)
+        }
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await comparison.getByRole('button', { name: '重置对照', exact: true }).click()
+        assert.equal(await purchaseSearch.inputValue(), '')
+        assert.equal(await productionSearch.inputValue(), '')
+        const motion = []
+        for (const [selector, target] of [['[aria-label="采购对照查询视角"]', 1], ['[aria-label="生产对照办理入口"]', 3]]) {
+          motion.push(await verifyMobileNavigationMotion(page, assert, selector, target))
+          motion.push(await verifyMobileNavigationMotion(page, assert, selector, 0, true))
+        }
+        await purchase.getByRole('tab', { name: '采购跟进', exact: true }).click()
+        await production.getByRole('tab', { name: '异常处理', exact: true }).click()
+        await comparison.scrollIntoViewIfNeeded()
+        await page.screenshot({ path: `${outputDir}/dev-ui-purchase-production-tabs-4k.png` })
+        await writeFile(`${outputDir}/dev-ui-purchase-production-tabs.json`, JSON.stringify({ geometry, motion, businessRequests: requests.get(page) }, null, 2))
+        assert.deepEqual(requests.get(page), [], '采购与生产对照不读取、写入或保存业务数据')
+        await Promise.all([purchaseInput.dispose(), productionInput.dispose()])
+      },
+    },
     {
       ...base,
       name: 'dev-ui-tab-rule-reference',

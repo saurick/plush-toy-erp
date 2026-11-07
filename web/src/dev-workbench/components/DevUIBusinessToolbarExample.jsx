@@ -40,6 +40,7 @@ import {
   toolbarViews,
 } from '../config/devToolbarExample.mjs'
 import '../styles/dev-ui-toolbar-example.css'
+import DevUIBusinessTabComparison from './DevUIBusinessTabComparison.jsx'
 
 const RESPONSIBILITIES = {
   content: [
@@ -617,64 +618,68 @@ export default function DevUIBusinessToolbarExample() {
   const [revision, setRevision] = useState(0)
   const scenario = scenarios[business] || 'current'
   return (
-    <section className="erp-dev-toolbar-example" aria-label="四业务工具栏组合">
-      <div className="erp-dev-toolbar-example__settings">
-        <SlidingSegmented
-          aria-label="组合示例业务"
-          value={business}
-          options={TOOLBAR_EXAMPLES.map(({ key, label }) => ({
-            value: key,
-            label,
-          }))}
-          onChange={(value) => {
-            setVisited((previous) =>
-              previous.includes(value) ? previous : [...previous, value]
-            )
-            setBusiness(value)
-          }}
-        />
-        <AppSelect
-          aria-label="组合示例增长场景"
-          allowClear={false} // 不可清空：场景切换必须保留一个当前演示场景。
-          value={scenario}
-          options={TOOLBAR_SCENARIOS}
-          onChange={(value) =>
-            setScenarios((previous) => ({ ...previous, [business]: value }))
-          }
-          className="erp-dev-toolbar-example__scenario"
-        />
-        <Checkbox
-          checked={annotations}
-          onChange={(event) => setAnnotations(event.target.checked)}
-        >
-          显示职责标注
-        </Checkbox>
-        <Button
-          aria-label="恢复示例"
-          icon={<ReloadOutlined />}
-          onClick={() => {
-            setBusiness('inventory')
-            setVisited(['inventory'])
-            setScenarios({})
-            setAnnotations(true)
-            setRevision((value) => value + 1)
-          }}
-        >
-          恢复示例
-        </Button>
-      </div>
-      <p className="erp-dev-toolbar-example__explanation">
-        {toolbarGrowthExplanation(business, scenario)}
-      </p>
-      {visited.map((key) => (
-        <ExamplePage
-          key={`${revision}:${key}`}
-          business={key}
-          scenario={scenarios[key] || 'current'}
-          annotations={annotations}
-          active={business === key}
-        />
-      ))}
-    </section>
+    <>
+      <DevUIBusinessTabComparison />
+      <section className="erp-dev-toolbar-example" aria-label="四业务工具栏组合">
+        <h3>更多业务组合与增长场景</h3>
+        <div className="erp-dev-toolbar-example__settings">
+          <SlidingSegmented
+            aria-label="组合示例业务"
+            value={business}
+            options={TOOLBAR_EXAMPLES.map(({ key, label }) => ({
+              value: key,
+              label,
+            }))}
+            onChange={(value) => {
+              setVisited((previous) =>
+                previous.includes(value) ? previous : [...previous, value]
+              )
+              setBusiness(value)
+            }}
+          />
+          <AppSelect
+            aria-label="组合示例增长场景"
+            allowClear={false} // 不可清空：场景切换必须保留一个当前演示场景。
+            value={scenario}
+            options={TOOLBAR_SCENARIOS}
+            onChange={(value) =>
+              setScenarios((previous) => ({ ...previous, [business]: value }))
+            }
+            className="erp-dev-toolbar-example__scenario"
+          />
+          <Checkbox
+            checked={annotations}
+            onChange={(event) => setAnnotations(event.target.checked)}
+          >
+            显示职责标注
+          </Checkbox>
+          <Button
+            aria-label="恢复示例"
+            icon={<ReloadOutlined />}
+            onClick={() => {
+              setBusiness('inventory')
+              setVisited(['inventory'])
+              setScenarios({})
+              setAnnotations(true)
+              setRevision((value) => value + 1)
+            }}
+          >
+            恢复示例
+          </Button>
+        </div>
+        <p className="erp-dev-toolbar-example__explanation">
+          {toolbarGrowthExplanation(business, scenario)}
+        </p>
+        {visited.map((key) => (
+          <ExamplePage
+            key={`${revision}:${key}`}
+            business={key}
+            scenario={scenarios[key] || 'current'}
+            annotations={annotations}
+            active={business === key}
+          />
+        ))}
+      </section>
+    </>
   )
 }

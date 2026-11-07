@@ -36,6 +36,7 @@ function resolveDetail(step, reference) {
 export function buildFulfillmentSubflow(step) {
   if (!step.subflow) return null
   return {
+    direction: 'LR',
     summary: step.subflow.summary,
     nodes: step.subflow.nodes.map((node) => ({
       ...node,
@@ -47,7 +48,7 @@ export function buildFulfillmentSubflow(step) {
   }
 }
 
-export function buildSubflowMermaid(flow, { role = 'all', compact = false, direction = 'TB' } = {}) {
+export function buildSubflowMermaid(flow, { role = 'all', compact = false, direction = flow.direction || 'LR' } = {}) {
   const ids = new Map(flow.nodes.map((node, index) => [node.key, `N${index}`]))
   if (ids.size !== flow.nodes.length) throw new Error('Duplicate subflow nodes')
   const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 24', '    rankSpacing: 28', '---', `flowchart ${direction === 'LR' ? 'LR' : 'TB'}`]

@@ -1,5 +1,6 @@
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../src/common/consts/workflowTaskDiscovery.generated.mjs'
 import { DEV_FLOW_STATE_CATALOG } from '../../src/dev-workbench/config/devFlowStateCatalog.mjs'
+import { buildDevBusinessChainCustomerReview } from '../../src/dev-workbench/config/devBusinessChainCustomerReview.mjs'
 import { assertInactivePrintStylesDoNotHideApp } from './styleIsolationAssertions.mjs'
 import { DEV_FLOW_STATE_OBSERVATORY_PATH, startNoWriteAudit } from './devFlowStateObservatoryScenarios.mjs'
 
@@ -57,8 +58,17 @@ export function createDevBusinessChainPrintScenarios({ assert, assertNoHorizonta
           await page.waitForFunction(() => window.__flowPrintCount > 0)
           const printRoot = page.locator('[data-customer-review-print-root]')
           const diagrams = printRoot.locator('[data-customer-review-diagram] .erp-markdown-mermaid')
-          assert.equal(await diagrams.count(), chain === 'all' ? 0 : 1)
-          assert.deepEqual(await diagrams.evaluateAll((nodes) => nodes.map((node) => node.dataset.mermaidStatus)), Array(chain === 'all' ? 0 : 1).fill('rendered'), '全部图渲染完成后才能打印')
+          const expectedReview = chain === 'all' ? null : buildDevBusinessChainCustomerReview({ catalog: DEV_FLOW_STATE_CATALOG, chainKey: chain })
+          const expectedDiagrams = expectedReview ? expectedReview.chain.diagram.parts.length : 0
+          assert.equal(await diagrams.count(), expectedDiagrams)
+          assert.deepEqual(await diagrams.evaluateAll((nodes) => nodes.map((node) => node.dataset.mermaidStatus)), Array(expectedDiagrams).fill('rendered'), '全部图渲染完成后才能打印')
+          if (expectedReview) {
+            const normalize = (value) => value.replace(/\s+/gu, '')
+            const nodeText = (await diagrams.locator('.erp-markdown-mermaid__canvas > svg .node').allTextContents()).map(normalize)
+            const edgeText = (await diagrams.locator('.erp-markdown-mermaid__canvas > svg .edgeLabels > .edgeLabel').allTextContents()).map(normalize)
+            for (const step of expectedReview.chain.steps) assert(nodeText.some((text) => text.includes(normalize(`${step.number}. ${step.name}${step.responsibleRole}`))), `${chain} 完整保留节点编号、名称与岗位：${step.number}`)
+            for (const edge of DEV_FLOW_STATE_CATALOG.businessChains.find((item) => item.key === chain).edges) assert(edgeText.some((text) => text.includes(normalize(edge.label))), `${chain} 完整保留关系标签：${edge.key}`)
+          }
           const printText = await printRoot.innerText()
           for (const copy of ['按问题查阅', '图册阅读顺序', '适用范围', '完成边界', '业务衔接 ·']) assert(!printText.includes(copy), `导出仍带有冗余说明：${copy}`)
           if (chain === 'all') {
@@ -85,7 +95,7 @@ export function createDevBusinessChainPrintScenarios({ assert, assertNoHorizonta
           const metrics = await printRoot.evaluate((node) => ({
             width: node.clientWidth,
             scrollWidth: node.scrollWidth,
-            diagrams: [...node.querySelectorAll('[data-customer-review-diagram] svg')].map((svg) => {
+            diagrams: [...node.querySelectorAll('[data-customer-review-diagram] .erp-markdown-mermaid__canvas > svg')].map((svg) => {
               const box = svg.getBoundingClientRect()
               const viewBox = svg.viewBox.baseVal
               const scale = Math.min(box.width / viewBox.width, box.height / viewBox.height)
@@ -93,9 +103,10 @@ export function createDevBusinessChainPrintScenarios({ assert, assertNoHorizonta
             }),
           }))
           assert(metrics.scrollWidth <= metrics.width + 1, `${chain} 打印正文横向溢出`)
+          if (chain !== 'all') assert(metrics.diagrams.length > 0, `${chain} 实际生成纸面流程图`)
           assert.equal(await printRoot.locator('table').count(), 0, '流程节点不再重复生成长表')
           for (const diagram of metrics.diagrams) {
-            assert(diagram.minText >= 11, `${chain} 图内文字过小: ${JSON.stringify(diagram)}`)
+            assert(diagram.minText >= 12, `${chain} 图内文字不得小于 9pt: ${JSON.stringify(diagram)}`)
           }
           if (chain === 'all') {
             const cards = await printRoot.locator('[data-customer-review-stage]').evaluateAll((nodes) => nodes.map((node) => ({

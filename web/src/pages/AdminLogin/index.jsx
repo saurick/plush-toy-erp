@@ -6,7 +6,7 @@ import {
   EyeOutlined,
   MobileOutlined,
 } from '@ant-design/icons'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
@@ -86,7 +86,6 @@ function pickSupportedEntryTarget(defaultTarget, supportedTargets) {
 }
 
 export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
-  const navigate = useNavigate()
   const location = useLocation()
   const legalReturnState = { from: buildLocationPath(location, '/admin-login') }
   const [form] = Form.useForm()
@@ -128,6 +127,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   )
   const [smsNow, setSmsNow] = useState(() => Date.now())
   const [submitting, setSubmitting] = useState(false)
+  const [loginDestination, setLoginDestination] = useState(null)
   const [error, setError] = useState('')
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [capsLock, setCapsLock] = useState(false)
@@ -262,13 +262,11 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       rememberChoice: rememberEntryChoice,
     })
 
-  if (admin) {
-    const loggedInRedirect = resolvePostLoginPath(admin, {
-      shouldRemember: false,
-    })
-    if (loggedInRedirect) {
-      return <Navigate to={loggedInRedirect} replace />
-    }
+  const destinationPath =
+    loginDestination?.path ||
+    (admin ? resolvePostLoginPath(admin, { shouldRemember: false }) : '')
+  if (destinationPath) {
+    return <Navigate to={destinationPath} state={loginDestination?.state} replace />
   }
 
   const requestSMSCode = async () => {
@@ -377,7 +375,13 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
         setError('当前账号不能使用所选工作方式，请联系系统管理员。')
         return
       }
-      navigate(nextPath, { replace: true })
+      setLoginDestination({
+        path: nextPath,
+        state:
+          entryTarget === ENTRY_TARGET.DESKTOP
+            ? { desktopLoginFrom: location.key }
+            : undefined,
+      })
     } catch (err) {
       if (isCurrentRequest()) setError(getActionErrorMessage(err, '登录'))
     } finally {

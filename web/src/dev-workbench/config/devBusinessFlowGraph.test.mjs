@@ -80,11 +80,27 @@ test('unsafe labels and business keys cannot inject diagram syntax; invalid rela
   const graph = buildBusinessFlowMermaid({ nodes: [{ key: 'a\\nclick A callback', label: '材料"<script>\\n#35;|%' }, { key: 'b', label: '停用' }], edges: [{ from: 'a\\nclick A callback', to: 'b', label: '检查"|条件' }] })
   assert(!graph.chart.includes('<script>'))
   assert(!graph.chart.includes('click A callback'))
-  assert(graph.chart.includes('#34;#60;script#62;'))
+  assert(graph.chart.replaceAll('<br/>', '').includes('#34;#60;script#62;'))
   assert.match(graph.chart, /N0 E0@-->/u)
   assert.throws(() => buildBusinessFlowMermaid({ nodes: [{ key: 'a' }], edges: [{ from: 'a', to: 'missing' }] }), /endpoint/u)
   assert.throws(() => buildBusinessFlowMermaid({ nodes: [{ key: 'a' }, { key: 'a' }], edges: [] }), /Duplicate/u)
   assert.throws(() => buildBusinessFlowMermaid({ nodes: [{ key: 'a' }], edges: [], groups: [{ label: '错误分组', nodeKeys: ['missing'] }] }), /group member/u)
+})
+
+test('wrapped diagram labels preserve complete text and grapheme clusters', () => {
+  const label = '生产执行、成品入库与包装👨‍👩‍👧‍👦e\u0301'
+  const condition = '质量条件满足后确认包装用料'
+  const graph = buildBusinessFlowMermaid({
+    nodes: [{ key: 'source', label }, { key: 'result', label: '查货与包装' }],
+    edges: [{ from: 'source', to: 'result', label: condition }],
+  })
+  assert(graph.chart.includes('<br/>'))
+  assert(graph.chart.replaceAll('<br/>', '').includes(label))
+  assert(graph.chart.replaceAll('<br/>', '').includes(condition))
+  assert.equal(graph.nodes[0].label, label)
+  assert.equal(graph.edges[0].description, condition)
+  assert(graph.chart.includes('👨‍👩‍👧‍👦'))
+  assert(graph.chart.includes('e\u0301'))
 })
 
 test('missing rule diagrams derive conditions and corrections from their selected source', () => {

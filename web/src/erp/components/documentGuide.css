@@ -37,6 +37,103 @@
   line-height: 1;
 }
 
+.erp-document-guide__frame {
+  padding-block: var(--erp-document-guide-frame-padding-block, 28px);
+  padding-right: 52px;
+}
+
+.erp-document-guide__frame--both-sides {
+  padding-left: 52px;
+}
+
+.erp-document-guide__annotations,
+.erp-document-guide__highlights {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.erp-document-guide__highlights rect {
+  fill: transparent;
+  stroke: none;
+}
+
+.erp-document-guide__highlights .erp-document-guide__highlight--active {
+  fill: color-mix(in srgb, var(--erp-primary) 10%, transparent);
+}
+
+.erp-document-guide__callout {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 52px;
+  height: 100%;
+}
+
+.erp-document-guide__callout[data-side='left'] {
+  right: 100%;
+  left: auto;
+}
+
+.erp-document-guide__lines {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  color: var(--erp-primary);
+}
+
+.erp-document-guide__lines line {
+  stroke: currentColor;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.erp-document-guide__marker {
+  position: absolute;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 9px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--erp-primary);
+  background-clip: content-box;
+  color: var(--erp-on-accent);
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.erp-document-guide__marker[aria-pressed='true'] .erp-document-guide__number {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--erp-primary) 20%, transparent);
+}
+
+.erp-document-guide__marker:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.erp-document-guide__callout[data-side='left'] .erp-document-guide__marker {
+  right: 8px;
+  left: auto;
+}
+
+.erp-document-guide__details {
+  min-width: 0;
+}
+
+.erp-document-guide__summary {
+  margin: 0 0 12px;
+  color: var(--erp-text-muted, #62736a);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
 .erp-document-guide__parts {
   display: grid;
   gap: 32px;
@@ -47,12 +144,39 @@
 }
 
 .erp-document-guide__parts li {
+  min-width: 0;
+}
+
+.erp-document-guide__part {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
 }
 
-.erp-document-guide__parts h4 {
+.erp-document-guide__part[aria-pressed='true'] {
+  background: var(--erp-interactive-bg-hover);
+}
+
+.erp-document-guide__part:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.erp-document-guide__description {
+  min-width: 0;
+}
+
+.erp-document-guide__part-title {
+  display: block;
   margin: 0 0 6px;
   color: var(--erp-text, #24352d);
   font-size: var(--erp-font-emphasis);
@@ -60,7 +184,8 @@
   line-height: 26px;
 }
 
-.erp-document-guide__parts p {
+.erp-document-guide__part-description {
+  display: block;
   margin: 0;
   color: var(--erp-text-muted, #62736a);
   line-height: 1.7;
@@ -80,5 +205,52 @@
 
   .erp-document-guide__parts {
     gap: 18px;
+  }
+}
+
+.erp-document-guide--fill {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.erp-document-guide--fill .erp-document-guide__body {
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  align-items: stretch;
+}
+
+.erp-document-guide--fill .erp-document-guide__figure {
+  display: flex;
+  flex-direction: column;
+  width: auto;
+  min-height: 0;
+}
+
+.erp-document-guide--fill .erp-document-guide__details {
+  align-self: center;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+@container document-guide (max-width: 719px) {
+  .erp-document-guide--fill .erp-document-guide__body {
+    flex: none;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 24px;
+  }
+
+  .erp-document-guide--fill .erp-document-guide__figure {
+    width: 100%;
+    height: clamp(340px, 60dvh, 640px);
+  }
+
+  .erp-document-guide--fill .erp-document-guide__details {
+    max-height: none;
+    overflow: visible;
   }
 }

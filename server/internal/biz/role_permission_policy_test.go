@@ -11,7 +11,7 @@ import (
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 )
 
-func TestRolePermissionPolicyUsesRegisteredRoleAndPreservesDuties(t *testing.T) {
+func TestRolePermissionPolicySeparatesDefaultsFromEditableBusinessPermissions(t *testing.T) {
 	for _, definition := range BuiltinRoles() {
 		role := AdminRole{Key: definition.Key, Type: definition.Type, Builtin: definition.Builtin, Permissions: definition.Permissions}
 		if IsSystemManagedRole(role) {
@@ -19,55 +19,89 @@ func TestRolePermissionPolicyUsesRegisteredRoleAndPreservesDuties(t *testing.T) 
 		}
 		t.Run(role.Key, func(t *testing.T) {
 			policy := RolePermissionPolicyFor(role)
-			if !policy.Registered || len(policy.Required) == 0 || len(policy.MissingRequired) != 0 || len(policy.OutsideTemplate) != 0 {
-				t.Fatalf("registered role does not satisfy its template: %#v", policy)
+			if !policy.Registered || !slices.Equal(policy.Defaults, NormalizePermissionKeys(definition.Permissions)) {
+				t.Fatalf("registered defaults drifted: %#v", policy)
 			}
-			if err := ValidateRolePermissionPolicy(role, policy.Required); err != nil {
-				t.Fatalf("core-only configuration: %v", err)
-			}
-			for _, optional := range policy.Optional {
-				candidate := append(slices.Clone(policy.Required), optional)
+			for _, candidate := range [][]string{nil, {}, {PermissionWarehouseInventoryRead}, {PermissionFinancePaymentRead, PermissionFinancePaymentPost}} {
 				if err := ValidateRolePermissionPolicy(role, candidate); err != nil {
-					t.Fatalf("registered assistance %s: %v", optional, err)
+					t.Fatalf("editable business permissions %v: %v", candidate, err)
+				}
+				role.Permissions = candidate
+				if !slices.Equal(RolePermissionPolicyFor(role).Defaults, policy.Defaults) {
+					t.Fatal("editing grants changed the initial template")
+				}
+				if err := ValidateRoleAssignment(role, true, "local"); err != nil {
+					t.Fatalf("edited role cannot be assigned: %v", err)
 				}
 			}
-			if err := ValidateRolePermissionPolicy(role, policy.Required[1:]); !errors.Is(err, ErrRolePermissionPolicy) {
-				t.Fatalf("removing a core capability: %v", err)
+			if err := ValidateAssignablePermissionKeys(policy.Assignable); err != nil || len(policy.Assignable) == 0 {
+				t.Fatalf("editable catalog contains invalid permissions: %v", err)
+			}
+			if !slices.Contains(policy.Assignable, PermissionFinancePaymentPost) || slices.Contains(policy.Assignable, PermissionSystemRolePermissionManage) {
+				t.Fatal("editable catalog must include business actions and exclude the control plane")
 			}
 		})
 	}
-	warehouse := AdminRole{Key: WarehouseRoleKey, Builtin: true}
-	policy := RolePermissionPolicyFor(warehouse)
-	if !slices.Contains(policy.Required, PermissionPurchaseOrderRead) || !slices.Contains(policy.Required, PermissionWarehouseInboundConfirm) {
-		t.Fatal("warehouse source reads and inbound posting must stay core")
+}
+
+func TestRolePermissionPolicyRejectsProtectedAndUnknownPermissions(t *testing.T) {
+	role := AdminRole{Key: WarehouseRoleKey, Builtin: true}
+	for _, key := range []string{PermissionSystemRolePermissionManage, PermissionCustomerConfigActivate, PermissionERPBusinessChainDebugRead} {
+		if err := ValidateRolePermissionPolicy(role, []string{key}); !errors.Is(err, ErrPermissionNotDelegable) {
+			t.Fatalf("protected permission %s: %v", key, err)
+		}
 	}
-	if err := ValidateRolePermissionPolicy(warehouse, append(policy.Required, PermissionFinancePaymentPost)); !errors.Is(err, ErrRolePermissionPolicy) {
-		t.Fatalf("cross-domain permission was accepted: %v", err)
+	if err := ValidateRolePermissionPolicy(role, []string{"unknown.permission"}); !errors.Is(err, ErrPermissionNotFound) {
+		t.Fatalf("unknown permission: %v", err)
 	}
-	if err := ValidateRolePermissionPolicy(AdminRole{Key: "arbitrary-role"}, []string{PermissionWarehouseInventoryRead}); !errors.Is(err, ErrRolePermissionPolicy) {
-		t.Fatalf("unregistered role was editable: %v", err)
+	for _, role := range []AdminRole{{Key: "arbitrary-role"}, {Key: AdminRoleKey}, {Key: DebugOperatorRoleKey}} {
+		if err := ValidateRolePermissionPolicy(role, []string{PermissionWarehouseInventoryRead}); !errors.Is(err, ErrRolePermissionPolicy) {
+			t.Fatalf("unregistered or protected role %s was editable: %v", role.Key, err)
+		}
+	}
+	if !builtinRoleAllowsPermission(WarehouseRoleKey, PermissionFinancePaymentPost) || builtinRoleAllowsPermission(WarehouseRoleKey, PermissionSystemRolePermissionManage) {
+		t.Fatal("customer configuration must use the same editable business boundary")
+	}
+	if builtinRoleHasPermission(WarehouseRoleKey, PermissionFinancePaymentPost) {
+		t.Fatal("an editable capability must not become a default duty or approval responsibility")
 	}
 }
 
-func TestRolePermissionPolicyRejectsInvalidSaveAndPreviewWithoutMutation(t *testing.T) {
+func TestRolePermissionPolicySaveAndPreviewPreserveExplicitSelection(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
 	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
 	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
 	before := repo.roleByKey(WarehouseRoleKey)
-	for _, candidate := range [][]string{
-		{PermissionWarehouseInventoryRead},
-		append(slices.Clone(before.Permissions), PermissionFinancePaymentPost),
-	} {
-		if _, err := uc.SetRoleSettings(ctx, before.Key, candidate, nil, RoleNavigationModeRecommended, nil, nil, before.Version); !errors.Is(err, ErrRolePermissionPolicy) {
-			t.Fatalf("invalid save: %v", err)
-		}
-		if _, err := uc.GetRoleForAccessPreview(ctx, before.Key, candidate); !errors.Is(err, ErrRolePermissionPolicy) {
-			t.Fatalf("invalid preview: %v", err)
+	wanted := []string{PermissionFinancePaymentRead, PermissionFinancePaymentPost}
+	preview, err := uc.GetRoleForAccessPreview(ctx, before.Key, wanted)
+	if err != nil || !slices.Equal(preview.Permissions, NormalizePermissionKeys(wanted)) {
+		t.Fatalf("preview: %#v err=%v", preview, err)
+	}
+	if !slices.Equal(repo.roleByKey(before.Key).Permissions, before.Permissions) || len(repo.auditEvents) != 0 {
+		t.Fatal("preview mutated the saved role or emitted a success audit")
+	}
+	for _, candidate := range [][]string{wanted, {}} {
+		current := repo.roleByKey(before.Key)
+		updated, err := uc.SetRoleSettings(ctx, current.Key, candidate, []RoleDataScope{{ResourceType: DataScopeResourceWarehouse, Mode: DataScopeModeAll}}, RoleNavigationModeRecommended, nil, nil, current.Version)
+		if err != nil || !slices.Equal(updated.Permissions, NormalizePermissionKeys(candidate)) || updated.Version != current.Version+1 {
+			t.Fatalf("save: %#v err=%v", updated, err)
 		}
 	}
-	after := repo.roleByKey(WarehouseRoleKey)
-	if after.Version != before.Version || !slices.Equal(before.Permissions, after.Permissions) || len(repo.auditEvents) != 0 {
-		t.Fatal("rejected role change mutated configuration or emitted a success audit")
+	if len(repo.auditEvents) != 2 {
+		t.Fatalf("successful saves must retain audit events, got %d", len(repo.auditEvents))
+	}
+	current := repo.roleByKey(before.Key)
+	for _, candidate := range [][]string{{PermissionSystemRolePermissionManage}, {"unknown.permission"}} {
+		if _, err := uc.SetRoleSettings(ctx, current.Key, candidate, nil, RoleNavigationModeRecommended, nil, nil, current.Version); err == nil {
+			t.Fatal("protected or unknown permission was saved")
+		}
+		if _, err := uc.GetRoleForAccessPreview(ctx, current.Key, candidate); err == nil {
+			t.Fatal("protected or unknown permission was previewed")
+		}
+	}
+	after := repo.roleByKey(before.Key)
+	if after.Version != current.Version || !slices.Equal(after.Permissions, current.Permissions) || len(repo.auditEvents) != 2 {
+		t.Fatal("rejected changes mutated configuration or emitted a success audit")
 	}
 }

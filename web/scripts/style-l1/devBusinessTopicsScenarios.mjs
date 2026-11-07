@@ -1,10 +1,15 @@
 import { expect } from 'playwright/test'
+import { writeFile } from 'node:fs/promises'
+import { DEV_FLOW_STATE_CATALOG as catalog } from '../../src/dev-workbench/config/devFlowStateCatalog.mjs'
+import { assertBusinessMermaidGraph } from './mermaidGraphAssertions.mjs'
+import { switchMermaidLayout, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
 
-export function createDevBusinessTopicsScenarios({ assert, assertNoHorizontalOverflow }) {
+export function createDevBusinessTopicsScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }) {
   return [{
     name: 'dev-business-topics-navigation-desktop',
     path: '/__dev/business-topics?flow_topic=finance_relations',
     viewport: { width: 1440, height: 900 },
+    deviceScaleFactor: 2,
     verify: async (page) => {
       const topicMenu = page.getByRole('link', { name: '业务专题', exact: true })
       const chainMenu = page.getByRole('link', { name: '业务链路', exact: true })
@@ -100,6 +105,45 @@ export function createDevBusinessTopicsScenarios({ assert, assertNoHorizontalOve
       await expect(topicMenu).toHaveAttribute('aria-current', 'page')
       await expect(topics.locator('[data-topic-diagram="purchase_to_inventory"]')).toBeVisible()
       await assertNoHorizontalOverflow(page)
+      const { origin } = new URL(page.url())
+      const reviewed = []
+      await page.setViewportSize({ width: 1920, height: 1080 })
+      for (const chain of catalog.businessChains) {
+        await page.goto(`${origin}/__dev/business-topics?flow_topic=${encodeURIComponent(chain.key)}`)
+        const graph = page.locator('[data-business-flow]')
+        await assertBusinessMermaidGraph(graph)
+        const viewer = graph.locator('.erp-markdown-mermaid')
+        await expect(viewer).toHaveAttribute('data-mermaid-direction', 'LR')
+        await waitForMermaidFit(page, viewer)
+        await expect(graph.locator('[data-graph-node]')).toHaveCount(chain.nodes.length)
+        await expect(graph.locator('[data-graph-wire]')).toHaveCount(chain.edges.length)
+        const metrics = await viewer.evaluate((root) => {
+          const svg = root.querySelector('.erp-markdown-mermaid__canvas > svg')
+          const box = svg.getBoundingClientRect()
+          const scale = Math.min(box.width / svg.viewBox.baseVal.width, box.height / svg.viewBox.baseVal.height)
+          return { scale, textPixels: parseFloat(getComputedStyle(svg.querySelector('.nodeLabel')).fontSize) * scale }
+        })
+        reviewed.push({ chain: chain.key, ...metrics })
+        if (chain.key === 'production_to_inventory') {
+          assert(metrics.textPixels >= 14, '生产专题首次显示的文字保持可读，不把细长全图缩成小字')
+          const selected = chain.nodes[1].key
+          await graph.locator(`[data-graph-node="${selected}"]`).click()
+          await expect(graph.locator(`[data-graph-node="${selected}"]`)).toHaveAttribute('aria-pressed', 'true')
+          await switchMermaidLayout(page, viewer, assert)
+          await expect(viewer).toHaveAttribute('data-mermaid-direction', 'TB')
+          await expect(graph.locator(`[data-graph-node="${selected}"]`)).toHaveAttribute('aria-pressed', 'true')
+          await page.reload()
+          await expect(viewer).toHaveAttribute('data-mermaid-direction', 'LR')
+          await assertBusinessMermaidGraph(graph)
+          await expect(graph.locator(`[data-graph-node="${selected}"]`)).toHaveAttribute('aria-pressed', 'true')
+          await page.screenshot({ path: path.join(outputDir, 'production-topic-direction-4k.png'), fullPage: false })
+        }
+        await page.getByRole('button', { name: '系统衔接图', exact: true }).click()
+        await assertBusinessMermaidGraph(graph)
+        await expect(graph.locator('.erp-markdown-mermaid')).toHaveAttribute('data-mermaid-direction', 'LR')
+        await assertNoHorizontalOverflow(page, `${chain.label}与系统衔接`)
+      }
+      await writeFile(path.join(outputDir, 'mermaid-topic-directions.json'), JSON.stringify(reviewed, null, 2))
     },
   }]
 }

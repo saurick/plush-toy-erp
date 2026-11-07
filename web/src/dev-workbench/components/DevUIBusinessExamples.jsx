@@ -4,7 +4,11 @@ import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import BusinessFormPage from '@/erp/components/business-list/BusinessFormPage.jsx'
 import BusinessFormSection from '@/erp/components/business-list/BusinessFormSection.jsx'
+import BusinessLineItemActionButton from '@/erp/components/business-list/BusinessLineItemActionButton.jsx'
+import ContactFormList from '@/erp/components/master-data/ContactFormList.jsx'
 import BusinessLineItemsSection from '@/erp/components/business-list/BusinessLineItemsSection.jsx'
+import BusinessCompactFieldTable, { BusinessCompactFieldRow } from '@/erp/components/business-list/BusinessCompactFieldTable.jsx'
+import BusinessGroupedLineItems from '@/erp/components/business-list/BusinessGroupedLineItems.jsx'
 import { BusinessLineItemRow } from '@/erp/components/business-list/BusinessLineItemsTable.jsx'
 import BusinessTextArea from '@/erp/components/business-list/BusinessTextArea.jsx'
 import { DateInput } from '@/erp/components/business-list/BusinessDateInputs.jsx'
@@ -30,6 +34,7 @@ function BusinessFormExample() {
   const [open, setOpen] = useState(false)
   const [fail, setFail] = useState(false)
   const [failure, setFailure] = useState(false)
+  const [layout, setLayout] = useState('standard')
   const [result, setResult] = useState('尚未保存演示草稿')
 
   const start = () => {
@@ -44,7 +49,7 @@ function BusinessFormExample() {
       return
     }
     setResult(
-      `演示草稿已保存：${values.subject}，${values.items.length} 条明细`
+      `演示草稿已保存：${values.subject}，${values[layout === 'contacts' ? 'contacts' : layout === 'compact' ? 'compactItems' : 'items'].length} ${layout === 'contacts' ? '位联系人' : '条明细'}`
     )
     setOpen(false)
   }
@@ -52,6 +57,17 @@ function BusinessFormExample() {
   return (
     <div className="erp-control-example-stack">
       <div className="erp-control-example-row">
+        <Segmented
+          aria-label="明细表结构"
+          value={layout}
+          onChange={setLayout}
+          disabled={open}
+          options={[
+            { value: 'standard', label: '普通明细' },
+            { value: 'compact', label: '紧凑字段明细' },
+            { value: 'contacts', label: '联系人' },
+          ]}
+        />
         <Segmented
           aria-label="表单保存结果"
           value={fail ? 'failure' : 'success'}
@@ -83,6 +99,8 @@ function BusinessFormExample() {
               subject: '毛绒材料采购',
               date: '2026-10-24',
               items: [{ name: '短毛绒', quantity: 10, note: '' }],
+              compactItems: [{ name: '短毛绒', quantity: 10 }],
+              contacts: [{ name: '演示联系人', is_primary: true }],
             }}
           >
             {failure && (
@@ -111,85 +129,129 @@ function BusinessFormExample() {
                 <DateInput />
               </Form.Item>
             </BusinessFormSection>
-            <BusinessFormSection
-              title="材料明细"
-              layout="stack"
-              showHeading={false}
-            >
-              <BusinessLineItemsSection
-                grouping={{ form, getGroup: (item) => ({ label: item.name || '待填写材料' }) }}
+            {layout === 'standard' ? (
+              <BusinessFormSection
                 title="材料明细"
-                columns={LINE_COLUMNS}
-                emptyDescription="暂无演示明细，可添加一条继续操作"
-                footerProps={({ add, fields }) => ({
-                  onAdd: () => add({ name: '', quantity: 1, note: '' }),
-                  stats: [
-                    {
-                      key: 'count',
-                      label: '明细',
-                      value: fields.length,
-                      suffix: ' 条',
-                    },
-                  ],
-                })}
-                renderRow={({ field, index, remove }) => (
-                  <BusinessLineItemRow
-                    key={field.key}
-                    index={index}
-                    cells={[
-                      <Form.Item
-                        key="name"
-                        name={[field.name, 'name']}
-                        rules={[
-                          {
-                            required: true,
-                            whitespace: true,
-                            message: '请填写材料名称',
-                          },
-                        ]}
-                      >
+                layout="stack"
+                showHeading={false}
+              >
+                <BusinessLineItemsSection
+                  grouping={{ form, getGroup: (item) => ({ label: item.name || '待填写材料' }) }}
+                  title="材料明细"
+                  columns={LINE_COLUMNS}
+                  emptyDescription="暂无演示明细，可添加一条继续操作"
+                  footerProps={({ add, fields }) => ({
+                    onAdd: () => add({ name: '', quantity: 1, note: '' }),
+                    stats: [
+                      {
+                        key: 'count',
+                        label: '明细',
+                        value: fields.length,
+                        suffix: ' 条',
+                      },
+                    ],
+                  })}
+                  renderRow={({ field, index, remove }) => (
+                    <BusinessLineItemRow
+                      key={field.key}
+                      index={index}
+                      cells={[
+                        <Form.Item
+                          key="name"
+                          name={[field.name, 'name']}
+                          rules={[
+                            {
+                              required: true,
+                              whitespace: true,
+                              message: '请填写材料名称',
+                            },
+                          ]}
+                        >
+                          <BusinessTextArea
+                            minRows={1}
+                            aria-label={`第 ${index + 1} 条材料名称`}
+                          />
+                        </Form.Item>,
+                        <Form.Item
+                          key="quantity"
+                          name={[field.name, 'quantity']}
+                          rules={[
+                            {
+                              required: true,
+                              type: 'number',
+                              min: 0.01,
+                              message: '数量须大于零',
+                            },
+                          ]}
+                        >
+                          <InputNumber
+                            aria-label={`第 ${index + 1} 条数量`}
+                            min={0.01}
+                          />
+                        </Form.Item>,
+                      ]}
+                      actions={
+                        <BusinessLineItemActionButton
+                          action="remove"
+                          onClick={() => remove(field.name)}
+                          aria-label={`移除第 ${index + 1} 条明细`}
+                        >
+                          移除
+                        </BusinessLineItemActionButton>
+                      }
+                    >
+                      <Form.Item name={[field.name, 'note']} label="明细备注">
                         <BusinessTextArea
-                          minRows={1}
-                          aria-label={`第 ${index + 1} 条材料名称`}
+                          aria-label={`第 ${index + 1} 条备注`}
+                          maxLength={BusinessTextPolicy.noteMaxCharacters}
                         />
-                      </Form.Item>,
-                      <Form.Item
-                        key="quantity"
-                        name={[field.name, 'quantity']}
-                        rules={[
-                          {
-                            required: true,
-                            type: 'number',
-                            min: 0.01,
-                            message: '数量须大于零',
-                          },
-                        ]}
-                      >
-                        <InputNumber
-                          aria-label={`第 ${index + 1} 条数量`}
-                          min={0.01}
+                      </Form.Item>
+                    </BusinessLineItemRow>
+                  )}
+                />
+              </BusinessFormSection>
+            ) : null}
+            {layout === 'compact' ? (
+              <BusinessFormSection title="紧凑字段明细" layout="content" showHeading={false}>
+                <Form.List name="compactItems">
+                  {(fields) => (
+                    <BusinessGroupedLineItems
+                      title="紧凑字段明细"
+                      form={form}
+                      fields={fields}
+                      getGroup={(item) => ({ label: item.name || '待填写材料' })}
+                      table={BusinessCompactFieldTable}
+                      tableProps={{
+                        label: '紧凑字段明细',
+                        showSequence: true,
+                        columns: LINE_COLUMNS,
+                      }}
+                    >
+                      {(field, index) => (
+                        <BusinessCompactFieldRow
+                          key={field.key}
+                          sequence={index + 1}
+                          label={`紧凑明细 ${index + 1}`}
+                          cells={[
+                            <Form.Item key="name" name={[field.name, 'name']} label="紧凑明细材料名称" rules={[{ required: true, whitespace: true, message: '请填写材料名称' }]}>
+                              <BusinessTextArea minRows={1} />
+                            </Form.Item>,
+                            <Form.Item key="quantity" name={[field.name, 'quantity']} label="紧凑明细数量" rules={[{ required: true, type: 'number', min: 0.01, message: '数量须大于零' }]}>
+                              <InputNumber min={0.01} />
+                            </Form.Item>,
+                          ]}
                         />
-                      </Form.Item>,
-                    ]}
-                    actions={
-                      <Button
-                        onClick={() => remove(field.name)}
-                        aria-label={`移除第 ${index + 1} 条明细`}
-                      >
-                        移除
-                      </Button>
-                    }
-                  >
-                    <Form.Item name={[field.name, 'note']} label="明细备注">
-                      <BusinessTextArea
-                        aria-label={`第 ${index + 1} 条备注`}
-                        maxLength={BusinessTextPolicy.noteMaxCharacters}
-                      />
-                    </Form.Item>
-                  </BusinessLineItemRow>
-                )}
-              />
-            </BusinessFormSection>
+                      )}
+                    </BusinessGroupedLineItems>
+                  )}
+                </Form.List>
+              </BusinessFormSection>
+            ) : null}
+            {layout === 'contacts' ? (
+              <BusinessFormSection title="联系人" layout="content" showHeading={false}>
+                <ContactFormList form={form} entityLabel="演示" />
+              </BusinessFormSection>
+            ) : null}
             <BusinessFormSection title="备注">
               <Form.Item
                 name="note"

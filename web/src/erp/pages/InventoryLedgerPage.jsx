@@ -1750,7 +1750,6 @@ export default function InventoryLedgerPage() {
                   />
           ) : (
             <InventoryTable
-              widthMode="columns"
               tableLayout="fixed"
               scrollToolbar
               sticky={sticky}

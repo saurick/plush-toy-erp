@@ -2,7 +2,7 @@ import { assertSingleSelectValues } from './singleSelectAssertions.mjs'
 import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
-export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverflow }) {
+export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverflow, outputDir }) {
   return [{
     name: 'dev-ui-select-overflow',
     path: '/__dev/ui-design?page=controls&control=select-overflow',
@@ -62,12 +62,26 @@ export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverfl
       await assertBusinessNoteTextAreas(sample)
       await note.fill('')
       await page.waitForFunction((height) => Math.abs(document.querySelector('textarea[aria-label="第 1 行备注"]').getBoundingClientRect().height - height) <= 1, initialNoteHeight)
-      await sample.getByRole('checkbox', { name: '窄区域', exact: true }).check()
-      await waitForFiniteAnimations(page)
       const region = sample.getByRole('region', { name: '长值演示明细', exact: true })
+      const wideDimensions = await region.evaluate((node) => ({ client: node.clientWidth, scroll: node.scrollWidth }))
+      assert(wideDimensions.scroll > wideDimensions.client, '宽屏列增加时只滚动明细容器')
+      assert.equal(await sample.getByRole('columnheader').count(), 12, '宽屏完整显示十个业务列和补充、序号列')
+      await assertNoHorizontalOverflow(page)
+      const quantity = sample.getByRole('spinbutton', { name: '第 1 行数量', exact: true })
+      await quantity.fill('25.5')
+      await sample.getByRole('checkbox', { name: '窄区域', exact: true }).check()
+      await sample.locator('[data-line-editor-compact="true"]').waitFor()
+      await waitForFiniteAnimations(page)
       const dimensions = await region.evaluate((node) => ({ client: node.clientWidth, scroll: node.scrollWidth }))
-      assert(dimensions.client <= 420 && dimensions.scroll > dimensions.client, '列增加时只滚动明细容器')
+      assert(dimensions.client > 0 && dimensions.client <= 420 && dimensions.scroll <= dimensions.client + 1, '窄区域按卡片重排，不产生横向溢出')
+      const cards = region.locator('.erp-task-line-card')
+      assert.equal(await cards.count(), 3, '窄区保留全部明细')
+      for (const card of await cards.all()) {
+        assert.equal(await card.locator('.erp-task-line-card__field').count(), 10, '窄区保留全部业务字段')
+      }
+      assert.equal(Number(await quantity.inputValue()), 25.5, '切换到窄区保留已输入数量')
       await assertSingleSelectValues(sample, '长引用十列窄区域', 6)
+      await assertNoHorizontalOverflow(page)
 
       const packing = control('第 1 行包装方式')
       const packingValue = await packing.locator('.ant-select-selection-item').getAttribute('title')
@@ -80,9 +94,17 @@ export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverfl
       await packing.getByRole('combobox').press('Escape')
       await menu.waitFor({ state: 'hidden' })
       assert(await packing.getByRole('combobox').evaluate((node) => node === document.activeElement), 'Escape 返回选择框')
+      await control('第 1 行单位').scrollIntoViewIfNeeded()
+      await waitForFiniteAnimations(page)
+      await page.screenshot({ path: `${outputDir}/select-overflow-narrow-4k.png` })
+      await sample.getByRole('checkbox', { name: '窄区域', exact: true }).uncheck()
+      await sample.locator('[data-line-editor-compact="false"]').waitFor()
+      assert.equal(await sample.getByRole('columnheader').count(), 12, '返回宽屏恢复完整表头')
+      assert.equal(Number(await quantity.inputValue()), 25.5, '返回宽屏保留已输入数量')
       await sample.getByRole('checkbox', { name: '增加 4 列', exact: true }).uncheck()
       await sample.getByRole('button', { name: '恢复初始内容', exact: true }).click()
-      assert.equal(await sample.getByRole('columnheader').count(), 8, '恢复六个业务列和序号、操作')
+      assert.equal(await sample.getByRole('columnheader').count(), 8, '恢复六个业务列及补充、序号列')
+      assert.equal(Number(await quantity.inputValue()), 1464, '重置后恢复初始数量')
       assert.equal(await sample.getByRole('checkbox', { name: '窄区域', exact: true }).isChecked(), false)
       await assertNoHorizontalOverflow(page)
       await page.getByRole('navigation', { name: '控件设计目录', exact: true }).getByRole('button', { name: /组件选用/u }).click()

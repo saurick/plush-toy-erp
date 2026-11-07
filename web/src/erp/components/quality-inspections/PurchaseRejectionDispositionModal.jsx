@@ -460,7 +460,6 @@ export default function PurchaseRejectionDispositionModal({
       /> : null}
       {history.length > 0 && !taskDispositionID ? (
         <Alert
-          style={{ marginTop: 12 }}
           type="info"
           showIcon
           message={`已登记 ${history.length} 笔处置，累计数量 ${sumNumeric20Scale6Values(history.filter((item) => item.status !== PurchaseRejectionStatus.CANCELLED).map((item) => item.quantity))}`}
@@ -471,7 +470,6 @@ export default function PurchaseRejectionDispositionModal({
           size="small"
           rowKey="id"
           pagination={false}
-          style={{ marginTop: 12 }}
           dataSource={history}
           rowSelection={{
             type: 'radio',
@@ -498,7 +496,6 @@ export default function PurchaseRejectionDispositionModal({
       <Descriptions
         size="small"
         column={{ xs: 1, sm: 2 }}
-        style={{ marginTop: 16 }}
         items={[
           {
             key: 'inspection',

@@ -3,6 +3,8 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -10,9 +12,87 @@ import (
 	"server/internal/attachmentstore"
 	"server/internal/biz"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 )
+
+func TestDatabaseGovernancePostgresProductSupplementalImages(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	productID := createInventoryPostgresFixtures(t, ctx, client).productID
+	repo := NewBusinessAttachmentRepo(data, newAttachmentMemoryStore(), log.NewStdLogger(io.Discard))
+	primary, err := repo.CreateBusinessAttachment(ctx, productImageAttachmentCreate(productID, biz.BusinessAttachmentProductImageSlotPrimary))
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendInput := func(number int) *biz.BusinessAttachmentCreate {
+		in := productImageAttachmentCreate(productID, biz.BusinessAttachmentProductImageSlotSupplemental)
+		in.Content = []byte(fmt.Sprintf("supplemental-image-%d", number))
+		in.SHA256 = attachmentSHA256(in.Content)
+		in.FileSize = len(in.Content)
+		return in
+	}
+	const attempts = biz.BusinessAttachmentProductImageSupplementalMaxCount + 1
+	type result struct {
+		item *biz.BusinessAttachment
+		err  error
+		n    int
+	}
+	results := make(chan result, attempts)
+	for i := range attempts {
+		go func() {
+			item, err := repo.CreateBusinessAttachment(ctx, appendInput(i))
+			results <- result{item, err, i}
+		}()
+	}
+	var first result
+	accepted, rejected := 0, 0
+	for range attempts {
+		got := <-results
+		switch {
+		case got.err == nil:
+			accepted++
+			if first.item == nil {
+				first = got
+			}
+		case errors.Is(got.err, biz.ErrBusinessAttachmentProductImageSupplementalLimit):
+			rejected++
+		default:
+			t.Fatal(got.err)
+		}
+	}
+	if accepted != attempts-1 || rejected != 1 {
+		t.Fatalf("concurrent uploads: accepted=%d rejected=%d", accepted, rejected)
+	}
+	replayed, err := repo.CreateBusinessAttachment(ctx, appendInput(first.n))
+	if err != nil || replayed.ID != first.item.ID {
+		t.Fatalf("full gallery exact retry: %v, %v", replayed, err)
+	}
+	if err := repo.ClearProductImage(ctx, productID, "", primary.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("fixed slot must not be cleared by supplemental ID: %v", err)
+	}
+	if err := repo.ClearProductImage(ctx, productID, "", first.item.ID); err != nil {
+		t.Fatal(err)
+	}
+	newImage, err := repo.CreateBusinessAttachment(ctx, appendInput(attempts))
+	if err != nil || newImage.ID == first.item.ID || *newImage.SlotKey != *first.item.SlotKey {
+		t.Fatalf("allocate freed slot with new identity: %v, %v", newImage, err)
+	}
+	if err := repo.ClearProductImage(ctx, productID, "", first.item.ID); err != nil {
+		t.Fatalf("stale removal: %v", err)
+	}
+	if _, err := repo.GetBusinessAttachmentMetadata(ctx, newImage.ID); err != nil {
+		t.Fatalf("stale removal deleted the new image: %v", err)
+	}
+	refs, err := repo.ListProductImageReferences(ctx, []int{productID})
+	if err != nil || refs[productID] != primary.ID {
+		t.Fatalf("main image reference changed: %v, %v", refs, err)
+	}
+	_, err = data.sqldb.ExecContext(ctx, "UPDATE business_attachments SET slot_key = 'supplemental_9' WHERE id = $1", newImage.ID)
+	assertDatabaseGovernancePGError(t, err, "23514", "business_attachments_product_image_contract")
+}
 
 func TestDatabaseGovernancePostgresInventoryConstraints(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

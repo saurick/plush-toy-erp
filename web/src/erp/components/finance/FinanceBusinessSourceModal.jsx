@@ -170,7 +170,6 @@ export default function FinanceBusinessSourceModal({
       <Descriptions
         size="small"
         column={1}
-        style={{ marginTop: 16, marginBottom: 8 }}
         items={sourceSummaryItems(effectiveAction, source)}
       />
       <BusinessForm

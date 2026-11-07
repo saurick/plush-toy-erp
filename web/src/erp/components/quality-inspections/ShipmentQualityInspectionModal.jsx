@@ -216,13 +216,11 @@ export default function ShipmentQualityInspectionModal({
           type="warning"
           showIcon
           message={unavailableMessage}
-          style={{ marginTop: 12 }}
         />
       ) : null}
       <Descriptions
         size="small"
         column={{ xs: 1, sm: 2 }}
-        style={{ marginTop: 16, marginBottom: 8 }}
         items={[
           {
             key: 'shipment',

@@ -243,8 +243,8 @@
   scrollbar-gutter: stable;
 }
 
-.erp-business-form-page__body:has(> .erp-business-form-section),
-.erp-business-form-page__body .ant-spin-container:has(> .erp-business-form-section) {
+.erp-business-form-page__body,
+.erp-business-form-page__body > .ant-spin-nested-loading > .ant-spin-container {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: start;

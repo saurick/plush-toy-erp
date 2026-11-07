@@ -16,7 +16,7 @@ function MeasuredHeaderTable({ style, ...props }) {
 
 const AppTable = React.forwardRef(
   (
-    { columns, className = '', locale, components, rowSelection, style, widthMode = 'container', scrollToolbar = false, scrollControlsOnEmpty = false, ...props },
+    { columns, className = '', locale, components, rowSelection, style, scrollToolbar = false, scrollControlsOnEmpty = false, ...props },
     ref
   ) => {
     const tableRef = useRef(null)
@@ -35,7 +35,6 @@ const AppTable = React.forwardRef(
       const minimumWidth = columnsWidth + TABLE_SELECTION_COLUMN_WIDTH + (props.expandable?.columnWidth || 0)
       return { ...props.scroll, x: Math.max(Number(props.scroll?.x) || 0, minimumWidth) }
     }, [columns, hasRowSelection, props.scroll, props.expandable?.columnWidth])
-    const budgetWidth = widthMode === 'columns' && props.tableLayout === 'fixed' && Number.isFinite(scroll?.x) ? scroll.x : undefined
     const selection = useMemo(
       () => rowSelection && { ...rowSelection, columnWidth: TABLE_SELECTION_COLUMN_WIDTH },
       [rowSelection]
@@ -52,7 +51,6 @@ const AppTable = React.forwardRef(
         scroll,
         props.pagination,
         props.tableLayout,
-        widthMode,
       ],
       [
         alignedColumns,
@@ -61,7 +59,6 @@ const AppTable = React.forwardRef(
         scroll,
         props.pagination,
         props.tableLayout,
-        widthMode,
       ]
     )
     return (
@@ -74,7 +71,7 @@ const AppTable = React.forwardRef(
           columns={alignedColumns}
           rowSelection={selection}
           scroll={scroll}
-          style={{ width: budgetWidth, maxWidth: budgetWidth === undefined ? undefined : '100%', ...style, '--app-table-selection-column-width': `${TABLE_SELECTION_COLUMN_WIDTH}px` }}
+          style={{ ...style, '--app-table-selection-column-width': `${TABLE_SELECTION_COLUMN_WIDTH}px` }}
           components={tableComponents}
           locale={{
             ...locale,

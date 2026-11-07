@@ -36,6 +36,7 @@ import {
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
   DEV_DATA_PREPARATION_TARGET_KEYS,
+  dataPreparationBatchLabel,
   dataPreparationStatusPresentation,
   getDataPreparationEnvironment,
   resolveDataPreparationAvailability,
@@ -345,8 +346,9 @@ function DatasetEnvironmentContract({ summary }) {
           </Text>
         </div>
         <Space wrap size={[4, 4]}>
-          <Tag>{contract.dataVersion}</Tag>
-          <Tag>{contract.runId}</Tag>
+          <Tag>
+            {dataPreparationBatchLabel(contract.dataVersion, contract.runId)}
+          </Tag>
           <Tag className="erp-dev-accent-tag">仅模拟数据</Tag>
         </Space>
       </header>
@@ -513,14 +515,12 @@ const READBACK_PRESENTATIONS = Object.freeze({
         children: <Text code>{readback.datasetKey}</Text>,
       },
       {
-        key: 'dataVersion',
-        label: '数据版本',
-        children: <Text code>{readback.dataVersion}</Text>,
-      },
-      {
-        key: 'runId',
-        label: '数据批次',
-        children: <Text code>{readback.runId}</Text>,
+        key: 'datasetBatch',
+        label: '手测批次',
+        children: dataPreparationBatchLabel(
+          readback.dataVersion,
+          readback.runId
+        ),
       },
       ...(readback.backupReceipt
         ? [
@@ -770,10 +770,19 @@ function OperationDetail({ operation, acceptancePlan, compact = false }) {
             },
             {
               key: 'runId',
-              label: '运行批次',
+              label: '执行编号',
               children: (
                 <Text code copyable>
                   {operation.runId}
+                </Text>
+              ),
+            },
+            {
+              key: 'datasetIdentity',
+              label: '数据合同标识',
+              children: (
+                <Text code copyable>
+                  {`${operation.contract.dataVersion} / ${operation.contract.datasetRunId}`}
                 </Text>
               ),
             },
@@ -1524,16 +1533,13 @@ export default function DevDataPreparationPage() {
                     '未证明',
                 },
                 {
-                  key: 'dataset',
-                  label: '固定数据合同',
-                  children: (
-                    <>
-                      {currentOperation?.targetSummary.datasetVersion ||
-                        '未证明'}{' '}
-                      /{' '}
-                      {currentOperation?.targetSummary.datasetRunId || '未证明'}
-                    </>
-                  ),
+                  key: 'datasetBatch',
+                  label: '手测批次',
+                  children:
+                    dataPreparationBatchLabel(
+                      currentOperation?.targetSummary.datasetVersion,
+                      currentOperation?.targetSummary.datasetRunId
+                    ) || '未证明',
                 },
                 {
                   key: 'semantic-digest',

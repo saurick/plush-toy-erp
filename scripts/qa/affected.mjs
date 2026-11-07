@@ -886,14 +886,24 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
-    if (/DevUIBusinessToolbarExample|devToolbarExample|dev-ui-toolbar-example\.css|DevControlStandards\.jsx|dev-ui-controls\.css|business-list\/(?:BusinessListLayout|BusinessListToolbarActions|BusinessStatusFilter|ColumnOrderModal|BusinessDetailsModal)\.jsx|BusinessVisualizationFrame\.jsx|common\/components\/SearchInput\.jsx/u.test(file)) {
+    if (/components\/(?:purchase-receipts\/PurchaseReceiptExceptionModal|inventory\/InventoryOperationModal|outsourcing-orders\/OutsourcingOrderSourceFactModal)\.jsx|warehouseDraftPageScenarios\.mjs/u.test(file)) {
+      addNodeTests(state, ["web/src/erp/components/inventory/InventoryOperationModal.behavior.test.mjs", "web/src/erp/components/inventory/InventoryOperationRecordsModal.test.mjs", "web/src/erp/components/purchase-receipts/PurchaseReceiptExceptionModal.test.mjs", "web/src/erp/components/outsourcing-orders/OutsourcingOrderSourceFactModal.test.mjs"], file, "T5");
+      addFollowUp(state, "warehouse-draft-form-pages-browser", "T5",
+        "运行 STYLE_L1_SCENARIOS=purchase-receipt-return-rapid-add,purchase-receipt-adjustment-rapid-add,inventory-operation-create-recovery,exception-inventory-operation-dark-desktop,warehouse-draft-page-cycle_count,warehouse-draft-page-transfer,warehouse-draft-page-manual_adjustment,outsourcing-material-draft-form-page,outsourcing-return-draft-form-page pnpm --dir web style:l1，分别用 Chromium 与 WebKit 核对整页、明细增长、来源锁定、失败保留与重试、离开保护、列表恢复和草稿保存不代替过账。", file);
+    }
+    if (/dev-workbench-boundary\.test|DevUIBusinessExamples|DevSharedComponentGuide|BusinessLineTable|BusinessLineItemActionButton|BusinessLineItemDetails|ContactFormList|contactFormRows|useLineItemAppendScroll|devSharedComponentScenarios|devBusinessComponentScenarios/u.test(file)) {
+      addNodeTests(state, ["scripts/qa/dev-workbench-boundary.test.mjs", "web/src/dev-workbench/config/devUIDesign.test.mjs"], file, "T5");
+      addFollowUp(state, "workbench-component-contracts-browser", "T5",
+        "运行 STYLE_L1_SCENARIOS=dev-ui-shared-component-catalog,dev-ui-shared-business-form,dev-ui-shared-source-picker,dev-ui-shared-consumer-entry pnpm --dir web style:l1，分别用 Chromium 与 WebKit 核对展示依赖、目录样例与消费者名称、文档返回恢复和从正式路由独立进入的业务消费者；工作台保持浅色桌面与零业务写入。独立制品另运行 build:workbench 和 test:workbench。", file);
+    }
+    if (/DevUIBusinessToolbarExample|DevUIBusinessTabComparison|devToolbarExample|dev-ui-toolbar-example\.css|DevControlStandards\.jsx|dev-ui-controls\.css|business-list\/(?:BusinessListLayout|BusinessListToolbarActions|BusinessStatusFilter|ColumnOrderModal|BusinessDetailsModal)\.jsx|BusinessVisualizationFrame\.jsx|common\/components\/SearchInput\.jsx/u.test(file)) {
       addNodeTests(state, [
         "scripts/qa/dev-workbench-boundary.test.mjs",
         "web/src/dev-workbench/config/devToolbarExample.test.mjs",
         "web/src/dev-workbench/components/DevUIBusinessToolbarExample.test.mjs",
       ], file, "T5");
       addFollowUp(state, "dev-toolbar-composition-browser", "T5",
-        "运行 STYLE_L1_SCENARIOS=dev-ui-toolbar-composition,dev-ui-toolbar-category-growth,dev-ui-toolbar-data-growth pnpm --dir web style:l1，分别使用 Chromium 与 WebKit 核对四业务组合、职责标注、分类增长与 30 项名单、查询草稿和选择恢复、真实详情与列设置、本地导出及零业务请求；工作台样例采用浅色桌面轻量验收。", file);
+        "运行 STYLE_L1_SCENARIOS=dev-ui-purchase-production-tabs,dev-ui-toolbar-composition,dev-ui-toolbar-category-growth,dev-ui-toolbar-data-growth pnpm --dir web style:l1，分别使用 Chromium 与 WebKit 核对采购与生产页签位置、职责与搜索恢复、四业务组合、职责标注、分类增长与 30 项名单、真实详情与列设置、本地导出及零业务请求；工作台样例采用浅色桌面轻量验收。", file);
     }
     if (/BusinessListLayout\.jsx|BusinessFormPage\.jsx|business-form-page\.css|BusinessToolbarWorkspace\.test\.mjs|useBusinessListStickyHeader\.js|BusinessVisualizationFrame\.jsx|(?:WarehouseHandling|PurchaseOrders|SalesOrders|HistoryRecords)Page\.jsx|businessToolbarCompositionScenarios\.mjs/u.test(file)) {
       addNodeTests(state, ["web/src/erp/components/business-list/BusinessToolbarWorkspace.test.mjs", "web/src/erp/components/business-list/BusinessSelectionActionBar.test.mjs", "web/src/erp/utils/businessModuleGroups.test.mjs"], file, "T5");
@@ -1025,7 +1035,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         "web/src/dev-workbench/config/devVerificationEvidence.test.mjs",
       ], file, "T5");
     }
-    if (/standaloneWorkbench|standalone\.jsx|vite\.workbench|workbench\.html|DevTestingPage|DevQualityGatesPage|DevVerificationEvidence|DevUIBusinessToolbarExample|devToolbarExample|dev-ui-toolbar-example\.css/u.test(file)) {
+    if (/standaloneWorkbench|standalone\.jsx|vite\.workbench|workbench\.html|DevTestingPage|DevQualityGatesPage|DevVerificationEvidence|DevUIBusinessToolbarExample|DevUIBusinessTabComparison|devToolbarExample|dev-ui-toolbar-example\.css/u.test(file)) {
       addFollowUp(state, "workbench-artifact-browser", "T5",
         "在固定候选目录先运行 pnpm --dir web build:workbench，再运行 pnpm --dir web test:workbench；用独立制品核对登录、深链接、服务器验证、诊断历史与禁用动作。测试仅使用回环服务和隔离夹具，不连接目标环境。", file);
     }

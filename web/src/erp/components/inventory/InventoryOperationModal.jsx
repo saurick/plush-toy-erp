@@ -4,7 +4,6 @@ import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import { inventoryOperationRequiresApproval } from '../../utils/inventoryOperationTransition.mjs'
 import Select from '@/common/components/select/AppSelect'
-import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
@@ -15,7 +14,7 @@ import BusinessCompactFieldTable, {
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { warehouseAcceptsSubject } from '../../utils/warehouseClassification.mjs'
 
-import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
@@ -104,6 +103,9 @@ export default function InventoryOperationModal({
     }
     return sourceRecords || (sourceRecord ? [sourceRecord] : [])
   }, [isEdit, operation?.items, sourceRecord, sourceRecords])
+  const sourceContextKey = `${effectiveType}:${operation?.id || sourceRows.map((row) =>
+    row.id || [row.subject_type, row.subject_id, row.warehouse_id, row.lot_id, row.product_sku_id, row.unit_id].join(':')
+  ).join('|')}`
 
   useEffect(() => {
     if (!open) return
@@ -124,37 +126,26 @@ export default function InventoryOperationModal({
   }
 
   return (
-    <BusinessFormModal
+    <BusinessFormPage
       form={form}
       className="erp-inventory-operation-modal"
-      title={isEdit ? meta.editTitle : <BusinessHelpLabel label={meta.createTitle} description="从当前选中的库存余额生成可核对、可恢复的作业草稿。" />}
-      description={
-        isEdit
-          ? '只可修改草稿中的业务内容，来源存货、仓库、批次和单位保持不变。'
-          : undefined
-      }
+      baselineKey={sourceContextKey}
+      title={isEdit ? meta.editTitle : meta.createTitle}
       open={open}
-      size={sourceRows.length > 1 ? 'lineItems' : 'localAction'}
       okText={isEdit ? '保存草稿' : meta.createSubmit}
-      cancelText="取消"
       confirmLoading={loading}
-      closable={!loading}
-      keyboard={!loading}
-      maskClosable={!loading}
-      destroyOnHidden
-      forceRender
       onCancel={() => !loading && onCancel?.()}
       onOk={submit}
     >
-      <div className="erp-business-inline-note" role="note">{meta.notice}</div>
+      <div className="erp-business-inline-note" role="note">{isEdit ? '来源存货、仓库、批次和单位保持不变。' : ''}{meta.notice}</div>
       {inventoryOperationRequiresApproval(effectiveType) && !isEdit ? (
         <ProcessSubmissionRoute processKey="inventory_adjustment_approval" customerKey={customerKey} open={open} />
       ) : null}
       <BusinessForm
+        name="inventory-operation"
         form={form}
         className="erp-business-action-form"
         layout="vertical"
-        preserve={false}
         disabled={loading}
         style={{ marginTop: 16 }}
       >
@@ -196,6 +187,7 @@ export default function InventoryOperationModal({
               tableProps={{
                     label: '库存作业明细',
                     showSequence: true,
+                    expandableDetails: true,
                     columns: [
                 {
                   label: '来源库存',
@@ -234,6 +226,7 @@ export default function InventoryOperationModal({
 
                 return (
                   <BusinessCompactFieldRow
+                    detailsToggleLabel="明细备注"
                     key={key}
                     label={`作业明细 ${index + 1}`}
                     sequence={index + 1}
@@ -358,6 +351,6 @@ export default function InventoryOperationModal({
           )}
         </Form.List>
       </BusinessForm>
-    </BusinessFormModal>
+    </BusinessFormPage>
   )
 }

@@ -6,6 +6,14 @@ const source = readFileSync(
   new URL('./FinancePaymentsPage.jsx', import.meta.url),
   'utf8'
 )
+const creditSource = readFileSync(
+  new URL('../components/finance/FinanceCreditNotesPanel.jsx', import.meta.url),
+  'utf8'
+)
+const workspaceSource = readFileSync(
+  new URL('../components/finance/FinanceWorkspace.jsx', import.meta.url),
+  'utf8'
+)
 const helpSource = readFileSync(
   new URL('../config/businessUsabilityCatalog.mjs', import.meta.url),
   'utf8'
@@ -24,7 +32,8 @@ const exportSource = readFileSync(
 )
 
 test('finance payments: routes reversal terms through the shared page help', () => {
-  assert.match(source, /helpKey="finance-payments"/u)
+  assert.match(source, /<FinanceWorkspace moduleKey="finance-payments"/u)
+  assert.match(workspaceSource, /helpKey=\{moduleKey\}/u)
   assert.doesNotMatch(source, /aria-label="查看冲销和红冲说明"/u)
   assert.match(helpSource, /'allocation-reversal'/u)
   assert.match(helpSource, /核销、冲销和红冲分别是什么/u)
@@ -33,9 +42,10 @@ test('finance payments: routes reversal terms through the shared page help', () 
   assert.match(helpSource, /三种操作都会保留原记录和审计/u)
 })
 
-test('finance payments: both fact tabs expose independent column-order tools', () => {
-  assert.equal(source.match(/<BusinessListToolbarActions/gu)?.length, 2)
-  assert.equal(source.match(/useBusinessColumnOrder\(\{/gu)?.length, 2)
+test('finance payments and account adjustments retain independent column-order tools', () => {
+  const recordSources = source + creditSource
+  assert.equal(recordSources.match(/<BusinessListToolbarActions/gu)?.length, 2)
+  assert.equal(recordSources.match(/useBusinessColumnOrder\(\{/gu)?.length, 2)
 
   assert.match(
     presentationSource,
@@ -54,7 +64,7 @@ test('finance payments: both fact tabs expose independent column-order tools', (
     'onOpenColumnOrder={openCreditColumnOrder}',
   ]) {
     assert.equal(
-      source.includes(text),
+      recordSources.includes(text),
       true,
       `finance payment table tools should preserve: ${text}`
     )

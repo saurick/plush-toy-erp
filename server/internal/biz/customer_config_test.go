@@ -991,7 +991,7 @@ func TestCustomerConfigUsecaseEffectiveSessionDisablesCustomerRoleProjection(t *
 	}
 }
 
-func TestCustomerConfigUsecaseRejectsEntitlementAboveBackendRole(t *testing.T) {
+func TestCustomerConfigUsecaseAllowsEditableBusinessEntitlement(t *testing.T) {
 	ctx := context.Background()
 	uc := NewCustomerConfigUsecase(newMemCustomerConfigRepo())
 
@@ -1001,8 +1001,15 @@ func TestCustomerConfigUsecaseRejectsEntitlementAboveBackendRole(t *testing.T) {
 		CapabilityKey: PermissionFinancePayableRead,
 		Enabled:       true,
 	})
-	if _, err := uc.PublishCustomerConfig(ctx, in, 99); !errors.Is(err, ErrBadParam) {
-		t.Fatalf("customer entitlement must not exceed backend role RBAC, got %v", err)
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+		t.Fatalf("customer entitlement may enable an assignable business capability, got %v", err)
+	}
+	for _, forbidden := range []string{PermissionSystemRolePermissionManage, PermissionERPBusinessChainDebugRead} {
+		invalid := validCustomerConfigInput()
+		invalid.AccessEntitlements = append(invalid.AccessEntitlements, AccessEntitlementInput{RoleKey: SalesRoleKey, CapabilityKey: forbidden, Enabled: true})
+		if _, err := uc.PublishCustomerConfig(ctx, invalid, 99); !errors.Is(err, ErrBadParam) {
+			t.Fatalf("business entitlement accepted protected capability %s: %v", forbidden, err)
+		}
 	}
 }
 

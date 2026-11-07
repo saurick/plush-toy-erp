@@ -441,7 +441,7 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 		if _, exists := roleProfileKeys[item.RoleKey]; !exists {
 			return CustomerConfigPublishInput{}, fmt.Errorf("%w: entitlement role profile %s is missing", ErrBadParam, item.RoleKey)
 		}
-		if !builtinRoleHasPermission(item.RoleKey, item.CapabilityKey) {
+		if !builtinRoleAllowsPermission(item.RoleKey, item.CapabilityKey) {
 			return CustomerConfigPublishInput{}, fmt.Errorf("%w: role %s does not own capability %s", ErrBadParam, item.RoleKey, item.CapabilityKey)
 		}
 		if item.Constraints == nil {
@@ -497,14 +497,19 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 	return in, nil
 }
 
+func builtinRoleAllowsPermission(roleKey, permissionKey string) bool {
+	policy := RolePermissionPolicyFor(AdminRole{Key: roleKey})
+	if policy.Registered {
+		return PermissionSetHasAny(PermissionKeySet(policy.Assignable), permissionKey)
+	}
+	return builtinRoleHasPermission(roleKey, permissionKey)
+}
+
 func builtinRoleHasPermission(roleKey, permissionKey string) bool {
 	roleKey = NormalizeRoleKey(roleKey)
 	permissionKey = strings.TrimSpace(permissionKey)
 	for _, role := range BuiltinRoles() {
 		if role.Key == roleKey {
-			if !IsSystemManagedRole(AdminRole{Key: role.Key, Type: role.Type, Builtin: role.Builtin}) && PermissionSetHasAny(PermissionKeySet(optionalRoleAssistance), permissionKey) {
-				return true
-			}
 			return PermissionSetHasAny(PermissionKeySet(role.Permissions), permissionKey)
 		}
 	}

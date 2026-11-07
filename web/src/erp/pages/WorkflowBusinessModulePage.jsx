@@ -1505,7 +1505,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             showIcon
             message="正在核对当前流程的审批表单"
             description="核对完成前不会提交审批决策。"
-            style={{ marginBottom: 16 }}
           />
         ) : null}
         {taskReasonProcessDecisionRequired &&
@@ -1516,7 +1515,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             showIcon
             message="审批表单与当前流程节点不一致"
             description="请关闭后刷新任务再试；系统不会按任务名称或页面入口猜测审批字段。"
-            style={{ marginBottom: 16 }}
           />
         ) : null}
         <label htmlFor="erp-module-task-reason">
@@ -1538,7 +1536,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         />
         <p className="erp-business-inline-note">任务结果会保留；库存、出货与财务结果以对应业务单据的实际记录为准。</p>
         {taskReasonApprovedQuantityAllowed ? (
-          <Space direction="vertical" size={6} style={{ width: '100%', marginTop: 16 }}>
+          <Space direction="vertical" size={6} style={{ width: '100%' }}>
             <label htmlFor="erp-module-approved-quantity">批准数量（选填）</label>
             <Input
               id="erp-module-approved-quantity"

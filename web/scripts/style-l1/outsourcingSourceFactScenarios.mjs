@@ -1,6 +1,8 @@
-import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertBusinessSectionInteractions } from './businessFormSectionAssertions.mjs'
 import { assertBusinessFormCorners } from './businessFormCornerAssertions.mjs'
+import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { workflowMockActionDecision } from '../../src/mocks/workflowTaskMockAuthorization.mjs'
 
@@ -445,7 +447,7 @@ export function createOutsourcingSourceFactScenarios(deps) {
           : productCard
         await sourceCard.getByRole('button', { name: actionLabel }).click()
         const modal = page
-          .locator('.erp-outsourcing-source-fact-modal.ant-modal:visible')
+          .locator('.erp-outsourcing-source-fact-modal.erp-business-form-page:not([hidden])')
           .last()
         try {
           await modal.waitFor({ state: 'visible', timeout: 10_000 })
@@ -458,8 +460,9 @@ export function createOutsourcingSourceFactScenarios(deps) {
             `${error.message}; 当前消息=${JSON.stringify(notices)}; 委外事实请求=${JSON.stringify(operationalFactMethods)}`
           )
         }
-        assert.equal(await page.locator('.ant-modal:visible').count(), 1, '专项办理只能有一层弹窗')
-        await modal.getByRole('button', { name: /取\s*消/u, exact: true }).click()
+        await assertBusinessFormPage(page, modal)
+        assert.equal(await page.locator('.erp-business-form-page:not([hidden])').count(), 1, '办理时只显示当前业务编辑页')
+        await modal.getByRole('button', { name: '返回列表', exact: true }).click()
         await modal.waitFor({ state: 'hidden', timeout: 10_000 })
         assert.equal(await sourceCard.isVisible(), true, '取消办理后保留原明细位置')
         assert.equal(createParams.length, 0, '取消不能产生业务写入')
@@ -664,6 +667,11 @@ export function createOutsourcingSourceFactScenarios(deps) {
         await returnToList()
 
         if (recordAction) {
+          const draftRead = recordAction === 'edit' ? page.waitForResponse(async (response) => {
+            if (response.request().postDataJSON()?.method !== 'list_outsourcing_facts') return false
+            const body = await response.json()
+            return body.result?.data?.outsourcing_facts?.some((row) => row.fact_no === params.fact_no)
+          }) : null
           const recordsEntry = page.getByRole('button', {
             name: '委外记录',
             exact: true,
@@ -686,6 +694,58 @@ export function createOutsourcingSourceFactScenarios(deps) {
             .first()
           await factRow.scrollIntoViewIfNeeded()
           await factRow.click()
+
+          if (recordAction === 'edit') {
+            let facts = structuredClone((await (await draftRead).json()).result.data.outsourcing_facts)
+            const original = facts.find((row) => row.fact_no === params.fact_no)
+            const writes = []
+            const saveMethod = materialIssue ? 'save_outsourcing_material_issue_draft' : 'save_outsourcing_return_receipt_draft'
+            await page.route('**/rpc/operational_fact', async (route) => {
+              const body = route.request().postDataJSON()
+              if (body.method === 'list_outsourcing_facts') {
+                const rows = facts.filter((row) => !body.params.keyword || String(row.id) === body.params.keyword || row.fact_no.includes(body.params.keyword))
+                return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: styleRpcResult(stylePaginatedRpcData(rows, 'outsourcing_facts', body.params)) } })
+              }
+              if (body.method !== saveMethod) return route.fallback()
+              writes.push(body.params)
+              assert.equal(body.params.id, original.id)
+              assert.equal(body.params.expected_version, original.version)
+              assert.ok(Object.keys(body.params).every((key) => ['id', 'expected_version', 'warehouse_id', 'lot_id', 'new_lot_no', 'quantity', 'occurred_at', 'note', 'customer_key'].includes(key)))
+              if (writes.length === 1) return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: styleRpcResult({}) } })
+              const saved = { ...original, warehouse_id: body.params.warehouse_id, lot_id: body.params.lot_id, quantity: body.params.quantity, note: body.params.note || '', occurred_at: Math.floor(new Date(body.params.occurred_at).getTime() / 1000), status: 'DRAFT', version: original.version + 1 }
+              facts = facts.map((row) => row.id === saved.id ? saved : row)
+              return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: styleRpcResult({ outsourcing_fact: saved }) } })
+            })
+            await recordsModal.getByRole('button', { name: '编辑草稿', exact: true }).click()
+            await recordsModal.waitFor({ state: 'hidden' })
+            await waitForFiniteAnimations(page)
+            const editor = page.locator('.erp-outsourcing-source-fact-modal.erp-business-form-page:not([hidden])')
+            await editor.getByRole('heading', { name: materialIssue ? '编辑委外发料草稿' : '编辑委外回货草稿', exact: true }).waitFor()
+            await assertBusinessFormPage(page, editor)
+            assert.equal(await editor.getByLabel('本次办理数量', { exact: true }).inputValue(), original.quantity)
+            await editor.getByLabel('备注', { exact: true }).fill('整页草稿编辑后保留来源')
+            await editor.getByRole('button', { name: '返回列表', exact: true }).click()
+            await page.getByRole('button', { name: '继续编辑', exact: true }).click()
+            assert.equal(await editor.getByLabel('备注', { exact: true }).inputValue(), '整页草稿编辑后保留来源')
+            const firstSave = page.waitForResponse((response) => response.request().postDataJSON()?.method === saveMethod)
+            await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+            const notice = page.locator('.ant-message-error, .ant-message-warning').first()
+            await Promise.race([
+              firstSave,
+              notice.waitFor({ state: 'visible', timeout: 10000 }).then(async () => {
+                throw new Error(`草稿未发出保存请求：${(await notice.innerText()).slice(0, 300)}`)
+              }),
+            ])
+            await editor.getByRole('button', { name: '保存草稿', exact: true }).waitFor({ state: 'visible' })
+            await page.waitForFunction((node) => node.getAttribute('aria-busy') === 'false', await editor.elementHandle())
+            assert.equal(await editor.getByLabel('备注', { exact: true }).inputValue(), '整页草稿编辑后保留来源')
+            await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+            await editor.waitFor({ state: 'hidden' })
+            assert.equal(writes.length, 2)
+            assert.deepEqual(writes[0], writes[1])
+            assert.equal(facts.find((row) => row.id === original.id).status, 'DRAFT')
+            assert.equal(operationalFactMethods.includes('post_outsourcing_fact'), false)
+          }
 
           if (['post', 'post-and-void'].includes(recordAction)) {
             const postButton = recordsModal.getByRole('button', {
@@ -747,6 +807,18 @@ export function createOutsourcingSourceFactScenarios(deps) {
   }
 
   return [
+    createScenario({
+      name: 'outsourcing-material-draft-form-page',
+      actionType: 'MATERIAL_ISSUE',
+      recordAction: 'edit',
+      viewport: { width: 1440, height: 900 },
+    }),
+    createScenario({
+      name: 'outsourcing-return-draft-form-page',
+      actionType: 'RETURN_RECEIPT',
+      recordAction: 'edit',
+      viewport: { width: 1440, height: 900 },
+    }),
     createScenario({
       name: 'outsourcing-task-material-issue-mobile',
       actionType: 'MATERIAL_ISSUE',

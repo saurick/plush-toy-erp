@@ -245,6 +245,7 @@ export default function ProductionRouteExecutionModal({
   initialBatchID = null,
   initialItemID = null,
   initialAction = '',
+  initialFinishedGoodsReceiptID = null,
   onReturnToExecution,
   canConfirmPackaging = false,
   canReadOutsourcingContracts = false,
@@ -279,6 +280,7 @@ export default function ProductionRouteExecutionModal({
   const [outsourcingLoadState, setOutsourcingLoadState] = useState('idle')
   const [outsourcingLoadError, setOutsourcingLoadError] = useState('')
   const requestSequenceRef = useRef(0)
+  const loadedRequestSequenceRef = useRef(0)
   const actionAttemptRef = useRef(null)
   const outsourcingAbortControllerRef = useRef(null)
   const outsourcingLoadStateRef = useRef('idle')
@@ -364,6 +366,7 @@ export default function ProductionRouteExecutionModal({
       try {
         const nextAggregate = await getProductionWip(orderID, { signal })
         if (requestSequenceRef.current !== requestSequence) return
+        loadedRequestSequenceRef.current = requestSequence
         setAggregate(nextAggregate)
       } catch (error) {
         if (
@@ -414,6 +417,7 @@ export default function ProductionRouteExecutionModal({
     orderID,
     initialBatchID,
     initialItemID,
+    initialFinishedGoodsReceiptID,
   ])
 
   const displayedBatches = useMemo(() => {
@@ -630,6 +634,11 @@ export default function ProductionRouteExecutionModal({
     return options
   }, [canReadOutsourcingContracts, currentOperation])
 
+  const activeActionTitle = currentOperation?.operation_code === 'PACKAGING'
+    ? ({ [PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION]: '安排查货包装', [PRODUCTION_WIP_ACTION.START_OPERATION]: '查货完成，开始包装', [PRODUCTION_WIP_ACTION.COMPLETE_OPERATION]: '确认包装完成' }[activeAction] || ACTION_TITLE[activeAction])
+    : activeAction === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION && nextOperation?.operation_code === 'PACKAGING' ? '安排查货包装' : ACTION_TITLE[activeAction]
+  const activeActionSuccess = currentOperation?.operation_code === 'PACKAGING' && activeAction === PRODUCTION_WIP_ACTION.COMPLETE_OPERATION ? '包装已完成，库存不重复入库' : ACTION_SUCCESS_TEXT[activeAction]
+
   const selectAction = async (action) => {
     if (dirtyRef.current && !(await confirmLeave())) return
     if (
@@ -650,6 +659,12 @@ export default function ProductionRouteExecutionModal({
       )
       return
     }
+    const receiptScopedTransfer = initialFinishedGoodsReceiptID && action === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION && nextOperation?.operation_code === 'PACKAGING'
+    const focusedReceipt = receiptScopedTransfer ? productionWipPackagingReceiptChoices(aggregate, selectedBatch).find((receipt) => Number(receipt.id) === Number(initialFinishedGoodsReceiptID)) : null
+    if (receiptScopedTransfer && !focusedReceipt) {
+      message.warning('当前成品入库记录已无可包装数量，请返回刷新后核对')
+      return
+    }
     actionAttemptRef.current = null
     setDirty(false)
     actionForm.resetFields()
@@ -661,9 +676,9 @@ export default function ProductionRouteExecutionModal({
       : executionModeOptions.find((option) => !option.disabled)?.value
     actionForm.setFieldsValue({
       quantity: action === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION
-        ? productionWipTransferRemainingQuantity(aggregate, selectedBatch, nextOperation)
+        ? focusedReceipt?.remaining_quantity || productionWipTransferRemainingQuantity(aggregate, selectedBatch, nextOperation)
         : undefined,
-      finished_goods_receipt_id: undefined,
+      finished_goods_receipt_id: focusedReceipt?.id,
       execution_mode: selectedExecutionMode,
       outsourcing_order_item_id: undefined,
       fabric_contract_order_id: undefined,
@@ -692,7 +707,8 @@ export default function ProductionRouteExecutionModal({
     if (directAction && actionButtonEnabled(directAction, selectedBatch, currentOperation, nextOperation, selectedPackagingConfirmation, canRunAction(directAction), authoritativeOrder)) selectAction(directAction)
   }
   useEffect(() => {
-    if (!open || loading || !aggregate || !selectedBatch || (!handling && (!initialAction || Number(selectedBatch.id) !== Number(initialBatchID))) || taskNavigation?.businessReceipt) return
+    // A reopened dialog must wait for its own read before selecting the direct action.
+    if (!open || loading || loadedRequestSequenceRef.current !== requestSequenceRef.current || !aggregate || !selectedBatch || (!handling && (!initialAction || Number(selectedBatch.id) !== Number(initialBatchID))) || taskNavigation?.businessReceipt) return
     const key = `${handling?.taskID || `process:${initialAction}`}:${selectedBatch.id}`
     if (directEntryRef.current === key) return
     directEntryRef.current = key
@@ -785,15 +801,15 @@ onCancel: () => resolve(false),
       const confirmedRecord = activeAction === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL
         ? nextAggregate.packagingConfirmations.find((item) => item.id === selectedPackagingConfirmation?.id)
         : nextAggregate.batches.find((item) => item.id === selectedBatch.id)
-      reportBusinessResult(ACTION_SUCCESS_TEXT[activeAction], confirmedRecord ? { ...confirmedRecord, order_no: nextAggregate.productionOrder.order_no } : nextAggregate.productionOrder)
+      reportBusinessResult(activeActionSuccess, confirmedRecord ? { ...confirmedRecord, order_no: nextAggregate.productionOrder.order_no } : nextAggregate.productionOrder)
       setEntrySaved(true)
-      message.success(ACTION_SUCCESS_TEXT[activeAction])
+      message.success(activeActionSuccess)
       onChanged?.(nextAggregate)
     } catch (error) {
       message.error(
         getActionErrorMessage(
           error,
-          ACTION_TITLE[activeAction] || '办理生产工序'
+          activeActionTitle || '办理生产工序'
         )
       )
     } finally {
@@ -894,10 +910,10 @@ onCancel: () => resolve(false),
         activeAction === PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION &&
         isNormalFabricBatch
           ? '安排布料整单外发'
-          : ACTION_TITLE[activeAction]
+          : activeActionTitle
       }
     >
-      <BusinessForm form={actionForm} layout="vertical" disabled={saving} onValuesChange={() => setDirty(true)}>
+      <BusinessForm name="production-route-execution-action" form={actionForm} layout="vertical" disabled={saving} onValuesChange={() => setDirty(true)}>
         {activeAction === PRODUCTION_WIP_ACTION.SPLIT_BATCH ? (
           <Form.Item
             name="quantity"
@@ -1304,7 +1320,8 @@ onCancel: () => resolve(false),
               <Form.Item name="finished_goods_receipt_id" label="成品入库单" rules={[{ required: true, message: '请选择已入库且尚有待包装数量的成品' }]}>
                 <Select
                   placeholder="选择成品入库单"
-                  options={productionWipPackagingReceiptChoices(aggregate, selectedBatch).map((receipt) => ({ value: receipt.id, label: `${receipt.fact_no} · 可包装 ${receipt.remaining_quantity}` }))}
+                  disabled={Boolean(initialFinishedGoodsReceiptID)}
+                  options={productionWipPackagingReceiptChoices(aggregate, selectedBatch).filter((receipt) => !initialFinishedGoodsReceiptID || Number(receipt.id) === Number(initialFinishedGoodsReceiptID)).map((receipt) => ({ value: receipt.id, label: `${receipt.fact_no} · 可包装 ${receipt.remaining_quantity}` }))}
                   onChange={(id) => actionForm.setFieldValue('quantity', productionWipPackagingReceiptChoices(aggregate, selectedBatch).find((receipt) => receipt.id === id)?.remaining_quantity)}
                 />
               </Form.Item>
@@ -1388,7 +1405,7 @@ onCancel: () => resolve(false),
       confirmLoading={saving}
       size={focusedEntry || assignmentOnly ? 'localAction' : 'lineItems'}
       title={
-        focusedEntry ? ACTION_TITLE[activeAction] || '生产事项办理' : assignmentOnly
+        focusedEntry ? activeActionTitle || '生产事项办理' : assignmentOnly
           ? '安排本厂或外发加工'
           : (
             <BusinessHelpLabel
@@ -1440,7 +1457,6 @@ onCancel: () => resolve(false),
       <Descriptions
         size="small"
         column={{ xs: 1, md: 2 }}
-        style={{ marginTop: 16 }}
         items={[
           {
             key: 'order',
@@ -1481,6 +1497,7 @@ onCancel: () => resolve(false),
               ? productionWipBatchLabel(selectedBatch, selectedOrderItem)
               : '尚未选择',
           },
+          ...(selectedBatch?.finished_goods_receipt_id ? [{ key: 'finished-goods-receipt', label: '成品入库单', children: aggregate?.finishedGoodsReceipts?.find((receipt) => Number(receipt.id) === Number(selectedBatch.finished_goods_receipt_id))?.fact_no || '收仓来源待核对' }] : []),
           ...(!assignmentOnly
             ? [
                 {
@@ -1516,7 +1533,6 @@ onCancel: () => resolve(false),
               重新加载
             </Button>
           }
-          style={{ marginTop: 16 }}
         />
       ) : aggregate && !aggregate.initialized ? (
         <Empty

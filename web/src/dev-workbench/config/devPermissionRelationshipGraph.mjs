@@ -505,7 +505,7 @@ export function buildPermissionRelationshipDetailRows({
           moduleKey: detail.moduleKey,
           moduleLabel: detail.moduleName,
           source: roleName,
-          relation: policy.required.includes(key) ? '核心职责' : policy.optional.includes(key) ? '可选辅助' : policy.registered ? '模板外功能' : '获得功能',
+          relation: policy.defaults.includes(key) ? '预设功能' : policy.allowed.has(key) ? '可调整功能' : policy.registered ? '不可分配功能' : '获得功能',
           target: detail.name,
           result: ungranted
             ? '岗位未授予该功能'

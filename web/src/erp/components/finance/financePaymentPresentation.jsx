@@ -44,13 +44,6 @@ export const CREDIT_STATUS_OPTIONS = [
   { value: FinanceAllocationStatus.REVERSED, label: '冲销记录' },
 ]
 
-export const FINANCE_VIEW_ITEMS = [
-  { key: 'payments', label: '收付款记录' },
-  { key: 'credits', label: '账款调整' },
-  { key: 'statement', label: '期间对账' },
-  { key: 'source-adjustments', label: '采购待调整' },
-]
-
 export function paymentStatus(value) {
   const [label, color] = PAYMENT_STATUS_META[value] || ['状态待核对', 'default']
   return <Tag color={color}>{label}</Tag>

@@ -1,17 +1,8 @@
 import React, { useCallback } from 'react'
 import './outsourcingContractForm.css'
-import {
-  CopyOutlined,
-  DeleteOutlined,
-} from '@ant-design/icons'
-import {
-  AutoComplete,
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  Space,
-} from 'antd'
+
+import { AutoComplete, Form, Input, InputNumber, Space } from 'antd'
+import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import { outsourcingOrderLineGroupKey } from '../../utils/sourceDocumentLineGroupKeys.mjs'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
@@ -340,10 +331,9 @@ export default function OutsourcingOrderForm({
                   size={4}
                   wrap
                 >
-                  <Button
+                  <BusinessLineItemActionButton
+                    action="copy"
                     aria-label={`复制第 ${index + 1} 行`}
-                    type="text"
-                    icon={<CopyOutlined />}
                     onClick={() => {
                       const currentLines = form.getFieldValue('items') || []
                       const sourceLine =
@@ -353,16 +343,14 @@ export default function OutsourcingOrderForm({
                     }}
                   >
                     复制行
-                  </Button>
-                  <Button
-                    danger
-                    type="text"
-                    icon={<DeleteOutlined />}
+                  </BusinessLineItemActionButton>
+                  <BusinessLineItemActionButton
+                    action="remove"
                     disabled={taskReadOnly || fields.length <= 1}
                     onClick={() => remove(field.name)}
                   >
                     移除行
-                  </Button>
+                  </BusinessLineItemActionButton>
                 </Space>
               }
               hiddenFields={

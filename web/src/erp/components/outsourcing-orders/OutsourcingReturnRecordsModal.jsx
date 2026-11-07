@@ -361,7 +361,6 @@ export default function OutsourcingReturnRecordsModal({
         type="info"
         showIcon
         message="草稿可编辑、过账或作废，作废草稿不会改变库存；已过账记录取消后恢复至过账前库存。只有已过账的委外回货可发起质检，并在判定合格或让步接收后生成应付。"
-        style={{ marginBottom: 12 }}
       /> : null}
       {taskBusiness ? (
         <section aria-label="本次委外记录">

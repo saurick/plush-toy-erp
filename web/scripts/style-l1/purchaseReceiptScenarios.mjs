@@ -1,11 +1,13 @@
-import { clickLineItemAction } from './lineEditorActions.mjs'
+import { clickLineItemAction, revealLineItemDetails } from './lineEditorActions.mjs'
+import { assertCompactLineNoteDisclosure } from './businessLineItemDisclosureAssertions.mjs'
 import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertBusinessSectionInteractions } from './businessFormSectionAssertions.mjs'
-import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
+import { assertBusinessFormPage, assertBusinessNoteTextAreas, closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
+import { assertAlertSiblingSpacing } from './alertSpacingAssertions.mjs'
 
 export function createPurchaseReceiptScenarios(deps) {
   const {
@@ -100,10 +102,11 @@ export function createPurchaseReceiptScenarios(deps) {
     scenarioName
   ) => {
     const filterDialog = page.getByRole('dialog', { name: '筛选条件' })
-    if (!(await filterDialog.isVisible()))
+    if (!(await filterDialog.isVisible())) {
       await page
         .locator('.erp-business-operation-panel button[aria-haspopup="dialog"]')
         .click()
+    }
     await filterDialog.waitFor()
     await waitForFiniteAnimations(page)
     const metrics = await page.evaluate(() => {
@@ -320,18 +323,30 @@ export function createPurchaseReceiptScenarios(deps) {
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 2,
       verify: async (page) => {
         const addButtonName = mode === 'return' ? '添加退货明细' : '添加调整明细'
         await page.locator('.erp-business-module-view-tabs [role="tab"][aria-selected="true"]').filter({ hasText: '采购收货' }).waitFor()
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, triggerName)
-        const modal = page.getByRole('dialog', { name: title, exact: true })
+        const modal = page.locator(`.erp-business-form-page[aria-label=${JSON.stringify(title)}]:not([hidden])`)
         await modal.waitFor({ state: 'visible' })
+        await assertBusinessFormPage(page, modal)
+        await assertAlertSiblingSpacing(modal.locator('.erp-business-form-page__body > .ant-spin-nested-loading > .ant-spin-container'), `${mode} 表单`)
+        await assertCompactLineNoteDisclosure(page, modal)
+        const firstNote = modal.locator('.erp-purchase-receipt-exception-row').first().getByLabel('明细备注', { exact: true })
+        const firstNoteNode = await firstNote.elementHandle()
         for (const viewport of [
           { width: 1440, height: 900 },
           { width: 390, height: 844 },
         ]) {
           await page.setViewportSize(viewport)
+          await waitForFiniteAnimations(page)
+          await assertAlertSiblingSpacing(modal.locator('.erp-business-form-page__body > .ant-spin-nested-loading > .ant-spin-container'), `${mode}-${viewport.width} 表单`)
+          await page.waitForFunction(({ node, compact }) => node.dataset.lineEditorCompact === String(compact), {
+            node: await modal.locator('.erp-line-editor').elementHandle(), compact: viewport.width === 390,
+          })
+          assert.equal(await firstNote.evaluate((node, previous) => node === previous, firstNoteNode), true, '切换宽窄布局不重建原明细备注')
           await assertBusinessSectionInteractions(page, modal)
           await assertBusinessNoteTextAreas(modal)
           for (let count = 0; count < 3; count += 1) {
@@ -359,18 +374,31 @@ export function createPurchaseReceiptScenarios(deps) {
           }
         }
         await page.setViewportSize({ width: 1440, height: 900 })
+        await page.waitForFunction((node) => node.dataset.lineEditorCompact === 'false', await modal.locator('.erp-line-editor').elementHandle())
+        await waitForFiniteAnimations(page)
+        assert.equal(await firstNote.evaluate((node, previous) => node === previous, firstNoteNode), true)
         const noteRows = modal.locator('.erp-purchase-receipt-exception-row')
         for (const [index, note] of ['待移除说明', '保留的明细说明'].entries()) {
+          await revealLineItemDetails(noteRows.nth(index))
+          await waitForFiniteAnimations(page)
           await noteRows.nth(index).getByLabel('明细备注', { exact: true }).fill(note)
         }
+        const survivingNote = await noteRows.nth(1).getByLabel('明细备注', { exact: true }).elementHandle()
         await clickLineItemAction(noteRows.first(), '移除明细 1')
         assert.ok(await noteRows.first().getByLabel('明细备注', { exact: true }).isVisible(), '移除前行后备注仍直接可填')
+        assert.equal(await noteRows.first().getByLabel('明细备注', { exact: true }).evaluate((node, previous) => node === previous, survivingNote), true, '移除前行不重建保留的备注字段')
         assert.equal(await noteRows.first().getByLabel('明细备注', { exact: true }).inputValue(), '保留的明细说明')
         await noteRows.first().getByLabel('明细备注', { exact: true }).fill('')
         assert.equal(await noteRows.first().getByLabel('明细备注', { exact: true }).inputValue(), '')
+        await firstNoteNode.dispose()
+        await survivingNote.dispose()
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: `${deps.outputDir}/purchase-receipt-${mode}-form-page-4k.png`, fullPage: true })
         await page.setViewportSize({ width: 1440, height: 900 })
-        await modal.getByRole('button', { name: /^取\s*消$/u }).click()
+        await closeBusinessFormPage(page, modal)
         await modal.waitFor({ state: 'hidden' })
+        await waitForFiniteAnimations(page)
         await clickSelectionAction(page, triggerName)
         await modal.waitFor({ state: 'visible' })
         assert.equal(
@@ -379,7 +407,7 @@ export function createPurchaseReceiptScenarios(deps) {
             .count(),
           1
         )
-        await modal.getByRole('button', { name: /^取\s*消$/u }).click()
+        await closeBusinessFormPage(page, modal)
       },
     })),
     {

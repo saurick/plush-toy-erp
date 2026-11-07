@@ -1,7 +1,7 @@
 export async function selectLineItem(row) {
   const editor = row.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " erp-line-editor ")][1]')
   if (!(await editor.count()) || await editor.getAttribute('data-line-editor-compact') === 'true' || !(await row.getAttribute('tabindex'))) return null
-  await row.locator('td').first().click({ position: { x: 2, y: 2 } })
+  await row.locator('.erp-editable-line-group__sequence').click({ position: { x: 2, y: 2 } })
   return editor
 }
 
@@ -13,5 +13,9 @@ export async function clickLineItemAction(row, name, { exact = typeof name === '
 
 export async function revealLineItemDetails(row) {
   const toggle = row.locator('.erp-line-editor__details-toggle')
-  if (await toggle.count() && await toggle.getAttribute('aria-expanded') === 'false') await toggle.click()
+  if (await toggle.count()) {
+    if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click()
+    const panelID = await toggle.getAttribute('aria-controls')
+    await row.locator(`[id=${JSON.stringify(panelID)}]`).waitFor({ state: 'visible' })
+  }
 }

@@ -135,3 +135,48 @@ test('application observation discovers portal content, skips editing surfaces a
   assert.equal(frames.size, 0)
   view.happyDOM.abort()
 })
+
+test('overlapping layout mutations discover each subtree once without losing independent portal changes', () => {
+  const view = new Window()
+  const doc = view.document
+  let changed
+  view.MutationObserver = class {
+    constructor(callback) { changed = callback }
+
+    observe() {}
+
+    disconnect() {}
+  }
+  const frames = new Map()
+  let nextFrame = 0
+  view.requestAnimationFrame = (callback) => { frames.set(++nextFrame, callback); return nextFrame }
+  view.cancelAnimationFrame = (id) => frames.delete(id)
+  const flush = () => { const batch = [...frames.values()]; frames.clear(); batch.forEach((callback) => callback()) }
+  const parent = doc.createElement('section')
+  parent.innerHTML = '<div><span>材料</span></div>'
+  doc.body.append(parent)
+  const child = parent.firstElementChild
+  const leaf = child.firstElementChild
+  const walks = []
+  const treeWalker = doc.createTreeWalker.bind(doc)
+  doc.createTreeWalker = (root, ...args) => { walks.push(root); return treeWalker(root, ...args) }
+  const dispose = mountScrollEdges(doc)
+  try {
+    flush()
+    walks.length = 0
+    changed([parent, child, leaf].map((target) => ({ type: 'attributes', target })))
+    flush()
+    assert.equal(walks.length, 1)
+    assert.equal(walks[0] === parent, true)
+    walks.length = 0
+    const portal = doc.createElement('aside')
+    doc.body.append(portal)
+    changed([{ type: 'attributes', target: leaf }, { type: 'childList', target: doc.body, addedNodes: [portal], removedNodes: [] }])
+    flush()
+    assert.equal(walks.length, 2)
+    assert.equal(walks.includes(leaf) && walks.includes(portal), true)
+  } finally {
+    dispose()
+    view.happyDOM.abort()
+  }
+})

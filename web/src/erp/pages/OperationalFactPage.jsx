@@ -1,6 +1,7 @@
 import React from 'react'
 import { getBusinessModule } from '../config/businessModules.mjs'
 import { OperationalFactWorkspace } from './OperationalFactsPage.jsx'
+import FinanceWorkspace from '../components/finance/FinanceWorkspace.jsx'
 
 const PAGE_CONFIGS = Object.freeze({
   'production-progress': {
@@ -78,7 +79,7 @@ const PAGE_CONFIGS = Object.freeze({
 export default function OperationalFactPage({ moduleKey }) {
   const moduleItem = getBusinessModule(moduleKey)
   const config = PAGE_CONFIGS[moduleKey] || PAGE_CONFIGS['production-progress']
-  return (
+  const records = (
     <OperationalFactWorkspace
       key={moduleKey}
       pageTitle={moduleItem?.title || config.viewOverrides?.finance?.title}
@@ -89,4 +90,7 @@ export default function OperationalFactPage({ moduleKey }) {
       showTabs={config.showTabs}
     />
   )
+  return ['receivables', 'payables', 'reconciliation'].includes(moduleKey)
+    ? <FinanceWorkspace moduleKey={moduleKey}>{records}</FinanceWorkspace>
+    : records
 }

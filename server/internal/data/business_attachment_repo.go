@@ -92,7 +92,7 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 	if productImageWrite && (in.OwnerType != biz.BusinessAttachmentOwnerProduct ||
 		in.AttachmentType != biz.BusinessAttachmentTypeProductImage ||
 		in.SlotKey == nil ||
-		!biz.IsBusinessAttachmentProductImageSlotAllowed(*in.SlotKey)) {
+		!biz.IsBusinessAttachmentProductImageUploadSlot(*in.SlotKey)) {
 		return nil, biz.ErrBadParam
 	}
 	if r.objects == nil {
@@ -167,8 +167,19 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		}
 		return nil, err
 	}
-	if productImageWrite {
-		if err := requireUnreferencedProductImage(ctx, tx, in.OwnerID, *in.SlotKey, r.data.sqlDialect); err != nil {
+	slotKey := in.SlotKey
+	supplemental := productImageWrite && *slotKey == biz.BusinessAttachmentProductImageSlotSupplemental
+	if supplemental {
+		slot, existing, err := resolveSupplementalProductImageSlot(ctx, tx, r.data.sqlDialect, in.OwnerID, in.SHA256)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return existing, nil
+		}
+		slotKey = &slot
+	} else if productImageWrite {
+		if err := requireUnreferencedProductImage(ctx, tx, in.OwnerID, *slotKey, r.data.sqlDialect); err != nil {
 			return nil, err
 		}
 	}
@@ -179,8 +190,8 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		r.log.WithContext(ctx).Warnw("msg", "attachment object write failed", "object_key", objectKey)
 		return nil, biz.ErrBusinessAttachmentStorageUnavailable
 	}
-	if productImageWrite {
-		if _, err := tx.ExecContext(ctx, businessAttachmentProductImageDeleteSQL(r.data.sqlDialect), in.OwnerID, *in.SlotKey); err != nil {
+	if productImageWrite && !supplemental {
+		if _, err := tx.ExecContext(ctx, businessAttachmentProductImageDeleteSQL(r.data.sqlDialect), in.OwnerID, *slotKey); err != nil {
 			return nil, err
 		}
 	}
@@ -205,7 +216,7 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		in.OwnerType,
 		in.OwnerID,
 		in.AttachmentType,
-		in.SlotKey,
+		slotKey,
 		in.FileName,
 		in.MimeType,
 		in.FileSize,
@@ -227,7 +238,7 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		OwnerType:      in.OwnerType,
 		OwnerID:        in.OwnerID,
 		AttachmentType: in.AttachmentType,
-		SlotKey:        in.SlotKey,
+		SlotKey:        slotKey,
 		FileName:       in.FileName,
 		MimeType:       in.MimeType,
 		FileSize:       in.FileSize,
@@ -237,6 +248,50 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		Note:           in.Note,
 		CreatedAt:      createdAt,
 	}, nil
+}
+
+// The product lock serializes free-slot allocation and exact-content retries.
+func resolveSupplementalProductImageSlot(ctx context.Context, tx *stdsql.Tx, dialect string, productID int, sha string) (string, *biz.BusinessAttachment, error) {
+	const query = `SELECT id, slot_key, file_name, mime_type, file_size, sha256, uploaded_by, note, created_at
+		FROM business_attachments WHERE owner_type = 'product' AND owner_id = $1
+		AND attachment_type = 'product_image' AND slot_key NOT IN ('primary', 'secondary')`
+	sql := query
+	if dialect == "sqlite3" {
+		sql = strings.Replace(query, "$1", "?", 1)
+	}
+	rows, err := tx.QueryContext(ctx, sql, productID)
+	if err != nil {
+		return "", nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	used := make(map[string]bool, biz.BusinessAttachmentProductImageSupplementalMaxCount)
+	for rows.Next() {
+		item := &biz.BusinessAttachment{OwnerType: biz.BusinessAttachmentOwnerProduct, OwnerID: productID, AttachmentType: biz.BusinessAttachmentTypeProductImage}
+		var slot string
+		if err := rows.Scan(&item.ID, &slot, &item.FileName, &item.MimeType, &item.FileSize, &item.SHA256, &item.UploadedBy, &item.Note, &item.CreatedAt); err != nil {
+			return "", nil, err
+		}
+		if item.SHA256 == sha {
+			if err := rows.Close(); err != nil {
+				return "", nil, err
+			}
+			item.SlotKey = &slot
+			return "", item, nil
+		}
+		used[slot] = true
+	}
+	if err := rows.Err(); err != nil {
+		return "", nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return "", nil, err
+	}
+	for _, slot := range biz.BusinessAttachmentProductImageSupplementalSlots() {
+		if !used[slot] {
+			return slot, nil, nil
+		}
+	}
+	return "", nil, biz.ErrBusinessAttachmentProductImageSupplementalLimit
 }
 
 func (r *businessAttachmentRepo) WithdrawBusinessAttachment(
@@ -377,12 +432,12 @@ func (r *businessAttachmentRepo) WithdrawBusinessAttachment(
 	return withdrawnAt, nil
 }
 
-func (r *businessAttachmentRepo) ClearProductImage(ctx context.Context, productID int, slotKey string) error {
+func (r *businessAttachmentRepo) ClearProductImage(ctx context.Context, productID int, slotKey string, attachmentID int) error {
 	if r == nil || r.data == nil || r.data.sqldb == nil || productID <= 0 {
 		return biz.ErrBadParam
 	}
 	slotKey = biz.NormalizeBusinessAttachmentProductImageSlot(slotKey)
-	if !biz.IsBusinessAttachmentProductImageSlotAllowed(slotKey) {
+	if !biz.IsBusinessAttachmentProductImageClearTarget(slotKey, attachmentID) {
 		return biz.ErrBadParam
 	}
 	tx, err := r.data.sqldb.BeginTx(ctx, nil)
@@ -401,6 +456,21 @@ func (r *businessAttachmentRepo) ClearProductImage(ctx context.Context, productI
 			return biz.ErrBusinessAttachmentOwnerNotFound
 		}
 		return err
+	}
+	if attachmentID > 0 {
+		query := "SELECT slot_key FROM business_attachments WHERE id = $1 AND owner_id = $2 AND owner_type = 'product' AND attachment_type = 'product_image'"
+		if r.data.sqlDialect == "sqlite3" {
+			query = strings.NewReplacer("$1", "?", "$2", "?").Replace(query)
+		}
+		if err := tx.QueryRowContext(ctx, query, attachmentID, productID).Scan(&slotKey); err != nil {
+			if err == stdsql.ErrNoRows {
+				return nil
+			}
+			return err
+		}
+		if !biz.IsBusinessAttachmentProductImageSupplementalSlot(slotKey) {
+			return biz.ErrBadParam
+		}
 	}
 	if err := requireUnreferencedProductImage(ctx, tx, productID, slotKey, r.data.sqlDialect); err != nil {
 		return err

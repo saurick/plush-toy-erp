@@ -47,5 +47,7 @@ export const AttachmentPolicy = Object.freeze({
   productImageMaxBytes: 5242880,
   productImageMaxHeight: 8192,
   productImageMaxWidth: 8192,
+  productImageSupplementalMaxCount: 8,
+  productImageSupplementalSlot: 'supplemental',
   requestTimeoutSeconds: 300,
 })

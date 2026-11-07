@@ -10,6 +10,7 @@ import { createInformationDensityExtras } from './informationDensityExtras.mjs'
 import { createInformationDensityScenarios } from './informationDensityScenarios.mjs'
 import { createEmptyStateScenarios } from './emptyStateScenarios.mjs'
 import { createPageHeaderScenarios } from './pageHeaderScenarios.mjs'
+import { createFinanceWorkspaceScenarios } from './financeWorkspaceScenarios.mjs'
 import { createTaskCalendarScenarios } from './taskCalendarScenarios.mjs'
 import { createTaskCurrentFocusScenarios } from './taskCurrentFocusScenarios.mjs'
 import { createTaskFlowRecordScenarios } from './taskFlowRecordScenarios.mjs'
@@ -43,6 +44,7 @@ import { createBusinessPageContractScenarios } from './businessPageContractScena
 import { createAuditLogScenarios } from './auditLogScenarios.mjs'
 import { createHistoryRecordScenarios } from './historyRecordScenarios.mjs'
 import { createTabMotionScenarios } from './tabMotionScenarios.mjs'
+import { createAlertSpacingScenarios } from './alertSpacingScenarios.mjs'
 import { createTableAlignmentScenarios } from './tableAlignmentScenarios.mjs'
 import { createBusinessTableScrollScenarios } from './businessTableScrollScenarios.mjs'
 import { createBusinessTabReuseScenarios } from './businessTabReuseScenarios.mjs'
@@ -455,6 +457,7 @@ export function createStyleL1Scenarios(deps) {
       path,
     }),
     ...createPageHeaderScenarios({ customerRuntimeEffectiveSession, assertNoHorizontalOverflow, outputDir }),
+    ...createFinanceWorkspaceScenarios({ customerRuntimeEffectiveSession, assertNoHorizontalOverflow, outputDir }),
     ...createBusinessColumnSettingsScenarios({
       ...deps,
       customerRuntimeEffectiveSession,
@@ -608,6 +611,7 @@ export function createStyleL1Scenarios(deps) {
       path,
     }),
     ...createTabMotionScenarios({ outputDir }),
+    ...createAlertSpacingScenarios(),
     ...createMobileInputScenarios(),
     ...createTableAlignmentScenarios({
       outputDir,
@@ -853,6 +857,7 @@ export function createStyleL1Scenarios(deps) {
     ...createPurchaseFollowupScenarios({ assert, customerRuntimeEffectiveSession, outputDir }),
     ...createPurchaseReceiptScenarios({
       assert,
+      outputDir,
       assertAntdModalCentered,
       assertBusinessFormModalKeyboardRecovery,
       assertBusinessListEmptySearchState,
