@@ -9396,7 +9396,7 @@ return {orders,financeCustomers};})();
           "pageKey": "reconciliation",
           "steps": [
             {
-              "title": "核对业务来源",
+              "title": "查询期间对账",
               "owner": "财务",
               "roles": [
                 "finance"
@@ -9404,7 +9404,7 @@ return {orders,financeCustomers};})();
               "description": "期间对账选择客户或供应商、币种和日期，查询并导出本期发生与余额。"
             },
             {
-              "title": "核对金额与往来方",
+              "title": "生成单笔对账草稿",
               "owner": "财务",
               "roles": [
                 "finance"
@@ -9412,12 +9412,20 @@ return {orders,financeCustomers};})();
               "description": "从一笔已过账应收、应付或发票记录生成对账草稿。"
             },
             {
-              "title": "办理并确认结果",
+              "title": "核对并过账",
               "owner": "财务",
               "roles": [
                 "finance"
               ],
               "description": "核对来源、往来方、币种和金额，填写必要说明后确认过账。"
+            },
+            {
+              "title": "完成核对",
+              "owner": "财务",
+              "roles": [
+                "finance"
+              ],
+              "description": "核对清楚后点“完成核对”；发现差异先联系来源岗位，不直接改余额。"
             }
           ],
           "completion": "当前对账记录已完成核对，来源和核对结果可查；不表示已收款或付款。",

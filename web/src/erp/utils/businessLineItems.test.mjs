@@ -21,7 +21,9 @@ import {
   withoutBlankPurchaseOrderDraftLines,
 } from './businessLineItems.mjs'
 
-const stylesRoot = fileURLToPath(new URL('../styles', import.meta.url))
+const styleRoots = ['../styles', '../components'].map((directory) =>
+  fileURLToPath(new URL(directory, import.meta.url))
+)
 const shipmentModalPath = fileURLToPath(
   new URL('../components/shipments/ShipmentEditor.jsx', import.meta.url)
 )
@@ -231,7 +233,7 @@ test('businessLineItems: CSS guard detects page-level row geometry overrides', (
 })
 
 test('businessLineItems: shared table owns horizontal geometry without a second vertical scroller', () => {
-  const cssFiles = listCSSFiles(stylesRoot)
+  const cssFiles = styleRoots.flatMap(listCSSFiles)
 
   for (const contract of horizontalLayoutContracts) {
     const rules = cssFiles.flatMap((filePath) =>

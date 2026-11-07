@@ -6,12 +6,29 @@ import { buildPurchaseOrderItemSourceValuesFromMaterial } from '../../utils/sour
 
 test('采购下单名称复用行补充资料折叠，收起后完整保存，切换与清空材料不留旧值', async (t) => {
   const ui = await businessFormHarness(t)
-  const [{ Form }, { default: Fields }, { BusinessLineItemRow }] = await Promise.all([import('antd'), import('./PurchaseMaterialSnapshotFields.jsx'), import('../business-list/BusinessLineItemsTable.jsx')])
+  const [{ Form }, { default: Fields }, { BusinessLineItemRow }, { default: BusinessLineTable }] =
+    await Promise.all([
+      import('antd'),
+      import('./PurchaseMaterialSnapshotFields.jsx'),
+      import('../business-list/BusinessLineItemsTable.jsx'),
+      import('../business-list/BusinessLineTable.jsx'),
+    ])
   const materials = [{ id: 1, code: 'MAT-1', name: '短毛绒', color: '米白', default_unit_id: 1 }, { id: 2, code: 'MAT-2', name: '长毛绒', color: '棕色', default_unit_id: 1 }]
   let form
   function Example() {
     [form] = Form.useForm()
-    return h(Form, { form, initialValues: { items: [buildPurchaseOrderItemSourceValuesFromMaterial(materials[0])] } }, h('table', null, h(Form.List, { name: 'items' }, (fields) => fields.map((field) => h(BusinessLineItemRow, { key: field.key, index: field.name, cells: [h('span', null, '材料')], collapsibleDetails: true, detailsToggleLabel: '下单材料信息' }, h(Fields, { fieldName: field.name }))))))
+    const rows = h(Form.List, { name: 'items' }, (fields) => fields.map((field) => h(BusinessLineItemRow, {
+      key: field.key,
+      index: field.name,
+      cells: [h('span', null, '材料')],
+      collapsibleDetails: true,
+      detailsToggleLabel: '下单材料信息',
+    }, h(Fields, { fieldName: field.name }))))
+    return h(Form, { form, initialValues: { items: [buildPurchaseOrderItemSourceValuesFromMaterial(materials[0])] } }, h(BusinessLineTable, {
+      label: '采购明细',
+      columns: [{ key: 'line', label: '序号' }, { key: 'material', label: '材料' }],
+      expandableDetails: true,
+    }, rows))
   }
   await ui.render(h(Example))
   assert.equal(Boolean(ui.field('下单材料名称').closest('[hidden]')), true)

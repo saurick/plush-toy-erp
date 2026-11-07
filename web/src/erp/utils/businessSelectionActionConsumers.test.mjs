@@ -29,6 +29,7 @@ const FORMAL_SELECTION_PAGE_CONSUMERS = Object.freeze({
   'PurchaseReceiptsPage.jsx': 'PurchaseReceiptsPage.jsx',
   'QualityInspectionsPage.jsx': 'QualityInspectionsPage.jsx',
   'SalesOrdersPage.jsx': 'SalesOrdersPage.jsx',
+  'WarehouseProductionWorkPage.jsx': 'WarehouseProductionWorkPage.jsx',
   'WorkflowBusinessModulePage.jsx': 'WorkflowBusinessModulePage.jsx',
 })
 
@@ -49,6 +50,7 @@ const FORMAL_SELECTION_STABLE_ACTION_EVIDENCE = Object.freeze({
   'QualityInspectionsPage.jsx': /data-business-action-key="submit"/u,
   'SalesOrdersPage.jsx':
     /disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u,
+  'WarehouseProductionWorkPage.jsx': /data-business-action-key="warehouse-handle"/u,
   'WorkflowBusinessModulePage.jsx':
     /data-business-action-key="workflow-task-complete"/u,
 })

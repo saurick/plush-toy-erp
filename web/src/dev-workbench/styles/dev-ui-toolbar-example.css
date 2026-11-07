@@ -93,7 +93,7 @@
 .erp-dev-tab-comparison__reason,
 .erp-dev-tab-comparison__responsibility {
   margin: 8px 0;
-  color: var(--erp-text-secondary);
+  color: var(--erp-text-muted);
   line-height: 1.6;
 }
 

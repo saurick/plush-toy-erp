@@ -907,7 +907,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 `get_production_wip` 需要 `production.wip.read`；生产订单的 `get_production_order` / `list_production_orders` 同时接受 `pmc.plan.read` 或 `production.wip.read`，但新建、编辑、发布、关闭、取消和引用选项仍只属于 PMC 计划权限。这样业务岗位可进入生产订单页只读核对路线并办理包材确认，不会获得生产计划维护权。
 
-`list_warehouse_production_work` 的 `kind=RETURN` 使用 `production.wip.read` 查询工序回货，`kind=RECEIPT` 使用 `production.fact.read` 查询成品收仓，并沿用仓库数据范围。两类都只读，按 `keyword / stage` 筛选后分页，`counts` 统计同关键词及可读范围内的全部阶段，空字符串键表示全部。结果按确切收仓记录投影待检、待包装数量及下一步工序动作，正式写入继续走原过账和 WIP 接口；不返回财务字段。包装批次的本厂安排使用 `warehouse.packaging.execute`，其他工序安排、批次拆分和取消继续要求 `production.wip.assign`。
+`list_warehouse_production_work` 的 `kind=RETURN` 使用 `production.wip.read` 查询未绑定库存仓的工序回货，`kind=RECEIPT` 使用 `production.fact.read` 查询成品收仓并应用仓库数据范围。两类都只读，按 `keyword / stage` 筛选后分页，`counts` 统计同关键词及可读范围内的全部阶段，空字符串键表示全部。结果按确切收仓记录投影待检、待包装数量及下一步工序动作，正式写入继续走原过账和 WIP 接口；不返回财务字段。包装批次的本厂安排使用 `warehouse.packaging.execute`，其他工序安排、批次拆分和取消继续要求 `production.wip.assign`。
 
 固定路线和首个 WIP 批次只在生产订单发布事务中冻结；缺失或损坏的路线必须修复工序主档绑定后重新发布，不提供事后初始化接口。工序主档以唯一 `production_route_operation_code` 显式绑定四个标准路线位置，不从名称、类别、普通工序编码或排序推断。
 

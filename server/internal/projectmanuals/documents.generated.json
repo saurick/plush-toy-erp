@@ -1530,7 +1530,7 @@
     "id": "guide:reconciliation",
     "book": "business",
     "title": "处理对账",
-    "source_hash": "178da70e156db2a4478128236c3b1d7fac6ebde8498bd9a82d86e740d7e0b1f0",
+    "source_hash": "5a3cfd1a0a66b98bb43739ce7d8c2b238a7e5ca1077261bd57de6bf4f02f23e4",
     "path": "/erp/finance/reconciliation",
     "roles": [
       "finance"

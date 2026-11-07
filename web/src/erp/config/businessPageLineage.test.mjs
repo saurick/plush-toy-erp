@@ -48,8 +48,8 @@ function apiMethodActions(relativePaths) {
 }
 
 const NON_LINEAGE_READ_ACTIONS = Object.freeze([
-  // These methods only read the owning page or a raw fact list. Source-specific
-  // candidate/projection reads are intentionally not allowed in this list.
+  // These methods only read the owning page or a raw fact list. Candidate
+  // queries that choose the source of a downstream record belong to lineage.
   'export_sales_orders',
   'get_bom_version',
   'get_customer',
@@ -98,6 +98,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_production_facts',
   'list_production_exceptions',
   'list_production_orders',
+  'list_warehouse_production_work',
   'list_products',
   'list_purchase_order_items',
   'list_purchase_orders',
@@ -570,6 +571,7 @@ test('business page lineage: producer and typed flow actions are backed by curre
     '../utils/operationalFactDraftEdit.mjs',
     '../api/productionOrderApi.mjs',
     '../api/productionWipApi.mjs',
+    '../api/warehouseProductionApi.mjs',
     '../api/purchaseApi.mjs',
     '../api/qualityApi.mjs',
     '../../../../server/internal/service/jsonrpc_production_wip.go',

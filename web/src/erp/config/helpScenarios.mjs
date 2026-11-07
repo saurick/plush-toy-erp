@@ -283,7 +283,12 @@ const financeScenarios = {
   '/erp/finance/receivables': financeScenario('receivables'),
   '/erp/finance/payables': financeScenario('payables'),
   '/erp/finance/invoices': financeScenario('invoices'),
-  '/erp/finance/reconciliation': financeScenario('reconciliation'),
+  '/erp/finance/reconciliation': pageScenario('reconciliation', [
+    ['查询期间对账', '财务', ['finance']],
+    ['生成单笔对账草稿', '财务', ['finance']],
+    ['核对并过账', '财务', ['finance']],
+    ['完成核对', '财务', ['finance']],
+  ]),
 }
 
 export function getBusinessPageHelpScenario(pageKey) {

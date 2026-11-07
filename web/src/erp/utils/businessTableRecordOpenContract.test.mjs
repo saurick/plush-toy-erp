@@ -25,6 +25,7 @@ const expectedBusinessDataTablePages = [
   'QualityInspectionsPage.jsx',
   'SalesOrdersPage.jsx',
   'ShipmentsPage.jsx',
+  'WarehouseProductionWorkPage.jsx',
   'WorkflowBusinessModulePage.jsx',
 ]
 
