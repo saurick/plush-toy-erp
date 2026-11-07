@@ -37,6 +37,12 @@ const fixture = {
         name: productName,
         code: 'PRODUCT-7',
       },
+      {
+        kind: 'product',
+        product_id: 8,
+        name: '图片预览模拟小鹿',
+        code: 'PRODUCT-8',
+      },
     ],
   },
 }
@@ -143,6 +149,28 @@ async function closePreview(page, button, { escape = false } = {}) {
     true,
     '关闭后焦点返回原图按钮'
   )
+}
+
+async function assertLinkedItemsPreviewStability(page) {
+  await page.getByRole('button', { name: '查看2 款产品', exact: true }).click()
+  const association = page.locator('.erp-task-linked-items-modal')
+  const thumbnail = association.getByRole('button', { name: previewButtonName, exact: true })
+  await thumbnail.waitFor()
+  await waitForFiniteAnimations(page)
+
+  const text = association.locator('.erp-task-identity__item').first()
+  const before = await text.boundingBox()
+  await thumbnail.click()
+  await waitImage(page)
+  const during = await text.boundingBox()
+  await closePreview(page, thumbnail)
+  const after = await text.boundingBox()
+  for (const box of [during, after]) {
+    assert.ok(
+      before && box && ['x', 'y', 'width', 'height'].every((key) => Math.abs(box[key] - before[key]) <= 1),
+      `打开和关闭大图时，关联产品文字位置与尺寸应保持稳定: ${JSON.stringify({ before, during, after })}`
+    )
+  }
 }
 
 async function assertPreview(
@@ -462,6 +490,7 @@ export function createTaskImagePreviewScenarios({
           }
           await assertPreview(page, button, outputDir, name)
         }
+        await assertLinkedItemsPreviewStability(page)
       },
     },
     {

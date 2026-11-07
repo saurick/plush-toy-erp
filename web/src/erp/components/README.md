@@ -20,7 +20,7 @@
 | 业务列表共享层   | `business-list/*`                                                              | 列表壳、表单弹窗、附件、明细行、列顺序和来源选择 |
 | 工具栏组合样例 | [`DevUIBusinessToolbarExample.jsx`](../../dev-workbench/components/DevUIBusinessToolbarExample.jsx) | 工作台“控件设计 → 业务工具栏组合”直接使用正式工具栏、表格、筛选、详情与列设置；四业务、职责标注及增长场景只处理本地样例，不导入真实页面或调用业务偏好 hook |
 | 关联资料选择与更新 | `RemoteReferenceSelect.jsx`、`ReferenceRecordsContext.jsx` | 远程搜索、分页与已选资料回显；物料保存后按权限定点重读，`BusinessFormPage` 承接可重试的读取提示，保留表单草稿与冻结快照 |
-| 产品图片图集 | `business-list/BusinessProductGallery.jsx`、`BusinessDocumentProductGallery.jsx`、`workflow/WorkflowTaskImagePreview.jsx` | 单据列表以主图缩略图和去重款数打开全部关联产品；预览采用常驻产品条与合并操作行，选中边框与底衬跟随主题色，切换不改变尺寸。单图收起翻页，帮助按需展开；单品身份共用主辅图、缩放、失败重试和关闭恢复。批量摘要仅支持正式关联，物料和未关联需求不借图 |
+| 产品图片图集 | `business-list/BusinessProductGallery.jsx`、`BusinessDocumentProductGallery.jsx`、`workflow/WorkflowTaskImagePreview.jsx` | 单据列表以主图缩略图和去重款数打开全部关联产品；预览采用常驻产品条与合并操作行，选中边框与底衬跟随主题色，切换不改变尺寸。单图收起翻页，帮助按需展开；单品身份共用主辅图、缩放、失败重试和关闭恢复。打开和关闭预览时，原有缩略图及相邻文字的位置保持稳定。批量摘要仅支持正式关联，物料和未关联需求不借图 |
 | 业务日期输入和范围筛选 | [`business-list/BusinessDateInputs.jsx`](business-list/BusinessDateInputs.jsx) | `DateInput`、`DateTimeInput`、`DateRangeFilter` 共用格式与范围约束；`InheritedDateInput` 供销售、采购、委外明细显示整单交期，单独改期后保存行值，清空恢复沿用。采购优先沿用供应商确认日期 |
 | 主数据和源单据   | `master-data/*`、`sales-orders/*`、`purchase-orders/*`、`outsourcing-orders/*` | 领域列配置、表单、业务动作面板和来源生成入口                   |
 | 共用资料目录操作条 | [`business-list/MaintenanceSelectionBar.jsx`](business-list/MaintenanceSelectionBar.jsx) | 仓库设置与付款方式共用选中摘要、清选及顶部维护动作布局；调用方持有独立选择、权限与状态，不继承来源页面的动作宿主。配合 AppTable 空白单选列表头与整行选择，提交及错误恢复仍归业务组件 |

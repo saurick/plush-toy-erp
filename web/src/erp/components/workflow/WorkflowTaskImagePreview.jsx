@@ -174,12 +174,12 @@ export default function WorkflowTaskImagePreview({
     </>
   )
 
+  // The preview renders in a portal; its local host must stay out of the thumbnail layout.
   return (
-    <span onClick={(event) => event.stopPropagation()}>
+    <span hidden onClick={(event) => event.stopPropagation()}>
       <Image
         src={thumbnail}
         alt={name}
-        wrapperStyle={{ display: 'none' }}
         preview={{
           visible,
           src: original || (gallery ? '' : thumbnail),
