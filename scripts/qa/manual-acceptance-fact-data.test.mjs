@@ -30,6 +30,7 @@ import {
   manualAcceptanceFactRole,
   manualAcceptanceFactRPCParams,
   mergeManualAcceptanceFactReferences,
+  readFinalManualAcceptanceFinanceFacts,
   readManualAcceptanceFinalInventoryReferences,
   readManualAcceptanceFulfillmentHandoffs,
   parseManualAcceptanceFactArgs,
@@ -1952,6 +1953,24 @@ test("authoritative lifecycle records win over stale source readback", () => {
       [{ id: 1, order_no: "MO-1", status: "CLOSED" }],
     ),
     [{ id: 1, order_no: "MO-1", status: "CLOSED" }],
+  );
+});
+
+test("final finance evidence reads the settled facts after payments and rejects identity drift", async () => {
+  const plan = { dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION };
+  const old = { id: 21, fact_no: "TEST-YS-261107V9-YS014", fact_type: "RECEIVABLE", status: "POSTED" };
+  const settled = { ...old, status: "SETTLED", outstanding_amount: "0" };
+  const read = async (request) => {
+    assert.equal(request.method, "list_finance_facts");
+    assert.equal(request.actor, "finance");
+    assert.equal(request.params.keyword, "TEST-YS-261107V9-");
+    return { finance_facts: [settled], total: 1 };
+  };
+  assert.deepEqual(await readFinalManualAcceptanceFinanceFacts(read, plan, [old]), [settled]);
+  assert.equal(old.status, "POSTED");
+  await assert.rejects(
+    () => readFinalManualAcceptanceFinanceFacts(read, plan, [{ ...old, fact_type: "PAYABLE" }]),
+    /lost identity/u,
   );
 });
 

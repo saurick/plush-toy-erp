@@ -5073,14 +5073,14 @@ function eligiblePostedFinanceFacts(financeFacts, factType) {
   );
 }
 
-export async function listAllFinancePageRecords(rpc, method, listKey) {
+export async function listAllFinancePageRecords(rpc, method, listKey, filter = {}) {
   const items = [];
   for (let offset = 0; offset < 200_000; offset += 200) {
     const data = await rpc({
       actor: "finance",
       domain: "operational_fact",
       method,
-      params: { limit: 200, offset },
+      params: { ...filter, limit: 200, offset },
     });
     const rows = data?.[listKey];
     if (!Array.isArray(rows))
@@ -5095,6 +5095,26 @@ export async function listAllFinancePageRecords(rpc, method, listKey) {
       throw new CliError(`${method} readback was truncated`);
   }
   throw new CliError(`${method} readback exceeded its page budget`);
+}
+
+export async function readFinalManualAcceptanceFinanceFacts(rpc, plan, facts) {
+  const keyword = shortBusinessNo(plan, "YS", 1).slice(0, -5);
+  const live = await listAllFinancePageRecords(
+    rpc,
+    "list_finance_facts",
+    "finance_facts",
+    { keyword },
+  );
+  const byID = new Map(live.map((row) => [row.id, row]));
+  return dedupeByID(facts).map((expected) => {
+    const row = byID.get(expected.id);
+    if (!row || row.fact_no !== expected.fact_no || row.fact_type !== expected.fact_type) {
+      throw new CliError(
+        `final finance readback lost identity for ${expected.fact_no}`,
+      );
+    }
+    return row;
+  });
 }
 
 export async function ensureFinanceCreditNoteSpecimens({
@@ -5984,6 +6004,11 @@ export async function runSourceDrivenFactStage(
     transitionPayment: (payment, desiredStatus) =>
       transitionManualAcceptanceFinancePayment({ rpc, payment, desiredStatus }),
   });
+  const finalFinanceFacts = await readFinalManualAcceptanceFinanceFacts(
+    rpc,
+    plan,
+    lifecycle.financeFacts,
+  );
   return {
     exceptionChains,
     plans: {
@@ -6041,7 +6066,7 @@ export async function runSourceDrivenFactStage(
       })),
       ...lifecycle.shipments,
     ]),
-    financeFacts: dedupeByID(lifecycle.financeFacts),
+    financeFacts: finalFinanceFacts,
     financePayments: dedupeByID([
       ...exceptionPageLifecycle.financePayments,
       ...cashPayments,

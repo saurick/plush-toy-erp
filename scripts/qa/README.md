@@ -716,6 +716,8 @@ node scripts/qa/manual-acceptance-data-depth.mjs
 
 配方包含客户验货与包装版本快照，并保留返工和异常处理。缺少路线、来源粒度漂移或旧配方报告均拒绝；既有 stage 指纹与业务 semantic 身份共同阻止旧批次续跑，不以直接完工或 Workflow 完成代替正式事实入账。
 
+收付款及核销结束后，事实阶段按本批单号和 ID 重新读取应收、应付等财务记录，再生成状态分布与字段摘要。就绪检查逐项对账，不沿用收付款前的状态快照。
+
 正式 browser 各登记模式按顶层报告明确的 `sourceScaleProfile` 重建当前 target plan，核对当前 semantic 与 stage 指纹，旧配方报告不能直接接入验收；shared opt-in 仍固定 volume 与长期基线。readiness 同时提供 source 和 facts 时校验两者的来源 semantic 同源，不把它们等同顶层 digest；独立组件检查没有顶层 bundle 时，不宣称已证明当前整批配方。
 
 ### 本地隔离验收与自动清理
