@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
+import { EventEmitter } from 'node:events'
 import { cp, mkdir, mkdtemp, readFile, readlink, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import os from 'node:os'
@@ -8,7 +9,48 @@ import path from 'node:path'
 import { readRepositoryIdentity } from '../qa/lib/repository-identity.mjs'
 import { workbenchBuildIdentityPlugin } from '../../web/vite.workbench-identity.mjs'
 import { digestFile, sealWorkbenchArtifact, verifyWorkbenchArtifact, WORKBENCH_BUILD_PATH } from './workbench-artifact.mjs'
-import { activateWorkbench, inspectWorkbenchState, main, transferWorkbench } from './workbench-release.mjs'
+import { activateWorkbench, checkWorkbenchHttpsBoundary, inspectWorkbenchState, main, transferWorkbench } from './workbench-release.mjs'
+
+function httpsFixture(responses, requests = []) {
+  return (options, respond) => {
+    requests.push(options)
+    const req = new EventEmitter()
+    req.end = () => queueMicrotask(() => {
+      const result = responses.shift()
+      if (result instanceof Error) req.emit('error', result)
+      else respond(Object.assign(new EventEmitter(), { statusCode: result.status, headers: result.headers || {}, resume() {} }))
+    })
+    return req
+  }
+}
+
+test('HTTPS readback uses the private gateway with the registered TLS identity and rejects invalid authentication boundaries', async () => {
+  const requests = []
+  await checkWorkbenchHttpsBoundary({ request: httpsFixture([
+    { status: 200 }, { status: 401, headers: { 'x-plush-workbench-auth': 'required' } },
+    { status: 200 }, { status: 401, headers: { 'x-plush-workbench-auth': 'required' } },
+  ], requests) })
+  assert.deepEqual(requests.map(({ hostname, port, servername, headers, path: pathname, rejectUnauthorized }) =>
+    ({ hostname, port, servername, host: headers.Host, pathname, rejectUnauthorized })), [
+    { hostname: '10.252.70.1', port: 443, servername: 'workbench.saurick.me', host: 'workbench.saurick.me', pathname: '/__dev/login', rejectUnauthorized: true },
+    { hostname: '10.252.70.1', port: 443, servername: 'workbench.saurick.me', host: 'workbench.saurick.me', pathname: '/__dev/api/delivery/summary', rejectUnauthorized: true },
+    { hostname: 'workbench.saurick.me', port: 443, servername: 'workbench.saurick.me', host: 'workbench.saurick.me', pathname: '/__dev/login', rejectUnauthorized: true },
+    { hostname: 'workbench.saurick.me', port: 443, servername: 'workbench.saurick.me', host: 'workbench.saurick.me', pathname: '/__dev/api/delivery/summary', rejectUnauthorized: true },
+  ])
+  for (const responses of [
+    [{ status: 403 }, { status: 401, headers: { 'x-plush-workbench-auth': 'required' } }],
+    [{ status: 200 }, { status: 200 }],
+    [{ status: 200 }, { status: 401 }],
+  ]) await assert.rejects(checkWorkbenchHttpsBoundary({ request: httpsFixture(responses) }), /内网 HTTPS/u)
+  await assert.rejects(checkWorkbenchHttpsBoundary({ request: httpsFixture([
+    { status: 200 }, { status: 401, headers: { 'x-plush-workbench-auth': 'required' } },
+    { status: 403 }, { status: 401, headers: { 'x-plush-workbench-auth': 'required' } },
+  ]) }), /公网 HTTPS/u)
+})
+
+test('HTTPS readback preserves connection and certificate failures', async () => {
+  await assert.rejects(checkWorkbenchHttpsBoundary({ request: httpsFixture([new Error('certificate verification failed')]) }), /certificate verification failed/u)
+})
 
 async function put(root, file, content, mode = 0o600) {
   await mkdir(path.dirname(path.join(root, file)), { recursive: true })
@@ -122,7 +164,7 @@ async function deploymentFixture(t) {
     assertHost() {},
     async stop() { calls.push('stop') },
     async start() { calls.push('start') },
-    async publicCheck() { calls.push('public') },
+    async httpsCheck() { calls.push('https') },
     async health() { return { status: 'ok', maintenance: true, activeWrites: 0, artifactId: manifest.artifactId, sourceSha: manifest.repository.commit, nodeVersion: manifest.nodeVersion } },
   }
   return { input, manifest, deployment, previous, oldKey, calls, services }
@@ -133,7 +175,7 @@ test('activation preserves byte-identical history and rollback carries the lates
   const first = await activateWorkbench({ input: f.input, root: f.deployment, services: f.services })
   assert.equal(first.status, 'passed')
   assert.equal(first.stateFiles, 2)
-  assert.deepEqual(f.calls, ['stop', 'start', 'public'])
+  assert.deepEqual(f.calls, ['stop', 'start', 'https'])
   const active = path.join(f.deployment, await readlink(path.join(f.deployment, 'current')))
   assert.equal(await readlink(path.join(active, 'web/node_modules/stub')), '.pnpm/stub@1.0.0/node_modules/stub')
   await put(active, 'output/qa/retained-report.json', '{"historical":true}')
@@ -191,7 +233,7 @@ test('an uncertain stop result restarts and verifies the previous release withou
   assert.equal(result.status, 'failed')
   assert.equal(result.failedStage, 'stop-service')
   assert.equal(result.previousServiceRestored, true)
-  assert.deepEqual(f.calls, ['stop', 'start', 'public'])
+  assert.deepEqual(f.calls, ['stop', 'start', 'https'])
   assert.equal(await readlink(path.join(f.deployment, 'current')), `releases/${f.oldKey}`)
   assert.equal(existsSync(path.join(f.deployment, result.candidate)), true)
   assert.equal(existsSync(path.join(f.deployment, 'runtime/release.lock')), false)

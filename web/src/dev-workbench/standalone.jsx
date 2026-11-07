@@ -15,6 +15,7 @@ import { WORKBENCH_APPEARANCE_STORAGE_KEY } from '@/common/theme/erpAppearance.m
 import { createERPAntdTheme } from '@/common/theme/erpAntdTheme.mjs'
 import { MESSAGE_CONFIG, NOTIFICATION_CONFIG } from '@/common/utils/feedbackConfig.mjs'
 import DevWorkbenchRoutes from './DevWorkbenchRoutes.jsx'
+import { WorkbenchIdentity } from './components/WorkbenchIdentity.jsx'
 
 function StandaloneWorkbenchTheme() {
   const { isDark, accent, appearance } = useERPTheme()
@@ -27,7 +28,7 @@ function StandaloneWorkbenchTheme() {
       <AntdApp message={MESSAGE_CONFIG} notification={NOTIFICATION_CONFIG}>
         <AntdAppBridge />
         <ScrollEdges />
-        <DevWorkbenchRoutes />
+        <WorkbenchIdentity><DevWorkbenchRoutes /></WorkbenchIdentity>
       </AntdApp>
     </ConfigProvider>
   )

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createDevDeliveryClient } from './devDelivery.mjs'
 import { requestWorkbenchJson } from './devWorkbenchRequest.mjs'
+import { WORKBENCH_READ_ONLY_MESSAGE } from './workbenchAccess.mjs'
 import {
   clearDevSummarySnapshot,
   loadDevSummarySnapshot,
@@ -17,6 +18,14 @@ function waitForAbort(signal) {
       }) }
   })
 }
+
+test('read-only refusal uses the shared user message without exposing arbitrary server text', async () => {
+  await assert.rejects(requestWorkbenchJson(async () => ({
+    ok: false,
+status: 403,
+    json: async () => ({ code: 'workbench_read_only', message: 'untrusted internal detail' }),
+  }), '/__dev/api/delivery/actions', { method: 'POST' }), { message: WORKBENCH_READ_ONLY_MESSAGE, status: 403 })
+})
 
 test('summary and session requests have deadlines; a timed-out session never sends a write', async () => {
   const requests = []

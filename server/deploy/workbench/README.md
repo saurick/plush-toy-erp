@@ -1,6 +1,6 @@
 # 独立效能工作台 / Standalone Engineering Workbench
 
-效能工作台可独立部署到测试环境，通过 `https://workbench.saurick.me` 登录。它使用单独的前端制品和 Node 服务；ERP 正式构建仍排除工作台。本地 `pnpm start` 与 `private-network` 配置继续免工作台登录。
+效能工作台可独立部署到测试环境，通过公网 `https://workbench.saurick.me` 登录；HTTP 只跳转到 HTTPS。查看人员使用独立只读账号，研发运维人员保留操作身份。它使用单独的前端制品和 Node 服务；ERP 正式构建仍排除工作台。本地 `pnpm start` 与 `private-network` 配置继续免工作台登录。
 
 ## 入口与职责
 
@@ -11,12 +11,20 @@
 | 页面制品 | `web/workbench.html`、`web/vite.workbench.config.mjs`，输出 `web/build-workbench/` |
 | 独立服务 | `web/dev-server/standaloneWorkbench.mjs`，复用现有受控工具 Bridge |
 | 域名与 TLS | 香港 Nginx，配置 [nginx.conf](nginx.conf)，复用已受管的 `*.saurick.me` 证书 |
+| 网关访问范围 | 工作台 HTTPS 对外提供登录，服务端会话决定查看或操作权限；内部代理仅信任登记的私网网关，覆盖客户端自报转发头。工作台虚拟主机、设备管理后台与 ERP 域名分别维护访问规则 |
 | 内部链路 | 香港 `10.252.70.1` 经现有 Netmaker 加密网络访问 133 的 `10.252.70.2:15300`；服务只信任指定代理、精确 Host 和 HTTPS 转发头 |
 | 常驻服务 | [plush-workbench-test.service](plush-workbench-test.service)，发布目录与本地开发 checkout 分离 |
 | 业务接口 | `/rpc`、`/templates` 只代理业务 registry 内 `customer-test-133` 的固定地址；仍需 ERP 业务身份与权限 |
 | 数据与执行 | 不自动迁移、造数、发版或重建；已有固定动作继续经过各自确认、CSRF、权限、目标预检与读回 |
 
-登录身份只授予研发运维人员，不使用甲方 ERP 账号。工作台的本地开发库工具需要独立登记的开发运行配置和工具链；缺少配置时显示未就绪，不借用 test 业务库或管理员凭据。GitLab 只读凭据、目标 SSH 权限和执行器所需权限分别配置，登录成功不代表这些能力已就绪。
+工作台使用自己的登录身份，不使用甲方 ERP 账号；查看身份与运维身份分开，前者不能执行工具写操作或访问业务代理。工作台的本地开发库工具需要独立登记的开发运行配置和工具链；缺少配置时显示未就绪，不借用 test 业务库或管理员凭据。GitLab 只读凭据、目标 SSH 权限和执行器所需权限分别配置，登录成功不代表这些能力已就绪。
+
+查看人员打开 HTTPS 链接即可登录，无需安装 VPN。运维检查还会直连登记的私网网关，保留正式 Host、TLS SNI 和证书验证，不修改系统 DNS，例如：
+
+```bash
+curl --noproxy '*' --resolve workbench.saurick.me:443:10.252.70.1 \
+  https://workbench.saurick.me/__dev/login
+```
 
 权限关系读取登记的共享开发库。独立服务使用构建机预编译的 `toolchain/bin/dev-permission-relationships`，不在目标机执行 `go run` 或构建。`PLUSH_WORKBENCH_PERMISSION_AUDIT_DSN_FILE` 指向服务用户持有的 `0600` 普通文件，只保存登记共享开发库的现有只读审计连接；调用前核验账号实际权限，Go 工具再次核验集群身份并强制只读。该文件不进入源码包、浏览器或操作历史，不使用应用、迁移、test 或正式库凭据替代。
 
@@ -36,11 +44,15 @@
 
 独立服务必填 `PLUSH_WORKBENCH_ORIGIN`、`PLUSH_WORKBENCH_USERNAME` 与 `PLUSH_WORKBENCH_PASSWORD_HASH`。域名必须匹配 target。密码使用至少 24 字符的独立随机值，经 `hashWorkbenchPassword` 转成 `scrypt:salt:hash`；运行 env 只保存哈希，不保存原密码。
 
+需要对外提供只读查看时，同时设置 `PLUSH_WORKBENCH_VIEWER_USERNAME` 与 `PLUSH_WORKBENCH_VIEWER_PASSWORD_HASH`，使用独立账号和随机密码；只设置其中一个、身份无效、用户名与运维账号重名或复用同一哈希均拒绝启动。没有配置查看身份时，仍仅接受运维账号。本方案只登记两个固定用途的身份，不新增 ERP 员工、角色、数据库或账号管理平台。
+
+角色在登录时由服务端匹配凭据并绑定不透明会话；浏览器提交的角色不产生权限。查看身份可以读取工作台页面、资源与结果，服务端在进入工具插件前拒绝所有写请求，并拒绝 `/rpc`、`/templates` 业务代理；正常登录、退出与会话查询保留。页面显示只读提示；无法确认会话时不加载工作台，显式重试后重新核对。此限制不依赖隐藏按钮，也不替代运维动作原有的 CSRF、目标检查和业务权限。
+
 env 文件必须由服务用户持有、权限 `0600`，放在部署根目录的 `runtime/workbench.env`，不放进源码或浏览器 `VITE_*` 变量。
 
 版本交付需要分别核对 GitLab 只读、发布写入、目标取件及目标 SSH 配置。只读重载使用 `PLUSH_GITLAB_READ_TOKEN_FILE`；部署执行器和“补录 GitLab”使用 `PLUSH_GITLAB_TOKEN_FILE`，两者均指向服务用户持有的 `0600` 文件。Bridge 的发布授权和目标取件沿用 `PLUSH_GITLAB_TOKEN`、`PLUSH_GITLAB_TARGET_FETCH_TOKEN`；配置与轮换时须同步对应受控文件，不能用只读令牌替代写入授权。在 133 本机执行固定目标预检时，SSH 仍须通过主机密钥校验；同机访问仅授予该主机来源，不复制开发者私钥。
 
-登录表单使用 `/__dev/login`，提交到固定 `/__dev/auth/login`。服务检查同源后设置 `Secure; HttpOnly; SameSite=Strict; Path=/` 的 `__Host-` Cookie；服务端会话绝对有效期为 1 小时，访问工作台不会续期，重启或更换身份后失效。重新登录轮换会话，退出登录立即撤回服务端会话。失败按来源限制尝试次数，并保留全局上限；日志仅记录结果、请求 ID、方法、状态和耗时。
+登录表单使用 `/__dev/login`，提交到固定 `/__dev/auth/login`。服务检查同源后设置 `Secure; HttpOnly; SameSite=Strict; Path=/` 的 `__Host-` Cookie；服务端会话绝对有效期为 1 小时，访问工作台不会续期，重启或更换身份后失效。重新登录轮换会话，退出登录立即撤回服务端会话。失败按来源限制尝试次数，并保留全局上限；日志仅记录结果、角色、请求 ID、方法、状态和耗时，不记录登录名、密码或 Cookie。
 
 未登录页面返回登录入口，API 和工具资源返回统一 401；深链接登录后恢复，拒绝外部跳转和 auth/API 返回地址。登录页和工作台共用 `/favicon-dev.svg`，该图标仅开放 HTTPS 受信代理边界内的 GET / HEAD，登录页 CSP 允许读取同源图片。外部网页的顶层导航只允许进入公开登录页；跨站 API、表单提交和 iframe 继续拒绝。服务另提供无操作能力的 `/healthz`；不运行 Vite，不提供源码、HMR、任意文件、命令或目标代理。
 
@@ -57,7 +69,7 @@ GIT_OPTIONAL_LOCKS=0 pnpm build:workbench
 GIT_OPTIONAL_LOCKS=0 pnpm test:workbench
 ```
 
-`test:workbench` 核对构建身份与当前源码一致，启动真实独立服务并加载 `build-workbench` 静态制品。浏览器通过 loopback HTTPS fixture 代理访问真实登录和会话合同，仅在本次独立浏览器进程信任临时证书的公钥指纹，不修改系统信任或用户浏览器设置；工具 API 使用隔离样例，不连接业务服务器、不执行诊断或部署。覆盖登录深链恢复、独立模式的服务端检查 / 诊断历史、服务器验证分项读取、三个桌面宽度、本地动作隐藏及服务端拒绝、会话失效重新登录和退出。结果、构建身份摘要与原生 3840×2160 截图写入 `output/qa/workbench-artifact-browser/`。
+`test:workbench` 核对构建身份与当前源码一致，启动真实独立服务并加载 `build-workbench` 静态制品。浏览器通过 loopback HTTPS fixture 代理访问真实登录和会话合同，仅在本次独立浏览器进程信任临时证书的公钥指纹，不修改系统信任或用户浏览器设置；工具 API 使用隔离样例，不连接业务服务器、不执行诊断或部署。覆盖登录深链恢复、独立模式的服务端检查 / 诊断历史、服务器验证分项读取、三个桌面宽度、本地动作隐藏及服务端拒绝、查看身份的页面提示与写入拒绝、会话读取失败关闭与恢复、会话失效重新登录和退出。结果、构建身份摘要与原生 3840×2160 截图写入 `output/qa/workbench-artifact-browser/`。
 
 该检查可用于未提交候选的隔离验证，但不是可发布制品，也不替代正式 TLS / 反向代理、目标凭据、实际目标执行或部署后读回。正式封装仍要求下文的 clean committed source。单元层服务端认证检查、普通 Vite 页面与本制品路径各证明自己的边界。
 
@@ -92,6 +104,8 @@ GIT_OPTIONAL_LOCKS=0 pnpm test:workbench
 
 目标必须已有经同一清单校验的旧版本、`releases/`、`current` 和服务用户持有的 `0600 runtime/workbench.env`。systemd 使用本目录 service 单元：主进程及子进程 `PATH` 都优先指向 `current/toolchain/bin`，不替换宿主共享 Node。旧版本缺少制品清单、维护状态读回或固定工具链时先阻断；首次接入须在另获授权的维护窗口核清旧版本与状态、保全原配置并安装对应服务，不能补造身份绕过检查。
 
+网关配置独立于工作台制品，切换或回滚应用不会变更其它站点的访问规则。对外提供查看账号前，必须先验证该版本包含服务端只读边界并安装对应运行凭据；不把运维凭据当作查看账号分发。回滚到没有查看身份能力的版本时，该账号不可登录，不放宽验证或就地修改旧制品来兜底。
+
 1. 只读核对制品和固定目标计划，明确审批的 `artifactId`；获得本次目标升级授权后才执行第二条：
 
    ```bash
@@ -101,8 +115,8 @@ GIT_OPTIONAL_LOCKS=0 pnpm test:workbench
    ```
 
 2. 执行器校验固定 SSH 主机身份、上传内容与 Node，再取得本次维护锁。锁期间拒绝新工具 POST，保留只读访问；有在途写请求、未结束或未知操作、执行锁、外部 store override、未知 `output/` 时不停止服务。只传输代码和依赖，不传输本机运行状态。
-3. 校验候选后停止本工作台服务，逐文件保全当前 `output/dev-workbench`、`output/dev-customer-config-operations`、`output/qa`、`output/playwright`，核对内容、权限与清单完全一致，再原子切换 `current`。客户配置操作与交付操作均须处于终态。成功须读回 exact artifact / source SHA、固定 Node、空闲状态、HTTPS 登录页和未登录 API 拒绝；历史记录与原回执继续保留。
-4. 停服结果不确定或新版本读回失败时，保留候选和旧版本，主动恢复旧服务并核对旧制品身份和公网边界。恢复未证明时保留维护锁；不自动重复发布、删除历史或重新启动数据操作。结果、第一失败阶段及恢复失败原因写入私有 `runtime/release-<operation-id>.json`，失败按该回执人工处理，不能仅因服务进程存在就宣称恢复。
+3. 校验候选后停止本工作台服务，逐文件保全当前 `output/dev-workbench`、`output/dev-customer-config-operations`、`output/qa`、`output/playwright`，核对内容、权限与清单完全一致，再原子切换 `current`。客户配置操作与交付操作均须处于终态。成功须读回 exact artifact / source SHA、固定 Node、空闲状态、内外网 HTTPS 登录页和未登录 API 拒绝；检查分别连接登记的 `trustedProxyAddress` 与正式公网域名，保留正式 Host、SNI 与证书验证。历史记录与原回执继续保留。
+4. 停服结果不确定或新版本读回失败时，保留候选和旧版本，主动恢复旧服务并核对旧制品身份和内外网 HTTPS 边界。恢复未证明时保留维护锁；不自动重复发布、删除历史或重新启动数据操作。结果、第一失败阶段及恢复失败原因写入私有 `runtime/release-<operation-id>.json`，失败按该回执人工处理，不能仅因服务进程存在就宣称恢复。
 5. 显式回滚使用已保留的精确 release key；先执行只读计划，获得授权后再加 `--execute`：
 
    ```bash

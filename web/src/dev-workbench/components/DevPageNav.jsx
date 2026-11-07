@@ -6,7 +6,7 @@ import {
   DeploymentUnitOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { Button, theme } from 'antd'
+import { Alert, Button, theme } from 'antd'
 import { Link, useLocation } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
@@ -19,6 +19,8 @@ import {
   resolveDevWorkbenchAreaKey,
 } from '../config/devRoutes.mjs'
 import { preloadDevRoute } from '../config/devRouteModules.mjs'
+import { useWorkbenchIdentity } from './WorkbenchIdentity.jsx'
+import { WORKBENCH_ROLES } from '../config/workbenchAccess.mjs'
 
 const navIcons = {
   [DEV_WORKBENCH_AREA_KEYS.overview]: <AppstoreOutlined />,
@@ -48,6 +50,7 @@ function isPlainRouteClick(event) {
 }
 
 export default function DevPageNav({ navRef = null }) {
+  const identity = useWorkbenchIdentity()
   const location = useLocation()
   const { token } = theme.useToken()
   const routedPathname = normalizePathname(location.pathname)
@@ -214,6 +217,9 @@ export default function DevPageNav({ navRef = null }) {
           ))}
         </div>
         <div className="erp-dev-workspace-nav__actions">
+          {identity?.role === WORKBENCH_ROLES.viewer ? (
+            <Alert type="info" message="只读查看" description="执行操作需运维账号。" role="status" />
+          ) : null}
           <ERPThemeToggle
             className="erp-dev-workspace-nav__theme-toggle"
             showLabel

@@ -2,6 +2,7 @@ import { cp, lstat, mkdir, readFile, readdir, readlink, realpath, rename, rm, sy
 import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { request as httpsRequest } from 'node:https'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -57,6 +58,29 @@ async function inspectRuntime(root) {
   if (/^\s*(?:export\s+)?PLUSH_[A-Z_]*(?:STORE|STORE_REPO_ROOT)[A-Z_]*\s*=/mu.test(content)) throw new Error('存在外部 store override，须先核清状态归属')
 }
 
+export async function checkWorkbenchHttpsBoundary({ request = httpsRequest } = {}) {
+  const origin = new URL(target.httpsOrigin)
+  const read = (hostname, pathname) => new Promise((resolve, reject) => {
+    const req = request({ hostname, port: Number(origin.port || 443),
+      servername: origin.hostname, method: 'GET', path: pathname, headers: { Host: origin.host },
+      rejectUnauthorized: true, signal: AbortSignal.timeout(15_000) }, (response) => {
+      response.on('error', reject)
+      response.resume()
+      resolve({ status: response.statusCode, headers: response.headers })
+    })
+    req.on('error', reject)
+    req.end()
+  })
+  // 同时验证内部代理链路与对外登录入口，保留正式 Host、SNI 和证书校验。
+  for (const hostname of [target.trustedProxyAddress, origin.hostname]) {
+    const login = await read(hostname, '/__dev/login')
+    const api = await read(hostname, '/__dev/api/delivery/summary')
+    if (login.status !== 200 || api.status !== 401 || api.headers['x-plush-workbench-auth'] !== 'required') {
+      throw new Error(`${hostname === origin.hostname ? '公网' : '内网'} HTTPS 登录或未登录 API 边界读回失败`)
+    }
+  }
+}
+
 const runtime = {
   assertHost,
   async inspectService() {
@@ -81,12 +105,7 @@ const runtime = {
     }
     throw new Error('独立工作台健康读取失败')
   },
-  async publicCheck() {
-    const options = { redirect: 'manual', signal: AbortSignal.timeout(15_000) }
-    const login = await fetch(`${target.httpsOrigin}/__dev/login`, options)
-    const api = await fetch(`${target.httpsOrigin}/__dev/api/delivery/summary`, options)
-    if (login.status !== 200 || api.status !== 401 || api.headers.get('x-plush-workbench-auth') !== 'required') throw new Error('公网登录或未登录 API 边界读回失败')
-  },
+  httpsCheck: checkWorkbenchHttpsBoundary,
 }
 
 async function switchCurrent(root, link, id) {
@@ -159,8 +178,8 @@ export async function activateWorkbench({ input: requestedInput, root: requested
     stage = 'runtime-readback'
     const after = await services.health()
     if (!runtimeMatchesArtifact(after, manifest)) throw new Error('新版本运行身份未读回')
-    stage = 'public-readback'
-    await services.publicCheck()
+    stage = 'https-readback'
+    await services.httpsCheck()
     receipt.status = 'passed'
   } catch (error) {
     receipt.status = 'failed'
@@ -176,7 +195,7 @@ export async function activateWorkbench({ input: requestedInput, root: requested
         await services.start()
         const restored = await services.health()
         if (!runtimeMatchesArtifact(restored, previousManifest)) throw new Error('原服务运行身份未读回')
-        await services.publicCheck()
+        await services.httpsCheck()
         receipt.previousServiceRestored = true
         mayUnlock = true
       } catch (recoveryError) {

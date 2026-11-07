@@ -1,3 +1,5 @@
+import { WORKBENCH_READ_ONLY_CODE, WORKBENCH_READ_ONLY_MESSAGE } from './workbenchAccess.mjs'
+
 // A deadline covers both headers and the response body. Only record GETs may retry.
 export async function requestWorkbenchJson(
   fetchImpl,
@@ -55,7 +57,9 @@ export async function requestWorkbenchJson(
           controller.signal.throwIfAborted()
           if (!response.ok) {
             const error = new Error(
-              exposeResponseMessage && typeof payload?.message === 'string'
+              payload?.code === WORKBENCH_READ_ONLY_CODE
+                ? WORKBENCH_READ_ONLY_MESSAGE
+                : exposeResponseMessage && typeof payload?.message === 'string'
                 ? payload.message
                 : failureMessage
             )
