@@ -15,6 +15,7 @@ import { engineeringMaterialLocked } from '../../utils/taskBOMOrderLink.mjs'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
+import ProductFieldControl from '../master-data/ProductFieldControl.jsx'
 import {
   ProductThumbnail,
   renderProductOption,
@@ -39,10 +40,11 @@ import {
 } from '../../utils/salesOrderRequirements.mjs'
 import BusinessForm from '../business-list/BusinessForm.jsx'
 
-function EngineeringSourceSelect({ onChange, ...props }) {
+const EngineeringSourceSelect = React.forwardRef(({ onChange, ...props }, ref) => {
   const editors = useBusinessEditorGroup()
-  return <Select {...props} onChange={async (...args) => { if (await editors.confirmLeave({ intent: 'object' })) onChange?.(...args) }} />
-}
+  return <Select {...props} ref={ref} onChange={async (...args) => { if (await editors.confirmLeave({ intent: 'object' })) onChange?.(...args) }} />
+})
+EngineeringSourceSelect.displayName = 'EngineeringSourceSelect'
 
 function EngineeringRow({ field, form, context, readOnly, referenceActions, onOpenEditor, busy }) {
   const source = context?.items[field.name]
@@ -66,41 +68,28 @@ function EngineeringRow({ field, form, context, readOnly, referenceActions, onOp
             <Tag>{source.customer_product_no}</Tag>
           ) : null}
         </div>,
-        <div className="erp-product-field-control">
+        <div>
           <Form.Item name={[field.name, 'id']} hidden>
             <Input />
           </Form.Item>
-          {productID ? (
-            <ProductThumbnail
-              productId={productID}
-              name={product?.name}
-              code={product?.code}
+          <Form.Item label="工程产品" name={[field.name, 'product_id']}>
+            <ProductFieldControl
+              as={EngineeringSourceSelect}
+              thumbnail={productID ? <ProductThumbnail productId={productID} name={product?.name} code={product?.code} /> : null}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="选择工程建立的产品"
+              listItemHeight={48}
+              optionRender={renderProductOption}
+              options={(context?.products || []).map(productOption)}
+              onChange={() => {
+                form.setFieldValue(['items', field.name, 'product_sku_id'], undefined)
+                form.setFieldValue(['items', field.name, 'bom_id'], undefined)
+              }}
             />
-          ) : null}
-          <div className="erp-engineering-workspace__reference">
-            <Form.Item label="工程产品" name={[field.name, 'product_id']}>
-              <EngineeringSourceSelect
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                placeholder="选择工程建立的产品"
-                listItemHeight={48}
-                optionRender={renderProductOption}
-                options={(context?.products || []).map(productOption)}
-                onChange={() => {
-                  form.setFieldValue(
-                    ['items', field.name, 'product_sku_id'],
-                    undefined
-                  )
-                  form.setFieldValue(
-                    ['items', field.name, 'bom_id'],
-                    undefined
-                  )
-                }}
-              />
-            </Form.Item>
-            {referenceEntry('product')}
-          </div>
+          </Form.Item>
+          {referenceEntry('product')}
         </div>,
         <div>
           <Form.Item label="规格（选填）" name={[field.name, 'product_sku_id']}>

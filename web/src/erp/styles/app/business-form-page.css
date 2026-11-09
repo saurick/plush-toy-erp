@@ -124,11 +124,6 @@
 
 
 
-.erp-engineering-workspace__reference {
-  flex: 1;
-  min-width: 0;
-}
-
 .erp-engineering-workspace__products {
   display: flex;
   align-items: center;

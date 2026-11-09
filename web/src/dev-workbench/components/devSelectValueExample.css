@@ -2,11 +2,6 @@
   min-width: 0;
 }
 
-.erp-select-value-example .erp-product-field-control > .app-select {
-  flex: 1;
-  min-width: 0;
-}
-
 .erp-select-value-example__viewport {
   width: 100%;
   max-width: 100%;

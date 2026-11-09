@@ -13,6 +13,7 @@ import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
 } from '../business-list/BusinessCompactFieldTable.jsx'
+import ProductFieldControl from '../master-data/ProductFieldControl.jsx'
 import { ProductThumbnail } from '../master-data/ProductIdentity.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
@@ -255,39 +256,34 @@ function RowReference({
             }}
           />
         </Form.Item>,
-        <div className="erp-product-field-control">
-          {productID ? (
-            <ProductThumbnail
-              productId={productID}
-              name={
-                optionsByType.product.find(
-                  (option) => Number(option.value) === Number(productID)
-                )?.label || '当前产品'
-              }
-            />
-          ) : null}
-          <Form.Item
-            name={[field.name, 'product_id']}
-            label="产品"
-            rules={[{ required: true, message: '请选择产品' }]}
-          >
-            <ProductionOrderReferenceSelect
-              referenceType="product"
-              disabled={readOnly || referenceAccess.product !== true}
-              initialOptions={optionsByType.product}
-              placeholder="选择产品"
-              onChange={(value, option) => {
-                setRow({
-                  product_id: value || null,
-                  product_sku_id: null,
-                  unit_id: option?.unit_value || null,
-                  sales_order_item_id: null,
-                  bom_header_id: null,
-                })
-              }}
-            />
-          </Form.Item>
-        </div>,
+        <Form.Item
+          name={[field.name, 'product_id']}
+          label="产品"
+          rules={[{ required: true, message: '请选择产品' }]}
+        >
+          <ProductFieldControl
+            as={ProductionOrderReferenceSelect}
+            thumbnail={productID ? (
+              <ProductThumbnail
+                productId={productID}
+                name={optionsByType.product.find((option) => Number(option.value) === Number(productID))?.label || '当前产品'}
+              />
+            ) : null}
+            referenceType="product"
+            disabled={readOnly || referenceAccess.product !== true}
+            initialOptions={optionsByType.product}
+            placeholder="选择产品"
+            onChange={(value, option) => {
+              setRow({
+                product_id: value || null,
+                product_sku_id: null,
+                unit_id: option?.unit_value || null,
+                sales_order_item_id: null,
+                bom_header_id: null,
+              })
+            }}
+          />
+        </Form.Item>,
         <Form.Item name={[field.name, 'product_sku_id']} label="规格（可选）">
           <ProductionOrderReferenceSelect
             referenceType="product_sku"

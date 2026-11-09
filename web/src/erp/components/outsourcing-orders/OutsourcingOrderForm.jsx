@@ -8,6 +8,7 @@ import { outsourcingOrderLineGroupKey } from '../../utils/sourceDocumentLineGrou
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import ProductFieldControl from '../master-data/ProductFieldControl.jsx'
 import {
   ProductThumbnail,
   renderProductOption,
@@ -403,7 +404,7 @@ export default function OutsourcingOrderForm({
                 </>
               }
               cells={[
-                <div className="erp-line-editor__paired-fields">
+                <div className="erp-line-editor__paired-fields erp-product-field-alignment">
                   <Form.Item
                     className="erp-line-item-field erp-line-item-field--source"
                     name={[field.name, 'subject_type']}
@@ -466,49 +467,32 @@ export default function OutsourcingOrderForm({
                         </Form.Item>
                       )
                     }
+                    const productID = getFieldValue(['items', field.name, 'product_id'])
                     return (
-                      <div
-                        className="erp-product-field-control"
+                      <Form.Item
                         key="product-source"
+                        className="erp-line-item-field erp-line-item-field--source"
+                        name={[field.name, 'product_id']}
+                        label="产品 / 半成品"
+                        rules={[{ required: true, message: '请选择产品或半成品' }]}
                       >
-                        {getFieldValue(['items', field.name, 'product_id']) ? (
-                          <ProductThumbnail
-                            productId={getFieldValue([
-                              'items',
-                              field.name,
-                              'product_id',
-                            ])}
-                            name={
-                              getFieldValue([
-                                'items',
-                                field.name,
-                                'product_name_snapshot',
-                              ]) || '当前产品'
-                            }
-                          />
-                        ) : null}
-                        <Form.Item
-                          className="erp-line-item-field erp-line-item-field--source"
-                          name={[field.name, 'product_id']}
-                          label="产品 / 半成品"
-                          rules={[
-                            { required: true, message: '请选择产品或半成品' },
-                          ]}
-                        >
-                          <Select
-                            placeholder="选择产品或半成品"
-                            allowClear
-                            showSearch
-                            options={productOptions}
-                            listItemHeight={48}
-                            optionRender={renderProductOption}
-                            optionFilterProp="searchText"
-                            onChange={(value) =>
-                              onProductChange(field.name, value)
-                            }
-                          />
-                        </Form.Item>
-                      </div>
+                        <ProductFieldControl
+                          thumbnail={productID ? (
+                            <ProductThumbnail
+                              productId={productID}
+                              name={getFieldValue(['items', field.name, 'product_name_snapshot']) || '当前产品'}
+                            />
+                          ) : null}
+                          placeholder="选择产品或半成品"
+                          allowClear
+                          showSearch
+                          options={productOptions}
+                          listItemHeight={48}
+                          optionRender={renderProductOption}
+                          optionFilterProp="searchText"
+                          onChange={(value) => onProductChange(field.name, value)}
+                        />
+                      </Form.Item>
                     )
                   }}
                   </Form.Item>

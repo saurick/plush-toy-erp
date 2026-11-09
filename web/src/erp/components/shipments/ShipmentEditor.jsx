@@ -13,6 +13,7 @@ import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import Table from '@/common/components/table/AppTable'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import DeliveryAddressFields from '../business-list/DeliveryAddressFields.jsx'
+import ProductFieldControl from '../master-data/ProductFieldControl.jsx'
 import ProductIdentity, {
   ProductThumbnail,
   renderProductOption,
@@ -62,10 +63,11 @@ import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.
 import BusinessForm from '../business-list/BusinessForm.jsx'
 
 const SHIPMENT_ITEM_COLUMNS = [
-{ label: '产品 / SKU', width: 300, flexible: true, required: true },
-{ label: '仓库', width: 200, required: true },
-{ label: '批次', width: 190 },
-{ label: '数量 / 单位', width: 200, required: true }
+  { label: '产品', width: 240, flexible: true, required: true },
+  { label: 'SKU', width: 150 },
+  { label: '仓库', width: 140, required: true },
+  { label: '批次', width: 160 },
+  { label: '数量 / 单位', width: 200, required: true },
 ]
 
 const { Text } = Typography
@@ -686,30 +688,28 @@ function ShipmentItemFormContent({
     form.setFieldValue(itemPath, { ...current, ...patch })
   }
   const productField = (
-    <div className="erp-product-field-control">
-      {productID ? <ProductThumbnail productId={productID} name={referenceLabel(productOptions, productID, '产品')} /> : null}
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="产品"
-        name={fieldName('product_id')}
-        rules={[{ required: true, message: '请选择产品' }]}
-      >
-        <Select
-          allowClear
-          disabled={sourceLocked}
-          optionFilterProp="label"
-          options={productOptions}
-          listItemHeight={48}
-          optionRender={renderProductOption}
-          aria-label={`第 ${index + 1} 行产品`}
-          placeholder="请选择产品"
-          showSearch
-          onChange={(nextID) =>
-            applyItemPatch(buildShipmentProductChangePatch(nextID, products))
-          }
-        />
-      </Form.Item>
-    </div>
+    <Form.Item
+      className="erp-business-action-form__field"
+      label="产品"
+      name={fieldName('product_id')}
+      rules={[{ required: true, message: '请选择产品' }]}
+    >
+      <ProductFieldControl
+        thumbnail={productID ? <ProductThumbnail productId={productID} name={referenceLabel(productOptions, productID, '产品')} /> : null}
+        allowClear
+        disabled={sourceLocked}
+        optionFilterProp="label"
+        options={productOptions}
+        listItemHeight={48}
+        optionRender={renderProductOption}
+        aria-label={`第 ${index + 1} 行产品`}
+        placeholder="请选择产品"
+        showSearch
+        onChange={(nextID) =>
+          applyItemPatch(buildShipmentProductChangePatch(nextID, products))
+        }
+      />
+    </Form.Item>
   )
   return (
     <BusinessLineItemRow
@@ -719,26 +719,24 @@ function ShipmentItemFormContent({
       rowRef={rowRef}
       actions={actions}
       cells={[
-        <div className="erp-line-item-identity-fields">
-          {productField}
-          <Form.Item
-            className="erp-business-action-form__field"
-            label="SKU"
-            name={fieldName('product_sku_id')}
-          >
-            <Select
-              allowClear
-              disabled={sourceLocked || !Number(productID || 0)}
-              optionFilterProp="label"
-              options={filteredProductSKUOptions}
-              placeholder={!Number(productID || 0) ? '请先选择产品' : sourceLocked ? '来源未指定规格' : '选择产品规格'}
-              showSearch
-              onChange={(nextID) =>
+        productField,
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="SKU"
+          name={fieldName('product_sku_id')}
+        >
+          <Select
+            allowClear
+            disabled={sourceLocked || !Number(productID || 0)}
+            optionFilterProp="label"
+            options={filteredProductSKUOptions}
+            placeholder={!Number(productID || 0) ? '请先选择产品' : sourceLocked ? '来源未指定规格' : '选择产品规格'}
+            showSearch
+            onChange={(nextID) =>
               applyItemPatch(buildShipmentSKUChangePatch(nextID, productSKUs))
             }
-            />
-          </Form.Item>
-        </div>,
+          />
+        </Form.Item>,
         <Form.Item
           className="erp-business-action-form__field"
           label="仓库"
@@ -1068,7 +1066,7 @@ export default function ShipmentEditor({
   warehouseOptions = [],
 }) {
   const { registerLineItemRow, requestLineItemScroll } =
-    useLineItemAppendScroll(undefined, { initialFocusSelector: '.erp-line-item-identity-action input' })
+    useLineItemAppendScroll(undefined, { initialFocusSelector: '.erp-product-field-control input' })
   const appendShipmentItem = (add, index) => {
     add(createBlankShipmentItem())
     requestLineItemScroll(index)

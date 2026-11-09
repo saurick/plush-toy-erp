@@ -111,3 +111,7 @@
   align-items: start;
   gap: 6px;
 }
+
+.erp-line-editor__paired-fields:has(.erp-product-field-control) > .ant-form-item:not(:has(.erp-product-field-control)) {
+  padding-block-start: var(--erp-product-field-inset);
+}

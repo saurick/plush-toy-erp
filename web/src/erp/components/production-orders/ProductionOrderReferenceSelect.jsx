@@ -32,7 +32,7 @@ function renderSalesReferenceOption(option) {
   )
 }
 
-export default function ProductionOrderReferenceSelect({
+function ProductionOrderReferenceSelect({
   id,
   referenceType,
   filters = {},
@@ -42,7 +42,8 @@ export default function ProductionOrderReferenceSelect({
   disabled = false,
   placeholder = '请选择',
   allowClear = true,
-}) {
+  ...fieldProps
+}, ref) {
   const [options, setOptions] = useState([])
   const [loading, setLoading] = useState(false)
   const requestGateRef = useRef(null)
@@ -224,6 +225,8 @@ export default function ProductionOrderReferenceSelect({
   return (
     <Select
       id={id}
+      {...fieldProps}
+      ref={ref}
       showSearch
       filterOption={false}
       allowClear={allowClear}
@@ -257,3 +260,5 @@ export default function ProductionOrderReferenceSelect({
     />
   )
 }
+
+export default React.forwardRef(ProductionOrderReferenceSelect)

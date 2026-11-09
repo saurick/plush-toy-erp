@@ -294,7 +294,7 @@ const selectValueSamplePresentationImports = new Set([
   "components/business-list/BusinessLineItemsTable.jsx",
   "components/business-list/BusinessTextArea.jsx",
   "components/workflow/WorkflowTaskImagePlaceholder.jsx",
-  "components/master-data/productIdentity.css",
+  "components/master-data/ProductFieldControl.jsx",
   "utils/referenceSelectOptions.mjs",
 ]);
 const toolbarSamplePresentationImports = new Set([
@@ -718,6 +718,7 @@ function assertBusinessSamplePresentationGraph(readSource = read) {
     "components/business-list/businessLineItemCards.css",
     "components/business-list/businessLineItemGroups.css",
     "components/business-list/businessFormSections.css",
+    "components/master-data/productIdentity.css",
     "components/workflow/workflowTaskIdentity.css",
   ].map((file) => `web/src/erp/${file}`);
   const dependencies = [...new Set([
@@ -821,6 +822,7 @@ test("business form presentation dependencies reject unregistered imports", () =
     ...[...businessSamplePresentationImports].map((module) => `web/src/erp/${module}`),
     ...businessSampleFormStateDependencies.map((module) => `web/src/erp/${module}`),
     ...commonSamplePresentationDependencies.filter((module) => /\.[cm]?[jt]sx?$/u.test(module)),
+    "web/src/erp/components/master-data/ProductFieldControl.jsx",
     "web/src/erp/components/workflow/WorkflowTaskImagePlaceholder.jsx",
     "web/src/erp/utils/referenceSelectOptions.mjs",
   ]) {
@@ -844,6 +846,7 @@ test("business form presentation dependencies reject business I/O and persistenc
     ...[...businessSamplePresentationImports].map((module) => `web/src/erp/${module}`),
     ...businessSampleFormStateDependencies.map((module) => `web/src/erp/${module}`),
     ...commonSamplePresentationDependencies.filter((module) => /\.[cm]?[jt]sx?$/u.test(module)),
+    "web/src/erp/components/master-data/ProductFieldControl.jsx",
     "web/src/erp/components/workflow/WorkflowTaskImagePlaceholder.jsx",
     "web/src/erp/utils/referenceSelectOptions.mjs",
     "web/src/dev-workbench/components/DevSelectValueExample.jsx",

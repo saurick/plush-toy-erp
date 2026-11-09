@@ -6,7 +6,7 @@ import { BusinessTextPolicy } from '@/common/consts/policies.generated.mjs'
 import BusinessLineItemsTable, { BusinessLineItemRow } from '@/erp/components/business-list/BusinessLineItemsTable.jsx'
 import { productOption, productSKUOption, warehouseOptionFromRecord, inventoryLotOption } from '@/erp/utils/referenceSelectOptions.mjs'
 import WorkflowTaskImagePlaceholder from '@/erp/components/workflow/WorkflowTaskImagePlaceholder.jsx'
-import '@/erp/components/master-data/productIdentity.css'
+import ProductFieldControl from '@/erp/components/master-data/ProductFieldControl.jsx'
 import './devSelectValueExample.css'
 
 const COLUMNS = [
@@ -57,10 +57,14 @@ export default function DevSelectValueExample() {
               key={index}
               index={index}
               cells={[
-                <div key="product" className="erp-product-field-control">
-                  <span className="erp-product-identity__picture"><WorkflowTaskImagePlaceholder item={{ kind: 'product', name: names[index] }} /></span>
-                  <AppSelect aria-label={`第 ${index + 1} 行产品`} disabled value={index + 1} options={[productOption({ id: index + 1, code: `YS8-CP-01${index + 6}`, name: long ? `${names[index]} · 米白色柔软长毛绒配套产品与独立包装规格 27016-1` : names[index] })]} />
-                </div>,
+                <ProductFieldControl
+                  key="product"
+                  thumbnail={<WorkflowTaskImagePlaceholder item={{ kind: 'product', name: names[index] }} />}
+                  aria-label={`第 ${index + 1} 行产品`}
+                  disabled
+                  value={index + 1}
+                  options={[productOption({ id: index + 1, code: `YS8-CP-01${index + 6}`, name: long ? `${names[index]} · 米白色柔软长毛绒配套产品与独立包装规格 27016-1` : names[index] })]}
+                />,
                 <AppSelect key="sku" aria-label={`第 ${index + 1} 行 SKU`} disabled value={index + 1} options={[productSKUOption({ id: index + 1, sku_code: `YS8-GG-01${index + 6}-XL${long ? '-EXPORT-PACK-20261030-000001' : ''}`, sku_name: long ? '27016-1 · 米白色加大号（客户定制包装）' : '米白 / XL' })]} />,
                 <AppSelect key="warehouse" aria-label={`第 ${index + 1} 行仓库`} placeholder="仓库" showSearch optionFilterProp="label" value={row.warehouse} options={warehouses} onChange={(warehouse) => update(index, { warehouse, lot: undefined })} />,
                 <AppSelect key="lot" aria-label={`第 ${index + 1} 行批次`} placeholder="批次" showSearch optionFilterProp="label" disabled={!row.warehouse} value={row.lot} options={[inventoryLotOption({ id: 1, lot_no: long ? 'LOT-20261030-FG-A-001' : '批次 A', status: 'ACTIVE' })]} onChange={(lot) => update(index, { lot })} />,

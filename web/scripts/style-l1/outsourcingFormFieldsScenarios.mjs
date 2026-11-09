@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { assertProductFieldLayout } from './productFieldLayoutAssertions.mjs'
 import {
   assertBusinessFormPage,
   closeBusinessFormPage,
@@ -156,20 +157,27 @@ export function createOutsourcingFormFieldsScenarios({
         assert.equal(await unit.isDisabled(), false)
         const product = editor.locator('input#outsourcing-order-editor_items_0_product_id')
         const sku = editor.locator('input#outsourcing-order-editor_items_0_product_sku_id')
+        const productRow = editor.locator('.erp-editable-line-group:visible').first()
+        const peers = (width === 1440 ? ['subject_type', 'process_id', 'outsourcing_quantity', 'unit_id'] : ['subject_type'])
+          .map((field) => `input[id$="_${field}"]`)
+        const aligned = await assertProductFieldLayout(productRow, peers)
         await clearSelect(product)
         assert.equal(await sku.isDisabled(), true)
+        const cleared = await assertProductFieldLayout(productRow, peers, { hasImage: false })
+        assert.ok(Math.abs(aligned.fields[0].top - cleared.fields[0].top) <= 1, '清空加工产品不推移同一行的控件')
         const skuControl = sku.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
-        assert.equal(await skuControl.locator('.ant-select-selection-placeholder').innerText(), '请先选择产品 / 半成品')
+        assert.equal(await skuControl.locator('.ant-select-selection-placeholder').innerText(), '请先选择产品')
         await product.press('ArrowDown')
         await page.locator('.ant-select-dropdown:visible .ant-select-item-option:not(.ant-select-item-option-disabled)').first().click()
         await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+        await assertProductFieldLayout(productRow, peers)
         assert.equal(await sku.isDisabled(), false)
         assert.equal(await skuControl.locator('.ant-select-selection-placeholder').innerText(), '选择产品规格')
         assert.equal(
           await editor.locator('input#outsourcing-order-editor_items_0_sku_code_snapshot').inputValue(),
           ''
         )
-        await selectOption(editor.locator('input#outsourcing-order-editor_items_0_process_id'), '车缝')
+        await selectOption(editor.locator('input#outsourcing-order-editor_items_0_process_id'), 'PROC-SEWING-L1 车缝 车缝')
         assert.equal(
           await editor
             .locator('input#outsourcing-order-editor_items_0_process_name_snapshot')
@@ -183,7 +191,7 @@ export function createOutsourcingFormFieldsScenarios({
             .inputValue(),
           ''
         )
-        await selectOption(editor.locator('input#outsourcing-order-editor_items_0_process_id'), '手工')
+        await selectOption(editor.locator('input#outsourcing-order-editor_items_0_process_id'), 'PROC-HANDWORK-L1 手工 手工')
         await selectOption(editor.locator('input#outsourcing-order-editor_items_0_subject_type'), '材料')
         assert.equal(
           await editor

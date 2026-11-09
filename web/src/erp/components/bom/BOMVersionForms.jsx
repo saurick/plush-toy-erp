@@ -6,6 +6,7 @@ import Select from '@/common/components/select/AppSelect'
 import { parseBOMSourceNumber } from '../../utils/bomSourceValues.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
+import ProductFieldControl from '../master-data/ProductFieldControl.jsx'
 import {
   ProductThumbnail,
   renderProductOption,
@@ -105,40 +106,39 @@ export function BOMHeaderFormFields({
 
   return (
     <>
-      <BusinessFormSection title="版本信息" className="erp-bom-header-primary">
+      <BusinessFormSection title="版本信息" className="erp-bom-header-primary erp-product-field-alignment">
         <Form.Item name="version" hidden>
           <Input readOnly />
         </Form.Item>
         {includeProduct ? (
-          <div className="erp-product-field-control erp-bom-header-product">
-            {productID ? (
-              <ProductThumbnail
-                productId={productID}
-                name={selectedProduct?.identity?.name || '当前产品'}
-                code={selectedProduct?.identity?.code}
-              />
-            ) : null}
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="产品"
-              extra={productActions}
-              name="product_id"
-              rules={[{ required: true, message: '请选择产品' }]}
-            >
-              <RemoteReferenceSelect
-                referenceType="products"
-                params={{ active_only: false }}
-                allowClear
-                disabled={disabled || productDisabled}
-                optionFilterProp="label"
-                options={productOptions}
-                listItemHeight={48}
-                optionRender={renderProductOption}
-                placeholder="请选择产品"
-                showSearch
-              />
-            </Form.Item>
-          </div>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="产品"
+            extra={productActions}
+            name="product_id"
+            rules={[{ required: true, message: '请选择产品' }]}
+          >
+            <ProductFieldControl
+              as={RemoteReferenceSelect}
+              thumbnail={productID ? (
+                <ProductThumbnail
+                  productId={productID}
+                  name={selectedProduct?.identity?.name || '当前产品'}
+                  code={selectedProduct?.identity?.code}
+                />
+              ) : null}
+              referenceType="products"
+              params={{ active_only: false }}
+              allowClear
+              disabled={disabled || productDisabled}
+              optionFilterProp="label"
+              options={productOptions}
+              listItemHeight={48}
+              optionRender={renderProductOption}
+              placeholder="请选择产品"
+              showSearch
+            />
+          </Form.Item>
         ) : null}
         <Form.Item
           className="erp-business-action-form__field"

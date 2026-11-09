@@ -7,6 +7,8 @@ import { assertVisibleBusinessFormControlHeight } from './inputControlAssertions
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { clickERPThemeOption } from './themeAssertions.mjs'
+import { assertSingleSelectValues } from './singleSelectAssertions.mjs'
+import { assertProductFieldLayout } from './productFieldLayoutAssertions.mjs'
 
 async function assertProductIdentityLayout(page) {
   const metrics = await page.locator('.ant-table-tbody .erp-product-identity').evaluateAll((nodes) =>
@@ -244,6 +246,7 @@ export function createProductIdentityScenarios({
   customerRuntimeEffectiveSession,
   outputDir,
 }) {
+  const shipmentSkuName = '模拟米白小号配套款，含独立礼盒包装、替换围巾与同色挂件'
   return [
     ...createBOMProductListScenarios({ customerRuntimeEffectiveSession, outputDir }),
     {
@@ -396,6 +399,11 @@ export function createProductIdentityScenarios({
         const preview = modal
           .locator('.erp-product-field-control .erp-product-gallery__trigger')
           .first()
+        await preview.locator('.erp-task-product-image img').waitFor()
+        const header = modal.locator('.erp-bom-header-primary')
+        const headerPeers = ['input[id$="quantity_text"]', 'input[id$="source_order_no"]']
+        const aligned = await assertProductFieldLayout(header, headerPeers)
+        await header.screenshot({ path: path.join(outputDir, 'bom-header-product-alignment.png'), animations: 'disabled' })
         assert.deepEqual(await preview.locator('.erp-task-product-image').evaluate((node) => ({
           width: node.getBoundingClientRect().width,
           height: node.getBoundingClientRect().height,
@@ -419,6 +427,8 @@ export function createProductIdentityScenarios({
           0,
           'clearing association removes the old image'
         )
+        const cleared = await assertProductFieldLayout(header, headerPeers, { hasImage: false })
+        assert.ok(Math.abs(aligned.fields[0].top - cleared.fields[0].top) <= 1, '清空产品不推移同行控件')
         await modal
           .getByRole('button', { name: '返回列表', exact: true })
           .click()
@@ -531,6 +541,8 @@ export function createProductIdentityScenarios({
         if (production) {
           const main = identityRoot.locator('.erp-product-field-control:visible').first()
           assert.ok((await main.boundingBox()).height < 140, '长产品名与图片不应挤成高列')
+          await assertProductFieldLayout(identityRoot.locator('.erp-compact-field-table__fields').first(),
+            ['sales_order_item_id', 'product_sku_id', 'planned_quantity', 'unit_id', 'bom_header_id'].map((name) => `input[id$="_${name}"]`))
           await assertVisibleBusinessFormControlHeight(page, '图集旁的自然换行业务引用')
           for (const kind of ['plain', 'undersized-select']) {
             await page.evaluate((type) => {
@@ -564,7 +576,16 @@ export function createProductIdentityScenarios({
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 1000 },
-      beforeNavigate: installImages,
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await installImages(page)
+        await page.route('**/rpc/masterdata', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_product_skus') return route.fallback()
+          const skus = [{ id: 1, product_id: 1, sku_code: 'SKU-STYLE-L1', sku_name: shipmentSkuName, is_active: true }]
+          await route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: stylePaginatedRpcData(skus, 'product_skus', params) } } })
+        })
+      },
       verify: async (page) => {
         const shipmentRow = page
           .locator('.ant-table-tbody tr')
@@ -589,6 +610,70 @@ export function createProductIdentityScenarios({
             'product-identification-shipment-desktop.png'
           ),
         })
+        await modal.getByRole('button', { name: '返回列表', exact: true }).click()
+        await modal.waitFor({ state: 'hidden' })
+
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await page.getByRole('button', { name: /新建出货单$/u }).click()
+        const editor = page.getByRole('region', { name: '新建出货单', exact: true })
+        const line = editor.locator('.erp-line-item-table__main-row').first()
+        const product = line.getByRole('combobox', { name: '第 1 行产品', exact: true })
+        const sku = line.getByRole('combobox', { name: 'SKU', exact: true })
+        const thumbnail = line.locator('.erp-task-product-image')
+        const region = editor.locator('.erp-sales-order-lines-form__list')
+        const peerFields = ['product_sku_id', 'warehouse_id', 'lot_id', 'quantity', 'unit_id'].map((name) => `input[id$="_${name}"]`)
+        const initial = await assertProductFieldLayout(line, peerFields, { hasImage: false })
+        const assertFieldAlignment = async (hasImage) => {
+          const layout = await assertProductFieldLayout(line, peerFields, { hasImage })
+          const [productBox, skuBox] = layout.fields
+          assert.ok(productBox.right <= skuBox.left, '产品和 SKU 应各自成列')
+          assert.ok(Math.abs(productBox.top - initial.fields[0].top) <= 1, '选择、清空、换行和校验不改变同行录入起点')
+        }
+
+        await product.press('ArrowDown')
+        const dropdown = page.locator('.ant-select-dropdown:visible')
+        await dropdown.locator('.ant-select-item-option').filter({ hasText: 'PROD-STYLE-L1' }).first().click()
+        await dropdown.waitFor({ state: 'hidden' })
+        await thumbnail.locator('img').waitFor()
+        await region.screenshot({ path: path.join(outputDir, 'shipment-line-alignment.png'), animations: 'disabled' })
+        await assertFieldAlignment(true)
+        await thumbnail.locator('xpath=ancestor::button[1]').click()
+        await page.locator('.erp-task-image-preview__stage img').waitFor()
+        await closeImage(page)
+
+        await sku.press('ArrowDown')
+        await dropdown.locator('.ant-select-item-option').filter({ hasText: 'SKU-STYLE-L1' }).first().click()
+        await dropdown.waitFor({ state: 'hidden' })
+        await assertFieldAlignment(true)
+        const selectedSKU = line.locator('.app-select__reference-name').filter({ hasText: shipmentSkuName })
+        assert.equal(await selectedSKU.innerText(), shipmentSkuName)
+        await assertSingleSelectValues(line, 'shipment-line-long-sku', 2)
+
+        await page.setViewportSize({ width: 1440, height: 900 })
+        assert.ok(await region.evaluate((node) => node.scrollWidth - node.clientWidth <= 1), '普通桌面应能同时看到数量和单位')
+        await assertFieldAlignment(true)
+        await assertSingleSelectValues(line, 'shipment-line-desktop-long-sku', 2)
+        const quantity = line.locator('input[id$="_quantity"]')
+        await quantity.fill('1')
+        await quantity.fill('')
+        await line.getByText('请填写数量', { exact: true }).waitFor()
+        await assertFieldAlignment(true)
+
+        await page.setViewportSize({ width: 1024, height: 900 })
+        const scroll = await region.evaluate((node) => {
+          node.scrollLeft = node.scrollWidth
+          return { left: node.scrollLeft, remaining: node.scrollWidth - node.clientWidth - node.scrollLeft, pageOverflow: document.documentElement.scrollWidth - innerWidth }
+        })
+        assert.ok(scroll.left > 0 && scroll.remaining <= 1 && scroll.pageOverflow <= 1, `窄桌面只在明细区横向滚动并能看到末列：${JSON.stringify(scroll)}`)
+        await assertFieldAlignment(true)
+        await page.setViewportSize({ width: 1920, height: 1080 })
+
+        const productControl = product.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+        await productControl.hover()
+        await productControl.locator('.ant-select-clear').click()
+        assert.equal(await sku.isDisabled(), true, '清空产品后规格回到未选产品状态')
+        assert.equal(await selectedSKU.count(), 0, '不残留原规格')
+        await assertFieldAlignment(false)
       },
     },
     {

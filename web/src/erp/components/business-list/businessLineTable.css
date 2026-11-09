@@ -27,9 +27,16 @@
 }
 
 .erp-line-item-table td {
-  padding-block: var(--erp-table-cell-padding-block);
+  padding-block: calc(var(--erp-table-cell-padding-block) + var(--erp-line-item-field-inset, 0px)) var(--erp-table-cell-padding-block);
   text-align: left;
   vertical-align: top;
+}
+
+@container (width > 720px) {
+  /* 只对齐主控件；换行、校验和展开资料仍从各自位置向下延伸。 */
+  .erp-line-item-table :is(.erp-line-item-table__main-row, .erp-compact-field-table__fields):has(.erp-product-field-control) > td:not(:has(.erp-product-field-control)) {
+    --erp-line-item-field-inset: var(--erp-product-field-inset);
+  }
 }
 
 .erp-line-item-table th,

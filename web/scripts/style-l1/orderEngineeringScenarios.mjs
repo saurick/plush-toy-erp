@@ -1,5 +1,6 @@
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { createBOMPreparationScenarios } from './bomPreparationScenarios.mjs'
+import { assertProductFieldLayout } from './productFieldLayoutAssertions.mjs'
 
 const fulfill = (route, id, data) =>
   route.fulfill({
@@ -225,6 +226,18 @@ export function createOrderEngineeringScenarios(deps) {
             (await engineering.evaluate((node) => node.clientWidth)) * 0.85,
           JSON.stringify(engineeringLayout)
         )
+        const engineeringRow = engineering.locator('.erp-compact-field-table__fields')
+        const productInput = engineeringRow.locator('input[id$="_product_id"]')
+        const peers = ['input[id$="_product_sku_id"]', 'input[id$="_bom_id"]', 'input[placeholder="由 BOM 带入"]']
+        await productInput.press('ArrowDown')
+        const options = page.locator('.ant-select-dropdown:visible')
+        await options.locator('.ant-select-item-option').filter({ hasText: 'PROD-STYLE-L1' }).first().click()
+        await options.waitFor({ state: 'hidden' })
+        await assertProductFieldLayout(engineeringRow, peers)
+        const productSelect = engineeringRow.locator('.erp-product-field-control .ant-select')
+        await productSelect.hover()
+        await productSelect.locator('.ant-select-clear').click()
+        await assertProductFieldLayout(engineeringRow, peers, { hasImage: false })
         await engineering.getByRole('button', { name: '保存工程资料', exact: true }).click()
         await engineering.waitFor({ state: 'hidden', timeout: 10000 })
         const engineeringSave = calls.find(

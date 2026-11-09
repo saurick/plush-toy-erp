@@ -1,6 +1,7 @@
 import { assertSingleSelectValues } from './singleSelectAssertions.mjs'
 import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { assertProductFieldLayout } from './productFieldLayoutAssertions.mjs'
 
 export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverflow, outputDir }) {
   return [{
@@ -14,7 +15,7 @@ export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverfl
       const control = (name) => sample.getByRole('combobox', { name, exact: true }).locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " app-select ")][1]')
       const product = control('第 1 行产品')
       const warehouse = control('第 1 行仓库')
-      const productField = product.locator('xpath=..')
+      const productField = sample.locator('.erp-product-field-control').first()
       const name = product.locator('.app-select__reference-name')
       const nameBox = await name.boundingBox()
       const controlBox = await product.boundingBox()
@@ -52,6 +53,8 @@ export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverfl
       await sample.getByRole('button', { name: '恢复初始内容', exact: true }).click()
       await sample.getByRole('checkbox', { name: '长名称', exact: true }).uncheck()
       assert(Math.abs((await product.boundingBox()).height - normalHeight) <= 1, '短名称恢复正常高度')
+      await assertProductFieldLayout(sample.locator('.erp-line-item-table__main-row').first(),
+        ['第 1 行 SKU', '第 1 行仓库', '第 1 行批次', '第 1 行数量', '第 1 行单位'].map((label) => `input[aria-label="${label}"]`))
       await sample.getByRole('checkbox', { name: '长名称', exact: true }).check()
       await sample.getByRole('checkbox', { name: '增加 4 列', exact: true }).check()
       await assertBusinessNoteTextAreas(sample)

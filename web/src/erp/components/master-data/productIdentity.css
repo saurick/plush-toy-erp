@@ -60,19 +60,33 @@
   outline-offset: 2px;
 }
 
+:where(.erp-product-field-control, .erp-product-field-alignment, .erp-line-item-table) {
+  --erp-product-field-thumbnail-size: 48px;
+  --erp-product-field-inset: max(0px, calc((var(--erp-product-field-thumbnail-size) - var(--erp-control-height, var(--erp-form-control-height, 34px))) / 2));
+}
+
 .erp-product-field-control {
+  --erp-task-product-image-size: var(--erp-product-field-thumbnail-size);
+
   display: flex;
-  align-items: center;
+  align-items: start;
   gap: 8px;
   min-width: 0;
+  min-block-size: var(--erp-product-field-thumbnail-size);
 }
 
-.erp-product-field-control > .ant-form-item {
+.erp-product-field-control > .erp-product-gallery {
+  flex: none;
+}
+
+.erp-product-field-control__input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   flex: 1;
   min-width: 0;
+  padding-block-start: var(--erp-product-field-inset);
 }
 
-.erp-product-field-control .erp-task-product-image,
 .erp-sales-order-product-summary .erp-task-product-image {
   width: 48px;
   height: 48px;

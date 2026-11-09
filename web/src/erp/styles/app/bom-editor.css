@@ -192,6 +192,12 @@
   align-items: start;
 }
 
+@container business-form-fields (width > 520px) {
+  .erp-bom-header-primary > .erp-business-form-section__fields:has(.erp-product-field-control) > .ant-form-item:not(:has(.erp-product-field-control)) .ant-form-item-control-input-content {
+    padding-block-start: var(--erp-product-field-inset);
+  }
+}
+
 .erp-bom-version-summary {
   display: inline-flex;
   align-items: center;
