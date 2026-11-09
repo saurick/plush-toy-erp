@@ -103,6 +103,7 @@ migration_apply_started=0
 bootstrap_started=0
 bootstrap_completed=0
 restore_database_created=0
+restore_database_cleanup_attempted=0
 predecessor_runtime_stopped=0
 predecessor_recovered=0
 backup_sha256=none
@@ -136,16 +137,14 @@ if ! flock -n 9; then
   fail "another promotion, rollback or database rebuild holds the fixed target lock"
 fi
 
-if [[ -f "$receipt" && ! -L "$receipt" ]]; then
+if [[ -e "$receipt" || -L "$receipt" ]]; then
+  [[ -f "$receipt" && ! -L "$receipt" ]] || fail "operation receipt is invalid"
   cat "$receipt"
   exit 0
 fi
-if [[ -f "$state_file" && ! -L "$state_file" ]]; then
-  previous_status="$(jq -r '.status // empty' "$state_file" 2>/dev/null || true)"
-  [[ "$previous_status" != running ]] ||
-    fail "operation has an unknown prior target outcome; read back before retry"
+if [[ -e "$state_file" || -L "$state_file" ]]; then
+  fail "operation has an unknown prior target outcome; read back before retry"
 fi
-
 write_state() {
   local status="$1"
   local next=$state_file.tmp
@@ -268,12 +267,21 @@ write_receipt() {
 }
 
 restore_database_cleanup() {
-  if [[ "$restore_database_created" -eq 1 ]]; then
-    docker exec "$project-postgres" sh -ceu \
+  [[ "$restore_database_created" -eq 1 ]] || return 0
+  [[ "$restore_database_cleanup_attempted" -eq 0 ]] || return 1
+  restore_database_cleanup_attempted=1
+  if ! {
+    docker exec "$postgres_cid" sh -ceu \
       'dropdb --if-exists --force -U "$POSTGRES_USER" "$1"' \
-      sh "$restore_database" >/dev/null 2>&1 || true
-    restore_database_created=0
+      sh "$restore_database" &&
+      docker exec "$postgres_cid" sh -ceu \
+        '[ "$(printf "%s\n" "SELECT COUNT(*) FROM pg_database WHERE datname = :'\''candidate'\'';" | psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v candidate="$1")" = 0 ]' \
+        sh "$restore_database"
+  } >>"$log_file" 2>&1; then
+    printf '[restore-check] cleanup not confirmed for %s\n' "$restore_database" >&2
+    return 1
   fi
+  restore_database_created=0
 }
 
 recover_predecessor_before_migration() {
@@ -327,6 +335,7 @@ restore_predecessor_runtime_before_switch() {
 
 on_error() {
   local exit_code=$?
+  local restore_cleanup_proven=1
   trap - ERR
   set +e
   if [[ -f "$receipt" && ! -L "$receipt" ]]; then
@@ -334,9 +343,11 @@ on_error() {
       "$stage" "$exit_code" >&2
     exit "$exit_code"
   fi
-  restore_database_cleanup
+  restore_database_cleanup || restore_cleanup_proven=0
   cleanup_bootstrap_secret
-  if [[ "$data_switch_started" -eq 0 ]]; then
+  if [[ "$restore_cleanup_proven" -eq 0 ]]; then
+    write_receipt not_proven database_rebuild_restore_database_cleanup_not_proven
+  elif [[ "$data_switch_started" -eq 0 ]]; then
     if [[ "$predecessor_runtime_stopped" -eq 0 ]]; then
       write_receipt failed database_rebuild_failed_before_data_switch
     elif restore_predecessor_runtime_before_switch; then
@@ -356,7 +367,13 @@ on_error() {
   exit "$exit_code"
 }
 trap on_error ERR
-trap 'restore_database_cleanup; cleanup_bootstrap_secret' EXIT
+on_exit() {
+  if [[ ! -e "$receipt" && ! -L "$receipt" ]] && ! restore_database_cleanup; then
+    write_receipt not_proven database_rebuild_restore_database_cleanup_not_proven
+  fi
+  cleanup_bootstrap_secret
+}
+trap on_exit EXIT
 
 : >"$log_file"
 chmod 600 "$log_file"

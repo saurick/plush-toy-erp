@@ -360,16 +360,14 @@ if ! flock -n 9; then
   fail "another promotion or rollback holds the fixed target lock"
 fi
 
-if [[ -f "$receipt" && ! -L "$receipt" ]]; then
+if [[ -e "$receipt" || -L "$receipt" ]]; then
+  [[ -f "$receipt" && ! -L "$receipt" ]] || fail "operation receipt is invalid"
   cat "$receipt"
   exit 0
 fi
-if [[ -f "$state_file" && ! -L "$state_file" ]]; then
-  previous_status="$(jq -r '.status // empty' "$state_file" 2>/dev/null || true)"
-  [[ "$previous_status" != running ]] ||
-    fail "rollback has an unknown prior target outcome; read back before retry"
+if [[ -e "$state_file" || -L "$state_file" ]]; then
+  fail "rollback has an unknown prior target outcome; read back before retry"
 fi
-
 write_state() {
   local status="$1"
   local next="$state_file.tmp"

@@ -85,7 +85,6 @@ backups_root=$root/backups
 operations_root=$root/operations
 run_root=$root/run
 current=$root/current
-postgres_container=$project-postgres
 server_container=$project-server
 web_container=$project-web-desktop
 minimum_available_bytes=32212254720
@@ -194,6 +193,7 @@ release_identity=$release_dir/.plush-release-identity.json
 restore_database="plush_restore_${operation_id//-/}"
 restore_database="${restore_database:0:50}"
 restore_database_created=0
+restore_database_cleanup_attempted=0
 stage=initial
 migration_apply_started=0
 migration_required=unknown
@@ -244,16 +244,14 @@ if ! flock -n 9; then
   fail "another promotion or rollback holds the fixed target lock"
 fi
 
-if [[ -f "$receipt" && ! -L "$receipt" ]]; then
+if [[ -e "$receipt" || -L "$receipt" ]]; then
+  [[ -f "$receipt" && ! -L "$receipt" ]] || fail "operation receipt is invalid"
   cat "$receipt"
   exit 0
 fi
-if [[ -f "$state_file" && ! -L "$state_file" ]]; then
-  previous_status="$(jq -r '.status // empty' "$state_file" 2>/dev/null || true)"
-  [[ "$previous_status" != running ]] ||
-    fail "operation has an unknown prior target outcome; read back before retry"
+if [[ -e "$state_file" || -L "$state_file" ]]; then
+  fail "operation has an unknown prior target outcome; read back before retry"
 fi
-
 write_state() {
   local status="$1"
   local next="$state_file.tmp"
@@ -427,12 +425,21 @@ write_receipt() {
 }
 
 restore_database_cleanup() {
-  if [[ "$restore_database_created" -eq 1 ]]; then
-    docker exec "$postgres_container" sh -ceu \
+  [[ "$restore_database_created" -eq 1 ]] || return 0
+  [[ "$restore_database_cleanup_attempted" -eq 0 ]] || return 1
+  restore_database_cleanup_attempted=1
+  if ! {
+    docker exec "$postgres_cid" sh -ceu \
       'dropdb --if-exists --force -U "$POSTGRES_USER" "$1"' \
-      sh "$restore_database" >/dev/null 2>&1 || true
-    restore_database_created=0
+      sh "$restore_database" &&
+      docker exec "$postgres_cid" sh -ceu \
+        '[ "$(printf "%s\n" "SELECT COUNT(*) FROM pg_database WHERE datname = :'\''candidate'\'';" | psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v candidate="$1")" = 0 ]' \
+        sh "$restore_database"
+  } >>"$log_file" 2>&1; then
+    printf '[restore-check] cleanup not confirmed for %s\n' "$restore_database" >&2
+    return 1
   fi
+  restore_database_created=0
 }
 
 cleanup_transient_materialization() {
@@ -563,17 +570,23 @@ recover_before_migration() {
 
 on_error() {
   local exit_code=$?
+  local restore_cleanup_proven=1
   local recovery_required=0
   local recovery_proven=1
   trap - ERR
+  if [[ -f "$receipt" && ! -L "$receipt" ]]; then
+    exit "$exit_code"
+  fi
   cleanup_transient_materialization
-  restore_database_cleanup
+  restore_database_cleanup || restore_cleanup_proven=0
   if [[ "$migration_apply_started" -eq 0 &&
     ("$env_changed" -eq 1 || "$runtime_stop_started" -eq 1) ]]; then
     recovery_required=1
     recover_before_migration || recovery_proven=0
   fi
-  if [[ "$credential_cleanup_proven" != true ]]; then
+  if [[ "$restore_cleanup_proven" -eq 0 ]]; then
+    write_receipt not_proven promotion_restore_database_cleanup_not_proven
+  elif [[ "$credential_cleanup_proven" != true ]]; then
     write_receipt not_proven promotion_credential_cleanup_not_proven
   elif [[ "$migration_apply_started" -ne 0 ]]; then
     write_receipt not_proven promotion_outcome_unknown_after_migration_start
@@ -589,20 +602,27 @@ on_error() {
   exit "$exit_code"
 }
 on_signal() {
+  local restore_cleanup_proven=1
   trap - ERR HUP INT TERM
   cleanup_transient_materialization
-  restore_database_cleanup
+  restore_database_cleanup || restore_cleanup_proven=0
   if [[ "$migration_apply_started" -eq 0 &&
     ("$env_changed" -eq 1 || "$runtime_stop_started" -eq 1) ]]; then
     recover_before_migration || true
   fi
-  write_receipt not_proven promotion_interrupted
+  if [[ "$restore_cleanup_proven" -eq 0 ]]; then
+    write_receipt not_proven promotion_restore_database_cleanup_not_proven
+  else
+    write_receipt not_proven promotion_interrupted
+  fi
   cat "$receipt"
   exit 130
 }
 on_exit() {
   cleanup_transient_materialization
-  restore_database_cleanup
+  if [[ ! -e "$receipt" && ! -L "$receipt" ]] && ! restore_database_cleanup; then
+    write_receipt not_proven promotion_restore_database_cleanup_not_proven
+  fi
 }
 trap on_error ERR
 trap on_signal HUP INT TERM
