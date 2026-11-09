@@ -112,7 +112,11 @@ func invalidParamResult() *v1.JsonrpcResult {
 }
 
 func okData(data map[string]any) *v1.JsonrpcResult {
-	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(data)}
+	payload := newDataStruct(data)
+	if payload == nil {
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: payload}
 }
 
 func operationalFactStatusMutationFromParams(

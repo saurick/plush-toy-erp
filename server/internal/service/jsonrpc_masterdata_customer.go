@@ -15,7 +15,10 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "save_customer_with_contacts":
-		ownerID := getInt(pm, "id", 0)
+		ownerID, ok := getOptionalJSONRPCID(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
 		if ownerID > 0 {
 			if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerUpdate); res != nil {
 				return id, res, nil
@@ -51,7 +54,11 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyCustomers); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.UpdateCustomer(ctx, getInt(pm, "id", 0), customerMutationFromParams(pm))
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.UpdateCustomer(ctx, targetID, customerMutationFromParams(pm))
 		return id, customerMutationResult(ctx, d, item, err), nil
 	case "get_customer":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerRead); res != nil {
@@ -84,7 +91,11 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyCustomers); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.SetCustomerActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))
+		targetID, active, ok := masterDataActiveMutationFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.SetCustomerActive(ctx, targetID, active)
 		return id, customerMutationResult(ctx, d, item, err), nil
 	default:
 		return id, unknownMasterDataResult(method), nil

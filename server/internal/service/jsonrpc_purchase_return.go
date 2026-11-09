@@ -57,7 +57,11 @@ func (d *jsonrpcDispatcher) handlePurchaseReturn(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "inventory"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.PostPurchaseReturn(ctx, getInt(pm, "id", 0))
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.PostPurchaseReturn(ctx, targetID)
 		return id, purchaseReturnResult(ctx, d, item, err), nil
 	case "cancel_purchase_return":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReturnCancel); res != nil {
@@ -66,7 +70,11 @@ func (d *jsonrpcDispatcher) handlePurchaseReturn(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "inventory"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.CancelPostedPurchaseReturn(ctx, getInt(pm, "id", 0))
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.CancelPostedPurchaseReturn(ctx, targetID)
 		return id, purchaseReturnResult(ctx, d, item, err), nil
 	case "get_purchase_return":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReturnRead); res != nil {

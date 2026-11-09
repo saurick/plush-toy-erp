@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -800,6 +801,74 @@ func TestCustomerConfigExceptionProcessesStartReadAndReplay(t *testing.T) {
 				t.Fatalf("source readback missing: %#v", read.Data.AsMap())
 			}
 		})
+	}
+}
+
+type processStartReadbackFailureRepo struct {
+	*serviceProcessRuntimeRepo
+	failNextList bool
+	activated    bool
+}
+
+func (r *processStartReadbackFailureRepo) ActivateProcessNodeInstance(ctx context.Context, in *biz.ProcessNodeInstanceActivate, actorID int) (*biz.ProcessNodeInstance, error) {
+	node, err := r.serviceProcessRuntimeRepo.ActivateProcessNodeInstance(ctx, in, actorID)
+	if err == nil {
+		r.activated = true
+	}
+	return node, err
+}
+
+func (r *processStartReadbackFailureRepo) ListProcessNodeInstances(ctx context.Context, instanceID int) ([]*biz.ProcessNodeInstance, error) {
+	if r.activated && r.failNextList {
+		r.failNextList = false
+		return nil, errors.New("node readback unavailable after start")
+	}
+	return r.serviceProcessRuntimeRepo.ListProcessNodeInstances(ctx, instanceID)
+}
+
+func TestCustomerConfigExceptionStartReadbackFailurePreservesStartedProcess(t *testing.T) {
+	now := time.Now()
+	facts := &exceptionProcessServiceOperationalFactRepo{
+		productionException: &biz.ProductionExceptionDecision{
+			ID: 103, DecisionNo: "PEX-READBACK", DecisionType: biz.ProductionExceptionScrap,
+			Status: biz.ProductionExceptionSubmitted, ExecutionStatus: biz.ProductionExceptionExecutionPending,
+			RequestedQuantity: decimal.RequireFromString("3"), RequestedBy: 2, RequestedAt: now, Version: 1,
+		},
+	}
+	dispatcher, repo := newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
+		&biz.AdminUser{ID: 1, Username: "super-admin", IsSuperAdmin: true, CreatedAt: now, UpdatedAt: now},
+		[]string{biz.BossRoleKey},
+		facts,
+	)
+	publishAndActivateCustomerConfigUsecaseForTest(t, dispatcher,
+		customerConfigPublishParamsWithExceptionProcess(t, "2026.07.26.exception-readback",
+			biz.ProcessKeyProductionExceptionApproval, biz.CustomerProcessVariantProductionExceptionApproval,
+			"production_exception_decision"), 1)
+	runtime := &processStartReadbackFailureRepo{serviceProcessRuntimeRepo: repo, failNextList: true}
+	dispatcher.processRuntimeUC = biz.NewProcessRuntimeUsecase(runtime, newServiceWorkflowRepo(), dispatcher.customerConfigUC)
+	ctx := customerConfigAdminCtx(1, "super-admin")
+	startParams := mustJSONRPCStruct(t, map[string]any{
+		"customer_key": biz.DefaultCustomerKey, "production_exception_id": 103,
+		"process_version": "v1", "idempotency_key": "production-exception/start/readback",
+	})
+	_, result, err := dispatcher.handleCustomerConfig(ctx, "start_production_exception_approval_process", "start", startParams)
+	if err != nil || result == nil || result.Code != errcode.Internal.Code || result.Data != nil ||
+		runtime.failNextList || !runtime.activated || len(repo.processes) != 1 {
+		t.Fatalf("started process must return an unconfirmed readback without stale data: result=%#v err=%v", result, err)
+	}
+	_, recovered, err := dispatcher.handleCustomerConfig(ctx, "get_production_exception_approval_process", "readback",
+		mustJSONRPCStruct(t, map[string]any{"customer_key": biz.DefaultCustomerKey, "production_exception_id": 103}))
+	if err != nil || recovered == nil || recovered.Code != errcode.OK.Code {
+		t.Fatalf("read-only recovery failed: result=%#v err=%v", recovered, err)
+	}
+	context := jsonRPCNestedMap(t, recovered, "process_context")
+	active := context["active_nodes"].([]any)
+	if len(active) != 1 || active[0].(map[string]any)["status"] != biz.ProcessNodeStatusActive {
+		t.Fatalf("readback did not return the current active node: %v", active)
+	}
+	_, replayed, err := dispatcher.handleCustomerConfig(ctx, "start_production_exception_approval_process", "replay", startParams)
+	if err != nil || replayed == nil || replayed.Code != errcode.OK.Code || len(repo.processes) != 1 {
+		t.Fatalf("same idempotency key must not start another process: result=%#v err=%v", replayed, err)
 	}
 }
 

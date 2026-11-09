@@ -324,9 +324,13 @@ func financeInvoiceFromShipmentCreateFromParams(pm map[string]any) (*biz.Finance
 	if invoiceCategory == nil {
 		return nil, false
 	}
+	shipmentID, ok := getRequiredJSONRPCPositiveInt(pm, "shipment_id")
+	if !ok {
+		return nil, false
+	}
 	return &biz.FinanceFactFromShipmentCreate{
 		FactNo:          getString(pm, "fact_no"),
-		ShipmentID:      getInt(pm, "shipment_id", 0),
+		ShipmentID:      shipmentID,
 		IdempotencyKey:  getString(pm, "idempotency_key"),
 		OccurredAt:      optionalTimeValue(occurredAt),
 		Note:            getWorkflowStringPtr(pm, "note"),
@@ -338,9 +342,13 @@ func financeFactFromPurchaseReceiptCreateFromParams(pm map[string]any) (*biz.Fin
 	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_no", "purchase_receipt_id", "idempotency_key", "note") {
 		return nil, false
 	}
+	receiptID, ok := getRequiredJSONRPCPositiveInt(pm, "purchase_receipt_id")
+	if !ok {
+		return nil, false
+	}
 	return &biz.FinanceFactFromPurchaseReceiptCreate{
 		FactNo:            getString(pm, "fact_no"),
-		PurchaseReceiptID: getInt(pm, "purchase_receipt_id", 0),
+		PurchaseReceiptID: receiptID,
 		IdempotencyKey:    getString(pm, "idempotency_key"),
 		Note:              getWorkflowStringPtr(pm, "note"),
 	}, true
@@ -350,9 +358,13 @@ func financeFactFromOutsourcingReturnCreateFromParams(pm map[string]any) (*biz.F
 	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_no", "outsourcing_fact_id", "idempotency_key", "note") {
 		return nil, false
 	}
+	factID, ok := getRequiredJSONRPCPositiveInt(pm, "outsourcing_fact_id")
+	if !ok {
+		return nil, false
+	}
 	return &biz.FinanceFactFromOutsourcingReturnCreate{
 		FactNo:            getString(pm, "fact_no"),
-		OutsourcingFactID: getInt(pm, "outsourcing_fact_id", 0),
+		OutsourcingFactID: factID,
 		IdempotencyKey:    getString(pm, "idempotency_key"),
 		Note:              getWorkflowStringPtr(pm, "note"),
 	}, true
@@ -362,9 +374,13 @@ func financeFactFromOutsourcingOrderCreateFromParams(pm map[string]any) (*biz.Fi
 	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_no", "outsourcing_order_id", "idempotency_key", "note") {
 		return nil, false
 	}
+	orderID, ok := getRequiredJSONRPCPositiveInt(pm, "outsourcing_order_id")
+	if !ok {
+		return nil, false
+	}
 	return &biz.FinanceFactFromOutsourcingOrderCreate{
 		FactNo:             getString(pm, "fact_no"),
-		OutsourcingOrderID: getInt(pm, "outsourcing_order_id", 0),
+		OutsourcingOrderID: orderID,
 		IdempotencyKey:     getString(pm, "idempotency_key"),
 		Note:               getWorkflowStringPtr(pm, "note"),
 	}, true
@@ -378,9 +394,13 @@ func financeReconciliationFromFactCreateFromParams(pm map[string]any) (*biz.Fina
 	if !ok {
 		return nil, false
 	}
+	factID, ok := getRequiredJSONRPCPositiveInt(pm, "finance_fact_id")
+	if !ok {
+		return nil, false
+	}
 	return &biz.FinanceReconciliationFromFactCreate{
 		FactNo:         getString(pm, "fact_no"),
-		FinanceFactID:  getInt(pm, "finance_fact_id", 0),
+		FinanceFactID:  factID,
 		IdempotencyKey: getString(pm, "idempotency_key"),
 		OccurredAt:     optionalTimeValue(occurredAt),
 		Note:           getWorkflowStringPtr(pm, "note"),

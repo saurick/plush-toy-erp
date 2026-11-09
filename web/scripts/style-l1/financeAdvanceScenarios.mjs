@@ -14,6 +14,7 @@ export function createFinanceAdvanceScenarios({
     { name: 'finance-full-balance-unknown-reopen-desktop', amount: '1000', reopen: true },
   ].map(({ name, amount, reopen }) => {
     const allocationRequests = []
+    let missingCandidateResult = false
     const remaining = reopen ? '0' : '800'
     return {
       name,
@@ -38,6 +39,7 @@ export function createFinanceAdvanceScenarios({
       },
       beforeNavigate: async (page) => {
         allocationRequests.length = 0
+        missingCandidateResult = !reopen
         let payment = {
           id: 41,
           payment_no: 'ADVANCE-ORDER-01',
@@ -84,6 +86,11 @@ export function createFinanceAdvanceScenarios({
               break
             case 'list_finance_payment_allocation_candidates':
               assert.equal(params.id, 41)
+              if (missingCandidateResult) {
+                missingCandidateResult = false
+                data = {}
+                break
+              }
               data = { facts: Number(fact.outstanding_amount) > 0 ? [fact] : [] }
               break
             case 'allocate_finance_payment':
@@ -257,6 +264,11 @@ export function createFinanceAdvanceScenarios({
           .click()
         await action('抵扣应收 / 应付')
         const allocation = page.getByRole('dialog', { name: '选择核销记录' })
+        if (!reopen) {
+          await page.getByText('读取可核销记录失败，请稍后重试', { exact: true }).waitFor()
+          assert.equal(await allocation.count(), 0, '缺失候选数组不能打开无记录弹窗')
+          await action('抵扣应收 / 应付')
+        }
         await allocation.waitFor({ state: 'visible' })
         await allocation
           .getByRole('textbox', { name: /本次核销金额/u })

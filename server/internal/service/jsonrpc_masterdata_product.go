@@ -38,7 +38,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if !ok {
 			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
 		}
-		item, err := d.masterDataUC.UpdateProduct(ctx, getInt(pm, "id", 0), mutation)
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.UpdateProduct(ctx, targetID, mutation)
 		return id, productMutationResult(ctx, d, item, err), nil
 	case "get_product":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductRead); res != nil {
@@ -71,7 +75,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.SetProductActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))
+		targetID, active, ok := masterDataActiveMutationFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.SetProductActive(ctx, targetID, active)
 		return id, productMutationResult(ctx, d, item, err), nil
 	case "create_product_sku":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKUCreate); res != nil {
@@ -97,7 +105,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if !ok {
 			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
 		}
-		item, err := d.masterDataUC.UpdateProductSKU(ctx, getInt(pm, "id", 0), mutation)
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.UpdateProductSKU(ctx, targetID, mutation)
 		return id, productSKUMutationResult(ctx, d, item, err), nil
 	case "get_product_sku":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKURead); res != nil {
@@ -130,7 +142,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.SetProductSKUActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))
+		targetID, active, ok := masterDataActiveMutationFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.SetProductSKUActive(ctx, targetID, active)
 		return id, productSKUMutationResult(ctx, d, item, err), nil
 	default:
 		return id, unknownMasterDataResult(method), nil

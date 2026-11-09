@@ -30,7 +30,11 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyMaterials); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.UpdateMaterial(ctx, getInt(pm, "id", 0), materialMutationFromParams(pm))
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.UpdateMaterial(ctx, targetID, materialMutationFromParams(pm))
 		return id, materialMutationResult(ctx, d, item, err), nil
 	case "get_material":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialRead); res != nil {
@@ -70,7 +74,11 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyMaterials); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.SetMaterialActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))
+		targetID, active, ok := masterDataActiveMutationFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.SetMaterialActive(ctx, targetID, active)
 		return id, materialMutationResult(ctx, d, item, err), nil
 	default:
 		return id, unknownMasterDataResult(method), nil

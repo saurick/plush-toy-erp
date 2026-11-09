@@ -151,6 +151,11 @@ func TestJsonrpcDispatcher_RejectedQualityInspectionCreatesTraceablePurchaseRetu
 	if err != nil || listRes == nil || listRes.Code != errcode.OK.Code || jsonRPCInt(t, listRes.Data.AsMap(), "total") != 1 {
 		t.Fatalf("list quality return source result=%#v err=%v", listRes, err)
 	}
+	_, invalidPost, err := j.handlePurchase(workflowJSONRPCAdminContext(), "post_purchase_return", "invalid-return-post", mustJSONRPCStruct(t, map[string]any{"id": float64(returnID) + 0.8}))
+	if err != nil || invalidPost == nil || invalidPost.Code != errcode.InvalidParam.Code ||
+		client.PurchaseReturn.GetX(ctx, returnID).Status != biz.PurchaseReturnStatusDraft {
+		t.Fatalf("non-integer return id must not post an existing return: result=%#v err=%v", invalidPost, err)
+	}
 	_, postRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "post_purchase_return", "quality-return-post", mustJSONRPCStruct(t, map[string]any{"id": float64(returnID)}))
 	if err != nil || postRes == nil || postRes.Code != errcode.OK.Code || jsonRPCNestedMap(t, postRes, "purchase_return")["status"] != biz.PurchaseReturnStatusPosted {
 		t.Fatalf("post quality-sourced return result=%#v err=%v", postRes, err)

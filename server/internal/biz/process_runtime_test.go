@@ -4962,6 +4962,21 @@ func TestApplyProcessLinkedBusinessRefRejectsMetadataDrift(t *testing.T) {
 	if _, err := ApplyProcessLinkedBusinessRefToSnapshot(snapshot, &changed); !errors.Is(err, ErrIdempotencyConflict) {
 		t.Fatalf("same linked ref identity with changed source must conflict, got %v", err)
 	}
+	for _, malformed := range []any{
+		nil,
+		"not an array",
+		[]any{"not a reference"},
+		[]any{map[string]any{"ref_type": "finance_fact", "ref_id": 3.5}},
+		[]any{map[string]any{"ref_type": "", "ref_id": 3}},
+		[]any{map[string]any{"ref_type": "finance_fact", "ref_id": 3}},
+		[]any{map[string]any{"ref_type": "finance_fact", "ref_id": 3, "ref_no": 9, "source_node_key": "node", "source_command_key": "command"}},
+	} {
+		snapshot := map[string]any{"linked_business_refs": malformed}
+		out, err := ApplyProcessLinkedBusinessRefToSnapshot(snapshot, base)
+		if out != nil || !errors.Is(err, ErrProcessDomainCommandRecoveryRequired) {
+			t.Fatalf("malformed prior link must not be replaced: type=%T out=%v err=%v", malformed, out, err)
+		}
+	}
 }
 
 func TestProcessRuntimeUsecaseWakeProcessWaitEventNodeCompletesAndAdvances(t *testing.T) {

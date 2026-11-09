@@ -40,7 +40,11 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "inventory"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.ReleaseStockReservation(ctx, getInt(pm, "id", 0))
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.ReleaseStockReservation(ctx, targetID)
 		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
 	case "list_stock_reservations":
 		permissions, res := d.CurrentEffectiveAdminPermissions(ctx)

@@ -41,7 +41,11 @@ func (d *jsonrpcDispatcher) handlePurchaseReceiptAdjustment(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "inventory"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.PostPurchaseReceiptAdjustment(ctx, getInt(pm, "id", 0))
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.PostPurchaseReceiptAdjustment(ctx, targetID)
 		return id, purchaseReceiptAdjustmentResult(ctx, d, item, err), nil
 	case "cancel_purchase_receipt_adjustment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptAdjustmentCancel); res != nil {
@@ -50,7 +54,11 @@ func (d *jsonrpcDispatcher) handlePurchaseReceiptAdjustment(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "inventory"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.CancelPostedPurchaseReceiptAdjustment(ctx, getInt(pm, "id", 0))
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.CancelPostedPurchaseReceiptAdjustment(ctx, targetID)
 		return id, purchaseReceiptAdjustmentResult(ctx, d, item, err), nil
 	case "get_purchase_receipt_adjustment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptAdjustmentRead); res != nil {

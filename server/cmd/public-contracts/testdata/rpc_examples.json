@@ -15009,7 +15009,7 @@
         "english_name": "DEMO",
         "hs_code": "DEMO",
         "id": 1,
-        "is_active": true,
+        "is_active": false,
         "name": "毛绒熊",
         "style_no": "DEMO",
         "unit_net_weight_g": "0.425",
@@ -15017,7 +15017,8 @@
       }
     },
     "params": {
-      "id": 2
+      "active": false,
+      "id": 1
     }
   },
   "masterdata.set_product_sku_active": {

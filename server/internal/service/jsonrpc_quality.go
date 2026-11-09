@@ -89,13 +89,17 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireQualityInspectionMutationRead(ctx, getInt(pm, "id", 0)); res != nil {
+		inspectionID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireQualityInspectionMutationRead(ctx, inspectionID); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "quality_inspections"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.SubmitQualityInspection(ctx, getInt(pm, "id", 0))
+		item, err := d.inventoryUC.SubmitQualityInspection(ctx, inspectionID)
 		return id, qualityInspectionResult(ctx, d, item, err), nil
 	case "pass_quality_inspection":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
@@ -135,19 +139,27 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireQualityInspectionMutationRead(ctx, getInt(pm, "id", 0)); res != nil {
+		inspectionID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireQualityInspectionMutationRead(ctx, inspectionID); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "quality_inspections"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.CancelQualityInspection(ctx, getInt(pm, "id", 0), getWorkflowStringPtr(pm, "decision_note"))
+		item, err := d.inventoryUC.CancelQualityInspection(ctx, inspectionID, getWorkflowStringPtr(pm, "decision_note"))
 		return id, qualityInspectionResult(ctx, d, item, err), nil
 	case "correct_quality_inspection_result":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityExceptionHandle); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireQualityInspectionMutationRead(ctx, getInt(pm, "id", 0)); res != nil {
+		inspectionID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireQualityInspectionMutationRead(ctx, inspectionID); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireSourceActionReadPermissions(ctx, "quality", method); res != nil {
@@ -160,7 +172,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.CorrectQualityInspectionResult(ctx, &biz.QualityInspectionCorrectionCreate{
-			InspectionID:           getInt(pm, "id", 0),
+			InspectionID:           inspectionID,
 			CorrectionInspectionNo: getString(pm, "correction_inspection_no"),
 			Reason:                 getString(pm, "reason"),
 		}, claims.UserID)
@@ -302,10 +314,18 @@ func qualityInspectionFromPurchaseReceiptCreateFromParams(pm map[string]any) (*b
 	if !jsonRPCParamsAllowed(pm, "customer_key", "inspection_no", "purchase_receipt_id", "purchase_receipt_item_id", "decision_note") {
 		return nil, false
 	}
+	receiptID, ok := getRequiredJSONRPCPositiveInt(pm, "purchase_receipt_id")
+	if !ok {
+		return nil, false
+	}
+	receiptItemID, ok := getRequiredJSONRPCPositiveInt(pm, "purchase_receipt_item_id")
+	if !ok {
+		return nil, false
+	}
 	return &biz.QualityInspectionFromPurchaseReceiptCreate{
 		InspectionNo:          getString(pm, "inspection_no"),
-		PurchaseReceiptID:     getInt(pm, "purchase_receipt_id", 0),
-		PurchaseReceiptItemID: getInt(pm, "purchase_receipt_item_id", 0),
+		PurchaseReceiptID:     receiptID,
+		PurchaseReceiptItemID: receiptItemID,
 		DecisionNote:          getWorkflowStringPtr(pm, "decision_note"),
 	}, true
 }
@@ -314,9 +334,13 @@ func qualityInspectionFromOutsourcingReturnCreateFromParams(pm map[string]any) (
 	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_id", "inspection_no", "note") {
 		return nil, false
 	}
+	factID, ok := getRequiredJSONRPCPositiveInt(pm, "fact_id")
+	if !ok {
+		return nil, false
+	}
 	return &biz.QualityInspectionFromOutsourcingReturnCreate{
 		InspectionNo:      getString(pm, "inspection_no"),
-		OutsourcingFactID: getInt(pm, "fact_id", 0),
+		OutsourcingFactID: factID,
 		DecisionNote:      getWorkflowStringPtr(pm, "note"),
 	}, true
 }
@@ -334,15 +358,31 @@ func finishedGoodsQualityInspectionCreateFromParams(pm map[string]any) (*biz.Qua
 	) {
 		return nil, false
 	}
+	shipmentID, ok := getRequiredJSONRPCPositiveInt(pm, "shipment_id")
+	if !ok {
+		return nil, false
+	}
+	lotID, ok := getRequiredJSONRPCPositiveInt(pm, "finished_goods_lot_id")
+	if !ok {
+		return nil, false
+	}
+	warehouseID, ok := getRequiredJSONRPCPositiveInt(pm, "warehouse_id")
+	if !ok {
+		return nil, false
+	}
+	productID, ok := getRequiredJSONRPCPositiveInt(pm, "product_id")
+	if !ok {
+		return nil, false
+	}
 	return &biz.QualityInspectionCreate{
 		InspectionNo:   getString(pm, "inspection_no"),
-		InventoryLotID: getInt(pm, "finished_goods_lot_id", 0),
-		WarehouseID:    getInt(pm, "warehouse_id", 0),
+		InventoryLotID: lotID,
+		WarehouseID:    warehouseID,
 		SourceType:     biz.QualityInspectionSourceShipment,
-		SourceID:       getInt(pm, "shipment_id", 0),
+		SourceID:       shipmentID,
 		InspectionType: biz.QualityInspectionTypeFinishedGoods,
 		SubjectType:    biz.QualityInspectionSubjectProduct,
-		SubjectID:      getInt(pm, "product_id", 0),
+		SubjectID:      productID,
 		DecisionNote:   getWorkflowStringPtr(pm, "decision_note"),
 	}, true
 }

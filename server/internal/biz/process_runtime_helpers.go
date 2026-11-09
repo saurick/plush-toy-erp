@@ -182,23 +182,28 @@ func ApplyProcessLinkedBusinessRefToSnapshot(snapshot map[string]any, in *Proces
 		return nil, err
 	}
 	out := cloneProcessPolicySnapshot(snapshot)
-	rawItems, _ := out["linked_business_refs"].([]any)
+	raw, hasStoredRefs := out["linked_business_refs"]
+	rawItems, ok := raw.([]any)
+	if hasStoredRefs && !ok {
+		return nil, ErrProcessDomainCommandRecoveryRequired
+	}
+	refs, err := processBusinessRefsFromStoredResult(rawItems)
+	if err != nil {
+		return nil, ErrProcessDomainCommandRecoveryRequired
+	}
 	items := make([]any, 0, len(rawItems)+1)
 	exists := false
-	for _, raw := range rawItems {
-		item, ok := raw.(map[string]any)
-		if !ok {
-			continue
+	for index, ref := range refs {
+		item := rawItems[index].(map[string]any)
+		existingRefNo, refNoOK := item["ref_no"].(string)
+		existingSourceNodeKey, _ := item["source_node_key"].(string)
+		existingSourceCommandKey, _ := item["source_command_key"].(string)
+		if (item["ref_no"] != nil && !refNoOK) ||
+			strings.TrimSpace(existingSourceNodeKey) == "" ||
+			strings.TrimSpace(existingSourceCommandKey) == "" {
+			return nil, ErrProcessDomainCommandRecoveryRequired
 		}
-		refID, err := processPositiveIntFromAny(item["ref_id"])
-		if err != nil {
-			continue
-		}
-		refType, _ := item["ref_type"].(string)
-		if strings.TrimSpace(refType) == normalized.RefType && refID == normalized.RefID {
-			existingRefNo, _ := item["ref_no"].(string)
-			existingSourceNodeKey, _ := item["source_node_key"].(string)
-			existingSourceCommandKey, _ := item["source_command_key"].(string)
+		if ref.RefType == normalized.RefType && ref.RefID == normalized.RefID {
 			normalizedRefNo := ""
 			if normalized.RefNo != nil {
 				normalizedRefNo = *normalized.RefNo

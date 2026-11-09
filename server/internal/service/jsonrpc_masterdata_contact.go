@@ -83,15 +83,20 @@ func (d *jsonrpcDispatcher) handleMasterDataContact(
 }
 
 func contactMutationFromParams(pm map[string]any) *biz.ContactMutation {
-	return &biz.ContactMutation{
-		OwnerType: getString(pm, "owner_type"),
-		OwnerID:   getInt(pm, "owner_id", 0),
+	mutation := contactFieldsFromParams(pm, getBool(pm, "is_primary", false))
+	mutation.OwnerType = getString(pm, "owner_type")
+	mutation.OwnerID = getInt(pm, "owner_id", 0)
+	return &mutation
+}
+
+func contactFieldsFromParams(pm map[string]any, isPrimary bool) biz.ContactMutation {
+	return biz.ContactMutation{
 		Name:      getString(pm, "name"),
 		Phone:     getWorkflowStringPtr(pm, "phone"),
 		Mobile:    getWorkflowStringPtr(pm, "mobile"),
 		Email:     getWorkflowStringPtr(pm, "email"),
 		Title:     getWorkflowStringPtr(pm, "title"),
-		IsPrimary: getBool(pm, "is_primary", false),
+		IsPrimary: isPrimary,
 		Note:      getWorkflowStringPtr(pm, "note"),
 	}
 }
@@ -111,9 +116,14 @@ func contactSaveMutationsFromParams(pm map[string]any) ([]*biz.ContactSaveMutati
 		if !ok {
 			return nil, false
 		}
+		contactID, validID := getOptionalJSONRPCID(itemMap, "id")
+		primary, validPrimary := getOptionalJSONRPCBool(itemMap, "is_primary")
+		if !validID || !validPrimary {
+			return nil, false
+		}
 		contacts = append(contacts, &biz.ContactSaveMutation{
-			ID:              getInt(itemMap, "id", 0),
-			ContactMutation: *contactMutationFromParams(itemMap),
+			ID:              contactID,
+			ContactMutation: contactFieldsFromParams(itemMap, primary != nil && *primary),
 		})
 	}
 	return contacts, true

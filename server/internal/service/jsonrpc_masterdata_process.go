@@ -30,7 +30,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProcesses); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.UpdateProcess(ctx, getInt(pm, "id", 0), processMutationFromParams(pm))
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.UpdateProcess(ctx, targetID, processMutationFromParams(pm))
 		return id, processMutationResult(ctx, d, item, err), nil
 	case "get_process":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRead); res != nil {
@@ -63,7 +67,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProcesses); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.SetProcessActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))
+		targetID, active, ok := masterDataActiveMutationFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.SetProcessActive(ctx, targetID, active)
 		return id, processMutationResult(ctx, d, item, err), nil
 	default:
 		return id, unknownMasterDataResult(method), nil

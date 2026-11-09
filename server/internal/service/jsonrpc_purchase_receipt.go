@@ -100,7 +100,11 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.CancelPurchaseReceiptDraft(ctx, getInt(pm, "id", 0), actorID, scope)
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.CancelPurchaseReceiptDraft(ctx, targetID, actorID, scope)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "cancel_purchase_receipt":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInboundConfirm); res != nil {
@@ -113,7 +117,11 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.CancelPostedPurchaseReceiptForAccess(ctx, getInt(pm, "id", 0), actorID, scope)
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.CancelPostedPurchaseReceiptForAccess(ctx, targetID, actorID, scope)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "get_purchase_receipt":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {

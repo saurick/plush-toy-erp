@@ -603,6 +603,15 @@ func TestJsonrpcDispatcher_SaveCustomerWithContactsUsesAggregateUsecase(t *testi
 			biz.PermissionContactDisable,
 		),
 	)
+	for field, value := range map[string]any{"id": 9.8, "is_primary": "false"} {
+		malformed := params.AsMap()
+		malformed["contacts"].([]any)[0].(map[string]any)[field] = value
+		_, rejected, err := j.handleMasterData(workflowJSONRPCAdminContext(), "save_customer_with_contacts", "invalid-contact", mustJSONRPCStruct(t, malformed))
+		if err != nil || rejected == nil || rejected.Code != errcode.InvalidParam.Code ||
+			repo.savedCustomer != nil || len(repo.savedContacts) != 0 {
+			t.Fatalf("invalid contact %s must stop the aggregate save: result=%#v err=%v", field, rejected, err)
+		}
+	}
 	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "save_customer_with_contacts", "2", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)

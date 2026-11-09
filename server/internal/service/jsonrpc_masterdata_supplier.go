@@ -16,7 +16,10 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "save_supplier_with_contacts":
-		ownerID := getInt(pm, "id", 0)
+		ownerID, ok := getOptionalJSONRPCID(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
 		if ownerID > 0 {
 			if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierUpdate); res != nil {
 				return id, res, nil
@@ -64,7 +67,11 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 		if !ok {
 			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
 		}
-		item, err := d.masterDataUC.UpdateSupplier(ctx, getInt(pm, "id", 0), mutation)
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.UpdateSupplier(ctx, targetID, mutation)
 		return id, supplierMutationResult(ctx, d, item, err), nil
 	case "get_supplier":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierRead); res != nil {
@@ -97,7 +104,11 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeySuppliers); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.SetSupplierActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))
+		targetID, active, ok := masterDataActiveMutationFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.SetSupplierActive(ctx, targetID, active)
 		return id, supplierMutationResult(ctx, d, item, err), nil
 	default:
 		return id, unknownMasterDataResult(method), nil

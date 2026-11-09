@@ -10,6 +10,12 @@ import (
 	"server/internal/errcode"
 )
 
+func masterDataActiveMutationFromParams(pm map[string]any) (int, bool, bool) {
+	targetID, idOK := getRequiredJSONRPCPositiveInt(pm, "id")
+	active, activeOK := getOptionalJSONRPCBool(pm, "active")
+	return targetID, active == nil || *active, idOK && activeOK
+}
+
 func (d *jsonrpcDispatcher) handleMasterDataReference(
 	ctx context.Context,
 	method, id string,

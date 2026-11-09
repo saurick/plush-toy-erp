@@ -162,15 +162,29 @@ func (d *jsonrpcDispatcher) startCustomerConfigExceptionProcess(
 	if err != nil {
 		return d.mapCustomerConfigError(ctx, err)
 	}
-	if refreshed, refreshErr := d.processRuntimeUC.GetProcessInstance(ctx, instance.ID); refreshErr == nil {
-		instance = refreshed
+	instanceID := instance.ID
+	instance, err = d.processRuntimeUC.GetProcessInstance(ctx, instanceID)
+	if err != nil {
+		return d.exceptionProcessStartReadbackUnavailable(ctx, instanceID, "instance")
 	}
-	if refreshed, refreshErr := d.processRuntimeUC.ListProcessNodeInstances(ctx, instance.ID); refreshErr == nil {
-		nodes = refreshed
+	nodes, err = d.processRuntimeUC.ListProcessNodeInstances(ctx, instanceID)
+	if err != nil {
+		return d.exceptionProcessStartReadbackUnavailable(ctx, instanceID, "nodes")
+	}
+	startedNodeID := startedNode.ID
+	startedNode = nil
+	for _, node := range nodes {
+		if node != nil && node.ID == startedNodeID {
+			startedNode = node
+			break
+		}
+	}
+	if startedNode == nil {
+		return d.exceptionProcessStartReadbackUnavailable(ctx, instanceID, "started_node")
 	}
 	sourceReadback, sourceRes := d.exceptionProcessSourceReadback(ctx, contract, businessRefID)
 	if sourceRes != nil {
-		return sourceRes
+		return d.exceptionProcessStartReadbackUnavailable(ctx, instanceID, "source")
 	}
 	return okData(map[string]any{
 		"process_context":  exceptionProcessContextToMap(instance, nodes),
@@ -187,6 +201,11 @@ func (d *jsonrpcDispatcher) startCustomerConfigExceptionProcess(
 			"workflow_task_done_posts_fact": false,
 		},
 	})
+}
+
+func (d *jsonrpcDispatcher) exceptionProcessStartReadbackUnavailable(ctx context.Context, instanceID int, part string) *v1.JsonrpcResult {
+	d.log.WithContext(ctx).Warnf("[customer_config] started process readback unavailable process_instance_id=%d part=%s", instanceID, part)
+	return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: "流程已启动，暂时无法确认当前办理进度，请刷新核对"}
 }
 
 func (d *jsonrpcDispatcher) startOrReadProcessFirstNode(

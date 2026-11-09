@@ -4,7 +4,7 @@ import {
 } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
-import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
+import { JsonRpc, requireRpcArray, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
 import {
   normalizeFinanceCancellationRequest,
   validateFinanceCancellationResult,
@@ -656,7 +656,7 @@ export async function listFinancePaymentAllocationCandidates(
     params,
     options
   )
-  return dataOf(result)?.facts || []
+  return requireRpcArray(result, 'facts', '读取可核销记录失败，请稍后重试')
 }
 
 export async function cancelFinancePayment(params = {}) {
