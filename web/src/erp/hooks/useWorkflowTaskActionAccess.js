@@ -87,23 +87,20 @@ export default function useWorkflowTaskActionAccess({
     }
   }, [enabled, requestKey, retryVersion, taskID])
 
-  return useMemo(
-    () => ({
+  return useMemo(() => {
+    const requested = enabled && Boolean(requestKey)
+    const current = requested && remoteState.requestKey === requestKey
+    return {
       ...buildWorkflowActionAccessState({
-        adminProfile,
         task,
-        explainData:
-          remoteState.requestKey === requestKey ? remoteState.data : null,
-        loading: remoteState.requestKey === requestKey && remoteState.loading,
-        failed: remoteState.requestKey === requestKey && remoteState.failed,
+        explainData: current ? remoteState.data : null,
+        loading: requested && (!current || remoteState.loading),
+        failed: current && remoteState.failed,
         actionModes,
       }),
       retry() {
-        if (enabled && requestKey) {
-          setRetryVersion((current) => current + 1)
-        }
+        if (requested) setRetryVersion((version) => version + 1)
       },
-    }),
-    [actionModes, adminProfile, enabled, remoteState, requestKey, task]
-  )
+    }
+  }, [actionModes, enabled, remoteState, requestKey, task])
 }

@@ -11,13 +11,10 @@ import {
   getWorkflowTaskBoardSummaryRequestKey,
   getWorkflowTaskBoardStatusOptions,
   getWorkflowTaskBoardDueOptions,
-  canRunWorkflowTaskAction,
   getWorkflowTaskActionPermission,
-  getWorkflowTaskAllowedActionModes,
   getWorkflowTaskBusinessStatusLabel,
   getWorkflowTaskCodeLabel,
   getWorkflowTaskOwnerRoleLabel,
-  getWorkflowTaskReadonlyReason,
   getWorkflowTaskReason,
   getWorkflowTaskReasonLabel,
   getWorkflowTaskStatusMeta,
@@ -298,7 +295,7 @@ test('FL_workflow_business_status__retains_business_status_snapshot workflowTask
   assert.equal(getWorkflowTaskBusinessStatusLabel({}), '业务状态未记录')
 })
 
-test('workflowTaskBoard: 负责岗位展示和只读原因不透出 owner_role_key', () => {
+test('workflowTaskBoard: 负责岗位展示不透出 owner_role_key', () => {
   const warehouseTask = {
     id: 20,
     task_status_key: 'ready',
@@ -306,15 +303,6 @@ test('workflowTaskBoard: 负责岗位展示和只读原因不透出 owner_role_k
     task_group: 'warehouse_inbound',
     source_type: 'inbound',
   }
-  const salesAdmin = {
-    id: 21,
-    roles: [{ role_key: 'sales' }],
-    permissions: ['workflow.task.read', 'workflow.task.complete'],
-    effective_session: {
-      actions: ['workflow.task.complete'],
-    },
-  }
-
   assert.equal(getWorkflowTaskOwnerRoleLabel(warehouseTask), '仓库')
   assert.equal(
     getWorkflowTaskOwnerRoleLabel({
@@ -330,13 +318,6 @@ test('workflowTaskBoard: 负责岗位展示和只读原因不透出 owner_role_k
     }),
     '负责岗位'
   )
-
-  const readonlyReason = getWorkflowTaskReadonlyReason(
-    salesAdmin,
-    warehouseTask
-  )
-  assert.match(readonlyReason, /不属于仓库/)
-  assert.doesNotMatch(readonlyReason, /warehouse/)
 })
 
 test('workflowTaskBoard: 岗位筛选包含工程岗位', () => {
@@ -704,171 +685,14 @@ test('workflowTaskBoard: 可判断任务管理是否存在活跃筛选', () => {
   assert.equal(hasActiveWorkflowTaskBoardFilters({ role: 'bad' }), false)
 })
 
-test('workflowTaskBoard: 任务处理动作按权限码和 owner 角色收口', () => {
-  const warehouseAdmin = {
-    id: 7,
-    roles: [{ role_key: 'warehouse' }],
-    permissions: [
-      'workflow.task.read',
-      'workflow.task.complete',
-      'workflow.task.update',
-      'workflow.task.reject',
-    ],
-    effective_session: {
-      actions: [
-        'workflow.task.complete',
-        'workflow.task.update',
-        'workflow.task.reject',
-      ],
-    },
-  }
-  const readOnlyAdmin = {
-    id: 8,
-    roles: [{ role_key: 'warehouse' }],
-    permissions: ['workflow.task.read'],
-    effective_session: {
-      actions: [],
-    },
-  }
-  const salesAdmin = {
-    id: 9,
-    roles: [{ role_key: 'sales' }],
-    permissions: ['workflow.task.read', 'workflow.task.complete'],
-    effective_session: {
-      actions: ['workflow.task.complete'],
-    },
-  }
-  const warehouseTask = {
-    id: 10,
-    task_status_key: 'ready',
-    owner_role_key: 'warehouse',
-    task_group: 'finished_goods_inbound',
-    source_type: 'production-progress',
-  }
-
+test('workflowTaskBoard: 退回与审批权限使用公共合同', () => {
   assert.equal(
-    canRunWorkflowTaskAction(warehouseAdmin, warehouseTask, 'complete'),
-    true
-  )
-  assert.equal(
-    canRunWorkflowTaskAction(warehouseAdmin, warehouseTask, 'reject'),
-    true
-  )
-  assert.equal(
-    getWorkflowTaskActionPermission('reject', warehouseTask),
+    getWorkflowTaskActionPermission('reject', { task_group: 'finished_goods_inbound' }),
     'workflow.task.reject'
   )
-  assert.equal(
-    canRunWorkflowTaskAction(
-      {
-        ...warehouseAdmin,
-        permissions: ['workflow.task.read', 'workflow.task.update'],
-        effective_session: { actions: ['workflow.task.update'] },
-      },
-      warehouseTask,
-      'reject'
-    ),
-    false
-  )
-  assert.deepEqual(
-    getWorkflowTaskAllowedActionModes(warehouseAdmin, warehouseTask),
-    ['complete', 'block', 'reject', 'urge']
-  )
-  assert.equal(
-    canRunWorkflowTaskAction(readOnlyAdmin, warehouseTask, 'complete'),
-    false
-  )
-  assert.equal(
-    canRunWorkflowTaskAction(salesAdmin, warehouseTask, 'complete'),
-    false
-  )
-  assert.deepEqual(
-    getWorkflowTaskAllowedActionModes(readOnlyAdmin, warehouseTask),
-    []
-  )
-  assert.match(
-    getWorkflowTaskReadonlyReason(readOnlyAdmin, warehouseTask),
-    /只有查看任务权限/
-  )
-  assert.match(
-    getWorkflowTaskReadonlyReason(salesAdmin, warehouseTask),
-    /不属于仓库/
-  )
-
-  assert.deepEqual(
-    getWorkflowTaskAllowedActionModes(warehouseAdmin, {
-      ...warehouseTask,
-      task_status_key: 'blocked',
-    }),
-    ['resume', 'urge']
-  )
-  assert.deepEqual(
-    getWorkflowTaskAllowedActionModes(warehouseAdmin, {
-      ...warehouseTask,
-      task_status_key: 'pending',
-    }),
-    []
-  )
-  assert.deepEqual(
-    getWorkflowTaskAllowedActionModes(warehouseAdmin, {
-      ...warehouseTask,
-      task_status_key: 'unknown',
-    }),
-    []
-  )
-  assert.equal(
-    canRunWorkflowTaskAction(
-      warehouseAdmin,
-      { ...warehouseTask, task_status_key: 'blocked' },
-      'complete'
-    ),
-    false
-  )
-})
-
-test('workflowTaskBoard: 审批类 done 使用 approve 权限，催办按 update 权限', () => {
-  const approvalTask = {
-    id: 11,
-    task_status_key: 'ready',
-    owner_role_key: 'boss',
-    task_group: 'order_approval',
-    source_type: 'project-orders',
-    required_capability_key: 'workflow.task.approve',
-  }
-  const bossAdmin = {
-    id: 12,
-    roles: [{ key: 'boss' }],
-    permissions: ['workflow.task.approve', 'workflow.task.update'],
-    effective_session: {
-      actions: ['workflow.task.approve', 'workflow.task.update'],
-    },
-  }
-  const pmcAdmin = {
-    id: 13,
-    roles: [{ role_key: 'pmc' }],
-    permissions: ['workflow.task.update'],
-    effective_session: {
-      actions: ['workflow.task.update'],
-    },
-  }
-
-  assert.equal(
-    getWorkflowTaskActionPermission('complete', approvalTask),
-    'workflow.task.approve'
-  )
-  assert.equal(
-    canRunWorkflowTaskAction(bossAdmin, approvalTask, 'complete'),
-    true
-  )
-  assert.equal(canRunWorkflowTaskAction(pmcAdmin, approvalTask, 'urge'), true)
-  assert.equal(
-    canRunWorkflowTaskAction(
-      bossAdmin,
-      { ...approvalTask, task_status_key: 'done' },
-      'complete'
-    ),
-    false
-  )
+  const approvalTask = { task_group: 'order_approval', required_capability_key: 'workflow.task.approve' }
+  assert.equal(getWorkflowTaskActionPermission('complete', approvalTask), 'workflow.task.approve')
+  assert.equal(getWorkflowTaskActionPermission('urge', approvalTask), 'workflow.task.update')
 })
 
 test('workflowTaskBoard: 所有服务端 approval capability 都使用审批权限', () => {

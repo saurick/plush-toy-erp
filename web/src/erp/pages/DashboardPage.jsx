@@ -95,7 +95,6 @@ import {
   getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
   getWorkflowTaskReasonMeta,
-  getWorkflowTaskReadonlyReason,
   getWorkflowTaskStatusRiskTags,
   workflowTaskBoardExtraFilterCount,
   normalizeWorkflowTaskPageSize,
@@ -686,8 +685,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     if (
       !sharedHandlingID ||
       selectedTask?.id !== sharedHandlingID ||
-      actionDrawerAccess.loading ||
-      actionDrawerAccess.source === 'fallback_checking'
+      actionDrawerAccess.loading
     )
       { return }
     setSharedHandlingID(null)
@@ -891,11 +889,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [navigate]
   )
 
-  const getTaskReadonlyNotice = useCallback(
-    (task) => getWorkflowTaskReadonlyReason(adminProfile, task),
-    [adminProfile]
-  )
-
   const selectWorkbenchQueue = useCallback((queueKey) => {
     pendingWorkbenchPageScrollRef.current = null
     setWorkbenchQueueKey(queueKey)
@@ -1068,10 +1061,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             return false
           }
           if (!actionAccessSnapshot.canRun(actionModeSnapshot)) {
-            message.warning(
-              actionAccessSnapshot.getReason(actionModeSnapshot) ||
-                getWorkflowTaskReadonlyReason(adminProfile, taskSnapshot)
-            )
+            message.warning(actionAccessSnapshot.getReason(actionModeSnapshot))
             return false
           }
           return verifyWorkflowTaskActionAccessBeforeSubmit({
@@ -1747,17 +1737,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         actionMode={actionMode}
         actionReason={actionReason}
         actionSaving={actionSaving || materialSaving}
-        actionAvailabilityLoading={
-          actionDrawerAccess.loading ||
-          actionDrawerAccess.source === 'fallback_checking'
-        }
+        actionAvailabilityLoading={actionDrawerAccess.loading}
         allowedActionModes={actionDrawerAllowedModes}
-        readonlyReason={
-          actionDrawerAccess.loading
-            ? '正在确认您是否可以处理当前任务。'
-            : actionDrawerAccess.readonlyReason ||
-              getTaskReadonlyNotice(selectedTask)
-        }
+        readonlyReason={actionDrawerAccess.readonlyReason}
         assignmentAccess={assignmentAccess}
         assignmentTarget={assignmentTarget}
         canOpenEntry={actionDrawerCanOpenEntry}

@@ -62,7 +62,7 @@ export default function WorkflowTaskLinkDrawer({ profile, taskOpen = false, auto
       const task = await getWorkflowTask(item.id, { signal: request.signal })
       const explainData = await explainWorkflowActionAccess({ task_id: item.id }, { signal: request.signal })
       if (request.signal.aborted) return
-      const access = buildWorkflowActionAccessState({ task, adminProfile: profile, explainData })
+      const access = buildWorkflowActionAccessState({ task, explainData })
       const handle = [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(task.task_status_key) && access.source === 'backend' && access.canHandle
       if (automatic && !handle) {
         setReload((value) => value + 1)

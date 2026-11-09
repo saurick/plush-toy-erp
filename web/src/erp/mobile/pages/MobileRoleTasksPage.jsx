@@ -1397,7 +1397,7 @@ export default function MobileRoleTasksPage() {
     })
   }, [clearActionReceipt, handleScreenBack, selectedTaskID, taskScopeKey])
   useEffect(() => {
-    if (!sharedHandlingID || selectedTask?.id !== sharedHandlingID || selectedTaskActionAccess.loading || selectedTaskActionAccess.source === 'fallback_checking') return
+    if (!sharedHandlingID || selectedTask?.id !== sharedHandlingID || selectedTaskActionAccess.loading) return
     setSharedHandlingID(null)
     if (selectedTaskActionAccess.source === 'backend' && selectedTaskActionAccess.canHandle) handleOpenSelectedTaskAction()
     else handleDetailBack()

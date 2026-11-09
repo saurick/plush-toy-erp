@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  buildWorkflowActionAccessFallback,
   buildWorkflowActionAccessState,
   hasWorkflowTaskActionCapability,
   normalizeWorkflowActionExplainData,
@@ -19,23 +18,6 @@ test('workflowTaskActionAccess: effective review roles participate in request id
   assert.equal(original, workflowTaskAdminAccessRequestIdentity({ ...profile, effective_session: { ...profile.effective_session, roles: ['warehouse', 'sales'] } }))
   assert.notEqual(original, workflowTaskAdminAccessRequestIdentity({ ...profile, effective_session: { ...profile.effective_session, roles: ['sales'] } }))
 })
-
-function admin(overrides = {}) {
-  return {
-    id: 7,
-    is_super_admin: false,
-    roles: [{ role_key: 'warehouse' }],
-    permissions: [
-      'workflow.task.read',
-      'workflow.task.update',
-      'workflow.task.complete',
-    ],
-    effective_session: {
-      actions: ['workflow.task.complete', 'workflow.task.update'],
-    },
-    ...overrides,
-  }
-}
 
 function task(overrides = {}) {
   return {
@@ -64,25 +46,8 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
         allowed: true,
         reason: '可完成',
         required_permission: 'workflow.task.complete',
-        owner_role_key: 'warehouse',
-        visible_owner_role_keys: ['sales', 'warehouse'],
-        candidate_owner_role_keys: ['warehouse'],
         owner_role_matched: false,
-        work_pool_role_matched: true,
-        work_pool_entitlement_matched: true,
         work_pool_entitlement_scope_matched: true,
-        domain_command_entry: {
-          enabled: false,
-          will_write_fact: false,
-          source: 'guarded_no_domain_command_contract',
-          command_key: '',
-          blocked_reasons: [
-            'domain_command_contract_not_configured',
-            'workflow_payload_command_key_ignored',
-          ],
-          required_contract: ['domain_command_key', 'idempotency_key'],
-        },
-        actor_role_key: 'warehouse',
       },
       {
         action_key: 'block',
@@ -116,31 +81,8 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
 
   assert.equal(normalized.complete.allowed, true)
   assert.equal(normalized.complete.requiredPermission, 'workflow.task.complete')
-  assert.equal(normalized.complete.ownerRoleKey, 'warehouse')
-  assert.deepEqual(normalized.complete.visibleOwnerRoleKeys, [
-    'sales',
-    'warehouse',
-  ])
-  assert.deepEqual(normalized.complete.candidateOwnerRoleKeys, ['warehouse'])
   assert.equal(normalized.complete.ownerRoleMatched, false)
-  assert.equal(normalized.complete.workPoolRoleMatched, true)
-  assert.equal(normalized.complete.workPoolEntitlementMatched, true)
   assert.equal(normalized.complete.workPoolEntitlementScopeMatched, true)
-  assert.equal(normalized.complete.domainCommandEntry.enabled, false)
-  assert.equal(normalized.complete.domainCommandEntry.willWriteFact, false)
-  assert.equal(
-    normalized.complete.domainCommandEntry.source,
-    'guarded_no_domain_command_contract'
-  )
-  assert.deepEqual(normalized.complete.domainCommandEntry.blockedReasons, [
-    'domain_command_contract_not_configured',
-    'workflow_payload_command_key_ignored',
-  ])
-  assert.deepEqual(normalized.complete.domainCommandEntry.requiredContract, [
-    'domain_command_key',
-    'idempotency_key',
-  ])
-  assert.equal(normalized.complete.actorRoleKey, 'warehouse')
   assert.equal(normalized.block.allowed, false)
   assert.equal(normalized.block.reasonCode, 'missing_permission')
   assert.equal(normalized.reject.allowed, true)
@@ -314,9 +256,8 @@ test('workflowTaskActionAccess: ignores non-contract backend action keys', () =>
   assert.deepEqual(normalized, {})
 })
 
-test('workflowTaskActionAccess: backend explain overrides local fallback', () => {
+test('workflowTaskActionAccess: backend response is the sole source of allowed actions', () => {
   const access = buildWorkflowActionAccessState({
-    adminProfile: admin(),
     task: task(),
     explainData: {
       source_access: sourceAccessNotApplicable,
@@ -355,7 +296,6 @@ test('workflowTaskActionAccess: denied source access blocks handling but keeps a
   const sourceReason =
     '当前账号不能查看该任务的相关单据，因此不能办理；可催办责任人或联系管理员调整岗位权限。'
   const access = buildWorkflowActionAccessState({
-    adminProfile: admin(),
     task: task(),
     explainData: {
       source_access: {
@@ -380,57 +320,37 @@ test('workflowTaskActionAccess: denied source access blocks handling but keeps a
   assert.equal(access.canRun('urge'), true)
 })
 
-test('workflowTaskActionAccess: fallback keeps local owner and terminal reasons', () => {
-  const fallback = buildWorkflowActionAccessFallback({
-    adminProfile: admin({ permissions: ['workflow.task.read'] }),
-    task: task(),
-  })
-
-  assert.equal(fallback.allowedModes.length, 0)
-  assert.match(fallback.readonlyReason, /只有查看任务权限/u)
-  assert.equal(fallback.byAction.complete.domainCommandEntry.enabled, false)
-  assert.equal(
-    fallback.byAction.complete.domainCommandEntry.willWriteFact,
-    false
-  )
-  assert.equal(
-    fallback.byAction.complete.domainCommandEntry.source,
-    'fallback_no_domain_command_contract'
-  )
-
-  const terminal = buildWorkflowActionAccessState({
-    adminProfile: admin(),
-    task: task({ task_status_key: 'done' }),
-  })
-  assert.equal(terminal.canRun('complete'), false)
-  assert.equal(terminal.readonlyReason, '该任务已结束，只能查看任务详情。')
+test('workflowTaskActionAccess: an absent task has no inferred actions or command', () => {
+  const access = buildWorkflowActionAccessState()
+  assert.equal(access.source, 'none')
+  assert.deepEqual(access.byAction, {})
+  assert.deepEqual(access.allowedModes, [])
+  assert.equal(access.readonlyReason, '')
 })
 
 test('workflowTaskActionAccess: missing backend explain does not expose local fallback actions', () => {
   const access = buildWorkflowActionAccessState({
-    adminProfile: admin(),
     task: task(),
   })
 
-  assert.equal(access.source, 'fallback_checking')
+  assert.equal(access.source, 'unavailable')
   assert.equal(access.loading, false)
   assert.deepEqual(access.allowedModes, [])
   assert.equal(access.canRun('complete'), false)
   assert.equal(access.canRun('block'), false)
   assert.equal(access.canRun('reject'), false)
   assert.equal(access.canRun('urge'), false)
-  assert.equal(access.readonlyReason, '正在确认操作权限，请稍后再提交。')
-  assert.equal(access.byAction.complete.reasonCode, 'action_access_checking')
+  assert.equal(access.readonlyReason, '当前操作暂不可用，请刷新后重试。')
+  assert.equal(access.byAction.complete.reasonCode, 'action_access_missing_from_backend')
 })
 
 test('workflowTaskActionAccess: failed backend explain disables local fallback actions', () => {
   const access = buildWorkflowActionAccessState({
-    adminProfile: admin(),
     task: task(),
     failed: true,
   })
 
-  assert.equal(access.source, 'fallback_failed')
+  assert.equal(access.source, 'failed')
   assert.deepEqual(access.allowedModes, [])
   assert.equal(access.canRun('complete'), false)
   assert.equal(access.canRun('block'), false)
@@ -452,12 +372,11 @@ test('workflowTaskActionAccess: failed backend explain disables local fallback a
 
 test('workflowTaskActionAccess: loading backend explain does not expose fallback submit actions', () => {
   const access = buildWorkflowActionAccessState({
-    adminProfile: admin(),
     task: task(),
     loading: true,
   })
 
-  assert.equal(access.source, 'fallback_checking')
+  assert.equal(access.source, 'checking')
   assert.equal(access.loading, true)
   assert.deepEqual(access.allowedModes, [])
   assert.equal(access.canRun('complete'), false)

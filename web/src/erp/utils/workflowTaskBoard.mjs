@@ -3,7 +3,6 @@ import { WorkCenterPaginationPolicy } from '../../common/consts/policies.generat
 import { WORKFLOW_TASK_DUE_OPTIONS } from './workflowTaskListFilters.mjs'
 import { isWorkflowHistoryDateFilter } from './workflowRoleTaskHistory.mjs'
 import { DISCOVERY_FILTER_KEYS, DISCOVERY_REQUEST_KEYS, normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from './workflowTaskDiscovery.mjs'
-import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { getWorkflowTaskDueStatus } from './workflowDashboardStats.mjs'
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 import {
@@ -12,12 +11,9 @@ import {
   getWorkflowTaskReasonLabel,
 } from './workflowTaskReason.mjs'
 import { getBusinessStatusLabel } from '../config/workflowStatus.mjs'
-import { hasActionPermission } from './masterDataOrderView.mjs'
 import { getRoleDisplayName } from './roleKeys.mjs'
 import {
-  canWorkflowTaskStatusRunAction,
   getWorkflowTaskActionPermission,
-  getWorkflowTaskStatusActionModes,
 } from './workflowTaskActionContract.mjs'
 import {
   WORKFLOW_TASK_BOARD_LANE_KEYS,
@@ -235,86 +231,6 @@ export function getWorkflowTaskBusinessStatusLabel(task = {}) {
 
 export function getWorkflowTaskCodeLabel(task = {}) {
   return String(task.task_code || '').trim() || '任务已关联'
-}
-
-function getAdminRoleKeys(admin = {}) {
-  return Array.isArray(admin?.roles)
-    ? admin.roles
-        .map((role) => String(role?.role_key || role?.key || '').trim())
-        .filter(Boolean)
-    : []
-}
-
-function adminHasRole(admin = {}, roleKey = '') {
-  const normalizedRoleKey = String(roleKey || '').trim()
-  if (!normalizedRoleKey) return false
-  return getAdminRoleKeys(admin).includes(normalizedRoleKey)
-}
-
-function isAssignedToAdmin(admin = {}, task = {}) {
-  const assigneeID = Number(task?.assignee_id || 0)
-  if (!Number.isFinite(assigneeID) || assigneeID <= 0) return false
-  return assigneeID === Number(admin?.id || 0)
-}
-
-function canHandleTaskByOwner(admin = {}, task = {}) {
-  if (isAssignedToAdmin(admin, task)) return true
-  return adminHasRole(admin, getTaskOwnerRoleKey(task))
-}
-
-function canUrgeTaskByOwner(admin = {}, task = {}) {
-  if (admin?.is_super_admin === true) return true
-  if (adminHasRole(admin, 'pmc') || adminHasRole(admin, 'boss')) return true
-  if (isAssignedToAdmin(admin, task)) return true
-  return adminHasRole(admin, getTaskOwnerRoleKey(task))
-}
-
-export function canRunWorkflowTaskAction(
-  admin = {},
-  task = {},
-  actionMode = ''
-) {
-  if (!task || !actionMode || isTerminalWorkflowTask(task)) return false
-  if (!canWorkflowTaskStatusRunAction(task, actionMode)) return false
-
-  const permissionKey = getWorkflowTaskActionPermission(actionMode, task)
-  if (!hasActionPermission(admin, permissionKey)) return false
-
-  if (actionMode === 'urge') {
-    return canUrgeTaskByOwner(admin, task)
-  }
-  return canHandleTaskByOwner(admin, task)
-}
-
-export function getWorkflowTaskAllowedActionModes(admin = {}, task = {}) {
-  return getWorkflowTaskStatusActionModes(task).filter((actionMode) =>
-    canRunWorkflowTaskAction(admin, task, actionMode)
-  )
-}
-
-export function getWorkflowTaskReadonlyReason(admin = {}, task = {}) {
-  if (!task) return ''
-  if (isTerminalWorkflowTask(task)) {
-    return '该任务已结束，只能查看任务详情。'
-  }
-
-  const ownerRoleKey = getTaskOwnerRoleKey(task)
-  const hasAnyWorkflowActionPermission = [
-    PermissionCode.WORKFLOW_TASK_COMPLETE,
-    PermissionCode.WORKFLOW_TASK_UPDATE,
-    PermissionCode.WORKFLOW_TASK_REJECT,
-    PermissionCode.WORKFLOW_TASK_APPROVE,
-    PermissionCode.FINANCE_PAYMENT_APPROVE,
-    PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE,
-    PermissionCode.PRODUCTION_EXCEPTION_APPROVE,
-  ].some((permissionKey) => hasActionPermission(admin, permissionKey))
-  if (!hasAnyWorkflowActionPermission) {
-    return '当前账号只有查看任务权限，没有完成、阻塞或催办权限。'
-  }
-  if (ownerRoleKey && !canHandleTaskByOwner(admin, task)) {
-    return `当前账号不属于${getWorkflowTaskOwnerRoleLabel(task)}，也不是该任务的指定处理人。`
-  }
-  return '当前账号没有可用的任务处理方式。'
 }
 
 export function getWorkflowTaskStatusMeta(task = {}) {

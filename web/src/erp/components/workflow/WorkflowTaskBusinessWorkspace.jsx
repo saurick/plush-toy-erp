@@ -237,7 +237,7 @@ export default function WorkflowTaskBusinessWorkspace({ controls, renderPage }) 
     taskCommand: command && relatedReady ? { kind: mode, ...related.source, selected } : null,
     taskBusiness: { device, taskID: actual?.id, task: actual, mode, contract, readOnly, processing: readingResult, formEditing, information, collaborationExternal: controls.collaborationExternal, onFormEditingChange: setFormEditing, onBusyChange: reportBusinessBusy, onCollaboration: controls.onCollaboration, actionHost, onResult, viewResult: openResult, navigate, confirmLeave, taskCenterPath } }
   const processFailed = needsBusinessProcess && currentBusinessProcess?.failed
-  const checking = !failed && (!actual || access.loading || access.source === 'fallback_checking' || (needsBusinessProcess && !currentBusinessProcess && !sameBusinessProcessSource))
+  const checking = !failed && (!actual || access.loading || (needsBusinessProcess && !currentBusinessProcess && !sameBusinessProcessSource))
   const relatedActions = mode === 'source' ? (
     <div className="mobile-task-business-actions">
       {commands.map((item) => <Button key={item.kind} onClick={() => changeMode(item.kind)}>{item.label}</Button>)}

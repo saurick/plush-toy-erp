@@ -1,9 +1,3 @@
-import {
-  canRunWorkflowTaskAction,
-  getWorkflowTaskAllowedActionModes,
-  getWorkflowTaskReadonlyReason,
-} from './workflowTaskBoard.mjs'
-
 export const DEFAULT_WORKFLOW_ACTION_MODES = Object.freeze([
   'complete',
   'block',
@@ -106,35 +100,6 @@ export function normalizeWorkflowActionMode(value = '') {
   return WORKFLOW_ACTION_MODE_SET.has(key) ? key : ''
 }
 
-function normalizeStringList(values) {
-  if (!Array.isArray(values)) return []
-  return values.map((value) => String(value || '').trim()).filter(Boolean)
-}
-
-function normalizeDomainCommandEntry(item = {}) {
-  const rawReasons = item.blocked_reasons
-  const rawContract = item.required_contract
-  return {
-    enabled: item.enabled === true,
-    willWriteFact: item.will_write_fact === true,
-    source: String(item.source || '').trim(),
-    commandKey: String(item.command_key || '').trim(),
-    blockedReasons: normalizeStringList(rawReasons),
-    requiredContract: normalizeStringList(rawContract),
-  }
-}
-
-function workflowActionFallbackDomainCommandEntry() {
-  return Object.freeze({
-    enabled: false,
-    willWriteFact: false,
-    source: 'fallback_no_domain_command_contract',
-    commandKey: '',
-    blockedReasons: ['domain_command_contract_not_configured'],
-    requiredContract: [],
-  })
-}
-
 function normalizeActionExplainItem(item = {}) {
   const actionMode = String(item.action_key || '').trim()
   if (!WORKFLOW_ACTION_MODE_SET.has(actionMode)) return null
@@ -144,25 +109,9 @@ function normalizeActionExplainItem(item = {}) {
     reason: String(item.reason || '').trim(),
     reasonCode: String(item.reason_code || '').trim(),
     requiredPermission: String(item.required_permission || '').trim(),
-    ownerRoleKey: String(item.owner_role_key || '').trim(),
-    visibleOwnerRoleKeys: Array.isArray(item.visible_owner_role_keys)
-      ? item.visible_owner_role_keys
-          .map((roleKey) => String(roleKey || '').trim())
-          .filter(Boolean)
-      : [],
-    candidateOwnerRoleKeys: Array.isArray(item.candidate_owner_role_keys)
-      ? item.candidate_owner_role_keys
-          .map((roleKey) => String(roleKey || '').trim())
-          .filter(Boolean)
-      : [],
     ownerRoleMatched: item.owner_role_matched === true,
-    workPoolRoleMatched: item.work_pool_role_matched === true,
-    workPoolEntitlementMatched: item.work_pool_entitlement_matched === true,
     workPoolEntitlementScopeMatched:
       item.work_pool_entitlement_scope_matched === true,
-    domainCommandEntry: normalizeDomainCommandEntry(item.domain_command_entry),
-    actorRoleKey: String(item.actor_role_key || '').trim(),
-    statusKey: String(item.status_key || '').trim(),
   }
 }
 
@@ -241,186 +190,66 @@ export function hasWorkflowTaskActionCapability(
   })
 }
 
-export function buildWorkflowActionAccessFallback({
-  adminProfile = {},
-  task = null,
-  actionModes = DEFAULT_WORKFLOW_ACTION_MODES,
-} = {}) {
-  if (!task) {
-    return {
-      source: 'none',
-      sourceAccess: {
-        source: 'none',
-        applicable: false,
-        resolved: true,
-        allowed: false,
-        reasonCode: '',
-        reason: '',
-      },
-      byAction: {},
-      allowedModes: [],
-      readonlyReason: '',
-    }
-  }
-  const allowedModes = getWorkflowTaskAllowedActionModes(
-    adminProfile,
-    task
-  ).filter((actionMode) => actionModes.includes(actionMode))
-  const readonlyReason =
-    allowedModes.length === 0
-      ? getWorkflowTaskReadonlyReason(adminProfile, task)
-      : ''
-  const byAction = {}
-  for (const actionMode of actionModes) {
-    byAction[actionMode] = {
-      actionMode,
-      allowed: canRunWorkflowTaskAction(adminProfile, task, actionMode),
-      reason: readonlyReason,
-      reasonCode: '',
-      requiredPermission: '',
-      ownerRoleKey: String(task.owner_role_key || '').trim(),
-      visibleOwnerRoleKeys: [],
-      ownerRoleMatched: false,
-      workPoolRoleMatched: false,
-      workPoolEntitlementMatched: false,
-      workPoolEntitlementScopeMatched: false,
-      domainCommandEntry: workflowActionFallbackDomainCommandEntry(),
-      actorRoleKey: '',
-      statusKey: '',
-    }
-  }
-  return {
-    source: 'fallback',
-    sourceAccess: {
-      source: 'checking',
-      applicable: true,
-      resolved: false,
-      allowed: false,
-      reasonCode: 'source_access_checking',
-      reason: WORKFLOW_ACTION_ACCESS_CHECKING_REASON,
-    },
-    byAction,
-    allowedModes,
-    readonlyReason,
-  }
-}
-
 export function buildWorkflowActionAccessState({
-  adminProfile = {},
   task = null,
   explainData = null,
   loading = false,
   failed = false,
   actionModes = DEFAULT_WORKFLOW_ACTION_MODES,
 } = {}) {
-  const fallback = buildWorkflowActionAccessFallback({
-    adminProfile,
-    task,
-    actionModes,
-  })
   const explainedByAction = normalizeWorkflowActionExplainData(explainData)
   const hasExplainData = Object.keys(explainedByAction).length > 0
-  const sourceAccess = hasExplainData
-    ? normalizeWorkflowTaskSourceAccess(explainData)
-    : {
-        ...fallback.sourceAccess,
-        source: failed ? 'failed' : 'checking',
-        reasonCode: failed
-          ? 'source_access_check_failed'
-          : 'source_access_checking',
-        reason: failed
-          ? WORKFLOW_ACTION_ACCESS_FAILED_REASON
-          : WORKFLOW_ACTION_ACCESS_CHECKING_REASON,
-      }
-  const shouldGateLocalActions =
-    Boolean(task) &&
-    !hasExplainData &&
-    !failed &&
-    fallback.allowedModes.length > 0
-  const byAction =
-    hasExplainData || failed || shouldGateLocalActions
-      ? { ...fallback.byAction }
-      : fallback.byAction
-
-  if (hasExplainData) {
+  const source = hasExplainData ? 'backend' : !task ? 'none' : failed ? 'failed' : loading ? 'checking' : 'unavailable'
+  const unavailableReason = source === 'none' ? ''
+    : source === 'failed' ? WORKFLOW_ACTION_ACCESS_FAILED_REASON
+    : source === 'checking' ? WORKFLOW_ACTION_ACCESS_CHECKING_REASON
+    : WORKFLOW_ACTION_ACCESS_MISSING_REASON
+  const reasonCode = source === 'failed' ? 'action_access_check_failed'
+    : source === 'checking' ? 'action_access_checking'
+    : 'action_access_missing_from_backend'
+  const sourceAccess = hasExplainData ? normalizeWorkflowTaskSourceAccess(explainData) : {
+    source,
+    applicable: Boolean(task),
+    resolved: !task,
+    allowed: false,
+    reasonCode: task ? reasonCode : '',
+    reason: unavailableReason,
+  }
+  const byAction = {}
+  if (source !== 'none') {
     for (const actionMode of actionModes) {
-      if (explainedByAction[actionMode]) {
-        byAction[actionMode] = explainedByAction[actionMode]
-      } else {
-        byAction[actionMode] = {
-          ...byAction[actionMode],
-          allowed: false,
-          reason: WORKFLOW_ACTION_ACCESS_MISSING_REASON,
-          reasonCode: 'action_access_missing_from_backend',
-        }
-      }
-    }
-    if (!sourceAccess.allowed) {
-      for (const actionMode of actionModes) {
-        if (actionMode === 'urge') continue
-        byAction[actionMode] = {
-          ...byAction[actionMode],
-          allowed: false,
-          reason: sourceAccess.reason,
-          reasonCode: sourceAccess.reasonCode,
-        }
-      }
-    }
-  } else if (failed) {
-    for (const actionMode of actionModes) {
-      byAction[actionMode] = {
-        ...byAction[actionMode],
+      const item = explainedByAction[actionMode] || {
+        actionMode,
         allowed: false,
-        reason: WORKFLOW_ACTION_ACCESS_FAILED_REASON,
-        reasonCode: 'action_access_check_failed',
+        reason: unavailableReason,
+        reasonCode,
       }
-    }
-  } else if (loading || shouldGateLocalActions) {
-    for (const actionMode of actionModes) {
-      byAction[actionMode] = {
-        ...byAction[actionMode],
-        allowed: false,
-        reason: WORKFLOW_ACTION_ACCESS_CHECKING_REASON,
-        reasonCode: 'action_access_checking',
-      }
+      byAction[actionMode] = hasExplainData && !sourceAccess.allowed && actionMode !== 'urge'
+        ? { ...item, allowed: false, reason: sourceAccess.reason, reasonCode: sourceAccess.reasonCode }
+        : item
     }
   }
 
-  const allowedModes = actionModes.filter(
-    (actionMode) => byAction[actionMode]?.allowed === true
-  )
-  const firstDenied = actionModes
-    .map((actionMode) => byAction[actionMode])
-    .find((item) => item && item.allowed !== true && item.reason)
-  const readonlyReason =
-    allowedModes.length === 0
-      ? firstDenied?.reason || fallback.readonlyReason
-      : ''
+  const allowedModes = actionModes.filter((mode) => byAction[mode]?.allowed === true)
+  const readonlyReason = allowedModes.length === 0
+    ? Object.values(byAction).find((item) => !item.allowed && item.reason)?.reason || unavailableReason
+    : ''
 
   return {
-    source: hasExplainData
-      ? 'backend'
-      : failed
-        ? 'fallback_failed'
-        : loading || shouldGateLocalActions
-          ? 'fallback_checking'
-          : 'fallback',
+    source,
     loading,
     failed,
     sourceAccess,
     byAction,
     allowedModes,
-    canHandle: allowedModes.some((actionMode) => actionMode !== 'urge'),
+    canHandle: allowedModes.some((mode) => mode !== 'urge'),
     urgeOnly: allowedModes.length === 1 && allowedModes[0] === 'urge',
     readonlyReason,
     canRun(actionMode) {
       return byAction[normalizeWorkflowActionMode(actionMode)]?.allowed === true
     },
     getReason(actionMode) {
-      return (
-        byAction[normalizeWorkflowActionMode(actionMode)]?.reason ||
-        readonlyReason
-      )
+      return byAction[normalizeWorkflowActionMode(actionMode)]?.reason || readonlyReason
     },
   }
 }
