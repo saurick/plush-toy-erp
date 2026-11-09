@@ -3040,7 +3040,16 @@ test('source document line summaries preserve numeric(20,6) boundary values exac
     quantity: '100000000000000',
     amount: '100000000000000',
   }
-  assert.deepEqual(summarizePurchaseOrderLines(lines), expected)
+  assert.deepEqual(summarizePurchaseOrderLines(lines), { ...expected, amount: undefined })
+  assert.deepEqual(
+    summarizePurchaseOrderLines(lines.map((line) => ({ ...line, unit_price: '1' }))),
+    expected
+  )
+  assert.equal(summarizePurchaseOrderLines([{ purchased_quantity: '2', unit_price: '0' }]).amount, '0')
+  assert.equal(summarizePurchaseOrderLines([
+    { purchased_quantity: '2', unit_price: '4' },
+    { purchased_quantity: '5', amount: '100' },
+  ]).amount, undefined)
   assert.deepEqual(summarizeOutsourcingOrderLines(lines), {
     ...expected,
     amount: '0',

@@ -252,14 +252,17 @@ function snapshotNumeric20Scale6(snapshot, keys) {
   return normalizeNumeric20Scale6(snapshotValue(snapshot, keys)) || '0'
 }
 
-function summarizeOrderLines(lines, quantityField, deriveAmount) {
+function summarizeOrderLines(lines, quantityField, deriveAmount, { requireCompleteAmount = false } = {}) {
   const items = Array.isArray(lines) ? lines : []
+  const amounts = items.map((line) => deriveAmount(line))
   return {
     count: items.length,
     quantity: sumNumeric20Scale6Values(
       items.map((line) => line?.[quantityField])
     ),
-    amount: sumNumeric20Scale6Values(items.map((line) => deriveAmount(line))),
+    amount: requireCompleteAmount && (!amounts.length || amounts.includes(undefined))
+      ? undefined
+      : sumNumeric20Scale6Values(amounts),
   }
 }
 
@@ -288,9 +291,9 @@ function summarizeSalesOrderLines(lines = [], snapshot = {}) {
 }
 
 function summarizePurchaseOrderLines(lines = []) {
-  return summarizeOrderLines(lines, 'purchased_quantity', (line) =>
-    derivePurchaseOrderItemAmount(line, { allowSnapshotFallback: true })
-  )
+  return summarizeOrderLines(lines, 'purchased_quantity', derivePurchaseOrderItemAmount, {
+    requireCompleteAmount: true,
+  })
 }
 
 function summarizeOutsourcingOrderLines(lines = []) {

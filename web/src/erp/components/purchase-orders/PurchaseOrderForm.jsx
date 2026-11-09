@@ -14,6 +14,7 @@ import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../../utils/warehouseClassifica
 import Select from '@/common/components/select/AppSelect'
 import { referenceLabel, supplierOption } from '../../utils/referenceSelectOptions.mjs'
 import {
+  derivePurchaseOrderItemAmount,
   formatUnitQuantitySummary,
   summarizePurchaseOrderLines,
 } from '../../utils/sourceOrderAmounts.mjs'
@@ -128,7 +129,6 @@ export function createBlankPurchaseLine(lineNo = 1) {
     product_name_snapshot: '',
     purchased_quantity: '',
     unit_price: '',
-    amount: '',
     expected_arrival_date: '',
     note: '',
   }
@@ -159,7 +159,6 @@ export function normalizePurchaseLineFormValue(item = {}) {
     product_name_snapshot: item.product_name_snapshot || '',
     purchased_quantity: optionalFormValue(item.purchased_quantity),
     unit_price: optionalFormValue(item.unit_price),
-    amount: optionalFormValue(item.amount),
     expected_arrival_date: unixToDateInputValue(item.expected_arrival_date),
     note: item.note || '',
     line_status: item.line_status,
@@ -376,7 +375,7 @@ export function PurchaseOrderFormFields({
           }}
           columns={PURCHASE_ORDER_COLUMNS}
           title="采购明细"
-          description="金额＝采购数量 × 单价；留空自动计算，手填金额须与计算结果一致。"
+          description="金额按采购数量和单价自动计算，缺少单价时显示待补齐。"
           emptyDescription="暂无采购明细"
           headerActions={(
             <>
@@ -572,13 +571,18 @@ export function PurchaseOrderFormFields({
                   <Input />
                 </Form.Item>,
 
-                <Form.Item
-                  className="erp-line-item-field erp-line-item-field--money"
-                  name={[field.name, 'amount']}
-                  label="金额"
-                  rules={[optionalMoneyRule('金额')]}
-                >
-                  <Input placeholder="自动计算" />
+                <Form.Item noStyle shouldUpdate={(before, after) => before.items?.[field.name] !== after.items?.[field.name]}>
+                  {({ getFieldValue }) => (
+                    <Form.Item className="erp-line-item-field erp-line-item-field--money" label="金额">
+                      <Input
+                        aria-label="金额"
+                        disabled
+                        readOnly
+                        placeholder="待补齐"
+                        value={derivePurchaseOrderItemAmount(getFieldValue(['items', field.name]) || {}) ?? ''}
+                      />
+                    </Form.Item>
+                  )}
                 </Form.Item>,
 
                 <Form.Item
@@ -678,9 +682,11 @@ export function PurchaseOrderFormFields({
                 label: '金额合计',
                 value: (
                   <BusinessLineItemsSummaryValue
-                    summarize={summarizePurchaseOrderLines}
+                    summarize={(lines) => summarizePurchaseOrderLines(withoutBlankPurchaseOrderDraftLines(lines))}
                     select={(summary) =>
-                      formatNumeric20Scale6Summary(summary.amount, 2)
+                      summary.amount === undefined
+                        ? (summary.count ? '待补齐' : '—')
+                        : formatNumeric20Scale6Summary(summary.amount, 2)
                     }
                   />
                 ),

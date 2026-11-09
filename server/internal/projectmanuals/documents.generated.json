@@ -349,7 +349,7 @@
     "id": "accessories-purchase",
     "book": "business",
     "title": "采购订单怎么用",
-    "source_hash": "40f6d77d779a5b15cad4bdd35f695bc58e513261bbfb0af420cc90474d278795",
+    "source_hash": "439e8889fea76c82dbde2b738c61e3217a459176087bab893d9d843a5700b3be",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"
@@ -360,7 +360,7 @@
     "id": "accessories-purchase:purchase-commitment",
     "book": "business",
     "title": "采购订单为什么不是入库单",
-    "source_hash": "0e2d3e3fefe7d1381f79bed0b62413118d4c6ee2e288a3cfa0b2f117fabf5927",
+    "source_hash": "d068b33b6c331dea46c48e14718dd75b50ca8a06f55f652e117a1bad87a6fb4a",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"
@@ -371,7 +371,7 @@
     "id": "accessories-purchase:purchase-line-amount",
     "book": "business",
     "title": "采购金额怎么算",
-    "source_hash": "6c9ae2a8aa4e2ccd946afa8b288add8040cc269980366884bd9b200df6ae4133",
+    "source_hash": "3ae09180ab85cc78fdd94d559e9209cac7b787998b7ec30b33257eed684365b1",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"
@@ -382,7 +382,7 @@
     "id": "accessories-purchase:supplier-material-source",
     "book": "business",
     "title": "供应商和材料从哪里来",
-    "source_hash": "abfa0276fade3fc5e4d2799ed47d9ac22bce46848070e5d2409f2d738ef2b159",
+    "source_hash": "a1d2e5b3bf8f410d5294b202fd0f5d0f702a4c5620d7ef4536f8f67952ea9113",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"
@@ -393,7 +393,7 @@
     "id": "accessories-purchase:purchase-action-disabled",
     "book": "business",
     "title": "为什么不能提交、审核或登记到货",
-    "source_hash": "ceacb5b2b45ab13d8e2da2987144709e0a542e6c3bcca25ced4a3c480866baf9",
+    "source_hash": "aeb5cfb34506e74f592972237767b848e1ab9109476195995b0207d0354c3b9d",
     "path": "/erp/purchase/accessories",
     "roles": [
       "purchase"
