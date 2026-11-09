@@ -265,7 +265,10 @@ test('printWorkspace: 草稿只读取当前版本且超过 24 小时自动失效
 
     storage.set(storageKey, JSON.stringify({ contractNo: 'legacy-draft' }))
     assert.equal(readPrintWorkspaceDraftSnapshot(storageKey, storageLike), null)
-    assert.equal(storage.has(storageKey), false)
+    assert.equal(storage.has(storageKey), true)
+    storage.set(storageKey, '{"version":')
+    assert.equal(readPrintWorkspaceDraftSnapshot(storageKey, storageLike), null)
+    assert.equal(storage.get(storageKey), '{"version":')
   } finally {
     Date.now = originalNow
   }

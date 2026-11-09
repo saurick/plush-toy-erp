@@ -1,5 +1,6 @@
 import React, { lazy, useEffect, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { Button, Result } from 'antd'
 import {
   AUTH_SESSION_CHANGED_EVENT,
   getCurrentUser,
@@ -9,6 +10,9 @@ import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
 import {
   buildPrintWorkspaceDraftStorageKey,
+  PRINT_WORKSPACE_DRAFT_MODE,
+  readInitialPrintWorkspaceDraftFromWindowName,
+  resolvePrintWorkspaceDraftMode,
   resolvePrintWorkspaceStateID,
 } from '../utils/printWorkspace.js'
 import { preparePrintDraftStorage } from '../utils/printDraftStorage.mjs'
@@ -59,25 +63,47 @@ export default function PrintWorkspacePage() {
     }
   }, [accountID, expiresAt, sessionRevision])
   const scope = getPrintWorkspaceDraftScope(searchParams)
+  const workspaceStateID = resolvePrintWorkspaceStateID(searchParams)
   const storageKey = buildPrintWorkspaceDraftStorageKey(
     templateKey,
-    resolvePrintWorkspaceStateID(searchParams),
+    workspaceStateID,
     scope
   )
-  const [preparedKey, setPreparedKey] = useState(null)
+  const restoreDraft = resolvePrintWorkspaceDraftMode(searchParams) === PRINT_WORKSPACE_DRAFT_MODE.RESTORE
+  const [prepared, setPrepared] = useState(null)
+  const [restoreAttempt, setRestoreAttempt] = useState(0)
   useEffect(() => {
-    let cancelled = false
     clearRetiredPrintWindowState()
-    preparePrintDraftStorage(storageKey).finally(() => {
-      if (!cancelled) setPreparedKey(storageKey)
+    if (!accountID || !restoreDraft) return undefined
+    const initialDraft = readInitialPrintWorkspaceDraftFromWindowName(templateKey, workspaceStateID, window, storageKey)
+    let cancelled = false
+    preparePrintDraftStorage(storageKey).then((status) => {
+      if (cancelled) return
+      setPrepared({
+        storageKey,
+        restoreAttempt,
+        blocked: status === 'unreadable' || (status === 'unavailable' && !initialDraft),
+      })
     })
     return () => {
       cancelled = true
     }
-  }, [storageKey])
+  }, [accountID, restoreDraft, storageKey, restoreAttempt, templateKey, workspaceStateID])
   if (!user) return <Navigate to="/admin-login" replace />
-  if (preparedKey !== storageKey) {
+  if (restoreDraft && (prepared?.storageKey !== storageKey || prepared.restoreAttempt !== restoreAttempt)) {
     return <div role="status">正在恢复本窗口内容…</div>
+  }
+  if (restoreDraft && prepared.blocked) {
+    return (
+      <div role="alert">
+        <Result
+          status="warning"
+          title="无法恢复此窗口的草稿"
+          subTitle="原草稿仍保留。请重试，或从来源单据重新打开打印窗口。"
+          extra={<Button type="primary" onClick={() => setRestoreAttempt((value) => value + 1)}>重新读取</Button>}
+        />
+      </div>
+    )
   }
 
   const Workspace = {

@@ -1,20 +1,47 @@
 const DATABASE_NAME = '__plush_erp_print_drafts__'
 const STORE_NAME = 'drafts'
+export const PRINT_DRAFT_VERSION = 1
 export const PRINT_DRAFT_TTL_MS = 24 * 60 * 60 * 1000
 const preparedDrafts = new Map()
 const databases = new WeakMap()
 
-export function isCurrentPrintDraftRecord(record, now = Date.now()) {
-  return Boolean(
-    record &&
-      record.version === 1 &&
-      Number.isFinite(record.updatedAt) &&
-      record.updatedAt > 0 &&
-      record.updatedAt <= now &&
-      now - record.updatedAt <= PRINT_DRAFT_TTL_MS &&
-      record.draft &&
-      typeof record.draft === 'object'
-  )
+function printDraftRecordStatus(record, now = Date.now()) {
+  if (
+    record?.version !== PRINT_DRAFT_VERSION ||
+    !Number.isFinite(record.updatedAt) ||
+    record.updatedAt <= 0 ||
+    record.updatedAt > now ||
+    !record.draft ||
+    typeof record.draft !== 'object' ||
+    Array.isArray(record.draft)
+  ) return 'unreadable'
+  return now - record.updatedAt > PRINT_DRAFT_TTL_MS ? 'expired' : 'restored'
+}
+
+export function isCurrentPrintDraftRecord(record, now) {
+  return printDraftRecordStatus(record, now) === 'restored'
+}
+
+export function readLocalPrintDraftRecord(storageKey, storage) {
+  let raw
+  try {
+    raw = storage?.getItem(storageKey)
+  } catch {
+    return { status: 'unavailable' }
+  }
+  if (raw == null) return { status: 'missing' }
+  let record
+  try {
+    record = JSON.parse(raw)
+  } catch {
+    return { status: 'unreadable' }
+  }
+  const status = printDraftRecordStatus(record)
+  if (status === 'expired') {
+    try { storage.removeItem(storageKey) } catch { /* already expired */ }
+    return { status: 'missing' }
+  }
+  return { status, record }
 }
 
 function openDatabase(indexedDBLike) {
@@ -77,9 +104,11 @@ function indexedDBFor(windowLike) {
 }
 
 export function readPreparedPrintDraft(storageKey) {
-  const record = preparedDrafts.get(storageKey)
+  const prepared = preparedDrafts.get(storageKey)
+  const record = prepared?.record
   if (!isCurrentPrintDraftRecord(record)) {
-    preparedDrafts.delete(storageKey)
+    if (prepared?.checkPrimaryOnSave) prepared.record = undefined
+    else preparedDrafts.delete(storageKey)
     return undefined
   }
   return record.draft
@@ -89,45 +118,66 @@ export async function preparePrintDraftStorage(
   storageKey,
   windowLike = globalThis.window
 ) {
-  if (!storageKey) return
+  if (!storageKey) return 'missing'
   preparedDrafts.delete(storageKey)
   const db = await openDatabase(indexedDBFor(windowLike))
-  if (!db) return
-  await new Promise((resolve) => {
+  let outcome = db ? await new Promise((resolve) => {
     try {
       const transaction = db.transaction(STORE_NAME, 'readwrite')
       const store = transaction.objectStore(STORE_NAME)
-      // Expire by indexed timestamps, without loading other windows' potentially large image payloads.
-      let expired = 0
+      const now = Date.now()
+      let inspected = 0
+      let result = { status: 'missing' }
+      // Only remove recognized expired drafts. A timestamp alone cannot prove that.
       const cleanup = store.index('updatedAt').openKeyCursor()
       cleanup.onsuccess = () => {
         const cursor = cleanup.result
-        if (
-          cursor &&
-          cursor.key < Date.now() - PRINT_DRAFT_TTL_MS &&
-          expired < 200
-        ) {
-          store.delete(cursor.primaryKey)
-          expired += 1
+        if (!cursor || cursor.key >= now - PRINT_DRAFT_TTL_MS || inspected >= 200) return
+        if (cursor.primaryKey === storageKey) {
+          cursor.continue()
+          return
+        }
+        inspected += 1
+        const candidate = store.get(cursor.primaryKey)
+        candidate.onsuccess = () => {
+          if (printDraftRecordStatus(candidate.result, now) === 'expired') {
+            store.delete(cursor.primaryKey)
+          }
           cursor.continue()
         }
       }
       const request = store.get(storageKey)
       request.onsuccess = () => {
-        if (isCurrentPrintDraftRecord(request.result)) {
-          preparedDrafts.set(storageKey, request.result)
+        const record = request.result
+        if (record === undefined) return
+        const status = printDraftRecordStatus(record, now)
+        if (status === 'expired') {
+          store.delete(storageKey)
         } else {
-          preparedDrafts.delete(storageKey)
-          if (request.result) store.delete(storageKey)
+          result = { status, record }
         }
       }
-      transaction.oncomplete = resolve
-      transaction.onerror = resolve
-      transaction.onabort = resolve
+      transaction.oncomplete = () => resolve(result)
+      transaction.onerror = () => resolve({ status: 'unavailable' })
+      transaction.onabort = () => resolve({ status: 'unavailable' })
     } catch {
-      resolve()
+      resolve({ status: 'unavailable' })
     }
-  })
+  }) : { status: 'unavailable' }
+  const checkPrimaryOnSave = outcome.status === 'unavailable'
+  if (outcome.status === 'missing' || checkPrimaryOnSave) {
+    try {
+      const local = readLocalPrintDraftRecord(storageKey, windowLike?.localStorage)
+      if (!checkPrimaryOnSave || local.status !== 'missing') outcome = local
+    } catch {
+      outcome = { status: 'unavailable' }
+    }
+  }
+  if (outcome.status === 'restored' || checkPrimaryOnSave) {
+    const record = outcome.status === 'restored' ? outcome.record : undefined
+    preparedDrafts.set(storageKey, { record, checkPrimaryOnSave })
+  }
+  return outcome.status
 }
 
 export async function writePrintDraft(
@@ -138,11 +188,24 @@ export async function writePrintDraft(
   if (!storageKey) return false
   const db = await openDatabase(indexedDBFor(windowLike))
   if (!db) return false
-  const record = { version: 1, updatedAt: Date.now(), draft }
+  const record = { version: PRINT_DRAFT_VERSION, updatedAt: Date.now(), draft }
   const saved = await new Promise((resolve) => {
     try {
       const transaction = db.transaction(STORE_NAME, 'readwrite')
-      transaction.objectStore(STORE_NAME).put(record, storageKey)
+      const store = transaction.objectStore(STORE_NAME)
+      if (preparedDrafts.get(storageKey)?.checkPrimaryOnSave) {
+        // An inaccessible store may already contain a newer or unreadable copy.
+        const existing = store.get(storageKey)
+        existing.onsuccess = () => {
+          if (existing.result !== undefined && printDraftRecordStatus(existing.result) !== 'expired') {
+            transaction.abort()
+            return
+          }
+          store.put(record, storageKey)
+        }
+      } else {
+        store.put(record, storageKey)
+      }
       transaction.oncomplete = () => resolve(true)
       transaction.onerror = () => resolve(false)
       transaction.onabort = () => resolve(false)
@@ -151,10 +214,13 @@ export async function writePrintDraft(
     }
   })
   if (saved) {
-    preparedDrafts.set(storageKey, record)
-    // 现有窗口草稿在 IndexedDB 提交成功后迁出旧存储；失败时仍保留原件。
+    preparedDrafts.set(storageKey, { record })
+    // 仅迁出能识别的旧草稿；无法读取的记录仍保留。
     try {
-      windowLike?.localStorage?.removeItem(storageKey)
+      const storage = windowLike?.localStorage
+      if (readLocalPrintDraftRecord(storageKey, storage).status === 'restored') {
+        storage.removeItem(storageKey)
+      }
     } catch {
       /* best effort */
     }

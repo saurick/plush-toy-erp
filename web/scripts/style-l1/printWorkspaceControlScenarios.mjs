@@ -12,6 +12,83 @@ export function createPrintWorkspaceControlScenarios({
 }) {
   return [
     {
+      name: 'print-workspace-bootstrap-without-storage',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh&state=bootstrap-source',
+      auth: 'admin',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await page.addInitScript(() => {
+          if (new URLSearchParams(location.search).get('source') !== 'business') return
+          const { getItem } = Storage.prototype
+          Storage.prototype.getItem = function getDraftItem(key) {
+            if (String(key).startsWith('__plush_erp_print_workspace_draft__:v3:')) {
+              throw new DOMException('draft storage unavailable', 'SecurityError')
+            }
+            return getItem.call(this, key)
+          }
+          Object.defineProperty(window, 'indexedDB', {
+            configurable: true,
+            get() { throw new DOMException('draft storage unavailable', 'SecurityError') },
+          })
+        })
+      },
+      verify: async (page) => {
+        await page.locator('.erp-print-shell--ready').waitFor()
+        const destination = await page.evaluate(async () => {
+          const workspaceModule = new URL('/src/erp/utils/printWorkspace.js', location.origin).href
+          const scopeModule = new URL('/src/erp/utils/printWorkspaceScope.mjs', location.origin).href
+          const { openPrintWorkspaceWindow, PRINT_WORKSPACE_ENTRY_SOURCE } = await import(workspaceModule)
+          const { getPrintWorkspaceDraftScope } = await import(scopeModule)
+          const { open } = window
+          const { setItem } = Storage.prototype
+          const popup = {
+            name: '',
+            url: '',
+            location: { replace(url) { popup.url = url } },
+            focus() {},
+          }
+          try {
+            window.open = () => popup
+            Storage.prototype.setItem = function setDraftItem(key, value) {
+              if (String(key).startsWith('__plush_erp_print_workspace_draft__:v3:')) {
+                throw new DOMException('draft storage unavailable', 'QuotaExceededError')
+              }
+              return setItem.call(this, key, value)
+            }
+            openPrintWorkspaceWindow('material-purchase-contract', {
+              ...getPrintWorkspaceDraftScope(new URLSearchParams(location.search)),
+              entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+              initialDraft: {
+                contractNo: 'PO-BOOTSTRAP-01',
+                lines: [{ materialName: '本次带入的样式材料', quantity: '2', unitPrice: '1.50' }],
+              },
+            })
+            window.name = popup.name
+            const url = new URL(popup.url)
+            return { path: url.pathname + url.search, hasBootstrap: Boolean(popup.name) }
+          } finally {
+            window.open = open
+            Storage.prototype.setItem = setItem
+          }
+        })
+        assert.equal(destination.hasBootstrap, true)
+        await gotoScenarioPath(page, destination.path)
+        const incoming = page.getByText('本次带入的样式材料', { exact: true })
+        const failure = page.getByRole('alert').filter({ hasText: '无法恢复此窗口的草稿' })
+        await incoming.or(failure).waitFor()
+        if (await incoming.isVisible()) {
+          await incoming.fill('本次带入的样式材料（已编辑）')
+          await page.getByText('本次带入的样式材料（已编辑）', { exact: true }).press('Tab')
+          await page.locator('[data-print-draft-save-status="error"]').waitFor()
+        }
+        await page.evaluate(() => document.fonts.ready)
+        await page.screenshot({ path: path.join(outputDir, 'print-workspace-bootstrap-without-storage-4k.png') })
+        assert.equal(await failure.count(), 0, '有效的一次性草稿不依赖浏览器持久化存储')
+        assert.equal(await page.getByText('本次带入的样式材料（已编辑）', { exact: true }).isVisible(), true)
+      },
+    },
+    {
       name: 'print-workspace-zoom-clear',
       path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
       auth: 'admin',

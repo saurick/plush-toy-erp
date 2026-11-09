@@ -1,14 +1,12 @@
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import { PROCESSING_CONTRACT_TEMPLATE_KEY } from '../data/processingContractTemplate.mjs'
-import { readPreparedPrintDraft } from './printDraftStorage.mjs'
+import { PRINT_DRAFT_VERSION, readLocalPrintDraftRecord, readPreparedPrintDraft } from './printDraftStorage.mjs'
 
 export const MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY =
   'material-purchase-contract'
 export { PROCESSING_CONTRACT_TEMPLATE_KEY }
 
 const PRINT_WORKSPACE_STATE_QUERY_KEY = 'state'
-const PRINT_WORKSPACE_DRAFT_SNAPSHOT_VERSION = 1
-const PRINT_WORKSPACE_DRAFT_SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000
 const PRINT_WORKSPACE_DRAFT_STORAGE_KEY_PREFIX =
   '__plush_erp_print_workspace_draft__:v3'
 const PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_PREFIX =
@@ -206,7 +204,9 @@ export function readInitialPrintWorkspaceDraftFromWindowName(
       normalizeTemplateKey(payload?.templateKey) !== normalizedTemplateKey ||
       normalizeStateID(payload?.stateID) !== normalizedStateID ||
       payload?.storageKey !== storageKey ||
-      !Object.prototype.hasOwnProperty.call(payload, 'draft')
+      !payload.draft ||
+      typeof payload.draft !== 'object' ||
+      Array.isArray(payload.draft)
     ) {
       return null
     }
@@ -294,7 +294,7 @@ export function persistPrintWorkspaceDraftSnapshot(
     storage.setItem(
       normalizedStorageKey,
       JSON.stringify({
-        version: PRINT_WORKSPACE_DRAFT_SNAPSHOT_VERSION,
+        version: PRINT_DRAFT_VERSION,
         updatedAt: Date.now(),
         draft,
       })
@@ -308,49 +308,10 @@ export function persistPrintWorkspaceDraftSnapshot(
 
 export function readPrintWorkspaceDraftSnapshot(storageKey, storageLike) {
   const normalizedStorageKey = String(storageKey || '').trim()
-  if (!storageLike) {
-    const prepared = readPreparedPrintDraft(normalizedStorageKey)
-    if (prepared !== undefined) return prepared
-  }
-  const storage =
-    storageLike || (typeof window !== 'undefined' ? window.localStorage : null)
-  if (!normalizedStorageKey || !storage) {
-    return null
-  }
-
-  const removeInvalidSnapshot = () => {
-    try {
-      storage.removeItem(normalizedStorageKey)
-    } catch {
-      // 读取失败时保持 fail closed；清理只是尽力而为。
-    }
-  }
-
-  try {
-    const raw = storage.getItem(normalizedStorageKey)
-    if (!raw) {
-      return null
-    }
-    const payload = JSON.parse(raw)
-    const updatedAt = Number(payload?.updatedAt)
-    if (
-      Number(payload?.version) !== PRINT_WORKSPACE_DRAFT_SNAPSHOT_VERSION ||
-      !Number.isFinite(updatedAt) ||
-      updatedAt <= 0 ||
-      !Object.prototype.hasOwnProperty.call(payload, 'draft')
-    ) {
-      removeInvalidSnapshot()
-      return null
-    }
-    if (Date.now() - updatedAt > PRINT_WORKSPACE_DRAFT_SNAPSHOT_TTL_MS) {
-      removeInvalidSnapshot()
-      return null
-    }
-    return payload.draft
-  } catch {
-    removeInvalidSnapshot()
-    return null
-  }
+  if (!normalizedStorageKey) return null
+  if (!storageLike) return readPreparedPrintDraft(normalizedStorageKey) ?? null
+  const { status, record } = readLocalPrintDraftRecord(normalizedStorageKey, storageLike)
+  return status === 'restored' ? record.draft : null
 }
 
 export function openPrintWorkspaceWindow(

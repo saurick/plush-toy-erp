@@ -41,7 +41,7 @@ test('FL_print_workspace_window_draft__restores_current_structured_draft 草稿�
   assert.deepEqual(readPreparedPrintDraft('account:b:window:2'), {
     value: '乙',
   })
-  assert.deepEqual(removed, ['account:a:window:1', 'account:b:window:2'])
+  assert.deepEqual(removed, [], '没有旧草稿时无需清理本地存储')
 })
 
 test('存储不可用时保留旧草稿且不冒充保存成功', async () => {
@@ -56,8 +56,85 @@ test('存储不可用时保留旧草稿且不冒充保存成功', async () => {
     },
   }
   assert.equal(await writePrintDraft('disabled', {}, windowLike), false)
-  await preparePrintDraftStorage('disabled', windowLike)
+  assert.equal(await preparePrintDraftStorage('disabled', windowLike), 'unavailable')
   assert.equal(readPreparedPrintDraft('disabled'), undefined)
+})
+
+test('IndexedDB 暂时不可读时可恢复可验证的旧草稿，恢复连接后不覆盖原记录', async () => {
+  const key = 'primary-unavailable-with-readable-local'
+  const indexedDB = new IDBFactory()
+  assert.equal(await writePrintDraft(key, { text: '主存储中的新内容' }, { indexedDB }), true)
+  const legacy = JSON.stringify({ version: 1, updatedAt: Date.now(), draft: { text: '旧存储内容' } })
+  let available = false
+  const runtime = {
+    get indexedDB() {
+      if (!available) throw new DOMException('denied', 'SecurityError')
+      return indexedDB
+    },
+    localStorage: {
+      getItem: (name) => name === key ? legacy : null,
+      removeItem() { assert.fail('未保存时不得删除旧草稿') },
+    },
+  }
+  assert.equal(await preparePrintDraftStorage(key, runtime), 'restored')
+  assert.deepEqual(readPreparedPrintDraft(key), { text: '旧存储内容' })
+  const newKey = 'primary-unavailable-with-new-window'
+  assert.equal(await preparePrintDraftStorage(newKey, runtime), 'unavailable')
+  available = true
+  assert.equal(await writePrintDraft(key, { text: '不能覆盖' }, runtime), false)
+  assert.equal(await preparePrintDraftStorage(key, runtime), 'restored')
+  assert.deepEqual(readPreparedPrintDraft(key), { text: '主存储中的新内容' })
+  assert.equal(await writePrintDraft(newKey, { text: '新窗口' }, runtime), true)
+})
+
+test('主存储缺少记录且旧存储不可访问时报告读取受限', async () => {
+  assert.equal(await preparePrintDraftStorage('blocked-local', {
+    indexedDB: new IDBFactory(),
+    localStorage: { getItem() { throw new DOMException('denied', 'SecurityError') } },
+  }), 'unavailable')
+})
+
+test('恢复草稿区分缺失和不可读，清理只删除可识别的过期草稿', async () => {
+  const indexedDB = new IDBFactory()
+  const local = new Map([['legacy-corrupt', '{"version":']])
+  const runtime = {
+    indexedDB,
+    localStorage: {
+      getItem: (key) => local.get(key) ?? null,
+      removeItem: (key) => local.delete(key),
+    },
+  }
+  assert.equal(await preparePrintDraftStorage('missing', runtime), 'missing')
+  assert.equal(await preparePrintDraftStorage('legacy-corrupt', runtime), 'unreadable')
+  assert.equal(local.get('legacy-corrupt'), '{"version":')
+  assert.equal(await writePrintDraft('legacy-corrupt', { text: '结构化草稿' }, runtime), true)
+  assert.equal(local.get('legacy-corrupt'), '{"version":', '保存有效草稿也不能清除不可读原件')
+  const db = await new Promise((resolve, reject) => {
+    const request = indexedDB.open('__plush_erp_print_drafts__')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  try {
+    const old = { updatedAt: Date.now() - PRINT_DRAFT_TTL_MS - 1, draft: { text: '旧草稿' } }
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('drafts', 'readwrite')
+      tx.objectStore('drafts').put({ ...old, version: 99 }, 'unsupported')
+      tx.objectStore('drafts').put({ ...old, version: 1 }, 'expired')
+      tx.oncomplete = resolve
+      tx.onerror = () => reject(tx.error)
+    })
+    assert.equal(await preparePrintDraftStorage('unsupported', runtime), 'unreadable')
+    assert.equal(await preparePrintDraftStorage('missing', runtime), 'missing')
+    const read = (key) => new Promise((resolve, reject) => {
+      const request = db.transaction('drafts').objectStore('drafts').get(key)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    assert.equal((await read('unsupported')).version, 99)
+    assert.equal(await read('expired'), undefined)
+  } finally {
+    db.close()
+  }
 })
 
 test('put 请求成功后事务中止，必须报告未保存并保留原草稿', async () => {
