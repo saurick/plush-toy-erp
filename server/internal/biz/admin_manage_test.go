@@ -367,6 +367,9 @@ func (r *stubAdminManageRepo) SetAdminProfileWithAudit(ctx context.Context, chan
 	if change == nil {
 		return nil, ErrBadParam
 	}
+	if existing := r.adminsByPhone[change.Phone]; existing != nil && existing.ID != change.AdminID {
+		return nil, ErrAdminPhoneExists
+	}
 	admin, ok := r.adminsByID[change.AdminID]
 	if !ok {
 		return nil, ErrAdminNotFound
@@ -1423,6 +1426,15 @@ func TestAdminManageUsecase_SetProfileRejectsDuplicatePhone(t *testing.T) {
 	_, err := uc.SetProfile(ctx, 2, "王经理", "13800138000")
 	if !errors.Is(err, ErrAdminPhoneExists) {
 		t.Fatalf("expected ErrAdminPhoneExists, got %v", err)
+	}
+	if repo.adminsByID[2].Phone != "" || repo.adminsByPhone["13800138000"].ID != 3 {
+		t.Fatal("duplicate phone must leave both accounts unchanged")
+	}
+	if _, err := uc.SetProfile(ctx, 3, "采购员", ""); err != nil {
+		t.Fatalf("clearing the previous owner's phone: %v", err)
+	}
+	if updated, err := uc.SetProfile(ctx, 2, "王经理", "13800138000"); err != nil || updated.Phone != "13800138000" {
+		t.Fatalf("reuse released phone: updated=%#v err=%v", updated, err)
 	}
 }
 

@@ -232,6 +232,15 @@ func TestAdminManageRepoControlPlaneMutationsCommitWithAudit(t *testing.T) {
 	if created.Phone != "13800138000" || created.DisplayName != "原子测试主管" {
 		t.Fatalf("profile = %#v", created)
 	}
+	_, err = fx.repo.SetAdminProfileWithAudit(fx.ctx, &biz.AdminProfileChange{
+		AdminID: limitedOperator.ID, OperatorID: fx.operator.ID, DisplayName: "不能覆盖", Phone: created.Phone,
+	})
+	if !errors.Is(err, biz.ErrAdminPhoneExists) {
+		t.Fatalf("database unique constraint must reject the duplicate phone: %v", err)
+	}
+	if owner := fx.client.AdminUser.GetX(fx.ctx, limitedOperator.ID); owner.DisplayName != limitedOperator.DisplayName {
+		t.Fatal("a rejected profile update must not change the account")
+	}
 	phoneAudit := fx.client.RuntimeAuditEvent.Query().
 		Where(runtimeauditevent.EventKey("admin_user.profile.set")).
 		OnlyX(fx.ctx)

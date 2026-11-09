@@ -1102,14 +1102,6 @@ func (uc *AdminManageUsecase) SetProfile(
 			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
-		if existing, checkErr := uc.repo.GetAdminByPhone(ctx, normalizedPhone); checkErr == nil && existing != nil && existing.ID != adminID {
-			span.SetStatus(codes.Error, ErrAdminPhoneExists.Error())
-			return nil, ErrAdminPhoneExists
-		} else if checkErr != nil && !errors.Is(checkErr, ErrAdminNotFound) && !errors.Is(checkErr, ErrBadParam) {
-			span.RecordError(checkErr)
-			span.SetStatus(codes.Error, checkErr.Error())
-			return nil, checkErr
-		}
 	}
 
 	updated, err = uc.repo.SetAdminProfileWithAudit(ctx, &AdminProfileChange{
