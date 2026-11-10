@@ -1,6 +1,13 @@
 import { AttachmentPolicy } from '../../common/consts/attachments.generated.mjs'
 
 export const DOCUMENT_PRODUCT_SOURCES = AttachmentPolicy.documentProductPreviewSources
+export const DOCUMENT_PRODUCT_GALLERY_COLUMN = Object.freeze({
+  key: 'product_gallery',
+  title: '产品图片',
+  width: 180,
+  defaultFirst: true,
+  exportable: false,
+})
 
 export function normalizeGalleryProducts(items = []) {
   const products = new Map()

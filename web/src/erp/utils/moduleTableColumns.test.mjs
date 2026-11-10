@@ -221,6 +221,27 @@ test('moduleTableColumns: 个人顺序优先，新增列按默认优先级追加
   ])
 })
 
+test('moduleTableColumns: 补上未设置的图片列，保留已有列顺序和显隐', () => {
+  const columns = [
+    { dataIndex: 'order_no', defaultPriority: 10 },
+    { dataIndex: 'status', defaultPriority: 20 },
+    { key: 'product_gallery', defaultFirst: true },
+    { dataIndex: 'note' },
+  ]
+  const keys = (ordered) => ordered.map((column) => column.key || column.dataIndex)
+  const saved = ['status', 'order_no']
+  assert.deepEqual(buildModuleColumnOrder(columns), ['product_gallery', 'order_no', 'status', 'note'])
+  assert.deepEqual(keys(applyModuleColumnOrder(columns, saved)), ['product_gallery', ...saved, 'note'])
+  assert.deepEqual(keys(applyModuleColumnOrder(columns, [...saved, 'product_gallery'])), [...saved, 'product_gallery', 'note'])
+
+  const hidden = resolveModuleHiddenColumns(saved, ['product_gallery'], columns)
+  assert.deepEqual(keys(applyModuleColumnVisibility(applyModuleColumnOrder(columns, saved), hidden)), [...saved, 'note'])
+  const restricted = columns.map((column) =>
+    column.key === 'product_gallery' ? { ...column, hiddenByEffectiveFieldPolicy: true } : column
+  )
+  assert.deepEqual(keys(applyModuleColumnOrder(restricted, ['product_gallery', ...saved])), [...saved, 'note'])
+})
+
 test('moduleTableColumns: 默认排序不改变展示列的已保存标识或快捷移动对象', () => {
   const businessColumns = [
     { title: '单号', dataIndex: 'order_no', defaultPriority: 10 },

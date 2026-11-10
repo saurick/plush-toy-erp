@@ -7,6 +7,7 @@ import { PRODUCT_IMAGES_CHANGED } from '../../src/erp/utils/productImageReferenc
 import { progressFixtureData } from './businessProgressFixtures.mjs'
 import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
 import { assertReadableOnBackground, parseRgb } from './colorAssertions.mjs'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 
 const photograph = readFileSync(new URL('../../src/erp/data/bom-example-images/product.jpg', import.meta.url)).toString('base64')
 const names = ['模拟蓝熊', '模拟粉熊', '模拟无图兔']
@@ -247,9 +248,37 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
       },
     })),
     ...documents.map(([module, url]) => ({
-      ...common, name: `product-gallery-${module}`, path: url,
-      viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2,
-      verify: (page) => verifyDocumentGallery(page, outputDir, `product-gallery-${module}`),
+      ...common,
+      name: `product-gallery-${module}`,
+      path: url,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      adminProfile: {
+        erp_preferences: {
+          column_orders: {
+            shipments: ['shipment_no', 'status', 'sales_order_id', 'freight'],
+            'production-orders': ['order_no', 'product_gallery'],
+          },
+        },
+      },
+      verify: async (page) => {
+        const headers = page.locator('.erp-business-data-table-card .ant-table-thead:not([aria-hidden="true"]) .erp-module-column-header-text')
+        await headers.first().waitFor()
+        const leading = module === 'shipment'
+          ? ['产品图片', '出货单号', '状态', '来源单据', '实际运费']
+          : module === 'production' ? ['生产单号', '产品图片'] : ['产品图片']
+        assert.deepEqual((await headers.allTextContents()).slice(0, leading.length), leading)
+        if (module === 'shipment') {
+          await openBusinessTableTool(page, '列设置')
+          const dialog = page.getByRole('dialog', { name: /^列设置/u })
+          const columns = dialog.getByRole('list', { name: '出货单列设置' })
+          await columns.waitFor()
+          assert.equal(await columns.locator('[data-column-key]').first().getAttribute('data-column-key'), 'product_gallery')
+          await dialog.getByRole('button', { name: /^取\s*消$/u }).click()
+          await dialog.waitFor({ state: 'hidden' })
+        }
+        await verifyDocumentGallery(page, outputDir, `product-gallery-${module}`)
+      },
     })),
     {
       ...common, name: 'product-gallery-progress', path: '/erp/business-dashboard', viewport: { width: 1440, height: 900 },

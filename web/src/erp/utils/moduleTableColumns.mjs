@@ -29,11 +29,12 @@ const visibleModuleColumns = (columns = []) =>
 export const filterBusinessListColumns = (columns = []) =>
   visibleModuleColumns(columns)
 
-export const buildModuleColumnOrder = (columns = []) =>
+const buildDefaultModuleColumnEntries = (columns = []) =>
   (Array.isArray(columns) ? columns : [])
     // 先确定列标识，再调整默认顺序，避免展示列的已保存偏好随位置改变。
     .map((column, index) => ({
       key: getModuleColumnKey(column, index),
+      defaultFirst: column.defaultFirst === true,
       priority: Number.isFinite(column.defaultPriority)
         ? column.defaultPriority
         : Number.MAX_SAFE_INTEGER,
@@ -43,12 +44,15 @@ export const buildModuleColumnOrder = (columns = []) =>
     .filter((column) => column.available)
     .sort(
       (left, right) =>
-        left.priority - right.priority || left.index - right.index
+        Number(right.defaultFirst) - Number(left.defaultFirst) ||
+        left.priority - right.priority ||
+        left.index - right.index
     )
-    .map(({ key }) => key)
 
-export const sanitizeModuleColumnOrder = (order = [], columns = []) => {
-  const validKeys = new Set(buildModuleColumnOrder(columns))
+export const buildModuleColumnOrder = (columns = []) =>
+  buildDefaultModuleColumnEntries(columns).map(({ key }) => key)
+
+const sanitizeColumnKeys = (order, validKeys) => {
   const seen = new Set()
   return (Array.isArray(order) ? order : []).reduce((list, value) => {
     const key = String(value || '').trim()
@@ -61,13 +65,22 @@ export const sanitizeModuleColumnOrder = (order = [], columns = []) => {
   }, [])
 }
 
+export const sanitizeModuleColumnOrder = (order = [], columns = []) =>
+  sanitizeColumnKeys(order, new Set(buildModuleColumnOrder(columns)))
+
 export const completeModuleColumnOrder = (order = [], columns = []) => {
-  const saved = sanitizeModuleColumnOrder(order, columns)
+  const defaults = buildDefaultModuleColumnEntries(columns)
+  const saved = sanitizeColumnKeys(order, new Set(defaults.map(({ key }) => key)))
   const savedKeys = new Set(saved)
-  return [
-    ...saved,
-    ...buildModuleColumnOrder(columns).filter((key) => !savedKeys.has(key)),
-  ]
+  const prepend = []
+  const append = []
+  // 只有尚未保存位置的前置列补到开头，已保存列保持原相对顺序。
+  for (const { key, defaultFirst } of defaults) {
+    if (savedKeys.has(key)) continue
+    const target = defaultFirst ? prepend : append
+    target.push(key)
+  }
+  return [...prepend, ...saved, ...append]
 }
 
 export const sanitizeModuleHiddenColumns = (hidden = [], columns = []) => {
@@ -132,15 +145,7 @@ export const applyModuleColumnOrder = (columns = [], order = []) => {
       column,
     ])
   )
-  const sanitizedOrder = sanitizeModuleColumnOrder(order, columns)
-  const orderedColumns = sanitizedOrder
-    .map((key) => keyToColumn.get(key))
-    .filter(Boolean)
-  const orderedKeySet = new Set(sanitizedOrder)
-  const remainingColumns = buildModuleColumnOrder(columns)
-    .filter((key) => !orderedKeySet.has(key))
-    .map((key) => keyToColumn.get(key))
-  return [...orderedColumns, ...remainingColumns]
+  return completeModuleColumnOrder(order, columns).map((key) => keyToColumn.get(key))
 }
 
 export const moveModuleColumnOrder = (

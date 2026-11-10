@@ -5,7 +5,7 @@ import { PermissionCode } from '../../../common/consts/permissions.generated.mjs
 import { RpcErrorCode } from '@/common/consts/errorCodes'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
-import { createDocumentProductPreviewLoader, DOCUMENT_PRODUCT_SOURCES } from '../../utils/businessProductGallery.mjs'
+import { createDocumentProductPreviewLoader, DOCUMENT_PRODUCT_GALLERY_COLUMN, DOCUMENT_PRODUCT_SOURCES } from '../../utils/businessProductGallery.mjs'
 import { listDocumentProductPreviews } from '../../api/attachmentApi.mjs'
 import { loadDocumentGalleryProducts } from '../../api/documentProductGalleryApi.mjs'
 import BusinessProductGallery from './BusinessProductGallery.jsx'
@@ -72,11 +72,7 @@ export default function BusinessDocumentProductGallery({ source, record, title }
 
 export function documentProductGalleryColumn(source, profile) {
   return canReadDocumentProductGallery(profile, source) ? [{
-    key: 'product_gallery',
-    title: '产品图片',
-    width: 180,
-    defaultPriority: 5,
-    exportable: false,
+    ...DOCUMENT_PRODUCT_GALLERY_COLUMN,
     className: 'erp-product-gallery-cell',
     render: (_value, record) => <BusinessDocumentProductGallery source={source} record={record} title={record.order_no || record.outsourcing_order_no || '单据产品'} />,
   }] : []

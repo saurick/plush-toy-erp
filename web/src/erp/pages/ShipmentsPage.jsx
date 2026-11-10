@@ -108,7 +108,7 @@ import ShipmentFinanceSourceModal from '../components/shipments/ShipmentFinanceS
 import ShipmentQualityInspectionModal from '../components/quality-inspections/ShipmentQualityInspectionModal.jsx'
 import ProductIdentity, { ProductThumbnail } from '../components/master-data/ProductIdentity.jsx'
 import BusinessProductGallery from '../components/business-list/BusinessProductGallery.jsx'
-import { normalizeGalleryProducts } from '../utils/businessProductGallery.mjs'
+import { DOCUMENT_PRODUCT_GALLERY_COLUMN, normalizeGalleryProducts } from '../utils/businessProductGallery.mjs'
 import {
   buildShipmentColumns,
   SHIPMENT_DATE_FILTER_OPTIONS,
@@ -1550,12 +1550,8 @@ export default function ShipmentsPage() {
   const productsByID = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
   const listColumns = useMemo(() => [
     ...(hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ) ? [{
-      key: 'product_gallery',
-      title: '产品图片',
+      ...DOCUMENT_PRODUCT_GALLERY_COLUMN,
       taskDetailRole: 'media',
-      width: 180,
-      defaultPriority: 5,
-      exportable: false,
       render: (_value, record) => {
         const entries = normalizeGalleryProducts(record.items).map((product) => ({ ...product, name: productsByID.get(product.productID)?.name || product.name, code: productsByID.get(product.productID)?.code || product.code }))
         return entries.length ? (
