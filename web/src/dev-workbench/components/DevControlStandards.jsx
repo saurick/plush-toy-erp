@@ -5,7 +5,7 @@ import {
   FilterOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
@@ -254,26 +254,19 @@ const TOPICS = [
   {
     key: 'navigation',
     title: '页签与视图',
-    summary: '切换内容，保留当前对象',
-    description:
-      '先区分独立业务入口、页内查询分类、详情分区和展示设置，再选导航位置与样式；正式规则与业务工具栏组合共用。',
+    summary: '区分页签、分段与筛选',
+    description: '先看点击后是换视图、选入口或展示方式，还是缩小结果。只有页签分一级、二级。',
     rules: [
-      ['独立办理入口或工作范围', '标题附近的主导航', '生产订单 / 执行 / 异常处理、任务范围及不同进度工作区保持各自层级。'],
-      ['同业务的资料分类、整单 / 明细、列表 / 到期顺序', '查询区左侧的下划线页签', '产品基础信息 / 规格、加工合同 / 明细等与搜索组合，切换保持同一分类条。'],
-      ['详情中的并列内容', '详情内的内容页签', '同一订单的产品明细与关联任务保留对象身份，使用下划线区分当前内容。'],
-      ['电脑 / 手机、表格 / 图形、主题与密度', '分段按钮', '选择运行模式、显示方式或设置值，使用底轨和选中滑块。'],
-      ['主导航和详情页签当前项', '主题色 + 2px 下划线', '透明底与中性基线，主题线标明当前位置；两种状态均使用 500 字重，保持选项宽度。'],
-      ['同页两条切换', '按职责区分', '登录页上方选择电脑或手机，下方切换密码或短信内容；选项少不等于分段按钮。'],
-      ['手机顶部', '层间留白 4–8px', '主次页签间 4px、页签至搜索 6px、搜索至状态 8px；触摸区域至少 44px。'],
-      ['管理员查看岗位', '我的 → 管理员视角', '保留所选岗位与查看权限，任务、风险和进度顶部不重复岗位栏。'],
-      ['内容切换', '导航持续挂载', '主导航的指示条连续移动，查询分类保留选中态与位置，不随正文重新出现。'],
+      ['页签', '细下划线', '切换办理、内容或查询视图；一级靠标题，二级留在所属内容区，查询页签可与搜索同排。'],
+      ['分段选择', '共用圆角底轨', '选择工作入口、展示方式或设置，例如电脑版 / 手机版、余额明细 / 仓库分布。'],
+      ['筛选', '独立圆角按钮', '缩小当前结果，例如库存批次的可用 / 冻结。有数量就显示；上下文明确时无需另加组名。'],
     ],
     checks: [
       '切到关联任务：订单身份保持不变。',
-      '快速反向切换：下划线或滑块从当前位置继续。',
-      '用方向键切换，核对禁用项与减少动态效果。',
+      '点手机版和冻结：一个换工作入口，一个只缩小批次结果。',
+      '用方向键和快速反向切换，核对禁用项与减少动态效果。',
     ],
-    source: 'SlidingTabs · SlidingSegmented · SlidingTabList · control-affordance.css；规范：交互设计说明 #business-toolbar-composition',
+    source: 'SlidingTabs · SlidingTabList · SlidingSegmented · FilterChip · control-affordance.css；规范：交互设计说明 #business-toolbar-composition',
     consumer: { ...TASK_PAGE, task: '切换待办、已办和流程跟踪，核对页签保持挂载及当前内容。' },
   },
   {
@@ -462,54 +455,93 @@ function CountExample() {
   )
 }
 
+const NAVIGATION_ENTRY_OPTIONS = [
+  { label: '电脑版', value: 'desktop' },
+  { label: '手机版', value: 'mobile' },
+]
+
+const NAVIGATION_BATCH_FILTERS = [
+  { label: '不限状态', value: 'all', count: 5 },
+  { label: '可用', value: 'available', count: 3 },
+  { label: '冻结', value: 'frozen', count: 2 },
+]
+
 function NavigationExample() {
   const [view, setView] = useState('orders')
   const [trackingView, setTrackingView] = useState('progress')
+  const [entry, setEntry] = useState('desktop')
+  const [batchFilter, setBatchFilter] = useState('all')
+  const currentBatchFilter = NAVIGATION_BATCH_FILTERS.find(({ value }) => value === batchFilter)
   return (
     <div className="erp-control-example-stack">
-      <div>
-        <h3>① 同一订单，切换内容</h3>
-        <div className="erp-control-example-context">
-          订单 SO-DEMO · 虚构样例
+      <section aria-label="三类控件对照">
+        <h3>① 三类控件对照</h3>
+        <div className="erp-control-navigation-comparison">
+          <div>
+            <h4>页签 · 切换订单内容</h4>
+            <div className="erp-control-example-context">订单 SO-DEMO · 同一张订单</div>
+            <SlidingTabs
+              aria-label="订单详情样例"
+              items={[
+                {
+                  key: 'products',
+                  label: '产品明细',
+                  children: (
+                    <dl className="erp-control-example-values">
+                      <div>
+                        <dt>产品</dt>
+                        <dd>布偶熊</dd>
+                      </div>
+                      <div>
+                        <dt>规格</dt>
+                        <dd>20 cm</dd>
+                      </div>
+                      <div>
+                        <dt>数量</dt>
+                        <dd>120 件</dd>
+                      </div>
+                    </dl>
+                  ),
+                },
+                {
+                  key: 'tasks',
+                  label: '关联任务',
+                  children: (
+                    <p>
+                      当前：关联任务。订单身份仍在原位置。
+                      <br />
+                      核对包装样例 · 待处理
+                    </p>
+                  ),
+                },
+                { key: 'unavailable', label: '无权限', disabled: true },
+              ]}
+            />
+          </div>
+          <div>
+            <h4>分段选择 · 选工作入口</h4>
+            <div className="erp-control-example-context">登录页 · 选择进入哪个界面</div>
+            <SlidingSegmented
+              aria-label="登录工作入口样例"
+              value={entry}
+              onChange={setEntry}
+              options={NAVIGATION_ENTRY_OPTIONS}
+            />
+            <p role="status">示例入口：{entry === 'desktop' ? '电脑版' : '手机版'}</p>
+          </div>
+          <div>
+            <h4>筛选 · 缩小批次结果</h4>
+            <div className="erp-control-example-context">库存批次 · 同一类记录</div>
+            <FilterChipGroup
+              aria-label="库存批次状态样例"
+              value={batchFilter}
+              onChange={setBatchFilter}
+              options={NAVIGATION_BATCH_FILTERS}
+            />
+            <p role="status">库存批次：{currentBatchFilter.label}，共 {currentBatchFilter.count} 条（示例）</p>
+          </div>
         </div>
-        <SlidingTabs
-          aria-label="订单详情样例"
-          items={[
-            {
-              key: 'products',
-              label: '产品明细',
-              children: (
-                <dl className="erp-control-example-values">
-                  <div>
-                    <dt>产品</dt>
-                    <dd>布偶熊</dd>
-                  </div>
-                  <div>
-                    <dt>规格</dt>
-                    <dd>20 cm</dd>
-                  </div>
-                  <div>
-                    <dt>数量</dt>
-                    <dd>120 件</dd>
-                  </div>
-                </dl>
-              ),
-            },
-            {
-              key: 'tasks',
-              label: '关联任务',
-              children: (
-                <p>
-                  当前：关联任务。订单身份仍在原位置。
-                  <br />
-                  核对包装样例 · 待处理
-                </p>
-              ),
-            },
-            { key: 'unavailable', label: '无权限', disabled: true },
-          ]}
-        />
-      </div>
+      </section>
       <div>
         <h3>② 进度工作区，切换内容</h3>
         <SlidingTabList
@@ -806,6 +838,48 @@ export default function DevControlStandards() {
   useLayoutEffect(() => {
     if (contentRef.current) contentRef.current.scrollTop = 0
   }, [current.key])
+  const isNavigation = current.key === 'navigation'
+  const rules = (
+    <section className="erp-control-library-rules">
+      <h3>{isNavigation ? '导航与切换控件' : '什么时候用，为什么这样设计'}</h3>
+      <div className="erp-control-table-scroll">
+        <table className="erp-control-table" data-table-lines="fixed">
+          <thead>
+            <tr>
+              <th>场景</th>
+              <th>设计选择</th>
+              <th>原因与边界</th>
+            </tr>
+          </thead>
+          <tbody>
+            {current.rules.map((row) => (
+              <tr key={row[0]}>
+                {row.map((cell) => (
+                  <td key={cell}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {isNavigation || current.key === 'business-toolbar' ? (
+        <p>
+          {isNavigation ? (
+            <>
+              <Link to="/__dev/ui-design?page=controls&control=business-toolbar">库存工具栏样例</Link>
+              {' · '}
+              <Link to="/__dev/ui-design?page=login">登录页样例</Link>
+              {' · '}
+            </>
+          ) : null}
+          <Link to="/__dev/ui-design?view=specification&read=reference#business-toolbar-composition">
+            页签层级与上下间距规范
+          </Link>
+        </p>
+      ) : null}
+    </section>
+  )
+
   return (
     <section className="erp-control-library" aria-label="控件设计">
       <aside className="erp-control-library-directory" ref={directoryRef}>
@@ -877,6 +951,7 @@ export default function DevControlStandards() {
           <DevSharedComponentGuide topics={TOPICS} />
         ) : (
           <>
+            {isNavigation ? rules : null}
             <div className={`erp-control-library-layout${current.key === 'business-toolbar' ? ' erp-control-library-layout--toolbar' : ''}`}>
               <section
                 className="erp-control-library-demo"
@@ -940,32 +1015,7 @@ export default function DevControlStandards() {
                 <p>{current.consumer.task}</p>
               </aside>
             </div>
-            <section className="erp-control-library-rules">
-              <h3>什么时候用，为什么这样设计</h3>
-              {['navigation', 'business-toolbar'].includes(current.key) ? (
-                <p>页签层级与上下间距按交互设计样板统一。</p>
-              ) : null}
-              <div className="erp-control-table-scroll">
-                <table className="erp-control-table" data-table-lines="fixed">
-                  <thead>
-                    <tr>
-                      <th>场景</th>
-                      <th>设计选择</th>
-                      <th>原因与边界</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {current.rules.map((row) => (
-                      <tr key={row[0]}>
-                        {row.map((cell) => (
-                          <td key={cell}>{cell}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
+            {!isNavigation ? rules : null}
             <details className="erp-dev-disclosure erp-control-library-source">
               <summary>共享实现与尺寸</summary>
               <p>{current.source}</p>
