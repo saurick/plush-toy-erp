@@ -13,7 +13,7 @@ test('所有环节保留办理规则和受阻处理，关联岗位路径只读�
   const harness = await createReactTestHarness(t)
   const { default: Guide } = await import('./TaskFulfillmentGuide.jsx')
   let navigate
-  function Probe() { navigate = useNavigate(); return h(Guide) }
+  function Probe() { navigate = useNavigate(); return h(Guide, { businessCatalog }) }
   await harness.render(h(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, h(Probe)))
   const root = harness.container
   for (const step of catalog.fulfillment_flow) {
@@ -31,7 +31,7 @@ test('所有环节保留办理规则和受阻处理，关联岗位路径只读�
         return [stage.group, stage.label].filter(Boolean).join(' · ')
       })
     )
-    assert.equal(rules.querySelector('a[href^="/erp/"]'), null)
+    assert(!rules.querySelector('a[href^="/erp/"]'))
   }
 })
 
@@ -43,5 +43,5 @@ test('业务专题选定后直接呈现同源交互图，没有文字节点中�
   const root = harness.container
   assert(root.querySelector('[data-topic-diagram="delivery_to_settlement"] [data-business-flow]'))
   assert(root.querySelector('[aria-label="选择业务专题"]'))
-  assert.equal(root.querySelector('.erp-dev-fulfillment-guide__topic-nodes'), null)
+  assert(!root.querySelector('.erp-dev-fulfillment-guide__topic-nodes'))
 })

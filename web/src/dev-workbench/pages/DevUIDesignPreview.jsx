@@ -3,7 +3,6 @@ import { DownloadOutlined, FullscreenOutlined, ReloadOutlined } from '@ant-desig
 import { Button, Result, Space } from 'antd'
 import { Loading } from '@/common/components/loading'
 import Select from '@/common/components/select/AppSelect'
-import { TaskFulfillmentGuideButton } from '../components/flow-state/TaskFulfillmentGuide.jsx'
 import { getUIDesignStateOptions, prepareUIDesignSandboxSource, UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../config/devUIDesign.mjs'
 import designHTML from '../../../../docs/product/ui-design/index.html?raw'
 
@@ -183,7 +182,6 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
               }}
             />
           ) : null}
-          {['task-handling', 'mobile-tasks'].includes(page) ? <TaskFulfillmentGuideButton /> : null}
           <Button icon={<ReloadOutlined />} onClick={() => setPreviewRevision((value) => value + 1)}>
             重置演示
           </Button>

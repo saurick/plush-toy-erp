@@ -1,5 +1,5 @@
 import React from 'react'
-import { Button, Drawer } from 'antd'
+import { Button } from 'antd'
 import { CloseOutlined, LeftOutlined } from '@ant-design/icons'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
@@ -11,7 +11,6 @@ import BusinessRelationFilters from './BusinessRelationFilters.jsx'
 import BusinessActionRelations from './BusinessActionRelations.jsx'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
 import {
-  fulfillmentRoleOptions,
   fulfillmentStepMatchesRole,
   fulfillmentTaskLinks,
   normalizeFulfillmentRole,
@@ -44,7 +43,6 @@ export default function TaskFulfillmentGuide({
   businessCatalog,
   steps = catalog.fulfillment_flow,
   scoped = false,
-  showViewSwitch = false,
   onOpenView,
   onOpenTopics,
 }) {
@@ -55,15 +53,11 @@ export default function TaskFulfillmentGuide({
     [queryKeys.flow]: action.machineKeys.length === 1 ? action.machineKeys[0] : null,
     [queryKeys.relationAction]: action.key,
   }) : undefined
-  const roleLabel = fulfillmentRoleOptions.find(
-    (option) => option.value === role
-  ).label
-  const roleSelectID = React.useId()
   const filters = readDevFlowRelationFilters(searchParams)
   const filtered = relationFiltersActive(filters)
-  const relations = React.useMemo(() => businessCatalog ? buildFulfillmentRelations(businessCatalog) : [], [businessCatalog])
+  const relations = React.useMemo(() => buildFulfillmentRelations(businessCatalog), [businessCatalog])
   const relationByStage = new Map(relations.map((item) => [item.stage.stage, item]))
-  const allActions = React.useMemo(() => businessCatalog ? businessCatalog.businessChains.flatMap((chain) => buildChainActionRelations(businessCatalog, chain)) : [], [businessCatalog])
+  const allActions = React.useMemo(() => businessCatalog.businessChains.flatMap((chain) => buildChainActionRelations(businessCatalog, chain)), [businessCatalog])
   const detailID = React.useId()
   const overviewRef = React.useRef(null)
   const detailRef = React.useRef(null)
@@ -94,7 +88,7 @@ export default function TaskFulfillmentGuide({
     : null
   const canReturn = Boolean(selection && current)
   const relatedChainKey = selection?.guide ? selection.guide.business_chain : current?.business_chain
-  const relatedChainKnown = businessCatalog?.businessChains.some((chain) => chain.key === relatedChainKey)
+  const relatedChainKnown = businessCatalog.businessChains.some((chain) => chain.key === relatedChainKey)
   const detailStep = selection
     ? steps.find((step) => step.stage === selection.origin?.stage) ||
       selection.origin
@@ -103,8 +97,8 @@ export default function TaskFulfillmentGuide({
 
   const exceptionDirectory = buildFulfillmentExceptionDirectory(
     catalog.exception_guides,
-    businessCatalog ? 'all' : role
-  ).filter(({ guide }) => !businessCatalog || !filtered || allActions.some((action) => action.chainKey === guide.business_chain && relationMatches(action, filters)))
+    'all'
+  ).filter(({ guide }) => !filtered || allActions.some((action) => action.chainKey === guide.business_chain && relationMatches(action, filters)))
   const filterActions = view === 'main' ? relations.filter((item) => steps.some((step) => step.stage === item.stage.stage)).flatMap((item) => item.actions) : allActions
   const matchingStages = new Set(relations.filter((item) => item.actions.some((action) => relationMatches(action, filters))).map((item) => item.stage.stage))
 
@@ -168,8 +162,8 @@ export default function TaskFulfillmentGuide({
   return (
     <section className="erp-dev-fulfillment-guide" id="task-fulfillment-guide">
       <div className="erp-dev-fulfillment-guide__heading">
-        {scoped || !showViewSwitch ? (
-          <h2>{scoped ? '办理环节' : '订单全流程'}</h2>
+        {scoped ? (
+          <h2>办理环节</h2>
         ) : (
           <SlidingSegmented
             aria-label="流程视图"
@@ -182,45 +176,19 @@ export default function TaskFulfillmentGuide({
             onChange={setView}
           />
         )}
-        {businessCatalog ? (
-          <BusinessRelationFilters
-            catalog={businessCatalog}
-            actions={filterActions}
-            filters={filters}
-            onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
-          />
-        ) : (
-          <div className="erp-dev-fulfillment-guide__role">
-            <label htmlFor={roleSelectID}>关注岗位</label>
-            <FilterSelect
-              emptyValue="all"
-              placeholder="选择关注岗位"
-              id={roleSelectID}
-              aria-label="关注岗位"
-              value={role}
-              options={fulfillmentRoleOptions}
-              onChange={(value) =>
-              update((next) => {
-                if (value === 'all') next.delete(queryKeys.role)
-                else next.set(queryKeys.role, value)
-                next.delete(queryKeys.roleTopicNode)
-                next.delete(queryKeys.roleTopicStep)
-                next.delete(queryKeys.roleTopicPanel)
-                next.delete(queryKeys.roleTopicBatch)
-              })
-            }
-              virtual={false}
-            />
-          </div>
-        )}
+        <BusinessRelationFilters
+          catalog={businessCatalog}
+          actions={filterActions}
+          filters={filters}
+          onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
+        />
       </div>
       {view === 'main' ? (
         <>
           <p className="erp-dev-fulfillment-guide__scope-bar" role="status">
-            {businessCatalog && filtered ? `匹配 ${steps.filter((step) => matchingStages.has(step.stage)).length} / ${steps.length} 个环节 · 保留上下游位置`
-              : role === 'all'
-              ? `${steps.length} 个环节 · 点选查看办理流程`
-              : `${roleLabel}参与 ${steps.filter((step) => fulfillmentStepMatchesRole(step, role)).length} / ${steps.length} 个环节`}
+            {filtered
+              ? `匹配 ${steps.filter((step) => matchingStages.has(step.stage)).length} / ${steps.length} 个环节 · 保留上下游位置`
+              : `${steps.length} 个环节 · 点选查看办理流程`}
           </p>
           {scoped ? (
             <div
@@ -232,13 +200,7 @@ export default function TaskFulfillmentGuide({
                   key={step.stage}
                   aria-pressed={detailStep?.stage === step.stage}
                   data-fulfillment-stage={step.stage}
-                  data-role-match={
-                    businessCatalog && filtered
-                      ? matchingStages.has(step.stage)
-                      : role === 'all'
-                      ? undefined
-                      : fulfillmentStepMatchesRole(step, role)
-                  }
+                  data-role-match={filtered ? matchingStages.has(step.stage) : undefined}
                   onClick={() => selectStage(step.stage)}
                 >
                   {getFulfillmentStageCopy(step).label}
@@ -248,7 +210,7 @@ export default function TaskFulfillmentGuide({
           ) : (
             <FulfillmentChainCanvas
               role={role}
-              matchingStages={businessCatalog && filtered ? matchingStages : null}
+              matchingStages={filtered ? matchingStages : null}
               selectedStage={detailStep?.stage}
               selectedGuide={selection?.guide?.key}
               detailID={detailID}
@@ -441,7 +403,7 @@ export default function TaskFulfillmentGuide({
               </details>
             </div>
           ) : null}
-          {selection?.guide && !selection.invalid && businessCatalog ? <BusinessActionRelations
+          {selection?.guide && !selection.invalid ? <BusinessActionRelations
             onOpenRules={openActionRules}
             actions={allActions.filter((action) => action.chainKey === selection.guide.business_chain && relationMatches(action, filters))}
             selectedKey={searchParams.get(queryKeys.relationAction)}
@@ -463,25 +425,5 @@ export default function TaskFulfillmentGuide({
         流程示意，非实际进度；任务完成不代替正式业务结果。
       </p>
     </section>
-  )
-}
-
-export function TaskFulfillmentGuideButton() {
-  const [open, setOpen] = React.useState(false)
-  return (
-    <>
-      <Button onClick={() => setOpen(true)}>岗位流程与异常分支</Button>
-      <Drawer
-        rootClassName="erp-dev-fulfillment-drawer"
-        title="订单全流程"
-        width={1120}
-        open={open}
-        closable={{ placement: 'start' }}
-        closeIcon={<LeftOutlined />}
-        onClose={() => setOpen(false)}
-      >
-        <TaskFulfillmentGuide />
-      </Drawer>
-    </>
   )
 }

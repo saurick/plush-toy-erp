@@ -194,7 +194,6 @@ function BusinessChainOverviewView({
         businessCatalog={catalog}
         onOpenView={onOpenView}
         onOpenTopics={onOpenTopics}
-        showViewSwitch
       />}
       {taskId ? (
         <section
