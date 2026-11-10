@@ -9,9 +9,9 @@ test('紧凑出货资料保留字段、额外资料、复制和图片入口，�
     import('./BusinessRecordDetails.jsx'),
     import('../shipments/shipmentColumns.jsx'),
   ])
-  const labels = ['出货单号', '状态', '财务审批', '来源单据', '客户', '明细行', '总净重（克）', '备注']
+  const labels = ['出货单号', '状态', '财务审批', '来源单据', '客户', '总净重（克）', '备注']
   const columns = buildShipmentColumns({ salesOrdersByID: new Map([[1, { order_no: 'YS8-XD-013' }]]) })
-    .filter((column) => labels.includes(column.title))
+    .filter((column) => labels.includes(column.title) || column.key === 'item_count')
   let opened = 0
   columns.unshift({ key: 'product_gallery', title: '产品图片', taskDetailRole: 'media', render: () => h('button', { onClick: () => { opened += 1 } }, '查看 18 款产品图片') })
   columns.push({ title: '额外参考', dataIndex: 'reference', taskDetailRole: 'unrecognized' })
@@ -21,8 +21,8 @@ test('紧凑出货资料保留字段、额外资料、复制和图片入口，�
   assert.deepEqual([...card.querySelectorAll('dt')].map((node) => node.textContent).sort(), [...labels, '产品图片', '额外参考'].sort())
   assert.match(card.querySelector('.mobile-task-facts__identity').textContent, /出货单号TEST-YS-260927V8-CK901/u)
   assert.equal(card.querySelector('.mobile-task-facts__state dd').textContent, '草稿')
-  assert.deepEqual([...card.querySelectorAll('.mobile-task-facts__grid dt')].map((node) => node.textContent), ['来源单据', '客户', '总净重（克）', '财务审批', '明细行', '备注', '额外参考'])
-  assert.match(card.textContent, /待确认.*待放行.*25.*分批出货.*独立业务资料/su)
+  assert.deepEqual([...card.querySelectorAll('.mobile-task-facts__grid dt')].map((node) => node.textContent), ['来源单据', '客户', '总净重（克）', '财务审批', '备注', '额外参考'])
+  assert.match(card.textContent, /待确认.*待放行.*分批出货.*独立业务资料/su)
   await harness.click(harness.button('查看 18 款产品图片'))
   assert.equal(opened, 1)
   const writes = []

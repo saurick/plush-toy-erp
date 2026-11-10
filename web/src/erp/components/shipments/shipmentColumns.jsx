@@ -205,15 +205,9 @@ export function buildShipmentColumns({ salesOrdersByID }) {
         record.customer_snapshot || (record.customer_id ? '客户已关联' : ''),
     },
     {
-      align: 'right',
-      title: '明细行',
       exportTitle: '明细行',
       key: 'item_count',
-      taskDetailOrder: 50,
-      defaultHidden: true,
-      width: 90,
-      sortValue: (record) => record.items?.length || 0,
-      render: (_, record) => record.items?.length || 0,
+      hidden: true,
       exportValue: (record) => record.items?.length || 0,
     },
     {

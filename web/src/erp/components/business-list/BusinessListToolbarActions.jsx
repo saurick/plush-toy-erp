@@ -76,34 +76,31 @@ export function useBusinessColumnOrder({
     applyEffectiveFieldPolicyFlags({ adminProfile, moduleKey, columns: next })
     return next
   }, [adminProfile, columns, moduleKey])
-  const orderableColumns = useMemo(
-    () => normalizedColumns.filter((column) => column?.hidden !== true),
-    [normalizedColumns]
-  )
   const preferences =
     savedSettings?.scopeKey === scopeKey
       ? savedSettings.preferences
       : adminProfile?.erp_preferences
+  // 保留原列位置，避免仅导出的字段让后面的无显式键列丢失已保存设置。
   const effectiveOrder = useMemo(
     () =>
       sanitizeModuleColumnOrder(
         preferences?.column_orders?.[moduleKey],
-        orderableColumns
+        normalizedColumns
       ),
-    [moduleKey, orderableColumns, preferences]
+    [moduleKey, normalizedColumns, preferences]
   )
   const hiddenColumns = useMemo(
     () =>
       resolveModuleHiddenColumns(
         preferences?.column_orders?.[moduleKey],
         preferences?.hidden_columns?.[moduleKey],
-        orderableColumns
+        normalizedColumns
       ),
-    [moduleKey, orderableColumns, preferences]
+    [moduleKey, normalizedColumns, preferences]
   )
   const visibleColumns = useMemo(
-    () => applyModuleColumnOrder(orderableColumns, effectiveOrder),
-    [effectiveOrder, orderableColumns]
+    () => applyModuleColumnOrder(normalizedColumns, effectiveOrder),
+    [effectiveOrder, normalizedColumns]
   )
   const exportColumns = useMemo(
     () => [
@@ -123,7 +120,7 @@ export function useBusinessColumnOrder({
       const { order, hidden_columns: hidden } = buildModuleColumnSettings(
         nextOrder,
         nextHidden,
-        orderableColumns
+        normalizedColumns
       )
       savingRef.current = true
       setSaving(true)
@@ -151,12 +148,12 @@ export function useBusinessColumnOrder({
         setSaving(false)
       }
     },
-    [hiddenColumns, moduleKey, orderableColumns, outletContext, scopeKey]
+    [hiddenColumns, moduleKey, normalizedColumns, outletContext, scopeKey]
   )
 
   const tableColumns = useMemo(() => {
     const displayed = new Set(
-      applyModuleColumnVisibility(orderableColumns, hiddenColumns)
+      applyModuleColumnVisibility(normalizedColumns, hiddenColumns)
     )
     return visibleColumns
       .filter((column) => displayed.has(column))
@@ -171,7 +168,7 @@ export function useBusinessColumnOrder({
           </span>
         ),
       }))
-  }, [hiddenColumns, orderableColumns, visibleColumns])
+  }, [hiddenColumns, normalizedColumns, visibleColumns])
 
   return {
     effectiveOrder,
@@ -184,7 +181,7 @@ export function useBusinessColumnOrder({
       <ColumnOrderModal
         key={scopeKey}
         open={panelScope === scopeKey}
-        columns={orderableColumns}
+        columns={normalizedColumns}
         order={effectiveOrder}
         hiddenColumns={hiddenColumns}
         saving={saving}

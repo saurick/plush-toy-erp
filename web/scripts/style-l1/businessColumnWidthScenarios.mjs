@@ -210,11 +210,19 @@ export function createBusinessColumnWidthScenarios({
       ...common,
       name: 'business-column-width-shipment-defaults',
       path: '/erp/warehouse/shipments',
+      adminProfile: {
+        erp_preferences: {
+          column_orders: { shipments: ['item_count', '__column__13'] },
+          hidden_columns: { shipments: ['__column__13'] },
+        },
+      },
       verify: async (page) => {
         await page.locator(rowSelector).first().waitFor()
         const initial = await grid(page)
         assertAlignedGrid(initial)
         const labels = initial.columns.map((column) => column.label)
+        assert.equal(labels.includes('明细行'), false, '已保存的列设置不再显示明细行')
+        assert.equal(labels.includes('出货日期'), false, '保留原先隐藏出货日期的设置')
         for (const label of [
           '出货单号',
           '状态',
@@ -229,6 +237,7 @@ export function createBusinessColumnWidthScenarios({
         const csv = await exportCSV(page)
         for (const label of [
           '物流信息',
+          '明细行',
           '包装信息',
           '实际运费',
           '收货信息',
@@ -240,20 +249,32 @@ export function createBusinessColumnWidthScenarios({
           )
         await openBusinessTableTool(page, '列设置')
         const dialog = page.getByRole('dialog', { name: /^列设置/u })
+        assert.equal(await dialog.getByRole('checkbox', { name: '明细行', exact: true }).count(), 0)
+        assert.equal(await dialog.getByRole('checkbox', { name: '出货日期', exact: true }).isChecked(), false)
         for (const label of ['物流信息', '包装信息', '实际运费'])
           await dialog
             .getByRole('checkbox', { name: label, exact: true })
             .check()
         await dialog.getByRole('button', { name: '完成', exact: true }).click()
         await dialog.waitFor({ state: 'hidden' })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page.locator(rowSelector).first().waitFor()
+        const savedLabels = (await grid(page)).columns.map((column) => column.label)
+        assert.equal(savedLabels.includes('出货日期'), false, '保存其他列后仍隐藏出货日期')
         for (const label of ['物流信息', '包装信息', '实际运费'])
-          assert.ok(
-            (await grid(page)).columns.some((column) => column.label === label),
-            label
-          )
+          assert.ok(savedLabels.includes(label), label)
         await page.setViewportSize({ width: 390, height: 844 })
         await assertNoHorizontalOverflow(page, '出货可选列窄屏')
         await page.setViewportSize({ width: 1920, height: 1080 })
+        await openBusinessTableTool(page, '列设置')
+        await dialog.getByRole('button', { name: '恢复默认', exact: true }).click()
+        await dialog.getByRole('button', { name: '完成', exact: true }).click()
+        await dialog.waitFor({ state: 'hidden' })
+        const restored = await grid(page)
+        assertAlignedGrid(restored)
+        const restoredLabels = restored.columns.map((column) => column.label)
+        assert.ok(restoredLabels.includes('出货日期'))
+        assert.deepEqual(restoredLabels.filter((label) => label !== '出货日期'), labels)
       },
     },
     {

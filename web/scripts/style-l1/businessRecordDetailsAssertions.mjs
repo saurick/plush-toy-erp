@@ -5,7 +5,9 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 export async function assertCompactShipmentFacts(page, { assert, path, outputDir, information, mobile, caseIdentity, sourceNo, note, customer }) {
   const facts = information.getByRole('region', { name: '本次业务资料', exact: true })
   await facts.locator('.mobile-task-facts__identity').waitFor()
-  assert.deepEqual(await facts.locator('.mobile-task-facts__grid dt').allTextContents().then((labels) => labels.slice(0, 6)), ['来源单据', '客户', '总净重（克）', '财务审批', '明细行', '备注'])
+  const labels = await facts.locator('.mobile-task-facts__grid dt').allTextContents()
+  assert.deepEqual(labels.slice(0, 5), ['来源单据', '客户', '总净重（克）', '财务审批', '备注'])
+  assert.equal(labels.includes('明细行'), false)
   assert.match(await facts.locator('.mobile-task-facts__identity').innerText(), new RegExp(sourceNo, 'u'))
   assert.equal((await facts.locator('.mobile-task-facts__state dd').innerText()).trim(), '草稿')
   assert.match(await facts.innerText(), /待确认/u)

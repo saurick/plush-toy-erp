@@ -139,7 +139,6 @@ test('moduleTableColumns: 业务字段显式保留正文语义对齐', () => {
       '行数',
       'right',
     ],
-    ['components/shipments/shipmentColumns.jsx', '明细行', 'right'],
     ['components/sales-orders/SalesOrderExcelImport.jsx', '明细', 'right'],
     [
       'components/sales-orders/EngineeringMaterialSummarySheet.jsx',
