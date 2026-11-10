@@ -84,14 +84,8 @@ function assertGrid(metric) {
 }
 
 async function assertLineSwitchMotion(dialog, reduced = false) {
-  await dialog
-    .page()
-    .waitForFunction(
-      () =>
-        !document.querySelector(
-          '.ant-modal[class*="-zoom-appear"], .ant-modal[class*="-zoom-enter"]'
-        )
-    )
+  await dialog.waitFor()
+  await waitForFiniteAnimations(dialog.page(), { selector: '.ant-modal' })
   const control = dialog.getByRole('radiogroup', { name: '表格线条' })
   const result = await control.evaluate(async (root) => {
     const group = root.querySelector('.ant-segmented-group')

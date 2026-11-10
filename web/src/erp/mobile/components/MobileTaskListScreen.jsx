@@ -1,6 +1,6 @@
 import '../mobileMine.css'
 import React, { useId, useRef, useState } from 'react'
-import { Button, Tag } from 'antd'
+import { Button } from 'antd'
 import {
   BarChartOutlined,
   CalendarOutlined,
@@ -39,6 +39,7 @@ import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
 import { WorkflowTaskSource } from '../../components/workflow/WorkflowTaskCopy.jsx'
 import WorkflowTaskTiming from '../../components/workflow/WorkflowTaskTiming.jsx'
 import { WorkflowTaskBlockedTag } from '../../components/workflow/WorkflowTaskBlocker.jsx'
+import WorkflowTaskStatusTag from '../../components/workflow/WorkflowTaskStatusTag.jsx'
 import WorkflowTaskReason from '../../components/workflow/WorkflowTaskReason.jsx'
 import { getWorkflowTaskReasonMeta } from '../../utils/workflowTaskReason.mjs'
 import { getWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
@@ -350,7 +351,7 @@ export default function MobileTaskListScreen({
     const blocked = task.task_status_key === WorkflowTaskStatus.BLOCKED
     const statusLabel = history || task.task_status_key === WorkflowTaskStatus.BLOCKED
       ? resolveMobileTaskStatusLabel(task)
-      : severity.label === '普通' ? '待处理' : severity.label
+      : severity.tone === 'regular' ? '待处理' : severity.label
     const tagColor = history ? rejected ? 'error' : 'success' : severity.tagColor
     return (
       <WorkflowTaskCard
@@ -372,7 +373,13 @@ export default function MobileTaskListScreen({
           layout="card"
           copyable={false}
           showTaskName
-          status={blocked ? <WorkflowTaskBlockedTag className="mobile-task-list-status" /> : <Tag className="mobile-task-list-status" color={tagColor}>{statusLabel}</Tag>}
+          status={blocked ? (
+            <WorkflowTaskBlockedTag className="mobile-task-list-status" />
+          ) : (
+            <WorkflowTaskStatusTag className="mobile-task-list-status" color={tagColor} tone={history ? undefined : severity.tone}>
+              {statusLabel}
+            </WorkflowTaskStatusTag>
+          )}
           source={<WorkflowTaskSource task={task} copyable={false} showUnavailable={false} />}
         />
         {businessLabel && businessLabel !== resolveMobileTaskStatusLabel(task) ? <div className="mobile-task-list-row__business"><span>所属业务：</span><span className="mobile-task-list-business-value">{businessLabel}</span></div> : null}
@@ -380,7 +387,7 @@ export default function MobileTaskListScreen({
         <div className="erp-task-card__footer mobile-task-list-row__footer">
           {renderTaskAssignee(task)}
           {!history && taskNeedsDesktop(task) ? <span>电脑办理</span> : null}
-          <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} showDueRisk={task.task_status_key === WorkflowTaskStatus.BLOCKED || severity.label !== '超时'} />
+          <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} showDueRisk={blocked || severity.tone !== 'overdue'} />
         </div>
         <WorkflowTaskReason meta={getWorkflowTaskReasonMeta(task)} />
       </WorkflowTaskCard>

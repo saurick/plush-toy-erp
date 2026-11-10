@@ -50,22 +50,25 @@
 
     [data-mode="dark"] {
       color-scheme: dark;
-      --canvas: #050607;
-      --shell: #080a0c;
-      --surface: #0d1013;
-      --surface-raised: #121619;
-      --surface-muted: #151a1f;
-      --surface-hover: #181e24;
-      --text: #f4f7fa;
-      --text-2: #a7b0b9;
-      --text-3: #7f8993;
-      --line: #2a3138;
-      --line-strong: #3b4650;
+      --canvas: #161a1e;
+      --shell: #1a1f23;
+      --surface: #20252a;
+      --surface-raised: #2b3238;
+      --surface-muted: #262d33;
+      --surface-hover: #293138;
+      --field-bg: #1a1f24;
+      --field-border: #656f78;
+      --overlay-bg: rgb(7 10 13 / 62%);
+      --text: #e9edf0;
+      --text-2: #c2cad1;
+      --text-3: #a9b4bf;
+      --line: #30383f;
+      --line-strong: #414b54;
       --shadow: 0 12px 34px rgba(0, 0, 0, .24);
       --brand-soft: color-mix(in srgb, var(--brand) 20%, var(--surface));
       --brand-softer: color-mix(in srgb, var(--brand) 6.5%, var(--surface));
-      --danger: #ff9595;
-      --warning: #efbe73;
+      --danger: #f0aca6;
+      --warning: #e6c28e;
       --success: #83d5a1;
       --info: #86b9ff;
       --danger-soft: rgba(214, 71, 71, .15);
@@ -549,6 +552,10 @@
     .badge.warning { color: var(--warning); background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 28%, transparent); }
     .badge.danger { color: var(--danger); background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 28%, transparent); }
     .badge.info { color: var(--info); background: var(--info-soft); border-color: color-mix(in srgb, var(--info) 28%, transparent); }
+    [data-mode="dark"] .badge[data-task-tone="info"] { color: #b5c9d8; background: #29343d; border-color: #384954; }
+    [data-mode="dark"] .badge[data-task-tone="danger"] { color: var(--danger); background: #423032; border-color: #634449; }
+    [data-mode="dark"] .badge[data-task-tone="overdue"] { color: #ebaaa5; background: transparent; border-color: #664b4f; }
+    [data-mode="dark"] .badge[data-task-tone="warning"] { color: var(--warning); background: #3c3428; border-color: #5c4d36; }
     .text-btn { padding: 4px 5px; border: 0; border-radius: 5px; background: transparent; color: var(--brand-strong); }
     .text-btn:hover { background: var(--brand-soft); }
     [data-mode="dark"] .text-btn { color: var(--brand-strong); }
@@ -599,11 +606,11 @@
     .field input, .field ui-select, .field textarea {
       width: 100%;
       min-height: 36px;
-      border: 1px solid var(--line-strong);
+      border: 1px solid var(--field-border, var(--line-strong));
       border-radius: 7px;
       outline: 0;
       padding: 7px 9px;
-      background: var(--surface);
+      background: var(--field-bg, var(--surface));
     }
     .field textarea { min-height: 74px; }
     textarea[data-remark-input] { min-height: calc(3em + 16px); }
@@ -624,7 +631,7 @@
       align-items: center;
       justify-content: center;
       padding: 18px;
-      background: rgba(13, 20, 16, .46);
+      background: var(--overlay-bg, rgba(13, 20, 16, .46));
       backdrop-filter: blur(2px);
       animation: fade .16s ease-out;
     }
@@ -1481,6 +1488,7 @@
     .rm-task-open:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
     .rm-task-card-content { position: relative; display: grid; gap: 4px; min-width: 0; pointer-events: none; }
     .rm-task-card .product-thumb, .task-board-table .rm-card-body .product-thumb, .workbench-task-table .rm-card-body .product-thumb { width: 64px; height: 64px; flex: 0 0 64px; pointer-events: auto; }
+    [data-mode="dark"] :is(.rm-task-card, .task-board-table, .workbench-task-table, .task-associations) .product-thumb > .product-art { filter: brightness(.82); }
     .rm-card-body { display: flex; gap: 10px; min-width: 0; min-height: 64px; }
     .rm-task-card .rm-card-body { align-items: center; }
     .rm-card-body--empty .rm-card-summary { min-height: 64px; align-content: center; color: var(--text-3); }
@@ -7374,13 +7382,19 @@ active = new Set()
       return ['可执行', '待办理', '到期提醒'].includes(task.state) ? '待处理' : task.state;
     }
 
+    function renderTaskListBadge(task) {
+      const label = taskListStatusLabel(task);
+      const tone = ['逾期', '已逾期', '超时', '已超时'].includes(label) ? 'overdue' : task.badge;
+      return `<span class="badge ${task.badge}" data-task-tone="${tone}">${escapeHTML(label)}</span>`;
+    }
+
     function renderTaskHeading(task, subject = getTaskListSubject(task)) {
       return `<span class="task-identity-heading"><strong>${escapeHTML(task.title)}</strong>${subject ? `<span class="task-identity-type">${escapeHTML(subject)}</span>` : ''}</span>`;
     }
 
     function renderWorkbenchTaskRow(task) {
       const heading = `<button class="workbench-task-entry" data-action="open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}详情"><strong>${escapeHTML(task.title)}</strong></button>`;
-      return `<tr data-action="open-task" data-id="${task.id}"><td class="workbench-task-title">${renderTaskAssociation(task, false, heading)}</td><td>${task.role}</td><td>${escapeHTML(demoTaskTime(task))}</td><td><span class="badge ${task.badge}">${escapeHTML(taskListStatusLabel(task))}</span></td></tr>`;
+      return `<tr data-action="open-task" data-id="${task.id}"><td class="workbench-task-title">${renderTaskAssociation(task, false, heading)}</td><td>${task.role}</td><td>${escapeHTML(demoTaskTime(task))}</td><td>${renderTaskListBadge(task)}</td></tr>`;
     }
 
     function renderDashboard() {
@@ -17072,7 +17086,7 @@ return {orders,financeCustomers};})();
 
     function renderTaskBoardRow(task) {
       const heading = `<button class="workbench-task-entry" data-action="open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}详情">${renderTaskHeading(task, '')}</button>`;
-      return `<tr data-action="open-task" data-id="${task.id}"><td>${renderTaskAssociation(task, false, heading)}</td><td>${escapeHTML(demoTaskTime(task))}</td><td><span class="badge ${task.badge}">${escapeHTML(taskListStatusLabel(task))}</span>${task.reason ? `<div class="task-reason">${escapeHTML(task.reason)}</div>` : ''}</td><td>${escapeHTML(task.role)}<small>${escapeHTML(demoAssignee(task))}</small></td></tr>`;
+      return `<tr data-action="open-task" data-id="${task.id}"><td>${renderTaskAssociation(task, false, heading)}</td><td>${escapeHTML(demoTaskTime(task))}</td><td>${renderTaskListBadge(task)}${task.reason ? `<div class="task-reason">${escapeHTML(task.reason)}</div>` : ''}</td><td>${escapeHTML(task.role)}<small>${escapeHTML(demoAssignee(task))}</small></td></tr>`;
     }
 
 
@@ -17761,7 +17775,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<article class="rm-task-card ${task.badge}" data-id="${task.id}">
         <button class="rm-task-open" data-action="mobile-open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}${task.status === 'done' ? '处理结果' : ''}"></button>
         <div class="rm-task-card-content">
-          <div class="rm-card-head"><strong>${escapeHTML(task.title)}</strong><span class="rm-card-badges"><span class="badge ${task.badge}">${escapeHTML(task.state === '阻塞' ? '受阻' : taskListStatusLabel(task))}</span></span></div>
+          <div class="rm-card-head"><strong>${escapeHTML(task.title)}</strong><span class="rm-card-badges">${renderTaskListBadge(task)}</span></div>
           ${renderTaskAssociation(task)}
           <div class="rm-card-foot"><span>${escapeHTML(task.role)} · <span class="rm-card-assignee">${escapeHTML(demoAssignee(task))}</span></span><span>${escapeHTML(demoTaskTime(task))}</span></div>
           ${renderMobileTaskReason(task)}

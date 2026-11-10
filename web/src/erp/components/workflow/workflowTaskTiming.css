@@ -49,11 +49,15 @@
 }
 
 [data-erp-theme='dark'] .erp-task-timing__row--danger {
-  color: #fca5a5;
+  color: var(--erp-visual-danger-text);
 }
 
 .erp-task-timing__row--warning {
   color: var(--erp-warning-text, #ad6800);
+}
+
+[data-erp-theme='dark'] .erp-task-timing__row[data-due-risk='shown-in-status'] {
+  color: inherit;
 }
 
 .erp-task-timing--detail {

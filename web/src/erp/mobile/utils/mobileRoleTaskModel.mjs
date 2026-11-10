@@ -180,6 +180,7 @@ export function resolveLatestTaskTime(tasks) {
 export function getTaskSeverityView(task) {
   if (isTaskOverdue(task)) {
     return {
+      tone: 'overdue',
       label: '超时',
       tagColor: 'error',
       badgeClass: 'border-red-300 bg-red-50 text-red-600',
@@ -189,6 +190,7 @@ export function getTaskSeverityView(task) {
   }
   if (task.alert_level === 'critical') {
     return {
+      tone: 'critical',
       label: '严重',
       tagColor: 'error',
       badgeClass: 'border-red-300 bg-red-50 text-red-600',
@@ -198,6 +200,7 @@ export function getTaskSeverityView(task) {
   }
   if (isTaskAlerted(task)) {
     return {
+      tone: 'warning',
       label: '预警',
       tagColor: 'warning',
       badgeClass: 'border-amber-300 bg-amber-50 text-amber-600',
@@ -206,6 +209,7 @@ export function getTaskSeverityView(task) {
     }
   }
   return {
+    tone: 'regular',
     label: '普通',
     badgeClass: 'border-slate-200 bg-slate-50 text-slate-500',
     rowClass: 'bg-white',

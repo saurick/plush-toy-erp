@@ -16,25 +16,25 @@
 
 /* stylelint-disable no-descending-specificity -- dark theme overrides must win over the existing light-theme component rules. */
 [data-erp-theme='dark'] {
-  --erp-page-bg: #050607;
-  --erp-shell-bg: #080a0c;
-  --erp-surface-bg: #0d1013;
-  --erp-surface-bg-soft: #151a1f;
-  --erp-surface-bg-muted: #151a1f;
-  --erp-surface-raised: #121619;
-  --erp-border: #2a3138;
-  --erp-border-strong: #3b4650;
-  --erp-modal-mask: rgb(2 6 23 / 0.72);
-  --erp-modal-bg: var(--erp-surface-bg);
-  --erp-modal-bg-soft: var(--erp-surface-raised);
+  --erp-page-bg: #161a1e;
+  --erp-shell-bg: #1a1f23;
+  --erp-surface-bg: #20252a;
+  --erp-surface-bg-soft: #262d33;
+  --erp-surface-bg-muted: var(--erp-surface-bg-soft);
+  --erp-surface-raised: #2b3238;
+  --erp-field-bg: #1a1f24;
+  --erp-field-border: #656f78;
+  --erp-border: #30383f;
+  --erp-border-strong: #414b54;
+  --erp-modal-mask: rgb(7 10 13 / 62%);
+  --erp-modal-bg: var(--erp-surface-raised);
+  --erp-modal-bg-soft: var(--erp-surface-bg);
   --erp-modal-bg-elevated: var(--erp-surface-bg-soft);
-  --erp-modal-border: rgb(203 213 225 / 0.7);
-  --erp-modal-divider: rgb(71 85 105 / 0.82);
-  --erp-modal-shadow:
-    0 28px 90px rgb(0 0 0 / 0.58), 0 0 0 1px rgb(148 163 184 / 0.16);
-  --erp-text: #f4f7fa;
-  --erp-text-muted: #a7b0b9;
-  --erp-text-subtle: #7f8993;
+  --erp-modal-border: var(--erp-border-strong);
+  --erp-modal-divider: var(--erp-border);
+  --erp-text: #e9edf0;
+  --erp-text-muted: #c2cad1;
+  --erp-text-subtle: #a9b4bf;
   --erp-primary: var(--erp-accent-dark);
   --erp-primary-strong: var(--erp-accent-dark);
   --erp-primary-soft: color-mix(
@@ -48,10 +48,10 @@
   --erp-interactive-bg-active: var(--erp-primary-soft);
   --erp-interactive-text-hover: var(--erp-text);
   --erp-focus-ring: color-mix(in srgb, var(--erp-accent-dark) 22%, transparent);
-  --erp-warning-bg: #2a2110;
-  --erp-warning-border: #8a6b24;
-  --erp-warning-text: #f5c96b;
-  --erp-visual-danger-text: #fda4af;
+  --erp-warning-bg: #3c3428;
+  --erp-warning-border: #5c4d36;
+  --erp-warning-text: #e6c28e;
+  --erp-visual-danger-text: #f0aca6;
   --erp-theme-toggle-bg: var(--erp-surface-raised);
   --erp-theme-toggle-border: var(--erp-border-strong);
   --erp-theme-toggle-selected-bg: var(--erp-primary-soft);
@@ -320,9 +320,13 @@
 [data-erp-theme='dark'] .ant-card:not(:where(.erp-business-page-header-card--secondary)),
 [data-erp-theme='dark'] .ant-table-wrapper .ant-table,
 [data-erp-theme='dark'] .ant-table-wrapper .ant-table-thead > tr > th,
-[data-erp-theme='dark'] .ant-table-wrapper .ant-table-tbody > tr > td,
-[data-erp-theme='dark'] .ant-picker-dropdown .ant-picker-panel-container {
+[data-erp-theme='dark'] .ant-table-wrapper .ant-table-tbody > tr > td {
   background: var(--erp-surface-bg);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .ant-picker-dropdown .ant-picker-panel-container {
+  background: var(--erp-surface-raised);
   color: var(--erp-text);
 }
 
@@ -434,13 +438,16 @@
   background: var(--erp-modal-mask);
 }
 
+[data-erp-theme='dark'] .erp-business-form-page {
+  --erp-business-action-modal-bg: var(--erp-surface-bg);
+  --erp-business-action-modal-border: var(--erp-border);
+  --erp-business-action-modal-divider: var(--erp-border);
+}
+
 [data-erp-theme='dark'] .erp-business-action-modal,
 [data-erp-theme='dark'] .erp-business-form-page {
-  --erp-business-action-modal-bg: var(--erp-modal-bg);
-  --erp-business-action-modal-border: var(--erp-modal-border);
-  --erp-business-action-modal-divider: var(--erp-modal-divider);
-  --erp-business-action-field-bg: var(--erp-page-bg);
-  --erp-business-action-field-border: var(--erp-border-strong);
+  --erp-business-action-field-bg: var(--erp-field-bg);
+  --erp-business-action-field-border: var(--erp-field-border);
   --erp-line-items-import-bg: rgb(15 23 42 / 72%);
   --erp-line-items-import-border: var(--erp-border);
   --erp-source-import-disabled-bg: rgb(15 23 42 / 58%);
@@ -459,9 +466,6 @@
 }
 
 [data-erp-theme='dark'] .erp-source-import-picker-modal {
-  --erp-business-action-modal-bg: var(--erp-modal-bg);
-  --erp-business-action-modal-border: var(--erp-modal-border);
-  --erp-business-action-modal-title: var(--erp-text);
   --erp-sales-order-lines-text-muted: var(--erp-text-muted);
   --erp-source-import-disabled-bg: rgb(15 23 42 / 58%);
   --erp-source-import-disabled-text: #94a3b8;
@@ -607,8 +611,8 @@
   .erp-business-action-form
   :where(.ant-input-affix-wrapper),
 [data-erp-theme='dark'] :where(.erp-business-action-form) .ant-select-selector {
-  border-color: var(--erp-border-strong);
-  background: var(--erp-page-bg);
+  border-color: var(--erp-field-border);
+  background: var(--erp-field-bg);
   color: var(--erp-text);
 }
 
@@ -620,7 +624,7 @@
     .ant-picker,
     .ant-input-affix-wrapper
   ):hover {
-  border-color: var(--erp-interactive-border-hover);
+  border-color: color-mix(in srgb, var(--erp-field-border) 75%, var(--erp-text-muted));
 }
 
 [data-erp-theme='dark']
@@ -653,8 +657,8 @@
   .erp-business-date-range-filter
   .erp-business-date-input.ant-picker,
 [data-erp-theme='dark'] .erp-business-date-input.ant-picker {
-  border-color: var(--erp-border-strong);
-  background: var(--erp-page-bg);
+  border-color: var(--erp-field-border);
+  background: var(--erp-field-bg);
   color: var(--erp-text);
 }
 
@@ -680,8 +684,8 @@
 [data-erp-theme='dark'] .erp-business-entry-form,
 [data-erp-theme='dark'] .erp-permission-modal,
 [data-erp-theme='dark'] .erp-business-status-reason-modal {
-  --erp-modal-control-background: var(--erp-page-bg);
-  --erp-modal-control-border: var(--erp-border-strong);
+  --erp-modal-control-background: var(--erp-field-bg);
+  --erp-modal-control-border: var(--erp-field-border);
   --erp-modal-control-hover: var(--erp-interactive-border-hover);
   color: var(--erp-text);
 }
@@ -690,8 +694,8 @@
   .erp-item-field-with-unit
   .ant-input-number-affix-wrapper,
 [data-erp-theme='dark'] .erp-business-entry-form__add-item-button.ant-btn {
-  border-color: var(--erp-border-strong);
-  background: var(--erp-page-bg);
+  border-color: var(--erp-field-border);
+  background: var(--erp-field-bg);
   color: var(--erp-text);
 }
 

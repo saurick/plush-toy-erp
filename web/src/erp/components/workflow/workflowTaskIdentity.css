@@ -381,6 +381,10 @@
   object-fit: contain;
 }
 
+[data-erp-theme='dark'] .erp-task-product-image img {
+  filter: brightness(0.82);
+}
+
 @media (max-width: 767px) {
   .mobile-role-tasks-page .erp-task-identity {
     font-size: 16px;

@@ -29,6 +29,7 @@ export default function WorkflowTaskTiming({
             className={`erp-task-timing__row erp-task-timing__row--${row.tone}`}
             data-task-time={row.key}
             data-time-state={row.state}
+            data-due-risk={row.key === 'due' && !showDueRisk ? 'shown-in-status' : undefined}
           >
             <dt hidden={!detail && row.state === 'missing' && ['due', 'ended'].includes(row.key)}>{row.label}</dt>
             <dd>

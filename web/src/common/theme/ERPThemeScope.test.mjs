@@ -3,6 +3,7 @@ import test from 'node:test'
 import { act, createElement, StrictMode } from 'react'
 import { installTestDOM, registerJSXTestLoader } from '../../../scripts/test/reactRuntime.mjs'
 import { ERP_ACCENTS } from './erpAppearance.mjs'
+import { ERP_DARK_PALETTE } from './erpThemePalette.mjs'
 
 test('isolated themes keep body portals stable and remove only their own container', async (t) => {
   const dom = installTestDOM()
@@ -39,7 +40,8 @@ test('isolated themes keep body portals stable and remove only their own contain
   await render('dark')
   assert.equal(document.querySelector('.first-scope').closest('[data-erp-theme-portal]') === first, true)
   assert.equal(first.dataset.erpTheme, 'dark')
-  assert.equal(first.style.getPropertyValue('--erp-text'), '#f4f7fa')
+  assert.equal(first.style.getPropertyValue('--erp-text'), ERP_DARK_PALETTE.text)
+  assert.equal(first.style.getPropertyValue('--erp-modal-bg'), ERP_DARK_PALETTE.surfaceRaised)
   await render('light', false)
   assert.equal(first.isConnected, false)
   assert.equal(second.isConnected, true, 'unmount does not remove a different theme scope')

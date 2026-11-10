@@ -45,13 +45,15 @@ function assertVariable(source, variable, expected, label) {
   )
 }
 
-test('dark palette is neutral black with readable layered surfaces', () => {
+test('dark surfaces are layered and keep fields and text readable', () => {
   const neutralKeys = [
     'page',
     'shell',
     'surface',
     'surfaceRaised',
     'surfaceSoft',
+    'field',
+    'fieldBorder',
     'border',
     'borderStrong',
   ]
@@ -63,7 +65,7 @@ test('dark palette is neutral black with readable layered surfaces', () => {
     )
   }
 
-  const layers = ['page', 'shell', 'surface', 'surfaceRaised', 'surfaceSoft']
+  const layers = ['page', 'shell', 'surface', 'surfaceSoft', 'surfaceRaised']
   for (let index = 1; index < layers.length; index += 1) {
     assert.ok(
       luminance(ERP_DARK_PALETTE[layers[index]]) >
@@ -72,14 +74,15 @@ test('dark palette is neutral black with readable layered surfaces', () => {
     )
   }
 
-  assert.ok(
-    contrast(ERP_DARK_PALETTE.text, ERP_DARK_PALETTE.surface) >= 7,
-    '主文字与内容面需要高对比度'
-  )
-  assert.ok(
-    contrast(ERP_DARK_PALETTE.textMuted, ERP_DARK_PALETTE.surface) >= 4.5,
-    '次要文字与内容面需要可读对比度'
-  )
+  for (const key of ['surface', 'surfaceSoft', 'surfaceRaised', 'field']) {
+    const background = ERP_DARK_PALETTE[key]
+    assert.ok(contrast(ERP_DARK_PALETTE.text, background) >= 7, `${key}: 正文`)
+    assert.ok(contrast(ERP_DARK_PALETTE.textMuted, background) >= 4.5, `${key}: 辅助文字`)
+    assert.ok(contrast(ERP_DARK_PALETTE.textSubtle, background) >= 4.5, `${key}: 说明与占位文字`)
+  }
+  for (const key of ['field', 'surface']) {
+    assert.ok(contrast(ERP_DARK_PALETTE.fieldBorder, ERP_DARK_PALETTE[key]) >= 3, `${key}: 输入框边界`)
+  }
 })
 
 test('Ant Design primary buttons and links retain contrast in default, hover and active states', () => {
@@ -104,13 +107,15 @@ test('Ant Design primary buttons and links retain contrast in default, hover and
   }
 })
 
-test('runtime CSS and interaction design share the black dark palette', () => {
+test('runtime CSS and interaction design share the dark palette', () => {
   const runtimeVariables = {
     'erp-page-bg': ERP_DARK_PALETTE.page,
     'erp-shell-bg': ERP_DARK_PALETTE.shell,
     'erp-surface-bg': ERP_DARK_PALETTE.surface,
     'erp-surface-raised': ERP_DARK_PALETTE.surfaceRaised,
     'erp-surface-bg-soft': ERP_DARK_PALETTE.surfaceSoft,
+    'erp-field-bg': ERP_DARK_PALETTE.field,
+    'erp-field-border': ERP_DARK_PALETTE.fieldBorder,
     'erp-border': ERP_DARK_PALETTE.border,
     'erp-border-strong': ERP_DARK_PALETTE.borderStrong,
     'erp-text': ERP_DARK_PALETTE.text,
@@ -127,6 +132,8 @@ test('runtime CSS and interaction design share the black dark palette', () => {
     surface: ERP_DARK_PALETTE.surface,
     'surface-raised': ERP_DARK_PALETTE.surfaceRaised,
     'surface-muted': ERP_DARK_PALETTE.surfaceSoft,
+    'field-bg': ERP_DARK_PALETTE.field,
+    'field-border': ERP_DARK_PALETTE.fieldBorder,
     line: ERP_DARK_PALETTE.border,
     'line-strong': ERP_DARK_PALETTE.borderStrong,
     text: ERP_DARK_PALETTE.text,

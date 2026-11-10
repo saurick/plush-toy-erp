@@ -12,17 +12,19 @@ export const ERP_LIGHT_PALETTE = Object.freeze({
 })
 
 export const ERP_DARK_PALETTE = Object.freeze({
-  page: '#050607',
-  shell: '#080a0c',
-  surface: '#0d1013',
-  surfaceRaised: '#121619',
-  surfaceSoft: '#151a1f',
-  border: '#2a3138',
-  borderStrong: '#3b4650',
-  text: '#f4f7fa',
-  textMuted: '#a7b0b9',
-  textSubtle: '#7f8993',
-  onAccent: '#050607',
+  page: '#161a1e',
+  shell: '#1a1f23',
+  surface: '#20252a',
+  surfaceSoft: '#262d33',
+  surfaceRaised: '#2b3238',
+  field: '#1a1f24',
+  fieldBorder: '#656f78',
+  border: '#30383f',
+  borderStrong: '#414b54',
+  text: '#e9edf0',
+  textMuted: '#c2cad1',
+  textSubtle: '#a9b4bf',
+  onAccent: '#161a1e',
 })
 
 export function getERPAccentTokens(isDark, accent) {
@@ -51,6 +53,7 @@ export function getERPSurfaceTokens(isDark) {
     colorBorderSecondary: palette.border,
     colorText: palette.text,
     colorTextSecondary: palette.textMuted,
+    ...(isDark ? { colorTextDescription: palette.textSubtle } : {}),
   }
 }
 
@@ -68,10 +71,12 @@ export function getERPThemeScopeStyle(isDark, accent) {
     '--erp-surface-raised': palette.surfaceRaised,
     '--erp-border': palette.border,
     '--erp-border-strong': palette.borderStrong,
-    '--erp-modal-bg': palette.surface,
-    '--erp-modal-bg-soft': palette.surfaceRaised,
+    '--erp-field-bg': isDark ? palette.field : palette.surface,
+    '--erp-field-border': isDark ? palette.fieldBorder : palette.borderStrong,
+    '--erp-modal-bg': isDark ? palette.surfaceRaised : palette.surface,
+    '--erp-modal-bg-soft': isDark ? palette.surface : palette.surfaceRaised,
     '--erp-modal-bg-elevated': palette.surfaceSoft,
-    '--erp-modal-border': palette.border,
+    '--erp-modal-border': isDark ? palette.borderStrong : palette.border,
     '--erp-modal-divider': palette.border,
     '--erp-text': palette.text,
     '--erp-text-muted': palette.textMuted,

@@ -1,0 +1,26 @@
+[data-erp-theme='dark']
+  .erp-task-status-tag.ant-tag:is([data-task-status-tone='ready'], [data-task-status-tone='regular']) {
+  border-color: #384954;
+  background: #29343d;
+  color: #b5c9d8;
+}
+
+[data-erp-theme='dark']
+  .erp-task-status-tag.ant-tag:is([data-task-status-tone='blocked'], [data-task-status-tone='critical']) {
+  border-color: #634449;
+  background: #423032;
+  color: var(--erp-visual-danger-text);
+}
+
+[data-erp-theme='dark'] .erp-task-status-tag.ant-tag[data-task-status-tone='overdue'] {
+  border-color: #664b4f;
+  background: transparent;
+  color: #ebaaa5;
+}
+
+[data-erp-theme='dark']
+  .erp-task-status-tag.ant-tag:is([data-task-status-tone='due_soon'], [data-task-status-tone='warning']) {
+  border-color: var(--erp-warning-border);
+  background: var(--erp-warning-bg);
+  color: var(--erp-warning-text);
+}

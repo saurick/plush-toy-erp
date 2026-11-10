@@ -6,9 +6,11 @@ export function createERPAntdTheme({ isDark, accent, density, mobile = false, wo
   const phone = mobile && !workbench
   const cellPaddingBlock = density === 'compact' ? 4 : 9
   const palette = isDark ? ERP_DARK_PALETTE : ERP_LIGHT_PALETTE
+  const overlaySurface = isDark ? palette.surfaceRaised : palette.surface
   const fieldTokens = {
-    colorBgContainer: isDark ? palette.page : palette.surface,
+    colorBgContainer: isDark ? palette.field : palette.surface,
     colorTextPlaceholder: palette.textSubtle,
+    ...(isDark ? { colorBorder: palette.fieldBorder } : {}),
   }
   return {
     algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
@@ -18,17 +20,17 @@ export function createERPAntdTheme({ isDark, accent, density, mobile = false, wo
       DatePicker: fieldTokens,
       Select: { ...fieldTokens, selectorBg: fieldTokens.colorBgContainer },
       Modal: {
-        contentBg: palette.surface,
-        headerBg: palette.surface,
-        footerBg: palette.surface,
+        contentBg: overlaySurface,
+        headerBg: overlaySurface,
+        footerBg: overlaySurface,
         titleColor: palette.text,
       },
-      Drawer: { colorBgElevated: palette.surface },
-      Message: { contentBg: palette.surfaceSoft },
-      Notification: { colorBgElevated: palette.surfaceSoft },
-      Popover: { colorBgElevated: isDark ? palette.surfaceSoft : palette.surfaceRaised },
+      Drawer: { colorBgElevated: overlaySurface },
+      Message: { contentBg: isDark ? palette.surfaceRaised : palette.surfaceSoft },
+      Notification: { colorBgElevated: isDark ? palette.surfaceRaised : palette.surfaceSoft },
+      Popover: { colorBgElevated: palette.surfaceRaised },
       Tooltip: {
-        colorBgSpotlight: isDark ? palette.surfaceSoft : 'rgba(0, 0, 0, 0.85)',
+        colorBgSpotlight: isDark ? palette.surfaceRaised : 'rgba(0, 0, 0, 0.85)',
         colorTextLightSolid: isDark ? palette.text : '#ffffff',
       },
       Button: {

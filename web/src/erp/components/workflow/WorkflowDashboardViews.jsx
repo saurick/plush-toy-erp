@@ -1,6 +1,6 @@
 import React from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
-import { Button, Card, Space, Tag, Typography } from 'antd'
+import { Button, Card, Space, Typography } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import { buildWorkflowTaskResponsibilityItems } from '../../utils/workflowTaskEventPresentation.mjs'
@@ -10,6 +10,7 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
 import { WorkflowTaskSource } from './WorkflowTaskCopy.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
+import WorkflowTaskStatusTag from './WorkflowTaskStatusTag.jsx'
 import { openWorkflowTaskRow } from '../../utils/workflowTaskEntry.mjs'
 import { SearchInput } from '../business-list/BusinessListLayout.jsx'
 import {
@@ -288,9 +289,9 @@ export function TaskLane({ lane, keyword = '', loading = false, onOpenTask }) {
               <div className="erp-workbench-task-cell">
                 <Space size={[4, 4]} wrap>
                   {getWorkflowTaskStatusRiskTags(task).map((tag) => (
-                    <Tag key={tag.key} color={tag.color}>
+                    <WorkflowTaskStatusTag key={tag.key} color={tag.color} tone={tag.key === 'status' ? task.task_status_key : tag.key}>
                       {tag.label}
-                    </Tag>
+                    </WorkflowTaskStatusTag>
                   ))}
                 </Space>
                 {getWorkflowTaskReason(task) ? (

@@ -49,6 +49,7 @@ import { TASK_ACTION_META, getWorkflowTaskActionMeta } from '../utils/workflowTa
 import WorkflowTaskIdentity from '../components/workflow/WorkflowTaskIdentity.jsx'
 import { WorkflowTaskSource } from '../components/workflow/WorkflowTaskCopy.jsx'
 import WorkflowTaskTiming from '../components/workflow/WorkflowTaskTiming.jsx'
+import WorkflowTaskStatusTag from '../components/workflow/WorkflowTaskStatusTag.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
 import WorkflowTrackingPanel from '../components/workflow/WorkflowTrackingPanel.jsx'
 
@@ -1163,13 +1164,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             wrap
           >
             {getWorkflowTaskStatusRiskTags(record).map((tag) => (
-              <Tag
+              <WorkflowTaskStatusTag
                 key={tag.key}
                 color={tag.color}
+                tone={tag.key === 'status' ? record.task_status_key : tag.key}
                 style={{ marginInlineEnd: 0 }}
               >
                 {tag.label}
-              </Tag>
+              </WorkflowTaskStatusTag>
             ))}
           </Space>
         )

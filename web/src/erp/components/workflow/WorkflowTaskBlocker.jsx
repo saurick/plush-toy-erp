@@ -1,7 +1,11 @@
 import React from 'react'
-import { Tag } from 'antd'
+import WorkflowTaskStatusTag from './WorkflowTaskStatusTag.jsx'
 import './workflowTaskBlocker.css'
 
 export function WorkflowTaskBlockedTag({ className = '' }) {
-  return <Tag color="error" className={`erp-task-blocked-tag ${className}`}>受阻</Tag>
+  return (
+    <WorkflowTaskStatusTag tone="blocked" color="error" className={`erp-task-blocked-tag ${className}`}>
+      受阻
+    </WorkflowTaskStatusTag>
+  )
 }

@@ -65,6 +65,7 @@ export function createTaskItemSemanticsScenarios({ assert }) {
     { mobile: true, theme: 'light' },
     { mobile: true, theme: 'dark' },
     { mobile: false, theme: 'light' },
+    { mobile: false, theme: 'dark' },
   ].map(({ mobile, theme }) => ({
     name: `task-item-semantics-${mobile ? 'mobile' : 'desktop'}-${theme}`,
     path: mobile ? '/m/sales/tasks' : '/erp/task-board?lane=exception',
@@ -114,6 +115,22 @@ export function createTaskItemSemanticsScenarios({ assert }) {
       assert.doesNotMatch(await row(97303).innerText(), /不应显示的旧产品|STALE-SOURCE|STALE-CODE/u)
       if (mobile) {
         assert.equal(await color.locator('.mobile-task-list-row__business').innerText(), '所属业务：业务阻塞')
+      }
+      if (theme === 'dark') {
+        const timing = await color.locator('[data-task-time="due"]').evaluate((node) => ({
+          color: getComputedStyle(node).color,
+          auxiliaryColor: getComputedStyle(node.closest('.erp-task-timing')).color,
+          text: node.textContent,
+        }))
+        if (mobile) {
+          assert.match(timing.text, /已超时/u, '受阻卡片没有单独的逾期标签，时间仍提示超时')
+          assert.notEqual(timing.color, timing.auxiliaryColor)
+        } else {
+          const overdue = color.getByText('逾期', { exact: true })
+          assert.equal(await overdue.evaluate((node) => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)')
+          assert.doesNotMatch(timing.text, /已超时/u)
+          assert.equal(timing.color, timing.auxiliaryColor, '已有逾期标签时，暗色截止时间沿用辅助色')
+        }
       }
       const field = await color.locator('.erp-task-identity__card-body').evaluate((node) => {
         const label = getComputedStyle(node.querySelector('.erp-task-identity__field-label'))
@@ -170,6 +187,7 @@ function createTaskItemLayoutScenarios({ assert }) {
     { mobile: true, width: 320, theme: 'light' },
     { mobile: true, width: 390, theme: 'dark' },
     { mobile: false, width: 1440, theme: 'light' },
+    { mobile: false, width: 1440, theme: 'dark' },
     { mobile: false, width: 1056, theme: 'light' },
     { mobile: false, width: 1056, theme: 'light', workbench: true },
     { mobile: true, width: 390, theme: 'light', restricted: true },
@@ -213,6 +231,16 @@ function createTaskItemLayoutScenarios({ assert }) {
         })
         await page.route('**/rpc/attachment', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
+          if (method === 'list_attachments' && params.owner_type === 'product' && params.owner_id === product.product_id) {
+            return route.fulfill({
+              json: { jsonrpc: '2.0', id, result: { code: 0, data: {
+                attachments: [{
+                  id: product.image_attachment_id, owner_type: 'product', owner_id: product.product_id,
+                  attachment_type: 'product_image', slot_key: 'primary', mime_type: 'image/png',
+                }],
+              } } },
+            })
+          }
           if (method !== 'download_attachment') return route.fallback()
           const attachmentID = Number(params.id)
           downloads.set(attachmentID, (downloads.get(attachmentID) || 0) + 1)
@@ -296,6 +324,18 @@ function createTaskItemLayoutScenarios({ assert }) {
           assert.equal(await row(97401).getByRole('button', { name: /大图|重试/u }).count(), 0)
           assert.equal(downloads.size, 0)
           return
+        }
+        const thumbnail = row(97401).locator('.erp-task-product-image img')
+        await thumbnail.waitFor()
+        assert.equal(await thumbnail.evaluate((node) => getComputedStyle(node).filter), theme === 'dark' ? 'brightness(0.82)' : 'none')
+        if (theme === 'dark') {
+          await row(97401).getByRole('button', { name: '查看示例狐狸大图', exact: true }).click()
+          const closePreview = page.getByRole('button', { name: '关闭图片预览', exact: true })
+          const fullImage = page.locator('.erp-task-image-preview__stage img').first()
+          await fullImage.waitFor()
+          assert.equal(await fullImage.evaluate((node) => getComputedStyle(node).filter), 'none', '查看原色不应用缩略图滤镜')
+          await closePreview.click()
+          await closePreview.waitFor({ state: 'hidden' })
         }
         const trigger = row(97402).getByRole('button', { name: '查看3 款产品', exact: true })
         if (!mobile) {
