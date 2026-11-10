@@ -435,11 +435,7 @@ function selectedShipmentSourceRows(formItems = [], sourceRows = []) {
   return sourceRows.filter((row) => sourceItemIDs.has(Number(row.id)))
 }
 
-function ShipmentSelectedSourceAlert({
-  selectedSalesOrder,
-  shipmentSourceRows = [],
-}) {
-  if (!selectedSalesOrder) return null
+function ShipmentImportedLineCount({ shipmentSourceRows }) {
   return (
     <Form.Item
       noStyle
@@ -451,12 +447,10 @@ function ShipmentSelectedSourceAlert({
           shipmentSourceRows
         )
         return (
-          <div
-            className="erp-business-source-summary erp-business-inline-note"
-            role="note"
-          >
-            <Text type="secondary">已导入 {selectedSourceRows.length} 行</Text>
-          </div>
+          <>
+            <span role="note">已导入 {selectedSourceRows.length} 行</span>
+            <span aria-hidden="true"> · </span>
+          </>
         )
       }}
     </Form.Item>
@@ -853,7 +847,7 @@ function ShipmentItemFormContent({
 }
 
 function ShipmentEditableLines({
-  fields, form, remove, registerLineItemRow, requestLineItemScroll, selectedSalesOrder, headerActions, ...options
+  fields, form, remove, registerLineItemRow, requestLineItemScroll, selectedSalesOrder, shipmentSourceRows, headerActions, ...options
 }) {
   const productOptions = useMemo(
     () => new Map(options.productOptions.map((option) => [Number(option.value), option])),
@@ -863,7 +857,12 @@ function ShipmentEditableLines({
   return (
     <BusinessGroupedLineItems
       title="出货明细"
-      description="确认出货时才会扣减相应库存。"
+      description={(
+        <>
+          {selectedSalesOrder ? <ShipmentImportedLineCount shipmentSourceRows={shipmentSourceRows} /> : null}
+          <span>确认出货时才会扣减相应库存。</span>
+        </>
+      )}
       headerActions={headerActions}
       fields={fields}
       form={form}
@@ -1151,12 +1150,6 @@ export default function ShipmentEditor({
               showHeading={false}
               layout="content"
             >
-              {isWritableModal ? (
-                <ShipmentSelectedSourceAlert
-                  selectedSalesOrder={selectedSalesOrder}
-                  shipmentSourceRows={shipmentSourceRows}
-                />
-              ) : null}
               {isViewModal && modalSelectedShipment ? (
                 <section className="erp-sales-order-lines-form erp-shipment-modal-items">
                   <BusinessLineItemsHeader title="出货明细">
@@ -1293,6 +1286,7 @@ export default function ShipmentEditor({
                         registerLineItemRow={registerLineItemRow}
                         requestLineItemScroll={requestLineItemScroll}
                         selectedSalesOrder={selectedSalesOrder}
+                        shipmentSourceRows={shipmentSourceRows}
                         inventoryLots={inventoryLots}
                         inventoryLotOptions={inventoryLotOptions}
                         products={products}

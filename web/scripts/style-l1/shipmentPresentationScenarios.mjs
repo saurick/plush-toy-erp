@@ -688,6 +688,10 @@ id: body.id,
             const importButton = editor.getByRole('button', { name: '从销售订单导入', exact: true })
             const undoButton = editor.getByRole('button', { name: '撤销本次导入', exact: true })
             const addButton = editor.getByRole('button', { name: '添加出货明细', exact: true })
+            const shipmentLines = editor.locator('.erp-shipment-modal-items .erp-sales-order-lines-form__row')
+            const headingBand = editor.locator('[data-form-section="出货明细"] .erp-business-form-heading')
+            const importedCount = editor.getByText(/^已导入 \d+ 行$/u)
+            const twoImportedInHeading = headingBand.getByText('已导入 2 行', { exact: true })
             const importRows = async (indexes) => {
               await importButton.click()
               const picker = page.locator('.erp-source-import-picker-modal.ant-modal:visible').last()
@@ -701,6 +705,7 @@ id: body.id,
               [...document.querySelectorAll('.erp-business-import-actions button')]
                 .some((button) => button.textContent.includes('撤销本次导入') && !button.disabled))
             assert.equal(await undoButton.count(), 0, '新建时没有撤销记录')
+            assert.equal(await importedCount.count(), 0, '手工新建不显示导入行数')
             await editor.getByLabel('收货人', { exact: true }).fill('导入前收货人')
             await editor.locator('#note').fill('导入前备注')
             await editor.getByLabel('数量', { exact: true }).fill('2')
@@ -708,7 +713,19 @@ id: body.id,
             await importRows([0, 1])
             await waitUndoReady()
             await assertImportUndoPlacement(editor)
-            assert.equal(await editor.getByRole('button', { name: /移除明细/u }).count(), 3)
+            assert.equal(await shipmentLines.count(), 3)
+            await twoImportedInHeading.waitFor()
+            assert.equal(await importedCount.count(), 1, '导入行数只在标题内显示一处，排除手工行')
+            const countPlacement = await twoImportedInHeading.evaluate((node) => {
+              const title = node.closest('.erp-business-form-heading').querySelector('[role="heading"]')
+              const labelBox = title.getBoundingClientRect()
+              const countBox = node.getBoundingClientRect()
+              return {
+                besideTitle: countBox.left >= labelBox.right && countBox.top < labelBox.bottom && labelBox.top < countBox.bottom,
+                smaller: parseFloat(getComputedStyle(node).fontSize) < parseFloat(getComputedStyle(title).fontSize),
+              }
+            })
+            assert.deepEqual(countPlacement, { besideTitle: true, smaller: true }, '桌面导入行数以小号文字排在标题旁')
             await importButton.click()
             const duplicatePicker = page.locator('.erp-source-import-picker-modal.ant-modal:visible').last()
             await duplicatePicker.locator('.ant-table-row').first().locator('.ant-checkbox-wrapper').first()
@@ -721,7 +738,7 @@ id: body.id,
             assert.equal(await undoButton.isEnabled(), true, '重复来源不替换或破坏上一次撤销记录')
             await editor.locator('#note').fill('导入后另填的备注')
             assert.equal(await undoButton.isEnabled(), true, '无关备注不使撤销失效')
-            await editor.locator('.erp-business-source-summary').scrollIntoViewIfNeeded()
+            await twoImportedInHeading.scrollIntoViewIfNeeded()
             await assertNoHorizontalOverflow(page)
             await page.waitForFunction(() => !document.querySelector('.ant-message-notice'), null, { timeout: 5000 })
             await page.screenshot({ path: path.join(outputDir, 'shipment-import-undo-ready-4k.png') })
@@ -729,9 +746,9 @@ id: body.id,
             await page.keyboard.press('Enter')
             await undoButton.waitFor({ state: 'hidden' })
             assert.equal(await importButton.evaluate((button) => button === document.activeElement), true, '撤销后焦点回到来源导入入口')
-            assert.equal(await editor.getByRole('button', { name: /移除明细/u }).count(), 1, '恢复导入前手工明细')
+            assert.equal(await shipmentLines.count(), 1, '恢复导入前手工明细')
             assert.equal(await addButton.isEnabled(), true, '来源解除后恢复手工添加')
-            assert.equal(await editor.locator('.erp-business-source-summary').count(), 0, '撤销不能留下订单摘要')
+            assert.equal(await importedCount.count(), 0, '撤销全部来源后不保留导入行数')
             assert.equal(await editor.getByLabel('收货人', { exact: true }).inputValue(), '导入前收货人')
             assert.equal(await editor.locator('#note').inputValue(), '导入后另填的备注')
             assert.equal(await editor.getByLabel('实际总净重（克）', { exact: true }).inputValue(), '1500')
@@ -740,11 +757,11 @@ id: body.id,
             await waitUndoReady()
             await importRows([1])
             await waitUndoReady()
-            assert.equal(await editor.getByRole('button', { name: /移除明细/u }).count(), 3)
+            assert.equal(await shipmentLines.count(), 3)
             await undoButton.click()
             await undoButton.waitFor({ state: 'hidden' })
-            assert.equal(await editor.getByRole('button', { name: /移除明细/u }).count(), 2, '第二批撤销保留原手工明细和第一批来源行')
-            assert.equal(await editor.locator('.erp-business-source-summary').count(), 1)
+            assert.equal(await shipmentLines.count(), 2, '第二批撤销保留原手工明细和第一批来源行')
+            await headingBand.getByText('已导入 1 行', { exact: true }).waitFor()
             assert.equal(await addButton.isDisabled(), true, '保留第一批的订单关联')
 
             await importRows([1])
@@ -757,16 +774,14 @@ id: body.id,
             await quantity.fill(originalQuantity)
             assert.equal(await undoButton.isDisabled(), true, '改回原值也不恢复旧撤销快照')
             await page.setViewportSize({ width: 1024, height: 900 })
-            await editor.locator('.erp-business-source-summary').scrollIntoViewIfNeeded()
+            await twoImportedInHeading.scrollIntoViewIfNeeded()
             await assertNoHorizontalOverflow(page)
-            const summaryFits = await editor.locator('.erp-business-source-summary').evaluate((node) => {
-              const bounds = node.getBoundingClientRect()
-              return [...node.children].every((child) => {
-                const box = child.getBoundingClientRect()
-                return box.left >= bounds.left - 1 && box.right <= bounds.right + 1
-              })
+            const summaryFits = await twoImportedInHeading.evaluate((node) => {
+              const bounds = node.closest('.erp-business-form-heading').getBoundingClientRect()
+              const box = node.getBoundingClientRect()
+              return box.left >= bounds.left - 1 && box.right <= bounds.right + 1 && box.top >= bounds.top - 1 && box.bottom <= bounds.bottom + 1
             })
-            assert.equal(summaryFits, true, '来源摘要在窄屏内换行，不覆盖相邻区域')
+            assert.equal(summaryFits, true, '窄屏导入行数留在标题区内，不覆盖相邻区域')
             await assertImportUndoPlacement(editor, { narrow: true })
             await page.setViewportSize({ width: 1920, height: 1080 })
           },
@@ -778,7 +793,7 @@ id: body.id,
           afterOpen: async (editor) => {
             assert.equal(await editor.getByRole('button', { name: '撤销本次导入', exact: true }).count(), 0)
             assert.equal(await editor.locator('#note').inputValue(), '')
-            assert.equal(await editor.locator('.erp-business-source-summary').count(), 0)
+            assert.equal(await editor.getByText(/^已导入 \d+ 行$/u).count(), 0)
           },
         })
         assert.deepEqual(shipmentWrites, [], '导入、撤销与关闭只修改本地表单，不写业务事实')
