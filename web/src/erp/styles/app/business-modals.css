@@ -235,7 +235,7 @@
   flex-wrap: wrap;
   gap: 4px;
   margin: 0;
-  padding: 4px 0;
+  padding: var(--erp-business-inline-note-padding, 4px 0);
   color: var(--erp-text-muted, #64748b);
   font-size: var(--erp-font-small);
   line-height: 1.55;

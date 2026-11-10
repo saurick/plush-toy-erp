@@ -141,6 +141,10 @@
   padding: 0;
 }
 
+.erp-business-form-section[data-heading='inline'] > .erp-business-form-section__content > .erp-business-inline-note {
+  --erp-business-inline-note-padding: 8px 12px;
+}
+
 .erp-business-form-section__fields > .erp-business-action-form__section-title {
   grid-column: 1 / -1;
 }

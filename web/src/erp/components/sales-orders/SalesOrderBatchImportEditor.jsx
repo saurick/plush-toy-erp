@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Alert, Button, Form, Space, Tag, Typography } from 'antd'
+import { Alert, Button, Form, Tag, Typography } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -36,6 +36,7 @@ import {
 } from '../../api/attachmentApi.mjs'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
 import BusinessForm from '../business-list/BusinessForm.jsx'
+import './salesOrderBatchImportEditor.css'
 
 const statusLabels = {
   pending: '待保存',
@@ -310,7 +311,7 @@ export default function SalesOrderBatchImportEditor({
       onOk={saveAll}
       onCancel={onClose}
     >
-      <Space wrap>
+      <div className="erp-sales-order-import-navigation">
         <Button
           disabled={saving || index === 0}
           onClick={() => selectOrder(index - 1)}
@@ -322,9 +323,9 @@ export default function SalesOrderBatchImportEditor({
           label="切换导入订单"
           placeholder="切换导入订单"
           aria-label="切换导入订单"
+          className="erp-sales-order-import-navigation__select"
           showSearch
           optionFilterProp="label"
-          style={{ minWidth: 360, maxWidth: '100%' }}
           value={index}
           disabled={saving}
           onChange={selectOrder}
@@ -345,7 +346,7 @@ export default function SalesOrderBatchImportEditor({
         <Tag color={completed === entries.length ? 'success' : undefined}>
           含图片已完成 {completed} / {entries.length} 张
         </Tag>
-      </Space>
+      </div>
       {current.errors?.length ? (
         <Alert
           data-sales-import-issue-count={
