@@ -61,12 +61,6 @@ function formatDateTime(value) {
   }).format(new Date(timestamp * 1000))
 }
 
-function itemSummary(record) {
-  const items = Array.isArray(record?.items) ? record.items : []
-  if (items.length === 0) return '暂无明细'
-  return `${items.length} 行来源库存`
-}
-
 function statusTag(value) {
   const status = String(value || '').toUpperCase()
   return (
@@ -190,13 +184,6 @@ export default function InventoryOperationRecordsModal({
         title: '业务原因',
         dataIndex: 'reason',
         render: (value) => value || '-',
-      },
-      {
-        align: 'left',
-        title: '作业明细',
-        key: 'items',
-        width: 130,
-        render: (_, record) => itemSummary(record),
       },
       {
         title: '最近更新',
