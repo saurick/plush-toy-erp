@@ -51,12 +51,6 @@
   font-weight: var(--erp-line-header-weight, 650);
 }
 
-.erp-line-item-table th:not(:last-child) {
-  --erp-table-column-shadow: none;
-
-  border-inline-end: var(--erp-line-header-divider-width, 1px) solid var(--erp-border-strong);
-}
-
 .erp-line-item-table__required {
   color: var(--erp-danger, #d43838);
 }

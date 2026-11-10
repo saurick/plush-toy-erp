@@ -8,7 +8,7 @@ import { openUIDesignAppearance } from './devUIDesignNavigation.mjs'
 const labels = ['表格密度', '表格线条', '编辑页显示']
 const notes = [
   '紧凑减少行高和留白，同屏可显示更多记录。',
-  '简洁弱化分隔线；网格突出行列边界，方便逐格核对。',
+  '网格给列表和桌面编辑明细加列线；卡片、打印和固定版式保持原样。',
   '适用于长编辑页：目录整页展示并定位分区；页签按分区切换。',
 ]
 

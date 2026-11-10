@@ -23,7 +23,6 @@ tbody.erp-editable-line-group + tbody.erp-editable-line-group {
 }
 
 .erp-editable-line-group > tr > .erp-editable-line-group__sequence {
-  border-inline-end: var(--erp-line-sequence-border-width, 1px) solid var(--erp-border);
   background: var(--erp-line-group-bg);
   vertical-align: top;
 }

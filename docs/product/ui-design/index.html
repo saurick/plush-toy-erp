@@ -2474,6 +2474,9 @@
     @media screen {
       [data-table-lines="grid"] .table-wrap tbody > tr > td:not(:last-child),
       [data-table-lines="grid"] .table-wrap tfoot > tr > td:not(:last-child) { border-inline-end: 1px solid var(--line); }
+      [data-table-lines="grid"] .line-editor-simplified > table[data-table-lines="appearance"] > :is(thead,tbody) > tr > :is(th,td):not(:last-child) {
+        box-shadow: var(--line-editor-column-shadow, inset -1px 0 0 var(--line));
+      }
     }
 
     @media (max-width: 1180px) {
@@ -2901,6 +2904,7 @@
     .compact-contact-note textarea { min-height:72px; }
     .compact-contacts-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; padding:10px 12px; font-size:13px; color:var(--text-3); }
     @container (max-width:900px) {
+      .compact-contacts table { --line-editor-column-shadow:none; }
       .compact-contacts table,.compact-contact-row { display:block; }
       .compact-contact-row { --line-group-cell-separator-width:0px; position:relative; padding-inline:36px 6px; }
       .compact-contacts thead,.compact-contacts colgroup { display:none; }
@@ -2972,6 +2976,7 @@
     .compact-field-help { position:relative; }
     @container (max-width:520px) { .production-line-fields { grid-template-columns:minmax(0,1fr); }  }
     @container (max-width:720px) {
+      .compact-form-table table { --line-editor-column-shadow:none; }
       .compact-form-table table,.compact-form-table tbody { display:block; }
       .compact-form-table tbody[data-form-row] { --line-group-cell-separator-width:0px; position:relative; padding-inline:36px 6px; }
       .compact-form-table thead,.compact-form-table colgroup { display:none; }
@@ -5112,7 +5117,7 @@
     const LOGIN_OPTIONS = Object.freeze({ desktop: true, mobile: true, sms: true });
 
     function readPrototypeAppearance(authenticated) {
-      const defaults = { mode: 'system', accent: 'blue', density: 'standard', tableLines: 'simple', formDisplay: 'all' };
+      const defaults = { mode: 'system', accent: 'blue', density: 'standard', tableLines: 'grid', formDisplay: 'all' };
       try {
         return { ...defaults, ...JSON.parse(localStorage.getItem(authenticated ? 'erp-prototype-account-appearance' : 'erp-prototype-guest-appearance') || '{}') };
       } catch { return defaults; }
@@ -17190,7 +17195,7 @@ return {orders,financeCustomers};})();
       form.querySelectorAll('.document-line-table,.compact-form-table,.compact-contacts').forEach((root,scopeIndex)=>{
         if(root.dataset.lineEditorEnhanced){if(root.updateLineEditorLayout)lineEditorLayoutObserver.observe(root);return;}
         root.dataset.lineEditorEnhanced='true';root.classList.add('line-editor-simplified');
-        const table=root.querySelector('table');if(!table)return;table.dataset.tableLines='fixed';
+        const table=root.querySelector('table');if(!table)return;table.dataset.tableLines='appearance';
         const contactFields=root.querySelector('.compact-contact-fields');
         const isCompact=()=>contactFields?getComputedStyle(contactFields).display==='grid':window.innerWidth<=720;
         const rows=[...table.querySelectorAll('tbody.editable-line-group')];
@@ -19402,7 +19407,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const table=(caption,cls='')=>`<figure><figcaption>${caption}</figcaption><table class="appearance-setting-help-table ${cls}" aria-label="${caption}效果示意">${rows}</table></figure>`;
       const placeholder='<div class="appearance-setting-help-placeholder"></div>';
       if(kind==='density')return `<strong>表格密度</strong><div class="appearance-setting-help-content"><div class="appearance-setting-help-compare">${table('标准')}${table('紧凑','is-compact')}</div><p class="appearance-setting-help-note">紧凑减少行高和留白，同屏可显示更多记录。</p></div>`;
-      if(kind==='lines')return `<strong>表格线条</strong><div class="appearance-setting-help-content"><div class="appearance-setting-help-compare">${table('简洁')}${table('网格','is-grid')}</div><p class="appearance-setting-help-note">简洁弱化分隔线；网格突出行列边界，方便逐格核对。</p></div>`;
+      if(kind==='lines')return `<strong>表格线条</strong><div class="appearance-setting-help-content"><div class="appearance-setting-help-compare">${table('简洁')}${table('网格','is-grid')}</div><p class="appearance-setting-help-note">网格给列表和桌面编辑明细加列线；卡片、打印和固定版式保持原样。</p></div>`;
       return `<strong>编辑页显示</strong><div class="appearance-setting-help-content"><div class="appearance-setting-help-compare"><figure><figcaption>目录</figcaption><div class="appearance-setting-help-editor is-directory" role="img" aria-label="左侧目录定位，右侧展示全部分区"><aside><span>基本</span><span>明细</span><span>交付</span></aside><div class="appearance-setting-help-sections">${['基本信息','采购明细','交付信息'].map(label=>`<div>${label}${placeholder}</div>`).join('')}</div></div></figure><figure><figcaption>页签</figcaption><div class="appearance-setting-help-editor" role="img" aria-label="顶部页签切换，一次展示一个分区"><div class="appearance-setting-help-tabs"><span>基本</span><b>明细</b><span>交付</span></div><div class="appearance-setting-help-sections"><div>采购明细${placeholder.repeat(3)}</div></div></div></figure></div><p class="appearance-setting-help-note">适用于长编辑页：目录整页展示并定位分区；页签按分区切换。</p></div>`;
     }
 

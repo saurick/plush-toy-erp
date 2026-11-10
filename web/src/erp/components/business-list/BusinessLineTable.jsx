@@ -44,7 +44,7 @@ export default function BusinessLineTable({
             className={`erp-line-item-table ${tableClassName}`.trim()}
             data-business-line-table
             data-line-details-column={expandableDetails ? 'true' : undefined}
-            data-table-lines="fixed"
+            data-table-lines="appearance"
             aria-label={label}
             style={minWidth === undefined ? undefined : { minWidth }}
           >

@@ -160,7 +160,7 @@ export async function assertEditorTableHeadersCentered(editor) {
 
 export async function assertSharedLineTableSurface(editor) {
   const surface = await editor.evaluate((root) => {
-    const candidates = [...root.querySelectorAll('table[data-table-lines="fixed"], .erp-contact-editor__table')].filter((table) => !table.closest('[data-table-sticky-header]') && !table.classList.contains('erp-bom-parts-table'))
+    const candidates = [...root.querySelectorAll('table:is([data-business-line-table], [data-table-lines="fixed"], .erp-contact-editor__table)')].filter((table) => !table.closest('[data-table-sticky-header]') && !table.classList.contains('erp-bom-parts-table'))
     return {
       cards: root.querySelectorAll('.erp-task-line-cards').length,
       empty: root.querySelectorAll('.erp-line-items-empty').length,

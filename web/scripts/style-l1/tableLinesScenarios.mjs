@@ -1,5 +1,6 @@
-import { openERPAppearance } from './themeAssertions.mjs'
+import { openERPAppearance, setERPFormDisplay } from './themeAssertions.mjs'
 import assert from 'node:assert/strict'
+import { expect } from 'playwright/test'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
@@ -7,23 +8,28 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
 import { assertReadableOnBackground } from './colorAssertions.mjs'
 import { createBusinessProgressScenarios } from './businessProgressScenarios.mjs'
+import { closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 
 async function selectSegment(dialog, name, label) {
   const control = dialog.getByRole('radiogroup', { name })
   await control.getByText(label, { exact: true }).click()
-  assert(
-    await control.getByRole('radio', { name: label, exact: true }).isChecked()
-  )
+  await expect(control.getByRole('radio', { name: label, exact: true })).toBeChecked()
 }
 
 async function setTableLines(page, label) {
-  const trigger = await openERPAppearance(page)
+  // WebKit 的指针点击不保证按钮获得焦点；直接入口走键盘激活后核对恢复。
+  const appearanceButton = page.getByRole('button', { name: '外观与密度', exact: true })
+  const direct = await appearanceButton.isVisible()
+  const trigger = direct ? appearanceButton : await openERPAppearance(page)
+  if (direct) await trigger.press('Enter')
   const dialog = page.getByRole('dialog', { name: '外观与密度' })
+  await dialog.waitFor()
+  await waitForFiniteAnimations(page, { selector: '.ant-modal' })
   await selectSegment(dialog, '表格线条', label)
   await dialog
     .locator('.ant-modal-footer')
     .getByRole('button', { name: /^关\s*闭$/u })
-    .click()
+    .press('Enter')
   await dialog.waitFor({ state: 'hidden' })
   await waitForFiniteAnimations(page)
   assert(await trigger.evaluate((node) => node === document.activeElement))
@@ -161,13 +167,17 @@ export function createTableLinesScenarios(deps) {
         'simple'
       )
       const before = await measure(business)
-      const nativeBefore = await page
-        .locator('#native-table')
-        .evaluate((node) => node.innerHTML)
-      const nativeTables = page.locator('table[data-table-lines="appearance"]')
+      const nativeName = page.getByRole('textbox', { name: '编辑品名', exact: true })
+      const draftName = '手工输入的长名称产品'
+      await nativeName.fill(draftName)
+      const nativeInput = await nativeName.elementHandle()
+      const nativeTables = page.locator('table:is([data-table-lines="appearance"], [data-business-line-table]):not([data-table-sticky-header] table)')
       const nativeMetricsBefore = await Promise.all(
         (await nativeTables.all()).map(measure)
       )
+      const stickyContactHeader = page.locator('#contact-table [data-table-sticky-header] table')
+      await stickyContactHeader.locator('th').first().waitFor({ state: 'attached' })
+      assert((await measure(stickyContactHeader)).cells.every(({ verticalLine }) => verticalLine === '0px'))
       const fixedTable = page.locator('#nested-fixed-table')
       const nestedFixedBefore = await measure(fixedTable)
       const borderedBefore = await measure(
@@ -195,18 +205,22 @@ export function createTableLinesScenarios(deps) {
           '原生表格切换网格保留列宽、行高与合并单元格'
         )
       }
+      assertGrid(await measure(stickyContactHeader))
+      assert(await nativeInput.evaluate((node) => node.isConnected), '切换列线不重新挂载录入字段')
+      await nativeInput.dispose()
+      assert.equal(await nativeName.inputValue(), draftName)
       assert.deepEqual(await measure(fixedTable), nestedFixedBefore, '嵌套固定表不继承外层列线')
       await page.getByRole('textbox', { name: '紧凑品名', exact: true }).fill('手工输入的长名称产品')
       await page.setViewportSize({ width: 700, height: 1000 })
-      for (const selector of ['#compact-table table', '#contact-table table']) {
-        assert(
-          await page.locator(selector).evaluate((node) =>
-            [...node.querySelectorAll('tbody td')].every((cell) => getComputedStyle(cell).boxShadow === 'none')
-          ),
-          '窄容器转为卡片后不绘制表格列线'
-        )
+      await page.locator('#native-table .erp-task-line-cards').waitFor()
+      for (const section of ['#compact-table', '#contact-table']) {
+        const cardTable = page.locator(`${section} table[data-business-line-table]`)
+        assert.equal(await cardTable.evaluate((node) => getComputedStyle(node).display), 'block')
+        assert((await measure(cardTable)).cells.every(({ verticalLine }) => verticalLine === '0px'), '窄容器转为卡片后不绘制表格列线')
       }
       await page.setViewportSize({ width: 960, height: 1000 })
+      await page.locator('#native-table table[data-business-line-table]').waitFor()
+      assert.equal(await nativeName.inputValue(), draftName, '从卡片恢复桌面明细保留草稿')
       assert.equal(await page.getByRole('textbox', { name: '紧凑品名', exact: true }).inputValue(), '手工输入的长名称产品')
       for (const table of await nativeTables.all()) assertGrid(await measure(table))
       assert.deepEqual(
@@ -249,11 +263,6 @@ export function createTableLinesScenarios(deps) {
       assert(await scroll.evaluate((node) => node.scrollLeft > 0))
       assert(Math.abs((await fixed.boundingBox()).x - fixedBefore.x) < 1)
       assertGrid(await measure(business))
-      assert.equal(
-        await page.locator('#native-table').evaluate((node) => node.innerHTML),
-        nativeBefore,
-        '编辑明细沿用自身版式'
-      )
       await page.emulateMedia({ media: 'print' })
       for (const [index, table] of (await nativeTables.all()).entries()) {
         const metric = await measure(table)
@@ -353,6 +362,46 @@ export function createTableLinesScenarios(deps) {
   return [
     ...fixtures,
     ...progressScenarios,
+    {
+      name: 'table-lines-shipment-editor',
+      path: '/erp/warehouse/shipments',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      themeMode: 'light',
+      verify: async (page) => {
+        await setERPFormDisplay(page, 'section')
+        await page.getByRole('button', { name: '新建出货单' }).click()
+        const editor = page.getByRole('region', { name: '新建出货单', exact: true })
+        await editor.getByRole('tab', { name: '出货明细', exact: true }).click()
+        await editor.getByRole('button', { name: '添加出货明细', exact: true }).click()
+        const table = editor.getByRole('table', { name: '出货明细', exact: true })
+        const row = table.getByRole('rowgroup', { name: '第 1 条明细', exact: true })
+        await row.getByRole('button', { name: '展开第 1 行补充资料', exact: true }).click()
+        const supplement = row.locator('.erp-line-item-table__details-row')
+        const caseNumber = supplement.getByLabel('箱号', { exact: true })
+        await caseNumber.fill('CASE-24')
+        await waitForFiniteAnimations(page)
+
+        const grid = await measure(table)
+        assertGrid(grid)
+        assert(grid.cells.filter(({ isLast }) => isLast).every(({ verticalLine }) => verticalLine === '0px'), '末列和跨列的补充资料不加竖线')
+        const geometry = (metrics) => metrics.cells.map(({ width, height }) => [width, height])
+
+        await setTableLines(page, '简洁')
+        const simple = await measure(table)
+        assert(simple.cells.every(({ verticalLine }) => verticalLine === '0px'), '简洁模式下表头与主行不加竖线')
+        assert.deepEqual(geometry(simple), geometry(grid), '切换列线不改变列宽和行高')
+
+        await setTableLines(page, '网格')
+        assert.deepEqual(await measure(table), grid, '切回网格恢复表头与数据列线')
+        assert.equal(await caseNumber.inputValue(), 'CASE-24', '切换外观保留明细草稿')
+        assert.equal(await supplement.isVisible(), true, '切换外观保留补充资料展开状态')
+        await page.screenshot({ path: path.join(outputDir, 'table-lines-shipment-editor-4k.png') })
+        await closeBusinessFormPage(page, editor)
+      },
+    },
     {
       name: 'table-lines-business',
       path: '/erp/sales/project-orders/sales-orders',
