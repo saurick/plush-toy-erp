@@ -15,6 +15,7 @@ import {
 } from '@/common/auth/auth'
 import { authBus } from '@/common/auth/authBus'
 import AppShell from '@/common/components/layout/AppShell'
+import AppSelect from '@/common/components/select/AppSelect.jsx'
 import { Loading } from '@/common/components/loading'
 import { getActiveERPBrand } from '@/common/consts/brand'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
@@ -185,6 +186,10 @@ function MobileAppContent({ legalNotice }) {
       ),
     [adminProfile, entryConfig]
   )
+  const mobileRoleOptions = useMemo(() => allowedMobileRoleKeys.map((roleKey) => ({
+    value: roleKey,
+    label: roleKey === MOBILE_ALL_ROLES_KEY ? '全部岗位' : getRoleDisplayName(roleKey, '岗位'),
+  })), [allowedMobileRoleKeys])
   const customerRuntimeAvailable = canMountCustomerRuntime(adminProfile)
   const shouldBlockMissingCustomerRuntime =
     profileSyncCompleted &&
@@ -529,28 +534,16 @@ function MobileAppContent({ legalNotice }) {
               </div>
             ) : null}
             {adminProfile?.is_super_admin !== true && allowedMobileRoleKeys.length > 1 ? (
-              <nav
-                className="mx-3 mt-3 flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2"
-                aria-label="切换岗位任务端"
-              >
-                {allowedMobileRoleKeys.map((roleKey) => (
-                  <button
-                    key={roleKey}
-                    type="button"
-                    className={`min-h-11 shrink-0 rounded-lg px-4 py-2 text-sm font-semibold ${
-                      roleKey === activeRoleKey
-                        ? 'bg-emerald-600 text-white'
-                        : 'border border-slate-300 bg-white text-slate-700'
-                    }`}
-                    aria-current={
-                      roleKey === activeRoleKey ? 'page' : undefined
-                    }
-                    onClick={() => handleSwitchMobileRole(roleKey)}
-                  >
-                    {getRoleDisplayName(roleKey, '岗位')}
-                  </button>
-                ))}
-              </nav>
+              <div className="mobile-role-scope erp-mobile-controls">
+                <AppSelect
+                  aria-label="切换岗位任务端"
+                  value={activeRoleKey}
+                  options={mobileRoleOptions}
+                  onChange={handleSwitchMobileRole}
+                  showSearch
+                  optionFilterProp="label"
+                />
+              </div>
             ) : null}
             <Outlet
               context={{
@@ -558,12 +551,7 @@ function MobileAppContent({ legalNotice }) {
                 canEnterDesktop,
                 handleLogout,
                 loggingOut,
-                mobileRoleOptions: allowedMobileRoleKeys.map((roleKey) => ({
-                  value: roleKey,
-                  label: roleKey === MOBILE_ALL_ROLES_KEY
-                    ? '全部岗位'
-                    : getRoleDisplayName(roleKey, '岗位'),
-                })),
+                mobileRoleOptions,
                 handleSwitchMobileRole,
               }}
             />

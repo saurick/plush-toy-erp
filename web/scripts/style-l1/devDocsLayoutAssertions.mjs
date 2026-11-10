@@ -17,7 +17,7 @@ export async function assertDevDocsDirectorySpace(page, assert) {
       .querySelector('.erp-dev-docs-tree')
       .getBoundingClientRect()
     const controls =
-      '.erp-dev-docs-lifecycle, .erp-dev-docs-search, .erp-dev-docs-search-scope'
+      '.erp-dev-docs-lifecycle, .erp-dev-docs-search, [role="group"][aria-label="项目文档搜索范围"]'
     return {
       headerControls: header.querySelectorAll(controls).length,
       sidebarControls: sidebar.querySelectorAll(controls).length,

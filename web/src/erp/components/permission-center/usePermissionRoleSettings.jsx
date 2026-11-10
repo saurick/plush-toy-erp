@@ -651,7 +651,6 @@ export function usePermissionRoleSettings({
   const roleNavigationContent = (
     <Tabs
       className="erp-role-navigation-workspace-tabs"
-      type="card"
       size="small"
       activeKey={roleNavigationViewKey}
       destroyOnHidden={false}

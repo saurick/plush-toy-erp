@@ -224,7 +224,7 @@
 .mobile-app-layout--sync-issue,
 .mobile-app-layout:has(> .mobile-task-step-panels),
 .mobile-app-layout:has(> .legal-notice-status-banner),
-.mobile-app-layout:has(> nav[aria-label='切换岗位任务端']) {
+.mobile-app-layout:has(> .mobile-role-scope) {
   display: flex;
   min-height: 0;
   height: 100vh;
@@ -240,7 +240,7 @@
 .mobile-app-layout--review .mobile-role-tasks-page,
 .mobile-app-layout--sync-issue .mobile-role-tasks-page,
 .mobile-app-layout:has(> .legal-notice-status-banner) .mobile-role-tasks-page,
-.mobile-app-layout:has(> nav[aria-label='切换岗位任务端']) .mobile-role-tasks-page {
+.mobile-app-layout:has(> .mobile-role-scope) .mobile-role-tasks-page {
   height: auto;
   flex: 1 1 auto;
 }
@@ -250,8 +250,13 @@
   flex: 1 1 0;
 }
 
-.mobile-app-layout > nav[aria-label='切换岗位任务端'] {
+.mobile-app-layout > .mobile-role-scope {
   flex: 0 0 auto;
+  padding: 8px 12px 0;
+}
+
+.mobile-role-scope > .ant-select {
+  width: min(100%, 240px);
 }
 
 .mobile-role-runtime-boundary {
@@ -1299,7 +1304,7 @@
   .mobile-app-layout--sync-issue,
   .mobile-app-layout:has(> .mobile-task-step-panels),
   .mobile-app-layout:has(> .legal-notice-status-banner),
-  .mobile-app-layout:has(> nav[aria-label='切换岗位任务端']) {
+  .mobile-app-layout:has(> .mobile-role-scope) {
     height: calc(100vh - 32px);
     height: calc(100dvh - 32px);
   }

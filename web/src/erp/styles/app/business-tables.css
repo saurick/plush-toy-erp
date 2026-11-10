@@ -438,11 +438,6 @@
   scrollbar-width: thin;
 }
 
-.erp-business-operation-panel__quick .ant-segmented-item-label {
-  padding-inline: 9px;
-  font-size: var(--erp-font-caption);
-}
-
 .erp-business-filter-popover__content {
   width: min(560px, calc(100vw - 48px));
   max-height: min(600px, calc(100dvh - 140px));

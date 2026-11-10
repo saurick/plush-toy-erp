@@ -16,6 +16,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_DOCS_ROUTE } from '../config/devRoutes.mjs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
@@ -983,16 +984,12 @@ export default function DevDocsPage() {
             onSearch={(value) => setKeyword(value)}
             className="erp-dev-docs-search"
           />
-          <div className="erp-dev-docs-search-scope">
-            <Segmented
-              size="small"
-              aria-label="项目文档搜索范围"
-              className="erp-dev-docs-search-scope__control"
-              options={SEARCH_SCOPE_OPTIONS}
-              value={searchScope}
-              onChange={setSearchScope}
-            />
-          </div>
+          <FilterChipGroup
+            aria-label="项目文档搜索范围"
+            options={SEARCH_SCOPE_OPTIONS}
+            value={searchScope}
+            onChange={setSearchScope}
+          />
         </div>
       </DevPageHeader>
 

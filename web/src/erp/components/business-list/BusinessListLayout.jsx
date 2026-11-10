@@ -35,7 +35,6 @@ import FilterSelect from '@/common/components/select/FilterSelect'
 import { filterSelectOptions, isEmptyFilterValue } from '@/common/components/select/filterSelectOptions.mjs'
 import Table, { TABLE_SELECTION_COLUMN_WIDTH } from '@/common/components/table/AppTable'
 import SharedSearchInput from '@/common/components/SearchInput'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import BusinessSwitchContent from '../BusinessSwitchContent.jsx'
 import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
@@ -904,7 +903,6 @@ export function SelectFilter({
   className = '',
   onOpenChange,
   onMouseDownCapture,
-  inline = false,
   ...restProps
 }) {
   const selectRef = React.useRef(null)
@@ -948,17 +946,6 @@ export function SelectFilter({
     [onOpenChange, scrollMobileSelectIntoView]
   )
 
-  if (inline) {
-    return (
-      <Segmented
-        className="erp-business-status-filter"
-        aria-label={restProps['aria-label'] || '业务状态'}
-        value={value}
-        options={options}
-        onChange={onChange}
-      />
-    )
-  }
   if (inFilterPanel && shouldUseDirectFilterChoices({ options, mode, allowClear, className, ...restProps })) {
     const choices = allowClear
       ? [{ value: emptyValue, label: '不限' }, ...filterSelectOptions(options, emptyValue)]

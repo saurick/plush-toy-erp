@@ -338,9 +338,8 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .business-attachment-panel__toolbar > .erp-sliding-segmented {
+  .business-attachment-panel__toolbar > .erp-filter-chip-group {
     grid-column: 1 / -1;
-    width: 100%;
   }
 
   .business-attachment-panel__toolbar > .erp-business-help-label {
@@ -355,20 +354,6 @@
   .business-attachment-panel__refresh {
     grid-column: 2;
     margin-inline-start: 0;
-  }
-
-  .business-attachment-panel__toolbar .ant-segmented-group {
-    width: 100%;
-  }
-
-  .business-attachment-panel__toolbar .ant-segmented-item {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .business-attachment-panel__toolbar .ant-segmented-item-label {
-    min-width: 0;
-    padding-inline: 6px;
   }
 
   .business-attachment-panel__refresh,

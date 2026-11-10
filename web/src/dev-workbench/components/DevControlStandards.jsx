@@ -11,6 +11,7 @@ import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import FilterChip from '@/common/components/navigation/FilterChip'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import NavigationCountBadge from '@/common/components/navigation/NavigationCountBadge'
@@ -129,7 +130,7 @@ const TOPICS = [
     description: '先操作采购与生产的并排样例，比较查看角度与办理职责如何决定页签位置；再核对库存、采购、待办与历史的工具栏组合。',
     rules: [
       ['入口层级', '独立办理入口靠标题，同业务分类靠查询', '采购在同一批订单中切换列表与跟进；生产切换计划、执行、记录与处置，各自有业务对象、职责和操作。'],
-      ['内容分类', '少量稳定分类直达，较多分类搜索选择', '内容由业务决定；页内分类使用查询区左侧的圆角分类条，切换保持挂载。'],
+      ['内容分类', '少量稳定分类直达，较多分类搜索选择', '内容由业务决定；页内分类使用查询区左侧的下划线页签，切换保持挂载。'],
       ['同范围展示', '明细 / 分布、列表 / 日历按需出现', '展示方式与业务内容分类、快捷条件分开。'],
       ['查询、工具与主动作', '共用插槽与交互，按任务组合', '保留搜索提交、筛选、列设置和选中操作；职责名称只在设计中标注。'],
       ['功能与数据增长', '分别切换两种假设场景', '扩展分类是假设，30 个数据选项进入搜索筛选，不自动变成导航。'],
@@ -258,7 +259,7 @@ const TOPICS = [
       '先区分独立业务入口、页内查询分类、详情分区和展示设置，再选导航位置与样式；正式规则与业务工具栏组合共用。',
     rules: [
       ['独立办理入口或工作范围', '标题附近的主导航', '生产订单 / 执行 / 异常处理、任务范围及不同进度工作区保持各自层级。'],
-      ['同业务的资料分类、整单 / 明细、列表 / 到期顺序', '查询区左侧的圆角分类条', '产品基础信息 / 规格、加工合同 / 明细等与搜索组合，切换保持同一分类条。'],
+      ['同业务的资料分类、整单 / 明细、列表 / 到期顺序', '查询区左侧的下划线页签', '产品基础信息 / 规格、加工合同 / 明细等与搜索组合，切换保持同一分类条。'],
       ['详情中的并列内容', '详情内的内容页签', '同一订单的产品明细与关联任务保留对象身份，使用下划线区分当前内容。'],
       ['电脑 / 手机、表格 / 图形、主题与密度', '分段按钮', '选择运行模式、显示方式或设置值，使用底轨和选中滑块。'],
       ['主导航和详情页签当前项', '主题色 + 2px 下划线', '透明底与中性基线，主题线标明当前位置；两种状态均使用 500 字重，保持选项宽度。'],
@@ -643,8 +644,7 @@ function FiltersExample() {
           <div className="erp-control-example-options">
             <fieldset>
               <legend>演示记录范围</legend>
-              <SlidingSegmented
-                block
+              <FilterChipGroup
                 aria-label="演示记录范围"
                 value={scope}
                 onChange={(nextScope) => {

@@ -8,7 +8,7 @@ async function assertAttachmentToolbar(panel, name) {
     const toolbar = root.querySelector('.business-attachment-panel__toolbar')
     const bounds = (node) => { const r = node.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height } }
     const controls = [...toolbar.querySelectorAll('.erp-sliding-segmented, button')].filter((node) => node.getClientRects().length).map((node) => ({ text: node.textContent.trim(), ...bounds(node) }))
-    return { panel: bounds(root), toolbar: bounds(toolbar), overflow: toolbar.scrollWidth - toolbar.clientWidth, panelOverflow: root.scrollWidth - root.clientWidth, controls, fileNames: [...root.querySelectorAll('.business-attachment-panel__file-name')].map((node) => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })), labels: [...toolbar.querySelectorAll('.ant-segmented-item-label')].map((node) => ({ text: node.textContent, width: node.clientWidth, scroll: node.scrollWidth })), style: { minWidth: getComputedStyle(toolbar).minWidth, wrap: getComputedStyle(toolbar).flexWrap } }
+    return { panel: bounds(root), toolbar: bounds(toolbar), overflow: toolbar.scrollWidth - toolbar.clientWidth, panelOverflow: root.scrollWidth - root.clientWidth, controls, fileNames: [...root.querySelectorAll('.business-attachment-panel__file-name')].map((node) => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })), labels: [...toolbar.querySelectorAll('.erp-filter-chip__label')].map((node) => ({ text: node.textContent, width: node.clientWidth, scroll: node.scrollWidth })), style: { minWidth: getComputedStyle(toolbar).minWidth, wrap: getComputedStyle(toolbar).flexWrap } }
   })
   const detail = `${name}: ${JSON.stringify(metrics)}`
   assert.ok(metrics.overflow <= 1 && metrics.panelOverflow <= 1, detail)
@@ -62,11 +62,13 @@ export function createAttachmentNarrowScenarios({ outputDir }, base) {
         assert.equal(await fileInput.evaluate((node, old) => node === old, inputNode), true)
         await inputNode.dispose()
       }
-      await panel.locator('.ant-segmented-item').filter({ hasText: /^图片\s+\d+$/u }).click()
-      assert.equal(await panel.getByRole('radio', { name: /^图片/u }).isChecked(), true)
+      const image = panel.getByRole('group', { name: '附件分类' }).getByRole('button', { name: /^图片/u })
+      await image.click()
+      assert.equal(await image.getAttribute('aria-pressed'), 'true')
       await assertAttachmentToolbar(panel, `${name}-images`)
-      await panel.locator('.ant-segmented-item').filter({ hasText: /^文件\s+\d+$/u }).click()
-      assert.equal(await panel.getByRole('radio', { name: /^文件/u }).isChecked(), true)
+      const file = panel.getByRole('group', { name: '附件分类' }).getByRole('button', { name: /^文件/u })
+      await file.click()
+      assert.equal(await file.getAttribute('aria-pressed'), 'true')
       if (mode !== 'readonly') await panel.getByText('窄屏待保存说明.txt', { exact: true }).waitFor()
       await assertAttachmentToolbar(panel, `${name}-files`)
       if (mode !== 'new') {

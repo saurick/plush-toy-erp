@@ -33,7 +33,7 @@ import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { AttachmentPolicy } from '../../../common/consts/attachments.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
-import SlidingSegmented from '@/common/components/navigation/SlidingSegmented.jsx'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import BusinessAttachmentThumbnail from './BusinessAttachmentThumbnail.jsx'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -381,14 +381,16 @@ const BusinessAttachmentPanel = forwardRef(
         (category === 'image') === isBusinessAttachmentImage(item)
     )
     const categoryOptions = [
-      { value: 'all', label: `全部 ${listItems.length}` },
+      { value: 'all', label: '全部', count: listItems.length },
       {
         value: 'image',
-        label: `图片 ${listItems.filter(isBusinessAttachmentImage).length}`,
+        label: '图片',
+        count: listItems.filter(isBusinessAttachmentImage).length,
       },
       {
         value: 'file',
-        label: `文件 ${listItems.filter((item) => !isBusinessAttachmentImage(item)).length}`,
+        label: '文件',
+        count: listItems.filter((item) => !isBusinessAttachmentImage(item)).length,
       },
     ]
     const batchIssueItems = useMemo(
@@ -1238,7 +1240,7 @@ const BusinessAttachmentPanel = forwardRef(
 
     const toolbar = (
       <div className="business-attachment-panel__toolbar">
-        <SlidingSegmented
+        <FilterChipGroup
           aria-label="附件分类"
           options={categoryOptions}
           value={category}

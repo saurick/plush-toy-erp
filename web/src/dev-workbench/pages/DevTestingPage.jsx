@@ -35,7 +35,6 @@ import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import { DevSourceReference } from '../components/DevSourceReferences.jsx'
 import { WorkbenchNotice, WorkbenchReading, WorkbenchSection, WorkbenchToolbar } from '../components/WorkbenchPattern.jsx'
-import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevPressurePanel from '../components/DevPressurePanel.jsx'
 import DevBusinessRulesPanel from '../components/DevBusinessRulesPanel.jsx'
 import DevTestingDetails from '../components/DevTestingDetails.jsx'
@@ -1167,11 +1166,10 @@ function CoverageReportView({
 
       </div>
 
-      <DevTaskNav
-        idPrefix="dev-testing-coverage"
-        ariaLabel="覆盖证据类型"
-        className="erp-dev-testing-coverage-tabs"
-        compact
+      <WorkbenchReading
+        label="覆盖证据类型"
+        detailLabel={sections.find((item) => item.value === section)?.label}
+        className="erp-dev-testing-coverage-reading"
         items={sections.map(({ value, label, status }) => ({
           value,
           label: (
@@ -1187,13 +1185,6 @@ function CoverageReportView({
         }))}
         value={section}
         onChange={onSectionChange}
-      />
-      <div
-        id={`dev-testing-coverage-panel-${section}`}
-        role="tabpanel"
-        aria-labelledby={`dev-testing-coverage-tab-${section}`}
-        className="erp-dev-testing-coverage-panel"
-        tabIndex={0}
       >
         {section === 'rules' ? <DevBusinessRulesPanel report={report} reportCurrent={source === 'workspace' && activeState?.status === 'current'} onRunConsistency={onRunConsistency} consistencyBusy={!qaReady || qaBusy?.active} /> : null}
 
@@ -1395,7 +1386,7 @@ function CoverageReportView({
             ) : null}
           </section>
         </DevTestingDetails>
-      </div>
+      </WorkbenchReading>
     </div>
   )
 }

@@ -82,7 +82,6 @@ export default function FinanceWorkspace({ moduleKey, children }) {
           contentSwitch={
             views.length > 1 ? (
               <BusinessViewSwitch
-                appearance="chips"
                 value={activeView}
                 options={views}
                 onChange={changeView}

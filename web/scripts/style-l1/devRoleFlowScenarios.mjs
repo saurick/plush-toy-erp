@@ -43,7 +43,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
           if (source.approval) assert.equal(await panel.getByRole('button', { name: '审批未通过 · 本次申请结束', exact: true }).count(), 1)
         }
       }
-      await guide.getByRole('radiogroup', { name: '流程视图' }).getByText('订单全流程', { exact: true }).click()
+      await guide.getByRole('tablist', { name: '流程视图', exact: true }).getByRole('tab', { name: '订单全流程', exact: true }).click()
       await waitForFiniteAnimations(page)
       await assertFulfillmentChainGeometry(guide.locator('[data-fulfillment-chain]'))
       await page.screenshot({ path: path.join(outputDir, 'order-role-flow-desktop-4k.png'), scale: 'device' })
@@ -102,7 +102,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
             await assertCompact(directorySelect, 'cleared after restore')
           }
         }
-        await guide.getByRole('radiogroup', { name: '流程视图' }).getByText('订单全流程', { exact: true }).click()
+        await guide.getByRole('tablist', { name: '流程视图', exact: true }).getByRole('tab', { name: '订单全流程', exact: true }).click()
         await guide.locator('[data-fulfillment-chain]').waitFor({ state: 'visible' })
         const [chainBox, guideBox] = await Promise.all([guide.locator('[data-fulfillment-chain]').boundingBox(), guide.boundingBox()])
         assert(chainBox.width >= guideBox.width * 0.9, 'Flow content must retain its full reading area')

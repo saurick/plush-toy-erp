@@ -954,7 +954,6 @@ export default function MasterDataPage({ type }) {
         compact
         contentSwitch={isProductCatalogPage ? (
           <BusinessViewSwitch
-            appearance="chips"
             aria-label="产品档案视图"
             value={effectiveType}
             onChange={handleProductCatalogTabChange}

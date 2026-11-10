@@ -46,7 +46,7 @@ effectiveSession: session,
     viewport: { width: 1920, height: 1080 },
 deviceScaleFactor: 2,
     verify: async (page) => {
-      const navigation = page.locator('.erp-business-operation-panel__content-switch').getByRole('tablist', { name: '页面展示方式', exact: true })
+      const navigation = page.locator('.erp-business-operation-panel__content-switch').getByRole('tablist', { name: '查询视图', exact: true })
       await navigation.getByRole('tab', { name: example.labels[0], selected: true, exact: true }).waitFor()
       await navigation.evaluate((element) => { window.__toolbarContentNavigation = element })
       await page.locator('.erp-business-operation-panel__command').first().evaluate((element) => { window.__toolbarCommand = element })
@@ -101,8 +101,8 @@ deviceScaleFactor: 2,
           { key: 'outsourcing', path: '/erp/purchase/processing-contracts', navigation: '委外订单内容分类', labels: ['加工合同', '加工明细'] },
           ...Object.entries(WAREHOUSE_HANDLING_VIEWS).map(([direction, views]) => ({ key: direction, path: `/erp/warehouse/${direction}`, navigation: direction === 'inbound' ? '入库办理分类' : '出库办理分类', labels: views.map(({ label }) => label) })),
           { key: 'inventory', path: '/erp/warehouse/inventory', navigation: '库存查询分类', labels: INVENTORY_VIEWS.map(({ label }) => label) },
-          { key: 'purchase', path: '/erp/purchase/accessories', navigation: '页面展示方式', labels: ['订单列表', '采购跟进'] },
-          { key: 'sales', path: '/erp/sales/project-orders/sales-orders', navigation: '页面展示方式', labels: ['订单列表', '交付进度'] },
+          { key: 'purchase', path: '/erp/purchase/accessories', navigation: '查询视图', labels: ['订单列表', '采购跟进'] },
+          { key: 'sales', path: '/erp/sales/project-orders/sales-orders', navigation: '查询视图', labels: ['订单列表', '交付进度'] },
         ]
         const evidence = []
         for (const entry of entries) {

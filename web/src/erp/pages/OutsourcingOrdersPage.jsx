@@ -669,7 +669,6 @@ export default function OutsourcingOrdersPage() {
 
   const outsourcingViewSwitch = (
     <BusinessViewSwitch
-      appearance="chips"
       aria-label="委外订单内容分类"
       value={summaryVisible ? 'items' : 'contracts'}
       options={[

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Alert, Button, Grid, Tag, Typography } from 'antd'
 import Drawer from '@/common/components/drawer/AppDrawer.jsx'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import { AUTH_SCOPE } from '@/common/auth/auth'
@@ -698,7 +699,7 @@ export default function AuditLogsPage() {
         }}
         filters={
           <>
-            <SelectFilter
+            <FilterChipGroup
               inline
               aria-label="操作来源"
               value={source}

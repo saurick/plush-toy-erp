@@ -793,24 +793,22 @@ export function createDevWorkbenchDesktopScenarios({
           .getByText('文件监听资源不足', { exact: true })
           .waitFor({ state: 'visible' })
         assert((await coverage.innerText()).includes('14.8%'))
-        const evidenceTabs = coverage.getByRole('tablist', {
+        const evidenceCatalog = coverage.getByRole('navigation', {
           name: '覆盖证据类型',
         })
-        const evidenceTab = (label) => evidenceTabs.getByRole('tab', {
+        const evidenceItem = (label) => evidenceCatalog.getByRole('button', {
           name: new RegExp(`^${label}`, 'u'),
         })
         const labels = ['代码覆盖', '业务场景', '关键规则', '门禁结果', '运行与验收']
-        assert.equal(await evidenceTabs.getByRole('tab').count(), labels.length)
-        for (const label of labels) assert.equal(await evidenceTab(label).count(), 1)
-        assert.match(await evidenceTab('代码覆盖').innerText(), /失败/u)
-        assert.match(await evidenceTab('业务场景').innerText(), /失败/u)
-        assert.match(await evidenceTab('运行与验收').innerText(), /部分覆盖/u)
-        const switchEvidence = async (label, reduced = false) => {
-          const text = await evidenceTabs.getByRole('tab').allTextContents()
-          const index = text.findIndex((value) => value.trim().startsWith(label))
-          assert(index >= 0, `缺少证据页签：${label}`)
-          await verifySlidingMotion(page, assert, '.erp-dev-testing-coverage-tabs', index, reduced)
-          assert.equal(await evidenceTab(label).getAttribute('aria-selected'), 'true')
+        assert.equal(await evidenceCatalog.getByRole('button').count(), labels.length)
+        assert.equal(await coverage.getByRole('tablist').count(), 0, '证据目录不叠加第三级页签')
+        for (const label of labels) assert.equal(await evidenceItem(label).count(), 1)
+        assert.match(await evidenceItem('代码覆盖').innerText(), /失败/u)
+        assert.match(await evidenceItem('业务场景').innerText(), /失败/u)
+        assert.match(await evidenceItem('运行与验收').innerText(), /部分覆盖/u)
+        const switchEvidence = async (label) => {
+          await evidenceItem(label).click()
+          await evidenceCatalog.getByRole('button', { name: new RegExp(`^${label}`, 'u'), pressed: true }).waitFor()
         }
         assert.equal(
           await coverage.locator('.erp-dev-testing-coverage-section').count(),
@@ -881,10 +879,10 @@ export function createDevWorkbenchDesktopScenarios({
           )
           .waitFor({ state: 'visible' })
         await assertNoHorizontalOverflow(page, '覆盖报告长场景名')
-        await switchEvidence('关键规则', true)
+        await switchEvidence('关键规则')
         await coverage.getByRole('region', { name: '关键规则与发布门禁', exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.get('coverage'), 'rules')
-        await switchEvidence('门禁结果', true)
+        await switchEvidence('门禁结果')
         await coverage
           .getByRole('region', { name: '门禁结果', exact: true })
           .waitFor()
@@ -1112,8 +1110,11 @@ export function createDevWorkbenchDesktopScenarios({
         await assertNoHorizontalOverflow(page, '文档检索页头窄窗口')
         await page.setViewportSize({ width: 1440, height: 900 })
         await assertDevDocsDirectorySpace(page, assert)
-        await verifySlidingMotion(page, assert, '[aria-label="项目文档搜索范围"]', 1)
-        await verifySlidingMotion(page, assert, '[aria-label="项目文档搜索范围"]', 0, true)
+        const searchScope = page.getByRole('group', { name: '项目文档搜索范围', exact: true })
+        for (const label of ['仅标题', '全部']) {
+          await searchScope.getByRole('button', { name: label, exact: true }).click()
+          await searchScope.getByRole('button', { name: label, exact: true, pressed: true }).waitFor()
+        }
         const selector = '[aria-label="项目文档层级"]'
         const selectedLifecycle = page.locator(
           `${selector} .erp-segmented-item-selected`
@@ -1372,7 +1373,7 @@ function createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow 
     },
     verify: async (page) => {
       const coverage = page.locator('.erp-dev-testing-coverage-view')
-      const evidenceTabs = coverage.getByRole('tablist', { name: '覆盖证据类型' })
+      const evidenceCatalog = coverage.getByRole('navigation', { name: '覆盖证据类型' })
       const source = coverage.locator('.erp-dev-testing-coverage-source')
       const reload = () => coverage.getByRole('button', { name: '重新读取', exact: true }).click()
       await coverage.getByText('报告与当前仓库指纹匹配', { exact: true }).waitFor()
@@ -1401,11 +1402,11 @@ function createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow 
       const reportInfo = await openTestingDetails(page, coverage.getByRole('button', { name: '报告信息', exact: true }), '覆盖报告信息')
       await reportInfo.getByText(report.repository.fingerprint, { exact: true }).waitFor()
       await closeTestingDetails(page)
-      for (const [index, label] of ['业务场景', '关键规则', '门禁结果', '运行与验收', '代码覆盖'].entries()) {
-        const optionIndex = index === 4 ? 0 : index + 1
-        await verifySlidingMotion(page, assert, '.erp-dev-testing-coverage-tabs', optionIndex, index % 2 === 0)
-        await evidenceTabs.getByRole('tab', { name: new RegExp(`^${label}`, 'u'), selected: true }).waitFor()
-        assert.equal(await page.getByRole('region', { name: '服务器测试与交付证据', exact: true }).count(), 0, '报告页签不重复挂载服务器证据')
+      for (const label of ['业务场景', '关键规则', '门禁结果', '运行与验收', '代码覆盖']) {
+        const name = new RegExp(`^${label}`, 'u')
+        await evidenceCatalog.getByRole('button', { name }).click()
+        await evidenceCatalog.getByRole('button', { name, pressed: true }).waitFor()
+        assert.equal(await page.getByRole('region', { name: '服务器测试与交付证据', exact: true }).count(), 0, '报告目录不重复挂载服务器证据')
         await assertNoHorizontalOverflow(page, label)
       }
       await source.getByText('历史隔离验证', { exact: true }).click()

@@ -2,7 +2,7 @@ import React from 'react'
 import { HistoryOutlined } from '@ant-design/icons'
 import { Button, Popover } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
-import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import { buildWorkflowTaskEventTrailModel } from '../../utils/workflowTaskEventPresentation.mjs'
 import { buildWorkflowTaskFlowEventItems } from '../../utils/workflowTaskFlowEventPresentation.mjs'
 import './workflowTaskEventTrail.css'
@@ -150,7 +150,7 @@ export default function WorkflowTaskEventTrail({
             {compact ? summary : null}
           </div>
           {!compact ? summary : null}
-          {records ? <SlidingSegmented className="workflow-task-event-trail__scope" hierarchy="secondary" size="small" aria-label="处理记录范围" options={[{ label: '含关联任务', value: 'flow' }, { label: '只看本任务', value: 'task' }]} value={records.scope} onChange={records.changeScope} /> : null}
+          {records ? <FilterChipGroup className="workflow-task-event-trail__scope" aria-label="处理记录范围" options={[{ label: '含关联任务', value: 'flow' }, { label: '只看本任务', value: 'task' }]} value={records.scope} onChange={records.changeScope} /> : null}
         </div>
 
         {showResponsibility ? (

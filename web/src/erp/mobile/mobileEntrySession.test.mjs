@@ -127,10 +127,10 @@ test('mobile entry session: 多岗位账号可在手机待办内显式切换岗�
   assert.match(source, /aria-label="切换岗位任务端"/u)
   assert.match(
     source,
-    /allowedMobileRoleKeys\.map\(\(roleKey\) =>[\s\S]*?handleSwitchMobileRole\(roleKey\)/u
+    /allowedMobileRoleKeys\.map\(\(roleKey\) =>[\s\S]*?options=\{mobileRoleOptions\}[\s\S]*?onChange=\{handleSwitchMobileRole\}/u
   )
   assert.match(source, /resolveMobileTasksPath\(roleKey\)/u)
-  assert.match(source, /aria-current=/u)
+  assert.match(source, /value=\{activeRoleKey\}/u)
 })
 
 test('mobile entry session: 直接访问未分配岗位时按账号业务岗位情况返回入口页', () => {

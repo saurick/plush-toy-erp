@@ -962,6 +962,16 @@ export function createAuthenticationEntryScenarios({
           0,
           '多岗位登录完成后不应停留在入口选择卡片'
         )
+        const picker = page.getByRole('combobox', { name: '切换岗位任务端', exact: true })
+        const trigger = page.locator('.mobile-role-scope .ant-select').filter({ has: picker })
+        const options = page.locator('.ant-select-dropdown:visible')
+        await trigger.click()
+        await options.getByText('品质', { exact: true }).click()
+        await waitForPath(page, '/m/quality/tasks')
+        await expectText(page, '待办')
+        await trigger.click()
+        await options.getByText('业务', { exact: true }).click()
+        await waitForPath(page, '/m/sales/tasks')
       },
     },
     {

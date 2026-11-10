@@ -9,7 +9,7 @@ import {
 } from './shared.jsx'
 import Table from '@/common/components/table/AppTable'
 import { DEV_PAGINATION } from '../../../config/devPagination.mjs'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import { DeliveryTaskPath } from '../DeliveryTaskPath.jsx'
 import DevStaticGuidance from '../../../components/DevStaticGuidance.jsx'
 import DevPipelineTimingPanel, {
@@ -212,7 +212,7 @@ export function buildVersionWorkspace({
               <div className="erp-dev-operation-history-filters__controls">
                 <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--result">
                   <Text type="secondary">结果</Text>
-                  <Segmented
+                  <FilterChipGroup
                     aria-label="筛选结果"
                     value={operationHistoryFilters.result}
                     options={OPERATION_HISTORY_RESULT_OPTIONS}

@@ -133,7 +133,6 @@ function ComparisonPage({ business, entries }) {
   ) : (
     <BusinessViewSwitch
       aria-label="采购对照查询视角"
-      appearance="chips"
       value={view}
       options={options}
       onChange={changeView}

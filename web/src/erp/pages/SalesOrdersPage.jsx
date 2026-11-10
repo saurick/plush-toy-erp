@@ -1533,7 +1533,6 @@ export default function SalesOrdersPage() {
   }
   const salesViewSwitch = (
     <BusinessViewSwitch
-      appearance="chips"
       value={contentView}
       options={[
         { value: 'list', label: '订单列表' },

@@ -4,7 +4,7 @@ import { Alert, Button, Input, Space, Spin, Tooltip, Typography } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SearchInput from '@/common/components/SearchInput.jsx'
 import Table from '@/common/components/table/AppTable.jsx'
-import SlidingTabs from '../../common/components/navigation/SlidingTabs.jsx'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import { getActionErrorMessage } from '../../common/utils/errorMessage.js'
 import { isRpcAbortError } from '../../common/utils/jsonRpc.js'
 import { createPaymentMethod, deletePaymentMethod, listPaymentMethodOptions, updatePaymentMethod } from '../api/masterDataOrderApi.mjs'
@@ -14,6 +14,7 @@ import MaintenanceSelectionBar from './business-list/MaintenanceSelectionBar.jsx
 import './paymentMethodInput.css'
 
 const PAGE_SIZE = 20
+const PAYMENT_METHOD_STATUS_OPTIONS = [{ value: 'active', label: '启用' }, { value: 'inactive', label: '已停用' }]
 const COLUMNS = [
   { title: '付款方式', dataIndex: 'method', key: 'method', render: (method, item) => <div className="erp-payment-method-manager__identity"><span className="erp-payment-method-manager__name">{method}</span><Typography.Text type="secondary" className="erp-payment-method-manager__usage">{item.has_been_used ? '已使用' : '未使用'}</Typography.Text></div> },
   { title: '状态', dataIndex: 'is_active', key: 'is_active', width: 80, render: (isActive) => isActive ? '启用' : '已停用' },
@@ -197,7 +198,7 @@ export default function PaymentMethodManager({ onClose, onChanged, onCreated, in
         <div className="erp-payment-method-manager">
           <Typography.Text type="secondary">公司共用；改名、停用不改写已保存单据。</Typography.Text>
           <div className="erp-payment-method-manager__toolbar">
-            <SlidingTabs tabBarGutter={20} activeKey={view} items={[{ key: 'active', label: '启用', disabled: navigationLocked }, { key: 'inactive', label: '已停用', disabled: navigationLocked }]} onChange={setView} />
+            <FilterChipGroup aria-label="付款方式状态" value={view} options={PAYMENT_METHOD_STATUS_OPTIONS} disabled={navigationLocked} onChange={setView} />
             <div className="erp-payment-method-manager__search"><SearchInput allowClear aria-label="搜索付款方式" placeholder="搜索付款方式" maxLength={128} disabled={navigationLocked} value={queries[view]} resetKey={view} onSearch={(value) => { setQueries((previous) => ({ ...previous, [view]: value })); setOffsets((previous) => ({ ...previous, [view]: 0 })) }} /><Tooltip title="刷新" trigger={['hover', 'focus']}><Button aria-label="刷新" icon={<ReloadOutlined />} loading={loading} disabled={navigationLocked} onClick={refresh} /></Tooltip></div>
             <Button className="erp-payment-method-manager__create" type="primary" icon={<PlusOutlined />} aria-label="新增付款方式" disabled={navigationLocked || loading} onClick={() => { setEditor({ item: null, name: '' }); setActionError('') }}>新增付款方式</Button>
           </div>

@@ -503,7 +503,7 @@ export function createUnifiedInteractionScenarios({
         await page
           .getByRole('heading', { name: '采购订单', exact: true })
           .waitFor()
-        const navigation = page.getByRole('tablist', { name: '页面展示方式', exact: true })
+        const navigation = page.getByRole('tablist', { name: '查询视图', exact: true })
         const navigationNode = await navigation.elementHandle()
         const before = await navigation.boundingBox()
         assert.deepEqual(await navigation.getByRole('tab').allTextContents(), ['订单列表', '采购跟进'])
@@ -692,7 +692,7 @@ export function createUnifiedInteractionScenarios({
         const toolbar = page.locator('.erp-business-operation-panel__command')
         const assertToolbarLayout = async (width) => {
           const layout = await toolbar.evaluate((element) => {
-            const view = element.querySelector('[aria-label="页面展示方式"]')
+            const view = element.querySelector('[aria-label="查询视图"]')
             const statuses = element.querySelector('[aria-label="单据状态"]')
             if (!view || !statuses) return null
             const box = (node) => {

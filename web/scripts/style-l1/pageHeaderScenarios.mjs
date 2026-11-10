@@ -159,7 +159,7 @@ export function createPageHeaderScenarios({ customerRuntimeEffectiveSession, ass
           await navigation.getByRole('tab', { name: label, exact: true }).click()
           await navigation.getByRole('tab', { name: label, exact: true, selected: true }).waitFor()
           assert.equal(await navigationNode.evaluate((node) => node.isConnected), true, '内容切换保持同一查询区分类条')
-          assert.equal(await navigation.getAttribute('class').then((value) => value.includes('erp-navigation-chips')), true)
+          assert.match(await navigation.evaluate((node) => getComputedStyle(node, '::before').boxShadow), /-2px/u)
           assert.equal(await page.locator('.erp-business-page-header-card--secondary').count(), 0, '页内分类不在模块页头下重复创建标题卡')
           await page.locator('.erp-business-operation-panel__search input').first().waitFor()
           const metrics = await measureHeaderSpacing(page)

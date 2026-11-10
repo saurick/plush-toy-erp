@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { expect } from 'playwright/test'
 
 export async function openFulfillmentExceptionDirectory(guide) {
-  await guide.getByRole('radiogroup', { name: '流程视图', exact: true }).getByText('异常处理', { exact: true }).click()
+  await guide.getByRole('tablist', { name: '流程视图', exact: true }).getByRole('tab', { name: '异常处理', exact: true }).click()
 }
 
 export async function assertFulfillmentDetailGeometry(detail) {

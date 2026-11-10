@@ -193,8 +193,7 @@
   min-width: 0;
 }
 
-.erp-dev-operation-history-filter-field .ant-select,
-.erp-dev-operation-history-filter-field .ant-segmented {
+.erp-dev-operation-history-filter-field .ant-select {
   width: 100%;
 }
 
@@ -745,21 +744,8 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-operation-history-filter-field .ant-segmented,
   .erp-dev-operation-history-filters__meta .ant-btn {
     min-height: 44px;
-  }
-
-  .erp-dev-operation-history-filter-field .ant-segmented-group {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .erp-dev-operation-history-filter-field .ant-segmented-item-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 40px;
   }
 
   .erp-dev-operation-history-filters__meta {

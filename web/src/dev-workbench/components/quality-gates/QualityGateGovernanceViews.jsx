@@ -9,7 +9,7 @@ import {
   Typography,
 } from 'antd'
 import Table from '@/common/components/table/AppTable'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import { WorkbenchEmpty, WorkbenchNotice, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import { formatQualityGateDuration } from '../../config/devQualityGates.mjs'
@@ -113,7 +113,7 @@ export function GovernanceView({
             onSearch={onSearch}
           />
         </div>
-        <Segmented
+        <FilterChipGroup
           aria-label="门禁范围"
           options={GOVERNANCE_FILTER_OPTIONS}
           value={values.filter}
@@ -214,13 +214,13 @@ export function GapsView({ data, loading, error, values, onRange, onRisk, onRetr
   return (
     <WorkbenchSection flat className="erp-dev-quality-gaps-view" aria-label="改动缺口结果">
       <WorkbenchToolbar className="erp-dev-quality-view-tools">
-        <Segmented
+        <FilterChipGroup
           aria-label="改动范围"
           options={GAP_RANGE_OPTIONS}
           value={values.range}
           onChange={onRange}
         />
-        <Segmented
+        <FilterChipGroup
           aria-label="风险范围"
           options={GAP_RISK_OPTIONS}
           value={values.risk}

@@ -198,71 +198,23 @@ export function createAuditLogScenarios({
       )
       await page.keyboard.press('Escape')
       await columnDialog.waitFor({ state: 'hidden' })
-      // The source strip remains mounted while its indicator actually moves.
-      const motion = await page
-        .locator('.erp-business-status-filter')
-        .evaluate(async (root) => {
-          const group = root.querySelector('.ant-segmented-group')
-          const items = group.querySelectorAll('.ant-segmented-item')
-          const read = () =>
-            new DOMMatrixReadOnly(getComputedStyle(group, '::before').transform)
-              .m41
-          const start = read()
-          const box = group.getBoundingClientRect()
-          items[1].click()
-          const samples = []
-          const began = performance.now()
-          await new Promise((resolve) => {
-            const frame = () => {
-              samples.push(read())
-              if (performance.now() - began < 350) requestAnimationFrame(frame)
-              else resolve()
-            }
-            requestAnimationFrame(frame)
-          })
-          return {
-            start,
-            end: read(),
-            samples,
-            stable:
-              group.isConnected &&
-              Math.abs(group.getBoundingClientRect().width - box.width) < 1,
-          }
-        })
-      assert(motion.stable)
-      assert(
-        motion.samples.some((x) => x > motion.start + 2 && x < motion.end - 2),
-        JSON.stringify(motion)
-      )
-      assert.equal(
-        await page
-          .getByRole('radio', { name: '系统管理', exact: true })
-          .isChecked(),
-        true
-      )
+      const sources = page.getByRole('group', { name: '操作来源', exact: true })
+      const group = await sources.elementHandle()
+      const before = await sources.boundingBox()
+      const system = sources.getByRole('button', { name: '系统管理', exact: true })
+      await system.click()
+      await sources.getByRole('button', { name: '系统管理', pressed: true }).waitFor()
       await page.waitForFunction(() =>
-        document
-          .querySelector('.ant-pagination-total-text')
-          ?.textContent?.includes('101')
+        document.querySelector('.ant-pagination-total-text')?.textContent?.includes('101')
       )
-      await page.emulateMedia({ reducedMotion: 'reduce' })
-      await page
-        .locator('.erp-business-status-filter label')
-        .filter({ hasText: '全部来源' })
-        .click()
-      const reducedDurations = await page
-        .locator('.ant-segmented-group')
-        .first()
-        .evaluate(
-          (node) => getComputedStyle(node, '::before').transitionDuration
-        )
-      assert(
-        reducedDurations
-          .split(',')
-          .every((duration) => Number.parseFloat(duration) === 0),
-        reducedDurations
-      )
-      await page.emulateMedia({ reducedMotion: 'no-preference' })
+      assert.equal(await sources.evaluate((node, original) => node === original, group), true)
+      const after = await sources.boundingBox()
+      for (const key of ['x', 'y', 'width', 'height']) {
+        assert.ok(Math.abs(before[key] - after[key]) <= 1, `操作来源切换时保持筛选位置：${key}`)
+      }
+      assert.equal(await system.evaluate((node) => getComputedStyle(node).borderRadius), '8px')
+      await sources.getByRole('button', { name: '全部来源', exact: true }).click()
+      await sources.getByRole('button', { name: '全部来源', pressed: true }).waitFor()
       const search = page.getByPlaceholder('搜索操作记录', { exact: true })
       await search.fill('读取失败')
       await search.press('Enter')

@@ -87,7 +87,7 @@ test("toolbar design samples retain focused both-engine growth and isolation che
 test("warehouse and shared navigation changes retain both-engine category regression", () => {
   for (const file of ["web/src/erp/components/BusinessModuleTabs.jsx", "web/src/erp/components/businessModuleTabs.css", "web/src/common/components/navigation/SlidingTabList.jsx", "web/src/common/components/navigation/useSlidingIndicator.js", "web/src/erp/styles/app/control-affordance.css", "web/scripts/style-l1/warehouseNavigationActions.mjs"]) {
     const text = buildAffectedPlan([file], { root: ROOT }).followUps.find(({ id }) => id === "warehouse-navigation-browser")?.text || "";
-    for (const expected of ["warehouse-category-chip-navigation", "warehouse-workbench-control-parity", "inventory-visible-copy-desktop", "WebKit", "Chromium"]) assert.ok(text.includes(expected), `${file}: ${expected}`);
+    for (const expected of ["warehouse-category-navigation", "warehouse-workbench-control-parity", "inventory-visible-copy-desktop", "WebKit", "Chromium"]) assert.ok(text.includes(expected), `${file}: ${expected}`);
   }
   assert.equal(buildAffectedPlan(["web/src/erp/utils/paymentConditions.mjs"], { root: ROOT }).followUps.some(({ id }) => id === "warehouse-navigation-browser"), false);
 });

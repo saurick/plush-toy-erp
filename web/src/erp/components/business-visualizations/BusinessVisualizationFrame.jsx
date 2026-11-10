@@ -73,12 +73,11 @@ export function VisualizationPagination({ pagination, onChange }) {
   )
 }
 
-export function BusinessViewSwitch({ value, onChange, onReselect, options, appearance = 'tabs', 'aria-label': ariaLabel = '页面展示方式' }) {
+export function BusinessViewSwitch({ value, onChange, onReselect, options, 'aria-label': ariaLabel = '查询视图' }) {
   return (
     <div className="erp-business-visual-switch">
       <SlidingTabList
         aria-label={ariaLabel}
-        appearance={appearance}
         value={value}
         options={options}
         onChange={onChange}

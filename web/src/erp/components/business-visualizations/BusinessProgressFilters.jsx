@@ -2,7 +2,7 @@ import React from 'react'
 import { Button } from 'antd'
 import SearchInput from '@/common/components/SearchInput'
 import FilterChip from '@/common/components/navigation/FilterChip'
-import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import MobileFilterChoices from '../../mobile/components/MobileFilterChoices.jsx'
 import {
   PROGRESS_SCOPE_OPTIONS,
@@ -74,8 +74,7 @@ export default function BusinessProgressFilterFields({
     <div className={`erp-progress-filter-fields${compact ? ' erp-progress-filter-fields--compact' : ''}`}>
       <fieldset role={compact ? 'presentation' : undefined}>
         <legend>记录范围</legend>
-        {compact ? <MobileFilterChoices label="记录范围" options={PROGRESS_SCOPE_OPTIONS} value={query.scope} onChange={(scope) => onChange({ scope })} /> : <SlidingSegmented
-          block
+        {compact ? <MobileFilterChoices label="记录范围" options={PROGRESS_SCOPE_OPTIONS} value={query.scope} onChange={(scope) => onChange({ scope })} /> : <FilterChipGroup
           aria-label="记录范围"
           options={PROGRESS_SCOPE_OPTIONS}
           value={query.scope}

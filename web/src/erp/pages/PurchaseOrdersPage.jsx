@@ -1362,7 +1362,6 @@ export default function PurchaseOrdersPage() {
 
   const purchaseViewSwitch = (
     <BusinessViewSwitch
-      appearance="chips"
       value={purchaseViewTransition.selected}
       onReselect={(view) => {
         if (purchaseViewTransition.pending) purchaseViewTransition.request(view, () => setContentView(view), { before: () => !recordActionBusy })

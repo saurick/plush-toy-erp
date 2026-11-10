@@ -9,7 +9,6 @@ export default function SlidingTabList({
   value,
   onChange,
   onReselect,
-  appearance = 'tabs',
   block = false,
   disabled = false,
   ...props
@@ -17,7 +16,7 @@ export default function SlidingTabList({
   const ref = useSlidingIndicator({
     itemSelector: ':scope > [role="tab"]',
     selectedSelector: ':scope > [role="tab"][aria-selected="true"]',
-    revealSelected: appearance === 'chips',
+    revealSelected: Boolean(options),
   })
   const content = options ? options.map((option) => (
     <button
@@ -26,7 +25,7 @@ export default function SlidingTabList({
       role="tab"
       aria-selected={option.value === value}
       disabled={disabled || option.disabled}
-      className={[appearance === 'chips' ? 'erp-filter-chip' : '', option.className].filter(Boolean).join(' ')}
+      className={option.className}
       onClick={() => {
         if (option.value !== value) onChange?.(option.value)
         else onReselect?.(option.value)
@@ -42,7 +41,7 @@ export default function SlidingTabList({
       ref={ref}
       role="tablist"
       tabIndex={-1}
-      className={`erp-sliding-tab-list ${options ? appearance === 'chips' ? 'erp-navigation-chips' : 'erp-navigation-tabs erp-navigation-tabs--options' : ''} ${block ? 'erp-navigation-tabs--block' : ''} ${className}`}
+      className={`erp-sliding-tab-list ${options ? 'erp-navigation-tabs erp-navigation-tabs--options' : ''} ${block ? 'erp-navigation-tabs--block' : ''} ${className}`}
       onKeyDown={(event) => {
         onKeyDown?.(event)
         if (event.defaultPrevented) return

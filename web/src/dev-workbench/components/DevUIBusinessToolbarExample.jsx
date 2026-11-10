@@ -258,7 +258,6 @@ function ExamplePage({ business, scenario, annotations, active }) {
           ) : (
             <BusinessViewSwitch
               aria-label={`${example.label}内容分类`}
-              appearance="chips"
               value={currentView}
               options={options}
               onChange={change(setView)}

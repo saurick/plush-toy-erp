@@ -32,7 +32,6 @@ export function BusinessModuleViewTabs({ navigation, onPendingChange }) {
   }
   return (
     <TabList
-      appearance="chips"
       className="erp-business-module-view-tabs"
       aria-label={navigation.label}
       value={viewSwitch.selected}

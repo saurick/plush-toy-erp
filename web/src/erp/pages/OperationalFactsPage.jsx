@@ -853,7 +853,6 @@ export function OperationalFactWorkspace({
     ) : null
   const contentViewSwitch = isFinanceDuePage && !financeWorkspace ? (
     <BusinessViewSwitch
-      appearance="chips"
       value={contentView}
       options={[
         { value: 'list', label: '账款列表' },

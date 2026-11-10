@@ -3,7 +3,7 @@ import { Button } from 'antd'
 import { CloseOutlined, LeftOutlined } from '@ant-design/icons'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
-import SlidingSegmented from '../../../common/components/navigation/SlidingSegmented.jsx'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters, patchDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
 import { buildFulfillmentRelations, buildChainActionRelations, relationMatches, relationFiltersActive } from '../../config/devFulfillmentRelations.mjs'
@@ -165,9 +165,8 @@ export default function TaskFulfillmentGuide({
         {scoped ? (
           <h2>办理环节</h2>
         ) : (
-          <SlidingSegmented
+          <SlidingTabList
             aria-label="流程视图"
-            hierarchy="secondary"
             value={view}
             options={[
               { value: 'main', label: '订单全流程' },

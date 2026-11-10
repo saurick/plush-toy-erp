@@ -245,6 +245,10 @@
   scroll-margin-top: 12px;
 }
 
+.erp-dev-quality-content[aria-busy='true'] {
+  min-block-size: calc(100dvh - 96px);
+}
+
 .erp-dev-quality-content > [role='tabpanel'] {
   display: grid;
   gap: 12px;
@@ -778,11 +782,6 @@
 
   .erp-dev-quality-view-tools {
     display: grid;
-  }
-
-  .erp-dev-quality-view-tools .ant-segmented {
-    max-width: 100%;
-    overflow-x: auto;
   }
 
   .erp-dev-quality-duration__legend {

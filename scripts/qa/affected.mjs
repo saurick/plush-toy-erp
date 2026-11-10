@@ -920,7 +920,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
     if (/BusinessModuleTabs\.jsx|businessModuleTabs\.css|common\/components\/navigation\/(?:SlidingTabList\.jsx|useSlidingIndicator\.js)|styles\/app\/control-affordance\.css|warehouseNavigationActions\.mjs/u.test(file)) {
       addFollowUp(state, "warehouse-navigation-browser", "T5",
-        "运行 STYLE_L1_SCENARIOS=warehouse-category-chip-navigation,warehouse-workbench-control-parity,warehouse-outbound-cold-entry-stability,warehouse-layout-all-views,warehouse-layout-dark-split,inventory-visible-copy-desktop pnpm --dir web style:l1，并分别验证 WebKit 与 Chromium，核对分类展开、键盘与动效、窄屏滚动、默认工作台隔离、首次加载和历史刷新。", file);
+        "运行 STYLE_L1_SCENARIOS=warehouse-category-navigation,warehouse-workbench-control-parity,warehouse-outbound-cold-entry-stability,warehouse-layout-all-views,warehouse-layout-dark-split,inventory-visible-copy-desktop pnpm --dir web style:l1，并分别验证 WebKit 与 Chromium，核对分类展开、键盘与动效、窄屏滚动、默认工作台隔离、首次加载和历史刷新。", file);
     }
     if (/common\/components\/table\/(?:AppTable\.jsx|tableColumns\.mjs)|BusinessListLayout\.jsx|InventoryLedgerPage\.jsx|productIdentity\.css|(?:masterData|shipment|qualityInspection)Columns\.jsx|inventoryLedgerPresentation\.jsx|businessColumnWidthScenarios\.mjs/u.test(file)) {
       addNodeTests(state, ["web/src/common/components/table/tableColumns.test.mjs", "web/src/erp/utils/businessDefaultColumns.test.mjs", "web/src/erp/components/inventory/inventoryLedgerPresentation.behavior.test.mjs"], file, "T5");

@@ -1,7 +1,6 @@
 import { expect } from 'playwright/test'
 import path from 'node:path'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
-import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflow, outputDir, customerRuntimeEffectiveSession }) {
@@ -251,10 +250,10 @@ export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflo
           assert(Math.abs(after.height - before.height) <= 1 && Math.abs(after.footerTop - before.footerTop) <= 1, `刷新${state}完成后底部应保持原位: ${JSON.stringify({ before, after })}`)
         }
         await assertRefreshStable('已有选项')
-        await dialog.getByRole('tab', { name: '已停用', exact: true }).click()
+        await dialog.getByRole('group', { name: '付款方式状态' }).getByRole('button', { name: '已停用', exact: true }).click()
         await expect(dialog.getByText('没有停用的付款方式', { exact: true })).toBeVisible()
         await assertRefreshStable('空结果')
-        await dialog.getByRole('tab', { name: '启用', exact: true }).click()
+        await dialog.getByRole('group', { name: '付款方式状态' }).getByRole('button', { name: '启用', exact: true }).click()
         await selectPaymentRow(dialog, 'aa')
         await expect(dialog.getByRole('button', { name: '停用 aa', exact: true })).toBeEnabled()
         const search = dialog.getByRole('textbox', { name: '搜索付款方式', exact: true })
@@ -292,7 +291,9 @@ export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflo
         await selectPaymentRow(dialog, 'aa')
         await dialog.getByRole('button', { name: '停用 aa', exact: true }).click()
         await expect(dialog.getByRole('button', { name: '停用 aa', exact: true })).toHaveCount(0)
-        await verifyMobileNavigationMotion(page, assert, '.erp-payment-method-manager .erp-sliding-tabs', 1)
+        const inactive = dialog.getByRole('group', { name: '付款方式状态' }).getByRole('button', { name: '已停用', exact: true })
+        await inactive.click()
+        await expect(inactive).toHaveAttribute('aria-pressed', 'true')
         await selectPaymentRow(dialog, 'aa')
         await expect(dialog.getByRole('button', { name: '启用 aa', exact: true })).toBeEnabled()
         await dialog.screenshot({ path: path.join(outputDir, `payment-management-${key}-hidden.png`) })
@@ -313,8 +314,9 @@ export function createPaymentMethodScenarios({ assert, assertNoHorizontalOverflo
         assert(Math.abs(popup.y - anchor.bottom) < 16 || Math.abs(popup.y + popup.height - anchor.y) < 16, `payment dropdown detached vertically ${JSON.stringify({ popup, anchor })}`)
         await method.press('Escape')
         await manage.click()
-        await expect(dialog.getByRole('tab', { name: '启用', exact: true })).toHaveAttribute('aria-selected', 'true')
-        await verifyMobileNavigationMotion(page, assert, '.erp-payment-method-manager .erp-sliding-tabs', 1, true)
+        await expect(dialog.getByRole('group', { name: '付款方式状态' }).getByRole('button', { name: '启用', exact: true })).toHaveAttribute('aria-pressed', 'true')
+        await inactive.click()
+        await expect(inactive).toHaveAttribute('aria-pressed', 'true')
         await selectPaymentRow(dialog, 'aa')
         await dialog.getByRole('button', { name: '启用 aa', exact: true }).click()
         await expect(dialog.getByRole('button', { name: '启用 aa', exact: true })).toHaveCount(0)
@@ -476,10 +478,10 @@ function createPaymentGrowthScenarios({ assert, assertNoHorizontalOverflow, outp
         await expect(rows).toHaveCount(20)
         assert.equal(reads.at(-1).offset, 20)
         await expect(dialog.getByRole('button', { name: '改名 模拟方式0000', exact: true })).toHaveCount(0)
-        await dialog.getByRole('tab', { name: '已停用', exact: true }).click()
+        await dialog.getByRole('group', { name: '付款方式状态' }).getByRole('button', { name: '已停用', exact: true }).click()
         await expect(rows).toHaveCount(20)
         await expect(dialog.getByText('第 1 页', { exact: true })).toBeVisible()
-        await dialog.getByRole('tab', { name: '启用', exact: true }).click()
+        await dialog.getByRole('group', { name: '付款方式状态' }).getByRole('button', { name: '启用', exact: true }).click()
         await expect(dialog.getByText('第 2 页', { exact: true })).toBeVisible()
         await expect(rows).toHaveCount(20)
         const search = dialog.getByRole('textbox', { name: '搜索付款方式', exact: true })

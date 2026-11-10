@@ -59,6 +59,7 @@ const EMPTY_ASYNC_VIEW_STATE = Object.freeze({
   loading: false,
   error: '',
 })
+const LOADING_ASYNC_VIEW_STATE = Object.freeze({ ...EMPTY_ASYNC_VIEW_STATE, loading: true })
 
 export default function DevQualityGatesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -100,7 +101,11 @@ export default function DevQualityGatesPage() {
   const standalone = Boolean(import.meta.env.PLUSH_STANDALONE_WORKBENCH)
   const viewKey = JSON.stringify([activeView, parsed.values.filter, parsed.values.q, parsed.values.range, parsed.values.risk])
   const activeViewState =
-    viewState.key === viewKey ? viewState : EMPTY_ASYNC_VIEW_STATE
+    viewState.key === viewKey
+      ? viewState
+      : parsed.valid && (activeView === 'governance' || activeView === 'gaps')
+        ? LOADING_ASYNC_VIEW_STATE
+        : EMPTY_ASYNC_VIEW_STATE
 
   useEffect(() => {
     window.requestAnimationFrame(() => titleRef.current?.focus())
@@ -473,7 +478,7 @@ export default function DevQualityGatesPage() {
           </div>
           {activeView !== 'run' || standalone ? contextStrip : null}
 
-          <section className="erp-dev-quality-content">
+          <section className="erp-dev-quality-content" aria-busy={activeViewState.loading}>
             <div
               id={`quality-gates-panel-${activeView}`}
               role={activeGroup === 'workspace' ? 'tabpanel' : undefined}

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Button, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { ProgressIdentity, ProgressDue, ProgressDelivery, ProgressAttention } from '../../erp/components/business-visualizations/ProgressCompactContent.jsx'
 import '../../erp/styles/app/progress-board.css'
@@ -57,7 +58,7 @@ function TaskCards({ point, mobile }) {
       </tr>
     )
   })
-  return <div className="erp-wc-task-examples"><Segmented aria-label="任务样例分组" value={group} options={DESIGN_TASK_GROUPS} onChange={setGroup} />{mobile ? <div className="erp-wc-card-list">{cards}</div> : <div className="erp-wc-table-wrap"><table className="erp-wc-task-table" data-table-lines="fixed" aria-label="电脑版任务列表样例"><thead><tr><th>办理事项 / 关联内容</th><th>来源 / 时间</th><th>状态 / 原因</th><th>负责岗位 / 办理人</th></tr></thead><tbody>{cards}</tbody></table></div>}</div>
+  return <div className="erp-wc-task-examples"><FilterChipGroup aria-label="任务样例分组" value={group} options={DESIGN_TASK_GROUPS} onChange={setGroup} />{mobile ? <div className="erp-wc-card-list">{cards}</div> : <div className="erp-wc-table-wrap"><table className="erp-wc-task-table" data-table-lines="fixed" aria-label="电脑版任务列表样例"><thead><tr><th>办理事项 / 关联内容</th><th>来源 / 时间</th><th>状态 / 原因</th><th>负责岗位 / 办理人</th></tr></thead><tbody>{cards}</tbody></table></div>}</div>
 }
 
 function ProgressCards({ point, mobile }) {

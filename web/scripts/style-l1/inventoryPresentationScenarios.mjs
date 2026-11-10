@@ -30,7 +30,7 @@ export function createInventoryPresentationScenarios(deps) {
       verify: async (page) => {
         const modes = page.getByRole('tablist', { name: '待办显示方式', exact: true })
         await modes.getByRole('tab', { name: '列表', selected: true }).waitFor()
-        assert.equal(await modes.evaluate((root) => root.classList.contains('erp-navigation-chips')), false, '原有工作方式保留下划线页签')
+        assert.match(await modes.evaluate((root) => getComputedStyle(root, '::before').boxShadow), /-2px/u, '内容导航保留下划线')
         const all = page.getByRole('button', { name: '全部待办', exact: true })
         await all.waitFor()
         const appearance = await all.evaluate((button) => {
@@ -48,7 +48,7 @@ export function createInventoryPresentationScenarios(deps) {
       },
     },
     {
-      name: 'warehouse-category-chip-navigation',
+      name: 'warehouse-category-navigation',
       path: '/erp/warehouse/outbound?warehouse_view=shipment',
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
@@ -59,6 +59,13 @@ export function createInventoryPresentationScenarios(deps) {
         const navigation = page.locator(selector)
         await navigation.getByRole('tab', { name: '销售出货', exact: true, selected: true }).waitFor()
         assert.deepEqual(await navigation.getByRole('tab').allTextContents(), ['销售出货', '生产领料', '委外发料', '库存预留'])
+        const style = await navigation.evaluate((root) => {
+          const tab = getComputedStyle(root.querySelector('[aria-selected="true"]'))
+          return { border: tab.borderTopWidth, background: tab.backgroundColor, marker: getComputedStyle(root, '::before').boxShadow }
+        })
+        assert.equal(style.border, '0px')
+        assert.equal(style.background, 'rgba(0, 0, 0, 0)')
+        assert.match(style.marker, /-2px/u)
         const motion = await verifySlidingMotion(page, assert, selector, 1)
         await verifySlidingMotion(page, assert, selector, 0, true)
         await navigation.getByRole('tab', { name: '销售出货', exact: true }).focus()
@@ -77,8 +84,8 @@ export function createInventoryPresentationScenarios(deps) {
           const { transform } = getComputedStyle(root, '::before')
           return Math.abs(new DOMMatrixReadOnly(transform === 'none' ? undefined : transform).m41 - selected.offsetLeft) < 1
         }, selector)
-        await page.locator('.erp-business-module-header').screenshot({ path: path.join(outputDir, 'warehouse-category-chips-header.png') })
-        await navigation.screenshot({ path: path.join(outputDir, 'warehouse-category-chips.png') })
+        await page.locator('.erp-business-module-header').screenshot({ path: path.join(outputDir, 'warehouse-category-tabs-header.png') })
+        await navigation.screenshot({ path: path.join(outputDir, 'warehouse-category-tabs.png') })
         await page.setViewportSize({ width: 390, height: 844 })
         await navigation.getByRole('tab', { name: '生产领料', exact: true }).focus()
         await page.keyboard.press('End')
@@ -99,8 +106,8 @@ export function createInventoryPresentationScenarios(deps) {
         assert.equal(new Set(narrow.tops).size, 1, '窄屏分类保持一行')
         assert.ok(narrow.heights.every((height) => height >= 44), '分类保留手机触控高度')
         assert.ok(narrow.selectedVisible, `键盘切到最后分类时应自动滚入可视区: ${JSON.stringify(narrow)}`)
-        await assertNoHorizontalOverflow(page, 'warehouse-category-chips-narrow')
-        await writeFile(path.join(outputDir, 'warehouse-category-chips.json'), JSON.stringify({ motion, narrow }, null, 2))
+        await assertNoHorizontalOverflow(page, 'warehouse-category-tabs-narrow')
+        await writeFile(path.join(outputDir, 'warehouse-category-tabs.json'), JSON.stringify({ motion, narrow }, null, 2))
       },
     },
     {
@@ -170,6 +177,20 @@ export function createInventoryPresentationScenarios(deps) {
               await inspect(`${group}-${view}`, width)
             }
             await page.setViewportSize({ width: 1920, height: 1080 })
+            if (view === '库存批次') {
+              const statuses = page.getByRole('group', { name: '批次状态', exact: true })
+              await statuses.getByRole('button', { name: /^可用，/u }).click()
+              await statuses.getByRole('button', { name: /^可用，/u, pressed: true }).waitFor()
+              await secondary.getByRole('tab', { name: '库存批次', exact: true, selected: true }).waitFor()
+              const filterStyle = await statuses.getByRole('button', { name: /^可用，/u }).evaluate((node) => {
+                const style = getComputedStyle(node)
+                return { radius: style.borderRadius, border: style.borderTopWidth }
+              })
+              assert.deepEqual(filterStyle, { radius: '8px', border: '1px' })
+              await page.locator('.erp-business-operation-panel__command').screenshot({ path: path.join(outputDir, 'warehouse-lots-tabs-and-filters.png') })
+              await statuses.getByRole('button', { name: /^不限状态，/u }).click()
+              await statuses.getByRole('button', { name: /^不限状态，/u, pressed: true }).waitFor()
+            }
             if (index === 0) {
               await page.screenshot({ path: path.join(outputDir, `warehouse-${group}-4k.png`) })
             }
@@ -259,7 +280,7 @@ export function createInventoryPresentationScenarios(deps) {
         await header.getByRole('tab', { name: '库存查询', exact: true }).waitFor()
         for (const [group, views] of [
           ['库存查询', ['库存余额', '库存批次', '库存变动记录']],
-          ['入库办理', ['采购收货', '成品入库', '委外回货']],
+          ['入库办理', ['采购收货', '成品入库', '委外回货', '工序回货']],
           ['出库办理', ['销售出货', '生产领料', '委外发料', '库存预留']],
         ]) {
           await header.getByRole('tab', { name: group, exact: true }).click()

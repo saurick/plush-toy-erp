@@ -184,6 +184,8 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
 
 .erp-navigation-tabs--options {
   display: inline-flex;
+  overflow-x: auto;
+  scrollbar-width: thin;
   vertical-align: top;
 }
 
@@ -232,6 +234,14 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   }
 }
 
+.erp-filter-chip-group {
+  display: inline-flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
 .erp-filter-chip {
   --erp-filter-chip-background: var(--erp-control-surface);
   --erp-filter-chip-text: var(--erp-control-text);
@@ -253,6 +263,12 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   line-height: 1.4;
   white-space: nowrap;
   cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .erp-filter-chip-group > .erp-filter-chip {
+    min-height: 44px;
+  }
 }
 
 .erp-filter-chip__label {
@@ -314,28 +330,6 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
 
 .erp-filter-chip--with-help:disabled .erp-filter-chip__help {
   pointer-events: none;
-}
-
-.erp-navigation-chips {
-  --erp-slider-radius: 8px;
-  display: inline-flex;
-  max-width: 100%;
-  gap: 8px;
-  overflow-x: auto;
-  vertical-align: top;
-}
-
-.erp-navigation-chips > .erp-filter-chip {
-  --erp-filter-chip-background: transparent;
-  min-height: 38px;
-  padding: 6px 12px;
-  font-size: var(--erp-font-body);
-}
-
-@media (max-width: 767px) {
-  .erp-navigation-chips > .erp-filter-chip {
-    min-height: 44px;
-  }
 }
 
 .erp-control-button {
