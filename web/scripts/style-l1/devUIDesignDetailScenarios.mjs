@@ -84,24 +84,40 @@ export function createDevUIDesignDetailScenarios({
         await page.reload()
         await target.waitFor()
         assert.equal(await target.getAttribute('aria-current'), 'page', '刷新应保留当前主题')
+        const fullDirectorySize = await directory.getByRole('button').count()
         await search.fill('窄屏与动效')
         await search.press('Enter')
         await page.waitForFunction(() => document.querySelectorAll('.erp-design-document-toc button').length === 1)
         assert.equal(await directory.getByRole('button').count(), 1)
         await directory.getByRole('button', { name: '窄屏与动效', exact: true }).click()
         await directory.locator('[aria-current="page"]').getByText('窄屏与动效', { exact: true }).waitFor()
-        assert.equal(await search.inputValue(), '', '选择搜索结果后恢复完整目录')
+        assert.equal(await search.inputValue(), '窄屏与动效', '打开图解保留关键词')
+        assert.equal(await directory.getByRole('button').count(), 1, '打开图解保留搜索结果')
+        assert.equal(await page.getByRole('button', { name: '下一个设计主题' }).isEnabled(), false)
         await assertHierarchy()
         await page.getByRole('button', { name: '收起目录', exact: true }).click()
         assert.equal(await directory.isVisible(), false)
         await page.getByRole('button', { name: '展开目录', exact: true }).click()
         await assertHierarchy()
+        await search.locator('xpath=..').getByRole('button', { name: '清除搜索', exact: true }).click()
+        await page.getByText(`${fullDirectorySize} / ${fullDirectorySize} 个图解`, { exact: true }).waitFor()
+        assert.equal(await search.inputValue(), '')
+        assert.equal(await directory.getByRole('button').count(), fullDirectorySize)
         await page.setViewportSize({ width: 1280, height: 800 })
         for (const view of ['设计依据', '设计说明']) {
           await page.getByRole('tab', { name: view, exact: true }).click()
           for (const read of ['图解', '规范原文']) {
             await page.locator('.erp-design-reader-toolbar').getByText(read, { exact: true }).click()
             await assertHierarchy()
+          }
+          if (view === '设计说明') {
+            await search.fill('页面结构')
+            await search.press('Enter')
+            await page.waitForURL((url) => url.searchParams.get('q') === '页面结构')
+            const chapter = directory.getByRole('button', { name: '页面结构', exact: true })
+            await chapter.click()
+            await directory.locator('[aria-current="page"]').getByText('页面结构', { exact: true }).waitFor()
+            assert.equal(await search.inputValue(), '页面结构', '打开规范章节保留该目录的关键词')
           }
         }
       },
@@ -372,7 +388,7 @@ export function createDevUIDesignDetailScenarios({
           .getByRole('button', { name: '查找、下钻与返回', exact: true })
           .waitFor()
         await select('查找、下钻与返回')
-        assert.equal(await search.inputValue(), '')
+        assert.equal(await search.inputValue(), '返回')
         await diagram.waitFor()
         const query = page.getByRole('textbox', { name: '示例查询条件' })
         await query.fill('核对刚才的筛选条件')
@@ -385,6 +401,7 @@ export function createDevUIDesignDetailScenarios({
           .click()
         assert.equal(await query.inputValue(), '核对刚才的筛选条件')
 
+        await search.locator('xpath=..').getByRole('button', { name: '清除搜索', exact: true }).click()
         await select('整页、弹窗与抽屉')
         const containerChoices = page.locator('.erp-feedback-container-choices')
         const modalChoice = containerChoices.getByRole('button', { name: /弹窗 · 局部选择/ })

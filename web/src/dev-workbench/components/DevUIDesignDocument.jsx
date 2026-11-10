@@ -81,7 +81,7 @@ export default function DevUIDesignDocument({ source, specification, view }) {
   const groups = [
     ...new Set(filtered.map((entry) => entry.group || '规范章节')),
   ]
-  const index = entries.findIndex(
+  const index = filtered.findIndex(
     (entry) => (entry.key || entry.id) === current
   )
 
@@ -105,7 +105,6 @@ export default function DevUIDesignDocument({ source, specification, view }) {
     updateLocation({
       [read === 'guide' ? 'topic' : 'chapter']: entry.key || entry.id,
       read,
-      q: '',
       point: '',
     })
   const reference = (id) =>
@@ -243,16 +242,16 @@ export default function DevUIDesignDocument({ source, specification, view }) {
                 aria-label="上一个设计主题"
                 icon={<ArrowLeftOutlined />}
                 disabled={index <= 0}
-                onClick={() => selectEntry(entries[index - 1])}
+                onClick={() => selectEntry(filtered[index - 1])}
               />
               <span>
-                {index + 1} / {entries.length}
+                {index + 1} / {filtered.length}
               </span>
               <Button
                 aria-label="下一个设计主题"
                 icon={<ArrowRightOutlined />}
-                disabled={index >= entries.length - 1}
-                onClick={() => selectEntry(entries[index + 1])}
+                disabled={index >= filtered.length - 1}
+                onClick={() => selectEntry(filtered[index + 1])}
               />
             </div>
           </div>
