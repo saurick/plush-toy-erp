@@ -110,7 +110,6 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
       placeholder={placeholder || label || props['aria-label']}
       prefix={basePrefix}
       labelRender={reference ? referenceLabelRenderer(identities, referenceLayout) : props.labelRender}
-      variant={referenceLayout && reference && props.disabled ? 'borderless' : props.variant}
       suffixIcon={referenceLayout && reference && props.disabled ? null : props.suffixIcon}
       allowClear={props.loading ? false : allowClear}
       popupMatchSelectWidth={props.popupMatchSelectWidth ?? props.dropdownMatchSelectWidth ?? popupWidth}

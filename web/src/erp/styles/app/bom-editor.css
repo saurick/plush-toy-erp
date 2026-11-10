@@ -52,14 +52,6 @@
   margin-bottom: 0;
 }
 
-.erp-bom-parts-table .ant-input:not(:where(.ant-input-affix-wrapper > input)),
-.erp-bom-parts-table .ant-input-affix-wrapper,
-.erp-bom-parts-table .ant-select .ant-select-selector {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-}
-
 .erp-bom-parts-table .erp-bom-center-cell,
 .erp-bom-center-cell .ant-input {
   text-align: center;
@@ -79,26 +71,6 @@
 .erp-bom-number-input-cell .ant-input {
   text-align: right;
   font-variant-numeric: tabular-nums;
-}
-
-.erp-bom-parts-table
-  .ant-input:not(:where(.ant-input-affix-wrapper > input)):hover,
-.erp-bom-parts-table .ant-input-affix-wrapper:hover,
-.erp-bom-parts-table .ant-select:hover .ant-select-selector {
-  border-color: var(--erp-business-control-hover, #abc5b3);
-}
-
-.erp-bom-parts-table
-  .ant-input:not(:where(.ant-input-affix-wrapper > input)):focus,
-.erp-bom-parts-table .ant-input-affix-wrapper-focused,
-.erp-bom-parts-table .ant-select.ant-select-focused .ant-select-selector {
-  background: var(--erp-business-action-modal-bg, #fff);
-}
-
-.erp-bom-parts-table
-  .ant-input-status-error:not(:where(.ant-input-affix-wrapper > input)),
-.erp-bom-parts-table .ant-input-affix-wrapper-status-error {
-  border-color: #d43838;
 }
 
 .erp-bom-parts-table td.erp-bom-material-cell {

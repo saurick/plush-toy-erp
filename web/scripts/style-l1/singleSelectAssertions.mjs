@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { parseRgb } from './colorAssertions.mjs'
 
 export async function assertSingleSelectValues(scope, label, minimum = 1) {
   await waitForFiniteAnimations(scope.page())
@@ -27,6 +28,7 @@ export async function assertSingleSelectValues(scope, label, minimum = 1) {
           }
         }
         const style = getComputedStyle(item)
+        const frame = getComputedStyle(selector)
         const name = item.querySelector('.app-select__reference-name')
         const code = control.parentElement?.querySelector('.app-select__reference-code')
         return [
@@ -42,6 +44,12 @@ export async function assertSingleSelectValues(scope, label, minimum = 1) {
             scrollHeight: item.scrollHeight,
             control: box(control),
             selector: box(selector),
+            border: {
+              width: parseFloat(frame.borderTopWidth),
+              style: frame.borderTopStyle,
+              color: frame.borderTopColor,
+              background: frame.backgroundColor,
+            },
             item: box(item),
             reference: name ? {
               name: { ...box(name), height: name.clientHeight, scroll: name.scrollHeight, client: name.clientWidth, scrollWidth: name.scrollWidth, lineHeight: parseFloat(getComputedStyle(name).lineHeight), whiteSpace: getComputedStyle(name).whiteSpace, text: name.textContent },
@@ -57,6 +65,12 @@ export async function assertSingleSelectValues(scope, label, minimum = 1) {
   )
   for (const entry of metrics) {
     const context = `${label}: ${JSON.stringify(entry)}`
+    const { border } = entry
+    assert.ok(
+      border.width > 0 && border.style === 'solid' &&
+      parseRgb(border.color)?.[3] > 0 && border.color !== border.background,
+      `${context}: 选中或锁定的下拉框仍保留可见边框`
+    )
     assert.equal(entry.whiteSpace, 'nowrap', context)
     assert.equal(entry.overflow, 'hidden', context)
     assert.equal(entry.textOverflow, 'ellipsis', context)
