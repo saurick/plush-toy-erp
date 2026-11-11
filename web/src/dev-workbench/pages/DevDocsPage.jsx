@@ -14,6 +14,7 @@ import {
 import { Button, Space, Spin, Tag, Tooltip, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp.jsx'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_DOCS_ROUTE } from '../config/devRoutes.mjs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
@@ -56,7 +57,7 @@ import {
   resolveDevDocsReadingHeading,
 } from './devDocsNavigation.mjs'
 
-const { Paragraph, Text, Title } = Typography
+const { Text, Title } = Typography
 
 const DEFAULT_EXPANDED_DIR_KEYS = Object.freeze([])
 const SEARCH_SCOPE_OPTIONS = Object.freeze([
@@ -946,13 +947,13 @@ export default function DevDocsPage() {
             >
               文档首页
             </Button>
-            <details className="erp-dev-disclosure erp-dev-docs-boundary-details">
-              <summary>收录范围</summary>
-              <Paragraph>
-                {'只读加载当前工作区的 Markdown；历史正文在打开或全文搜索时加载。 '}
-                收录不代表已纳入 Git；实现、运行和验收仍需核对对应证据。
-              </Paragraph>
-            </details>
+            <SupplementalHelp
+              label="收录范围"
+              placement="bottomLeft"
+              content="只读加载当前工作区的 Markdown；历史正文在打开或全文搜索时加载。收录不代表已纳入 Git；实现、运行和验收仍需核对对应证据。"
+            >
+              收录范围
+            </SupplementalHelp>
           </div>
         }
       >

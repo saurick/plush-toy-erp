@@ -354,11 +354,6 @@
   gap: 10px 20px;
 }
 
-.erp-dev-tool-page .erp-dev-docs-boundary-details {
-  margin-top: 0;
-  flex-basis: auto;
-}
-
 .erp-dev-tool-page .erp-dev-business-usability-summary {
   display: flex;
   flex-wrap: wrap;

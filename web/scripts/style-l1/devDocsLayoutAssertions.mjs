@@ -53,6 +53,82 @@ export async function assertDevDocsDirectorySpace(page, assert) {
   )
 }
 
+export async function verifyDevDocsScopeHelp(page, assert) {
+  const header = page.locator('.erp-dev-docs-header')
+  const trigger = header.getByRole('button', { name: /收录范围/u })
+  const help = page.getByText(/^只读加载当前工作区的 Markdown/u)
+  await trigger.waitFor()
+  await waitForFiniteAnimations(page, { selector: '.erp-dev-docs-page' })
+  assert.equal(await trigger.getAttribute('aria-expanded'), 'false')
+
+  await trigger.evaluate((button) => {
+    const root = button.closest('.erp-dev-docs-page')
+    const nodes = [
+      ['收录范围', button],
+      ...['header', 'controls', 'search', 'sidebar', 'reader'].map((part) => [
+        part,
+        root.querySelector(`.erp-dev-docs-${part}`),
+      ]),
+    ]
+    const read = (node) => {
+      const { x, y, width, height } = node.getBoundingClientRect()
+      return [x, y, width, height]
+    }
+    const before = nodes.map(([, node]) => read(node))
+    let frameId
+    let frames = 0
+    let shift = null
+    const sample = () => {
+      frames += 1
+      for (const [index, [part, node]] of nodes.entries()) {
+        const after = read(node)
+        if (!node.isConnected || after.some((value, i) => Math.abs(value - before[index][i]) > 1)) {
+          shift ??= { part, before: before[index], after }
+          break
+        }
+      }
+      frameId = requestAnimationFrame(sample)
+    }
+    frameId = requestAnimationFrame(sample)
+    root.stopScopeHelpLayoutSample = () => {
+      cancelAnimationFrame(frameId)
+      delete root.stopScopeHelpLayoutSample
+      return { frames, shift }
+    }
+  })
+
+  let sample
+  try {
+    await trigger.click()
+    await help.waitFor({ state: 'visible' })
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'true')
+    await waitForFiniteAnimations(page, { selector: '.erp-supplemental-help-popover' })
+    assert(await help.evaluate((element) => {
+      const { left, right, top, bottom } = element.closest('.erp-supplemental-help-popover').getBoundingClientRect()
+      return left >= -1 && right <= innerWidth + 1 && top >= -1 && bottom <= innerHeight + 1
+    }), '收录范围浮层应在视口内完整显示')
+    await trigger.click()
+    await help.waitFor({ state: 'hidden' })
+
+    await header.getByRole('button', { name: '文档首页', exact: true }).focus()
+    await page.keyboard.press('Tab')
+    await help.waitFor({ state: 'visible' })
+    await page.keyboard.press('Escape')
+    await help.waitFor({ state: 'hidden' })
+    assert(await trigger.evaluate((button) => document.activeElement === button), '关闭说明后键盘焦点应留在触发按钮')
+
+    await trigger.click()
+    await help.waitFor({ state: 'visible' })
+    await header.getByRole('heading', { name: '项目文档', exact: true }).click()
+    await help.waitFor({ state: 'hidden' })
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'false')
+  } finally {
+    sample = await page.locator('.erp-dev-docs-page').evaluate((root) => root.stopScopeHelpLayoutSample())
+  }
+  assert(sample.frames > 1, '收录范围开关期间应采到真实浏览器帧')
+  assert.equal(sample.shift, null, `收录范围开关推动了布局：${JSON.stringify(sample.shift)}`)
+}
+
 export function createDevDocsReadingFixture(keyword) {
   return [
     '# 归档全文检索探针',

@@ -28,7 +28,7 @@ import {
   DEV_WORKSPACE_NAV_ITEMS,
 } from '../../src/dev-workbench/config/devRoutes.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
-import { assertDevDocsDirectorySpace, createDevDocsReadingFixture, verifyDevDocsReadingNavigation } from './devDocsLayoutAssertions.mjs'
+import { assertDevDocsDirectorySpace, createDevDocsReadingFixture, verifyDevDocsReadingNavigation, verifyDevDocsScopeHelp } from './devDocsLayoutAssertions.mjs'
 import { verifyTestingOverview } from './devTestingOverviewAssertions.mjs'
 import { openTestingDetails, closeTestingDetails } from './devTestingDetailsActions.mjs'
 import { verifyProductCoreLayout, verifyProductCoreRelations } from './devProductCoreAssertions.mjs'
@@ -1105,8 +1105,10 @@ export function createDevWorkbenchDesktopScenarios({
       }
       if (item.route === DEV_DOCS_ROUTE) {
         await assertDevDocsDirectorySpace(page, assert)
+        await verifyDevDocsScopeHelp(page, assert)
         await page.setViewportSize({ width: 1024, height: 800 })
         await assertDevDocsDirectorySpace(page, assert)
+        await verifyDevDocsScopeHelp(page, assert)
         await assertNoHorizontalOverflow(page, '文档检索页头窄窗口')
         await page.setViewportSize({ width: 1440, height: 900 })
         await assertDevDocsDirectorySpace(page, assert)
