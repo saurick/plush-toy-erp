@@ -1530,7 +1530,7 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
   );
   assert.match(
     runnerCloudInit,
-    /ccfe7ae822d2c2f41f4fe7c956199967a4dac22d0ee0d2b2bfdb440aab3b20c5/u,
+    /9849f4e04ee35303714e34fbc3ac8ab44ea3e448a95aa182f91e3b9b79c710ec/u,
   );
   assert.match(runnerCloudInit, /sha512sum --check --strict/u);
   assert.match(

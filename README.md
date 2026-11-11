@@ -29,7 +29,7 @@ bash scripts/bootstrap.sh
 | --- | --- |
 | Node.js | [.n-node-version](.n-node-version)，当前 `24.22.1` |
 | pnpm | [web/package.json](web/package.json)，当前 `10.34.5` |
-| Go | [server/go.mod](server/go.mod)，toolchain `go1.26.10` |
+| Go | [server/go.mod](server/go.mod)，toolchain `go1.26.11` |
 | Bash | `>= 4`，由 `scripts/lib/bash.sh` 检查 |
 | PostgreSQL | [后端配置说明](server/docs/config.md)及 `make print_db_url` |
 

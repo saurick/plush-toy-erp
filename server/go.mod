@@ -2,7 +2,7 @@ module server
 
 go 1.26.0
 
-toolchain go1.26.10
+toolchain go1.26.11
 
 require (
 	entgo.io/ent v0.14.6
