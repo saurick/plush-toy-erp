@@ -125,6 +125,7 @@ export async function runNodeTestProcess(args, {
   let outputBytes = 0;
   let reason = "";
   let cleanupError = "";
+  let inspectionFailure = "";
   let rows = [];
   let sampling = false;
   let closed = false;
@@ -146,6 +147,7 @@ export async function runNodeTestProcess(args, {
     if (closed || exited || sampling || reason) return;
     if (process.ppid !== parentPid) return stop("parent-exited");
     sampling = true;
+    let inspectionStage = "snapshot";
     try {
       const snapshot = await processSnapshot();
       if (closed || reason) return;
@@ -164,6 +166,7 @@ export async function runNodeTestProcess(args, {
         // the executable instead so file deadlines cannot silently disappear.
         let executable = row.executable;
         if (process.platform === "linux") {
+          inspectionStage = "worker-executable";
           try { executable = path.basename(await readlink(`/proc/${row.pid}/exe`)); }
           catch (error) { if (error.code === "ENOENT" || error.code === "ESRCH") continue; throw error; }
         }
@@ -173,7 +176,13 @@ export async function runNodeTestProcess(args, {
         }
       }
       if (total > policy.totalRssMiB) stop("total-rss-limit");
-    } catch { if (!closed) stop("process-inspection-failed"); }
+    } catch (error) {
+      if (!closed) {
+        const code = typeof error?.code === "string" ? error.code : error?.killed ? "timeout" : "";
+        inspectionFailure = `${inspectionStage}:${/^[\w-]{1,48}$/u.test(code) ? code : "unknown"}`;
+        stop("process-inspection-failed");
+      }
+    }
     finally { sampling = false; }
   };
   const deadline = setTimeout(() => stop("timeout"), policy.timeoutMs);
@@ -215,7 +224,7 @@ export async function runNodeTestProcess(args, {
   process.removeListener("SIGINT", interrupted);
   process.removeListener("SIGTERM", interrupted);
   return {
-    ...result, reason, cleanupError, kernelGuard, limitProcess, durationMs: Date.now() - started,
+    ...result, reason, cleanupError, inspectionFailure, kernelGuard, limitProcess, durationMs: Date.now() - started,
     peakProcessRssMiB: Math.ceil(peakProcessRssMiB),
     peakTotalRssMiB: Math.ceil(peakTotalRssMiB),
     stdout: Buffer.concat(output.stdout).toString("utf8"),
@@ -231,7 +240,7 @@ async function main(argv) {
   process.stdout.write(result.stdout);
   process.stderr.write(result.stderr);
   if (result.reason) {
-    console.error(`[qa:node-process] status=incomplete reason=${result.reason} cleanupError=${result.cleanupError || "none"} durationMs=${result.durationMs} peakProcessRssMiB=${result.peakProcessRssMiB} peakTotalRssMiB=${result.peakTotalRssMiB} limitProcess=${JSON.stringify(result.limitProcess)}`);
+    console.error(`[qa:node-process] status=incomplete reason=${result.reason} cleanupError=${result.cleanupError || "none"} durationMs=${result.durationMs} peakProcessRssMiB=${result.peakProcessRssMiB} peakTotalRssMiB=${result.peakTotalRssMiB} limitProcess=${JSON.stringify(result.limitProcess)} inspectionFailure=${result.inspectionFailure || "none"}`);
   }
   process.exitCode = result.reason ? 1 : result.status ?? 1;
 }

@@ -1895,11 +1895,17 @@ test("yoyoosun contract print source pages expose every business-owned print fie
       "name={[field.name, 'unit_id']}",
       "name={[field.name, 'purchased_quantity']}",
       "name={[field.name, 'unit_price']}",
-      "name={[field.name, 'amount']}",
+      'label="金额"',
       "name={[field.name, 'note']}",
     ],
     "purchase order form",
   );
+  assert.match(
+    purchaseForm,
+    /<Input\s+aria-label="金额"\s+disabled\s+readOnly[\s\S]*?value=\{derivePurchaseOrderItemAmount\(/u,
+    "purchase amount is derived and read only",
+  );
+  assert.doesNotMatch(purchaseForm, /name=\{\[field\.name, 'amount'\]\}/u);
   assertSourceContainsAll(
     purchaseMaterialSnapshots,
     [
