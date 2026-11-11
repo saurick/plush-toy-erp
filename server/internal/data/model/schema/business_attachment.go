@@ -24,14 +24,15 @@ func (BusinessAttachment) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"business_attachments_owner_type_allowed":     "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'finance_payment', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task')",
-				"business_attachments_file_size_positive":     "file_size > 0",
-				"business_attachments_file_size_max":          fmt.Sprintf("file_size <= %d", biz.BusinessAttachmentMaxBytes),
-				"business_attachments_object_key_shape":       "length(object_key) IN (44, 76) AND substr(object_key, 1, 12) = 'attachments/' AND object_key = lower(object_key)",
-				"business_attachments_product_image_size_max": "attachment_type <> 'product_image' OR file_size <= 5242880",
-				"business_attachments_sha256_lower_hex":       "length(sha256) = 64 AND sha256 = lower(sha256)",
-				"business_attachments_product_image_contract": fmt.Sprintf("((owner_type = 'product' AND attachment_type = 'product_image' AND slot_key IS NOT NULL AND slot_key IN ('%s') AND mime_type IN ('image/png', 'image/jpeg', 'image/webp')) OR (owner_type <> 'product' AND attachment_type <> 'product_image'))", strings.Join(productImageSlots, "', '")),
-				"business_attachments_withdrawal_contract":    "((withdrawn_at IS NULL AND withdrawn_by IS NULL AND withdrawal_reason IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND withdrawn_by > 0 AND withdrawal_reason IS NOT NULL AND length(trim(withdrawal_reason)) BETWEEN 1 AND 255 AND owner_type <> 'product' AND attachment_type <> 'product_image'))",
+				"business_attachments_owner_type_allowed":      "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'finance_payment', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task', 'material')",
+				"business_attachments_file_size_positive":      "file_size > 0",
+				"business_attachments_file_size_max":           fmt.Sprintf("file_size <= %d", biz.BusinessAttachmentMaxBytes),
+				"business_attachments_object_key_shape":        "length(object_key) IN (44, 76) AND substr(object_key, 1, 12) = 'attachments/' AND object_key = lower(object_key)",
+				"business_attachments_product_image_size_max":  "attachment_type <> 'product_image' OR file_size <= 5242880",
+				"business_attachments_sha256_lower_hex":        "length(sha256) = 64 AND sha256 = lower(sha256)",
+				"business_attachments_product_image_contract":  fmt.Sprintf("((owner_type = 'product' AND attachment_type = 'product_image' AND slot_key IS NOT NULL AND slot_key IN ('%s') AND mime_type IN ('image/png', 'image/jpeg', 'image/webp')) OR (owner_type <> 'product' AND attachment_type <> 'product_image'))", strings.Join(productImageSlots, "', '")),
+				"business_attachments_material_media_contract": fmt.Sprintf("((owner_type = 'material' AND ((attachment_type = 'evidence' AND slot_key IS NULL) OR (attachment_type = 'material_image' AND slot_key IS NOT NULL AND slot_key = 'primary' AND mime_type IN ('image/png', 'image/jpeg', 'image/webp') AND file_size <= %d AND withdrawn_at IS NULL))) OR (owner_type <> 'material' AND attachment_type <> 'material_image'))", biz.BusinessAttachmentProductImageMaxBytes),
+				"business_attachments_withdrawal_contract":     "((withdrawn_at IS NULL AND withdrawn_by IS NULL AND withdrawal_reason IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND withdrawn_by > 0 AND withdrawal_reason IS NOT NULL AND length(trim(withdrawal_reason)) BETWEEN 1 AND 255 AND owner_type <> 'product' AND attachment_type <> 'product_image'))",
 			},
 		},
 	}
@@ -96,6 +97,10 @@ func (BusinessAttachment) Indexes() []ent.Index {
 		index.Fields("owner_type", "owner_id", "attachment_type", "slot_key").
 			Unique().
 			Annotations(entsql.IndexWhere("owner_type = 'product' AND attachment_type = 'product_image'")),
+		index.Fields("owner_id").
+			Unique().
+			StorageKey("businessattachment_material_image_owner_id").
+			Annotations(entsql.IndexWhere("owner_type = 'material' AND attachment_type = 'material_image'")),
 		index.Fields("sha256"),
 		index.Fields("object_key").Unique(),
 		index.Fields("uploaded_by"),

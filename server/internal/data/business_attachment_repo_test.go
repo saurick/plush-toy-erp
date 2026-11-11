@@ -384,14 +384,14 @@ func TestBusinessAttachmentRepoProductImageWriteSerializesAndReplacesSlot(t *tes
 			name:         "postgres row lock",
 			dialect:      "postgres",
 			ownerQuery:   "SELECT id FROM products WHERE id = $1 FOR UPDATE",
-			deleteQuery:  "DELETE FROM business_attachments WHERE owner_type = 'product' AND owner_id = $1 AND attachment_type = 'product_image' AND slot_key = $2",
+			deleteQuery:  "DELETE FROM business_attachments WHERE owner_type = $1 AND owner_id = $2 AND attachment_type = $3 AND slot_key = $4",
 			insertMarker: "INSERT INTO business_attachments",
 		},
 		{
 			name:         "sqlite write lock",
 			dialect:      "sqlite3",
 			ownerQuery:   "UPDATE products SET id = id WHERE id = ? RETURNING id",
-			deleteQuery:  "DELETE FROM business_attachments WHERE owner_type = 'product' AND owner_id = ? AND attachment_type = 'product_image' AND slot_key = ?",
+			deleteQuery:  "DELETE FROM business_attachments WHERE owner_type = ? AND owner_id = ? AND attachment_type = ? AND slot_key = ?",
 			insertMarker: "INSERT INTO business_attachments",
 		},
 	}
@@ -413,7 +413,7 @@ func TestBusinessAttachmentRepoProductImageWriteSerializesAndReplacesSlot(t *tes
 				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
 			mock.ExpectQuery("SELECT EXISTS").WithArgs(7, biz.BusinessAttachmentProductImageSlotPrimary).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 			mock.ExpectExec(regexp.QuoteMeta(tc.deleteQuery)).
-				WithArgs(7, biz.BusinessAttachmentProductImageSlotPrimary).
+				WithArgs(biz.BusinessAttachmentOwnerProduct, 7, biz.BusinessAttachmentTypeProductImage, biz.BusinessAttachmentProductImageSlotPrimary).
 				WillReturnResult(sqlmock.NewResult(0, 1))
 			mock.ExpectQuery(tc.insertMarker).
 				WithArgs(
@@ -459,8 +459,8 @@ func TestBusinessAttachmentRepoClearProductImageLocksOwnerAndDeletesExactSlot(t 
 		WithArgs(7).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
 	mock.ExpectQuery("SELECT EXISTS").WithArgs(7, biz.BusinessAttachmentProductImageSlotSecondary).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM business_attachments WHERE owner_type = 'product' AND owner_id = $1 AND attachment_type = 'product_image' AND slot_key = $2")).
-		WithArgs(7, biz.BusinessAttachmentProductImageSlotSecondary).
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM business_attachments WHERE owner_type = $1 AND owner_id = $2 AND attachment_type = $3 AND slot_key = $4")).
+		WithArgs(biz.BusinessAttachmentOwnerProduct, 7, biz.BusinessAttachmentTypeProductImage, biz.BusinessAttachmentProductImageSlotSecondary).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 

@@ -2125,6 +2125,22 @@
     },
     "test": "TestJsonrpcDispatcher_AdminSetRolesRequiresRoleAssignPermission"
   },
+  "attachment.clear_material_image": {
+    "basis": "handler-fixture",
+    "data": {
+      "cleared": true
+    },
+    "message": "OK",
+    "params": {
+      "id": 71,
+      "material_id": 7
+    },
+    "test": "TestRPCDocumentedMaterialAttachments",
+    "verification": {
+      "case": "attachment.clear_material_image",
+      "test": "TestRPCDocumentedExamples"
+    }
+  },
   "attachment.clear_product_image": {
     "basis": "handler-fixture",
     "data": {
@@ -2210,6 +2226,34 @@
       "source_type": "sales_order"
     },
     "test": "TestJsonrpcDocumentProductPreviews"
+  },
+  "attachment.list_material_image_references": {
+    "basis": "handler-fixture",
+    "data": {
+      "images": [
+        {
+          "image_attachment_id": 71,
+          "material_id": 7
+        },
+        {
+          "image_attachment_id": 0,
+          "material_id": 8
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "material_ids": [
+        7,
+        8,
+        7
+      ]
+    },
+    "test": "TestRPCDocumentedMaterialAttachments",
+    "verification": {
+      "case": "attachment.list_material_image_references",
+      "test": "TestRPCDocumentedExamples"
+    }
   },
   "attachment.list_product_image_references": {
     "basis": "handler-fixture",

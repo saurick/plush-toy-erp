@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 	"strings"
 
 	v1 "server/api/jsonrpc/v1"
@@ -38,17 +40,9 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if res := d.requireBusinessAttachmentOwnerPermission(ctx, biz.BusinessAttachmentOwnerProduct, false); res != nil {
 			return id, res, nil
 		}
-		values, ok := pm["product_ids"].([]any)
-		if !ok || len(values) == 0 || len(values) > 80 {
+		ids, ok := businessAttachmentImageReferenceIDs(pm["product_ids"])
+		if !ok {
 			return id, d.mapBusinessAttachmentError(ctx, biz.ErrBadParam), nil
-		}
-		ids := make([]int, 0, len(values))
-		for _, value := range values {
-			productID, valid := positiveSafeIntegerParam(map[string]any{"id": value}, "id")
-			if !valid {
-				return id, d.mapBusinessAttachmentError(ctx, biz.ErrBadParam), nil
-			}
-			ids = append(ids, productID)
 		}
 		refs, err := d.attachmentUC.ListProductImageReferences(ctx, ids)
 		if err != nil {
@@ -57,6 +51,23 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		items := make([]any, 0, len(refs))
 		for productID, attachmentID := range refs {
 			items = append(items, map[string]any{"product_id": productID, "image_attachment_id": attachmentID})
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"images": items})}, nil
+	case "list_material_image_references":
+		if res := d.requireBusinessAttachmentOwnerPermission(ctx, biz.BusinessAttachmentOwnerMaterial, false); res != nil {
+			return id, res, nil
+		}
+		ids, ok := businessAttachmentImageReferenceIDs(pm["material_ids"])
+		if !ok {
+			return id, d.mapBusinessAttachmentError(ctx, biz.ErrBadParam), nil
+		}
+		refs, err := d.attachmentUC.ListMaterialImageReferences(ctx, ids)
+		if err != nil {
+			return id, d.mapBusinessAttachmentError(ctx, err), nil
+		}
+		items := make([]any, 0, len(refs))
+		for _, materialID := range slices.Sorted(maps.Keys(refs)) {
+			items = append(items, map[string]any{"material_id": materialID, "image_attachment_id": refs[materialID]})
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"images": items})}, nil
 	case "list_attachments":
@@ -150,6 +161,24 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			}
 		}
 		if err := d.attachmentUC.ClearProductImage(ctx, getInt(pm, "owner_id", 0), getString(pm, "slot_key"), attachmentID); err != nil {
+			return id, d.mapBusinessAttachmentError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+			"cleared": true,
+		})}, nil
+	case "clear_material_image":
+		if res := d.requireBusinessAttachmentOwnerPermission(ctx, biz.BusinessAttachmentOwnerMaterial, true); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), biz.BusinessAttachmentOwnerMaterial); res != nil {
+			return id, res, nil
+		}
+		materialID, materialOK := positiveSafeIntegerParam(pm, "material_id")
+		attachmentID, attachmentOK := positiveSafeIntegerParam(pm, "id")
+		if !materialOK || !attachmentOK {
+			return id, d.mapBusinessAttachmentError(ctx, biz.ErrBadParam), nil
+		}
+		if err := d.attachmentUC.ClearMaterialImage(ctx, materialID, attachmentID); err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
@@ -271,7 +300,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if _, res := d.authorizeWorkflowAttachmentTaskAccess(ctx, item.OwnerType, item.OwnerID, 0, false); res != nil {
 			return id, res, nil
 		}
-		if variant == "thumbnail" && (item.OwnerType != biz.BusinessAttachmentOwnerProduct || item.AttachmentType != biz.BusinessAttachmentTypeProductImage) {
+		if variant == "thumbnail" && !biz.IsBusinessAttachmentReferenceImage(item.OwnerType, item.AttachmentType) {
 			return id, d.mapBusinessAttachmentError(ctx, biz.ErrBadParam), nil
 		}
 		content, err := d.attachmentUC.GetBusinessAttachmentContent(ctx, item)
@@ -279,8 +308,11 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
 		}
 		if variant == "thumbnail" {
-			thumbnail, err := biz.ProductImageThumbnail(item, content)
+			thumbnail, err := biz.BusinessAttachmentImageThumbnail(item, content)
 			if err != nil {
+				if item.OwnerType == biz.BusinessAttachmentOwnerMaterial {
+					err = biz.ErrBusinessAttachmentContentInvalid
+				}
 				return id, d.mapBusinessAttachmentError(ctx, err), nil
 			}
 			return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
@@ -297,6 +329,22 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			Message: fmt.Sprintf("未知 attachment 接口 method=%s", method),
 		}, nil
 	}
+}
+
+func businessAttachmentImageReferenceIDs(raw any) ([]int, bool) {
+	values, ok := raw.([]any)
+	if !ok || len(values) == 0 || len(values) > 80 {
+		return nil, false
+	}
+	ids := make([]int, 0, len(values))
+	for _, value := range values {
+		id, valid := positiveSafeIntegerParam(map[string]any{"id": value}, "id")
+		if !valid {
+			return nil, false
+		}
+		ids = append(ids, id)
+	}
+	return ids, true
 }
 
 func positiveSafeIntegerParam(pm map[string]any, key string) (int, bool) {
@@ -462,6 +510,8 @@ func businessAttachmentOwnerModuleKeys(ownerType string) []string {
 		return []string{"production"}
 	case biz.BusinessAttachmentOwnerProduct:
 		return []string{"products"}
+	case biz.BusinessAttachmentOwnerMaterial:
+		return []string{masterDataModuleKeyMaterials}
 	case biz.BusinessAttachmentOwnerProductSKU:
 		return []string{"products"}
 	case biz.BusinessAttachmentOwnerBOMHeader:
@@ -495,6 +545,8 @@ func businessAttachmentReadPermissions(ownerType string) []string {
 		return []string{biz.PermissionOutsourcingOrderRead}
 	case biz.BusinessAttachmentOwnerProduct:
 		return []string{biz.PermissionProductRead}
+	case biz.BusinessAttachmentOwnerMaterial:
+		return []string{biz.PermissionMaterialRead}
 	case biz.BusinessAttachmentOwnerProductSKU:
 		return []string{biz.PermissionProductSKURead, biz.PermissionProductRead}
 	case biz.BusinessAttachmentOwnerBOMHeader:
@@ -545,6 +597,8 @@ func businessAttachmentWritePermissions(ownerType string) []string {
 		return []string{biz.PermissionOutsourcingOrderCreate, biz.PermissionOutsourcingOrderUpdate}
 	case biz.BusinessAttachmentOwnerProduct:
 		return []string{biz.PermissionProductUpdate}
+	case biz.BusinessAttachmentOwnerMaterial:
+		return []string{biz.PermissionMaterialUpdate}
 	case biz.BusinessAttachmentOwnerProductSKU:
 		return []string{biz.PermissionProductSKUCreate, biz.PermissionProductSKUUpdate}
 	case biz.BusinessAttachmentOwnerBOMHeader:

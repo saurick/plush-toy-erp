@@ -18,7 +18,7 @@ func TestProductImageThumbnailKeepsAspectAndOriginal(t *testing.T) {
 		}
 		original := append([]byte(nil), input.Bytes()...)
 		metadata := &BusinessAttachment{OwnerType: BusinessAttachmentOwnerProduct, AttachmentType: BusinessAttachmentTypeProductImage, MimeType: "image/png"}
-		thumb, err := ProductImageThumbnail(metadata, input.Bytes())
+		thumb, err := BusinessAttachmentImageThumbnail(metadata, input.Bytes())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -38,7 +38,7 @@ func TestProductImageThumbnailKeepsAspectAndOriginal(t *testing.T) {
 
 func TestProductImageThumbnailRejectsEvidenceAndCorruption(t *testing.T) {
 	for _, metadata := range []*BusinessAttachment{nil, {OwnerType: BusinessAttachmentOwnerWorkflowTask, AttachmentType: "evidence"}, {OwnerType: BusinessAttachmentOwnerProduct, AttachmentType: BusinessAttachmentTypeProductImage, MimeType: "image/png"}} {
-		if _, err := ProductImageThumbnail(metadata, []byte("not an image")); err == nil {
+		if _, err := BusinessAttachmentImageThumbnail(metadata, []byte("not an image")); err == nil {
 			t.Fatal("invalid thumbnail accepted")
 		}
 	}

@@ -1,7 +1,15 @@
 export function createTaskProductImageLoader(download) {
+  return createOwnedReferenceImageLoader(download, {
+    ownerType: 'product',
+    ownerKey: 'productID',
+    invalidResponse: '产品图片不可用',
+  })
+}
+
+export function createOwnedReferenceImageLoader(download, { ownerType, ownerKey, invalidResponse }) {
   const cache = new Map()
-  function load({ attachmentID, productID, variant = 'thumbnail' }) {
-    const key = `${productID}:${attachmentID}:${variant}`
+  function load({ attachmentID, [ownerKey]: ownerID, variant = 'thumbnail' }) {
+    const key = `${ownerID}:${attachmentID}:${variant}`
     if (variant === 'thumbnail' && cache.has(key)) return cache.get(key)
     const request = download({
       id: attachmentID,
@@ -10,12 +18,12 @@ export function createTaskProductImageLoader(download) {
       .then((image) => {
         if (
           image?.id !== attachmentID ||
-          image?.owner_type !== 'product' ||
-          image?.owner_id !== productID ||
+          image?.owner_type !== ownerType ||
+          image?.owner_id !== ownerID ||
           !image?.content_base64 ||
           !['image/png', 'image/jpeg', 'image/webp'].includes(image?.mime_type)
         ) {
-          throw new Error('产品图片不可用')
+          throw new Error(invalidResponse)
         }
         return `data:${image.mime_type};base64,${image.content_base64}`
       })
@@ -29,8 +37,8 @@ export function createTaskProductImageLoader(download) {
     }
     return request
   }
-  load.invalidate = ({ attachmentID, productID }) => {
-    cache.delete(`${productID}:${attachmentID}:thumbnail`)
+  load.invalidate = ({ attachmentID, [ownerKey]: ownerID }) => {
+    cache.delete(`${ownerID}:${attachmentID}:thumbnail`)
   }
   return load
 }

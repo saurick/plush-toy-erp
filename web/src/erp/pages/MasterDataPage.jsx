@@ -52,6 +52,7 @@ import {
   normalizeContactRows,
 } from '../components/master-data/MasterDataForm.jsx'
 import ProductRecordEditor from '../components/master-data/ProductRecordEditor.jsx'
+import MaterialRecordMedia from '../components/master-data/MaterialRecordMedia.jsx'
 import { PaymentMethodEntry } from '../components/PaymentMethodInput.jsx'
 import {
   listContactsByOwner,
@@ -75,6 +76,7 @@ import {
   buildProcessParams,
 } from '../utils/masterDataParams.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
+import { businessFormSnapshot } from '../utils/businessFormSnapshot.mjs'
 import { filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.mjs'
 import {
   processOption,
@@ -206,6 +208,9 @@ export default function MasterDataPage({ type }) {
   const [recordSuspended, setRecordSuspended] = useState(false)
   const [relatedCreateID, setRelatedCreateID] = useState(null)
   const openedRelatedCreate = useRef(null)
+  const materialMedia = useRef(null)
+  const materialSaveReceipt = useRef(null)
+  const [materialEditorSession, setMaterialEditorSession] = useState(0)
   const [editingRecord, setEditingRecord] = useState(null)
   const [detailRecord, setDetailRecord] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -683,6 +688,10 @@ export default function MasterDataPage({ type }) {
       setRecordModalOpen(true)
       return
     }
+    if (effectiveType === 'materials') {
+      materialSaveReceipt.current = null
+      setMaterialEditorSession((value) => value + 1)
+    }
     setEditingRecord(null)
     setContacts([])
     recordForm.resetFields()
@@ -738,6 +747,12 @@ export default function MasterDataPage({ type }) {
     setRelatedCreateID(null)
     setRecordSuspended(false)
     setRecordModalOpen(false)
+    const receipt = materialSaveReceipt.current
+    materialSaveReceipt.current = null
+    if (effectiveType === 'materials' && receipt?.record?.id) {
+      setSelectedRecord(receipt.record)
+      loadRecords()
+    }
   }
 
   useEffect(() => {
@@ -777,6 +792,10 @@ export default function MasterDataPage({ type }) {
       setRecordModalOpen(true)
       return
     }
+    if (effectiveType === 'materials') {
+      materialSaveReceipt.current = null
+      setMaterialEditorSession((value) => value + 1)
+    }
     setRelatedCreateID(null)
     setSelectedRecord(record)
     recordForm.resetFields()
@@ -811,12 +830,15 @@ export default function MasterDataPage({ type }) {
       recordForm.setFields([{ name: 'name', errors: [conflict] }])
       return
     }
-    const isCreatingRecord = !editingRecord?.id
+    const materialEditor = effectiveType === 'materials'
+    const receipt = materialEditor ? materialSaveReceipt.current : null
+    const isCreatingRecord = receipt?.created ?? !editingRecord?.id
     const shouldShowCreatedRecordOnFirstPage =
       isCreatingRecord && effectiveType !== 'processes'
     setSaving(true)
     try {
-      const extra = editingRecord?.id ? { id: editingRecord.id } : {}
+      const recordID = receipt?.record?.id || editingRecord?.id
+      const extra = recordID ? { id: recordID } : {}
       const params = effectiveType === 'processes'
         ? buildProcessParams(values, extra)
         : buildMasterDataParams(values, extra)
@@ -829,15 +851,27 @@ export default function MasterDataPage({ type }) {
               ),
             })
           : null
-      const saved = savedData
+      const snapshot = materialEditor ? businessFormSnapshot(buildMasterDataParams(values)) : null
+      const saved = receipt?.snapshot === snapshot && receipt?.record?.id
+        ? receipt.record
+        : savedData
         ? savedData?.[config.entityKey]
-        : editingRecord?.id
+        : recordID
           ? await config.update(params)
           : await config.create(params)
+      if (materialEditor && saved?.id) {
+        materialSaveReceipt.current = { record: saved, snapshot, created: isCreatingRecord }
+        if ((await materialMedia.current?.flushChanges(saved.id)) === false) {
+          setEditingRecord(saved)
+          message.warning('材料已保存，图片或附件尚未全部确认，请保留当前内容重试。')
+          return
+        }
+        materialSaveReceipt.current = null
+      }
       const applied = relatedCreate && saved?.id
         ? await split.completeRelatedCreate(relatedCreate.id, saved)
         : null
-      message.success(relatedCreate ? applied ? '物料已保存并用于当前 BOM 物料组' : '物料已保存，原物料组有变化，请从 BOM 候选中选择' : editingRecord?.id ? `${entityLabel}已更新` : `${entityLabel}已创建`)
+      message.success(relatedCreate ? applied ? '物料已保存并用于当前 BOM 物料组' : '物料已保存，原物料组有变化，请从 BOM 候选中选择' : isCreatingRecord ? `${entityLabel}已创建` : `${entityLabel}已更新`)
       setRecordModalOpen(false)
       setRecordSuspended(false)
       setRelatedCreateID(null)
@@ -1246,6 +1280,17 @@ export default function MasterDataPage({ type }) {
                 ) : null
               }
                 />
+                {effectiveType === 'materials' ? (
+                  <MaterialRecordMedia
+                    key={materialEditorSession}
+                    ref={materialMedia}
+                    materialID={editingRecord?.id}
+                    materialName={editingRecord?.name}
+                    open={recordModalOpen || recordSuspended}
+                    canEdit={canUpdate}
+                    saving={saving}
+                  />
+                ) : null}
 
               </BusinessForm>
             </BusinessFormPage>
@@ -1261,7 +1306,11 @@ export default function MasterDataPage({ type }) {
         record={detailRecord}
         title={`${entityLabel}详情`}
         onClose={() => setDetailRecord(null)}
-      />
+      >
+        {effectiveType === 'materials' && detailRecord?.id ? (
+          <MaterialRecordMedia materialID={detailRecord.id} materialName={detailRecord.name} open />
+        ) : null}
+      </BusinessDetailsModal>
 
       {columnOrderModal}
     </BusinessPageLayout>

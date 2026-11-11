@@ -1206,21 +1206,27 @@ ProcessRuntime 入库命令只在上述来源交接全部完成后记录 durable
 
 | 方法 | 中文名称 | 用途 |
 | --- | --- | --- |
+| `clear_material_image` | 移除材料参考图 | 按材料和当前附件 ID 移除实物参考图，保留普通附件。 |
 | `clear_product_image` | 清除产品图片引用 | 清除产品图片引用，用于业务附件的对应办理或核对。 |
 | `download_attachment` | 下载业务附件 | 下载业务附件，用于业务附件的对应办理或核对。 |
 | `list_attachments` | 查询业务附件 | 读取业务附件，供列表查询、引用和追溯。 |
 | `list_document_product_previews` | 查询单据产品图片摘要 | 批量读取销售订单、生产订单、产品委外单的关联产品款数与首款身份，供列表认货。 |
+| `list_material_image_references` | 查询材料参考图引用 | 批量读取材料的实物参考图引用，供库存和档案按需加载。 |
 | `list_product_image_references` | 查询产品图片引用 | 读取产品图片引用，供列表查询、引用和追溯。 |
 | `upload_attachment` | 上传业务附件 | 上传业务附件，用于业务附件的对应办理或核对。 |
 | `withdraw_attachment` | 撤下业务附件 | 撤下业务附件，用于业务附件的对应办理或核对。 |
 
-`attachment` JSON-RPC 域承载业务附件证据与产品图片，canonical 方法为 `list_attachments / upload_attachment / download_attachment / withdraw_attachment`；产品图片使用受控的 `clear_product_image` 移除。
+`attachment` JSON-RPC 域承载业务附件证据和档案图片。普通附件使用 `list_attachments / upload_attachment / download_attachment / withdraw_attachment`；档案图片使用各自的受控移除方法。
 
 普通物理删除接口仍已退出；普通已上传证据只允许填写 1–255 字原因后做单向受控撤销，以 `withdrawn_at / withdrawn_by / withdrawal_reason` 全空或全有值为数据库合同。撤销行继续出现在列表并保留原文件元数据、上传审计和撤销审计，但不再允许普通预览 / 下载，也不提供恢复；相同操作者和相同规范化原因的精确重试返回首次回执，其他重复撤销返回版本冲突。
 
 产品图片使用 `owner_type=product + attachment_type=product_image`，只接受 PNG / JPEG / WEBP。上传时 `slot_key=primary|secondary` 替换主图或辅图；`slot_key=supplemental` 追加补充图，后端分配空位并返回已保存图片的 ID。每款最多 8 张补充图；重复追加相同内容返回已有图片。已存补充图由 `list_attachments` 返回为 `supplemental_1` 至 `supplemental_8`，档案按附件 ID 升序展示，列表和工程打印仍只使用原有图片位。
 
 `clear_product_image` 传 `owner_id`，并在 `slot_key=primary|secondary` 或补充图的正整数 `id` 中二选一。补充图按产品和附件身份移除，已不存在的引用重复移除仍返回成功。图片不进入普通证据撤销。
+
+材料参考图使用 `owner_type=material + attachment_type=material_image + slot_key=primary`，按材料行加锁替换，最多一张。格式、大小和完整解码要求与产品图片一致；普通材料附件使用 `evidence` 且不传槽位。材料的 `list_attachments` 只列普通附件。读取和下载要求 `material.read`；上传、撤销普通附件和移除参考图要求 `material.update` 且材料档案模块启用。
+
+`list_material_image_references` 接受 1–80 个正 JSON 安全整数 `material_ids`，去重后返回 `images: [{material_id, image_attachment_id}]`；没有参考图或材料不存在时 ID 为 `0`。原图和 160px 缩略图按附件 ID 通过 `download_attachment` 读取，仍校验其材料归属与权限。`clear_material_image` 要求正整数 `material_id` 与 `id`，只移除匹配的引用，重试或旧 ID 不会删掉新图。参考图不能走普通附件撤销。
 
 `list_document_product_previews(source_type, document_ids)` 只读支持 `sales_order / production_order / outsourcing_order`，每批接受 1–80 个互不重复的正 JSON 安全整数。每张单据返回 `document_id、product_count、product_id、product_name、product_code`；款数按全部明细中仍存在的正式 `product_id` 去重，相同产品的多行或 SKU 只算一款，未关联需求和物料行不计入。首款按产品 ID 稳定选择，名称和编号读取当前产品主数据；没有关联产品时款数和产品 ID 均为 0，名称和编号为空，不从业务快照按名称猜测产品。查询按单据集合一次分组，不逐单读取明细，不返回图片内容。
 
@@ -7501,6 +7507,64 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 样例依据：[TestJsonrpcDispatcher_AdminSetRolesRequiresRoleAssignPermission](../internal/service/jsonrpc_admin_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
+#### 移除材料参考图 `attachment.clear_material_image`
+
+##### 请求参数
+
+**顶层字段**
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:173`。 |
+| `id` | integer | 按业务条件 | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 依据：`server/internal/service/jsonrpc_attachment.go:177`。 |
+| `material_id` | integer | 按业务条件 | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "material_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 依据：`server/internal/service/jsonrpc_attachment.go:176`。 |
+
+对象引用、权限、状态和并发版本由后端校验。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "clear_material_image",
+  "params": {
+    "id": 71,
+    "material_id": 7
+  },
+  "id": "rpc-demo-attachment.clear_material_image"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 成功为 0；错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的返回内容。 |
+
+**顶层字段**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.cleared` | boolean | 依据：`server/internal/service/jsonrpc_attachment.go:185`。 |
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-attachment.clear_material_image",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "cleared": true
+    }
+  }
+}
+```
+
+样例依据：[TestRPCDocumentedMaterialAttachments](../internal/service/jsonrpc_material_attachments_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+
+执行核对入口：[TestRPCDocumentedExamples/attachment.clear_material_image](../internal/service/jsonrpc_documented_examples_test.go)；实际执行状态读取对应源码身份的原始回执。
+
 #### 清除产品图片引用 `attachment.clear_product_image`
 
 ##### 请求参数
@@ -7509,10 +7573,10 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:141`。 |
-| `id` | integer | 条件必填（id 有值） | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_attachment.go:147`。 |
-| `owner_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "owner_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_attachment.go:152`。 |
-| `slot_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "slot_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:152`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:152`。 |
+| `id` | integer | 条件必填（id 有值） | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_attachment.go:158`。 |
+| `owner_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "owner_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_attachment.go:163`。 |
+| `slot_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "slot_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:163`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -7540,7 +7604,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.cleared` | boolean | 依据：`server/internal/service/jsonrpc_attachment.go:156`。 |
+| `result.data.cleared` | boolean | 依据：`server/internal/service/jsonrpc_attachment.go:167`。 |
 
 ```json
 {
@@ -7566,8 +7630,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_attachment.go:264`。 |
-| `variant` | string &#124; null | 条件必填（variant 有值） | 解析器 `getString`；调用 `getString(pm, "variant")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_attachment.go:255`。 |
+| `id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_attachment.go:293`。 |
+| `variant` | string &#124; null | 条件必填（variant 有值） | 解析器 `getString`；调用 `getString(pm, "variant")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_attachment.go:284`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -7595,37 +7659,37 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachment` | object | 依据：`server/internal/service/jsonrpc_attachment.go:287`。 |
+| `result.data.attachment` | object | 依据：`server/internal/service/jsonrpc_attachment.go:319`。 |
 
 **`attachment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachment.attachment_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:567`。 |
-| `result.data.attachment.content_base64` | string | 依据：`server/internal/service/jsonrpc_attachment.go:287`。 |
-| `result.data.attachment.created_at` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:582`。 |
-| `result.data.attachment.file_name` | string | 依据：`server/internal/service/jsonrpc_attachment.go:569`。 |
-| `result.data.attachment.file_size` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:571`。 |
-| `result.data.attachment.id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:287`。 |
-| `result.data.attachment.mime_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:287`。 |
-| `result.data.attachment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:576`。 |
-| `result.data.attachment.owner_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:287`。 |
-| `result.data.attachment.owner_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:287`。 |
-| `result.data.attachment.sha256` | string | 依据：`server/internal/service/jsonrpc_attachment.go:572`。 |
-| `result.data.attachment.slot_key` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:568`。 |
-| `result.data.attachment.uploaded_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:573`。 |
-| `result.data.attachment.uploaded_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:575`。 |
-| `result.data.attachment.uploaded_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:574`。 |
-| `result.data.attachment.withdrawal_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:581`。 |
+| `result.data.attachment.attachment_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:621`。 |
+| `result.data.attachment.content_base64` | string | 依据：`server/internal/service/jsonrpc_attachment.go:319`。 |
+| `result.data.attachment.created_at` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:636`。 |
+| `result.data.attachment.file_name` | string | 依据：`server/internal/service/jsonrpc_attachment.go:623`。 |
+| `result.data.attachment.file_size` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:625`。 |
+| `result.data.attachment.id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:319`。 |
+| `result.data.attachment.mime_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:319`。 |
+| `result.data.attachment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:630`。 |
+| `result.data.attachment.owner_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:319`。 |
+| `result.data.attachment.owner_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:319`。 |
+| `result.data.attachment.sha256` | string | 依据：`server/internal/service/jsonrpc_attachment.go:626`。 |
+| `result.data.attachment.slot_key` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:622`。 |
+| `result.data.attachment.uploaded_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:627`。 |
+| `result.data.attachment.uploaded_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:629`。 |
+| `result.data.attachment.uploaded_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:628`。 |
+| `result.data.attachment.withdrawal_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:635`。 |
 
 **`attachment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachment.withdrawn_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:577`。 |
-| `result.data.attachment.withdrawn_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:578`。 |
-| `result.data.attachment.withdrawn_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:580`。 |
-| `result.data.attachment.withdrawn_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:579`。 |
+| `result.data.attachment.withdrawn_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:631`。 |
+| `result.data.attachment.withdrawn_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:632`。 |
+| `result.data.attachment.withdrawn_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:634`。 |
+| `result.data.attachment.withdrawn_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:633`。 |
 
 ```json
 {
@@ -7657,8 +7721,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `owner_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "owner_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_attachment.go:64`。 |
-| `owner_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "owner_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:63`。 |
+| `owner_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "owner_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_attachment.go:75`。 |
+| `owner_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "owner_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:74`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -7686,37 +7750,37 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachments` | array | 依据：`server/internal/service/jsonrpc_attachment.go:76`。 |
-| `result.data.attachments[]` | object | 依据：`server/internal/service/jsonrpc_attachment.go:561`。 |
+| `result.data.attachments` | array | 依据：`server/internal/service/jsonrpc_attachment.go:87`。 |
+| `result.data.attachments[]` | object | 依据：`server/internal/service/jsonrpc_attachment.go:615`。 |
 
 **`attachments[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachments[].attachment_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:567`。 |
-| `result.data.attachments[].created_at` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:582`。 |
-| `result.data.attachments[].file_name` | string | 依据：`server/internal/service/jsonrpc_attachment.go:569`。 |
-| `result.data.attachments[].file_size` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:571`。 |
-| `result.data.attachments[].id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:564`。 |
-| `result.data.attachments[].mime_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:570`。 |
-| `result.data.attachments[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:576`。 |
-| `result.data.attachments[].owner_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:566`。 |
-| `result.data.attachments[].owner_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:565`。 |
-| `result.data.attachments[].sha256` | string | 依据：`server/internal/service/jsonrpc_attachment.go:572`。 |
-| `result.data.attachments[].slot_key` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:568`。 |
-| `result.data.attachments[].uploaded_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:573`。 |
-| `result.data.attachments[].uploaded_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:575`。 |
-| `result.data.attachments[].uploaded_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:574`。 |
-| `result.data.attachments[].withdrawal_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:581`。 |
-| `result.data.attachments[].withdrawn_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:577`。 |
+| `result.data.attachments[].attachment_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:621`。 |
+| `result.data.attachments[].created_at` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:636`。 |
+| `result.data.attachments[].file_name` | string | 依据：`server/internal/service/jsonrpc_attachment.go:623`。 |
+| `result.data.attachments[].file_size` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:625`。 |
+| `result.data.attachments[].id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:618`。 |
+| `result.data.attachments[].mime_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:624`。 |
+| `result.data.attachments[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:630`。 |
+| `result.data.attachments[].owner_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:620`。 |
+| `result.data.attachments[].owner_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:619`。 |
+| `result.data.attachments[].sha256` | string | 依据：`server/internal/service/jsonrpc_attachment.go:626`。 |
+| `result.data.attachments[].slot_key` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:622`。 |
+| `result.data.attachments[].uploaded_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:627`。 |
+| `result.data.attachments[].uploaded_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:629`。 |
+| `result.data.attachments[].uploaded_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:628`。 |
+| `result.data.attachments[].withdrawal_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:635`。 |
+| `result.data.attachments[].withdrawn_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:631`。 |
 
 **`attachments[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachments[].withdrawn_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:578`。 |
-| `result.data.attachments[].withdrawn_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:580`。 |
-| `result.data.attachments[].withdrawn_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:579`。 |
+| `result.data.attachments[].withdrawn_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:632`。 |
+| `result.data.attachments[].withdrawn_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:634`。 |
+| `result.data.attachments[].withdrawn_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:633`。 |
 
 ```json
 {
@@ -7832,6 +7896,82 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 样例依据：[TestJsonrpcDocumentProductPreviews](../internal/service/jsonrpc_document_product_preview_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
+#### 查询材料参考图引用 `attachment.list_material_image_references`
+
+##### 请求参数
+
+**顶层字段**
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `material_ids` | array | 按业务条件 | 解析器 `businessAttachmentImageReferenceIDs`；调用 `businessAttachmentImageReferenceIDs(pm["material_ids"])`。 依据：`server/internal/service/jsonrpc_attachment.go:60`。 |
+
+对象引用、权限、状态和并发版本由后端校验。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "list_material_image_references",
+  "params": {
+    "material_ids": [
+      7,
+      8,
+      7
+    ]
+  },
+  "id": "rpc-demo-attachment.list_material_image_references"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 成功为 0；错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的返回内容。 |
+
+**顶层字段**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.images` | array | 依据：`server/internal/service/jsonrpc_attachment.go:72`。 |
+| `result.data.images[]` | object | 依据：`server/internal/service/jsonrpc_attachment.go:70`。 |
+
+**`images[]`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.images[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:70`。 |
+| `result.data.images[].material_id` | json | 依据：`server/internal/service/jsonrpc_attachment.go:70`。 |
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-attachment.list_material_image_references",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "images": [
+        {
+          "image_attachment_id": 71,
+          "material_id": 7
+        },
+        {
+          "image_attachment_id": 0,
+          "material_id": 8
+        }
+      ]
+    }
+  }
+}
+```
+
+样例依据：[TestRPCDocumentedMaterialAttachments](../internal/service/jsonrpc_material_attachments_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+
+执行核对入口：[TestRPCDocumentedExamples/attachment.list_material_image_references](../internal/service/jsonrpc_documented_examples_test.go)；实际执行状态读取对应源码身份的原始回执。
+
 #### 查询产品图片引用 `attachment.list_product_image_references`
 
 ##### 请求参数
@@ -7840,7 +7980,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `product_ids` | array | 按业务条件 | 由后端实际解析读取；嵌套字段和数组按所属解析器校验。 依据：`server/internal/service/jsonrpc_attachment.go:41`。 |
+| `product_ids` | array | 按业务条件 | 解析器 `businessAttachmentImageReferenceIDs`；调用 `businessAttachmentImageReferenceIDs(pm["product_ids"])`。 依据：`server/internal/service/jsonrpc_attachment.go:43`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -7869,15 +8009,15 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.images` | array | 依据：`server/internal/service/jsonrpc_attachment.go:61`。 |
-| `result.data.images[]` | object | 依据：`server/internal/service/jsonrpc_attachment.go:59`。 |
+| `result.data.images` | array | 依据：`server/internal/service/jsonrpc_attachment.go:55`。 |
+| `result.data.images[]` | object | 依据：`server/internal/service/jsonrpc_attachment.go:53`。 |
 
 **`images[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.images[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:59`。 |
-| `result.data.images[].product_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:59`。 |
+| `result.data.images[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:53`。 |
+| `result.data.images[].product_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:53`。 |
 
 ```json
 {
@@ -7908,16 +8048,16 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `attachment_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "attachment_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:114`。 |
-| `content_base64` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "content_base64")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:118`。 |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:88`。 |
-| `expected_version` | integer | 条件必填（owner_type=workflow_task） | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“ownerType == biz.BusinessAttachmentOwnerWorkflowTask && !expectedVersionOK”。 依据：`server/internal/service/jsonrpc_attachment.go:81`。 |
-| `file_name` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "file_name")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:116`。 |
-| `mime_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "mime_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:117`。 |
-| `note` | string | 可选 | 解析器 `optionalStringFromParams`；调用 `optionalStringFromParams(pm, "note")`。 依据：`server/internal/service/jsonrpc_attachment.go:120`。 |
-| `owner_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "owner_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_attachment.go:80`。 |
-| `owner_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "owner_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:79`。 |
-| `slot_key` | string | 可选 | 解析器 `optionalStringFromParams`；调用 `optionalStringFromParams(pm, "slot_key")`。 依据：`server/internal/service/jsonrpc_attachment.go:115`。 |
+| `attachment_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "attachment_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:125`。 |
+| `content_base64` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "content_base64")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:129`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:99`。 |
+| `expected_version` | integer | 条件必填（owner_type=workflow_task） | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“ownerType == biz.BusinessAttachmentOwnerWorkflowTask && !expectedVersionOK”。 依据：`server/internal/service/jsonrpc_attachment.go:92`。 |
+| `file_name` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "file_name")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:127`。 |
+| `mime_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "mime_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:128`。 |
+| `note` | string | 可选 | 解析器 `optionalStringFromParams`；调用 `optionalStringFromParams(pm, "note")`。 依据：`server/internal/service/jsonrpc_attachment.go:131`。 |
+| `owner_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "owner_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_attachment.go:91`。 |
+| `owner_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "owner_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:90`。 |
+| `slot_key` | string | 可选 | 解析器 `optionalStringFromParams`；调用 `optionalStringFromParams(pm, "slot_key")`。 依据：`server/internal/service/jsonrpc_attachment.go:126`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -7949,36 +8089,36 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachment` | object | 依据：`server/internal/service/jsonrpc_attachment.go:135`。 |
+| `result.data.attachment` | object | 依据：`server/internal/service/jsonrpc_attachment.go:146`。 |
 
 **`attachment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachment.attachment_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:567`。 |
-| `result.data.attachment.created_at` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:582`。 |
-| `result.data.attachment.file_name` | string | 依据：`server/internal/service/jsonrpc_attachment.go:569`。 |
-| `result.data.attachment.file_size` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:571`。 |
-| `result.data.attachment.id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:564`。 |
-| `result.data.attachment.mime_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:570`。 |
-| `result.data.attachment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:576`。 |
-| `result.data.attachment.owner_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:566`。 |
-| `result.data.attachment.owner_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:565`。 |
-| `result.data.attachment.sha256` | string | 依据：`server/internal/service/jsonrpc_attachment.go:572`。 |
-| `result.data.attachment.slot_key` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:568`。 |
-| `result.data.attachment.uploaded_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:573`。 |
-| `result.data.attachment.uploaded_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:575`。 |
-| `result.data.attachment.uploaded_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:574`。 |
-| `result.data.attachment.withdrawal_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:581`。 |
-| `result.data.attachment.withdrawn_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:577`。 |
+| `result.data.attachment.attachment_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:621`。 |
+| `result.data.attachment.created_at` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:636`。 |
+| `result.data.attachment.file_name` | string | 依据：`server/internal/service/jsonrpc_attachment.go:623`。 |
+| `result.data.attachment.file_size` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:625`。 |
+| `result.data.attachment.id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:618`。 |
+| `result.data.attachment.mime_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:624`。 |
+| `result.data.attachment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:630`。 |
+| `result.data.attachment.owner_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:620`。 |
+| `result.data.attachment.owner_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:619`。 |
+| `result.data.attachment.sha256` | string | 依据：`server/internal/service/jsonrpc_attachment.go:626`。 |
+| `result.data.attachment.slot_key` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:622`。 |
+| `result.data.attachment.uploaded_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:627`。 |
+| `result.data.attachment.uploaded_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:629`。 |
+| `result.data.attachment.uploaded_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:628`。 |
+| `result.data.attachment.withdrawal_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:635`。 |
+| `result.data.attachment.withdrawn_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:631`。 |
 
 **`attachment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachment.withdrawn_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:578`。 |
-| `result.data.attachment.withdrawn_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:580`。 |
-| `result.data.attachment.withdrawn_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:579`。 |
+| `result.data.attachment.withdrawn_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:632`。 |
+| `result.data.attachment.withdrawn_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:634`。 |
+| `result.data.attachment.withdrawn_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:633`。 |
 
 ```json
 {
@@ -8024,10 +8164,10 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:207`。 |
-| `expected_version` | integer | 条件必填 | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“item.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask && !expectedVersionOK”。 依据：`server/internal/service/jsonrpc_attachment.go:200`。 |
-| `id` | integer | 必填 | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!attachmentIDOK”。 依据：`server/internal/service/jsonrpc_attachment.go:159`。 |
-| `reason` | string | 按业务条件 | 解析器 `NormalizeBusinessAttachmentWithdrawalReason`；调用 `biz.NormalizeBusinessAttachmentWithdrawalReason(rawWithdrawalReason)`。 依据：`server/internal/service/jsonrpc_attachment.go:171`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_attachment.go:236`。 |
+| `expected_version` | integer | 条件必填 | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“item.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask && !expectedVersionOK”。 依据：`server/internal/service/jsonrpc_attachment.go:229`。 |
+| `id` | integer | 必填 | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!attachmentIDOK”。 依据：`server/internal/service/jsonrpc_attachment.go:188`。 |
+| `reason` | string | 按业务条件 | 解析器 `NormalizeBusinessAttachmentWithdrawalReason`；调用 `biz.NormalizeBusinessAttachmentWithdrawalReason(rawWithdrawalReason)`。 依据：`server/internal/service/jsonrpc_attachment.go:200`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -8056,36 +8196,36 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachment` | object | 依据：`server/internal/service/jsonrpc_attachment.go:197`。 |
+| `result.data.attachment` | object | 依据：`server/internal/service/jsonrpc_attachment.go:226`。 |
 
 **`attachment`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachment.attachment_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:567`。 |
-| `result.data.attachment.created_at` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:582`。 |
-| `result.data.attachment.file_name` | string | 依据：`server/internal/service/jsonrpc_attachment.go:569`。 |
-| `result.data.attachment.file_size` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:571`。 |
-| `result.data.attachment.id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:564`。 |
-| `result.data.attachment.mime_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:570`。 |
-| `result.data.attachment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:576`。 |
-| `result.data.attachment.owner_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:566`。 |
-| `result.data.attachment.owner_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:565`。 |
-| `result.data.attachment.sha256` | string | 依据：`server/internal/service/jsonrpc_attachment.go:572`。 |
-| `result.data.attachment.slot_key` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:568`。 |
-| `result.data.attachment.uploaded_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:573`。 |
-| `result.data.attachment.uploaded_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:575`。 |
-| `result.data.attachment.uploaded_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:574`。 |
-| `result.data.attachment.withdrawal_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:581`。 |
-| `result.data.attachment.withdrawn_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:577`。 |
+| `result.data.attachment.attachment_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:621`。 |
+| `result.data.attachment.created_at` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:636`。 |
+| `result.data.attachment.file_name` | string | 依据：`server/internal/service/jsonrpc_attachment.go:623`。 |
+| `result.data.attachment.file_size` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:625`。 |
+| `result.data.attachment.id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:618`。 |
+| `result.data.attachment.mime_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:624`。 |
+| `result.data.attachment.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:630`。 |
+| `result.data.attachment.owner_id` | integer | 依据：`server/internal/service/jsonrpc_attachment.go:620`。 |
+| `result.data.attachment.owner_type` | string | 依据：`server/internal/service/jsonrpc_attachment.go:619`。 |
+| `result.data.attachment.sha256` | string | 依据：`server/internal/service/jsonrpc_attachment.go:626`。 |
+| `result.data.attachment.slot_key` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:622`。 |
+| `result.data.attachment.uploaded_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:627`。 |
+| `result.data.attachment.uploaded_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:629`。 |
+| `result.data.attachment.uploaded_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:628`。 |
+| `result.data.attachment.withdrawal_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:635`。 |
+| `result.data.attachment.withdrawn_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:631`。 |
 
 **`attachment`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.attachment.withdrawn_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:578`。 |
-| `result.data.attachment.withdrawn_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:580`。 |
-| `result.data.attachment.withdrawn_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:579`。 |
+| `result.data.attachment.withdrawn_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:632`。 |
+| `result.data.attachment.withdrawn_by_display_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:634`。 |
+| `result.data.attachment.withdrawn_by_username` | string &#124; null | 依据：`server/internal/service/jsonrpc_attachment.go:633`。 |
 
 ```json
 {

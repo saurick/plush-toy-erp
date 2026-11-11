@@ -61,10 +61,12 @@ export const RpcMethod = Object.freeze({
     SET_ROLES: 'set_roles',
   }),
   attachment: Object.freeze({
+    CLEAR_MATERIAL_IMAGE: 'clear_material_image',
     CLEAR_PRODUCT_IMAGE: 'clear_product_image',
     DOWNLOAD_ATTACHMENT: 'download_attachment',
     LIST_ATTACHMENTS: 'list_attachments',
     LIST_DOCUMENT_PRODUCT_PREVIEWS: 'list_document_product_previews',
+    LIST_MATERIAL_IMAGE_REFERENCES: 'list_material_image_references',
     LIST_PRODUCT_IMAGE_REFERENCES: 'list_product_image_references',
     UPLOAD_ATTACHMENT: 'upload_attachment',
     WITHDRAW_ATTACHMENT: 'withdraw_attachment',

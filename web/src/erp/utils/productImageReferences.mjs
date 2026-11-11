@@ -10,8 +10,16 @@ export function notifyProductImagesChanged(productID) {
   }
 }
 
-// Coalesce visible product references without putting originals in list responses.
 export function createProductImageReferenceLoader(list) {
+  return createReferenceImageIDLoader(list, {
+    requestField: 'product_ids',
+    identityField: 'product_id',
+    invalidResponse: '产品图片引用不完整',
+  })
+}
+
+// Coalesce visible references without putting originals in list responses.
+export function createReferenceImageIDLoader(list, { requestField, identityField, invalidResponse }) {
   const pending = new Map()
   const queued = new Map()
   let scheduled = false
@@ -21,21 +29,22 @@ export function createProductImageReferenceLoader(list) {
     if (!entries.length) return
     for (const [id] of entries) queued.delete(id)
     try {
-      const rows = await list({ product_ids: entries.map(([id]) => id) })
+      const rows = await list({ [requestField]: entries.map(([id]) => id) })
       const refs = new Map()
       const requested = new Set(entries.map(([id]) => id))
       for (const row of Array.isArray(rows) ? rows : []) {
+        const id = row?.[identityField]
         if (
-          !requested.has(row?.product_id) ||
-          refs.has(row.product_id) ||
+          !requested.has(id) ||
+          refs.has(id) ||
           !Number.isSafeInteger(row.image_attachment_id) ||
           row.image_attachment_id < 0
         ) {
-          throw new Error('产品图片引用不完整')
+          throw new Error(invalidResponse)
         }
-        refs.set(row.product_id, row.image_attachment_id)
+        refs.set(id, row.image_attachment_id)
       }
-      if (refs.size !== entries.length) throw new Error('产品图片引用不完整')
+      if (refs.size !== entries.length) throw new Error(invalidResponse)
       for (const [id, request] of entries) request.resolve(refs.get(id))
     } catch (error) {
       for (const [, request] of entries) request.reject(error)
@@ -49,30 +58,30 @@ export function createProductImageReferenceLoader(list) {
       }
     }
   }
-  function read(productID) {
-    if (!Number.isSafeInteger(productID) || productID <= 0) {
+  function read(ownerID) {
+    if (!Number.isSafeInteger(ownerID) || ownerID <= 0) {
       return Promise.resolve(0)
     }
-    if (pending.has(productID)) return pending.get(productID)
+    if (pending.has(ownerID)) return pending.get(ownerID)
     let resolve
     let reject
     const promise = new Promise((yes, no) => {
       resolve = yes
       reject = no
     })
-    pending.set(productID, promise)
-    queued.set(productID, { promise, resolve, reject })
+    pending.set(ownerID, promise)
+    queued.set(ownerID, { promise, resolve, reject })
     if (!scheduled) {
       scheduled = true
       setTimeout(flush, 0)
     }
     return promise
   }
-  read.invalidate = (productID) => {
-    pending.delete(productID)
-    const request = queued.get(productID)
+  read.invalidate = (ownerID) => {
+    pending.delete(ownerID)
+    const request = queued.get(ownerID)
     if (request) {
-      queued.delete(productID)
+      queued.delete(ownerID)
       request.resolve(0)
     }
   }

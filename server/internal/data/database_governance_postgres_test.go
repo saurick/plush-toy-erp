@@ -1,9 +1,13 @@
 package data
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"io"
 	"strings"
 	"testing"
@@ -16,6 +20,81 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 )
+
+func TestDatabaseGovernancePostgresMaterialAttachments(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	materialID := fixtures.materialID
+	repo := NewBusinessAttachmentRepo(data, newAttachmentMemoryStore(), log.NewStdLogger(io.Discard))
+	uc := biz.NewBusinessAttachmentUsecase(repo)
+	slot := biz.BusinessAttachmentProductImageSlotPrimary
+	imageContent := func(width int) string {
+		t.Helper()
+		var content bytes.Buffer
+		if err := png.Encode(&content, image.NewNRGBA(image.Rect(0, 0, width, 200))); err != nil {
+			t.Fatal(err)
+		}
+		return base64.StdEncoding.EncodeToString(content.Bytes())
+	}
+	upload := func(kind, fileName, mimeType, content string, slotKey *string) *biz.BusinessAttachment {
+		t.Helper()
+		attachment, err := uc.UploadBusinessAttachment(ctx, &biz.BusinessAttachmentUploadInput{
+			OwnerType: biz.BusinessAttachmentOwnerMaterial, OwnerID: materialID, AttachmentType: kind,
+			SlotKey: slotKey, FileName: fileName, MimeType: mimeType, ContentBase64: content,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return attachment
+	}
+	doc := upload("evidence", "spec.txt", "text/plain", base64.StdEncoding.EncodeToString([]byte("material specification")), nil)
+	first := upload(biz.BusinessAttachmentTypeMaterialImage, "first.png", "image/png", imageContent(320), &slot)
+	second := upload(biz.BusinessAttachmentTypeMaterialImage, "current.png", "image/png", imageContent(400), &slot)
+	if first.ID == second.ID {
+		t.Fatal("image replacement reused a cache identity")
+	}
+	for _, id := range []int{first.ID, doc.ID} {
+		if err := uc.ClearMaterialImage(ctx, materialID, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	refs, err := uc.ListMaterialImageReferences(ctx, []int{materialID, materialID + 100000})
+	if err != nil || refs[materialID] != second.ID || refs[materialID+100000] != 0 {
+		t.Fatalf("stale or unrelated clear changed the current reference: %v, %v", refs, err)
+	}
+	productRefs, err := uc.ListProductImageReferences(ctx, []int{fixtures.productID})
+	if err != nil || productRefs[fixtures.productID] != 0 {
+		t.Fatalf("material image leaked into product references: %v, %v", productRefs, err)
+	}
+	attachments, err := uc.ListBusinessAttachments(ctx, biz.BusinessAttachmentOwnerMaterial, materialID)
+	if err != nil || len(attachments) != 1 || attachments[0].ID != doc.ID {
+		t.Fatalf("ordinary list returned reference photos or lost the attachment: %v, %v", attachments, err)
+	}
+	metadata, err := uc.GetBusinessAttachmentMetadata(ctx, second.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := uc.GetBusinessAttachmentContent(ctx, metadata)
+	if err != nil || base64.StdEncoding.EncodeToString(content) != imageContent(400) {
+		t.Fatalf("replacement did not preserve original bytes: %v", err)
+	}
+	_, err = data.sqldb.ExecContext(ctx, "UPDATE business_attachments SET attachment_type = 'material_image', slot_key = 'primary', mime_type = 'image/png' WHERE id = $1", doc.ID)
+	assertDatabaseGovernancePGError(t, err, "23505", "businessattachment_material_image_owner_id")
+	for range 2 {
+		if err := uc.ClearMaterialImage(ctx, materialID, second.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	refs, err = uc.ListMaterialImageReferences(ctx, []int{materialID})
+	if err != nil || refs[materialID] != 0 {
+		t.Fatalf("material reference remained after clear: %v, %v", refs, err)
+	}
+	if _, err := uc.GetBusinessAttachmentMetadata(ctx, doc.ID); err != nil {
+		t.Fatalf("clearing reference removed ordinary evidence: %v", err)
+	}
+}
 
 func TestDatabaseGovernancePostgresProductSupplementalImages(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

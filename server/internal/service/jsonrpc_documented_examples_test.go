@@ -84,6 +84,11 @@ func (*documentedInventoryRepo) ListInventoryTxnsForAccess(context.Context, biz.
 
 func documentedRPCFixture(t *testing.T, key string) (*jsonrpcDispatcher, context.Context) {
 	t.Helper()
+	if key == "attachment.list_material_image_references" || key == "attachment.clear_material_image" {
+		repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{ID: 71, OwnerType: biz.BusinessAttachmentOwnerMaterial, OwnerID: 7}}
+		admin := workflowJSONRPCAdmin([]string{biz.EngineeringRoleKey}, biz.PermissionMaterialRead, biz.PermissionMaterialUpdate)
+		return newAttachmentJSONRPCTestDispatcher(t, repo, admin), workflowJSONRPCAdminContext()
+	}
 	if key == "sales_order.export_sales_orders" {
 		d, _ := salesOrderExportRPCFixture(t, biz.PermissionSalesOrderRead)
 		return d, workflowJSONRPCAdminContext()
@@ -123,6 +128,8 @@ func documentedRPCCall(t *testing.T, dispatcher *jsonrpcDispatcher, ctx context.
 	var result *v1.JsonrpcResult
 	if domain == "inventory" {
 		_, result, err = dispatcher.handleInventory(ctx, method, "documented-example", input)
+	} else if domain == "attachment" {
+		_, result, err = dispatcher.handleBusinessAttachment(ctx, method, "documented-example", input)
 	} else if domain == "sales_order" {
 		_, result, err = dispatcher.Handle(ctx, domain, "2.0", method, "documented-example", input)
 	} else {
@@ -143,7 +150,7 @@ func TestRPCDocumentedExamples(t *testing.T) {
 	if err := json.Unmarshal(raw, &examples); err != nil {
 		t.Fatal(err)
 	}
-	registered := []string{"admin.audit_logs", "admin.me", "admin.set_role_settings", "inventory.list_inventory_balances", "inventory.list_inventory_lots", "inventory.list_inventory_txns", "sales_order.export_sales_orders"}
+	registered := []string{"admin.audit_logs", "admin.me", "admin.set_role_settings", "attachment.clear_material_image", "attachment.list_material_image_references", "inventory.list_inventory_balances", "inventory.list_inventory_lots", "inventory.list_inventory_txns", "sales_order.export_sales_orders"}
 	for _, key := range registered {
 		t.Run(key, func(t *testing.T) {
 			example, present := examples[key]

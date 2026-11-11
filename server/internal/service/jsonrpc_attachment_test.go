@@ -35,6 +35,7 @@ type stubAttachmentJSONRPCRepo struct {
 	withdrawErr       error
 	clearCalls        int
 	clearProduct      int
+	clearMaterial     int
 	clearSlot         string
 	clearAttachmentID int
 }

@@ -256,6 +256,7 @@ const BusinessAttachmentPanel = forwardRef(
       variant = 'section',
       compact = false,
       allowPendingAttachmentsWithoutOwner = true,
+      uploadWithForm = false,
       enablePrintAppendixUpload = false,
       missingOwnerDescription,
       missingOwnerEmptyText,
@@ -1116,7 +1117,7 @@ const BusinessAttachmentPanel = forwardRef(
       if (item.__kind === 'pending') {
         return [
           renderPreviewAction(item),
-          item.upload_status === 'failed' ? (
+          item.upload_status === 'failed' && !uploadWithForm ? (
             <Button
               key="retry-pending"
               size="small"
@@ -1209,7 +1210,7 @@ const BusinessAttachmentPanel = forwardRef(
                       ? '结果待确认'
                       : uploading
                         ? '上传中'
-                        : missingOwner
+                        : missingOwner || uploadWithForm
                           ? '保存后上传'
                           : '待上传'}
                 </Tag>
@@ -1262,11 +1263,15 @@ const BusinessAttachmentPanel = forwardRef(
         ) : null}
       </div>
     )
+    const saveHint = pendingAttachments.length > 0 && (uploadWithForm || (missingOwner && canQueuePending))
+    const canRetryHere = !uploadWithForm && canUpload && retryablePendingAttachments.length > 1
+    const canUploadHere = !uploadWithForm && canUpload && !missingOwner && queuedAttachments.length > 0
     const showFooter = Boolean(
       uploadProgress ||
-      (missingOwner && canQueuePending && pendingAttachments.length > 0) ||
+      saveHint ||
       onClose ||
-      (canUpload && (retryablePendingAttachments.length > 1 || (!missingOwner && queuedAttachments.length > 0)))
+      canRetryHere ||
+      canUploadHere
     )
 
     return (
@@ -1458,6 +1463,8 @@ const BusinessAttachmentPanel = forwardRef(
                     <Spin size="small" /> 上传中（{uploadProgress.completed}/
                     {uploadProgress.total}）
                   </>
+                ) : uploadWithForm && saveHint ? (
+                  '待上传附件将在保存时上传'
                 ) : missingOwner && canQueuePending ? (
                   '待上传附件将在保存业务记录后绑定'
                 ) : null}
@@ -1471,7 +1478,7 @@ const BusinessAttachmentPanel = forwardRef(
                     关闭
                   </Button>
                 ) : null}
-                {canUpload && retryablePendingAttachments.length > 1 ? (
+                {canRetryHere ? (
                   <Button
                     icon={<RedoOutlined aria-hidden="true" />}
                     disabled={uploading || preparing}
@@ -1482,7 +1489,7 @@ const BusinessAttachmentPanel = forwardRef(
                     重试失败项（{retryablePendingAttachments.length}）
                   </Button>
                 ) : null}
-                {canUpload && !missingOwner && queuedAttachments.length > 0 ? (
+                {canUploadHere ? (
                   <Button
                     type="primary"
                     icon={<UploadOutlined aria-hidden="true" />}

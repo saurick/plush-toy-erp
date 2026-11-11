@@ -73,6 +73,14 @@ export async function installAttachmentRpcMocks(page, context) {
           })),
         }
         break
+      case 'list_material_image_references':
+        data = {
+          images: (params.material_ids || []).map((material_id) => ({
+            material_id,
+            image_attachment_id: 0,
+          })),
+        }
+        break
       case 'list_attachments':
         data = {
           attachments:

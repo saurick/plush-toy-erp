@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
 
 import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
+import { createMaterialMediaScenario } from './materialMediaScenario.mjs'
 
 export function createBusinessAttachmentRecoveryScenarios(deps) {
   const {
@@ -16,6 +17,7 @@ export function createBusinessAttachmentRecoveryScenarios(deps) {
   } = deps
   const { findSelectionActionButton } = createBusinessFormalAssertions(deps)
   return [
+    createMaterialMediaScenario(deps),
     (() => {
       const retryFileName = 'batch-needs-retry.txt'
       const pendingRetryFileName = 'pending-needs-retry.txt'

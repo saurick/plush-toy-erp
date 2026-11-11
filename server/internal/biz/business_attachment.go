@@ -45,6 +45,7 @@ const (
 	BusinessAttachmentOwnerProductionFact    = "production_fact"
 	BusinessAttachmentOwnerOutsourcingFact   = "outsourcing_fact"
 	BusinessAttachmentOwnerProduct           = "product"
+	BusinessAttachmentOwnerMaterial          = "material"
 	BusinessAttachmentOwnerProductSKU        = "product_sku"
 	BusinessAttachmentOwnerBOMHeader         = "bom_header"
 	BusinessAttachmentOwnerWorkflowTask      = "workflow_task"
@@ -52,6 +53,7 @@ const (
 
 const (
 	BusinessAttachmentTypeProductImage                 = "product_image"
+	BusinessAttachmentTypeMaterialImage                = "material_image"
 	BusinessAttachmentTypePrintAppendix                = "print_appendix"
 	BusinessAttachmentProductImageSlotPrimary          = "primary"
 	BusinessAttachmentProductImageSlotSecondary        = "secondary"
@@ -102,6 +104,7 @@ var allowedBusinessAttachmentOwnerTypes = map[string]struct{}{
 	BusinessAttachmentOwnerProductionFact:    {},
 	BusinessAttachmentOwnerOutsourcingFact:   {},
 	BusinessAttachmentOwnerProduct:           {},
+	BusinessAttachmentOwnerMaterial:          {},
 	BusinessAttachmentOwnerProductSKU:        {},
 	BusinessAttachmentOwnerBOMHeader:         {},
 	BusinessAttachmentOwnerWorkflowTask:      {},
@@ -231,9 +234,11 @@ type BusinessAttachmentWithdraw struct {
 
 type BusinessAttachmentRepo interface {
 	ListProductImageReferences(ctx context.Context, productIDs []int) (map[int]int, error)
+	ListMaterialImageReferences(ctx context.Context, materialIDs []int) (map[int]int, error)
 	CreateBusinessAttachment(ctx context.Context, in *BusinessAttachmentCreate) (*BusinessAttachment, error)
 	WithdrawBusinessAttachment(ctx context.Context, in *BusinessAttachmentWithdraw) (time.Time, error)
 	ClearProductImage(ctx context.Context, productID int, slotKey string, attachmentID int) error
+	ClearMaterialImage(ctx context.Context, materialID, attachmentID int) error
 	ListBusinessAttachments(ctx context.Context, ownerType string, ownerID int) ([]*BusinessAttachment, error)
 	GetBusinessAttachmentMetadata(ctx context.Context, id int) (*BusinessAttachment, error)
 	GetBusinessAttachmentContent(ctx context.Context, id int, ownerType string, ownerID int) ([]byte, error)
@@ -250,12 +255,20 @@ func NewBusinessAttachmentUsecase(repo BusinessAttachmentRepo) *BusinessAttachme
 
 // ListProductImageReferences returns current primary media references, never image content or evidence attachments.
 func (uc *BusinessAttachmentUsecase) ListProductImageReferences(ctx context.Context, productIDs []int) (map[int]int, error) {
-	if uc == nil || uc.repo == nil || len(productIDs) == 0 || len(productIDs) > 80 {
+	return uc.listReferenceImageIDs(ctx, BusinessAttachmentOwnerProduct, productIDs)
+}
+
+func (uc *BusinessAttachmentUsecase) ListMaterialImageReferences(ctx context.Context, materialIDs []int) (map[int]int, error) {
+	return uc.listReferenceImageIDs(ctx, BusinessAttachmentOwnerMaterial, materialIDs)
+}
+
+func (uc *BusinessAttachmentUsecase) listReferenceImageIDs(ctx context.Context, ownerType string, ownerIDs []int) (map[int]int, error) {
+	if uc == nil || uc.repo == nil || len(ownerIDs) == 0 || len(ownerIDs) > 80 {
 		return nil, ErrBadParam
 	}
-	seen := make(map[int]bool, len(productIDs))
-	ids := make([]int, 0, len(productIDs))
-	for _, id := range productIDs {
+	seen := make(map[int]bool, len(ownerIDs))
+	ids := make([]int, 0, len(ownerIDs))
+	for _, id := range ownerIDs {
 		if id <= 0 {
 			return nil, ErrBadParam
 		}
@@ -264,7 +277,15 @@ func (uc *BusinessAttachmentUsecase) ListProductImageReferences(ctx context.Cont
 			ids = append(ids, id)
 		}
 	}
+	if ownerType == BusinessAttachmentOwnerMaterial {
+		return uc.repo.ListMaterialImageReferences(ctx, ids)
+	}
 	return uc.repo.ListProductImageReferences(ctx, ids)
+}
+
+func IsBusinessAttachmentReferenceImage(ownerType, attachmentType string) bool {
+	return (ownerType == BusinessAttachmentOwnerProduct && attachmentType == BusinessAttachmentTypeProductImage) ||
+		(ownerType == BusinessAttachmentOwnerMaterial && attachmentType == BusinessAttachmentTypeMaterialImage)
 }
 
 func NormalizeBusinessAttachmentOwnerType(raw string) string {
@@ -335,7 +356,7 @@ func (uc *BusinessAttachmentUsecase) UploadBusinessAttachment(ctx context.Contex
 		return nil, ErrBusinessAttachmentOwnerNotFound
 	}
 	maxBytes := BusinessAttachmentMaxBytes
-	if normalized.AttachmentType == BusinessAttachmentTypeProductImage {
+	if IsBusinessAttachmentReferenceImage(normalized.OwnerType, normalized.AttachmentType) {
 		maxBytes = BusinessAttachmentProductImageMaxBytes
 	}
 	content, err := decodeBusinessAttachmentContentWithMax(in.ContentBase64, maxBytes)
@@ -355,7 +376,7 @@ func (uc *BusinessAttachmentUsecase) UploadBusinessAttachment(ctx context.Contex
 			return nil, err
 		}
 	}
-	if normalized.AttachmentType == BusinessAttachmentTypePrintAppendix {
+	if normalized.AttachmentType == BusinessAttachmentTypePrintAppendix || normalized.AttachmentType == BusinessAttachmentTypeMaterialImage {
 		if err := validateBusinessAttachmentProductImageContent(content, normalized.MimeType); err != nil {
 			return nil, ErrBusinessAttachmentContentInvalid
 		}
@@ -406,6 +427,13 @@ func (uc *BusinessAttachmentUsecase) ClearProductImage(ctx context.Context, prod
 	return uc.repo.ClearProductImage(ctx, productID, normalizedSlotKey, attachmentID)
 }
 
+func (uc *BusinessAttachmentUsecase) ClearMaterialImage(ctx context.Context, materialID, attachmentID int) error {
+	if uc == nil || uc.repo == nil || materialID <= 0 || attachmentID <= 0 {
+		return ErrBadParam
+	}
+	return uc.repo.ClearMaterialImage(ctx, materialID, attachmentID)
+}
+
 func (uc *BusinessAttachmentUsecase) WithdrawBusinessAttachment(
 	ctx context.Context,
 	in *BusinessAttachmentWithdrawInput,
@@ -422,6 +450,9 @@ func (uc *BusinessAttachmentUsecase) WithdrawBusinessAttachment(
 	}
 	if ownerType == BusinessAttachmentOwnerProduct || attachmentType == BusinessAttachmentTypeProductImage {
 		return nil, ErrBusinessAttachmentProductImageWithdrawalUnsupported
+	}
+	if attachmentType == BusinessAttachmentTypeMaterialImage {
+		return nil, ErrBadParam
 	}
 	reason, err := NormalizeBusinessAttachmentWithdrawalReason(in.Reason)
 	if err != nil {
@@ -543,8 +574,15 @@ func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (B
 
 	isProductOwner := in.OwnerType == BusinessAttachmentOwnerProduct
 	isProductImage := in.AttachmentType == BusinessAttachmentTypeProductImage
+	isMaterialImage := in.AttachmentType == BusinessAttachmentTypeMaterialImage
 	isPrintAppendix := in.AttachmentType == BusinessAttachmentTypePrintAppendix
 	if isProductOwner != isProductImage {
+		return in, ErrBadParam
+	}
+	if isMaterialImage && (in.OwnerType != BusinessAttachmentOwnerMaterial || in.SlotKey == nil || *in.SlotKey != BusinessAttachmentProductImageSlotPrimary) {
+		return in, ErrBadParam
+	}
+	if in.OwnerType == BusinessAttachmentOwnerMaterial && !isMaterialImage && (in.AttachmentType != "evidence" || in.SlotKey != nil) {
 		return in, ErrBadParam
 	}
 	if isPrintAppendix &&
@@ -560,6 +598,8 @@ func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (B
 		if !isBusinessAttachmentProductImageFileTypeAllowed(in.FileName, in.MimeType) {
 			return in, ErrBusinessAttachmentProductImageMimeNotAllowed
 		}
+	} else if isMaterialImage && !isBusinessAttachmentProductImageFileTypeAllowed(in.FileName, in.MimeType) {
+		return in, ErrBusinessAttachmentMimeNotAllowed
 	} else if isPrintAppendix && !isBusinessAttachmentPrintAppendixFileTypeAllowed(in.FileName, in.MimeType) {
 		return in, ErrBusinessAttachmentMimeNotAllowed
 	} else if !isPrintAppendix && !isBusinessAttachmentFileTypeAllowed(in.FileName, in.MimeType) {
@@ -683,9 +723,9 @@ func decodeBusinessAttachmentContentWithMax(raw string, maxBytes int) ([]byte, e
 	return content, nil
 }
 
-// ProductImageThumbnail is a read-only derivative; the uploaded original remains unchanged.
-func ProductImageThumbnail(metadata *BusinessAttachment, content []byte) ([]byte, error) {
-	if metadata == nil || metadata.OwnerType != BusinessAttachmentOwnerProduct || metadata.AttachmentType != BusinessAttachmentTypeProductImage {
+// BusinessAttachmentImageThumbnail is a read-only derivative of a reference image.
+func BusinessAttachmentImageThumbnail(metadata *BusinessAttachment, content []byte) ([]byte, error) {
+	if metadata == nil || !IsBusinessAttachmentReferenceImage(metadata.OwnerType, metadata.AttachmentType) {
 		return nil, ErrBadParam
 	}
 	config, format, err := image.DecodeConfig(bytes.NewReader(content))

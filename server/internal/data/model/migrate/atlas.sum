@@ -1,4 +1,4 @@
-h1:GbRwxRUG7KGoWfsVsi8NVsAMpeH790E9nnbNtmZVB/M=
+h1:jWGnL5RwXun6tL33/6xlnv8dr+2Ki8/J4EnN5OGNri0=
 20260315161316_migrate.sql h1:aW9ynfMUR5IdFF5E6zkq5zQdgTv9YEtXjRiZTSF6f+I=
 20260421140457_migrate.sql h1:Znvhutjs+bPceNgWeN7W2TxKXHUQtyBH+Yr1b5kmXwE=
 20260423081607_migrate.sql h1:ZXYJO5Kvb2GkCOhWtMP/2nIV3stabZ5wFouUxOPbzhM=
@@ -181,3 +181,4 @@ h1:GbRwxRUG7KGoWfsVsi8NVsAMpeH790E9nnbNtmZVB/M=
 20261103142336_migrate.sql h1:dHPrVAH6NelTOPyHYJu2yChvnfMIglRGxp4sZtz/Sps=
 20261103142757_payment_method_catalogue.sql h1:tf2EF3pJkR3G4RGetx0pa5idmU8L/kmKUdfjYHCBX2o=
 20261107062510_migrate.sql h1:ucsDUeMIgMsddaQ5QyiX2b62V8Giu+ah4NADQemkbfo=
+20261111044154_migrate.sql h1:MRKS366GHVbKVXSpvIlpyLSKh2QcU92V2SYxmicgqac=

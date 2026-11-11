@@ -67,6 +67,11 @@ export async function listProductImageReferences(params = {}) {
   return requireRpcArray(result, 'images', '产品图片数据不完整，请重新读取')
 }
 
+export async function listMaterialImageReferences(params = {}, options = {}) {
+  const result = await attachmentRpc.call(RpcMethod.attachment.LIST_MATERIAL_IMAGE_REFERENCES, params, options)
+  return requireRpcArray(result, 'images', '材料参考图数据不完整，请重新读取')
+}
+
 export async function listDocumentProductPreviews(params = {}) {
   const result = await attachmentRpc.call(
     RpcMethod.attachment.LIST_DOCUMENT_PRODUCT_PREVIEWS,
@@ -103,4 +108,32 @@ export async function clearProductImage(params = {}) {
   }
   if (!rest.id) notifyProductImagesChanged(productID)
   return true
+}
+
+export async function uploadMaterialReferenceImage(materialID, file) {
+  const image = await uploadBusinessAttachment({
+    owner_type: 'material',
+    owner_id: materialID,
+    attachment_type: 'material_image',
+    slot_key: 'primary',
+    file_name: file.file_name,
+    mime_type: file.mime_type,
+    content_base64: file.content_base64,
+  })
+  if (image.owner_type !== 'material' || image.owner_id !== materialID || image.attachment_type !== 'material_image' || image.slot_key !== 'primary') {
+    const error = new Error('材料参考图上传结果不完整，请重新读取')
+    error.isInvalidResponse = true
+    throw error
+  }
+  return image
+}
+
+export async function clearMaterialReferenceImage(materialID, attachmentID) {
+  const result = await attachmentRpc.call(RpcMethod.attachment.CLEAR_MATERIAL_IMAGE, { material_id: materialID, id: attachmentID })
+  const data = dataOf(result, '材料参考图移除结果不完整，请重新读取')
+  if (data.cleared !== true) {
+    const error = new Error('材料参考图移除结果不完整，请重新读取')
+    error.isInvalidResponse = true
+    throw error
+  }
 }

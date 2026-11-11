@@ -284,7 +284,18 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	add(PermissionPaymentMethodDelete, paymentMethodDeleteSurfaces...)
 	addCRUD(PermissionCustomerRead, PermissionCustomerCreate, PermissionCustomerUpdate, PermissionCustomerDisable, "customers", "customers", "客户档案", "客户", "masterdata", []string{"get_customer", "list_customers"}, []string{"create_customer", "save_customer_with_contacts"}, []string{"update_customer", "save_customer_with_contacts"}, []string{"set_customer_active"})
 	addCRUD(PermissionSupplierRead, PermissionSupplierCreate, PermissionSupplierUpdate, PermissionSupplierDisable, "suppliers", "suppliers", "供应商与加工厂", "供应商", "masterdata", []string{"get_supplier", "list_suppliers"}, []string{"create_supplier", "save_supplier_with_contacts"}, []string{"update_supplier", "save_supplier_with_contacts"}, []string{"set_supplier_active"})
-	addCRUD(PermissionMaterialRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionMaterialDisable, "materials", "materials", "材料档案", "材料", "masterdata", []string{"get_material", "list_materials", "list_material_warehouses"}, []string{"create_material"}, []string{"update_material"}, []string{"set_material_active"})
+	materialMediaReads := permissionMethods("attachment", "list_material_image_references", "list_attachments", "download_attachment")
+	add(PermissionMaterialRead,
+		menuPermissionSurface("materials", "materials", "材料档案", "materials-content", "材料页面和内容", permissionControlPage, "允许进入并查看", permissionMethods("masterdata", "get_material", "list_materials", "list_material_warehouses"), businessUsageConditions),
+		menuPermissionSurface("materials", "material-media", "图片与附件", "view-material-media", "查看材料参考图和附件", permissionControlSection, "允许查看当前材料的资料", materialMediaReads, businessUsageConditions),
+		menuPermissionSurface("inventory", "material-media", "材料资料", "view-inventory-material-media", "查看材料参考图和附件", permissionControlSection, "允许在存货列查看材料资料", materialMediaReads, []string{"同时需要库存查询权限"}),
+	)
+	addMenu(PermissionMaterialCreate, "materials", "materials", "材料档案", "materials-create", "新建材料", permissionControlButton, "显示并允许创建", permissionMethods("masterdata", "create_material"), businessUsageConditions)
+	add(PermissionMaterialUpdate,
+		menuPermissionSurface("materials", "materials", "材料档案", "materials-update", "编辑材料及表单", permissionControlForm, "显示并允许编辑", permissionMethods("masterdata", "update_material"), businessUsageConditions),
+		menuPermissionSurface("materials", "material-media", "图片与附件", "edit-material-media", "维护材料参考图和附件", permissionControlForm, "允许上传、替换或移除参考图，上传或撤销附件", permissionMethods("attachment", "upload_attachment", "clear_material_image", "withdraw_attachment"), []string{"需能查看材料档案；文件归属材料，不属于库存批次"}),
+	)
+	addMenu(PermissionMaterialDisable, "materials", "materials", "材料档案", "materials-status", "启用或停用材料", permissionControlSwitch, "显示并允许切换状态", permissionMethods("masterdata", "set_material_active"), businessUsageConditions)
 	addCRUD(PermissionProcessRead, PermissionProcessCreate, PermissionProcessUpdate, PermissionProcessDisable, "processes", "processes", "工序档案", "工序", "masterdata", []string{"get_process", "list_processes"}, []string{"create_process"}, []string{"update_process"}, []string{"set_process_active"})
 	addCRUD(PermissionProductRead, PermissionProductCreate, PermissionProductUpdate, PermissionProductDisable, "products", "products", "产品档案", "产品", "masterdata", []string{"get_product", "list_products"}, []string{"create_product"}, []string{"update_product"}, []string{"set_product_active"})
 	addCRUD(PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, "products", "product-skus", "产品规格", "产品规格", "masterdata", []string{"get_product_sku", "list_product_skus"}, []string{"create_product_sku"}, []string{"update_product_sku"}, []string{"set_product_sku_active"})

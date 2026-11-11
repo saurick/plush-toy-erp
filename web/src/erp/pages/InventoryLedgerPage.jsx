@@ -68,6 +68,7 @@ import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
+import InventoryMaterialIdentity from '../components/inventory/InventoryMaterialIdentity.jsx'
 import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../utils/warehouseClassification.mjs'
 import WarehouseSettingsModal from '../components/inventory/WarehouseSettingsModal.jsx'
 import { message } from '@/common/utils/antdApp'
@@ -1033,18 +1034,14 @@ export default function InventoryLedgerPage() {
     },
     [materialOptions, productOptions]
   )
-  const renderSubjectIdentity = useCallback(
-    (value, record) =>
-      record?.subject_type === 'PRODUCT' ? (
-        <ProductIdentity
-          productId={value}
-          name={renderSubjectReference(value, record)}
-        />
-      ) : (
-        renderSubjectReference(value, record)
-      ),
-    [renderSubjectReference]
-  )
+  const renderSubjectIdentity = useCallback((value, record) => {
+    const name = renderSubjectReference(value, record)
+    if (record?.subject_type === 'PRODUCT') return <ProductIdentity productId={value} name={name} />
+    if (record?.subject_type === 'MATERIAL' && canReadMaterials && Number(value) > 0) {
+      return <InventoryMaterialIdentity materialID={Number(value)} name={name} />
+    }
+    return name
+  }, [canReadMaterials, renderSubjectReference])
   const renderWarehouseReference = useCallback(
     (value) => referenceLabel(warehouseFilterOptions, value, '仓库'),
     [warehouseFilterOptions]
