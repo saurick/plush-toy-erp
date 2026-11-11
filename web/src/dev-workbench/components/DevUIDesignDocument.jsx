@@ -1,6 +1,5 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowLeftOutlined,
   ArrowRightOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -81,9 +80,6 @@ export default function DevUIDesignDocument({ source, specification, view }) {
   const groups = [
     ...new Set(filtered.map((entry) => entry.group || '规范章节')),
   ]
-  const index = filtered.findIndex(
-    (entry) => (entry.key || entry.id) === current
-  )
 
   const updateLocation = (changes, replace = false) => {
     // Match Help Center: merge into the latest URL during rapid navigation.
@@ -237,23 +233,6 @@ export default function DevUIDesignDocument({ source, specification, view }) {
             <span>
               {read === 'guide' && topic.group === '工作中心' ? topic.group : <>{read === 'guide' ? topic.group : '规范原文'} /{' '}<strong>{read === 'guide' ? topic.title : chapter.title}</strong></>}
             </span>
-            <div>
-              <Button
-                aria-label="上一个设计主题"
-                icon={<ArrowLeftOutlined />}
-                disabled={index <= 0}
-                onClick={() => selectEntry(filtered[index - 1])}
-              />
-              <span>
-                {index + 1} / {filtered.length}
-              </span>
-              <Button
-                aria-label="下一个设计主题"
-                icon={<ArrowRightOutlined />}
-                disabled={index >= filtered.length - 1}
-                onClick={() => selectEntry(filtered[index + 1])}
-              />
-            </div>
           </div>
           <div
             ref={contentRef}

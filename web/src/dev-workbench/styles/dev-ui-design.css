@@ -182,19 +182,11 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   min-height: 52px;
   padding: 8px 20px;
   border-bottom: 1px solid var(--erp-border);
   color: var(--erp-text-muted);
   font-size: var(--erp-font-small);
-}
-.erp-design-reader-location > div {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  white-space: nowrap;
 }
 .erp-design-reader-location strong {
   color: var(--erp-text);

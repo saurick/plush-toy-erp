@@ -93,7 +93,6 @@ export function createDevUIDesignDetailScenarios({
         await directory.locator('[aria-current="page"]').getByText('窄屏与动效', { exact: true }).waitFor()
         assert.equal(await search.inputValue(), '窄屏与动效', '打开图解保留关键词')
         assert.equal(await directory.getByRole('button').count(), 1, '打开图解保留搜索结果')
-        assert.equal(await page.getByRole('button', { name: '下一个设计主题' }).isEnabled(), false)
         await assertHierarchy()
         await page.getByRole('button', { name: '收起目录', exact: true }).click()
         assert.equal(await directory.isVisible(), false)
@@ -425,7 +424,7 @@ export function createDevUIDesignDetailScenarios({
           await directory.evaluate((node) => node.scrollTop),
           beforePanelScroll
         )
-        await page.getByRole('button', { name: '下一个设计主题' }).click()
+        await select('弹窗结构与尺寸')
         await page
           .getByRole('heading', { name: '弹窗结构与尺寸', exact: true })
           .waitFor()
