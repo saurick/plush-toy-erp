@@ -642,6 +642,17 @@ export function createInventoryPresentationScenarios(deps) {
         await quantity.and(page.locator('[aria-sort="descending"]')).waitFor()
         await readAfter(balances, (p) => !p.sort_by && !p.sort_direction && p.keyword === 'SORT', () => quantity.click())
         await page.waitForFunction(() => !document.querySelector('[data-business-view-panel="balances"]:not([hidden]) th[aria-sort]'))
+        for (const [name, field] of [
+          ['材料可领用', 'issuable_quantity'],
+          [/受限库存/u, 'restricted_quantity'],
+          ['可发货数量', 'ready_to_ship_quantity'],
+        ]) {
+          const header = panel.getByRole('columnheader', { name })
+          await readAfter(balances, (p) => p.sort_by === field && p.sort_direction === 'asc' && p.offset === 0, () => header.click())
+          await header.and(page.locator('[aria-sort="ascending"]')).waitFor()
+        }
+        const pending = panel.getByRole('columnheader', { name: '待成品检验', exact: true })
+        assert.equal(await pending.locator('.ant-table-column-sorter').count(), 0)
         await assertNoHorizontalOverflow(page, 'warehouse-inventory-server-table-sort')
       },
     },

@@ -1769,21 +1769,18 @@ export function BusinessDataTable({
   React.useLayoutEffect(() => () => {
     setSelectionAvailability?.((current) => current.owner === selectionOwner ? { visible: false, loading: false } : current)
   }, [setSelectionAvailability, selectionOwner])
-  const resolvedColumns = React.useMemo(
-    () => normalizeBusinessTableColumns(columns),
-    [columns]
-  )
+  const paginated = Boolean(pagination)
+  const resolvedColumns = React.useMemo(() => {
+    const normalized = normalizeBusinessTableColumns(columns)
+    return paginated ? normalized.map((column) =>
+      typeof column.sorter === 'function'
+        ? { ...column, showSorterTooltip: { title: '仅排序当前页' } }
+        : column
+    ) : normalized
+  }, [columns, paginated])
   const resolvedRowSelection = React.useMemo(
     () => resolveBusinessTableRowSelection(rowSelection),
     [rowSelection]
-  )
-  const hasPageLocalSorter = React.useMemo(
-    () =>
-      Boolean(
-        pagination &&
-        resolvedColumns.some((column) => typeof column?.sorter === 'function')
-      ),
-    [pagination, resolvedColumns]
   )
   const resolvedScroll = React.useMemo(() => {
     const baseScroll =
@@ -1819,15 +1816,12 @@ export function BusinessDataTable({
         onRow={resolvedOnRow}
         onChange={onChange}
         pagination={pagination ? { showTotal: formatPaginationTotal, ...pagination } : pagination}
-        showSorterTooltip={
-          hasPageLocalSorter ? { title: '仅排序当前页' } : undefined
-        }
         locale={{
           emptyText: <Empty description={emptyDescription} />,
         }}
       />
     ),
-    [sticky, loading, rowKey, resolvedColumns, dataSource, tableLayout, expandable, resolvedScroll, resolvedRowSelection, rowClassName, resolvedOnRow, onChange, pagination, hasPageLocalSorter, emptyDescription]
+    [sticky, loading, rowKey, resolvedColumns, dataSource, tableLayout, expandable, resolvedScroll, resolvedRowSelection, rowClassName, resolvedOnRow, onChange, pagination, emptyDescription]
   )
 
   if (taskBusiness) {

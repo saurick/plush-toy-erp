@@ -50,7 +50,10 @@ import ProductionRouteExecutionModal from '../components/production-orders/Produ
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
 import { useProductionFactActions } from '../components/production-orders/useProductionFactActions.mjs'
 
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../utils/moduleTableColumns.mjs'
+
 const EMPTY_PAGE = { items: [], total: 0, counts: {} }
+const WAREHOUSE_WORK_SORT_FIELDS = { quantity: 'quantity' }
 
 function ReceiptReviewInitialization({ receipt }) {
   const form = Form.useFormInstance()
@@ -78,6 +81,7 @@ export default function WarehouseProductionWorkPage({ kind }) {
     null
   )
   const [page, setPage] = useState(EMPTY_PAGE)
+  const [displayedSort, setDisplayedSort] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [routeRecord, setRouteRecord] = useState(null)
@@ -117,6 +121,7 @@ export default function WarehouseProductionWorkPage({ kind }) {
           kind,
           keyword: query.keyword,
           stage: query.stage,
+          ...(query.sort || {}),
           limit: query.pageSize,
           offset: (query.current - 1) * query.pageSize,
         },
@@ -124,6 +129,7 @@ export default function WarehouseProductionWorkPage({ kind }) {
       )
       if (!request.isCurrent()) return
       setPage(result)
+      setDisplayedSort(query.sort ?? null)
       setLoadError('')
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) return
@@ -277,9 +283,10 @@ export default function WarehouseProductionWorkPage({ kind }) {
       },
       {
         title: '本次数量',
-        key: 'quantity',
+        dataIndex: 'quantity',
         width: 130,
-        render: (_, row) => `${row.quantity} ${row.unit_name}`,
+        showSorterTooltip: { title: '同单位内按数量排序', target: 'sorter-icon' },
+        render: (quantity, row) => `${quantity} ${row.unit_name}`,
       },
       {
         title: '办理状态',
@@ -308,6 +315,13 @@ export default function WarehouseProductionWorkPage({ kind }) {
     ],
     []
   )
+  const sortedColumns = useMemo(
+    () => applyBusinessServerColumnSorters(columns, WAREHOUSE_WORK_SORT_FIELDS, displayedSort),
+    [columns, displayedSort]
+  )
+  const handleTableChange = (_pagination, _filters, sorter, { action }) => {
+    if (action === 'sort') changeQuery({ sort: readBusinessServerTableSort(sorter, WAREHOUSE_WORK_SORT_FIELDS) })
+  }
   const quantity = Form.useWatch('quantity', reviewForm)
   let quantityMismatch = false
   try {
@@ -408,7 +422,8 @@ export default function WarehouseProductionWorkPage({ kind }) {
       <BusinessDataTable
         rowKey="id"
         loading={loading}
-        columns={columns}
+        columns={sortedColumns}
+        onChange={handleTableChange}
         dataSource={page.items}
         rowSelection={{
           type: 'radio',

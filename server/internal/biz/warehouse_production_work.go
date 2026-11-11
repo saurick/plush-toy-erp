@@ -50,9 +50,12 @@ type WarehouseProductionWork struct {
 	Action                    string `json:"action"`
 }
 
+const WarehouseProductionSortQuantity = "quantity"
+
 type WarehouseProductionWorkFilter struct {
-	Kind, Stage, Keyword string
-	Limit, Offset        int
+	Kind, Stage, Keyword  string
+	SortBy, SortDirection string
+	Limit, Offset         int
 }
 
 type WarehouseProductionWorkPage struct {
@@ -81,7 +84,7 @@ func NormalizeWarehouseProductionWorkFilter(in WarehouseProductionWorkFilter) (W
 		allowed[WarehouseProductionStagePackaging] = true
 		allowed[WarehouseProductionStageReady] = true
 	}
-	if !allowed[in.Stage] {
+	if !allowed[in.Stage] || !validBusinessListSort(in.SortBy, in.SortDirection, WarehouseProductionSortQuantity) {
 		return in, ErrBadParam
 	}
 	return in, nil

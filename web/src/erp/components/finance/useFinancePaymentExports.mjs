@@ -23,6 +23,7 @@ export default function useFinancePaymentExports({
   paymentStatusFilter,
   paymentDirectionFilter,
   creditStatusFilter,
+  recordSort,
   beginLatestRequest,
   paymentExportColumns,
   creditExportColumns,
@@ -43,6 +44,7 @@ export default function useFinancePaymentExports({
           status: paymentStatusFilter,
           keyword: paymentKeyword.trim(),
           direction: paymentDirectionFilter,
+          ...recordSort,
         }),
         { signal: request.signal }
       )
@@ -73,6 +75,7 @@ export default function useFinancePaymentExports({
     paymentExportColumns,
     paymentStatusFilter,
     paymentKeyword,
+    recordSort,
   ])
 
   const exportCreditRows = useCallback(async () => {
@@ -85,6 +88,7 @@ export default function useFinancePaymentExports({
         compactParams({
           status: creditStatusFilter,
           keyword: creditKeyword.trim(),
+          ...recordSort,
         }),
         { signal: request.signal }
       )
@@ -115,6 +119,7 @@ export default function useFinancePaymentExports({
     creditExportColumns,
     creditStatusFilter,
     creditKeyword,
+    recordSort,
   ])
 
   return { exportingTab, exportPaymentRows, exportCreditRows }

@@ -793,7 +793,18 @@ func (r *operationalFactRepo) ListFinancePayments(ctx context.Context, filter bi
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Desc(financepayment.FieldOccurredAt), ent.Desc(financepayment.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	opts := businessListOrderOptions(filter.SortDirection)
+	switch filter.SortBy {
+	case biz.FinanceRecordSortAmount:
+		query.Order(financepayment.ByCurrency(), financepayment.ByAmount(opts...))
+	case biz.FinancePaymentSortNumber:
+		query.Order(financepayment.ByPaymentNo(opts...))
+	case biz.FinancePaymentSortOccurredAt:
+		query.Order(financepayment.ByOccurredAt(opts...))
+	default:
+		query.Order(ent.Desc(financepayment.FieldOccurredAt))
+	}
+	rows, err := query.Order(ent.Desc(financepayment.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -875,7 +886,16 @@ func (r *operationalFactRepo) ListFinanceCreditNotes(ctx context.Context, filter
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Desc(financecreditnote.FieldCreatedAt), ent.Desc(financecreditnote.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	opts := businessListOrderOptions(filter.SortDirection)
+	switch filter.SortBy {
+	case biz.FinanceRecordSortAmount:
+		query.Order(financecreditnote.ByCurrency(), financecreditnote.ByAmount(opts...))
+	case biz.FinanceCreditSortNumber:
+		query.Order(financecreditnote.ByCreditNoteNo(opts...))
+	default:
+		query.Order(ent.Desc(financecreditnote.FieldCreatedAt))
+	}
+	rows, err := query.Order(ent.Desc(financecreditnote.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -569,6 +569,8 @@ type FinanceFactFromShipmentCreate struct {
 	InvoiceCategory     *string
 }
 
+const ShipmentSortNetWeight = "total_net_weight_g"
+
 type OperationalFactFilter struct {
 	Status         string
 	FactType       string
@@ -588,6 +590,8 @@ type OperationalFactFilter struct {
 	CounterpartyID int
 	Limit          int
 	Offset         int
+	SortBy         string
+	SortDirection  string
 }
 
 type OperationalFactStatusMutation struct {
@@ -2189,6 +2193,9 @@ func normalizeOutsourcingFactFilter(in OperationalFactFilter) (OperationalFactFi
 
 func normalizeShipmentFilter(in OperationalFactFilter) (OperationalFactFilter, error) {
 	in = normalizeOperationalFactFilter(in)
+	if !validBusinessListSort(in.SortBy, in.SortDirection, ShipmentSortNetWeight) {
+		return OperationalFactFilter{}, ErrBadParam
+	}
 	if err := validateFilterValue(in.Status, shipmentStatuses); err != nil {
 		return OperationalFactFilter{}, err
 	}

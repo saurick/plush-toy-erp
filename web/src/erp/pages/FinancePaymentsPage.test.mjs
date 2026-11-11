@@ -56,8 +56,10 @@ test('finance payments and account adjustments retain independent column-order t
     /const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY =\s*'finance-credit-notes-records'/u
   )
   for (const text of [
-    'columns={paymentTableColumns}',
-    'columns={creditTableColumns}',
+    'columns={sortedPaymentColumns}',
+    'applyBusinessServerColumnSorters(paymentTableColumns,',
+    'columns={sortedCreditColumns}',
+    'applyBusinessServerColumnSorters(creditTableColumns,',
     '{paymentColumnOrderModal}',
     '{creditColumnOrderModal}',
     'onOpenColumnOrder={openPaymentColumnOrder}',

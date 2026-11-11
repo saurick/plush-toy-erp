@@ -231,6 +231,8 @@ export function canOpenSourceDocument(record = {}) {
   return Boolean(businessSourceRouteFor(record.source_document_type, record.source_document_id))
 }
 
+const unitQuantitySortTooltip = { title: '同单位内按数量排序', target: 'sorter-icon' }
+
 export function createInventoryLedgerColumns({
   activeView,
   renderLotReference,
@@ -665,6 +667,7 @@ export function createInventoryLedgerColumns({
     },
     {
       title: '材料可领用',
+      showSorterTooltip: unitQuantitySortTooltip,
 exportTitle: '材料可领用',
 dataIndex: 'issuable_quantity',
 width: 110,
@@ -676,6 +679,7 @@ defaultPriority: 40,
     {
       title: <BusinessHelpLabel label="受限库存" description="暂扣、不合格或停用批次的账面库存，仍计入结存；不能普通领用或出货。" />,
       exportTitle: '受限库存',
+      showSorterTooltip: unitQuantitySortTooltip,
 dataIndex: 'restricted_quantity',
 width: 120,
 align: 'right',
@@ -691,6 +695,7 @@ exportValue: (record) => record.restricted_quantity ?? '',
       title,
       exportTitle: title,
       dataIndex: key,
+      ...(key === 'ready_to_ship_quantity' ? { showSorterTooltip: unitQuantitySortTooltip } : {}),
       width: key === 'pending_packaging_quantity' ? 130 : 110,
       align: 'right',
       defaultPriority: 45,

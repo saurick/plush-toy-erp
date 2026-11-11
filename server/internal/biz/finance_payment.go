@@ -150,6 +150,14 @@ type FinancePaymentReverse struct {
 	ExpectedVersion int
 	Reason          string
 }
+
+const (
+	FinanceRecordSortAmount      = "amount"
+	FinancePaymentSortNumber     = "payment_no"
+	FinancePaymentSortOccurredAt = "occurred_at"
+	FinanceCreditSortNumber      = "credit_note_no"
+)
+
 type FinancePaymentFilter struct {
 	FinanceFactID     int
 	Currency          string
@@ -166,6 +174,8 @@ type FinancePaymentFilter struct {
 	Direction         string
 	CounterpartyType  string
 	CounterpartyID    int
+	SortBy            string
+	SortDirection     string
 	Limit             int
 	Offset            int
 }
@@ -188,6 +198,8 @@ type FinanceCreditNoteFilter struct {
 	FinanceFactID int
 	Limit         int
 	Offset        int
+	SortBy        string
+	SortDirection string
 }
 
 type FinancePaymentRepo interface {
@@ -312,7 +324,8 @@ func normalizeFinanceCreditNoteListFilter(filter FinanceCreditNoteFilter) (Finan
 	if filter.Status != "" && filter.Status != FinanceAllocationStatusPosted && filter.Status != FinanceAllocationStatusReversed {
 		return FinanceCreditNoteFilter{}, ErrBadParam
 	}
-	if filter.FinanceFactID < 0 || filter.Offset < 0 {
+	if filter.FinanceFactID < 0 || filter.Offset < 0 ||
+		!validBusinessListSort(filter.SortBy, filter.SortDirection, FinanceRecordSortAmount, FinanceCreditSortNumber) {
 		return FinanceCreditNoteFilter{}, ErrBadParam
 	}
 	filter.Limit = NormalizeBusinessListLimit(filter.Limit)
@@ -386,7 +399,8 @@ func normalizeFinancePaymentListFilter(filter FinancePaymentFilter) (FinancePaym
 	if filter.CounterpartyType != "" && filter.CounterpartyType != FinanceCounterpartyCustomer && filter.CounterpartyType != FinanceCounterpartySupplier {
 		return FinancePaymentFilter{}, ErrBadParam
 	}
-	if filter.CounterpartyID < 0 || filter.FinanceFactID < 0 || filter.Offset < 0 {
+	if filter.CounterpartyID < 0 || filter.FinanceFactID < 0 || filter.Offset < 0 ||
+		!validBusinessListSort(filter.SortBy, filter.SortDirection, FinanceRecordSortAmount, FinancePaymentSortNumber, FinancePaymentSortOccurredAt) {
 		return FinancePaymentFilter{}, ErrBadParam
 	}
 	filter.Limit = NormalizeBusinessListLimit(filter.Limit)

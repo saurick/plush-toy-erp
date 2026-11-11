@@ -47,7 +47,7 @@ func TestWarehouseProductionWorkReturnStagesDoNotPostInventory(t *testing.T) {
 func TestWarehouseProductionWorkReceiptStagesPaginationAndWarehouseScope(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "warehouse_production_work")
-	flow := releaseProductionWIPRoute(t, ctx, f, "MO-WH-WORK", 10, false)
+	flow := releaseProductionWIPRoute(t, ctx, f, "MO-WH-WORK", 14, false)
 	flow, handwork := acceptProductionHandworkBatchForReworkTest(t, ctx, f.client, f.uc, f.actorID, flow, "wh-work")
 	firstWarehouse := createTestProductWarehouse(t, ctx, f.client, "WH-WORK-A")
 	secondWarehouse := createTestProductWarehouse(t, ctx, f.client, "WH-WORK-B")
@@ -61,7 +61,7 @@ func TestWarehouseProductionWorkReceiptStagesPaginationAndWarehouseScope(t *test
 		}
 		return row
 	}
-	first, second := create("FG-WORK-A", firstWarehouse.ID, 6), create("FG-WORK-B", secondWarehouse.ID, 4)
+	first, second := create("FG-WORK-A", firstWarehouse.ID, 10), create("FG-WORK-B", secondWarehouse.ID, 4)
 	list := func(readCtx context.Context, filter biz.WarehouseProductionWorkFilter) *biz.WarehouseProductionWorkPage {
 		t.Helper()
 		filter.Kind = biz.WarehouseProductionKindReceipt
@@ -75,6 +75,12 @@ func TestWarehouseProductionWorkReceiptStagesPaginationAndWarehouseScope(t *test
 	if page.Total != 2 || len(page.Items) != 1 || page.Counts[biz.WarehouseProductionStageInbound] != 2 {
 		t.Fatalf("pagination and global stage counts: %#v", page)
 	}
+	for offset, want := range []int{first.ID, second.ID} {
+		page = list(ctx, biz.WarehouseProductionWorkFilter{Stage: biz.WarehouseProductionStageInbound, SortBy: biz.WarehouseProductionSortQuantity, SortDirection: "desc", Limit: 1, Offset: offset})
+		if page.Total != 2 || len(page.Items) != 1 || page.Items[0].FactID != want || page.Counts[biz.WarehouseProductionStageInbound] != 2 {
+			t.Fatalf("quantity order at offset %d: %+v, want receipt %d", offset, page, want)
+		}
+	}
 	page = list(biz.WithWarehouseDataScope(ctx, biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{secondWarehouse.ID}}), biz.WarehouseProductionWorkFilter{})
 	if page.Total != 1 || page.Items[0].FactID != second.ID {
 		t.Fatalf("warehouse scope leaked: %#v", page)
@@ -87,7 +93,7 @@ func TestWarehouseProductionWorkReceiptStagesPaginationAndWarehouseScope(t *test
 		t.Fatal(err)
 	}
 	page = list(ctx, biz.WarehouseProductionWorkFilter{Stage: biz.WarehouseProductionStagePackaging})
-	if page.Total != 1 || page.Items[0].FactID != first.ID || page.Items[0].PendingPackagingQuantity != "6" || page.Items[0].Action != biz.ProductionWIPActionTransferToNextOperation {
+	if page.Total != 1 || page.Items[0].FactID != first.ID || page.Items[0].PendingPackagingQuantity != "10" || page.Items[0].Action != biz.ProductionWIPActionTransferToNextOperation {
 		t.Fatalf("posted receipt projection: %#v", page)
 	}
 	readiness, err := productionFinishedGoodsReadiness(ctx, f.client, biz.InventoryBalanceKey{SubjectType: first.SubjectType, SubjectID: first.SubjectID, ProductSkuID: first.ProductSkuID, WarehouseID: first.WarehouseID, LotID: first.LotID, UnitID: first.UnitID})
@@ -96,7 +102,7 @@ func TestWarehouseProductionWorkReceiptStagesPaginationAndWarehouseScope(t *test
 	}
 	op := productionWIPOperationForCode(t, flow, biz.ProductionWIPOperationPackaging)
 	current := f.client.ProductionWIPBatch.GetX(ctx, handwork.ID)
-	flow, err = f.uc.TransferProductionWIPToNextOperation(ctx, &biz.ProductionWIPAction{ProductionOrderID: flow.ProductionOrderID, BatchID: handwork.ID, ExpectedVersion: current.Version, TargetOperationID: op.ID, FinishedGoodsReceiptID: first.ID, Quantity: decimal.NewFromInt(6), ActorID: f.actorID, IdempotencyKey: "wh-work-pack-transfer"})
+	flow, err = f.uc.TransferProductionWIPToNextOperation(ctx, &biz.ProductionWIPAction{ProductionOrderID: flow.ProductionOrderID, BatchID: handwork.ID, ExpectedVersion: current.Version, TargetOperationID: op.ID, FinishedGoodsReceiptID: first.ID, Quantity: decimal.NewFromInt(10), ActorID: f.actorID, IdempotencyKey: "wh-work-pack-transfer"})
 	if err != nil {
 		t.Fatal(err)
 	}

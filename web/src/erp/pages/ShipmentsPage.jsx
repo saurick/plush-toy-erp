@@ -50,6 +50,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import useBusinessPageState from '../hooks/useBusinessPageState.js'
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../utils/moduleTableColumns.mjs'
 import {
   cancelShipment,
   createInvoiceFromShipment,
@@ -283,6 +284,8 @@ function shipmentFormValues(shipment = {}) {
   }
 }
 
+const SHIPMENT_SORT_FIELDS = { total_net_weight_g: 'total_net_weight_g' }
+
 export default function ShipmentsPage() {
   const modal = useModal()
   const reportBusinessResult = useWorkflowTaskBusinessResult()
@@ -337,6 +340,8 @@ export default function ShipmentsPage() {
     current: 1,
     pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
+  const [requestedSort, setRequestedSort] = useBusinessPageState('shipmentSort', null)
+  const [displayedSort, setDisplayedSort] = useState(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   useWorkflowTaskBusinessBusy(saving)
@@ -646,6 +651,8 @@ export default function ShipmentsPage() {
     () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
     [warehouses]
   )
+  const canSortNetWeight = !taskBusiness && !routeShipmentID
+  const shipmentSort = canSortNetWeight ? requestedSort : null
   const shipmentListParams = useMemo(
     () =>
       compactParams({
@@ -664,6 +671,7 @@ export default function ShipmentsPage() {
         date_field: dateFilterField,
         date_from: dateFilterStart || undefined,
         date_to: dateFilterEnd || undefined,
+        ...shipmentSort,
       }),
     [
       customerFilter,
@@ -675,6 +683,7 @@ export default function ShipmentsPage() {
       productFilter,
       routeSalesOrderID,
       routeShipmentID,
+      shipmentSort,
       statusFilter,
       warehouseFilter,
     ]
@@ -712,6 +721,7 @@ export default function ShipmentsPage() {
       })
       const nextRows = exactPage.records
       setRows(nextRows)
+      setDisplayedSort(shipmentSort)
       setSelectedRow((current) => {
         if (routeSelectedID > 0) {
           return routeShipment
@@ -743,7 +753,7 @@ export default function ShipmentsPage() {
         request.finish()
       }
     }
-  }, [beginLatestRequest, pagination, routeShipmentID, shipmentListParams])
+  }, [beginLatestRequest, pagination, routeShipmentID, shipmentListParams, shipmentSort])
 
   const clearRouteContext = useCallback(
     (keys) => {
@@ -1570,6 +1580,20 @@ export default function ShipmentsPage() {
       moduleTitle: '出货单',
       columns: listColumns,
     })
+  // Without a server sort, let the table manage its existing page sorts.
+  const sortedColumns = useMemo(
+    () => canSortNetWeight
+      ? applyBusinessServerColumnSorters(tableColumns, SHIPMENT_SORT_FIELDS, displayedSort ?? undefined)
+      : tableColumns,
+    [canSortNetWeight, displayedSort, tableColumns]
+  )
+  const handleTableChange = (_pagination, _filters, sorter, { action }) => {
+    if (action !== 'sort' || !canSortNetWeight) return
+    const sort = readBusinessServerTableSort(sorter, SHIPMENT_SORT_FIELDS)
+    if (!sort && !shipmentSort) return
+    setRequestedSort(sort)
+    resetBusinessPaginationCurrent(setPagination)
+  }
   const loadExportRows = useCallback(
     async ({ signal }) => {
       const routeSelectedID = Number(routeShipmentID || 0)
@@ -2084,7 +2108,8 @@ export default function ShipmentsPage() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
-        columns={tableColumns}
+        columns={sortedColumns}
+        onChange={handleTableChange}
         taskDetailColumns={taskDetailColumns}
         pagination={createBusinessTablePagination({
           pagination,

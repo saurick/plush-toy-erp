@@ -130,6 +130,30 @@ func productionFinishedGoodsReadiness(ctx context.Context, client *ent.Client, k
 	if key.SubjectType != biz.InventorySubjectProduct {
 		return finishedGoodsReadiness{}, nil
 	}
-	values, err := productionFinishedGoodsReadinessForKeys(ctx, client, []biz.InventoryBalanceKey{key})
-	return values[inventoryProductGrain(key)], err
+	rows, err := client.QueryContext(ctx, `WITH receipts AS (
+ SELECT f.* FROM production_facts f WHERE f.fact_type='FINISHED_GOODS_RECEIPT' AND f.status='POSTED'
+ AND f.production_wip_batch_id IS NOT NULL AND f.subject_id=$1 AND f.warehouse_id=$2 AND f.unit_id=$3
+ AND f.product_sku_id IS NOT DISTINCT FROM CAST($4 AS INTEGER) AND f.lot_id IS NOT DISTINCT FROM CAST($5 AS INTEGER)
+ )`+productionReceiptReadinessCTEs+`
+ SELECT COALESCE(SUM(inspection_quantity),0),COALESCE(SUM(packaging_quantity),0),COALESCE(MAX(invalid_source),0)
+ FROM receipt_readiness`, key.SubjectID, key.WarehouseID, key.UnitID, key.ProductSkuID, key.LotID)
+	if err != nil {
+		return finishedGoodsReadiness{}, err
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return finishedGoodsReadiness{}, err
+		}
+		return finishedGoodsReadiness{}, biz.ErrProductionOrderFactSourceInvalid
+	}
+	var result finishedGoodsReadiness
+	var invalid int
+	if err := rows.Scan(&result.PendingInspection, &result.PendingPackaging, &invalid); err != nil {
+		return finishedGoodsReadiness{}, err
+	}
+	if invalid != 0 {
+		return finishedGoodsReadiness{}, biz.ErrProductionOrderFactSourceInvalid
+	}
+	return result, nil
 }

@@ -7,6 +7,7 @@ import { FinanceAllocationStatus } from '../../../common/consts/statuses.generat
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 import { createBusinessTablePagination } from '../../utils/businessPagination.mjs'
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../../utils/moduleTableColumns.mjs'
 import {
   BusinessActionTooltip,
   BusinessDataTable,
@@ -34,6 +35,7 @@ import useFinanceCreditActions from './useFinanceCreditActions.mjs'
 import { FinanceCreditEditor } from './FinanceCreditEditor.jsx'
 
 const EMPTY_PARTIES = []
+const CREDIT_SORT_FIELDS = { credit_note_no: 'credit_note_no', amount: 'amount' }
 
 export default function FinanceCreditNotesPanel({ attemptsRef }) {
   const outletContext = useBusinessPageContext()
@@ -67,6 +69,9 @@ export default function FinanceCreditNotesPanel({ attemptsRef }) {
     PermissionCode.FINANCE_CREDIT_NOTE_REVERSE
   )
   const {
+    recordSort,
+    displayedSort,
+    changeRecordSort,
     currentCredit,
     setCurrentCredit,
     creditNotes,
@@ -104,7 +109,15 @@ export default function FinanceCreditNotesPanel({ attemptsRef }) {
     moduleTitle: '账款调整',
     columns: creditColumns,
   })
+  const sortedCreditColumns = useMemo(
+    () => applyBusinessServerColumnSorters(creditTableColumns, CREDIT_SORT_FIELDS, displayedSort),
+    [creditTableColumns, displayedSort]
+  )
+  const handleTableChange = (_pagination, _filters, sorter, { action }) => {
+    if (action === 'sort') changeRecordSort(readBusinessServerTableSort(sorter, CREDIT_SORT_FIELDS))
+  }
   const { exportingTab, exportCreditRows } = useFinancePaymentExports({
+    recordSort,
     creditKeyword,
     creditStatusFilter,
     beginLatestRequest,
@@ -269,7 +282,8 @@ export default function FinanceCreditNotesPanel({ attemptsRef }) {
         rowKey="id"
         loading={tableLoading.credits}
         dataSource={creditNotes}
-        columns={creditTableColumns}
+        columns={sortedCreditColumns}
+        onChange={handleTableChange}
         pagination={createBusinessTablePagination({
           pagination: creditPagination,
           total: creditTotal,

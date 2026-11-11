@@ -8,7 +8,7 @@ import (
 )
 
 func (d *jsonrpcDispatcher) listWarehouseProductionWork(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "kind", "stage", "keyword", "limit", "offset") {
+	if !productionOrderAllowsOnly(pm, "kind", "stage", "keyword", "limit", "offset", "sort_by", "sort_direction") {
 		return invalidParamResult()
 	}
 	kind, ok := productionOrderRequiredString(pm, "kind", 32)
@@ -41,7 +41,15 @@ func (d *jsonrpcDispatcher) listWarehouseProductionWork(ctx context.Context, pm 
 	if !ok {
 		return invalidParamResult()
 	}
-	filter := biz.WarehouseProductionWorkFilter{Kind: kind, Stage: stage, Keyword: keyword, Limit: limit, Offset: offset}
+	sortBy, ok := productionOrderOptionalExactString(pm, "sort_by")
+	if !ok {
+		return invalidParamResult()
+	}
+	sortDirection, ok := productionOrderOptionalExactString(pm, "sort_direction")
+	if !ok {
+		return invalidParamResult()
+	}
+	filter := biz.WarehouseProductionWorkFilter{Kind: kind, Stage: stage, Keyword: keyword, Limit: limit, Offset: offset, SortBy: sortBy, SortDirection: sortDirection}
 	scope, result := d.currentWarehouseDataScope(ctx)
 	if result != nil {
 		return result

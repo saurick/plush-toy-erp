@@ -320,9 +320,11 @@ export function applyBusinessServerColumnSorters(columns, sortFields, sort) {
     return {
       ...column,
       sorter: true,
-      sortOrder: sort?.sort_by === field
-        ? (sort.sort_direction === 'asc' ? 'ascend' : 'descend')
-        : null,
+      ...(sort === undefined ? {} : {
+        sortOrder: sort?.sort_by === field
+          ? (sort.sort_direction === 'asc' ? 'ascend' : 'descend')
+          : null,
+      }),
     }
   })
 }

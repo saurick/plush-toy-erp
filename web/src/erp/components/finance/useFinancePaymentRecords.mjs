@@ -24,7 +24,7 @@ import {
   listAllSuppliers,
 } from '../../api/masterDataOrderApi.mjs'
 
-import { DEFAULT_BUSINESS_PAGE_SIZE, getBusinessPaginationParams } from '../../utils/businessPagination.mjs'
+import { DEFAULT_BUSINESS_PAGE_SIZE, getBusinessPaginationParams, resetBusinessPaginationCurrent } from '../../utils/businessPagination.mjs'
 
 import { compactParams } from '../../utils/sourceDocumentValues.mjs'
 
@@ -84,6 +84,16 @@ export default function useFinancePaymentRecords({
     'creditPagination',
     { current: 1, pageSize: DEFAULT_BUSINESS_PAGE_SIZE }
   )
+
+  const [recordSort, setRecordSort] = useBusinessPageState(
+    recordType === 'credits' ? 'creditSort' : 'paymentSort',
+    null
+  )
+  const [displayedSort, setDisplayedSort] = useState(null)
+  const changeRecordSort = useCallback((sort) => {
+    setRecordSort(sort)
+    resetBusinessPaginationCurrent(recordType === 'credits' ? setCreditPagination : setPaymentPagination)
+  }, [recordType, setCreditPagination, setPaymentPagination, setRecordSort])
 
   const [paymentKeyword, setPaymentKeyword] = useBusinessPageState(
     'paymentKeyword',
@@ -159,12 +169,14 @@ export default function useFinancePaymentRecords({
           keyword: paymentKeyword.trim(),
           direction: paymentDirectionFilter,
           ...getBusinessPaginationParams(paymentPagination),
+          ...recordSort,
         }),
         { signal: request.signal }
       )
       if (!request.isCurrent()) return
       const nextRows = Array.isArray(result?.payments) ? result.payments : []
       setPayments(nextRows)
+      setDisplayedSort(recordSort)
       setPaymentTotal(Number(result?.total || 0))
       setPaymentTotals(Array.isArray(result?.totals) ? result.totals : [])
       setPaymentStatusCounts(resolveBusinessStatusCounts(result))
@@ -192,6 +204,7 @@ export default function useFinancePaymentRecords({
     paymentPagination,
     paymentStatusFilter,
     paymentKeyword,
+    recordSort,
   ])
 
   const loadCreditRows = useCallback(async () => {
@@ -205,6 +218,7 @@ export default function useFinancePaymentRecords({
           status: creditStatusFilter,
           keyword: creditKeyword.trim(),
           ...getBusinessPaginationParams(creditPagination),
+          ...recordSort,
         }),
         { signal: request.signal }
       )
@@ -213,6 +227,7 @@ export default function useFinancePaymentRecords({
         ? result.credit_notes
         : []
       setCreditNotes(nextRows)
+      setDisplayedSort(recordSort)
       setCreditTotal(Number(result?.total || 0))
       setCreditStatusCounts(resolveBusinessStatusCounts(result))
       setCurrentCredit((current) =>
@@ -232,7 +247,7 @@ export default function useFinancePaymentRecords({
       }
       request.finish()
     }
-  }, [beginLatestRequest, creditPagination, creditStatusFilter, creditKeyword])
+  }, [beginLatestRequest, creditPagination, creditStatusFilter, creditKeyword, recordSort])
 
   const loadPartyReferences = useCallback(async () => {
     const request = beginLatestRequest('finance-party-references')
@@ -371,6 +386,9 @@ export default function useFinancePaymentRecords({
   }, [currentPayment, financeFacts])
 
   return {
+    recordSort,
+    displayedSort,
+    changeRecordSort,
     paymentRecovery,
     currentPayment,
     currentCredit,

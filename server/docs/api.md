@@ -735,11 +735,11 @@ Product Core 登记六个 process key：销售、采购和 Shipment 三条可配
 | `create_reconciliation_from_finance_fact` | 从往来事实创建对账 | 从往来事实创建对账，保留对应来源关系供追溯。 |
 | `get_finance_credit_note` | 查看财务贷项 | 读取财务贷项详情，供业务核对。 |
 | `get_finance_payment` | 查看收付款 | 读取收付款详情，供业务核对。 |
-| `list_finance_credit_notes` | 查询财务贷项 | 读取财务贷项，供列表查询、引用和追溯。 |
+| `list_finance_credit_notes` | 查询财务贷项 | 读取财务贷项，可按调整单号或同币种内的金额排序。 |
 | `list_finance_facts` | 查询往来事实 | 读取往来事实，供列表查询、引用和追溯。 |
 | `get_finance_fact` | 读取单笔往来事实 | 按编号读取；按应收、应付、发票、对账各自权限校验，供财务关联追溯。 |
 | `list_finance_payment_allocation_candidates` | 查询收付款核销候选 | 读取收付款核销候选，供列表查询、引用和追溯。 |
-| `list_finance_payments` | 查询收付款 | 按状态、方向、用途、币种、往来方、发生日期、账户 / 凭据及账款关联查询；账款关联包含已冲回核销，须同时具备该账款读取权限；可汇总全部筛选结果，按币种、方向和状态分组，分页不改变汇总。 |
+| `list_finance_payments` | 查询收付款 | 按状态、方向、用途、币种、往来方、发生日期、账户 / 凭据及账款关联查询；账款关联包含已冲回核销，须同时具备该账款读取权限；可按收付款单号、同币种内的金额或发生时间排序；汇总按币种、方向和状态分组，分页不改变汇总。 |
 | `get_finance_statement` | 查询期间对账 | 按往来方、币种、中国自然日期及固定查询时点，汇总已入账账款、收付款和追加冲销；核销不重复计入现金。 |
 | `list_finance_source_adjustments` | 查询采购待调整 | 分页查看应付形成后的采购退货和数量差额，金额由冻结来源推导。 |
 | `create_finance_source_adjustment` | 确认采购应付差额 | 从已过账采购退货或数量调整追加财务调整；不接受手填金额，保留原应付和收付款。 |
@@ -802,11 +802,13 @@ Product Core 登记六个 process key：销售、采购和 Shipment 三条可配
 | `create_stock_reservation_from_sales_order` | 从销售订单创建库存预留 | 从销售订单创建库存预留，保留对应来源关系供追溯。 |
 | `get_shipment` | 查看出货单 | 读取出货单详情，供业务核对。 |
 | `list_shipment_source_candidates` | 查询出货来源候选 | 读取出货来源候选，供列表查询、引用和追溯。 |
-| `list_shipments` | 查询出货单 | 读取出货单，供列表查询、引用和追溯。 |
+| `list_shipments` | 查询出货单 | 读取出货单，可按总净重排序，缺值排最后。 |
 | `list_stock_reservations` | 查询库存预留 | 读取库存预留，供列表查询、引用和追溯。 |
 | `release_stock_reservation` | 释放库存预留 | 释放库存预留，用于业务事实的对应办理或核对。 |
 | `save_shipment_draft` | 保存出货单草稿 | 保存出货单草稿的当前编辑内容，由正式入口检查业务约束。 |
 | `ship_shipment` | 确认真实出货 | 通过出货与数量校验，形成实际出货及相应库存事实。 |
+
+出货单列表的 `sort_by=total_net_weight_g` 使用保存的总净重（克），缺值排最后；`sort_direction` 支持 `asc`、`desc`，省略方向默认降序。清空排序恢复默认；筛选后排序、再分页，同值按记录 ID 倒序。
 
 该域承载已登记的生产、委外、出货、库存预留和财务事实方法。出货主路径当前包括：
 
@@ -900,8 +902,10 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | --- | --- | --- |
 | `execute_production_wip_action` | 办理在制生产动作 | 办理在制生产动作，用于在制生产的对应办理或核对。 |
 | `get_production_wip` | 查看在制生产 | 读取在制生产详情，供业务核对。 |
-| `list_warehouse_production_work` | 查询仓库生产办理记录 | 分页查询工序回货或成品收仓的来源、数量、质量与包装进度；只读，不代替入库或工序动作。 |
+| `list_warehouse_production_work` | 查询仓库生产办理记录 | 分页查询工序回货或成品收仓的来源、数量、质量与包装进度，可按同单位内的本次数量排序；只读，不代替入库或工序动作。 |
 | `prepare_production_outsourcing_order` | 准备生产委外单 | 准备生产委外单，用于在制生产的对应办理或核对。 |
+
+仓库生产办理列表支持 `sort_by=quantity`，同单位内按 `sort_direction`（`asc` 或 `desc`，默认降序）比较，同值按记录 ID 倒序。筛选和权限限定候选后再排序、分页。省略排序时仍按办理状态优先。
 
 该域承载固定 `PLUSH_SEW_HAND_V1` v1 的路线快照、WIP 批次和工序动作：
 
@@ -1121,7 +1125,7 @@ ProcessRuntime 入库命令只在上述来源交接全部完成后记录 durable
 
 `inventory` JSON-RPC 域只读返回库存余额、批次和流水，并支持按显式 `product_sku_id` 筛选。
 
-库存余额的 `sort_by` 支持 `subject_code`（材料或产品编号）、`warehouse_name`（仓库名称）、`lot_no`（批次号）、`quantity`（账面数量，按数值且不换算单位）；库存批次支持 `lot_no` 和 `received_at`（接收日期）。指定字段时 `sort_direction` 可为 `asc` 或 `desc`，省略方向按降序。省略字段与方向时维持最近更新优先；不支持的字段、方向或只指定方向返回参数错误。排序在仓库权限和筛选之后、分页之前执行；无值排最后，同值按记录 ID 倒序。库存流水仍按发生时间倒序。
+库存余额的 `sort_by` 支持 `subject_code`（材料或产品编号）、`warehouse_name`（仓库名称）、`lot_no`（批次号）、`quantity`（账面数量）、`issuable_quantity`（材料可领用）、`restricted_quantity`（受限库存）和 `ready_to_ship_quantity`（可发货数量）；后三者同单位内比较，不适用的存货排最后，零值参与排序。库存批次支持 `lot_no` 和 `received_at`（接收日期）。指定字段时 `sort_direction` 可为 `asc` 或 `desc`，省略方向按降序。省略字段与方向时维持最近更新优先；不支持的字段、方向或只指定方向返回参数错误。排序在仓库权限和筛选之后、分页之前执行；无值排最后，同值按记录 ID 倒序。库存流水仍按发生时间倒序。
 
 产品库存 grain 当前为产品 + 可选 SKU + 仓库 + 单位 + 可选批次；`inventory_lots / inventory_txns / inventory_balances`、生产 / 委外事实、出货和预留共用这一粒度，扣减、冲正、可用量和幂等匹配都不能跨 SKU。
 
@@ -3281,7 +3285,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 收付款读回包括 `kind / source_type / source_id / source_no / refund_of_payment_id / refund_of_payment_no / purpose_note / allocated_amount / refunded_amount / available_amount`，分配明细含撤销原因。余额为六位小数精确值。
 
-列表可按 `kind`、直接首款来源或 `refund_of_payment_id` 筛选；状态计数使用同一条件。新接口仍受 `finance / finance_payments` 模块边界控制。
+列表可按 `kind`、直接首款来源或 `refund_of_payment_id` 筛选；状态计数使用同一条件。收付款的 `sort_by` 支持 `payment_no`、`amount`、`occurred_at`；账款调整支持 `credit_note_no`、`amount`。金额在币种内比较，不做换汇。指定字段时 `sort_direction` 可为 `asc` 或 `desc`，默认降序；省略两者恢复最近发生或最近登记优先。同值按记录 ID 倒序，排序在筛选后分页前完成。新接口仍受 `finance / finance_payments` 模块边界控制。
 
 ## 全量接口字段合同 / RPC Field Contracts
 
@@ -32539,7 +32543,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
   "jsonrpc": "2.0",
   "method": "list_inventory_balances",
   "params": {
-    "sort_by": "quantity",
+    "sort_by": "ready_to_ship_quantity",
     "sort_direction": "desc",
     "subject_id": 1,
     "subject_type": "PRODUCT",
@@ -38414,9 +38418,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
 | `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance.go:200`。 |
-| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:131`。 |
-| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:127`。 |
-| `reason` | string | 必填 | 拒绝条件：“!exists &#124;&#124; !stringOK &#124;&#124; reason == "" &#124;&#124; len([]rune(reason)) > 255”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:138`。 |
+| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:136`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:132`。 |
+| `reason` | string | 必填 | 拒绝条件：“!exists &#124;&#124; !stringOK &#124;&#124; reason == "" &#124;&#124; len([]rune(reason)) > 255”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:143`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -38732,9 +38736,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
 | `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:105`。 |
-| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:131`。 |
-| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:127`。 |
-| `reason` | string | 必填 | 拒绝条件：“!exists &#124;&#124; !stringOK &#124;&#124; reason == "" &#124;&#124; len([]rune(reason)) > 255”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:138`。 |
+| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:136`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:132`。 |
+| `reason` | string | 必填 | 拒绝条件：“!exists &#124;&#124; !stringOK &#124;&#124; reason == "" &#124;&#124; len([]rune(reason)) > 255”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:143`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -39092,9 +39096,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
 | `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_production.go:193`。 |
-| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:131`。 |
-| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:127`。 |
-| `reason` | string | 必填 | 拒绝条件：“!exists &#124;&#124; !stringOK &#124;&#124; reason == "" &#124;&#124; len([]rune(reason)) > 255”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:138`。 |
+| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:136`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:132`。 |
+| `reason` | string | 必填 | 拒绝条件：“!exists &#124;&#124; !stringOK &#124;&#124; reason == "" &#124;&#124; len([]rune(reason)) > 255”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:143`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -42859,6 +42863,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:202`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:283`。 |
 | `offset` | integer &#124; null | 可选 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:201`。 |
+| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:202`。 |
+| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:202`。 |
 | `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:202`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
@@ -42871,6 +42877,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "keyword": "抱抱猴子",
     "limit": 10,
     "offset": 0,
+    "sort_by": "amount",
+    "sort_direction": "desc",
     "status": "POSTED"
   },
   "id": "rpc-demo-operational_fact.list_finance_credit_notes"
@@ -43232,6 +43240,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
 | `refund_of_payment_id` | integer &#124; null | 可选 | 解析器 `getInt`；调用 `getInt(pm, "refund_of_payment_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:162`。 |
+| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:162`。 |
+| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:162`。 |
 | `source_id` | integer &#124; null | 可选 | 解析器 `getInt`；调用 `getInt(pm, "source_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:162`。 |
 | `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:162`。 |
 | `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:162`。 |
@@ -43247,6 +43257,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "include_totals": true,
     "limit": 1,
     "offset": 20,
+    "sort_by": "amount",
+    "sort_direction": "desc",
     "status": "DRAFT"
   },
   "id": "rpc-demo-operational_fact.list_finance_payments"
@@ -44271,14 +44283,16 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:295`。 |
 | `product_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:68`。 |
 | `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:69`。 |
+| `sort_by` | string | 可选 | 解析器 `productionOrderOptionalExactString`；调用 `productionOrderOptionalExactString(pm, "sort_by")`。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:81`。 |
+| `sort_direction` | string | 可选 | 解析器 `productionOrderOptionalExactString`；调用 `productionOrderOptionalExactString(pm, "sort_direction")`。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:85`。 |
 | `source_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "source_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:66`。 |
-| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:65`。 |
-| `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:55`。 |
 
 **顶层字段（续）**
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
+| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:65`。 |
+| `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:55`。 |
 | `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:62`。 |
 | `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:61`。 |
 | `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:63`。 |
@@ -44290,7 +44304,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
   "jsonrpc": "2.0",
   "method": "list_shipments",
   "params": {
-    "limit": 20
+    "limit": 20,
+    "sort_by": "total_net_weight_g",
+    "sort_direction": "desc"
   },
   "id": "rpc-demo-operational_fact.list_shipments"
 }
@@ -44565,8 +44581,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
 | `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance.go:160`。 |
-| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:131`。 |
-| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:127`。 |
+| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:136`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:132`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -44707,8 +44723,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
 | `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:89`。 |
-| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:131`。 |
-| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:127`。 |
+| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:136`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:132`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -44938,8 +44954,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
 | `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_production.go:158`。 |
-| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:131`。 |
-| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:127`。 |
+| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:136`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:132`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -46722,8 +46738,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
 | `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_finance.go:182`。 |
-| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:131`。 |
-| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:127`。 |
+| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok &#124;&#124; actorID <= 0”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:136`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_shared.go:132`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -49821,6 +49837,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `kind` | string | 必填 | 解析器 `productionOrderRequiredString`；调用 `productionOrderRequiredString(pm, "kind", 32)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:14`。 |
 | `limit` | integer | 可选 | 解析器 `productionOrderOptionalNonNegativeInt`；调用 `productionOrderOptionalNonNegativeInt(pm, "limit", 20)`。 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:28`。 |
 | `offset` | integer | 可选 | 解析器 `productionOrderOptionalNonNegativeInt`；调用 `productionOrderOptionalNonNegativeInt(pm, "offset", 0)`。 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:32`。 |
+| `sort_by` | string | 可选 | 解析器 `productionOrderOptionalExactString`；调用 `productionOrderOptionalExactString(pm, "sort_by")`。 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:44`。 |
+| `sort_direction` | string | 可选 | 解析器 `productionOrderOptionalExactString`；调用 `productionOrderOptionalExactString(pm, "sort_direction")`。 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:48`。 |
 | `stage` | string | 可选 | 解析器 `productionOrderOptionalExactString`；调用 `productionOrderOptionalExactString(pm, "stage")`。 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:36`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
@@ -49834,6 +49852,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "kind": "RECEIPT",
     "limit": 20,
     "offset": 0,
+    "sort_by": "quantity",
+    "sort_direction": "desc",
     "stage": ""
   },
   "id": "rpc-demo-production_wip.list_warehouse_production_work"
@@ -49852,51 +49872,51 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.counts` | object | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:61`。 |
-| `result.data.items` | array | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:61`。 |
-| `result.data.items[]` | object | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:65`。 |
+| `result.data.counts` | object | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:69`。 |
+| `result.data.items` | array | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:69`。 |
+| `result.data.items[]` | object | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:73`。 |
 
 **`items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.items[].action` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:71`。 |
-| `result.data.items[].action_batch_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:71`。 |
-| `result.data.items[].batch_no` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:67`。 |
-| `result.data.items[].fact_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:67`。 |
-| `result.data.items[].fact_no` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:67`。 |
-| `result.data.items[].fact_status` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:67`。 |
-| `result.data.items[].fact_version` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:67`。 |
-| `result.data.items[].id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:66`。 |
-| `result.data.items[].kind` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:66`。 |
-| `result.data.items[].lot_no` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:69`。 |
-| `result.data.items[].operation_name` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:68`。 |
-| `result.data.items[].order_no` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:66`。 |
-| `result.data.items[].packaging_confirmed` | boolean | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:70`。 |
-| `result.data.items[].pending_inspection_quantity` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:70`。 |
-| `result.data.items[].pending_packaging_quantity` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:70`。 |
-| `result.data.items[].product_code` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:68`。 |
+| `result.data.items[].action` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:79`。 |
+| `result.data.items[].action_batch_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:79`。 |
+| `result.data.items[].batch_no` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:75`。 |
+| `result.data.items[].fact_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:75`。 |
+| `result.data.items[].fact_no` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:75`。 |
+| `result.data.items[].fact_status` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:75`。 |
+| `result.data.items[].fact_version` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:75`。 |
+| `result.data.items[].id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:74`。 |
+| `result.data.items[].kind` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:74`。 |
+| `result.data.items[].lot_no` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:77`。 |
+| `result.data.items[].operation_name` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:76`。 |
+| `result.data.items[].order_no` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:74`。 |
+| `result.data.items[].packaging_confirmed` | boolean | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:78`。 |
+| `result.data.items[].pending_inspection_quantity` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:78`。 |
+| `result.data.items[].pending_packaging_quantity` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:78`。 |
+| `result.data.items[].product_code` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:76`。 |
 
 **`items[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.items[].product_name` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:68`。 |
-| `result.data.items[].production_order_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:66`。 |
-| `result.data.items[].production_order_item_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:66`。 |
-| `result.data.items[].production_wip_batch_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:67`。 |
-| `result.data.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:69`。 |
-| `result.data.items[].sku_code` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:68`。 |
-| `result.data.items[].stage` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:66`。 |
-| `result.data.items[].unit_name` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:68`。 |
-| `result.data.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:69`。 |
-| `result.data.items[].warehouse_name` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:69`。 |
+| `result.data.items[].product_name` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:76`。 |
+| `result.data.items[].production_order_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:74`。 |
+| `result.data.items[].production_order_item_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:74`。 |
+| `result.data.items[].production_wip_batch_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:75`。 |
+| `result.data.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:77`。 |
+| `result.data.items[].sku_code` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:76`。 |
+| `result.data.items[].stage` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:74`。 |
+| `result.data.items[].unit_name` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:76`。 |
+| `result.data.items[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:77`。 |
+| `result.data.items[].warehouse_name` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:77`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:61`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:69`。 |
 
 ```json
 {

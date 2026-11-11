@@ -11,6 +11,7 @@ import { createInformationDensityScenarios } from './informationDensityScenarios
 import { createEmptyStateScenarios } from './emptyStateScenarios.mjs'
 import { createPageHeaderScenarios } from './pageHeaderScenarios.mjs'
 import { createFinanceWorkspaceScenarios } from './financeWorkspaceScenarios.mjs'
+import { createBusinessQuantitySortScenarios } from './businessQuantitySortScenarios.mjs'
 import { createTaskCalendarScenarios } from './taskCalendarScenarios.mjs'
 import { createTaskCurrentFocusScenarios } from './taskCurrentFocusScenarios.mjs'
 import { createTaskFlowRecordScenarios } from './taskFlowRecordScenarios.mjs'
@@ -458,6 +459,7 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createPageHeaderScenarios({ customerRuntimeEffectiveSession, assertNoHorizontalOverflow, outputDir }),
     ...createFinanceWorkspaceScenarios({ customerRuntimeEffectiveSession, assertNoHorizontalOverflow, outputDir }),
+    ...createBusinessQuantitySortScenarios({ customerRuntimeEffectiveSession, assertNoHorizontalOverflow }),
     ...createBusinessColumnSettingsScenarios({
       ...deps,
       customerRuntimeEffectiveSession,

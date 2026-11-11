@@ -78,7 +78,12 @@ func operationalFactShipmentFilterFromParams(pm map[string]any) (biz.Operational
 	if !ok {
 		return biz.OperationalFactFilter{}, false
 	}
-	return filter, true
+	filter.SortBy, ok = productionOrderOptionalExactString(pm, "sort_by")
+	if !ok {
+		return biz.OperationalFactFilter{}, false
+	}
+	filter.SortDirection, ok = productionOrderOptionalExactString(pm, "sort_direction")
+	return filter, ok
 }
 
 func getOptionalInt(pm map[string]any, key string) *int {

@@ -115,6 +115,23 @@ func testProductionFinishedGoodsPartialPackingAndShipment(t *testing.T, f produc
 	}
 	readiness(first, "3")
 	readiness(second, "4")
+	// This independently available lot has less book stock than the blocked lot.
+	standaloneLot := f.client.InventoryLot.Create().SetSubjectType(first.SubjectType).SetSubjectID(first.SubjectID).
+		SetNillableProductSkuID(first.ProductSkuID).SetLotNo("FG-AVAILABLE-" + suffix).SaveX(ctx)
+	f.client.InventoryBalance.Create().SetSubjectType(first.SubjectType).SetSubjectID(first.SubjectID).
+		SetNillableProductSkuID(first.ProductSkuID).SetWarehouseID(warehouse.ID).SetLotID(standaloneLot.ID).
+		SetUnitID(first.UnitID).SetQuantity(decimal.NewFromInt(2)).SaveX(ctx)
+	for offset, want := range []struct {
+		lotID    int
+		quantity string
+	}{{*first.LotID, "3"}, {standaloneLot.ID, "2"}, {*second.LotID, "0"}} {
+		rows, total, err := inv.ListInventoryBalancesForAccess(ctx, biz.InventoryBalanceFilter{
+			SubjectID: first.SubjectID, SubjectType: first.SubjectType, SortBy: biz.InventorySortReadyToShip, SortDirection: "desc", Limit: 1, Offset: offset,
+		}, biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{warehouse.ID}})
+		if err != nil || total != 3 || len(rows) != 1 || rows[0].LotID == nil || *rows[0].LotID != want.lotID || rows[0].ReadyToShipQuantity.String() != want.quantity {
+			t.Fatalf("shipment readiness page %d: rows=%v total=%d err=%v want lot=%d quantity=%s", offset, rows, total, err, want.lotID, want.quantity)
+		}
+	}
 	shipment := func(receipt *biz.ProductionFact, quantity int64) *biz.Shipment {
 		t.Helper()
 		no := fmt.Sprintf("SHIP-%d-%d", receipt.ID, quantity)

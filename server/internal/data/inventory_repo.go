@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"server/internal/biz"
-	"server/internal/core/calc"
 	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/bomheader"
@@ -440,174 +439,6 @@ func (r *inventoryRepo) GetInventoryBalance(ctx context.Context, key biz.Invento
 	return entInventoryBalanceToBiz(row), nil
 }
 
-func (r *inventoryRepo) ListInventoryBalances(ctx context.Context, filter biz.InventoryBalanceFilter) ([]*biz.InventoryBalance, int, error) {
-	return r.listInventoryBalances(ctx, filter, biz.WarehouseDataScope{Mode: biz.DataScopeModeAll})
-}
-
-func (r *inventoryRepo) ListInventoryBalancesForAccess(ctx context.Context, filter biz.InventoryBalanceFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryBalance, int, error) {
-	return r.listInventoryBalances(ctx, filter, biz.NormalizeWarehouseDataScope(scope))
-}
-
-func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.InventoryBalanceFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryBalance, int, error) {
-	query := r.data.postgres.InventoryBalance.Query()
-	if filter.StockCategory != "" {
-		query.Where(inventoryMaterialCategoryPredicate(filter.StockCategory))
-	}
-	switch scope.Mode {
-	case biz.DataScopeModeAssigned:
-		query = query.Where(inventorybalance.WarehouseIDIn(scope.WarehouseIDs...))
-	case biz.DataScopeModeAll:
-	default:
-		return []*biz.InventoryBalance{}, 0, nil
-	}
-	if filter.SubjectType != "" {
-		query = query.Where(inventorybalance.SubjectTypeEQ(filter.SubjectType))
-	}
-	if filter.SubjectID > 0 {
-		query = query.Where(inventorybalance.SubjectIDEQ(filter.SubjectID))
-	}
-	if filter.ProductSkuID > 0 {
-		query = query.Where(inventorybalance.ProductSkuID(filter.ProductSkuID))
-	}
-	if filter.WarehouseID > 0 {
-		query = query.Where(inventorybalance.WarehouseIDEQ(filter.WarehouseID))
-	}
-	if filter.LotID > 0 {
-		query = query.Where(inventorybalance.LotIDEQ(filter.LotID))
-	}
-	if filter.Keyword != "" {
-		query = query.Where(inventorybalance.Or(
-			businessDocumentKeyword("balance", filter.Keyword),
-			inventorybalance.SubjectTypeContainsFold(filter.Keyword),
-			inventorybalance.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			inventorybalance.SubjectIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			inventorybalance.ProductSkuIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			inventorybalance.WarehouseIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			inventorybalance.LotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			inventorybalance.UnitIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-		))
-	}
-	total, err := query.Clone().Count(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	// Each reference join matches at most one row; DISTINCT would prevent sorting by joined fields.
-	rows, err := query.
-		Unique(false).
-		Order(inventoryBalanceOrder(filter), ent.Desc(inventorybalance.FieldID)).
-		WithInventoryLot().
-		Limit(filter.Limit).
-		Offset(filter.Offset).
-		All(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	materialIDs := []int{}
-	for _, row := range rows {
-		if row.SubjectType == biz.InventorySubjectMaterial {
-			materialIDs = append(materialIDs, row.SubjectID)
-		}
-	}
-	categories, err := loadInventoryMaterialStockCategories(ctx, r.data.postgres, materialIDs)
-	if err != nil {
-		return nil, 0, err
-	}
-	keys := make([]biz.InventoryBalanceKey, 0, len(rows))
-	for _, row := range rows {
-		if row.SubjectType == biz.InventorySubjectProduct {
-			keys = append(keys, biz.InventoryBalanceKey{SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, LotID: row.LotID, UnitID: row.UnitID})
-		}
-	}
-	reservations, err := activeReservedQuantitiesForInventoryKeys(ctx, r.data.postgres, keys)
-	if err != nil {
-		return nil, 0, err
-	}
-	readinessByKey, err := productionFinishedGoodsReadinessForKeys(ctx, r.data.postgres, keys)
-	if err != nil {
-		return nil, 0, err
-	}
-	out := make([]*biz.InventoryBalance, 0, len(rows))
-	for _, row := range rows {
-		item := entInventoryBalanceToBiz(row)
-		if row.SubjectType == biz.InventorySubjectMaterial {
-			item.StockCategory = categories[row.SubjectID]
-		}
-		key := inventoryProductGrain(biz.InventoryBalanceKey{SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, LotID: row.LotID, UnitID: row.UnitID})
-		activeReserved := decimal.Zero
-		readiness := finishedGoodsReadiness{}
-		if row.SubjectType == biz.InventorySubjectProduct {
-			activeReserved = reservations[key]
-			readiness = readinessByKey[key]
-		}
-		item.ActiveReservedQuantity = activeReserved
-		item.AvailableQuantity = calc.InventoryAvailableQuantity(item.Quantity, activeReserved)
-		item.LotStatus = corestatus.InventoryLotActive
-		if row.Edges.InventoryLot != nil {
-			item.LotStatus = row.Edges.InventoryLot.Status
-		}
-		if item.LotStatus != corestatus.InventoryLotActive {
-			item.RestrictedQuantity = item.Quantity
-		}
-		if row.SubjectType == biz.InventorySubjectMaterial && item.LotStatus == corestatus.InventoryLotActive {
-			item.IssuableQuantity = item.AvailableQuantity
-		}
-		item.PendingInspectionQuantity = readiness.PendingInspection
-		item.PendingPackagingQuantity = readiness.PendingPackaging
-		item.ReadyToShipQuantity = decimal.Max(decimal.Zero, item.AvailableQuantity.Sub(readiness.blocked()))
-		if row.SubjectType != biz.InventorySubjectProduct || (row.Edges.InventoryLot != nil && row.Edges.InventoryLot.Status != corestatus.InventoryLotActive) {
-			item.ReadyToShipQuantity = decimal.Zero
-		}
-		out = append(out, item)
-	}
-	return out, total, nil
-}
-
-func inventoryListOrderOptions(direction string) []entsql.OrderTermOption {
-	if direction == "asc" {
-		return []entsql.OrderTermOption{entsql.OrderAsc(), entsql.OrderNullsLast()}
-	}
-	return []entsql.OrderTermOption{entsql.OrderDesc(), entsql.OrderNullsLast()}
-}
-
-func inventoryBalanceOrder(filter biz.InventoryBalanceFilter) inventorybalance.OrderOption {
-	opts := inventoryListOrderOptions(filter.SortDirection)
-	switch filter.SortBy {
-	case biz.InventorySortSubjectCode:
-		return inventoryBalanceSubjectCodeOrder(filter.SortDirection)
-	case biz.InventorySortWarehouseName:
-		return inventorybalance.ByWarehouseField(warehouse.FieldName, opts...)
-	case biz.InventorySortLotNo:
-		return inventorybalance.ByInventoryLotField(inventorylot.FieldLotNo, opts...)
-	case biz.InventorySortQuantity:
-		return inventorybalance.ByQuantity(opts...)
-	default:
-		return ent.Desc(inventorybalance.FieldUpdatedAt)
-	}
-}
-
-func inventoryBalanceSubjectCodeOrder(direction string) inventorybalance.OrderOption {
-	return func(s *entsql.Selector) {
-		m := entsql.Table(material.Table).As("balance_material")
-		p := entsql.Table(product.Table).As("balance_product")
-		s.LeftJoin(m).OnP(entsql.And(
-			entsql.EQ(s.C(inventorybalance.FieldSubjectType), biz.InventorySubjectMaterial),
-			entsql.ColumnsEQ(s.C(inventorybalance.FieldSubjectID), m.C(material.FieldID)),
-		))
-		s.LeftJoin(p).OnP(entsql.And(
-			entsql.EQ(s.C(inventorybalance.FieldSubjectType), biz.InventorySubjectProduct),
-			entsql.ColumnsEQ(s.C(inventorybalance.FieldSubjectID), p.C(product.FieldID)),
-		))
-		s.OrderExprFunc(func(b *entsql.Builder) {
-			b.WriteString("COALESCE(").WriteString(m.C(material.FieldCode)).
-				WriteString(", ").WriteString(p.C(product.FieldCode)).WriteString(")")
-			if direction != "asc" {
-				b.WriteString(" DESC")
-			}
-			b.WriteString(" NULLS LAST")
-		})
-	}
-}
-
 func activeReservedQuantityForBalance(ctx context.Context, client *ent.Client, row *ent.InventoryBalance) (decimal.Decimal, error) {
 	if row == nil {
 		return decimal.Zero, nil
@@ -730,7 +561,7 @@ func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.Invent
 }
 
 func inventoryLotOrder(filter biz.InventoryLotFilter) inventorylot.OrderOption {
-	opts := inventoryListOrderOptions(filter.SortDirection)
+	opts := businessListOrderOptions(filter.SortDirection)
 	switch filter.SortBy {
 	case biz.InventorySortLotNo:
 		return inventorylot.ByLotNo(opts...)

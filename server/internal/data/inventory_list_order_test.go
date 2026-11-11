@@ -35,6 +35,7 @@ func TestInventoryPostgresListSortingBeforePagination(t *testing.T) {
 	lotB := newLot("-B", &late)
 	lotA := newLot("-A", &early)
 	lotC := newLot("-C", nil)
+	client.InventoryLot.UpdateOneID(lotB).SetStatus("HOLD").SaveX(ctx)
 	newBalance := func(subjectType string, subjectID, warehouseID int, lotID *int, quantity string) int {
 		return client.InventoryBalance.Create().
 			SetSubjectType(subjectType).SetSubjectID(subjectID).SetWarehouseID(warehouseID).
@@ -55,6 +56,12 @@ func TestInventoryPostgresListSortingBeforePagination(t *testing.T) {
 		{"", "", []int{c, b, a}},
 		{biz.InventorySortQuantity, "asc", []int{c, a, b}},
 		{biz.InventorySortQuantity, "desc", []int{b, c, a}},
+		{biz.InventorySortIssuable, "asc", []int{a, c, b}},
+		{biz.InventorySortIssuable, "desc", []int{c, a, b}},
+		{biz.InventorySortRestricted, "asc", []int{c, b, a}},
+		{biz.InventorySortRestricted, "desc", []int{a, c, b}},
+		{biz.InventorySortReadyToShip, "asc", []int{b, c, a}},
+		{biz.InventorySortReadyToShip, "desc", []int{b, c, a}},
 		{biz.InventorySortSubjectCode, "asc", []int{b, c, a}},
 		{biz.InventorySortSubjectCode, "desc", []int{c, a, b}},
 		{biz.InventorySortWarehouseName, "asc", []int{c, a, b}},

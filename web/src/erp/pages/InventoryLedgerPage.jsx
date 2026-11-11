@@ -162,7 +162,15 @@ import { BusinessViewPanels } from '../components/business-visualizations/Busine
 
 const EMPTY_INVENTORY_ROWS = Object.freeze([])
 const INVENTORY_SORT_FIELDS = {
-  [VIEW_BALANCES]: { subject_id: 'subject_code', warehouse_id: 'warehouse_name', lot_id: 'lot_no', quantity: 'quantity' },
+  [VIEW_BALANCES]: {
+    subject_id: 'subject_code',
+    warehouse_id: 'warehouse_name',
+    lot_id: 'lot_no',
+    quantity: 'quantity',
+    issuable_quantity: 'issuable_quantity',
+    restricted_quantity: 'restricted_quantity',
+    ready_to_ship_quantity: 'ready_to_ship_quantity',
+  },
   [VIEW_LOTS]: { lot_no: 'lot_no', received_at: 'received_at' },
 }
 
@@ -1116,7 +1124,7 @@ export default function InventoryLedgerPage() {
   })
   const copyableTableColumns = useMemo(
     () => normalizeBusinessTableColumns(
-      sortFields ? applyBusinessServerColumnSorters(tableColumns, sortFields, listResult?.sort) : tableColumns
+      sortFields ? applyBusinessServerColumnSorters(tableColumns, sortFields, listResult?.sort ?? null) : tableColumns
     ),
     [tableColumns, sortFields, listResult?.sort]
   )

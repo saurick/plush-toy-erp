@@ -14,6 +14,8 @@ import {
   paymentSourceReference,
 } from './financePaymentPresentation.jsx'
 
+const amountSortTooltip = { title: '同币种内按金额排序', target: 'sorter-icon' }
+
 export default function useFinancePaymentColumns({ customers, suppliers }) {
   const paymentColumns = useMemo(() => {
     const counterpartyLabel = (record) => {
@@ -49,6 +51,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
         defaultPriority: 50,
         title: '金额',
         dataIndex: 'amount',
+        showSorterTooltip: amountSortTooltip,
         width: 140,
       },
       { defaultPriority: 60, title: '币种', dataIndex: 'currency', width: 90 },
@@ -204,6 +207,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
         defaultPriority: 50,
         title: '调整金额',
         dataIndex: 'amount',
+        showSorterTooltip: amountSortTooltip,
         width: 140,
       },
       { defaultPriority: 60, title: '币种', dataIndex: 'currency', width: 90 },

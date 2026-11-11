@@ -141,7 +141,7 @@ func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id
 		out, err := d.operationalFactUC.GetFinancePayment(ctx, getInt(pm, "id", 0))
 		return id, financePaymentResult(d, ctx, out, err), nil
 	case "list_finance_payments":
-		if !jsonRPCParamsAllowed(pm, "finance_fact_id", "include_status_counts", "include_totals", "currency", "date_from", "date_to", "account_ref", "evidence_ref", "customer_key", "keyword", "status", "direction", "counterparty_type", "counterparty_id", "limit", "offset", "kind", "source_type", "source_id", "refund_of_payment_id") {
+		if !jsonRPCParamsAllowed(pm, "finance_fact_id", "include_status_counts", "include_totals", "currency", "date_from", "date_to", "account_ref", "evidence_ref", "customer_key", "keyword", "status", "direction", "counterparty_type", "counterparty_id", "limit", "offset", "kind", "source_type", "source_id", "refund_of_payment_id", "sort_by", "sort_direction") {
 			return id, invalidParamResult(), nil
 		}
 		factID := 0
@@ -159,7 +159,7 @@ func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id
 				return id, res, nil
 			}
 		}
-		filter := biz.FinancePaymentFilter{Currency: getString(pm, "currency"), DateFrom: getString(pm, "date_from"), DateTo: getString(pm, "date_to"), AccountRef: getString(pm, "account_ref"), EvidenceRef: getString(pm, "evidence_ref"), Kind: getString(pm, "kind"), SourceType: getString(pm, "source_type"), SourceID: getInt(pm, "source_id", 0), RefundOfPaymentID: getInt(pm, "refund_of_payment_id", 0), Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), Direction: getString(pm, "direction"), CounterpartyType: getString(pm, "counterparty_type"), CounterpartyID: getInt(pm, "counterparty_id", 0), Limit: normalizedBusinessListLimit(pm), Offset: getInt(pm, "offset", 0)}
+		filter := biz.FinancePaymentFilter{Currency: getString(pm, "currency"), DateFrom: getString(pm, "date_from"), DateTo: getString(pm, "date_to"), AccountRef: getString(pm, "account_ref"), EvidenceRef: getString(pm, "evidence_ref"), Kind: getString(pm, "kind"), SourceType: getString(pm, "source_type"), SourceID: getInt(pm, "source_id", 0), RefundOfPaymentID: getInt(pm, "refund_of_payment_id", 0), Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), Direction: getString(pm, "direction"), CounterpartyType: getString(pm, "counterparty_type"), CounterpartyID: getInt(pm, "counterparty_id", 0), SortBy: getString(pm, "sort_by"), SortDirection: getString(pm, "sort_direction"), Limit: normalizedBusinessListLimit(pm), Offset: getInt(pm, "offset", 0)}
 		filter.FinanceFactID = factID
 		items, total, err := d.operationalFactUC.ListFinancePayments(ctx, filter)
 		if err != nil {
@@ -195,11 +195,11 @@ func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id
 		out, err := d.operationalFactUC.GetFinanceCreditNote(ctx, getInt(pm, "id", 0))
 		return id, financeCreditNoteResult(d, ctx, out, err), nil
 	case "list_finance_credit_notes":
-		if !jsonRPCParamsAllowed(pm, "include_status_counts", "customer_key", "keyword", "status", "finance_fact_id", "limit", "offset") {
+		if !jsonRPCParamsAllowed(pm, "include_status_counts", "customer_key", "keyword", "status", "finance_fact_id", "sort_by", "sort_direction", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
 		limit, offset := normalizedBusinessListLimit(pm), getInt(pm, "offset", 0)
-		filter := biz.FinanceCreditNoteFilter{Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), FinanceFactID: getInt(pm, "finance_fact_id", 0), Limit: limit, Offset: offset}
+		filter := biz.FinanceCreditNoteFilter{Keyword: getString(pm, "keyword"), Status: getString(pm, "status"), FinanceFactID: getInt(pm, "finance_fact_id", 0), SortBy: getString(pm, "sort_by"), SortDirection: getString(pm, "sort_direction"), Limit: limit, Offset: offset}
 		items, total, err := d.operationalFactUC.ListFinanceCreditNotes(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil

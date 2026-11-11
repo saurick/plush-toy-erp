@@ -963,6 +963,9 @@ func (r *operationalFactRepo) ListShipments(ctx context.Context, filter biz.Oper
 	if err != nil {
 		return nil, 0, err
 	}
+	if filter.SortBy == biz.ShipmentSortNetWeight {
+		q.Order(shipment.ByTotalNetWeightG(businessListOrderOptions(filter.SortDirection)...))
+	}
 	rows, err := q.Order(ent.Desc(shipment.FieldID)).Limit(filter.Limit).Offset(filter.Offset).
 		WithItems(func(q *ent.ShipmentItemQuery) { q.Order(ent.Asc(shipmentitem.FieldID)) }).All(ctx)
 	if err != nil {

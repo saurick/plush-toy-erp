@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { Alert, Button } from 'antd'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 
@@ -42,6 +42,7 @@ import {
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { createBusinessTablePagination } from '../utils/businessPagination.mjs'
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../utils/moduleTableColumns.mjs'
 
 import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
 import {
@@ -71,6 +72,8 @@ import {
   FinancePaymentReversalModal,
 } from '../components/finance/FinancePaymentAdjustmentModals.jsx'
 import { FinancePaymentDetails } from '../components/finance/FinancePaymentDetails.jsx'
+
+const PAYMENT_SORT_FIELDS = { payment_no: 'payment_no', amount: 'amount', occurred_at: 'occurred_at' }
 
 export default function FinancePaymentsPage() {
   return (
@@ -122,6 +125,9 @@ function FinancePaymentRecords() {
   )
 
   const {
+    recordSort,
+    displayedSort,
+    changeRecordSort,
     currentPayment,
     paymentRecovery,
     payments,
@@ -238,7 +244,15 @@ function FinancePaymentRecords() {
     moduleTitle: '收付款与核销 / 收付款记录',
     columns: paymentColumns,
   })
+  const sortedPaymentColumns = useMemo(
+    () => applyBusinessServerColumnSorters(paymentTableColumns, PAYMENT_SORT_FIELDS, displayedSort),
+    [paymentTableColumns, displayedSort]
+  )
+  const handleTableChange = (_pagination, _filters, sorter, { action }) => {
+    if (action === 'sort') changeRecordSort(readBusinessServerTableSort(sorter, PAYMENT_SORT_FIELDS))
+  }
   const { exportingTab, exportPaymentRows } = useFinancePaymentExports({
+    recordSort,
     paymentKeyword,
     paymentFilters,
     paymentStatusFilter,
@@ -651,7 +665,8 @@ function FinancePaymentRecords() {
       <BusinessDataTable
         rowKey="id"
         loading={tableLoading.payments}
-        columns={paymentTableColumns}
+        columns={sortedPaymentColumns}
+        onChange={handleTableChange}
         dataSource={payments}
         pagination={createBusinessTablePagination({
           pagination: paymentPagination,

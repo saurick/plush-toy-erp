@@ -85,7 +85,7 @@ test('newest-first master-data creates return to page one while edits and ordere
     'const toggleRecordActive'
   )
 
-  assert.match(mutation, /const isCreatingRecord = !editingRecord\?\.id/u)
+  assert.match(mutation, /const isCreatingRecord = receipt\?\.created \?\? !editingRecord\?\.id/u)
   assert.match(
     mutation,
     /const shouldShowCreatedRecordOnFirstPage =\s*isCreatingRecord && effectiveType !== 'processes'/u
@@ -305,20 +305,14 @@ test('purchase sort changes reset page one before applying the new server sort',
   )
 })
 
-test('server-paginated tables label function sorters as current-page sorting', () => {
+test('server-paginated tables label only their current-page sort columns', () => {
   const dataTable = sourceSlice(
     businessListLayoutSource,
     'export function BusinessDataTable({',
     'export const ToolbarButton ='
   )
-  assert.match(
-    dataTable,
-    /pagination &&\s*resolvedColumns\.some\(\(column\) => typeof column\?\.sorter === 'function'\)/u
-  )
-  assert.match(
-    dataTable,
-    /showSorterTooltip=\{\s*hasPageLocalSorter \? \{ title: '仅排序当前页' \} : undefined\s*\}/u
-  )
+  assert.match(dataTable, /paginated \? normalized\.map\(\(column\) =>\s*typeof column\.sorter === 'function'\s*\? \{ \.\.\.column, showSorterTooltip: \{ title: '仅排序当前页' \} \}/u)
+  assert.doesNotMatch(dataTable, /showSorterTooltip=/u)
 })
 
 test('exact linked-record routes use a one-record page instead of injecting into paginated rows', () => {

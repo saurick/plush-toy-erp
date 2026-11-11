@@ -13827,7 +13827,7 @@
     },
     "message": "OK",
     "params": {
-      "sort_by": "quantity",
+      "sort_by": "ready_to_ship_quantity",
       "sort_direction": "desc",
       "subject_id": 1,
       "subject_type": "PRODUCT",
@@ -16843,6 +16843,8 @@
     },
     "message": "OK",
     "params": {
+      "sort_by": "amount",
+      "sort_direction": "desc",
       "keyword": "抱抱猴子",
       "limit": 10,
       "offset": 0,
@@ -16890,6 +16892,8 @@
     },
     "message": "OK",
     "params": {
+      "sort_by": "amount",
+      "sort_direction": "desc",
       "include_status_counts": true,
       "include_totals": true,
       "limit": 1,
@@ -17093,6 +17097,8 @@
     },
     "message": "OK",
     "params": {
+      "sort_by": "total_net_weight_g",
+      "sort_direction": "desc",
       "limit": 20
     },
     "test": "TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions"
@@ -23270,6 +23276,8 @@
   "production_wip.list_warehouse_production_work": {
     "basis": "backend-wire-shape",
     "params": {
+      "sort_by": "quantity",
+      "sort_direction": "desc",
       "kind": "RECEIPT",
       "stage": "",
       "keyword": "",

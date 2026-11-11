@@ -1,5 +1,7 @@
 package biz
 
+import "slices"
+
 const (
 	BusinessListDefaultLimit = 50
 	BusinessListMaxLimit     = 500
@@ -12,4 +14,11 @@ func NormalizeBusinessListLimit(limit int) int {
 		return BusinessListDefaultLimit
 	}
 	return limit
+}
+
+func validBusinessListSort(field, direction string, fields ...string) bool {
+	if field == "" {
+		return direction == ""
+	}
+	return slices.Contains(fields, field) && (direction == "" || direction == "asc" || direction == "desc")
 }
