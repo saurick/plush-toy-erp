@@ -45,10 +45,12 @@ function decodeHash(value) {
   }
 }
 
+const isNarrowReader = () => window.matchMedia('(max-width: 680px)').matches
+
 export default function DevUIDesignDocument({ source, specification, view }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const [directoryOpen, setDirectoryOpen] = useState(true)
+  const [directoryOpen, setDirectoryOpen] = useState(() => !isNarrowReader())
   const contentRef = useRef(null)
   const directoryRef = useRef(null)
   const chapters = useMemo(() => readUIDesignChapters(source), [source])
@@ -126,14 +128,21 @@ export default function DevUIDesignDocument({ source, specification, view }) {
 
   useLayoutEffect(() => {
     const directory = directoryRef.current
-    const selected = directory?.querySelector('[aria-current="page"]')
-    if (!selected) return
-    const bounds = directory.getBoundingClientRect()
-    const item = selected.getBoundingClientRect()
-    if (item.top < bounds.top) directory.scrollTop -= bounds.top - item.top
-    else if (item.bottom > bounds.bottom) {
-      directory.scrollTop += item.bottom - bounds.bottom
+    if (!directory || !directoryOpen) return
+    const revealCurrent = () => {
+      const selected = directory.querySelector('[aria-current="page"]')
+      if (!selected) return
+      const bounds = directory.getBoundingClientRect()
+      const item = selected.getBoundingClientRect()
+      if (item.top < bounds.top) directory.scrollTop -= bounds.top - item.top
+      else if (item.bottom > bounds.bottom) {
+        directory.scrollTop += item.bottom - bounds.bottom
+      }
     }
+    revealCurrent()
+    const observer = new ResizeObserver(revealCurrent)
+    observer.observe(directory)
+    return () => observer.disconnect()
   }, [current, read, directoryOpen])
 
   return (
@@ -206,7 +215,13 @@ export default function DevUIDesignDocument({ source, specification, view }) {
                       aria-current={
                         (entry.key || entry.id) === current ? 'page' : undefined
                       }
-                      onClick={() => selectEntry(entry)}
+                      onClick={() => {
+                        selectEntry(entry)
+                        if (isNarrowReader()) {
+                          setDirectoryOpen(false)
+                          contentRef.current?.focus({ preventScroll: true })
+                        }
+                      }}
                     >
                       <span>{entry.title}</span>
                     </button>

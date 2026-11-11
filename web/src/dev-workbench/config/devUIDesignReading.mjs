@@ -35,7 +35,7 @@ export const UI_DESIGN_TOPICS = [
     title: '文字与对齐',
     group: '布局与视觉',
     description: '标题、复合信息、金额与辅助说明的阅读顺序',
-    chapters: ['高保真视觉合同', '排版与阅读路径'],
+    chapters: ['高保真视觉合同', '页面结构', '排版与阅读路径'],
   },
   {
     key: 'navigation',
@@ -83,7 +83,7 @@ export const UI_DESIGN_TOPICS = [
     key: 'states',
     title: '状态与异常恢复',
     group: '操作与反馈',
-    description: '读取、空结果、失败与重试保留什么',
+    description: '首次读取、刷新、空结果和读取失败时保留什么',
     chapters: ['状态与恢复', '视觉与可达性'],
   },
   {

@@ -231,7 +231,7 @@ export function createDevUIFeedbackScenarios({ assert, assertNoHorizontalOverflo
         await page.keyboard.press('ArrowRight')
         await page.getByText('讲解：调整正文留白（28px）', { exact: true }).waitFor()
         await page.getByRole('button', { name: '恢复当前桌面值' }).click()
-        await page.getByRole('link', { name: '查看使用说明', exact: true }).click()
+        await page.getByRole('tab', { name: '设计说明', exact: true }).click()
         await page.getByRole('heading', { name: '内容区如何表现', exact: true }).waitFor()
         await page.goBack()
         await page.getByRole('slider', { name: '讲解正文留白' }).waitFor()
@@ -243,26 +243,34 @@ export function createDevUIFeedbackScenarios({ assert, assertNoHorizontalOverflo
         await page.reload()
         await page.locator('.erp-design-prose').getByText('localAction', { exact: true }).waitFor()
         await page.goBack()
-        await page.getByRole('textbox', { name: '搜索设计图解或规范' }).fill('Toast')
-        await page.getByRole('textbox', { name: '搜索设计图解或规范' }).press('Enter')
+        const search = page.getByRole('textbox', { name: '搜索设计图解或规范' })
+        await search.fill('Toast')
+        await search.press('Enter')
+        await page.waitForURL((url) => url.searchParams.get('q') === 'Toast')
         await page.reload()
-        assert.equal(await page.getByRole('textbox', { name: '搜索设计图解或规范' }).inputValue(), 'Toast')
+        assert.equal(await search.inputValue(), 'Toast')
         await directory.getByRole('button', { name: 'Toast 与反馈选择' }).click()
         await page.getByRole('button', { name: /短暂且无后续动作/ }).click()
         await page.screenshot({ path: `${outputDir}/feedback-choice-4k.png` })
+        await search.locator('..').getByRole('button', { name: '清除搜索', exact: true }).click()
         for (const title of ['提交与恢复', '关闭与焦点']) {
           await directory.getByRole('button', { name: title, exact: true }).click()
           await page.locator('.erp-design-guide-section svg').first().waitFor()
         }
         await page.setViewportSize({ width: 1280, height: 720 })
         await assertNoHorizontalOverflow(page, 'feedback-reader-1280')
-        const selection = await directory.locator('[aria-current="page"]').evaluate((node) => ({ item: node.getBoundingClientRect().toJSON(), directory: node.closest('nav').getBoundingClientRect().toJSON() }))
-        assert.ok(selection.item.top >= selection.directory.top && selection.item.bottom <= selection.directory.bottom)
+        await page.waitForFunction(() => {
+          const selected = document.querySelector('.erp-design-document-toc [aria-current="page"]')
+          if (!selected) return false
+          const item = selected.getBoundingClientRect()
+          const bounds = selected.closest('nav').getBoundingClientRect()
+          return item.top >= bounds.top - 1 && item.bottom <= bounds.bottom + 1
+        })
         await page.getByRole('button', { name: '收起目录', exact: true }).click()
         assert.equal(await directory.isVisible(), false)
         await page.getByRole('button', { name: '展开目录', exact: true }).click()
         await directory.waitFor()
-        await page.getByRole('link', { name: '查看设计依据', exact: true }).click()
+        await page.getByRole('tab', { name: '设计依据', exact: true }).click()
         for (const [title, chapter] of [
           ['Toast 与反馈选择', '反馈持续时间的取舍'],
           ['提交与恢复', '保留上下文与确认结果'],

@@ -285,7 +285,7 @@ export function createDevUIDesignDetailScenarios({
       },
     },
     {
-      name: 'dev-ui-design-details',
+      name: 'dev-ui-design-reading-details',
       path: '/__dev/ui-design?topic=layout',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
@@ -389,16 +389,36 @@ export function createDevUIDesignDetailScenarios({
         await select('查找、下钻与返回')
         assert.equal(await search.inputValue(), '返回')
         await diagram.waitFor()
+        const calloutNotes = page.getByRole('complementary', { name: '图解要点' })
+        const returnMarker = page.getByRole('button', { name: '图解 3：回到原列表', exact: true })
+        const returnNote = calloutNotes.getByRole('button', { name: '3 回到原列表', exact: true })
+        const pressed = page.locator('[aria-pressed="true"]')
+        await returnNote.press('Enter')
+        await returnMarker.and(pressed).waitFor()
+        const recordMarker = page.getByRole('button', { name: '图解 2：选中具体记录', exact: true })
+        const recordNote = calloutNotes.getByRole('button', { name: '2 选中具体记录', exact: true })
+        await recordMarker.click()
+        await recordNote.and(pressed).waitFor()
+        assert.equal(await returnNote.getAttribute('aria-pressed'), 'false')
         const query = page.getByRole('textbox', { name: '示例查询条件' })
-        await query.fill('核对刚才的筛选条件')
+        await query.fill('没有这个订单')
         await query.press('Enter')
-        await page
-          .getByRole('button', { name: '查看样例详情', exact: true })
-          .click()
+        await page.getByText('没有匹配的样例订单', { exact: true }).waitFor()
+        await query.fill('B')
+        await query.press('Enter')
+        const detailTrigger = page.getByRole('button', { name: '查看样例订单 B详情', exact: true })
+        await detailTrigger.press('Enter')
+        const sampleDetailTitle = page.getByRole('heading', { name: '样例订单 B · 详情', exact: true })
+        await sampleDetailTitle.waitFor()
+        assert(await sampleDetailTitle.evaluate((node) => node === document.activeElement), '打开具体详情后聚焦对象')
         await page
           .getByRole('button', { name: '返回原列表', exact: true })
           .click()
-        assert.equal(await query.inputValue(), '核对刚才的筛选条件')
+        assert.equal(await query.inputValue(), 'B')
+        assert(await detailTrigger.evaluate((node) => node === document.activeElement), '返回恢复原记录入口焦点')
+        assert.equal(await detailTrigger.locator('..').getAttribute('data-selected'), 'true')
+        await page.reload()
+        assert.equal(await recordNote.getAttribute('aria-pressed'), 'true', '刷新恢复图解定位')
 
         await search.locator('xpath=..').getByRole('button', { name: '清除搜索', exact: true }).click()
         await select('整页、弹窗与抽屉')
@@ -406,10 +426,22 @@ export function createDevUIDesignDetailScenarios({
         const modalChoice = containerChoices.getByRole('button', { name: /弹窗 · 局部选择/ })
         await modalChoice.click()
         assert.equal(await modalChoice.getAttribute('aria-pressed'), 'true')
+        const sourceDemo = page.getByRole('region', { name: '试一次局部来源选择' })
+        const sourceTrigger = sourceDemo.getByRole('button', { name: '选择演示材料', exact: true })
+        await sourceTrigger.click()
+        const sourceDialog = page.getByRole('dialog').filter({ hasText: '从演示材料库添加' })
+        await sourceDialog.locator('tbody tr.ant-table-row').first().getByRole('checkbox').check()
+        await sourceDialog.getByRole('button', { name: '添加到演示结果', exact: true }).click()
+        await sourceDialog.waitFor({ state: 'hidden' })
+        const sourceResult = sourceDemo.getByLabel('来源选择示例结果', { exact: true })
+        assert.equal(await sourceResult.innerText(), '已添加 1 条：短毛绒')
         const drawerChoice = containerChoices.getByRole('button', { name: /抽屉 · 任务/ })
         await drawerChoice.click()
         assert.equal(await drawerChoice.getAttribute('aria-pressed'), 'true')
         await page.getByText('侧边展开上下文；复杂编辑仍返回正式入口。', { exact: true }).waitFor()
+        assert.equal(await sourceDemo.isVisible(), false)
+        await modalChoice.click()
+        assert.equal(await sourceResult.innerText(), '已添加 1 条：短毛绒', '切换容器不丢已确认样例')
         // Use a short viewport so this chapter exercises independent scrolling.
         await page.setViewportSize({ width: 1440, height: 700 })
         await waitForFiniteAnimations(page, { selector: '.erp-design-document-shell' })
@@ -447,19 +479,16 @@ export function createDevUIDesignDetailScenarios({
         await page.setViewportSize({ width: 1440, height: 900 })
         await select('状态与异常恢复')
         await diagram.waitFor()
-        const draft = page.getByRole('textbox', {
-          name: '待保存的说明',
-          exact: true,
-        })
-        await draft.fill('失败后这段输入应继续保留')
-        await page
-          .getByRole('button', { name: '模拟保存失败', exact: true })
-          .click()
-        await page
-          .getByRole('button', { name: '重试示例', exact: true })
-          .click()
-        await page.getByText('已保存样例', { exact: true }).waitFor()
-        assert.equal(await draft.inputValue(), '失败后这段输入应继续保留')
+        const phone = page.getByRole('region', { name: '手机页面状态样例' })
+        await page.getByRole('button', { name: '完成读取', exact: true }).click()
+        await phone.getByRole('button', { name: '选择核对样品资料', exact: true }).click()
+        await page.locator('.erp-design-state-tools .ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible').getByText('刷新失败', { exact: true }).click()
+        await phone.getByText('刷新失败，仍显示上次结果', { exact: true }).waitFor()
+        await phone.getByText('当前选择：核对样品资料', { exact: true }).waitFor()
+        await phone.getByRole('button', { name: '重试读取', exact: true }).click()
+        await phone.getByText('刷新失败，仍显示上次结果', { exact: true }).waitFor({ state: 'hidden' })
+        await phone.getByText('当前选择：核对样品资料', { exact: true }).waitFor()
 
         await select('数据与可视化')
         await diagram.waitFor()
@@ -611,10 +640,30 @@ export function createDevUIDesignDetailScenarios({
           ),
           '窄桌面内容不能产生整栏横向滚动'
         )
-        await page.setViewportSize({ width: 1440, height: 900 })
-        await page
-          .getByRole('link', { name: '打开可交互设计', exact: true })
-          .click()
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.goto(new URL('/__dev/ui-design?view=specification&topic=navigation&point=record', page.url()).href)
+        const openDirectory = page.getByRole('button', { name: '展开目录', exact: true })
+        await openDirectory.waitFor()
+        assert.equal(await directory.isVisible(), false)
+        assert.equal(await recordMarker.getAttribute('aria-pressed'), 'true')
+        const markerBox = await recordMarker.boundingBox()
+        assert(markerBox.width >= 44 && markerBox.height >= 44, '窄屏标注点击区至少 44px')
+        assert(await panel.evaluate((node) => node.clientWidth > 340 && node.scrollWidth <= node.clientWidth + 1), '目录收起后保留正文可读宽度')
+        await returnMarker.click()
+        await returnNote.and(pressed).waitFor()
+        await openDirectory.click()
+        await directory.getByRole('button', { name: '文字与对齐', exact: true }).click()
+        await openDirectory.waitFor()
+        assert.equal(await directory.isVisible(), false, '选择主题后收起窄屏目录')
+        assert(await panel.evaluate((node) => node === document.activeElement), '从窄屏目录转到正文')
+        await assertNoHorizontalOverflow(page, '390px 图解阅读器')
+      },
+    },
+    {
+      name: 'dev-ui-design-details',
+      path: '/__dev/ui-design',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
         await page
           .locator('iframe[title="ERP 最新可交互设计"]')
           .waitFor({ state: 'visible' })

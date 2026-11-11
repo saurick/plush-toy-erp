@@ -83,7 +83,12 @@
 .erp-wc-task-card .erp-wc-card-footer { padding-top: 8px; }
 .erp-wc-task-examples .erp-wc-marker { left: -32px; top: 0; }
 .erp-wc-progress-examples .erp-wc-marker { left: -32px; top: 0; }
-.erp-wc-task-examples .erp-wc-card-list { padding-inline-start: 34px; }
+.erp-wc-task-examples .erp-wc-card-list {
+  /* 常规样例给名称或数量及两行引用预留空间；长内容仍可增高。 */
+  --erp-work-item-association-height: max(var(--erp-work-item-image-size), calc(28px + var(--erp-font-caption) * 3));
+
+  padding-inline-start: 34px;
+}
 .erp-wc-progress-examples .erp-wc-card-list { padding-inline-start: 34px; }
 .erp-wc-task-table td:first-child { padding-inline-start: 34px; }
 .erp-wc-task-card .erp-wc-card-footer > .erp-wc-point { font-size: var(--erp-font-caption); }

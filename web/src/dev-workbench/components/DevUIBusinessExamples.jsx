@@ -13,6 +13,7 @@ import { BusinessLineItemRow } from '@/erp/components/business-list/BusinessLine
 import BusinessTextArea from '@/erp/components/business-list/BusinessTextArea.jsx'
 import { DateInput } from '@/erp/components/business-list/BusinessDateInputs.jsx'
 import SourceImportPickerModal from '@/erp/components/business-list/SourceImportPickerModal.jsx'
+import '../styles/dev-ui-controls.css'
 
 const LINE_COLUMNS = [
   { label: '材料名称', width: 200, flexible: true, required: true },

@@ -3,6 +3,7 @@ import { Button, Slider, Switch } from 'antd'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import BusinessCellStack from '@/erp/components/business-list/BusinessCellStack.jsx'
 import DevUIDesignMechanisms from './DevUIDesignMechanisms.jsx'
+import DevUIDesignCallouts from './DevUIDesignCallouts.jsx'
 import DevUIFeedbackGuide from './DevUIFeedbackGuide.jsx'
 import DevWorkCenterDesign from './DevWorkCenterDesign.jsx'
 import { WORK_CENTER_DESIGN_TOPICS } from '../config/devWorkCenterDesign.mjs'
@@ -178,7 +179,7 @@ function LayoutGuide() {
           <dl>
             <div>
               <dt>外部留白</dt>
-              <dd>12 px · 隔开页面与容器</dd>
+              <dd>8 px · 隔开页面与容器</dd>
             </div>
             <div>
               <dt>内部留白</dt>
@@ -186,7 +187,7 @@ function LayoutGuide() {
             </div>
             <div>
               <dt>区块间隔</dt>
-              <dd>9 px · 操作区与数据区</dd>
+              <dd>6 px · 操作区与数据区</dd>
             </div>
             <div>
               <dt>容器边界</dt>
@@ -199,6 +200,12 @@ function LayoutGuide() {
   )
 }
 
+const TYPE_POINTS = [
+  { key: 'hierarchy', title: '文字先分主次', description: '页面标题定位当前工作，分区标题组织相邻字段。正文保持可读，辅助说明靠近被解释的内容，按字重和位置区分。' },
+  { key: 'alignment', title: '同类信息沿一条线比较', description: '名称和状态文字靠左；同单位的数量、金额按位靠右。留足列宽，保持单位及币种与数值同行。' },
+  { key: 'related', title: '同一对象的相关信息成组', description: '上行先认出对象，下行补足电话、地址或编号。缺项不留空行，长名称自然换行；精确规则可查复合单元格说明。' },
+]
+
 function TypographyGuide() {
   return (
     <GuideSection
@@ -206,73 +213,58 @@ function TypographyGuide() {
       title="文字与对齐：让眼睛有一条稳定的路径"
       description="用字号、字重和位置区分主次；先读对象，再比较状态与数值。"
     >
-      <div className="erp-design-explainer-grid">
-        <figure className="erp-design-type-figure">
-          <div className="erp-design-type-line">
-            <strong>订单列表</strong>
-            <span>页面标题 · 识别当前工作</span>
-          </div>
-          <div className="erp-design-type-line">
-            <b>交付明细</b>
-            <span>分区标题 · 组织相邻字段</span>
-          </div>
-          <div className="erp-design-type-line">
-            <span>样例订单 A</span>
-            <span>表格正文 · 沿用正文字号</span>
-          </div>
-          <div className="erp-design-type-line">
-            <small>按当前筛选条件统计</small>
-            <span>辅助说明 · 就近解释口径</span>
-          </div>
-          <SampleTable />
-          <h3 className="erp-design-cell-samples-title">联系人：同一格内区分主次</h3>
-          <table className="erp-design-cell-samples" data-table-lines="fixed" aria-label="虚构联系人上下布局样例">
-            <thead>
-              <tr>
-                <th scope="col">场景</th>
-                <th scope="col">联系人</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">信息齐全</th>
-                <td><BusinessCellStack primary="张小林" secondary="13800000000" /></td>
-              </tr>
-              <tr>
-                <th scope="row">缺少电话</th>
-                <td><BusinessCellStack primary="王小雨" /></td>
-              </tr>
-              <tr>
-                <th scope="row">长内容</th>
-                <td><BusinessCellStack primary="欧阳晴川（华南仓储服务中心夜班收货联系人）" secondary="13800000000" /></td>
-              </tr>
-            </tbody>
-          </table>
-          <figcaption>
-            联系人为虚构示例。缺项不留空行，长内容自然换行；文字靠左，数量靠右，状态保留文字。
-          </figcaption>
-        </figure>
-        <aside className="erp-design-explanation">
-          <span className="erp-design-eyebrow">平面编排的三个抓手</span>
-          <h3>对齐、接近、对比</h3>
-          <p>
-            共同左边缘让标题、筛选和数据自然衔接；组内距离小、组间距离大，让关联不必靠更多边框解释。
-          </p>
-          <p>
-            标题靠字重与适度字号建立层级，主动作才使用强调色。正文保持可读，较低优先级通过位置与色阶处理。
-          </p>
-          <h3>相关信息成组，上行先识别</h3>
-          <p>
-            姓名与电话、收货人与地址、承运信息与运单号、产品与规格、仓库与批次可上下排列，减少横向占宽和拼接后的随意换行。
-          </p>
-          <p className="erp-design-guide-note">
-            两行沿用正文大小，下行用次要文字色。金额、数量、单独日期和短状态保留各自的比较方式；单位、比例和原值中有含义的斜杠仍保留。
-          </p>
-          <p className="erp-design-guide-note">
-            长文档控制行宽，宽数据表保留比较所需的空间。
-          </p>
-        </aside>
-      </div>
+      <DevUIDesignCallouts points={TYPE_POINTS}>
+        {(point) => (
+          <figure className="erp-design-type-figure">
+            {point('hierarchy', (
+              <>
+                <div className="erp-design-type-line">
+                  <strong>订单列表</strong>
+                  <span>页面标题 · 识别当前工作</span>
+                </div>
+                <div className="erp-design-type-line">
+                  <b>交付明细</b>
+                  <span>分区标题 · 组织相邻字段</span>
+                </div>
+                <div className="erp-design-type-line">
+                  <span>样例订单 A</span>
+                  <span>表格正文 · 沿用正文字号</span>
+                </div>
+                <div className="erp-design-type-line">
+                  <small>按当前筛选条件统计</small>
+                  <span>辅助说明 · 就近解释口径</span>
+                </div>
+              </>
+            ))}
+            {point('alignment', <div className="erp-design-sample-table-scroll"><SampleTable /></div>)}
+            {point('related', (
+              <>
+                <h3 className="erp-design-cell-samples-title">联系人：同一格内区分主次</h3>
+                <table className="erp-design-cell-samples" data-table-lines="fixed" aria-label="虚构联系人上下布局样例">
+                  <thead>
+                    <tr><th scope="col">场景</th><th scope="col">联系人</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th scope="row">信息齐全</th>
+                      <td><BusinessCellStack primary="张小林" secondary="13800000000" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">缺少电话</th>
+                      <td><BusinessCellStack primary="王小雨" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row">长内容</th>
+                      <td><BusinessCellStack primary="欧阳晴川（华南仓储服务中心夜班收货联系人）" secondary="13800000000" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </>
+            ))}
+            <figcaption>联系人与订单均为虚构示例。</figcaption>
+          </figure>
+        )}
+      </DevUIDesignCallouts>
     </GuideSection>
   )
 }
@@ -365,6 +357,12 @@ function SpacingGuide() {
   )
 }
 
+const SURFACE_POINTS = [
+  { key: 'page', title: '页面底色', description: '中性底色托住各区块，区块之间靠留白分隔。普通页面用平面，阴影主要用于覆盖内容的浮层。' },
+  { key: 'surface', title: '内容面', description: '细边界和独立底色把一组相关操作与数据放在一起。切换去掉分层，比较分组是否还容易辨认。' },
+  { key: 'selected', title: '选中视图', description: '强调色和字重指明正在看的视图；主题改变后选中、焦点和禁用仍能区分。状态始终保留文字。' },
+]
+
 function SurfaceGuide() {
   const [layered, setLayered] = useState(true)
   return (
@@ -384,56 +382,30 @@ function SurfaceGuide() {
           ]}
         />
       </div>
-      <div className="erp-design-explainer-grid">
-        <figure
-          className={`erp-design-surface-figure${layered ? '' : ' is-flat'}`}
-        >
-          <div className="erp-design-surface-page">
-            <span>① 页面底色 · 区块之间的留白</span>
-            <div className="erp-design-surface-content">
-              <span>② 内容面 · 把一组操作放在一起</span>
-              <div className="erp-design-surface-track">
-                <span className="erp-design-surface-selected">③ 选中视图</span>
-                <span>其他视图</span>
+      <DevUIDesignCallouts points={SURFACE_POINTS}>
+        {(point) => (
+          <figure className={`erp-design-surface-figure${layered ? '' : ' is-flat'}`}>
+            <div className="erp-design-surface-page">
+              {point('page', <span className="erp-design-surface-label">页面底色 · 区块之间的留白</span>)}
+              <div className="erp-design-surface-content">
+                {point('surface', <span className="erp-design-surface-label">内容面 · 把一组操作放在一起</span>)}
+                {point('selected', (
+                  <div className="erp-design-surface-track">
+                    <span className="erp-design-surface-selected">选中视图</span>
+                    <span>其他视图</span>
+                  </div>
+                ))}
+                <div className="erp-design-sample-table-scroll"><SampleTable /></div>
               </div>
-              <SampleTable />
             </div>
-          </div>
-          <figcaption>
-            {layered
-              ? '底色 → 内容面 → 底轨 → 选中块。阴影主要留给真正覆盖内容的浮层。'
-              : '颜色与边界全部相同时，分组和当前选中项更难辨认。示例保留文字以便对照。'}
-          </figcaption>
-        </figure>
-        <aside className="erp-design-explanation">
-          <span className="erp-design-eyebrow">克制不等于没有反馈</span>
-          <h3>中性底色托住内容，强调色指向动作</h3>
-          <p>
-            主题色用于主动作、选中和焦点；成功、待处理、错误各自保留语义和文字。装饰色不承担业务判断。
-          </p>
-          <div className="erp-design-swatches">
-            <span>
-              <i className="erp-design-swatch-page" />
-              页面
-            </span>
-            <span>
-              <i className="erp-design-swatch-content" />
-              内容
-            </span>
-            <span>
-              <i className="erp-design-swatch-accent" />
-              强调
-            </span>
-          </div>
-          <p>
-            10 px 容器圆角与 8 px 控件圆角区分包裹层级；1 px
-            细线明确边界，避免用大面积阴影给普通区块制造虚假高低关系。
-          </p>
-          <p className="erp-design-guide-note">
-            暗色保持同样分工，以不同黑阶区分内容和浮层；键盘焦点、错误和禁用态需要单独可辨。
-          </p>
-        </aside>
-      </div>
+            <figcaption>
+              {layered
+                ? '比较页面底色、内容面和当前选中项。'
+                : '去掉色差与边界后，比较还能不能迅速认出分组和选中项。'}
+            </figcaption>
+          </figure>
+        )}
+      </DevUIDesignCallouts>
     </GuideSection>
   )
 }

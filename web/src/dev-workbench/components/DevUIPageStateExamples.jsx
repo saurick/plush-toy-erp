@@ -13,6 +13,7 @@ import WorkflowTaskCard from '../../erp/components/workflow/WorkflowTaskCard.jsx
 import WorkflowTaskIdentity from '../../erp/components/workflow/WorkflowTaskIdentity.jsx'
 import { UI_DESIGN_MOBILE_STATES } from '../config/devUIDesign.mjs'
 import '../../erp/mobile/mobileRoleTasks.css'
+import '../styles/dev-ui-controls.css'
 import '../styles/dev-ui-page-states.css'
 
 const TASKS = [
@@ -225,71 +226,96 @@ function DesktopExample({ state, setState }) {
   )
 }
 
-export default function DevUIPageStateExamples() {
+export default function DevUIPageStateExamples({ annotate } = {}) {
   const [device, setDevice] = useState('mobile')
   const [state, setState] = useState('loading')
   const [width, setWidth] = useState(390)
   const [attentionOnly, setAttentionOnly] = useState(false)
   const states = device === 'mobile' ? UI_DESIGN_MOBILE_STATES : DESKTOP_STATES
+  const options = [
+    { value: 'mobile', label: '手机任务' },
+    { value: 'desktop', label: '电脑切页' },
+    ...(!annotate ? [{ value: 'specifications', label: '空提示规格' }] : []),
+  ]
+  const showExample = device !== 'specifications'
+  const controls = (
+    <>
+      <SlidingSegmented
+        aria-label="页面状态设备"
+        value={device}
+        onChange={(value) => {
+          setDevice(value)
+          setState(value === 'mobile' ? 'loading' : 'route-loading')
+        }}
+        options={options}
+      />
+      {showExample ? (
+        <AppSelect
+          label="页面状态"
+          placeholder="页面状态"
+          aria-label="页面状态"
+          value={state}
+          onChange={(value) => {
+            setState(value)
+            if (value === 'filtered') setAttentionOnly(true)
+          }}
+          options={states.map(({ key, label }) => ({ value: key, label }))}
+        />
+      ) : null}
+      {device === 'mobile' ? (
+        <SlidingSegmented
+          aria-label="手机样例宽度"
+          value={width}
+          onChange={setWidth}
+          options={[
+            { value: 390, label: '390px' },
+            { value: 320, label: '320px' },
+          ]}
+        />
+      ) : null}
+    </>
+  )
+  const finish = showExample && ['loading', 'switching', 'refreshing', 'route-loading'].includes(state) ? (
+    <Button onClick={() => setState('data')}>完成读取</Button>
+  ) : null
+  const hint = showExample && state ? (
+    <p className="erp-page-state-hint">{STATE_HELP[state]}</p>
+  ) : null
+  const sample = !showExample ? null : !state ? (
+    <Empty description="请选择页面状态" />
+  ) : device === 'mobile' ? (
+    <MobileExample
+      state={state}
+      setState={setState}
+      width={width}
+      attentionOnly={attentionOnly}
+      setAttentionOnly={setAttentionOnly}
+    />
+  ) : (
+    <DesktopExample state={state} setState={setState} />
+  )
+
+  if (annotate) {
+    return (
+      <>
+        {annotate('state', <div className="erp-design-state-tools">{controls}</div>)}
+        {annotate('result', <div className="erp-page-state-guide-sample">{sample}</div>)}
+        {annotate('recovery', <div className="erp-design-state-tools">{hint}{finish}</div>)}
+      </>
+    )
+  }
+
   return (
     <>
       <div className="erp-control-example-stack erp-page-state-examples">
         <div className="erp-control-example-row">
-          <SlidingSegmented
-            aria-label="页面状态设备"
-            value={device}
-            onChange={(value) => {
-            setDevice(value)
-            setState(value === 'mobile' ? 'loading' : 'route-loading')
-          }}
-            options={[
-            { value: 'mobile', label: '手机任务' },
-            { value: 'desktop', label: '电脑切页' },
-            { value: 'specifications', label: '空提示规格' },
-          ]}
-          />
-          {device !== 'specifications' ? <AppSelect
-            label="页面状态"
-            placeholder="页面状态"
-            aria-label="页面状态"
-            value={state}
-            onChange={(value) => {
-            setState(value)
-            if (value === 'filtered') setAttentionOnly(true)
-          }}
-            options={states.map(({ key, label }) => ({ value: key, label }))}
-          /> : null}
-          {device === 'mobile' && (
-          <SlidingSegmented
-            aria-label="手机样例宽度"
-            value={width}
-            onChange={setWidth}
-            options={[
-              { value: 390, label: '390px' },
-              { value: 320, label: '320px' },
-            ]}
-          />
-        )}
-          {device !== 'specifications' && ['loading', 'switching', 'refreshing', 'route-loading'].includes(
-          state
-        ) && <Button onClick={() => setState('data')}>完成读取</Button>}
+          {controls}
+          {finish}
         </div>
-        {device !== 'specifications' && state && <p className="erp-page-state-hint">{STATE_HELP[state]}</p>}
-        {device === 'specifications' ? null : !state ? (
-          <Empty description="请选择页面状态" />
-      ) : device === 'mobile' ? (
-        <MobileExample
-          state={state}
-          setState={setState}
-          width={width}
-          attentionOnly={attentionOnly}
-          setAttentionOnly={setAttentionOnly}
-        />
-      ) : (
-        <DesktopExample state={state} setState={setState} />
-      )}
+        {hint}
+        {sample}
       </div>
-      <div hidden={device !== 'specifications'}><DevUIEmptyExamples /></div>
+      <div hidden={showExample}><DevUIEmptyExamples /></div>
     </>
   )
 }

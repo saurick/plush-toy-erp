@@ -40,10 +40,10 @@ function TaskCards({ point, mobile }) {
         <article className="erp-wc-task-card erp-task-card erp-task-card--compact" key={task.id} data-design-task-case={task.id}>
           {point('identity', <div className="erp-wc-card-head erp-task-identity__card-heading"><strong className="erp-wc-task-title">{item.title}</strong><span className="erp-wc-task-badges">{status}</span></div>, index === 0)}
           {association}
-          {point('responsibility', <span className="erp-wc-secondary erp-wc-source">{source}</span>, index === 0)}
-          {reason}
+          {point('responsibility', <span className="erp-wc-secondary erp-wc-source">{source}</span>)}
+          {reason ? point('attention', reason) : null}
           <div className="erp-wc-card-footer erp-task-card__footer">
-            {responsibility}
+            {point('responsibility', responsibility, index === 0)}
             {point('attention', deadline, index === 0)}
           </div>
         </article>
@@ -52,9 +52,9 @@ function TaskCards({ point, mobile }) {
     return (
       <tr key={task.id} className="erp-task-table-row" data-design-task-case={task.id}>
         <td>{association}</td>
-        <td>{point('responsibility', <span>{source}</span>, index === 0)}{deadline}</td>
+        <td>{point('responsibility', <span>{source}</span>)}{point('attention', deadline)}</td>
         <td>{point('attention', <>{status}{reason}</>, index === 0)}</td>
-        <td>{responsibility}</td>
+        <td>{point('responsibility', responsibility, index === 0)}</td>
       </tr>
     )
   })
@@ -112,13 +112,13 @@ export default function DevWorkCenterDesign({ topic: entry }) {
   const select = (key, from = 'sample') => {
     origin.current = from
     if (key === selected.key) {
-      root.current?.querySelector(from === 'sample' ? '.erp-wc-explanation' : `[data-design-point="${key}"]`)?.scrollIntoView({ block: 'nearest' })
+      root.current?.querySelector(from === 'sample' ? '.erp-wc-explanation' : `[data-design-point="${key}"]:has(> .erp-wc-marker)`)?.scrollIntoView({ block: 'nearest' })
     }
     update({ point: key === topic.points[0].key ? '' : key })
   }
   useEffect(() => {
     if (!origin.current) return
-    root.current?.querySelector(origin.current === 'sample' ? '.erp-wc-explanation' : `[data-design-point="${selected.key}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    root.current?.querySelector(origin.current === 'sample' ? '.erp-wc-explanation' : `[data-design-point="${selected.key}"]:has(> .erp-wc-marker)`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     origin.current = null
   }, [selected.key])
   const point = (id, children, marked = false) => <Point key={id} id={id} marked={marked} topic={topic} selected={selected.key} select={select}>{children}</Point>

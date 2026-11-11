@@ -1,8 +1,10 @@
-import React, { useState } from 'react'
+import React, { Suspense, useState } from 'react'
 import { Alert, Button, Form, Input, Slider } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { MermaidDiagram } from '@/common/components/markdown'
+import { Loading } from '@/common/components/loading'
+import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import { ERP_MODAL_WIDTHS } from '@/erp/utils/modalSizes.mjs'
 import {
   MESSAGE_CONFIG,
@@ -10,6 +12,10 @@ import {
 } from '@/common/utils/feedbackConfig.mjs'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
 import '../styles/dev-ui-feedback.css'
+
+const DevUIBusinessExamples = lazyWithDynamicImportRetry(
+  () => import('./DevUIBusinessExamples.jsx')
+)
 
 const SIZE_LABELS = {
   confirm: '单步确认',
@@ -166,7 +172,10 @@ function Anatomy({ rationale, size, onSize }) {
 }
 
 function ContainerChoice({ rationale }) {
-  const [selected, setSelected] = useState('modal')
+  const [{ selected, visited }, setChoice] = useState({
+    selected: 'modal',
+    visited: ['modal'],
+  })
   const options = [
     {
       key: 'page',
@@ -200,7 +209,10 @@ function ContainerChoice({ rationale }) {
             type="button"
             className="erp-feedback-container-choice"
             aria-pressed={selected === item.key}
-            onClick={() => setSelected(item.key)}
+            onClick={() => setChoice({
+              selected: item.key,
+              visited: visited.includes(item.key) ? visited : [...visited, item.key],
+            })}
           >
             <strong>
               {item.title} · {item.task}
@@ -239,6 +251,27 @@ function ContainerChoice({ rationale }) {
           </tbody>
         </table>
       ) : null}
+      {[
+        { key: 'page', label: '试一次整页录入', type: 'business-form' },
+        { key: 'modal', label: '试一次局部来源选择', type: 'source-picker' },
+        { key: 'drawer', label: '试一次抽屉内查看与返回' },
+      ].map(({ key, label, type }) => visited.includes(key) ? (
+        <section
+          className="erp-feedback-container-example"
+          key={key}
+          aria-label={label}
+          hidden={key !== selected}
+        >
+          <h3>{label}</h3>
+          {type ? (
+            <Suspense fallback={<Loading title="正在加载操作样例" />}>
+              <DevUIBusinessExamples type={type} />
+            </Suspense>
+          ) : (
+            <DevUIFeedbackExamples topic="closing" />
+          )}
+        </section>
+      ) : null)}
     </>
   )
 }
@@ -408,15 +441,14 @@ function StateGuide({ topic, chapters, rationale }) {
             ]
           : [
               [
-                '首次读取 / 刷新',
-                '首次给占位，刷新保留原结果与条件；只锁相关区域。',
+                '结果已确认',
+                '读回本次结果后再提示成功，更新受影响的记录。',
               ],
               ['明确失败', '输入保留，校验定位字段；可重试失败的操作。'],
               ['结果未知', '先按已有能力查询结果；不能把网络失败当成未执行。'],
             ]
-        ).map(([title, text], index) => (
+        ).map(([title, text]) => (
           <div key={title}>
-            <b>{index + 1}</b>
             <strong>{title}</strong>
             <p>{text}</p>
           </div>
@@ -456,7 +488,7 @@ export default function DevUIFeedbackGuide({ topic, chapters, view }) {
       ) : (
         <StateGuide topic={topic} chapters={chapters} rationale={rationale} />
       )}
-      <DevUIFeedbackExamples topic={topic.key} size={size} />
+      {topic.key !== 'forms' ? <DevUIFeedbackExamples topic={topic.key} size={size} /> : null}
     </section>
   )
 }

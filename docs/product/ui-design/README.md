@@ -29,7 +29,9 @@
 4. 按需要收起目录。
 5. 复制链接、刷新或前进后退时，恢复阅读方式、主题、章节及搜索词。
 
-打开图解或章节时保留当前关键词和结果。清除搜索可恢复完整目录。目录与正文独立滚动。
+打开图解或章节时保留当前关键词和结果。清除搜索可恢复完整目录。目录与正文独立滚动。窄屏按需展开目录，选中后收起并返回正文。
+
+可从[查找、下钻与返回](/__dev/ui-design?view=specification&topic=navigation)试一次查询与返回；从[整页、弹窗与抽屉](/__dev/ui-design?view=specification&topic=forms)切换并操作对应样例；从[状态与异常恢复](/__dev/ui-design?view=specification&topic=states)对照首次读取、同条件刷新与失败重试。编号、流程和对照的选用见[图解阅读](交互设计说明.md#图解阅读--illustrated-reading)。
 
 | 图解内容 | 维护方式 |
 | --- | --- |
