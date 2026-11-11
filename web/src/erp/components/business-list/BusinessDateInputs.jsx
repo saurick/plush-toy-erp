@@ -1,7 +1,7 @@
 import React from 'react'
 import { CalendarOutlined } from '@ant-design/icons'
 import { Button, DatePicker, Form } from 'antd'
-import FilterChipGroup from '@/common/components/navigation/FilterChipGroup'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import Select from '@/common/components/select/AppSelect'
 import {
   DATE_INPUT_DISPLAY_FORMAT,

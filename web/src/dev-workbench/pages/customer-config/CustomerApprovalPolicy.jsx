@@ -1,7 +1,7 @@
 import { Tag, Typography } from 'antd'
 import { Link } from 'react-router-dom'
 import { Markdown } from '@/common/components/markdown'
-import { PERMISSION_CENTER_TAB_KEYS } from '@/erp/components/permission-center/permissionCenterModel.mjs'
+import { PERMISSION_CENTER_TAB_KEYS } from '@/common/consts/permissionCenterTabs.mjs'
 import policySource from '../../../../../docs/product/配置与权限策略.md?raw'
 import { WorkbenchNotice, WorkbenchSection } from '../../components/WorkbenchPattern.jsx'
 

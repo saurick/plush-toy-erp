@@ -310,6 +310,8 @@ const toolbarSamplePresentationImports = new Set([
 ]);
 const commonSamplePresentationDependencies = [
   "web/src/common/components/overlay/OverlayScopeContext.mjs",
+  "web/src/common/components/navigation/FilterChip.jsx",
+  "web/src/common/components/navigation/FilterChipGroup.jsx",
   "web/src/common/components/navigation/SlidingSegmented.jsx",
   "web/src/common/components/navigation/SlidingTabList.jsx",
   "web/src/common/components/navigation/useSlidingIndicator.js",
@@ -975,6 +977,13 @@ test("date input samples keep shared pickers free of business dependencies", () 
     ["web/src/erp/components/business-list/BusinessDateInputs.jsx", new Set([
       "react", "antd", "@ant-design/icons", "../../utils/dateRange.mjs",
       "@/common/components/select/AppSelect",
+      "@/common/components/navigation/FilterChipGroup.jsx",
+    ])],
+    ["web/src/common/components/navigation/FilterChipGroup.jsx", new Set([
+      "react", "./FilterChip.jsx",
+    ])],
+    ["web/src/common/components/navigation/FilterChip.jsx", new Set([
+      "react", "@ant-design/icons",
     ])],
     ["web/src/erp/utils/dateRange.mjs", new Set([
       "dayjs", "dayjs/plugin/customParseFormat.js",

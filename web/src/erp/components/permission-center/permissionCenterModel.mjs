@@ -41,13 +41,6 @@ const DISABLE_USER_PERMISSION = PermissionCode.SYSTEM_USER_DISABLE
 
 const REVOKE_USER_PERMISSION = PermissionCode.SYSTEM_USER_REVOKE
 
-const PERMISSION_CENTER_TAB_KEYS = {
-  ROLES: 'roles',
-  ADMINS: 'admins',
-  APPROVALS: 'approvals',
-  NAVIGATION: 'navigation',
-}
-
 const ROLE_NAVIGATION_VIEW_KEYS = {
   MENU: 'menu',
   ACCESS: 'access',
@@ -221,7 +214,6 @@ export {
   CREATE_USER_PERMISSION,
   DISABLE_USER_PERMISSION,
   REVOKE_USER_PERMISSION,
-  PERMISSION_CENTER_TAB_KEYS,
   ROLE_NAVIGATION_VIEW_KEYS,
   adminStatusOptions,
   buildPermissionSignature,

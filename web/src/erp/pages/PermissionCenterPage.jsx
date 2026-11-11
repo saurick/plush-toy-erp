@@ -2,6 +2,7 @@ import { Alert } from 'antd'
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
+import { PERMISSION_CENTER_TAB_KEYS } from '@/common/consts/permissionCenterTabs.mjs'
 import { PageHeaderCard } from '../components/business-list/BusinessListLayout.jsx'
 import { usePermissionRoleSettings } from '../components/permission-center/usePermissionRoleSettings.jsx'
 import PermissionAdminAccounts from '../components/permission-center/PermissionAdminAccounts.jsx'
@@ -17,7 +18,6 @@ import {
   CREATE_USER_PERMISSION,
   DISABLE_USER_PERMISSION,
   REVOKE_USER_PERMISSION,
-  PERMISSION_CENTER_TAB_KEYS,
   hasPermission,
 } from '../components/permission-center/permissionCenterModel.mjs'
 
