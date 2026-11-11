@@ -2466,6 +2466,8 @@
 
     .toast-stack { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 100; display: grid; justify-items: center; gap: 8px; width: min(480px, calc(100vw - 32px)); pointer-events: none; }
     .toast { max-width: 100%; padding: 11px 13px; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-raised); box-shadow: 0 16px 34px rgba(10, 25, 16, .16); animation: toast-in .2s var(--ease); }
+    .toast--dismissible { display: flex; align-items: center; gap: 8px; padding-block: 4px; padding-inline-end: 6px; animation: copy-toast-in .18s cubic-bezier(.2,.8,.2,1); }
+    .toast-close { flex: none; pointer-events: auto; }
     .empty > div { text-align: center; }
     .kbd { padding: 1px 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--surface-muted); font-size: 11px; }
     .scrim { display: none; }
@@ -2474,6 +2476,8 @@
     @keyframes rise { from { opacity: 0; transform: translateY(8px) scale(.985); } }
     @keyframes slide { from { transform: translateX(28px); opacity: .4; } }
     @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } }
+    @keyframes copy-toast-in { from { opacity: 0; transform: translateY(10px); } }
+    @media (prefers-reduced-motion: reduce) { .toast--dismissible { animation: none; } }
     @keyframes skeleton { to { background-position: -220% 0; } }
 
     [data-density="compact"] { --row-h: 42px; --table-cell-padding: 4px; }
@@ -5338,8 +5342,10 @@
           try { field.select(); if (!document.execCommand('copy')) throw new Error('copy unavailable'); }
           finally { field.remove(); }
         }
-        toast(`已复制：${value}`);
-      } catch { toast('复制失败，请选中文字复制'); }
+        const failure = document.querySelector('#toasts [data-key="clipboard-copy-failure"]');
+        if (failure) { clearTimeout(failure.dismissTimer); failure.remove(); }
+        toast(`已复制：${value}`, { duration: 5000, dismissible: true });
+      } catch { toast('复制失败，请选中文字复制', { key: 'clipboard-copy-failure', type: 'error' }); }
     }
 
     function bomRevisionActionLabel(row) {
@@ -19649,13 +19655,23 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `${choices}<section class="detail-section"><h3>本次办理</h3><dl class="detail-grid"><dt>任务</dt><dd>${escapeHTML(task.title)}</dd><dt>处理方式</dt><dd>${taskActionLabel(task,state.taskAction)}</dd></dl>${state.taskAction==='assign'?`<div class="field task-result-field ${state.taskError==='target'?'error':''}"><label for="task-target">同岗位接收人 *</label><ui-select id="task-target"><option value="">请选择接收人</option><option value="pool" ${state.taskTarget==='pool'?'selected':''}>交回${task.role}，由岗位人员处理</option>${(task.candidates||[]).map(([id,name])=>`<option value="${id}" ${state.taskTarget===id?'selected':''}>${name}</option>`).join('')}</ui-select>${state.taskError==='target'?'<span class="error-text">请选择同岗位接收人，或由岗位人员处理</span>':''}</div>`:''}<div class="field task-result-field ${state.taskError==='note'?'error':''}"><label for="task-note">${fieldLabel}${required?' *':'（选填）'}</label><textarea id="task-note" placeholder="填写处理说明">${escapeHTML(state.taskNote)}</textarea>${state.taskError==='note'?`<span class="error-text">请填写${fieldLabel}</span>`:''}</div><p class="source-summary-note">${state.taskAction==='urge'?'本次只记录催办，不改变任务状态，也不表示已送达站外通知。':'本次只更新协同任务；库存、出货和财务事实仍需在所属单据确认。'}</p></section>`;
     }
 
-    function toast(message, { key = '', duration = 3000, type = 'info' } = {}) {
+    function toast(message, { key = '', duration = 3000, type = 'info', dismissible = false } = {}) {
       const stack = document.querySelector('#toasts');
       const existing = key && [...stack.children].find(node => node.dataset.key === key);
       const el = existing || document.createElement('div');
       clearTimeout(el.dismissTimer);
-      el.className = 'toast'; el.dataset.key = key; el.textContent = message;
+      el.className = dismissible ? 'toast toast--dismissible' : 'toast'; el.dataset.key = key; el.textContent = message;
       el.setAttribute('role', type === 'error' || type === 'warning' ? 'alert' : 'status');
+      if (dismissible) {
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'btn ghost icon-btn toast-close';
+        close.setAttribute('aria-label', `关闭「${message}」提示`);
+        close.innerHTML = icon('close');
+        close.addEventListener('mousedown', (event) => event.preventDefault());
+        close.addEventListener('click', () => { clearTimeout(el.dismissTimer); el.remove(); });
+        el.appendChild(close);
+      }
       stack.appendChild(el);
       while (stack.children.length > 3) { clearTimeout(stack.firstElementChild.dismissTimer); stack.firstElementChild.remove(); }
       if (duration > 0) el.dismissTimer = setTimeout(() => el.remove(), duration);

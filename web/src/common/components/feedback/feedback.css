@@ -13,3 +13,69 @@
   flex: none;
   margin-top: 3px;
 }
+
+.erp-feedback-message--copy-success .ant-message-notice-content {
+  padding-block: 4px;
+  padding-inline-end: 6px;
+}
+
+.erp-feedback-message--copy-success .ant-message-custom-content {
+  align-items: center;
+}
+
+.erp-feedback-message--copy-success .ant-message-custom-content > .anticon {
+  margin-top: 0;
+}
+
+.ant-message-notice-wrapper:is(.ant-message-move-up-appear, .ant-message-move-up-enter):has(> .erp-feedback-message--copy-success) {
+  --erp-copy-toast-rise: 10px;
+  animation-name: erp-copy-toast-enter;
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Hide the whole notice as its slot collapses, including SVG descendants. */
+.ant-message-notice-wrapper.ant-message-move-up-leave:has(> .erp-feedback-message--copy-success) {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  visibility: hidden;
+  opacity: 0;
+  animation-name: erp-copy-toast-collapse;
+  animation-duration: 150ms;
+  animation-timing-function: ease-out;
+}
+
+.ant-message-move-up-leave > .erp-feedback-message--copy-success .ant-message-notice-content {
+  pointer-events: none;
+}
+
+@keyframes erp-copy-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--erp-copy-toast-rise));
+  }
+}
+
+@keyframes erp-copy-toast-collapse {
+  to {
+    grid-template-rows: minmax(0, 0fr);
+    padding-block: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ant-message-notice-wrapper:is(.ant-message-move-up-appear, .ant-message-move-up-enter, .ant-message-move-up-leave):has(> .erp-feedback-message--copy-success) {
+    --erp-copy-toast-rise: 0px;
+    animation-duration: 1ms;
+  }
+}
+
+.erp-feedback-copy-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-feedback-copy-content > .ant-btn {
+  flex: none;
+}

@@ -46,7 +46,7 @@ import ERPPageActions from '../ERPPageActions.jsx'
 import { BusinessSplitPageTitle } from '../BusinessSplitHeader.jsx'
 import useBusinessListStickyHeader from './useBusinessListStickyHeader.js'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
-import { message } from '@/common/utils/antdApp'
+import { showCopyFailure, showCopySuccess } from '@/common/components/feedback/copyFeedback.jsx'
 import { BusinessHelpLabel, BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
 import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
 import { formatPaginationTotal } from '@/common/utils/pagination.mjs'
@@ -639,10 +639,6 @@ function resolveBusinessTableColumnWidth(column = {}) {
 }
 
 function CopyableBusinessTableCell({ column, value, record, children }) {
-  const copyConfig =
-    typeof column?.copyable === 'object' && column.copyable !== null
-      ? column.copyable
-      : {}
   const copyText = resolveBusinessTableCopyText(column, value, record)
   if (!copyText) return children
 
@@ -653,9 +649,9 @@ function CopyableBusinessTableCell({ column, value, record, children }) {
     event.stopPropagation()
     try {
       await copyTextToClipboard(copyText)
-      message.success(copyConfig.successText || `${copyLabel}已复制`)
+      showCopySuccess(copyLabel, trigger)
     } catch {
-      message.error(copyConfig.errorText || '复制失败，请手动复制')
+      showCopyFailure()
     } finally {
       if (shouldReleasePointerFocus && document.activeElement === trigger) {
         trigger.blur()

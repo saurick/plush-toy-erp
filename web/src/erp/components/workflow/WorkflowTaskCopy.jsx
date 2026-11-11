@@ -1,7 +1,7 @@
 import React from 'react'
 import { CopyOutlined, EllipsisOutlined, ExportOutlined, LinkOutlined } from '@ant-design/icons'
 import { Button, Dropdown } from 'antd'
-import { message } from '@/common/utils/antdApp'
+import { showCopyFailure, showCopySuccess } from '@/common/components/feedback/copyFeedback.jsx'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import {
   formatWorkflowTaskSource,
@@ -16,9 +16,9 @@ import './workflowTaskCopy.css'
 async function copyTaskText(text, label, trigger) {
   try {
     await copyTextToClipboard(text)
-    message.success(`${label}已复制`)
+    showCopySuccess(label, trigger)
   } catch {
-    message.error('复制失败，请在任务详情中选中文字复制')
+    showCopyFailure('复制失败，请在任务详情中选中文字复制')
   } finally {
     if (trigger?.isConnected && document.activeElement === document.body) {
       trigger.focus({ preventScroll: true })

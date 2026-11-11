@@ -2,7 +2,7 @@ import React from 'react'
 import { CopyOutlined } from '@ant-design/icons'
 import { Button } from 'antd'
 
-import { message } from '@/common/utils/antdApp'
+import { showCopyFailure, showCopySuccess } from '@/common/components/feedback/copyFeedback.jsx'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { normalizeBusinessTableCopyText } from '../../utils/businessTableCopy.mjs'
 
@@ -16,9 +16,9 @@ export default function BusinessCopyButton({ label, value, className = '' }) {
     event.stopPropagation()
     try {
       await copyTextToClipboard(copyText)
-      message.success(`${label}已复制`)
+      showCopySuccess(label, trigger)
     } catch {
-      message.error('复制失败，请手动复制')
+      showCopyFailure()
     } finally {
       if (shouldReleasePointerFocus && document.activeElement === trigger) {
         trigger.blur()
