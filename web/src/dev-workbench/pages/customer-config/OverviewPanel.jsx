@@ -1,8 +1,7 @@
 import { Button, Typography } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
-import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
 
-const { Text, Title } = Typography
+const { Paragraph, Text, Title } = Typography
 
 export function OverviewPanel({
   overview,
@@ -69,28 +68,27 @@ export function OverviewPanel({
         </dl>
       </section>
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <DevStaticGuidance title="配置如何上线">
-          <Text type="secondary">配置来源：{overview.sourceLabel}</Text>
-          <ol
-            className="erp-dev-customer-delivery-flow"
-            aria-label="配置与部署的关系"
-          >
-            <li>
-              <strong>本页准备配置</strong>
-              <span>检查、预览、本地验证与发布就绪检查</span>
-              <small>当前工作区</small>
-            </li>
-            <li>
-              <strong>执行正式配置</strong>
-              <span>由受控执行器确认目标、应用配置并读回</span>
-              <small>通过检查后交接</small>
-            </li>
-            <li>
-              <strong>发布与部署版本</strong>
-              <span>由版本发布中心和 GitLab 流水线完成</span>
-            </li>
-          </ol>
-        </DevStaticGuidance>
+        <Title level={3}>配置如何上线</Title>
+        <Paragraph type="secondary">配置来源：{overview.sourceLabel}</Paragraph>
+        <ol
+          className="erp-dev-customer-delivery-flow"
+          aria-label="配置与部署的关系"
+        >
+          <li>
+            <strong>本页准备配置</strong>
+            <span>检查、预览、本地验证与发布就绪检查</span>
+            <small>当前工作区</small>
+          </li>
+          <li>
+            <strong>执行正式配置</strong>
+            <span>由受控执行器确认目标、应用配置并读回</span>
+            <small>通过检查后交接</small>
+          </li>
+          <li>
+            <strong>发布与部署版本</strong>
+            <span>由版本发布中心和 GitLab 流水线完成</span>
+          </li>
+        </ol>
       </section>
     </div>
   )
