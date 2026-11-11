@@ -220,6 +220,8 @@ Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/releas
 
 即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。promotion 在已创建权限为 `0600` 的 env 备份后，同时推进 release 固定的 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 版本；外部附件存储不在该动作中变更。
 
+普通升级确认前，`promotion-service-scope.mjs` 从候选提交的固定执行器读取预期配置，与登记目标实际运行的 PostgreSQL、Jaeger、受管 SeaweedFS 镜像及本机预置镜像内容身份比较。计划列出 Jaeger 内存上限 / 预留，以及候选与当前提交间共用和目标 Compose、PostgreSQL 初始化脚本、Jaeger 配置文件的变化。差异随计划指纹封存；无法核实或执行前出现漂移时，停止并重新准备。旧待确认计划可放弃后重做，历史回执原样可读。固定项一致不代表 Compose 不会重建容器；首次部署无运行基线，按首次部署计划创建基础服务。
+
 新晋级使用 `plush.remote-promotion-receipt/v6`，在 Atlas 状态检查后通过固定只读查询记录当次实际 migration 版本，与不可变制品要求比较；缺失或不一致不得形成成功回执。工作台将当次版本与当前运行态再次核对，备份恢复另以当次恢复核验、备份摘要和实际步骤证明。已留存的旧格式回执原文保持不变，缺少实际版本的历史记录继续显示未记录，不以当前运行版本补写旧执行结果。
 
 固定的基础服务镜像须在执行前预置到目标，执行器使用 `--pull never`，并在创建新备份和进入维护窗口前核对所需镜像与 `linux/amd64` 平台，缺失时失败关闭。operation 分别记录 Mac 控制包字节/耗时、目标宿主内部取件期望与实际字节/耗时、校验与缓存命中，不把控制面等待伪装成制品传输。

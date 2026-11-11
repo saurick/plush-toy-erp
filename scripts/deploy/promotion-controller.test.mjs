@@ -13,7 +13,7 @@ import test from "node:test";
 
 import {
   parsePromotionControllerArgs,
-  preparePromotion,
+  preparePromotion as preparePromotionWithChecks,
   readPromotionPlan,
 } from "./promotion-controller.mjs";
 import {
@@ -23,11 +23,25 @@ import {
   transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
 import { releaseManifestV2Fixture } from "./release-catalog-test-fixtures.mjs";
+import { executePromotion } from "./promotion-executor.mjs";
 
 const SHA = "a".repeat(40);
 const CURRENT_SHA = "b".repeat(40);
 const IDEMPOTENCY_KEY =
   "promotion:demo-133:123e4567-e89b-42d3-a456-426614174000";
+
+function serviceScope() {
+  const image = (image, n) => ({ image, contentId: `sha256:${n.repeat(64)}` });
+  const jaeger = (n) => ({ ...image("jaegertracing/jaeger:2.21.0", n), memoryLimit: 192 * 1024 ** 2, memoryReservation: 96 * 1024 ** 2 });
+  return { attachmentMode: "external", services: [
+    { key: "postgres", current: image("postgres:18.5", "a"), candidate: image("postgres:18.6", "b") },
+    { key: "jaeger", current: jaeger("c"), candidate: jaeger("c") },
+  ], configurationChanges: [] };
+}
+
+const preparePromotion = (request, runtime) => preparePromotionWithChecks(request, {
+  readServiceScope: serviceScope, ...runtime,
+});
 
 function classifyRelation({ currentGitSha, candidateGitSha }) {
   const current = currentGitSha === candidateGitSha;
@@ -300,10 +314,42 @@ test("promotion preparation awaits one read-only preflight and becomes ready", a
   assert.equal(second.reused, true);
   assert.equal(second.operation.id, first.operation.id);
   assert.equal(preflightCalls, 1);
+  assert.deepEqual(first.plan.serviceScope, serviceScope());
+  assert.equal(first.operation.metadata.promotionFingerprint, first.plan.fingerprint);
   assert.equal(
     readPromotionPlan(data.store, first.operation.id).status,
     "eligible",
   );
+});
+
+test("promotion refuses an unprovable service comparison", async (t) => {
+  const data = fixture(t);
+  const request = { repoRoot: data.root, releaseManifestPath: data.releaseManifestPath, targetKey: "demo-133", operationStore: data.store };
+  const runtime = { classifyRelation, runPreflight: () => targetPreflight(false) };
+  const blocked = await preparePromotion({ ...request, idempotencyKey: `${IDEMPOTENCY_KEY}:unavailable` }, {
+    ...runtime, readServiceScope: () => { throw new Error("synthetic unreadable image"); },
+  });
+  assert.equal(blocked.operation.status, "blocked");
+  assert.deepEqual(blocked.plan.blockers, ["promotion_service_scope_unavailable"]);
+});
+
+test("promotion never writes a target after the confirmed service scope drifts", async (t) => {
+  const data = fixture(t);
+  const request = { repoRoot: data.root, releaseManifestPath: data.releaseManifestPath, targetKey: "demo-133", operationStore: data.store };
+  const runtime = { classifyRelation, runPreflight: () => targetPreflight(false) };
+  const { operation } = await preparePromotion({ ...request, idempotencyKey: `${IDEMPOTENCY_KEY}:drift` }, runtime);
+  const drift = executePromotion({
+    ...request, operationId: operation.id,
+    confirmation: `PROMOTE:demo-133:${SHA}:${operation.id}`,
+  }, {
+    ...runtime,
+    fetchToken: null,
+    readServiceScope: () => ({ ...serviceScope(), configurationChanges: ["jaegerConfig"] }),
+    runCommand: () => assert.fail("must stop before transport or execution"),
+  });
+  assert.equal(drift.targetWriteStarted, false);
+  assert.equal(drift.operation.status, "blocked");
+  assert.deepEqual(drift.operation.issues.map(({ code }) => code), ["promotion_service_scope_changed"]);
 });
 
 test("ordinary passed rollback starts a new promotion intent for the same release", async (t) => {

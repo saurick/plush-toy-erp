@@ -16,6 +16,7 @@ import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 
 import {
   consumeDeliveryOperationStore,
@@ -50,6 +51,7 @@ import {
 } from "./target-initialization-manifest.mjs";
 import { runTargetInitializationPreflight } from "./target-initialization-preflight.mjs";
 import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
+import { readPromotionServiceScope } from "./promotion-service-scope.mjs";
 import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
 import {
   buildTargetReleaseCacheIdentity,
@@ -1395,6 +1397,7 @@ export function executePromotion(
     runPreflight = runTargetPreflight,
     runInitializationPreflight = runTargetInitializationPreflight,
     classifyRelation = classifyGitAncestryRelation,
+    readServiceScope = readPromotionServiceScope,
     buildCacheIdentity = buildTargetReleaseCacheIdentity,
     cleanupCache = cleanupPreparedTargetReleaseIncoming,
     probeCache = probeTargetReleaseCache,
@@ -1482,6 +1485,28 @@ export function executePromotion(
   ) {
     immediateBlockers.add("promotion_git_relation_not_ahead");
   }
+  const serviceScopeMessages = {
+    promotion_service_scope_not_prepared: "当前计划未核对基础服务差异，请放弃并重新准备。",
+    promotion_service_scope_changed: "确认后基础服务范围发生变化，请重新准备并确认。",
+    promotion_service_scope_unavailable: "执行前无法核实基础服务差异，请核对目标后重新准备。",
+  };
+  if (!plan.serviceScope || operation.metadata.promotionFingerprint !== plan.fingerprint) {
+    immediateBlockers.add("promotion_service_scope_not_prepared");
+  } else if (immediateBlockers.size === 0 && immediateGate.status === "passed") {
+    try {
+      const serviceScope = readServiceScope({
+        repoRoot: root,
+        targetKey,
+        currentGitSha: immediateRuntime.serverSha,
+        candidateGitSha: plan.release.gitSha,
+      });
+      if (!isDeepStrictEqual(serviceScope, plan.serviceScope)) {
+        immediateBlockers.add("promotion_service_scope_changed");
+      }
+    } catch {
+      immediateBlockers.add("promotion_service_scope_unavailable");
+    }
+  }
   if (immediateGate.status !== "passed" || immediateBlockers.size > 0) {
     operation = transitionDeliveryOperation(store, operation.id, {
       status: "blocked",
@@ -1489,7 +1514,7 @@ export function executePromotion(
       issues: [...immediateBlockers].sort().map((code) => ({
         code,
         level: "error",
-        message: `目标即时预检阻断：${code}`,
+        message: serviceScopeMessages[code] || `目标即时预检阻断：${code}`,
       })),
       now: now(),
     });

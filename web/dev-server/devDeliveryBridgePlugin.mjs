@@ -981,6 +981,20 @@ export function createDevDeliveryService({
       evidence,
       gitlabRecord: gitlabRecordForOperation(operation),
     })
+    if (operation.action === 'promote' && operation.status === 'ready') {
+      // Only show the service comparison from this operation's sealed plan.
+      try {
+        const plan = readPromotionPlan(store, operation.id)
+        if (
+          plan?.operationId === operation.id &&
+          plan.target.key === operation.target &&
+          plan.release.gitSha === operation.gitSha &&
+          plan.fingerprint === operation.metadata?.promotionFingerprint
+        ) presented.serviceScope = plan.serviceScope ?? null
+      } catch {
+        presented.serviceScope = null
+      }
+    }
     if (indexed.unreadableRequests > 0) {
       presented.issues = [
         ...presented.issues,

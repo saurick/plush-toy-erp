@@ -1,8 +1,72 @@
-import { Alert, Input, Space, Typography } from 'antd'
+import { Alert, Descriptions, Input, Space, Typography } from 'antd'
 import Modal from '@/common/components/modal/AppModal'
+import { formatDeliveryBytes } from '@/dev-workbench/config/devDelivery.mjs'
 import { deliveryTargetLabel } from './shared.jsx'
 
 const { Text } = Typography
+const serviceNames = {
+  postgres: 'PostgreSQL',
+  jaeger: 'Jaeger',
+  'attachment-store': 'SeaweedFS',
+}
+const configurationNames = {
+  compose: '共用 Compose',
+  targetCompose: '目标 Compose',
+  postgresRoles: 'PostgreSQL 初始化脚本',
+  jaegerConfig: 'Jaeger 配置',
+}
+
+function serviceItems(scope) {
+  const items = scope.services.map(({ key, current, candidate }) => {
+    const imageName = ({ image }) => image.split('@')[0]
+    const imageChanged =
+      current.image !== candidate.image ||
+      current.contentId !== candidate.contentId
+    const memoryChanged =
+      key === 'jaeger' &&
+      (current.memoryLimit !== candidate.memoryLimit ||
+        current.memoryReservation !== candidate.memoryReservation)
+    const currentName = imageName(current)
+    const candidateName = imageName(candidate)
+    const memory = ({ memoryLimit, memoryReservation }) =>
+      `${formatDeliveryBytes(memoryLimit)} / ${formatDeliveryBytes(memoryReservation)}`
+    return {
+      key,
+      label: serviceNames[key],
+      children: (
+        <>
+          {currentName === candidateName
+            ? currentName
+            : `${currentName} → ${candidateName}`}
+          {imageChanged && currentName === candidateName && '（镜像内容变化）'}
+          {memoryChanged && (
+            <div>
+              内存上限 / 预留：{memory(current)} → {memory(candidate)}
+            </div>
+          )}
+          {!imageChanged && !memoryChanged && '（固定项一致）'}
+        </>
+      ),
+    }
+  })
+  if (scope.attachmentMode === 'external') {
+    items.push({
+      key: 'attachment-store',
+      label: '附件存储',
+      children: '使用外部服务，本次部署不变更',
+    })
+  }
+  if (scope.configurationChanges.length > 0) {
+    items.push({
+      key: 'configuration',
+      label: '配置文件变化',
+      children: scope.configurationChanges
+        .map((key) => configurationNames[key])
+        .join('、'),
+    })
+  }
+  return items
+}
 
 export function ExecutionModal({
   actionKey,
@@ -13,6 +77,10 @@ export function ExecutionModal({
   setConfirmationText,
   summaryFresh,
 }) {
+  const upgrading =
+    confirmOperation?.action === 'promote' &&
+    confirmOperation.promotionMode !== 'initialize'
+  const serviceScope = upgrading ? confirmOperation.serviceScope : null
   return (
     <Modal
       title={
@@ -49,10 +117,11 @@ export function ExecutionModal({
         disabled:
           !summaryFresh ||
           !confirmOperation ||
+          (upgrading && !serviceScope) ||
           confirmationText !== confirmOperation.confirmationRequired,
       }}
       onOk={async () => {
-        if (!confirmOperation) return
+        if (!confirmOperation || (upgrading && !serviceScope)) return
         const succeeded = await performAction(
           `execute:${confirmOperation.id}`,
           confirmOperation.action === 'rollback'
@@ -98,6 +167,29 @@ export function ExecutionModal({
                 : '执行器会重新做即时预检、创建并恢复检查新备份、校验制品、串行迁移、启动和 smoke。若结果未知，不会自动重试。'
           }
         />
+        {upgrading &&
+          (serviceScope ? (
+            <>
+              <Descriptions
+                size="small"
+                column={1}
+                bordered
+                title="基础服务变更"
+                items={serviceItems(serviceScope)}
+              />
+              <Text type="secondary">
+                执行前会重新核对。Compose
+                会应用目标配置，固定项一致时容器仍可能重建。
+              </Text>
+            </>
+          ) : (
+            <Text type="danger">
+              这份计划未核对基础服务差异。请放弃计划，再重新准备部署。
+            </Text>
+          ))}
+        {confirmOperation?.promotionMode === 'initialize' && (
+          <Text>首次部署将创建 PostgreSQL、Jaeger 和受管附件存储。</Text>
+        )}
         <Text>请完整输入以下确认文本：</Text>
         <Text copyable code>
           {confirmOperation?.confirmationRequired || ''}

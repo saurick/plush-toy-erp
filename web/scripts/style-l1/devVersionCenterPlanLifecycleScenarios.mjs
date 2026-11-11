@@ -17,6 +17,17 @@ export function createDevVersionCenterPlanLifecycleScenarios({ assert, assertNoH
         lifecycleSummary = await installSummaryRoute(page)
         const ready = lifecycleSummary.operations.find(operation => operation.status === 'ready')
         ready.target = 'demo-133'
+        ready.promotionMode = 'upgrade'
+        const image = (image, value) => ({ image, contentId: `sha256:${value.repeat(64)}` })
+        const jaeger = (memoryLimit) => ({ ...image('jaegertracing/jaeger:2.21.0', 'c'), memoryLimit, memoryReservation: 96 * 1024 ** 2 })
+        ready.serviceScope = {
+          attachmentMode: 'external',
+          services: [
+            { key: 'postgres', current: image('postgres:18.5', 'a'), candidate: image('postgres:18.6', 'b') },
+            { key: 'jaeger', current: jaeger(256 * 1024 ** 2), candidate: jaeger(192 * 1024 ** 2) },
+          ],
+          configurationChanges: ['jaegerConfig'],
+        }
         ready.confirmationRequired = `PROMOTE:demo-133:${ready.gitSha}:${ready.id}`
         await page.route('**/__dev/api/delivery/session', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ kind: 'plush.dev-delivery-session', csrfToken: 'a'.repeat(48), target: 'demo-133', targets: DEV_DELIVERY_TARGETS.map(target => target.key) }) }))
         await page.route('**/__dev/api/delivery/actions', async route => {
@@ -46,6 +57,43 @@ export function createDevVersionCenterPlanLifecycleScenarios({ assert, assertNoH
         const current = page.locator('.erp-dev-version-current-operation')
         await current.getByRole('button', { name: '放弃计划', exact: true }).waitFor()
         await current.getByText('准备耗时', { exact: false }).waitFor()
+        const readyPlan = lifecycleSummary.operations.find(operation => operation.status === 'ready')
+        await current.getByRole('button', { name: '确认部署', exact: true }).click()
+        const confirmation = page.getByRole('dialog')
+        await confirmation.getByText('基础服务变更', { exact: true }).waitFor()
+        await confirmation.getByText('postgres:18.5 → postgres:18.6', { exact: true }).waitFor()
+        await confirmation.getByText('内存上限 / 预留：256.0 MiB / 96.0 MiB → 192.0 MiB / 96.0 MiB', { exact: true }).waitFor()
+        await confirmation.getByText('使用外部服务，本次部署不变更', { exact: true }).waitFor()
+        await confirmation.getByText('Jaeger 配置', { exact: true }).waitFor()
+        await assertNoHorizontalOverflow(page, 'promotion service scope confirmation')
+        const execute = confirmation.getByRole('button', { name: '开始部署', exact: true })
+        assert.equal(await execute.isEnabled(), false)
+        await confirmation.getByRole('textbox', { name: '部署确认文本' }).fill(readyPlan.confirmationRequired)
+        assert.equal(await execute.isEnabled(), true)
+        await confirmation.getByRole('button', { name: '取消', exact: true }).click()
+        await confirmation.waitFor({ state: 'hidden' })
+        const sealedScope = readyPlan.serviceScope
+        readyPlan.serviceScope = {
+          ...sealedScope,
+          attachmentMode: 'managed',
+          services: [...sealedScope.services, { key: 'attachment-store', current: { image: 'chrislusf/seaweedfs:4.47', contentId: `sha256:${'a'.repeat(64)}` }, candidate: { image: 'chrislusf/seaweedfs:4.47', contentId: `sha256:${'b'.repeat(64)}` } }],
+        }
+        await page.getByRole('button', { name: '刷新状态', exact: true }).click()
+        await current.getByRole('button', { name: '确认部署', exact: true }).click()
+        await confirmation.getByText('SeaweedFS', { exact: true }).waitFor()
+        await confirmation.getByText('chrislusf/seaweedfs:4.47（镜像内容变化）', { exact: true }).waitFor()
+        assert.equal(await confirmation.getByText('使用外部服务，本次部署不变更', { exact: true }).count(), 0)
+        await confirmation.getByRole('button', { name: '取消', exact: true }).click()
+        await confirmation.waitFor({ state: 'hidden' })
+        readyPlan.serviceScope = null
+        await page.getByRole('button', { name: '刷新状态', exact: true }).click()
+        await current.getByRole('button', { name: '确认部署', exact: true }).click()
+        await confirmation.getByText('这份计划未核对基础服务差异。', { exact: false }).waitFor()
+        await confirmation.getByRole('textbox', { name: '部署确认文本' }).fill(readyPlan.confirmationRequired)
+        assert.equal(await execute.isEnabled(), false)
+        await confirmation.getByRole('button', { name: '取消', exact: true }).click()
+        await confirmation.waitFor({ state: 'hidden' })
+        readyPlan.serviceScope = sealedScope
         const fullHeight = await current.evaluate(node => node.getBoundingClientRect().height)
         const nav = page.getByRole('tablist').filter({ has: page.getByRole('tab', { name: '版本与部署' }) })
         const navBefore = await nav.boundingBox()

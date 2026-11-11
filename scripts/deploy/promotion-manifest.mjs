@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { validateReleaseManifest } from "./release-catalog.mjs";
 import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
 import { getDeploymentTarget } from "./deployment-targets.mjs";
+import { validatePromotionServiceScope } from "./promotion-service-scope.mjs";
 
 export const PROMOTION_MANIFEST_CONTRACT = "plush.promotion-manifest/v1";
 
@@ -88,6 +89,7 @@ export function validatePromotionManifest(manifest) {
     throw new Error("promotion manifest contract is invalid");
   }
   const imageKinds = new Set();
+  if (manifest.serviceScope !== undefined) validatePromotionServiceScope(manifest.serviceScope);
   for (const image of manifest.release.images) {
     if (
       !["server", "web"].includes(image?.kind) ||
@@ -158,6 +160,8 @@ export function buildPromotionManifest({
   releaseManifestSha256,
   targetPreflight,
   ancestry,
+  serviceScope,
+  serviceScopeUnavailable = false,
   createdAt = new Date().toISOString(),
 }) {
   const release = validateReleaseManifest(releaseManifest);
@@ -204,6 +208,7 @@ export function buildPromotionManifest({
   if (!["promote", "current"].includes(gitRelation.actionClass)) {
     blockerSet.add("promotion_git_relation_not_ahead");
   }
+  if (serviceScopeUnavailable) blockerSet.add("promotion_service_scope_unavailable");
   const blockers = [...blockerSet].sort();
   const status =
     blockers.length > 0
@@ -223,6 +228,7 @@ export function buildPromotionManifest({
       trialTarget: target.trialTarget,
     },
     ancestry: gitRelation,
+    ...(serviceScope === undefined ? {} : { serviceScope }),
     release: {
       version: release.version,
       gitSha: release.gitSha,

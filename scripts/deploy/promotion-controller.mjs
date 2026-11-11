@@ -37,6 +37,7 @@ import {
 } from "./target-initialization-manifest.mjs";
 import { runTargetInitializationPreflight } from "./target-initialization-preflight.mjs";
 import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
+import { readPromotionServiceScope } from "./promotion-service-scope.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
@@ -70,6 +71,8 @@ function issueForBlocker(code) {
     target_capacity_unknown: "无法证明目标部署目录所在磁盘容量",
     target_migration_lock_held: "133 migration lock 正在被其他操作持有",
     target_runtime_sha_mismatch: "133 Server/Web 当前 SHA 不一致",
+    promotion_service_scope_unavailable:
+      "基础服务的镜像或配置差异未能核实。请核对目标容器、已预置镜像和版本源码后重新准备。",
     promotion_git_relation_not_ahead:
       "发布 SHA 不是 133 当前 SHA 的后继，禁止按发布时间猜测部署方向",
   };
@@ -103,6 +106,7 @@ export async function preparePromotion(
     runPreflight = runTargetPreflight,
     runInitializationPreflight = runTargetInitializationPreflight,
     classifyRelation = classifyGitAncestryRelation,
+    readServiceScope = readPromotionServiceScope,
     qualifyEligiblePlan = null,
     now = () => new Date().toISOString(),
   } = {},
@@ -225,14 +229,29 @@ export async function preparePromotion(
         currentGitSha: targetPreflight.remote?.runtime?.serverSha,
         candidateGitSha: releaseManifest.gitSha,
       });
-      plan = buildPromotionManifest({
+      const manifestInput = {
         operationId: operation.id,
         releaseManifest,
         releaseManifestSha256,
         targetPreflight,
         ancestry,
         createdAt: now(),
-      });
+      };
+      plan = buildPromotionManifest(manifestInput);
+      if (plan.status === "eligible") {
+        try {
+          const serviceScope = await readServiceScope({
+            repoRoot: root,
+            targetKey,
+            currentGitSha: runtimeServerSha,
+            candidateGitSha: releaseManifest.gitSha,
+          });
+          if (!serviceScope) throw new Error("promotion service scope is missing");
+          plan = buildPromotionManifest({ ...manifestInput, serviceScope });
+        } catch {
+          plan = buildPromotionManifest({ ...manifestInput, serviceScopeUnavailable: true });
+        }
+      }
       writePromotionManifest(promotionPlanFile(store, operation.id), plan);
       promotionMode = "upgrade";
     } else {
