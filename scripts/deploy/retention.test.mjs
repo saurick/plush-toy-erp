@@ -11,11 +11,14 @@ import {
   readRetentionLedger,
   saveRetentionLedger,
 } from "./backup-replica/retention.mjs";
-import { rotateScheduled, rotateFiles } from "./retention-files.mjs";
 import {
-  rotateGitlabArtifacts,
   gitlabExportItems,
-} from "./retention-server.mjs";
+  gitlabExportProtection,
+  rotateGitlabExport,
+  rotateScheduled,
+  rotateFiles,
+} from "./retention-files.mjs";
+import { rotateGitlabArtifacts } from "./retention-server.mjs";
 
 function temporary(t) {
   const root = fs.realpathSync(
@@ -56,6 +59,82 @@ test("GitLab encrypted exports include the checksums.sha256.age recovery member"
   saveRetentionLedger(root, ledger);
   fs.unlinkSync(path.join(directory, "encrypted.sha256"));
   assert.deepEqual(await gitlabExportItems(root), []);
+});
+
+test("export rotation keeps three synchronized packages and never deletes unsynced or pinned packages", async (t) => {
+  const root = temporary(t);
+  const names = [
+    "checksums.sha256.age",
+    "config.tar.gz.age",
+    "manifest.env.age",
+    "repository.tar.age",
+  ];
+  const ids = Array.from(
+    { length: 7 },
+    (_, i) => "backup-2026100" + (i + 1) + "T030000Z",
+  );
+  for (const id of ids) {
+    const directory = path.join(root, id);
+    fs.mkdirSync(directory);
+    for (const name of names)
+      fs.writeFileSync(path.join(directory, name), name);
+    fs.writeFileSync(
+      path.join(directory, "encrypted.sha256"),
+      names.map((name) => hash(name) + "  " + name + "\n").join(""),
+    );
+  }
+  const items = await gitlabExportItems(root);
+  const generatedAt = new Date().toISOString();
+  const report = {
+    schemaVersion: "plush.replica-retention-report/v1",
+    sourceId: "gitlab-r740xd",
+    retentionCount: 7,
+    generatedAt,
+    records: items
+      .filter((item) => item.id !== ids[6])
+      .map((item) => ({
+        id: item.id,
+        state: "retained",
+        replicatedFiles: item.files.slice(0, 4),
+      })),
+  };
+  const corrupted = structuredClone(report);
+  corrupted.records[1].replicatedFiles[0].sha256 = "a".repeat(64);
+  assert.ok(gitlabExportProtection(items, corrupted)[ids[1]]);
+  assert.equal(
+    Object.keys(
+      gitlabExportProtection(
+        items,
+        report,
+        Date.parse(generatedAt) + 37 * 3600_000,
+      ),
+    ).length,
+    7,
+  );
+  fs.writeFileSync(
+    path.join(root, "retention-replica-report.json"),
+    JSON.stringify(report),
+  );
+  fs.writeFileSync(
+    path.join(root, "retention-protection.json"),
+    JSON.stringify({
+      schemaVersion: "plush.retention-protection/v1",
+      protected: { [ids[0]]: ["upgrade recovery"] },
+    }),
+  );
+  const rotated = await rotateGitlabExport(root, { execute: true });
+  assert.equal(rotated.retentionCount, 3);
+  assert.deepEqual(
+    fs
+      .readdirSync(root)
+      .filter((name) => name.startsWith("backup-"))
+      .sort(),
+    [ids[0], ...ids.slice(3)],
+  );
+  assert.equal(
+    readRetentionLedger(root, "gitlab-export").records[ids[1]].state,
+    "cleaned",
+  );
 });
 
 test("seven complete copies plus active and upgrade recovery points; failed replacements consume no slot", () => {

@@ -1,0 +1,21 @@
+[Unit]
+Description=Plush Toy ERP daily paired PostgreSQL and attachment backup
+Requires=docker.service
+After=docker.service
+RequiresMountsFor=/mnt/plush-toy-erp-offsite/database
+OnFailure=plush-toy-erp-backup-failure@%n.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/plush-toy-erp/paired-backup.env
+ExecStartPre=/usr/bin/mountpoint --quiet /mnt/plush-toy-erp-offsite/database
+ExecStart=/usr/bin/flock --nonblock --no-fork /root/deploy/plush-toy-erp-production/run/promotion.lock /usr/bin/flock --nonblock --no-fork /root/deploy/plush-toy-erp-production/backups/scheduled/.scheduled-backup.lock /usr/local/bin/node ${BACKUP_TOOL_DIR}/scripts/deploy/backup-set/cli.mjs create --project ${COMPOSE_PROJECT_NAME} --database ${BACKUP_DATABASE} --compose-file ${BACKUP_COMPOSE_FILE} --env-file ${BACKUP_RUNTIME_ENV} --backup-dir ${BACKUP_DIR} --offsite-dir ${BACKUP_OFFSITE_DIR} --recipient-file ${BACKUP_AGE_RECIPIENT_FILE} --retention-count ${BACKUP_RETENTION_COUNT} --confirm BACKUP_SET:${COMPOSE_PROJECT_NAME}:${BACKUP_DATABASE}
+TimeoutStartSec=8min
+TimeoutStopSec=3min
+KillMode=mixed
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true

@@ -9,7 +9,9 @@ import {
   readRetentionLedger,
   recordCleanup,
   saveRetentionLedger,
+  RETENTION_COUNT,
 } from "./backup-replica/retention.mjs";
+import { bundleFiles, bundleTime } from "./backup-replica/gitlab-sync.mjs";
 
 export function plainFile(file) {
   const stat = fs.lstatSync(file);
@@ -74,11 +76,17 @@ export async function rotateFiles(
   root,
   sourceId,
   items,
-  { execute = false, protection: extraProtection = {} } = {},
+  {
+    execute = false,
+    protection: extraProtection = {},
+    count = RETENTION_COUNT,
+  } = {},
 ) {
   requireValue(fs.realpathSync(root) === root, "unsafe_retention_root");
   const ledger = readRetentionLedger(root, sourceId),
-    protection = { ...readProtection(root), ...extraProtection };
+    protection = readProtection(root);
+  for (const [id, reasons] of Object.entries(extraProtection))
+    protection[id] = [...new Set([...(protection[id] ?? []), ...reasons])];
   const pending = Object.values(ledger.records).filter(
     (x) => x.state === "cleaning",
   );
@@ -99,6 +107,7 @@ export async function rotateFiles(
         ...x,
         reasons: [...new Set([...x.reasons, ...(protection[x.id] ?? [])])],
       })),
+    { count },
   );
   // Validate the entire set before the first deletion, including replacements.
   for (const item of plan)
@@ -115,39 +124,51 @@ export async function rotateFiles(
     for (const item of pending) {
       requireValue(
         !protection[item.id]?.length &&
-          plan.filter((x) => x.valid && x.state !== "eligible").length >= 7,
+          plan.filter((x) => x.valid && x.state !== "eligible").length >= count,
         "pending_cleanup_protection_changed",
       );
       const remaining = item.files.filter((f) =>
         fs.existsSync(member(root, f.name)),
       );
       await verifyFiles(root, remaining);
-      recordCleanup(root, ledger, { ...item, state: "eligible" }, () => {
-        for (const file of remaining) fs.unlinkSync(member(root, file.name));
-        for (const directory of item.emptyDirectories ?? [])
-          if (fs.existsSync(member(root, directory)))
-            fs.rmdirSync(member(root, directory));
-      });
+      recordCleanup(
+        root,
+        ledger,
+        { ...item, state: "eligible" },
+        () => {
+          for (const file of remaining) fs.unlinkSync(member(root, file.name));
+          for (const directory of item.emptyDirectories ?? [])
+            if (fs.existsSync(member(root, directory)))
+              fs.rmdirSync(member(root, directory));
+        },
+        { count },
+      );
     }
-    saveRetentionLedger(root, ledger);
+    saveRetentionLedger(root, ledger, count);
     for (const item of plan.filter((x) => x.state === "eligible")) {
       await verifyFiles(root, item.files, item.files);
-      recordCleanup(root, ledger, item, () => {
-        for (const file of item.files) fs.unlinkSync(member(root, file.name));
-        for (const directory of item.emptyDirectories ?? []) {
-          requireValue(
-            !path.isAbsolute(directory) &&
-              !directory.split("/").some((x) => ["", ".", ".."].includes(x)),
-            "unsafe_retention_path",
-          );
-          fs.rmdirSync(path.join(root, directory));
-        }
-      });
+      recordCleanup(
+        root,
+        ledger,
+        item,
+        () => {
+          for (const file of item.files) fs.unlinkSync(member(root, file.name));
+          for (const directory of item.emptyDirectories ?? []) {
+            requireValue(
+              !path.isAbsolute(directory) &&
+                !directory.split("/").some((x) => ["", ".", ".."].includes(x)),
+              "unsafe_retention_path",
+            );
+            fs.rmdirSync(path.join(root, directory));
+          }
+        },
+        { count },
+      );
     }
   }
   return {
     sourceId,
-    retentionCount: 7,
+    retentionCount: count,
     records: Object.values(ledger.records),
   };
 }
@@ -260,6 +281,135 @@ export async function gitlabItems(root) {
   return items;
 }
 
+export async function gitlabExportItems(root) {
+  const items = [];
+  const ledger = readRetentionLedger(root, "gitlab-export");
+  for (const name of fs.readdirSync(root)) {
+    if (!/^backup-\d{8}T\d{6}Z$/u.test(name)) continue;
+    if (ledger.records[name]?.state === "cleaning") continue;
+    const directory = path.join(root, name);
+    requireValue(
+      fs.realpathSync(directory) === directory &&
+        fs.statSync(directory).isDirectory(),
+      "unsafe_gitlab_export",
+    );
+    requireValue(
+      JSON.stringify(fs.readdirSync(directory).sort()) ===
+        JSON.stringify([...bundleFiles, "encrypted.sha256"].sort()),
+      "invalid_gitlab_export_inventory",
+    );
+    const checksum = path.join(directory, "encrypted.sha256");
+    const rows = fs
+      .readFileSync(plainFile(checksum) && checksum, "utf8")
+      .trim()
+      .split("\n")
+      .map((x) => /^([a-f0-9]{64})  ([a-z0-9.]+)$/u.exec(x));
+    requireValue(
+      rows.length === 4 &&
+        rows.every(Boolean) &&
+        rows
+          .map((x) => x[2])
+          .sort()
+          .join() === bundleFiles.join(),
+      "invalid_gitlab_export",
+    );
+    const files = rows.map((x) => ({
+      name: `${name}/${x[2]}`,
+      sha256: x[1],
+      sizeBytes: plainFile(path.join(directory, x[2])).size,
+    }));
+    files.push(...(await describeFiles(root, [`${name}/encrypted.sha256`])));
+    items.push({
+      id: name,
+      createdAt: new Date(bundleTime(name)).toISOString(),
+      valid: true,
+      reasons: [],
+      files,
+      emptyDirectories: [name],
+    });
+  }
+  return items;
+}
+
+const GITLAB_EXPORT_COUNT = 3;
+const GITLAB_REPLICA_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+
+function exportIdentities(id, files) {
+  if (!Array.isArray(files)) return null;
+  const entries = files
+    .filter((file) => file?.name !== id + "/encrypted.sha256")
+    .map((file) => [file?.name, file?.sizeBytes, file?.sha256])
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+  const names = bundleFiles.map((file) => id + "/" + file);
+  return entries.length === names.length &&
+    entries.every(
+      ([name, bytes, sha], i) =>
+        name === names[i] &&
+        Number.isSafeInteger(bytes) &&
+        bytes > 0 &&
+        /^[a-f0-9]{64}$/u.test(sha),
+    )
+    ? JSON.stringify(entries)
+    : null;
+}
+
+export function gitlabExportProtection(items, report, clock = Date.now()) {
+  const generatedAt = Date.parse(report?.generatedAt);
+  const fresh =
+    report?.schemaVersion === "plush.replica-retention-report/v1" &&
+    report?.sourceId === "gitlab-r740xd" &&
+    report?.retentionCount === RETENTION_COUNT &&
+    Number.isFinite(generatedAt) &&
+    generatedAt <= clock &&
+    clock - generatedAt <= GITLAB_REPLICA_MAX_AGE_MS &&
+    Array.isArray(report.records) &&
+    report.records.every((row) => typeof row?.id === "string") &&
+    new Set(report.records.map((row) => row.id)).size === report.records.length;
+  const receipts = new Map(
+    fresh
+      ? report.records
+          .filter((row) => ["retained", "protected"].includes(row.state))
+          .map((row) => [row.id, exportIdentities(row.id, row.replicatedFiles)])
+      : [],
+  );
+  const protection = {};
+  const acknowledged = [];
+  for (const item of items) {
+    const identity = exportIdentities(item.id, item.files);
+    if (identity && receipts.get(item.id) === identity) {
+      if (item.state !== "cleaning") acknowledged.push(item);
+    } else protection[item.id] = ["未核实 PD-SSD 同步"];
+  }
+  // Unsynced exports must not consume the last three confirmed slots.
+  for (const item of acknowledged
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, GITLAB_EXPORT_COUNT))
+    protection[item.id] = ["最近三套已同步交接包"];
+  return protection;
+}
+
+export async function rotateGitlabExport(root, { execute = false } = {}) {
+  const items = await gitlabExportItems(root);
+  const pending = Object.values(
+    readRetentionLedger(root, "gitlab-export").records,
+  ).filter((item) => item.state === "cleaning");
+  const file = path.join(root, "retention-replica-report.json");
+  let report;
+  if (fs.existsSync(file)) {
+    const stat = plainFile(file);
+    requireValue(
+      stat.uid === process.getuid() && (stat.mode & 0o022) === 0,
+      "unsafe_gitlab_replica_report",
+    );
+    report = JSON.parse(fs.readFileSync(file, "utf8"));
+  }
+  return rotateFiles(root, "gitlab-export", items, {
+    execute,
+    count: GITLAB_EXPORT_COUNT,
+    protection: gitlabExportProtection([...items, ...pending], report),
+  });
+}
+
 if (
   process.argv[1] &&
   fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
@@ -267,7 +417,9 @@ if (
   const [kind, root, mode] = process.argv.slice(2);
   try {
     requireValue(
-      ["scheduled", "gitlab"].includes(kind) &&
+      ["scheduled", "gitlab", "gitlab-export"].includes(kind) &&
+        (kind !== "gitlab-export" ||
+          root === "/srv/raid5/gitlab/backups/export") &&
         path.isAbsolute(root) &&
         ["--execute", "--preview"].includes(mode),
       "invalid_retention_arguments",
@@ -275,9 +427,11 @@ if (
     const result =
       kind === "scheduled"
         ? await rotateScheduled(root, { execute: mode === "--execute" })
-        : await rotateFiles(root, "gitlab-native", await gitlabItems(root), {
-            execute: mode === "--execute",
-          });
+        : kind === "gitlab-export"
+          ? await rotateGitlabExport(root, { execute: mode === "--execute" })
+          : await rotateFiles(root, "gitlab-native", await gitlabItems(root), {
+              execute: mode === "--execute",
+            });
     atomicJSON(path.join(root, "retention-last-run.json"), {
       generatedAt: new Date().toISOString(),
       ...result,

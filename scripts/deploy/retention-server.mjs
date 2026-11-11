@@ -10,10 +10,10 @@ import {
 import { runTargetPreflight } from "./target-preflight.mjs";
 import {
   plainFile,
-  describeFiles,
   rotateFiles,
   rotateScheduled,
   gitlabItems,
+  rotateGitlabExport,
 } from "./retention-files.mjs";
 import {
   atomicJSON,
@@ -26,7 +26,6 @@ import {
   readRetentionLedger,
   saveRetentionLedger,
 } from "./backup-replica/retention.mjs";
-import { bundleFiles, bundleTime } from "./backup-replica/gitlab-sync.mjs";
 import { pruneSets } from "./backup-set/archive.mjs";
 
 export const RETENTION_STATE = "/var/lib/plush-retention";
@@ -175,51 +174,6 @@ export async function targetBackups(target, protection, execute) {
     execute,
     protection: protectedBackups,
   });
-}
-
-export async function gitlabExportItems(root) {
-  const items = [];
-  const ledger = readRetentionLedger(root, "gitlab-export");
-  for (const name of fs.readdirSync(root)) {
-    if (!/^backup-\d{8}T\d{6}Z$/u.test(name)) continue;
-    if (ledger.records[name]?.state === "cleaning") continue;
-    const directory = path.join(root, name);
-    requireValue(
-      fs.realpathSync(directory) === directory &&
-        fs.statSync(directory).isDirectory(),
-      "unsafe_gitlab_export",
-    );
-    const checksum = path.join(directory, "encrypted.sha256");
-    const rows = fs
-      .readFileSync(plainFile(checksum) && checksum, "utf8")
-      .trim()
-      .split("\n")
-      .map((x) => /^([a-f0-9]{64})  ([a-z0-9.]+)$/u.exec(x));
-    requireValue(
-      rows.length === 4 &&
-        rows.every(Boolean) &&
-        rows
-          .map((x) => x[2])
-          .sort()
-          .join() === bundleFiles.join(),
-      "invalid_gitlab_export",
-    );
-    const files = rows.map((x) => ({
-      name: `${name}/${x[2]}`,
-      sha256: x[1],
-      sizeBytes: plainFile(path.join(directory, x[2])).size,
-    }));
-    files.push(...(await describeFiles(root, [`${name}/encrypted.sha256`])));
-    items.push({
-      id: name,
-      createdAt: new Date(bundleTime(name)).toISOString(),
-      valid: true,
-      reasons: [],
-      files,
-      emptyDirectories: [name],
-    });
-  }
-  return items;
 }
 
 export function rotateTargetArtifacts(
@@ -620,12 +574,7 @@ export async function runRetention({
   console.error("[retention] verify encrypted export sets");
   summary.backups.push(
     ...publicRows(
-      await rotateFiles(
-        exportRoot,
-        "gitlab-export",
-        await gitlabExportItems(exportRoot),
-        { execute },
-      ),
+      await rotateGitlabExport(exportRoot, { execute }),
       "gitlab",
       "加密源副本",
     ),

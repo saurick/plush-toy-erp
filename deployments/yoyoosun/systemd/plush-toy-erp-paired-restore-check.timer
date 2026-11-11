@@ -2,10 +2,9 @@
 Description=Verify a Plush Toy ERP offsite backup every week
 
 [Timer]
-OnCalendar=Sun *-*-* 04:15:00
-RandomizedDelaySec=45min
+OnCalendar=Sun *-*-* 03:15:00 Asia/Shanghai
 Persistent=true
-Unit=plush-toy-erp-backup-restore-check.service
+Unit=plush-toy-erp-paired-restore-check.service
 
 [Install]
 WantedBy=timers.target

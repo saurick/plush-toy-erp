@@ -317,6 +317,7 @@ retention_tool="${PLUSH_RETENTION_RUNTIME:-/opt/plush-retention/current}/scripts
   exit 1
 }
 node "$retention_tool" gitlab "$GITLAB_RAID_BACKUP_DIR" --execute
+node "$retention_tool" gitlab-export "$GITLAB_BACKUP_EXPORT_DIR" --execute
 
 rm -f -- "$portable_checksum" "$portable_manifest" "$generation_marker"
 write_status passed 0

@@ -21,9 +21,9 @@
 - 发布前：必须备份。
 - migration apply 前：必须备份。
 - 真实导入 apply 前：必须备份；当前 yoyoosun 真实导入未开放。
-- 日常目标：每日在维护窗口生成一个 PG＋附件成套备份，本地和异地均只保留加密包及 checksum，保留最近 7 套并额外保护当前、必要回滚和升级前恢复点；每周从异地副本恢复到新建临时 PG / S3，验证后精确删除临时资源。
+- 生产每日北京时间 02:15 在维护窗口生成 PG＋附件成套备份，错过窗口不补跑停写动作。本地和异地各保留最近 7 套加密包及 checksum，并额外保护必要恢复点。每周日北京时间 03:15 从异地副本恢复到新建临时 PG / S3，验证后清除临时资源。
 
-[`systemd` 模板](../systemd/README.md) 已指向成套入口；模板变化不修改已安装任务。升级时须同时核对固定工具版本、Node 路径、独占维护窗口、工作盘空间、异地挂载和恢复端镜像。只有首跑成功、异地同名包 / checksum 读回、恢复报告为 `passed` 且绑定同一 backupId，才可宣称该目标已启用成套日常备份。
+[`systemd` 模板](../systemd/README.md) 使用独立的 `plush-toy-erp-paired-*` 单元。升级时须同时核对固定工具版本、Node 路径、独占维护窗口、工作盘空间、异地挂载和恢复端镜像。只有首跑成功、异地同名包 / checksum 读回、恢复报告为 `passed` 且绑定同一 backupId，才可宣称该目标已启用成套日常备份。
 
 旧 `scheduled-postgres-backup.sh` 和 `verify-scheduled-postgres-backup.sh` 仍为 PG 专用工具，旧报告不能升级为成套证明。
 
@@ -40,8 +40,8 @@ node scripts/deploy/backup-set/cli.mjs create \
   --project plush-toy-erp-production --database plush_erp_production \
   --compose-file /root/deploy/plush-toy-erp-production/current/server/deploy/compose/prod/compose.yml \
   --env-file /root/deploy/plush-toy-erp-production/runtime/.env.production-133 \
-  --backup-dir /root/deploy/plush-toy-erp-production/backups/scheduled \
-  --offsite-dir /mnt/plush-toy-erp-offsite/database \
+  --backup-dir /root/deploy/plush-toy-erp-production/backups/paired \
+  --offsite-dir /mnt/plush-toy-erp-offsite/database/production-133 \
   --recipient-file /etc/plush-toy-erp/backup-age-recipient.txt \
   --confirm BACKUP_SET:plush-toy-erp-production:plush_erp_production
 ```
@@ -74,10 +74,10 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 
 ```bash
 node scripts/deploy/backup-set/cli.mjs restore-check \
-  --offsite-dir /mnt/plush-toy-erp-offsite/database \
+  --offsite-dir /mnt/plush-toy-erp-offsite/database/production-133 \
   --identity-file /etc/plush-toy-erp/backup-age-identity.txt \
-  --work-dir /root/deploy/plush-toy-erp-production/backups/restore-work \
-  --report /var/lib/plush-toy-erp/backup/latest-restore-check.json \
+  --work-dir /root/deploy/plush-toy-erp-production/backups/restore-work-paired \
+  --report /var/lib/plush-toy-erp/backup/paired/latest-restore-check.json \
   --max-age-hours 36
 ```
 

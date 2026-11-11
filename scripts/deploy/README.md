@@ -178,6 +178,8 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 升级、初始化、数据库重建和代码回滚执行器先校验目标原始回执，再以 `0600` 原子文件归档到 store 的 `receipts/`，最后保存 operation 终态。同一 operation 的回执只能幂等重读，不能覆盖不同内容。详情按 operation / target / SHA / 版本 / 计划指纹校验归属，只公开检查结果、迁移信息、数据库恢复结论和摘要；完整原始回执及目标日志仍分别留在受控 store 和目标 `operations/<operation-id>/`。缺少回执、字段或检查时明确显示未记录 / 未证明，不根据 operation 成功、当前运行状态或聊天补造历史事实。
 
+手工数据准备的备份回执归入目标 `backups/receipts/data-preparation/`，备份与校验文件沿用 `backups/<backup-alias>.dump` 和同名 `.sha256`。目标 `operations/` 专用于有正式操作 ID 的发布、回滚、初始化和数据库重建记录；其它目录会让轮换停止并要求核对。归位回执时先核实目标、备份别名和校验值，再持轮换与目标发布锁操作，并复核预览中的历史备份保护。
+
 发布请求保存 GitLab 返回的 pipeline ID，等待中的操作按该 ID 查询，避免把同 SHA 的另一次失败归到本次发布。详情提供源码提交、同 SHA 的 CI/CD、不可变 Release 和已记录的本次发布流水线链接。早期记录没有 pipeline ID 时只提供同 SHA 列表，不猜测具体流水线。旧部署回执可经相同 validator 和 `persistDeliveryOperationReceipt` 从固定目标补录，必须核对原始内容、身份及摘要，并保留补录证据；补录不改写原 operation 状态和时间。
 
 保留规则及页面分工见[每次 CI/CD 与部署留痕](../../docs/部署约定.md#devops-records)。读取索引每次扫描文件身份（设备、inode、大小、mtime / ctime、权限），只解析和校验变化文件；原子替换、原地修复和删除在下次读取立即生效，无后台 watcher 或第二份持久化真源。索引只供读取，执行、恢复和写入仍直接校验原始文件。单文件损坏返回完整性计数，不把旧缓存当作最新结果；目录不可读则返回读取失败。页面按客户、目标、筛选和页码缓存最多 20 页，切换取消请求、重新校验，不用 200 毫秒固定延迟；每次读取最多两次尝试，每次 8 秒截止。
@@ -196,7 +198,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 `plush-retention.timer` 每小时运行一次；主机和路径固定，不接受浏览器输入命令。GitLab 有运行中或排队 CI 时暂停本轮；操作、保护信息或文件身份不明时保留现场。只通过 GitLab Package File API 删除 `server-image.tar`、`web-image.tar` 和 `source.tar`，Release、tag、manifest、checksum、SBOM、演练、CI 及部署记录继续保留。目标制品只清理预检确认的过期源码、缓存和停止的入口容器；镜像还须无容器引用，不使用全局 prune。
 
-`retention-files.mjs` 供生成任务调用，ERP PG、成套 PG＋附件、GitLab 原生备份和加密交接包各自按完整恢复输入计数；不同环境、来源及备份类型不互相挤占。`retention-protection.json` 使用 `plush.retention-protection/v1` 与 `protected: {"精确备份标识": ["保护原因"]}` 显式保护升级恢复点，修改须沿对应目标的操作锁核对。部署恢复点自动绑定当前 / 回滚版本及最近成功升级；未闭环引用、历史不完整或归属未确认的输入保留核对。源与副本分别保留最近 7 份，复制和校验通过后才轮换。
+`retention-files.mjs` 供生成任务调用，ERP PG、成套 PG＋附件、GitLab 原生备份与异机副本各自按完整恢复输入保留最近 7 份。`retention-protection.json` 使用 `plush.retention-protection/v1` 与 `protected: {"精确备份标识": ["保护原因"]}` 显式保护升级恢复点，修改须沿对应目标的操作锁核对。部署恢复点自动绑定当前 / 回滚版本及最近成功升级；未闭环引用、历史不完整或归属未确认的输入保留核对。GitLab 服务器加密交接在 GitLab 备份锁下轮换：PD-SSD 核验回执须在 36 小时内，且包内四个密文文件的名称、大小和 SHA-256 与服务器清单一致，才允许淘汰超过最近 3 套的已同步包。缺少有效回执、未同步和显式保护的包保留；离线跨过外盘的七套窗口后，未同步的旧包也需要人工核对。
 
 原始回执不删除；各来源 `retention-ledger.json` 长期保存已清理文件的标识、大小、SHA-256、原因和时间。私有汇总位于 `/var/lib/plush-retention/summary.json`，工作台仅展示脱敏状态。轮换账本和摘要随下一次 GitLab 配置加密备份进入 PD-SSD；`runs/` 保留每次轮换结果。失败不能宣称文件仍可恢复，已清理版本只保留记录入口。
 

@@ -239,7 +239,7 @@ GPT Review 按本次 GitLab push 前后的 base/head SHA 读取 GitHub main 提�
 
 ## 备份、恢复和升级
 
-Compose 固定 GitLab CE `19.3.6` 的官方镜像 digest；该版本包含 [GitLab 官方 2026-10-21 紧急安全补丁](https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/)。本次沿用 `19.3` 系列，补丁包含常规数据库迁移，单机升级需要短暂停机。升级前须验证完整备份及匹配配置的独立恢复，并在停写后保留同版本数据库备份、secrets、原 Compose 和旧镜像；配置版本不替代目标机运行版本与升级后检查。
+Compose 固定 GitLab CE `19.5.4` 的官方镜像摘要，包含 [GitLab 2026-11-10 安全补丁](https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-4-released/)。按[官方升级路径](https://docs.gitlab.com/update/upgrade_paths/)，`19.3.6` 至 `19.5.4` 无需中途停留；内置 PostgreSQL 17 符合版本要求。跨小版本会执行数据库迁移，单机切换需要短暂停机。升级前须验证完整备份及匹配配置的独立恢复，并在停写后保留同版本数据库备份、secrets、原 Compose 和旧镜像；配置版本不替代目标机运行版本与升级后检查。
 
 ### PD-SSD 自动加密副本 / External Backup Replica
 
@@ -248,7 +248,7 @@ GitLab 的完整备份由 r740xd 每日生成，Mac 经 SSH 拉取加密包到 P
 | 环节 | 合同与状态来源 |
 | --- | --- |
 | GitLab 原生备份 | 数据库、仓库、CI/CD 制品、Package、Release 与部署记录；匹配的 `/etc/gitlab`、secrets、实际 Compose / env、镜像 digest 和 GitLab 版本另存配置归档 |
-| 服务器加密交接 | `GITLAB_BACKUP_EXPORT_DIR=/srv/raid5/gitlab/backups/export`；固定来源标记 `plush.backup-source/v1:gitlab-r740xd`。每包四个 age 文件及密文校验清单，完整后原子发布 |
+| 服务器加密交接 | `GITLAB_BACKUP_EXPORT_DIR=/srv/raid5/gitlab/backups/export`；固定来源标记 `plush.backup-source/v1:gitlab-r740xd`。每包四个 age 文件及密文校验清单，完整后原子发布。只轮换超过最近 3 套且有近期 PD-SSD 核验回执的已同步包，另保留待确认和受保护的包 |
 | 独立介质 | Mac 私有配置通过 PD-SSD 的 UUID 绑定 `plush-toy-erp-backups/gitlab`；不以卷名判断身份，不覆盖现有 ERP 目录 |
 | 保留与容量 | 外盘保留最近 7 个完整包；转移前检查全部缺失包大小加 64 GiB 余量，每个文件前复查。新包全部验证后才清理索引内的超期整包；空间不足、损坏或未知内容均保留现有副本并报告失败 |
 | 定时 | 服务器每日 03:30 UTC（随机延迟最多 30 分钟）；Mac 每日 14:15 本地时间、登录或挂载时同步。Mac 休眠 / 离线时不保证取得新副本，36 小时新鲜度检查会识别陈旧 |

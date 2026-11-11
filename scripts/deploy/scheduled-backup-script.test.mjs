@@ -74,7 +74,10 @@ test("scheduled restore check uses the newest checksum-bound dump in an isolated
   assert.match(restoreSource, /information_schema\.tables/u);
   assert.match(restoreSource, /atlas_schema_revisions/u);
   assert.match(restoreSource, /temporary-postgres-container-removed/u);
-  assert.match(restoreSource, /docker rm --force --volumes "\$container_name"/u);
+  assert.match(
+    restoreSource,
+    /docker rm --force --volumes "\$container_name"/u,
+  );
   assert.match(restoreSource, /backupAgeSeconds/u);
   assert.match(restoreSource, /restoreDurationSeconds/u);
   assert.match(restoreSource, /备份文件名不符合受管格式/u);
@@ -82,22 +85,22 @@ test("scheduled restore check uses the newest checksum-bound dump in an isolated
   assert.match(restoreSource, /if ! cleanup_resources; then/u);
 });
 
-test("systemd timers persist daily backup and weekly restore checks with failure hooks", () => {
+test("the paired backup only stops production in its maintenance window; weekly restore may catch up", () => {
   const systemdRoot = path.join(root, "deployments/yoyoosun/systemd");
   const backupService = readFileSync(
-    path.join(systemdRoot, "plush-toy-erp-backup.service"),
+    path.join(systemdRoot, "plush-toy-erp-paired-backup.service"),
     "utf8",
   );
   const backupTimer = readFileSync(
-    path.join(systemdRoot, "plush-toy-erp-backup.timer"),
+    path.join(systemdRoot, "plush-toy-erp-paired-backup.timer"),
     "utf8",
   );
   const restoreService = readFileSync(
-    path.join(systemdRoot, "plush-toy-erp-backup-restore-check.service"),
+    path.join(systemdRoot, "plush-toy-erp-paired-restore-check.service"),
     "utf8",
   );
   const restoreTimer = readFileSync(
-    path.join(systemdRoot, "plush-toy-erp-backup-restore-check.timer"),
+    path.join(systemdRoot, "plush-toy-erp-paired-restore-check.timer"),
     "utf8",
   );
 
@@ -109,11 +112,20 @@ test("systemd timers persist daily backup and weekly restore checks with failure
   assert.match(backupService, /--recipient-file/u);
   assert.match(backupService, /--confirm BACKUP_SET:/u);
   assert.match(backupService, /KillMode=mixed/u);
-  assert.match(backupTimer, /OnCalendar=\*-\*-\* 02:15:00/u);
-  assert.match(backupTimer, /Persistent=true/u);
+  assert.match(backupService, /promotion\.lock .*\.scheduled-backup\.lock/u);
+  assert.match(backupTimer, /OnCalendar=\*-\*-\* 02:15:00 Asia\/Shanghai/u);
+  assert.match(backupTimer, /Persistent=false/u);
+  assert.match(backupTimer, /Unit=plush-toy-erp-paired-backup\.service/u);
   assert.match(restoreService, /backup-set\/cli\.mjs restore-check/u);
   assert.match(restoreService, /--identity-file/u);
   assert.match(restoreService, /--work-dir/u);
-  assert.match(restoreTimer, /OnCalendar=Sun \*-\*-\* 04:15:00/u);
+  assert.match(
+    restoreTimer,
+    /OnCalendar=Sun \*-\*-\* 03:15:00 Asia\/Shanghai/u,
+  );
+  assert.match(
+    restoreTimer,
+    /Unit=plush-toy-erp-paired-restore-check\.service/u,
+  );
   assert.match(restoreTimer, /Persistent=true/u);
 });

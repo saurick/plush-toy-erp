@@ -156,6 +156,17 @@ export async function execute(
                 sizeBytes ?? (files ?? []).reduce((n, f) => n + f.sizeBytes, 0),
             },
           ],
+          ...(gitlab &&
+          ["retained", "protected"].includes(state) &&
+          files?.length === 4
+            ? {
+                replicatedFiles: files.map(({ name, sizeBytes, sha256 }) => ({
+                  name,
+                  sizeBytes,
+                  sha256,
+                })),
+              }
+            : {}),
         }),
       ),
     });

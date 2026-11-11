@@ -73,11 +73,11 @@ export function readRetentionLedger(root, sourceId) {
   return value;
 }
 
-export function saveRetentionLedger(root, ledger) {
+export function saveRetentionLedger(root, ledger, count = RETENTION_COUNT) {
   atomicJSON(path.join(root, "retention-ledger.json"), {
     ...ledger,
     updatedAt: new Date().toISOString(),
-    retentionCount: RETENTION_COUNT,
+    retentionCount: count,
   });
 }
 
@@ -117,7 +117,7 @@ export function recordCleanup(
   ledger,
   item,
   remove,
-  { clock = () => new Date().toISOString() } = {},
+  { clock = () => new Date().toISOString(), count = RETENTION_COUNT } = {},
 ) {
   requireValue(item.state === "eligible", "retention_item_is_protected");
   // Persist the identity before removing bytes. An interrupted cleanup is
@@ -127,12 +127,12 @@ export function recordCleanup(
     state: "cleaning",
     cleanupStartedAt: clock(),
   };
-  saveRetentionLedger(root, ledger);
+  saveRetentionLedger(root, ledger, count);
   remove();
   ledger.records[item.id] = {
     ...ledger.records[item.id],
     state: "cleaned",
     cleanedAt: clock(),
   };
-  saveRetentionLedger(root, ledger);
+  saveRetentionLedger(root, ledger, count);
 }
