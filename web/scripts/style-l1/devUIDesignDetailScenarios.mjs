@@ -99,7 +99,7 @@ export function createDevUIDesignDetailScenarios({
         await page.getByRole('button', { name: '展开目录', exact: true }).click()
         await assertHierarchy()
         await search.locator('xpath=..').getByRole('button', { name: '清除搜索', exact: true }).click()
-        await page.getByText(`${fullDirectorySize} / ${fullDirectorySize} 个图解`, { exact: true }).waitFor()
+        await directory.getByRole('button').nth(fullDirectorySize - 1).waitFor()
         assert.equal(await search.inputValue(), '')
         assert.equal(await directory.getByRole('button').count(), fullDirectorySize)
         await page.setViewportSize({ width: 1280, height: 800 })

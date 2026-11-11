@@ -152,14 +152,8 @@
   display: none;
 }
 .erp-design-directory-search {
-  display: grid;
-  gap: 8px;
   padding: 12px;
   border-bottom: 1px solid var(--erp-border);
-}
-.erp-design-directory-search > span {
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
 }
 .erp-design-document-toc {
   min-height: 0;

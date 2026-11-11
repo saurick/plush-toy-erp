@@ -187,10 +187,6 @@ export default function DevUIDesignDocument({ source, specification, view }) {
                 updateLocation({ q: value }, true)
               }
             />
-            <span role="status">
-              {filtered.length} / {entries.length}{' '}
-              {read === 'guide' ? '个图解' : '个章节'}
-            </span>
           </div>
           <nav
             ref={directoryRef}
