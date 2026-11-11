@@ -71,7 +71,8 @@ const TOPICS = [
       '修改后关闭：先确认，取消后输入仍在。',
       '切换保存结果：分别试重试、查询结果和连续点击。',
     ],
-    source: 'BusinessFormModal · AppModal · message / notification',
+    componentRefs: ['BusinessFormModal', 'AppModal'],
+    source: 'message / notification',
     consumer: { ...PURCHASE_PAGE, task: '选中采购单，查看详情或打开局部办理弹窗，核对关闭与焦点恢复。' },
   },
   {
@@ -101,7 +102,11 @@ const TOPICS = [
       '移除明细查看空态，再添加；修改后返回列表，先继续编辑，再放弃修改。',
       '选择首次失败后重试，编辑并保存；核对输入保留及重试结果。',
     ],
-    source: 'BusinessFormPage · BusinessFormSection · BusinessLineItemsSection · BusinessLineItemRow · BusinessLineTable · BusinessLineItemActionButton · ContactFormList · BusinessTextArea · DateInput',
+    componentRefs: [
+      'BusinessFormPage', 'BusinessFormSection', 'BusinessLineItemsSection',
+      'BusinessLineItemRow', 'BusinessLineTable', 'BusinessLineItemActionButton',
+      'ContactFormList', 'BusinessTextArea', 'DateInput',
+    ],
     consumer: { ...PURCHASE_PAGE, task: '打开新建或编辑，核对整页表单、材料明细与返回列表；浏览验证无需保存真实单据。' },
   },
   {
@@ -120,7 +125,10 @@ const TOPICS = [
       '输入关键词后搜索，再清空筛选；取消后重新打开，确认临时选择已清空。',
       '加载时确认不可用；空列表或读取失败时重新加载，再确认并清空结果。',
     ],
-    source: 'SourceImportPickerModal · BusinessModal · SearchInput · AppTable · AppPagination；远程消费者：RemoteReferencePicker / RemoteReferenceSelect',
+    componentRefs: [
+      'SourceImportPickerModal', 'BusinessModal', 'SearchInput', 'AppTable', 'AppPagination',
+      'RemoteReferencePicker', 'RemoteReferenceSelect',
+    ],
     consumer: { ...PURCHASE_PAGE, task: '进入编辑页的“从材料库添加”，核对远程搜索、跨页选择与清空；取消返回，不提交业务数据。' },
   },
   {
@@ -140,7 +148,11 @@ const TOPICS = [
       '切换两种增长场景，搜索分类或第 30 个数据选项；关闭职责标注比较实际布局。',
       '往返四种业务，查看详情、翻页、调整列和导出；恢复示例后回到初始状态。',
     ],
-    source: 'BusinessToolbarWorkspace · BusinessOperationPanel · BusinessDataTable · BusinessViewSwitch · BusinessStatusFilter · ColumnOrderModal；规范：交互设计说明 #business-toolbar-composition',
+    componentRefs: [
+      'BusinessToolbarWorkspace', 'BusinessOperationPanel', 'BusinessDataTable',
+      'BusinessViewSwitch', 'BusinessStatusFilter', 'ColumnOrderModal',
+    ],
+    source: '规范：交互设计说明 #business-toolbar-composition',
     consumer: { ...PURCHASE_PAGE, task: '对照库存查询、采购订单、工作台和历史记录；此样例仅使用本地虚构数据，业务权限与提交由真实页面负责。' },
   },
   {
@@ -160,7 +172,8 @@ const TOPICS = [
       '切换表格内与独立分页，再试单页、空列表和恢复初始内容。',
       '切换加载中与加载失败，核对禁用、内容保留和重试恢复。',
     ],
-    source: 'common/components/pagination/AppPagination · common/components/table/AppTable · common/utils/pagination.mjs',
+    componentRefs: ['common/components/table/AppTable', 'common/components/pagination/AppPagination'],
+    source: 'common/utils/pagination.mjs',
     consumer: { ...MATERIAL_PAGE, task: '操作主列表的页码、每页条数和筛选，核对记录范围与读取恢复。' },
   },
   {
@@ -178,7 +191,8 @@ const TOPICS = [
       ['领域选择', '已有来源或主数据选择器', '读取、搜索和来源快照合同由领域组件承接。'],
     ],
     checks: ['修改名称和类别，核对当前结果；输入多行备注，观察字数和高度。', '清空内容，再恢复初始值。', '切换禁用与错误，核对值保留、计数和状态外观。'],
-    source: 'antd: Button / Input · BusinessTextArea · common/components/select · common/theme/erpAntdTheme.mjs · erp/styles/app/control-*.css',
+    componentRefs: ['Input', 'BusinessTextArea', 'AppSelect', 'FilterSelect', 'Button'],
+    source: 'Ant Design · common/components/select · common/theme/erpAntdTheme.mjs · erp/styles/app/control-*.css',
     consumer: { ...MATERIAL_PAGE, task: '打开新建或编辑，核对字段输入、选择、清空与禁用；取消返回。' },
   },
   {
@@ -196,7 +210,8 @@ const TOPICS = [
       '切换查看密度示意；在弹窗中打开说明，按 Esc，核对弹窗和草稿保留。',
       '打开页面帮助，核对完整内容；警告不随说明开关隐藏。',
     ],
-    source: 'SupplementalHelp · BusinessHelpLabel · ERPAppearanceHelp；规范：交互设计说明 #input-hints',
+    componentRefs: ['SupplementalHelp', 'BusinessHelpLabel', 'ERPAppearanceHelp'],
+    source: '规范：交互设计说明 #input-hints',
     consumer: { ...TASK_PAGE, task: '在任务详情查看进度或处理记录的范围说明，再核对字段说明、完整页面帮助和原有警告。' },
   },
   {
@@ -215,7 +230,8 @@ const TOPICS = [
       '点击分类标题、尝试禁用项，再用方向键选择；标题和禁用项不能成为选中值。',
       '搜索采购、尝试无结果，再清空和重新选择；切换浅深主题并核对窄窗口。',
     ],
-    source: 'AppSelect · historySourceSelectOptions · control-foundation.css；规范：交互设计说明 #grouped-select-options',
+    componentRefs: ['AppSelect'],
+    source: 'historySourceSelectOptions · control-foundation.css；规范：交互设计说明 #grouped-select-options',
     consumer: { ...HISTORY_PAGE, task: '展开记录类型，核对基础资料与业务单据两类，以及搜索、清空和选择后的结果。' },
   },
   {
@@ -234,7 +250,8 @@ const TOPICS = [
       '搜索仓库后选择，再清空；核对原批次同时清空，完整值不残留。',
       '切换长名称、窄区域和增加 4 列，横向查看右侧字段；恢复初始内容后继续填写。',
     ],
-    source: 'AppSelect · useSelectPopupWidth · BusinessLineItemsTable · control-foundation.css',
+    componentRefs: ['AppSelect', 'BusinessLineItemsTable'],
+    source: 'useSelectPopupWidth · control-foundation.css',
     consumer: { ...getBusinessPagePresentation('shipments'), task: '打开出货编辑页，核对产品、SKU、仓库、批次的完整值与明细横向滚动；无需保存真实单据。' },
   },
   {
@@ -248,6 +265,7 @@ const TOPICS = [
       ['起止筛选', 'DateRangeFilter', '组件组合日期类型与起止日期，限制倒置选择；已有倒置值保留错误提示并允许清空。'],
     ],
     checks: ['选择日期和分钟，核对下方值即时变化。', '使用截止快捷项，再切换禁用和错误。', '切换日期类型，查看倒置范围并清空、重置。'],
+    componentRefs: ['DateInput', 'DateTimeInput', 'DateRangeFilter'],
     source: 'erp/components/business-list/BusinessDateInputs.jsx · erp/utils/dateRange.mjs · erp/utils/workflowTaskTiming.mjs',
     consumer: { ...PURCHASE_PAGE, task: '核对列表日期范围，以及编辑页下单、到货日期的选择和清空。' },
   },
@@ -266,7 +284,8 @@ const TOPICS = [
       '点手机版和冻结：一个换工作入口，一个只缩小批次结果。',
       '用方向键和快速反向切换，核对禁用项与减少动态效果。',
     ],
-    source: 'SlidingTabs · SlidingTabList · SlidingSegmented · FilterChip · control-affordance.css；规范：交互设计说明 #business-toolbar-composition',
+    componentRefs: ['SlidingTabs', 'SlidingTabList', 'SlidingSegmented', 'FilterChip'],
+    source: 'control-affordance.css；规范：交互设计说明 #business-toolbar-composition',
     consumer: { ...TASK_PAGE, task: '切换待办、已办和流程跟踪，核对页签保持挂载及当前内容。' },
   },
   {
@@ -298,7 +317,7 @@ const TOPICS = [
       '输入期间结果不变；提交不存在的关键词后，出现无结果与清除入口。',
       '改变范围再重置：搜索词保持，其他页面条件不变。',
     ],
-    source: 'FilterChip · HorizontalScroll · MobileSearchInput · Popover',
+    componentRefs: ['FilterChip', 'SearchInput', 'HorizontalScroll', 'MobileSearchInput', 'Popover'],
     consumer: { ...TASK_PAGE, task: '组合任务范围与关键词，再清空和返回，核对当前条件及结果。' },
   },
   {
@@ -321,7 +340,8 @@ const TOPICS = [
       '点击刷新与取消：就地看到各自结果。',
       '禁用项不触发；加载项保留原按钮尺寸。',
     ],
-    source: 'Ant Design Button · control-affordance.css',
+    componentRefs: ['Button'],
+    source: 'Ant Design · control-affordance.css',
     consumer: { ...PURCHASE_PAGE, task: '比较未选、已选和只读记录的操作入口；动作权限与状态由真实页面决定。' },
   },
   {
@@ -346,7 +366,7 @@ const TOPICS = [
       '选择一张卡片后刷新并模拟失败；核对选择保留、重试和清除条件。',
       '选择电脑切页，在等待期间点击另一导航；手机样例可切换宽度和外观。',
     ],
-    source: 'AppEmpty · AppTable · AppSelect · MobileTaskListContent · MobileTaskListSkeleton · WorkflowTaskCard · Loading / Alert',
+    componentRefs: ['AppEmpty', 'AppTable', 'AppSelect', 'MobileTaskListContent', 'MobileTaskListSkeleton', 'WorkflowTaskCard', 'Loading', 'Alert'],
     consumer: { ...TASK_PAGE, task: '切换任务范围并刷新，核对内容区等待与恢复；手机组件另在岗位任务端核对。' },
   },
   {
@@ -365,10 +385,15 @@ const TOPICS = [
       '办理一项：清单和数字一起减少，归零后隐藏。',
       '切换大数量、读取中和失败，核对显示及重试。',
     ],
-    source: 'NavigationCountBadge · 服务端任务管理总数',
+    componentRefs: ['NavigationCountBadge'],
+    source: '服务端任务管理总数',
     consumer: { ...TASK_PAGE, task: '比较侧栏任务数字与实际清单范围，不能用演示数字判断真实待办。' },
   },
-]
+].map(({ componentRefs = [], source, ...topic }) => ({
+  ...topic,
+  componentNames: componentRefs.map((reference) => reference.split('/').at(-1)),
+  source: [...componentRefs, source].filter(Boolean).join(' · '),
+}))
 
 const RECORDS = [
   {
@@ -808,6 +833,20 @@ function ActionsExample() {
   )
 }
 
+function DirectoryComponentName({ name }) {
+  const words = name.replace(/([a-z0-9])([A-Z])/gu, '$1 $2').split(' ')
+  return (
+    <code className="erp-control-library-component-name" lang="en">
+      {words.map((word, index) => (
+        <React.Fragment key={`${word}-${index}`}>
+          {index > 0 && <wbr />}
+          {word}
+        </React.Fragment>
+      ))}
+    </code>
+  )
+}
+
 export default function DevControlStandards() {
   const [params, setParams] = useSearchParams()
   const { accent, appearance, effectiveTheme } = useERPTheme()
@@ -885,27 +924,33 @@ export default function DevControlStandards() {
       <aside className="erp-control-library-directory" ref={directoryRef}>
         <SearchInput
           aria-label="搜索控件设计"
-          placeholder="控件或场景"
-          searchHint="可搜索：控件名称、使用场景、复用边界"
+          placeholder="用途或组件名"
+          searchHint="可搜索：组件代码名、使用场景、复用边界"
           value={query}
           allowClear
           onSearch={(value) => update({ controlq: value })}
         />
         <nav aria-label="控件设计目录">
-          {matches.map((topic) => (
-            <button
-              key={topic.key}
-              type="button"
-              className="erp-dev-directory-item"
-              aria-current={current.key === topic.key ? 'page' : undefined}
-              onClick={() => update({ control: topic.key, controlq: '' })}
-            >
-              <span>
-                <strong>{topic.title}</strong>
-                <small>{topic.summary}</small>
-              </span>
-            </button>
-          ))}
+          {matches.map((topic) => {
+            const componentName =
+              topic.componentNames.find((name) => words.includes(name.toLowerCase())) ??
+              topic.componentNames.find((name) => words.some((word) => name.toLowerCase().includes(word))) ??
+              topic.componentNames[0]
+            return (
+              <button
+                key={topic.key}
+                type="button"
+                className="erp-dev-directory-item"
+                aria-current={current.key === topic.key ? 'page' : undefined}
+                onClick={() => update({ control: topic.key, controlq: '' })}
+              >
+                <span>
+                  <strong>{topic.title}</strong>
+                  {componentName && <DirectoryComponentName name={componentName} />}
+                </span>
+              </button>
+            )
+          })}
           {!matches.length && (
             <div className="erp-control-library-no-results">
               <p>没有匹配的控件</p>

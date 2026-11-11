@@ -147,6 +147,24 @@ export function createDevSharedComponentScenarios({
           name: '控件设计目录',
           exact: true,
         })
+        const catalogEntry = directory.getByRole('button', { name: '组件选用', exact: true })
+        const paginationEntry = directory.getByRole('button', { name: /列表与分页/u })
+        const pickerEntry = directory.getByRole('button', { name: /来源选择/u })
+        assert.equal(await catalogEntry.locator('code').count(), 0, '选用索引没有虚构的组件名')
+        assert.equal(await pickerEntry.locator('code').textContent(), 'SourceImportPickerModal')
+        assert.equal(await paginationEntry.locator('code').textContent(), 'AppTable')
+
+        await search.fill('AppPagination')
+        await search.press('Enter')
+        await page.waitForURL((url) => url.searchParams.get('controlq') === 'AppPagination')
+        await paginationEntry.locator('code').filter({ hasText: /^AppPagination$/u }).waitFor()
+        await paginationEntry.focus()
+        await page.keyboard.press('Enter')
+        await page.getByRole('heading', { name: '列表与分页', exact: true }).waitFor()
+        assert.equal(await page.getByRole('button', { name: '返回组件选用', exact: true }).count(), 0)
+        await catalogEntry.click()
+        await catalog.waitFor()
+
         await search.fill('PrintEditableText')
         await search.press('Enter')
         await page.waitForURL((url) => url.searchParams.get('controlq') === 'PrintEditableText')
@@ -182,6 +200,12 @@ export function createDevSharedComponentScenarios({
         assert(
           bounds.scrollWidth <= bounds.width + 1,
           '长组件路径在目录正文内换行'
+        )
+        assert(
+          await directory.locator('code').evaluateAll((labels) =>
+            labels.length > 0 && labels.every((label) => label.scrollWidth <= label.clientWidth + 1)
+          ),
+          '目录中的长代码名可换行且不横向溢出'
         )
         await assertNoHorizontalOverflow(page)
       },

@@ -21,15 +21,18 @@
   margin-top: 16px;
 }
 
-.erp-control-library-directory :is(strong, small) {
+.erp-control-library-directory strong,
+.erp-control-library-component-name {
   display: block;
 }
 
-.erp-control-library-directory small {
-  margin-top: 5px;
+.erp-control-library-component-name {
+  margin-top: 3px;
   color: var(--erp-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: var(--erp-font-caption);
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .erp-control-library-note,
