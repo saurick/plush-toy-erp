@@ -184,10 +184,11 @@ func (r *productionOrderRepo) ListProductionOrders(ctx context.Context, filter b
 		"planned_end_at": productionorder.FieldPlannedEndAt, "created_at": productionorder.FieldCreatedAt,
 		"updated_at": productionorder.FieldUpdatedAt,
 	}[filter.SortBy]
-	order := ent.Desc(sortField)
+	direction := entsql.OrderDesc()
 	if filter.SortDirection == "asc" {
-		order = ent.Asc(sortField)
+		direction = entsql.OrderAsc()
 	}
+	order := entsql.OrderByField(sortField, direction, entsql.OrderNullsLast()).ToFunc()
 	rows, err := query.Order(order, ent.Desc(productionorder.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err

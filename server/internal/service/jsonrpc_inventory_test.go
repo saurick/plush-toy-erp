@@ -173,6 +173,25 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 		})
 	}
 
+	for _, tc := range []struct {
+		method, field, direction string
+	}{
+		{"list_inventory_balances", "available_quantity", "asc"},
+		{"list_inventory_balances", "quantity", "sideways"},
+		{"list_inventory_balances", "", "asc"},
+		{"list_inventory_lots", "quantity", "desc"},
+		{"list_inventory_lots", "received_at", "sideways"},
+	} {
+		t.Run(tc.method+"/"+tc.field+"/"+tc.direction, func(t *testing.T) {
+			_, res, err := j.handleInventory(adminCtx, tc.method, "invalid-sort", mustJSONRPCStruct(t, map[string]any{
+				"sort_by": tc.field, "sort_direction": tc.direction,
+			}))
+			if err != nil || res == nil || res.Code != errcode.InvalidParam.Code {
+				t.Fatalf("expected invalid inventory sort, got %v, %v", res, err)
+			}
+		})
+	}
+
 	if _, err := j.inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,

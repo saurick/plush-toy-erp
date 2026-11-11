@@ -336,7 +336,12 @@ test('exact linked-record routes use a one-record page instead of injecting into
       /const exactPage = resolveExactRecordPage\(\{/u,
       `${title} must resolve exact route records outside ordinary page totals`
     )
-    assert.match(source, /setTotal\(exactPage\.total\)/u)
+    assert.match(
+      source,
+      title === '生产订单'
+        ? /setListResult\(\{ orders: exactPage\.records, total: exactPage\.total, query \}\)/u
+        : /setTotal\(exactPage\.total\)/u
+    )
     assert.doesNotMatch(
       source,
       /setTotal\([\s\S]{0,180}\? 1\s*:\s*0/u,

@@ -155,9 +155,14 @@ import {
 } from '../utils/sourceBusinessAction.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../utils/moduleTableColumns.mjs'
 import { BusinessViewPanels } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 
 const EMPTY_INVENTORY_ROWS = Object.freeze([])
+const INVENTORY_SORT_FIELDS = {
+  [VIEW_BALANCES]: { subject_id: 'subject_code', warehouse_id: 'warehouse_name', lot_id: 'lot_no', quantity: 'quantity' },
+  [VIEW_LOTS]: { lot_no: 'lot_no', received_at: 'received_at' },
+}
 
 const INVENTORY_OPERATION_SESSION_PREFIX =
   'plush-erp:inventory-operation:last:v1:'
@@ -194,9 +199,9 @@ export default function InventoryLedgerPage() {
     'list'
   )
   const [statusCounts, setStatusCounts] = useState(null)
-  const [rowsByView, setRowsByView] = useState({})
+  const [listResults, setListResults] = useState({})
+  const [sortByView, setSortByView] = useBusinessPageState('sortByView', {})
   const [viewSwitchPending, setViewSwitchPending] = useState(false)
-  const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useBusinessPageState('keyword', '')
   const [subjectType, setSubjectType] = useBusinessPageState('subjectType', '')
   const [stockCategory, setStockCategory] = useBusinessPageState(
@@ -245,7 +250,11 @@ export default function InventoryLedgerPage() {
   const activeView = Object.hasOwn(VIEW_LABELS, routeView)
     ? routeView
     : VIEW_BALANCES
-  const rows = rowsByView[activeView] || EMPTY_INVENTORY_ROWS
+  const listResult = listResults[activeView]
+  const rows = listResult?.rows || EMPTY_INVENTORY_ROWS
+  const total = listResult?.total || 0
+  const sortFields = !outletContext?.taskBusiness ? INVENTORY_SORT_FIELDS[activeView] : undefined
+  const sort = sortFields ? sortByView[activeView] : null
   const previousView = useRef(activeView)
   const routeLotID = taskStock?.lot_id || searchParamPositiveInt(searchParams, 'lot_id')
   const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
@@ -397,6 +406,7 @@ export default function InventoryLedgerPage() {
         return list(
           compactParams({
             ...commonParams,
+            ...sort,
             status: lotStatus,
             include_status_counts: all ? undefined : true,
             date_field: 'received_at',
@@ -431,7 +441,7 @@ export default function InventoryLedgerPage() {
         )
       }
       const list = all ? listAllInventoryBalances : listInventoryBalances
-      return list(commonParams, { signal })
+      return list({ ...commonParams, ...sort }, { signal })
     },
     [
       activeView,
@@ -442,6 +452,7 @@ export default function InventoryLedgerPage() {
       pagination,
       routeSourceID,
       routeSourceType,
+      sort,
       sourceType,
       txnType,
     ]
@@ -449,10 +460,10 @@ export default function InventoryLedgerPage() {
 
   const loadDistributionBalances = useCallback(
     async ({ signal }) => {
-      const data = await loadInventoryList({ signal, all: true })
+      const data = await listAllInventoryBalances(inventoryCommonParams, { signal })
       return getRowsFromData(VIEW_BALANCES, data)
     },
-    [loadInventoryList]
+    [inventoryCommonParams]
   )
 
   const distributionData = useBusinessVisualizationData({
@@ -468,8 +479,7 @@ export default function InventoryLedgerPage() {
     setStatusCounts(null)
     if (!canReadInventory) {
       if (request.isCurrent()) {
-        setRowsByView({})
-        setTotal(0)
+        setListResults({})
         setSelectedRow(null)
       }
       request.finish()
@@ -483,11 +493,13 @@ export default function InventoryLedgerPage() {
       }
       setStatusCounts(activeView === VIEW_LOTS ? resolveBusinessStatusCounts(data) : null)
       const nextRows = getRowsFromData(activeView, data)
-      setRowsByView((current) => ({ ...current, [activeView]: nextRows }))
+      setListResults((current) => ({
+        ...current,
+        [activeView]: { rows: nextRows, total: Number(data?.total || 0), pagination, sort },
+      }))
       setSelectedRecords((current) => taskStock
         ? nextRows.filter((item) => item.lot_id === taskStock.lot_id && item.warehouse_id === taskStock.warehouse_id).slice(0, 1)
         : nextRows.filter((item) => current.some((selected) => selected.id === item.id)))
-      setTotal(Number(data?.total || 0))
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return
@@ -499,7 +511,7 @@ export default function InventoryLedgerPage() {
         request.finish()
       }
     }
-  }, [setSelectedRow, operationsOnly, taskOperation, activeView, beginLatestRequest, canReadInventory, loadInventoryList, taskStock])
+  }, [setSelectedRow, operationsOnly, taskOperation, activeView, beginLatestRequest, canReadInventory, loadInventoryList, pagination, sort, taskStock])
 
   useEffect(() => {
     loadRows()
@@ -540,6 +552,13 @@ export default function InventoryLedgerPage() {
   const resetCurrentPage = useCallback(() => {
     resetBusinessPaginationCurrent(setPagination)
   }, [setPagination])
+
+  const handleTableChange = (_pagination, _filters, sorter, { action }) => {
+    if (action !== 'sort' || !sortFields) return
+    const nextSort = readBusinessServerTableSort(sorter, sortFields)
+    setSortByView((current) => ({ ...current, [activeView]: nextSort }))
+    resetCurrentPage()
+  }
 
   const activeLabel = VIEW_LABELS[activeView]
   const inventoryBalanceSwitch = (
@@ -1097,8 +1116,10 @@ export default function InventoryLedgerPage() {
     columns,
   })
   const copyableTableColumns = useMemo(
-    () => normalizeBusinessTableColumns(tableColumns),
-    [tableColumns]
+    () => normalizeBusinessTableColumns(
+      sortFields ? applyBusinessServerColumnSorters(tableColumns, sortFields, listResult?.sort) : tableColumns
+    ),
+    [tableColumns, sortFields, listResult?.sort]
   )
   const loadExportRows = useCallback(
     async ({ signal }) => {
@@ -1757,8 +1778,9 @@ export default function InventoryLedgerPage() {
               loading={loading}
               dataSource={canReadInventory ? rows : EMPTY_INVENTORY_ROWS}
               columns={copyableTableColumns}
+              onChange={handleTableChange}
               pagination={createBusinessTablePagination({
-                pagination,
+                pagination: listResult?.pagination || pagination,
                 total,
                 onChange: (current, pageSize) =>
                   setPagination({ current, pageSize }),

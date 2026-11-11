@@ -590,6 +590,46 @@ func TestProductionOrderPostgresGetAndListReadContract(t *testing.T) {
 	}
 }
 
+func TestProductionOrderPostgresListPlanDatesNullLast(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	prefix := "MO-SORT-" + postgresTestSuffix()
+	actor := client.AdminUser.Create().SetUsername(prefix).SetPasswordHash("test-password-hash").SaveX(ctx)
+	first := time.Date(2026, time.June, 10, 0, 0, 0, 0, time.UTC)
+	last := first.AddDate(0, 0, 2)
+	create := func(suffix string, start, end *time.Time) int {
+		return client.ProductionOrder.Create().SetOrderNo(prefix + suffix).SetCreatedBy(actor.ID).
+			SetNillablePlannedStartAt(start).SetNillablePlannedEndAt(end).SaveX(ctx).ID
+	}
+	a := create("-A", &first, &last)
+	b := create("-B", &last, &last)
+	undated := create("-C", nil, nil)
+	uc := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, log.NewStdLogger(io.Discard)))
+	for _, tc := range []struct {
+		field, direction string
+		want             []int
+	}{
+		{"planned_start_at", "asc", []int{a, b, undated}},
+		{"planned_start_at", "desc", []int{b, a, undated}},
+		{"planned_end_at", "desc", []int{b, a, undated}},
+		{"order_no", "asc", []int{a, b, undated}},
+	} {
+		t.Run(tc.field+"/"+tc.direction, func(t *testing.T) {
+			for offset, want := range tc.want {
+				rows, total, err := uc.List(ctx, biz.ProductionOrderFilter{
+					Keyword: prefix, SortBy: tc.field, SortDirection: tc.direction, Limit: 1, Offset: offset,
+				})
+				if err != nil || total != len(tc.want) || len(rows) != 1 {
+					t.Fatalf("page at offset %d: %d rows of %d, err=%v", offset, len(rows), total, err)
+				}
+				if rows[0].ID != want {
+					t.Fatalf("page at offset %d: got ID %d want %d", offset, rows[0].ID, want)
+				}
+			}
+		})
+	}
+}
+
 func assertOneProductionOrderWinner(t *testing.T, results []productionOrderPGResult, loserError error) {
 	t.Helper()
 	successes, losers := 0, 0

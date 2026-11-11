@@ -513,11 +513,12 @@ export function createInventoryPresentationScenarios(deps) {
         })
       },
       verify: async (page) => {
+        const activePage = page.locator('[data-business-view-panel]:not([hidden]) .ant-pagination-item-active')
         await page.locator('tr[data-row-key="lots-2000"]').waitFor()
         await page.locator('.ant-pagination-item-2').click()
         await page.locator('tr[data-row-key="lots-2050"]')
           .filter({ hasText: 'PAGINATION-LOT-051' }).waitFor()
-        assert.equal(await page.locator('.ant-pagination-item-active').getAttribute('title'), '2')
+        assert.equal(await activePage.getAttribute('title'), '2')
         const [response] = await Promise.all([
           page.waitForResponse((response) => {
             if (!response.url().endsWith('/rpc/inventory')) return false
@@ -530,12 +531,107 @@ export function createInventoryPresentationScenarios(deps) {
         assert.equal(await response.finished(), null)
         assert.equal((await response.json()).result.code, 0)
         await page.locator('tr[data-row-key="txns-501"]').waitFor()
-        assert.equal(await page.locator('.ant-pagination-item-active').getAttribute('title'), '1')
+        assert.equal(await activePage.getAttribute('title'), '1')
         await writeFile(path.join(outputDir, 'inventory-pagination-view-reset.json'), JSON.stringify({
           fromPage: 2,
           toPage: 1,
           query: response.request().postDataJSON().params,
         }, null, 2))
+      },
+    },
+    {
+      name: 'warehouse-inventory-server-table-sort',
+      path: '/erp/warehouse/inventory?view=balances',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        const balances = Array.from({ length: 51 }, (_, index) => ({
+          id: 3000 + index,
+          subject_type: 'MATERIAL',
+          subject_id: 1,
+          warehouse_id: 1,
+          unit_id: 1,
+          quantity: index === 50 ? '0.125' : '12',
+        }))
+        const lots = [
+          { id: 4000, lot_no: 'SORT-LOT-LATE', received_at: 1781683200 },
+          { id: 4001, lot_no: 'SORT-LOT-EARLY', received_at: 1781596800 },
+        ]
+        let failDescendingOnce = true
+        await page.route('**/rpc/inventory', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method === 'list_inventory_balances') {
+            if (params.sort_direction === 'desc' && failDescendingOnce) {
+              failDescendingOnce = false
+              return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 50000, message: '读取失败' } } })
+            }
+            const rows = params.sort_direction === 'asc' ? [balances[50], ...balances.slice(0, 50)] : balances
+            return route.fulfill({ json: {
+              jsonrpc: '2.0', id, result: styleRpcResult(stylePaginatedRpcData(rows, 'inventory_balances', params)),
+            } })
+          }
+          if (method === 'list_inventory_lots' && !Array.isArray(params.ids)) {
+            const rows = params.sort_by === 'received_at' ? [...lots].reverse() : lots
+            return route.fulfill({ json: {
+              jsonrpc: '2.0', id, result: styleRpcResult(stylePaginatedRpcData(rows, 'inventory_lots', params)),
+            } })
+          }
+          return route.fallback()
+        })
+      },
+      verify: async (page) => {
+        const quantity = page.getByRole('columnheader', { name: '账面数量', exact: true })
+        const panel = page.locator('[data-business-view-panel]:not([hidden])')
+        const activePage = panel.locator('.ant-pagination-item-active')
+        const waitForFirstRow = (key) => panel.locator('.ant-table-tbody tr[data-row-key]').first()
+          .and(page.locator(`tr[data-row-key="${key}"]`)).waitFor()
+        const readAfter = (method, check, action) => Promise.all([
+          page.waitForResponse((response) => {
+            if (!response.url().endsWith('/rpc/inventory')) return false
+            const call = response.request().postDataJSON()
+            return call.method === method && !Array.isArray(call.params?.ids) && check(call.params || {})
+          }),
+          action(),
+        ])
+        const balances = 'list_inventory_balances'
+        await waitForFirstRow('balances-3000')
+        const search = page.locator('.erp-business-operation-panel__search input')
+        await search.fill('SORT')
+        await readAfter(balances, (p) => p.keyword === 'SORT', () => search.press('Enter'))
+        await panel.locator('.ant-pagination-item-2').click()
+        await waitForFirstRow('balances-3050')
+        assert.equal(await activePage.getAttribute('title'), '2')
+        const isQuantityAscending = (p) =>
+          p.keyword === 'SORT' && p.sort_by === 'quantity' && p.sort_direction === 'asc' && p.offset === 0
+        await readAfter(balances, isQuantityAscending, () => quantity.press('Enter'))
+        await waitForFirstRow('balances-3050')
+        await quantity.and(page.locator('[aria-sort="ascending"]')).waitFor()
+        assert.equal(await activePage.getAttribute('title'), '1')
+        await panel.locator('.ant-pagination-item-2').click()
+        await waitForFirstRow('balances-3049')
+        const isDescendingFirstPage = (p) => p.sort_direction === 'desc' && p.offset === 0
+        const [failed] = await readAfter(balances, isDescendingFirstPage, () => quantity.click())
+        assert.equal((await failed.json()).result.code, 50000)
+        await page.locator('.erp-inventory-ledger-page .ant-spin-spinning').waitFor({ state: 'hidden' })
+        assert.equal(await quantity.getAttribute('aria-sort'), 'ascending')
+        assert.equal(await activePage.getAttribute('title'), '2')
+        await waitForFirstRow('balances-3049')
+        const refresh = page.getByRole('button', { name: '刷新当前页', exact: true })
+        await readAfter(balances, isDescendingFirstPage, () => refresh.click())
+        await waitForFirstRow('balances-3000')
+        await quantity.and(page.locator('[aria-sort="descending"]')).waitFor()
+        await readAfter('list_inventory_lots', (p) => !p.sort_by, () => selectWarehouseView(page, '库存批次'))
+        await waitForFirstRow('lots-4000')
+        const received = page.getByRole('columnheader', { name: '接收日期', exact: true })
+        await readAfter('list_inventory_lots', (p) => p.sort_by === 'received_at' && p.sort_direction === 'asc', () => received.click())
+        await waitForFirstRow('lots-4001')
+        await received.and(page.locator('[aria-sort="ascending"]')).waitFor()
+        await readAfter(balances, (p) => p.sort_by === 'quantity' && p.sort_direction === 'desc', () => selectWarehouseView(page, '库存余额'))
+        await quantity.and(page.locator('[aria-sort="descending"]')).waitFor()
+        await readAfter(balances, (p) => !p.sort_by && !p.sort_direction && p.keyword === 'SORT', () => quantity.click())
+        await page.waitForFunction(() => !document.querySelector('[data-business-view-panel="balances"]:not([hidden]) th[aria-sort]'))
+        await assertNoHorizontalOverflow(page, 'warehouse-inventory-server-table-sort')
       },
     },
     {

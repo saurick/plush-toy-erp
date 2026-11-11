@@ -312,3 +312,23 @@ export const applyBusinessColumnSorters = (columns = []) =>
         }
       : column
   })
+
+export function applyBusinessServerColumnSorters(columns, sortFields, sort) {
+  return columns.map((column) => {
+    const field = Object.hasOwn(sortFields, column.dataIndex) && sortFields[column.dataIndex]
+    if (!field) return column
+    return {
+      ...column,
+      sorter: true,
+      sortOrder: sort?.sort_by === field
+        ? (sort.sort_direction === 'asc' ? 'ascend' : 'descend')
+        : null,
+    }
+  })
+}
+
+export function readBusinessServerTableSort(sorter, sortFields) {
+  const direction = { ascend: 'asc', descend: 'desc' }[sorter?.order]
+  if (!direction || !Object.hasOwn(sortFields, sorter?.field)) return null
+  return { sort_by: sortFields[sorter.field], sort_direction: direction }
+}

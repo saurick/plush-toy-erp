@@ -13783,6 +13783,8 @@
     },
     "message": "OK",
     "params": {
+      "sort_by": "quantity",
+      "sort_direction": "desc",
       "subject_id": 1,
       "subject_type": "PRODUCT",
       "warehouse_id": 2
@@ -13832,6 +13834,8 @@
       "date_to": "2026-06-17",
       "include_status_counts": true,
       "keyword": "INV-LEDGER-LOT",
+      "sort_by": "received_at",
+      "sort_direction": "asc",
       "status": "ACTIVE",
       "warehouse_id": 1
     },

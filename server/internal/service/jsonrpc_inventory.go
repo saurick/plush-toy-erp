@@ -114,6 +114,8 @@ func inventoryBalanceFilterFromParams(pm map[string]any) biz.InventoryBalanceFil
 		WarehouseID:   getInt(pm, "warehouse_id", 0),
 		LotID:         getInt(pm, "lot_id", 0),
 		Keyword:       getString(pm, "keyword"),
+		SortBy:        getString(pm, "sort_by"),
+		SortDirection: getString(pm, "sort_direction"),
 		Limit:         getInt(pm, "limit", 50),
 		Offset:        getInt(pm, "offset", 0),
 	}
@@ -143,6 +145,8 @@ func inventoryLotFilterFromParams(pm map[string]any) (biz.InventoryLotFilter, bo
 		Keyword:       getString(pm, "keyword"),
 		DateFrom:      dateFrom,
 		DateTo:        dateTo,
+		SortBy:        getString(pm, "sort_by"),
+		SortDirection: getString(pm, "sort_direction"),
 		Limit:         getInt(pm, "limit", 50),
 		Offset:        getInt(pm, "offset", 0),
 	}, true

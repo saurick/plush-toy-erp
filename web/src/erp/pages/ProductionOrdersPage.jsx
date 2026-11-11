@@ -23,6 +23,7 @@ import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../utils/moduleTableColumns.mjs'
 import {
   BusinessActionTooltip,
   BusinessDataTable,
@@ -174,6 +175,12 @@ const DEFAULT_QUERY = Object.freeze({
   page: 1,
   page_size: DEFAULT_BUSINESS_PAGE_SIZE,
 })
+const PRODUCTION_SORT_FIELDS = {
+  order_no: 'order_no',
+  planned_start_at: 'planned_start_at',
+  planned_end_at: 'planned_end_at',
+}
+const EMPTY_ORDERS = Object.freeze([])
 
 function positiveQuery(value, fallback) {
   const parsed = Number(value)
@@ -290,8 +297,10 @@ export default function ProductionOrdersPage() {
   const [form] = Form.useForm()
   const [reasonForm] = Form.useForm()
   const [query, setQuery] = useState(() => queryFromSearchParams(searchParams))
-  const [orders, setOrders] = useState([])
-  const [total, setTotal] = useState(0)
+  const [listResult, setListResult] = useState(null)
+  const orders = listResult?.orders || EMPTY_ORDERS
+  const total = listResult?.total || 0
+  const displayedQuery = listResult?.query || query
   const [statusCounts, setStatusCounts] = useState(null)
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -568,9 +577,7 @@ export default function ProductionOrdersPage() {
         hasExactContext: routeSelectedID > 0,
         total: data.total,
       })
-      const nextOrders = exactPage.records
-      setOrders(nextOrders)
-      setTotal(exactPage.total)
+      setListResult({ orders: exactPage.records, total: exactPage.total, query })
       setStatusCounts(resolveBusinessStatusCounts(data, {
         hasExactContext: routeSelectedID > 0, exactRecord: routeOrder, statusField: 'status',
       }))
@@ -1631,6 +1638,24 @@ export default function ProductionOrdersPage() {
       moduleTitle: '生产订单',
       columns: listColumns,
     })
+  const canSortOrders = !taskSource && !routeProductionOrderID
+  const sortedColumns = useMemo(
+    () => canSortOrders
+      ? applyBusinessServerColumnSorters(tableColumns, PRODUCTION_SORT_FIELDS, displayedQuery)
+      : tableColumns,
+    [canSortOrders, displayedQuery, tableColumns]
+  )
+  const handleTableChange = (_pagination, _filters, sorter, { action }) => {
+    if (action !== 'sort' || !canSortOrders) return
+    const sort = readBusinessServerTableSort(sorter, PRODUCTION_SORT_FIELDS)
+    setSelected(null)
+    setAggregate(null)
+    writeQuery({
+      sort_by: sort?.sort_by || DEFAULT_QUERY.sort_by,
+      sort_direction: sort?.sort_direction || DEFAULT_QUERY.sort_direction,
+      page: 1,
+    })
+  }
   const loadExportOrders = useCallback(
     async ({ signal }) => {
       if (!canRead) return []
@@ -2079,8 +2104,9 @@ export default function ProductionOrdersPage() {
       <BusinessDataTable
         loading={loading}
         rowKey="id"
-        columns={tableColumns}
+        columns={sortedColumns}
         dataSource={orders}
+        onChange={handleTableChange}
         rowSelection={{
               type: 'radio',
               selectedRowKeys: selected ? [selected.id] : [],
@@ -2104,7 +2130,7 @@ export default function ProductionOrdersPage() {
               )
             }
         pagination={createBusinessTablePagination({
-          pagination: { current: query.page, pageSize: query.page_size },
+          pagination: { current: displayedQuery.page, pageSize: displayedQuery.page_size },
           total,
           onChange: (page, pageSize) =>
             writeQuery({ page, page_size: pageSize }),

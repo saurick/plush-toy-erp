@@ -101,6 +101,7 @@ export function createProductionCompactPagesScenarios({
           .getByRole('heading', { name: '待仓库确认成品入库', exact: true })
           .waitFor()
         await drawer.getByText('PROD-FACT-L1', { exact: true }).waitFor()
+        await drawer.getByText('产品', { exact: true }).waitFor()
         assert.equal(await page.locator('.ant-table-column-sort').count(), 0, '选中导致行移动时，第二次点击不能误触表头排序')
         await drawer.getByText(/确认成功才增加成品库存/u).waitFor()
         assert.equal(
@@ -247,6 +248,52 @@ export function createProductionCompactPagesScenarios({
     ...scenarios,
     {
       ...base,
+      name: 'production-orders-server-table-sort',
+      path: '/erp/production/orders?keyword=MO-SORT&page=2',
+      beforeNavigate: async (page) => {
+        const orders = Array.from({ length: 51 }, (_, index) => ({
+          id: 7000 + index,
+          order_no: `MO-SORT-${index + 1}`,
+          status: 'DRAFT',
+          version: 1,
+          item_count: 0,
+          planned_start_at: index === 50 ? 1781596800 : 1781683200,
+        }))
+        await page.route('**/rpc/production_order', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_production_orders') return route.fallback()
+          const rows = params.sort_by === 'planned_start_at' && params.sort_direction === 'asc'
+            ? [orders[50], ...orders.slice(0, 50)] : orders
+          return route.fulfill({ json: {
+            jsonrpc: '2.0', id, result: styleRpcResult(stylePaginatedRpcData(rows, 'production_orders', params)),
+          } })
+        })
+      },
+      verify: async (page) => {
+        const header = page.getByRole('columnheader', { name: '计划开始', exact: true })
+        const activePage = page.locator('.ant-pagination-item-active')
+        await page.locator('.ant-table-tbody tr[data-row-key="7050"]').waitFor()
+        assert.equal(await activePage.getAttribute('title'), '2')
+        const [response] = await Promise.all([
+          page.waitForResponse((response) => {
+            if (!response.url().endsWith('/rpc/production_order')) return false
+            const call = response.request().postDataJSON()
+            return call.method === 'list_production_orders' && call.params?.sort_by === 'planned_start_at'
+          }),
+          header.click(),
+        ])
+        const { params } = response.request().postDataJSON()
+        assert.equal(params.keyword, 'MO-SORT')
+        assert.equal(params.sort_direction, 'asc')
+        assert.equal(params.offset, 0)
+        await header.and(page.locator('[aria-sort="ascending"]')).waitFor()
+        assert.equal(await activePage.getAttribute('title'), '1')
+        assert.equal(await page.locator('.ant-table-tbody tr[data-row-key]').first().getAttribute('data-row-key'), '7050')
+        await assertNoHorizontalOverflow(page, 'production-orders-server-table-sort')
+      },
+    },
+    {
+      ...base,
       name: 'production-exception-query-consistency',
       path: '/erp/production/exceptions',
       beforeNavigate: scenarios[2].beforeNavigate,
@@ -261,7 +308,7 @@ export function createProductionCompactPagesScenarios({
         const request = page.waitForRequest((request) => request.url().endsWith('/rpc/operational_fact') && request.postDataJSON()?.method === 'list_production_exceptions' && request.postDataJSON().params.keyword === 'PE-COMPACT')
         await query.fill('PE-COMPACT')
         await query.press('Enter')
-        const params = (await request).postDataJSON().params
+        const { params } = (await request).postDataJSON()
         assert.equal(params.offset, 0)
         assert.equal(params.handling_status, 'APPROVED')
         await statuses.getByRole('button', { name: '已批准，共 1 条', exact: true }).waitFor()

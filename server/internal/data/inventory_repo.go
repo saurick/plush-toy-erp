@@ -491,8 +491,10 @@ func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.In
 	if err != nil {
 		return nil, 0, err
 	}
+	// Each reference join matches at most one row; DISTINCT would prevent sorting by joined fields.
 	rows, err := query.
-		Order(ent.Desc(inventorybalance.FieldUpdatedAt), ent.Desc(inventorybalance.FieldID)).
+		Unique(false).
+		Order(inventoryBalanceOrder(filter), ent.Desc(inventorybalance.FieldID)).
 		WithInventoryLot().
 		Limit(filter.Limit).
 		Offset(filter.Offset).
@@ -558,6 +560,52 @@ func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.In
 		out = append(out, item)
 	}
 	return out, total, nil
+}
+
+func inventoryListOrderOptions(direction string) []entsql.OrderTermOption {
+	if direction == "asc" {
+		return []entsql.OrderTermOption{entsql.OrderAsc(), entsql.OrderNullsLast()}
+	}
+	return []entsql.OrderTermOption{entsql.OrderDesc(), entsql.OrderNullsLast()}
+}
+
+func inventoryBalanceOrder(filter biz.InventoryBalanceFilter) inventorybalance.OrderOption {
+	opts := inventoryListOrderOptions(filter.SortDirection)
+	switch filter.SortBy {
+	case biz.InventorySortSubjectCode:
+		return inventoryBalanceSubjectCodeOrder(filter.SortDirection)
+	case biz.InventorySortWarehouseName:
+		return inventorybalance.ByWarehouseField(warehouse.FieldName, opts...)
+	case biz.InventorySortLotNo:
+		return inventorybalance.ByInventoryLotField(inventorylot.FieldLotNo, opts...)
+	case biz.InventorySortQuantity:
+		return inventorybalance.ByQuantity(opts...)
+	default:
+		return ent.Desc(inventorybalance.FieldUpdatedAt)
+	}
+}
+
+func inventoryBalanceSubjectCodeOrder(direction string) inventorybalance.OrderOption {
+	return func(s *entsql.Selector) {
+		m := entsql.Table(material.Table).As("balance_material")
+		p := entsql.Table(product.Table).As("balance_product")
+		s.LeftJoin(m).OnP(entsql.And(
+			entsql.EQ(s.C(inventorybalance.FieldSubjectType), biz.InventorySubjectMaterial),
+			entsql.ColumnsEQ(s.C(inventorybalance.FieldSubjectID), m.C(material.FieldID)),
+		))
+		s.LeftJoin(p).OnP(entsql.And(
+			entsql.EQ(s.C(inventorybalance.FieldSubjectType), biz.InventorySubjectProduct),
+			entsql.ColumnsEQ(s.C(inventorybalance.FieldSubjectID), p.C(product.FieldID)),
+		))
+		s.OrderExprFunc(func(b *entsql.Builder) {
+			b.WriteString("COALESCE(").WriteString(m.C(material.FieldCode)).
+				WriteString(", ").WriteString(p.C(product.FieldCode)).WriteString(")")
+			if direction != "asc" {
+				b.WriteString(" DESC")
+			}
+			b.WriteString(" NULLS LAST")
+		})
+	}
 }
 
 func activeReservedQuantityForBalance(ctx context.Context, client *ent.Client, row *ent.InventoryBalance) (decimal.Decimal, error) {
@@ -653,7 +701,7 @@ func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.Invent
 		return nil, 0, err
 	}
 	rows, err := query.
-		Order(ent.Desc(inventorylot.FieldUpdatedAt), ent.Desc(inventorylot.FieldID)).
+		Order(inventoryLotOrder(filter), ent.Desc(inventorylot.FieldID)).
 		Limit(filter.Limit).
 		Offset(filter.Offset).
 		All(ctx)
@@ -679,6 +727,18 @@ func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.Invent
 		out = append(out, item)
 	}
 	return out, total, nil
+}
+
+func inventoryLotOrder(filter biz.InventoryLotFilter) inventorylot.OrderOption {
+	opts := inventoryListOrderOptions(filter.SortDirection)
+	switch filter.SortBy {
+	case biz.InventorySortLotNo:
+		return inventorylot.ByLotNo(opts...)
+	case biz.InventorySortReceivedAt:
+		return inventorylot.ByReceivedAt(opts...)
+	default:
+		return ent.Desc(inventorylot.FieldUpdatedAt)
+	}
 }
 
 func (r *inventoryRepo) ListInventoryTxns(ctx context.Context, filter biz.InventoryTxnFilter) ([]*biz.InventoryTxn, int, error) {

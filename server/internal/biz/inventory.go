@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -254,6 +255,14 @@ type InventoryBalanceKey struct {
 	UnitID       int
 }
 
+const (
+	InventorySortSubjectCode   = "subject_code"
+	InventorySortWarehouseName = "warehouse_name"
+	InventorySortQuantity      = "quantity"
+	InventorySortLotNo         = "lot_no"
+	InventorySortReceivedAt    = "received_at"
+)
+
 type InventoryBalanceFilter struct {
 	StockCategory string
 	SubjectType   string
@@ -262,6 +271,8 @@ type InventoryBalanceFilter struct {
 	WarehouseID   int
 	LotID         int
 	Keyword       string
+	SortBy        string
+	SortDirection string
 	Limit         int
 	Offset        int
 }
@@ -277,6 +288,8 @@ type InventoryLotFilter struct {
 	Keyword       string
 	DateFrom      *time.Time
 	DateTo        *time.Time
+	SortBy        string
+	SortDirection string
 	Limit         int
 	Offset        int
 }
@@ -1071,6 +1084,9 @@ func normalizeInventoryBalanceFilter(in InventoryBalanceFilter) (InventoryBalanc
 	if (in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType)) || in.ProductSkuID < 0 {
 		return InventoryBalanceFilter{}, ErrBadParam
 	}
+	if !validInventoryListSort(in.SortBy, in.SortDirection, InventorySortSubjectCode, InventorySortWarehouseName, InventorySortLotNo, InventorySortQuantity) {
+		return InventoryBalanceFilter{}, ErrBadParam
+	}
 	normalizeInventoryListPagination(&in.Limit, &in.Offset)
 	return in, nil
 }
@@ -1094,8 +1110,18 @@ func normalizeInventoryLotFilter(in InventoryLotFilter) (InventoryLotFilter, err
 	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
 		return InventoryLotFilter{}, ErrBadParam
 	}
+	if !validInventoryListSort(in.SortBy, in.SortDirection, InventorySortLotNo, InventorySortReceivedAt) {
+		return InventoryLotFilter{}, ErrBadParam
+	}
 	normalizeInventoryListPagination(&in.Limit, &in.Offset)
 	return in, nil
+}
+
+func validInventoryListSort(field, direction string, fields ...string) bool {
+	if field == "" {
+		return direction == ""
+	}
+	return slices.Contains(fields, field) && (direction == "" || direction == "asc" || direction == "desc")
 }
 
 func normalizeInventoryTxnFilter(in InventoryTxnFilter) (InventoryTxnFilter, error) {
