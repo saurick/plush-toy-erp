@@ -1009,6 +1009,7 @@ viewport: { width: viewport.width, height: viewport.height },
           )
           for (const expected of [
             '来源单据：PR-IQC-20260717-001',
+            '材料：',
             '按当前来源单据估算，不需要逐件计数',
             '大于 50%',
             '自定义',

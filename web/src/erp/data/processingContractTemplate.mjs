@@ -2,6 +2,7 @@ import { standardUnitForLabel } from '../utils/unitQuantity.mjs'
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
 import { unixSecondsToBusinessDate } from '../utils/businessDate.mjs'
 import { normalizeContractClauseGroups } from '../utils/contractClauseEditor.mjs'
+import { businessSubjectLabel } from '../utils/referenceSelectOptions.mjs'
 import {
   multiplyNumeric20Scale6Values,
   normalizeNumeric20Scale6,
@@ -521,7 +522,7 @@ function normalizeProcessingFactTrace(record = {}) {
     )
   }
   if (subjectNo || (subjectType && subjectID)) {
-    traceParts.push(`产品 / 材料：${subjectNo || '已关联'}`)
+    traceParts.push(`${businessSubjectLabel(subjectType, '加工对象')}：${subjectNo || '已关联'}`)
   }
   if (sourceNo || (sourceType && sourceID)) {
     traceParts.push(`来源单据: ${sourceNo || '来源单据已关联'}`)

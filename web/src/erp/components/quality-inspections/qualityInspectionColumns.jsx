@@ -7,7 +7,7 @@ import { QUALITY_RESULT_OPTIONS } from './qualityInspectionResultOptions.mjs'
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import { formatQualityDefectRate } from '../../utils/qualityDefectRate.mjs'
-import { referenceLabel, inventoryLotStatusLabel } from '../../utils/referenceSelectOptions.mjs'
+import { businessSubjectLabel, referenceLabel, inventoryLotStatusLabel } from '../../utils/referenceSelectOptions.mjs'
 
 const { Text } = Typography
 
@@ -240,20 +240,23 @@ function sourceParts(
   return !sourceType && options?.emptyText === '' ? [] : ['业务来源已关联']
 }
 
+export function qualityInspectionSubjectType(record) {
+  return String(record?.subject_type || '').trim().toUpperCase() ||
+    (Number(record?.material_id) > 0 ? 'MATERIAL' : '')
+}
+
 function subjectLabel(record, materialOptions, productOptions, options) {
   if (isProductionStageQualityInspection(record)) {
     return productionWipProductLabel(record, options)
   }
-  const subjectType = String(record?.subject_type || '').toUpperCase()
+  const subjectType = qualityInspectionSubjectType(record)
   if (subjectType === 'PRODUCT') {
     return referenceLabel(productOptions, record?.subject_id, '产品', options)
   }
-  return referenceLabel(
-    materialOptions,
-    record?.material_id || record?.subject_id,
-    '材料',
-    options
-  )
+  if (subjectType === 'MATERIAL') {
+    return referenceLabel(materialOptions, record?.material_id || record?.subject_id, '材料', options)
+  }
+  return options?.emptyText ?? '-'
 }
 
 function subjectParts(
@@ -530,6 +533,7 @@ export function buildQualityInspectionDataColumns({
       width: 260,
       className: 'erp-product-identity-cell',
       render: (_value, record) => renderSubject(record),
+      detailLabel: (record) => businessSubjectLabel(qualityInspectionSubjectType(record), '检验对象'),
       detailValue: renderSubject,
       exportValue: (record) =>
         subjectParts(record, inventoryLotOptions, materialOptions, productOptions, warehouseOptions, { emptyText: '' })

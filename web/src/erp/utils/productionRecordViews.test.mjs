@@ -26,8 +26,14 @@ test('finished-goods drafts explain the warehouse confirmation before inventory 
 })
 
 test('material and rework drafts do not claim posted results', () => {
-  for (const fact_type of ['MATERIAL_ISSUE', 'REWORK']) {
-    assert.match(productionFactSummary({ fact_type, status: 'DRAFT' }).next, /草稿尚未影响库存/u)
+  for (const [fact_type, subject_type, label] of [
+    ['MATERIAL_ISSUE', 'MATERIAL', '材料'],
+    ['REWORK', 'PRODUCT', '产品'],
+    ['REWORK', undefined, '业务对象'],
+  ]) {
+    const { next } = productionFactSummary({ fact_type, subject_type, status: 'DRAFT' })
+    assert.ok(next.includes(`来源、${label}、数量`))
+    assert.match(next, /草稿尚未影响库存/u)
   }
   assert.equal(productionFactSummary({ status: 'CANCELLED' }).title, '生产记录已取消')
   assert.match(productionFactSummary({ status: 'POSTED' }).title, /已过账/u)

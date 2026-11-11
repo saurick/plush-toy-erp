@@ -88,6 +88,7 @@ import {
   buildQualityInspectionExportColumns,
   isProductionStageQualityInspection,
   productionQualityGateLabel,
+  qualityInspectionSubjectType,
   QUALITY_DATE_FILTER_OPTIONS,
   QUALITY_INSPECTION_TYPE_LABELS,
   QUALITY_INSPECTION_TYPE_FILTER_OPTIONS,
@@ -114,6 +115,7 @@ import {
 import { applyEffectiveFieldPolicyFlags } from '../utils/adminProfileSync.mjs'
 import {
   inventoryLotOption,
+  businessSubjectLabel,
   materialOption,
   productOption,
   purchaseReceiptItemOption,
@@ -176,7 +178,7 @@ function buildDecisionSourceSummary({
   purchaseReceiptOptions,
 }) {
   const sourceType = String(inspection?.source_type || '').toUpperCase()
-  const subjectType = String(inspection?.subject_type || '').toUpperCase()
+  const subjectType = qualityInspectionSubjectType(inspection)
   const inspectionType =
     QUALITY_INSPECTION_TYPE_LABELS[
       String(inspection?.inspection_type || '').toUpperCase()
@@ -225,14 +227,13 @@ function buildDecisionSourceSummary({
           '入库行已关联'
         )
       : ''
+  const subjectLabel = businessSubjectLabel(subjectType)
   const subject =
     subjectType === 'PRODUCT'
-      ? referenceLabel(productOptions, inspection?.subject_id, '产品已关联')
-      : referenceLabel(
-          materialOptions,
-          inspection?.material_id || inspection?.subject_id,
-          '材料已关联'
-        )
+      ? referenceLabel(productOptions, inspection?.subject_id, subjectLabel, { emptyText: '' })
+      : subjectType === 'MATERIAL'
+        ? referenceLabel(materialOptions, inspection?.material_id || inspection?.subject_id, subjectLabel, { emptyText: '' })
+        : ''
   const lot = inspection?.inventory_lot_id
     ? referenceLabel(
         inventoryLotOptions,
@@ -250,7 +251,7 @@ function buildDecisionSourceSummary({
       .filter(Boolean)
       .join('；'),
     secondary: [
-      subject ? `产品或材料：${subject}` : '',
+      subject ? `${subjectLabel}：${subject}` : '',
       lot ? `批次：${lot}` : '',
     ]
       .filter(Boolean)

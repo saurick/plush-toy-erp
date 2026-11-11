@@ -722,6 +722,9 @@ export function createOutsourcingSourceFactScenarios(deps) {
             const editor = page.locator('.erp-outsourcing-source-fact-modal.erp-business-form-page:not([hidden])')
             await editor.getByRole('heading', { name: materialIssue ? '编辑委外发料草稿' : '编辑委外回货草稿', exact: true }).waitFor()
             await assertBusinessFormPage(page, editor)
+            const subject = materialIssue ? '材料' : '产品'
+            await editor.getByText(subject, { exact: true }).waitFor()
+            await editor.getByText(`来源订单、明细、加工厂、${subject}和单位保持不变；保存后仍是草稿。`, { exact: true }).waitFor()
             assert.equal(await editor.getByLabel('本次办理数量', { exact: true }).inputValue(), original.quantity)
             await editor.getByLabel('备注', { exact: true }).fill('整页草稿编辑后保留来源')
             await editor.getByRole('button', { name: '返回列表', exact: true }).click()

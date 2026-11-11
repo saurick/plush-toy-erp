@@ -361,7 +361,7 @@ test('processingContractTemplate: 委外事实只带入合同打印可确认快�
   assert.equal(draft.lines[0].quantity, '')
   assert.equal(draft.lines[0].unitPrice, '')
   assert.match(draft.lines[0].remark, /业务来源: 材料发料/u)
-  assert.match(draft.lines[0].remark, /产品 \/ 材料：已关联/u)
+  assert.match(draft.lines[0].remark, /材料：已关联/u)
   assert.match(draft.lines[0].remark, /来源单据: 来源单据已关联/u)
   assert.match(draft.lines[0].remark, /需先核对工序和单价/u)
   assert.doesNotMatch(
@@ -386,7 +386,7 @@ test('processingContractTemplate: 委外事实追溯优先显示业务单号且�
   const [{ remark }] = draft.lines
 
   assert.match(remark, /业务来源: 业务来源已关联/u)
-  assert.match(remark, /产品 \/ 材料：MAT-26001/u)
+  assert.match(remark, /加工对象：MAT-26001/u)
   assert.match(remark, /来源单据: SO-26001/u)
   assert.doesNotMatch(
     remark,
@@ -409,7 +409,7 @@ test('FL_processing_contract_fact_trace__uses_business_numbers_without_internal_
   const [{ remark }] = draft.lines
 
   assert.match(remark, /业务来源: 委外回货/u)
-  assert.match(remark, /产品 \/ 材料：半成品兔头/u)
+  assert.match(remark, /产品：半成品兔头/u)
   assert.match(remark, /来源单据: OUT-26003/u)
   assert.match(remark, /按业务来源号核对/u)
   assert.doesNotMatch(

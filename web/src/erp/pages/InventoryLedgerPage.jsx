@@ -135,6 +135,7 @@ import {
 } from '../utils/businessPagination.mjs'
 import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
+  businessSubjectLabel,
   inventoryLotOption,
   materialOption,
   productOption,
@@ -677,6 +678,7 @@ export default function InventoryLedgerPage() {
     }
     return []
   }, [materialOptions, productOptions, subjectType])
+  const subjectFilterLabel = businessSubjectLabel(subjectType, '存货')
   const subjectTypeOptions = useMemo(
     () =>
       SUBJECT_TYPE_OPTIONS.filter(
@@ -1471,13 +1473,10 @@ export default function InventoryLedgerPage() {
                   component={SelectFilter}
                   referenceType={subjectType === 'PRODUCT' ? 'products' : 'materials'}
                   className="erp-business-filter-control--status"
-                  aria-label="材料或产品"
+                  aria-label={subjectFilterLabel}
                   value={subjectID}
-                  options={[
-                { label: '全部材料或产品', value: '' },
-                ...subjectOptions,
-              ]}
-                  placeholder={subjectType ? '选择材料或产品' : '先选存货类型'}
+                  options={subjectOptions}
+                  placeholder={subjectType ? `选择${subjectFilterLabel}` : '先选存货类型'}
                   disabled={!subjectType}
                   showSearch
                   optionFilterProp="label"

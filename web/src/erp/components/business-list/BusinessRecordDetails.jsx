@@ -40,13 +40,14 @@ export default function BusinessRecordDetails({ columns = [], record, column = {
   )
 
   const items = detailColumns.map((column, index) => {
-          const label = getColumnLabel(column)
+          const columnLabel = getColumnLabel(column)
+          const label = column.detailLabel?.(record) || columnLabel
           const key =
             column.key ||
             (Array.isArray(column.dataIndex)
               ? column.dataIndex.join('.')
               : column.dataIndex) ||
-            `${label}-${index}`
+            `${columnLabel}-${index}`
           const value = visibleDetailValue(detailValue(column, record || {}))
           const copyText = resolveBusinessDetailCopyText(column, record)
           const empty = value === '-' && !copyText
@@ -69,7 +70,7 @@ export default function BusinessRecordDetails({ columns = [], record, column = {
               <span className="erp-business-details-modal__copy-value">
                 <span className="erp-business-details-modal__copy-text">{value}</span>
                 <BusinessCopyButton
-                  label={resolveBusinessTableCopyLabel(column)}
+                  label={resolveBusinessTableCopyLabel(column, record)}
                   value={copyText}
                 />
               </span>

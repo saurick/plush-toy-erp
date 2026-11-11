@@ -73,7 +73,7 @@ export async function verifyBusinessCoreInventory(page, deps) {
       1
     )
   }
-  for (const name of ['材料或产品', '产品规格', '仓库', '批次']) {
+  for (const name of ['存货', '产品规格', '仓库', '批次']) {
     assert.equal(
       await page.getByRole('combobox', { name, exact: true }).count(),
       1
@@ -105,6 +105,7 @@ export async function verifyBusinessCoreInventory(page, deps) {
     .getByRole('button', { name: '成品', exact: true })
     .click()
 
+  await page.getByRole('combobox', { name: '产品', exact: true }).waitFor()
   await inventorySKUFilter
     .locator('input:not(:disabled)')
     .waitFor({ state: 'visible' })

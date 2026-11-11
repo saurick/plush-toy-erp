@@ -10,6 +10,7 @@ import {
 } from '../../utils/masterDataOrderView.mjs'
 import { businessSourceRouteFor } from '../../utils/businessSourceNavigation.mjs'
 import { INVENTORY_VIEWS } from '../../utils/warehouseViews.mjs'
+import { businessSubjectLabel } from '../../utils/referenceSelectOptions.mjs'
 
 export const VIEW_BALANCES = 'balances'
 
@@ -239,6 +240,11 @@ export function createInventoryLedgerColumns({
   renderUnitReference,
   renderWarehouseReference,
 }) {
+  const subjectLabel = (record) => businessSubjectLabel(record?.subject_type, '存货')
+  const subjectCopy = {
+    label: subjectLabel,
+    resolveValue: (_value, record) => renderSubjectReference(record?.subject_id, record),
+  }
   if (activeView === VIEW_LOTS) {
     return [
       {
@@ -270,11 +276,8 @@ export function createInventoryLedgerColumns({
         defaultPriority: 30,
         title: '材料 / 产品',
         dataIndex: 'subject_id',
-        copyable: {
-          label: '材料或产品',
-          resolveValue: (_value, record) =>
-            renderSubjectReference(record?.subject_id, record),
-        },
+        copyable: subjectCopy,
+        detailLabel: subjectLabel,
         width: 260,
         className: 'erp-product-identity-cell',
         render: renderSubjectIdentity,
@@ -401,11 +404,8 @@ export function createInventoryLedgerColumns({
         defaultPriority: 20,
         title: '材料 / 产品',
         dataIndex: 'subject_id',
-        copyable: {
-          label: '材料或产品',
-          resolveValue: (_value, record) =>
-            renderSubjectReference(record?.subject_id, record),
-        },
+        copyable: subjectCopy,
+        detailLabel: subjectLabel,
         width: 240,
         className: 'erp-product-identity-cell',
         render: renderSubjectIdentity,
@@ -569,11 +569,8 @@ export function createInventoryLedgerColumns({
       defaultPriority: 10,
       title: '材料 / 产品',
       dataIndex: 'subject_id',
-      copyable: {
-        label: '材料或产品',
-        resolveValue: (_value, record) =>
-          renderSubjectReference(record?.subject_id, record),
-      },
+      copyable: subjectCopy,
+      detailLabel: subjectLabel,
       width: 240,
       className: 'erp-product-identity-cell',
       render: renderSubjectIdentity,

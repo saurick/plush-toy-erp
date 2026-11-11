@@ -644,10 +644,9 @@ function CopyableBusinessTableCell({ column, value, record, children }) {
       ? column.copyable
       : {}
   const copyText = resolveBusinessTableCopyText(column, value, record)
-  const copyLabel = resolveBusinessTableCopyLabel(column)
-
   if (!copyText) return children
 
+  const copyLabel = resolveBusinessTableCopyLabel(column, record)
   const handleCopy = async (event) => {
     const trigger = event.currentTarget
     const shouldReleasePointerFocus = event.detail > 0

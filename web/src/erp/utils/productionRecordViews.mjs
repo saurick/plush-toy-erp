@@ -1,13 +1,14 @@
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 import { OperationalFactStatus, ProductionExceptionStatus, ProductionExceptionExecutionStatus } from '../../common/consts/statuses.generated.mjs'
+import { businessSubjectLabel } from './referenceSelectOptions.mjs'
 
 export function productionFactSummary(record = {}) {
   const receipt = record.fact_type === 'FINISHED_GOODS_RECEIPT'
   if (record.status === OperationalFactStatus.DRAFT) {
     return receipt
       ? { title: '待仓库确认成品入库', next: '仓库核对产品、数量、仓库和批次后确认入库；确认成功才增加成品库存。' }
-      : { title: '草稿待核对', next: '核对来源、材料或产品、数量和批次，再按当前记录允许的动作办理。草稿尚未影响库存。' }
+      : { title: '草稿待核对', next: `核对来源、${businessSubjectLabel(record.subject_type, '业务对象')}、数量和批次，再按当前记录允许的动作办理。草稿尚未影响库存。` }
   }
   if (record.status === OperationalFactStatus.POSTED) {
     return receipt

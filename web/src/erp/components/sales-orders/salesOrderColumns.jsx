@@ -376,7 +376,7 @@ function renderSalesOrderGroupedField(column, record, label) {
       <span className="erp-business-table-copyable-cell__content" title={copyText}>{content}</span>
       <BusinessCopyButton
         className="erp-business-table-copyable-cell__button"
-        label={resolveBusinessTableCopyLabel(column)}
+        label={resolveBusinessTableCopyLabel(column, record)}
         value={copyText}
       />
     </span>

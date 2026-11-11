@@ -52,6 +52,18 @@ export function referenceLabel(options, value, fallbackPrefix = '记录', { empt
   return matched?.label || `${fallbackPrefix}已关联`
 }
 
+export function businessSubjectLabel(subjectType, fallback = '') {
+  switch (String(subjectType ?? '').trim().toUpperCase()) {
+    case 'MATERIAL': return '材料'
+    case 'PRODUCT': return '产品'
+    case 'PRODUCT_SKU': return '产品规格'
+    case 'WIP': return '在制品'
+    case 'PROCESS': return '工序'
+    case 'OTHER': return '其他业务'
+    default: return fallback
+  }
+}
+
 export function materialOption(material = {}) {
   const value = positiveID(material.id)
   if (!value) return null

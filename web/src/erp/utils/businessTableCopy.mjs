@@ -51,13 +51,13 @@ export function resolveBusinessDetailCopyText(column, record) {
   )
 }
 
-export function resolveBusinessTableCopyLabel(column) {
+export function resolveBusinessTableCopyLabel(column, record) {
   const copyConfig =
     typeof column?.copyable === 'object' && column.copyable !== null
       ? column.copyable
       : {}
   const candidates = [
-    copyConfig.label,
+    typeof copyConfig.label === 'function' ? copyConfig.label(record) : copyConfig.label,
     column?.copyableLabel,
     column?.exportTitle,
     typeof column?.title === 'string' ? column.title : '',

@@ -44,6 +44,7 @@ import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { DEFAULT_BUSINESS_PAGE_SIZE } from '../../utils/businessPagination.mjs'
+import { businessSubjectLabel } from '../../utils/referenceSelectOptions.mjs'
 
 export const DEFAULT_OPERATIONAL_FACT_PAGINATION = Object.freeze({
   current: 1,
@@ -162,14 +163,6 @@ const FINANCE_SETTLEMENT_ACTIONS = Object.freeze({
   }),
 })
 
-const SUBJECT_TYPE_LABELS = Object.freeze({
-  MATERIAL: '物料',
-  PRODUCT: '产品',
-  PRODUCT_SKU: '产品规格',
-  PROCESS: '工序',
-  OTHER: '其他业务',
-})
-
 function readableRef(label, value, { emptyText = '-' } = {}) {
   return value === null || value === undefined || value === ''
     ? emptyText
@@ -200,7 +193,7 @@ function sourceColumnText(record = {}) {
 function subjectColumnText(record = {}, options = {}) {
   return [
     namedBusinessReference(record.subject_name, record.subject_code, safeRefText(
-      SUBJECT_TYPE_LABELS[record.subject_type] || '业务记录',
+      businessSubjectLabel(record.subject_type, '业务记录'),
       record.subject_id || record.product_id,
       options
     )),
@@ -424,6 +417,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       width: 150,
       sortValue: subjectColumnText,
       render: (_, record) => subjectColumnText(record),
+      detailLabel: (record) => businessSubjectLabel(record?.subject_type, '业务对象'),
       exportValue: (record) => subjectColumnText(record, { emptyText: '' }),
     },
     {

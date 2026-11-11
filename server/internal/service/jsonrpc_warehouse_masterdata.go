@@ -60,12 +60,27 @@ func (d *jsonrpcDispatcher) handleWarehouseMasterData(ctx context.Context, metho
 }
 
 func warehouseClassificationError(err error) *v1.JsonrpcResult {
+	var categoryError *biz.WarehouseCategoryError
+	subjectType := ""
+	if errors.As(err, &categoryError) {
+		subjectType = categoryError.SubjectType
+	}
 	message := ""
 	switch {
 	case errors.Is(err, biz.ErrStockCategoryRequired):
-		message = "请先补齐材料的库存类别和仓库类型，再办理入库"
+		message = "请先设置所选仓库的类型"
+		if subjectType == biz.InventorySubjectMaterial {
+			message = "请先核对材料的库存类别和所选仓库的类型"
+		}
 	case errors.Is(err, biz.ErrWarehouseCategoryMismatch):
-		message = "材料或成品与所选仓库类型不符，请重新选择入库仓库"
+		switch subjectType {
+		case biz.InventorySubjectMaterial:
+			message = "材料的库存类别与所选仓库不符，请重新选择仓库"
+		case biz.InventorySubjectProduct:
+			message = "产品须入成品仓，请重新选择仓库"
+		default:
+			message = "所选仓库类型与当前存货不符，请重新选择仓库"
+		}
 	case errors.Is(err, biz.ErrWarehouseClassificationInUse):
 		message = "当前类别或仓库仍有关联库存或材料默认仓，请先处理后再修改"
 	case errors.Is(err, biz.ErrWarehouseCodeConflict):

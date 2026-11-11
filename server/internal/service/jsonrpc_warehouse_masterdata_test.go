@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -10,6 +11,32 @@ import (
 	datarepo "server/internal/data"
 	"server/internal/errcode"
 )
+
+func TestWarehouseCategoryMessageFollowsSubjectType(t *testing.T) {
+	for _, tc := range []struct {
+		warehouseType string
+		subjectType   string
+		category      string
+		cause         error
+		message       string
+	}{
+		{biz.WarehouseFinishedGoods, biz.InventorySubjectMaterial, biz.MaterialStockMain, biz.ErrWarehouseCategoryMismatch, "材料的库存类别与所选仓库不符，请重新选择仓库"},
+		{biz.WarehouseMainMaterial, biz.InventorySubjectProduct, "", biz.ErrWarehouseCategoryMismatch, "产品须入成品仓，请重新选择仓库"},
+		{biz.WarehouseMainMaterial, biz.InventorySubjectMaterial, biz.MaterialStockUnclassified, biz.ErrStockCategoryRequired, "请先核对材料的库存类别和所选仓库的类型"},
+		{biz.WarehouseUnclassified, biz.InventorySubjectProduct, "", biz.ErrStockCategoryRequired, "请先设置所选仓库的类型"},
+	} {
+		t.Run(tc.subjectType+"/"+tc.warehouseType, func(t *testing.T) {
+			err := biz.ValidateWarehouseCategory(tc.warehouseType, tc.subjectType, tc.category)
+			if !errors.Is(err, tc.cause) {
+				t.Fatalf("got error %v, want %v", err, tc.cause)
+			}
+			result := warehouseClassificationError(err)
+			if result == nil || result.Code != errcode.BusinessRuleViolation.Code || result.Message != tc.message {
+				t.Fatalf("unexpected result: %v", result)
+			}
+		})
+	}
+}
 
 func TestWarehouseMasterDataPermissionsAndMaterialReferenceBoundary(t *testing.T) {
 	d, client := openInventoryRepoTestData(t, "warehouse_permissions")

@@ -11,6 +11,7 @@ import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import {
+  businessSubjectLabel,
   inventoryLotOption,
   warehouseOptionFromRecord,
 } from '../../utils/referenceSelectOptions.mjs'
@@ -77,6 +78,8 @@ export default function OutsourcingOrderSourceFactModal({
   const lotSelection = Form.useWatch('lot_selection', form)
   const copy = actionCopy(actionType)
   const returnReceipt = actionType === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
+  const subjectType = String(item?.subject_type || '').trim().toUpperCase()
+  const subjectLabel = businessSubjectLabel(subjectType, '加工对象')
   const sourceContextKey = `${mode}:${actionType}:${record?.id || item?.id || 0}`
   const warehouseOptions = useMemo(
     () =>
@@ -101,19 +104,21 @@ export default function OutsourcingOrderSourceFactModal({
       : facts
   )
   const sourceObject =
-    String(item?.subject_type || '').toUpperCase() === 'MATERIAL'
+    subjectType === 'MATERIAL'
       ? readableText(
           [item?.material_code_snapshot, item?.material_name_snapshot],
           '材料已关联'
         )
-      : readableText(
-          [
-            item?.product_no_snapshot,
-            item?.sku_code_snapshot,
-            item?.product_name_snapshot,
-          ],
-          '产品已关联'
-        )
+      : subjectType === 'PRODUCT'
+        ? readableText(
+            [
+              item?.product_no_snapshot,
+              item?.sku_code_snapshot,
+              item?.product_name_snapshot,
+            ],
+            '产品已关联'
+          )
+        : '—'
   const supplierText = readableText(
     [order?.supplier_snapshot?.code, order?.supplier_snapshot?.name],
     '加工厂已关联'
@@ -175,7 +180,7 @@ export default function OutsourcingOrderSourceFactModal({
         showIcon
         message={
           editing
-            ? '来源订单、明细、加工厂、产品或材料和单位保持不变；保存后仍是草稿。'
+            ? `来源订单、明细、加工厂、${subjectLabel}和单位保持不变；保存后仍是草稿。`
             : copy.alert
         }
       />
@@ -205,9 +210,9 @@ export default function OutsourcingOrderSourceFactModal({
           { key: 'supplier', label: '加工厂', children: supplierText },
           {
             key: 'subject',
-            label: '产品 / 材料',
+            label: subjectLabel,
             children:
-              String(item?.subject_type || '').toUpperCase() === 'PRODUCT' ? (
+              subjectType === 'PRODUCT' ? (
                 <ProductIdentity
                   productId={item?.product_id}
                   name={item?.product_name_snapshot || '委外产品'}

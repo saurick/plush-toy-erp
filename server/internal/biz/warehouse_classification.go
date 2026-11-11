@@ -29,6 +29,15 @@ var (
 	ErrWarehouseCodeConflict        = errors.New("warehouse code already exists")
 )
 
+type WarehouseCategoryError struct {
+	SubjectType string
+	cause       error
+}
+
+func (e *WarehouseCategoryError) Error() string { return e.cause.Error() }
+
+func (e *WarehouseCategoryError) Unwrap() error { return e.cause }
+
 func ValidMaterialStockCategory(category string) bool {
 	switch category {
 	case MaterialStockMain, MaterialStockAuxiliary, MaterialStockPackaging, MaterialStockOther, MaterialStockUnclassified:
@@ -47,7 +56,7 @@ func ValidWarehouseType(value string) bool {
 
 func ValidateWarehouseCategory(warehouseType, subjectType, materialCategory string) error {
 	if warehouseType == WarehouseUnclassified || (subjectType == InventorySubjectMaterial && materialCategory == MaterialStockUnclassified) {
-		return ErrStockCategoryRequired
+		return &WarehouseCategoryError{SubjectType: subjectType, cause: ErrStockCategoryRequired}
 	}
 	if subjectType == InventorySubjectProduct && warehouseType == WarehouseFinishedGoods {
 		return nil
@@ -61,7 +70,7 @@ func ValidateWarehouseCategory(warehouseType, subjectType, materialCategory stri
 			return nil
 		}
 	}
-	return ErrWarehouseCategoryMismatch
+	return &WarehouseCategoryError{SubjectType: subjectType, cause: ErrWarehouseCategoryMismatch}
 }
 
 type WarehouseMutation struct {

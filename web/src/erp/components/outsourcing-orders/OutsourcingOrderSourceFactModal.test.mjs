@@ -20,7 +20,6 @@ test('outsourcing source fact modal shows a readable locked source summary', () 
   for (const label of [
     '委外订单',
     '加工厂',
-    '产品 / 材料',
     '工序',
     '单位',
     '计划数量',

@@ -3214,6 +3214,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 `inventory.list_inventory_balances / list_inventory_lots / list_inventory_txns` 支持 `stock_category` 筛选（与 `PRODUCT` 互斥），列表返回材料当前 `stock_category`。分类在服务端计数和分页前过滤；库存作业详情的材料行也返回该只读字段。新入库与库存增加统一验证用途和启用状态，原始流水的合法冲正与原请求重放保留。
 
+仓库与存货类型不匹配时仍返回 `BusinessRuleViolation`；提示按校验中的对象区分材料库存类别和产品成品仓。
+
 ### 任务治理升级边界 / Task Fulfillment Upgrade
 
 本轮成品收仓改由已完成手工批次提供数量上限，包装通过 `finished_goods_receipt_id` 绑定已过账成品收仓。先记录正式库存，质量或查货包装未完成时禁止发货及普通负向挪用。旧已完成包装来源的过账收仓保持历史事实，并占用手工容量。
