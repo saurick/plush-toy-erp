@@ -246,7 +246,7 @@ GitLab CI 的 Web / Server 测试仍在进程内解析完整 TAP / Go JSON，但
 
 直接运行 full / strict 时，任何 `SKIP_*`、`STRICT_SKIP_*` 或调用者提供的旧 coverage 变量都会得到 `incomplete` 并失败；full 始终真实执行 secrets 与 govulncheck，不接受普通调用者自签 JSON 作为前序成功证明。
 
-默认单一 `origin/main` 的普通 `prepare-push` 签发 `server-ci` 回执：保留聚合范围风险计划、数据库 guard、remote URL、live checks 和 gate-tree 指纹，执行 git-log、严格 secrets 和下述定向 Node 检查。
+默认单一 `origin/main` 的实际推送地址匹配[项目 GitLab 入口](../lib/gitlab-project.mjs)时，普通 `prepare-push` 签发 `server-ci` 回执：保留聚合范围风险计划、数据库 guard、remote URL、live checks 和 gate-tree 指纹，执行 git-log、严格 secrets 和下述定向 Node 检查。
 
 pre-push hook 在连接后按真实 stdin 重算回执身份与检查清单，再执行 git-log / secrets；同一有效回执覆盖的定向测试不重复运行。其他 remote/ref、多 ref 与显式 `--full` 保持 affected/full 保守合同。
 
@@ -266,14 +266,16 @@ GitLab `CI Gate` 成功并确认 GitHub main 镜像到同一 SHA 后，GPT 才�
 
 fixture、mock、选择器、测试文案、开发工作台或证据展示问题若不使生产结论失效，记录为后续事项，不扩展当前 QA 或重新跑全套。真实 CI / 目标阻塞只报告精确阻塞、清理状态和回滚点，不再新造一层门禁。
 
-普通 main push 按真实文件路径选择验证范围，不依赖提交消息。路径规则由 `ci-plan.mjs` 的 `CI_FULL_CHANGE_PATTERNS` 与 workflow 同步测试守住；plan 再从 Git 范围独立复核，删除和改名包含旧、新路径。
+普通 main push 按真实文件路径选择验证范围，不依赖提交消息。路径规则由 `ci-plan.mjs` 的 `CI_FULL_CHANGE_PATTERNS` 与 workflow 同步测试守住；plan 再从 Git 范围独立复核，包含文件类型变化和改名两端。`CI Gate` 按入口依赖文档 Job、MR Job 或完整汇总。文档和 MR 必须读回对应 Job 成功后写入 `output/ci/checks/` 的本次流水线、SHA 和计划摘要；缺失或不匹配就失败。
 
 | 实际改动 / 触发 | 执行范围 | 通过后能证明什么 |
 | --- | --- | --- |
 | 仅普通小写 `.md` 文档，含 `progress.md` 与客户交付矩阵 | `plan → quality_docs → CI Gate`，3 个 Job | diff/log、可信基线 secrets、文档登记 / 链接 / 命名及命中的 Skill / 客户资料边界；不产生 strict 或发布证据 |
-| 任意非 Markdown、混合改动、未知扩展名或 `server/docs/database/**` 生成数据字典 | 原完整 DAG，当前 28 个 Job | 七类分片、聚合与 exact-SHA strict 证据包；仍不证明目标部署 |
+| 任意非 Markdown、混合改动、未知扩展名或 `server/docs/database/**/*` 生成数据字典 | 原完整 DAG，当前 28 个 Job | 七类分片、聚合与 exact-SHA strict 证据包；仍不证明目标部署 |
 | 首次 push（before SHA 为零） | 完整 CI | 避免未知基线被归入轻量检查 |
 | 受保护 main 的手动流水线，`QA_MODE=full` | 同一 SHA 的完整 CI | 与完整 push CI 相同的覆盖和证据，provenance 保留真实 `web` 来源 |
+
+历史密钥扫描和路径计划使用不同范围。受保护 main 的普通 push、文档 push 与手动 full 都从[已审计的固定检查点](ci-history-scan.mjs)扫描到本次 SHA；前一条流水线失败或被取消时，中间提交仍在扫描范围内。MR 使用可信 diff base。扫描只读取 Git 对象与基线的 `.gitleaks.toml`、`.gitleaksignore`，不接受候选的忽略文件或行内放行；`trust.json` 记录扫描范围、规则对象和工具版本，完整汇总按 Git 对象重新核对。推进检查点前，需用同样的 Gitleaks 版本与规则对新检查点的完整可达历史做脱敏扫描并保留成功证据。
 
 文档 Job 只从 pnpm store 的只读缓存安装锁定依赖，用于客户文档的 Mermaid / DOM 语法检查；不执行 Web 构建或浏览器，也不需要 Go / Docker / Atlas / Chromium。MR 文档计划同样显式声明该依赖。生成数据字典仍走 full，因为其零漂移检查需要 Go 生成器。
 
@@ -1666,7 +1668,7 @@ make purchase_return_pg_test
 
 前端源码与测试在 pre-commit 中按实际暂存内容执行零 warning ESLint，未暂存修正不能掩盖提交中的错误。短门禁对 Markdown 改动保留文档链接检查，对共享帮助、手册源码和生成物改动保留手册同步检查；重型发布、数据库和浏览器测试继续由同一 SHA 的完整 CI 证明。
 
-- 准备阶段在 Git 建立 receive-pack 连接前查询远端 ref，计算每个目标 range 和 aggregate range，并按目标与选项选择 `server-ci`、`affected` 或 `full`。默认单一 `origin/main` 只执行上文约定的签名短门禁；非标准目标和显式 `--full` 按当次计划执行保守本地门禁。
+- 准备阶段在 Git 建立 receive-pack 连接前查询实际 push URL 的 ref，计算每个目标 range 和 aggregate range。只有匹配项目 GitLab 入口的默认单一 `origin/main` 执行签名短门禁；其他目标和显式 `--full` 按当次计划执行保守本地门禁。fetch URL 与 push URL 不同时从后者读基线；多个 push URL 或 hook 报告的目标不一致时阻断。
 
   首次把同名分支镜像到空远端时，aggregate range 和严格 secrets 仍覆盖 `empty-tree..HEAD`；只有目标恰为单个缺失同名分支、另一个已配置 upstream tracking ref 存在且为 HEAD 祖先时，数据库守卫和实时 `git log --check` 才使用该 upstream SHA 到 HEAD 的范围。
 

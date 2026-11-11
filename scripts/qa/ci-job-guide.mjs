@@ -130,9 +130,9 @@ function diagnosticsFor(guide) {
       environment:
         "Node / gitleaks 版本与仓库身份正确，before/base SHA 可读；main 按实际路径选择 docs/full，MR 使用 affected。",
       steps: [
-        "依据 source / before SHA / MR base 计算 diff 与历史范围。",
-        "检查 diff/log，并用可信基线的 gitleaks 配置扫描历史。",
-        "生成计划、范围与信任回执；后续 Job 必须匹配它们的 digest。",
+        "依据 source / before SHA / MR base 计算本次改动范围。",
+        "main 从已审计检查点扫描到本次 SHA，MR 使用可信 diff base；只读取 Git 对象和基线规则。",
+        "检查 diff/log，生成计划和信任回执；完整汇总重新核对历史范围、规则对象和 digest。",
       ],
       evidence: [
         "output/ci/plan.json",
@@ -161,7 +161,7 @@ function diagnosticsFor(guide) {
         "从只读缓存安装锁定的 Mermaid / DOM 依赖，再按真实范围检查文档登记、链接、命名和相关边界。",
         "核对工作区零漂移；通过只表示文档检查成功，不产生 strict 证据。",
       ],
-      evidence: ["output/ci/plan.json", "output/ci/range.txt", "GitLab quality_docs Job 日志"],
+      evidence: ["output/ci/plan.json", "output/ci/checks/quality_docs", "GitLab quality_docs Job 日志"],
       source: "scripts/qa/affected.mjs",
     },
     quality_aggregate: {
@@ -183,9 +183,9 @@ function diagnosticsFor(guide) {
     "CI Gate": {
       entry: ".gitlab-ci.yml → CI Gate.script",
       environment:
-        "full 要求 protected main 与 aggregate 成功；docs 依赖 quality_docs，MR 依赖 quality_affected。Package 上传使用 Job token，凭据不进入页面。",
+        "full 依赖 protected main 的 aggregate，docs 依赖 quality_docs，MR 依赖 quality_affected；对应的成功证据必须存在。",
       steps: [
-        "按 plan.effectiveMode 核对分支：docs 仅完成文档门禁；full 核对三个证据文件及当前分支保护身份。",
+        "docs 和 MR 核对作业回执的流水线、SHA 和计划摘要；完整 main 核对三个证据文件及当前分支保护身份。",
         "上传到 plush-ci-evidence 的 pipeline-<id>-job-<id>-<sha> 版本，失败仍阻断。",
         "清理临时凭据文件；发布链另行读回同 SHA 的不可变证据。",
       ],

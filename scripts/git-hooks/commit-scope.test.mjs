@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -16,7 +16,7 @@ for (const key of execFileSync('git', ['rev-parse', '--local-env-vars'], { cwd: 
 delete environment.PLUSH_COMMIT_CONTEXT
 environment.GIT_OPTIONAL_LOCKS = '0'
 
-function fixture(t) {
+function fixture(t, { previousCoordinator = false } = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'plush-commit-scope-test-'))
   const git = (...args) => execFileSync('git', args, { cwd: root, env: environment, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim()
   git('init', '-q')
@@ -24,16 +24,20 @@ function fixture(t) {
   git('config', 'user.email', 'test@example.invalid')
   git('config', 'commit.gpgsign', 'false')
   for (const name of ['a.txt', 'b.txt']) writeFileSync(path.join(root, name), `${name}\nkeep\n`)
-  git('add', '--', 'a.txt', 'b.txt')
-  git('commit', '-qm', 'test: 初始内容')
-  const base = git('rev-parse', 'HEAD')
   for (const name of ['scripts/git-hooks/commit-scope.py', '.githooks/pre-commit', '.githooks/commit-msg', 'scripts/git-hooks/commit-msg.sh']) {
     mkdirSync(path.dirname(path.join(root, name)), { recursive: true })
     copyFileSync(path.join(sourceRoot, name), path.join(root, name))
   }
-  git('config', 'core.hooksPath', '.githooks')
-  const setHook = (body = ':') => writeFileSync(path.join(root, 'scripts/git-hooks/pre-commit.sh'), `#!/usr/bin/env bash\nset -euo pipefail\n${body}\n`, { mode: 0o755 })
+  writeFileSync(path.join(root, 'scripts/git-hooks/pre-commit.sh'), '#!/usr/bin/env bash\nset -euo pipefail\nsource .git/fixture-hook-command\n', { mode: 0o755 })
+  const setHook = (body = ':') => writeFileSync(path.join(root, '.git/fixture-hook-command'), `${body}\n`)
   setHook()
+  const coordinator = 'scripts/git-hooks/commit-scope.py'
+  if (previousCoordinator) writeFileSync(path.join(root, coordinator), '# previous coordinator\nraise SystemExit(99)\n')
+  git('add', '--', 'a.txt', 'b.txt', '.githooks', 'scripts/git-hooks')
+  git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'test: 初始内容')
+  const base = git('rev-parse', 'HEAD')
+  git('config', 'core.hooksPath', '.githooks')
+  if (previousCoordinator) copyFileSync(path.join(sourceRoot, coordinator), path.join(root, coordinator))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const command = (options) => ['scripts/git-hooks/commit-scope.py', '--base', base, '--message', 'test(git): 验证精确提交', ...options]
   const run = (...options) => spawnSync('python3', command(options), { cwd: root, env: environment, encoding: 'utf8', timeout: 15000 })
@@ -216,6 +220,47 @@ test('partial patch commits only reviewed lines and keeps the remaining edits', 
   assert.equal(result.status, 0, result.stderr + result.stdout)
   assert.equal(f.git('show', 'HEAD:a.txt'), 'selected\nkeep')
   assert.equal(readFileSync(path.join(f.root, 'a.txt'), 'utf8'), 'selected\nforeign remainder\n')
+  assert.equal(f.git('diff', '--cached'), '')
+})
+
+test('commit runs frozen hooks even when the corresponding worktree programs have been weakened', t => {
+  const f = fixture(t)
+  writeFileSync(path.join(f.root, 'a.txt'), 'candidate\n')
+  writeFileSync(path.join(f.root, 'scripts/git-hooks/pre-commit.sh'), '#!/usr/bin/env bash\nexit 0\n')
+  f.setHook('echo FROZEN_HOOK_REJECTED >&2; exit 17')
+  const result = f.run('--', 'a.txt')
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /FROZEN_HOOK_REJECTED/u)
+  assert.equal(f.git('rev-parse', 'HEAD'), f.base)
+  assert.equal(f.git('diff', '--cached'), '')
+  assert.match(f.git('diff', '--name-only'), /scripts\/git-hooks\/pre-commit\.sh/u)
+})
+
+test('the new coordinator checks an unrelated commit without staging its own upgrade', t => {
+  const f = fixture(t, { previousCoordinator: true })
+  writeFileSync(path.join(f.root, 'a.txt'), 'independent candidate\n')
+  f.setHook('echo checked >> .git/fixture-hook-runs')
+  const result = f.run('--', 'a.txt')
+  assert.equal(result.status, 0, result.stderr + result.stdout)
+  assert.equal(f.git('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'), 'a.txt')
+  assert.equal(readFileSync(path.join(f.root, '.git/fixture-hook-runs'), 'utf8'), 'checked\n')
+  assert.match(f.git('diff', '--name-only'), /scripts\/git-hooks\/commit-scope\.py/u)
+  assert.equal(f.git('diff', '--cached'), '')
+})
+
+test('commit rejects a non-executable candidate hook and inherited skips before touching the index', t => {
+  const f = fixture(t)
+  chmodSync(path.join(f.root, '.githooks/commit-msg'), 0o644)
+  const invalidHook = f.run('--', '.githooks/commit-msg')
+  assert.notEqual(invalidHook.status, 0)
+  assert.match(invalidHook.stderr, /执行权限不符：\.githooks\/commit-msg/u)
+  writeFileSync(path.join(f.root, 'a.txt'), 'candidate\n')
+  const skipped = spawnSync('python3', [
+    'scripts/git-hooks/commit-scope.py', '--base', f.base, '--message', 'test: 禁止继承跳过', '--', 'a.txt',
+  ], { cwd: f.root, env: { ...environment, SKIP_SECRETS_SCAN: '1' }, encoding: 'utf8' })
+  assert.notEqual(skipped.status, 0)
+  assert.match(skipped.stderr, /环境变量：SKIP_SECRETS_SCAN/u)
+  assert.equal(f.git('rev-parse', 'HEAD'), f.base)
   assert.equal(f.git('diff', '--cached'), '')
 })
 

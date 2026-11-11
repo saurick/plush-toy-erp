@@ -38,11 +38,12 @@ import {
   selectPrePushProfile,
 } from "./affected.mjs";
 import { collectGitChangedFiles } from "./lib/git-range.mjs";
+import { isGitlabDeliveryPushLocation } from "../lib/gitlab-project.mjs";
 
-export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v6";
+export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v7";
 export const PRE_PUSH_RECEIPT_TTL_MS = 30 * 60 * 1000;
 export const PRE_PUSH_ENVIRONMENT_CONTRACT = "plush.pre-push-environment/v2";
-export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v6";
+export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v7";
 export const PRE_PUSH_SIGNATURE_CONTRACT = "hmac-sha256/v1";
 export const REMOTE_REF_QUERY_TIMEOUT_MS = 20_000;
 
@@ -316,10 +317,14 @@ function normalizeRemoteLocation(root, location) {
 }
 
 function resolveRemoteLocation(root, remoteName, suppliedLocation = "") {
-  const configured = runGit(root, ["remote", "get-url", "--push", remoteName]).trim();
-  const effective = suppliedLocation || configured;
-  const normalized = normalizeRemoteLocation(root, effective);
-  return { sha256: sha256(normalized) };
+  const urls = runGit(root, ["remote", "get-url", "--push", "--all", "--", remoteName]).trim().split("\n");
+  if (urls.length !== 1 || !urls[0]) throw new ReceiptError("single_push_url_required");
+  const url = urls[0];
+  const normalized = normalizeRemoteLocation(root, url);
+  if (suppliedLocation && normalizeRemoteLocation(root, suppliedLocation) !== normalized) {
+    throw new ReceiptError("push_location_mismatch");
+  }
+  return { url, sha256: sha256(normalized), canonicalGitlab: isGitlabDeliveryPushLocation(normalized) };
 }
 
 function parseRefspec(root, value) {
@@ -377,12 +382,27 @@ function resolveDefaultPreparation(root, requestedRemote = "") {
   return { remoteName, refspecs: [{ localRef, remoteRef }] };
 }
 
-function readRemoteRefs(root, remoteName, remoteRefs) {
+function readRemoteRefs(root, remoteName, pushLocation, remoteRefs) {
   const unique = [...new Set(remoteRefs)].sort();
+  const fetchUrl = runGit(root, ["remote", "get-url", "--", remoteName]).trim();
+  // Use the remote name when it resolves to the same endpoint. For a split URL,
+  // query the push destination and refuse another rewrite or inline credentials.
+  let query = remoteName;
+  if (fetchUrl !== pushLocation.url) {
+    if (/^https?:\/\/[^/]*@/iu.test(pushLocation.url)) {
+      throw new ReceiptError("push_url_credentials_unsupported", "use a Git credential helper");
+    }
+    query = pushLocation.url;
+    const effectiveQuery = runGit(root, ["ls-remote", "--get-url", "--", query]).trim();
+    if (normalizeRemoteLocation(root, effectiveQuery) !== normalizeRemoteLocation(root, pushLocation.url)) {
+      throw new ReceiptError("push_url_query_mismatch");
+    }
+  }
   const output = runRemoteRefQueryWithRetry(root, [
     "ls-remote",
     "--refs",
-    remoteName,
+    "--",
+    query,
     ...unique,
   ]);
   const refs = new Map();
@@ -610,6 +630,7 @@ function buildPushPlan({
   return {
     remoteName,
     remoteUrlSha256: remote.sha256,
+    canonicalGitlab: remote.canonicalGitlab,
     refs: sortedRefs,
     aggregateRange: computeAggregateRange(root, snapshot.head, sortedRefs),
   };
@@ -621,15 +642,17 @@ function resolvePreparationPlan(root, options) {
       ? resolveDefaultPreparation(root, options.remoteName)
       : { remoteName: options.remoteName || "origin", refspecs: options.refspecs };
   const remoteName = options.remoteName || defaults.remoteName;
-  resolveRemoteLocation(root, remoteName);
+  const pushLocation = resolveRemoteLocation(root, remoteName);
   const remoteRefs = readRemoteRefs(
     root,
     remoteName,
+    pushLocation,
     defaults.refspecs.map((ref) => ref.remoteRef),
   );
   return buildPushPlan({
     root,
     remoteName,
+    remoteLocation: pushLocation.url,
     refspecs: defaults.refspecs,
     remoteRefs,
   });
@@ -658,6 +681,7 @@ function resolveServerCiRequirement(pushPlan, allowServerCi) {
   if (
     allowServerCi !== true ||
     pushPlan.remoteName !== CANONICAL_GITLAB_REMOTE ||
+    pushPlan.canonicalGitlab !== true ||
     pushPlan.refs.length !== 1
   ) {
     return null;
@@ -789,6 +813,7 @@ function resolveHookPlan(root, remoteName, remoteLocation, records) {
   return {
     remoteName,
     remoteUrlSha256: remote.sha256,
+    canonicalGitlab: remote.canonicalGitlab,
     refs: sortedRefs,
     aggregateRange: computeAggregateRange(root, snapshot.head, sortedRefs),
   };

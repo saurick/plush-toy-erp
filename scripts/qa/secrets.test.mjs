@@ -6,6 +6,7 @@ import {
   mkdir,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import os from "node:os";
@@ -110,6 +111,16 @@ if [[ "\${1:-}" == "git" ]]; then
   if [[ "\${pipeline_statuses[1]}" -ne 1 ]]; then exit 2; fi
   exit 0
 fi
+if [[ "\${1:-}" == "detect" ]]; then
+  shift
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "--source" ]]; then
+      [[ ! -f "$2/payload.txt" ]] || ! grep -qF 'GATE_STAGED_TYPE_MARKER' "$2/payload.txt" || exit 1
+      break
+    fi
+    shift
+  done
+fi
 exit 0
 `,
     "utf8",
@@ -213,5 +224,20 @@ test("staged mode reads index content and reports only a redacted path and line"
     assert.equal(result.reason, "npm-token");
     assert.deepEqual(result.files, [".npmrc:1"]);
     assert.equal(JSON.stringify(result).includes("plain-text-token"), false);
+  });
+});
+
+test("staged secrets scans a regular file replacing a symlink even with a harmless worktree copy", async () => {
+  await withRepository(async (root) => {
+    const payload = path.join(root, "payload.txt");
+    await symlink("base.txt", payload);
+    commit(root, "stage a symlink");
+    await rm(payload);
+    await writeFile(payload, "GATE_STAGED_TYPE_MARKER\n");
+    git(root, ["add", "--", "payload.txt"]);
+    await writeFile(payload, "harmless unstaged version\n");
+    const result = scanSecrets({ root, mode: "staged", strict: true, gitleaksCommand: await fakeGitleaks(root) });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "content-leak");
   });
 });

@@ -52,7 +52,7 @@
 4. 需要迁移时进入 `server/`，交互使用 `make migrate`；非交互严格使用同一次 `make migrate_prepare` 输出执行 `make migrate_execute`。准备保持日常固定版本运行，先只读审计，再固定当前前后端、配置及迁移，完成成套备份与临时恢复库升级、登录和业务读取验证。确认后才进入短维护窗口、生成新的成套恢复点、执行一次迁移并切换固定版本。
 
    单位精度或单据引用冲突必须处理后重新准备，不能直接取整或删除已过账记录。准备成功不表示已升级，结果未知先只读核对。
-5. 已获提交 / 推送授权并形成 clean HEAD 后，运行 `bash scripts/qa/prepare-push.sh`。默认单一 `origin/main` 只签发短门禁回执，高成本验证由 GitLab exact-SHA CI 完成；其他目标和显式 `--full` 按 [QA 回执合同](qa/README.md#推送准备与回执) 执行。
+5. 已获提交 / 推送授权并形成 clean HEAD 后，运行 `bash scripts/qa/prepare-push.sh`。默认单一 `origin/main` 且实际推送地址是项目 GitLab 时签发短门禁回执，高成本验证由 GitLab exact-SHA CI 完成；其他目标和显式 `--full` 按 [QA 回执合同](qa/README.md#推送准备与回执) 执行。
 6. 发布、部署和恢复分别使用 [部署脚本](deploy/README.md)，固定 SHA / digest 并读回目标结果；GitLab push 不自动部署。
 
 ## Git 只读检查 / Read-only Git checks
@@ -93,7 +93,9 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 | hooks 失败 | 完整 index 和 HEAD 未漂移时只撤销本次新加的暂存，保留工作文件；原有暂存或外来漂移保留供核对 |
 | Git `index.lock` 存在 | 保留原锁，按全局 `git-closeout-coordination` 核验；入口不自动恢复或删除 Git 锁 |
 
-pre-commit 与 commit-msg 检查持锁身份、分支、HEAD、完整候选和范围内工作文件；普通裸提交会提示改用此入口。`index.codex-commit-once.lock` 是持久的 OS 锁载体，文件存在不表示被占用，不删除它。该入口协调遵守约定的提交进程，不能阻止编辑器同时改同一文件或绕过 hooks 的外部 Git 命令；出现这类漂移须核对现场，不强行合并或反复重试。
+提交入口在修改共享暂存区之前，核验候选树的 Hook 文件并冻结两个检查脚本。Git 从本次入口的私有副本启动 Hook，前后都核对持锁身份、分支、HEAD、完整候选和范围内工作文件。候选的必需文件缺失、类型或执行权限错误、继承 `SKIP_*` / `STRICT_SKIP_*` 的有效跳过值均阻断。普通裸提交会提示改用此入口。
+
+`index.codex-commit-once.lock` 是持久的 OS 锁载体，文件存在不表示被占用，不删除它。该入口协调遵守约定的提交进程，不能阻止编辑器同时改同一文件或绕过 hooks 的外部 Git 命令；出现这类漂移须核对现场，不强行合并或反复重试。
 
 遇到可协调的冲突时，入口在 stderr 输出一行 `[commit-scope:coordination]` JSON，包含 `reason`、精确 `paths` 和项目 Skill 路径。当前 Codex 会话在进程退出后读取 [按需 Git 冲突协调](../.agents/skills/plush-git-conflict-coordination/SKILL.md)，自动联系实际相关会话核清，再验证和串行提交；这条诊断本身不发送消息、不自动重试、不改变授权。提交前发现混合 hunk 或跨会话依赖时直接进入同一流程，不必故意触发一次失败。
 
@@ -113,7 +115,7 @@ pre-commit 与 commit-msg 检查持锁身份、分支、HEAD、完整候选和�
 
 | Hook | 脚本与职责 |
 | --- | --- |
-| pre-commit | 先后核对提交互斥与候选；`git-hooks/pre-commit.sh` 只读 staged 快照，执行 db-guard，并对改动的前端代码与测试执行零 warning ESLint；不生成、不 apply、不重新暂存 |
+| pre-commit | 核对提交互斥与候选；`git-hooks/pre-commit.sh` 只读 staged 快照，识别文件类型变化和重命名两端，执行 db-guard，并对改动的前端代码与测试执行零 warning ESLint；不生成、不 apply、不重新暂存 |
 | commit-msg | 先后核对提交互斥与候选；`git-hooks/commit-msg.sh` 校验项目提交格式 |
 | pre-push | `git-hooks/pre-push.sh`，核对真实 push 范围、签名回执、TTL 与最新 secrets；不现场回退到 full |
 

@@ -21,7 +21,7 @@ workflow:
           - "**/*[^.]md"
           - "**/md"
           - "**/d"
-          - "server/docs/database/**"
+          - "server/docs/database/**/*"
       variables:
         CI_QUALITY_SCOPE: full
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
@@ -128,9 +128,9 @@ variables:
 
 .main_quality_rules: &main_quality_rules
   rules:
-    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
+    - if: &skip_quality '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
       when: never
-    - if: '$CI_PIPELINE_SOURCE =~ /^(push|web)$/ && $CI_QUALITY_SCOPE == "full" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - if: &main_full_quality '$CI_PIPELINE_SOURCE =~ /^(push|web)$/ && $CI_QUALITY_SCOPE == "full" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
     - when: never
 
 plan:
@@ -145,42 +145,40 @@ plan:
       set -euo pipefail
       zero=0000000000000000000000000000000000000000
       empty_tree="$(git hash-object -t tree /dev/null)"
-      trusted_config_sha=HEAD
+      if [[ "$CI_PIPELINE_SOURCE" != "merge_request_event" ]]; then
+        test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
+        test "$CI_COMMIT_REF_PROTECTED" = true
+      fi
       if [[ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]]; then
         test -n "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
         range="$CI_MERGE_REQUEST_DIFF_BASE_SHA...HEAD"
-        history_range="$(git merge-base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" HEAD)..HEAD"
-        trusted_config_sha="$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+        log_range="$(git merge-base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" HEAD)..HEAD"
         mode=affected
       elif [[ "$CI_PIPELINE_SOURCE" == "push" ]]; then
         if [[ "$CI_COMMIT_BEFORE_SHA" == "$zero" ]]; then
           range="$empty_tree..HEAD"
-          history_range=HEAD
+          log_range=HEAD
         else
           git cat-file -e "$CI_COMMIT_BEFORE_SHA^{commit}"
           range="$CI_COMMIT_BEFORE_SHA..HEAD"
-          history_range="$range"
-          trusted_config_sha="$CI_COMMIT_BEFORE_SHA"
+          log_range="$range"
         fi
         mode="$CI_QUALITY_SCOPE"
       else
         if git rev-parse --verify 'HEAD^' >/dev/null 2>&1; then
           range="HEAD^..HEAD"
-          history_range="$range"
+          log_range="$range"
         else
           range="$empty_tree..HEAD"
-          history_range=HEAD
+          log_range=HEAD
         fi
         mode="${QA_MODE:-full}"
       fi
       case "$mode" in affected|docs|full) ;; *) echo "[gitlab-ci] invalid QA mode=$mode"; exit 1 ;; esac
+      test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
+      history_scan="$(node scripts/qa/ci-history-scan.mjs)"
       git --no-optional-locks -c diff.autoRefreshIndex=false diff --check "$range"
-      git log --check --format= "$history_range"
-      trusted_config="$(mktemp)"
-      trap 'rm -f "$trusted_config"' EXIT
-      git show "$trusted_config_sha:.gitleaks.toml" > "$trusted_config"
-      trusted_config_blob="$(git rev-parse "$trusted_config_sha:.gitleaks.toml")"
-      gitleaks git --config "$trusted_config" --log-opts "$history_range" --no-banner --redact "$CI_PROJECT_DIR"
+      git log --check --format= "$log_range"
       mkdir -p output/ci
       node scripts/qa/ci-plan.mjs \
         --range "$range" \
@@ -190,7 +188,7 @@ plan:
       protected=false
       [[ "${CI_COMMIT_REF_PROTECTED:-false}" == "true" ]] && protected=true
       jq -n \
-        --arg schemaVersion 'plush.gitlab-ci-trust/v1' \
+        --arg schemaVersion 'plush.gitlab-ci-trust/v2' \
         --arg repository "$CI_PROJECT_PATH" \
         --arg gitSha "$CI_COMMIT_SHA" \
         --arg pipelineId "$CI_PIPELINE_ID" \
@@ -202,12 +200,9 @@ plan:
         --arg range "$range" \
         --arg planSha256 "$(sha256sum output/ci/plan.json | awk '{print $1}')" \
         --arg rangeSha256 "$(sha256sum output/ci/range.txt | awk '{print $1}')" \
-        --arg trustedConfigCommit "$(git rev-parse "$trusted_config_sha")" \
-        --arg trustedConfigBlob "$trusted_config_blob" \
-        --arg gitleaksVersion '8.30.1' \
-        --arg gitleaksStatus passed \
+        --argjson historyScan "$history_scan" \
         --argjson protected "$protected" \
-        '{schemaVersion:$schemaVersion,repository:$repository,gitSha:$gitSha,pipeline:{id:$pipelineId,iid:$pipelineIid,source:$pipelineSource},job:{id:$jobId,name:$jobName},ref:$ref,protectedDefaultBranch:$protected,range:$range,planSha256:$planSha256,rangeSha256:$rangeSha256,trustedConfigCommit:$trustedConfigCommit,trustedConfigBlob:$trustedConfigBlob,gitleaksVersion:$gitleaksVersion,gitleaksStatus:$gitleaksStatus,redaction:{containsSecrets:false,containsCredentials:false,containsRawLogs:false}}' \
+        '{schemaVersion:$schemaVersion,repository:$repository,gitSha:$gitSha,pipeline:{id:$pipelineId,iid:$pipelineIid,source:$pipelineSource},job:{id:$jobId,name:$jobName},ref:$ref,protectedDefaultBranch:$protected,range:$range,planSha256:$planSha256,rangeSha256:$rangeSha256,historyScan:$historyScan,redaction:{containsSecrets:false,containsCredentials:false,containsRawLogs:false}}' \
         > output/ci/trust.json
   artifacts:
     expire_in: 30 days
@@ -782,9 +777,9 @@ quality_docs:
     - job: plan
       artifacts: true
   rules:
-    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
+    - if: *skip_quality
       when: never
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_QUALITY_SCOPE == "docs" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - if: &main_docs_quality '$CI_PIPELINE_SOURCE == "push" && $CI_QUALITY_SCOPE == "docs" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
     - when: never
   timeout: 10m
   script:
@@ -807,11 +802,15 @@ quality_docs:
       [[ "$range" =~ ^[0-9a-f]{40}\.\.HEAD$ ]]
       bash scripts/qa/affected.sh --base "$range" --run
       test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
+    - &write_quality_completion |
+      mkdir -p output/ci/checks
+      plan_digest="$(sha256sum output/ci/plan.json | awk '{print $1}')"
+      printf '%s\n' "$CI_PIPELINE_ID:$CI_COMMIT_SHA:$plan_digest" > "output/ci/checks/$CI_JOB_NAME"
   artifacts:
     when: always
     expire_in: 30 days
     paths:
-      - output/ci/
+      - output/ci/checks/quality_docs
       - output/qa/test-gates/
 
 quality_affected:
@@ -821,9 +820,9 @@ quality_affected:
     - job: plan
       artifacts: true
   rules:
-    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
+    - if: *skip_quality
       when: never
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: &mr_quality '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - when: never
   timeout: 2h
   script:
@@ -918,42 +917,62 @@ quality_affected:
         node scripts/deploy/source-archive-release-check.mjs --light --ref HEAD
       fi
       test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
+      trap - EXIT
+      cleanup
+    - *write_quality_completion
   artifacts:
     when: always
     expire_in: 30 days
     paths:
-      - output/ci/
+      - output/ci/checks/quality_affected
       - output/dev-workbench/receipts/
 
 "CI Gate":
   stage: gate
   <<: *lightweight_setup
-  needs:
-    - job: plan
-      artifacts: true
-    - job: quality_aggregate
-      artifacts: true
-      optional: true
-    - job: quality_affected
-      artifacts: false
-      optional: true
-    - job: quality_docs
-      artifacts: false
-      optional: true
   rules:
-    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
+    - if: *skip_quality
       when: never
-    - when: on_success
+    - if: *main_full_quality
+      needs:
+        - job: plan
+          artifacts: true
+        - job: quality_aggregate
+          artifacts: true
+    - if: *main_docs_quality
+      needs:
+        - job: plan
+          artifacts: true
+        - job: quality_docs
+          artifacts: true
+    - if: *mr_quality
+      needs:
+        - job: plan
+          artifacts: true
+        - job: quality_affected
+          artifacts: true
+    - when: never
   script:
     - |
       set -euo pipefail
       effective_mode="$(jq -er '.effectiveMode | select(. == "affected" or . == "docs" or . == "full")' output/ci/plan.json)"
+      require_quality_completion() {
+        local receipt="output/ci/checks/$1" plan_digest
+        plan_digest="$(sha256sum output/ci/plan.json | awk '{print $1}')"
+        if [[ ! -f "$receipt" || "$(<"$receipt")" != "$CI_PIPELINE_ID:$CI_COMMIT_SHA:$plan_digest" ]]; then
+          echo "[gitlab-ci] missing or mismatched completion receipt: $1" >&2
+          return 1
+        fi
+      }
       if [[ "$effective_mode" == "docs" ]]; then
         test "$CI_PIPELINE_SOURCE" = push
         test "$CI_QUALITY_SCOPE" = docs
         test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
         test "$CI_COMMIT_REF_PROTECTED" = true
+        require_quality_completion quality_docs
         echo "[gitlab-ci] scope=docs release_evidence=not_produced"
+      elif [[ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]]; then
+        require_quality_completion quality_affected
       elif [[ "$CI_PIPELINE_SOURCE" =~ ^(push|web)$ ]]; then
         test "$effective_mode" = full
         test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"

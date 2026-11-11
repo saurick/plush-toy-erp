@@ -23,6 +23,9 @@ class Refused(Exception):
 
 
 COORDINATION_SKILL = ".agents/skills/plush-git-conflict-coordination/SKILL.md"
+CHECKERS = {hook: f"scripts/git-hooks/{hook}.sh" for hook in ("pre-commit", "commit-msg")}
+VERIFIER = "scripts/git-hooks/commit-scope.py"
+RUNNING_VERIFIER = Path(__file__).resolve()
 
 
 def index_paths(tree, env=None):
@@ -87,7 +90,35 @@ def merge_head():
     return path.read_text() if path.exists() else None
 
 
+def reject_skip_environment():
+    for name, setting in os.environ.items():
+        if name.startswith(("SKIP_", "STRICT_SKIP_")) and setting not in ("", "0"):
+            raise Refused(f"提交门禁不接受跳过检查的环境变量：{name}")
+
+
+def freeze_commit_hooks(tree, directory):
+    for name in (*(f".githooks/{hook}" for hook in CHECKERS), *CHECKERS.values(), VERIFIER):
+        entry = value("ls-tree", tree, "--", name).split()
+        valid_modes = ("100644", "100755") if name == VERIFIER else ("100755",)
+        if len(entry) != 4 or entry[0] not in valid_modes or entry[1] != "blob":
+            raise Refused(f"候选中的提交门禁缺失或文件类型/执行权限不符：{name}；未修改暂存区")
+        if name in CHECKERS.values():
+            target = directory / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(git("cat-file", "blob", entry[2]))
+            target.chmod(0o700)
+    # Dispatch with the coordinator the caller actually launched. Only the
+    # checkers come from the candidate, so entrypoint edits do not block other commits.
+    dispatcher = directory / VERIFIER
+    dispatcher.write_bytes(RUNNING_VERIFIER.read_bytes())
+    dispatcher.chmod(0o700)
+    (directory / ".githooks").mkdir()
+    for hook in CHECKERS:
+        (directory / ".githooks" / hook).symlink_to(dispatcher)
+
+
 def verify_context():
+    reject_skip_environment()
     source = os.environ.get("PLUSH_COMMIT_CONTEXT")
     if not source:
         raise Refused(
@@ -143,6 +174,7 @@ def acquire(mutex, seconds, paths):
 
 
 def commit(args):
+    reject_skip_environment()
     if any(os.environ.get(key) for key in ("GIT_INDEX_FILE", "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR")):
         raise Refused("提交入口不接受外部 Git 目录或 index 覆盖")
     patch_file = Path(args.patch).resolve() if args.patch else None
@@ -209,6 +241,8 @@ def commit(args):
             if not staged_here and not unchanged(tree):
                 raise Refused("暂存区含其他内容；未清空或覆盖，请先由原提交完成收口",
                               reason="foreign_staging", paths=[*paths, *index_paths(head)])
+            frozen = temp / "hooks"
+            freeze_commit_hooks(tree, frozen)
             context = {"root": root, "fd": mutex.fileno(), "head": head, "branch": branch,
                        "tree": tree, "worktree": scope_state, "merge_head": f"{parent}\n" if parent else None}
             context_path = temp / "context.json"
@@ -223,11 +257,12 @@ def commit(args):
                         stream.write(context["merge_head"])
                 # Check again after staging, then let the real project hooks check the same candidate.
                 subprocess.run(
-                    [sys.executable, str(Path(__file__).resolve()), "--verify"],
+                    [sys.executable, str(frozen / VERIFIER), "--verify"],
                     env=env, pass_fds=(mutex.fileno(),), check=True,
                 )
                 result = subprocess.run(
-                    ["git", "-c", "core.lockfilePid=true", "commit", "-m", args.message],
+                    ["git", "-c", "core.lockfilePid=true", "-c", f"core.hooksPath={frozen / '.githooks'}",
+                     "commit", "-m", args.message],
                     env=env, pass_fds=(mutex.fileno(),),
                 )
                 if result.returncode:
@@ -255,6 +290,12 @@ def commit(args):
 
 
 def main():
+    hook = Path(sys.argv[0]).name
+    if hook in CHECKERS:
+        verify_context()
+        subprocess.run([str(RUNNING_VERIFIER.with_name(f"{hook}.sh")), *sys.argv[1:]], check=True)
+        verify_context()
+        return
     parser = argparse.ArgumentParser(description="仅在用户授权后提交；精确范围、进程互斥、真实 hooks，不推送")
     parser.add_argument("--verify", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--base", help="已审查补丁/文件对应的完整 HEAD SHA")

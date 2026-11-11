@@ -17,7 +17,7 @@ export const CI_FULL_CHANGE_PATTERNS = Object.freeze([
   "**/*[^.]md",
   "**/md",
   "**/d",
-  "server/docs/database/**",
+  "server/docs/database/**/*",
 ]);
 
 export function isDocumentationOnlyCIChange(files) {

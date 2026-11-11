@@ -171,7 +171,7 @@ export function collectGitChangedFiles({
   includeWorktree = true,
   includeStaged = true,
   includeUntracked = false,
-  diffFilter = "ACMRD",
+  diffFilter = "ACDMT",
 } = {}) {
   if (!root) throw new Error("[qa:git-range] root is required");
   const files = [];

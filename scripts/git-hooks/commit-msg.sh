@@ -12,18 +12,11 @@ print_help() {
 允许类型:
   feat|fix|chore|docs|refactor|test|ci|build|perf|style
 
-环境变量:
-  SKIP_COMMIT_MSG=1  跳过检查
 USAGE
 }
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   print_help
-  exit 0
-fi
-
-if [[ "${SKIP_COMMIT_MSG:-0}" == "1" ]]; then
-  echo "[commit-msg] SKIP_COMMIT_MSG=1，跳过"
   exit 0
 fi
 

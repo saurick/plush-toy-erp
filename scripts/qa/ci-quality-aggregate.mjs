@@ -16,6 +16,7 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import { sha256File } from "../lib/file-digest.mjs";
+import { assertHistoryScanEvidence, CI_TRUST_SCHEMA, resolveHistoryScan } from "./ci-history-scan.mjs";
 import {
   buildDevWorkbenchReceipt,
   getDevWorkbenchGitContext,
@@ -300,7 +301,6 @@ export function buildObservedQualityPaths(
   }
   return Object.freeze(paths);
 }
-const TRUST_SCHEMA = "plush.gitlab-ci-trust/v1";
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 
@@ -480,9 +480,9 @@ export function validateCiQualityShardSet(receipts, expected) {
   return byShard;
 }
 
-function validateTrust(trust, expected) {
+function validateTrust(root, trust, expected) {
   if (
-    trust?.schemaVersion !== TRUST_SCHEMA ||
+    trust?.schemaVersion !== CI_TRUST_SCHEMA ||
     trust?.repository !== expected.repository ||
     trust?.gitSha !== expected.gitSha ||
     trust?.pipeline?.id !== expected.pipelineId ||
@@ -494,14 +494,13 @@ function validateTrust(trust, expected) {
     trust?.protectedDefaultBranch !== true ||
     trust?.range !== expected.range ||
     trust?.planSha256 !== expected.planSha256 ||
-    trust?.rangeSha256 !== expected.rangeSha256 ||
-    !SHA_PATTERN.test(String(trust?.trustedConfigCommit || "")) ||
-    !SHA_PATTERN.test(String(trust?.trustedConfigBlob || "")) ||
-    !/^8\.30\.1$/u.test(String(trust?.gitleaksVersion || "")) ||
-    trust?.gitleaksStatus !== "passed"
+    trust?.rangeSha256 !== expected.rangeSha256
   ) {
     throw new Error("quality aggregate trust bootstrap evidence is invalid");
   }
+  assertHistoryScanEvidence(trust.historyScan, resolveHistoryScan(root, {
+    gitSha: expected.gitSha, source: expected.pipelineSource,
+  }));
   return trust;
 }
 
@@ -540,6 +539,7 @@ export async function aggregateCiQuality({
     runnerId: String(env.CI_RUNNER_ID),
   });
   const trust = validateTrust(
+    root,
     plainJson(path.resolve(root, trustFile), "CI trust receipt"),
     expected,
   );
@@ -774,7 +774,7 @@ export async function aggregateCiQuality({
       sha256: sha256File(path.resolve(root, trustFile)),
       planSha256: trust.planSha256,
       rangeSha256: trust.rangeSha256,
-      gitleaksStatus: trust.gitleaksStatus,
+      historyScan: trust.historyScan,
     },
     strictIdentity,
     shards: shardDurations,

@@ -32,9 +32,9 @@ import {
   validateTargetReleaseFetch,
 } from "./target-release-fetch.mjs";
 import { readBoundedPlainFile } from "../lib/file-digest.mjs";
+import { GITLAB_DELIVERY_BASE_URL, GITLAB_DELIVERY_PROJECT } from "../lib/gitlab-project.mjs";
 
-export const GITLAB_DELIVERY_BASE_URL = "https://gitlab.saurick.me";
-export const GITLAB_DELIVERY_PROJECT = "saurick/plush-toy-erp";
+export { GITLAB_DELIVERY_BASE_URL, GITLAB_DELIVERY_PROJECT };
 export const GITLAB_DELIVERY_PACKAGE = "plush-release";
 export const GITLAB_CANDIDATE_PACKAGE = "plush-release-candidate";
 export const GITLAB_SOURCE_PACKAGE = "plush-release-source";

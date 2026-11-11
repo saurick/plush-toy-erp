@@ -11,7 +11,7 @@ cd "$ROOT_DIR"
 STAGED_FILES=()
 while IFS= read -r -d '' file; do
   STAGED_FILES+=("$file")
-done < <(git --no-optional-locks -c diff.autoRefreshIndex=false diff --cached --name-only --diff-filter=ACMRD -z)
+done < <(git --no-optional-locks -c diff.autoRefreshIndex=false diff --cached --no-renames --name-only --diff-filter=ACDMT -z --)
 
 if [[ "${#STAGED_FILES[@]}" -eq 0 ]]; then
   exit 0

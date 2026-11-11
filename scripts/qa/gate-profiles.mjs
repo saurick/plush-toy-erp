@@ -82,8 +82,11 @@ const SUPERSEDING_GATES = Object.freeze({
 // copying them here would create a second, hand-maintained topology.
 const FAST_REQUIRED_FILES = Object.freeze([
   ".githooks/pre-commit",
+  ".githooks/commit-msg",
   ".githooks/pre-push",
+  "scripts/git-hooks/commit-scope.py",
   "scripts/git-hooks/pre-commit.sh",
+  "scripts/git-hooks/commit-msg.sh",
   "scripts/git-hooks/pre-push.sh",
   "scripts/qa/prepare-push.sh",
   "scripts/qa/affected.mjs",
@@ -120,8 +123,10 @@ const STRICT_REQUIRED_FILES = Object.freeze([
 
 const FAST_REQUIRED_EXECUTABLES = Object.freeze([
   ".githooks/pre-commit",
+  ".githooks/commit-msg",
   ".githooks/pre-push",
   "scripts/git-hooks/pre-commit.sh",
+  "scripts/git-hooks/commit-msg.sh",
   "scripts/git-hooks/pre-push.sh",
   "scripts/qa/prepare-push.sh",
   "scripts/qa/fast.sh",

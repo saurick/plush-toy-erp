@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   collectGitChangedFiles,
+  gitDiffFiles,
   normalizeHistoryRange,
-  readNullDelimited,
   resolveDefaultRange,
   runGit,
   validateGitRange,
@@ -98,13 +98,7 @@ function indexFileExists(root, file) {
 function collectCandidateFiles({ root, mode, range }) {
   if (mode === "package") return walkPackageFiles(root);
   if (mode === "staged") {
-    const files = readNullDelimited(
-      runGit(
-        root,
-        ["diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z", "--"],
-        { encoding: null },
-      ),
-    );
+    const files = gitDiffFiles(root, ["--cached", "--diff-filter=ACMT"]);
     for (const file of NPM_CONFIG_FILES) {
       if (indexFileExists(root, file)) files.push(file);
     }
@@ -119,7 +113,7 @@ function collectCandidateFiles({ root, mode, range }) {
     range,
     includeWorktree: true,
     includeStaged: true,
-    diffFilter: "ACMR",
+    diffFilter: "ACMT",
   });
   for (const file of NPM_CONFIG_FILES) {
     if (existsSync(path.join(root, file))) files.push(file);

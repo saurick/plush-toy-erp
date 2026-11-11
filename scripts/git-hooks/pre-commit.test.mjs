@@ -490,6 +490,22 @@ test("pre-commit rejects a required hook deleted only from the index", () => {
   }
 });
 
+test("pre-commit rejects a type-only replacement of a required hook with a symlink", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-type-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  git(root, ["init", "-q"]);
+  installHookFixture(root);
+  commit(root, "base");
+  const hook = ".githooks/commit-msg";
+  rmSync(path.join(root, hook));
+  symlinkSync("pre-commit", path.join(root, hook));
+  git(root, ["add", "--", hook]);
+  assert.equal(git(root, ["diff", "--cached", "--name-status"]), `T\t${hook}`);
+  const result = spawnSync("bash", ["scripts/git-hooks/pre-commit.sh"], { cwd: root, encoding: "utf8" });
+  assert.equal(result.status, 1, result.stderr || result.stdout);
+  assert.match(result.stderr, /不是普通文件/u);
+});
+
 test("pre-commit uses the indexed checker when its worktree copy is weakened", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-checker-"));
   try {

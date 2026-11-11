@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import { buildCIPlan, CI_FULL_CHANGE_PATTERNS, isDocumentationOnlyCIChange } from "./ci-plan.mjs";
+import { assertHistoryScanEvidence, resolveHistoryScan } from "./ci-history-scan.mjs";
+import { collectGitChangedFiles } from "./lib/git-range.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 
 function matchesGitLabChangePattern(file, pattern) {
-  if (pattern === "server/docs/database/**") {
+  if (pattern === "server/docs/database/**/*") {
     return file.startsWith("server/docs/database/");
   }
   assert(pattern.startsWith("**/"));
@@ -34,7 +39,7 @@ test("docs CI rejects mixed, unknown, executable skill and generated-schema chan
 });
 
 test("GitLab full-path patterns match the conservative documentation classifier", () => {
-  const paths = ["README.md", ".md", "dir/.md", "docs/中文 空格.md", "d", "md", "amd", ".MD", "docs/a.md/script", "server/docs/database/README.md", "unknown/file.json"];
+  const paths = ["README.md", ".md", "dir/.md", "docs/中文 空格.md", "d", "md", "amd", ".MD", "docs/a.md/script", "server/docs/database/README.md", "server/docs/database/domains/tables.md", "unknown/file.json"];
   // Enumerate suffix boundaries rather than sampling only familiar extensions.
   let names = [""];
   for (let length = 1; length <= 5; length += 1) {
@@ -44,6 +49,66 @@ test("GitLab full-path patterns match the conservative documentation classifier"
   for (const file of paths.filter((value) => ![".", "..", "nested/.", "nested/.."].includes(value))) {
     assert.equal(CI_FULL_CHANGE_PATTERNS.some((pattern) => matchesGitLabChangePattern(file, pattern)), !isDocumentationOnlyCIChange([file]), file);
   }
+});
+
+function historyFixture(t) {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-ci-plan-history-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false",
+    "-c", "user.name=CI Plan Fixture", "-c", "user.email=fixture@example.invalid", ...args], {
+    cwd: root, env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+  const put = (file, contents) => writeFileSync(path.join(root, file), contents);
+  const commit = (message) => {
+    git("add", ".");
+    git("commit", "-qm", message);
+    return git("rev-parse", "HEAD");
+  };
+  git("init", "-qb", "main");
+  put(".gitleaks.toml", "[extend]\nuseDefault = true\n");
+  put(".gitleaksignore", "");
+  return { root, put, git, commit };
+}
+
+test("push and manual full both cover the same history, including commits missed by an earlier job", (t) => {
+  const f = historyFixture(t);
+  const checkpoint = f.commit("audited checkpoint");
+  f.put("sample.txt", "earlier change\n");
+  const earlier = f.commit("earlier unscanned push");
+  f.git("rm", "-q", "sample.txt");
+  f.put(".gitleaksignore", "untrusted candidate exclusion\n");
+  const gitSha = f.commit("follow-up push with changed ignore policy");
+  const push = resolveHistoryScan(f.root, { gitSha, source: "push", checkpoint });
+  const web = resolveHistoryScan(f.root, { gitSha, source: "web", checkpoint });
+  assert.deepEqual(web, push);
+  assert.equal(push.range, `${checkpoint}..${gitSha}`);
+  assert(f.git("rev-list", push.range).split("\n").includes(earlier));
+  assert.equal(push.policyCommit, checkpoint);
+  assert.equal(push.ignoreBlob, f.git("rev-parse", `${checkpoint}:.gitleaksignore`));
+  assert.notEqual(push.ignoreBlob, f.git("rev-parse", `${gitSha}:.gitleaksignore`));
+  const evidence = { ...push, gitleaksVersion: "8.30.1", status: "passed" };
+  assert.doesNotThrow(() => assertHistoryScanEvidence(evidence, push));
+  assert.throws(() => assertHistoryScanEvidence({ ...evidence, range: `${earlier}..${gitSha}` }, push), /does not cover/u);
+  assert.throws(() => assertHistoryScanEvidence({ ...evidence, ignoreBlob: f.git("rev-parse", `${gitSha}:.gitleaksignore`) }, push), /does not cover/u);
+  const mr = resolveHistoryScan(f.root, { gitSha, source: "merge_request_event", mrBaseSha: earlier });
+  assert.equal(mr.range, `${earlier}..${gitSha}`);
+  assert.equal(mr.policyCommit, earlier);
+  assert.throws(() => resolveHistoryScan(f.root, { gitSha: earlier, source: "push", checkpoint: gitSha }), /does not contain/u);
+});
+
+test("a type-only source change reaches QA selection instead of looking like a docs-only change", (t) => {
+  const f = historyFixture(t);
+  mkdirSync(path.join(f.root, "web/src"), { recursive: true });
+  f.put("web/src/fixture.mjs", "export const value = 1;\n");
+  f.put("target.txt", "a fixture\n");
+  const base = f.commit("base");
+  rmSync(path.join(f.root, "web/src/fixture.mjs"));
+  symlinkSync("../../target.txt", path.join(f.root, "web/src/fixture.mjs"));
+  f.commit("change source file type");
+  assert.equal(f.git("diff", "--name-status", `${base}..HEAD`), "T\tweb/src/fixture.mjs");
+  const files = collectGitChangedFiles({ root: f.root, range: `${base}..HEAD` });
+  assert.deepEqual(files, ["web/src/fixture.mjs"]);
+  assert.throws(() => buildCIPlan({ files, mode: "docs", root: f.root }), /docs CI cannot cover/u);
 });
 
 test("CI plan keeps documentation with workbench consumers on focused checks", () => {

@@ -64,20 +64,20 @@ GitLab HTTP 只绑定 GitLab 宿主 `127.0.0.1:8929`，由 FRP 到阿里云 `182
 
 `.gitlab-ci.yml` 是唯一 canonical 编排：
 
-1. `plan` 根据 MR base、push before SHA 或手工范围建立可信 diff，先做 diff/log 检查和可信基线 gitleaks，再生成带 digest 的 `ci-plan` / range / trust。
+1. `plan` 根据 MR base、push before SHA 或手工范围建立 diff；main 的历史密钥扫描从已审计检查点覆盖到本次 SHA，MR 使用可信 diff base。完成扫描和 diff/log 检查后生成 `ci-plan` / range / trust，信任回执绑定实际扫描范围与规则对象。
 2. MR 保留 plan-driven affected/full 单 job。
 
    main 完整 CI 先由唯一 `prepare` cache writer 预热 locked pnpm/Playwright/Go 依赖，再由 Runner 已登记容量调度 static、Node contracts、Web、Server/PostgreSQL、resource-sensitive、browser 和 security 七个固定外部分片。
 
    Server 内部把 schema 零漂移、存量升级、普通测试/构建和关键 PostgreSQL 合同拆为四条独立 lane；只有升级与关键合同持有受管 PostgreSQL，只有普通测试/构建消费 Chromium。browser 等待同 SHA Web build，以及升级和关键 PostgreSQL Job 清理完成；其余依赖以当前 CI 编排为准。
 3. `quality_aggregate` 要求七个回执、阶段并集、分类执行数、source archive、依赖审计、`make data`、Web build digest、PostgreSQL/Chromium/browser 清理全部同 SHA 且通过，再签发标准 v3 strict terminal。
-4. `CI Gate` 按 plan 范围分别等待文档检查、main aggregate 或 MR quality；main 完整 CI 才会把 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 `plush-ci-evidence` Package，作为 protected main 的稳定 required job 和后续 release 唯一可复用证据。
+4. `CI Gate` 按入口依赖文档检查、main aggregate 或 MR quality，并核对对应的成功证据。main 完整 CI 才会把 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 `plush-ci-evidence` Package，作为 protected main 的稳定 required job 和后续 release 唯一可复用证据。
 
 普通 Markdown main push 使用 `plan → quality_docs → CI Gate` 三个 Job；任意非 Markdown、混合改动、首次推送与生成数据字典走完整 CI。文档绿色只证明文档检查，不产生 strict Package，也不授予发布资格。
 
 需要发布该 SHA 时，在 GitLab 新建受保护 main 流水线并设 `QA_MODE=full`，保留真实 `web` provenance；完整 Job 集合由工作台与发布复用共享，具体范围和入口见 [QA 合同](../../scripts/qa/README.md#门禁完整性与-ci-边界)。
 
-默认 `origin/main` 推送前，本地 `prepare-push` 执行并签名 clean HEAD/tree、remote/ref/range、git-log、严格 secrets、源码完整性及 affected 选择的短 Node 检查，不重复 Runner 的 affected/full、数据库、浏览器或构建。
+默认 `origin/main` 的实际推送地址核对为项目 GitLab 后，本地 `prepare-push` 以该地址的 ref 为基线，执行并签名 clean HEAD/tree、remote/ref/range、git-log、严格 secrets、源码完整性及 affected 选择的短 Node 检查；完整验证交给 Runner。
 
 短检查范围、并发、截止时间和回执合同见 [QA 入口](../../scripts/qa/README.md#门禁完整性与-ci-边界)。该回执只允许普通非强制 push，不表示 CI 已成功；Release、Package 显式版本提升（Explicit Promotion）和任何受保护部署必须读回同一 40 位 SHA 的不可变终态成功 `CI Gate`。
 

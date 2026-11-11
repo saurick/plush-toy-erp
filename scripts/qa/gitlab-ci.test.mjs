@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -23,6 +24,7 @@ import {
 import { CI_NODE_TEST_LANES } from "./ci-node-test-lane.mjs";
 import { CI_RESOURCE_TEST_LANES } from "./ci-resource-test-lane.mjs";
 import { CI_FULL_CHANGE_PATTERNS } from "./ci-plan.mjs";
+import { CI_TRUST_SCHEMA } from "./ci-history-scan.mjs";
 
 const repositoryRoot = new URL("../../", import.meta.url);
 const trackedFiles = execFileSync("git", ["ls-files", "-z"], {
@@ -205,8 +207,59 @@ test("documentation routing is guarded by the shared complete non-Markdown path 
   assert.doesNotMatch(docs, /docker|atlas|ci-playwright-runtime/u);
   const gate = yamlJobBlock("CI Gate");
   assert.match(gate, /job: quality_docs/u);
+  assert.doesNotMatch(gate, /optional:/u);
   assert.match(gate, /release_evidence=not_produced/u);
   assert.match(gate, /test "\$effective_mode" = full/u);
+});
+
+test("each CI Gate route requires its own producer with the producer's rule", () => {
+  const gate = yamlJobBlock("CI Gate");
+  for (const [rule, definition, producer, artifacts] of [
+    ["main_full_quality", ".main_quality_rules", "quality_aggregate", true],
+    ["main_docs_quality", "quality_docs", "quality_docs", true],
+    ["mr_quality", "quality_affected", "quality_affected", true],
+  ]) {
+    const ruleLine = `if: *${rule}`;
+    assert(workflow.includes(`if: &${rule} `), definition);
+    const dependencies = gate.slice(gate.indexOf(ruleLine) + ruleLine.length).split(/\n    - |\n  script:/u, 1)[0];
+    assert.match(dependencies, new RegExp(`needs:\\s+- job: plan\\s+artifacts: true\\s+- job: ${producer}\\s+artifacts: ${artifacts}`, "u"));
+    assert.doesNotMatch(dependencies, /optional:/u);
+  }
+});
+
+test("docs and MR Gate require producer completion for the same pipeline, SHA and plan", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-gitlab-gate-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const out = path.join(root, "output/ci");
+  mkdirSync(path.join(out, "checks"), { recursive: true });
+  const script = yamlJobBlock("CI Gate").split("\n  script:\n    - |\n")[1]
+    .split("\n").map((line) => line.slice(6)).join("\n");
+  const sha = "a".repeat(40);
+  for (const [mode, source, producer] of [
+    ["docs", "push", "quality_docs"],
+    ["affected", "merge_request_event", "quality_affected"],
+    ["full", "merge_request_event", "quality_affected"],
+  ]) {
+    const plan = JSON.stringify({ effectiveMode: mode }) + "\n";
+    writeFileSync(path.join(out, "plan.json"), plan);
+    const run = () => spawnSync("bash", ["-c", script], {
+      cwd: root, encoding: "utf8", timeout: 5_000,
+      env: { ...process.env, CI_PIPELINE_SOURCE: source, CI_QUALITY_SCOPE: mode,
+        CI_COMMIT_BRANCH: "main", CI_DEFAULT_BRANCH: "main", CI_COMMIT_REF_PROTECTED: "true", CI_PIPELINE_ID: "23", CI_COMMIT_SHA: sha },
+    });
+    const missing = run();
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, new RegExp(`missing or mismatched completion receipt: ${producer}`, "u"));
+    const digest = createHash("sha256").update(plan).digest("hex");
+    const receipt = path.join(out, "checks", producer);
+    writeFileSync(receipt, `22:${sha}:${digest}\n`);
+    assert.notEqual(run().status, 0, "old pipeline must not pass");
+    writeFileSync(receipt, `23:${sha}:${digest}\n`);
+    const completed = run();
+    assert.equal(completed.status, 0, completed.stderr);
+    assert.match(completed.stdout, /status=complete/u);
+    rmSync(receipt);
+  }
 });
 
 test("browser lanes wait for database and Bootstrap Docker network cleanup", () => {
@@ -609,12 +662,11 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     securityBlock,
     /SKIP_GOVULNCHECK|-scan (?:module|package)/u,
   );
-  assert.match(workflow, /history_range=HEAD/u);
-  assert.match(
-    workflow,
-    /trusted_config_sha="\$CI_MERGE_REQUEST_DIFF_BASE_SHA"/u,
-  );
-  assert.match(workflow, /git show "\$trusted_config_sha:[.]gitleaks[.]toml"/u);
+  const plan = yamlJobBlock("plan");
+  assert.match(plan, /log_range=HEAD/u);
+  assert.match(plan, /history_scan="\$\(node scripts\/qa\/ci-history-scan[.]mjs\)"/u);
+  assert(plan.includes(`--arg schemaVersion '${CI_TRUST_SCHEMA}'`));
+  assert.match(plan, /--argjson historyScan "\$history_scan"/u);
   assert.match(workflow, /output\/ci\/plan[.]json/u);
   assert.match(workflow, /output\/ci\/range[.]txt/u);
   assert.match(workflow, /output\/cache\/gitlab\/pnpm-store/u);

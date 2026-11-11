@@ -18,6 +18,7 @@ import os from "node:os";
 import path from "node:path";
 import test, { after } from "node:test";
 import { fileURLToPath } from "node:url";
+import { GITLAB_DELIVERY_PROJECT, GITLAB_DELIVERY_SSH_URL } from "../lib/gitlab-project.mjs";
 
 import {
   PROFILE_REQUIRED_EXECUTABLES,
@@ -100,6 +101,7 @@ function installRealReceiptFiles(root) {
     "scripts/qa/native/node-test-bootstrap.cjs",
     "scripts/qa/lib/git-range.mjs",
     "scripts/qa/lib/repository-identity.mjs",
+    "scripts/lib/gitlab-project.mjs",
     "scripts/git-hooks/pre-push.sh",
   ]) {
     const target = path.join(root, file);
@@ -286,6 +288,7 @@ function createFixture({
   changePath = "tracked.txt",
   baseContent = "base\n",
   headContent = "head\n",
+  canonical = false,
 } = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-repo-"));
   const remote = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-remote-"));
@@ -308,9 +311,28 @@ function createFixture({
   ]);
   writeFileSync(path.join(root, changePath), headContent, "utf8");
   const localSha = commit(root, "head");
+  let location = remote;
+  if (canonical) {
+    location = `${GITLAB_DELIVERY_SSH_URL}/${GITLAB_DELIVERY_PROJECT}.git`;
+    // Preserve the real push URL seen by Git and its hook; only the fixture's
+    // SSH transport is redirected to its disposable bare repository.
+    const transport = path.join(root, ".git", "fixture-ssh");
+    writeFileSync(transport, String.raw`#!/bin/sh
+for argument do last="$argument"; done
+case "$last" in
+  git-upload-pack\ *) exec git-upload-pack "${remote}" ;;
+  git-receive-pack\ *) exec git-receive-pack "${remote}" ;;
+  *) exit 91 ;;
+esac
+`, { mode: 0o755 });
+    git(root, ["config", "core.sshCommand", `"${transport}"`]);
+    git(root, ["config", "ssh.variant", "ssh"]);
+    git(root, ["remote", "set-url", "origin", location]);
+  }
   return {
     root,
     remote,
+    location,
     remoteSha,
     localSha,
     cleanup() {
@@ -335,7 +357,7 @@ function runHook(
     input = `refs/heads/main ${fixture.localSha} refs/heads/main ${fixture.remoteSha}\n`,
     env = cleanEnvironment(),
     remoteName = "origin",
-    remoteLocation = fixture.remote,
+    remoteLocation = fixture.location,
   } = {},
 ) {
   return spawnSync(
@@ -497,7 +519,7 @@ test("removed review-only option fails closed", () => {
 });
 
 test("canonical main signs a server-CI receipt without local affected or full", () => {
-  const fixture = createFixture({ changePath: "docs/guide.md" });
+  const fixture = createFixture({ changePath: "docs/guide.md", canonical: true });
   try {
     const env = cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" });
     const first = runPrepare(fixture.root, [], env);
@@ -555,7 +577,7 @@ test("canonical main signs a server-CI receipt without local affected or full", 
 });
 
 test("canonical high-risk changes keep the full recommendation but run on server CI", () => {
-  const fixture = createFixture();
+  const fixture = createFixture({ canonical: true });
   try {
     const result = runPrepare(
       fixture.root,
@@ -601,6 +623,7 @@ test("local Node check deadline preserves the small batch budget and bounds larg
 
 test("canonical prepare runs real local tests once and signs their selection", () => {
   const fixture = createFixture({
+    canonical: true,
     changePath: LOCAL_TEST_PATH,
     baseContent: LOCAL_TEST_SOURCE,
     headContent: `${LOCAL_TEST_SOURCE}\n// candidate\n`,
@@ -640,6 +663,7 @@ test("local failure, skip, zero execution and source drift never sign a receipt"
     [LOCAL_TEST_SOURCE, { LOCAL_DIRTY: "1" }, "worktree_changed_during_gate", /tests=1 pass=1/u],
   ]) {
     const fixture = createFixture({
+      canonical: true,
       changePath: LOCAL_TEST_PATH,
       baseContent: source,
       headContent: `${source}\n// candidate\n`,
@@ -658,6 +682,7 @@ test("local failure, skip, zero execution and source drift never sign a receipt"
 
 test("the hook refuses modified local coverage and the previous gate contract", () => {
   const fixture = createFixture({
+    canonical: true,
     changePath: LOCAL_TEST_PATH,
     baseContent: LOCAL_TEST_SOURCE,
     headContent: `${LOCAL_TEST_SOURCE}\n// candidate\n`,
@@ -672,7 +697,7 @@ test("the hook refuses modified local coverage and the previous gate contract", 
       [(receipt) => { receipt.gate.localNodeChecks.tests = []; }, "receipt_profile_mismatch"],
       [(receipt) => { receipt.gate.localNodeChecks.timeoutMs = 0; }, "receipt_profile_mismatch"],
       [(receipt) => { delete receipt.gate.localNodeChecks; }, "receipt_profile_mismatch"],
-      [(receipt) => { receipt.gate.contract = "plush.pre-push-gate-tree/v5"; }, "receipt_gate_contract_mismatch"],
+      [(receipt) => { receipt.gate.contract = "plush.pre-push-gate-tree/v6"; }, "receipt_gate_contract_mismatch"],
     ]) {
       writeFileSync(state.receiptPath, validReceipt);
       resignReceipt(state, mutate);
@@ -707,7 +732,7 @@ test("noncanonical high-risk changes still require explicit full", () => {
 });
 
 test("server-CI metadata is signed and recomputed by the hook", () => {
-  const fixture = createFixture({ changePath: "docs/guide.md" });
+  const fixture = createFixture({ changePath: "docs/guide.md", canonical: true });
   try {
     const env = cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" });
     const prepared = runPrepare(fixture.root, [], env);
@@ -726,6 +751,41 @@ test("server-CI metadata is signed and recomputed by the hook", () => {
   } finally {
     fixture.cleanup();
   }
+});
+
+test("origin/main on a bare repository does not delegate QA to GitLab", (t) => {
+  const fixture = createFixture({ changePath: "docs/guide.md" });
+  t.after(fixture.cleanup);
+  const result = runPrepare(fixture.root, []);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /status=complete profile=affected/u);
+  const receipt = JSON.parse(readFileSync(resolveReceiptState(fixture.root).receiptPath, "utf8"));
+  assert.equal(receipt.push.canonicalGitlab, false);
+  assert.equal(receipt.gate.serverCiRequired, null);
+});
+
+test("prepare reads the push URL ref and refuses a different hook destination or multiple push URLs", (t) => {
+  const fixture = createFixture({ changePath: "docs/guide.md" });
+  t.after(fixture.cleanup);
+  const target = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-push-url-"));
+  t.after(() => rmSync(target, { recursive: true, force: true }));
+  git(fixture.root, ["clone", "--quiet", "--bare", fixture.root, target]);
+  const pushBase = fixture.localSha;
+  writeFileSync(path.join(fixture.root, "docs/guide.md"), "push candidate\n");
+  const head = commit(fixture.root, "push URL candidate");
+  git(fixture.root, ["remote", "set-url", "--push", "origin", target]);
+  const result = runPrepare(fixture.root, []);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const receipt = JSON.parse(readFileSync(resolveReceiptState(fixture.root).receiptPath, "utf8"));
+  assert.equal(receipt.push.aggregateRange, `${pushBase}..${head}`);
+  const input = `refs/heads/main ${head} refs/heads/main ${pushBase}\n`;
+  const wrong = runHook(fixture, { input });
+  assert.match(wrong.stderr, /reason=push_location_mismatch/u);
+  const verified = runHook(fixture, { input, remoteLocation: target });
+  assert.equal(verified.status, 0, verified.stderr || verified.stdout);
+  git(fixture.root, ["remote", "set-url", "--add", "--push", "origin", fixture.remote]);
+  const multi = runPrepare(fixture.root, []);
+  assert.match(multi.stderr, /reason=single_push_url_required/u);
 });
 
 test("affected failures and repository drift never produce a push receipt", () => {
