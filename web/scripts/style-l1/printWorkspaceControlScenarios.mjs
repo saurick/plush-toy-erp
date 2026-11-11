@@ -3,6 +3,7 @@ import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 import { measureEmptyEditorHints } from './printEmptyEditorAssertions.mjs'
 import { createMockAdminSessionToken } from '../mockAdminSessionToken.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createPrintWorkspaceControlScenarios({
   assert,
@@ -370,6 +371,11 @@ export function createPrintWorkspaceControlScenarios({
           }
           for (const scale of ['1', '0.75', '1.25', '1.5']) {
             await chooseSelectOption(zoomControl, scale)
+            await page.waitForFunction((expected) => {
+              const stage = document.querySelector('.erp-print-shell__stage')
+              return stage?.style.getPropertyValue('--print-view-scale') === expected
+            }, scale)
+            await waitForFiniteAnimations(page)
             await assertEditorInventory(`${scale} 缩放清空前`)
             for (let index = 0; index < count; index += 1) {
               const editor = editors.nth(index)

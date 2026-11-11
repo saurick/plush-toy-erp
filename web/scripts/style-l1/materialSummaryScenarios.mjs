@@ -20,6 +20,7 @@ export function summaryFixture(inventoryStatus = 'AVAILABLE', empty = false) {
       unit_id: item.unit_id,
       sales_order_item_id: index + 1,
       line_no: index + 1,
+      product_id: index ? null : 901,
       product_name: index ? '小熊挂件' : '节庆毛绒礼盒',
       customer_product_no: `DEMO-${index + 1}`,
       product_unit_name: '只',
@@ -90,6 +91,7 @@ export function createMaterialSummaryScenarios({
           'workflow.task.complete',
           'sales_order.read',
           'engineering.material.read',
+          'product.read',
         ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': ['boss'],
@@ -195,10 +197,14 @@ export function createMaterialSummaryScenarios({
           productRects.every((rect) => rect.height < 130),
           '产品摘要保持紧凑'
         )
-        assert.equal(
-          await dialog.getByRole('img', { name: /暂无可显示的图片/ }).count(),
-          2
-        )
+        await dialog.getByRole('img', {
+          name: '节庆毛绒礼盒：暂无可显示的图片',
+          exact: true,
+        }).waitFor()
+        await dialog.getByRole('img', {
+          name: '小熊挂件：仅有款式资料，未关联产品档案',
+          exact: true,
+        }).waitFor()
         const scroller = dialog
           .locator('.erp-material-sheet__table .ant-table-body')
           .first()
