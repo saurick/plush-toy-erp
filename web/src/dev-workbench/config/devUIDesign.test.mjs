@@ -19,16 +19,19 @@ import {
   DEV_UI_DESIGN_ROUTE,
   UI_DESIGN_ASSET,
   UI_DESIGN_DIRECTORY,
-  UI_DESIGN_PREVIEW_PAGES,
+  UI_DESIGN_PREVIEW_MODES,
   prepareUIDesignSandboxSource,
+  resolveUIDesignPreviewMode,
   resolveUIDesignPreviewPage,
 } from './devUIDesign.mjs'
 import { DEV_WORKSPACE_NAV_ITEMS, getDevSecondaryNavItems } from './devRoutes.mjs'
 import {
-  filterUIDesignEntries,
+  filterUIDesignTopics,
   findUIDesignChapter,
+  findUIDesignRule,
   getUIDesignTopics,
   readUIDesignChapters,
+  resolveUIDesignReading,
 } from './devUIDesignReading.mjs'
 
 const root = path.resolve(import.meta.dirname, '../../../..')
@@ -108,6 +111,14 @@ test('design chapters retain full content and resolve aliases without splitting 
     '',
     '子章节说明。',
     '',
+    '#### 数量对齐',
+    '',
+    '金额右对齐。',
+    '',
+    '### 其他规则',
+    '',
+    '不属于对齐。',
+    '',
     '## 恢复 / Recovery',
     '',
     '```mermaid',
@@ -125,13 +136,17 @@ test('design chapters retain full content and resolve aliases without splitting 
     assert.equal(findUIDesignChapter(chapters, anchor), chapters[1])
   }
   assert.equal(findUIDesignChapter(chapters, '代码里的标题'), undefined)
+  assert.equal(findUIDesignRule(chapters, 'alignment').content, [
+    '<a id="alignment"></a>', '### 对齐', '', '子章节说明。', '', '#### 数量对齐', '', '金额右对齐。',
+  ].join('\n'))
+  assert.equal(findUIDesignRule(chapters, '数量对齐').content, '#### 数量对齐\n\n金额右对齐。')
   assert.deepEqual(chapters[2].diagrams, [
     'flowchart LR\n  A[失败] --> B[重试]',
   ])
   assert.deepEqual(readUIDesignChapters(''), [])
 })
 
-test('every design topic has a formal chapter and mechanisms read diagrams from that specification', () => {
+test('every design topic reads a focused source rule and mechanisms keep their formal diagrams', () => {
   const specification = readUIDesignChapters(
     read(UI_DESIGN_ASSET.specificationPath)
   )
@@ -142,14 +157,9 @@ test('every design topic has a formal chapter and mechanisms read diagrams from 
   ]) {
     const topics = getUIDesignTopics(view, chapters)
     assert.equal(new Set(topics.map(({ key }) => key)).size, topics.length)
-    for (const topic of topics) {
-      assert(
-        topic.references.length > 0,
-        `${view} / ${topic.title} 必须能查阅原规则`
-      )
-      for (const reference of topic.references) {
-        assert.equal(findUIDesignChapter(chapters, reference.id), reference)
-      }
+    for (const { title, rule } of topics) {
+      assert(rule?.content, `${view} / ${title} 必须能查阅原规则`)
+      assert(findUIDesignChapter(chapters, rule.id)?.content.includes(rule.content))
     }
   }
   for (const [title, count] of [
@@ -166,20 +176,36 @@ test('every design topic has a formal chapter and mechanisms read diagrams from 
   }
 })
 
+test('design links keep exact anchors and old topic bookmarks open the focused rule', () => {
+  const chapters = readUIDesignChapters(read(UI_DESIGN_ASSET.specificationPath))
+  const topics = getUIDesignTopics('specification', chapters)
+  const resolve = (query, hash = '') => resolveUIDesignReading(chapters, topics, new URLSearchParams(query), hash)
+  const layout = resolve('topic=layout&read=reference&chapter=高保真视觉合同--visual-contract')
+  assert.equal(layout.topic.key, 'layout')
+  assert.match(layout.rule.content, /桌面侧栏[\s\S]*侧栏品牌区[\s\S]*页面边距/u)
+  assert.doesNotMatch(layout.rule.content, /颜色、内容面|日期、弹层|桌面输入框/u)
+  assert.equal(resolve('topic=layout&chapter=侧栏页头与间距').rule, layout.rule)
+  assert.equal(resolve('read=reference&topic=layout').rule, layout.rule)
+  assert.equal(resolve('topic=layout&read=guide&chapter=高保真视觉合同--visual-contract').rule, undefined)
+  const toolbar = resolve('read=reference', 'business-toolbar-composition')
+  assert.match(toolbar.rule.content, /业务工具栏的组合与差异/u)
+  assert.doesNotMatch(toolbar.rule.content, /先核对布局尺寸|高保真视觉合同/u)
+})
+
 test('design directory searches titles, explanations and formal rules with all query terms', () => {
   const entries = [
     {
       key: 'layout',
       title: '页面骨架',
       description: '区域与对齐',
-      references: [{ content: 'CSS 像素 · 12px 留白' }],
+      rule: { content: 'CSS 像素 · 12px 留白' },
     },
-    { id: 'state', title: '状态与恢复', content: '失败后保留输入，再重试' },
+    { key: 'state', title: '状态与恢复', rule: { content: '失败后保留输入，再重试' } },
   ]
-  assert.deepEqual(filterUIDesignEntries(entries, '   '), entries)
-  assert.deepEqual(filterUIDesignEntries(entries, 'css 留白'), [entries[0]])
-  assert.deepEqual(filterUIDesignEntries(entries, '失败 输入'), [entries[1]])
-  assert.deepEqual(filterUIDesignEntries(entries, '状态 对齐'), [])
+  assert.deepEqual(filterUIDesignTopics(entries, '   '), entries)
+  assert.deepEqual(filterUIDesignTopics(entries, 'css 留白'), [entries[0]])
+  assert.deepEqual(filterUIDesignTopics(entries, '失败 输入'), [entries[1]])
+  assert.deepEqual(filterUIDesignTopics(entries, '状态 对齐'), [])
 })
 
 test('quantity design snapshot follows the canonical unit labels and precision', () => {
@@ -550,8 +576,8 @@ test('every documented preview entry uses the same isolated design asset', () =>
   const source = '<html><head></head><body></body></html>'
   const documented = [...read(`${UI_DESIGN_DIRECTORY}/README.md`).matchAll(/\/__dev\/ui-design\?page=([\w-]+)/gu)]
     .map((match) => match[1]).filter((entry) => entry !== 'controls')
-  for (const entry of documented) assert.equal(resolveUIDesignPreviewPage(entry), entry)
-  for (const { value: entry } of UI_DESIGN_PREVIEW_PAGES) {
+  for (const entry of new Set([...documented, ...UI_DESIGN_PREVIEW_MODES.map(({ value }) => value)])) {
+    assert.equal(resolveUIDesignPreviewPage(entry), entry)
     const prepared = prepareUIDesignSandboxSource(source, { page: entry })
     assert.ok(prepared.includes(`window.__ERP_UI_DESIGN_ENTRY__ = "${entry}"`))
     assert.match(prepared, /connect-src 'none'/)
@@ -573,6 +599,9 @@ test('production preview opens the same module as the ERP design navigation', ()
   }), 'production-hub')
   assert.equal(resolveUIDesignPreviewPage('controls'), 'workspace')
   assert.equal(resolveUIDesignPreviewPage(undefined), 'workspace')
+  for (const entry of ['production-hub', 'task-handling', 'workbench', 'help', '']) {
+    assert.equal(resolveUIDesignPreviewMode(entry), 'workspace')
+  }
 })
 
 test('workbench design navigation matches the formal area and visible tool order', () => {

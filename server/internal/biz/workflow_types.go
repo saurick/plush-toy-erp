@@ -68,6 +68,7 @@ type WorkflowTaskDisplayContext struct {
 type WorkflowTaskDisplayItem struct {
 	ProductID         int    `json:"product_id"`
 	ImageAttachmentID int    `json:"image_attachment_id"`
+	HasProductImages  bool   `json:"has_product_images"`
 	Kind              string `json:"kind"`
 	Name              string `json:"name"`
 	Code              string `json:"code"`

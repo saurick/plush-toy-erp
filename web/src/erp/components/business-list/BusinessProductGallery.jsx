@@ -10,7 +10,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import WorkflowTaskImagePreview from '../workflow/WorkflowTaskImagePreview.jsx'
 import './businessProductGallery.css'
 
-function ProductGallerySession({ products, productCount, title = '产品图片', loadProducts, renderThumbnail, children, compact = false, onClose }) {
+function ProductGallerySession({ products, productCount, title = '产品图片', triggerLabel, loadProducts, renderThumbnail, children, compact = false, onClose }) {
   const trigger = useRef(null)
   const request = useRef(null)
   const [busy, setBusy] = useState(false)
@@ -43,7 +43,7 @@ function ProductGallerySession({ products, productCount, title = '产品图片',
   }
   return (
     <span className={`erp-product-gallery${compact ? ' erp-product-gallery--compact' : ''}`}>
-      <button ref={trigger} type="button" className="erp-product-gallery__trigger" aria-label={count > 1 ? `查看${title}的 ${count} 款产品图片` : `查看${initialProducts[0]?.name || title}大图`} aria-haspopup="dialog" aria-busy={busy} disabled={busy} onClick={open} onDoubleClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key !== 'Escape') event.stopPropagation() }}>
+      <button ref={trigger} type="button" className="erp-product-gallery__trigger" aria-label={triggerLabel || (count > 1 ? `查看${title}的 ${count} 款产品图片` : `查看${initialProducts[0]?.name || title}大图`)} aria-haspopup="dialog" aria-busy={busy} disabled={busy} onClick={open} onDoubleClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key !== 'Escape') event.stopPropagation() }}>
         <span className={count > 1 ? 'erp-product-gallery__stack' : 'erp-product-gallery__thumbnail'}>{children}</span>
         {compact ? null : <span className="erp-product-gallery__summary"><span>{count > 1 ? `共 ${count} 款产品` : initialProducts[0]?.name || '产品图片'}</span><small>{busy ? '正在读取' : '查看图片'}</small></span>}
       </button>

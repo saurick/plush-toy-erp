@@ -179,7 +179,17 @@ func productionExceptionToAny(item *biz.ProductionExceptionDecision) map[string]
 	if item == nil {
 		return nil
 	}
-	return map[string]any{"id": item.ID, "decision_no": item.DecisionNo, "decision_type": item.DecisionType, "status": item.Status, "execution_status": item.ExecutionStatus, "stock_disposition_required": item.StockDispositionRequired, "production_order_id": item.ProductionOrderID, "production_order_item_id": item.ProductionOrderItemID, "production_material_requirement_id": optionalIntToAny(item.ProductionMaterialRequirementID), "production_wip_batch_id": optionalIntToAny(item.ProductionWIPBatchID), "quality_inspection_id": optionalIntToAny(item.QualityInspectionID), "target_operation_id": optionalIntToAny(item.TargetOperationID), "target_supplier_id": optionalIntToAny(item.TargetSupplierID), "requested_quantity": item.RequestedQuantity.String(), "approved_quantity": optionalDecimalToAny(item.ApprovedQuantity), "reason": item.Reason, "version": item.Version, "requested_by": item.RequestedBy, "requested_at": item.RequestedAt.Unix(), "decided_by": optionalIntToAny(item.DecidedBy), "decided_at": optionalUnix(item.DecidedAt), "decision_reason": optionalStringToAny(item.DecisionReason), "executed_by": optionalIntToAny(item.ExecutedBy), "executed_at": optionalUnix(item.ExecutedAt), "execution_reason": optionalStringToAny(item.ExecutionReason), "reversed_by": optionalIntToAny(item.ReversedBy), "reversed_at": optionalUnix(item.ReversedAt), "reverse_reason": optionalStringToAny(item.ReverseReason)}
+	return map[string]any{"id": item.ID, "decision_no": item.DecisionNo, "decision_type": item.DecisionType, "status": item.Status, "execution_status": item.ExecutionStatus, "stock_disposition_required": item.StockDispositionRequired, "production_order_id": item.ProductionOrderID, "production_order_item_id": item.ProductionOrderItemID, "production_material_requirement_id": optionalIntToAny(item.ProductionMaterialRequirementID), "production_wip_batch_id": optionalIntToAny(item.ProductionWIPBatchID), "quality_inspection_id": optionalIntToAny(item.QualityInspectionID), "target_operation_id": optionalIntToAny(item.TargetOperationID), "target_supplier_id": optionalIntToAny(item.TargetSupplierID), "requested_quantity": item.RequestedQuantity.String(), "approved_quantity": optionalDecimalToAny(item.ApprovedQuantity), "reason": item.Reason, "version": item.Version, "requested_by": item.RequestedBy, "requested_at": item.RequestedAt.Unix(), "decided_by": optionalIntToAny(item.DecidedBy), "decided_at": optionalUnix(item.DecidedAt), "decision_reason": optionalStringToAny(item.DecisionReason), "executed_by": optionalIntToAny(item.ExecutedBy), "executed_at": optionalUnix(item.ExecutedAt), "execution_reason": optionalStringToAny(item.ExecutionReason), "reversed_by": optionalIntToAny(item.ReversedBy), "reversed_at": optionalUnix(item.ReversedAt), "reverse_reason": optionalStringToAny(item.ReverseReason), "source_identity": productionExceptionSourceIdentityToAny(item.SourceIdentity)}
+}
+
+func productionExceptionSourceIdentityToAny(item *biz.ProductionExceptionSourceIdentity) any {
+	if item == nil {
+		return nil
+	}
+	return map[string]any{
+		"subject_type": item.SubjectType, "subject_id": item.SubjectID, "name": item.Name, "code": item.Code,
+		"sku_code": item.SKUCode, "batch_no": item.BatchNo,
+	}
 }
 
 func (d *jsonrpcDispatcher) handleOutsourcingReturnDisposition(ctx context.Context, method, id string, pm map[string]any, actorID int) (string, *v1.JsonrpcResult, error) {

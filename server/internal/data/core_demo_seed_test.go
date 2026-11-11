@@ -552,11 +552,20 @@ func TestSeedScenarioDemoReferencesPreservesEveryEarlierReference(t *testing.T) 
 	dataset := DefaultCoreDemoReferenceSeedDataset()
 	mock.ExpectBegin()
 	for i, unit := range dataset.Units {
-		mock.ExpectQuery("INSERT INTO units").WithArgs(unit.Code, unit.Name, unit.Precision).
-			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11 + i))
+		insert := mock.ExpectQuery(`(?s)INSERT INTO units .*ON CONFLICT \(code\) DO NOTHING`).
+			WithArgs(unit.Code, unit.Name, unit.Precision)
+		rows := sqlmock.NewRows([]string{"id"})
+		if i == 0 {
+			insert.WillReturnRows(rows)
+			mock.ExpectQuery("SELECT id FROM units WHERE").
+				WithArgs(unit.Code, unit.Name, unit.Precision).
+				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
+		} else {
+			insert.WillReturnRows(rows.AddRow(11 + i))
+		}
 	}
 	for i, warehouse := range dataset.Warehouses {
-		mock.ExpectQuery("INSERT INTO warehouses").WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
+		mock.ExpectQuery(`(?s)INSERT INTO warehouses .*ON CONFLICT \(code\) DO NOTHING`).WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31 + i))
 	}
 	// No query, update, or identity assumption is allowed for a previous batch.
@@ -567,6 +576,36 @@ func TestSeedScenarioDemoReferencesPreservesEveryEarlierReference(t *testing.T) 
 	}
 	if len(result.RetiredUnitIDs) != 0 || len(result.RetiredWarehouseIDs) != 0 {
 		t.Fatal("shared development references were retired")
+	}
+	if result.UnitIDs[dataset.Units[0].Code] != 11 || len(result.WarehouseIDs) != len(dataset.Warehouses) {
+		t.Fatalf("existing or missing references were not resolved: %+v", result)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSeedScenarioDemoReferencesRejectsExistingIdentityDrift(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		mock.ExpectClose()
+		if err := db.Close(); err != nil {
+			t.Errorf("close seed test database: %v", err)
+		}
+	})
+	dataset := DefaultCoreDemoReferenceSeedDataset()
+	unit := dataset.Units[0]
+	mock.ExpectBegin()
+	mock.ExpectQuery(`(?s)INSERT INTO units .*ON CONFLICT \(code\) DO NOTHING`).
+		WithArgs(unit.Code, unit.Name, unit.Precision).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectQuery(`SELECT id FROM units .*precision = \$3 AND is_active IS TRUE`).
+		WithArgs(unit.Code, unit.Name, unit.Precision).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectRollback()
+	if _, err := SeedScenarioDemoReferences(context.Background(), db, dataset); !errors.Is(err, ErrCoreDemoSeedInvalidRecord) {
+		t.Fatalf("expected drift to stop preparation, got %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

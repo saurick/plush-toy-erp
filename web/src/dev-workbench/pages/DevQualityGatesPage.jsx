@@ -486,6 +486,7 @@ export default function DevQualityGatesPage() {
             >
               {parsed.valid && activeView === 'server' ? (
                 <ServerCiEvidencePanel
+                  inlineHistory
                   showEmptyState={false}
                   summary={summary}
                 />

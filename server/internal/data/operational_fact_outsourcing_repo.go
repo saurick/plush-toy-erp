@@ -199,7 +199,7 @@ func (r *operationalFactRepo) createOutsourcingFactFromOrder(ctx context.Context
 				if !operationalFactMutationMatchesOutsourcing(replay, resolved) {
 					return nil, biz.ErrIdempotencyConflict
 				}
-				return outsourcingFactWithSourceSKUProjection(ctx, r.data.postgres, replay)
+				return outsourcingFactWithProjections(ctx, r.data.postgres, replay)
 			}
 		}
 		return nil, err
@@ -452,7 +452,7 @@ func (r *operationalFactRepo) CreateOutsourcingFactDraft(ctx context.Context, in
 		}
 		return nil, err
 	}
-	return outsourcingFactWithSourceSKUProjection(ctx, r.data.postgres, row)
+	return outsourcingFactWithProjections(ctx, r.data.postgres, row)
 }
 
 func (r *operationalFactRepo) SaveOutsourcingFactDraft(ctx context.Context, in *biz.OutsourcingFactDraftSave) (*biz.OutsourcingFact, error) {
@@ -696,22 +696,12 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	return out, total, nil
 }
 
-type outsourcingFactSourceSKUKey struct {
-	sourceID     int
-	sourceLineID int
-	productSkuID int
-}
-
-type outsourcingFactSourceSKUProjection struct {
-	skuCodeSnapshot *string
-}
-
 func hydrateOutsourcingFactProjections(
 	ctx context.Context,
 	client *ent.Client,
 	items []*biz.OutsourcingFact,
 ) error {
-	projections, err := resolveOutsourcingFactSourceSKUSnapshots(ctx, client, items)
+	lines, err := resolveOutsourcingFactSourceLines(ctx, client, items)
 	if err != nil {
 		return err
 	}
@@ -741,46 +731,47 @@ func hydrateOutsourcingFactProjections(
 		if item == nil {
 			continue
 		}
-		item.SKUCodeSnapshot = nil
-		key, ok := outsourcingFactSourceSKUKeyFromFact(item)
-		if !ok {
+		item.SubjectName, item.SubjectCode, item.SKUCodeSnapshot = "", "", nil
+		line := lines[outsourcingFactSourceLineID(item)]
+		if line == nil || line.OutsourcingOrderID != *item.SourceID {
 			continue
 		}
-		if projection, found := projections[key]; found {
-			item.SKUCodeSnapshot = projection.skuCodeSnapshot
+		switch {
+		case item.SubjectType == biz.InventorySubjectProduct && line.SubjectType == biz.OutsourcingOrderSubjectProduct &&
+			line.ProductID != nil && *line.ProductID == item.SubjectID:
+			item.SubjectName, item.SubjectCode = displayString(line.ProductNameSnapshot), displayString(line.ProductNoSnapshot)
+			if line.ProductSkuID != nil && item.ProductSkuID != nil && *line.ProductSkuID == *item.ProductSkuID && displayString(line.SkuCodeSnapshot) != "" {
+				item.SKUCodeSnapshot = line.SkuCodeSnapshot
+			}
+		case item.SubjectType == biz.InventorySubjectMaterial && line.SubjectType == biz.OutsourcingOrderSubjectMaterial &&
+			line.MaterialID != nil && *line.MaterialID == item.SubjectID:
+			item.SubjectName, item.SubjectCode = displayString(line.MaterialNameSnapshot), displayString(line.MaterialCodeSnapshot)
 		}
 	}
 	return nil
 }
 
-func outsourcingFactSourceSKUKeyFromFact(item *biz.OutsourcingFact) (outsourcingFactSourceSKUKey, bool) {
+func outsourcingFactSourceLineID(item *biz.OutsourcingFact) int {
 	if item == nil || item.SourceType == nil || *item.SourceType != biz.OutsourcingOrderSourceType ||
-		item.SourceID == nil || *item.SourceID <= 0 || item.SourceLineID == nil || *item.SourceLineID <= 0 ||
-		item.ProductSkuID == nil || *item.ProductSkuID <= 0 {
-		return outsourcingFactSourceSKUKey{}, false
+		item.SourceID == nil || *item.SourceID <= 0 || item.SourceLineID == nil || *item.SourceLineID <= 0 {
+		return 0
 	}
-	return outsourcingFactSourceSKUKey{
-		sourceID:     *item.SourceID,
-		sourceLineID: *item.SourceLineID,
-		productSkuID: *item.ProductSkuID,
-	}, true
+	return *item.SourceLineID
 }
 
-func resolveOutsourcingFactSourceSKUSnapshots(
+func resolveOutsourcingFactSourceLines(
 	ctx context.Context,
 	client *ent.Client,
 	items []*biz.OutsourcingFact,
-) (map[outsourcingFactSourceSKUKey]outsourcingFactSourceSKUProjection, error) {
+) (map[int]*ent.OutsourcingOrderItem, error) {
 	sourceLineIDs := make(map[int]struct{})
 	for _, item := range items {
-		key, ok := outsourcingFactSourceSKUKeyFromFact(item)
-		if !ok {
-			continue
+		if id := outsourcingFactSourceLineID(item); id > 0 {
+			sourceLineIDs[id] = struct{}{}
 		}
-		sourceLineIDs[key.sourceLineID] = struct{}{}
 	}
 	if len(sourceLineIDs) == 0 {
-		return map[outsourcingFactSourceSKUKey]outsourcingFactSourceSKUProjection{}, nil
+		return nil, nil
 	}
 
 	ids := make([]int, 0, len(sourceLineIDs))
@@ -793,27 +784,24 @@ func resolveOutsourcingFactSourceSKUSnapshots(
 		Select(
 			outsourcingorderitem.FieldID,
 			outsourcingorderitem.FieldOutsourcingOrderID,
+			outsourcingorderitem.FieldSubjectType,
+			outsourcingorderitem.FieldProductID,
 			outsourcingorderitem.FieldProductSkuID,
+			outsourcingorderitem.FieldProductNameSnapshot,
+			outsourcingorderitem.FieldProductNoSnapshot,
 			outsourcingorderitem.FieldSkuCodeSnapshot,
+			outsourcingorderitem.FieldMaterialID,
+			outsourcingorderitem.FieldMaterialNameSnapshot,
+			outsourcingorderitem.FieldMaterialCodeSnapshot,
 		).
 		All(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	resolved := make(map[outsourcingFactSourceSKUKey]outsourcingFactSourceSKUProjection, len(sourceRows))
+	resolved := make(map[int]*ent.OutsourcingOrderItem, len(sourceRows))
 	for _, row := range sourceRows {
-		if row.ProductSkuID == nil || row.SkuCodeSnapshot == nil || strings.TrimSpace(*row.SkuCodeSnapshot) == "" {
-			continue
-		}
-		key := outsourcingFactSourceSKUKey{
-			sourceID:     row.OutsourcingOrderID,
-			sourceLineID: row.ID,
-			productSkuID: *row.ProductSkuID,
-		}
-		resolved[key] = outsourcingFactSourceSKUProjection{
-			skuCodeSnapshot: row.SkuCodeSnapshot,
-		}
+		resolved[row.ID] = row
 	}
 	return resolved, nil
 }
@@ -1123,7 +1111,7 @@ func outsourcingFactInventoryDirection(factType string) (int, string) {
 }
 
 func commitOutsourcingFact(ctx context.Context, tx *inventoryDBTx, row *ent.OutsourcingFact) (*biz.OutsourcingFact, error) {
-	item, err := outsourcingFactWithSourceSKUProjection(ctx, tx.client, row)
+	item, err := outsourcingFactWithProjections(ctx, tx.client, row)
 	if err != nil {
 		return nil, err
 	}
@@ -1137,7 +1125,7 @@ func commitOutsourcingFact(ctx context.Context, tx *inventoryDBTx, row *ent.Outs
 	return item, nil
 }
 
-func outsourcingFactWithSourceSKUProjection(ctx context.Context, client *ent.Client, row *ent.OutsourcingFact) (*biz.OutsourcingFact, error) {
+func outsourcingFactWithProjections(ctx context.Context, client *ent.Client, row *ent.OutsourcingFact) (*biz.OutsourcingFact, error) {
 	item := entOutsourcingFactToBiz(row)
 	if item == nil {
 		return nil, nil

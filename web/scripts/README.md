@@ -213,6 +213,10 @@ happy-dom 的文本框 computed style 会将 `none` / `hidden` 边框宽度保�
 
 `global-table-alignment-business-pages` 按正式业务模块目录逐页检查表头、单元格、列设置和复制按钮的实际对齐，并覆盖产品规格、库存批次及库存变动视图；复用 Style L1 模拟接口，输出逐页 JSON 证据。
 
+`desktop-list-sticky-*` 从正式桌面菜单和表格子视图取样，附带 1920 与 1024 CSS px 下的表格宽度、末列、对齐和横向滚动证据；专项宽度视图仅记录几何。产品基础信息的 `business-column-width-product-fit` 另验收余宽分配、窄窗及分栏、列设置和空结果恢复。
+
+加工环节、历史记录、客户档案和岗位影响分别由 `desktop-list-sticky-processes`、`desktop-list-sticky-history`、`desktop-list-sticky-customers`、`desktop-list-sticky-permission-role-impact` 检查列宽；岗位影响在窄窗另操作表内滚动和展开恢复。
+
 ## 本地启动与进程范围
 
 ```bash

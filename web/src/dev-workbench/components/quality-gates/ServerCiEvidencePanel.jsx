@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { Button, Space, Tag, Typography } from 'antd'
+import Table from '@/common/components/table/AppTable'
 import DevTimestamp from '../DevTimestamp.jsx'
+import { WorkbenchNotice, WorkbenchSection } from '../WorkbenchPattern.jsx'
 import { shortCommit } from '../../config/qualityGatePresentation.mjs'
 import { formatQualityGateDuration } from '../../config/devQualityGates.mjs'
 import { ServerJobGuideDrawer } from './ServerCiJobGuideDrawer.jsx'
@@ -8,7 +10,33 @@ import { ServerJobGuideDrawer } from './ServerCiJobGuideDrawer.jsx'
 const { Link, Text } = Typography
 export const SERVER_CI_STATUS = { passed: '完整 CI 通过', docs_passed: '文档检查通过', running: 'CI 运行中', failed: 'CI 未通过', missing: '当前提交尚无 CI', unavailable: 'CI 读取失败' }
 
-export function ServerCiEvidencePanel({ summary, showEmptyState = true }) {
+const HISTORY_TITLE = '历史流水线记录（GitLab）'
+const HISTORY_BOUNDARY = '历史状态来自 GitLab；历史成功不能证明当前提交通过。'
+const PIPELINE_RESULTS = {
+  success: { label: '成功', color: 'success' },
+  failed: { label: '失败', color: 'error' },
+  running: { label: '运行中', color: 'processing' },
+  queued: { label: '等待运行', color: 'default' },
+  cancelled: { label: '已取消', color: 'default' },
+  skipped: { label: '已跳过', color: 'default' },
+}
+const HISTORY_COLUMNS = [
+  {
+    title: '流水线',
+    dataIndex: 'id',
+    width: 132,
+    align: 'left',
+    render: (id, run) => <Link href={run.url} target="_blank" rel="noopener noreferrer">#{id}</Link>,
+  },
+  { title: '提交版本', dataIndex: 'gitSha', width: 180, render: (sha) => <code>{shortCommit(sha)}</code> },
+  {
+    title: 'GitLab 状态',
+    dataIndex: 'result',
+    render: (result) => <Tag color={PIPELINE_RESULTS[result].color}>{PIPELINE_RESULTS[result].label}</Tag>,
+  },
+]
+
+export function ServerCiEvidencePanel({ summary, showEmptyState = true, inlineHistory = false }) {
   const evidence = summary?.serverEvidence
   const [jobGuideOpen, setJobGuideOpen] = useState(false)
   const [selectedJobName, setSelectedJobName] = useState('')
@@ -19,10 +47,15 @@ export function ServerCiEvidencePanel({ summary, showEmptyState = true }) {
   if (!evidence) return null
   const { reports } = evidence
   const firstFailure = evidence.jobs?.find((job) => job.conclusion === 'failure')
+  const guideButton = (
+    <Button size="small" aria-label="流程与原理" onClick={(event) => { guideTrigger.current = event.currentTarget; setSelectedJobName(''); setJobGuideOpen(true) }}>流程与原理</Button>
+  )
+  const allHistoryLink = <Link href="https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines?ref=main" target="_blank" rel="noopener noreferrer">查看全部历史流水线</Link>
+  const historyUnavailable = evidence.historyStatus === 'unavailable'
   return (
     <section className="erp-dev-quality-server-evidence" aria-label="GitLab CI 质量证据">
       {evidence.pipeline ? (
-        <>
+        <WorkbenchSection flat title={inlineHistory ? '当前提交的 CI 结果' : undefined}>
           <Space wrap>
             <Text>CI 对应版本 <Text code>{shortCommit(evidence.gitSha)}</Text></Text>
             <Tag color={evidence.status === 'passed' ? 'success' : evidence.status === 'failed' ? 'error' : 'default'}>{SERVER_CI_STATUS[evidence.status] || 'CI 尚未证明'}</Tag>
@@ -52,24 +85,42 @@ export function ServerCiEvidencePanel({ summary, showEmptyState = true }) {
               </Space>
             )) : <Text type="secondary">本次流水线尚无覆盖率报告</Text>}
           </Space>
-          <Text type="secondary">CI 不覆盖未提交改动；覆盖率仅代表本次执行范围，部署与客户验收分别核对。</Text>
-        </>
+          <Text type="secondary">{inlineHistory ? '' : 'CI 不覆盖未提交改动；'}覆盖率仅代表本次执行范围，部署与客户验收分别核对。</Text>
+        </WorkbenchSection>
       ) : showEmptyState ? (
         <div role="status">
           <Text strong>{SERVER_CI_STATUS[evidence.status] || 'CI 尚未证明'}</Text>
           <div><Text type="secondary">{evidence.status === 'missing' ? '当前提交尚未产生执行结果，可查看历史流水线。' : '请刷新后重新核对；读取失败不代表没有流水线。'}</Text></div>
         </div>
       ) : null}
-      <Button size="small" aria-label="流程与原理" onClick={(event) => { guideTrigger.current = event.currentTarget; setSelectedJobName(''); setJobGuideOpen(true) }}>流程与原理</Button>
-      <details className="erp-dev-disclosure">
-        <summary>历史流水线记录（GitLab）</summary>
-        <Space direction="vertical">
-          <Text type="secondary">以下为 GitLab 原生状态；完整门禁资格以当前提交的 CI 结论为准。</Text>
-          {evidence.historyStatus === 'unavailable' ? <Text type="warning">历史列表暂时读取失败，仍可进入 GitLab 查看。</Text> : null}
-          {evidence.history.map((run) => <Link key={run.id} href={run.url} target="_blank" rel="noopener noreferrer">#{run.id} · {shortCommit(run.gitSha)} · {({ success: '成功', failed: '失败', running: '运行中', queued: '等待运行', cancelled: '已取消', skipped: '已跳过' })[run.result]}</Link>)}
-          <Link href="https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines?ref=main" target="_blank" rel="noopener noreferrer">查看全部历史流水线</Link>
-        </Space>
-      </details>
+      {inlineHistory ? (
+        <WorkbenchSection flat title={HISTORY_TITLE} description={HISTORY_BOUNDARY} tools={<>{allHistoryLink}{guideButton}</>}>
+          {historyUnavailable ? (
+            <WorkbenchNotice tone="warning" title="历史列表暂时读取失败" description="可在 GitLab 查看全部流水线。" />
+          ) : evidence.history.length ? (
+            <Table
+              size="small"
+              rowKey="id"
+              columns={HISTORY_COLUMNS}
+              dataSource={evidence.history}
+              pagination={{ pageSize: 5, showSizeChanger: false, hideOnSinglePage: true }}
+            />
+          ) : <Text type="secondary">暂无历史流水线</Text>}
+        </WorkbenchSection>
+      ) : (
+        <>
+          {guideButton}
+          <details className="erp-dev-disclosure">
+            <summary>{HISTORY_TITLE}</summary>
+            <Space direction="vertical">
+              <Text type="secondary">{HISTORY_BOUNDARY}</Text>
+              {historyUnavailable ? <Text type="warning">历史列表暂时读取失败，仍可进入 GitLab 查看。</Text> : null}
+              {evidence.history.map((run) => <Link key={run.id} href={run.url} target="_blank" rel="noopener noreferrer">#{run.id} · {shortCommit(run.gitSha)} · {PIPELINE_RESULTS[run.result].label}</Link>)}
+              {allHistoryLink}
+            </Space>
+          </details>
+        </>
+      )}
       <ServerJobGuideDrawer repository={summary.repository} evidence={evidence} open={jobGuideOpen} selectedJobName={selectedJobName} onSelect={setSelectedJobName} onShowAll={() => setSelectedJobName('')} onClose={() => setJobGuideOpen(false)} onAfterOpenChange={restoreGuideFocus} />
     </section>
   )

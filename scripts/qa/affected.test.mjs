@@ -160,10 +160,12 @@ test("select overflow changes retain the shared sample and real form follow-ups"
     "web/src/dev-workbench/components/devSelectValueExample.css",
     "web/src/dev-workbench/components/DevControlStandards.jsx",
     "web/scripts/style-l1/selectOverflowScenarios.mjs",
+    "web/scripts/style-l1/shipmentBatchDropdownScenarios.mjs",
+    "web/src/erp/components/shipments/ShipmentEditor.jsx",
   ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const text = plan.followUps.find((item) => item.id === "browser-regression")?.text || "";
-    for (const scenario of ["dev-ui-select-overflow", "business-select-values-sales", "business-select-values-purchase", "business-select-values-outsourcing", "business-select-values-bom", "business-select-values-shipment", "business-select-values-arrival"]) assert(text.includes(scenario), `${file}: ${scenario}`);
+    for (const scenario of ["shipment-batch-dropdown-stability", "dev-ui-select-overflow", "business-select-values-sales", "business-select-values-purchase", "business-select-values-outsourcing", "business-select-values-bom", "business-select-values-shipment", "business-select-values-arrival"]) assert(text.includes(scenario), `${file}: ${scenario}`);
     assert(!ids(plan).includes("full"), file);
   }
 });

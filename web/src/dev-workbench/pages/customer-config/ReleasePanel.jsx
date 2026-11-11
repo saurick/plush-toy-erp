@@ -3,10 +3,12 @@ import { CopyOutlined } from '@ant-design/icons'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
+import { WorkbenchNotice, WorkbenchSection } from '../../components/WorkbenchPattern.jsx'
+import { CustomerConfigPath } from './CustomerConfigPath.jsx'
 import { ReleaseApplySummary } from './ReleaseApplySummary.jsx'
 import { CommandList, FormalGateItem, copyText } from './presentation.jsx'
 
-const { Text, Title } = Typography
+const { Text } = Typography
 
 export function ReleasePanel({
   importSummary,
@@ -20,25 +22,42 @@ export function ReleasePanel({
 }) {
   const passed = releaseState.status === 'success'
   const batches = releaseBatchesState.batches || []
+  const checkStatus = {
+    idle: '待检查',
+    historical: '历史检查，待复核',
+    checking: '正在检查',
+    blocked: '条件未通过',
+    error: '检查失败',
+    success: '本次检查通过',
+  }[releaseState.status]
+  const path = [
+    { title: '证据批次', detail: releaseBatch ? '已选择' : '待选择' },
+    { title: '发布检查', detail: checkStatus },
+    { title: '执行器交接', detail: passed ? '可以交接' : '待通过本次检查' },
+  ]
   return (
     <div
       className="erp-dev-customer-panel-grid"
       data-dev-customer-view="发布交接"
     >
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-action-panel">
-        <Title level={2}>正式配置发布检查</Title>
-        <Text type="secondary">
-          选择证据批次，检查正式配置是否就绪；通过后交接执行器。
-        </Text>
+      <WorkbenchSection
+        flat
+        title="正式配置发布检查"
+        description="当前页核对证据并交接执行器。"
+        className="erp-dev-customer-panel erp-dev-customer-panel--wide"
+      >
+        {batches.length > 0 ? (
+          <CustomerConfigPath label="发布检查与交接路径" items={path} />
+        ) : null}
         {batches.length > 0 ? (
           <div className="erp-dev-customer-release-input">
             <label htmlFor="customer-config-release-batch">发布证据批次</label>
             <Select
               id="customer-config-release-batch"
               aria-label="选择发布证据批次"
-              disabled={disabled || batches.length === 0}
+              disabled={disabled}
               value={releaseBatch || undefined}
-              placeholder={batches.length ? '选择已登记批次' : '暂无可选批次'}
+              placeholder="选择已登记批次"
               loading={releaseBatchesState.status === 'loading'}
               options={batches.map((value) => ({ value, label: value }))}
               onChange={onReleaseBatchChange}
@@ -74,17 +93,17 @@ export function ReleasePanel({
             <Button onClick={onRetryRead}>刷新批次</Button>
           </Empty>
         ) : null}
+        {batches.length > 0 && !importSummary.canCheckReleaseReadiness ? (
+          <WorkbenchNotice tone="warning" title="当前客户包未开放发布检查" />
+        ) : null}
         <ReleaseApplySummary
           releaseState={releaseState}
           releaseBatch={releaseBatch}
         />
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <Title level={3}>检查后的两个交接</Title>
-        <div className="erp-dev-customer-handoff-grid">
+        <div className="erp-dev-customer-handoff-grid" role="group" aria-label="检查后的两个交接">
           <div>
             <strong>客户配置生效</strong>
-            <p>由受控执行器确认目标环境、应用正式配置并读回结果。</p>
+            <p>由受控执行器应用正式配置；以交付回执中的目标、版本和读回时间核对生效。</p>
             {passed ? (
               <Button
                 icon={<CopyOutlined aria-hidden="true" />}
@@ -93,17 +112,13 @@ export function ReleasePanel({
               >
                 复制配置执行器模板
               </Button>
-            ) : (
-              <small>本次发布检查通过后可复制执行器模板</small>
-            )}
+            ) : null}
           </div>
           <div>
             <strong>服务器版本部署</strong>
             <p>固定版本通过检查后，再部署到测试服或正式服。</p>
           </div>
         </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <DevStaticGuidance title="发布依据与执行要求">
           <div className="erp-dev-customer-formal-gates">
             {importSummary.formalGates.map((item) => (
@@ -113,13 +128,10 @@ export function ReleasePanel({
           <p>
             就绪检查不直接发布或激活正式配置。执行器继续校验目标端点、管理员身份、确认短语、审计报告及生效读回。
           </p>
-        </DevStaticGuidance>
-        <DevStaticGuidance title="配置回滚与业务数据边界">
           <p>
             配置回滚只恢复配置版本，并保留审计。库存、出货、财务与业务单据按对应业务规则处理；真实客户数据导入另行办理。
           </p>
-        </DevStaticGuidance>
-        <DevStaticGuidance title="备用命令与输入模板">
+          <Text strong>备用命令与输入模板</Text>
           <CommandList
             commands={(importSummary.tools || []).map((tool) => ({
               ...tool,
@@ -127,7 +139,7 @@ export function ReleasePanel({
             }))}
           />
         </DevStaticGuidance>
-      </section>
+      </WorkbenchSection>
     </div>
   )
 }

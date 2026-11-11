@@ -140,7 +140,7 @@ function createBOMProductListScenarios({ customerRuntimeEffectiveSession, output
   }))
 }
 
-async function installImages(page) {
+export async function installImages(page) {
   const image = await page.evaluate(() => {
     const canvas = document.createElement('canvas')
     canvas.width = 400
@@ -242,6 +242,87 @@ async function closeImage(page) {
   await page.locator('.erp-task-image-preview').waitFor({ state: 'detached' })
 }
 
+function operationalPhotoReviewScenarios(effectiveSession) {
+  const common = {
+    auth: 'admin',
+    effectiveSession,
+    viewport: { width: 1440, height: 1000 },
+    beforeNavigate: installImages,
+  }
+  const row = (page, no) => page.locator('tr.ant-table-row:visible').filter({ hasText: no }).first()
+  const picture = (scope) => scope.locator('.erp-product-identity img')
+  return [
+    {
+      ...common,
+      name: 'product-identification-warehouse-return',
+      path: '/erp/warehouse/inbound?warehouse_view=outsourcing-return',
+      async verify(page) {
+        const product = row(page, 'OUT-RR-POSTED-L1')
+        await picture(product).waitFor()
+        await product.getByText('模拟委外小熊', { exact: true }).waitFor()
+        await product.getByText(/OUT-PHOTO-01/).waitFor()
+        const material = row(page, 'OUTSOURCE-FACT-L1')
+        await material.waitFor()
+        assert.equal(await material.locator('.erp-product-identity').count(), 0)
+        await openBusinessRecordDetails(page, 'OUT-RR-POSTED-L1')
+        await picture(page.locator('.erp-business-details-modal:visible').filter({ hasText: '委外回货详情' })).waitFor()
+      },
+    },
+    {
+      ...common,
+      name: 'product-identification-production-record-review',
+      path: '/erp/production/progress',
+      async verify(page) {
+        const pending = row(page, 'PROD-FACT-L1')
+        await picture(pending).waitFor()
+        await pending.getByText('PROD-FACT-L1', { exact: true }).click()
+        await page.locator('button[data-business-action-key="operational-fact-post"]:visible').click()
+        const review = page.getByRole('dialog').filter({ hasText: '核对本次生产记录' })
+        await picture(review).waitFor()
+        await review.getByRole('button', { name: /返\s*回\s*列\s*表/ }).click()
+        const posted = row(page, 'PROD-FG-POSTED-L1')
+        await posted.waitFor()
+        assert.equal(await posted.locator('.erp-product-identity').count(), 0, '历史生产记录把照片留在详情')
+        await openBusinessRecordDetails(page, 'PROD-FG-POSTED-L1')
+        await picture(page.getByRole('dialog').filter({ hasText: '生产记录详情' })).waitFor()
+      },
+    },
+    {
+      ...common,
+      name: 'product-identification-exception-review',
+      path: '/erp/production/exceptions',
+      async beforeNavigate(page) {
+        await installImages(page)
+        const record = {
+          id: 91, decision_no: 'EX-PHOTO-01', decision_type: 'SCRAP', status: 'APPROVED',
+          execution_status: 'PENDING', version: 2, requested_quantity: '5', approved_quantity: '5',
+          production_order_id: 71, production_order_item_id: 7100, production_wip_batch_id: 91001,
+          reason: '模拟报废核对', source_identity: {
+            subject_type: 'PRODUCT', subject_id: 1, name: '模拟异常小熊', code: 'PHOTO-01',
+            sku_code: 'SKU-01', batch_no: 'WIP-PHOTO-01',
+          },
+        }
+        await page.route('**/rpc/*', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_production_exceptions') return route.fallback()
+          const data = stylePaginatedRpcData([record], 'production_exceptions', params)
+          await route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data } } })
+        })
+      },
+      async verify(page) {
+        const record = row(page, 'EX-PHOTO-01')
+        await record.getByText(/PHOTO-01.*WIP-PHOTO-01/).waitFor()
+        assert.equal(await record.locator('.erp-product-identity').count(), 0)
+        await record.dblclick()
+        const detail = page.getByRole('dialog', { name: '生产异常详情', exact: true })
+        await picture(detail).waitFor()
+        await detail.getByRole('button', { name: '确认执行', exact: true }).click()
+        await picture(page.getByRole('dialog', { name: '确认生产异常处置', exact: true })).waitFor()
+      },
+    },
+  ]
+}
+
 export function createProductIdentityScenarios({
   customerRuntimeEffectiveSession,
   outputDir,
@@ -249,6 +330,7 @@ export function createProductIdentityScenarios({
   const shipmentSkuName = '模拟米白小号配套款，含独立礼盒包装、替换围巾与同色挂件'
   return [
     ...createBOMProductListScenarios({ customerRuntimeEffectiveSession, outputDir }),
+    ...operationalPhotoReviewScenarios(customerRuntimeEffectiveSession),
     {
       name: 'product-identification-catalog',
       path: '/erp/master/products',

@@ -11,6 +11,7 @@ import { createTaskProductImageLoader } from '../../utils/taskProductImage.mjs'
 import WorkflowTaskImagePreview from './WorkflowTaskImagePreview.jsx'
 import { isUsableImageDimensions } from '../../utils/imageDisplay.mjs'
 import WorkflowTaskImagePlaceholder, { ImagePlaceholder } from './WorkflowTaskImagePlaceholder.jsx'
+import BusinessProductGallery from '../business-list/BusinessProductGallery.jsx'
 
 // A profile's cache becomes unreachable on logout; permission changes use a new loader.
 const profileLoaders = new WeakMap()
@@ -151,14 +152,27 @@ export default function WorkflowTaskProductImage({
 }) {
   const { adminProfile } = useBusinessPageContext() || {}
   const denied = item.kind !== 'material' && item.productID > 0 && !hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
+  if (preview && item.kind === 'product' && item.productID > 0 && !item.imageAttachmentID && item.hasProductImages && !denied) {
+    return (
+      <BusinessProductGallery
+        products={[item]}
+        title={item.name}
+        triggerLabel={`查看产品图：${item.name || '产品'}`}
+        compact
+      >
+        <WorkflowTaskImagePlaceholder item={item} state="album" />
+      </BusinessProductGallery>
+    )
+  }
   if (
     item.kind === 'material' ||
     !item.productID ||
     !item.imageAttachmentID ||
-    !hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
+    denied
   ) {
+    const placeholder = denied ? 'denied' : item.kind === 'product' && !(item.productID > 0) ? 'unlinked' : state
     return (
-      <WorkflowTaskImagePlaceholder item={item} state={denied ? 'denied' : state} />
+      <WorkflowTaskImagePlaceholder item={item} state={placeholder} />
     )
   }
   const accessKey = workflowTaskAdminAccessRequestIdentity(adminProfile)

@@ -15,6 +15,48 @@ import (
 	"server/internal/data/model/ent/enttest"
 )
 
+func TestWorkflowTaskDisplayContextTrustedFollowup(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_display_followup?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client, sqlDialect: dialect.SQLite}, log.NewStdLogger(io.Discard))
+	actor := client.AdminUser.Create().SetUsername("followup_display").SetPasswordHash("hash").SaveX(ctx)
+	customer := createSalesOrderTestCustomer(t, ctx, client, "FOLLOWUP-DISPLAY-C", true)
+	unit := createSalesOrderTestUnit(t, ctx, client, "FOLLOWUP-DISPLAY-U", true)
+	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "FOLLOWUP-DISPLAY-P", true)
+	order := client.SalesOrder.Create().SetOrderNo("SO-FOLLOWUP-DISPLAY").SetCustomerID(customer.ID).SetOrderDate(time.Now()).SaveX(ctx)
+	client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetProductID(product.ID).SetUnitID(unit.ID).SetOrderedQuantity(decimal.NewFromInt(1)).SaveX(ctx)
+	image := client.BusinessAttachment.Create().SetOwnerType("product").SetOwnerID(product.ID).SetAttachmentType("product_image").SetSlotKey("primary").SetFileName("product.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetObjectKey(attachmentstore.NewKey()).SaveX(ctx)
+	in, err := biz.PrepareWorkflowFollowupCreate(biz.WorkflowFollowupCreate{
+		SourceType: "sales_order", SourceID: order.ID, TaskName: "核对款式图", Description: "对照订单资料核对款式。",
+		OwnerRoleKey: "engineering", DueAt: time.Now().Add(time.Hour), IdempotencyKey: "followup-display",
+	}, actor.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	followup := client.WorkflowTask.Create().SetTaskCode(in.TaskCode).SetTaskGroup(in.TaskGroup).
+		SetTaskName(in.TaskName).SetOwnerRoleKey(in.OwnerRoleKey).SetTaskStatusKey(in.TaskStatusKey).
+		SetCreatedBy(actor.ID).SetCreateIdempotencyKey(in.IdempotencyKey).SetCreateIntentHash(in.IntentHash).
+		SetSourceType(in.SourceType).SetSourceID(in.SourceID).SetSourceNo(order.OrderNo).SaveX(ctx)
+	items, _, err := repo.ListWorkflowTasks(ctx, biz.WorkflowTaskFilter{Keyword: followup.TaskCode, Limit: 10})
+	if err != nil || len(items) != 1 || items[0].ID != followup.ID {
+		t.Fatalf("follow-up list: %d items, err=%v", len(items), err)
+	}
+	projection := items[0].DisplayContext
+	if projection == nil || !projection.Available || projection.SourceNo != order.OrderNo || len(projection.Items) != 1 ||
+		projection.Items[0].ProductID != product.ID || projection.Items[0].ImageAttachmentID != image.ID {
+		t.Fatalf("follow-up source projection=%#v", projection)
+	}
+
+	forged := client.WorkflowTask.Create().SetTaskCode("UNTRUSTED-FOLLOWUP").SetTaskGroup(biz.WorkflowFollowupTaskGroup).
+		SetTaskName("无签发编号").SetOwnerRoleKey("engineering").SetTaskStatusKey("ready").SetCreatedBy(actor.ID).
+		SetSourceType("sales_order").SetSourceID(order.ID).SetSourceNo(order.OrderNo).SaveX(ctx)
+	untrusted, err := repo.GetWorkflowTask(ctx, forged.ID)
+	if err != nil || untrusted.DisplayContext != nil {
+		t.Fatalf("untrusted follow-up exposed source projection: task=%#v err=%v", untrusted, err)
+	}
+}
+
 func TestWorkflowTaskDisplayContextProductionBatch(t *testing.T) {
 	f := openProductionWIPQualityTestFixture(t, "workflow_display_wip")
 	product := createSalesOrderTestProduct(t, f.ctx, f.client, f.unitID, "WIP-DISPLAY-P", true)
@@ -111,13 +153,13 @@ func TestWorkflowTaskDisplayContextSourceIdentityAndSearch(t *testing.T) {
 	}
 
 	primary := client.BusinessAttachment.Create().SetOwnerType("product").SetOwnerID(product.ID).SetAttachmentType("product_image").SetSlotKey("primary").SetFileName("bear.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetObjectKey(attachmentstore.NewKey()).SaveX(ctx)
-	client.BusinessAttachment.Create().SetOwnerType("product").SetOwnerID(other.ID).SetAttachmentType("product_image").SetSlotKey("secondary").SetFileName("other.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetObjectKey(attachmentstore.NewKey()).SaveX(ctx)
+	secondary := client.BusinessAttachment.Create().SetOwnerType("product").SetOwnerID(other.ID).SetAttachmentType("product_image").SetSlotKey("secondary").SetFileName("other.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetObjectKey(attachmentstore.NewKey()).SaveX(ctx)
 	task := read()
 	if task.DisplayContext == nil || !task.DisplayContext.Available || task.DisplayContext.SourceNo != order.OrderNo || len(task.DisplayContext.Items) != 2 {
 		t.Fatalf("context=%#v", task.DisplayContext)
 	}
 	first := task.DisplayContext.Items[0]
-	if first.Name != "订单时的小熊" || first.Code != "ORDER-P" || first.StyleNo != "STYLE-UNIQUE" || first.ProductID != product.ID || first.ImageAttachmentID != primary.ID {
+	if first.Name != "订单时的小熊" || first.Code != "ORDER-P" || first.StyleNo != "STYLE-UNIQUE" || first.ProductID != product.ID || first.ImageAttachmentID != primary.ID || !first.HasProductImages {
 		t.Fatalf("identity=%#v", first)
 	}
 	if task.Payload["product_name"] != "旧任务快照" {
@@ -151,7 +193,7 @@ func TestWorkflowTaskDisplayContextSourceIdentityAndSearch(t *testing.T) {
 		}
 	}
 	client.BusinessAttachment.DeleteOne(primary).ExecX(ctx)
-	if read().DisplayContext.Items[0].ImageAttachmentID != 0 {
+	if got := read().DisplayContext.Items[0]; got.ImageAttachmentID != 0 || got.HasProductImages {
 		t.Fatal("cleared primary image retained in projection")
 	}
 	product.Update().ClearStyleNo().SaveX(ctx)
@@ -159,8 +201,12 @@ func TestWorkflowTaskDisplayContextSourceIdentityAndSearch(t *testing.T) {
 		t.Fatal("cleared style resurrected from code or task payload")
 	}
 	item.Update().SetProductID(other.ID).ClearProductNameSnapshot().ClearProductCodeSnapshot().SaveX(ctx)
-	if got := read().DisplayContext.Items; len(got) != 1 || got[0].Name != other.Name || got[0].Code != other.Code || got[0].ProductID != other.ID || got[0].ImageAttachmentID != 0 {
+	if got := read().DisplayContext.Items; len(got) != 1 || got[0].Name != other.Name || got[0].Code != other.Code || got[0].ProductID != other.ID || got[0].ImageAttachmentID != 0 || !got[0].HasProductImages {
 		t.Fatalf("source replacement retained old identity: %#v", got)
+	}
+	client.BusinessAttachment.DeleteOne(secondary).ExecX(ctx)
+	if got := read().DisplayContext.Items[0]; got.HasProductImages {
+		t.Fatalf("cleared secondary still opens an album: %+v", got)
 	}
 	row.Update().ClearProcessInstanceID().ClearProcessNodeInstanceID().SaveX(ctx)
 	if read().DisplayContext != nil {

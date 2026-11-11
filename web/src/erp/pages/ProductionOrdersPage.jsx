@@ -175,6 +175,10 @@ const DEFAULT_QUERY = Object.freeze({
   page: 1,
   page_size: DEFAULT_BUSINESS_PAGE_SIZE,
 })
+const PRODUCTION_DATE_FILTER_OPTIONS = [
+  { value: 'planned_start_at', label: '计划开始' },
+  { value: 'planned_end_at', label: '计划结束' },
+]
 const PRODUCTION_SORT_FIELDS = {
   order_no: 'order_no',
   planned_start_at: 'planned_start_at',
@@ -1590,6 +1594,7 @@ export default function ProductionOrdersPage() {
         dataIndex: 'order_no',
         copyable: { label: '生产单号' },
         width: 180,
+        widthGrow: 1,
       },
       {
         title: '状态',
@@ -1622,13 +1627,14 @@ export default function ProductionOrdersPage() {
         title: '备注',
         dataIndex: 'note',
         width: 260,
+        widthGrow: 2,
         render: (value) => value || '-',
       },
     ],
     []
   )
   const listColumns = useMemo(
-    () => [...documentProductGalleryColumn(DOCUMENT_PRODUCT_SOURCES.PRODUCTION_ORDER, adminProfile), ...columns],
+    () => [...documentProductGalleryColumn(DOCUMENT_PRODUCT_SOURCES.PRODUCTION_ORDER, adminProfile, { showIdentity: true }), ...columns],
     [adminProfile, columns]
   )
   const { tableColumns, exportColumns, openColumnOrder, columnOrderModal } =
@@ -1738,10 +1744,8 @@ export default function ProductionOrdersPage() {
               onChange={(value) => writeQuery({ status: value || '', page: 1 })}
             />
             <DateRangeFilter
-              options={[
-                { value: 'planned_start_at', label: '计划开始' },
-                { value: 'planned_end_at', label: '计划结束' },
-              ]}
+              options={PRODUCTION_DATE_FILTER_OPTIONS}
+              typePresentation="inline"
               value={query.date_field}
               startValue={query.date_from}
               endValue={query.date_to}

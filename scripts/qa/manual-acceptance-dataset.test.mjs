@@ -1,3 +1,4 @@
+import { MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT } from "./manual-acceptance-task-board-data.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
@@ -67,10 +68,6 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 import { MANUAL_ACCEPTANCE_PRODUCTION_RECIPE } from "./manual-acceptance-source-data.mjs";
 import {
-  PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
-  PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-  PREVIOUS_TASK_COPY_REVISION,
-  PREVIOUS_TASK_RUN_ID,
   TASK_COPY_REVISION,
   TASK_PROFILE_ACCEPTANCE_SNAPSHOT,
   TASK_PROFILE_LONG_LIVED_WORKBENCH,
@@ -172,7 +169,7 @@ test("stage logic fingerprints are deterministic and isolate declared component 
   });
   assert.notEqual(sourceChanged.get("source"), first.get("source"));
   assert.equal(sourceChanged.get("task"), first.get("task"));
-  assert.equal(sourceChanged.get("facts"), first.get("facts"));
+  assert.notEqual(sourceChanged.get("facts"), first.get("facts"));
   const sharedParamsChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
     projectRoot,
     readFileImpl: (filePath) => Buffer.from(`${path.relative(projectRoot, filePath)}:${filePath.endsWith("manual-acceptance-source-driven-facts.mjs") ? "changed" : "current"}`),
@@ -191,14 +188,16 @@ test("stage logic fingerprints are deterministic and isolate declared component 
       assert.equal(quantityRulesChanged.get(stageKey), first.get(stageKey));
     }
   }
-  const engineeringChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
-    projectRoot,
-    readFileImpl: (filePath) => Buffer.from(path.relative(projectRoot, filePath) +
-      (filePath.endsWith("manual-acceptance-engineering-data.mjs") ? ":changed" : ":current")),
-  });
-  assert.notEqual(engineeringChanged.get("facts"), first.get("facts"));
-  for (const stageKey of MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter((key) => key !== "facts"))
-    assert.equal(engineeringChanged.get(stageKey), first.get(stageKey));
+  for (const helper of ["manual-acceptance-engineering-data.mjs", "manual-acceptance-form-coverage.mjs"]) {
+    const helperChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
+      projectRoot,
+      readFileImpl: (filePath) => Buffer.from(path.relative(projectRoot, filePath) +
+        (filePath.endsWith(helper) ? ":changed" : ":current")),
+    });
+    assert.notEqual(helperChanged.get("facts"), first.get("facts"));
+    for (const stageKey of MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter((key) => key !== "facts"))
+      assert.equal(helperChanged.get(stageKey), first.get(stageKey));
+  }
   const factDataChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
     projectRoot,
     readFileImpl: (filePath) => readDependency(filePath, true),
@@ -316,7 +315,7 @@ test("default task runner binds the exact same-run source report", async () => {
   assert.equal(receivedTaskProfile, TASK_PROFILE_ACCEPTANCE_SNAPSHOT);
 });
 
-test("persistent task runner uses the long-lived profile and retires snapshot batches", async () => {
+test("persistent task runner requires real source task proof instead of independent snapshots", async () => {
   const outputRoot = await fs.mkdtemp(
     path.join(os.tmpdir(), "plush-persistent-task-profile-"),
   );
@@ -348,68 +347,28 @@ test("persistent task runner uses the long-lived profile and retires snapshot ba
     },
     reportPath,
   };
-  const retired = [];
+  const state = {
+    componentReports: new Map([
+      ["source", { report: sourceReport, reportPath: sourceReportPath }],
+    ]),
+  };
+  const write = (dailyTaskBoard) => runDefaultManualAcceptanceTaskComponent(invocation, {
+    state,
+    applyTaskData: async (plan, options) => {
+      assert.equal(plan.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
+      assert.equal(options.sourceReport, sourceReport);
+      return { mode: "apply", taskProfile: plan.taskProfile, dailyTaskBoard };
+    },
+  });
   try {
-    const result = await runDefaultManualAcceptanceTaskComponent(invocation, {
-      state: {
-        componentReports: new Map([
-          ["source", { report: sourceReport, reportPath: sourceReportPath }],
-        ]),
-      },
-      applyTaskData: async (plan, options) => {
-        assert.equal(plan.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
-        assert.equal(options.sourceReport, sourceReport);
-        return {
-          mode: "apply",
-          datasetKey: "yoyoosun-manual-acceptance",
-          dataVersion: "2026.11.07-v9",
-          runId: "20261107-V9",
-          taskProfile: plan.taskProfile,
-          summary: { persisted: 180 },
-        };
-      },
-      retireTaskBatch: async (plan, options) => {
-        assert.equal(plan.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
-        retired.push({
-          runId: options.retireRunId,
-          copyRevision: options.retireCopyRevision,
-          allowAbsent: options.allowAbsent,
-          confirmation: options.confirmPhrase,
-        });
-        return { summary: { terminalized: retired.length } };
-      },
-    });
-    assert.equal(result.report.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
-    assert.equal(result.report.summary.legacyBatchCount, 3);
-    assert.equal(result.report.summary.legacyTasksTerminalized, 6);
+    await assert.rejects(() => write(undefined), (error) => error.code === "task_board_source_evidence_missing");
+    const evidence = { contract: MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT, samples: [] };
+    const result = await write(evidence);
+    assert.equal(result.report.dailyTaskBoard, evidence);
+    assert.deepEqual(JSON.parse(await fs.readFile(reportPath, "utf8")).dailyTaskBoard, evidence);
   } finally {
     await fs.rm(outputRoot, { recursive: true, force: true });
   }
-  assert.deepEqual(
-    retired.map(({ runId, copyRevision, allowAbsent }) => ({
-      runId,
-      copyRevision,
-      allowAbsent,
-    })),
-    [
-      {
-        runId: PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
-        copyRevision: PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-        allowAbsent: true,
-      },
-      {
-        runId: PREVIOUS_TASK_RUN_ID,
-        copyRevision: PREVIOUS_TASK_COPY_REVISION,
-        allowAbsent: true,
-      },
-      {
-        runId: "20261107-V9",
-        copyRevision: TASK_COPY_REVISION,
-        allowAbsent: true,
-      },
-    ],
-  );
-  assert.ok(retired.every((item) => item.confirmation.length > 20));
 });
 
 function localApplyPlan(overrides = {}) {

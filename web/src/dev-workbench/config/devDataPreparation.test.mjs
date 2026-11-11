@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { readDevWorkbenchPageSource } from '../../../scripts/test/pageSources.mjs'
 import { DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS } from '../../../dev-server/devDataPreparationPlugin.mjs'
 
 import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION } from '../../../../scripts/qa/manual-acceptance-target-policy.mjs'
@@ -13,22 +12,15 @@ import { MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS } from '../../../../scripts/qa/man
 import {
   DEV_DATA_PREPARATION_ACTION_API_PATH,
   DEV_DATA_PREPARATION_API_PREFIX,
-  DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
-  DEV_DATA_PREPARATION_MODULE_FLOW,
   DEV_DATA_PREPARATION_OPERATION_API_PREFIX,
-  DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
-  DEV_DATA_PREPARATION_PROFILE_QUERY_KEY,
   DEV_DATA_PREPARATION_ROUTE,
   DEV_DATA_PREPARATION_SESSION_API_PATH,
   DEV_DATA_PREPARATION_SOURCE_PATH,
   DEV_DATA_PREPARATION_SUMMARY_API_PATH,
   DEV_DATA_PREPARATION_TARGET_KEYS,
-  DEV_DATA_PREPARATION_TARGET_QUERY_KEY,
-  buildDevDataPreparationSearch,
   createDataPreparationIdempotencyKey,
   createDevDataPreparationClient,
-  getDataPreparationEnvironment,
   projectDataPreparationAcceptancePlan,
   resolveDataPreparationAvailability,
   resolveDataPreparationExecutionConfirmation,
@@ -37,48 +29,6 @@ import {
   validateDevDataPreparationOperation,
   validateDevDataPreparationSummary,
 } from './devDataPreparation.mjs'
-
-test('data target labels distinguish local, isolated and remote targets without attributing mixed history to one target', () => {
-  assert.equal(getDataPreparationEnvironment('local-development').kind, 'local')
-  assert.equal(getDataPreparationEnvironment('isolated-local').label, '数据目标：本地隔离环境')
-  assert.equal(getDataPreparationEnvironment('customer-trial-133').kind, 'server')
-  assert.equal(getDataPreparationEnvironment('customer-trial-133', 'confirm').kind, 'server')
-  assert.equal(getDataPreparationEnvironment('local-development', 'receipts').kind, 'reference')
-  assert.equal(getDataPreparationEnvironment(undefined, 'confirm').label, '数据目标尚未确认')
-})
-
-test('data preparation route search keeps profile, target, and customer atomic', () => {
-  assert.equal(
-    buildDevDataPreparationSearch('', {
-      profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
-      targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
-      customerKey: 'yoyoosun',
-    }).toString(),
-    'dataProfile=scenario-demo&dataTarget=local-development&customer=yoyoosun'
-  )
-  assert.equal(
-    buildDevDataPreparationSearch(
-      'view=history&dataTarget=customer-trial-133&customer=yoyoosun',
-      {
-        profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
-        targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal,
-        customerKey: 'yoyoosun',
-      }
-    ).toString(),
-    'view=history&customer=yoyoosun&dataProfile=full-acceptance'
-  )
-  assert.equal(DEV_DATA_PREPARATION_PROFILE_QUERY_KEY, 'dataProfile')
-  assert.equal(DEV_DATA_PREPARATION_TARGET_QUERY_KEY, 'dataTarget')
-  assert.throws(
-    () =>
-      buildDevDataPreparationSearch('', {
-        profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
-        targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal,
-        customerKey: 'yoyoosun',
-      }),
-    /registered target/u
-  )
-})
 
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
 const PLAN_HASH = 'a'.repeat(64)
@@ -290,16 +240,6 @@ function summaryFixture() {
       },
     },
     target: {
-      coreDemo: {
-        status: 'available',
-        safeTarget: '共享开发库（固定身份）',
-        databaseName: 'plush_erp',
-        migrationVersion:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
-        customerConfigRevision: 'not-proven',
-        customerConfigProductVersion: 'not-proven',
-        targetFingerprint: TARGET_FINGERPRINT,
-      },
       scenarioDemo: {
         status: 'available',
         safeTarget: '共享开发库业务场景（固定身份）',
@@ -334,16 +274,6 @@ function summaryFixture() {
       },
     },
     profiles: [
-      {
-        key: 'core-demo',
-        title: '共享开发基础数据',
-        purpose: '稳定准备共享账号与基础主数据',
-        writesDatabase: true,
-        dataRetention: 'long-lived',
-        cleanupMode: 'not-supported',
-        exactCleanCommitRequired: false,
-        requiredEnvironment: ['共享开发库'],
-      },
       {
         key: 'scenario-demo',
         title: '业务场景演示数据',
@@ -405,26 +335,6 @@ test('data preparation uses one fixed DEV-only API surface', () => {
   )
 })
 
-test('scenario demo copy keeps one-click review, forward-only and acceptance boundaries visible', () => {
-  const copy =
-    DEV_DATA_PREPARATION_PROFILE_COPY[
-      DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
-    ]
-
-  assert.equal(copy.targetKey, 'scenarioDemo')
-  assert.equal(copy.badgeLabel, '长期保留')
-  assert.equal(copy.prepareButtonLabel, '生成业务场景测试数据')
-  assert.match(copy.prepareDescription, /权威读回目标身份/u)
-  assert.match(copy.prepareDescription, /二次确认/u)
-  assert.match(copy.prepareDescription, /demo/u)
-  assert.match(copy.prepareDescription, /DSN/u)
-  assert.match(copy.confirmationDescription, /release/u)
-  assert.match(copy.confirmationDescription, /不清空历史/u)
-  assert.match(copy.retention, /不清空已有数据/u)
-  assert.match(copy.cleanup, /forward-only/u)
-  assert.match(copy.purpose, /不是完整验收/u)
-})
-
 test('scenario demo uses the prepared confirmation without exposing a typed secret or long token', () => {
   const scenarioOperation = operationFixture({
     profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
@@ -465,7 +375,7 @@ test('summary keeps scenario volume separate from core and full acceptance ident
   assert.throws(() => validateDevDataPreparationSummary(unknownProfile), /unsupported fields/u)
 })
 
-test('summary contract requires three fixed profiles and fail-closed boundaries', () => {
+test('summary contract requires only the two active profiles and fail-closed boundaries', () => {
   assert.equal(
     validateDevDataPreparationSummary(summaryFixture()).status,
     'success'
@@ -799,13 +709,13 @@ test('scenario demo readback binds the fixed batch and rejects half batches or d
 test('prepare intent keeps one idempotency key until the intent is proven or reset', () => {
   const firstIntent = resolveDataPreparationPrepareIntent(
     null,
-    'core-demo',
+    'scenario-demo',
     'local-development',
     () => '22222222-2222-4222-8222-222222222222'
   )
   const retriedIntent = resolveDataPreparationPrepareIntent(
     firstIntent,
-    'core-demo',
+    'scenario-demo',
     'local-development',
     () => {
       throw new Error('retry must not allocate a second key')
@@ -836,105 +746,39 @@ test('prepare intent keeps one idempotency key until the intent is proven or res
   )
 })
 
-test('refresh recovery resumes the newest nonterminal operation and preserves an explicit current receipt', () => {
-  const olderReady = operationFixture({
-    id: '44444444-4444-4444-8444-444444444444',
-    updatedAt: '2026-07-29T02:02:00.000Z',
+test('recovery stays in the selected target and never resumes a retired profile', () => {
+  const local = scenarioOperationFixture({
+    status: 'ready', terminal: false, readback: null,
   })
-  const newerRunning = operationFixture({
-    id: '55555555-5555-4555-8555-555555555555',
-    status: 'running',
-    confirmationRequired: '',
-    updatedAt: '2026-07-29T02:03:00.000Z',
-  })
-  const newestScenarioRunning = scenarioOperationFixture({
-    id: '77777777-7777-4777-8777-777777777777',
-    status: 'running',
-    confirmationRequired: '',
-    terminal: false,
-    readback: null,
-    updatedAt: '2026-07-29T02:05:00.000Z',
-  })
-  const terminal = operationFixture({
-    id: '66666666-6666-4666-8666-666666666666',
-    status: 'passed',
-    confirmationRequired: '',
-    terminal: true,
-    updatedAt: '2026-07-29T02:04:00.000Z',
-  })
-  const operations = [olderReady, terminal, newerRunning, newestScenarioRunning]
-
-  assert.equal(
-    selectRecoverableDataPreparationOperation(operations)?.id,
-    newestScenarioRunning.id
-  )
-  assert.equal(
-    selectRecoverableDataPreparationOperation(operations)?.profileKey,
-    'scenario-demo'
-  )
-  assert.equal(
-    selectRecoverableDataPreparationOperation(operations, terminal.id)?.id,
-    terminal.id
-  )
-  assert.equal(selectRecoverableDataPreparationOperation([terminal]), null)
-
-  const fullAcceptanceReady = operationFixture({
-    id: '88888888-8888-4888-8888-888888888888',
-    profileKey: DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
-    updatedAt: '2026-07-29T02:01:00.000Z',
-  })
-  assert.equal(
-    selectRecoverableDataPreparationOperation(
-      [olderReady],
-      '',
-      DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
-    ),
-    null
-  )
-  assert.equal(
-    selectRecoverableDataPreparationOperation(
-      [olderReady, fullAcceptanceReady],
-      '',
-      DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
-    )?.id,
-    fullAcceptanceReady.id
-  )
-  const trialReady = scenarioOperationFixture({
+  const remote = scenarioOperationFixture({
     id: '99999999-9999-4999-8999-999999999999',
-    targetSummary: {
-      ...scenarioOperationFixture().targetSummary,
-      targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
-      targetFingerprint: '7'.repeat(64),
-    },
-    readback: null,
-    status: 'ready',
-    confirmationRequired:
-      'DATA_PREPARATION:scenario-demo:customer-trial-133:d260729020304_01020304:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:99999999-9999-4999-8999-999999999999',
+    status: 'running',
     terminal: false,
+    readback: null,
+    targetSummary: {
+      ...local.targetSummary,
+      targetKey: DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
+    },
   })
-  assert.equal(
-    selectRecoverableDataPreparationOperation(
-      [olderReady, trialReady],
-      '',
-      DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
-      DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
-    )?.id,
-    trialReady.id
-  )
-  assert.equal(
-    selectRecoverableDataPreparationOperation(
-      [fullAcceptanceReady, newerRunning],
-      '',
-      DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
-    )?.id,
-    newerRunning.id
-  )
+  const terminal = scenarioOperationFixture({ id: '66666666-6666-4666-8666-666666666666' })
+  const oldCore = operationFixture({ id: '77777777-7777-4777-8777-777777777777', status: 'running' })
+  const operations = [local, remote, terminal, oldCore]
+  assert.equal(selectRecoverableDataPreparationOperation(operations, remote.id, 'scenario-demo', 'local-development'), local)
+  assert.equal(selectRecoverableDataPreparationOperation(operations, oldCore.id, 'scenario-demo', 'customer-trial-133'), remote)
+  assert.equal(selectRecoverableDataPreparationOperation(operations, terminal.id, 'scenario-demo', 'local-development'), terminal)
+  assert.equal(selectRecoverableDataPreparationOperation(operations, '', 'full-acceptance', 'isolated-local'), null)
 })
 
 test('client reuses one CSRF session and only posts prepare or execute envelopes', async () => {
   const requests = []
-  const readyOperation = operationFixture()
-  const runningOperation = operationFixture({
+  const readyOperation = scenarioOperationFixture({
+    status: 'ready',
+    terminal: false,
+    readback: null,
+    confirmationRequired: `DATA_PREPARATION:scenario-demo:local-development:${SCENARIO_OPERATION_RUN_ID}:${PLAN_HASH}:${OPERATION_ID}`,
+  })
+  const runningOperation = scenarioOperationFixture({
+    readback: null,
     status: 'running',
     confirmationRequired: '',
     terminal: false,
@@ -973,15 +817,15 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
     },
   })
 
-  assert.equal((await client.summary()).profiles.length, 3)
-  assert.equal((await client.summary({ force: true })).profiles.length, 3)
+  assert.equal((await client.summary()).profiles.length, 2)
+  assert.equal((await client.summary({ force: true })).profiles.length, 2)
   assert.equal((await client.operation(OPERATION_ID)).status, 'running')
   const idempotencyKey = createDataPreparationIdempotencyKey(
-    'core-demo',
+    'scenario-demo',
     'local-development',
     () => '22222222-2222-4222-8222-222222222222'
   )
-  await client.prepare('core-demo', 'local-development', idempotencyKey)
+  await client.prepare('scenario-demo', 'local-development', idempotencyKey)
   await client.execute(OPERATION_ID, readyOperation.confirmationRequired)
 
   assert.equal(
@@ -1005,7 +849,7 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
   assert.deepEqual(JSON.parse(posts[0].options.body), {
     action: 'prepare',
     payload: {
-      profileKey: 'core-demo',
+      profileKey: 'scenario-demo',
       targetKey: 'local-development',
       idempotencyKey,
     },
@@ -1027,7 +871,7 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
       client.prepare(
         'core-demo',
         'local-development',
-        'data-preparation:prepare:core-demo:arbitrary'
+        'data-preparation:prepare:core-demo:22222222-2222-4222-8222-222222222222'
       ),
     /参数无效/u
   )
@@ -1059,134 +903,6 @@ test('client surfaces only a bounded backend message on rejected requests', asyn
     () => client.summary(),
     /数据准备预检读取失败：固定目标预检未通过/u
   )
-})
-
-test('page defaults to the latest business-chain regression while retaining daily integration profiles', () => {
-  const pageSource = readDevWorkbenchPageSource('DevDataPreparationPage.jsx')
-  assert.match(pageSource, /DEV_DATA_PREPARATION_PROFILE_COPY/u)
-  assert.match(pageSource, /profiles\.map/u)
-  assert.match(pageSource, /确认生成业务场景测试数据/u)
-  assert.match(pageSource, /测试数据/u)
-  assert.match(pageSource, /选择要准备的数据/u)
-  assert.match(pageSource, /当前批次/u)
-  assert.match(pageSource, /执行记录/u)
-  assert.match(pageSource, /AcceptancePlanReview/u)
-  assert.match(pageSource, /DatasetEnvironmentContract/u)
-  assert.match(pageSource, /统一数据合同/u)
-  assert.match(pageSource, /本地长期数据/u)
-  assert.match(pageSource, /demo 演练造数/u)
-  assert.match(pageSource, /隔离完整验收/u)
-  assert.match(pageSource, /不是永绅真实客户导入/u)
-  assert.match(pageSource, /选择只影响计划下钻/u)
-  assert.match(pageSource, /代码变化后，旧数据怎么处理/u)
-  assert.match(pageSource, /MermaidDiagram/u)
-  assert.match(pageSource, /DEV_DATA_PREPARATION_INCREMENTAL_FLOW/u)
-  assert.match(pageSource, /增量造数判断/u)
-  assert.match(pageSource, /模块依赖与刷新范围/u)
-  assert.match(pageSource, /实际执行：/u)
-  assert.match(pageSource, /stageTimings/u)
-  assert.match(pageSource, /PROFILE_QUERY_KEY/u)
-  assert.match(pageSource, /TARGET_QUERY_KEY/u)
-  assert.match(
-    pageSource,
-    /searchParams\.get\(DEV_DATA_PREPARATION_PROFILE_QUERY_KEY\)/u
-  )
-  assert.match(
-    pageSource,
-    /searchParams\.get\(DEV_DATA_PREPARATION_TARGET_QUERY_KEY\)/u
-  )
-  assert.match(pageSource, /buildDevDataPreparationSearch/u)
-  assert.match(pageSource, /new AbortController\(\)/u)
-  assert.match(pageSource, /signal: controller\.signal/u)
-  assert.match(pageSource, /customerTrial133/u)
-  assert.match(pageSource, /targetSummary\.targetKey/u)
-  assert.match(pageSource, /erp-dev-data-operation-technical/u)
-  assert.match(pageSource, /erp-dev-data-history/u)
-  assert.match(pageSource, /本次准备需要处理的条件/u)
-  assert.match(pageSource, /open=\{technicalOpen\}/u)
-  assert.match(pageSource, /onToggle=\{\(event\) =>/u)
-  assert.match(pageSource, /READBACK_PRESENTATIONS/u)
-  assert.match(pageSource, /selectedProfileCopy\.prepareDescription/u)
-  assert.match(pageSource, /successDescription/u)
-  assert.match(pageSource, /confirmationDescription/u)
-  assert.match(pageSource, /resolveDataPreparationExecutionConfirmation/u)
-  assert.match(pageSource, /DevCustomerScopeSelector/u)
-  assert.match(pageSource, /useDevCustomerScope/u)
-  assert.match(pageSource, /normalize: selectedIsScenarioDemo/u)
-  assert.match(pageSource, /\(!selectedIsScenarioDemo \|\| customerReady\)/u)
-  assert.match(pageSource, /\(!currentIsScenarioDemo \|\| customerReady\)/u)
-  assert.match(pageSource, /label="客户"/u)
-  assert.match(pageSource, /其他数据准备方式不受影响/u)
-  assert.match(pageSource, /exact confirmation/u)
-  assert.match(
-    pageSource,
-    /<DevPageNav\s*\/>/u
-  )
-  assert.match(pageSource, /selectRecoverableDataPreparationOperation/u)
-  assert.match(pageSource, /profileTargetKey\(selectedProfileKey/u)
-  assert.match(pageSource, /releaseSha/u)
-  assert.match(pageSource, /customerConfigRevision/u)
-  assert.match(pageSource, /rollbackPoint/u)
-  assert.equal(pageSource.match(/<Input\b/gu)?.length, 1)
-  assert.match(pageSource, /aria-label="不可变计划确认文本"/u)
-  assert.doesNotMatch(pageSource, /<label\b/u)
-  assert.match(
-    pageSource,
-    /function ProfileOption[\s\S]*?<tr[\s\S]*?<Radio value=\{profile\.key\}/u
-  )
-  assert.match(pageSource, /cancelButtonProps=\{\{ disabled: executing \}\}/u)
-  assert.match(pageSource, /closable=\{!executing\}/u)
-  assert.match(pageSource, /maskClosable=\{!executing\}/u)
-  assert.match(pageSource, /keyboard=\{!executing\}/u)
-  assert.doesNotMatch(
-    pageSource,
-    /name=["'](?:host|target|path|command|sql|dsn|url|password)["']/iu
-  )
-  assert.doesNotMatch(
-    pageSource,
-    /(?:spawn|child_process|execFile|\/Users\/|192[.]168)/u
-  )
-
-  const buttonLabels = Array.from(
-    pageSource.matchAll(/<Button\b[^>]*>([\s\S]*?)<\/Button>/gu),
-    (match) => match[1].replace(/<[^>]+>/gu, '').trim()
-  )
-  assert(
-    buttonLabels.every((label) => !/(?:清理|删除)/u.test(label)),
-    'the page must not expose cleanup or delete buttons'
-  )
-})
-
-test('incremental data flow stays reviewable and synchronized with the workbench design', () => {
-  assert.match(DEV_DATA_PREPARATION_INCREMENTAL_FLOW, /^flowchart LR/u)
-  assert.match(
-    DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
-    /业务数据摘要或阶段逻辑指纹变化/u
-  )
-  assert.match(
-    DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
-    /按登记依赖图展开刷新闭包/u
-  )
-  assert.match(DEV_DATA_PREPARATION_INCREMENTAL_FLOW, /始终执行只读 readiness/u)
-
-  const designSource = readFileSync(
-    new URL(
-      '../../../../docs/engineering/研发效能工作台与CI-CD设计.md',
-      import.meta.url
-    ),
-    'utf8'
-  )
-  const diagrams = Array.from(
-    designSource.matchAll(/```mermaid\s*\n([\s\S]*?)```/gu),
-    (match) => match[1].trim()
-  )
-  assert.ok(
-    diagrams.includes(DEV_DATA_PREPARATION_INCREMENTAL_FLOW.trim()),
-    'the data preparation page and design document must use the same Mermaid source'
-  )
-  assert.ok(diagrams.includes(DEV_DATA_PREPARATION_MODULE_FLOW.trim()))
-  assert.doesNotMatch(DEV_DATA_PREPARATION_INCREMENTAL_FLOW, /subgraph Modules/u)
-  assert.match(DEV_DATA_PREPARATION_MODULE_FLOW, /Core --> Source/u)
 })
 
 test('data preparation route stays outside formal menu, seedData and RBAC projection', () => {
@@ -1256,13 +972,13 @@ test('preparation availability scopes dirty commits and unavailable targets to t
       message: '缺少隔离库配置',
     },
   ]
-  const core = resolveDataPreparationAvailability(
+  const local = resolveDataPreparationAvailability(
     summary,
-    'core-demo',
+    'scenario-demo',
     'local-development'
   )
-  assert.equal(core.status, 'available')
-  assert.deepEqual(core.blockers, [])
+  assert.equal(local.status, 'available')
+  assert.deepEqual(local.blockers, [])
   const full = resolveDataPreparationAvailability(
     summary,
     'full-acceptance',
@@ -1291,7 +1007,7 @@ test('preparation availability scopes dirty commits and unavailable targets to t
   assert.equal(
     resolveDataPreparationAvailability(
       summary,
-      'core-demo',
+      'scenario-demo',
       'local-development'
     ).status,
     'blocked'

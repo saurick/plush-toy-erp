@@ -31,7 +31,7 @@
 - 普通页面和原型使用 Page；客户源文件、纸张版式或 PDF/打印保真是主目标时使用 Print。
 - seed / fixture / dry-run / cleanup、模拟场景覆盖、甲方资料脱敏映射和 `reuse / reverify / reseed` 判断使用 Seed；验收目录、readiness、浏览器/PDF、人工结论和签收编排使用 Manual Acceptance。
 - Manual Acceptance 只编排验收与证据；目标访问、migration、release、rollback 的真实执行仍由 Operations 负责。
-- 提示词整理使用全局显式 `$prompt-governance`。存在待提交 / 需交接改动时按 `AGENTS.md` 留一份被动 `Git handoff record`；只有当前任务已授权 commit / push 且实时现场复杂时，才使用全局 `$git-closeout-coordination`。
+- 提示词整理使用全局显式 `$prompt-governance`。存在待提交 / 需交接改动时按 `AGENTS.md` 留一份被动 `Git handoff record`。已获 commit、push 或 Git 锁修复授权时，使用全局 `$git-closeout-coordination` 的对应流程；本地提交仍统一走[项目提交入口](../../scripts/README.md#git-commit-entry)。
 - 已授权本地提交遇到实际跨会话冲突时，使用 [Git Conflict Coordination](plush-git-conflict-coordination/SKILL.md) 自动核清，沿用项目精确提交入口；无冲突时不联系其他聊天，暂缓批次不纳入。
 - 项目 skill 不重复高内聚、低耦合等通用常识，只保留项目真源、判断流程、命令和验收。
 - 修改 Skill 时核对 `agents/openai.yaml` 仍准确；仅在适用范围、入口或元数据变化时修改相关 README / metadata / 引用。验证入口与覆盖见下文；只有命中项目过程记录条件时才更新 `progress.md`。
@@ -65,13 +65,18 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --check -- .agents/
 | --- | --- | --- |
 | “评估采购页布局，先别改。” | Page | 只读核对页面真源并给结论；无浏览器证据时说明范围，不写实现。 |
 | “只调整页面间距，做好必要验证。” | Page / Test | 选择受影响页面与状态，复用现有数据；不触发整批重造。 |
+| “库存余额按数量跨页排序。” | Page / Domain | 查真实查询和可比较的业务口径；排序在分页前执行，用两页数据核对结果和恢复默认。 |
 | “给数量校验单测补空值 fixture。” | Seed / Test | 复用所属测试/helper，验证空值、隔离和清理；不要求人工验收批次回执。 |
 | “继续已授权的共享组件修改，完成必要浏览器验证。” | Page / Test | 沿用同一目标授权，按真实影响选择验证；只在显著超出范围或预算时询问。 |
+| “只验证共享文件里本轮已核清的改动。” | Test | 按文件和依赖选测；需要证明可独立交付时隔离精确候选，不引用混合工作区的绿色结果。 |
 | “根据已有发布回执判断缺口，不连接目标。” | Capability Evidence Audit | 读取已有证据，保留目标未核验结论；不访问生产或取得运行凭据。 |
-| “实现 schema 调整并生成 migration，暂不 apply。” | Domain / Test | 完成设计、生成、守卫及适用的隔离升级检查；不执行目标库 apply。 |
+| “调整数量精度并生成迁移，暂不 apply。” | Domain / Test | 分别做工作区迁移检查和登记开发库只读审计；按项目门禁生成、核对 seed / fixture 并在隔离库验证现库升级，不执行目标库 apply。 |
+| “升级计划未绑定基础服务差异，或确认后差异变了。” | Operations | 入口未支持时报告阻断；入口支持但本次范围缺失或变化时，停止目标写入，核实后重新准备并确认。 |
+| “打印窗口带入草稿，但浏览器存储暂不可读。” | Print | 核对传入稿的范围和保存提示；恢复时先检查原位置，不覆盖未知或损坏的草稿。 |
 | “订单按钮以后增多时仍要清楚好用。” | Page | 评估业务分组、优先级、宽度与交互恢复，选择受影响的增长场景；不自动新增功能区或后台压测。 |
 | “评估历史数据增长后的查询和导出，先别改。” | Domain / Test | 区分总量、处理范围、负载和环境，核对现有主路径并提出有依据的验证方案；不改库、不启动压测、不承诺未实测容量。 |
 | “只改一个按钮文案。” | Page | 沿用现有布局与容量边界，完成相关核对；不额外引入规模分析、造数或压测。 |
+| “只修复 `index.lock`，不要提交。” | 全局 Git 收口 | 按原生锁核验流程保全已证实的陈旧锁；活动或未知归属时保留现场。不暂存或提交。 |
 | “提交本次修复；同文件有另一会话改动，必要依赖暂未提交。” | Git Conflict Coordination | 定向核对归属、依赖与授权，在候选上验证后串行提交；明确暂缓的依赖不纳入，只阻断相应目标。 |
 | “在没有跨会话工具的宿主中提交存在混合归属的修复。” | Git Conflict Coordination | 先报告缺失工具，保留待核清的文件 / hunk 和 index；已有交接可证明独立的目标仍按原授权推进，不模拟联系或轮询。 |
 | “审查 DEV 工作台局部布局修改。” | Code Review / Test | 按正式测试策略核对浅色桌面 smoke、受影响交互与溢出；截图按失败诊断或人工视觉评审需要选择，不追加全站主题、移动端或通用键盘矩阵。 |

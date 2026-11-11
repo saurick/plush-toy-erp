@@ -2,8 +2,10 @@ import { compactParams, trimOptional } from './sourceDocumentValues.mjs'
 import {
   formatNumeric20Scale6,
   isPositiveNumeric20Scale6Units,
+  numeric20Scale6TextFromUnits,
   numeric20Scale6Units,
 } from './numeric20Scale6.mjs'
+import { InventoryLotStatus, StockReservationStatus } from '../../common/consts/statuses.generated.mjs'
 
 export function positiveInt(value) {
   const numberValue = Number(value || 0)
@@ -199,31 +201,55 @@ export function filterShipmentProductSKUOptions(
 
 export function filterShipmentInventoryLotOptions(
   options,
-  inventoryLots,
-  { productID, productSkuID } = {}
+  balances,
+  { productID, productSkuID, warehouseID, unitID, salesOrderID, sourceItemID, reservations = [] } = {}
 ) {
   const normalizedProductID = positiveInt(productID)
   const normalizedSkuID = positiveInt(productSkuID)
-  if (!normalizedProductID) return []
-  const allowedIDs = new Set(
-    (Array.isArray(inventoryLots) ? inventoryLots : [])
-      .filter(
-        (lot) =>
-          String(lot?.subject_type || '')
-            .trim()
-            .toUpperCase() === 'PRODUCT' &&
-          positiveInt(lot?.subject_id) === normalizedProductID &&
-          positiveInt(lot?.product_sku_id) === normalizedSkuID &&
-          String(lot?.status || '')
-            .trim()
-            .toUpperCase() === 'ACTIVE'
-      )
-      .map((lot) => positiveInt(lot?.id || lot?.lot_id))
-      .filter(Boolean)
-  )
-  return (Array.isArray(options) ? options : []).filter((option) =>
-    allowedIDs.has(positiveInt(option?.value))
-  )
+  const normalizedWarehouseID = positiveInt(warehouseID)
+  const normalizedUnitID = positiveInt(unitID)
+  const orderID = positiveInt(salesOrderID)
+  const lineID = positiveInt(sourceItemID)
+  if (!normalizedProductID || !normalizedWarehouseID || !normalizedUnitID) return []
+
+  const availableByLot = new Map()
+  for (const balance of balances) {
+    const lotID = positiveInt(balance.lot_id)
+    if (!lotID || balance.subject_type !== 'PRODUCT' ||
+      positiveInt(balance.subject_id) !== normalizedProductID ||
+      positiveInt(balance.product_sku_id) !== normalizedSkuID ||
+      positiveInt(balance.warehouse_id) !== normalizedWarehouseID ||
+      positiveInt(balance.unit_id) !== normalizedUnitID ||
+      balance.lot_status !== InventoryLotStatus.ACTIVE) continue
+
+    let available = numeric20Scale6Units(balance.ready_to_ship_quantity)
+    if (available === null) continue
+    const owned = orderID && lineID ? reservations
+      .filter((row) => row.status === StockReservationStatus.ACTIVE &&
+        positiveInt(row.sales_order_id) === orderID && positiveInt(row.sales_order_item_id) === lineID &&
+        positiveInt(row.product_id) === normalizedProductID && positiveInt(row.product_sku_id) === normalizedSkuID &&
+        positiveInt(row.warehouse_id) === normalizedWarehouseID && positiveInt(row.unit_id) === normalizedUnitID &&
+        positiveInt(row.lot_id) === lotID)
+      .reduce((sum, row) => sum + BigInt(numeric20Scale6Units(row.quantity) || '0'), 0n) : 0n
+    if (owned > 0n) {
+      // The global ready quantity already excludes all reservations. Restore only
+      // the source line's own share, before applying the inspection/packing hold.
+      const inputs = [balance.quantity, balance.active_reserved_quantity,
+        balance.pending_inspection_quantity, balance.pending_packaging_quantity].map(numeric20Scale6Units)
+      if (inputs.some((entry) => entry === null)) continue
+      const [quantity, reserved, inspection, packaging] = inputs.map(BigInt)
+      if (owned > reserved) continue
+      const ready = quantity - reserved + owned - inspection - packaging
+      available = ready > 0n ? String(ready) : '0'
+    }
+    if (isPositiveNumeric20Scale6Units(available)) {
+      availableByLot.set(lotID, numeric20Scale6TextFromUnits(available))
+    }
+  }
+  return options.flatMap((option) => {
+    const available = availableByLot.get(positiveInt(option.value))
+    return available ? [{ ...option, label: `${option.label} · 可发 ${available}`, available }] : []
+  })
 }
 
 export function isBlankShipmentItem(item = {}) {

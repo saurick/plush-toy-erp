@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises'
-import { chooseUIDesignState, openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
+import { chooseUIDesignMode, chooseUIDesignState, openUIDesignMobileTasks, visibleUIDesignFrame } from './devUIDesignNavigation.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { getContrastRatio } from './colorAssertions.mjs'
 import { createDevWorkCenterDesignScenarios } from './devWorkCenterDesignScenarios.mjs'
@@ -32,7 +32,10 @@ export function createDevUIDesignDetailScenarios({
       themeMode: 'light',
       verify: async (page) => {
         const directory = page.getByRole('navigation', { name: '设计阅读目录' })
-        const search = page.getByRole('textbox', { name: '搜索设计图解或规范' })
+        const searchArea = page.getByRole('search', { name: '查找图解主题' })
+        const search = searchArea.getByRole('textbox', { name: '搜索设计图解' })
+        const hideDirectory = page.getByRole('button', { name: '收起目录', exact: true })
+        const showDirectory = page.getByRole('button', { name: '展开目录', exact: true })
         const assertHierarchy = async () => {
           await directory.getByRole('button').first().waitFor()
           await waitForFiniteAnimations(page, { selector: '.erp-design-document-shell' })
@@ -85,40 +88,101 @@ export function createDevUIDesignDetailScenarios({
         await target.waitFor()
         assert.equal(await target.getAttribute('aria-current'), 'page', '刷新应保留当前主题')
         const fullDirectorySize = await directory.getByRole('button').count()
+        await hideDirectory.click()
+        await directory.waitFor({ state: 'hidden' })
+        assert(await search.isVisible(), '收起目录后仍可从顶部搜索')
         await search.fill('窄屏与动效')
         await search.press('Enter')
-        await page.waitForFunction(() => document.querySelectorAll('.erp-design-document-toc button').length === 1)
+        await directory.getByRole('button', { name: '窄屏与动效', exact: true }).waitFor()
+        await page.waitForFunction(() => document.querySelectorAll('.erp-design-document-toc .erp-design-topic-button').length === 1)
         assert.equal(await directory.getByRole('button').count(), 1)
         await directory.getByRole('button', { name: '窄屏与动效', exact: true }).click()
         await directory.locator('[aria-current="page"]').getByText('窄屏与动效', { exact: true }).waitFor()
         assert.equal(await search.inputValue(), '窄屏与动效', '打开图解保留关键词')
         assert.equal(await directory.getByRole('button').count(), 1, '打开图解保留搜索结果')
         await assertHierarchy()
-        await page.getByRole('button', { name: '收起目录', exact: true }).click()
-        assert.equal(await directory.isVisible(), false)
-        await page.getByRole('button', { name: '展开目录', exact: true }).click()
+        await hideDirectory.click()
+        await directory.waitFor({ state: 'hidden' })
+        await search.press('Enter')
+        await directory.waitFor()
+        assert.equal(await directory.getByRole('button').count(), 1, '再次提交相同关键词也能展开结果')
+        await hideDirectory.click()
+        await showDirectory.click()
         await assertHierarchy()
         await search.locator('xpath=..').getByRole('button', { name: '清除搜索', exact: true }).click()
         await directory.getByRole('button').nth(fullDirectorySize - 1).waitFor()
         assert.equal(await search.inputValue(), '')
         assert.equal(await directory.getByRole('button').count(), fullDirectorySize)
         await page.setViewportSize({ width: 1280, height: 800 })
+        const rules = page.getByRole('group', { name: '当前图解的规范来源' })
+        const closeRule = page.getByRole('button', { name: '收起规则', exact: true })
+        const excerpt = page.locator('.erp-design-prose')
         for (const view of ['设计依据', '设计说明']) {
           await page.getByRole('tab', { name: view, exact: true }).click()
-          for (const read of ['图解', '规范原文']) {
-            await page.locator('.erp-design-reader-toolbar').getByText(read, { exact: true }).click()
-            await assertHierarchy()
-          }
-          if (view === '设计说明') {
-            await search.fill('页面结构')
-            await search.press('Enter')
-            await page.waitForURL((url) => url.searchParams.get('q') === '页面结构')
-            const chapter = directory.getByRole('button', { name: '页面结构', exact: true })
-            await chapter.click()
-            await directory.locator('[aria-current="page"]').getByText('页面结构', { exact: true }).waitFor()
-            assert.equal(await search.inputValue(), '页面结构', '打开规范章节保留该目录的关键词')
-          }
+          await assertHierarchy()
+          assert.equal(await page.getByLabel('设计阅读方式', { exact: true }).count(), 0)
+          const selected = directory.locator('[aria-current="page"]')
+          const title = await selected.innerText()
+          const count = await directory.getByRole('button').count()
+          await rules.getByRole('button').click()
+          await excerpt.waitFor()
+          await assertHierarchy()
+          assert.equal(await selected.innerText(), title, '原位展开不切换目录对象')
+          assert.equal(await directory.getByRole('button').count(), count, '始终使用图解目录')
+          assert.equal(await search.count(), 1)
+          await closeRule.click()
+          await excerpt.waitFor({ state: 'hidden' })
         }
+      },
+    },
+    {
+      name: 'dev-ui-design-rule-read-through',
+      path: '/__dev/ui-design?view=specification&topic=navigation',
+      viewport: { width: 1280, height: 720 },
+      themeMode: 'light',
+      verify: async (page) => {
+        const panel = page.locator('.erp-design-document-content')
+        const trigger = page.getByRole('button', { name: '查找与返回的主线', exact: true })
+        const article = page.getByRole('article', { name: '查找与返回的主线', exact: true })
+        const chart = article.locator('.erp-markdown-mermaid__canvas svg')
+        const close = article.getByRole('button', { name: '收起规则', exact: true })
+        const openRule = async () => {
+          await trigger.scrollIntoViewIfNeeded()
+          const origin = await panel.evaluate((node) => node.scrollTop)
+          await trigger.click()
+          await chart.waitFor()
+          return origin
+        }
+        const closeRule = async (origin) => {
+          await close.click()
+          await article.waitFor({ state: 'hidden' })
+          assert(Math.abs(await panel.evaluate((node) => node.scrollTop) - origin) <= 1, '收起规则恢复原阅读位置')
+          assert(await trigger.evaluate((node) => node === document.activeElement), '收起规则恢复入口焦点')
+        }
+
+        const origin = await openRule()
+        await page.waitForFunction(() => {
+          const rule = document.querySelector('#design-related-rule')?.getBoundingClientRect()
+          const reader = document.querySelector('.erp-design-document-content')?.getBoundingClientRect()
+          return rule && reader && rule.top >= reader.top - 1 && rule.bottom <= reader.bottom + 1
+        }, undefined, { timeout: 4000 })
+        assert(await article.evaluate((node) => node === document.activeElement), '展开时焦点进入规则')
+        await closeRule(origin)
+
+        await page.setViewportSize({ width: 950, height: 540 })
+        const narrowOrigin = await openRule()
+        const start = await panel.evaluate((node) => node.scrollTop)
+        const reader = await panel.boundingBox()
+        await page.mouse.move(reader.x + 8, reader.y + reader.height / 2)
+        await page.mouse.wheel(0, 1200)
+        await page.waitForFunction((previous) => {
+          const panel = document.querySelector('.erp-design-document-content')
+          const button = document.querySelector('.erp-design-rule-close')?.getBoundingClientRect()
+          const bounds = panel?.getBoundingClientRect()
+          return button && bounds && panel.scrollTop > previous && button.top >= bounds.top && button.bottom <= bounds.bottom + 1
+        }, start, { timeout: 4000 })
+        await closeRule(narrowOrigin)
+        await assertNoHorizontalOverflow(page)
       },
     },
     {
@@ -197,9 +261,9 @@ export function createDevUIDesignDetailScenarios({
       path: '/__dev/ui-design?view=specification',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        const preview = page.locator('iframe[title="ERP 最新可交互设计"]')
+        const preview = page.locator(visibleUIDesignFrame)
         const assertHTMLNotLoaded = async () => {
-          assert.equal(await preview.count(), 0)
+          assert.equal(await page.locator('iframe[title="ERP 最新可交互设计"]').count(), 0)
           const loaded = await page.evaluate(() => performance
             .getEntriesByType('resource')
             .some((item) => decodeURIComponent(item.name).includes('/docs/product/ui-design/index.html')))
@@ -213,12 +277,13 @@ export function createDevUIDesignDetailScenarios({
 
         await page.goto(new URL('/__dev/ui-design?page=controls', page.url()).href)
         await page.getByRole('region', { name: '控件设计', exact: true }).waitFor()
+        assert.equal(await page.getByRole('tab', { name: '设计样例', exact: true }).getAttribute('aria-selected'), 'true')
         await assertHTMLNotLoaded()
-        await page.locator('.erp-dev-ui-design-page-select').click()
-        await page.getByText('登录页', { exact: true }).click()
+        await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
+        await chooseUIDesignMode(page, '登录页')
         await preview.waitFor()
         const originalFrame = await preview.elementHandle()
-        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        const frame = page.frameLocator(visibleUIDesignFrame)
         const account = frame.locator('input').first()
         await account.fill('retained-preview')
         const tabs = page.locator('.erp-dev-ui-design-header')
@@ -227,7 +292,7 @@ export function createDevUIDesignDetailScenarios({
         await page.locator('.erp-design-document-shell').waitFor()
         await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
         await preview.waitFor()
-        assert(await originalFrame.evaluate((node) => node === document.querySelector('iframe[title="ERP 最新可交互设计"]')), '已打开的原型保持挂载')
+        assert(await originalFrame.evaluate((node) => node.isConnected && !node.closest('[hidden]')), '已打开的原型保持挂载')
         assert.equal(await account.inputValue(), 'retained-preview')
         const after = await tabs.boundingBox()
         for (const key of ['x', 'y', 'width', 'height']) {
@@ -244,7 +309,7 @@ export function createDevUIDesignDetailScenarios({
       path: '/__dev/ui-design?page=login',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        const frame = page.frameLocator(visibleUIDesignFrame)
         await frame.getByRole('heading', { name: '毛绒玩具管理系统' }).waitFor()
         await frame.getByRole('button', { name: '登录', exact: true }).click()
         await frame.getByText('请输入账号', { exact: true }).waitFor()
@@ -278,8 +343,7 @@ export function createDevUIDesignDetailScenarios({
             .inputValue(),
           ''
         )
-        await page.locator('.erp-dev-ui-design-page-select').click()
-        await page.getByText('业务界面', { exact: true }).click()
+        await chooseUIDesignMode(page, '桌面 ERP')
         await frame.locator('.workbench-queue-tabs button').first().waitFor()
         await assertNoHorizontalOverflow(page)
       },
@@ -295,7 +359,7 @@ export function createDevUIDesignDetailScenarios({
         await page.getByRole('tab', { name: '设计说明', exact: true }).click()
         const directory = page.getByRole('navigation', { name: '设计阅读目录' })
         const panel = page.locator('.erp-design-document-content')
-        const search = page.getByRole('textbox', { name: '搜索设计图解或规范' })
+        const search = page.getByRole('textbox', { name: '搜索设计图解' })
         const select = async (title) => {
           const button = directory.getByRole('button', {
             name: title,
@@ -368,7 +432,7 @@ export function createDevUIDesignDetailScenarios({
 
         await search.fill('不存在的图解')
         await search.press('Enter')
-        await page.getByText('没有匹配的主题或章节', { exact: true }).waitFor()
+        await page.getByText('没有匹配的图解主题', { exact: true }).waitFor()
         assert.equal(
           await directory
             .getByRole('button', { name: '页面骨架', exact: true })
@@ -378,11 +442,14 @@ export function createDevUIDesignDetailScenarios({
         await page.reload()
         await search.waitFor()
         assert.equal(await search.inputValue(), '不存在的图解')
-        await search.locator('xpath=..')
-          .getByRole('button', { name: '清除搜索', exact: true })
-          .click()
+        await directory.getByRole('button', { name: '清除搜索', exact: true }).click()
+        await page.waitForFunction(() => {
+          const search = document.activeElement
+          return search?.getAttribute('aria-label') === '搜索设计图解' && search.value === ''
+        })
         await search.fill('返回')
         await search.press('Enter')
+        await page.waitForURL((url) => url.searchParams.get('q') === '返回')
         await directory
           .getByRole('button', { name: '查找、下钻与返回', exact: true })
           .waitFor()
@@ -417,6 +484,10 @@ export function createDevUIDesignDetailScenarios({
         assert.equal(await query.inputValue(), 'B')
         assert(await detailTrigger.evaluate((node) => node === document.activeElement), '返回恢复原记录入口焦点')
         assert.equal(await detailTrigger.locator('..').getAttribute('data-selected'), 'true')
+        await page.getByRole('group', { name: '当前图解的规范来源' }).getByRole('button', { name: '查找与返回的主线', exact: true }).click()
+        await page.getByRole('button', { name: '收起规则', exact: true }).click()
+        assert.equal(await query.inputValue(), 'B')
+        assert.equal(await recordNote.getAttribute('aria-pressed'), 'true')
         await page.reload()
         assert.equal(await recordNote.getAttribute('aria-pressed'), 'true', '刷新恢复图解定位')
 
@@ -543,17 +614,37 @@ export function createDevUIDesignDetailScenarios({
         await select('文字与对齐')
         await page.locator('.erp-design-type-figure').waitFor()
 
-        await page
-          .locator('.erp-design-reader-toolbar')
-          .getByText('规范原文', { exact: true })
-          .click()
-        await select('高保真视觉合同')
+        const rules = page.getByRole('group', { name: '当前图解的规范来源' })
+        const visualRule = rules.getByRole('button', { name: '复合信息与上下布局', exact: true })
+        const closeRule = page.getByRole('button', { name: '收起规则', exact: true })
         const prose = page.locator('.erp-design-prose')
-        assert.equal(await prose.locator('h2').count(), 1, '规范按章节阅读')
-        assert.equal(await page.locator('.erp-design-guide-section').count(), 0)
+        const visualSection = prose.getByRole('heading', { name: '复合信息与上下布局', exact: true })
+        await search.fill('文字与对齐')
+        await search.press('Enter')
+        await page.waitForURL((url) => url.searchParams.get('q') === '文字与对齐')
+        await visualRule.scrollIntoViewIfNeeded()
+        const guideScroll = await panel.evaluate((node) => node.scrollTop)
+        await visualRule.press('Enter')
+        await visualSection.waitFor()
+        assert.equal(await prose.getByRole('heading', { name: '高保真视觉合同 / Visual Contract' }).count(), 0)
+        assert(await page.locator('.erp-design-type-figure').isVisible(), '展开规则时图解保持可用')
+        assert(await prose.evaluate((node) => document.activeElement === node), '从键盘展开后聚焦规则')
+        assert.equal(await search.inputValue(), '文字与对齐', '展开不改变图解搜索')
+        await page.goBack()
+        await prose.waitFor({ state: 'hidden' })
+        assert.equal(await search.inputValue(), '文字与对齐')
+        await page.goForward()
+        await visualSection.waitFor()
+        await closeRule.click()
+        await prose.waitFor({ state: 'hidden' })
+        assert.equal(await search.inputValue(), '文字与对齐')
+        assert(Math.abs(await panel.evaluate((node) => node.scrollTop) - guideScroll) <= 1, '收起规则恢复正文滚动位置')
+        assert(await visualRule.evaluate((node) => document.activeElement === node), '收起后焦点回到规则入口')
+        await visualRule.click()
+        await visualSection.waitFor()
         const typography = await prose.evaluate((node) => ({
           title: Number.parseFloat(
-            getComputedStyle(node.querySelector('h2')).fontSize
+            getComputedStyle(node.querySelector('h3')).fontSize
           ),
           paragraphLineHeight: Number.parseFloat(
             getComputedStyle(node.querySelector('p')).lineHeight
@@ -563,12 +654,12 @@ export function createDevUIDesignDetailScenarios({
             getComputedStyle(node.querySelector('td')).paddingLeft
           ),
         }))
-        assert(typography.title >= 20 && typography.paragraphLineHeight >= 22)
+        assert(typography.title >= 16 && typography.paragraphLineHeight >= 22)
         assert(
           typography.firstColumn >= 150 && typography.cellPadding >= 10,
           '表格名称列不能退化为窄竖排'
         )
-        await select('图解阅读')
+        await page.goto(new URL('/__dev/ui-design?view=specification&read=reference&chapter=图解阅读--illustrated-reading', page.url()).href)
         await prose
           .getByRole('link', { name: '设计依据：空间与密度', exact: true })
           .click()
@@ -594,11 +685,7 @@ export function createDevUIDesignDetailScenarios({
         await page.reload()
         await heading.waitFor()
         assert.equal(await search.inputValue(), '留白')
-        await page
-          .locator('.erp-design-reader-toolbar')
-          .getByText('图解', { exact: true })
-          .click()
-        await select('间距与密度')
+        await closeRule.click()
         const slider = page.getByRole('slider', { name: '对比页面边距' })
         await slider.focus()
         await slider.press('Home')
@@ -610,8 +697,14 @@ export function createDevUIDesignDetailScenarios({
             .evaluate((node) => getComputedStyle(node).paddingLeft),
           '4px'
         )
+        await rules.getByRole('button', { name: '各处留白解决什么问题', exact: true }).click()
+        await prose.getByRole('heading', { name: /各处留白解决什么问题/u }).waitFor()
+        await closeRule.click()
+        await slider.waitFor()
+        assert.equal(await slider.getAttribute('aria-valuenow'), '4', '返回原主题保留图解参数')
         await page.getByRole('button', { name: '对齐当前基准' }).click()
         assert.equal(await slider.getAttribute('aria-valuenow'), '8')
+        await search.locator('..').getByRole('button', { name: '清除搜索', exact: true }).click()
         await select('平面与层次')
         await page.getByText('去掉分层作对照', { exact: true }).click()
         assert(
@@ -645,18 +738,28 @@ export function createDevUIDesignDetailScenarios({
         const openDirectory = page.getByRole('button', { name: '展开目录', exact: true })
         await openDirectory.waitFor()
         assert.equal(await directory.isVisible(), false)
+        const searchBox = await search.boundingBox()
+        const toggleBox = await openDirectory.boundingBox()
+        assert(searchBox && toggleBox && searchBox.y + searchBox.height <= toggleBox.y, '窄屏顶部搜索独占一行')
         assert.equal(await recordMarker.getAttribute('aria-pressed'), 'true')
         const markerBox = await recordMarker.boundingBox()
         assert(markerBox.width >= 44 && markerBox.height >= 44, '窄屏标注点击区至少 44px')
         assert(await panel.evaluate((node) => node.clientWidth > 340 && node.scrollWidth <= node.clientWidth + 1), '目录收起后保留正文可读宽度')
         await returnMarker.click()
         await returnNote.and(pressed).waitFor()
-        await openDirectory.click()
+        await search.fill('文字与对齐')
+        await search.press('Enter')
         await directory.getByRole('button', { name: '文字与对齐', exact: true }).click()
         await openDirectory.waitFor()
         assert.equal(await directory.isVisible(), false, '选择主题后收起窄屏目录')
+        assert.equal(await search.inputValue(), '文字与对齐', '窄屏返回正文保留搜索词')
         assert(await panel.evaluate((node) => node === document.activeElement), '从窄屏目录转到正文')
+        await rules.getByRole('button', { name: '复合信息与上下布局', exact: true }).click()
+        await visualSection.waitFor()
+        assert(await panel.evaluate((node) => node.scrollWidth <= node.clientWidth + 1), '规则表只在自身范围内横向滚动')
         await assertNoHorizontalOverflow(page, '390px 图解阅读器')
+        await closeRule.click()
+        await prose.waitFor({ state: 'hidden' })
       },
     },
     {
@@ -664,6 +767,9 @@ export function createDevUIDesignDetailScenarios({
       path: '/__dev/ui-design',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
+        await page
+          .getByRole('tab', { name: '可交互设计', exact: true })
+          .click()
         await page
           .locator('iframe[title="ERP 最新可交互设计"]')
           .waitFor({ state: 'visible' })

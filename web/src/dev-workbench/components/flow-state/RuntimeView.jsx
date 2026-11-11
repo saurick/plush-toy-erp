@@ -48,7 +48,7 @@ const PROCESS_STATUS_COLORS = Object.freeze({
   waiting: 'default',
 })
 
-function ProcessDefinitionCard({ definition }) {
+export function ProcessDefinitionCard({ definition }) {
   const nodeByKey = new Map(definition.nodes.map((node) => [node.key, node]))
   const [selectedKey, select] = useState(null)
   const selected = nodeByKey.get(selectedKey)

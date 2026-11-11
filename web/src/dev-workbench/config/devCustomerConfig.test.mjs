@@ -48,10 +48,6 @@ function collectConsoleVisibleText(summary) {
     push(item.sourceLabel)
     push(item.nextAction)
   }
-  for (const item of summary.assetSummary || []) {
-    push(item.label)
-    push(item.note)
-  }
   for (const item of summary.sourceReferences || []) {
     push(item.label)
     push(item.sourceLabel)
@@ -611,12 +607,10 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
   assert.equal(summary.activateEnabled, false)
   assert.equal(summary.rollbackEnabled, false)
   assert.equal(summary.workflowCount, 4)
-  assert.equal(summary.workflowNodeCount, 18)
-  assert.equal(summary.businessFlowCount, 4)
-  assert.equal(summary.stateMachineCount, 3)
-  assert.equal(summary.processPolicyCount, 3)
-  assert.equal(summary.extensionPointCount, 0)
-  assert.equal(summary.importMappingCount, 0)
+  assert.equal(summary.workflows.reduce((count, item) => count + item.nodeCount, 0), 18)
+  assert.equal(summary.businessFlows.length, 4)
+  assert.equal(summary.stateMachines.length, 3)
+  assert.equal(summary.processPolicies.length, 3)
   assert.equal(summary.printTemplateDefaultCount, 2)
   assert.deepEqual(
     summary.printTemplateDefaults.map((item) => [
@@ -663,7 +657,7 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
   assert.deepEqual(summary.extensionRegistryChecks, [
     {
       key: 'controlled-empty-extension-catalog',
-      label: '扩展边界',
+      label: '未登记扩展',
       status: 'controlled_empty',
       implementationSource: 'not_implemented',
       implementationSourceLabel: '当前未实现',
@@ -674,7 +668,7 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
         'no_reviewed_extension_contract',
         'customer_package_handler_forbidden',
       ],
-      note: '当前未声明扩展候选，也没有运行时扩展能力；新增扩展须先完成专项评审。',
+      note: '当前没有运行时扩展能力；有具体需求时先评审用途、影响和验证方式。',
     },
   ])
   assert.deepEqual(
@@ -762,11 +756,7 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
     customerPackageCatalog.modules.length
   )
   assert.equal(summary.moduleStateOverrideCount, 0)
-  assert.equal(
-    summary.moduleStateCounts.enabled,
-    customerPackageCatalog.modules.length
-  )
-  assert.deepEqual(summary.nonEnabledModuleStates, [])
+  assert(summary.moduleStates.every((item) => item.state === 'enabled'))
   assert.equal(
     summary.workflows.find((item) => item.key === 'sales_order_approval')
       ?.factBoundary,
@@ -896,20 +886,12 @@ test('devCustomerConfig: 注册检查保留机器 key 但可见 label 不 fallba
   assert.equal(handlerExtension.label, '测试扩展点处理器')
   assert.match(handlerExtension.note, /客户包不得上传扩展点实现/)
   assert.equal(summary.unregisteredExtensionBindingCount, 3)
-  const handlerExtensionSummary = summary.extensionPoints.find(
-    (item) => item.key === 'handler_extension_key'
-  )
-  assert.equal(handlerExtensionSummary.hasCustomerPackageHandler, true)
-  assert.equal(handlerExtensionSummary.registered, false)
-  assert.equal('handler' in handlerExtensionSummary, false)
+  assert.equal(handlerExtension.handlerAllowed, false)
+  assert.equal('handler' in handlerExtension, false)
   for (const key of ['module_extension_key', 'runtime_extension_key']) {
     assert.equal(
       summary.extensionRegistryChecks.find((item) => item.key === key).status,
       'blocked'
-    )
-    assert.equal(
-      summary.extensionPoints.find((item) => item.key === key).registered,
-      false
     )
   }
 
@@ -923,7 +905,7 @@ test('devCustomerConfig: 注册检查保留机器 key 但可见 label 不 fallba
 test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw key', async () => {
   const source = (await Promise.all([
     'DevCustomerConfigPage.jsx',
-    ...['AssetsPanel.jsx', 'PreflightPanel.jsx', 'DiffPanel.jsx', 'OverviewPanel.jsx', 'ValidationPanel.jsx', 'ReleasePanel.jsx', 'DryRunSummary.jsx', 'TestApplySummary.jsx', 'ReleaseApplySummary.jsx', 'presentation.jsx'].map((name) => `customer-config/${name}`),
+    ...['AssetsPanel.jsx', 'PreflightPanel.jsx', 'RuntimeSettings.jsx', 'ReviewEvidence.jsx', 'DiffPanel.jsx', 'OverviewPanel.jsx', 'ValidationPanel.jsx', 'ReleasePanel.jsx', 'DryRunSummary.jsx', 'TestApplySummary.jsx', 'ReleaseApplySummary.jsx', 'CustomerPackageContents.jsx', 'CustomerStrategyReview.jsx', 'CustomerExtensionRegistry.jsx', 'presentation.jsx'].map((name) => `customer-config/${name}`),
   ].map((name) => readFile(new URL(`../pages/${name}`, import.meta.url), 'utf8')))).join('\n')
 
   assert.match(source, /ariaLabel="配置预检任务"/)
@@ -985,12 +967,7 @@ test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw
   assert.match(source, /requirement\.requirementKeyLabel/)
   assert.match(source, /item\.partyDefaultKeysLabel/)
   assert.match(source, /item\.templateLabel/)
-  assert.match(source, /flow\.flowKeyLabel/)
   assert.match(source, /item\.stateCountLabel/)
-  assert.match(source, /item\.ruleCountLabel/)
-  assert.match(source, /item\.ruleItems\.map/)
-  assert.match(source, /rule\.triggerLabel/)
-  assert.match(source, /rule\.resultLabel/)
 })
 
 test('devCustomerConfig: 主操作各有唯一入口并保留写入保护', async () => {
@@ -1068,7 +1045,7 @@ test('devCustomerConfig: 客户包打印默认方信息经 effective session 投
   const printReview = overview.packageConsoleSummary.reviewChecklist.find(
     (item) => item.key === 'print-template-field-review'
   )
-  const printDefaultsAsset = overview.packageConsoleSummary.assetSummary.find(
+  const printDefaultsSource = overview.packageConsoleSummary.sourceReferences.find(
     (item) => item.key === 'print-template-defaults'
   )
 
@@ -1085,7 +1062,7 @@ test('devCustomerConfig: 客户包打印默认方信息经 effective session 投
     )
   )
   assert.match(printReview.nextAction, /有效配置投影/)
-  assert.equal(printDefaultsAsset.status, 'effective_session_projected')
+  assert.equal(printDefaultsSource.status, 'effective_session_projected')
 })
 
 test('devCustomerConfig: moduleStates 进入控制台预检但不改变默认客户包', () => {
@@ -1111,13 +1088,11 @@ test('devCustomerConfig: moduleStates 进入控制台预检但不改变默认客
   )
   assert.equal(summary.moduleStateOverrideCount, 2)
   assert.equal(
-    summary.moduleStateCounts.enabled,
+    summary.moduleStates.filter((item) => item.state === 'enabled').length,
     customerPackageCatalog.modules.length - 2
   )
-  assert.equal(summary.moduleStateCounts.read_only, 1)
-  assert.equal(summary.moduleStateCounts.disabled, 1)
   assert.deepEqual(
-    summary.nonEnabledModuleStates
+    summary.moduleStates.filter((item) => item.state !== 'enabled')
       .map((item) => [item.moduleKey, item.state, item.reason])
       .sort(),
     [
@@ -1165,6 +1140,49 @@ test('devCustomerConfig: moduleStates 可见标签不 fallback 到 raw module ke
   assert.equal(salesOrderModuleState.sourceLabel, '目录默认')
 })
 
+test('devCustomerConfig: 列表字段取值区分覆盖、恢复默认和无效候选', () => {
+  const base = DEV_CUSTOMER_CONFIG_REGISTRY.yoyoosun.customerPackage
+  const override = { surfaceKey: 'sales_orders.default', fieldKey: 'source_no', visible: false, reason: '候选试用范围' }
+  const fieldIn = (overrides) => buildCustomerPackagePreviewSummary({
+    ...base,
+    fieldPolicyOverrides: overrides,
+  }).fieldVisibilityReview.find((item) => item.key === 'sales_orders.default.source_no')
+
+  assert.deepEqual(
+    [fieldIn([override]).defaultLabel, fieldIn([override]).candidateLabel, fieldIn([override]).sourceLabel],
+    ['显示', '隐藏', '客户包覆盖']
+  )
+  assert.deepEqual(
+    [fieldIn([]).candidateLabel, fieldIn([]).sourceLabel],
+    ['显示', '目录默认']
+  )
+  assert.equal(fieldIn([{ ...override, visible: 'false' }]).candidateLabel, '待校验')
+  assert.equal(fieldIn([override, { ...override, visible: true }]).candidateLabel, '待校验')
+})
+
+test('devCustomerConfig: 客户包明细随声明变化，不暴露其余打印方字段', () => {
+  const base = DEV_CUSTOMER_CONFIG_REGISTRY.yoyoosun.customerPackage
+  const sales = base.runtimeProcessSelections[0]
+  const overview = buildCustomerConfigDevOverview({
+    customerKey: 'yoyoosun',
+    customerPackage: {
+      ...base,
+      runtimeProcessSelections: [{ ...sales, variantKey: 'approval_pmc' }],
+      roleProfiles: [{ ...base.roleProfiles[0], displayName: '样本销售岗位' }],
+      printTemplateDefaults: [{
+        ...base.printTemplateDefaults[0],
+        partyDefaults: { buyerCompany: '样本甲方', buyerPhone: 'SENSITIVE-FIXTURE-VALUE' },
+      }],
+    },
+  })
+  const summary = overview.customerPackageSummary
+  assert.deepEqual(summary.runtimeProcessSelections, [{ ...sales, variantKey: 'approval_pmc' }])
+  assert.deepEqual(summary.roleProfileNames, ['样本销售岗位'])
+  assert.equal(summary.printTemplateDefaults[0].buyerCompany, '样本甲方')
+  assert(!JSON.stringify(summary).includes('SENSITIVE-FIXTURE-VALUE'))
+  assert.equal(summary.processPolicies.find((item) => item.key === 'close_policy').ruleItems[0].triggerLabel, '条件：必需节点完成后')
+})
+
 test('devCustomerConfig: 规则策略和打印默认方提供业务可读投影 label', () => {
   const summary = buildCustomerPackagePreviewSummary()
   const firstFieldCandidate =
@@ -1177,19 +1195,13 @@ test('devCustomerConfig: 规则策略和打印默认方提供业务可读投影 
   assert.match(firstFieldCandidate.sourceLabel, /^来源：/)
   assert.notEqual(firstFieldCandidate.fieldKeyLabel, firstFieldCandidate.key)
 
-  assert.equal(firstBusinessFlow.flowKeyLabel, '业务流锚点已登记')
   assert.match(firstBusinessFlow.moduleRouteLabel, /^关联模块：\d+ 个$/)
-  assert.notEqual(firstBusinessFlow.flowKeyLabel, firstBusinessFlow.key)
 
   assert.match(firstStateMachine.stateCountLabel, /^\d+ 个状态$/)
   assert.match(firstStateMachine.transitionCountLabel, /^\d+ 条转换$/)
   assert.doesNotMatch(firstStateMachine.stateCountLabel, /states/)
   assert.doesNotMatch(firstStateMachine.transitionCountLabel, /transitions/)
 
-  assert.match(firstProcessPolicy.kindLabel, /^策略类型：/)
-  assert.doesNotMatch(firstProcessPolicy.kindLabel, /skip_policy/)
-  assert.doesNotMatch(firstProcessPolicy.kindLabel, /auto_generate_policy/)
-  assert.doesNotMatch(firstProcessPolicy.kindLabel, /close_policy/)
   assert.match(firstProcessPolicy.ruleCountLabel, /^\d+ 条规则$/)
   assert.doesNotMatch(firstProcessPolicy.ruleCountLabel, /rules/)
   assert(firstProcessPolicy.ruleItems.length > 0)
@@ -1197,6 +1209,7 @@ test('devCustomerConfig: 规则策略和打印默认方提供业务可读投影 
     key: 'policy-rule-1',
     triggerLabel: '条件：可选评审未配置时',
     resultLabel: '结果：进入人工评审',
+    declaration: { key: 'skip_optional_review_when_unconfigured', decision: 'manual_review_required' },
     note: '',
   })
   assert.doesNotMatch(
@@ -1252,18 +1265,6 @@ test('devCustomerConfig: 配置包预检控制台区分本地测试应用与正�
       'release_gate_required',
     ]
   )
-  assert.deepEqual(
-    summary.assetSummary.map((item) => item.status),
-    [
-      'runtime_frontend_only',
-      'draft_only',
-      'preview_only',
-      'preview_only',
-      'source_grounded',
-      'effective_session_projected',
-      'preview_only',
-    ]
-  )
   assert(summary.validationChecks.some((item) => item.key === 'real-import'))
   assert(summary.validationChecks.some((item) => item.key === 'module-states'))
   assert(
@@ -1316,43 +1317,19 @@ test('devCustomerConfig: 配置包预检控制台区分本地测试应用与正�
     summary.versionGates.map((item) => item.enabled),
     [false, false, false]
   )
-  assert.deepEqual(
-    summary.packageAssetScope.map((item) => item.key),
-    [
-      'config-assets',
-      'rule-assets',
-      'workflow-assets',
-      'strategy-bindings',
-      'extension-bindings',
-      'template-assets',
-      'import-mapping-assets',
-    ]
-  )
-  assert(
-    summary.packageAssetScope.some(
-      (item) =>
-        item.key === 'strategy-bindings' && item.status === 'preview_only'
-    )
-  )
-  assert(
-    summary.packageAssetScope.some(
-      (item) =>
-        item.key === 'extension-bindings' && item.status === 'controlled_empty'
-    )
-  )
   assert(
     summary.registryChecks.some((item) =>
       item.note.includes('策略实现不得由客户包上传')
     )
   )
+  const extensionChecks = buildCustomerPackagePreviewSummary().extensionRegistryChecks
   assert(
-    summary.registryChecks.some((item) =>
+    extensionChecks.some((item) =>
       item.note.includes('没有运行时扩展能力')
     )
   )
   const visibleTexts = [
-    ...summary.packageAssetScope.flatMap((item) => [item.label, item.note]),
-    ...summary.registryChecks.flatMap((item) => [
+    ...[...summary.registryChecks, ...extensionChecks].flatMap((item) => [
       item.label,
       item.note,
       item.handlerAllowedLabel,

@@ -1,12 +1,18 @@
 @media screen and (max-width: 480px) {
-  .erp-business-date-range-filter__range {
+  :where(.erp-business-date-range-filter:not(.erp-business-date-range-filter--inline-types))
+    .erp-business-date-range-filter__range {
     flex-direction: column;
     align-items: stretch;
-    gap: 6px;
   }
 
-  .erp-business-date-range-filter__separator {
+  :where(.erp-business-date-range-filter:not(.erp-business-date-range-filter--inline-types))
+    .erp-business-date-range-filter__separator {
     display: none;
+  }
+
+  .erp-business-date-range-filter--inline-types .erp-business-date-range-filter__range {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .erp-business-date-range-filter .erp-business-date-input.ant-picker {

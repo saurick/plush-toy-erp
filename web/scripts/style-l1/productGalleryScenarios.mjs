@@ -37,7 +37,11 @@ async function installGalleryFixture(page) {
     let data
     let code = 0
     if (method === 'list_document_product_previews') {
-      data = { previews: params.document_ids.map((documentID) => ({ document_id: documentID, product_count: 3, product_id: 1, product_name: names[0], product_code: products[0].code })) }
+      data = { previews: params.document_ids.map((documentID) => ({
+        document_id: documentID, product_count: 3, product_id: 1,
+        product_name: names[0], product_code: products[0].code,
+        style_no: 'STYLE-001', customer_style_no: 'CUSTOMER-001',
+      })) }
     } else if (method === 'list_product_image_references') {
       data = { images: params.product_ids.map((productID) => ({ product_id: productID, image_attachment_id: currentImages(productID).find((image) => image.slot_key === 'primary')?.id || 0 })) }
     } else if (method === 'list_attachments' && params.owner_type === 'product') {
@@ -266,8 +270,13 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
         await headers.first().waitFor()
         const leading = module === 'shipment'
           ? ['产品图片', '出货单号', '状态', '来源单据', '实际运费']
-          : module === 'production' ? ['生产单号', '产品图片'] : ['产品图片']
+          : module === 'production' ? ['生产单号', '产品 / 款号'] : ['产品图片']
         assert.deepEqual((await headers.allTextContents()).slice(0, leading.length), leading)
+        if (module === 'production') {
+          const identity = page.locator('.erp-business-data-table-card tbody .erp-product-identity-cell').first()
+          await identity.getByText(names[0], { exact: true }).waitFor()
+          await identity.getByText('内部款号：STYLE-001 · 客户款号：CUSTOMER-001', { exact: true }).waitFor()
+        }
         if (module === 'shipment') {
           await openBusinessTableTool(page, '列设置')
           const dialog = page.getByRole('dialog', { name: /^列设置/u })
@@ -379,6 +388,16 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
         await page.screenshot({ path: path.join(outputDir, 'product-gallery-design.png') })
         await preview.getByRole('button', { name: '关闭图片预览', exact: true }).click()
         await preview.waitFor({ state: 'detached' })
+        await frame.getByRole('button', { name: '仓储管理', exact: true }).click()
+        await frame.getByRole('tab', { name: '入库办理', exact: true }).click()
+        await frame.getByRole('tab', { name: '成品入库', exact: true }).click()
+        await frame.locator('tr[data-row]').first().getByRole('button', { name: '查看浅棕小熊大图', exact: true }).waitFor()
+        await frame.locator('tr[data-row]').first().getByRole('button', { name: 'FG-20260925-001', exact: true }).click()
+        const identity = frame.locator('.detail-section').filter({ has: frame.getByRole('heading', { name: '核对产品与规格', exact: true }) })
+        await identity.getByRole('button', { name: '查看浅棕小熊大图', exact: true }).click()
+        await preview.locator('.product-image-preview-stage .product-art').waitFor()
+        await preview.getByRole('button', { name: '关闭图片预览', exact: true }).click()
+        await identity.waitFor({ state: 'visible' })
       },
     },
   ]

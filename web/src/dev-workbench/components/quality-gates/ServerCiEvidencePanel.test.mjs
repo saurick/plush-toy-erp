@@ -30,21 +30,23 @@ test('CI without a pipeline keeps history available and distinguishes missing fr
   const ui = await setup(t)
   await ui.show()
   assert.match(ui.container.querySelector('[role="status"]').textContent, /当前提交尚无 CI/u)
-  assert.equal(ui.container.querySelector('[aria-label="GitLab 测试报告摘要"]'), null)
-  assert.equal(ui.container.querySelector('[aria-label="GitLab 覆盖率摘要"]'), null)
+  assert.equal(Boolean(ui.container.querySelector('[aria-label="GitLab 测试报告摘要"]')), false)
+  assert.equal(Boolean(ui.container.querySelector('[aria-label="GitLab 覆盖率摘要"]')), false)
   assert.equal(ui.container.querySelector('a[href="https://example.test/pipelines/7"]').target, '_blank')
+  assert.equal(ui.container.querySelector('details').open, false)
 
-  await ui.show({ showEmptyState: false })
-  assert.equal(ui.container.querySelector('[role="status"]'), null)
-  assert.ok(ui.container.querySelector('details summary'))
-  assert.ok(ui.container.querySelector('button[aria-label="流程与原理"]'))
+  await ui.show({ showEmptyState: false, inlineHistory: true })
+  assert.equal(Boolean(ui.container.querySelector('[role="status"]')), false)
+  assert.match(ui.container.querySelector('table tbody').textContent, /#7.*bbbbbbbbbbbb.*成功/u)
 
+  ui.evidence.history = []
+  await ui.show({ showEmptyState: false, inlineHistory: true })
+  assert.match(ui.container.textContent, /暂无历史流水线/u)
   ui.evidence.status = 'unavailable'
   ui.evidence.historyStatus = 'unavailable'
-  await ui.show()
-  assert.match(ui.container.querySelector('[role="status"]').textContent, /CI 读取失败/u)
-  assert.match(ui.container.textContent, /历史列表暂时读取失败/u)
-  assert.doesNotMatch(ui.container.textContent, /当前提交尚无 CI|尚无原生测试报告/u)
+  await ui.show({ showEmptyState: false, inlineHistory: true })
+  assert.match(ui.container.querySelector('[role="status"]').textContent, /历史列表暂时读取失败/u)
+  assert.doesNotMatch(ui.container.textContent, /暂无历史流水线|当前提交尚无 CI|尚无原生测试报告/u)
 })
 
 test('CI pipeline details preserve report failures, results and links through running and completed states', async (t) => {

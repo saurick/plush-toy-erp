@@ -21,6 +21,8 @@ import {
   MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT,
 } from "./manual-acceptance-page-data-contract.mjs";
 import { runManualAcceptanceReadinessCli } from "./manual-acceptance-readiness.mjs";
+import { MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT } from "./manual-acceptance-task-board-data.mjs";
+import { verifyManualAcceptanceImageReadback } from "./manual-acceptance-image-readback.mjs";
 import {
   MANUAL_ACCEPTANCE_CORE_UNIT_CODES,
   MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
@@ -31,19 +33,11 @@ import {
 } from "./manual-acceptance-source-data.mjs";
 import {
   CONFIRM_PHRASE as TASK_CONFIRM_PHRASE,
-  PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
-  PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-  PREVIOUS_TASK_COPY_REVISION,
-  PREVIOUS_TASK_RUN_ID,
-  TASK_COPY_REVISION,
   TASK_PROFILE_LONG_LIVED_WORKBENCH,
   applyManualAcceptanceTaskData,
   countManualAcceptanceProcessInstances,
-  buildLegacyManualAcceptanceTaskBatchReference,
   buildManualAcceptanceTaskDataPlan,
   buildManualAcceptanceTaskSchedule,
-  manualAcceptanceTaskRetireConfirmation,
-  retireLegacyManualAcceptanceTaskBatch,
 } from "./manual-acceptance-task-data.mjs";
 import {
   SCENARIO_DEMO_TARGET,
@@ -114,12 +108,16 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
     ]),
     task: Object.freeze([
       "scripts/qa/manual-acceptance-task-data.mjs",
+      "scripts/qa/manual-acceptance-task-board-data.mjs",
       "scripts/qa/manual-acceptance-task-catalog.mjs",
       "scripts/qa/seed-business-values.mjs",
     ]),
     facts: Object.freeze([
       "web/src/erp/utils/numeric20Scale6.mjs",
       "scripts/qa/manual-acceptance-fact-data.mjs",
+      "scripts/qa/manual-acceptance-form-coverage.mjs",
+      ...MANUAL_ACCEPTANCE_PRODUCT_IMAGE_FILES.filter((file) => !file.includes("/plush-products/") || /(?:catalog\.json|cloud_bear-.*\.jpg)$/u.test(file)),
+      "scripts/qa/manual-acceptance-source-data.mjs",
       "scripts/qa/manual-acceptance-finance-scenarios.mjs",
       "scripts/qa/manual-acceptance-finance-readback.mjs",
       "scripts/qa/manual-acceptance-cash-payment-data.mjs",
@@ -137,15 +135,19 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
       "scripts/qa/manual-acceptance-fact-report-contract.mjs",
     ]),
     attachments: Object.freeze([
+      "scripts/qa/manual-acceptance-task-board-data.mjs",
       "scripts/qa/manual-acceptance-task-data.mjs",
       "scripts/qa/manual-acceptance-account-identities.mjs",
       "scripts/qa/manual-acceptance-attachment-data.mjs",
+      "scripts/qa/manual-acceptance-image-evidence.mjs",
+      ...MANUAL_ACCEPTANCE_PRODUCT_IMAGE_FILES,
       "scripts/qa/fixtures/plush-products/order-requirements.pdf",
       "scripts/qa/fixtures/plush-products/cloud_bear.png",
       "scripts/qa/fixtures/plush-products/cloud_bear.jpg",
       "scripts/qa/seed-business-values.mjs",
     ]),
     readiness: Object.freeze([
+      "scripts/qa/manual-acceptance-task-board-data.mjs",
       "web/src/erp/utils/roleKeys.mjs",
       "scripts/qa/manual-acceptance-account-identities.mjs",
       "scripts/qa/manual-acceptance-task-data.mjs",
@@ -156,6 +158,8 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
       "scripts/qa/manual-acceptance-fact-report-contract.mjs",
       "scripts/qa/manual-acceptance-page-data-contract.mjs",
       "scripts/qa/manual-acceptance-readiness.mjs",
+      "scripts/qa/manual-acceptance-image-readback.mjs",
+      "scripts/qa/manual-acceptance-target-policy.mjs",
       "scripts/qa/manual-acceptance-test-index.mjs",
     ]),
   });
@@ -1727,7 +1731,7 @@ export async function runDefaultManualAcceptanceTaskComponent(
     "adminPassword",
     "task",
   );
-  let report = await applyTaskData(plan, {
+  const report = await applyTaskData(plan, {
     password: rolePassword,
     adminPassword,
     confirmPhrase: TASK_CONFIRM_PHRASE,
@@ -1736,58 +1740,12 @@ export async function runDefaultManualAcceptanceTaskComponent(
     fetchImpl: deps.fetchImpl,
     sourceReport: sourceState.report,
   });
-  if (useLongLivedTaskProfile) {
-    const retireTaskBatch =
-      deps.retireTaskBatch || retireLegacyManualAcceptanceTaskBatch;
-    const legacyBatches = [
-      {
-        runId: PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
-        copyRevision: PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
-      },
-      {
-        runId: PREVIOUS_TASK_RUN_ID,
-        copyRevision: PREVIOUS_TASK_COPY_REVISION,
-      },
-      { runId: businessInput.runId, copyRevision: TASK_COPY_REVISION },
-    ];
-    const legacyRetirements = [];
-    for (const legacy of legacyBatches) {
-      const legacyBatch = buildLegacyManualAcceptanceTaskBatchReference({
-        ...legacy,
-        backendURL: targetAdapter.backendURL,
-      });
-      const retirement = await retireTaskBatch(plan, {
-        retireRunId: legacy.runId,
-        retireCopyRevision: legacy.copyRevision,
-        password: rolePassword,
-        adminPassword,
-        allowAbsent: true,
-        confirmPhrase: manualAcceptanceTaskRetireConfirmation(
-          plan,
-          legacyBatch,
-        ),
-        targetConfirmation: targetAdapter.confirmation || undefined,
-        targetAttestation: targetAdapter.attestation || undefined,
-        fetchImpl: deps.fetchImpl,
-      });
-      legacyRetirements.push({
-        runId: legacy.runId,
-        copyRevision: legacy.copyRevision,
-        summary: retirement.summary,
-      });
-    }
-    report = {
-      ...report,
-      legacyRetirements,
-      summary: {
-        ...report.summary,
-        legacyBatchCount: legacyRetirements.length,
-        legacyTasksTerminalized: legacyRetirements.reduce(
-          (total, item) => total + Number(item.summary?.terminalized || 0),
-          0,
-        ),
-      },
-    };
+  if (useLongLivedTaskProfile && report.dailyTaskBoard?.contract !== MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "task_board_source_evidence_missing",
+      "long-lived role tasks must bind real source documents and product images",
+      { stageKey: "task" },
+    );
   }
   await persistReport(reportPath, report);
   return { operation: "applied", report, reportPath };
@@ -1893,10 +1851,11 @@ async function defaultReadinessComponent(invocation, deps) {
   const source = deps.state.componentReports.get("source");
   const facts = deps.state.componentReports.get("facts");
   const task = deps.state.componentReports.get("task");
-  if (!source?.reportPath || !facts?.reportPath || !task?.reportPath) {
+  const attachments = deps.state.componentReports.get("attachments");
+  if (!source?.reportPath || !facts?.reportPath || !task?.reportPath || !attachments?.report) {
     throw new ManualAcceptanceDatasetRunnerError(
       "readiness_input_report_missing",
-      "readiness requires source, facts, and task reports from the same runner execution",
+      "readiness requires source, facts, task, and attachment reports from the same runner execution",
       { stageKey: "readiness" },
     );
   }
@@ -1944,13 +1903,29 @@ async function defaultReadinessComponent(invocation, deps) {
     result.report,
     result.exitCode,
   );
+  const imageCoverage = await verifyManualAcceptanceImageReadback({
+    sourceReport: source.report,
+    factReport: facts.report,
+    attachmentReport: attachments.report,
+    taskReport: task.report,
+    rolePassword: targetAdapter.credentials.rolePassword,
+    targetAttestation: targetAdapter.attestation || undefined,
+    fetchImpl: deps.fetchImpl,
+  });
+  const report = { ...result.report, imageCoverage };
+  await persistReport(result.output.jsonPath, report);
   return {
     operation: "verified",
-    report: result.report,
+    report,
     reportPath: result.output.jsonPath,
     summary: {
       ...result.report.summary,
       ...datasetReadiness,
+      imageCoverage: {
+        products: imageCoverage.products,
+        photos: imageCoverage.photos,
+        linkedTasks: imageCoverage.linkedTasks,
+      },
     },
   };
 }

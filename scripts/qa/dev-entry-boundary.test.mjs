@@ -1173,8 +1173,13 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   assert.match(pageSource, /<PreflightPanel\b/u);
   assertIncludes(
     consoleSource,
-    "流程与扩展项仅预览",
-    "customer config console package-source boundary",
+    "不执行流程或写入业务事实",
+    "customer config draft paths must not imply workflow or fact execution",
+  );
+  assertIncludes(
+    consoleSource,
+    "当前没有运行时实现",
+    "customer config extension candidates must not imply a runtime implementation",
   );
   assert(
     !consoleSource.includes("客户配置包导入控制台"),

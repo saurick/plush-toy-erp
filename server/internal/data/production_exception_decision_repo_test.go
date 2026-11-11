@@ -32,6 +32,11 @@ func TestProductionOverIssueApprovalExtendsAndCapsMaterialIssue(t *testing.T) {
 	if err != nil || decision.Status != biz.ProductionExceptionApproved || decision.ApprovedQuantity == nil || !decision.ApprovedQuantity.Equal(approved) {
 		t.Fatalf("decision=%#v err=%v", decision, err)
 	}
+	identity := decision.SourceIdentity
+	if identity == nil || identity.SubjectType != biz.InventorySubjectMaterial || identity.SubjectID != requirement.MaterialID ||
+		identity.Code != requirement.MaterialCodeSnapshot || identity.BatchNo != "" {
+		t.Fatalf("over-issue must identify its material requirement, not the order product: %+v", identity)
+	}
 	requirements, err := factUC.ListProductionOrderMaterialRequirements(ctx, released.Order.ID)
 	if err != nil || len(requirements) != 1 ||
 		!requirements[0].ApprovedOverIssueQuantity.Equal(approved) ||
@@ -233,6 +238,15 @@ func TestProductionWIPConcessionKeepsRejectedInspectionAndAcceptsBatch(t *testin
 	applied, err := factRepo.executeProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "执行让步"}, nil, nil)
 	if err != nil || applied.ExecutionStatus != biz.ProductionExceptionExecutionApplied {
 		t.Fatalf("applied=%#v err=%v", applied, err)
+	}
+	rows, total, err := factUC.ListProductionExceptions(f.ctx, biz.ProductionExceptionFilter{ProductionOrderID: fixture.order.ID})
+	if err != nil || total != 1 || len(rows) != 1 {
+		t.Fatalf("list production exceptions: total=%d rows=%+v err=%v", total, rows, err)
+	}
+	identity := rows[0].SourceIdentity
+	if identity == nil || identity.SubjectType != biz.InventorySubjectProduct || identity.SubjectID != fixture.item.ProductID ||
+		identity.BatchNo != fixture.batch.BatchNo || rows[0].StockDispositionRequired {
+		t.Fatalf("product disposition must use the exact order line and WIP batch: %+v", identity)
 	}
 	batch := f.client.ProductionWIPBatch.GetX(f.ctx, batchID)
 	inspection := f.client.QualityInspection.GetX(f.ctx, inspectionID)

@@ -6,7 +6,7 @@ import Select from '@/common/components/select/AppSelect'
 import { getUIDesignStateOptions, prepareUIDesignSandboxSource, UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../config/devUIDesign.mjs'
 import designHTML from '../../../../docs/product/ui-design/index.html?raw'
 
-export default function DevUIDesignPreview({ active, page, pageSelector }) {
+export default function DevUIDesignPreview({ active, page }) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewRevision, setPreviewRevision] = useState(0)
   const previewId = `${page}-${previewRevision}`
@@ -24,7 +24,6 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
   )
 
   useEffect(() => {
-    if (!active) return undefined
     setSimulationState((current) => current?.id === previewId ? current : { id: previewId, value: undefined })
     const frame = frameRef.current
     let timeout
@@ -53,16 +52,18 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
         return
       }
       if (
-        document.hidden ||
+        !active || document.hidden ||
         event.data.type !== 'ui-design-preview-status' ||
         !['ready', 'failed'].includes(event.data.status)
       ) return
       finish(event.data.status, event.data.reason)
     }
     window.addEventListener('message', onMessage)
-    document.addEventListener('visibilitychange', check)
-    frame?.addEventListener('load', check)
-    check()
+    if (active) {
+      document.addEventListener('visibilitychange', check)
+      frame?.addEventListener('load', check)
+      check()
+    }
     return () => {
       window.clearTimeout(timeout)
       window.removeEventListener('message', onMessage)
@@ -162,7 +163,6 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
       aria-label={fullscreen ? '交互设计全屏预览' : '最新可交互设计'}
     >
       <div className="erp-dev-ui-design-toolbar">
-        {pageSelector}
         <Space wrap>
           {stateOptions.length ? (
             <Select
@@ -204,8 +204,8 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
           ref={frameRef}
           key={previewId}
           title="ERP 最新可交互设计"
-          tabIndex={previewStatus === 'ready' ? 0 : -1}
-          aria-hidden={previewStatus !== 'ready' || undefined}
+          tabIndex={active && previewStatus === 'ready' ? 0 : -1}
+          aria-hidden={!active || previewStatus !== 'ready' || undefined}
           sandbox="allow-scripts allow-downloads"
           srcDoc={source}
           className="erp-dev-ui-design-frame"

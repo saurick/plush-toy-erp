@@ -502,57 +502,71 @@ test('businessLineItems: shipment SKU and lot options stay inside the selected p
     skuOptions[0],
   ])
   assert.deepEqual(filterShipmentProductSKUOptions(skuOptions, skus, ''), [])
+})
 
-  const lotOptions = [
-    { value: 21, label: 'SKU-A lot' },
-    { value: 22, label: 'SKU-B lot' },
-    { value: 23, label: 'unclassified lot' },
-    { value: 24, label: 'hold lot' },
+test('shipment lot choices require the exact warehouse, unit and SKU with stock ready to ship', () => {
+  const common = {
+    subject_type: 'PRODUCT',
+subject_id: 7,
+product_sku_id: 11,
+warehouse_id: 5,
+unit_id: 2,
+    lot_status: 'ACTIVE',
+ready_to_ship_quantity: '18',
+  }
+  const balances = [
+    { ...common, lot_id: 21 },
+    { ...common, lot_id: 22, warehouse_id: 8 },
+    { ...common, lot_id: 23, product_sku_id: null },
+    { ...common, lot_id: 24, lot_status: 'HOLD' },
+    { ...common, lot_id: 25, ready_to_ship_quantity: '0' },
+    { ...common, lot_id: 26, unit_id: 3 },
   ]
-  const lots = [
-    {
-      id: 21,
-      subject_type: 'PRODUCT',
-      subject_id: 7,
-      product_sku_id: 11,
-      status: 'ACTIVE',
-    },
-    {
-      id: 22,
-      subject_type: 'PRODUCT',
-      subject_id: 7,
-      product_sku_id: 12,
-      status: 'ACTIVE',
-    },
-    {
-      id: 23,
-      subject_type: 'PRODUCT',
-      subject_id: 7,
-      product_sku_id: null,
-      status: 'ACTIVE',
-    },
-    {
-      id: 24,
-      subject_type: 'PRODUCT',
-      subject_id: 7,
-      product_sku_id: 11,
-      status: 'HOLD',
-    },
-  ]
+  const options = balances.map(({ lot_id: value }) => ({ value, label: `LOT-${value}` }))
+  const context = { productID: 7, productSkuID: 11, warehouseID: 5, unitID: 2 }
+  assert.deepEqual(filterShipmentInventoryLotOptions(options, balances, context), [
+    { value: 21, label: 'LOT-21 · 可发 18', available: '18' },
+  ])
   assert.deepEqual(
-    filterShipmentInventoryLotOptions(lotOptions, lots, {
-      productID: 7,
-      productSkuID: 11,
-    }),
-    [lotOptions[0]]
+    filterShipmentInventoryLotOptions(options, balances, { ...context, productSkuID: undefined }).map(({ value }) => value),
+    [23]
   )
-  assert.deepEqual(
-    filterShipmentInventoryLotOptions(lotOptions, lots, {
-      productID: 7,
-      productSkuID: undefined,
-    }),
-    [lotOptions[2]]
-  )
+  assert.deepEqual(filterShipmentInventoryLotOptions(options, balances, { ...context, warehouseID: undefined }), [])
+})
+
+test('shipment lot choices preserve the source line’s own reservation without exposing stock held by others', () => {
+  const balances = [{
+    subject_type: 'PRODUCT',
+subject_id: 7,
+product_sku_id: 11,
+warehouse_id: 5,
+unit_id: 2,
+lot_id: 31,
+    lot_status: 'ACTIVE',
+quantity: '10',
+active_reserved_quantity: '10',
+ready_to_ship_quantity: '0',
+    pending_inspection_quantity: '1',
+pending_packaging_quantity: '2',
+  }]
+  const reservations = [{
+    status: 'ACTIVE',
+sales_order_id: 6,
+sales_order_item_id: 61,
+product_id: 7,
+    product_sku_id: 11,
+warehouse_id: 5,
+unit_id: 2,
+lot_id: 31,
+quantity: '10',
+  }]
+  const options = [{ value: 31, label: 'LOT-31' }]
+  const context = { productID: 7, productSkuID: 11, warehouseID: 5, unitID: 2, reservations }
+  assert.deepEqual(filterShipmentInventoryLotOptions(options, balances, { ...context, salesOrderID: 6, sourceItemID: 61 }), [
+    { value: 31, label: 'LOT-31 · 可发 7', available: '7' },
+  ])
+  assert.deepEqual(filterShipmentInventoryLotOptions(options, balances, { ...context, salesOrderID: 6, sourceItemID: 62 }), [])
+  assert.deepEqual(filterShipmentInventoryLotOptions(options, balances, { ...context, salesOrderID: 8, sourceItemID: 61 }), [])
 })
 
 test('businessLineItems: shipment modal wires source clearing and no longer claims backend quantity validation is missing', () => {

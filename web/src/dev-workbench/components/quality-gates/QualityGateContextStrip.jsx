@@ -21,6 +21,14 @@ export function ContextStrip({
   flat = false,
 }) {
   const blocked = Boolean(summaryError || status?.tone === 'error' || (summary?.environment && !summary.environment.disposableDatabaseReady))
+  const inlineEvidence = view === 'server'
+  const nextStep = status?.recommendation ? `下一步：${status.recommendation}` : null
+  const evidence = !summaryError && (status?.description || status?.notProven?.length) ? (
+    <>
+      {status.description ? <div>{status.description}</div> : null}
+      {status.notProven?.length ? <div>尚未证明：{status.notProven.join('、')}</div> : null}
+    </>
+  ) : null
   const notice = (
     <WorkbenchNotice
       className="erp-dev-quality-status-banner"
@@ -28,13 +36,13 @@ export function ContextStrip({
       title={summaryError ? '质量门禁状态读取失败' : status?.title || '正在读取当前质量状态'}
       description={summaryError
         ? `${summaryError} 请刷新状态；当前数据尚未重新核实。`
-        : status?.recommendation ? `下一步：${status.recommendation}` : null}
-      details={!summaryError && (status?.description || status?.notProven?.length) ? (
-        <>
-          <span>{status.description}</span>
-          {status.notProven?.length ? <span>尚未证明：{status.notProven.join('、')}</span> : null}
-        </>
-      ) : null}
+        : inlineEvidence && summary && evidence ? (
+          <>
+            {nextStep ? <div>{nextStep}</div> : null}
+            {evidence}
+          </>
+        ) : nextStep}
+      details={inlineEvidence ? null : evidence}
     />
   )
   return (

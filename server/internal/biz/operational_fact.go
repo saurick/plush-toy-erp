@@ -157,6 +157,8 @@ type OutsourcingFact struct {
 	Version      int
 	SubjectType  string
 	SubjectID    int
+	SubjectName  string
+	SubjectCode  string
 	ProductSkuID *int
 	// SKUCodeSnapshot is a read projection from the immutable source order line.
 	// It is not persisted on outsourcing_facts and must not be inferred from an ID.

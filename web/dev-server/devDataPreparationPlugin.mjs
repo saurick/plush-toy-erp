@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, open } from 'node:fs/promises'
+import { isIPv4 } from 'node:net'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
@@ -11,9 +12,8 @@ import {
   acquireDataPreparationIdempotencyLock,
   acquireDataPreparationExecutionLock,
   createOrReuseDataPreparationOperation,
-  DATA_PREPARATION_HISTORICAL_SCENARIO_READBACK_BASELINES,
-  DATA_PREPARATION_PROFILE_KEYS,
   DATA_PREPARATION_TARGET_KEYS,
+  DATA_PREPARATION_HISTORICAL_SCENARIO_READBACK_BASELINES,
   DATA_PREPARATION_TERMINAL_STATUSES,
   hashDataPreparationPlan,
   listDataPreparationOperations,
@@ -27,7 +27,7 @@ import {
   resolveDataPreparationOperationStore,
   transitionDataPreparationOperation,
 } from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
-import { projectDataPreparationAcceptancePlan } from '../src/dev-workbench/config/devDataPreparation.mjs'
+import { projectDataPreparationAcceptancePlan, supportsDataPreparationTarget } from '../src/dev-workbench/config/devDataPreparation.mjs'
 import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
 import { createCustomerTrial133DataBackup } from '../../scripts/qa/customer-trial-133-data.mjs'
 import { buildManualAcceptanceBusinessChainReviewPlan } from '../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
@@ -63,7 +63,7 @@ export const MAX_DEV_DATA_PREPARATION_REQUEST_BYTES = 16 * 1024
 
 const execFileAsync = promisify(execFile)
 const IDEMPOTENCY_PATTERN =
-  /^data-preparation:prepare:(core-demo|scenario-demo|full-acceptance):(local-development|customer-trial-133|isolated-local):([0-9a-f-]{36})$/u
+  /^data-preparation:prepare:(scenario-demo|full-acceptance):(local-development|customer-trial-133|isolated-local):([0-9a-f-]{36})$/u
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const OPERATION_PATH_PATTERN = new RegExp(
@@ -72,6 +72,7 @@ const OPERATION_PATH_PATTERN = new RegExp(
 )
 const REGISTERED_DEVELOPMENT_HOST = '192.168.0.133'
 const REGISTERED_DEVELOPMENT_PORT = 5432
+const SCENARIO_DEMO_LOCAL_DATABASE = 'plush_erp'
 const SCENARIO_DEMO_DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION
 const SCENARIO_DEMO_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID
 const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 50
@@ -82,14 +83,6 @@ const DATA_PREPARATION_OPERATION_CONTRACT_KIND =
 const INTERRUPTED_OPERATION_RECOVERY_GRACE_MS = 30_000
 const LOCAL_DEVELOPMENT_TARGET = 'local-development'
 const ISOLATED_LOCAL_TARGET = 'isolated-local'
-const PROFILE_TARGETS = Object.freeze({
-  'core-demo': Object.freeze([LOCAL_DEVELOPMENT_TARGET]),
-  'scenario-demo': Object.freeze([
-    LOCAL_DEVELOPMENT_TARGET,
-    CUSTOMER_TRIAL_133_TARGET,
-  ]),
-  'full-acceptance': Object.freeze([ISOLATED_LOCAL_TARGET]),
-})
 const LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV =
   'LOCAL_ACCEPTANCE_DATABASE_BASE_URL'
 const DATABASE_TARGET_MODULE_URL = pathToFileURL(
@@ -156,7 +149,7 @@ function loadDatabaseTargetModule() {
 export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
   Object.freeze({
     key: 'full-acceptance',
-    title: '按最新业务链完整回归',
+    title: '完整回归',
     purpose: '在新隔离库运行全部已登记业务链、场景合同与现有完整验收生命周期',
     writesDatabase: true,
     dataRetention: 'ephemeral',
@@ -167,18 +160,8 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
     ]),
   }),
   Object.freeze({
-    key: 'core-demo',
-    title: '本地长期基础数据',
-    purpose: '准备演示账号与当前数据合同的标准单位、仓库引用',
-    writesDatabase: true,
-    dataRetention: 'long-lived',
-    cleanupMode: 'not-supported',
-    exactCleanCommitRequired: false,
-    requiredEnvironment: Object.freeze([]),
-  }),
-  Object.freeze({
     key: 'scenario-demo',
-    title: '长期业务场景数据',
+    title: '手测数据',
     purpose:
       '本地开发与 demo-133 分别按固定目标身份，共用当前数据合同精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
     writesDatabase: true,
@@ -223,11 +206,7 @@ export function validateDevDataPreparationAction(value) {
       String(value.payload.idempotencyKey || '')
     )
     if (
-      !DATA_PREPARATION_PROFILE_KEYS.includes(value.payload.profileKey) ||
-      !DATA_PREPARATION_TARGET_KEYS.includes(value.payload.targetKey) ||
-      !PROFILE_TARGETS[value.payload.profileKey]?.includes(
-        value.payload.targetKey
-      ) ||
+      !supportsDataPreparationTarget(value.payload.profileKey, value.payload.targetKey) ||
       idempotency?.[1] !== value.payload.profileKey ||
       idempotency?.[2] !== value.payload.targetKey ||
       !UUID_PATTERN.test(String(idempotency?.[3] || ''))
@@ -289,10 +268,7 @@ export function customerTrialBackupAlias(repository, runId) {
 
 function operationTargetSummary(target, { profileKey, repository, runId }) {
   const customerConfigRevision =
-    target.customerConfigRevision ||
-    (profileKey === 'core-demo'
-      ? 'not-applicable-core-demo'
-      : 'activated-during-lifecycle')
+    target.customerConfigRevision || 'activated-during-lifecycle'
   const migrationVersion =
     target.migrationVersion || 'verified-during-lifecycle'
   const rollbackPoint =
@@ -319,23 +295,10 @@ function operationTargetSummary(target, { profileKey, repository, runId }) {
   })
 }
 
-function isRegisteredDevelopmentDatabaseName(databaseName) {
-  if (databaseName === 'plush_erp') return true
-  if (
-    !databaseName.startsWith('plush_erp_') ||
-    !databaseName.endsWith('_dev')
-  ) {
-    return false
-  }
-  const middle = databaseName.slice('plush_erp_'.length, -'_dev'.length)
-  return /^[a-z0-9_]+$/u.test(middle) && /[a-z0-9]/u.test(middle)
-}
-
-function assertRegisteredDevelopmentTarget(parsed, { coreDemo = false } = {}) {
+function assertRegisteredDevelopmentTarget(parsed) {
   if (
     parsed.host !== REGISTERED_DEVELOPMENT_HOST ||
-    parsed.port !== REGISTERED_DEVELOPMENT_PORT ||
-    (coreDemo && !isRegisteredDevelopmentDatabaseName(parsed.databaseName))
+    parsed.port !== REGISTERED_DEVELOPMENT_PORT
   ) {
     throw new Error('registered development database target is required')
   }
@@ -350,7 +313,7 @@ async function defaultCommandRunner(command, args, options) {
   })
 }
 
-export function coreDemoTargetCommand(projectRoot) {
+export function developmentDatabaseTargetCommand(projectRoot) {
   return Object.freeze({
     command: 'go',
     args: Object.freeze([
@@ -362,57 +325,6 @@ export function coreDemoTargetCommand(projectRoot) {
     options: Object.freeze({
       cwd: path.join(path.resolve(projectRoot), 'server'),
     }),
-  })
-}
-
-export function coreDemoExecutionCommands(projectRoot, databaseName) {
-  const root = path.resolve(projectRoot)
-  const database = String(databaseName || '').trim()
-  if (!isRegisteredDevelopmentDatabaseName(database)) {
-    throw new Error('core demo database is not a registered development target')
-  }
-  const confirmation = [
-    'SEED_SCENARIO_DEMO_CORE_REFERENCES',
-    'scenario-demo',
-    database,
-    MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
-    MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
-  ].join(':')
-  return Object.freeze([
-    Object.freeze({
-      key: 'role-seed',
-      command: 'bash',
-      args: Object.freeze([
-        path.join(root, 'scripts', 'seed-role-demo-admins.sh'),
-      ]),
-      options: Object.freeze({ cwd: root }),
-    }),
-    Object.freeze({
-      key: 'core-seed',
-      command: 'bash',
-      args: Object.freeze([
-        path.join(root, 'scripts', 'seed-core-demo-data.sh'),
-        '--scenario-references',
-        '--expected-database',
-        database,
-        '--confirm',
-        confirmation,
-      ]),
-      options: Object.freeze({ cwd: root }),
-    }),
-  ])
-}
-
-export function coreDemoPreflightCommand(projectRoot) {
-  const root = path.resolve(projectRoot)
-  return Object.freeze({
-    command: process.execPath,
-    args: Object.freeze([
-      path.join(root, 'scripts', 'local-runtime-preflight.mjs'),
-      '--mode',
-      'database',
-    ]),
-    options: Object.freeze({ cwd: root }),
   })
 }
 
@@ -547,86 +459,6 @@ function validateRepositoryIdentity(repository) {
     throw new Error('repository identity is invalid')
   }
   return repository
-}
-
-function parseRoleSeedReadback(stdout) {
-  const match = String(stdout || '').match(
-    /role demo admin seed completed accounts=(\d+)\b/u
-  )
-  const accounts = Number(match?.[1])
-  if (!Number.isSafeInteger(accounts) || accounts < 1) {
-    throw new Error('role seed readback contract did not match')
-  }
-  return accounts
-}
-
-function parseCoreSeedReadback(stdout) {
-  const output = String(stdout || '')
-  const match = output.match(
-    /core demo seed completed prefix=(\S+) units=(\d+) materials=(\d+) products=(\d+) warehouses=(\d+) processes=(\d+) bom_headers=(\d+)\b/u
-  )
-  if (!match || match[1] !== MANUAL_ACCEPTANCE_CORE_CONTRACT.visiblePrefix) {
-    throw new Error('core seed readback contract did not match')
-  }
-  const values = match.slice(2).map(Number)
-  if (
-    values.some((value) => !Number.isSafeInteger(value) || value < 0) ||
-    values[0] !== MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length ||
-    values[3] !== MANUAL_ACCEPTANCE_CORE_CONTRACT.warehouses.length ||
-    values[1] !== 0 ||
-    values[2] !== 0 ||
-    values[4] !== 0 ||
-    values[5] !== 0 ||
-    !/simulated_only=true real_customer_import=false no_direct_fact_posting=true/u.test(
-      output
-    ) ||
-    !/references_only=false scenario_references=true exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0/u.test(
-      output
-    )
-  ) {
-    throw new Error('core seed readback counts are invalid')
-  }
-  return {
-    units: values[0],
-    materials: values[1],
-    products: values[2],
-    warehouses: values[3],
-    processes: values[4],
-    bomHeaders: values[5],
-  }
-}
-
-function corePreflightEvidence(stdout) {
-  const output = String(stdout || '').trim()
-  const migration = output.match(
-    /migration 已是最新版本（([^，\r\n]+)，(\d+)\/(\d+)）/u
-  )
-  if (
-    !/工作区数据库规则检查通过/u.test(output) ||
-    !migration ||
-    migration[2] !== migration[3] ||
-    !/non-system-schema function=0 procedure=0 non-internal-trigger=0/u.test(
-      output
-    )
-  ) {
-    throw new Error('core demo migration preflight contract did not match')
-  }
-  const evidence = {
-    kind: 'plush.dev-data-preparation-core-preflight',
-    migrationVersion: migration[1],
-    appliedFiles: Number(migration[2]),
-    availableFiles: Number(migration[3]),
-    pendingFiles: 0,
-    programmableObjects: {
-      functions: 0,
-      procedures: 0,
-      nonInternalTriggers: 0,
-    },
-  }
-  return Object.freeze({
-    migrationVersion: migration[1],
-    fingerprint: hashDataPreparationPlan(evidence),
-  })
 }
 
 async function fullAcceptancePlanFingerprint(stdout, repository, runId) {
@@ -1159,6 +991,29 @@ export function unresolvedDataPreparationOutcomeBlocksExecution(operation, opera
   return blockingDataPreparationOperations(operation, operations).length > 0
 }
 
+function legacyScenarioTargetsDifferentDevelopmentDatabase(candidate, operation) {
+  const previous = candidate.targetSummary
+  const current = operation.targetSummary
+  if (candidate.profileKey !== 'scenario-demo' || previous.targetKey ||
+    previous.disposable !== false || previous.automaticCleanup !== false ||
+    operation.profileKey !== 'scenario-demo' || current.targetKey !== LOCAL_DEVELOPMENT_TARGET) {
+    return false
+  }
+  // Older receipts stored the connection identity before targetKey existed.
+  const match = /^host=(192\.168\.[0-9.]+) port=(\d+) database=([a-z0-9_]+)$/u.exec(previous.safeTarget)
+  if (!match) return false
+  const [, host, port, database] = match
+  if (!isIPv4(host) || host === REGISTERED_DEVELOPMENT_HOST ||
+    port !== String(REGISTERED_DEVELOPMENT_PORT) || database !== SCENARIO_DEMO_LOCAL_DATABASE) {
+    return false
+  }
+  const hasFingerprint = (targetHost, fingerprint) => ['postgres', 'postgresql'].some((scheme) =>
+    createHash('sha256').update(`${scheme}://${targetHost}:${port}/${database}`).digest('hex') === fingerprint
+  )
+  return hasFingerprint(host, previous.targetFingerprint) &&
+    hasFingerprint(REGISTERED_DEVELOPMENT_HOST, current.targetFingerprint)
+}
+
 function blockingDataPreparationOperations(operation, operations) {
   return operations.filter((candidate) => {
     if (operationContract(candidate).classification === 'historical') {
@@ -1174,6 +1029,9 @@ function blockingDataPreparationOperations(operation, operations) {
       return true
     }
     if (laterScenarioReadbackResolves(candidate, operations)) {
+      return false
+    }
+    if (legacyScenarioTargetsDifferentDevelopmentDatabase(candidate, operation)) {
       return false
     }
     const operationTargetKey =
@@ -1254,29 +1112,6 @@ export function createDevDataPreparationService({
   }
   recoverOrphanedOperations()
 
-  async function readCoreTarget() {
-    const { parseDatabaseURL } = await loadDatabaseTargetModule()
-    const command = coreDemoTargetCommand(root)
-    const result = await commandRunner(command.command, command.args, {
-      ...command.options,
-      env: environment,
-    })
-    const parsed = assertRegisteredDevelopmentTarget(
-      parseDatabaseURL(String(result.stdout || '').trim(), {
-        allowRegisteredDevelopment: true,
-      }),
-      { coreDemo: true }
-    )
-    return Object.freeze({
-      ...targetSummary(parsed, {
-        targetKey: LOCAL_DEVELOPMENT_TARGET,
-        disposable: false,
-        automaticCleanup: false,
-      }),
-      databaseName: parsed.databaseName,
-    })
-  }
-
   async function readFullAcceptanceTarget() {
     const { parseDatabaseURL } = await loadDatabaseTargetModule()
     const value = String(
@@ -1301,7 +1136,7 @@ export function createDevDataPreparationService({
   async function readScenarioTargetIdentity() {
     const { classifyDatabaseName, parseDatabaseURL } =
       await loadDatabaseTargetModule()
-    const command = coreDemoTargetCommand(root)
+    const command = developmentDatabaseTargetCommand(root)
     const result = await commandRunner(command.command, command.args, {
       ...command.options,
       env: environment,
@@ -1313,7 +1148,7 @@ export function createDevDataPreparationService({
     )
     const classification = classifyDatabaseName(parsed.databaseName)
     if (
-      parsed.databaseName !== 'plush_erp' ||
+      parsed.databaseName !== SCENARIO_DEMO_LOCAL_DATABASE ||
       classification.disposable ||
       classification.profile !== 'development'
     ) {
@@ -1329,10 +1164,6 @@ export function createDevDataPreparationService({
         automaticCleanup: false,
       }),
     })
-  }
-
-  async function readScenarioTarget() {
-    return (await readScenarioTargetIdentity()).summary
   }
 
   function assertCustomerTrialPreflight(report, repository) {
@@ -1427,39 +1258,12 @@ export function createDevDataPreparationService({
     })
   }
 
-  async function resolveTarget(profileKey, targetKey) {
-    if (profileKey === 'core-demo') return readCoreTarget()
-    if (profileKey === 'scenario-demo') {
-      if (targetKey === LOCAL_DEVELOPMENT_TARGET) return readScenarioTarget()
-      throw new Error('customer-trial-133 requires authoritative prepare')
-    }
-    return readFullAcceptanceTarget()
-  }
-
   async function resolvePreparedTarget(
     profileKey,
     targetKey,
     repository,
     runId
   ) {
-    if (profileKey === 'core-demo') {
-      const before = await readCoreTarget()
-      const command = coreDemoPreflightCommand(root)
-      const result = await commandRunner(command.command, command.args, {
-        ...command.options,
-        env: environment,
-      })
-      const after = await readCoreTarget()
-      if (after.targetFingerprint !== before.targetFingerprint) {
-        throw new Error('core demo target changed during migration preflight')
-      }
-      const preflight = corePreflightEvidence(result.stdout)
-      return Object.freeze({
-        ...after,
-        preflightFingerprint: preflight.fingerprint,
-        migrationVersion: preflight.migrationVersion,
-      })
-    }
     if (
       profileKey === 'scenario-demo' &&
       targetKey === LOCAL_DEVELOPMENT_TARGET
@@ -1571,7 +1375,6 @@ export function createDevDataPreparationService({
       },
     }
     for (const [key, profileKey, targetKey, prepareTarget] of [
-      ['coreDemo', 'core-demo', LOCAL_DEVELOPMENT_TARGET, true],
       ['scenarioDemo', 'scenario-demo', LOCAL_DEVELOPMENT_TARGET, true],
       ['fullAcceptance', 'full-acceptance', ISOLATED_LOCAL_TARGET, false],
     ]) {
@@ -1583,7 +1386,7 @@ export function createDevDataPreparationService({
               repositoryResult,
               'summary'
             )
-          : await resolveTarget(profileKey, targetKey)
+          : await readFullAcceptanceTarget()
         target[key] = {
           status: 'available',
           safeTarget: resolved.safeTarget,
@@ -1609,11 +1412,9 @@ export function createDevDataPreparationService({
           code: `${profileKey.replace(/-/gu, '_')}_target_unavailable`,
           severity: 'blocked',
           message:
-            profileKey === 'core-demo'
-              ? '核心演示数据库目标或 migration 前置未通过'
-              : profileKey === 'scenario-demo'
-                ? '长期场景数据的共享库、migration、运行态或客户配置前置未通过'
-                : '完整验收数据库环境未配置或不属于登记开发目标',
+            profileKey === 'scenario-demo'
+              ? '本地开发库、迁移或后端服务未通过检查。'
+              : '本地临时数据库未配置或不属于登记开发目标。',
         })
       }
     }
@@ -1925,49 +1726,6 @@ severity: 'blocked',
     return currentTarget
   }
 
-  async function runCoreDemo(operation) {
-    const outputs = new Map()
-    const completed = []
-    for (const command of coreDemoExecutionCommands(
-      root,
-      operation.targetSummary.databaseName
-    )) {
-      try {
-        const result = await commandRunner(command.command, command.args, {
-          ...command.options,
-          env: environment,
-        })
-        outputs.set(command.key, String(result.stdout || ''))
-        completed.push(command.key)
-      } catch (error) {
-        const stage =
-          command.key === 'role-seed' ? '角色账号' : '标准单位与仓库'
-        const partial =
-          completed.length > 0
-            ? `；已完成 ${completed.join('、')}，目标可能已部分更新，禁止按全量成功使用`
-            : ''
-        throw new Error(`${stage}固定步骤失败${partial}；${redactError(error)}`)
-      }
-    }
-    const targetReadback = await readCoreTarget()
-    if (
-      targetReadback.targetFingerprint !==
-      operation.targetSummary.targetFingerprint
-    ) {
-      throw new Error('core demo target readback changed')
-    }
-    return {
-      schemaVersion: 'plush.dev-data-preparation-readback/v1',
-      profileKey: 'core-demo',
-      targetFingerprint: targetReadback.targetFingerprint,
-      preflight: 'passed',
-      roleAccounts: parseRoleSeedReadback(outputs.get('role-seed')),
-      core: parseCoreSeedReadback(outputs.get('core-seed')),
-      stableUpsert: true,
-      cleanupSupported: false,
-    }
-  }
-
   async function runFullAcceptance(operation) {
     const command = await fullAcceptanceExecutionCommand(root, operation)
     let commandError = null
@@ -2086,6 +1844,9 @@ severity: 'blocked',
     if (!isCurrentPublicOperation(operation)) {
       throw new Error('data preparation operation contract is not current')
     }
+    if (!supportsDataPreparationTarget(operation.profileKey, operation.targetSummary.targetKey)) {
+      throw new Error('data preparation operation is read-only or has an invalid target')
+    }
     const persistedOperations = listDataPreparationOperations(store, {
       limit: 200,
     })
@@ -2143,11 +1904,9 @@ severity: 'blocked',
           now: now().toISOString(),
         })
         const readback =
-          operation.profileKey === 'core-demo'
-            ? await runCoreDemo(operation)
-            : operation.profileKey === 'scenario-demo'
-              ? await runScenarioDemo(operation, executionTarget)
-              : await runFullAcceptance(operation)
+          operation.profileKey === 'scenario-demo'
+            ? await runScenarioDemo(operation, executionTarget)
+            : await runFullAcceptance(operation)
         transitionDataPreparationOperation(store, operation.id, {
           status: 'passed',
           message: 'fixed profile execution and readback passed',

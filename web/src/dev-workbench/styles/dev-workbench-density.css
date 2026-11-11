@@ -248,8 +248,7 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
 .erp-dev-workspace-page
   :is(
     .erp-dev-version-summary,
-    .erp-dev-database-migration-summary,
-    .erp-dev-data-preflight
+    .erp-dev-database-migration-summary
   ) {
   gap: var(--dev-workbench-section-gap);
 }
@@ -283,9 +282,7 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   .erp-dev-fulfillment-guide,
   .erp-dev-fulfillment-guide__body,
   .erp-dev-fulfillment-guide__result,
-  .erp-dev-fulfillment-guide__detail-content,
-  .erp-dev-skills__catalog,
-  .erp-dev-skills__detail
+  .erp-dev-fulfillment-guide__detail-content
 ) {
   row-gap: var(--dev-workbench-section-gap);
 }
@@ -304,8 +301,7 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   .erp-dev-flow-main,
   .erp-dev-fulfillment-guide,
   .erp-dev-fulfillment-guide__result,
-  .erp-dev-customer-panel,
-  .erp-dev-skills__detail
+  .erp-dev-customer-panel
 ) {
   padding: var(--dev-workbench-panel-padding);
 }

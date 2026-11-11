@@ -51,6 +51,8 @@ import {
   CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  SCENARIO_DEMO_TARGET,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
@@ -59,6 +61,24 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 const NOW_SEC = 1_800_000_000;
+
+test("local handtest engineering status fixtures do not imply a product association", () => {
+  const plan = buildManualAcceptanceTaskDataPlan({
+    target: SCENARIO_DEMO_TARGET,
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
+    databaseName: "plush_erp",
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+    nowSec: NOW_SEC,
+  });
+  const engineering = plan.tasks.filter((task) => task.roleKey === "engineering");
+  assert.equal(engineering.length, TASKS_PER_ROLE);
+  assert.ok(engineering.every(({ createParams }) =>
+    createParams.source_id === null &&
+    !Object.hasOwn(createParams.payload, "product_name") &&
+    !Object.hasOwn(createParams.payload, "style_no")));
+  assert.equal(new Set(engineering.map(({ scenarioKey }) => scenarioKey)).size, 5);
+});
 
 test("process runtime count uses distinct verified instances rather than roles or display tasks", () => {
   const started = {
@@ -365,7 +385,7 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
     });
     assert.equal(request.redirect, "error");
     assert.ok(actorRole, `${domain}.${body.method} must be authenticated`);
-    if (domain === "workflow") {
+    if (domain === "workflow" || domain === "sales_order") {
       assert.equal(
         Object.hasOwn(params, "customer_key"),
         false,
@@ -373,6 +393,19 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
       );
     } else {
       assert.equal(params.customer_key, "yoyoosun");
+    }
+
+    if (domain === "sales_order" && body.method === "get_sales_order") {
+      assert.equal(actorRole, "sales");
+      const source = sources.find((candidate) => candidate.id === params.id);
+      assert.ok(source);
+      const record = records.get(source.id);
+      const status = record?.nodes[0].status !== "completed"
+        ? source.status
+        : record.nodes.some((node) => node.node_key === "sales_order_rejected_end")
+          ? "CANCELED"
+          : record.processStatus === "completed" ? "ACTIVE" : "SUBMITTED";
+      return jsonResponse({ sales_order: { id: source.id, order_no: source.orderNo, lifecycle_status: status } });
     }
 
     if (
@@ -671,13 +704,9 @@ test("runtime evidence advances five simulated sales orders through the formal p
     false,
   );
 
-  const replaySources = sources.map((source, index) => ({
-    ...source,
-    status: ["DRAFT", "SUBMITTED", "SUBMITTED", "CANCELED", "ACTIVE"][index],
-  }));
   const replay = await applySalesOrderAcceptanceRuntimeEvidence({
     plan,
-    sources: replaySources,
+    sources,
     accounts: {
       sales: { token: "token-sales" },
       boss: { token: "token-boss" },
@@ -691,6 +720,7 @@ test("runtime evidence advances five simulated sales orders through the formal p
     replay.map((item) => item.caseKey),
     ["started_only", "active_ready", "task_blocked", "rejected", "completed"],
   );
+  assert.deepEqual(replay.map((item) => item.source.status), ["DRAFT", "SUBMITTED", "SUBMITTED", "CANCELED", "ACTIVE"]);
   assert.equal(
     replay.find((item) => item.caseKey === "rejected")?.processContext
       ?.process_instance?.status,
@@ -2041,7 +2071,7 @@ test("applies and safely resumes the 810-task batch through current CAS action c
   assert.deepEqual(mock.counts(), countsBeforeReplay);
 });
 
-test("long-lived workbench reuses its immutable batch across Scenario run upgrades", async () => {
+test("long-lived workbench retains its old retirement scope but rejects preparing tasks without sources", async () => {
   const previousPlan = buildLocalTaskMutationPlan({
     runId: LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
     dataVersion: "2026.11.07-v9",
@@ -2054,35 +2084,21 @@ test("long-lived workbench reuses its immutable batch across Scenario run upgrad
     nowSec: NOW_SEC + 86_400,
     taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
   });
-  const mock = createMockRuntime();
-  previousPlan.tasks.forEach((task) =>
-    mock.seedPlannedTask(previousPlan, task, { final: true }),
-  );
-
-  const report = await applyManualAcceptanceTaskData(
+  assert.equal(currentPlan.batchRunId, LONG_LIVED_WORKBENCH_BATCH_RUN_ID);
+  assert.equal(currentPlan.sourceID, previousPlan.sourceID);
+  assert.deepEqual(currentPlan.tasks.map((task) => task.createParams.task_code),
+    previousPlan.tasks.map((task) => task.createParams.task_code));
+  let requests = 0;
+  await assert.rejects(() => applyManualAcceptanceTaskData(
     currentPlan,
     localTaskMutationOptions(currentPlan, {
       confirmPhrase: CONFIRM_PHRASE,
       password: "local-password",
       adminPassword: "admin-password",
-      fetchImpl: mock.fetchImpl,
+      fetchImpl: async () => { requests++; throw new Error("unexpected request"); },
     }),
-  );
-
-  assert.equal(report.runId, currentPlan.runId);
-  assert.equal(report.batchRunId, LONG_LIVED_WORKBENCH_BATCH_RUN_ID);
-  assert.equal(report.sourceID, previousPlan.sourceID);
-  assert.equal(report.summary.persisted, TOTAL_TASKS);
-  assert.equal(report.summary.created, 0);
-  assert.equal(report.summary.resumed, 0);
-  assert.equal(report.summary.reusedFinal, TOTAL_TASKS);
-  assert.equal(report.summary.actionsApplied, 0);
-  assert.equal(report.scheduleBinding.source, "persisted_batch_readback");
-  assert.equal(
-    report.scheduleBinding.effectiveAnchorUtc,
-    previousPlan.schedule.anchorUtc,
-  );
-  assert.deepEqual(mock.counts(), { createCount: 0, actionCount: 0 });
+  ), /必须使用同批业务单据报告/u);
+  assert.equal(requests, 0);
 });
 
 test("rejects an exact task batch whose persisted due dates imply multiple anchors", async () => {

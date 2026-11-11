@@ -1261,6 +1261,10 @@
   overflow: visible;
 }
 
+.erp-business-date-range-filter--inline-types {
+  flex-wrap: wrap;
+}
+
 .erp-business-date-range-filter__type.ant-select,
 :where(.erp-business-date-range-filter__type.ant-select) .ant-select-selector {
   flex: 0 0 132px;

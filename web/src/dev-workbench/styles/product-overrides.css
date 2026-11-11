@@ -411,7 +411,6 @@
   .erp-dev-customer-quick-actions,
   .erp-dev-customer-review-list,
   .erp-dev-customer-source-ref-list,
-  .erp-dev-customer-dry-run-metrics,
   .erp-dev-customer-test-apply-steps,
   .erp-dev-customer-test-apply-facts,
   .erp-dev-customer-release-facts {
@@ -454,19 +453,11 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-customer-asset-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .erp-dev-customer-diff {
     grid-template-columns: 1fr;
   }
 
   .erp-dev-customer-review-item {
-    grid-template-columns: 1fr;
-  }
-
-  .erp-dev-customer-numbering {
     grid-template-columns: 1fr;
   }
 }
@@ -550,9 +541,6 @@
   .erp-dev-customer-page *,
   .erp-dev-customer-panel-grid,
   .erp-dev-customer-panel,
-  .erp-dev-customer-menu-group,
-  .erp-dev-customer-field,
-  .erp-dev-customer-numbering,
   .erp-dev-customer-review-item,
   .erp-dev-customer-source-ref,
   .erp-dev-customer-guard,
@@ -567,11 +555,8 @@
   }
 
   .erp-dev-customer-import-flow,
-  .erp-dev-customer-db-targets,
   .erp-dev-customer-review-list,
   .erp-dev-customer-source-ref-list,
-  .erp-dev-customer-asset-grid,
-  .erp-dev-customer-dry-run-metrics,
   .erp-dev-customer-test-apply-steps,
   .erp-dev-customer-test-apply-facts,
   .erp-dev-customer-release-facts {
@@ -600,16 +585,12 @@
   }
 
   .erp-dev-customer-panel__head,
-  .erp-dev-customer-menu-group__title,
   .erp-dev-customer-review-item__head,
   .erp-dev-customer-source-ref,
-  .erp-dev-customer-field__head,
   .erp-dev-customer-tool__head,
   .erp-dev-customer-import-step__head,
-  .erp-dev-customer-db-target__head,
   .erp-dev-customer-formal-gate,
   .erp-dev-customer-guard,
-  .erp-dev-customer-asset__top,
   .erp-dev-customer-diff__type,
   .erp-dev-customer-import-flags > div {
     align-items: flex-start;
@@ -620,14 +601,8 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-customer-db-target__body {
-    grid-template-columns: 1fr;
-  }
-
   .erp-dev-customer-panel__head :where(.ant-typography),
-  .erp-dev-customer-menu-group__title :where(.ant-typography),
   .erp-dev-customer-review-item__head :where(.ant-typography),
-  .erp-dev-customer-field__head :where(.ant-typography),
   .erp-dev-customer-tool__head :where(.ant-typography) {
     max-width: 100%;
     overflow-wrap: anywhere;
@@ -774,13 +749,10 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-title.ant-typography,
-[data-erp-theme='dark'] .erp-dev-customer-asset__value,
 [data-erp-theme='dark'] .erp-dev-customer-diff strong,
 [data-erp-theme='dark'] .erp-dev-customer-panel__head,
-[data-erp-theme='dark'] .erp-dev-customer-menu-group__title,
 [data-erp-theme='dark'] .erp-dev-customer-review-item__head,
 [data-erp-theme='dark'] .erp-dev-customer-source-ref,
-[data-erp-theme='dark'] .erp-dev-customer-field__head,
 [data-erp-theme='dark'] .erp-dev-customer-tool__head {
   color: var(--erp-text);
 }
@@ -788,25 +760,18 @@
 [data-erp-theme='dark'] .erp-dev-customer-summary,
 [data-erp-theme='dark'] .erp-dev-customer-selector__note.ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-quick-action__copy small,
-[data-erp-theme='dark'] .erp-dev-customer-field__key,
 [data-erp-theme='dark'] .erp-dev-customer-review-item__path,
-[data-erp-theme='dark'] .erp-dev-customer-field .ant-typography,
-[data-erp-theme='dark'] .erp-dev-customer-numbering .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-review-item .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-source-ref .ant-typography,
-[data-erp-theme='dark'] .erp-dev-customer-asset__value small,
 [data-erp-theme='dark'] .erp-dev-customer-diff .ant-typography {
   color: var(--erp-text-muted);
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-import-step,
-[data-erp-theme='dark'] .erp-dev-customer-db-target,
 [data-erp-theme='dark'] .erp-dev-customer-formal-gate,
-[data-erp-theme='dark'] .erp-dev-customer-dry-run-metrics > div,
 [data-erp-theme='dark'] .erp-dev-customer-dry-run-paths,
 [data-erp-theme='dark'] .erp-dev-customer-test-apply-step,
 [data-erp-theme='dark'] .erp-dev-customer-test-apply-facts > div,
-[data-erp-theme='dark'] .erp-dev-customer-test-apply-session,
 [data-erp-theme='dark'] .erp-dev-customer-release-missing,
 [data-erp-theme='dark'] .erp-dev-customer-release-facts > div {
   border-color: var(--erp-border);
@@ -821,13 +786,10 @@
 
 [data-erp-theme='dark'] .erp-dev-customer-import-hero__copy .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-import-step .ant-typography,
-[data-erp-theme='dark'] .erp-dev-customer-db-target .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-formal-gate .ant-typography,
-[data-erp-theme='dark'] .erp-dev-customer-dry-run-metrics .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-dry-run-paths .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-test-apply-step .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-test-apply-facts .ant-typography,
-[data-erp-theme='dark'] .erp-dev-customer-test-apply-session .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-release-missing .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-release-facts .ant-typography,
 [data-erp-theme='dark'] .erp-dev-customer-release-primary .ant-typography {
@@ -838,26 +800,15 @@
   .erp-dev-customer-import-hero__copy
   .ant-typography-strong,
 [data-erp-theme='dark'] .erp-dev-customer-import-step strong,
-[data-erp-theme='dark'] .erp-dev-customer-db-target strong,
 [data-erp-theme='dark'] .erp-dev-customer-formal-gate strong,
-[data-erp-theme='dark'] .erp-dev-customer-dry-run-metrics strong,
 [data-erp-theme='dark'] .erp-dev-customer-test-apply-facts strong,
 [data-erp-theme='dark'] .erp-dev-customer-release-facts strong {
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-dev-customer-dry-run-report {
-  border-color: var(--erp-border);
-  background: var(--erp-surface-bg-soft);
-  color: var(--erp-text);
-}
-
-[data-erp-theme='dark'] .erp-dev-customer-field,
-[data-erp-theme='dark'] .erp-dev-customer-numbering,
 [data-erp-theme='dark'] .erp-dev-customer-review-item,
 [data-erp-theme='dark'] .erp-dev-customer-source-ref,
 [data-erp-theme='dark'] .erp-dev-customer-tool,
-[data-erp-theme='dark'] .erp-dev-customer-menu-group,
 [data-erp-theme='dark'] .erp-dev-customer-guard,
 [data-erp-theme='dark'] .erp-dev-customer-asset,
 [data-erp-theme='dark'] .erp-dev-customer-diff,

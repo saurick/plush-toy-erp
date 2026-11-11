@@ -26,20 +26,21 @@ const visibleKeys = (columns) =>
     buildDefaultModuleHiddenColumns(columns)
   ).map(getModuleColumnKey)
 
-test('shipment defaults keep recipient, approval, weight and instructions while optional logistics remain exportable', () => {
+test('shipment defaults show tracking and keep supplementary fields available for export', () => {
   const visible = visibleKeys(shipmentColumns)
   for (const key of [
     'shipment_no',
     'status',
     'finance_release_status',
     'sales_order_id',
+    'transport',
     'delivery_snapshot',
     'total_net_weight_g',
     'note',
   ]) {
     assert.ok(visible.includes(key), `出货默认保留 ${key}`)
   }
-  for (const key of ['transport', 'package_summary', 'freight']) {
+  for (const key of ['package_summary', 'freight']) {
     const column = shipmentColumns.find(
       (entry) => getModuleColumnKey(entry) === key
     )

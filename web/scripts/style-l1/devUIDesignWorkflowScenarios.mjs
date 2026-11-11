@@ -5,7 +5,6 @@ import { readFile } from 'node:fs/promises'
 import { prepareUIDesignSandboxSource } from '../../src/dev-workbench/config/devUIDesign.mjs'
 import { ERP_DARK_PALETTE } from '../../src/common/theme/erpThemePalette.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
-import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { createDevTaskGovernanceScenarios } from './devTaskGovernanceScenarios.mjs'
 import { createDevRoleFlowScenarios } from './devRoleFlowScenarios.mjs'
 import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
@@ -693,9 +692,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
       verify: async (page) => {
         page.setDefaultTimeout(8000)
         await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
-        await page.getByText('任务处理', { exact: true }).waitFor()
-        await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-page > .erp-dev-workbench-toolbar .erp-sliding-tabs', 1)
-        await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-page > .erp-dev-workbench-toolbar .erp-sliding-tabs', 0, true)
+        assert.equal(await page.getByLabel('设计预览界面', { exact: true }).getByRole('radio', { name: '桌面 ERP' }).isChecked(), true)
         await page.frameLocator('iframe[title="ERP 最新可交互设计"]').locator('.task-handling-board').waitFor()
         await page.screenshot({ path: path.join(outputDir, 'task-handling-workbench-4k.png'), scale: 'device' })
         await page.getByRole('button', { name: /全屏预览/ }).click()

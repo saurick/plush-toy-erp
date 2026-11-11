@@ -136,7 +136,7 @@ function renderStackCell(primary, secondaryItems = []) {
   )
 }
 
-function inspectorLabel(record, { emptyText = '-' } = {}) {
+function inspectorLabel(record, { emptyText = '—' } = {}) {
   return record?.inspector_name || (record?.inspector_id ? '姓名待核对' : emptyText)
 }
 
@@ -169,7 +169,7 @@ function productionWipProductLabel(record, options) {
   return [
     visibleBusinessText(record?.product_code, options),
     visibleBusinessText(record?.product_name, options),
-  ].filter(Boolean).join(' ')
+  ].filter(Boolean).join(' / ')
 }
 
 function productionWipSourceParts(record, options) {
@@ -181,13 +181,15 @@ function productionWipSourceParts(record, options) {
 }
 
 function productionWipSubjectParts(record, options) {
-  const batch = visibleBusinessText(record?.wip_batch_no, options)
   const quantity = visibleBusinessText(record?.batch_quantity, options)
   return [
     productionWipProductLabel(record, options),
-    batch && `在制批次：${batch}`,
     quantity && `批次数量：${quantity}`,
   ]
+}
+
+function productionWipBatchLabel(record, options) {
+  return visibleBusinessText(record?.wip_batch_no, options)
 }
 
 function qualityDefectRateText(record, options) {
@@ -261,7 +263,6 @@ function subjectLabel(record, materialOptions, productOptions, options) {
 
 function subjectParts(
   record,
-  inventoryLotOptions,
   materialOptions,
   productOptions,
   warehouseOptions,
@@ -272,7 +273,6 @@ function subjectParts(
   }
   return [
     subjectLabel(record, materialOptions, productOptions, options),
-    referenceLabel(inventoryLotOptions, record?.inventory_lot_id, '批次', options),
     referenceLabel(warehouseOptions, record?.warehouse_id, '仓库', options),
     record?.original_lot_status
       ? `原批次状态 ${lotStatusText(record.original_lot_status)}`
@@ -441,7 +441,6 @@ export function buildQualityInspectionDataColumns({
   const renderSubject = (record) => {
     const [subject, ...secondary] = subjectParts(
       record,
-      inventoryLotOptions,
       materialOptions,
       productOptions,
       warehouseOptions
@@ -509,6 +508,7 @@ export function buildQualityInspectionDataColumns({
       exportTitle: '检验来源',
       dataIndex: 'inspection_type',
       width: 240,
+      widthGrow: 1,
       render: (_value, record) =>
         renderStackCell(
           inspectionTypeLabel(record),
@@ -531,38 +531,32 @@ export function buildQualityInspectionDataColumns({
       exportTitle: '产品 / 材料 / 在制品',
       dataIndex: 'subject_type',
       width: 260,
+      widthGrow: 2,
       className: 'erp-product-identity-cell',
       render: (_value, record) => renderSubject(record),
       detailLabel: (record) => businessSubjectLabel(qualityInspectionSubjectType(record), '检验对象'),
       detailValue: renderSubject,
       exportValue: (record) =>
-        subjectParts(record, inventoryLotOptions, materialOptions, productOptions, warehouseOptions, { emptyText: '' })
+        subjectParts(record, materialOptions, productOptions, warehouseOptions, { emptyText: '' })
           .filter(Boolean)
           .join(' '),
     },
     {
       align: 'left',
       defaultPriority: 70,
-      title: '检验信息',
-      exportTitle: '检验信息',
+      title: '检验日期',
       dataIndex: 'inspected_at',
-      width: 180,
+      width: 128,
       sortType: 'date',
-      render: (_value, record) =>
-        renderStackCell(formatUnixDate(record?.inspected_at), [
-          qualityInspectorText(record),
-        ]),
-      exportValue: (record) =>
-        [formatUnixDate(record?.inspected_at, { emptyText: '' }), qualityInspectorText(record, { emptyText: '' })]
-          .filter(Boolean)
-          .join(' '),
+      render: (value) => formatUnixDate(value, { emptyText: '—' }),
+      exportValue: (record) => formatUnixDate(record?.inspected_at, { emptyText: '' }),
     },
     {
       align: 'left',
       title: '判定备注',
       exportTitle: '判定备注',
       dataIndex: 'decision_note',
-      width: 300,
+      width: 220,
       render: (_value, record) => qualityRemarkText(record),
       exportValue: (record) => qualityRemarkText(record, { emptyText: '' }),
     },
@@ -582,6 +576,32 @@ export function buildQualityInspectionDataColumns({
           'inspector_id',
         ].includes(column.dataIndex)
       )
-      .map((column) => ({ ...column, defaultHidden: true, detailHidden: true })),
+      .map((column) => {
+        if (column.dataIndex === 'inventory_lot_id') {
+          const batchLabel = (record, options) =>
+            isProductionStageQualityInspection(record)
+              ? productionWipBatchLabel(record, options)
+              : referenceLabel(inventoryLotOptions, record?.inventory_lot_id, '批次', options)
+          return {
+            ...column,
+            defaultPriority: 45,
+            width: 170,
+            sortType: 'text',
+            sortValue: (record) => batchLabel(record, { emptyText: '' }),
+            render: (_value, record) => batchLabel(record, { emptyText: '—' }),
+            exportValue: (record) => batchLabel(record, { emptyText: '' }),
+          }
+        }
+        if (column.dataIndex === 'inspector_id') {
+          return {
+            ...column,
+            defaultPriority: 80,
+            width: 120,
+            sortType: 'text',
+            sortValue: (record) => qualityInspectorText(record, { emptyText: '' }),
+          }
+        }
+        return { ...column, defaultHidden: true, detailHidden: true }
+      }),
   ])
 }

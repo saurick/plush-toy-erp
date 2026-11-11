@@ -1,6 +1,7 @@
 import React from 'react'
 import { CalendarOutlined } from '@ant-design/icons'
 import { Button, DatePicker, Form } from 'antd'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup'
 import Select from '@/common/components/select/AppSelect'
 import {
   DATE_INPUT_DISPLAY_FORMAT,
@@ -311,6 +312,7 @@ export const DateTimeInput = React.forwardRef((props, ref) => (
 
 export function DateRangeFilter({
   options = [],
+  typePresentation = 'select',
   value,
   onTypeChange,
   startValue,
@@ -319,6 +321,7 @@ export function DateRangeFilter({
   onEndChange,
 }) {
   const hasMultipleDateTypes = options.length > 1
+  const showInlineTypes = hasMultipleDateTypes && typePresentation === 'inline'
   const selectedDateTypeLabel =
     options.find((option) => option.value === value)?.label || options[0]?.label
   const rangeInvalid = isDateInputRangeReversed(startValue, endValue)
@@ -334,12 +337,20 @@ export function DateRangeFilter({
     <div
       className={joinClassNames(
         'erp-business-filter-control erp-business-date-range-filter erp-business-module-date-filter',
+        showInlineTypes ? 'erp-business-date-range-filter--inline-types' : '',
         rangeInvalid ? 'erp-business-date-range-filter--invalid' : ''
       )}
       role="group"
       aria-label={selectedDateTypeLabel || '日期范围'}
     >
-      {hasMultipleDateTypes ? (
+      {showInlineTypes ? (
+        <FilterChipGroup
+          aria-label="日期类型"
+          options={options}
+          value={value}
+          onChange={onTypeChange}
+        />
+      ) : hasMultipleDateTypes ? (
         <Select
           allowClear={false /* 不可清空：起止日期必须绑定明确的日期字段，清除日期范围使用日期输入框。 */}
           label="日期类型"
@@ -362,6 +373,9 @@ export function DateRangeFilter({
         </span>
       ) : null}
       <div className="erp-business-date-range-filter__range">
+        {showInlineTypes ? (
+          <span className="erp-business-date-range-filter__separator" aria-hidden="true">从</span>
+        ) : null}
         <DateInput
           aria-label="开始日期"
           className="erp-business-date-range-filter__date"

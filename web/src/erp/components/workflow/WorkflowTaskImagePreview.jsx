@@ -16,7 +16,10 @@ import { canRestoreOverlayFocus } from '@/common/components/overlay/OverlayScope
 import './workflowTaskImagePreview.css'
 import { isUsableImageDimensions } from '../../utils/imageDisplay.mjs'
 import { listProductImages } from '../../api/attachmentApi.mjs'
-import { selectSavedProductImages } from '../../utils/productImageSlots.mjs'
+import {
+  selectSavedProductImages,
+  selectSavedSupplementalProductImages,
+} from '../../utils/productImageSlots.mjs'
 import { PRODUCT_IMAGES_CHANGED } from '../../utils/productImageReferences.mjs'
 import { RpcErrorCode } from '@/common/consts/errorCodes'
 
@@ -42,18 +45,30 @@ export default function WorkflowTaskImagePreview({
   const focusClose = useCallback((node) => node?.focus({ preventScroll: true }), [])
   const selected = gallery?.products[productIndex] || item
   const { productID } = selected
-  const metadataKey = `${productID}:${mediaRevision}`
+  const galleryEnabled = Boolean(gallery || (!source && productID > 0 && item.imageAttachmentID > 0))
+  const metadataKey = `${productID}:${gallery ? 0 : item.imageAttachmentID || 0}:${mediaRevision}`
   const currentMetadata = metadata?.key === metadataKey ? metadata : null
   const photos = currentMetadata?.photos || []
   const selectedPhoto = photos[photoIndex] || photos[0]
-  const attachmentID = gallery ? selectedPhoto?.id || 0 : item.imageAttachmentID
+  const attachmentID = currentMetadata?.state === 'ready'
+    ? selectedPhoto?.id || 0
+    : gallery ? 0 : item.imageAttachmentID
+  const blockedAlbum = galleryEnabled && !attachmentID
   const resourceKey = `${productID}:${attachmentID}:${attempt}`
   const original = source || (resource?.key === resourceKey ? resource.src : '')
   const failed = resource?.key === resourceKey && resource.failed
   const denied = resource?.key === resourceKey && resource.denied
   const name = selected.name || '产品主图'
-  const galleryEnabled = Boolean(gallery)
   const productCount = gallery?.products.length || 0
+  const retryAlbum = Boolean(attachmentID && currentMetadata?.state === 'failed')
+  const showPhotoControls = galleryEnabled && (productCount > 1 || photos.length > 1 || retryAlbum)
+  const photoLabel = selectedPhoto
+    ? `${selectedPhoto.label} · ${photoIndex + 1} / ${photos.length} 张`
+    : ({
+      ready: '暂无图片',
+      denied: '无相册查看权限',
+      failed: '相册读取失败',
+    }[currentMetadata?.state] || '正在读取图片')
 
   useEffect(() => {
     const strip = toolbar?.querySelector('.erp-product-gallery-preview__products')
@@ -78,10 +93,13 @@ export default function WorkflowTaskImagePreview({
     listProductImages({ product_id: productID })
       .then((attachments) => {
         if (!active) return
-        const saved = selectSavedProductImages(attachments)
-        const rows = Object.entries(saved).filter(([, image]) => image && image.owner_type === 'product' && image.owner_id === productID)
+        const owned = attachments.filter((image) => image.owner_type === 'product' && image.owner_id === productID && !image.withdrawn_at)
+        const saved = selectSavedProductImages(owned)
+        const slots = Object.entries(saved).filter(([, image]) => image)
           .map(([slot, image]) => ({ id: image.id, label: slot === 'primary' ? '主图' : '辅图' }))
-        setMetadata({ key: metadataKey, photos: rows, state: 'ready' })
+        const supplemental = selectSavedSupplementalProductImages(owned)
+          .map((image, index) => ({ id: image.id, label: `附图 ${index + 1}` }))
+        setMetadata({ key: metadataKey, photos: [...slots, ...supplemental], state: 'ready' })
       })
       .catch((error) => {
         if (active) setMetadata({ key: metadataKey, photos: [], state: Number(error?.code) === RpcErrorCode.PERMISSION_DENIED ? 'denied' : 'failed' })
@@ -125,6 +143,7 @@ export default function WorkflowTaskImagePreview({
         <div className="erp-task-image-preview__identity">
           <strong>{name}</strong>
           {selected.code ? <span>产品编号 {selected.code}</span> : null}
+          {!showPhotoControls && selectedPhoto ? <span>{photoLabel}</span> : null}
           {gallery && (gallery.products.length > 1 || (gallery.title && gallery.title !== name)) ? <span>{gallery.title || '产品图片'}{gallery.products.length > 1 ? ` · 产品 ${productIndex + 1} / ${gallery.products.length}` : ''}</span> : null}
         </div>
         <button
@@ -137,11 +156,11 @@ export default function WorkflowTaskImagePreview({
         </button>
       </div>
       <div className="erp-task-image-preview__stage" data-scroll-edges="off">
-        {gallery && currentMetadata?.state === 'denied' || denied ? (
+        {(blockedAlbum && currentMetadata?.state === 'denied') || denied ? (
           <div className="erp-task-image-preview__status" role="status"><PictureOutlined aria-hidden="true" /><span>无图片读取权限</span></div>
-        ) : gallery && currentMetadata?.state === 'failed' ? (
+        ) : blockedAlbum && currentMetadata?.state === 'failed' ? (
           <div className="erp-task-image-preview__status" role="alert"><span>图片读取失败，请重试</span><button type="button" onClick={() => setMediaRevision((value) => value + 1)}><ReloadOutlined aria-hidden="true" />重新加载</button></div>
-        ) : gallery && currentMetadata?.state === 'ready' && !photos.length ? (
+        ) : blockedAlbum && currentMetadata?.state === 'ready' ? (
           <div className="erp-task-image-preview__status" role="status"><PictureOutlined aria-hidden="true" /><span>该产品暂无图片</span></div>
         ) : failed ? (
           <div className="erp-task-image-preview__status" role="alert">
@@ -182,7 +201,7 @@ export default function WorkflowTaskImagePreview({
         alt={name}
         preview={{
           visible,
-          src: original || (gallery ? '' : thumbnail),
+          src: original || (galleryEnabled ? '' : thumbnail),
           rootClassName: 'erp-task-image-preview',
           getContainer: overlay.getContainer,
           focusTriggerAfterClose: overlay.scope ? false : undefined,
@@ -210,11 +229,12 @@ export default function WorkflowTaskImagePreview({
                     ))}
                   </div>
                 ) : null}
-                <div className={`erp-task-image-preview__controls${gallery ? '' : ' erp-task-image-preview__controls--single'}`}>
-                  {gallery ? (
+                <div className={`erp-task-image-preview__controls${showPhotoControls ? '' : ' erp-task-image-preview__controls--single'}`}>
+                  {showPhotoControls ? (
                     <div className="erp-product-gallery-preview__photos" role="group" aria-label="切换当前产品图片">
                       {photos.length > 1 ? <button type="button" aria-label="上一张图片" disabled={photoIndex === 0} onClick={() => { actions.onReset(); setPhotoIndex((value) => value - 1) }}><LeftOutlined aria-hidden="true" /></button> : null}
-                      <span aria-live="polite">{selectedPhoto ? `${selectedPhoto.label} · ${photoIndex + 1} / ${photos.length} 张` : currentMetadata?.state === 'ready' ? '暂无图片' : '正在读取图片'}</span>
+                      <span aria-live="polite">{photoLabel}</span>
+                      {retryAlbum ? <button type="button" aria-label="重新读取相册" onClick={() => setMediaRevision((value) => value + 1)}><ReloadOutlined aria-hidden="true" /></button> : null}
                       {photos.length > 1 ? <button type="button" aria-label="下一张图片" disabled={photoIndex >= photos.length - 1} onClick={() => { actions.onReset(); setPhotoIndex((value) => value + 1) }}><RightOutlined aria-hidden="true" /></button> : null}
                     </div>
                   ) : null}

@@ -1,13 +1,13 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowRightOutlined,
+  DownOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  UpOutlined,
 } from '@ant-design/icons'
-import { Button } from 'antd'
+import { Button, Tooltip } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import { Markdown } from '@/common/components/markdown'
 import {
@@ -17,8 +17,9 @@ import {
 import {
   readUIDesignChapters,
   getUIDesignTopics,
-  findUIDesignChapter,
-  filterUIDesignEntries,
+  findUIDesignRule,
+  filterUIDesignTopics,
+  resolveUIDesignReading,
 } from '../config/devUIDesignReading.mjs'
 import DevUIDesignIllustrations from './DevUIDesignIllustrations.jsx'
 
@@ -47,16 +48,49 @@ function decodeHash(value) {
 
 const isNarrowReader = () => window.matchMedia('(max-width: 680px)').matches
 
+function revealRuleInPanel(panel, article, target) {
+  let placedTop
+  const align = () => {
+    const top = panel.scrollTop + target.getBoundingClientRect().top - panel.getBoundingClientRect().top - 16
+    panel.scrollTop = top
+    placedTop = panel.scrollTop
+    return top > placedTop + 1
+  }
+
+  // A rule that loads a diagram can grow after the initial scroll reaches the bottom.
+  if (!align()) return undefined
+  const inputEvents = ['wheel', 'pointerdown', 'keydown']
+  const observer = new ResizeObserver(() => {
+    if (Math.abs(panel.scrollTop - placedTop) > 1 || !align()) stop()
+  })
+  function stop() {
+    observer.disconnect()
+    for (const event of inputEvents) panel.removeEventListener(event, stop, true)
+  }
+  for (const event of inputEvents) {
+    panel.addEventListener(event, stop, { capture: true, passive: true })
+  }
+  observer.observe(article)
+  return stop
+}
+
 export default function DevUIDesignDocument({ source, specification, view }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [directoryOpen, setDirectoryOpen] = useState(() => !isNarrowReader())
+  const directoryAction = directoryOpen ? '收起目录' : '展开目录'
   const contentRef = useRef(null)
   const directoryRef = useRef(null)
+  const searchRef = useRef(null)
+  const focusSearchAfterClear = useRef(false)
+  const ruleRef = useRef(null)
+  const ruleTriggerRef = useRef(null)
+  const ruleReturnRef = useRef(null)
+  const previousSelection = useRef(null)
   const chapters = useMemo(() => readUIDesignChapters(source), [source])
   const diagramChapters = useMemo(
-    () => readUIDesignChapters(specification),
-    [specification]
+    () => source === specification ? chapters : readUIDesignChapters(specification),
+    [chapters, source, specification]
   )
   const topics = useMemo(
     () => getUIDesignTopics(view, chapters),
@@ -64,67 +98,90 @@ export default function DevUIDesignDocument({ source, specification, view }) {
   )
   const params = new URLSearchParams(location.search)
   const hash = decodeHash(location.hash)
-  const hashChapter = findUIDesignChapter(chapters, hash)
-  const read =
-    hashChapter || params.get('read') === 'reference' ? 'reference' : 'guide'
-  const topic =
-    topics.find((item) => item.key === params.get('topic')) ||
-    topics.find((item) => item.key === (params.get('page') === 'task-handling' ? 'task-handling' : 'task-cards')) || topics[0]
-  const chapter =
-    hashChapter ||
-    findUIDesignChapter(chapters, params.get('chapter')) ||
-    topic.references[0] ||
-    chapters[0]
+  const { topic, rule } = resolveUIDesignReading(chapters, topics, params, hash)
+  const topicKey = topic.key
+  const ruleId = rule?.id
+  const topicRuleOpen = Boolean(ruleId && ruleId === topic.rule?.id)
   const query = params.get('q') || ''
-  const entries = read === 'guide' ? topics : chapters
-  const current = read === 'guide' ? topic.key : chapter.id
-  const filtered = filterUIDesignEntries(entries, query)
-  const groups = [
-    ...new Set(filtered.map((entry) => entry.group || '规范章节')),
-  ]
+  const filtered = filterUIDesignTopics(topics, query)
+  const groups = [...new Set(filtered.map((entry) => entry.group))]
 
-  const updateLocation = (changes, replace = false) => {
+  const updateLocation = useCallback((changes, { replace = false, fragment = location.hash } = {}) => {
     // Match Help Center: merge into the latest URL during rapid navigation.
     const next = new URLSearchParams(window.location.search)
-    if (hashChapter) {
-      next.set('read', 'reference')
-      next.set('chapter', hashChapter.id)
-    }
     Object.entries(changes).forEach(([key, value]) => {
       if (value) next.set(key, value)
       else next.delete(key)
     })
     navigate(
-      { pathname: location.pathname, search: `?${next}`, hash: '' },
+      { pathname: location.pathname, search: `?${next}`, hash: fragment },
       { replace }
     )
+  }, [location.hash, location.pathname, navigate])
+  const selectTopic = (entry) =>
+    updateLocation({ topic: entry.key, read: '', chapter: '', point: '' }, { fragment: '' })
+  const clearEmptySearch = () => {
+    focusSearchAfterClear.current = true
+    updateLocation({ q: '' }, { replace: true })
   }
-  const selectEntry = (entry) =>
-    updateLocation({
-      [read === 'guide' ? 'topic' : 'chapter']: entry.key || entry.id,
-      read,
-      point: '',
-    })
-  const reference = (id) =>
-    updateLocation({ read: 'reference', chapter: id, q: '' })
+  const closeRule = () =>
+    updateLocation({ topic: topicKey, read: '', chapter: '' }, { fragment: '' })
+  const toggleTopicRule = () => {
+    if (topicRuleOpen) {
+      closeRule()
+      return
+    }
+    ruleReturnRef.current = { topicKey, scrollTop: contentRef.current.scrollTop }
+    updateLocation({ topic: topicKey, read: '', chapter: topic.rule.id }, { fragment: '' })
+  }
+
+  useEffect(() => {
+    if (query || !focusSearchAfterClear.current) return
+    focusSearchAfterClear.current = false
+    searchRef.current?.focus({ preventScroll: true })
+  }, [query])
+
   useLayoutEffect(() => {
     const panel = contentRef.current
-    if (!panel) return
-    panel.scrollTop = 0
-    if (hash) {
-      const anchor = [...panel.querySelectorAll('[id]')].find(
-        (element) => element.id === hash
-      )
-      const heading =
-        anchor?.closest('[data-markdown-anchor="heading"]') || anchor
-      if (heading) {
-        panel.scrollTop =
-          heading.getBoundingClientRect().top -
-          panel.getBoundingClientRect().top -
-          20
-      }
+    if (!panel) return undefined
+    const previous = previousSelection.current
+    previousSelection.current = { topicKey, ruleId }
+    const article = ruleRef.current
+    if (article) {
+      const anchor = hash ? [...article.querySelectorAll('[id]')].find((element) => element.id === hash) : null
+      const target = anchor?.closest('[data-markdown-anchor="heading"]') || anchor || article
+      const stop = revealRuleInPanel(panel, article, target)
+      article.focus({ preventScroll: true })
+      return stop
     }
-  }, [current, read, hash])
+    if (previous?.ruleId && previous.topicKey === topicKey) {
+      const trigger = ruleTriggerRef.current
+      const origin = ruleReturnRef.current
+      if (origin?.topicKey === topicKey) {
+        panel.scrollTop = origin.scrollTop
+        trigger?.focus({ preventScroll: true })
+      } else {
+        (trigger || panel).focus()
+      }
+      return undefined
+    }
+    panel.scrollTop = 0
+    return undefined
+  }, [topicKey, ruleId, hash])
+
+  useEffect(() => {
+    const article = ruleRef.current
+    if (!article) return undefined
+    const followRuleLink = (event) => {
+      const anchor = event.target?.closest?.('a[href^="#"]')
+      if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      if (!findUIDesignRule(chapters, decodeHash(anchor.hash))) return
+      event.preventDefault()
+      updateLocation({ topic: topicKey, read: '', chapter: '' }, { fragment: anchor.hash })
+    }
+    article.addEventListener('click', followRuleLink)
+    return () => article.removeEventListener('click', followRuleLink)
+  }, [chapters, ruleId, topicKey, updateLocation])
 
   useLayoutEffect(() => {
     const directory = directoryRef.current
@@ -143,38 +200,46 @@ export default function DevUIDesignDocument({ source, specification, view }) {
     const observer = new ResizeObserver(revealCurrent)
     observer.observe(directory)
     return () => observer.disconnect()
-  }, [current, read, directoryOpen])
+  }, [topicKey, query, directoryOpen])
 
   return (
     <section
       className="erp-dev-ui-design-document"
       aria-label={view === 'specification' ? '设计说明' : '设计依据'}
     >
-      <div className="erp-design-reader-toolbar">
-        <Segmented
-          aria-label="设计阅读方式"
-          value={read}
-          onChange={(value) => updateLocation({ read: value, q: '' })}
-          options={[
-            { value: 'guide', label: '图解' },
-            { value: 'reference', label: '规范原文' },
-          ]}
-        />
-        <div>
-          <Button
-            icon={
-              directoryOpen ? (
-                <MenuFoldOutlined aria-hidden="true" />
-              ) : (
-                <MenuUnfoldOutlined aria-hidden="true" />
-              )
-            }
+      <div className="erp-design-reader-location">
+        <div className="erp-design-reader-search" role="search" aria-label="查找图解主题">
+          <SearchInput
+            ref={searchRef}
+            aria-label="搜索设计图解"
             aria-controls="design-reading-directory"
-            aria-expanded={directoryOpen}
-            onClick={() => setDirectoryOpen(!directoryOpen)}
-          >
-            {directoryOpen ? '收起目录' : '展开目录'}
-          </Button>
+            placeholder="搜索图解主题"
+            value={query}
+            allowClear
+            onSearch={(value) => updateLocation({ q: value }, { replace: true })}
+            onSubmitted={() => setDirectoryOpen(true)}
+          />
+        </div>
+        <div className="erp-design-reader-context">
+          <span>
+            {topic.group === '工作中心' ? topic.group : <>{topic.group} / <strong>{topic.title}</strong></>}
+          </span>
+          <Tooltip title={directoryAction} trigger={['hover', 'focus']} placement="bottomRight">
+            <Button
+              className="erp-design-directory-toggle"
+              icon={
+                directoryOpen ? (
+                  <MenuFoldOutlined aria-hidden="true" />
+                ) : (
+                  <MenuUnfoldOutlined aria-hidden="true" />
+                )
+              }
+              aria-label={directoryAction}
+              aria-controls="design-reading-directory"
+              aria-expanded={directoryOpen}
+              onClick={() => setDirectoryOpen((open) => !open)}
+            />
+          </Tooltip>
         </div>
       </div>
       <div
@@ -186,17 +251,6 @@ export default function DevUIDesignDocument({ source, specification, view }) {
           className="erp-design-document-sidebar"
           hidden={!directoryOpen}
         >
-          <div className="erp-design-directory-search">
-            <SearchInput
-              aria-label="搜索设计图解或规范"
-              placeholder="搜索主题或规则"
-              value={query}
-              allowClear
-              onSearch={(value) =>
-                updateLocation({ q: value }, true)
-              }
-            />
-          </div>
           <nav
             ref={directoryRef}
             className="erp-design-document-toc"
@@ -206,17 +260,17 @@ export default function DevUIDesignDocument({ source, specification, view }) {
               <div key={group} className="erp-design-topic-group">
                 <h3 className="erp-dev-directory-group-title">{group}</h3>
                 {filtered
-                  .filter((entry) => (entry.group || '规范章节') === group)
+                  .filter((entry) => entry.group === group)
                   .map((entry) => (
                     <button
                       type="button"
-                      key={entry.key || entry.id}
+                      key={entry.key}
                       className="erp-dev-directory-item erp-dev-directory-item--nested erp-design-topic-button"
                       aria-current={
-                        (entry.key || entry.id) === current ? 'page' : undefined
+                        entry.key === topicKey ? 'page' : undefined
                       }
                       onClick={() => {
-                        selectEntry(entry)
+                        selectTopic(entry)
                         if (isNarrowReader()) {
                           setDirectoryOpen(false)
                           contentRef.current?.focus({ preventScroll: true })
@@ -230,9 +284,9 @@ export default function DevUIDesignDocument({ source, specification, view }) {
             ))}
             {!filtered.length ? (
               <Empty
-                description="没有匹配的主题或章节"
+                description="没有匹配的图解主题"
               >
-                <Button onClick={() => updateLocation({ q: '' }, true)}>
+                <Button onClick={clearEmptySearch}>
                   清除搜索
                 </Button>
               </Empty>
@@ -240,42 +294,40 @@ export default function DevUIDesignDocument({ source, specification, view }) {
           </nav>
         </aside>
         <div className="erp-design-reader-pane">
-          <div className="erp-design-reader-location">
-            <span>
-              {read === 'guide' && topic.group === '工作中心' ? topic.group : <>{read === 'guide' ? topic.group : '规范原文'} /{' '}<strong>{read === 'guide' ? topic.title : chapter.title}</strong></>}
-            </span>
-          </div>
           <div
             ref={contentRef}
             tabIndex={-1}
             className="erp-design-document-content"
             aria-label="当前设计内容"
           >
-            {read === 'guide' ? (
-              <>
-                <DevUIDesignIllustrations
-                  key={topic.key}
-                  topic={topic}
-                  chapters={diagramChapters}
-                  view={view}
-                />
-                <nav
-                  className="erp-design-related-rules"
-                  aria-label="当前图解的规范来源"
+            <DevUIDesignIllustrations
+              key={topicKey}
+              topic={topic}
+              chapters={diagramChapters}
+              view={view}
+            />
+            {topic.rule ? (
+              <div className="erp-design-related-rules" role="group" aria-label="当前图解的规范来源">
+                <span>查阅规则</span>
+                <Button
+                  ref={ruleTriggerRef}
+                  aria-expanded={topicRuleOpen}
+                  aria-controls={topicRuleOpen ? 'design-related-rule' : undefined}
+                  onClick={toggleTopicRule}
                 >
-                  <span>查阅规则</span>
-                  {topic.references.map((item) => (
-                    <Button key={item.id} onClick={() => reference(item.id)}>
-                      {item.title}
-                      <ArrowRightOutlined aria-hidden="true" />
-                    </Button>
-                  ))}
-                </nav>
-              </>
-            ) : (
+                  {topic.rule.title}
+                  {topicRuleOpen ? <UpOutlined aria-hidden="true" /> : <DownOutlined aria-hidden="true" />}
+                </Button>
+              </div>
+            ) : null}
+            {rule ? (
               <article
+                id="design-related-rule"
+                aria-label={rule.title}
+                tabIndex={-1}
                 className="erp-design-prose"
                 ref={(element) => {
+                  ruleRef.current = element
                   element?.querySelectorAll('a[href]').forEach((link) => {
                     const href = link.getAttribute('href')
                     if (!href || /^(?:#|[a-z]+:|\/)/iu.test(href)) return
@@ -284,9 +336,12 @@ export default function DevUIDesignDocument({ source, specification, view }) {
                   })
                 }}
               >
-                <Markdown source={chapter.content} />
+                <Markdown source={rule.content} />
+                <Button className="erp-design-rule-close" icon={<UpOutlined aria-hidden="true" />} onClick={closeRule}>
+                  收起规则
+                </Button>
               </article>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

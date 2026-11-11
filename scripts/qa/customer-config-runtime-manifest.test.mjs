@@ -3,6 +3,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 
 import { customerPackageCatalog } from "../../config/catalog/customerPackageCatalog.mjs";
 import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
@@ -10,6 +11,8 @@ import { referenceCustomerPackage } from "../../config/customers/reference-custo
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import { yoyoosunReleasePackage } from "../../config/customers/yoyoosun/releasePackage.mjs";
 import { yoyoosunMenuConfig } from "../../config/customers/yoyoosun/menuConfig.mjs";
+import { customerPackageFieldGuide } from "../../config/schemas/customerPackageFieldGuide.mjs";
+import { customerPackageFieldTrace, customerPackageObjectTrace } from "../../config/schemas/customerPackageFieldTrace.mjs";
 import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
 import {
   LOCAL_TEST_APPLY_PURPOSE,
@@ -70,6 +73,59 @@ function buildRuntimeManifest(config = yoyoosunReleasePackage) {
     config.status === "release_ready" ? config : releaseReadyPackage(config),
   );
 }
+
+function tracePathExists(object, tracePath) {
+  const pathParts = tracePath.replace(/\[(?:\*)?\]/gu, ".*").split(".");
+  let values = [object];
+  for (const part of pathParts) {
+    values = values.flatMap((value) => {
+      if (!value || typeof value !== "object") return [];
+      if (part === "*") return Object.values(value);
+      return Object.hasOwn(value, part) ? [value[part]] : [];
+    });
+  }
+  return values.length > 0;
+}
+
+test("field trace paths resolve against compiled JSON and the deployed frontend configuration", () => {
+  const source = yoyoosunReleasePackage;
+  const manifest = buildRuntimeManifest({
+    ...source,
+    fieldPolicyOverrides: [{ surfaceKey: "sales_orders.default", fieldKey: "source_no", visible: false, reason: "评审夹具" }],
+    printTemplateDefaults: source.printTemplateDefaults.map((item) => ({
+      ...item,
+      partyDefaults: { ...item.partyDefaults, buyerPhone: "样本联系信息", buyerSigner: "样本签字方" },
+    })),
+    processPolicies: source.processPolicies.map((item, index) => index === 0 ? {
+      ...item,
+      rules: [{ ...item.rules[0], when: "样本条件", action: "样本预览动作", note: "样本评审说明" }],
+    } : item),
+    extensionPoints: [{ key: "review-fixture", label: "样本扩展", status: "preview_only", runtimeEnabled: false, guardrail: "仅用于验证清单路径" }],
+  });
+  const overlay = { window: {} };
+  runInNewContext(readFileSync(new URL("../../config/customers/yoyoosun/customer-config.example.js", import.meta.url), "utf8"), overlay);
+  const installed = overlay.window.__PLUSH_ERP_CUSTOMER_CONFIG__;
+  overlay.window.__PLUSH_ERP_CUSTOMER_CONFIG__ = {
+    ...installed,
+    desktopMenu: { ...installed.desktopMenu, itemOverrides: { customers: { label: "样本客户档案" } } },
+  };
+  assert(getNavigationSections(overlay.window.__PLUSH_ERP_CUSTOMER_CONFIG__).flatMap((section) => section.items)
+    .some((item) => item.label === "样本客户档案"));
+
+  const guided = customerPackageFieldGuide.flatMap((group) => group.fields);
+  assert.deepEqual(guided.map((field) => field.path).sort(), Object.keys(customerPackageFieldTrace).sort());
+  for (const { path: sourcePath, trace } of guided) {
+    if (trace.kind === "source") {
+      assert.equal(trace.path, "");
+    } else {
+      assert(tracePathExists(trace.kind === "frontend" ? overlay : manifest, trace.path), `${sourcePath} -> ${trace.path}`);
+    }
+  }
+  for (const trace of Object.values(customerPackageObjectTrace)) assert(tracePathExists(manifest, trace.path), trace.path);
+  assert.deepEqual(manifest.compiled_snapshot.fieldPolicies["sales_orders.default"].source_no, { visible: false });
+  assert.equal(manifest.compiled_snapshot.policyCatalog.runtime_enabled, false);
+  assert.equal(manifest.compiled_snapshot.extensionPointCatalog.runtime_enabled, false);
+});
 
 function navigationPageKeys() {
   return getNavigationSections().flatMap((section) =>

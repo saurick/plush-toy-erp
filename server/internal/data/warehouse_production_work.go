@@ -16,7 +16,7 @@ import (
 func warehouseProductionWorkQuery(ctx context.Context, filter biz.WarehouseProductionWorkFilter) (string, []any) {
 	args := []any{}
 	bind := func(value any) string { args = append(args, value); return fmt.Sprintf("$%d", len(args)) }
-	identity := `COALESCE(NULLIF(i.product_name_snapshot,''),p.name,'') AS product_name,
+	identity := `p.id AS product_id,COALESCE(NULLIF(i.product_name_snapshot,''),p.name,'') AS product_name,
  COALESCE(NULLIF(i.product_code_snapshot,''),p.code,'') AS product_code,
  COALESCE(NULLIF(i.sku_code_snapshot,''),sk.sku_code,'') AS sku_code,u.id AS unit_id,
  COALESCE(NULLIF(i.unit_name_snapshot,''),u.name,'') AS unit_name`
@@ -146,7 +146,7 @@ func (r *productionOrderRepo) ListWarehouseProductionWork(ctx context.Context, f
 		}
 	}
 	query := cte + ` SELECT id,production_order_id,production_order_item_id,order_no,fact_id,fact_no,fact_status,fact_version,
- batch_id,batch_no,operation_name,product_name,product_code,sku_code,unit_name,warehouse_id,warehouse_name,lot_no,
+ batch_id,batch_no,operation_name,product_id,product_name,product_code,sku_code,unit_name,warehouse_id,warehouse_name,lot_no,
  CAST(quantity AS TEXT),CAST(pending_inspection_quantity AS TEXT),CAST(pending_packaging_quantity AS TEXT),packaging_confirmed,action_batch_id,action,stage FROM filtered WHERE ` + where +
 		" ORDER BY " + order + fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)-1, len(args))
 	rows, err := tx.QueryContext(ctx, query, args...)
@@ -155,7 +155,7 @@ func (r *productionOrderRepo) ListWarehouseProductionWork(ctx context.Context, f
 	}
 	for rows.Next() {
 		row := &biz.WarehouseProductionWork{Kind: filter.Kind}
-		err = rows.Scan(&row.ID, &row.ProductionOrderID, &row.ProductionOrderItemID, &row.OrderNo, &row.FactID, &row.FactNo, &row.FactStatus, &row.FactVersion, &row.BatchID, &row.BatchNo, &row.OperationName, &row.ProductName, &row.ProductCode, &row.SKUCode, &row.UnitName, &row.WarehouseID, &row.WarehouseName, &row.LotNo, &row.Quantity, &row.PendingInspectionQuantity, &row.PendingPackagingQuantity, &row.PackagingConfirmed, &row.ActionBatchID, &row.Action, &row.Stage)
+		err = rows.Scan(&row.ID, &row.ProductionOrderID, &row.ProductionOrderItemID, &row.OrderNo, &row.FactID, &row.FactNo, &row.FactStatus, &row.FactVersion, &row.BatchID, &row.BatchNo, &row.OperationName, &row.ProductID, &row.ProductName, &row.ProductCode, &row.SKUCode, &row.UnitName, &row.WarehouseID, &row.WarehouseName, &row.LotNo, &row.Quantity, &row.PendingInspectionQuantity, &row.PendingPackagingQuantity, &row.PackagingConfirmed, &row.ActionBatchID, &row.Action, &row.Stage)
 		if err != nil {
 			_ = rows.Close()
 			return nil, err

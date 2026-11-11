@@ -48,3 +48,24 @@ test('broken batches fail closed and manual retry rereads updated products', asy
   await assert.rejects(read('unknown', 7))
   await assert.rejects(read(source, -1))
 })
+
+test('a revised production order does not reuse an earlier in-flight product summary', async () => {
+  const starts = [Promise.withResolvers(), Promise.withResolvers()]
+  let callCount = 0
+  const read = createDocumentProductPreviewLoader(({ document_ids: [id] }) => {
+    const response = Promise.withResolvers()
+    starts[callCount++].resolve(response.resolve)
+    return response.promise.then((summary) => [{ document_id: id, ...summary }])
+  })
+  const source = DOCUMENT_PRODUCT_SOURCES.PRODUCTION_ORDER
+  const before = read(source, 7, '1')
+  const resolveBefore = await starts[0].promise
+  const after = read(source, 7, '2')
+  assert.notEqual(after, before)
+  const resolveAfter = await starts[1].promise
+  resolveBefore({ product_count: 1, product_id: 9, style_no: 'OLD' })
+  assert.equal((await before).style_no, 'OLD')
+  assert.equal(read(source, 7, '2'), after)
+  resolveAfter({ product_count: 0, product_id: 0, style_no: '' })
+  assert.equal((await after).style_no, '')
+})

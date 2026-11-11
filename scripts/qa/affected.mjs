@@ -922,10 +922,14 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       addFollowUp(state, "warehouse-navigation-browser", "T5",
         "运行 STYLE_L1_SCENARIOS=warehouse-category-navigation,warehouse-workbench-control-parity,warehouse-outbound-cold-entry-stability,warehouse-layout-all-views,warehouse-layout-dark-split,inventory-visible-copy-desktop pnpm --dir web style:l1，并分别验证 WebKit 与 Chromium，核对分类展开、键盘与动效、窄屏滚动、默认工作台隔离、首次加载和历史刷新。", file);
     }
-    if (/common\/components\/table\/(?:AppTable\.jsx|tableColumns\.mjs)|BusinessListLayout\.jsx|InventoryLedgerPage\.jsx|productIdentity\.css|(?:masterData|shipment|qualityInspection)Columns\.jsx|inventoryLedgerPresentation\.jsx|businessColumnWidthScenarios\.mjs/u.test(file)) {
+    if (/common\/components\/table\/(?:AppTable\.jsx|app-table\.css|tableColumns\.mjs)|BusinessListLayout\.jsx|InventoryLedgerPage\.jsx|productIdentity\.css|(?:masterData|shipment|qualityInspection)Columns\.jsx|inventoryLedgerPresentation\.jsx|businessColumnWidthScenarios\.mjs/u.test(file)) {
       addNodeTests(state, ["web/src/common/components/table/tableColumns.test.mjs", "web/src/erp/utils/businessDefaultColumns.test.mjs", "web/src/erp/components/inventory/inventoryLedgerPresentation.behavior.test.mjs"], file, "T5");
       addFollowUp(state, "business-column-width-browser", "T5",
-        "运行 STYLE_L1_SCENARIOS=business-column-width-empty-recovery,business-column-width-shipment-defaults,business-column-width-inventory-defaults pnpm --dir web style:l1，核对加载、空结果、恢复、默认列与完整导出、详情、窄屏和暗色。", file);
+        "运行 STYLE_L1_SCENARIOS=business-column-width-product-fit,business-column-width-empty-recovery,business-column-width-shipment-defaults,business-column-width-inventory-defaults pnpm --dir web style:l1，核对按用途分配、窄屏滚动、列设置、加载与空结果恢复、默认列与完整导出、详情和暗色。", file);
+    }
+    if (/common\/components\/table\/(?:AppTable\.jsx|app-table\.css|tableColumns\.mjs)|PermissionAccessOverview\.jsx|HistoryRecordsPage\.jsx|masterDataColumns\.jsx|desktopListStickyScenarios\.mjs/u.test(file)) {
+      addFollowUp(state, "desktop-table-fit-browser", "T5",
+        "运行 STYLE_L1_SCENARIOS=desktop-list-sticky-customers,desktop-list-sticky-processes,desktop-list-sticky-history,desktop-list-sticky-permission-role-impact pnpm --dir web style:l1，并分别使用 Chromium 与 WebKit；核对宽屏余宽、短列、窄窗表内滚动和岗位影响重新展开。", file);
     }
     if (/common\/components\/empty\/|DevUIEmptyExamples|devUIEmptyExamples|emptyFeedbackScenarios|RemoteReference(?:Picker|Select)\.jsx$/u.test(file)) {
       addFollowUp(
@@ -966,13 +970,13 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
     if (
       /^web\/src\/common\/components\/select\//u.test(file) ||
-      /(?:DevSelectValueExample|devSelectValueExample|DevControlStandards|selectOverflowScenarios|Business(?:LineItems|CompactField)Table|referenceSelectOptions)/u.test(file)
+      /(?:DevSelectValueExample|devSelectValueExample|DevControlStandards|selectOverflowScenarios|Business(?:LineItems|CompactField)Table|referenceSelectOptions|ShipmentEditor\.jsx|shipmentBatchDropdownScenarios)/u.test(file)
     ) {
       addFollowUp(
         state,
         "browser-regression",
         "T5",
-        "运行 STYLE_L1_SCENARIOS=dev-ui-select-overflow,business-select-values-sales,business-select-values-purchase,business-select-values-outsourcing,business-select-values-bom,business-select-values-shipment,business-select-values-arrival pnpm --dir web style:l1，核对标准框高与框外独立编码、完整值读取、锁定字段、清空替换、窄列与多列滚动，保留业务读取和授权合同。",
+        "运行 STYLE_L1_SCENARIOS=shipment-batch-dropdown-stability,dev-ui-select-overflow,business-select-values-sales,business-select-values-purchase,business-select-values-outsourcing,business-select-values-bom,business-select-values-shipment,business-select-values-arrival pnpm --dir web style:l1，核对候选首帧、慢响应与文字适宽，以及完整值读取、清空替换、窄列与多列滚动。",
         file,
       );
     }

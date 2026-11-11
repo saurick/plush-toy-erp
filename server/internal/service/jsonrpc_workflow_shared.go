@@ -156,7 +156,7 @@ func workflowTaskDisplayContextToMap(context *biz.WorkflowTaskDisplayContext) an
 			"kind": item.Kind, "name": item.Name, "code": item.Code,
 			"style_no": item.StyleNo, "order_no": item.OrderNo,
 			"supplier_item_no": item.SupplierItemNo,
-			"product_id":       item.ProductID, "image_attachment_id": item.ImageAttachmentID,
+			"product_id":       item.ProductID, "image_attachment_id": item.ImageAttachmentID, "has_product_images": item.HasProductImages,
 		})
 	}
 	return map[string]any{

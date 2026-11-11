@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import {
-  buildProjectSkillDiagram,
-  filterProjectSkills,
-} from './devProjectSkills.mjs'
+import { filterProjectSkills, readProjectSkillDecisionGuide } from './devProjectSkills.mjs'
 import { buildDevDocsItems } from './devDocs.mjs'
 import { resolveDevDocsMarkdownHref } from '../pages/devDocsNavigation.mjs'
 
@@ -13,7 +11,6 @@ const skills = [
     title: '页面治理',
     scope: '表单 DOM',
     summary: '页面布局',
-    references: [],
     relatedSkills: ['plush-test', 'missing'],
   },
   {
@@ -21,7 +18,6 @@ const skills = [
     title: '测试治理',
     scope: '浏览器测试',
     summary: '验证范围',
-    references: [],
     relatedSkills: [],
   },
 ]
@@ -33,19 +29,18 @@ test('search supports task text, names and multiple terms without a second routi
   assert.deepEqual(filterProjectSkills(skills, '  '), skills)
 })
 
-test('focused graph distinguishes references and mentions, and omits unknown relations', () => {
-  const chart = buildProjectSkillDiagram(skills[0], skills)
-  assert.match(chart, /适用任务/u)
-  assert.match(chart, /引用依据/u)
-  assert.match(chart, /正文提及.*测试治理/u)
-  assert.doesNotMatch(chart, /missing|执行顺序/u)
-  assert.equal(buildProjectSkillDiagram(null, skills), '')
-  assert(
-    !buildProjectSkillDiagram(
-      { ...skills[0], title: '<script>"\n' },
-      skills
-    ).includes('<script>')
-  )
+test('reads the operations guide from the Skill and rejects notes with missing source sections', () => {
+  const source = readFileSync(new URL(
+    '../../../../.agents/skills/plush-operations-governance/SKILL.md',
+    import.meta.url
+  ), 'utf8')
+  const guide = readProjectSkillDecisionGuide(source)
+  assert.match(guide.chart, /gate -->\|缺失或失败\| stop/u)
+  assert.deepEqual(guide.nodes.map((node) => node.id), ['choose', 'audit', 'inspect', 'gate', 'execute', 'stop'])
+  assert.equal(guide.nodes.find((node) => node.id === 'stop').headingId, 'operations-stop')
+  assert.equal(readProjectSkillDecisionGuide(source.replace('#operations-stop)', '#missing-section)')), undefined)
+  assert.equal(readProjectSkillDecisionGuide('```md\n## 选用决策图 / Decision Guide\n```'), undefined)
+  assert.equal(readProjectSkillDecisionGuide(), undefined)
 })
 
 test('existing document catalog and relative-link navigation support Skill sources and reference headings', () => {

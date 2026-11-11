@@ -549,10 +549,10 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     'docs/engineering/研发效能工作台与CI-CD设计.md'
   )
   assert.match(dataPreparationItem?.truthSource || '', /Source \/ Fact API/)
-  assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /本地与服务器 demo 按登记目标区分/)
-  assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /只向前补齐/)
-  assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /业务场景固定批次/)
-  assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /长期保留/)
+  const dataPreparationGuardrails = dataPreparationItem?.guardrails?.join(' ') || ''
+  assert.match(dataPreparationGuardrails, /本地开发与服务器 Demo 分别按登记目标执行.*共用手测数据配方/u)
+  assert.match(dataPreparationGuardrails, /只补齐缺项.*保留已有记录/u)
+  assert.match(dataPreparationGuardrails, /禁止任意目标或命令/u)
 
   const databaseMigrationItem = DEV_HUB_ITEMS.find(
     (item) => item.key === 'database-migration'

@@ -20,6 +20,7 @@ test('finance pages project only fields that belong to their fact type', () => {
   assert.deepEqual(financeColumnKeys('RECEIVABLE'), [
     'counterparty',
     'amount',
+    'outstanding_amount',
     'fee_amount',
     'currency',
     'payment_term',
@@ -28,6 +29,7 @@ test('finance pages project only fields that belong to their fact type', () => {
   assert.deepEqual(financeColumnKeys('PAYABLE'), [
     'counterparty',
     'amount',
+    'outstanding_amount',
     'fee_amount',
     'currency',
     'payment_term',

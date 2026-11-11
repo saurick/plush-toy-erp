@@ -2,6 +2,22 @@ import assert from 'node:assert/strict'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { parseRgb } from './colorAssertions.mjs'
 
+export function readSelectPopup(popup) {
+  return popup.evaluate((node) => {
+    const { width, left, right, top, bottom } = node.getBoundingClientRect()
+    const options = [...node.querySelectorAll('.ant-select-item-option-content')].map((option) => {
+      const range = document.createRange()
+      range.selectNodeContents(option)
+      return {
+        textWidth: range.getBoundingClientRect().width,
+        lines: range.getClientRects().length,
+        clipped: option.scrollWidth > option.clientWidth + 1 || option.scrollHeight > option.clientHeight + 1,
+      }
+    })
+    return { width, left, right, top, bottom, options }
+  })
+}
+
 export async function assertSingleSelectValues(scope, label, minimum = 1) {
   await waitForFiniteAnimations(scope.page())
   const metrics = await scope

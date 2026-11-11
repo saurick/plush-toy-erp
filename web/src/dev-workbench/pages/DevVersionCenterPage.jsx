@@ -9,6 +9,7 @@ import { ReleaseModal } from './delivery/version/ReleaseModal.jsx'
 import {
   issueDescription,
 } from './delivery/version/shared.jsx'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp.jsx'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
@@ -200,12 +201,13 @@ export default function DevVersionCenterPage() {
                   }))}
                   onChange={setSelectedTargetKey}
                 />
-                <details className="erp-dev-disclosure erp-dev-target-data-boundary">
-                  <summary>数据保留方式</summary>
-                  <Text type="secondary">
-                    {selectedTargetDefinition.dataBoundary}
-                  </Text>
-                </details>
+                <SupplementalHelp
+                  label="数据保留方式"
+                  content={selectedTargetDefinition.dataBoundary}
+                  placement="bottom"
+                >
+                  数据保留方式
+                </SupplementalHelp>
               </div>
             </section>
             {['versions', 'overview'].includes(activeView) ? (

@@ -468,7 +468,7 @@ export function qualityGateViewStatus(summary, view, summaryError) {
           : evidence?.status === 'running'
             ? '等待当前流水线结束。'
             : evidence?.status === 'missing'
-              ? '读取链路正常；等待该提交触发 CI。'
+              ? '等待该提交触发 CI。'
               : evidence?.status === 'failed'
                 ? '查看未通过的 Job，修复后重新验证。'
                 : '先恢复 GitLab 读取链路，再刷新状态。',

@@ -127,6 +127,7 @@ import {
   buildOperationalFactRelatedMenuItems,
   financeSettlementActionFor,
   getOperationalFactAttachmentOwnerType,
+  operationalFactProductID,
   sourceTypeLabel,
 } from '../components/operational-facts/operationalFactPageConfig.mjs'
 
@@ -229,7 +230,7 @@ export function OperationalFactWorkspace({
 
   const activeSelectedRow = selectedByKey[currentActiveKey] || null
   const productionHandling = outletContext?.workflowTaskNavigation?.productionHandling
-  const [taskReviewOpen, setTaskReviewOpen] = useState(false)
+  const [productionReviewID, setProductionReviewID] = useState(null)
   const taskReviewRef = useRef(0)
   const taskContext = operationalFactTaskContext(
     currentActiveKey,
@@ -642,6 +643,13 @@ export function OperationalFactWorkspace({
   const selectedIsProductionCompletion =
     currentActiveKey === 'production' &&
     isFinishedGoodsReceipt(activeSelectedRow)
+  const reviewProductBeforePost =
+    currentActiveKey === 'production' &&
+    Boolean(operationalFactProductID(currentActiveKey, activeSelectedRow))
+  const productionReviewOpen =
+    currentActiveKey === 'production' &&
+    productionReviewID !== null &&
+    activeSelectedRow?.id === productionReviewID
   const postButtonLabel = selectedIsProductionCompletion
     ? '确认成品入库'
     : '过账'
@@ -884,8 +892,28 @@ export function OperationalFactWorkspace({
       activeSelectedRow?.status !== OperationalFactStatus.DRAFT || !canPostSelected ||
       sourceBoundDraftTransitionBlocked) return
     taskReviewRef.current = productionHandling.taskID
-    setTaskReviewOpen(true)
+    setProductionReviewID(activeSelectedRow.id)
   }, [productionHandling, activeSelectedRow, canPostSelected, sourceBoundDraftTransitionBlocked])
+  const postButton = (
+    <Button
+      size="small"
+      type="primary"
+      className="erp-business-module-status-action"
+      icon={<CheckCircleOutlined />}
+      data-business-action-key="operational-fact-post"
+      data-business-action-role="primary"
+      onClick={reviewProductBeforePost ? () => setProductionReviewID(activeSelectedRow.id) : undefined}
+      disabled={
+        !activeSelectedRow ||
+        activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
+        !canPostSelected ||
+        sourceBoundDraftTransitionBlocked ||
+        saving
+      }
+    >
+      {postButtonLabel}
+    </Button>
+  )
   const LayoutRoot = productionRecordsWorkspace
     ? React.Fragment
     : BusinessPageLayout
@@ -1137,37 +1165,23 @@ export function OperationalFactWorkspace({
                           : ''
               }
             >
-              <Popconfirm
-                title={postConfirmTitle}
-                onConfirm={() =>
-                  runRowAction(
-                    activeConfig,
-                    activeSelectedRow,
-                    'post',
-                    postButtonLabel
-                  )
-                }
-                okText="确认"
-                cancelText="取消"
-              >
-                <Button
-                  size="small"
-                  type="primary"
-                  className="erp-business-module-status-action"
-                  icon={<CheckCircleOutlined />}
-                  data-business-action-key="operational-fact-post"
-                  data-business-action-role="primary"
-                  disabled={
-                    !activeSelectedRow ||
-                    activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
-                    !canPostSelected ||
-                    sourceBoundDraftTransitionBlocked ||
-                    saving
+              {reviewProductBeforePost ? postButton : (
+                <Popconfirm
+                  title={postConfirmTitle}
+                  onConfirm={() =>
+                    runRowAction(
+                      activeConfig,
+                      activeSelectedRow,
+                      'post',
+                      postButtonLabel
+                    )
                   }
+                  okText="确认"
+                  cancelText="取消"
                 >
-                  {postButtonLabel}
-                </Button>
-              </Popconfirm>
+                  {postButton}
+                </Popconfirm>
+              )}
             </BusinessActionTooltip>
           ) : null}
           {currentActiveKey === 'production' && canEditAnyProductionDraft ? (
@@ -1837,10 +1851,10 @@ export function OperationalFactWorkspace({
       <ProductionRecordDrawer
         title="核对本次生产记录"
         summary={productionFactSummary(activeSelectedRow || {})}
-        open={taskReviewOpen}
+        open={productionReviewOpen}
         record={activeSelectedRow}
         columns={columns}
-        onClose={saving ? undefined : () => setTaskReviewOpen(false)}
+        onClose={saving ? undefined : () => setProductionReviewID(null)}
         actions={
           <Button
             type="primary"
@@ -1849,7 +1863,7 @@ export function OperationalFactWorkspace({
             onClick={async () => {
               if (!canPostSelected || sourceBoundDraftTransitionBlocked || activeSelectedRow?.status !== OperationalFactStatus.DRAFT) return
               const success = await runRowAction(activeConfig, activeSelectedRow, 'post', postButtonLabel)
-              if (success) setTaskReviewOpen(false)
+              if (success) setProductionReviewID(null)
             }}
           >
             {postButtonLabel}

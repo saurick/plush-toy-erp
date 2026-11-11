@@ -6,11 +6,17 @@ export function shipmentGrossNetWeightError(netWeightG, grossWeightKg) {
   const gross = numeric20Scale6Units(grossWeightKg)
   if (net === null || gross === null) return ''
   return compareUnsignedDecimalStrings(`${gross}000`, net) < 0
-    ? '毛重不能小于总净重，请核对千克与克的单位'
+    ? '毛重不能小于总净重，请核对录入的重量和单位'
     : ''
 }
 
 const DECIMAL_SCALE = NumericContract.scale
+const KILOGRAM_DECIMAL_SHIFT = 3
+const NET_WEIGHT_ENTRY_PATTERN = /^(-?)(?:(\d+)(?:\.(\d*))?|\.(\d+))$/u
+export const SHIPMENT_NET_WEIGHT_ENTRY_SCALE = Object.freeze({
+  kg: DECIMAL_SCALE + KILOGRAM_DECIMAL_SHIFT,
+  g: DECIMAL_SCALE,
+})
 const MAX_NET_WEIGHT_SCALED = NumericContract.maxUnits
 const HALF_DECIMAL_FACTOR_TEXT = '5'.padEnd(DECIMAL_SCALE, '0')
 const POSITIVE_DECIMAL_PATTERN =
@@ -136,12 +142,40 @@ function normalizedDecimal(value) {
     : null
 }
 
-function formatScaledDecimal(value) {
+function formatScaledDecimal(value, scale = DECIMAL_SCALE) {
   const scaled = stripLeadingZeros(value)
-  const padded = scaled.padStart(DECIMAL_SCALE + 1, '0')
-  const integer = stripLeadingZeros(padded.slice(0, -DECIMAL_SCALE))
-  const fraction = padded.slice(-DECIMAL_SCALE).replace(/0+$/u, '')
+  const padded = scaled.padStart(scale + 1, '0')
+  const integer = stripLeadingZeros(padded.slice(0, -scale))
+  const fraction = padded.slice(-scale).replace(/0+$/u, '')
   return fraction ? `${integer}.${fraction}` : integer
+}
+
+export function parseShipmentNetWeightEntry(value) {
+  const text = String(value ?? '').trim()
+  // InputNumber converts scientific notation through Number, which can round the original reading.
+  return !text || NET_WEIGHT_ENTRY_PATTERN.test(text) ? text : 'NaN'
+}
+
+function shiftNetWeightEntry(value, places) {
+  const text = String(value ?? '').trim()
+  if (!text) return null
+  const match = NET_WEIGHT_ENTRY_PATTERN.exec(text)
+  if (!match) throw new TypeError('实际总净重应为十进制数值')
+  const [, sign, whole = '', fraction, leadingFraction] = match
+  const tail = fraction ?? leadingFraction ?? ''
+  const digits = stripLeadingZeros(`${whole}${tail}`)
+  if (digits === '0') return '0'
+  const scale = tail.length - places
+  const amount = scale > 0 ? formatScaledDecimal(digits, scale) : `${digits}${'0'.repeat(-scale)}`
+  return `${sign}${amount}`
+}
+
+export function shipmentNetWeightEntryFromGrams(value, unit) {
+  return shiftNetWeightEntry(value, unit === 'kg' ? -KILOGRAM_DECIMAL_SHIFT : 0)
+}
+
+export function shipmentNetWeightEntryToGrams(value, unit) {
+  return shiftNetWeightEntry(value, unit === 'kg' ? KILOGRAM_DECIMAL_SHIFT : 0)
 }
 
 function roundProductToWeightScale(value) {

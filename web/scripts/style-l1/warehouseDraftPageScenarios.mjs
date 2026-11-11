@@ -1,6 +1,7 @@
 import { expect } from 'playwright/test'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
+import { installImages } from './productIdentityScenarios.mjs'
 
 export function createWarehouseDraftPageScenarios(deps) {
   return [
@@ -32,6 +33,7 @@ export function createWarehouseDraftPageScenarios(deps) {
       beforeNavigate: async (page) => {
         writes = []
         posts = []
+        if (kind === 'CYCLE_COUNT') await installImages(page)
         record = {
           id: 991,
           operation_no: `SIM-DRAFT-${kind}`,
@@ -48,6 +50,7 @@ export function createWarehouseDraftPageScenarios(deps) {
               line_no: 1,
               subject_type: 'PRODUCT',
               subject_id: 1,
+              subject_name: '模拟盘点小熊',
               product_sku_id: 1,
               from_warehouse_id: 1,
               from_lot_id: 402,
@@ -130,6 +133,13 @@ export function createWarehouseDraftPageScenarios(deps) {
         const row = page
           .getByRole('row')
           .filter({ hasText: record.operation_no })
+        if (kind === 'CYCLE_COUNT') {
+          await expect(row.locator('.erp-product-identity')).toHaveCount(0)
+          await row.getByRole('button', { name: '核对', exact: true }).click()
+          const detail = page.getByRole('dialog', { name: /库存作业明细/ })
+          await expect(detail.getByRole('button', { name: '查看模拟盘点小熊大图' }).locator('img')).toBeVisible()
+          await detail.locator('button.ant-modal-close').click()
+        }
         await row.getByRole('button', { name: '编辑草稿', exact: true }).click()
         const editor = page.locator(
           '.erp-inventory-operation-modal.erp-business-form-page:not([hidden])'

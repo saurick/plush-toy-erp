@@ -3536,22 +3536,20 @@ function buildPreviewEntry({ item, kind, customerKey, sourceRef, flowByKey }) {
   })
 }
 
-function buildRuntimeProcessSelection(
-  item,
-  customerKey,
-  sourceRef,
-  processDefinitionByIdentity
-) {
+function processDefinitionIdentity({ processKey, processVersion, variantKey, businessRefType }) {
+  return [processKey, processVersion, variantKey, businessRefType].join('/')
+}
+
+const processDefinitionByIdentity = new Map(
+  processDefinitions.map((definition) => [processDefinitionIdentity(definition), definition])
+)
+
+export function buildRuntimeProcessSelection(item, customerKey, sourceRef) {
   const processKey = item?.processKey || ''
   const processVersion = item?.processVersion || ''
   const variantKey = item?.variantKey || ''
   const businessRefType = item?.businessRefType || ''
-  const identity = [
-    processKey,
-    processVersion,
-    variantKey,
-    businessRefType,
-  ].join('/')
+  const identity = processDefinitionIdentity({ processKey, processVersion, variantKey, businessRefType })
   const canonicalProcessDefinition =
     processDefinitionByIdentity.get(identity) || null
   const sameProcess = processDefinitions.filter(
@@ -3593,11 +3591,7 @@ function buildRuntimeProcessSelection(
   })
 }
 
-function buildCustomerOverlay(
-  registration,
-  flowByKey,
-  processDefinitionByIdentity
-) {
+function buildCustomerOverlay(registration, flowByKey) {
   const customerPackage = registration?.customerPackage || {}
   const sourceRef = registration?.sourceRef || ''
   const customerKey = customerPackage.customerKey || ''
@@ -3649,14 +3643,7 @@ function buildCustomerOverlay(
       (Array.isArray(customerPackage.runtimeProcessSelections)
         ? customerPackage.runtimeProcessSelections
         : []
-      ).map((item) =>
-        buildRuntimeProcessSelection(
-          item,
-          customerKey,
-          sourceRef,
-          processDefinitionByIdentity
-        )
-      )
+      ).map((item) => buildRuntimeProcessSelection(item, customerKey, sourceRef))
     ),
     definition: customerPackage,
   })
@@ -3693,25 +3680,9 @@ export function buildDevFlowStateCatalog({
     throw new Error('flow catalog references an unknown scope')
   }
   const flowByKey = new Map(flows.map((item) => [item.key, item]))
-  const processDefinitionByIdentity = new Map(
-    processDefinitions.map((definition) => [
-      [
-        definition.processKey,
-        definition.processVersion,
-        definition.variantKey,
-        definition.businessRefType,
-      ].join('/'),
-      definition,
-    ])
-  )
   const overlays = Object.freeze(
     (Array.isArray(customerPackages) ? customerPackages : []).map(
-      (registration) =>
-        buildCustomerOverlay(
-          registration,
-          flowByKey,
-          processDefinitionByIdentity
-        )
+      (registration) => buildCustomerOverlay(registration, flowByKey)
     )
   )
   const factLedgerCatalog = buildDevFactLedgerCatalog({ flows })

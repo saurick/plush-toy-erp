@@ -477,7 +477,7 @@ super admin 当前保留查看和催办类诊断边界，但不通过普通任�
 
 该机制不是长期 break-glass session、审批流、客户可见岗位能力或生产放行证据。它们不写库存、出货、质检、财务或其他 Fact，也不暴露 entitlement ID、user-level 候选人或全局候选人清单。
 
-任务读取接口 `get_task / list_tasks / get_task_board / get_workbench / list_role_tasks` 返回可选只读 `display_context`，只投影识别任务所需的 `source_no` 和产品 / 物料 `kind、name、code、style_no、order_no`，产品项还包含 `product_id、image_attachment_id`（仅当前主图 ID；不返回图片内容）。
+任务读取接口 `get_task / list_tasks / get_task_board / get_workbench / list_role_tasks` 返回可选只读 `display_context`，只投影识别任务所需的 `source_no` 和产品 / 物料 `kind、name、code、style_no、order_no`，产品项还包含 `product_id、image_attachment_id、has_product_images`。主图 ID 为 0 表示未设置主图；有未撤销的主图、辅图或附图时，`has_product_images` 为 true。该标记只用于展示相册入口，查看相册和实际图片仍要求 `product.read`；物料项不提供产品图。
 
 采购订单来源另外返回 `source_line_count`，它只统计真实采购明细行，不受产品 / 物料识别项展开或去重影响；其他来源暂返回 null。仅对任务已经可见且 ProcessRuntime 来源绑定一致，或命中既有正式来源任务生产者合同的记录批量读取；不输出价格、客户或完整单据，也不扩大原单据查看权限。
 
@@ -757,6 +757,8 @@ Product Core 登记六个 process key：销售、采购和 Shipment 三条可配
 
 **委外**
 
+委外事实的 `subject_name / subject_code` 取对应委外订单行的冻结名称和编号。须同时匹配订单、行和产品或材料；历史没有快照时留空。仓库委外回货按事实中的产品对象及现有产品图片权限查看产品图。
+
 | 方法 | 中文名称 | 用途 |
 | --- | --- | --- |
 | `cancel_outsourcing_fact` | 取消委外事实 | 按当前状态和关联约束取消委外事实，保留业务追溯。 |
@@ -765,7 +767,7 @@ Product Core 登记六个 process key：销售、采购和 Shipment 三条可配
 | `create_outsourcing_return_disposition` | 创建委外退货处置 | 登记委外退货处置，供后续业务办理和追溯。 |
 | `create_outsourcing_return_receipt_from_order` | 从委外单创建收货 | 从委外单创建收货，保留对应来源关系供追溯。 |
 | `get_outsourcing_return_disposition` | 查看委外退货处置 | 读取委外退货处置详情，供业务核对。 |
-| `list_outsourcing_facts` | 查询委外事实 | 读取委外事实，供列表查询、引用和追溯。 |
+| `list_outsourcing_facts` | 查询委外事实 | 读取委外事实及对应订单行的存货名称、编号，供列表查询、引用和追溯。 |
 | `list_outsourcing_return_dispositions` | 查询委外退货处置 | 读取委外退货处置，供列表查询、引用和追溯。 |
 | `post_outsourcing_fact` | 过账委外事实 | 对委外事实执行领域过账，结果以业务回执及事实记录为准。 |
 | `post_outsourcing_return_disposition` | 过账委外退货处置 | 对委外退货处置执行领域过账，结果以业务回执及事实记录为准。 |
@@ -774,6 +776,8 @@ Product Core 登记六个 process key：销售、采购和 Shipment 三条可配
 
 **生产**
 
+生产异常记录的 `source_identity` 是只读投影。产品处置沿同一生产单下的在制批次和订单行带出产品、冻结款号 / 规格和批次；超领只带本次用料需求的材料，无产品图。无法确认来源时返回 null。查看图片继续使用产品图片权限。
+
 | 方法 | 中文名称 | 用途 |
 | --- | --- | --- |
 | `cancel_production_exception` | 取消生产异常 | 按当前状态和关联约束取消生产异常，保留业务追溯。 |
@@ -781,9 +785,9 @@ Product Core 登记六个 process key：销售、采购和 Shipment 三条可配
 | `create_production_completion_from_order` | 从生产订单登记完工 | 从生产订单登记完工，保留对应来源关系供追溯。 |
 | `create_production_material_issue_from_order` | 从生产订单登记领料 | 从生产订单登记领料，保留对应来源关系供追溯。 |
 | `create_production_rework_from_completion` | 从完工登记返工 | 从完工登记返工，保留对应来源关系供追溯。 |
-| `get_production_exception` | 查看生产异常 | 读取生产异常详情，供业务核对。 |
+| `get_production_exception` | 查看生产异常 | 读取处置状态和对应的产品、批次或材料，供核对和执行。 |
 | `get_production_exception_context` | 查看生产异常处理上下文 | 读取生产异常处理上下文详情，供业务核对。 |
-| `list_production_exceptions` | 查询生产异常 | 读取生产异常，供列表查询、引用和追溯。 |
+| `list_production_exceptions` | 查询生产异常 | 分页读取处置记录及对应的产品、批次或材料。 |
 | `list_production_facts` | 查询生产事实 | 读取生产事实，供列表查询、引用和追溯。 |
 | `list_production_order_material_requirements` | 查询生产订单用料需求 | 读取生产订单用料需求，供列表查询、引用和追溯。 |
 | `post_production_fact` | 过账生产事实 | 对生产事实执行领域过账，结果以业务回执及事实记录为准。 |
@@ -911,7 +915,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 `get_production_wip` 需要 `production.wip.read`；生产订单的 `get_production_order` / `list_production_orders` 同时接受 `pmc.plan.read` 或 `production.wip.read`，但新建、编辑、发布、关闭、取消和引用选项仍只属于 PMC 计划权限。这样业务岗位可进入生产订单页只读核对路线并办理包材确认，不会获得生产计划维护权。
 
-`list_warehouse_production_work` 的 `kind=RETURN` 使用 `production.wip.read` 查询未绑定库存仓的工序回货，`kind=RECEIPT` 使用 `production.fact.read` 查询成品收仓并应用仓库数据范围。两类都只读，按 `keyword / stage` 筛选后分页，`counts` 统计同关键词及可读范围内的全部阶段，空字符串键表示全部。结果按确切收仓记录投影待检、待包装数量及下一步工序动作，正式写入继续走原过账和 WIP 接口；不返回财务字段。包装批次的本厂安排使用 `warehouse.packaging.execute`，其他工序安排、批次拆分和取消继续要求 `production.wip.assign`。
+`list_warehouse_production_work` 的 `kind=RETURN` 使用 `production.wip.read` 查询未绑定库存仓的工序回货，`kind=RECEIPT` 使用 `production.fact.read` 查询成品收仓并应用仓库数据范围。两类都只读，按 `keyword / stage` 筛选后分页，`counts` 统计同关键词及可读范围内的全部阶段，空字符串键表示全部。结果按确切收仓记录投影待检、待包装数量及下一步工序动作。工序回货的 `product_id` 来自批次对应的生产订单行，成品收仓来自收仓事实的成品对象，客户端用该关联读取产品图。正式写入继续走原过账和 WIP 接口；不返回财务字段。包装批次的本厂安排使用 `warehouse.packaging.execute`，其他工序安排、批次拆分和取消继续要求 `production.wip.assign`。
 
 固定路线和首个 WIP 批次只在生产订单发布事务中冻结；缺失或损坏的路线必须修复工序主档绑定后重新发布，不提供事后初始化接口。工序主档以唯一 `production_route_operation_code` 显式绑定四个标准路线位置，不从名称、类别、普通工序编码或排序推断。
 
@@ -1214,7 +1218,7 @@ ProcessRuntime 入库命令只在上述来源交接全部完成后记录 durable
 | `clear_product_image` | 清除产品图片引用 | 清除产品图片引用，用于业务附件的对应办理或核对。 |
 | `download_attachment` | 下载业务附件 | 下载业务附件，用于业务附件的对应办理或核对。 |
 | `list_attachments` | 查询业务附件 | 读取业务附件，供列表查询、引用和追溯。 |
-| `list_document_product_previews` | 查询单据产品图片摘要 | 批量读取销售订单、生产订单、产品委外单的关联产品款数与首款身份，供列表认货。 |
+| `list_document_product_previews` | 查询单据产品图片摘要 | 批量读取销售、生产、委外单据的关联产品款数与首款身份；点开委外单相册时可读取完整产品集合。 |
 | `list_material_image_references` | 查询材料参考图引用 | 批量读取材料的实物参考图引用，供库存和档案按需加载。 |
 | `list_product_image_references` | 查询产品图片引用 | 读取产品图片引用，供列表查询、引用和追溯。 |
 | `upload_attachment` | 上传业务附件 | 上传业务附件，用于业务附件的对应办理或核对。 |
@@ -1232,9 +1236,11 @@ ProcessRuntime 入库命令只在上述来源交接全部完成后记录 durable
 
 `list_material_image_references` 接受 1–80 个正 JSON 安全整数 `material_ids`，去重后返回 `images: [{material_id, image_attachment_id}]`；没有参考图或材料不存在时 ID 为 `0`。原图和 160px 缩略图按附件 ID 通过 `download_attachment` 读取，仍校验其材料归属与权限。`clear_material_image` 要求正整数 `material_id` 与 `id`，只移除匹配的引用，重试或旧 ID 不会删掉新图。参考图不能走普通附件撤销。
 
-`list_document_product_previews(source_type, document_ids)` 只读支持 `sales_order / production_order / outsourcing_order`，每批接受 1–80 个互不重复的正 JSON 安全整数。每张单据返回 `document_id、product_count、product_id、product_name、product_code`；款数按全部明细中仍存在的正式 `product_id` 去重，相同产品的多行或 SKU 只算一款，未关联需求和物料行不计入。首款按产品 ID 稳定选择，名称和编号读取当前产品主数据；没有关联产品时款数和产品 ID 均为 0，名称和编号为空，不从业务快照按名称猜测产品。查询按单据集合一次分组，不逐单读取明细，不返回图片内容。
+`list_document_product_previews(source_type, document_ids)` 只读支持 `sales_order / production_order / outsourcing_order`，每批接受 1–80 个互不重复的正 JSON 安全整数。每张单据返回 `document_id、product_count、product_id、product_name、product_code、style_no、customer_style_no`。销售和生产按直接产品明细去重；委外同时读取合同来源在制批次和明细的正式工序分配，从生产明细取产品。同款重复行、SKU 或多条关联只算一款。代表项按产品 ID 稳定选择；名称、编号、内部款号和客户款号来自同一款的当前产品主数据，未填写的款号为空字符串。没有正式关联时款数和 ID 均为 0，产品文字字段为空；共享材料、来源单号文本和手填款号不会推断产品。摘要按单据集合分组，不逐单加载明细。
 
-该摘要同时要求 `product.read` 及来源读取权限：销售订单要求 `sales_order.read + sales_order_item.read`，生产订单要求 `pmc.plan.read`，委外单要求 `outsourcing_order.read`。图片仍从产品当前主图、辅图读取；列表只在进入视口后批量取摘要与主图缩略图，打开图集后才通过原明细接口读取全部产品并按需下载原图。物料没有产品媒体槽，不能按名称、款号快照或采购用途借用产品图片。
+打开委外图集时传 `include_products: true` 和单个 `document_ids`；响应额外包含 `previews[].products`（产品 ID、名称和编号按 ID 排序），与摘要按同一关联查询生成。可带正整数 `expected_version` 核对当前合同版本；列表请求不传该参数。查询不返回图片内容。
+
+摘要和委外图集同时要求 `product.read` 及来源读取权限：销售订单要求 `sales_order.read + sales_order_item.read`，生产订单要求 `pmc.plan.read`，委外单要求 `outsourcing_order.read`。列表只在进入视口后取摘要和主图缩略图，打开图集后才读完整产品并按需下载照片。材料合同的产品图用于识别对应款式，加工对象及收发料仍为原材料。
 
 产品图片写入要求 `product.update` 和 `products=enabled`；上传或清空在同一事务内锁定 `products` 行，同槽替换失败会回滚并保留旧图，数据库 partial unique index 再约束每个产品 / 槽位最多一行。
 
@@ -7832,8 +7838,10 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `document_ids` | array | 必填 | 拒绝条件：“!ok &#124;&#124; len(values) == 0 &#124;&#124; len(values) > biz.DocumentProductPreviewBatchLimit”。 依据：`server/internal/service/jsonrpc_document_product_preview.go:22`。 |
-| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_document_product_preview.go:12`。 |
+| `document_ids` | array | 必填 | 拒绝条件：“!ok &#124;&#124; len(values) == 0 &#124;&#124; len(values) > biz.DocumentProductPreviewBatchLimit”。 依据：`server/internal/service/jsonrpc_document_product_preview.go:23`。 |
+| `expected_version` | integer | 条件必填（expected_version 有值） | 解析器 `positiveSafeIntegerParam`；调用 `positiveSafeIntegerParam(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_document_product_preview.go:41`。 |
+| `include_products` | boolean &#124; null | 可选 | 解析器 `getOptionalJSONRPCBool`；调用 `getOptionalJSONRPCBool(pm, "include_products")`。 依据：`server/internal/service/jsonrpc_document_product_preview.go:35`。 |
+| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_document_product_preview.go:13`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -7845,7 +7853,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "document_ids": [
       11
     ],
-    "source_type": "sales_order"
+    "expected_version": 3,
+    "include_products": true,
+    "source_type": "outsourcing_order"
   },
   "id": "rpc-demo-attachment.list_document_product_previews"
 }
@@ -7863,18 +7873,35 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.previews` | array | 依据：`server/internal/service/jsonrpc_document_product_preview.go:45`。 |
-| `result.data.previews[]` | object | 依据：`server/internal/service/jsonrpc_document_product_preview.go:40`。 |
+| `result.data.previews` | array | 依据：`server/internal/service/jsonrpc_document_product_preview.go:70`。 |
+| `result.data.previews[]` | object | 依据：`server/internal/service/jsonrpc_document_product_preview.go:56`。 |
 
 **`previews[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.previews[].document_id` | integer | 依据：`server/internal/service/jsonrpc_document_product_preview.go:41`。 |
-| `result.data.previews[].product_code` | string | 依据：`server/internal/service/jsonrpc_document_product_preview.go:42`。 |
-| `result.data.previews[].product_count` | integer | 依据：`server/internal/service/jsonrpc_document_product_preview.go:41`。 |
-| `result.data.previews[].product_id` | integer | 依据：`server/internal/service/jsonrpc_document_product_preview.go:42`。 |
-| `result.data.previews[].product_name` | string | 依据：`server/internal/service/jsonrpc_document_product_preview.go:42`。 |
+| `result.data.previews[].customer_style_no` | string | 依据：`server/internal/service/jsonrpc_document_product_preview.go:59`。 |
+| `result.data.previews[].document_id` | integer | 依据：`server/internal/service/jsonrpc_document_product_preview.go:57`。 |
+| `result.data.previews[].product_code` | string | 依据：`server/internal/service/jsonrpc_document_product_preview.go:58`。 |
+| `result.data.previews[].product_count` | integer | 依据：`server/internal/service/jsonrpc_document_product_preview.go:57`。 |
+| `result.data.previews[].product_id` | integer | 依据：`server/internal/service/jsonrpc_document_product_preview.go:58`。 |
+| `result.data.previews[].product_name` | string | 依据：`server/internal/service/jsonrpc_document_product_preview.go:58`。 |
+| `result.data.previews[].products` | array | 后端返回映射。 |
+| `result.data.previews[].products[]` | object | 依据：`server/internal/service/jsonrpc_document_product_preview.go:64`。 |
+
+**`previews[].products[]`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.previews[].products[].product_code` | string | 依据：`server/internal/service/jsonrpc_document_product_preview.go:64`。 |
+| `result.data.previews[].products[].product_id` | integer | 依据：`server/internal/service/jsonrpc_document_product_preview.go:64`。 |
+| `result.data.previews[].products[].product_name` | string | 依据：`server/internal/service/jsonrpc_document_product_preview.go:64`。 |
+
+**`previews[]`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.previews[].style_no` | string | 依据：`server/internal/service/jsonrpc_document_product_preview.go:59`。 |
 
 ```json
 {
@@ -7886,11 +7913,25 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "data": {
       "previews": [
         {
+          "customer_style_no": "DEMO-CUSTOMER",
           "document_id": 11,
           "product_code": "DEMO-BEAR",
           "product_count": 2,
           "product_id": 7,
-          "product_name": "模拟小熊"
+          "product_name": "模拟小熊",
+          "products": [
+            {
+              "product_code": "DEMO-BEAR",
+              "product_id": 7,
+              "product_name": "模拟小熊"
+            },
+            {
+              "product_code": "DEMO-RABBIT",
+              "product_id": 8,
+              "product_name": "模拟小兔"
+            }
+          ],
+          "style_no": "DEMO-INTERNAL"
         }
       ]
     }
@@ -7898,7 +7939,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 }
 ```
 
-样例依据：[TestJsonrpcDocumentProductPreviews](../internal/service/jsonrpc_document_product_preview_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+样例依据：[TestJsonrpcDocumentProductGallery](../internal/service/jsonrpc_document_product_preview_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
 #### 查询材料参考图引用 `attachment.list_material_image_references`
 
@@ -12237,16 +12278,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.source_readback.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:370`。 |
 | `result.data.source_readback.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:371`。 |
 | `result.data.source_readback.source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:342`。 |
+| `result.data.source_readback.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`source_readback.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.source_readback.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`source_readback`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.source_readback.source_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:343`。 |
 | `result.data.source_readback.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:341`。 |
 | `result.data.source_readback.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:351`。 |
 | `result.data.source_readback.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.submitted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
-
-**`source_readback`（续）**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
 | `result.data.source_readback.submitted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
 | `result.data.source_readback.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.target_supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -13155,16 +13208,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.source_readback.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:370`。 |
 | `result.data.source_readback.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:371`。 |
 | `result.data.source_readback.source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:342`。 |
+| `result.data.source_readback.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`source_readback.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.source_readback.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`source_readback`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.source_readback.source_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:343`。 |
 | `result.data.source_readback.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:341`。 |
 | `result.data.source_readback.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:351`。 |
 | `result.data.source_readback.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.submitted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
-
-**`source_readback`（续）**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
 | `result.data.source_readback.submitted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
 | `result.data.source_readback.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.target_supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -14073,16 +14138,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.source_readback.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:370`。 |
 | `result.data.source_readback.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:371`。 |
 | `result.data.source_readback.source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:342`。 |
+| `result.data.source_readback.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`source_readback.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.source_readback.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`source_readback`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.source_readback.source_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:343`。 |
 | `result.data.source_readback.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:341`。 |
 | `result.data.source_readback.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:351`。 |
 | `result.data.source_readback.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.submitted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
-
-**`source_readback`（续）**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
 | `result.data.source_readback.submitted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
 | `result.data.source_readback.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.target_supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -15336,16 +15413,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.source_readback.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:370`。 |
 | `result.data.source_readback.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:371`。 |
 | `result.data.source_readback.source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:342`。 |
+| `result.data.source_readback.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`source_readback.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.source_readback.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`source_readback`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.source_readback.source_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:343`。 |
 | `result.data.source_readback.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:341`。 |
 | `result.data.source_readback.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:351`。 |
 | `result.data.source_readback.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.submitted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
-
-**`source_readback`（续）**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
 | `result.data.source_readback.submitted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
 | `result.data.source_readback.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.target_supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -17064,16 +17153,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.source_readback.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:370`。 |
 | `result.data.source_readback.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:371`。 |
 | `result.data.source_readback.source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:342`。 |
+| `result.data.source_readback.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`source_readback.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.source_readback.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`source_readback`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.source_readback.source_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:343`。 |
 | `result.data.source_readback.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:341`。 |
 | `result.data.source_readback.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:351`。 |
 | `result.data.source_readback.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.submitted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
-
-**`source_readback`（续）**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
 | `result.data.source_readback.submitted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
 | `result.data.source_readback.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.target_supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -17929,16 +18030,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.source_readback.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:370`。 |
 | `result.data.source_readback.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:371`。 |
 | `result.data.source_readback.source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:342`。 |
+| `result.data.source_readback.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`source_readback.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.source_readback.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`source_readback`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.source_readback.source_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:343`。 |
 | `result.data.source_readback.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:341`。 |
 | `result.data.source_readback.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:351`。 |
 | `result.data.source_readback.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.submitted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
-
-**`source_readback`（续）**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
 | `result.data.source_readback.submitted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
 | `result.data.source_readback.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.target_supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -19333,16 +19446,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.source_readback.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:370`。 |
 | `result.data.source_readback.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:371`。 |
 | `result.data.source_readback.source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:342`。 |
+| `result.data.source_readback.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`source_readback.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.source_readback.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`source_readback`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.source_readback.source_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:343`。 |
 | `result.data.source_readback.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:341`。 |
 | `result.data.source_readback.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:351`。 |
 | `result.data.source_readback.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.submitted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
-
-**`source_readback`（续）**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
 | `result.data.source_readback.submitted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
 | `result.data.source_readback.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.target_supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -24645,16 +24770,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.source_readback.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:370`。 |
 | `result.data.source_readback.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:371`。 |
 | `result.data.source_readback.source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:342`。 |
+| `result.data.source_readback.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`source_readback.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.source_readback.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`source_readback`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.source_readback.source_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:343`。 |
 | `result.data.source_readback.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:341`。 |
 | `result.data.source_readback.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:351`。 |
 | `result.data.source_readback.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.submitted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
-
-**`source_readback`（续）**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
 | `result.data.source_readback.submitted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
 | `result.data.source_readback.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.target_supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -26026,16 +26163,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.source_readback.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:370`。 |
 | `result.data.source_readback.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:371`。 |
 | `result.data.source_readback.source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:342`。 |
+| `result.data.source_readback.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`source_readback.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.source_readback.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`source_readback`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.source_readback.source_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:343`。 |
 | `result.data.source_readback.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:341`。 |
 | `result.data.source_readback.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:351`。 |
 | `result.data.source_readback.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.submitted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
-
-**`source_readback`（续）**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
 | `result.data.source_readback.submitted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
 | `result.data.source_readback.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.target_supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -27420,16 +27569,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.source_readback.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:370`。 |
 | `result.data.source_readback.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:371`。 |
 | `result.data.source_readback.source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:342`。 |
+| `result.data.source_readback.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`source_readback.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.source_readback.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.source_readback.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.source_readback.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`source_readback`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.source_readback.source_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:343`。 |
 | `result.data.source_readback.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:341`。 |
 | `result.data.source_readback.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_finance_payment.go:351`。 |
 | `result.data.source_readback.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.submitted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
-
-**`source_readback`（续）**
-
-| 返回字段 | 类型 | 说明 |
-| --- | --- | --- |
 | `result.data.source_readback.submitted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory_operation.go:333`。 |
 | `result.data.source_readback.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.source_readback.target_supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -38802,12 +38963,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.outsourcing_fact.source_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+
+**`outsourcing_fact`（续）**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.outsourcing_fact.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 
@@ -38843,7 +39011,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "source_no": null,
         "source_type": null,
         "status": "CANCELLED",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "MATERIAL",
         "supplier_id": null,
         "supplier_name": null,
@@ -38867,10 +39037,10 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:198`。 |
-| `expected_version` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "expected_version", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:225`。 |
-| `id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:225`。 |
-| `reason` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "reason")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:225`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:208`。 |
+| `expected_version` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "expected_version", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:235`。 |
+| `id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:235`。 |
+| `reason` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "reason")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:235`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -38899,34 +39069,34 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:248`。 |
+| `result.data.outsourcing_return_disposition` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:258`。 |
 
 **`outsourcing_return_disposition`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition.cancel_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.cancelled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.cancelled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.created_by` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.disposition_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.disposition_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.outsourcing_return_fact_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.posted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.posted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.production_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.quality_inspection_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.result_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_disposition.cancel_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.cancelled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.cancelled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.created_by` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.disposition_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.disposition_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.outsourcing_return_fact_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.posted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.posted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.production_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.quality_inspection_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.result_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 **`outsourcing_return_disposition`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_disposition.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 ```json
 {
@@ -39036,6 +39206,23 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.production_exception.reverse_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+| `result.data.production_exception.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`production_exception.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.production_exception.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.production_exception.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.production_exception.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`production_exception`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.production_exception.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -40030,12 +40217,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.outsourcing_fact.source_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+
+**`outsourcing_fact`（续）**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.outsourcing_fact.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 
@@ -40071,7 +40265,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "source_no": null,
         "source_type": "OUTSOURCING_ORDER",
         "status": "DRAFT",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "MATERIAL",
         "supplier_id": null,
         "supplier_name": null,
@@ -40095,14 +40291,14 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:198`。 |
-| `disposition_no` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "disposition_no")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:215`。 |
-| `disposition_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "disposition_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:215`。 |
-| `idempotency_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "idempotency_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:215`。 |
-| `production_wip_batch_id` | integer | 可选 | 解析器 `getOptionalInt`；调用 `getOptionalInt(pm, "production_wip_batch_id")`。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:215`。 |
-| `quality_inspection_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "quality_inspection_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:215`。 |
-| `quantity` | string | 必填 | 解析器 `getRequiredJSONRPCNumeric20Scale6`；调用 `getRequiredJSONRPCNumeric20Scale6(pm, "quantity")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:211`。 |
-| `reason` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "reason")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:215`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:208`。 |
+| `disposition_no` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "disposition_no")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:225`。 |
+| `disposition_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "disposition_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:225`。 |
+| `idempotency_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "idempotency_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:225`。 |
+| `production_wip_batch_id` | integer | 可选 | 解析器 `getOptionalInt`；调用 `getOptionalInt(pm, "production_wip_batch_id")`。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:225`。 |
+| `quality_inspection_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "quality_inspection_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:225`。 |
+| `quantity` | string | 必填 | 解析器 `getRequiredJSONRPCNumeric20Scale6`；调用 `getRequiredJSONRPCNumeric20Scale6(pm, "quantity")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:221`。 |
+| `reason` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "reason")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:225`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -40131,34 +40327,34 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:248`。 |
+| `result.data.outsourcing_return_disposition` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:258`。 |
 
 **`outsourcing_return_disposition`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition.cancel_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.cancelled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.cancelled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.created_by` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.disposition_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.disposition_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.outsourcing_return_fact_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.posted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.posted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.production_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.quality_inspection_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.result_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_disposition.cancel_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.cancelled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.cancelled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.created_by` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.disposition_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.disposition_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.outsourcing_return_fact_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.posted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.posted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.production_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.quality_inspection_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.result_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 **`outsourcing_return_disposition`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_disposition.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 ```json
 {
@@ -40280,12 +40476,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.outsourcing_fact.source_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+
+**`outsourcing_fact`（续）**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.outsourcing_fact.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 
@@ -40321,7 +40524,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "source_no": null,
         "source_type": "OUTSOURCING_ORDER",
         "status": "DRAFT",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "PRODUCT",
         "supplier_id": null,
         "supplier_name": null,
@@ -42375,8 +42580,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:198`。 |
-| `id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:230`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:208`。 |
+| `id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:240`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -42403,34 +42608,34 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:248`。 |
+| `result.data.outsourcing_return_disposition` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:258`。 |
 
 **`outsourcing_return_disposition`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition.cancel_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.cancelled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.cancelled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.created_by` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.disposition_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.disposition_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.outsourcing_return_fact_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.posted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.posted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.production_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.quality_inspection_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.result_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_disposition.cancel_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.cancelled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.cancelled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.created_by` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.disposition_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.disposition_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.outsourcing_return_fact_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.posted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.posted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.production_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.quality_inspection_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.result_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 **`outsourcing_return_disposition`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_disposition.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 ```json
 {
@@ -42537,6 +42742,23 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.production_exception.reverse_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+| `result.data.production_exception.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`production_exception.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.production_exception.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.production_exception.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.production_exception.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`production_exception`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.production_exception.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -42552,18 +42774,18 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "message": "OK",
     "data": {
       "production_exception": {
-        "approved_quantity": "DEMO",
+        "approved_quantity": "6",
         "decided_at": 1,
         "decided_by": 1,
-        "decision_no": "DEMO",
+        "decision_no": "PE-PHOTO-DEMO",
         "decision_reason": "DEMO",
-        "decision_type": "DEMO",
+        "decision_type": "SCRAP",
         "executed_at": 1,
         "executed_by": 1,
         "execution_reason": "DEMO",
-        "execution_status": "DEMO",
+        "execution_status": "PENDING",
         "id": 1,
-        "production_material_requirement_id": 1,
+        "production_material_requirement_id": null,
         "production_order_id": 1,
         "production_order_item_id": 1,
         "production_wip_batch_id": 1,
@@ -42571,11 +42793,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "reason": "DEMO",
         "requested_at": 1,
         "requested_by": 1,
-        "requested_quantity": "DEMO",
+        "requested_quantity": "6",
         "reverse_reason": "DEMO",
         "reversed_at": 1,
         "reversed_by": 1,
-        "status": "DEMO",
+        "source_identity": {
+          "batch_no": "WIP-PHOTO-DEMO",
+          "code": "PRODUCT-7",
+          "name": "模拟小熊",
+          "sku_code": "SKU-7",
+          "subject_id": 7,
+          "subject_type": "PRODUCT"
+        },
+        "status": "APPROVED",
         "stock_disposition_required": false,
         "target_operation_id": 1,
         "target_supplier_id": 1,
@@ -43593,12 +43823,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.outsourcing_facts[].source_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_facts[].source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_facts[].status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_facts[].subject_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_facts[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_facts[].subject_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_facts[].subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_facts[].supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_facts[].supplier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_facts[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_facts[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+
+**`outsourcing_facts[]`（续）**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.outsourcing_facts[].version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_facts[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 
@@ -43635,12 +43872,12 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:198`。 |
-| `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:235`。 |
-| `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:235`。 |
-| `outsourcing_return_fact_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "outsourcing_return_fact_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:235`。 |
-| `quality_inspection_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "quality_inspection_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:235`。 |
-| `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:235`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:208`。 |
+| `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:245`。 |
+| `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:245`。 |
+| `outsourcing_return_fact_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "outsourcing_return_fact_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:245`。 |
+| `quality_inspection_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "quality_inspection_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:245`。 |
+| `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:245`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -43665,41 +43902,41 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_dispositions` | array | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:243`。 |
-| `result.data.outsourcing_return_dispositions[]` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_dispositions` | array | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:253`。 |
+| `result.data.outsourcing_return_dispositions[]` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 **`outsourcing_return_dispositions[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_dispositions[].cancel_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].cancelled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].cancelled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].created_by` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].disposition_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].disposition_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].outsourcing_return_fact_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].posted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].posted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].production_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].quality_inspection_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].result_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_dispositions[].status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_dispositions[].cancel_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].cancelled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].cancelled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].created_by` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].disposition_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].disposition_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].outsourcing_return_fact_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].posted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].posted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].production_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].quality_inspection_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].result_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_dispositions[].status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 **`outsourcing_return_dispositions[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_dispositions[].version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_dispositions[].version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:243`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:253`。 |
 
 ```json
 {
@@ -43800,6 +44037,23 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.production_exceptions[].reverse_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exceptions[].reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exceptions[].reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+| `result.data.production_exceptions[].source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`production_exceptions[].source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.production_exceptions[].source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.production_exceptions[].source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exceptions[].source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exceptions[].source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.production_exceptions[].source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exceptions[].source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`production_exceptions[]`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.production_exceptions[].status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exceptions[].stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exceptions[].target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -44787,12 +45041,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.outsourcing_fact.source_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+
+**`outsourcing_fact`（续）**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.outsourcing_fact.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 
@@ -44828,7 +45089,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "source_no": null,
         "source_type": null,
         "status": "POSTED",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "MATERIAL",
         "supplier_id": null,
         "supplier_name": null,
@@ -44852,9 +45115,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:198`。 |
-| `expected_version` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "expected_version", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:220`。 |
-| `id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:220`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:208`。 |
+| `expected_version` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "expected_version", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:230`。 |
+| `id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:230`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -44882,34 +45145,34 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:248`。 |
+| `result.data.outsourcing_return_disposition` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:258`。 |
 
 **`outsourcing_return_disposition`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition.cancel_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.cancelled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.cancelled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.created_by` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.disposition_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.disposition_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.outsourcing_return_fact_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.posted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.posted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.production_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.quality_inspection_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.result_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
-| `result.data.outsourcing_return_disposition.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_disposition.cancel_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.cancelled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.cancelled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.created_by` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.disposition_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.disposition_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.outsourcing_return_fact_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.posted_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.posted_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.production_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.quality_inspection_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.quantity` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.reason` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.result_wip_batch_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
+| `result.data.outsourcing_return_disposition.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 **`outsourcing_return_disposition`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.outsourcing_return_disposition.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:255`。 |
+| `result.data.outsourcing_return_disposition.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:265`。 |
 
 ```json
 {
@@ -45712,6 +45975,23 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.production_exception.reverse_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+| `result.data.production_exception.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`production_exception.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.production_exception.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.production_exception.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.production_exception.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`production_exception`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.production_exception.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -45842,12 +46122,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.outsourcing_fact.source_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+
+**`outsourcing_fact`（续）**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.outsourcing_fact.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 
@@ -45883,7 +46170,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "source_no": "DEMO",
         "source_type": "OUTSOURCING_ORDER",
         "status": "DRAFT",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "MATERIAL",
         "supplier_id": 1,
         "supplier_name": "DEMO",
@@ -45979,12 +46268,19 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.outsourcing_fact.source_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.source_type` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+| `result.data.outsourcing_fact.subject_name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.supplier_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.unit_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.updated_at` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
+
+**`outsourcing_fact`（续）**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.outsourcing_fact.version` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 | `result.data.outsourcing_fact.warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_outsourcing.go:210`。 |
 
@@ -46020,7 +46316,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "source_no": "DEMO",
         "source_type": "OUTSOURCING_ORDER",
         "status": "DRAFT",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "MATERIAL",
         "supplier_id": 1,
         "supplier_name": "DEMO",
@@ -47126,6 +47424,23 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.production_exception.reverse_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.reversed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.reversed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+| `result.data.production_exception.source_identity` | object &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
+
+**`production_exception.source_identity`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.production_exception.source_identity.batch_no` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.production_exception.source_identity.code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.name` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.sku_code` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:191`。 |
+| `result.data.production_exception.source_identity.subject_id` | integer | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+| `result.data.production_exception.source_identity.subject_type` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:190`。 |
+
+**`production_exception`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
 | `result.data.production_exception.status` | string | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.stock_disposition_required` | boolean | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
 | `result.data.production_exception.target_operation_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_operational_fact_exception.go:182`。 |
@@ -49901,6 +50216,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
+| `result.data.items[].product_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:76`。 |
 | `result.data.items[].product_name` | string | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:76`。 |
 | `result.data.items[].production_order_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:74`。 |
 | `result.data.items[].production_order_item_id` | integer | 依据：`server/internal/service/jsonrpc_warehouse_production_work.go:74`。 |
@@ -49926,9 +50242,42 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "code": 0,
     "message": "OK",
     "data": {
-      "counts": {},
-      "items": [],
-      "total": 0
+      "counts": {
+        "": 1,
+        "AWAITING_INBOUND": 1
+      },
+      "items": [
+        {
+          "action": "",
+          "action_batch_id": 91003,
+          "batch_no": "WIP-PHOTO-DEMO",
+          "fact_id": 901,
+          "fact_no": "FG-PHOTO-DEMO",
+          "fact_status": "DRAFT",
+          "fact_version": 1,
+          "id": 901,
+          "kind": "RECEIPT",
+          "lot_no": "FG-LOT-DEMO",
+          "operation_name": "手工制作",
+          "order_no": "MO-PHOTO-DEMO",
+          "packaging_confirmed": false,
+          "pending_inspection_quantity": "0",
+          "pending_packaging_quantity": "0",
+          "product_code": "PRODUCT-7",
+          "product_id": 7,
+          "product_name": "模拟小熊",
+          "production_order_id": 71,
+          "production_order_item_id": 7100,
+          "production_wip_batch_id": 91003,
+          "quantity": "30",
+          "sku_code": "SKU-7",
+          "stage": "AWAITING_INBOUND",
+          "unit_name": "只",
+          "warehouse_id": 1,
+          "warehouse_name": "模拟成品仓"
+        }
+      ],
+      "total": 1
     }
   }
 }
@@ -60041,6 +60390,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.task.display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.task.display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.task.display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -60243,6 +60593,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.task.display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.task.display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.task.display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -60445,6 +60796,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.task.display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.task.display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.task.display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -60653,6 +61005,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.task.display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.task.display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.task.display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -61362,6 +61715,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.task.display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.task.display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.task.display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -61431,7 +61785,24 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "created_by": null,
         "critical_path": false,
         "discovery": null,
-        "display_context": null,
+        "display_context": {
+          "available": true,
+          "items": [
+            {
+              "code": "PRODUCT-7",
+              "has_product_images": true,
+              "image_attachment_id": 0,
+              "kind": "product",
+              "name": "模拟小鹿",
+              "order_no": "",
+              "product_id": 7,
+              "style_no": "",
+              "supplier_item_no": ""
+            }
+          ],
+          "source_line_count": null,
+          "source_no": "SO-PHOTO-DEMO"
+        },
         "due_at": null,
         "escalate_target_role_key": null,
         "escalated_at": null,
@@ -61716,6 +62087,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.calendar.items[].display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.calendar.items[].display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.calendar.items[].display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.calendar.items[].display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.calendar.items[].display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -61856,6 +62228,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.lanes[].tasks[].display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.lanes[].tasks[].display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.lanes[].tasks[].display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.lanes[].tasks[].display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.lanes[].tasks[].display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -62743,6 +63116,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.tracking.summary.display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.tracking.summary.display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.tracking.summary.display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.tracking.summary.display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.tracking.summary.display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -62970,6 +63344,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.items[].display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.items[].display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.items[].display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.items[].display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.items[].display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -63471,6 +63846,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.calendar.items[].display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.calendar.items[].display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.calendar.items[].display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.calendar.items[].display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.calendar.items[].display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -63609,6 +63985,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.items[].display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.items[].display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.items[].display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.items[].display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.items[].display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -63918,6 +64295,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.tasks[].display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.tasks[].display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.tasks[].display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.tasks[].display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.tasks[].display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -64095,6 +64473,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.items[].display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.items[].display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.items[].display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.items[].display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.items[].display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -64293,6 +64672,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.calendar.items[].display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.calendar.items[].display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.calendar.items[].display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.calendar.items[].display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.calendar.items[].display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -64431,6 +64811,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.items[].display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.items[].display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.items[].display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.items[].display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.items[].display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -64719,6 +65100,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.task.display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.task.display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.task.display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -64927,6 +65309,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.task.display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.task.display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.task.display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -65127,6 +65510,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.task.display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.task.display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.task.display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
@@ -65331,6 +65715,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.task.display_context.items[].code` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
+| `result.data.task.display_context.items[].has_product_images` | boolean | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].image_attachment_id` | integer | 依据：`server/internal/service/jsonrpc_workflow_shared.go:159`。 |
 | `result.data.task.display_context.items[].kind` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |
 | `result.data.task.display_context.items[].name` | string | 依据：`server/internal/service/jsonrpc_workflow_shared.go:156`。 |

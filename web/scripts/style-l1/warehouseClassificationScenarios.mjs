@@ -5,7 +5,7 @@ import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
 export function createWarehouseClassificationScenarios(deps) {
   let calls; let warehouses; let
 materials
-  const install = async (page) => {
+  const install = async (page, { includeHistoricalBalance = false } = {}) => {
     calls = []
     warehouses = [
       {
@@ -52,6 +52,16 @@ materials
         is_active: true,
       },
     ]
+    if (includeHistoricalBalance) {
+      materials.push({
+        id: 4,
+        code: 'MAT-HISTORY',
+        name: '模拟待补分类材料',
+        stock_category: 'UNCLASSIFIED',
+        default_unit_id: 1,
+        is_active: true,
+      })
+    }
     await page.route('**/rpc/*', async (route) => {
       const { method, params = {}, id } = route.request().postDataJSON() || {}
       let data
@@ -100,7 +110,7 @@ materials
           subject_type: 'MATERIAL',
           subject_id: row.id,
           stock_category: row.stock_category,
-          warehouse_id: row.default_warehouse_id,
+          warehouse_id: row.default_warehouse_id || 1,
           unit_id: 1,
           quantity: '10',
           active_reserved_quantity: '0',
@@ -110,8 +120,8 @@ materials
         data = stylePaginatedRpcData(
           balances.filter(
             (row) =>
-              !params.stock_category ||
-              row.stock_category === params.stock_category
+              (!params.subject_type || row.subject_type === params.subject_type) &&
+              (!params.stock_category || row.stock_category === params.stock_category)
           ),
           'inventory_balances',
           params
@@ -178,12 +188,11 @@ materials
       auth: 'admin',
       effectiveSession: deps.customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
-      beforeNavigate: install,
+      beforeNavigate: (page) => install(page, { includeHistoricalBalance: true }),
       verify: async (page) => {
         await deps.expectHeading(page, '库存查询')
-        await page
-          .getByRole('button', { name: '仓库设置', exact: true })
-          .click()
+        const warehouseSettings = page.getByRole('button', { name: '仓库设置', exact: true })
+        await warehouseSettings.press('Enter')
         const modal = page
           .getByRole('dialog')
           .filter({ hasText: '仓库设置' })
@@ -221,13 +230,18 @@ materials
         })
         await modal.locator('.ant-modal-close').click()
         await modal.waitFor({ state: 'hidden' })
-        await page.waitForFunction(
-          () => document.activeElement?.textContent === '仓库设置'
-        )
+        await expect(warehouseSettings).toBeFocused()
         // The shared modal restores trigger focus 80 ms after its close transition.
         await page.waitForTimeout(120)
-        await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
-        await page.getByRole('group', { name: '材料库存类别', exact: true }).getByRole('button', { name: '辅料', exact: true }).click()
+        const filterTrigger = page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]')
+        await filterTrigger.click()
+        const filters = page.getByRole('dialog', { name: '筛选条件' })
+        const categoryChoices = filters.getByRole('group', { name: '材料库存类别', exact: true })
+        const onlyUnclassified = filters.getByRole('checkbox', { name: '只看待分类', exact: true })
+        const balances = page.locator('.erp-business-data-table-card')
+        await expect(categoryChoices.getByRole('button', { name: '待分类', exact: true })).toHaveCount(0)
+        await expect(onlyUnclassified).not.toBeChecked()
+        await categoryChoices.getByRole('button', { name: '辅料', exact: true }).click()
         await page.waitForFunction(() =>
           document
             .querySelector('.erp-business-data-table-card')
@@ -243,6 +257,47 @@ materials
           path: `${deps.outputDir}/inventory-auxiliary-filter.png`,
           fullPage: true,
         })
+        await onlyUnclassified.press('Space')
+        await expect(onlyUnclassified).toBeChecked()
+        await expect(balances).toContainText('模拟待补分类材料')
+        await expect(balances).not.toContainText('模拟车缝线')
+        deps.assert.equal(
+          calls.filter(({ method }) => method === 'list_inventory_balances').at(-1).params.stock_category,
+          'UNCLASSIFIED'
+        )
+        await filters.screenshot({ path: `${deps.outputDir}/inventory-unclassified-filter.png` })
+
+        await categoryChoices.getByRole('button', { name: '其他材料', exact: true }).click()
+        await expect(onlyUnclassified).not.toBeChecked()
+        await expect(balances).not.toContainText('模拟待补分类材料')
+        deps.assert.equal(
+          calls.filter(({ method }) => method === 'list_inventory_balances').at(-1).params.stock_category,
+          'OTHER'
+        )
+        await filters.getByRole('button', { name: '清空筛选', exact: true }).click()
+        await expect(balances).toContainText('模拟待补分类材料')
+        await expect(balances).toContainText('模拟车缝线')
+
+        await onlyUnclassified.check()
+        await filters.getByRole('button', { name: '成品', exact: true }).click()
+        await expect(onlyUnclassified).toBeDisabled()
+        await expect(onlyUnclassified).not.toBeChecked()
+        await filters.getByRole('button', { name: '清空筛选', exact: true }).click()
+        await filters.getByRole('button', { name: '完成', exact: true }).click()
+
+        await page.setViewportSize({ width: 390, height: 844 })
+        await filterTrigger.click()
+        await onlyUnclassified.check()
+        await expect(balances).toContainText('模拟待补分类材料')
+        const geometry = await filters.evaluate((panel) => {
+          const { left, right } = panel.getBoundingClientRect()
+          return { left, right, width: document.documentElement.clientWidth, overflow: panel.scrollWidth - panel.clientWidth }
+        })
+        deps.assert(geometry.left >= -1 && geometry.right <= geometry.width + 1 && geometry.overflow <= 1,
+          `窄窗口的库存筛选应完整显示：${JSON.stringify(geometry)}`)
+        await filters.screenshot({ path: `${deps.outputDir}/inventory-unclassified-filter-narrow.png` })
+        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await expect(filterTrigger).toBeFocused()
       },
     },
     {

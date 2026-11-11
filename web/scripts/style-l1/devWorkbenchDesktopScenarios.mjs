@@ -445,18 +445,21 @@ export function createDevWorkbenchDesktopScenarios({
         batches = [{ id: batch, status: 'ready' }]
         await page.getByRole('button', { name: '重新读取', exact: true }).click()
         const reportRoot = page.locator('[data-dev-chain-audit]')
-        await page.getByRole('button', { name: '采购测试链', exact: true }).waitFor()
-        assert.deepEqual(await reportRoot.getByRole('columnheader').allTextContents(), ['链路', '结果', '首个未通过环节'])
-        assert.equal(await reportRoot.getByRole('table').count(), 1, '默认只比较链路结果')
+        const purchaseChain = reportRoot.getByRole('button', { name: '采购测试链', exact: true })
+        const summaryTable = reportRoot.locator('.erp-dev-chain-audit__results').getByRole('table')
+        const stepTable = reportRoot.getByRole('region', { name: '步骤明细' }).getByRole('table')
+        await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
+        assert.deepEqual(await summaryTable.getByRole('columnheader').allTextContents(), ['链路', '结果', '首个未通过环节'])
+        assert.deepEqual(await stepTable.getByRole('columnheader').allTextContents(), ['', '环节', '结果', '实际操作与读回'])
+        assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2, '默认直接显示全部链路步骤')
+        assert.equal(await reportRoot.getByRole('button', { name: /^(查看全部步骤|收起步骤)$/u }).count(), 0)
         assert.equal(await reportRoot.getByRole('tablist').count(), 0, '技术详情不占默认导航')
-        assert.equal(await reportRoot.getByRole('textbox').count(), 0, '步骤筛选只在查看步骤时显示')
         assert.equal(await page.getByRole('combobox', { name: '实跑批次' }).count(), 0, '只有一个批次时无需选择')
         await reportRoot.getByText('历史报告 · 定义待核对', { exact: true }).waitFor()
-        await page.getByRole('button', { name: '采购测试链', exact: true }).click()
-        await page.getByText('1. 采购步骤', { exact: true }).waitFor()
+        await purchaseChain.click()
+        await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor({ state: 'hidden' })
         assert.equal(new URL(page.url()).searchParams.get('chain'), 'purchase_to_inventory')
-        const stepTable = reportRoot.locator('.erp-dev-chain-audit__steps').getByRole('table')
-        assert.deepEqual(await stepTable.getByRole('columnheader').allTextContents(), ['', '环节', '结果', '实际操作与读回'])
+        assert.equal(await purchaseChain.getAttribute('aria-current'), 'true')
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 1)
         assert.equal(new URL(page.url()).searchParams.get('batch'), batch, '默认读取的实际批次写入 URL，关联返回不漂移到另一批次')
         const capabilityLink = reportRoot.getByRole('link', { name: '采购订单、收货、质检、退货与调整', exact: true })
@@ -471,11 +474,13 @@ export function createDevWorkbenchDesktopScenarios({
         await stepTable.getByText('测试岗位', { exact: true }).waitFor()
         await stepTable.getByText('页面夹具', { exact: true }).waitFor()
         await page.reload()
-        await page.getByRole('button', { name: '收起步骤', exact: true }).click()
-        await page.getByRole('button', { name: '查看全部步骤', exact: true }).click()
+        const allChains = reportRoot.getByRole('button', { name: '查看全部链路', exact: true })
+        await allChains.click()
         await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2)
+        assert.equal(new URL(page.url()).searchParams.has('chain'), false)
         const stepSearch = page.getByRole('textbox', { name: '搜索环节、岗位或实际读回', exact: true })
+        assert.equal(await stepSearch.evaluate((element) => element === document.activeElement), true, '清除链路筛选后焦点留在步骤筛选区')
         await stepSearch.fill('采购')
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2, 'typing keeps the current chain results')
         await stepSearch.press('Enter')
@@ -519,8 +524,7 @@ export function createDevWorkbenchDesktopScenarios({
         await reportTabs.getByRole('tab', { name: '链路实测', exact: true }).click()
         await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
         assert.equal(page.url(), reportURL, '其他页签刷新后仍能恢复报告选择')
-        await page.getByRole('button', { name: '收起步骤', exact: true }).click()
-        await page.getByRole('button', { name: '采购测试链', exact: true }).click()
+        await purchaseChain.click()
         assert.equal(await page.locator('.erp-dev-chain-audit__header').getByRole('link', { name: '业务链路', exact: true }).count(), 0, '报告正文不重复导航入口')
         await nav.getByRole('link', { name: '业务链路', exact: true }).click()
         await page.locator('[data-dev-flow-state-observatory][data-catalog-status="ready"]').waitFor()
@@ -562,11 +566,11 @@ export function createDevWorkbenchDesktopScenarios({
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 0)
         await page.getByRole('button', { name: '取消交接定位', exact: true }).click()
         await stepTable.getByText('1. 采购步骤', { exact: true }).waitFor()
-        await page.getByRole('button', { name: '收起步骤', exact: true }).click()
-        await stepTable.waitFor({ state: 'hidden' })
-        await page.getByRole('button', { name: '查看全部步骤', exact: true }).waitFor()
-        assert.deepEqual(await reportRoot.getByRole('columnheader').allTextContents(), ['链路', '结果', '首个未通过环节'])
-        await assertNoHorizontalOverflow(page, '极简链路结果与批次恢复')
+        await allChains.click()
+        await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
+        await summaryTable.waitFor()
+        assert.equal(await reportRoot.getByRole('button', { name: /^(查看全部步骤|收起步骤)$/u }).count(), 0)
+        await assertNoHorizontalOverflow(page, '常显步骤与批次恢复')
       }
       if (item.route === DEV_TESTING_ROUTE) {
         await verifyTestingOverview(page, assert, assertNoHorizontalOverflow)
@@ -900,10 +904,10 @@ export function createDevWorkbenchDesktopScenarios({
         await coverage
           .getByRole('region', { name: '运行与验收', exact: true })
           .waitFor()
-        await evidenceTab('运行与验收').press('Home')
+        await switchEvidence('代码覆盖')
         await coverage.getByText('文件监听资源不足', { exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.has('coverage'), false)
-        await evidenceTab('代码覆盖').press('ArrowRight')
+        await switchEvidence('业务场景')
         await business.waitFor()
         assert.deepEqual(
           { workspaceReads, snapshotReads },
@@ -946,7 +950,7 @@ export function createDevWorkbenchDesktopScenarios({
         await coverage
           .getByText('按供应商生成采购结果', { exact: true })
           .waitFor()
-        await evidenceTab('业务场景').press('End')
+        await switchEvidence('运行与验收')
         await coverage
           .getByRole('region', { name: '运行与验收', exact: true })
           .waitFor()
@@ -1271,6 +1275,7 @@ export function createDevWorkbenchDesktopScenarios({
           { label: '包结构', key: 'package' },
           { label: '运行设置', key: 'runtime' },
           { label: '流程策略', key: 'flow' },
+          { label: '扩展登记', key: 'extensions' },
           { label: '包结构', key: 'package' },
         ]) {
           await sections
@@ -1282,16 +1287,11 @@ export function createDevWorkbenchDesktopScenarios({
               (url.searchParams.get('section') || 'package') === section.key
           )
           if (section.key === 'package') {
-            await preflight.getByText('配置范围与依据', { exact: true }).click()
-            await preflight.getByText('客户包对象', { exact: true }).waitFor({ state: 'visible' })
-            const declarations = preflight
-              .locator('.erp-dev-customer-db-target')
-              .filter({
-                has: page.getByText('策略 / 命令声明', { exact: true }),
-              })
-            assert((await declarations.innerText()).includes('仅预览'))
-            await preflight.getByText('配置范围与依据', { exact: true }).click()
+            const map = preflight.getByRole('group', { name: '客户包组成与去向' })
+            await map.getByRole('button', { name: '流程策略与评审草案', exact: true }).getByText('草案仅供预览', { exact: true }).waitFor({ state: 'visible' })
+            await map.getByRole('button', { name: '扩展登记', exact: true }).getByText('暂无扩展登记', { exact: true }).waitFor({ state: 'visible' })
           } else if (section.key === 'runtime') {
+            await preflight.getByText('编译范围', { exact: true }).click()
             const catalog = preflight.locator('.erp-dev-customer-tool')
             assert(
               (
@@ -1309,7 +1309,11 @@ export function createDevWorkbenchDesktopScenarios({
                   .innerText()
               ).includes('当前未实现')
             )
+          } else if (section.key === 'extensions') {
+            await preflight.getByRole('region', { name: '本包扩展登记' }).getByText('暂无扩展登记', { exact: true }).waitFor()
           } else {
+            await preflight.getByRole('region', { name: '本包的流程与策略' }).getByText('仅预览 · 不执行', { exact: true }).waitFor()
+            await preflight.getByText('查看候选策略与命令声明', { exact: true }).click()
             const checks = preflight.locator('.erp-dev-customer-formal-gate')
             await checks
               .filter({ hasText: '仅声明式预览' })
@@ -1320,11 +1324,6 @@ export function createDevWorkbenchDesktopScenarios({
               .allTextContents()
             assert(previews.length > 0)
             assert(previews.every((text) => text.includes('仅预览')))
-            assert(
-              (
-                await checks.filter({ hasText: '当前未实现' }).innerText()
-              ).includes('受控空目录')
-            )
           }
           assert.doesNotMatch(
             await preflight.innerText(),

@@ -57,7 +57,7 @@ export function createDevDisclosureScenarios({ assert, assertNoHorizontalOverflo
     deviceScaleFactor: 2,
     beforeNavigate: async (page) => {
       await installPermissionRelationshipMock(page)
-      await installDataPreparationBrowserRoutes(page, createDataPreparationBrowserFixture())
+      await installDataPreparationBrowserRoutes(page, createDataPreparationBrowserFixture({ fullAcceptanceHistory: true }))
       const report = {
         schemaVersion: 'plush-test-coverage-report/v1',
         snapshot: { kind: 'isolated' },
@@ -82,7 +82,7 @@ export function createDevDisclosureScenarios({ assert, assertNoHorizontalOverflo
       const routes = [
         '/__dev/testing?view=coverage&coverage=gates&reportSource=snapshot',
         '/__dev/testing?view=guide&guide=presets',
-        '/__dev/data-preparation',
+        '/__dev/testing?view=full-acceptance',
         '/__dev/permission-relationships',
         '/__dev/status-flows?view=chain',
         '/__dev/docs',

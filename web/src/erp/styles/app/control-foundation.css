@@ -4,6 +4,9 @@ body {
   --erp-form-control-height: 34px;
   --erp-control-focus-border: var(--erp-primary);
   --erp-control-focus-ring: var(--erp-focus-ring);
+  --erp-menu-padding: 6px;
+  --erp-menu-option-padding: 10px;
+  --erp-select-grouped-option-padding: 28px;
   --erp-popup-option-divider: rgb(15 23 42 / 8%);
   --erp-popup-option-hover: var(--erp-primary-softer);
   --erp-popup-option-selected: var(--erp-primary-soft);
@@ -265,7 +268,7 @@ body :is(.ant-modal, .ant-drawer, .ant-popover) .ant-select-single .ant-select-s
 body .ant-select-dropdown,
 body .ant-dropdown .ant-dropdown-menu,
 body .erp-business-selection-action-menu {
-  padding: 6px;
+  padding: var(--erp-menu-padding);
   border-radius: var(--erp-control-radius);
 }
 
@@ -287,7 +290,7 @@ body .erp-business-selection-action-menu__item .ant-btn {
   align-items: center;
   border-radius: 8px;
   padding-block: 8px;
-  padding-inline-end: 10px;
+  padding-inline-end: var(--erp-menu-option-padding);
   line-height: 1.45;
   white-space: normal;
 }
@@ -296,13 +299,13 @@ body .ant-select-dropdown .ant-select-item-option:not(.ant-select-item-option-gr
 body :where(.ant-dropdown) .ant-dropdown-menu-item,
 body :where(.ant-dropdown) .ant-dropdown-menu-submenu-title,
 body .erp-business-selection-action-menu__item .ant-btn {
-  padding-inline-start: 10px;
+  padding-inline-start: var(--erp-menu-option-padding);
 }
 
 body .ant-select-dropdown .ant-select-item-group {
   min-height: 32px;
   margin-block: 8px 4px;
-  padding: 6px 10px;
+  padding: var(--erp-menu-padding) var(--erp-menu-option-padding);
   border-radius: 4px;
   background: var(--erp-surface-bg-muted);
   color: var(--erp-text-muted);
@@ -319,7 +322,7 @@ body .ant-select-dropdown .ant-select-item-group:first-child {
 }
 
 body .ant-select-dropdown .ant-select-item-option-grouped {
-  padding-inline-start: 28px;
+  padding-inline-start: var(--erp-select-grouped-option-padding);
 }
 
 body .ant-select-dropdown .ant-select-item-option-grouped .ant-select-item-option-state {

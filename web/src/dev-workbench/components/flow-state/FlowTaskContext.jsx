@@ -12,6 +12,7 @@ import {
   getWorkflowTaskStatusMeta,
 } from '@/erp/utils/workflowTaskBoard.mjs'
 import { getPermissionCenterRoleName } from '../../../erp/utils/permissionCenterAccess.mjs'
+import { SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS } from '../../../../../config/catalog/customerPackageCatalog.mjs'
 import {
   buildDevFlowStateTaskLookupQuery,
   parseDevFlowStateTaskIDReference,
@@ -19,7 +20,10 @@ import {
 } from '../../pages/devFlowStateTaskLookup.mjs'
 
 function getProcessOwnerPoolLabel(ownerPool) {
-  const label = getPermissionCenterRoleName({ role_key: ownerPool })
+  const roleKey = SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS.find(
+    (item) => item.pool_key === ownerPool
+  )?.source_pool_key || ownerPool
+  const label = getPermissionCenterRoleName({ role_key: roleKey })
   return label === '已配置岗位' ? ownerPool : label
 }
 

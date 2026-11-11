@@ -14,7 +14,7 @@ export function createBusinessColumnSettingsScenarios({
   const open = async (page) => {
     await openBusinessTableTool(page, '列设置')
     const dialog = page.getByRole('dialog', { name: /^列设置/u })
-    await dialog.waitFor({ state: 'visible' })
+    await dialog.locator('[role="list"] input[type="checkbox"]:focus').waitFor()
     return dialog
   }
   const save = async (page, dialog) => {
@@ -37,6 +37,17 @@ export function createBusinessColumnSettingsScenarios({
     const result = await response
     await dialog.waitFor({ state: 'hidden' })
     return result.request().postDataJSON().params
+  }
+  const restoreDefaults = async (page, dialog, expected) => {
+    await dialog.getByRole('button', { name: '恢复默认', exact: true }).click()
+    const reset = await save(page, dialog)
+    assert.deepEqual(reset.order, [], '恢复默认清除个人顺序覆盖')
+    assert.deepEqual(reset.hidden_columns, [], '恢复默认清除个人显隐覆盖')
+    await page.waitForFunction(({ selector, expected }) => {
+      const current = [...document.querySelectorAll(selector)]
+      return current.length === expected.length &&
+        current.every((node, index) => node.textContent === expected[index])
+    }, { selector: headerSelector, expected }, { timeout: 5_000 })
   }
   const geometry = async (dialog) => {
     await dialog.evaluate(async (node) => {
@@ -164,6 +175,7 @@ export function createBusinessColumnSettingsScenarios({
           '未完成的显隐不得改变列表'
         )
         await dialog.locator('.ant-modal-close').click()
+        await dialog.waitFor({ state: 'hidden' })
         dialog = await open(page)
         assert(
           await dialog
@@ -174,11 +186,12 @@ export function createBusinessColumnSettingsScenarios({
         const rows = dialog.locator('[data-column-key]')
         await dialog
           .getByRole('button', { name: '颜色 拖动排列', exact: true })
-          .dragTo(rows.first())
-        assert.equal(await rows.first().getAttribute('data-column-key'), 'color', '拖动应调整草稿顺序')
+          .dragTo(rows.first(), { steps: 12 })
         await dialog.getByText('有未保存的调整', { exact: true }).waitFor()
+        assert.equal(await rows.first().getAttribute('data-column-key'), 'color', '拖动应调整草稿顺序')
         assert.deepEqual(await labels(page), defaults, '拖动草稿不得提前改变列表')
         await dialog.getByRole('button', { name: '取消', exact: true }).click()
+        await dialog.waitFor({ state: 'hidden' })
         dialog = await open(page)
         assert.notEqual(await rows.first().getAttribute('data-column-key'), 'color', '取消应放弃拖动顺序')
         await dialog
@@ -243,12 +256,9 @@ export function createBusinessColumnSettingsScenarios({
         await dialog.getByRole('button', { name: '恢复默认' }).click()
         await dialog.getByRole('button', { name: '取消', exact: true }).click()
         assert.deepEqual(await labels(page), beforeReset, '取消恢复默认应保留已保存的列表')
+        await dialog.waitFor({ state: 'hidden' })
         dialog = await open(page)
-        await dialog.getByRole('button', { name: '恢复默认' }).click()
-        const reset = await save(page, dialog)
-        assert.deepEqual(reset.order, [], '恢复默认清除个人顺序覆盖')
-        assert.deepEqual(reset.hidden_columns, [], '恢复默认清除个人显隐覆盖')
-        assert.deepEqual(await labels(page), defaults)
+        await restoreDefaults(page, dialog, defaults)
 
         let failure = true
         const failureRoute = async (route) => {
@@ -291,7 +301,7 @@ export function createBusinessColumnSettingsScenarios({
           ['/erp/purchase/accessories', '收货地址'],
           ['/erp/purchase/processing-contracts'],
           ['/erp/purchase/material-bom', '审核'],
-          ['/erp/production/quality-inspections', '检验员'],
+          ['/erp/production/quality-inspections', '原批次状态'],
           ['/erp/warehouse/shipments', '唛头'],
           ['/erp/finance/payments'],
         ]
@@ -315,9 +325,7 @@ export function createBusinessColumnSettingsScenarios({
               assert((await labels(page)).includes(optional), '全部显示应跨刷新保存')
             }
             dialog = await open(page)
-            await dialog.getByRole('button', { name: '恢复默认' }).click()
-            await save(page, dialog)
-            assert.deepEqual(await labels(page), before, `${url} 恢复默认应重新收起辅助列`)
+            await restoreDefaults(page, dialog, before)
             dialog = await open(page)
           }
           const enabledOptions = await dialog.getByRole('checkbox').all()
@@ -333,9 +341,7 @@ export function createBusinessColumnSettingsScenarios({
             `${url} 显隐应生效`
           )
           dialog = await open(page)
-          await dialog.getByRole('button', { name: '恢复默认' }).click()
-          await save(page, dialog)
-          assert.deepEqual(await labels(page), before, `${url} 应恢复默认`)
+          await restoreDefaults(page, dialog, before)
         }
         await gotoScenarioPath(page, '/erp/master/materials', {
           waitUntil: 'domcontentloaded',

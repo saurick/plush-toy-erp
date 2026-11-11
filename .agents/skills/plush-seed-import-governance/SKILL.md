@@ -11,7 +11,7 @@ description: 数据准备、模拟场景与导入（plush-toy-erp）；验收目
 
 - 范围、数据入口或模块责任不清时，才用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位；否则直接读取相关 module docs、代码和测试。
 - 写数据前确认 target DB/env、schema/migration state、run id/prefix 和 cleanup path。
-- 登记整批模拟数据的“怎么造全、哪些变化需要重造”读取 [Full Dataset Coverage](references/full-dataset-coverage.md)；普通单测 fixture 或单模块 seed 直接使用对应测试、helper 或 runner，不加载整批验收合同。“怎样从甲方资料提取业务特征并生成脱敏模拟场景”读取 [Customer Source to Synthetic](references/customer-source-to-synthetic.md)。
+- 登记整批模拟数据时，按 [Full Dataset Coverage](references/full-dataset-coverage.md) 核对图片入口、正常流程、异常恢复、纠正和复用范围；普通单测 fixture 或单模块 seed 直接使用对应测试、helper 或 runner，不加载整批验收合同。从甲方资料提取业务特征并生成脱敏模拟场景时读 [Customer Source to Synthetic](references/customer-source-to-synthetic.md)。
 - 当前阶段、依赖、业务链、场景、页面和数量必须从 runner、合同与测试读取；Skill 只保存判断方法，不复制会漂移的当前统计。
 
 ## 项目规则 Project Rules
@@ -28,7 +28,7 @@ description: 数据准备、模拟场景与导入（plush-toy-erp）；验收目
 
 1. 定义用途和数据范围：单测 fixture、单模块 seed、登记整批模拟数据、导入演练、初始化或清理；人工验收编排切到 `$plush-manual-acceptance-governance`。
 2. 确认来源、允许写入和隔离/恢复边界。实际访问数据库或服务时再核对 target environment、migration 与所用批次身份；纯内存 fixture 不要求运行环境凭据。
-3. 普通 fixture 或单模块 seed：复用所属测试/helper/runner，验证需要的关系、正常与边界状态及清理。只有被登记整批 runner 消费的共享构造逻辑变化，才补查对应阶段影响；不为独立 fixture 新建 profile、dataVersion 或阶段回执。
+3. 普通 fixture 或单模块 seed：复用所属测试/helper/runner，按本模块适用范围核对图片关联、正常状态、异常恢复、纠正及清理。只有被登记整批 runner 消费的共享构造逻辑变化，才补查对应阶段影响；不为独立 fixture 新建 profile、dataVersion 或阶段回执。
 4. 登记整批模拟数据：读取当前业务链摘要、验证摘要、阶段 registry / fingerprint / dependency 和上一批回执，形成 `reuse / reverify / reseed` 判断。`reseed` 按直接变化模块和登记依赖闭包刷新；`reverify` 保留同批数据并重跑相关合同、readiness 与浏览器验证；`reuse` 仍实时核对 target、core 与 readiness。
 5. 复用现有 seed/import runner 和适用的 stable prefixes/run ids；import、清理或共享环境写入前先 dry-run / plan，不另建平行造数体系。
 6. 实际写入后用 API/page/query/test 读回业务关系、状态、数量、权限与隔离，并给出 cleanup/rollback。登记整批 runner 的回执额外保留 reuse 判断以及 `reusedStages`、`logicChangedStages`、`dependencyRefreshedStages` 和 `refreshedStages`。

@@ -746,6 +746,57 @@ function buildSalesOrders(prefix, count, customers, products, anchorDate) {
   });
 }
 
+function buildShipmentCoverageSalesOrders(prefix, salesOrders, products, bomVersions) {
+  const activeBOMProducts = new Set(bomVersions.filter(({ targetStatus }) => targetStatus === "ACTIVE").map(({ productRef }) => productRef));
+  const cookieBear = activeBOMProducts.has(products[16]?.code) ? 16 : 2;
+  const covered = [
+    { kind: "ready", products: [0, 1, cookieBear], reserveLineNo: 2 },
+    { kind: "ready", products: [3, 4, 5] },
+    { kind: "ready", products: [6, 7, 8] },
+    { kind: "ready", products: [9, 10, 11], reserveLineNo: 1 },
+    { kind: "shortage", products: [16] },
+    { kind: "frozen", products: [12] },
+    { kind: "reserved-elsewhere", products: [9], reservedFromOrderIndex: 3 },
+  ];
+  return covered.map(({ kind, products: productOffsets, reserveLineNo, reservedFromOrderIndex }, offset) => {
+    const orderNo = `${prefix}-FH-${pad(offset + 1, 3)}`;
+    const template = salesOrders[offset];
+    const items = productOffsets.map((productOffset, lineOffset) => {
+      const product = products[productOffset];
+      const sku = product.skus[lineOffset % product.skus.length];
+      const quantity = 12 + (reservedFromOrderIndex ?? offset) * 3 + lineOffset * 4;
+      return {
+        ...template.items[0],
+        line_no: lineOffset + 1,
+        productRef: product.code,
+        skuRef: sku.sku_code,
+        unitKey: product.unitKey,
+        product_code_snapshot: product.style_no,
+        product_name_snapshot: product.name,
+        color_snapshot: sku.color,
+        ordered_quantity: String(quantity),
+        unit_price: "20.00",
+        amount: (quantity * 20).toFixed(2),
+        note: "按规格分开装箱",
+      };
+    });
+    return {
+      ...template,
+      order_no: orderNo,
+      customer_order_no: orderNo,
+      productRef: items[0].productRef,
+      targetStatus: "ACTIVE",
+      note: "按订单明细核对规格、箱数和收货信息。",
+      shipmentCoverage: {
+        kind,
+        ...(reserveLineNo ? { reserveLineNo } : {}),
+        ...(reservedFromOrderIndex != null ? { reservedFromOrderNo: `${prefix}-FH-${pad(reservedFromOrderIndex + 1, 3)}` } : {}),
+      },
+      items,
+    };
+  });
+}
+
 function buildPurchaseOrders(
   prefix,
   count,
@@ -2011,9 +2062,7 @@ function assertPersistedContacts(label, expected, actual) {
       fields: [
         "owner_type",
         "name",
-        "phone",
-        "mobile",
-        "email",
+        ...["phone", "mobile", "email"].filter((field) => Object.hasOwn(contact, field)),
         "title",
         "is_primary",
         "note",
@@ -2427,7 +2476,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
             "product_id",
             "sku_code",
             "sku_name",
-            "barcode",
+            ...(Object.hasOwn(expected, "barcode") ? ["barcode"] : []),
             "customer_sku",
             "color",
             "color_no",
@@ -2454,7 +2503,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
           "product_id",
           "sku_code",
           "sku_name",
-          "barcode",
+          ...(Object.hasOwn(expected, "barcode") ? ["barcode"] : []),
           "customer_sku",
           "color",
           "color_no",
@@ -3353,11 +3402,13 @@ async function applyDocumentGroup({
   itemDecimalFields,
   report,
   advanceLifecycleFn,
+  apply = true,
 }) {
   for (const record of records) {
     const resolvedParams = resolveParams(record);
     let item = existing.get(record[key]);
     if (!item) {
+      if (!apply) throw new CliError(`${resultKey} ${record[key]} is missing`);
       const data = await rpcCall({
         backendURL: plan.backendURL,
         domain,
@@ -3421,6 +3472,10 @@ async function applyDocumentGroup({
       });
     }
     const current = item[listStatusKey] || "DRAFT";
+    if (!apply) {
+      if (String(current).toUpperCase() !== record.targetStatus) throw new CliError(`${record[key]} expected ${record.targetStatus}, got ${current}`);
+      continue;
+    }
     const finalStatus = advanceLifecycleFn
       ? await advanceLifecycleFn({
           plan,
@@ -3612,13 +3667,9 @@ export function buildOutsourcingOrderLineReferences({
   });
 }
 
-async function createSourceDocuments({
-  plan,
-  tokens,
-  roleTokens,
-  refs,
-  fetchImpl,
-  report,
+async function ensureSalesSourceDocuments({
+  plan, tokens, roleTokens, refs, fetchImpl, report,
+  records = plan.records.salesOrders, keyword, apply = true, extraHeaderFields = [],
 }) {
   const unitIdsByKey = Object.fromEntries(
     Object.entries(refs.unitsByKey).map(([key, item]) => [key, item.id]),
@@ -3631,6 +3682,7 @@ async function createSourceDocuments({
       method: "list_sales_orders",
       listKey: "sales_orders",
       fetchImpl,
+      ...(keyword ? { params: { keyword } } : {}),
     }),
     "order_no",
   );
@@ -3642,7 +3694,8 @@ async function createSourceDocuments({
     plan,
     token: tokens.sales,
     fetchImpl,
-    records: plan.records.salesOrders,
+    records,
+    apply,
     existing: sales,
     key: "order_no",
     domain: "sales_order",
@@ -3673,6 +3726,7 @@ async function createSourceDocuments({
       "order_date",
       "planned_delivery_date",
       "note",
+      ...extraHeaderFields,
     ],
     headerDateFields: ["order_date", "planned_delivery_date"],
     headerDecimalFields: ["tax_rate", "quoted_freight_amount"],
@@ -3702,6 +3756,8 @@ async function createSourceDocuments({
       customerRef: undefined,
       productRef: undefined,
       targetStatus: undefined,
+      shipmentCoverage: undefined,
+      formCoverage: undefined,
       items: record.items.map(({ unitKey, ...item }) => ({
         ...item,
         product_id: refs.products.get(item.productRef).id,
@@ -3718,7 +3774,7 @@ async function createSourceDocuments({
     [...refs.products].map(([code, item]) => [code, item.id]),
   );
   const skuIds = new Map([...refs.skus].map(([code, item]) => [code, item.id]));
-  for (const record of plan.records.salesOrders.filter(
+  for (const record of records.filter(
     (item) => item.targetStatus === "ACTIVE",
   )) {
     const order = sales.get(record.order_no);
@@ -3746,6 +3802,148 @@ async function createSourceDocuments({
     );
   }
 
+  return { sales, salesOrderItems };
+}
+
+export function planManualAcceptanceShipmentCoverageSources(sourceReport) {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    target: sourceReport.target,
+    dataVersion: sourceReport.dataVersion,
+    runId: sourceReport.runId,
+    databaseName: sourceReport.databaseName,
+    backendURL: sourceReport.backendURL,
+    sourceScaleProfile: sourceReport.sourceScaleProfile,
+    anchorDate: sourceReport.anchorDate,
+  });
+  if (sourceReport.semanticDigest !== plan.semanticDigest) {
+    throw new CliError("shipment coverage needs the exact applied source plan", 2);
+  }
+  const specs = buildShipmentCoverageSalesOrders(plan.prefix, plan.records.salesOrders, plan.records.products, plan.records.bomVersions);
+  return { plan, specs };
+}
+
+export async function prepareManualAcceptanceShipmentCoverageSources(sourceReport, { tokens, fetchImpl, apply }) {
+  const { plan, specs } = planManualAcceptanceShipmentCoverageSources(sourceReport);
+  return prepareCoverageSalesSources(sourceReport, { plan, specs, tokens, fetchImpl, apply, marker: "FH", metadata: "shipmentCoverage" });
+}
+
+export function planManualAcceptanceFormCoverageSources(sourceReport) {
+  const { plan, specs } = planManualAcceptanceShipmentCoverageSources(sourceReport);
+  const configurations = [
+    { template: 1, currency: "CNY", checkpoints: ["ready", "ready", "ready"], alternateWarehouseLine: 1 },
+    { template: 2, currency: "CNY", checkpoints: ["pending-inspection", "pending-packaging"] },
+    { template: 3, currency: "USD", checkpoints: [] },
+    { template: 0, currency: "HKD", checkpoints: [] },
+    { template: 1, currency: "CNY", checkpoints: [] },
+    ...FORM_MEDIA_CASES.map((mediaCase) => ({ template: 0, currency: "CNY", checkpoints: [], mediaCase })),
+    { template: 2, currency: "CNY", checkpoints: ["draft-receipt"] },
+    { template: 1, currency: "CNY", checkpoints: ["pending-return"] },
+    { template: 2, currency: "CNY", checkpoints: ["ready"], postShipment: true },
+    { template: 3, currency: "CNY", checkpoints: ["ready"], postShipment: true },
+    ...[0, 1, 2, 3, 1, 2].map((template) => ({ template, currency: "CNY", checkpoints: [], materialPreview: true })),
+    ...Array.from({ length: 14 }, (_, offset) => ({ template: offset % 4, currency: "CNY", checkpoints: [], materialPreview: true, customerOffset: 25 + offset })),
+  ];
+  const activeCustomers = plan.records.customers.filter((customer) => customer.isActive);
+  return { plan, specs: configurations.map(({ template, currency, checkpoints, alternateWarehouseLine, mediaCase, postShipment, materialPreview, customerOffset }, index) => {
+    const { shipmentCoverage: _shipmentCoverage, ...order } = specs[template];
+    const customer = customerOffset === undefined ? undefined : activeCustomers[customerOffset % activeCustomers.length];
+    const orderNo = `${plan.prefix}-FM-${pad(index + 1, 3)}`;
+    const delivery = index === 4 ? {} : {
+      recipient: `样品签收岗${index + 1}`,
+      phone: "0769-00000000",
+      address: index === 0 ? "试用园区南门成品收货台" : "试用园区样品收货台",
+      country_region: "中国",
+    };
+    const items = mediaCase ? [{
+      ...order.items[0],
+      productRef: formMediaCodes(plan.prefix, mediaCase.key).code, skuRef: formMediaCodes(plan.prefix, mediaCase.key).skuCode,
+      unitKey: "piece", product_code_snapshot: mediaCase.style, product_name_snapshot: mediaCase.name, color_snapshot: "米白",
+    }] : order.items.slice(0, checkpoints.length || 2);
+    return {
+      ...order,
+      order_no: orderNo, customer_order_no: orderNo, currency,
+      ...(customer ? { customerRef: customer.code, customer_snapshot: { name: customer.name },
+        contact_snapshot: customer.contacts[0] ? { name: customer.contacts[0].name } : {} } : {}),
+      ...(postShipment ? { tax_mode: "NONE", tax_rate: undefined, freight_terms: "INCLUDED", quoted_freight_amount: undefined } : {}),
+      delivery_snapshot: delivery,
+      note: checkpoints.length ? "分规格装箱，按单核对成品批次。" : "工程核对后安排排产，交期以销售订单为准。",
+      formCoverage: { checkpoints, alternateWarehouseLine, ...(mediaCase ? { mediaCase: mediaCase.key } : {}), ...(postShipment ? { postShipment } : {}), ...(materialPreview ? { materialPreview } : {}) },
+      items,
+    };
+  }) };
+}
+
+export const FORM_MEDIA_CASES = Object.freeze([
+  { key: "secondary", name: "云朵小熊", skuName: "米白·小号", style: "27001-FM", task: "核对小熊侧面图与装箱要求" },
+  { key: "none", name: "待拍样品小熊", skuName: "米白·待拍样", style: "27001-WAIT", task: "跟进未拍样品的交图时间" },
+]);
+
+export function formMediaCodes(prefix, key) {
+  const index = FORM_MEDIA_CASES.findIndex((item) => item.key === key);
+  if (index < 0) throw new CliError("unknown form coverage photo case");
+  return { code: `${prefix}-FM-CP-${index + 1}`, skuCode: `${prefix}-FM-GG-${index + 1}` };
+}
+
+export async function prepareManualAcceptanceFormCoverageSources(sourceReport, { tokens, fetchImpl, apply, media }) {
+  const { plan, specs } = planManualAcceptanceFormCoverageSources(sourceReport);
+  return prepareCoverageSalesSources(sourceReport, {
+    plan, specs, tokens, fetchImpl, apply, media, marker: "FM", metadata: "formCoverage", extraHeaderFields: ["delivery_snapshot"],
+  });
+}
+
+async function prepareCoverageSalesSources(sourceReport, { plan, specs, tokens, fetchImpl, apply, marker, metadata, extraHeaderFields, media = [] }) {
+  const reference = sourceReport.referenceRecords;
+  const refs = {
+    unitsByKey: Object.fromEntries(reference.units.map((unit) => [unit.key, unit])),
+    customers: mapBy(reference.customers, "code"),
+    products: mapBy(reference.products, "code"),
+    skus: mapBy(reference.skus, "code"),
+  };
+  for (const product of media) {
+    refs.products.set(product.code, { id: product.productId });
+    refs.skus.set(product.skuCode, { id: product.skuId });
+  }
+  for (const spec of specs) {
+    if (!refs.customers.has(spec.customerRef) || spec.items.some((line) =>
+      !refs.products.has(line.productRef) || !refs.skus.has(line.skuRef) || !refs.unitsByKey[line.unitKey])) {
+      throw new CliError(`${spec.order_no} coverage source references are incomplete`);
+    }
+  }
+  const boms = mapBy(reference.bomVersions.filter((bom) => bom.status === "ACTIVE"), "productCode");
+  const report = { steps: [] };
+  const { sales, salesOrderItems } = await ensureSalesSourceDocuments({
+    plan, tokens: { sales: tokens.admin }, roleTokens: tokens, refs, fetchImpl, report,
+    records: specs, keyword: `${plan.prefix}-${marker}-`, apply, extraHeaderFields,
+  });
+  return specs.map((spec) => {
+    const order = sales.get(spec.order_no);
+    const customer = refs.customers.get(spec.customerRef);
+    return {
+      ...spec[metadata],
+      salesOrder: { id: order.id, orderNo: spec.order_no, status: String(order.lifecycle_status).toUpperCase(), customerId: customer.id },
+      ...(metadata === "formCoverage" ? { currency: order.currency, deliverySnapshot: order.delivery_snapshot } : {}),
+      lines: salesOrderItems.get(order.id).map((line) => ({
+        ...line,
+        bom: boms.get(spec.items.find((item) => item.line_no === line.lineNo).productRef),
+      })),
+    };
+  });
+}
+
+async function createSourceDocuments({
+  plan,
+  tokens,
+  roleTokens,
+  refs,
+  fetchImpl,
+  report,
+}) {
+  const unitIdsByKey = Object.fromEntries(
+    Object.entries(refs.unitsByKey).map(([key, item]) => [key, item.id]),
+  );
+  const { sales, salesOrderItems } = await ensureSalesSourceDocuments({
+    plan, tokens, roleTokens, refs, fetchImpl, report,
+  });
   const purchase = mapBy(
     await listAll({
       plan,

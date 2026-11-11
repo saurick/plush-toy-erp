@@ -479,9 +479,9 @@ function moduleStateOverridesFromPackage(config, catalog) {
     assert(!overrides.has(moduleKey), `${path}.moduleKey must not be duplicated`);
     assert(typeof item.state === "string" && item.state.trim() !== "", `${path}.state must be set`);
     const state = item.state.trim();
-    assert(["enabled", "read_only", "disabled"].includes(state), `${path}.state must be enabled, read_only or disabled`);
+    assert(Object.hasOwn(customerPackageSchema.moduleStates, state), `${path}.state must be enabled, read_only or disabled`);
     const reason = typeof item.reason === "string" ? item.reason.trim() : "";
-    if (state !== "enabled") {
+    if (state !== customerPackageSchema.defaultModuleState) {
       assert(reason !== "", `${path}.reason must be set for read_only or disabled module`);
     }
     overrides.set(moduleKey, { state, reason });
@@ -494,7 +494,7 @@ function moduleStatesFromCatalog(catalog, config = {}) {
   return catalog.modules.map((item) => ({
     module_key: item.key,
     contract_version: catalog.catalogKey,
-    state: overrides.get(item.key)?.state || "enabled",
+    state: overrides.get(item.key)?.state || customerPackageSchema.defaultModuleState,
     reason:
       overrides.get(item.key)?.reason ||
       "compiled from tracked customer package catalog",
@@ -792,7 +792,7 @@ function fieldPoliciesFromCatalog(catalog, config = {}) {
     for (const fieldKey of [...surface.fieldKeys].sort()) {
       const override = overrides.get(`${surface.key}.${fieldKey}`);
       fieldPolicies[fieldKey] = {
-        visible: override?.visible ?? true,
+        visible: override?.visible ?? customerPackageSchema.defaultFieldVisible,
       };
     }
     policies[surface.key] = fieldPolicies;

@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import useDevCustomerScope from '../../hooks/useDevCustomerScope.mjs'
 import {
-  DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
-  DEV_DATA_PREPARATION_PROFILE_QUERY_KEY,
-  DEV_DATA_PREPARATION_ROUTE,
   DEV_DATA_PREPARATION_TARGET_KEYS,
   DEV_DATA_PREPARATION_TARGET_QUERY_KEY,
-  buildDevDataPreparationSearch,
   createDevDataPreparationClient,
   resolveDataPreparationAvailability,
   resolveDataPreparationExecutionConfirmation,
@@ -20,282 +15,223 @@ import {
 
 export const DATA_VIEW_ITEMS = [
   { value: 'scope', label: '准备数据' },
-  { value: 'confirm', label: '当前批次' },
   { value: 'receipts', label: '执行记录' },
 ]
-const DATA_PROFILE_ORDER = [
-  DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
-  DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo,
-  DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
-]
 
-export function profileTargetKey(profileKey, scenarioTargetKey) {
-  if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo) return DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment
-  if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo) return scenarioTargetKey
-  return DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal
+function isWriting(operation) {
+  return operation.status === 'launching' || operation.status === 'running'
 }
 
-export function useDataPreparation() {
+function scenarioTarget(search) {
+  return search.get(DEV_DATA_PREPARATION_TARGET_QUERY_KEY) === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
+    ? DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
+    : DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment
+}
+
+export function useDataPreparation(profileKey) {
+  const daily = profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
   const [searchParams, setSearchParams] = useSearchParams()
-  const requestedDataView = DATA_VIEW_ITEMS.some((item) => item.value === searchParams.get('view'))
-    ? searchParams.get('view') : 'scope'
-  const selectDataView = (value) => setSearchParams((current) => {
-    const next = new URLSearchParams(current)
-    next.set('view', value)
-    return next
-  })
-  const client = useMemo(() => createDevDataPreparationClient(), [])
-  const searchWriterRef = useRef(setSearchParams)
-  useEffect(() => { searchWriterRef.current = setSearchParams }, [setSearchParams])
-  const mountedRef = useRef(false)
-  const requestVersionRef = useRef(0)
-  const refreshAbortRef = useRef(null)
-  const currentOperationIdRef = useRef('')
-  const prepareIntentRef = useRef(null)
-  const mutationRef = useRef(false)
-  const [summary, setSummary] = useState(null)
-  const [selectedProfileKey, setSelectedProfileKey] = useState(() => {
-    const requested = searchParams.get(DEV_DATA_PREPARATION_PROFILE_QUERY_KEY)
-    return Object.values(DEV_DATA_PREPARATION_PROFILE_KEYS).includes(requested)
-      ? requested : DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
-  })
-  const [selectedScenarioTargetKey, setSelectedScenarioTargetKey] = useState(() =>
-    searchParams.get(DEV_DATA_PREPARATION_TARGET_QUERY_KEY) === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
-      ? DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133 : DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment)
-  const selectedIsScenarioDemo = selectedProfileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
-  const customerScope = useDevCustomerScope({ searchParams, setSearchParams, normalize: selectedIsScenarioDemo })
-  const customerReady = customerScope.status === 'ready'
+  const dataView = daily && searchParams.get('view') === 'receipts' ? 'receipts' : 'scope'
+  const selectedTargetKey = daily ? scenarioTarget(searchParams) : DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal
+  const customerScope = useDevCustomerScope({ searchParams, setSearchParams, normalize: daily })
+  const customerReady = !daily || customerScope.status === 'ready'
   const selectedChainKey = searchParams.get('planChain') || ''
-  const setSelectedChainKey = (value) => setSearchParams((current) => {
+
+  const setQuery = (key, value, options) => setSearchParams((current) => {
     const next = new URLSearchParams(current)
-    if (value) next.set('planChain', value)
-    else next.delete('planChain')
+    if (value) next.set(key, value)
+    else next.delete(key)
     return next
-  })
-  const [currentOperation, setCurrentOperation] = useState(null)
-  const dataView = requestedDataView === 'confirm'
-    ? !currentOperation ? 'scope' : currentOperation.terminal ? 'receipts' : 'confirm'
-    : requestedDataView
+  }, options)
+
+  const client = useMemo(() => createDevDataPreparationClient(), [])
+  const mounted = useRef(false)
+  const refreshAbort = useRef(null)
+  const mutation = useRef(false)
+  const prepareIntent = useRef(null)
+  const [summary, setSummary] = useState(null)
+  const [trackedId, setTrackedId] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [pollError, setPollError] = useState('')
   const [preparing, setPreparing] = useState(false)
   const [executing, setExecuting] = useState(false)
-  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmOperationId, setConfirmOperationId] = useState('')
   const [confirmation, setConfirmation] = useState('')
 
   useEffect(() => {
-    if (requestedDataView !== 'confirm' || !currentOperation?.terminal) return
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current)
-      next.set('view', 'receipts')
-      return next
-    }, { replace: true })
-  }, [requestedDataView, currentOperation?.terminal, setSearchParams])
-  useEffect(() => {
-    mountedRef.current = true
-    return () => { mountedRef.current = false }
+    mounted.current = true
+    return () => { mounted.current = false }
   }, [])
-  const isPageActive = () => mountedRef.current &&
-    window.location.pathname.replace(/\/$/u, '') === DEV_DATA_PREPARATION_ROUTE
-  const updateOperation = useCallback((operation) => {
-    currentOperationIdRef.current = operation.id
-    setCurrentOperation(operation)
-    setSummary((current) => current ? { ...current,
-      currentOperations: [operation, ...current.currentOperations.filter((item) => item.id !== operation.id)],
-    } : current)
-  }, [])
+
   const refresh = useCallback(async ({ force = false } = {}) => {
-    refreshAbortRef.current?.abort()
+    refreshAbort.current?.abort()
     const controller = new AbortController()
-    refreshAbortRef.current = controller
-    const requestVersion = ++requestVersionRef.current
+    refreshAbort.current = controller
     setLoading(true)
     setLoadError('')
     try {
       const summaryClient = createDevDataPreparationClient({
         fetchImpl: (input, init) => globalThis.fetch(input, { ...init, signal: controller.signal }),
       })
-      const nextSummary = await summaryClient.summary({ force })
-      if (requestVersion !== requestVersionRef.current) return
-      setSummary(nextSummary)
-      const recoveredOperation = selectRecoverableDataPreparationOperation(
-        nextSummary.currentOperations, currentOperationIdRef.current, selectedProfileKey, profileTargetKey(selectedProfileKey, selectedScenarioTargetKey))
-      currentOperationIdRef.current = recoveredOperation?.id || ''
-      setCurrentOperation(recoveredOperation)
-      if (recoveredOperation) {
-        setSelectedProfileKey(recoveredOperation.profileKey)
-        const recoveredTargetKey = recoveredOperation.targetSummary.targetKey
-        if (recoveredOperation.profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo) setSelectedScenarioTargetKey(recoveredTargetKey)
-        searchWriterRef.current((current) => buildDevDataPreparationSearch(current, {
-          profileKey: recoveredOperation.profileKey, targetKey: recoveredTargetKey, customerKey: customerScope.customerKey,
-        }), { replace: true })
-        if (prepareIntentRef.current?.profileKey === recoveredOperation.profileKey) prepareIntentRef.current = null
-      }
+      const next = await summaryClient.summary({ force })
+      if (!controller.signal.aborted) setSummary(next)
     } catch (error) {
-      if (controller.signal.aborted || requestVersion !== requestVersionRef.current) return
-      setLoadError(getActionErrorMessage(error, '读取数据准备预检'))
+      if (!controller.signal.aborted) setLoadError(getActionErrorMessage(error, '检查数据环境'))
     } finally {
-      if (requestVersion === requestVersionRef.current) setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
-  }, [customerScope.customerKey, selectedProfileKey, selectedScenarioTargetKey])
+  }, [])
+
   useEffect(() => {
     refresh()
-    return () => { refreshAbortRef.current?.abort(); requestVersionRef.current += 1 }
-  }, [refresh])
+    return () => refreshAbort.current?.abort()
+  }, [refresh, selectedTargetKey])
 
-  const activeOperationId = currentOperation?.id || ''
-  const activeOperationTerminal = currentOperation?.terminal === true
+  const updateOperation = useCallback((operation) => {
+    setSummary((current) => current ? {
+      ...current,
+      currentOperations: [operation, ...current.currentOperations.filter(({ id }) => id !== operation.id)],
+    } : current)
+  }, [])
+  const operations = summary?.currentOperations || []
+  const writingId = operations.find(isWriting)?.id
+  const hasActiveOperation = Boolean(writingId) || (summary?.unresolvedOperations || []).some(isWriting)
+
   useEffect(() => {
-    if (!activeOperationId || activeOperationTerminal) return undefined
+    if (!writingId) return undefined
     let cancelled = false
-    let timerId
+    let timer
     const poll = async () => {
       let delay = 1500
       try {
-        const operation = await client.operation(activeOperationId)
-        if (cancelled || currentOperationIdRef.current !== activeOperationId) return
+        const operation = await client.operation(writingId)
+        if (cancelled) return
         setPollError('')
         updateOperation(operation)
         if (operation.terminal) return
       } catch (error) {
-        if (cancelled || currentOperationIdRef.current !== activeOperationId) return
-        setPollError(getActionErrorMessage(error, '刷新回执'))
+        if (cancelled) return
+        setPollError(getActionErrorMessage(error, '刷新执行结果'))
         delay = 3000
       }
-      timerId = window.setTimeout(poll, delay)
+      timer = window.setTimeout(poll, delay)
     }
-    timerId = window.setTimeout(poll, 1500)
-    return () => { cancelled = true; window.clearTimeout(timerId) }
-  }, [activeOperationId, activeOperationTerminal, client, updateOperation])
+    timer = window.setTimeout(poll, 1500)
+    return () => { cancelled = true; window.clearTimeout(timer) }
+  }, [writingId, client, updateOperation])
 
-  const profiles = [...(summary?.profiles || [])].sort((a, b) => DATA_PROFILE_ORDER.indexOf(a.key) - DATA_PROFILE_ORDER.indexOf(b.key))
-  const selectedProfile = profiles.find((profile) => profile.key === selectedProfileKey)
-  const selectedProfileCopy = DEV_DATA_PREPARATION_PROFILE_COPY[selectedProfileKey]
-  const selectedOperationTargetKey = profileTargetKey(selectedProfileKey, selectedScenarioTargetKey)
-  const availability = resolveDataPreparationAvailability(summary, selectedProfileKey, selectedOperationTargetKey)
-  const hasActiveOperation = (summary?.currentOperations || []).some((operation) => ['launching', 'running'].includes(operation.status))
-  const currentIsScenarioDemo = currentOperation?.profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
-  const canPrepare = Boolean(selectedProfile) && !availability.blockers.length && !hasActiveOperation &&
-    (!selectedIsScenarioDemo || customerReady) && !loading && !loadError && !preparing && !executing
-  const canExecuteCurrent = currentOperation?.status === 'ready' && !currentOperation.issues.some((issue) => issue.severity === 'blocked') && currentOperation.profileKey === selectedProfileKey &&
-    currentOperation.targetSummary.targetKey === selectedOperationTargetKey && !hasActiveOperation &&
-    !availability.blockers.length && (!currentIsScenarioDemo || customerReady) && !loading && !loadError && !preparing && !executing
-  const currentExecutionConfirmation = currentOperation ? resolveDataPreparationExecutionConfirmation(currentOperation, confirmation) : ''
+  const currentOperation = selectRecoverableDataPreparationOperation(operations, trackedId, profileKey, selectedTargetKey)
+  const availability = resolveDataPreparationAvailability(summary, profileKey, selectedTargetKey)
+  const canPrepare = customerReady && !availability.blockers.length && !hasActiveOperation &&
+    !loading && !loadError && !preparing && !executing
+  const canExecute = canPrepare && currentOperation?.status === 'ready' &&
+    !currentOperation.issues.some((issue) => issue.severity === 'blocked')
+  const confirmOpen = Boolean(currentOperation?.status === 'ready' && confirmOperationId === currentOperation.id)
+  const executionConfirmation = confirmOpen ? resolveDataPreparationExecutionConfirmation(currentOperation, confirmation) : ''
 
-  const changeSelection = (profileKey, targetKey) => {
-    if (mutationRef.current) return
-    requestVersionRef.current += 1
-    refreshAbortRef.current?.abort()
-    setLoading(true)
-    setSelectedProfileKey(profileKey)
-    setSelectedScenarioTargetKey(targetKey)
-    setSearchParams((current) => buildDevDataPreparationSearch(current, {
-      profileKey, targetKey, customerKey: customerScope.customerKey,
-    }), { replace: true })
-    currentOperationIdRef.current = ''
-    prepareIntentRef.current = null
-    setCurrentOperation(null)
-    setActionError('')
-    setPollError('')
-    setConfirmOpen(false)
+  function closeConfirm() {
+    setConfirmOperationId('')
     setConfirmation('')
   }
-  const selectProfile = (profileKey) => changeSelection(profileKey, selectedScenarioTargetKey)
-  const selectScenarioTarget = (targetKey) => changeSelection(selectedProfileKey, targetKey)
-  const prepareBlockingReason = loading ? '正在检查当前条件…'
-    : loadError ? '预检读取失败，请重新检查后再操作。'
-      : selectedIsScenarioDemo && !customerReady ? '先选择已登记甲方，再准备对应的业务场景。'
-        : hasActiveOperation ? '已有批次正在执行，请先查看当前批次。'
-          : availability.blockers.length ? '请先处理下面列出的条件，再重新检查。' : ''
 
-  const handlePrepare = async () => {
-    if (!canPrepare || mutationRef.current) return
-    mutationRef.current = true
+  function selectTarget(targetKey) {
+    if (mutation.current || targetKey === selectedTargetKey) return
+    refreshAbort.current?.abort()
+    setLoading(true)
+    setTrackedId('')
+    prepareIntent.current = null
+    setActionError('')
+    closeConfirm()
+    setQuery(DEV_DATA_PREPARATION_TARGET_QUERY_KEY, targetKey, { replace: true })
+  }
+
+  function belongsToCurrentTarget() {
+    return mounted.current && (!daily || scenarioTarget(new URLSearchParams(window.location.search)) === selectedTargetKey)
+  }
+
+  async function handlePrepare() {
+    if (!canPrepare || mutation.current) return
+    if (canExecute && !actionError) {
+      setConfirmOperationId(currentOperation.id)
+      return
+    }
+    mutation.current = true
     setPreparing(true)
     setActionError('')
     try {
-      const intent = resolveDataPreparationPrepareIntent(prepareIntentRef.current, selectedProfileKey, selectedOperationTargetKey)
-      prepareIntentRef.current = intent
-      const result = await client.prepare(selectedProfileKey, selectedOperationTargetKey, intent.idempotencyKey)
-      if (!isPageActive()) return
-      updateOperation(result.operation)
-      selectDataView('confirm')
-      prepareIntentRef.current = null
-      message.success(result.reused ? '已读回复用的不可变计划' : '不可变计划已准备')
-      if (selectedIsScenarioDemo && result.operation.status === 'ready') {
-        setConfirmation(result.operation.confirmationRequired)
-        setConfirmOpen(true)
+      const intent = resolveDataPreparationPrepareIntent(prepareIntent.current, profileKey, selectedTargetKey)
+      prepareIntent.current = intent
+      const { operation } = await client.prepare(profileKey, selectedTargetKey, intent.idempotencyKey)
+      if (!mounted.current) return
+      updateOperation(operation)
+      if (!belongsToCurrentTarget()) return
+      setTrackedId(operation.id)
+      prepareIntent.current = null
+      if (operation.status === 'ready' && !operation.issues.some((issue) => issue.severity === 'blocked')) {
+        setConfirmOperationId(operation.id)
       }
     } catch (error) {
-      if (isPageActive()) setActionError(getActionErrorMessage(error, '准备计划'))
+      if (belongsToCurrentTarget()) setActionError(getActionErrorMessage(error, daily ? '准备手测数据' : '准备完整回归'))
     } finally {
-      mutationRef.current = false
-      if (isPageActive()) setPreparing(false)
+      mutation.current = false
+      if (mounted.current) setPreparing(false)
     }
   }
-  const handleExecute = async () => {
-    if (!canExecuteCurrent || !currentOperation || mutationRef.current || currentExecutionConfirmation !== currentOperation.confirmationRequired) return
-    mutationRef.current = true
+
+  async function handleExecute() {
+    if (!confirmOpen || !canExecute || mutation.current || executionConfirmation !== currentOperation.confirmationRequired) return
+    mutation.current = true
     setExecuting(true)
     setActionError('')
     try {
-      const result = await client.execute(currentOperation.id, currentExecutionConfirmation)
-      if (!isPageActive()) return
-      updateOperation(result.operation)
-      setConfirmOpen(false)
-      setConfirmation('')
-      selectDataView('confirm')
-      message.success('批次已启动，正在跟踪执行结果')
+      const { operation } = await client.execute(currentOperation.id, executionConfirmation)
+      if (!mounted.current) return
+      updateOperation(operation)
+      if (belongsToCurrentTarget()) closeConfirm()
     } catch (error) {
-      if (isPageActive()) {
-        setActionError(getActionErrorMessage(error, '执行固定计划', {
-          suffix: '请先重新检查并核对批次结果，系统没有自动重试',
+      if (belongsToCurrentTarget()) {
+        closeConfirm()
+        setActionError(getActionErrorMessage(error, daily ? '补齐手测数据' : '执行完整回归', {
+          suffix: '请先重新检查并核对执行记录。',
         }))
       }
     } finally {
-      mutationRef.current = false
-      if (isPageActive()) setExecuting(false)
+      mutation.current = false
+      if (mounted.current) setExecuting(false)
     }
   }
+
   return {
     actionError,
-    availability,
-    canExecuteCurrent,
-    canPrepare,
-    confirmation,
-    confirmOpen,
-    currentExecutionConfirmation,
-    currentIsScenarioDemo,
+availability,
+canPrepare,
+canExecute,
+confirmOpen,
+confirmation,
     currentOperation,
-    customerScope,
-    dataView,
-    executing,
+customerScope,
+dataView,
+executing,
+executionConfirmation,
     handleExecute,
-    handlePrepare,
-    loadError,
-    loading,
-    pollError,
-    prepareBlockingReason,
+handlePrepare,
+hasActiveOperation,
+loading,
+loadError,
+pollError,
     preparing,
-    profiles,
-    refresh,
-    selectDataView,
-    selectedChainKey,
-    selectedIsScenarioDemo,
-    selectedOperationTargetKey,
-    selectedProfile,
-    selectedProfileCopy,
-    selectedProfileKey,
-    selectedScenarioTargetKey,
-    selectProfile,
-    selectScope: changeSelection,
-    selectScenarioTarget,
-    setActionError,
-    setConfirmation,
-    setConfirmOpen,
-    setSelectedChainKey,
-    summary,
+refresh,
+selectedChainKey,
+selectedTargetKey,
+summary,
+    closeConfirm,
+selectTarget,
+setConfirmation,
+    selectDataView: daily ? (value) => setQuery('view', value === 'scope' ? '' : value) : undefined,
+    setSelectedChainKey: (value) => {
+      if (value !== selectedChainKey) setQuery('planChain', value, daily ? undefined : { replace: true, preventScrollReset: true })
+    },
   }
 }

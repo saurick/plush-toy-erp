@@ -9,7 +9,51 @@
       "sha256": "e08508b3b3955e31e26c86c9651df2bb5eae79a3b79080d368fc1107a3f14c4c",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 背包小象: a cream-white seated elephant plush with large round ears and a short curved trunk, wearing a small pale blue backpack clearly visible beside its shoulder in a three-quarter view. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 背包小象: a cream-white seated elephant plush with large round ears and a short curved trunk, wearing a small pale blue backpack clearly visible beside its shoulder in a three-quarter view. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream elephant, huge round ears, curled short trunk, blue backpack and straps, pink cheeks. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/backpack_elephant-side.jpg",
+          "sha256": "8d81c08e1a69dd961d1aa9f231bf9cc51f3f4dd57c5088e277da44bd3528585d",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/backpack_elephant-angle.jpg",
+          "sha256": "826431329b28b318de61f76e3f606475d0a496232f549cb239ac4382b5e510d4",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/backpack_elephant-detail.png",
+          "sha256": "c903458eae09b09a539121764fbadf7a0d905a08001bd1da5e756fe08e4d7efa",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/backpack_elephant-back.jpg",
+          "sha256": "985226c0d5989fcc278857ed47a745ce7e30bce8615125cd3f0d3dd436d1f66a",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "bell_deer",
@@ -18,7 +62,51 @@
       "sha256": "d2041aad1c80063c2afa2432b00df055cdb3d515af471b5b27ef17770e333772",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 铃铛小鹿: a cream-white seated deer plush with small soft beige antlers, long ears and one tiny golden bell on a pale pink ribbon. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 铃铛小鹿: a cream-white seated deer plush with small soft beige antlers, long ears and one tiny golden bell on a pale pink ribbon. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream fawn with small tan antlers and hooves, pink neck bow and little gold bell, closed smiling eyes. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/bell_deer-side.jpg",
+          "sha256": "2c38805a57639d0ff954802f602a7e7a79e514c1cd5b1dcf8928d34898ce68db",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/bell_deer-angle.jpg",
+          "sha256": "ae11805235af963b6d8072c098c37a5d6d3d5d353ed7f312785fd44747c80485",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/bell_deer-detail.webp",
+          "sha256": "2a792e55126d54adc213a477a279b22c13389a1f93ac92bb0b40944955d6ecf6",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/bell_deer-back.jpg",
+          "sha256": "ea4fbb3d5e578ed5d927a3b0903febb3541005f5f8826323ba84802b3ecd6324",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "butterfly_cat",
@@ -27,7 +115,51 @@
       "sha256": "88b4ba43e2b97d8f5fe13a50ce3e4e40c9960069a89889f330e26e02355ebe19",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 蝴蝶小猫: a cream-white seated kitten plush with triangular ears, small pink nose and a small pale purple butterfly applique on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 蝴蝶小猫: a cream-white seated kitten plush with triangular ears, small pink nose and a small pale purple butterfly applique on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: ivory seated kitten, lavender stitched butterfly on chest, pink ears, tail on one side, whiskers. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/butterfly_cat-side.jpg",
+          "sha256": "5be5af6442c14a3651ccd41a78fe07dfaa1c0565f47f47c93bd9dc47180e4908",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/butterfly_cat-angle.jpg",
+          "sha256": "16459ddab32daeca93bc1883ae3bc300978e62ff7597566f0f69d12ec5976378",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/butterfly_cat-detail.jpg",
+          "sha256": "1b1a2f48834ee86f8c26309445c122d088e4be0a57abdfe7c202fba3a33c3208",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/butterfly_cat-back.jpg",
+          "sha256": "0abaee1d8b99495de928fbe9062728cc83e682197ea51592e8cf439c98c6443b",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "cloud_bear",
@@ -36,7 +168,51 @@
       "sha256": "fb27edfda238f078ccd2cd3b02a29729f11dddf05cf3c9ecc4f7b8a107b613af",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. Create one photorealistic studio product photograph for a fictional ERP product named 云朵小熊 (Cloud Teddy Bear). A single seated cream-white plush teddy bear, cloud-soft short pile fabric, rounded ears, small black embroidered eyes, warm brown embroidered nose, pale blue small cloud applique on chest. Entire plush visible, centered, simple seamless white background with a subtle contact shadow, soft diffused catalog lighting, realistic sewn seams and tactile textile, neutral color accurate photograph, no text, no numbers, no watermark, no brand, no props. Square composition with safe white margins, native 3840x3840 if available. This is a concrete product catalog photograph asset, no UI or placeholder icon."
+      "prompt": "Use case: product-mockup. Create one photorealistic studio product photograph for a fictional ERP product named 云朵小熊 (Cloud Teddy Bear). A single seated cream-white plush teddy bear, cloud-soft short pile fabric, rounded ears, small black embroidered eyes, warm brown embroidered nose, pale blue small cloud applique on chest. Entire plush visible, centered, simple seamless white background with a subtle contact shadow, soft diffused catalog lighting, realistic sewn seams and tactile textile, neutral color accurate photograph, no text, no numbers, no watermark, no brand, no props. Square composition with safe white margins, native 3840x3840 if available. This is a concrete product catalog photograph asset, no UI or placeholder icon.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream seated teddy, plain face, pale blue cloud embroidery on chest, soft round unpatterned feet. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/cloud_bear-side.jpg",
+          "sha256": "4240ed5fd2e3d3f1e4a0a7a40c7b3b7522b8dbe71ced4f3d35a95a93a3bd983b",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/cloud_bear-angle.jpg",
+          "sha256": "5eb24662f03f79115faf29338906db1447427684d6b8f36f4e371b825f3cbfd1",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/cloud_bear-detail.jpg",
+          "sha256": "2fcae8155781942d214a684d94766300119713b707e77d77538b37b7617dca4f",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/cloud_bear-back.jpg",
+          "sha256": "b0e5832f9e168e77149d91c9e5289f2d535ac6d2ba11b1de9d5fbcd0a0734721",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "coffee_dog",
@@ -45,7 +221,51 @@
       "sha256": "d15db0cff6ce22795daee81404916d54b2d6101c9720ead3aec2af080cf5bd20",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 咖啡小狗: a seated warm cream and coffee-beige puppy plush with floppy darker beige ears holding a tiny soft brown fabric coffee cup without any text. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 咖啡小狗: a seated warm cream and coffee-beige puppy plush with floppy darker beige ears holding a tiny soft brown fabric coffee cup without any text. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: seated cream puppy with brown floppy ears and matching eye patch, two paws holding the brown plush coffee cup, brown paw pads. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/coffee_dog-side.jpg",
+          "sha256": "3dc43e2d54c0fe7799b9a30151ab02ae465a690297165cb6d344eb8c77c71175",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/coffee_dog-angle.jpg",
+          "sha256": "e8b21836825f2e265dac2a8609d0a13b75a70febd2deace11803f9b2f3845754",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/coffee_dog-detail.png",
+          "sha256": "20836c5a8cc96013b55ad40eadad74e2f8bc7fef7f0e19f9d1c8d8615cb223f7",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/coffee_dog-back.jpg",
+          "sha256": "1b9a75334f2c06193f9dc2341660264330903707719f45acd6a960fd3778048a",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "cookie_bear",
@@ -54,7 +274,51 @@
       "sha256": "4d15421b475e1a227491f2a4327ed93c8173bed7096219c187382cf7c7ae7ab0",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 饼干小熊: a cream-white seated teddy bear plush holding one round beige plush biscuit with small chocolate-brown embroidered dots. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 饼干小熊: a cream-white seated teddy bear plush holding one round beige plush biscuit with small chocolate-brown embroidered dots. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream seated teddy holding tan round chocolate-chip plush cookie, brown embroidered paw pads. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/cookie_bear-side.jpg",
+          "sha256": "07344d061da4b2469777bc7b0e5b997c6c515b683e5726589cef019804a849e9",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/cookie_bear-angle.jpg",
+          "sha256": "f6e9d24fa7dfb07066770623beb55490af1863be970258507ea970bb14a89d89",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/cookie_bear-detail.webp",
+          "sha256": "0bf212f8d47bb7e204fd39e27613472877eda223e0dbb7b042eaf291492ce1c9",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/cookie_bear-back.jpg",
+          "sha256": "8410da2b893cfeffce85d4e261a059c161c5f220bb761e80c2387cc89b4cd722",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "cream_dog",
@@ -63,7 +327,51 @@
       "sha256": "6ef19a11676aad6ca7ff34a76f4b85ea2a06cb9a805b2dd8504316dcd3d46cc9",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 奶油小狗: a cream-white seated plush puppy with floppy beige ears, embroidered black eyes and brown nose. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 奶油小狗: a cream-white seated plush puppy with floppy beige ears, embroidered black eyes and brown nose. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: plain seated cream puppy with light tan floppy ears and no accessories or markings. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/cream_dog-side.jpg",
+          "sha256": "4fecc1335afdd169e79e309b01db78fc5347ade9c51985f575fd79dc6892b5e7",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/cream_dog-angle.jpg",
+          "sha256": "aeae8337640944fd53a84830362412a884c055edacfe612faa99e8c9f8bf09f9",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/cream_dog-detail.jpg",
+          "sha256": "c110435c713dc4a57434e3dd150698251fb2e5366c6154331e4c139b0a075327",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/cream_dog-back.jpg",
+          "sha256": "6106013cae6c5b8e99aca6fb644bbc45bdcf52d2772b4760121976efbf6fa69b",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "garden_cat",
@@ -72,7 +380,51 @@
       "sha256": "942ac824c740b0ee707b9d6c2de83a48a1153885aed0b8bae2bf064289817fe5",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 花园小猫: a cream-white seated kitten plush with a small soft pale pink flower crown and tiny embroidered green leaf on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 花园小猫: a cream-white seated kitten plush with a small soft pale pink flower crown and tiny embroidered green leaf on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream seated kitten with a wreath of tiny pink flowers and green leaves, green sprig on chest, pink paw pads. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/garden_cat-side.jpg",
+          "sha256": "1711677e7a423ce94b11e496cd6715f3a3878f9280b1015221c9da7a0fbbb834",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/garden_cat-angle.jpg",
+          "sha256": "9972c1c56b2bb1ac6f0c60b03c84776982335c1a47816f405bc82b8c600564e0",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/garden_cat-detail.jpg",
+          "sha256": "69b354b8f48a0447454f8b19010c9ef4a53fd970e4fe4fca4288d94183feadb0",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/garden_cat-back.jpg",
+          "sha256": "e27ae3868e11bbf7228a9ccb7e50e371572e5eb3cf708b462ea969cd8f6b2423",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "long_tail_cat",
@@ -81,7 +433,51 @@
       "sha256": "999c41521c9ed989fc9b3dfeb158cafb622830e5709d9557508d60a394bbb77b",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 长尾小猫: a cream-white seated plush kitten with triangular ears, pale pink nose, and a clearly visible long curled tail. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 长尾小猫: a cream-white seated plush kitten with triangular ears, pale pink nose, and a clearly visible long curled tail. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: ivory seated kitten with an especially prominent long thick curled tail, pink foot pads and dark whiskers. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/long_tail_cat-side.jpg",
+          "sha256": "6f726bf41c45bdfe67d090684e8a06e1db959794302d2dc61c61897dd1403ca8",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/long_tail_cat-angle.jpg",
+          "sha256": "4a7ace9f09c6cbb6a29e20dc8ace28b4c2ff0760211f06c64caab72d8f2167ee",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/long_tail_cat-detail.png",
+          "sha256": "59d652c20395d7df1023133792aa85e14c72405e41fa1987bbcfd11fa24eb9d1",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/long_tail_cat-back.jpg",
+          "sha256": "d6460b7312add51dd625f39d283b6ac568bc92f903e39d9b43234575fad02de9",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "lying_dog",
@@ -90,7 +486,51 @@
       "sha256": "7797b8d93b43151d2b150fc4cec945630436a51ec6a1822f231af517d67a3c4f",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 趴趴小狗: a cream-white plush puppy lying flat on its belly with its front paws stretched forward, floppy beige ears and a tiny brown nose. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 趴趴小狗: a cream-white plush puppy lying flat on its belly with its front paws stretched forward, floppy beige ears and a tiny brown nose. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream puppy with tan floppy ears lying flat on belly with chin low and front paws forward; preserve prone pose. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/lying_dog-side.jpg",
+          "sha256": "dd880c56a78337f414379ae39e0e21f83597618dbb63ad29267d28d86936cc80",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/lying_dog-angle.jpg",
+          "sha256": "8da482552b4804e0024045837c292a0dac3f37d6b7f9e0451e5a096c9a787afc",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/lying_dog-detail.webp",
+          "sha256": "1588daa65958bf505fd7c06da21316d6221e25db2cd09d6a67f60f94dc136386",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/lying_dog-back.jpg",
+          "sha256": "f3d4fc478fffc2bf3c91d66f59ef371e92170022b3032a8f3c9cf1e681c6cb8d",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "moon_rabbit",
@@ -99,7 +539,51 @@
       "sha256": "88c86733cb3d5da1f3ffa229cd2f0ca8e76251e25199bd0b9f146f3a12b48e5a",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 月亮小兔: a cream-white seated long-eared rabbit plush holding one small pale yellow crescent moon pillow. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 月亮小兔: a cream-white seated long-eared rabbit plush holding one small pale yellow crescent moon pillow. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream sitting rabbit with long pink-lined drooping ears, held yellow crescent moon, pink paw pads. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/moon_rabbit-side.jpg",
+          "sha256": "3b4e691acab431468ee41525b083d648c4f3d81c6bab38bfff82bf997a39e239",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/moon_rabbit-angle.jpg",
+          "sha256": "b292ea9a24a1a6c88e51d4bac22db30fdae6d118ebdddb2060380bfc3237d6b6",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/moon_rabbit-detail.jpg",
+          "sha256": "49d994d87c9127a656027c90bbcc62f876bccc409e4fc49a268283a99d5923c1",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/moon_rabbit-back.jpg",
+          "sha256": "d718d0b705e78e4300b4b54c6e7ec0768f496d6710322da42f81f2dfde971669",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "orange_fox",
@@ -108,7 +592,51 @@
       "sha256": "052c81b8ca0e853cca2f21adcf05b604edc5cc6849f48a42c85d966c80c97c05",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 橘子狐狸: a cream-white seated fox plush with pointed ears, bushy tail and a small plush orange fruit held in its paws. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 橘子狐狸: a cream-white seated fox plush with pointed ears, bushy tail and a small plush orange fruit held in its paws. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream fox with tall pointed ears and fluffy curled tail, closed eyes, holding a little bright orange fruit with green leaf. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/orange_fox-side.jpg",
+          "sha256": "b43b88d7af7a99b36377cba0af663dfe05945952f20369bea4fef73d41c17ab5",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/orange_fox-angle.jpg",
+          "sha256": "c9abac4d369bfb4e6017fd59cf77f496d7a02c24dc50726176e068a249f22893",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/orange_fox-detail.jpg",
+          "sha256": "6fd847bcb4bf52afdc96193e77fc5b5b622b562941ebe1b419bacf861775b24b",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/orange_fox-back.jpg",
+          "sha256": "9788d3cf12c4a2400aedae435834aa9d5d851357943101fcfb64df1619351a21",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "pocket_elephant",
@@ -117,7 +645,51 @@
       "sha256": "32588fb12531e66444042315a08b21bce16a910484119be6db404e24eba65046",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 口袋小象: a cream-white seated elephant plush with large round floppy ears, a short curved trunk and one small pale blue fabric pocket on the belly. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 口袋小象: a cream-white seated elephant plush with large round floppy ears, a short curved trunk and one small pale blue fabric pocket on the belly. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream seated elephant, big round ears and curled trunk, pale blue sewn belly pocket, no backpack. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/pocket_elephant-side.jpg",
+          "sha256": "b9fa057e03fac481e8adb2691240a0c7fe4eeae0a5939a703de2856ab078caef",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/pocket_elephant-angle.jpg",
+          "sha256": "6cf4ae4298074fc03eaa04b898f36eb1f7be9a00f885563b10f3013d5f284d2b",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/pocket_elephant-detail.png",
+          "sha256": "bb049fe315d396419cac5d68de8e2ab59d851e57853c3c16923c6273541e6fb3",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/pocket_elephant-back.jpg",
+          "sha256": "13676518c39982deee44681302c95b8348daafb61e8ecd2f88efbbe0ea773feb",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "rainbow_rabbit",
@@ -126,7 +698,51 @@
       "sha256": "c1ef0fbcbdb0d0e1645fffc28640190ac482c6796bff2a55106026e7bd3b9173",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 彩虹小兔: a cream-white seated rabbit plush with long upright ears and a small pastel rainbow applique on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 彩虹小兔: a cream-white seated rabbit plush with long upright ears and a small pastel rainbow applique on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams and friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream seated rabbit with upright pink-lined ears, pastel rainbow chest embroidery and pink paws. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/rainbow_rabbit-side.jpg",
+          "sha256": "23d287e052bbb2c646049bcda1c2e1ffed78d47b6231082de4231065bc5bcae7",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/rainbow_rabbit-angle.jpg",
+          "sha256": "98dff53e4d370e564b84f1766b75c6a71865ca8f5d8c7411174da0bd738a336c",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/rainbow_rabbit-detail.webp",
+          "sha256": "2dddd46af2c4d3eed1cf8766f7b28f9d180d16d9093020e2b6c6030e9c3f19c7",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/rainbow_rabbit-back.jpg",
+          "sha256": "9fbd87c02e2a4652ee9b0329b492d484f8666a006d2b384c6efddd1e2ab3d904",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "sailor_penguin",
@@ -135,7 +751,51 @@
       "sha256": "4eb391fbf9eca7fd1538a392c496512ae436bc58b35c03a78a7c462a2f4b43e7",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 水手企鹅: a seated penguin plush with cream-white belly, fog-blue body, small orange beak and white sailor collar with blue edging. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 水手企鹅: a seated penguin plush with cream-white belly, fog-blue body, small orange beak and white sailor collar with blue edging. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: blue and white seated penguin, tiny sailor hat and blue trimmed white collar, bow and orange feet. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/sailor_penguin-side.jpg",
+          "sha256": "8bb960d3d216d16dd83d707b630836f4cd0081bff00d98ca6547671bf69470a7",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/sailor_penguin-angle.jpg",
+          "sha256": "1361553f0d044226cd07c4c6084a1820820a01dec324e168d3a3d4681ef7278a",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/sailor_penguin-detail.jpg",
+          "sha256": "5c731277d36322d23a581f8e9079ff2808e8af2eab16c89ee066d361fd26fcfd",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/sailor_penguin-back.jpg",
+          "sha256": "50541a7a43a6ee7f2b43d716ec9c871129616d6982c72f6f0ff81dfd742c687d",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "scarf_fox",
@@ -144,7 +804,51 @@
       "sha256": "fd00d8cc1791c2c536c616745223b346ae929d3a536efa1f925493d8adc385b3",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 围巾狐狸: a cream-white seated arctic fox plush with pointed ears, bushy tail and a soft muted orange scarf. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 围巾狐狸: a cream-white seated arctic fox plush with pointed ears, bushy tail and a soft muted orange scarf. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream seated fox with closed eyes, triangular pointed ears, fluffy tail and the exact burnt orange fringed scarf. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/scarf_fox-side.jpg",
+          "sha256": "5a2100612d4b0929ea1be09d8bb61b29ced567dec8b0ea1939d096f98ea0ff98",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/scarf_fox-angle.jpg",
+          "sha256": "5a10ce82dba112f669806b561bbd9ae57b05debc9a5aa1716ac9c009fe3f76d2",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/scarf_fox-detail.jpg",
+          "sha256": "44575534e3b7fc96b587acca6fc6cce6290550ed996712c8a13ec13cd393a638",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/scarf_fox-back.jpg",
+          "sha256": "7642cbb6be04a0e10d836de3977d2b4512575617f410c53bc24f9ebeebd8c093",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "sea_salt_penguin",
@@ -153,7 +857,51 @@
       "sha256": "df59e0c8a7e5730cd97b3bd2e9cc722d24a9799a90e24f12533d789fe5a3cd56",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 海盐企鹅: a small seated penguin plush, fog-blue flippers and head with a cream-white belly, small pale orange beak and feet. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 海盐企鹅: a small seated penguin plush, fog-blue flippers and head with a cream-white belly, small pale orange beak and feet. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: dusty blue and cream seated penguin, closed smiling eyes, warm peach beak and feet, no clothes. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/sea_salt_penguin-side.jpg",
+          "sha256": "2fe7b193435eddda974e435c8d7a4b5f9be802d2ace7b0dc045ea81fd517e76a",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/sea_salt_penguin-angle.jpg",
+          "sha256": "f0ce2e49814e6320e27ed556226b3a8046bb21ee8d7fc99f06e80e0c2617b099",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/sea_salt_penguin-detail.png",
+          "sha256": "89a376a498ce20af14428d0e74c0f2a46e916891b983df5aeed390a7576638f9",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/sea_salt_penguin-back.jpg",
+          "sha256": "1d736cf6cb0b74da75ca34321a7b59baf5f7c618a399befb0b93fe5f570e6152",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "snow_deer",
@@ -162,7 +910,51 @@
       "sha256": "ca73a408557642de62fab237e70c7c9e8cb64b6e779a2f69704a1a29d6e5174a",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 雪花小鹿: a cream-white seated deer plush with soft beige antlers and a pale blue snowflake applique on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 雪花小鹿: a cream-white seated deer plush with soft beige antlers and a pale blue snowflake applique on its chest. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile, sewn seams, friendly embroidered features. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream seated fawn with tan antlers and hooves, pale blue embroidered snowflake on chest, open eyes. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/snow_deer-side.jpg",
+          "sha256": "ce035f1ecec480f87ad73bc916f4125086d56c61d0f41b946ec68cbd8f82c3e2",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/snow_deer-angle.jpg",
+          "sha256": "cad02ef03fddc689a585642f5736988b1304fba6b37cc5afe145fcb0ac3b6b23",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/snow_deer-detail.webp",
+          "sha256": "320c56099c6900eabe4e89b36e03389269c0ad9d0cfe359918879d468563b8b1",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/snow_deer-back.jpg",
+          "sha256": "d50be7c3b088b598956536ec69451104db6a3e8be3d4ec67fa173f8ec67a48ca",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "star_rabbit",
@@ -171,7 +963,51 @@
       "sha256": "106936d24c6f306cb64560fccf466f4a4e92f971c36a229363a2639f8f472d0b",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 星星挂兔: a cream-white plush rabbit bag charm with long upright ears, tiny pale yellow star applique on its chest, small stitched hanging loop on top. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 星星挂兔: a cream-white plush rabbit bag charm with long upright ears, tiny pale yellow star applique on its chest, small stitched hanging loop on top. Exactly one full toy centered, entire toy visible, realistic textile pile, sewn seams, soft embroidered features. Seamless white studio background, subtle contact shadow, soft diffused natural studio lighting. No text, number, logo, watermark, UI, collage, other toy, human or clutter. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: small cream rabbit keychain, upright pink-lined ears, hanging loop and small yellow star embroidery on chest. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/star_rabbit-side.jpg",
+          "sha256": "29dc58df4525b7eff59a5e8f89a6ba96e893b6a223ac39fd343423a440d870b0",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/star_rabbit-angle.jpg",
+          "sha256": "87ae7407afbe80f98333534dfbdd19563ca4efdfc699aae7ebb73534b964b832",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/star_rabbit-detail.jpg",
+          "sha256": "1019e8f958aadb02375b4f6be2e6661b22ea17e3a25c8132a8c1f622f79b16f9",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/star_rabbit-back.jpg",
+          "sha256": "0479aa86bf82b3953ea2d1f107ea0f07e4a42b12916c6406c5affbfcb7ede98d",
+          "width": 627,
+          "height": 627
+        }
+      ]
     },
     {
       "key": "strawberry_bear",
@@ -180,7 +1016,51 @@
       "sha256": "9b56dc56ed6655fc549bf241ab1329d4875d156e5a4516e4700575c3310fbfac",
       "nativeWidth": 1254,
       "nativeHeight": 1254,
-      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 草莓小熊: a cream-white seated teddy bear plush holding one small red plush strawberry with green felt leaves. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported."
+      "prompt": "Use case: product-mockup. One photorealistic catalog photograph of a fictional plush toy named 草莓小熊: a cream-white seated teddy bear plush holding one small red plush strawberry with green felt leaves. Exactly one full toy centered, entire toy visible, realistic tactile fabric pile and sewn seams, embroidered friendly face. Seamless white studio background, subtle contact shadow, soft diffused studio lighting. No text, number, logo, watermark, UI, collage, other toy or human. Square composition, safe white margins, native 3840 square pixels if supported.",
+      "viewPrompt": "Use case: product-mockup. Produce a new studio photography turnaround board for the exact fictional plush toy in the single reference image. Identity lock: cream seated teddy with round pink-lined ears and paw pads, holding the exact red plush strawberry with green top. Match the reference stitch colors, design, facial embroidery, fabric texture and dimensions faithfully. Show the identical physical plush from two different cameras. Output one square, clean 2 by 2 image grid with exact half width/half height cells, no borders, lettering or visible split rules. The four photographs must be completely independent, no objects crossing cells and the subject composition centered with white margins in every cell. TOP LEFT: a full-body three-quarter SIDE view (rotate the subject to the side about 50 degrees compared to the reference, do not just repeat the front); include all limbs and accessories, soft shadow on white. TOP RIGHT: full-body view from the opposite three-quarter angle slightly from above, same plush and soft white studio. BOTTOM LEFT: close detail photo of distinctive embroidery, fabric and accessory, enough context to recognize the same toy. BOTTOM RIGHT: full rear or rear three-quarter studio photo of the same plush as physically plausible from reference. Studio photorealism, neutral lighting, simple white backdrop. No other object, packaging, graphic, text, logo, mock image symbol, duplicate front views, or artwork. The four photos are meant to be separated at exactly the halfway horizontal and vertical cuts for an ERP demo product album.",
+      "viewSource": {
+        "tool": "image_gen",
+        "width": 1254,
+        "height": 1254
+      },
+      "views": [
+        {
+          "key": "side",
+          "label": "侧面图",
+          "slot": "secondary",
+          "file": "views/strawberry_bear-side.jpg",
+          "sha256": "2cf06b780b6fc3f16d919bfe9d126b5d33582e5a565685607093710eba984444",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "angle",
+          "label": "斜俯视图",
+          "slot": "supplemental",
+          "file": "views/strawberry_bear-angle.jpg",
+          "sha256": "2681637c783ef2d4d168cdc2e9ecaa25d5eaf2a4ddd44d9bee87b62634491258",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "detail",
+          "label": "工艺细节图",
+          "slot": "supplemental",
+          "file": "views/strawberry_bear-detail.jpg",
+          "sha256": "1e50166657edd6d6bc0c16bb835387d7cf4817d9645d23b92bffae6a432243ba",
+          "width": 627,
+          "height": 627
+        },
+        {
+          "key": "back",
+          "label": "背面图",
+          "slot": "supplemental",
+          "file": "views/strawberry_bear-back.jpg",
+          "sha256": "26ab268f2b8d8824eacd4f2c732fa99becfe75e06caad79d2931a541bba3c9ac",
+          "width": 627,
+          "height": 627
+        }
+      ]
     }
   ]
 }

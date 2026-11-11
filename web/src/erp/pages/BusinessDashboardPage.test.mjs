@@ -139,7 +139,7 @@ test('progress lists and details share independently previewable product identit
   assert.doesNotMatch(progressContent, /return row\.product_match_count/u)
   assert.match(progressContent, /<BusinessProductGallery\b[^>]*loadProducts=\{loadProducts\}/u)
   assert.match(progressContent, /row\.product_count > 1[\s\S]*?canReadDocumentProductGallery/u)
-  assert.match(progressContent, /<ProductIdentity\b[^>]*thumbnail=\{gallery\}/u)
+  assert.match(progressContent, /<ProductIdentity\b[^>]*thumbnail=\{\w+\}/u)
   assert.match(source, /<ProgressIdentity row=\{row\}/u)
   assert.match(summary, /<ProgressProductIdentity row=\{row\}/u)
   assert.match(mobileSummary, /<BusinessProgressSummary/u)

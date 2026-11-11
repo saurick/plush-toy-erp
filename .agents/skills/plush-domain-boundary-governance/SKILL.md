@@ -39,6 +39,7 @@ description: 领域设计与生成（plush-toy-erp），不执行目标库迁移
 4. 按字段影响检查 defaults、edits、source switch/clear 和相关 list/detail/print/export/search；旧实验不构成兼容对象，已落库残留按正式 migration 清理。
 5. UI 不补造 backend facts；客户/模板特例不污染 generic core。
 6. 按影响面选择 unit、integration、contract、browser、migration validation。
+   数据库改动按[项目部署与迁移规则](../../../AGENTS.md#部署迁移与收口)完成适用的生成、工作区迁移合同检查、登记开发库只读审计、seed / fixture 核对和隔离升级验证；生成或验证通过不表示已迁移。需要执行目标库迁移时转运行治理。
    版本治理至少运行现有命名门禁及相关回归：内容变化 / 不变、跨配置启动、冻结身份的回滚 / 完成检查 / 密码轮换、错误环境和标记拒绝。沿生产者、消费者及回执链复查，区分落盘原件与同次构建的展示投影；新写入校验不能误用于历史读取。涉及冻结快照、哈希、回执或 Schema 的删除时，补齐存量转换与回放证据，不用放宽测试代替治理。
 
 客户配置任务若进入 validate / publish / transition check / activate / readback、目标环境 migration 或 rollback，由本 skill 先确认 Product Core 与字段真源，再切 `$plush-operations-governance` 执行运行态步骤；不要另造页面私有配置真源或直接改库。

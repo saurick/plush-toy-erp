@@ -1,10 +1,10 @@
 import { UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../../src/dev-workbench/config/devUIDesign.mjs'
+import { DEV_TESTING_FULL_ACCEPTANCE_VIEW, DEV_TESTING_ROUTE, DEV_TESTING_WORKSPACE_VIEWS } from '../../src/dev-workbench/config/devTesting.mjs'
 import { chooseSelectOption } from './selectControlActions.mjs'
-import { chooseUIDesignState } from './devUIDesignNavigation.mjs'
+import { chooseUIDesignMode, chooseUIDesignState, visibleUIDesignFrame as frameSelector } from './devUIDesignNavigation.mjs'
 import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
-
-const frameSelector = 'iframe[title="ERP 最新可交互设计"]'
+import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 
 export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }) {
   const waitReady = async (page) => {
@@ -16,22 +16,11 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
       return { width: box.width, height: box.height }
     })
     assert(geometry.width > 0 && geometry.height > 0, '预览内容完成布局后才算就绪')
-    assert.equal(await page.locator('.erp-dev-ui-design-feedback').count(), 0)
-    const selectionOverflow = await page.locator('.erp-dev-ui-design-page-select:visible .ant-select-selection-item')
-      .evaluate((node) => node.scrollWidth - node.clientWidth)
-    assert(selectionOverflow <= 1, `预览入口名称被截断 ${selectionOverflow}px`)
+    assert.equal(await page.locator('.erp-dev-ui-design-feedback:visible').count(), 0)
     return frame
   }
-  const select = async (page, value) => {
-    const label = { workspace: '业务界面', login: '登录页', help: '岗位帮助', controls: '控件设计', workbench: '效能工作台', 'production-hub': '生产管理' }[value]
-    const control = page.locator('.erp-dev-ui-design-page-select:visible')
-    await control.click()
-    const listId = await control.getByRole('combobox').getAttribute('aria-controls')
-    const popup = page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id=${JSON.stringify(listId)}]`) })
-    await popup.getByText(label, { exact: true }).click()
-    await popup.waitFor({ state: 'hidden' })
-    if (value === 'workbench') await page.getByText('整体交互预览', { exact: true }).click()
-  }
+  const openSamples = (page) => page.getByRole('tab', { name: '设计样例', exact: true }).click()
+  const returnToPreview = (page) => page.getByRole('tab', { name: '可交互设计', exact: true }).click()
   return [
     {
       name: 'dev-ui-design-inbound-related-actions',
@@ -482,30 +471,66 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
       },
     },
     {
-      name: 'dev-ui-design-entry-clear',
-      path: '/__dev/ui-design',
+      name: 'dev-ui-design-preview-modes',
+      path: '/__dev/ui-design?page=',
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       verify: async (page) => {
+        const frame = await waitReady(page)
+        const modes = page.getByLabel('设计预览界面', { exact: true })
+        assert.deepEqual(await modes.locator('.ant-segmented-item-label').allTextContents(), ['桌面 ERP', '手机版', '登录页'])
+        assert.equal(await modes.getByRole('radio', { name: '桌面 ERP' }).isChecked(), true)
+        await frame.locator('.nav-item[data-page="tasks"]').click()
+        const search = frame.locator('#board-search')
+        await search.fill('采购到货')
+        await search.press('Enter')
+        const opener = frame.getByRole('button', { name: '办理样例', exact: true })
+        await opener.click()
+        const samples = frame.getByRole('dialog', { name: '办理样例', exact: true })
+        const example = samples.getByRole('button', { name: '完善量产工程资料', exact: true })
+        await example.click()
+        const task = frame.getByRole('dialog', { name: '任务办理', exact: true })
+        await task.getByRole('button', { name: '任务办理', exact: true }).click()
+        await task.getByRole('button', { name: '编制 BOM', exact: true }).click()
+        assert.equal(await frame.locator('.form-view [data-form-field="source-order"]').inputValue(), 'SO-20260925-001')
+        await frame.locator('.form-foot [data-action="handling-return"]').click()
+        await task.getByRole('button', { name: '返回办理样例', exact: true }).click()
+        assert.equal(await example.evaluate((node) => document.activeElement === node), true)
+        await samples.getByRole('button', { name: '返回任务管理', exact: true }).click()
+        assert.equal(await opener.evaluate((node) => document.activeElement === node), true)
+        assert.equal(await search.inputValue(), '采购到货')
+
+        const switcher = '[aria-label="设计预览界面"]'
+        await verifyMobileNavigationMotion(page, assert, switcher, 1)
         await waitReady(page)
-        const control = page.locator('.erp-dev-ui-design-page-select:visible')
-        await control.locator('.ant-select-clear').click()
-        await page.getByText('请选择设计预览入口', { exact: true }).waitFor()
-        assert.equal(new URL(page.url()).searchParams.get('page'), '')
-        assert.equal(await control.locator('.ant-select-selection-placeholder').innerText(), '设计预览入口')
-        assert.equal(await page.locator(`${frameSelector}:visible`).count(), 0)
-        await page.reload()
-        await page.getByText('请选择设计预览入口', { exact: true }).waitFor()
-        await select(page, 'controls')
-        await page.locator('.erp-dev-ui-design-reader .erp-dev-ui-design-page-select .ant-select-clear').click()
-        await page.getByText('请选择设计预览入口', { exact: true }).waitFor()
-        await select(page, 'workspace')
+        await verifyMobileNavigationMotion(page, assert, switcher, 2, true)
         await waitReady(page)
-        assert.equal(await control.locator('.ant-select-clear').evaluate((node) => getComputedStyle(node).opacity), '1')
-        await assertNoHorizontalOverflow(page)
-        await page.screenshot({ path: path.join(outputDir, 'ui-design-entry-clear-4k.png') })
         await page.goBack()
-        await page.getByText('请选择设计预览入口', { exact: true }).waitFor()
+        await waitReady(page)
+        assert.equal(await modes.getByRole('radio', { name: '手机版' }).isChecked(), true)
+        await chooseUIDesignMode(page, '桌面 ERP')
+        await waitReady(page)
+        assert.equal(await search.inputValue(), '采购到货')
+        await page.screenshot({ path: path.join(outputDir, 'ui-design-preview-modes-4k.png') })
+        await page.setViewportSize({ width: 390, height: 844 })
+        await chooseUIDesignMode(page, '手机版')
+        await waitReady(page)
+        const headerTabs = page.locator('.erp-dev-ui-design-header').getByRole('tablist')
+        assert.deepEqual(await headerTabs.getByRole('tab').allTextContents(), ['可交互设计', '设计样例', '设计说明', '设计依据'])
+        assert.equal(await headerTabs.evaluate((node) => {
+          const wrap = node.querySelector('.ant-tabs-nav-wrap').getBoundingClientRect()
+          return [...node.querySelectorAll('[role="tab"]')].every((tab) => {
+            const box = tab.getBoundingClientRect()
+            return box.left >= wrap.left - 1 && box.right <= wrap.right + 1
+          })
+        }), true, '窄屏完整显示上排四个页签')
+        const bar = await modes.evaluate((node) => ({
+          fits: node.scrollWidth <= node.clientWidth + 1,
+          labelsFit: [...node.querySelectorAll('.ant-segmented-item-label')].every((label) => label.scrollWidth <= label.clientWidth + 1),
+        }))
+        assert(bar.fits && bar.labelsFit, '窄屏完整显示三个预览入口')
+        await assertNoHorizontalOverflow(page)
+        await page.screenshot({ path: path.join(outputDir, 'ui-design-preview-modes-narrow.png') })
       },
     },
     {
@@ -517,7 +542,7 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         const frame = await waitReady(page)
         const heading = frame.getByRole('heading', { name: '生产管理', exact: true })
         await heading.waitFor()
-        assert.equal(await page.locator('.erp-dev-ui-design-page-select').getByText('生产管理', { exact: true }).isVisible(), true)
+        assert.equal(await page.getByLabel('设计预览界面', { exact: true }).getByRole('radio', { name: '桌面 ERP' }).isChecked(), true)
         for (const name of ['生产订单', '生产执行', '生产记录', '异常处理']) {
           const tab = frame.getByRole('tab', { name, exact: true })
           await tab.click()
@@ -529,12 +554,13 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
         await waitReady(page)
         assert.equal(await frame.getByRole('tab', { name: '异常处理', exact: true }).getAttribute('aria-selected'), 'true')
+        await chooseUIDesignMode(page, '手机版')
+        await waitReady(page)
+        await chooseUIDesignMode(page, '桌面 ERP')
+        await waitReady(page)
+        assert.equal(await frame.getByRole('tab', { name: '异常处理', exact: true }).getAttribute('aria-selected'), 'true')
+        assert.equal(new URL(page.url()).searchParams.get('page'), 'production-hub')
         await page.reload()
-        await waitReady(page)
-        await heading.waitFor()
-        await select(page, 'workbench')
-        await waitReady(page)
-        await select(page, 'production-hub')
         await waitReady(page)
         await heading.waitFor()
         await assertNoHorizontalOverflow(page)
@@ -570,8 +596,20 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         assert.equal(await reportStates.getByRole('columnheader').count(), 2)
         assert.equal(await frame.getByRole('table', { name: '测试维度说明', exact: true }).count(), 0, '方法说明统一从测试指引阅读')
         const localTabs = frame.getByRole('tablist', { name: '本地测试功能' })
-        assert.deepEqual(await localTabs.getByRole('tab').allTextContents(), ['测试总览', '本轮验证', '覆盖报告', '链路实测', '压力测试'])
+        assert.deepEqual(await localTabs.getByRole('tab').allTextContents(), DEV_TESTING_WORKSPACE_VIEWS.map(({ label }) => label))
         await frame.getByText('本地开发机 · 当前工作区的执行与报告。', { exact: true }).waitFor()
+        await localTabs.getByRole('tab', { name: '完整回归', exact: true }).click()
+        await frame.getByRole('region', { name: '运行条件', exact: true }).waitFor()
+        const regressionLink = frame.getByRole('link', { name: '打开完整回归', exact: true })
+        assert.equal(await regressionLink.getAttribute('href'), `${DEV_TESTING_ROUTE}?view=${DEV_TESTING_FULL_ACCEPTANCE_VIEW}`)
+        await frame.getByRole('region', { name: '回归范围', exact: true }).waitFor()
+        const regressionRecords = frame.getByRole('region', { name: '执行记录', exact: true })
+        const regressionSteps = frame.getByRole('region', { name: '业务链与步骤', exact: true })
+        await regressionSteps.getByText('销售受理到生产准备', { exact: true }).waitFor()
+        await regressionRecords.locator('summary').click()
+        await regressionRecords.getByText('已生成本地回归计划，尚未运行。', { exact: true }).waitFor()
+        await regressionSteps.locator('summary').click()
+        await regressionSteps.getByText('销售提交订单后进入受理流程。', { exact: true }).waitFor()
         await localTabs.getByRole('tab', { name: '本轮验证', exact: true }).click()
         await frame.getByRole('button', { name: '演示本轮验证', exact: true }).click()
 
@@ -621,9 +659,13 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await frame.getByRole('heading', { name: '链路实测报告', exact: true }).waitFor()
         const chainResults = frame.getByRole('table', { name: '链路实测结果样例', exact: true })
         assert.deepEqual(await chainResults.getByRole('columnheader').allTextContents(), ['链路', '结果', '首个未通过环节'])
+        const chainSteps = frame.getByRole('table', { name: '链路步骤样例', exact: true })
+        await chainSteps.getByText('登记不合格品处置', { exact: true }).waitFor()
         await chainResults.getByRole('button', { name: '采购下单到入库应付', exact: true }).click()
-        await frame.getByRole('table', { name: '链路步骤样例', exact: true }).waitFor()
-        await frame.getByRole('button', { name: '收起步骤', exact: true }).click()
+        assert.deepEqual(await chainSteps.getByRole('rowheader').allTextContents(), ['采购到货交接'])
+        await frame.getByRole('button', { name: '查看全部链路', exact: true }).click()
+        await chainSteps.getByText('登记不合格品处置', { exact: true }).waitFor()
+        assert.equal(await frame.getByRole('button', { name: /^(查看全部步骤|收起步骤)$/u }).count(), 0)
         await chainResults.waitFor()
         assert.equal(await navigation.locator('[aria-current="page"]').innerText(), '测试执行')
         await localTabs.getByRole('tab', { name: '覆盖报告', exact: true }).click()
@@ -723,7 +765,7 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
             await page.getByRole('button', { name: '展开目录', exact: true }).click()
           }
         }
-        await page.locator('.erp-design-reader-toolbar').getByText('规范原文', { exact: true }).click()
+        await page.getByRole('group', { name: '当前图解的规范来源' }).getByRole('button').click()
         await page.locator('.erp-design-prose').waitFor()
         await assertViewportFilled(documentShell)
         const scroll = await page.locator('.erp-design-document-content').evaluate((node) => {
@@ -733,13 +775,10 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         assert(scroll.scrollHeight > scroll.height && scroll.top > 0, '长文仍在阅读区内滚动')
         await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
         await waitReady(page)
-        await select(page, 'controls')
+        await openSamples(page)
         await page.getByRole('region', { name: '控件设计', exact: true }).waitFor()
         await assertViewportFilled(reader)
-        await page.locator(`${reader} .erp-dev-ui-design-page-select .ant-select-clear`).click()
-        await page.getByText('请选择设计预览入口', { exact: true }).waitFor()
-        await assertViewportFilled(reader)
-        await select(page, 'workspace')
+        await returnToPreview(page)
         await waitReady(page)
         await assertViewportFilled(reader)
         await page.setViewportSize({ width: 1920, height: 1080 })
@@ -757,9 +796,9 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         const frame = await waitReady(page)
         await frame.getByRole('heading', { name: '你想完成什么？', exact: true }).waitFor()
         const helpWindow = await preview.elementHandle()
-        await select(page, 'login')
+        await chooseUIDesignMode(page, '登录页')
         await waitReady(page)
-        assert.equal(await helpWindow.evaluate((node) => node.isConnected), false, '切换入口不复用旧文档的浏览上下文')
+        assert.equal(await helpWindow.evaluate((node) => node.isConnected && node.closest('[hidden]') !== null), true, '切换界面保留隐藏的桌面预览')
         const loginWindow = await preview.elementHandle()
         const account = frame.locator('input').first()
         await account.fill('keep-preview-state')
@@ -771,16 +810,19 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         assert.equal(await loginWindow.evaluate((node) => node.isConnected), true)
         assert.equal(await account.inputValue(), 'keep-preview-state')
 
-        await select(page, 'controls')
+        const topTabs = '.erp-dev-ui-design-header .erp-sliding-tabs'
+        await verifyMobileNavigationMotion(page, assert, topTabs, 1)
         await page.getByRole('region', { name: '控件设计', exact: true }).waitFor()
         assert.equal(await preview.isVisible(), false)
-        await select(page, 'login')
+        assert.equal(await page.getByLabel('设计预览界面', { exact: true }).isVisible(), false)
+        assert.equal(await page.getByRole('button', { name: '返回预览', exact: true }).count(), 0)
+        await verifyMobileNavigationMotion(page, assert, topTabs, 0, true)
         await waitReady(page)
         assert.equal(await loginWindow.evaluate((node) => node.isConnected), true)
         assert.equal(await account.inputValue(), 'keep-preview-state')
 
-        for (const entry of ['help', 'login', 'workbench', 'help']) {
-          await select(page, entry)
+        for (const label of ['桌面 ERP', '登录页', '手机版', '桌面 ERP']) {
+          await chooseUIDesignMode(page, label)
         }
         await waitReady(page)
         await frame.getByRole('heading', { name: '你想完成什么？', exact: true }).waitFor()

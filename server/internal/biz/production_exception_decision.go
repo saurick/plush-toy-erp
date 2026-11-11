@@ -57,6 +57,13 @@ type ProductionExceptionDecision struct {
 	ExecutedBy, ReversedBy                                             *int
 	ExecutedAt, ReversedAt                                             *time.Time
 	ExecutionReason, ReverseReason                                     *string
+	SourceIdentity                                                     *ProductionExceptionSourceIdentity
+}
+
+type ProductionExceptionSourceIdentity struct {
+	SubjectType                  string
+	SubjectID                    int
+	Name, Code, SKUCode, BatchNo string
 }
 
 type ProductionExceptionSubmit struct {

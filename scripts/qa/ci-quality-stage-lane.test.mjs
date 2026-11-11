@@ -219,6 +219,7 @@ test("Web, Server and Browser internal lane catalogs partition canonical work on
   assert.equal(validateCiBrowserQualityLaneRegistry(), true);
   for (const scenario of [
     "sales-order-demand-and-material-approval-desktop",
+    "shipment-batch-dropdown-stability",
     "material-summary-task-light",
     "work-center-table-tasks-light",
     "work-center-table-tasks-dark",

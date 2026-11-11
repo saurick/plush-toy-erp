@@ -73,7 +73,7 @@ func warehouseProductionWorkToMap(row *biz.WarehouseProductionWork) map[string]a
 	return map[string]any{
 		"id": row.ID, "kind": row.Kind, "stage": row.Stage, "production_order_id": row.ProductionOrderID, "production_order_item_id": row.ProductionOrderItemID, "order_no": row.OrderNo,
 		"fact_id": row.FactID, "fact_no": row.FactNo, "fact_status": row.FactStatus, "fact_version": row.FactVersion, "production_wip_batch_id": row.BatchID, "batch_no": row.BatchNo,
-		"operation_name": row.OperationName, "product_name": row.ProductName, "product_code": row.ProductCode, "sku_code": row.SKUCode, "unit_name": row.UnitName,
+		"operation_name": row.OperationName, "product_id": row.ProductID, "product_name": row.ProductName, "product_code": row.ProductCode, "sku_code": row.SKUCode, "unit_name": row.UnitName,
 		"warehouse_id": row.WarehouseID, "warehouse_name": row.WarehouseName, "lot_no": row.LotNo, "quantity": row.Quantity,
 		"pending_inspection_quantity": row.PendingInspectionQuantity, "pending_packaging_quantity": row.PendingPackagingQuantity, "packaging_confirmed": row.PackagingConfirmed,
 		"action_batch_id": row.ActionBatchID, "action": row.Action,

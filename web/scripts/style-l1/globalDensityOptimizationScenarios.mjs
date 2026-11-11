@@ -4,6 +4,7 @@ import { openBusinessTableTool } from './businessTableTools.mjs'
 import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
 import { assertTaskCopy } from './taskCopyAssertions.mjs'
 import { assertTrackingNavigation } from './taskTrackingScenarios.mjs'
+import { chooseSelectOption } from './selectControlActions.mjs'
 
 // Baseline mode captures the frozen source with identical fixtures and viewport.
 // Assertions for the new hierarchy run only against the implementation.
@@ -49,7 +50,7 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     await page.getByRole('button', { name: /新建出货单$/u }).click()
     const form = page.locator('.erp-business-form-page:visible')
     await form.getByText('填写出货明细后显示预计总净重。', { exact: true }).waitFor()
-    if (!baseline) assert.equal(await form.getByText('预计总净重暂不可计算', { exact: true }).count(), 0, '空白表单不应伪装重量异常')
+    if (!baseline) assert.equal(await form.locator('.erp-shipment-weight-summary[role="status"]').count(), 0, '空白表单不应伪装重量异常')
     await capture(page, 'shipment-empty', form)
     await form.getByRole('button', { name: '从销售订单导入', exact: true }).click()
     const picker = page.locator('.erp-source-import-picker-modal:visible')
@@ -57,11 +58,12 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     await capture(page, 'shipment-picker', picker)
     await help(page, picker.getByRole('button', { name: '查看从销售订单导入出货明细说明', exact: true }), '选择同一张销售订单', 'shipment-picker-help', picker)
     await picker.getByRole('button', { name: /取消/u }).click()
-    const weight = form.getByRole('spinbutton').filter({ visible: true }).last()
-    // The quantity field participates in the existing weight calculation; no submission is made.
+    const weight = form.getByLabel('实际总净重', { exact: true })
     const quantity = form.locator('input[id$="quantity"]').first()
+    await chooseSelectOption(form.locator('#items_0_product_id'), { label: /PROD-STYLE-L1/u })
+    await chooseSelectOption(form.locator('#items_0_unit_id'), { label: '只' })
     await quantity.fill('2')
-    await form.getByText('预计总净重暂不可计算', { exact: true }).waitFor()
+    await weight.waitFor({ state: 'visible' })
     await capture(page, 'shipment-missing-weight', form)
     assert.equal(await weight.count(), 1)
     await form.getByRole('button', { name: '返回列表', exact: true }).click()

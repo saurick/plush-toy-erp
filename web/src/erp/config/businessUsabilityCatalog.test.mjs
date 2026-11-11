@@ -133,7 +133,7 @@ test('businessUsabilityCatalog: 公式说明带来源和例子且金额统一使
     'purchase-line-amount'
   )
   assert.match(purchaseAmount.explanation, /采购数量 × 单价/u)
-  assert.match(purchaseAmount.explanation, /不允许/u)
+  assert.match(purchaseAmount.explanation, /金额只读/u)
   assert.doesNotMatch(purchaseAmount.explanation, /确认金额/u)
   ;[
     ['sales-orders', 'line-amount'],

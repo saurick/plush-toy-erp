@@ -14,7 +14,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { numeric20Scale6Units } from "../../web/src/erp/utils/numeric20Scale6.mjs";
+import { multiplyNumeric20Scale6Values, numeric20Scale6Units } from "../../web/src/erp/utils/numeric20Scale6.mjs";
 import { roundRequiredMaterialQuantity } from "./lib/unit-quantity.mjs";
 
 import {
@@ -39,6 +39,11 @@ import {
 import {
   MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
   MANUAL_ACCEPTANCE_PRODUCTION_RECIPE,
+  advanceOutsourcingOrderLifecycle,
+  planManualAcceptanceFormCoverageSources,
+  planManualAcceptanceShipmentCoverageSources,
+  prepareManualAcceptanceFormCoverageSources,
+  prepareManualAcceptanceShipmentCoverageSources,
 } from "./manual-acceptance-source-data.mjs";
 import {
   MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
@@ -47,6 +52,18 @@ import {
 } from "./manual-acceptance-catalog.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
+import {
+  prepareFormCoverageFinance,
+  prepareFormCoverageInventoryCount,
+  prepareFormCoverageMasterData,
+  prepareFormCoverageOutsourcingReturns,
+  prepareFormCoverageShipment,
+  prepareFormCoverageShipmentDetails,
+  prepareFormCoverageTaskPhotos,
+  verifyFormCoveragePlanning,
+  verifyFormCoveragePurchases,
+  verifyFormCoverageWarehouseWork,
+} from "./manual-acceptance-form-coverage.mjs";
 import { approvePurchaseOrderThroughProcess } from "./purchase-order-approval-process.mjs";
 import { prepareManualAcceptanceEngineering } from "./manual-acceptance-engineering-data.mjs";
 import {
@@ -1042,6 +1059,8 @@ async function createExecutionContext(plan, options = {}) {
     });
   return {
     rpc,
+    tokens,
+    fetchImpl,
     rolePasswordSource: roleCredential.source,
     targetConfirmation:
       options.targetConfirmation ||
@@ -2301,9 +2320,10 @@ async function readProductionPlan(rpc, sourcePlan, completionLotNo) {
     businessNo: sourcePlan.identities.production.order.businessNo,
   });
   const facts = [];
+  const checkpoint = sourcePlan.phases.production.source.completion.checkpoint;
   const identities = [
     ...sourcePlan.identities.production.materialIssues,
-    sourcePlan.identities.production.completion,
+    ...(checkpoint === "pending-return" ? [] : [sourcePlan.identities.production.completion]),
     ...(sourcePlan.identities.production.rework
       ? [sourcePlan.identities.production.rework]
       : []),
@@ -2332,25 +2352,31 @@ async function readProductionPlan(rpc, sourcePlan, completionLotNo) {
         }),
       ]
     : [];
-  const lot = await exactRequired({
+  const lotQuery = {
     rpc,
     domain: "inventory",
     method: "list_inventory_lots",
     listKey: "inventory_lots",
     businessField: "lot_no",
     businessNo: completionLotNo,
-  });
-  const balances = await rpc({
+  };
+  const beforeReceipt = ["pending-return", "draft-receipt"].includes(checkpoint);
+  const lot = beforeReceipt ? await exactByBusinessNo(lotQuery) : await exactRequired(lotQuery);
+  if (beforeReceipt && lot) throw new CliError(`${completionLotNo} already has a posted receipt`);
+  const balances = lot ? await rpc({
     domain: "inventory",
     method: "list_inventory_balances",
     params: { lot_id: lot.id, limit: 20, offset: 0 },
-  });
-  const txns = await rpc({
+  }) : {};
+  const txns = lot ? await rpc({
     domain: "inventory",
     method: "list_inventory_txns",
     params: { lot_id: lot.id, limit: 200, offset: 0 },
-  });
-  const completion = facts.find(
+  }) : {};
+  const completion = checkpoint === "pending-return" ? await exactByBusinessNo({
+    rpc, domain: "operational_fact", method: "list_production_facts", listKey: "production_facts",
+    businessField: "fact_no", businessNo: sourcePlan.identities.production.completion.businessNo,
+  }) : facts.find(
     (item) =>
       String(item.fact_no || "") ===
       sourcePlan.identities.production.completion.businessNo,
@@ -2557,6 +2583,7 @@ export function sourceDrivenPhaseIdentitySpecs(sourcePlan, phase) {
   const financeStatuses = ["POSTED", "SETTLED", "CANCELLED"];
   if (phase === "production") {
     const identity = sourcePlan.identities.production;
+    const checkpoint = sourcePlan.phases.production.source.completion.checkpoint;
     return [
       {
         ...phaseIdentitySpec({
@@ -2591,14 +2618,14 @@ export function sourceDrivenPhaseIdentitySpecs(sourcePlan, phase) {
             }),
           ]
         : []),
-      phaseIdentitySpec({
+      ...(checkpoint === "pending-return" ? [] : [phaseIdentitySpec({
         domain: "operational_fact",
         method: "list_production_facts",
         listKey: "production_facts",
         businessField: "fact_no",
         identity: identity.completion,
-        statuses: ["POSTED"],
-      }),
+        statuses: [checkpoint === "draft-receipt" ? "DRAFT" : "POSTED"],
+      })]),
       ...(identity.rework
         ? [
             phaseIdentitySpec({
@@ -2719,7 +2746,7 @@ export async function validateProductionPhasePartialRecords(
   const directMaterialIssues = source.directMaterialIssues;
   const fabricIssueCount = identity.fabricIssue ? 1 : 0;
   const expectedCount =
-    2 +
+    (source.completion.checkpoint === "pending-return" ? 1 : 2) +
     directMaterialIssues.length +
     fabricIssueCount +
     (identity.rework ? 1 : 0);
@@ -2878,7 +2905,7 @@ export async function validateProductionPhaseRecords(rpc, sourcePlan, records) {
   const source = sourcePlan.phases.production.source;
   const identity = sourcePlan.identities.production;
   const expectedCount =
-    2 +
+    (source.completion.checkpoint === "pending-return" ? 1 : 2) +
     source.directMaterialIssues.length +
     (identity.fabricIssue ? 1 : 0) +
     (identity.rework ? 1 : 0);
@@ -5654,6 +5681,420 @@ async function applyLifecycleSpecimens({
   };
 }
 
+async function ensureShipmentFabricContract({ plan, rpc, tokens, fetchImpl, template, processId, source, sequence, fabric, apply }) {
+  const orderNo = `${plan.prefix}-JG-FH-${sequence}`;
+  const args = {
+    outsourcing_order_no: orderNo,
+    supplier_id: template.supplier_id,
+    currency: template.currency,
+    order_date: template.order_date,
+    expected_return_date: template.expected_return_date,
+    supplier_snapshot: template.supplier_snapshot,
+    contract_party_snapshot: template.contract_party_snapshot,
+    source_order_no: source.orderNo,
+    note: "按生产明细办理裁片加工。",
+    items: [{
+      line_no: 1, subject_type: "MATERIAL", material_id: fabric.materialId,
+      process_id: processId, unit_id: fabric.unitId, outsourcing_quantity: fabric.quantity,
+      processing_item: "裁片加工", unit_price: "1", amount: multiplyNumeric20Scale6Values(fabric.quantity, "1"),
+    }],
+  };
+  const admin = (request) => rpc({ actor: "admin", ...request });
+  let order = await exactByBusinessNo({
+    rpc: admin, domain: "outsourcing_order", method: "list_outsourcing_orders",
+    listKey: "outsourcing_orders", businessField: "outsourcing_order_no", businessNo: orderNo,
+  });
+  if (!order && apply) order = resultItem(await admin({
+    domain: "outsourcing_order", method: "save_outsourcing_order_with_items", params: args,
+  }), "outsourcing_order", "prepare fabric contract");
+  assertRecordGrain(orderNo, order, { supplier_id: args.supplier_id, source_order_no: args.source_order_no });
+  const { outsourcing_order_items: lines } = await admin({
+    domain: "outsourcing_order", method: "list_outsourcing_order_items", params: { outsourcing_order_id: order.id, limit: 2 },
+  });
+  if (lines.length !== 1) throw new CliError(`${orderNo} must have one cutting material line`);
+  const [line] = lines;
+  assertRecordGrain(orderNo, line, {
+    line_no: 1, subject_type: "MATERIAL", material_id: fabric.materialId, process_id: processId,
+    unit_id: fabric.unitId, outsourcing_quantity: fabric.quantity,
+  }, new Set(["outsourcing_quantity"]));
+  const status = apply ? await advanceOutsourcingOrderLifecycle({
+    plan, token: tokens.admin, fetchImpl, item: order, current: order.lifecycle_status,
+    target: "CONFIRMED",
+    lifecycleActions: { CONFIRMED: [
+      { method: "submit_outsourcing_order", resultStatus: "SUBMITTED" },
+      { method: "confirm_outsourcing_order", resultStatus: "CONFIRMED" },
+    ] },
+  }) : String(order.lifecycle_status).toUpperCase();
+  if (status !== "CONFIRMED") throw new CliError(`${orderNo} cutting contract is not confirmed`);
+  return {
+    order: { id: order.id, status },
+    item: { id: line.id, materialId: fabric.materialId, unitId: fabric.unitId, quantity: fabric.quantity },
+    warehouseId: fabric.warehouseId,
+    lotId: fabric.lotId,
+    quantity: fabric.quantity,
+  };
+}
+
+async function coverageProductionInputs(rpc, sourceReport) {
+  const unitPrecision = new Map(sourceReport.referenceRecords.units.map((unit) => [unit.id, unit.precision]));
+  const reference = sourceReport.referenceRecords;
+  const fabricCandidate = reference.sourceDrivenFacts.sourceCandidates.productionWIPOutsourcingCandidates[0];
+  const process = reference.processes.find((item) => item.productionRouteOperationCode === "FABRIC_PROCESSING");
+  if (!fabricCandidate?.order?.id || !process?.id) throw new CliError("coverage requires the registered cutting process and supplier");
+  const template = resultItem(await rpc({
+    actor: "admin", domain: "outsourcing_order", method: "get_outsourcing_order",
+    params: { id: fabricCandidate.order.id },
+  }), "outsourcing_order", "read cutting contract template");
+  return { unitPrecision, template, processId: process.id };
+}
+
+async function prepareCoverageProductionStock({
+  plan, sourceReport, purchase, context, apply, inputs, salesOrder, line, item, sequence, warehouseID, checkpoint = "ready",
+}) {
+  const { rpc, tokens, fetchImpl, targetConfirmation, targetAttestation } = context;
+  const { unitPrecision, template, processId } = inputs;
+  if (!line.bom?.id || !line.bom.items?.length) throw new CliError(`${salesOrder.orderNo} line ${line.lineNo} has no active BOM`);
+  const lotNo = shortBusinessNo(plan, "CP", sequence);
+  const materialIssues = line.bom.items.map((component) => {
+    const stock = purchase.materialStock.get(`${component.materialId}:${component.unitId}`);
+    if (!stock) throw new CliError(`${salesOrder.orderNo} line ${line.lineNo} has no posted material batch for its BOM`);
+    return {
+      materialId: component.materialId,
+      unitId: component.unitId,
+      warehouseId: stock.warehouseId,
+      lotId: stock.lotId,
+      quantity: roundRequiredMaterialQuantity(component.quantity, line.quantity, component.lossRate, unitPrecision.get(component.unitId)),
+    };
+  });
+  const fabricOutsourcing = await ensureShipmentFabricContract({
+    plan, rpc, tokens, fetchImpl, template, processId, source: salesOrder,
+    sequence, fabric: materialIssues.at(-1), apply,
+  });
+  const production = buildSourceDrivenFactPlan(overrideReadyReport(sourceReport, ["production"]), {
+    instanceKey: `SHIPMENT-STOCK-${sequence}`,
+    enabledPhases: ["production"],
+    production: {
+      salesOrder, item, bom: line.bom, plannedQuantity: line.quantity,
+      route: {
+        code: MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.routeCode,
+        customerInspectionRequired: false,
+        packagingVersionSnapshot: MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.packagingVersionSnapshot,
+      },
+      completion: { warehouseId: warehouseID, newLotNo: lotNo, quantity: line.quantity, ...(checkpoint !== "ready" ? { checkpoint } : {}) },
+      materialIssues,
+      fabricOutsourcing,
+    },
+  });
+  const readStock = warehouseID === plan.productWarehouse.id ? rpc : (call) =>
+    rpc(call.domain === "inventory" ? { ...call, actor: "admin" } : call);
+  const stocked = await reuseOrApplyManualAcceptanceFactPhase({
+    phase: `${salesOrder.orderNo} line ${line.lineNo} stock`,
+    apply, rpc,
+    specs: sourceDrivenPhaseIdentitySpecs(production, "production"),
+    mutate: () => applySourceDrivenFactPlan(production, {
+      rpc, confirmation: sourceDrivenFactConfirmation(production), targetConfirmation, targetAttestation,
+    }),
+    validateRecords: (records) => validateProductionPhaseRecords(rpc, production, records),
+    allowVerifiedPartialResume: true,
+    validatePartialRecords: (records) => validateProductionPhasePartialRecords(rpc, production, records),
+    readComplete: async () => {
+      const records = await readProductionPlan(readStock, production, lotNo);
+      await ensureSourceDrivenProductionRoute({ rpc, plan: production, order: records.order, completion: records.completion, apply });
+      return records;
+    },
+  });
+  return { lotNo, stocked, fabricOrderId: fabricOutsourcing.order.id };
+}
+
+async function verifyCoverageFabricProductImages(rpc, links) {
+  const productByOrder = new Map(links.map(({ fabricOrderId, productId }) => [fabricOrderId, productId]));
+  if (!productByOrder.size) return;
+  if (productByOrder.size !== links.length) throw new CliError("cutting stock specimens reused a contract identity");
+  const { previews } = await rpc({ actor: "admin", domain: "attachment", method: "list_document_product_previews",
+    params: { source_type: "outsourcing_order", document_ids: [...productByOrder.keys()] } });
+  const productIds = [...new Set(productByOrder.values())];
+  const { images } = await rpc({ actor: "admin", domain: "attachment", method: "list_product_image_references", params: { product_ids: productIds } });
+  const imageByProduct = new Map(images.map(({ product_id, image_attachment_id }) => [product_id, image_attachment_id]));
+  const previewByOrder = new Map(previews.map((row) => [row.document_id, row]));
+  for (const [documentId, productId] of productByOrder) {
+    assertRecordGrain(`cutting contract ${documentId}`, previewByOrder.get(documentId), { product_count: 1, product_id: productId });
+    if (!(imageByProduct.get(productId) > 0)) throw new CliError(`cutting contract ${documentId} has no photo for product ${productId}`);
+  }
+}
+
+async function prepareShipmentCoverage(plan, sourceReport, purchase, context, apply) {
+  const { rpc, tokens, fetchImpl } = context;
+  const sources = await prepareManualAcceptanceShipmentCoverageSources(sourceReport, { tokens, fetchImpl, apply });
+  await prepareManualAcceptanceEngineering({
+    plan: { ...plan, productionCandidates: sources.filter(({ kind }) => ["ready", "frozen"].includes(kind)) },
+    sourceReport, rpc, apply,
+  });
+  const inputs = await coverageProductionInputs(rpc, sourceReport);
+  const warehouseID = plan.productWarehouse.id;
+  const coverage = [];
+  const fabricLinks = [];
+  for (const [orderIndex, source] of sources.entries()) {
+    const { salesOrder, kind } = source;
+    const rows = [];
+    for (const line of source.lines) {
+      const item = {
+        id: line.salesOrderItemId,
+        productId: line.productId,
+        productSkuId: line.productSkuId,
+        unitId: line.unitId,
+      };
+      const row = {
+        lineNo: line.lineNo,
+        salesOrderItemId: item.id,
+        productId: item.productId,
+        productSkuId: item.productSkuId,
+        unitId: item.unitId,
+        warehouseId: warehouseID,
+        quantity: line.quantity,
+      };
+      if (kind === "shortage") {
+        const { inventory_balances: balances, total } = await rpc({
+          domain: "inventory", method: "list_inventory_balances",
+          params: {
+            subject_type: "PRODUCT", subject_id: row.productId, product_sku_id: row.productSkuId,
+            warehouse_id: warehouseID, limit: 200,
+          },
+        });
+        if (Number(total) !== balances.length) throw new CliError(`${salesOrder.orderNo} shortage balance readback is incomplete`);
+        if (balances.some((balance) => balance.unit_id === row.unitId && Number(balance.ready_to_ship_quantity) > 0)) {
+          throw new CliError(`${salesOrder.orderNo} shortage sample has available finished goods`);
+        }
+        row.readyQuantity = "0";
+        rows.push(row);
+        continue;
+      }
+      if (kind === "reserved-elsewhere") {
+        const owner = coverage.find((order) => order.orderNo === source.reservedFromOrderNo);
+        const reserved = owner?.lines.find((entry) => entry.productSkuId === row.productSkuId && entry.reservationNo);
+        if (!reserved || reserved.unitId !== row.unitId || reserved.quantity !== row.quantity) {
+          throw new CliError(`${salesOrder.orderNo} has no exact reservation owned by the other order`);
+        }
+        const { inventory_balances: balances } = await rpc({
+          domain: "inventory", method: "list_inventory_balances",
+          params: { lot_id: reserved.lotId, warehouse_id: warehouseID, limit: 20 },
+        });
+        const balance = balances.find((entry) => entry.product_sku_id === row.productSkuId && entry.unit_id === row.unitId);
+        if (!balance || (reserved.reservationStatus === "ACTIVE" && Number(balance.ready_to_ship_quantity) !== 0)) {
+          throw new CliError(`${salesOrder.orderNo} lot is not fully reserved by the other order`);
+        }
+        rows.push({
+          ...row, lotId: reserved.lotId, lotNo: reserved.lotNo, reservedFromOrderNo: owner.orderNo,
+          reservationStatus: reserved.reservationStatus, readyQuantity: balance.ready_to_ship_quantity,
+        });
+        continue;
+      }
+      const sequence = 820 + orderIndex * 3 + line.lineNo;
+      const { lotNo, stocked, fabricOrderId } = await prepareCoverageProductionStock({
+        plan, sourceReport, purchase, context, apply, inputs, salesOrder, line, item,
+        sequence, warehouseID,
+      });
+      fabricLinks.push({ fabricOrderId, productId: item.productId });
+      assertRecordGrain(lotNo, stocked.lot, { subject_type: "PRODUCT", subject_id: row.productId, product_sku_id: row.productSkuId });
+      assertRecordGrain(lotNo, stocked.completion, {
+        status: "POSTED", fact_type: "FINISHED_GOODS_RECEIPT", subject_id: row.productId,
+        product_sku_id: row.productSkuId, warehouse_id: warehouseID, unit_id: row.unitId,
+        lot_id: stocked.lot.id, quantity: row.quantity,
+      }, new Set(["quantity"]));
+      const balance = stocked.balances.find((candidate) =>
+        candidate.lot_id === stocked.lot.id && candidate.warehouse_id === warehouseID &&
+        candidate.unit_id === row.unitId && candidate.product_sku_id === row.productSkuId
+      );
+      if (!balance) throw new CliError(`${lotNo} has no exact finished-goods balance`);
+      const shipped = stocked.txns.some((txn) => txn.source_type === "SHIPMENT" && txn.txn_type === "OUT");
+      Object.assign(row, {
+        lotId: stocked.lot.id, lotNo, lotStatus: stocked.lot.status,
+        productionOrderNo: stocked.order.order_no, receiptNo: stocked.completion.fact_no,
+        receivedQuantity: stocked.completion.quantity, readyQuantity: balance.ready_to_ship_quantity, shipped,
+      });
+      if (source.reserveLineNo === line.lineNo) {
+        const reservationNo = shortBusinessNo(plan, "BL", sequence);
+        let reservation = await exactByBusinessNo({
+          rpc, domain: "operational_fact", method: "list_stock_reservations", listKey: "stock_reservations",
+          businessField: "reservation_no", businessNo: reservationNo,
+        });
+        if (!reservation && apply && !shipped) {
+          reservation = resultItem(await rpc({
+            domain: "operational_fact", method: "create_stock_reservation_from_sales_order",
+            params: {
+              reservation_no: reservationNo, sales_order_id: salesOrder.id, sales_order_item_id: item.id,
+              warehouse_id: warehouseID, lot_id: row.lotId, quantity: row.quantity,
+              idempotency_key: `manual-acceptance:${plan.runId}:shipment-stock-reservation:${sequence}`,
+            },
+          }), "stock_reservation", "reserve shipment coverage lot");
+        }
+        assertRecordGrain(reservationNo, reservation, {
+          sales_order_id: salesOrder.id, sales_order_item_id: item.id, product_id: row.productId,
+          product_sku_id: row.productSkuId, warehouse_id: warehouseID, unit_id: row.unitId,
+          lot_id: row.lotId, quantity: row.quantity,
+        }, new Set(["quantity"]));
+        row.reservationNo = reservationNo;
+        row.reservationStatus = reservation.status;
+        if (!shipped && reservation.status === "ACTIVE" &&
+          Number(balance.quantity) >= Number(reservation.quantity) &&
+          Number(balance.pending_inspection_quantity) === 0 &&
+          Number(balance.pending_packaging_quantity) === 0) row.readyQuantity = reservation.quantity;
+      }
+      if (kind === "ready" && !shipped &&
+        (row.lotStatus !== "ACTIVE" || Number(row.readyQuantity) < Number(row.quantity))) {
+        throw new CliError(`${lotNo} is not ready for its sales order quantity`);
+      }
+      if (kind === "frozen") {
+        const shipmentNo = shortBusinessNo(plan, "CK", sequence);
+        const inspectionNo = shortBusinessNo(plan, "CKZJ", sequence);
+        const shipment = await exactByBusinessNo({
+          rpc, domain: "operational_fact", method: "list_shipments", listKey: "shipments",
+          businessField: "shipment_no", businessNo: shipmentNo,
+        }) || (apply ? resultItem(await rpc({
+          domain: "operational_fact", method: "create_shipment_with_items",
+          params: {
+            shipment_no: shipmentNo, sales_order_id: salesOrder.id, customer_id: salesOrder.customerId,
+            idempotency_key: `manual-acceptance:${plan.runId}:shipment-stock-frozen:${sequence}`,
+            items: [{ sales_order_item_id: item.id, product_id: row.productId, product_sku_id: row.productSkuId,
+              warehouse_id: warehouseID, unit_id: row.unitId, lot_id: row.lotId, quantity: row.quantity }],
+          },
+        }), "shipment", "create frozen lot shipment draft") : null);
+        if (!shipment?.id) throw new CliError(`${shipmentNo} frozen lot source draft is missing`);
+        let inspection = await exactByBusinessNo({
+          rpc, domain: "quality", method: "list_finished_goods_quality_inspections", listKey: "quality_inspections",
+          businessField: "inspection_no", businessNo: inspectionNo, params: { shipment_id: shipment.id },
+        });
+        if (!inspection && apply) {
+          inspection = resultItem(await rpc({
+            domain: "quality", method: "create_finished_goods_quality_inspection_draft",
+            params: { inspection_no: inspectionNo, shipment_id: shipment.id, finished_goods_lot_id: row.lotId,
+              product_id: row.productId, warehouse_id: warehouseID, decision_note: "待核对外观及包装" },
+          }), "quality_inspection", "create frozen lot inspection");
+        }
+        if (inspection?.status === "DRAFT" && apply) {
+          inspection = resultItem(await rpc({
+            domain: "quality", method: "submit_quality_inspection", params: { id: inspection.id },
+          }), "quality_inspection", "submit frozen lot inspection");
+        }
+        const lot = await exactRequired({ rpc, domain: "inventory", method: "list_inventory_lots",
+          listKey: "inventory_lots", businessField: "lot_no", businessNo: lotNo });
+        if (!inspection?.id || Number(inspection.inventory_lot_id) !== row.lotId ||
+          (inspection.status === "SUBMITTED" && lot.status !== "HOLD")) {
+          throw new CliError(`${lotNo} frozen lot does not match its submitted inspection`);
+        }
+        row.shipmentNo = shipmentNo;
+        row.inspectionNo = inspectionNo;
+        row.inspectionStatus = inspection.status;
+        row.lotStatus = lot.status;
+        row.readyQuantity = lot.status === "HOLD" ? "0" : balance.ready_to_ship_quantity;
+      }
+      rows.push(row);
+    }
+    coverage.push({ orderNo: salesOrder.orderNo, salesOrderId: salesOrder.id, kind, lines: rows });
+  }
+  await verifyCoverageFabricProductImages(rpc, fabricLinks);
+  return coverage;
+}
+
+async function prepareFormCoverage(plan, sourceReport, purchase, context, apply, readyShipments) {
+  const { rpc, tokens, fetchImpl } = context;
+  const requiredFact = async (code, sequence, listKey, expected) => {
+    const factNo = shortBusinessNo(plan, code, sequence);
+    const fact = await exactRequired({ rpc, domain: "operational_fact", method: `list_${listKey}`, listKey,
+      businessField: "fact_no", businessNo: factNo });
+    assertRecordGrain(factNo, fact, { status: "POSTED", ...expected });
+    return fact;
+  };
+  const [receivable, correctionReceivable, returned] = await Promise.all([
+    requiredFact("YS", 45, "finance_facts", { fact_type: "RECEIVABLE", source_type: "SHIPMENT" }),
+    requiredFact("YS", 41, "finance_facts", { fact_type: "RECEIVABLE", source_type: "SHIPMENT" }),
+    requiredFact("WWHG", 45, "outsourcing_facts", { fact_type: "RETURN_RECEIPT", subject_type: "PRODUCT", source_type: "OUTSOURCING_ORDER" }),
+  ]);
+  const shipmentSources = readyShipments ?? await prepareShipmentCoverage(plan, sourceReport, purchase, context, false);
+  const masterData = await prepareFormCoverageMasterData({ plan, sourceReport, rpc, apply });
+  const sources = await prepareManualAcceptanceFormCoverageSources(sourceReport, { tokens, fetchImpl, apply, media: masterData.media });
+  const engineering = await prepareManualAcceptanceEngineering({
+    plan: { ...plan, productionCandidates: sources.filter((source) => !source.mediaCase && !source.materialPreview) }, sourceReport, rpc, apply,
+  });
+  const materialPreview = await prepareManualAcceptanceEngineering({
+    plan: { ...plan, productionCandidates: sources.filter((source) => source.materialPreview) }, sourceReport, rpc, apply,
+    materialMode: "preview",
+  });
+  const warehouseSpec = { code: `${plan.prefix}-CK-FM`, name: "成品二仓", type: "FINISHED_GOODS", is_active: true };
+  const readWarehouse = () => exactByBusinessNo({
+    rpc, domain: "masterdata", method: "list_warehouses", listKey: "warehouses",
+    businessField: "code", businessNo: warehouseSpec.code,
+  });
+  let warehouse = await readWarehouse();
+  if (!warehouse && apply) {
+    await rpc({ actor: "admin", domain: "masterdata", method: "create_warehouse", params: warehouseSpec });
+    warehouse = await readWarehouse();
+  }
+  assertRecordGrain(warehouseSpec.code, warehouse, warehouseSpec);
+  const inputs = await coverageProductionInputs(rpc, sourceReport);
+  const orders = [];
+  const fabricLinks = [];
+  for (const [index, source] of sources.entries()) {
+    const { salesOrder, checkpoints, alternateWarehouseLine } = source;
+    const rows = [];
+    for (const line of source.lines) {
+      const checkpoint = checkpoints[line.lineNo - 1];
+      if (!checkpoint) continue;
+      const warehouseID = line.lineNo === alternateWarehouseLine ? warehouse.id : plan.productWarehouse.id;
+      const item = { id: line.salesOrderItemId, productId: line.productId, productSkuId: line.productSkuId, unitId: line.unitId };
+      const { lotNo, stocked, fabricOrderId } = await prepareCoverageProductionStock({
+        plan, sourceReport, purchase, context, apply, inputs, salesOrder, line, item, checkpoint,
+        sequence: 840 + index * 3 + line.lineNo, warehouseID,
+      });
+      fabricLinks.push({ fabricOrderId, productId: item.productId });
+      if (["pending-return", "draft-receipt"].includes(checkpoint)) {
+        rows.push({ checkpoint, productionOrderNo: stocked.order.order_no, receiptId: stocked.completion?.id ?? null,
+          salesOrderItemId: item.id, productId: item.productId, productSkuId: item.productSkuId, unitId: item.unitId,
+          warehouseId: warehouseID, quantity: line.quantity });
+        continue;
+      }
+      const balance = stocked.balances.find((row) => row.lot_id === stocked.lot.id && row.warehouse_id === warehouseID && row.product_sku_id === item.productSkuId && row.unit_id === item.unitId);
+      const shipped = stocked.txns.some((txn) => txn.source_type === "SHIPMENT" && txn.txn_type === "OUT");
+      if (!balance && !(checkpoint === "ready" && shipped)) throw new CliError(`${lotNo} is missing its finished goods balance`);
+      if (!shipped || checkpoint !== "ready") assertRecordGrain(lotNo, balance, {
+        quantity: line.quantity,
+        pending_inspection_quantity: checkpoint === "pending-inspection" ? line.quantity : "0",
+        pending_packaging_quantity: checkpoint === "pending-packaging" ? line.quantity : "0",
+        ready_to_ship_quantity: checkpoint === "ready" ? line.quantity : "0",
+      }, new Set(["quantity", "pending_inspection_quantity", "pending_packaging_quantity", "ready_to_ship_quantity"]));
+      rows.push({
+        checkpoint, lotNo, lotId: stocked.lot.id, receiptId: stocked.completion.id, productionOrderNo: stocked.order.order_no,
+        salesOrderItemId: item.id, productId: item.productId, productSkuId: item.productSkuId, unitId: item.unitId,
+        warehouseId: warehouseID, quantity: line.quantity, shipped,
+        pendingInspection: balance?.pending_inspection_quantity, pendingPackaging: balance?.pending_packaging_quantity,
+        readyToShip: balance?.ready_to_ship_quantity,
+      });
+    }
+    orders.push({ ...salesOrder, currency: source.currency, deliverySnapshot: source.deliverySnapshot, mediaCase: source.mediaCase,
+      materialPreview: source.materialPreview,
+      lines: source.lines.map(({ bom, ...line }) => ({ ...line, bomId: bom?.id })), stock: rows });
+  }
+  const planning = await verifyFormCoveragePlanning({ rpc, orders });
+  await verifyCoverageFabricProductImages(rpc, fabricLinks);
+  const purchases = await verifyFormCoveragePurchases({ engineering, materialPreview, rpc });
+  const warehouseWork = await verifyFormCoverageWarehouseWork({ rpc, orders, sourceReport });
+  const outsourcingReturns = await prepareFormCoverageOutsourcingReturns({ plan, sourceReport, original: returned, orders, rpc, tokens, fetchImpl, apply, businessNo: shortBusinessNo });
+  const inventoryCount = await prepareFormCoverageInventoryCount({ plan, purchase, orders, rpc, apply, businessNo: shortBusinessNo });
+  const shipment = await prepareFormCoverageShipment({ plan, orders, rpc, apply, businessNo: shortBusinessNo });
+  const shipments = await prepareFormCoverageShipmentDetails({ plan, orders, sources, readyShipments: shipmentSources, rpc, apply, businessNo: shortBusinessNo });
+  const taskPhotos = await prepareFormCoverageTaskPhotos({ plan, rpc, apply, sources, media: masterData.media });
+  const finance = await prepareFormCoverageFinance({
+    plan, sourceReport, purchase, orders, receivables: [receivable, correctionReceivable], rpc, apply,
+    businessNo: shortBusinessNo, transitionPayment: transitionManualAcceptanceFinancePayment,
+  });
+  return { warehouse: { id: warehouse.id, code: warehouse.code, name: warehouse.name },
+    engineering, orders, masterData, planning, purchases, warehouseWork, outsourcingReturns, inventoryCount, shipment, shipments, taskPhotos, finance };
+}
+
+function buildFactCoverageReport(mode, plan, runtime, coverage) {
+  const { datasetKey, dataVersion, runId, target, backendURL, databaseName, semanticDigest } = plan;
+  return { mode, datasetKey, dataVersion, runId, target, backendURL, databaseName, semanticDigest, runtime, ...coverage };
+}
+
 export async function runSourceDrivenFactStage(
   plan,
   sourceReport,
@@ -6641,7 +7082,7 @@ export async function applyManualAcceptanceFactPlan(
   };
   assertSourceRuntimeIdentity(sourceReport, context.runtime);
   const purchase =
-    options.phase === "facts"
+    ["facts", "shipment-coverage", "form-coverage"].includes(options.phase)
       ? options.verifyPurchaseStage
         ? await options.verifyPurchaseStage(plan, context)
         : await verifyPurchaseQualityStage(plan, context)
@@ -6654,6 +7095,16 @@ export async function applyManualAcceptanceFactPlan(
       plan,
       runtime: context.runtime,
       purchase,
+    });
+  }
+  if (options.phase === "shipment-coverage") {
+    return buildFactCoverageReport("apply", plan, context.runtime, {
+      shipmentCoverage: await prepareShipmentCoverage(plan, sourceReport, purchase, context, true),
+    });
+  }
+  if (options.phase === "form-coverage") {
+    return buildFactCoverageReport("apply", plan, context.runtime, {
+      formCoverage: await prepareFormCoverage(plan, sourceReport, purchase, context, true),
     });
   }
   const engineeringPreparation = options.factStage
@@ -6680,6 +7131,7 @@ export async function applyManualAcceptanceFactPlan(
           ...purchase.inventoryLots,
           ...facts.inventoryLots,
         ]);
+  const shipmentCoverage = options.factStage ? undefined : await prepareShipmentCoverage(plan, sourceReport, purchase, context, true);
   return {
     ...buildFactReport({
       mode: "apply",
@@ -6696,6 +7148,8 @@ export async function applyManualAcceptanceFactPlan(
             facts,
           ),
     }),
+    shipmentCoverage,
+    formCoverage: options.factStage ? undefined : await prepareFormCoverage(plan, sourceReport, purchase, context, true, shipmentCoverage),
     engineeringPreparation,
   };
 }
@@ -6719,6 +7173,16 @@ export async function verifyManualAcceptanceFactPlan(
       purchase,
     });
   }
+  if (options.phase === "shipment-coverage") {
+    return buildFactCoverageReport("verify", plan, context.runtime, {
+      shipmentCoverage: await prepareShipmentCoverage(plan, sourceReport, purchase, context, false),
+    });
+  }
+  if (options.phase === "form-coverage") {
+    return buildFactCoverageReport("verify", plan, context.runtime, {
+      formCoverage: await prepareFormCoverage(plan, sourceReport, purchase, context, false),
+    });
+  }
   const engineeringPreparation = options.factStage
     ? undefined
     : await prepareManualAcceptanceEngineering({
@@ -6744,6 +7208,7 @@ export async function verifyManualAcceptanceFactPlan(
           ...purchase.inventoryLots,
           ...facts.inventoryLots,
         ]);
+  const shipmentCoverage = options.factStage ? undefined : await prepareShipmentCoverage(plan, sourceReport, purchase, context, false);
   return {
     ...buildFactReport({
       mode: "verify",
@@ -6760,6 +7225,8 @@ export async function verifyManualAcceptanceFactPlan(
             facts,
           ),
     }),
+    shipmentCoverage,
+    formCoverage: options.factStage ? undefined : await prepareFormCoverage(plan, sourceReport, purchase, context, false, shipmentCoverage),
     engineeringPreparation,
   };
 }
@@ -6816,8 +7283,8 @@ export function parseManualAcceptanceFactArgs(argv = []) {
   }
   if (options.apply && options.verify)
     throw new CliError("--apply and --verify are mutually exclusive", 2);
-  if (!new Set(["all", "purchase-quality", "facts"]).has(options.phase)) {
-    throw new CliError("--phase must be all, purchase-quality, or facts", 2);
+  if (!new Set(["all", "purchase-quality", "facts", "shipment-coverage", "form-coverage"]).has(options.phase)) {
+    throw new CliError("--phase must be all, purchase-quality, facts, shipment-coverage, or form-coverage", 2);
   }
   return options;
 }
@@ -6837,7 +7304,7 @@ function usage() {
 只读精确核验：
   node scripts/qa/manual-acceptance-fact-data.mjs --verify --source-report <apply-report.json>
 
-可用 --phase purchase-quality 或 --phase facts 分段执行。customer-trial-133 还必须提供绑定 target/version/run 的确认串与严格运行态 attestation。`;
+可用 --phase purchase-quality 或 --phase facts 分段执行。已有当前来源与采购入库时，可用 --phase shipment-coverage 补齐多行出货。当前批次已有完整业务数据时，可用 --phase form-coverage 补齐表单与库存场景。customer-trial-133 还必须提供绑定 target/version/run 的确认串与严格运行态 attestation。`;
 }
 
 async function writeReport(outDir, report) {
@@ -6869,10 +7336,24 @@ export async function runManualAcceptanceFactCli(argv = [], deps = {}) {
   }
   const plan = buildManualAcceptanceFactPlan(sourceReport);
   if (!options.apply && !options.verify) {
+    const outputPlan = options.phase === "shipment-coverage" ? {
+      mode: "plan", writes: false, target: plan.target, dataVersion: plan.dataVersion, runId: plan.runId,
+      shipmentCoverage: planManualAcceptanceShipmentCoverageSources(sourceReport).specs.map((order) => ({
+        orderNo: order.order_no,
+        ...order.shipmentCoverage,
+        lines: order.items.map((item) => ({ sku: item.skuRef, unit: item.unitKey, quantity: item.ordered_quantity })),
+      })),
+    } : options.phase === "form-coverage" ? {
+      mode: "plan", writes: false, target: plan.target, dataVersion: plan.dataVersion, runId: plan.runId,
+      formCoverage: planManualAcceptanceFormCoverageSources(sourceReport).specs.map((order) => ({
+        orderNo: order.order_no, currency: order.currency, ...order.formCoverage,
+        lines: order.items.map((item) => ({ sku: item.skuRef, unit: item.unitKey, quantity: item.ordered_quantity })),
+      })),
+    } : plan;
     return {
       exitCode: 0,
-      text: `${JSON.stringify(plan, null, options.json ? 2 : 0)}\n`,
-      plan,
+      text: `${JSON.stringify(outputPlan, null, options.json ? 2 : 0)}\n`,
+      plan: outputPlan,
       sourceReport,
     };
   }

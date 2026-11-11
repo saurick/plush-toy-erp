@@ -35,6 +35,7 @@ type WarehouseProductionWork struct {
 	BatchID                   int    `json:"production_wip_batch_id"`
 	BatchNo                   string `json:"batch_no"`
 	OperationName             string `json:"operation_name"`
+	ProductID                 int    `json:"product_id"`
 	ProductName               string `json:"product_name"`
 	ProductCode               string `json:"product_code"`
 	SKUCode                   string `json:"sku_code"`

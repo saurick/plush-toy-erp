@@ -20,6 +20,12 @@ export async function chooseSelectOption(control, value) {
   if ((await input.getAttribute('aria-expanded')) !== 'true') {
     await select.locator('.ant-select-selector').click()
   }
+  if (value?.label) {
+    const popup = control.page().locator('.ant-select-dropdown:visible')
+    await popup.getByText(value.label, { exact: true }).click()
+    await popup.waitFor({ state: 'hidden' })
+    return
+  }
   const listId = await input.getAttribute('aria-controls')
   if (!listId) throw new Error('选择控件缺少可访问的选项列表')
   await control

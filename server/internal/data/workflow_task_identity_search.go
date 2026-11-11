@@ -27,6 +27,9 @@ var workflowIdentitySearchSources = []workflowIdentitySearchSource{
 	{kind: "outsourcing_order", types: []any{"outsourcing_order", "outsourcing-order", "processing-contracts"}, table: "outsourcing_order_items", sourceColumn: "outsourcing_order_id", productColumn: "product_id", materialColumn: "material_id", productName: "product_name_snapshot", productCode: "product_no_snapshot", materialName: "material_name_snapshot", materialCode: "material_code_snapshot", additional: []string{"product_order_no_snapshot"}, headerTable: "outsourcing_orders", headerNo: "outsourcing_order_no"},
 	{kind: "production_order", types: []any{"production_order", "production-order", "production-orders"}, table: "production_order_items", sourceColumn: "production_order_id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id", headerTable: "production_orders", headerNo: "order_no"},
 	{kind: "production_wip_batch", types: []any{"production_wip_batch"}, table: "production_order_items", sourceColumn: "id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id"},
+	{kind: "production_packaging_confirmation", types: []any{"production_packaging_confirmation"}, table: "production_order_items", sourceColumn: "id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id"},
+	{kind: "outsourcing_fact", types: []any{"outsourcing_fact"}, table: "outsourcing_facts", sourceColumn: "id", productColumn: "subject_id", materialColumn: "subject_id", subjectColumn: "subject_type", additional: []string{"fact_no"}},
+	{kind: "finance_payment", types: []any{"finance_payment"}, table: "finance_payments", sourceColumn: "id", additional: []string{"payment_no"}},
 	{kind: "purchase_receipt", types: []any{"purchase_receipt", "purchase-receipt", "inbound"}, table: "purchase_receipt_items", sourceColumn: "receipt_id", materialColumn: "material_id", headerTable: "purchase_receipts", headerNo: "receipt_no"},
 	{kind: "shipment", types: []any{"shipment", "shipments"}, table: "shipment_items", sourceColumn: "shipment_id", productColumn: "product_id", salesItemColumn: "sales_order_item_id", headerTable: "shipments", headerNo: "shipment_no"},
 	{kind: "bom_header", types: []any{"bom_header", "material-bom"}, table: "bom_headers", sourceColumn: "id", productColumn: "product_id", additional: []string{"source_order_no"}},
@@ -184,6 +187,13 @@ func workflowSourceIdentityKeywordPredicate(keyword, sourceIDColumn string, bind
 				batch := entsql.Table("production_wip_batches").As("identity_source_batch")
 				query.Join(batch).On(item.C("id"), batch.C("production_order_item_id")).Select(batch.C("id"))
 				fields = append(fields, entsql.ContainsFold(batch.C("batch_no"), keyword))
+			}
+			if source.kind == "production_packaging_confirmation" {
+				confirmation := entsql.Table("production_packaging_confirmations").As("identity_packaging")
+				order := entsql.Table("production_orders").As("identity_production_order")
+				query.Join(confirmation).On(item.C("id"), confirmation.C("production_order_item_id")).Select(confirmation.C("id"))
+				query.Join(order).On(confirmation.C("production_order_id"), order.C("id"))
+				fields = append(fields, entsql.ContainsFold(order.C("order_no"), keyword))
 			}
 			query.Where(entsql.Or(fields...))
 			matches = append(matches, entsql.And(binding(selector, source), entsql.In(selector.C(sourceIDColumn), query)))

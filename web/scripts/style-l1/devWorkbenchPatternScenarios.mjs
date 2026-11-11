@@ -22,7 +22,7 @@ export function createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalO
       for (const width of [1024, 1280, 1920]) {
         await page.setViewportSize({ width, height: 900 })
         const bounds = await samples.evaluate((node) => {
-          const toolbar = document.querySelector('.erp-dev-ui-design-workbench-toolbar').getBoundingClientRect()
+          const toolbar = node.closest('.erp-dev-ui-design-reader').querySelector('.erp-dev-ui-design-toolbar').getBoundingClientRect()
           const box = node.getBoundingClientRect()
           return { gap: box.top - toolbar.bottom, top: box.top, fonts: [...node.querySelectorAll('td, dt, dd, p, h2, h3')].filter((e) => e.getBoundingClientRect().height).map((e) => parseFloat(getComputedStyle(e).fontSize)) }
         })
@@ -110,10 +110,15 @@ export function createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalO
       await page.getByRole('button', { name: '重置演示', exact: true }).click()
       await reading.getByRole('heading', { name: 'CI 证明什么', exact: true }).waitFor()
 
-      const switcher = await page.locator('.erp-dev-ui-design-workbench-toolbar').elementHandle()
-      await page.getByText('整体交互预览', { exact: true }).click()
-      await page.frameLocator('iframe[title="ERP 最新可交互设计"]').getByRole('table', { name: '开发工具对照', exact: true }).waitFor()
-      const previewNavigation = await page.frameLocator('iframe[title="ERP 最新可交互设计"]').locator('.dev-design').evaluate((root) => {
+      const topTabs = page.locator('.erp-dev-ui-design-header').getByRole('tablist')
+      const sampleTab = topTabs.getByRole('tab', { name: '设计样例', exact: true })
+      const switcher = await topTabs.elementHandle()
+      assert.equal(await sampleTab.getAttribute('aria-selected'), 'true')
+      await topTabs.getByRole('tab', { name: '可交互设计', exact: true }).click()
+      const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]:visible')
+      await frame.locator('.nav-item[data-page="dev-workbench"]').click()
+      await frame.getByRole('table', { name: '开发工具对照', exact: true }).waitFor()
+      const previewNavigation = await frame.locator('.dev-design').evaluate((root) => {
         const header = root.querySelector('.dev-design-heading')
         const nav = root.querySelector('.dev-design-tabs')
         const box = header.getBoundingClientRect()
@@ -128,8 +133,9 @@ export function createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalO
       assert.equal(previewNavigation.sameLabelCount, 1, '主任务导航保持唯一')
       assert(previewNavigation.contained, '导航完整位于所属页头，宽度不足时允许在页头内换行')
       assert(await switcher.evaluate((node) => node.isConnected), '样板与整体预览切换保留切换栏')
-      await page.getByText('统一页面样板', { exact: true }).click()
+      await sampleTab.click()
       await samples.waitFor()
+      assert.equal(await page.getByLabel('设计样例分类', { exact: true }).getByRole('radio', { name: '统一页面样板' }).isChecked(), true)
       await samples.getByText('阅读统一设计约定', { exact: true }).count()
       assert.equal(writes.length, 0, '设计样板不能调用运行、采集、发布或业务写接口')
       await assertNoHorizontalOverflow(page)

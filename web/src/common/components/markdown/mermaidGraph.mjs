@@ -141,7 +141,7 @@ export function buildBusinessFlowMermaid(
         [
           node.role || layerLabels[node.kind || node.layer],
           node.key === runtimeKey ? '实例所在' : '',
-          node.terminal || node.kind === 'terminal' ? '结束' : '',
+          (node.terminal || node.kind === 'terminal') && !String(node.label || '').trim().endsWith('结束') ? '结束' : '',
         ].filter(Boolean)
       ),
     ].join(' · ')

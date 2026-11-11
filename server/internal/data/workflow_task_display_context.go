@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/inventoryoperation"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/product"
@@ -19,6 +20,7 @@ import (
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
+	"server/internal/data/model/ent/productionpackagingconfirmation"
 	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchasereceipt"
@@ -59,7 +61,7 @@ func workflowDisplaySourceKind(value string) string {
 		return "production_fact"
 	case "quality_inspection", "quality-inspection", "quality-inspections":
 		return "quality_inspection"
-	case "production_exception_decision", "production_wip_batch", "inventory_operation":
+	case "production_exception_decision", "production_wip_batch", "production_packaging_confirmation", "outsourcing_fact", "finance_payment", "inventory_operation":
 		return value
 	case "bom_header", "material-bom":
 		return "bom_header"
@@ -80,6 +82,10 @@ func displayInt(value *int) int {
 		return 0
 	}
 	return *value
+}
+
+func productionItemDisplayRef(item *ent.ProductionOrderItem) workflowDisplayRef {
+	return workflowDisplayRef{kind: "product", id: item.ProductID, name: displayString(item.ProductNameSnapshot), code: displayString(item.ProductCodeSnapshot), salesItemID: displayInt(item.SalesOrderItemID)}
 }
 
 // Only already-visible tasks or processes with a persisted binding may read source
@@ -116,7 +122,9 @@ func hydrateWorkflowTaskDisplayContexts(ctx context.Context, client *ent.Client,
 		if kind == "" || task.SourceID <= 0 {
 			continue
 		}
-		trusted := biz.IsTrustedEngineeringMaterialTask(task) || biz.IsTrustedProductionSchedulingSourceTask(task) || biz.IsTrustedProductionExceptionSourceTask(task) || biz.IsTrustedShipmentReleaseSourceTask(task) || biz.IsTrustedFulfillmentTask(task)
+		trusted := biz.IsTrustedEngineeringMaterialTask(task) || biz.IsTrustedProductionSchedulingSourceTask(task) ||
+			biz.IsTrustedProductionExceptionSourceTask(task) || biz.IsTrustedShipmentReleaseSourceTask(task) ||
+			biz.IsTrustedFulfillmentTask(task) || biz.IsTrustedWorkflowFollowupTask(task)
 		if instance := instances[displayInt(task.ProcessInstanceID)]; instance != nil {
 			trusted = instance.BusinessRefID == task.SourceID && workflowDisplaySourceKind(instance.BusinessRefType) == kind
 		}
@@ -166,6 +174,7 @@ func hydrateWorkflowTaskDisplayContexts(ctx context.Context, client *ent.Client,
 	}
 	products := map[int]*ent.Product{}
 	primaryImages := map[int]int{}
+	hasProductImages := map[int]bool{}
 	materials := map[int]*ent.Material{}
 	orderNos := map[int]string{}
 	if len(productIDs) > 0 {
@@ -176,19 +185,23 @@ func hydrateWorkflowTaskDisplayContexts(ctx context.Context, client *ent.Client,
 		for _, row := range rows {
 			products[row.ID] = row
 		}
-		// Only the current primary image of the same product identifies this item.
+		// Album availability is independent of the primary thumbnail.
+		slots := append([]string{biz.BusinessAttachmentProductImageSlotPrimary, biz.BusinessAttachmentProductImageSlotSecondary}, biz.BusinessAttachmentProductImageSupplementalSlots()...)
 		images, err := client.BusinessAttachment.Query().Where(
 			businessattachment.OwnerTypeEQ(biz.BusinessAttachmentOwnerProduct),
 			businessattachment.OwnerIDIn(productIDs...),
 			businessattachment.AttachmentTypeEQ(biz.BusinessAttachmentTypeProductImage),
-			businessattachment.SlotKeyEQ(biz.BusinessAttachmentProductImageSlotPrimary),
+			businessattachment.SlotKeyIn(slots...),
 			businessattachment.WithdrawnAtIsNil(),
-		).Select(businessattachment.FieldID, businessattachment.FieldOwnerID).All(ctx)
+		).Select(businessattachment.FieldID, businessattachment.FieldOwnerID, businessattachment.FieldSlotKey).All(ctx)
 		if err != nil {
 			return err
 		}
 		for _, image := range images {
-			primaryImages[image.OwnerID] = image.ID
+			hasProductImages[image.OwnerID] = true
+			if image.SlotKey != nil && *image.SlotKey == biz.BusinessAttachmentProductImageSlotPrimary {
+				primaryImages[image.OwnerID] = image.ID
+			}
 		}
 	}
 	if len(materialIDs) > 0 {
@@ -228,6 +241,7 @@ func hydrateWorkflowTaskDisplayContexts(ctx context.Context, client *ent.Client,
 					item.StyleNo = displayString(row.StyleNo)
 					item.ProductID = row.ID
 					item.ImageAttachmentID = primaryImages[row.ID]
+					item.HasProductImages = hasProductImages[row.ID]
 				}
 				if row := materials[ref.id]; ref.kind == "material" && row != nil {
 					item.SupplierItemNo = displayString(row.SupplierItemNo)
@@ -293,17 +307,35 @@ func loadWorkflowDisplaySources(ctx context.Context, client *ent.Client, kind st
 			out[row.ID] = source
 		}
 	case "purchase_order":
-		rows, err := client.PurchaseOrder.Query().Where(purchaseorder.IDIn(ids...)).WithItems(func(q *ent.PurchaseOrderItemQuery) { q.Order(ent.Asc("id")) }).All(ctx)
+		rows, err := client.PurchaseOrder.Query().Where(purchaseorder.IDIn(ids...)).WithEngineeringMaterialRequest().WithItems(func(q *ent.PurchaseOrderItemQuery) { q.Order(ent.Asc("id")) }).All(ctx)
 		if err != nil {
 			return nil, err
 		}
 		for _, row := range rows {
 			lineCount := len(row.Edges.Items)
 			source := workflowDisplaySource{no: row.PurchaseOrderNo, lineCount: &lineCount}
+			request := row.Edges.EngineeringMaterialRequest
+			var byMaterial map[[2]int][]purchaseEngineeringSource
+			if request != nil && request.Status == biz.MaterialRequestApproved {
+				byMaterial, err = purchaseEngineeringSourcesByMaterial(request.SourceSnapshot)
+				if err != nil {
+					return nil, err
+				}
+			}
 			for _, item := range row.Edges.Items {
-				source.items = append(source.items, workflowDisplayRef{kind: "material", id: item.MaterialID, name: displayString(item.MaterialNameSnapshot), code: displayString(item.MaterialCodeSnapshot), orderNo: displayString(item.ProductOrderNoSnapshot)})
-				if displayString(item.ProductNameSnapshot) != "" || displayString(item.ProductNoSnapshot) != "" {
-					source.items = append(source.items, workflowDisplayRef{kind: "product", name: displayString(item.ProductNameSnapshot), code: displayString(item.ProductNoSnapshot), orderNo: displayString(item.ProductOrderNoSnapshot)})
+				orderNo := displayString(item.ProductOrderNoSnapshot)
+				parts := byMaterial[[2]int{item.MaterialID, item.UnitID}]
+				if len(parts) > 0 {
+					orderNo = request.OrderNoSnapshot
+				}
+				source.items = append(source.items, workflowDisplayRef{kind: "material", id: item.MaterialID, name: displayString(item.MaterialNameSnapshot), code: displayString(item.MaterialCodeSnapshot), orderNo: orderNo})
+				for _, part := range parts {
+					if part.ProductID > 0 {
+						source.items = append(source.items, workflowDisplayRef{kind: "product", id: part.ProductID, name: part.ProductName, code: part.ProductCode, orderNo: orderNo})
+					}
+				}
+				if len(parts) == 0 && (displayString(item.ProductNameSnapshot) != "" || displayString(item.ProductNoSnapshot) != "") {
+					source.items = append(source.items, workflowDisplayRef{kind: "product", name: displayString(item.ProductNameSnapshot), code: displayString(item.ProductNoSnapshot), orderNo: orderNo})
 				}
 			}
 			out[row.ID] = source
@@ -333,7 +365,7 @@ func loadWorkflowDisplaySources(ctx context.Context, client *ent.Client, kind st
 		for _, row := range rows {
 			source := workflowDisplaySource{no: row.OrderNo}
 			for _, item := range row.Edges.Items {
-				source.items = append(source.items, workflowDisplayRef{kind: "product", id: item.ProductID, name: displayString(item.ProductNameSnapshot), code: displayString(item.ProductCodeSnapshot), salesItemID: displayInt(item.SalesOrderItemID)})
+				source.items = append(source.items, productionItemDisplayRef(item))
 			}
 			out[row.ID] = source
 		}
@@ -345,10 +377,30 @@ func loadWorkflowDisplaySources(ctx context.Context, client *ent.Client, kind st
 		for _, row := range rows {
 			source := workflowDisplaySource{no: row.BatchNo}
 			if item := row.Edges.ProductionOrderItem; item != nil {
-				source.items = []workflowDisplayRef{{kind: "product", id: item.ProductID, name: displayString(item.ProductNameSnapshot), code: displayString(item.ProductCodeSnapshot), salesItemID: displayInt(item.SalesOrderItemID)}}
+				source.items = []workflowDisplayRef{productionItemDisplayRef(item)}
 			}
 			out[row.ID] = source
 		}
+	case "production_packaging_confirmation":
+		rows, err := client.ProductionPackagingConfirmation.Query().Where(productionpackagingconfirmation.IDIn(ids...)).WithProductionOrder().WithProductionOrderItem().All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			if row.Edges.ProductionOrder != nil && row.Edges.ProductionOrderItem != nil {
+				out[row.ID] = workflowDisplaySource{no: row.Edges.ProductionOrder.OrderNo, items: []workflowDisplayRef{productionItemDisplayRef(row.Edges.ProductionOrderItem)}}
+			}
+		}
+	case "outsourcing_fact":
+		rows, err := client.OutsourcingFact.Query().Where(outsourcingfact.IDIn(ids...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			out[row.ID] = workflowDisplaySource{no: row.FactNo, items: []workflowDisplayRef{{kind: strings.ToLower(row.SubjectType), id: row.SubjectID}}}
+		}
+	case "finance_payment":
+		return loadWorkflowFinancePaymentDisplaySources(ctx, client, ids)
 	case "purchase_receipt":
 		rows, err := client.PurchaseReceipt.Query().Where(purchasereceipt.IDIn(ids...)).WithItems(func(q *ent.PurchaseReceiptItemQuery) { q.Order(ent.Asc("id")) }).All(ctx)
 		if err != nil {
@@ -452,7 +504,7 @@ func loadWorkflowDisplaySources(ctx context.Context, client *ent.Client, kind st
 		}
 		refs := map[int]workflowDisplayRef{}
 		for _, item := range items {
-			refs[item.ID] = workflowDisplayRef{kind: "product", id: item.ProductID, name: displayString(item.ProductNameSnapshot), code: displayString(item.ProductCodeSnapshot), salesItemID: displayInt(item.SalesOrderItemID)}
+			refs[item.ID] = productionItemDisplayRef(item)
 		}
 		for _, row := range rows {
 			out[row.ID] = workflowDisplaySource{no: row.DecisionNo, items: []workflowDisplayRef{refs[row.ProductionOrderItemID]}}

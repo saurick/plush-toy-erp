@@ -1,54 +1,106 @@
-import {
-  ApartmentOutlined,
-  CheckCircleOutlined,
-  CodeOutlined,
-  CopyOutlined,
-  DeploymentUnitOutlined,
-  FileTextOutlined,
-  SafetyCertificateOutlined,
-} from '@ant-design/icons'
-import { Space, Tag, Typography } from 'antd'
+import { lazy, Suspense, useRef, useState } from 'react'
+import { Tag, Typography } from 'antd'
 import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
 import DevTaskNav from '../../components/DevTaskNav.jsx'
-import { WorkbenchNotice } from '../../components/WorkbenchPattern.jsx'
-import {
-  guardItemLabel,
-  StatusTag,
-  ReviewChecklistItem,
-  SourceReference,
-  CommandBlock,
-  CommandList,
-  ImportAssetScopeItem,
-  RegistryCheckItem,
-  CompiledCatalogItem,
-  AssetTile,
-} from './presentation.jsx'
+import { WorkbenchNotice, WorkbenchSection } from '../../components/WorkbenchPattern.jsx'
+import { CustomerExtensionRegistry } from './CustomerExtensionRegistry.jsx'
+import { CustomerPackageDiagram } from './CustomerPackageDiagram.jsx'
+import { guardItemLabel, StatusTag, RegistryCheckItem } from './presentation.jsx'
+import { ReviewEvidence } from './ReviewEvidence.jsx'
+import { RuntimeSettings } from './RuntimeSettings.jsx'
 
 import {
   PREFLIGHT_SECTION_OPTIONS,
   PREFLIGHT_SECTION_PACKAGE,
   PREFLIGHT_SECTION_RUNTIME,
   PREFLIGHT_SECTION_FLOW,
+  PREFLIGHT_SECTION_EXTENSIONS,
   PREFLIGHT_SECTION_EVIDENCE,
 } from './navigation.mjs'
 
-const { Paragraph, Text } = Typography
+const { Text } = Typography
+const CustomerStrategyReview = lazy(() => import('./CustomerStrategyReview.jsx'))
+const CustomerApprovalPolicy = lazy(() => import('./CustomerApprovalPolicy.jsx'))
+
+function OtherProcessDrafts({ summary }) {
+  const drafts = [
+    ...summary.workflows.map((item) => ({ ...item, type: '工作流', scope: [`${item.nodeCount} 个节点`, item.ownerPoolLabels.join('、'), item.factBoundaryLabel].filter(Boolean).join(' · ') })),
+    ...summary.businessFlows.map((item) => ({ ...item, type: '业务流转', scope: item.moduleRouteLabel })),
+    ...summary.stateMachines.map((item) => ({ ...item, type: '状态机', scope: `${item.stateCountLabel} / ${item.transitionCountLabel}` })),
+  ]
+  if (!drafts.length) return null
+
+  return (
+    <DevStaticGuidance title="其他流程草案" hint="仅供评审">
+      <div className="erp-dev-tool-table-wrap">
+        <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="其他流程草案">
+          <thead><tr><th scope="col">声明</th><th scope="col">范围</th><th scope="col">边界</th></tr></thead>
+          <tbody>
+            {drafts.map((item) => (
+              <tr key={`${item.type}:${item.key}`}>
+                <th scope="row">{item.label}<br /><Text type="secondary">{item.type}</Text></th>
+                <td>{item.scope}</td>
+                <td>{item.status !== 'preview_only' ? <StatusTag status={item.status} /> : null}{item.guardrail}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </DevStaticGuidance>
+  )
+}
 
 export function PreflightPanel({
   consoleSummary,
   customerPackageSummary,
+  menuSummary,
+  fieldNumberingSummary,
   activeSection,
   onSectionChange,
 }) {
+  const [packageArea, setPackageArea] = useState(null)
+  const sectionNav = useRef(null)
+  const openSection = (section) => {
+    const index = PREFLIGHT_SECTION_OPTIONS.findIndex((item) => item.value === section)
+    sectionNav.current?.querySelectorAll('[role="tab"]')[index]?.focus()
+    onSectionChange(section)
+  }
   const boundaryIssues = customerPackageSummary.boundaries.filter(
     (item) => !item.ok
   )
+  const reviewIssues = consoleSummary.validationChecks.filter((item) =>
+    item.status === 'blocked' && (boundaryIssues.length === 0 || !['no-code-sql-secret', 'runtime-loader'].includes(item.key))
+  )
+  const hasIssues = boundaryIssues.length + reviewIssues.length > 0
+  const blockers = hasIssues ? (
+    <WorkbenchNotice
+      tone="error"
+      title="先处理配置包问题"
+      description={
+        <>
+          <ul className="erp-dev-customer-boundary-issues">
+            {boundaryIssues.map((item) => (
+              <li key={item.key}>
+                <strong>{guardItemLabel(item, '客户配置包边界')}</strong>
+                {'：'}{item.valueLabel}
+                {item.expectedLabel ? `；要求：${item.expectedLabel}` : ''}
+              </li>
+          ))}
+            {reviewIssues.map((item) => (
+              <li key={item.key}><strong>{item.label}：</strong>{item.note}</li>
+            ))}
+          </ul>
+          <Text>处理后再继续试跑或发布检查。</Text>
+        </>
+      }
+    />
+  ) : null
   return (
     <div
       className="erp-dev-customer-panel-grid"
       data-dev-customer-view="包预检"
     >
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-section-nav">
+      <section ref={sectionNav} className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-section-nav">
         <DevTaskNav
           compact
           ariaLabel="配置预检任务"
@@ -58,327 +110,61 @@ export function PreflightPanel({
         />
       </section>
       {activeSection === PREFLIGHT_SECTION_PACKAGE ? (
-        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-package-checks">
-          <div className="erp-dev-customer-panel__head">
-            <CheckCircleOutlined aria-hidden="true" />
-            <Text strong>配置包检查</Text>
-          </div>
-          <div className="erp-dev-tool-table-wrap">
-            <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="客户配置预检步骤">
-              <thead>
-                <tr>
-                  <th scope="col">核对项</th>
-                  <th scope="col">结果</th>
-                </tr>
-              </thead>
-              <tbody>
-                {consoleSummary.preflightStages.map((item) => (
-                  <tr key={item.key}>
-                    <th scope="row">{item.label}</th>
-                    <td>
-                      <StatusTag status={item.status} />
-                      {item.status === 'blocked' && item.key !== 'schema-lint' ? (
-                        <Text type="danger">{item.note}</Text>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {boundaryIssues.length > 0 ? (
-            <WorkbenchNotice
-              tone="error"
-              title={`配置包存在 ${boundaryIssues.length} 项边界问题`}
-              description={
-                <>
-                  <ul className="erp-dev-customer-boundary-issues">
-                    {boundaryIssues.map((item) => (
-                      <li key={item.key}>
-                        <strong>{guardItemLabel(item, '客户配置包边界')}</strong>
-                        {'：'}{item.valueLabel}
-                        {item.expectedLabel ? `；要求：${item.expectedLabel}` : ''}
-                      </li>
+        <WorkbenchSection
+          flat
+          className="erp-dev-customer-panel erp-dev-customer-panel--wide"
+          title="客户包结构"
+          description="目标环境未核验"
+          tools={!hasIssues ? <Tag color="success">包结构检查通过</Tag> : null}
+        >
+          {blockers}
+          <CustomerPackageDiagram
+            area={packageArea}
+            summary={customerPackageSummary}
+            menu={menuSummary}
+            numbering={fieldNumberingSummary}
+            onSelectArea={setPackageArea}
+            onOpenSection={openSection}
+          />
+        </WorkbenchSection>
+      ) : null}
+      {activeSection === PREFLIGHT_SECTION_RUNTIME ? (
+        <RuntimeSettings summary={customerPackageSummary} />
+      ) : null}
+      {activeSection === PREFLIGHT_SECTION_FLOW ? (
+        <>
+          <Suspense fallback={<section className="erp-dev-customer-panel erp-dev-customer-panel--wide" role="status">正在载入客户包的流程定义</section>}>
+            <CustomerStrategyReview key={customerPackageSummary.customerKey} summary={customerPackageSummary} />
+          </Suspense>
+          <WorkbenchSection flat className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <OtherProcessDrafts summary={customerPackageSummary} />
+            {consoleSummary.registryChecks.length > 0 ? (
+              <DevStaticGuidance title="查看候选策略与命令声明">
+                <div className="erp-dev-customer-formal-gates">
+                  {consoleSummary.registryChecks.map((item) => (
+                    <RegistryCheckItem item={item} key={item.key} />
                   ))}
-                  </ul>
-                  <Text>处理后再继续试跑或发布检查。</Text>
-                </>
-              }
-            />
-          ) : null}
-          <DevStaticGuidance title="配置范围与依据">
-            <Text strong>操作范围</Text>
-            <dl className="erp-dev-customer-preflight-notes">
-              {consoleSummary.preflightStages.map((item) => (
-                <div key={item.key}>
-                  <dt>{item.label}</dt>
-                  <dd>{item.key === 'schema-lint' ? '校验结构与配置边界' : item.note}</dd>
                 </div>
-              ))}
-            </dl>
-            <Text strong>配置包边界</Text>
-            <div className="erp-dev-customer-package-guards">
-              <div className="erp-dev-customer-guard-list">
-                {customerPackageSummary.boundaries.map((item) => (
-                  <div className="erp-dev-customer-guard" key={item.key}>
-                    <Text>{guardItemLabel(item, '客户配置包边界')}</Text>
-                    <Tag color={item.ok ? 'green' : 'red'}>
-                      {item.ok ? item.expectedLabel : item.valueLabel}
-                    </Tag>
-                  </div>
-                ))}
-              </div>
-              <CommandBlock command={customerPackageSummary.qaCommand} />
-            </div>
-            <Text strong>客户包资产范围</Text>
-            <div className="erp-dev-customer-asset-grid">
-              {consoleSummary.assetSummary.map((item) => (
-                <AssetTile item={item} key={item.key} />
-              ))}
-            </div>
-            <Text strong>客户包对象</Text>
-            <Text type="secondary">流程与扩展项仅预览。</Text>
-            <div className="erp-dev-customer-db-targets">
-              {consoleSummary.packageAssetScope.map((item) => (
-                <ImportAssetScopeItem item={item} key={item.key} />
-              ))}
-            </div>
-          </DevStaticGuidance>
-        </section>
-      ) : null}
-      {activeSection === PREFLIGHT_SECTION_RUNTIME ? (
-        <>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--module-states">
-            <div className="erp-dev-customer-panel__head">
-              <DeploymentUnitOutlined aria-hidden="true" />
-              <Text strong>模块运行设置</Text>
-            </div>
-            <Text type="secondary">
-              登记模块默认启用；只读或关闭需说明原因。这里预览候选设置。
-            </Text>
-            <div className="erp-dev-customer-tool-list">
-              {customerPackageSummary.moduleStates.map((item) => (
-                <article className="erp-dev-customer-tool" key={item.moduleKey}>
-                  <div className="erp-dev-customer-tool__head">
-                    <Space wrap>
-                      <Text strong>{item.label}</Text>
-                      <Tag>{item.sourceLabel}</Tag>
-                      {item.overridden ? <Tag>已覆盖</Tag> : null}
-                    </Space>
-                    <StatusTag status={item.stateLabel} />
-                  </div>
-                  <Paragraph>{item.reason}</Paragraph>
-                </article>
-              ))}
-            </div>
-          </section>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-template-defaults">
-            <div className="erp-dev-customer-panel__head">
-              <FileTextOutlined aria-hidden="true" />
-              <Text strong>打印默认方信息</Text>
-            </div>
-            <Text type="secondary">
-              预览采购合同与加工合同的甲方默认字段；实际打印读取有效配置和单据快照。
-            </Text>
-            <div className="erp-dev-customer-tool-list">
-              {customerPackageSummary.printTemplateDefaults.map((item) => (
-                <article
-                  className="erp-dev-customer-tool"
-                  key={item.templateKey}
-                >
-                  <div className="erp-dev-customer-tool__head">
-                    <Space wrap>
-                      <Text strong>{item.templateLabel}</Text>
-                      <Tag>{item.defaultFieldCountLabel}</Tag>
-                      <Tag>{item.supplierDefaultsAllowedLabel}</Tag>
-                    </Space>
-                    <StatusTag status={item.status} />
-                  </div>
-                  <Text type="secondary">
-                    {item.partyDefaultKeysLabel || '默认方字段未声明'}
-                  </Text>
-                  <Paragraph>{item.guardrail}</Paragraph>
-                </article>
-              ))}
-            </div>
-          </section>
+              </DevStaticGuidance>
+            ) : null}
+            <DevStaticGuidance title="产品通用审批规则">
+              <Suspense fallback={<Text type="secondary" role="status">正在读取通用审批规则</Text>}>
+                <CustomerApprovalPolicy />
+              </Suspense>
+            </DevStaticGuidance>
+          </WorkbenchSection>
         </>
       ) : null}
-      {activeSection === PREFLIGHT_SECTION_EVIDENCE ? (
-        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-          <div className="erp-dev-customer-panel__head">
-            <SafetyCertificateOutlined aria-hidden="true" />
-            <Text strong>人工评审清单</Text>
-          </div>
-          <div className="erp-dev-customer-review-list">
-            {consoleSummary.reviewChecklist.map((item) => (
-              <ReviewChecklistItem item={item} key={item.key} />
-            ))}
-          </div>
-        </section>
+      {activeSection === PREFLIGHT_SECTION_EXTENSIONS ? (
+        <CustomerExtensionRegistry summary={customerPackageSummary} />
       ) : null}
       {activeSection === PREFLIGHT_SECTION_EVIDENCE ? (
-        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-          <div className="erp-dev-customer-panel__head">
-            <SafetyCertificateOutlined aria-hidden="true" />
-            <Text strong>校验结果</Text>
-          </div>
-          <div className="erp-dev-customer-tool-list">
-            {consoleSummary.validationChecks.map((check) => (
-              <article className="erp-dev-customer-tool" key={check.key}>
-                <div className="erp-dev-customer-tool__head">
-                  <Space wrap>
-                    <Text strong>{check.label}</Text>
-                    <Tag>{check.level}</Tag>
-                  </Space>
-                  <StatusTag status={check.status} />
-                </div>
-                <Paragraph>{check.note}</Paragraph>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
-      {activeSection === PREFLIGHT_SECTION_RUNTIME ? (
-        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-          <div className="erp-dev-customer-panel__head">
-            <DeploymentUnitOutlined aria-hidden="true" />
-            <Text strong>编译范围</Text>
-          </div>
-          <div className="erp-dev-customer-tool-list">
-            {customerPackageSummary.compiledCatalogSummary.map((item) => (
-              <CompiledCatalogItem item={item} key={item.key} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-      {activeSection === PREFLIGHT_SECTION_FLOW ? (
-        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-          <div className="erp-dev-customer-panel__head">
-            <SafetyCertificateOutlined aria-hidden="true" />
-            <Text strong>策略声明与扩展边界</Text>
-          </div>
-          <div className="erp-dev-customer-formal-gates">
-            {consoleSummary.registryChecks.map((item) => (
-              <RegistryCheckItem item={item} key={item.key} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-      {activeSection === PREFLIGHT_SECTION_FLOW ? (
-        <>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
-              <DeploymentUnitOutlined aria-hidden="true" />
-              <Text strong>工作流预览</Text>
-            </div>
-            <div className="erp-dev-customer-tool-list">
-              {customerPackageSummary.workflows.map((workflow) => (
-                <article className="erp-dev-customer-tool" key={workflow.key}>
-                  <div className="erp-dev-customer-tool__head">
-                    <Text strong>{workflow.label}</Text>
-                    <StatusTag status={workflow.status} />
-                  </div>
-                  <Space wrap>
-                    <Tag>{workflow.nodeCount} 个节点</Tag>
-                    <Tag>{workflow.factBoundaryLabel}</Tag>
-                    {(workflow.ownerPoolLabels || []).map((poolLabel) => (
-                      <Tag key={poolLabel}>{poolLabel}</Tag>
-                    ))}
-                  </Space>
-                  <Paragraph>{workflow.guardrail}</Paragraph>
-                </article>
-              ))}
-            </div>
-          </section>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
-              <ApartmentOutlined aria-hidden="true" />
-              <Text strong>业务流转</Text>
-            </div>
-            <div className="erp-dev-customer-field-list">
-              {customerPackageSummary.businessFlows.map((flow) => (
-                <article className="erp-dev-customer-field" key={flow.key}>
-                  <div className="erp-dev-customer-field__head">
-                    <Text strong>{flow.label}</Text>
-                    <StatusTag status={flow.status} />
-                  </div>
-                  <Text className="erp-dev-customer-field__key">
-                    {flow.flowKeyLabel} / {flow.moduleRouteLabel}
-                  </Text>
-                  <Paragraph>{flow.guardrail}</Paragraph>
-                </article>
-              ))}
-            </div>
-          </section>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
-              <CodeOutlined aria-hidden="true" />
-              <Text strong>状态机与策略</Text>
-            </div>
-            <div className="erp-dev-customer-numbering-list">
-              {customerPackageSummary.stateMachines.map((item) => (
-                <article className="erp-dev-customer-numbering" key={item.key}>
-                  <div>
-                    <Text strong>{item.label}</Text>
-                    <Text type="secondary">
-                      {item.stateCountLabel} / {item.transitionCountLabel}
-                    </Text>
-                  </div>
-                  <StatusTag status={item.status} />
-                  <Paragraph>{item.guardrail}</Paragraph>
-                </article>
-              ))}
-              {customerPackageSummary.processPolicies.map((item) => (
-                <article className="erp-dev-customer-numbering" key={item.key}>
-                  <div>
-                    <Text strong>{item.label}</Text>
-                    <Text type="secondary">
-                      {item.kindLabel} / {item.ruleCountLabel}
-                    </Text>
-                    {(item.ruleItems || []).length > 0 ? (
-                      <div className="erp-dev-customer-policy-rule-list">
-                        {item.ruleItems.map((rule) => (
-                          <div
-                            className="erp-dev-customer-policy-rule"
-                            key={rule.key}
-                          >
-                            <Text>{rule.triggerLabel}</Text>
-                            <Text type="secondary">{rule.resultLabel}</Text>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                  <StatusTag status={item.status} />
-                  <Paragraph>{item.guardrail}</Paragraph>
-                </article>
-              ))}
-            </div>
-          </section>
-        </>
-      ) : null}
-      {activeSection === PREFLIGHT_SECTION_EVIDENCE ? (
-        <>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
-              <CopyOutlined aria-hidden="true" />
-              <Text strong>预检命令</Text>
-            </div>
-            <CommandList commands={consoleSummary.qaCommands} />
-          </section>
-          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-            <div className="erp-dev-customer-panel__head">
-              <CodeOutlined aria-hidden="true" />
-              <Text strong>来源路径</Text>
-            </div>
-            <div className="erp-dev-customer-source-ref-list">
-              {consoleSummary.sourceReferences.map((item) => (
-                <SourceReference item={item} key={item.key} />
-              ))}
-            </div>
-          </section>
-        </>
+        <ReviewEvidence
+          consoleSummary={consoleSummary}
+          customerPackageSummary={customerPackageSummary}
+          menuSummary={menuSummary}
+          blockers={blockers}
+        />
       ) : null}
     </div>
   )

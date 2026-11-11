@@ -3,6 +3,7 @@ import { yoyoosunFieldNumberingConfig } from '../../../../config/customers/yoyoo
 import { yoyoosunCustomerPackage } from '../../../../config/customers/yoyoosun/customerPackage.mjs'
 import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
 import { customerPackageCatalog } from '../../../../config/catalog/customerPackageCatalog.mjs'
+import { customerPackageSchema } from '../../../../config/schemas/customerPackageSchema.mjs'
 import { DEV_CUSTOMER_CONFIG_ROUTE } from './devCustomerConfigRoute.mjs'
 import {
   DEFAULT_DEV_CUSTOMER_SCOPE_KEY,
@@ -114,11 +115,7 @@ const SOURCE_PATH_LABELS = Object.freeze({
   'config/customers/<customer-key>/': '客户配置包目录',
 })
 
-const MODULE_STATE_LABELS = Object.freeze({
-  enabled: '启用',
-  read_only: '只读',
-  disabled: '关闭',
-})
+const MODULE_STATE_LABELS = customerPackageSchema.moduleStates
 
 const WORKFLOW_FACT_BOUNDARY_LABELS = Object.freeze({
   workflow_only: '只做协同流转',
@@ -152,14 +149,10 @@ const RUNTIME_ENABLED_LABELS = Object.freeze({
 
 const CUSTOMER_PACKAGE_HANDLER_FORBIDDEN_LABEL = '禁止客户包处理器'
 
-const POLICY_KIND_LABELS = Object.freeze({
-  skip_policy: '跳过策略',
-  auto_generate_policy: '自动生成策略',
-  close_policy: '关闭策略',
-})
-
 const POLICY_RULE_TRIGGER_LABELS = Object.freeze({
   skip_optional_review_when_unconfigured: '可选评审未配置时',
+  generate_downstream_task_preview: '下游任务生成声明',
+  close_after_required_nodes_done: '必需节点完成后',
   no_risk: '无风险事项',
   source_ready: '来源资料已就绪',
   all_tasks_done: '所有协同任务完成',
@@ -168,7 +161,7 @@ const POLICY_RULE_TRIGGER_LABELS = Object.freeze({
 const POLICY_RULE_RESULT_LABELS = Object.freeze({
   manual_review_required: '进入人工评审',
   preview_only: '仅生成预览',
-  requires_usecase_review: '需要 usecase 评审',
+  requires_usecase_review: '需要业务规则评审',
   skip_optional_review: '跳过可选评审',
   generate_next_task_preview: '生成下一任务预览',
   close_preview_flow: '关闭预览流程',
@@ -386,13 +379,6 @@ function withWriteBoundaryLabels(item = {}) {
   }
 }
 
-function countPackageNodes(workflows = []) {
-  return workflows.reduce(
-    (total, workflow) => total + (workflow.nodes || []).length,
-    0
-  )
-}
-
 function buildKeySet(items = []) {
   return new Set((Array.isArray(items) ? items : []).map((item) => item.key))
 }
@@ -418,8 +404,11 @@ function buildPolicyRuleItem(rule = {}, index = 0) {
   const result = rule.action || rule.decision || ''
   return {
     key: `policy-rule-${index + 1}`,
-    triggerLabel: `条件：${POLICY_RULE_TRIGGER_LABELS[trigger] || '条件已登记'}`,
-    resultLabel: `结果：${POLICY_RULE_RESULT_LABELS[result] || '结果已登记'}`,
+    triggerLabel: `条件：${POLICY_RULE_TRIGGER_LABELS[trigger] || '待核对'}`,
+    resultLabel: `结果：${POLICY_RULE_RESULT_LABELS[result] || '待核对'}`,
+    declaration: Object.fromEntries(customerPackageSchema.allowedProcessPolicyRuleKeys
+      .filter((key) => key !== 'note' && typeof rule[key] === 'string')
+      .map((key) => [key, rule[key]])),
     note:
       typeof rule.note === 'string' && rule.note.trim() ? rule.note.trim() : '',
   }
@@ -547,13 +536,19 @@ function buildModuleStateSummary(
   )
   const moduleStates = (catalog.modules || []).map((item) => {
     const override = overrideMap.get(item.key)
-    const state = override?.state || 'enabled'
+    const defaultState = customerPackageSchema.defaultModuleState
+    const state = override ? override.state : defaultState
     return {
       moduleKey: item.key,
       label: resolveModuleStateLabel(item.label),
       state,
-      stateLabel: MODULE_STATE_LABELS[state] || '未标记',
-      reason: override?.reason || '未在客户包覆盖，编译清单默认按启用处理。',
+      defaultStateLabel: MODULE_STATE_LABELS[defaultState],
+      stateLabel: Object.hasOwn(MODULE_STATE_LABELS, state)
+        ? MODULE_STATE_LABELS[state]
+        : '待校验',
+      reason: override
+        ? override.reason || '未填写覆盖原因。'
+        : `未在客户包覆盖，编译清单默认按${MODULE_STATE_LABELS[defaultState]}处理。`,
       source: override ? 'customer_package_override' : 'catalog_default',
       sourceLabel: override
         ? MODULE_STATE_SOURCE_LABELS.customer_package_override
@@ -568,24 +563,50 @@ function buildModuleStateSummary(
       state: overrideMap.get(moduleKey)?.state || '',
       reason: overrideMap.get(moduleKey)?.reason || '',
     }))
-  const stateCounts = countBy(moduleStates, 'state')
-  const nonEnabledModuleStates = moduleStates.filter(
-    (item) => item.state !== 'enabled'
-  )
 
   return {
     catalogModuleCount: moduleStates.length,
     overrideCount: moduleStates.filter((item) => item.overridden).length,
     unknownOverrideCount: unknownOverrides.length,
-    stateCounts,
     moduleStates,
-    nonEnabledModuleStates,
     unknownOverrides,
     source:
       overrideMap.size > 0
         ? 'customer_package_override'
         : 'catalog_default_all_enabled',
   }
+}
+
+function buildFieldVisibilityReview(config, catalog) {
+  const overrides = Array.isArray(config.fieldPolicyOverrides)
+    ? config.fieldPolicyOverrides
+    : []
+  const moduleLabels = buildLabelMap(catalog.modules)
+  const defaultVisible = customerPackageSchema.defaultFieldVisible
+  const visibilityLabel = (visible) => (visible ? '显示' : '隐藏')
+
+  return (catalog.fieldPolicySurfaces || []).flatMap((surface) =>
+    surface.fieldKeys.map((fieldKey) => {
+      const matches = overrides.filter((item) =>
+        item?.surfaceKey === surface.key && item?.fieldKey === fieldKey
+      )
+      const candidate = matches[0]
+      const protectedField = surface.protectedVisible.includes(fieldKey)
+      const knownValue = matches.length === 1 && typeof candidate.visible === 'boolean'
+      const fieldLabel = catalog.fields?.find(
+        (field) => field.module === surface.moduleKey && field.key === fieldKey
+      )?.label || '已登记字段'
+      return {
+        key: `${surface.key}.${fieldKey}`,
+        label: `${moduleLabels.get(surface.moduleKey) || '已登记页面'} · ${fieldLabel}`,
+        defaultLabel: visibilityLabel(defaultVisible),
+        candidateLabel: candidate ? (knownValue ? visibilityLabel(candidate.visible) : '待校验') : visibilityLabel(defaultVisible),
+        sourceLabel: candidate ? '客户包覆盖' : '目录默认',
+        overridden: Boolean(candidate),
+        impact: protectedField ? '列表与 CSV；受保护，必须显示' : '列表与 CSV',
+      }
+    })
+  )
 }
 
 export function buildPrintTemplateFieldSummary(
@@ -733,8 +754,16 @@ export function buildCustomerPackagePreviewSummary(
     activateEnabled: config.sourcePolicy?.activateEnabled === true,
     rollbackEnabled: config.sourcePolicy?.rollbackEnabled === true,
     localTestApplyEnabled: config.sourcePolicy?.localTestApplyEnabled === true,
+    roleProfileNames: (Array.isArray(config.roleProfiles) ? config.roleProfiles : []).map((item) =>
+      resolveRegistryCheckLabel(item?.displayName, '岗位名称待核对')
+    ),
+    runtimeProcessSelections: (Array.isArray(config.runtimeProcessSelections) ? config.runtimeProcessSelections : []).map((item) => ({
+      processKey: item?.processKey,
+      processVersion: item?.processVersion,
+      variantKey: item?.variantKey,
+      businessRefType: item?.businessRefType,
+    })),
     workflowCount: workflows.length,
-    workflowNodeCount: countPackageNodes(workflows),
     workflows: workflows.map((workflow) => ({
       key: workflow.key,
       label: workflow.label,
@@ -756,15 +785,12 @@ export function buildCustomerPackagePreviewSummary(
         '协同边界未标记',
       guardrail: workflow.guardrail,
     })),
-    businessFlowCount: (config.businessFlows || []).length,
     businessFlows: (config.businessFlows || []).map((item) => ({
       ...item,
-      flowKeyLabel: '业务流锚点已登记',
       moduleRouteLabel: (item.modules || []).length
         ? `关联模块：${(item.modules || []).length} 个`
         : '关联模块未声明',
     })),
-    stateMachineCount: (config.stateMachines || []).length,
     stateMachines: (config.stateMachines || []).map((item) => ({
       key: item.key,
       label: item.label,
@@ -775,31 +801,14 @@ export function buildCustomerPackagePreviewSummary(
       transitionCountLabel: `${(item.transitions || []).length} 条转换`,
       guardrail: item.guardrail,
     })),
-    processPolicyCount: processPolicies.length,
     processPolicies: processPolicies.map((item) => ({
       key: item.key,
       label: item.label,
       status: item.status,
-      kind: item.kind,
-      ruleCount: (item.rules || []).length,
-      kindLabel: item.kind
-        ? `策略类型：${POLICY_KIND_LABELS[item.kind] || '已登记策略'}`
-        : '策略类型未声明',
       ruleCountLabel: `${(item.rules || []).length} 条规则`,
       ruleItems: (item.rules || []).map((rule, ruleIndex) =>
         buildPolicyRuleItem(rule, ruleIndex)
       ),
-      registered: catalogPolicyKeys.has(item.key),
-      guardrail: item.guardrail,
-    })),
-    extensionPointCount: extensionPoints.length,
-    extensionPoints: extensionPoints.map((item) => ({
-      key: item.key,
-      label: item.label,
-      status: item.status,
-      runtimeEnabled: item.runtimeEnabled === true,
-      hasCustomerPackageHandler: Boolean(item.handler || item.module),
-      registered: !hasExecutableExtensionBinding(item),
       guardrail: item.guardrail,
     })),
     strategyRegistryChecks: processPolicies.map((item) => ({
@@ -841,6 +850,12 @@ export function buildCustomerPackagePreviewSummary(
             status: hasExecutableExtensionBinding(item)
               ? 'blocked'
               : 'contract_preview_only',
+            declaration: {
+              key: item.key,
+              label: item.label,
+              status: item.status,
+              runtimeEnabled: typeof item.runtimeEnabled === 'boolean' ? item.runtimeEnabled : undefined,
+            },
             implementationSource: 'not_implemented',
             implementationSourceLabel:
               IMPLEMENTATION_SOURCE_LABELS.not_implemented,
@@ -850,12 +865,12 @@ export function buildCustomerPackagePreviewSummary(
             blockedReasons: [...EXTENSION_RUNTIME_BLOCKERS],
             note: hasExecutableExtensionBinding(item)
               ? '客户包不得上传扩展点实现或启用处理器。'
-              : '仅记录待评审扩展候选，当前没有运行时实现。',
+              : ['仅记录待评审扩展候选，当前没有运行时实现。', typeof item.guardrail === 'string' ? item.guardrail.trim() : ''].join(''),
           }))
         : [
             {
               key: 'controlled-empty-extension-catalog',
-              label: '扩展边界',
+              label: '未登记扩展',
               status: 'controlled_empty',
               implementationSource: 'not_implemented',
               implementationSourceLabel:
@@ -864,13 +879,10 @@ export function buildCustomerPackagePreviewSummary(
               handlerAllowedLabel: CUSTOMER_PACKAGE_HANDLER_FORBIDDEN_LABEL,
               customerPackageHandlerAllowed: false,
               blockedReasons: [...EXTENSION_RUNTIME_BLOCKERS],
-              note: '当前未声明扩展候选，也没有运行时扩展能力；新增扩展须先完成专项评审。',
+              note: '当前没有运行时扩展能力；有具体需求时先评审用途、影响和验证方式。',
             },
           ],
     compiledCatalogSummary: buildCompiledCatalogSummary(config),
-    importMappingCount: Array.isArray(config.importMappings)
-      ? config.importMappings.length
-      : 0,
     printTemplateDefaultCount: printTemplateDefaults.length,
     printTemplateDefaults: printTemplateDefaults.map((item) => ({
       templateKey: item.templateKey,
@@ -886,6 +898,9 @@ export function buildCustomerPackagePreviewSummary(
         Object.keys(item.partyDefaults || {}).length
       } 个默认方字段已登记`,
       partyDefaultKeys: Object.keys(item.partyDefaults || {}),
+      buyerCompany: typeof item.partyDefaults?.buyerCompany === 'string'
+        ? item.partyDefaults.buyerCompany.trim()
+        : '',
       runtimeConsumed: true,
       supplierDefaultsAllowed: false,
       supplierDefaultsAllowedLabel: '供应商快照受保护',
@@ -900,9 +915,8 @@ export function buildCustomerPackagePreviewSummary(
     moduleStateCatalogCount: moduleStateSummary.catalogModuleCount,
     moduleStateOverrideCount: moduleStateSummary.overrideCount,
     moduleStateUnknownOverrideCount: moduleStateSummary.unknownOverrideCount,
-    moduleStateCounts: moduleStateSummary.stateCounts,
     moduleStates: moduleStateSummary.moduleStates,
-    nonEnabledModuleStates: moduleStateSummary.nonEnabledModuleStates,
+    fieldVisibilityReview: buildFieldVisibilityReview(config, catalog),
     moduleStateSource: moduleStateSummary.source,
     boundaries,
     boundaryOk: allPackageBoundariesOk(boundaries),
@@ -1495,21 +1509,14 @@ export function buildCustomerPackageConsoleSummary({
 } = {}) {
   const fieldReviewCount = fieldNumberingSummary?.fieldCandidateCount || 0
   const workflowCount = customerPackageSummary?.workflowCount || 0
-  const processPolicyCount = customerPackageSummary?.processPolicyCount || 0
   const moduleStateCount = customerPackageSummary?.moduleStateCatalogCount || 0
   const moduleStateOverrideCount =
     customerPackageSummary?.moduleStateOverrideCount || 0
-  const moduleStateNonEnabledCount =
-    customerPackageSummary?.nonEnabledModuleStates?.length || 0
-  const menuItemCount = menuSummary?.itemCount || 0
   const printTemplateCount = printTemplateSummary?.templateCount || 0
   const printFieldTruthCount = printTemplateSummary?.fieldTruthCount || 0
   const printTemplateDefaultCount =
     customerPackageSummary?.printTemplateDefaultCount || 0
   const boundaryOk = customerPackageSummary?.boundaryOk === true
-  const policyBindingCount = customerPackageSummary?.processPolicyCount || 0
-  const extensionPointCount = customerPackageSummary?.extensionPointCount || 0
-  const importMappingCount = customerPackageSummary?.importMappingCount || 0
   const unregisteredStrategyCount =
     (customerPackageSummary?.unregisteredPolicyBindingCount || 0) +
     (customerPackageSummary?.unregisteredCommandBindingCount || 0)
@@ -1590,33 +1597,28 @@ export function buildCustomerPackageConsoleSummary({
         key: 'registered-package',
         label: '读取已登记客户包',
         status: 'passed',
-        note: '只读取 registry 已登记配置，不接上传入口。',
       },
       {
         key: 'schema-lint',
         label: '结构与禁止项校验',
         status: boundaryOk ? 'passed' : 'blocked',
-        note: packageQaCommand,
       },
       {
         key: 'diff-preview',
         label: '差异预览',
         status: 'preview_only',
-        note: `${menuItemCount} 个菜单项、${fieldReviewCount} 个字段候选、${moduleStateOverrideCount} 个模块状态覆盖、${printTemplateCount} 套打印模板进入人工评审。`,
       },
       {
         key: 'dry-run',
         label: '测试版页面试跑',
         status: importSummary?.canRunUiDryRun ? 'preview_only' : 'blocked',
-        note: '在开发页触发试跑，生成证据和报告，不写数据库。',
+        note: importSummary?.canRunUiDryRun ? '' : '当前客户包未开放样本试跑。',
       },
       {
         key: 'publish',
         label: '发布与回滚',
         status: canApplyTestConfig ? 'release_gate_required' : 'blocked',
-        note: canApplyTestConfig
-          ? '发布 / 激活 / 回滚都必须走发布证据；页面只提供命令复核，不提供裸回滚按钮。'
-          : testApplyNote,
+        note: canApplyTestConfig ? '' : testApplyNote,
       },
     ],
     reviewChecklist: [
@@ -1756,73 +1758,6 @@ export function buildCustomerPackageConsoleSummary({
         sourceLabel: importSummary?.sourceLabel,
       },
     ],
-    assetSummary: [
-      {
-        key: 'menus',
-        label: '菜单品牌',
-        value: menuItemCount,
-        unit: '项',
-        status: 'runtime_frontend_only',
-        note: `${menuSummary?.sectionCount || 0} 个分组，另有 ${menuSummary?.routeOnlyItemCount || 0} 个页内路由，只影响前端展示。`,
-      },
-      {
-        key: 'fields',
-        label: '字段编号',
-        value: fieldReviewCount,
-        unit: '项',
-        status: 'draft_only',
-        note: '运行时未启用，必须人工确认。',
-      },
-      {
-        key: 'workflows',
-        label: '工作流',
-        value: workflowCount,
-        unit: '条',
-        status: 'preview_only',
-        note: `${customerPackageSummary?.workflowNodeCount || 0} 个节点，不写事实。`,
-      },
-      {
-        key: 'module-states',
-        label: '模块状态',
-        value: moduleStateCount,
-        unit: '项',
-        status: 'preview_only',
-        note:
-          moduleStateNonEnabledCount > 0
-            ? `${moduleStateNonEnabledCount} 个非启用状态需要原因，编译到模块状态控制面。`
-            : `${moduleStateCount} 个模块默认启用，未声明关闭或只读覆盖。`,
-      },
-      {
-        key: 'print-templates',
-        label: '打印模板',
-        value: printTemplateCount,
-        unit: '套',
-        status: 'source_grounded',
-        note: `${printFieldTruthCount} 条字段真源；当前覆盖合同和工程资料打印模板。`,
-      },
-      {
-        key: 'print-template-defaults',
-        label: '打印默认方信息',
-        value: printTemplateDefaultCount,
-        unit: '条',
-        status:
-          printTemplateDefaultCount > 0
-            ? 'effective_session_projected'
-            : 'controlled_empty',
-        note:
-          printTemplateDefaultCount > 0
-            ? '客户包打印默认方信息通过有效配置投影供打印入口消费，不覆盖供应商快照。'
-            : '当前客户包未声明打印默认方信息。',
-      },
-      {
-        key: 'policies',
-        label: '策略预览',
-        value: processPolicyCount,
-        unit: '条',
-        status: 'preview_only',
-        note: '只允许绑定检查，不接收客户包代码。',
-      },
-    ],
     validationChecks: [
       {
         key: 'no-code-sql-secret',
@@ -1938,71 +1873,9 @@ export function buildCustomerPackageConsoleSummary({
         note: '受控回滚只切 active customer_config revision；库存流水、出货、财务和业务单据必须保留。',
       },
     ],
-    packageAssetScope: [
-      {
-        key: 'config-assets',
-        label: '配置资产',
-        value: menuItemCount + fieldReviewCount + moduleStateCount,
-        status: 'preview_only',
-        note: '菜单、字段显示、编号和模块状态只进入客户配置控制面。',
-      },
-      {
-        key: 'rule-assets',
-        label: '规则预览',
-        value: policyBindingCount,
-        status: 'preview_only',
-        note: '客户包只保留规则 / 策略声明和参数，当前仅预览，不执行策略。',
-      },
-      {
-        key: 'workflow-assets',
-        label: '流程编排',
-        value:
-          workflowCount +
-          (customerPackageSummary?.businessFlowCount || 0) +
-          (customerPackageSummary?.stateMachineCount || 0),
-        status: 'preview_only',
-        note: '协同流程、业务流转和状态机必须闭环，且不写业务事实。',
-      },
-      {
-        key: 'strategy-bindings',
-        label: '策略 / 命令声明',
-        value:
-          (customerPackageSummary?.strategyRegistryChecks || []).length +
-          (customerPackageSummary?.commandBindingChecks || []).length,
-        status: unregisteredStrategyCount > 0 ? 'blocked' : 'preview_only',
-        note: '此处只校验声明，不执行策略或命令；正式运行由产品核心已登记合同承接。',
-      },
-      {
-        key: 'extension-bindings',
-        label: '扩展候选',
-        value: extensionPointCount,
-        status:
-          unregisteredExtensionCount > 0
-            ? 'blocked'
-            : extensionPointCount > 0
-              ? 'contract_preview_only'
-              : 'controlled_empty',
-        note: '当前没有运行时扩展能力；候选只供评审，客户包不得携带或启用处理器。',
-      },
-      {
-        key: 'template-assets',
-        label: '模板资产',
-        value: printTemplateCount,
-        status: 'source_grounded',
-        note: '当前展示正式合同和工程资料打印模板字段真源。',
-      },
-      {
-        key: 'import-mapping-assets',
-        label: '导入映射',
-        value: importMappingCount,
-        status: 'report_gate_only',
-        note: '历史数据映射只进入试跑和执行报告；真实业务数据导入另开专项。',
-      },
-    ],
     registryChecks: [
       ...(customerPackageSummary?.strategyRegistryChecks || []),
       ...(customerPackageSummary?.commandBindingChecks || []),
-      ...(customerPackageSummary?.extensionRegistryChecks || []),
     ],
     versionAuditSupport: [
       {

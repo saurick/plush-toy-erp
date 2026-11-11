@@ -41,7 +41,7 @@ async function choose(page, root, label, value) {
 }
 
 export function createFilterConflictScenarios(deps) {
-  const { assert, path, outputDir, assertNoHorizontalOverflow } = deps
+  const { assert, path, outputDir, assertNoHorizontalOverflow, gotoScenarioPath } = deps
   const verifyProgress = (phone, name) => async (page) => {
     if (phone) await page.getByTestId('mobile-role-nav-progress').click()
     const panel = page.getByRole('region', { name: phone ? '手机进度看板' : '进度看板', exact: true })
@@ -324,6 +324,76 @@ export function createFilterConflictScenarios(deps) {
     },
   }
   const listFixture = createBusinessStatusCountsScenarios(deps).find((scenario) => scenario.name === 'business-status-counts-pages')
+  const productionDate = {
+    ...listFixture,
+    name: 'production-order-date-type-filter',
+    path: '/erp/production/orders?date_from=2026-09-21&date_to=2026-09-28&page=2',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
+      const trigger = page.locator('.erp-business-operation-panel').getByRole('button', { name: /^筛选(?:，已应用 \d+ 项)?$/u })
+      const types = filters.getByRole('group', { name: '日期类型', exact: true })
+      const start = types.getByRole('button', { name: '计划开始', exact: true })
+      const end = types.getByRole('button', { name: '计划结束', exact: true })
+      const from = filters.getByRole('textbox', { name: '开始日期', exact: true })
+      const to = filters.getByRole('textbox', { name: '结束日期', exact: true })
+      const waitForQuery = (predicate) => page.waitForResponse((response) => {
+        if (!response.url().endsWith('/rpc/production_order')) return false
+        const { method, params } = response.request().postDataJSON() || {}
+        return method === 'list_production_orders' && predicate(params)
+      })
+      const openFilters = async () => {
+        await trigger.click()
+        await waitForFilters(page, filters)
+      }
+      const readDates = () => Promise.all([from.inputValue(), to.inputValue()])
+      await openFilters()
+      assert.equal(await start.getAttribute('aria-pressed'), 'true')
+      assert.equal(await trigger.getAttribute('aria-label'), '筛选，已应用 1 项')
+      const initialDates = await readDates()
+      assert(initialDates.every(Boolean), '已保存日期应在两个输入框回显')
+      const bounds = await types.boundingBox()
+      const typeGroup = await types.elementHandle()
+      const [response] = await Promise.all([
+        waitForQuery((params) => params.date_field === 'planned_end_at'),
+        end.press('Space'),
+      ])
+      const { params } = response.request().postDataJSON()
+      assert(params.date_from > 0 && params.date_to > params.date_from, '切换后仍发送原范围')
+      assert.equal(params.offset ?? 0, 0, '切换日期字段返回第一页')
+      assert.equal(await end.getAttribute('aria-pressed'), 'true')
+      assert.equal(await start.getAttribute('aria-pressed'), 'false')
+      assert.deepEqual(await readDates(), initialDates)
+      assert.equal(await typeGroup.evaluate((node) => node.isConnected), true)
+      const nextBounds = await types.boundingBox()
+      assert(Object.keys(bounds).every((key) => Math.abs(bounds[key] - nextBounds[key]) <= 1), '切换时日期选项保持原位')
+      await filters.getByRole('button', { name: '完成', exact: true }).click()
+      await filters.waitFor({ state: 'hidden' })
+
+      await page.setViewportSize({ width: 390, height: 844 })
+      await openFilters()
+      assert.equal(await end.getAttribute('aria-pressed'), 'true')
+      assert.deepEqual(await readDates(), initialDates)
+      const labels = filters.locator('.erp-business-date-range-filter__separator:visible')
+      assert.deepEqual(await labels.allTextContents(), ['从', '至'])
+      assert.equal(await filters.evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true)
+      await assertNoHorizontalOverflow(page, '生产订单日期筛选窄屏')
+      await page.screenshot({ path: path.join(outputDir, 'production-order-date-type-filter-narrow.png') })
+      await Promise.all([
+        waitForQuery((params) => params.date_field === 'planned_start_at' && !params.date_from && !params.date_to),
+        filters.getByRole('button', { name: '清空筛选', exact: true }).click(),
+      ])
+      assert.deepEqual(await readDates(), ['', ''])
+      assert.equal(await start.getAttribute('aria-pressed'), 'true')
+      assert.equal(await trigger.getAttribute('aria-label'), '筛选')
+
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', { waitUntil: 'domcontentloaded' })
+      await openFilters()
+      await filters.getByRole('combobox', { name: '日期类型', exact: true }).waitFor()
+      assert.equal(await types.count(), 0, '销售订单仍用共享日期下拉')
+    },
+  }
   const lifecycle = [
     { key: 'sales', url: '/erp/sales/project-orders/sales-orders', method: 'list_sales_orders', field: 'lifecycle_status', group: '销售订单状态' },
     { key: 'purchase', url: '/erp/purchase/accessories', method: 'list_purchase_orders', field: 'lifecycle_status', group: '采购订单状态' },
@@ -363,7 +433,7 @@ export function createFilterConflictScenarios(deps) {
       }
       if (config.group) {
         await openFilters()
-        await choose(page, filters, '记录范围', '全部记录')
+        await choose(page, filters, '记录范围', '不限')
         await filters.getByRole('button', { name: '完成', exact: true }).click()
         const group = page.getByRole('group', { name: config.group, exact: true })
         const selectedStatus = group.getByRole('button', { pressed: true })
@@ -383,13 +453,13 @@ export function createFilterConflictScenarios(deps) {
         assert.equal(page.filterQueries.at(-1)[config.field], 'draft', '合法缓存状态仍需保留')
         assert.equal(await operation.getByRole('button', { name: '清空筛选', exact: true }).count(), 0, '仅快捷状态不显示额外条件清空入口')
         await openFilters()
-        await Promise.all([response(), choose(page, filters, '记录范围', '全部记录')])
+        await Promise.all([response(), choose(page, filters, '记录范围', '不限')])
         await filters.getByRole('button', { name: '完成', exact: true }).click()
       } else {
         await openFilters()
         assert(page.filterQueries.length > 0)
         assert(page.filterQueries.every((query) => !query[config.field]), '冲突链接不能发送范围外状态')
-        await Promise.all([response(), choose(page, filters, '记录范围', '全部记录')])
+        await Promise.all([response(), choose(page, filters, '记录范围', '不限')])
         assert.equal(page.filterQueries.at(-1)[config.field] || '', '')
         await page.reload()
         await openFilters()
@@ -458,5 +528,5 @@ export function createFilterConflictScenarios(deps) {
       await assertNoHorizontalOverflow(page, '桌面任务日期筛选')
     },
   }
-  return [...mobile, progress, taskDates, productionOnly, ...tracking, controls, ...lifecycle]
+  return [...mobile, progress, taskDates, productionOnly, ...tracking, controls, productionDate, ...lifecycle]
 }

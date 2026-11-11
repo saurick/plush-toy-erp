@@ -31,6 +31,7 @@ import {
   financeInvoiceCategoryText,
   financePaymentTermText,
 } from '../../utils/financeFactDisplay.mjs'
+import { normalizeNumeric20Scale6 } from '../../utils/numeric20Scale6.mjs'
 import {
   ACTION_PERMISSIONS,
   FINANCE_INVOICE_CATEGORY_LABELS,
@@ -122,6 +123,7 @@ const FINANCE_COLUMN_KEYS_BY_FACT_TYPE = Object.freeze({
   RECEIVABLE: Object.freeze([
     'counterparty',
     'amount',
+    'outstanding_amount',
     'fee_amount',
     'currency',
     'payment_term',
@@ -130,6 +132,7 @@ const FINANCE_COLUMN_KEYS_BY_FACT_TYPE = Object.freeze({
   PAYABLE: Object.freeze([
     'counterparty',
     'amount',
+    'outstanding_amount',
     'fee_amount',
     'currency',
     'payment_term',
@@ -148,6 +151,10 @@ const FINANCE_COLUMN_KEYS_BY_FACT_TYPE = Object.freeze({
     'currency',
   ]),
 })
+
+function formatAccountAmount(value) {
+  return normalizeNumeric20Scale6(value) || '—'
+}
 
 const FINANCE_COUNTERPARTY_COLUMN_TITLES = Object.freeze({
   RECEIVABLE: '客户',
@@ -199,6 +206,33 @@ function subjectColumnText(record = {}, options = {}) {
     )),
     normalizeText(record.sku_code_snapshot),
   ].filter(Boolean).join(' ')
+}
+
+export function operationalFactProductID(view, record) {
+  if (record?.subject_type !== 'PRODUCT' || !(record.subject_id > 0)) return 0
+  if (view === 'production' && ['FINISHED_GOODS_RECEIPT', 'REWORK'].includes(record.fact_type)) {
+    return record.subject_id
+  }
+  return view === 'outsourcing' && record.fact_type === 'RETURN_RECEIPT'
+    ? record.subject_id
+    : 0
+}
+
+function renderOperationalFactSubject(view, record, detail = false) {
+  const productId = operationalFactProductID(view, record)
+  if (!productId || (view === 'production' && !detail && record.status !== OperationalFactStatus.DRAFT)) {
+    return subjectColumnText(record)
+  }
+  const code = normalizeText(record.subject_code)
+  const name = normalizeText(record.subject_name) || code || '产品已关联'
+  return React.createElement(
+    ProductIdentity,
+    { productId, name },
+    React.createElement(BusinessCellStack, {
+      primary: name,
+      secondary: [code !== name ? code : '', normalizeText(record.sku_code_snapshot)].filter(Boolean).join(' · '),
+    })
+  )
 }
 
 function stockContextParts(record = {}, options = {}) {
@@ -414,10 +448,12 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       defaultPriority: 40,
       title: '产品 / 材料',
       exportTitle: '产品 / 材料',
-      width: 150,
+      width: 260,
+      className: 'erp-product-identity-cell',
       sortValue: subjectColumnText,
-      render: (_, record) => subjectColumnText(record),
+      render: (_, record) => renderOperationalFactSubject(activeKey, record),
       detailLabel: (record) => businessSubjectLabel(record?.subject_type, '业务对象'),
+      detailValue: (record) => renderOperationalFactSubject(activeKey, record, true),
       exportValue: (record) => subjectColumnText(record, { emptyText: '' }),
     },
     {
@@ -490,6 +526,8 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
   ]
 
   const normalizedFinanceFactType = normalizeFinanceFactType(financeFactType)
+  const isReceivableOrPayable = ['RECEIVABLE', 'PAYABLE'].includes(normalizedFinanceFactType)
+  const amountTitle = isReceivableOrPayable ? '原金额' : '金额'
   const financeColumnByKey = {
     counterparty: {
       align: 'left',
@@ -506,15 +544,28 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
     amount: {
       align: 'right',
       defaultPriority: 50,
-      title: '金额',
-      exportTitle: '金额',
+      title: amountTitle,
+      exportTitle: amountTitle,
       dataIndex: 'amount',
       width: 120,
       sorter: (left, right) =>
         compareOperationalFactDecimalValues(left?.amount, right?.amount),
-      render: formatQuantity,
+      render: isReceivableOrPayable ? formatAccountAmount : formatQuantity,
       exportValue: (record) => (record?.amount ?? ''),
     },
+    ...(isReceivableOrPayable ? {
+      outstanding_amount: {
+        align: 'right',
+        defaultPriority: 55,
+        title: '未结金额',
+        dataIndex: 'outstanding_amount',
+        width: 125,
+        sorter: (left, right) =>
+          compareOperationalFactDecimalValues(left?.outstanding_amount, right?.outstanding_amount),
+        render: formatAccountAmount,
+        exportValue: (record) => (record?.outstanding_amount ?? ''),
+      },
+    } : {}),
     fee_amount: {
       defaultHidden: true,
       align: 'right',

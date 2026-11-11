@@ -20,8 +20,6 @@ const ALLOWED_MODES = Object.freeze([
   "activate",
   "rollback",
 ]);
-const ALLOWED_MODULE_STATES = new Set(["enabled", "read_only", "disabled"]);
-
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
@@ -95,10 +93,10 @@ function validateModuleStates(config, moduleKeys) {
     seen.add(item.moduleKey);
     assertNonEmptyString(item.state, `${path}.state`);
     assert(
-      ALLOWED_MODULE_STATES.has(item.state),
+      Object.hasOwn(customerPackageSchema.moduleStates, item.state),
       `${path}.state must be enabled, read_only or disabled`,
     );
-    if (item.state !== "enabled") {
+    if (item.state !== customerPackageSchema.defaultModuleState) {
       assertNonEmptyString(item.reason, `${path}.reason`);
     }
   });

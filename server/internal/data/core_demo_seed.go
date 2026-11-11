@@ -368,16 +368,24 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 }
 
 func SeedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoReferenceSeedDataset) (*CoreDemoSeedResult, error) {
-	return seedCoreDemoReferences(ctx, db, dataset, true)
+	return seedCoreDemoReferences(ctx, db, dataset, coreReferencesRetireLegacy)
 }
 
 // SeedScenarioDemoReferences prepares the current batch in a shared development
 // database. Earlier references may be used by manual work and remain untouched.
 func SeedScenarioDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoReferenceSeedDataset) (*CoreDemoSeedResult, error) {
-	return seedCoreDemoReferences(ctx, db, dataset, false)
+	return seedCoreDemoReferences(ctx, db, dataset, coreReferencesMissingOnly)
 }
 
-func seedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoReferenceSeedDataset, retireLegacy bool) (*CoreDemoSeedResult, error) {
+type coreReferenceMode int
+
+const (
+	coreReferencesPreserveLegacy coreReferenceMode = iota
+	coreReferencesRetireLegacy
+	coreReferencesMissingOnly
+)
+
+func seedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoReferenceSeedDataset, mode coreReferenceMode) (*CoreDemoSeedResult, error) {
 	if db == nil {
 		return nil, ErrCoreDemoSeedMissingDB
 	}
@@ -391,7 +399,7 @@ func seedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoRef
 	}
 	defer rollbackSQLTx(ctx, tx, nil)
 
-	result, err := reconcileCoreDemoReferencesInTx(ctx, tx, dataset, retireLegacy)
+	result, err := reconcileCoreDemoReferencesInTx(ctx, tx, dataset, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +424,7 @@ func seedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoRef
 // checks; this function only writes the exact current allowlist and retires
 // exact previously managed references.
 func ReconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset CoreDemoReferenceSeedDataset) (*CoreDemoSeedResult, error) {
-	return reconcileCoreDemoReferencesInTx(ctx, tx, dataset, true)
+	return reconcileCoreDemoReferencesInTx(ctx, tx, dataset, coreReferencesRetireLegacy)
 }
 
 // ReconcilePreservedCoreReferencesInTx writes only the exact current
@@ -424,10 +432,10 @@ func ReconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset Co
 // ordinary deployments and one-shot foundation preparation must not retire
 // older or manually maintained references.
 func ReconcilePreservedCoreReferencesInTx(ctx context.Context, tx *sql.Tx, dataset CoreDemoReferenceSeedDataset) (*CoreDemoSeedResult, error) {
-	return reconcileCoreDemoReferencesInTx(ctx, tx, dataset, false)
+	return reconcileCoreDemoReferencesInTx(ctx, tx, dataset, coreReferencesPreserveLegacy)
 }
 
-func reconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset CoreDemoReferenceSeedDataset, retireLegacy bool) (*CoreDemoSeedResult, error) {
+func reconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset CoreDemoReferenceSeedDataset, mode coreReferenceMode) (*CoreDemoSeedResult, error) {
 	if tx == nil {
 		return nil, ErrCoreDemoSeedMissingDB
 	}
@@ -445,21 +453,25 @@ func reconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset Co
 		RetiredUnitIDs:      map[string]int{},
 		RetiredWarehouseIDs: map[string]int{},
 	}
+	writeUnit, writeWarehouse := upsertCoreDemoUnit, upsertCoreDemoWarehouse
+	if mode == coreReferencesMissingOnly {
+		writeUnit, writeWarehouse = ensureScenarioDemoUnit, ensureScenarioDemoWarehouse
+	}
 	for _, unit := range dataset.Units {
-		id, err := upsertCoreDemoUnit(ctx, tx, unit)
+		id, err := writeUnit(ctx, tx, unit)
 		if err != nil {
 			return nil, err
 		}
 		result.UnitIDs[unit.Code] = id
 	}
 	for _, warehouse := range dataset.Warehouses {
-		id, err := upsertCoreDemoWarehouse(ctx, tx, warehouse)
+		id, err := writeWarehouse(ctx, tx, warehouse)
 		if err != nil {
 			return nil, err
 		}
 		result.WarehouseIDs[warehouse.Code] = id
 	}
-	if retireLegacy {
+	if mode == coreReferencesRetireLegacy {
 		if err := retireLegacyCoreDemoReferences(ctx, tx, result); err != nil {
 			return nil, err
 		}
@@ -472,6 +484,42 @@ func reconcileCoreDemoReferencesInTx(ctx context.Context, tx *sql.Tx, dataset Co
 		}
 	}
 	return result, nil
+}
+
+func ensureScenarioDemoUnit(ctx context.Context, tx *sql.Tx, unit CoreDemoUnitSeed) (int, error) {
+	var id int
+	err := tx.QueryRowContext(ctx, `
+INSERT INTO units (code, name, precision, is_active, created_at, updated_at)
+VALUES ($1, $2, $3, TRUE, NOW(), NOW())
+ON CONFLICT (code) DO NOTHING
+RETURNING id`, unit.Code, unit.Name, unit.Precision).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = tx.QueryRowContext(ctx, `
+SELECT id FROM units WHERE code = $1 AND name = $2 AND precision = $3 AND is_active IS TRUE FOR SHARE`,
+			unit.Code, unit.Name, unit.Precision).Scan(&id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("%w: unit %q differs from the expected active reference", ErrCoreDemoSeedInvalidRecord, unit.Code)
+		}
+	}
+	return id, err
+}
+
+func ensureScenarioDemoWarehouse(ctx context.Context, tx *sql.Tx, warehouse CoreDemoWarehouseSeed) (int, error) {
+	var id int
+	err := tx.QueryRowContext(ctx, `
+INSERT INTO warehouses (code, name, type, is_active, created_at, updated_at)
+VALUES ($1, $2, $3, TRUE, NOW(), NOW())
+ON CONFLICT (code) DO NOTHING
+RETURNING id`, warehouse.Code, warehouse.Name, warehouse.Type).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = tx.QueryRowContext(ctx, `
+SELECT id FROM warehouses WHERE code = $1 AND name = $2 AND type = $3 AND is_active IS TRUE FOR SHARE`,
+			warehouse.Code, warehouse.Name, warehouse.Type).Scan(&id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("%w: warehouse %q differs from the expected active reference", ErrCoreDemoSeedInvalidRecord, warehouse.Code)
+		}
+	}
+	return id, err
 }
 
 func retireLegacyCoreDemoReferences(ctx context.Context, tx *sql.Tx, result *CoreDemoSeedResult) error {

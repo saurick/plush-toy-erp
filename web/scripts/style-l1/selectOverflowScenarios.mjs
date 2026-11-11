@@ -1,4 +1,4 @@
-import { assertSingleSelectValues } from './singleSelectAssertions.mjs'
+import { assertSingleSelectValues, readSelectPopup } from './singleSelectAssertions.mjs'
 import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertProductFieldLayout } from './productFieldLayoutAssertions.mjs'
@@ -28,14 +28,20 @@ export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverfl
       await assertSingleSelectValues(sample, '长引用初始显示', 6)
       assert(!(await control('第 1 行 SKU').innerText()).includes('EXPORT-PACK'), '规格编码留在候选项，不混入已选名称')
 
-      await warehouse.getByRole('combobox').fill('FINISHED')
+      await warehouse.getByRole('combobox').press('ArrowDown')
       const menu = page.locator('.ant-select-dropdown:visible')
       await menu.locator('.ant-select-item-option').first().waitFor()
       await waitForFiniteAnimations(page)
-      assert((await menu.boundingBox()).width >= 559, '业务引用候选列表独立加宽到 560px')
+      const fitted = await readSelectPopup(menu)
+      const labelWidth = Math.max(...fitted.options.map(({ textWidth }) => textWidth))
+      const fieldWidth = (await warehouse.boundingBox()).width
+      assert(fitted.width > fieldWidth && fitted.width <= Math.max(fieldWidth, labelWidth) + 50,
+        `长名称按内容加宽，保留正常留白：${JSON.stringify({ fitted, labelWidth, fieldWidth })}`)
+      await warehouse.getByRole('combobox').fill('FINISHED')
       const option = menu.getByText('成品仓 · 东莞二厂 B 区出口订单待出货产品与独立包装存放区 WH-FINISHED-02', { exact: true })
       const optionSize = await option.evaluate((node) => ({ client: node.clientWidth, scroll: node.scrollWidth, clientHeight: node.clientHeight, scrollHeight: node.scrollHeight }))
       assert(optionSize.scroll <= optionSize.client + 1 && optionSize.scrollHeight <= optionSize.clientHeight + 1, '候选选项完整换行')
+      assert(Math.abs((await menu.boundingBox()).width - fitted.width) <= 1, '筛选不重新定宽')
       await option.click()
       await menu.waitFor({ state: 'hidden' })
       assert.equal(await control('第 1 行批次').locator('.ant-select-selection-item').count(), 0, '更换仓库清空原批次')
@@ -47,7 +53,8 @@ export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverfl
       assert.equal(await warehouse.locator('.ant-select-selection-item').count(), 0)
       await warehouse.getByRole('combobox').press('ArrowDown')
       await menu.locator('.ant-select-item-option').first().waitFor()
-      assert((await menu.boundingBox()).width >= 559, '空值选择框仍提供完整宽度的候选列表')
+      await waitForFiniteAnimations(page)
+      assert(Math.abs((await menu.boundingBox()).width - fitted.width) <= 1, '清空选中值后，仍按同一组候选定宽')
       await warehouse.getByRole('combobox').press('Escape')
       await menu.waitFor({ state: 'hidden' })
       await sample.getByRole('button', { name: '恢复初始内容', exact: true }).click()

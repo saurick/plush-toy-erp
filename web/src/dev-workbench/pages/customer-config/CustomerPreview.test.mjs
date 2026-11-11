@@ -22,21 +22,25 @@ async function render(prepare) {
   }
 }
 
-test('customer preview preserves every original field and defaults its original disclosures to open', async () => {
+test('customer preview shows the complete primary lists and opens the requested print evidence', async () => {
   const { AssetsPanel } = await import('./AssetsPanel.jsx')
   const { statusText } = await import('./presentation.jsx')
   const { buildCustomerConfigDevOverviewFromSearch } = await import('../../config/devCustomerConfig.mjs')
   const overview = buildCustomerConfigDevOverviewFromSearch('customer=yoyoosun')
   await render(async ({ container, update }) => {
     await update(h(AssetsPanel, overview))
-    const menuItems = [...container.querySelectorAll('.erp-dev-customer-menu-group__items .erp-dev-customer-menu-item')]
-    assert.equal(menuItems.length, overview.menuSummary.sections.reduce((total, section) => total + section.items.length, 0))
-    assert(menuItems.every((item) => item.closest('details').open && Boolean(item.querySelector('code'))))
-    const panels = [...container.querySelectorAll('details.erp-dev-customer-disclosure')]
-    for (const label of ['字段显示候选', '编号规则候选', '打印模板字段']) {
-      const panel = panels.find((node) => node.querySelector('summary').textContent.includes(label))
-      assert(Boolean(panel?.open), `${label} is readable by default and can still be collapsed`)
-      assert.equal(panel.hasAttribute('name'), false, 'opening one panel must not close another')
+    const menu = container.querySelector('table[aria-label="菜单分组与页面"]')
+    assert.equal(menu.querySelectorAll('tbody tr').length, overview.menuSummary.sections.length)
+    assert.equal(menu.querySelectorAll('li').length, overview.menuSummary.itemCount)
+    assert.equal(menu.querySelectorAll('code').length, 0)
+    await act(() => container.querySelector('input[type="checkbox"]').click())
+    assert.deepEqual(
+      [...menu.querySelectorAll('code')].map((item) => item.textContent),
+      overview.menuSummary.sections.flatMap((section) => section.items)
+    )
+    for (const label of ['字段显示候选', '编号规则候选', '打印模板清单']) {
+      const table = container.querySelector(`table[aria-label="${label}"]`)
+      assert(table && !table.closest('details'), `${label} is readable immediately`)
     }
     for (const candidate of overview.fieldNumberingSummary.fieldCandidates) {
       for (const value of [candidate.label, candidate.moduleLabel, candidate.decisionLabel, candidate.fieldKeyLabel, candidate.sourceLabel, candidate.note]) {
@@ -48,13 +52,28 @@ test('customer preview preserves every original field and defaults its original 
         assert(container.textContent.includes(value), `numbering content retained: ${value}`)
       }
     }
+    const prints = container.querySelector('table[aria-label="打印模板清单"]')
+    assert.equal(prints.querySelectorAll('tbody tr').length, overview.printTemplateSummary.templates.length)
+    assert.equal(prints.querySelectorAll('section').length, 0)
     for (const template of overview.printTemplateSummary.templates) {
-      for (const value of [template.title, template.category, statusText(template.readiness), template.templateKeyLabel, template.fieldTruthCountLabel, template.fieldRequirementCountLabel, template.factBoundaryLabel, ...template.fieldTruth]) {
-        assert(container.textContent.includes(value), `template content retained: ${value}`)
+      const option = prints.querySelector(`button[aria-label="${template.title}字段依据"]`)
+      assert(Boolean(option))
+      const row = option.closest('tr')
+      for (const value of [template.title, template.category, statusText(template.readiness), template.fieldTruthCountLabel, template.fieldRequirementCountLabel, template.factBoundaryLabel]) {
+        assert(row.textContent.includes(value), `template summary retained: ${value}`)
+      }
+      await act(() => option.click())
+      const detail = prints.querySelector(`section[aria-label="${template.title}字段依据"]`)
+      assert(Boolean(detail))
+      assert.equal(option.getAttribute('aria-expanded'), 'true')
+      assert.equal(prints.querySelectorAll('section').length, 1)
+      assert(detail.parentElement.textContent.includes(template.templateKeyLabel))
+      for (const value of template.fieldTruth) {
+        assert(detail.textContent.includes(value), `template content retained: ${value}`)
       }
       for (const item of template.fieldRequirementItems) {
         for (const value of [item.label, item.requirementKeyLabel, item.sourceLabel, item.boundary]) {
-          assert(container.textContent.includes(value), `template requirement retained: ${value}`)
+          assert(detail.textContent.includes(value), `template requirement retained: ${value}`)
         }
       }
     }
@@ -65,7 +84,7 @@ test('customer preview preserves every original field and defaults its original 
       fieldNumberingSummary: { ...overview.fieldNumberingSummary, fieldCandidates: [], numberingRules: [] },
       printTemplateSummary: { templates: [] },
     }))
-    assert.equal(container.querySelectorAll('.erp-dev-customer-field, .erp-dev-customer-numbering, .erp-dev-customer-tool, .erp-dev-customer-menu-item').length, 0)
+    assert.equal(container.querySelectorAll('table, .erp-dev-customer-menu-item').length, 0)
   })
 })
 
@@ -94,6 +113,8 @@ test('configuration boundary failures are visible with actual and required value
   const props = {
     consoleSummary: overview.packageConsoleSummary,
     customerPackageSummary: { ...overview.customerPackageSummary, boundaries: [boundary] },
+    menuSummary: overview.menuSummary,
+    fieldNumberingSummary: overview.fieldNumberingSummary,
     activeSection: 'package',
     onSectionChange() {},
   }
@@ -104,11 +125,50 @@ test('configuration boundary failures are visible with actual and required value
     for (const text of ['候选配置对象范围', '包含未登记对象', '仅允许已登记配置对象']) {
       assert(alert.textContent.includes(text), `${text} is visible without opening guidance`)
     }
-    assert.equal(container.querySelector('.erp-dev-static-guidance').open, false)
+    await update(h(PreflightPanel, { ...props, activeSection: 'evidence' }))
+    assert.match(container.querySelector('[role="alert"]').textContent, /包含未登记对象.*仅允许已登记配置对象/u)
     await update(h(PreflightPanel, {
       ...props,
+      activeSection: 'evidence',
       customerPackageSummary: { ...props.customerPackageSummary, boundaries: [{ ...boundary, ok: true }] },
     }))
     assert.equal(Boolean(container.querySelector('.erp-workbench-notice[role="alert"]')), false)
+  })
+})
+
+test('runtime settings and the comparison both show real overrides and clear them on source changes', async () => {
+  const { RuntimeSettings } = await import('./RuntimeSettings.jsx')
+  const { DiffPanel } = await import('./DiffPanel.jsx')
+  const { buildCustomerConfigDevOverviewFromSearch } = await import('../../config/devCustomerConfig.mjs')
+  const overview = buildCustomerConfigDevOverviewFromSearch('customer=yoyoosun')
+  const base = overview.customerPackageSummary
+  const [module, ...otherModules] = base.moduleStates
+  const changed = {
+    ...base,
+    moduleStateOverrideCount: 1,
+    moduleStates: [
+      { ...module, state: 'read_only', stateLabel: '只读', overridden: true, sourceLabel: '客户包覆盖', reason: '样本原因' },
+      ...otherModules,
+    ],
+  }
+
+  await render(async ({ container, update }) => {
+    await update(h(RuntimeSettings, { summary: changed }))
+    const moduleRows = () => [...container.querySelectorAll('table[aria-label="模块候选取值"] tbody tr')]
+      .filter((row) => !row.closest('details'))
+    assert.equal(moduleRows().length, base.moduleStates.length)
+    assert.match(moduleRows()[0].textContent, /只读客户包覆盖样本原因/u)
+    await update(h(RuntimeSettings, { summary: base }))
+    assert.equal(moduleRows().length, base.moduleStates.length)
+    assert.doesNotMatch(container.textContent, /样本原因/u)
+
+    const diff = (summary) => h(DiffPanel, { consoleSummary: overview.packageConsoleSummary, customerPackageSummary: summary })
+    await update(diff(changed))
+    const values = () => container.querySelector('table[aria-label="模块与列表字段候选取值"] tbody')
+    assert.match(values().firstElementChild.textContent, /启用只读客户包覆盖样本原因/u)
+    assert.equal(values().querySelectorAll('tr').length, base.moduleStates.length + base.fieldVisibilityReview.length)
+    await update(diff(base))
+    assert.doesNotMatch(values().textContent, /样本原因/u)
+    assert.equal(values().querySelectorAll('tr').length, base.moduleStates.length + base.fieldVisibilityReview.length)
   })
 })

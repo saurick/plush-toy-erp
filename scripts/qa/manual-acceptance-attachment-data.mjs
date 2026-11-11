@@ -8,6 +8,8 @@ import {
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { createSyntheticSourceFixture } from "../import/fixtures/synthetic/createSyntheticSourceFixture.mjs";
+import { buildManualAcceptanceImageEvidence } from "./manual-acceptance-image-evidence.mjs";
+import { MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT } from "./manual-acceptance-task-board-data.mjs";
 
 import {
   CUSTOMER_TRIAL_133_TARGET,
@@ -440,15 +442,23 @@ export function buildAttachmentTargets({
   ];
 }
 
-export function selectAttachmentWorkflowTask(tasks = [], { taskCode } = {}) {
+export function selectAttachmentWorkflowTask(tasks = [], { taskCode, daily = null } = {}) {
   if (typeof taskCode !== "string" || !taskCode.trim()) return undefined;
   return (Array.isArray(tasks) ? tasks : []).find((item) =>
     item?.task_code === taskCode &&
-    item?.task_group === "trial_pmc_work" &&
     item?.task_status_key === "ready" &&
     item?.owner_role_key === "pmc" &&
-    !item?.source_type && !item?.source_id,
+    (daily
+      ? item.id === daily.id && item.task_group === "business_followup" &&
+        item.source_type === daily.sourceType && item.source_id === daily.sourceID
+      : item?.task_group === "trial_pmc_work" && !item?.source_type && !item?.source_id),
   );
+}
+
+function attachmentDailyWorkflowSample(taskReport) {
+  return taskReport?.dailyTaskBoard?.contract === MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT
+    ? taskReport.dailyTaskBoard.samples.find((sample) => sample.role === "pmc" && sample.status === "ready")
+    : null;
 }
 
 export function attachmentWorkflowTaskCodeForReport(taskReport) {
@@ -464,6 +474,11 @@ export function attachmentWorkflowTaskCodeForReport(taskReport) {
   ]) {
     if (taskReport?.[key] !== identity[key])
       throw new Error(`task report batch identity drifted: ${key}`);
+  }
+  if (taskReport.dailyTaskBoard) {
+    const sample = attachmentDailyWorkflowSample(taskReport);
+    if (!sample?.taskCode || !sample.sourceID) throw new Error("daily PMC attachment task has no ready source sample");
+    return sample.taskCode;
   }
   return `${getManualAcceptanceTaskVisibleCodePrefix("pmc", taskReport.taskProfile)}-01`;
 }
@@ -627,16 +642,19 @@ export async function applyAttachmentData({
   });
   const workflowTask = selectAttachmentWorkflowTask(taskList.tasks, {
     taskCode: workflowTaskCode,
+    daily: attachmentDailyWorkflowSample(taskReport),
   });
-  const targets = buildAttachmentTargets({
-    sourceReport,
-    factReport,
-    workflowTask,
-  });
+  const targets = [
+    ...buildAttachmentTargets({ sourceReport, factReport, workflowTask }),
+    ...buildManualAcceptanceImageEvidence({ sourceReport, factReport }),
+  ];
   const fixtures = buildAttachmentFixtures();
   const steps = [];
   for (const target of targets) {
-    const actorToken = actorTokens[target.owner_type];
+    const actorToken = target.imageEvidence
+      ? runtimeAdminToken
+      : actorTokens[target.owner_type];
+    const selectedFixtures = target.fixtures || fixtures.slice(0, target.files);
     const listed = await rpc({
       backendURL,
       domain: "attachment",
@@ -653,7 +671,7 @@ export async function applyAttachmentData({
       }
       existing.set(listedItem.file_name, listedItem);
     }
-    for (const item of fixtures.slice(0, target.files)) {
+    for (const item of selectedFixtures) {
       let attachment = existing.get(item.file_name);
       let operation = "reuse";
       if (!attachment) {
@@ -670,7 +688,7 @@ export async function applyAttachmentData({
               ...(target.expected_version
                 ? { expected_version: target.expected_version }
                 : {}),
-              attachment_type: "manual_acceptance_evidence",
+              attachment_type: item.attachmentType || "manual_acceptance_evidence",
               file_name: item.file_name,
               mime_type: item.mime_type,
               content_base64: item.content.toString("base64"),
@@ -698,6 +716,13 @@ export async function applyAttachmentData({
         attachment,
         downloadedAttachment: downloaded.attachment,
       });
+      if (item.attachmentType && (
+        attachment.attachment_type !== item.attachmentType ||
+        downloaded.attachment.attachment_type !== item.attachmentType ||
+        attachment.withdrawn_at
+      )) {
+        throw new Error(`${item.file_name} is not an active ${item.attachmentType} attachment`);
+      }
       steps.push({
         ownerType: target.owner_type,
         ownerId: target.owner_id,
@@ -709,6 +734,9 @@ export async function applyAttachmentData({
         sha256: integrity.sha256,
         operation,
         actor: target.owner_type === "workflow_task" ? pmcUsername : "admin",
+        ...(target.imageEvidence
+          ? { imageEvidence: target.imageEvidence, attachmentType: item.attachmentType }
+          : {}),
       });
     }
     const verified = await rpc({
@@ -720,7 +748,7 @@ export async function applyAttachmentData({
     });
     if (
       (verified.attachments || []).filter((item) =>
-        fixtures.some(
+        selectedFixtures.some(
           (fixtureItem) => fixtureItem.file_name === item.file_name,
         ),
       ).length < target.files

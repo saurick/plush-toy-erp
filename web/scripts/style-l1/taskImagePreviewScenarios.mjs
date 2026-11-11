@@ -5,6 +5,7 @@ import { createMobileTouchSession } from './mobileGestureAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const productName = '图片预览模拟长耳兔抱枕（可拆卸围巾礼盒款）'
+const auxiliaryProductName = '图片预览模拟小鹿'
 const previewButtonName = `查看${productName}大图`
 const stageSelector = '.erp-task-image-preview__stage'
 const mobilePermissions = [
@@ -40,7 +41,8 @@ const fixture = {
       {
         kind: 'product',
         product_id: 8,
-        name: '图片预览模拟小鹿',
+        has_product_images: true,
+        name: auxiliaryProductName,
         code: 'PRODUCT-8',
       },
     ],
@@ -87,6 +89,7 @@ async function installPreviewImage(page) {
   })
   page.__previewProbe = {
     reads: [],
+    albumReads: [],
     fail: false,
     corrupt: false,
     hold: false,
@@ -94,10 +97,22 @@ async function installPreviewImage(page) {
   }
   await page.route('**/rpc/attachment', async (route) => {
     const body = route.request().postDataJSON()
-    if (body.method !== 'download_attachment' || body.params.id !== 8801) {
+    const probe = page.__previewProbe
+    if (body.method === 'list_attachments' && body.params.owner_type === 'product' && [7, 8].includes(body.params.owner_id)) {
+      const ownerID = body.params.owner_id
+      probe.albumReads.push(ownerID)
+      return route.fulfill({
+        json: { jsonrpc: '2.0', id: body.id, result: { code: 0, data: {
+          attachments: [{
+            id: ownerID === 7 ? 8801 : 8802, owner_type: 'product', owner_id: ownerID,
+            attachment_type: 'product_image', slot_key: ownerID === 7 ? 'primary' : 'secondary', mime_type: 'image/png',
+          }],
+        } } },
+      })
+    }
+    if (body.method !== 'download_attachment' || ![8801, 8802].includes(body.params.id)) {
       return route.fallback()
     }
-    const probe = page.__previewProbe
     probe.reads.push(body.params.variant || 'original')
     const original = !body.params.variant
     const failed = original && probe.fail
@@ -118,9 +133,9 @@ async function installPreviewImage(page) {
             ? {}
             : {
                 attachment: {
-                  id: 8801,
+                  id: body.params.id,
                   owner_type: 'product',
-                  owner_id: 7,
+                  owner_id: body.params.id === 8801 ? 7 : 8,
                   mime_type: 'image/png',
                   content_base64: content,
                 },
@@ -171,6 +186,19 @@ async function assertLinkedItemsPreviewStability(page) {
       `打开和关闭大图时，关联产品文字位置与尺寸应保持稳定: ${JSON.stringify({ before, during, after })}`
     )
   }
+  await assertAuxiliaryOnlyPreview(page, association)
+}
+
+async function assertAuxiliaryOnlyPreview(page, association) {
+  const trigger = association.getByRole('button', { name: `查看产品图：${auxiliaryProductName}`, exact: true })
+  await trigger.waitFor()
+  assert.equal(await trigger.locator('img').count(), 0, '辅图不替代主图缩略图')
+  assert.equal(page.__previewProbe.albumReads.includes(8), false, '相册仅在打开时读取')
+  await trigger.click()
+  await waitImage(page)
+  await page.getByText('辅图 · 1 / 1 张', { exact: true }).waitFor()
+  await closePreview(page, trigger)
+  assert.equal(await association.isVisible(), true, '关闭相册保留关联产品列表')
 }
 
 async function assertPreview(
@@ -586,6 +614,8 @@ export function createTaskImagePreviewScenarios({
         await button.click()
         await waitImage(page)
         await closePreview(page, button)
+        await page.getByRole('button', { name: '查看2 款产品', exact: true }).click()
+        await assertAuxiliaryOnlyPreview(page, page.locator('.erp-task-linked-items-modal'))
       },
     },
   ]

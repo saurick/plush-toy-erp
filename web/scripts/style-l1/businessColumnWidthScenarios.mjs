@@ -1,18 +1,19 @@
 import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { selectWarehouseView } from './warehouseNavigationActions.mjs'
 import { clickERPThemeOption } from './themeAssertions.mjs'
+import { collapseBusinessSplit } from './businessSplitActions.mjs'
 import { assertNoHorizontalOverflow } from './pageAssertions.mjs'
 import { assertTableHeaderControlsFit } from './businessTableAssertions.mjs'
 
 const card = '.erp-business-data-table-card'
-const rowSelector = `${card} tbody tr[data-row-key]`
+const rowSelector = `${card} tbody tr[data-row-key]:visible`
 async function grid(page) {
   return page
-    .locator(`${card} .ant-table-wrapper`)
+    .locator(`${card} .ant-table-wrapper:visible`)
     .first()
     .evaluate(async (root) => {
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
@@ -24,7 +25,7 @@ async function grid(page) {
       const body = root.querySelector('tbody tr[data-row-key]')
       const content = root.querySelector('.ant-table-body, .ant-table-content')
       return {
-        availableWidth: root.parentElement.clientWidth,
+        availableWidth: root.closest('.erp-business-data-table-card').clientWidth,
         width: root.getBoundingClientRect().width,
         headerWidth: head.closest('table').getBoundingClientRect().width,
         tableWidth: root
@@ -36,6 +37,7 @@ async function grid(page) {
           label: cell.textContent.trim(),
           width: cell.getBoundingClientRect().width,
           bodyWidth: body?.children[index]?.getBoundingClientRect().width || 0,
+          align: getComputedStyle(cell).textAlign,
         })),
       }
     })
@@ -46,10 +48,10 @@ function assertStableGrid(before, after) {
     before.columns.map((column) => column.label)
   )
   for (let index = 0; index < before.columns.length; index += 1)
-    assert.ok(
+    { assert.ok(
       Math.abs(before.columns[index].width - after.columns[index].width) <= 1,
       `空态或加载不能改变列宽: ${JSON.stringify({ before: before.columns[index], after: after.columns[index] })}`
-    )
+    ) }
 }
 function assertAlignedGrid(result) {
   assert.ok(
@@ -69,16 +71,42 @@ function assertAlignedGrid(result) {
     `选择列保持固定宽度: ${JSON.stringify(result.columns[0])}`
   )
   for (const column of result.columns)
-    if (column.bodyWidth)
-      assert.ok(
+    { if (column.bodyWidth)
+      { assert.ok(
         Math.abs(column.width - column.bodyWidth) <= 1,
         `表头与表体列宽一致: ${JSON.stringify(column)}`
-      )
+      ) } }
 }
 async function exportCSV(page) {
   const pending = page.waitForEvent('download')
   await openBusinessTableTool(page, '导出筛选结果')
   return readFile(await (await pending).path(), 'utf8')
+}
+
+const productWidthBudget = {
+  产品编号: 150,
+  产品名称: 260,
+  状态: 90,
+  内部款号: 160,
+  客户款号: 160,
+  默认单位: 90,
+  '产品单重（净重）': 150,
+}
+
+function assertProductGrid(result) {
+  assertAlignedGrid(result)
+  const visible = result.columns.filter(({ label }) => label)
+  const budget = 52 + visible.reduce((sum, { label }) => sum + productWidthBudget[label], 0)
+  const weights = { 产品编号: 1, 产品名称: 2, 内部款号: 1, 客户款号: 1 }
+  const weightSum = visible.reduce((sum, { label }) => sum + (weights[label] || 0), 0)
+  const surplus = Math.max(0, result.width - budget)
+  assert.ok(Math.abs(result.tableWidth - Math.max(result.width, budget)) <= 1, JSON.stringify(result))
+  assert.equal(result.horizontalRange > 1, budget > result.width + 1)
+  for (const column of visible) {
+    const expected = productWidthBudget[column.label] + surplus * (weights[column.label] || 0) / weightSum
+    assert.ok(Math.abs(column.width - expected) <= 1, `${column.label} 宽度应约为 ${expected}：${column.width}`)
+  }
+  assert.equal(visible.find(({ label }) => label === '产品单重（净重）').align, 'right')
 }
 
 export function createBusinessColumnWidthScenarios({
@@ -91,7 +119,85 @@ export function createBusinessColumnWidthScenarios({
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 2,
   }
+  const longPaymentMethod = '银行电汇（核对到货资料后按双方约定的账款周期结算）'
   return [
+    {
+      ...common,
+      name: 'business-column-width-product-fit',
+      path: '/erp/master/products?catalog=products',
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/masterdata', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_products') return route.fallback()
+          const rows = params.keyword ? [] : [{
+            id: 1,
+            code: 'PROD-STYLE-L1',
+            name: '样式产品长名称，用于核对产品图片、名称换行和相邻款号列的宽度'.repeat(2),
+            style_no: 'BEAR-STYLE',
+            customer_style_no: 'CUSTOMER-BEAR-STYLE-2026-001',
+            default_unit_id: 1,
+            unit_net_weight_g: '425.125',
+            is_active: true,
+          }]
+          return route.fulfill({
+            json: { jsonrpc: '2.0', id, result: styleRpcResult(stylePaginatedRpcData(rows, 'products', params)) },
+          })
+        })
+      },
+      verify: async (page) => {
+        await page.locator(rowSelector).first().waitFor()
+        const evidence = []
+        for (const width of [1920, 1024, 2560, 1920]) {
+          await page.setViewportSize({ width, height: 1080 })
+          const result = await grid(page)
+          assertProductGrid(result)
+          await assertNoHorizontalOverflow(page, `产品基础信息 ${width}`)
+          evidence.push({ viewport: width, ...result })
+          if (width === 1024) {
+            await page.getByRole('button', { name: '向右查看列', exact: true }).click()
+            await page.waitForFunction(() => document.querySelector('.erp-business-data-table-card .ant-table-body, .erp-business-data-table-card .ant-table-content').scrollLeft > 0)
+          }
+        }
+        await assertTableHeaderControlsFit(page, { scenarioName: 'business-column-width-product-fit' })
+        await page.screenshot({ path: path.join(outputDir, 'product-table-fit-4k.png'), animations: 'disabled' })
+        const defaultGrid = await grid(page)
+        const dialog = page.getByRole('dialog', { name: /^列设置/u })
+        const saveColumns = async () => {
+          await dialog.getByRole('button', { name: '完成', exact: true }).click()
+          await dialog.waitFor({ state: 'hidden' })
+        }
+        await openBusinessTableTool(page, '列设置')
+        await dialog.getByRole('checkbox', { name: '产品名称', exact: true }).uncheck()
+        await dialog.getByRole('button', { name: '产品单重（净重） 移到最前', exact: true }).click()
+        await saveColumns()
+        const adjusted = await grid(page)
+        assert.equal(adjusted.columns[1].label, '产品单重（净重）')
+        assert.equal(adjusted.columns.some(({ label }) => label === '产品名称'), false)
+        assertProductGrid(adjusted)
+        await openBusinessTableTool(page, '列设置')
+        await dialog.getByRole('button', { name: '恢复默认', exact: true }).click()
+        await saveColumns()
+        assertStableGrid(defaultGrid, await grid(page))
+
+        await page.getByRole('button', { name: '分栏', exact: true }).first().click()
+        const split = await grid(page)
+        assertProductGrid(split)
+        assert.ok(split.horizontalRange > 1, '分栏收窄时应在表内查看其余列')
+        await collapseBusinessSplit(page)
+        assertStableGrid(defaultGrid, await grid(page))
+
+        const search = page.locator('.erp-business-operation-panel__search input').first()
+        await search.fill('模拟查无产品')
+        await search.press('Enter')
+        await page.locator(`${card} .ant-table-placeholder`).waitFor()
+        assertStableGrid(defaultGrid, await grid(page))
+        await search.fill('')
+        await search.press('Enter')
+        await page.locator(rowSelector).first().waitFor()
+        assertStableGrid(defaultGrid, await grid(page))
+        await writeFile(path.join(outputDir, 'product-table-fit.json'), JSON.stringify(evidence, null, 2))
+      },
+    },
     {
       ...common,
       name: 'business-column-width-bom-fill',
@@ -110,10 +216,10 @@ export function createBusinessColumnWidthScenarios({
           )
           await assertNoHorizontalOverflow(page, `BOM 横向铺满 ${width}`)
           evidence.push({ viewport: width, ...result })
-          if (width === 1920) await page.screenshot({
+          if (width === 1920) { await page.screenshot({
             path: path.join(outputDir, 'bom-table-fill-4k.png'),
             animations: 'disabled',
-          })
+          }) }
         }
         await writeFile(
           path.join(outputDir, 'bom-table-fill.json'),
@@ -131,10 +237,10 @@ export function createBusinessColumnWidthScenarios({
           const { id, method, params = {} } = route.request().postDataJSON()
           if (method !== 'list_customers') return route.fallback()
           if (probe.hold)
-            await new Promise((resolve) => {
+            { await new Promise((resolve) => {
               probe.release = resolve
               probe.onHeld?.()
-            })
+            }) }
           const records = params.keyword
             ? []
             : [
@@ -142,6 +248,8 @@ export function createBusinessColumnWidthScenarios({
                   id: 1,
                   code: 'SIM-COLUMN-001',
                   name: '模拟客户长名称与国际贸易进出口产品设计制造有限责任公司',
+                  default_payment_method: longPaymentMethod,
+                  default_payment_term_days: 45,
                   is_active: true,
                 },
               ]
@@ -159,6 +267,21 @@ export function createBusinessColumnWidthScenarios({
       },
       verify: async (page) => {
         await page.locator(rowSelector).first().waitFor()
+        const paymentCell = page.locator(rowSelector).first().getByRole('cell', {
+          name: `${longPaymentMethod} 45天`,
+          exact: true,
+        })
+        const longPayment = await paymentCell.evaluate((cell) => {
+          const bounds = cell.getBoundingClientRect()
+          const range = document.createRange()
+          range.selectNodeContents(cell)
+          const lines = [...range.getClientRects()].filter(({ width }) => width > 0)
+          return {
+            wraps: lines.length > 1,
+            fits: lines.every(({ left, right }) => left >= bounds.left - 1 && right <= bounds.right + 1),
+          }
+        })
+        assert(longPayment.wraps && longPayment.fits, '较长付款条件须在列内完整换行')
         for (const width of [1920, 2560, 1440, 390]) {
           await page.setViewportSize({ width, height: 1080 })
           const before = await grid(page)
@@ -221,48 +344,50 @@ export function createBusinessColumnWidthScenarios({
         const initial = await grid(page)
         assertAlignedGrid(initial)
         const labels = initial.columns.map((column) => column.label)
+        const optionalLabels = ['包装信息', '实际运费']
         assert.equal(labels.includes('明细行'), false, '已保存的列设置不再显示明细行')
         assert.equal(labels.includes('出货日期'), false, '保留原先隐藏出货日期的设置')
         for (const label of [
           '出货单号',
           '状态',
           '财务审批',
+          '物流信息',
           '收货信息',
           '总净重（克）',
           '备注',
         ])
-          assert.ok(labels.includes(label), label)
-        for (const label of ['物流信息', '包装信息', '实际运费'])
-          assert.equal(labels.includes(label), false, label)
+          { assert.ok(labels.includes(label), label) }
+        for (const label of optionalLabels)
+          { assert.equal(labels.includes(label), false, label) }
         const csv = await exportCSV(page)
         for (const label of [
           '物流信息',
           '明细行',
-          '包装信息',
-          '实际运费',
+          ...optionalLabels,
           '收货信息',
           '总净重（克）',
         ])
-          assert.ok(
+          { assert.ok(
             csv.split('\n')[0].includes(label),
             `${label} 不因默认收起而丢失导出`
-          )
+          ) }
         await openBusinessTableTool(page, '列设置')
         const dialog = page.getByRole('dialog', { name: /^列设置/u })
         assert.equal(await dialog.getByRole('checkbox', { name: '明细行', exact: true }).count(), 0)
         assert.equal(await dialog.getByRole('checkbox', { name: '出货日期', exact: true }).isChecked(), false)
-        for (const label of ['物流信息', '包装信息', '实际运费'])
-          await dialog
+        assert.equal(await dialog.getByRole('checkbox', { name: '物流信息', exact: true }).isChecked(), true)
+        for (const label of optionalLabels)
+          { await dialog
             .getByRole('checkbox', { name: label, exact: true })
-            .check()
+            .check() }
         await dialog.getByRole('button', { name: '完成', exact: true }).click()
         await dialog.waitFor({ state: 'hidden' })
         await page.reload({ waitUntil: 'domcontentloaded' })
         await page.locator(rowSelector).first().waitFor()
         const savedLabels = (await grid(page)).columns.map((column) => column.label)
         assert.equal(savedLabels.includes('出货日期'), false, '保存其他列后仍隐藏出货日期')
-        for (const label of ['物流信息', '包装信息', '实际运费'])
-          assert.ok(savedLabels.includes(label), label)
+        for (const label of ['物流信息', ...optionalLabels])
+          { assert.ok(savedLabels.includes(label), label) }
         await page.setViewportSize({ width: 390, height: 844 })
         await assertNoHorizontalOverflow(page, '出货可选列窄屏')
         await page.setViewportSize({ width: 1920, height: 1080 })
@@ -343,7 +468,7 @@ export function createBusinessColumnWidthScenarios({
           '可发货数量',
           '批次',
         ])
-          assert.ok(labels.includes(label), label)
+          { assert.ok(labels.includes(label), label) }
         assert.equal(labels.includes('库存项'), false)
         await page.locator(rowSelector).first().dblclick()
         const balanceDetails = page.getByRole('dialog', {
@@ -360,7 +485,7 @@ export function createBusinessColumnWidthScenarios({
           '待查货包装',
           '可发货数量',
         ])
-          assert.ok(csv.split('\n')[0].includes(label), label)
+          { assert.ok(csv.split('\n')[0].includes(label), label) }
         await selectWarehouseView(page, '库存变动记录')
         await page.locator(rowSelector).first().waitFor()
         const transactions = await grid(page)

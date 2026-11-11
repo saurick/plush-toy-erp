@@ -46,6 +46,7 @@ import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx
 import BusinessForm from '../components/business-list/BusinessForm.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessCellStack from '../components/business-list/BusinessCellStack.jsx'
+import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import ProductionRouteExecutionModal from '../components/production-orders/ProductionRouteExecutionModal.jsx'
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
 import { useProductionFactActions } from '../components/production-orders/useProductionFactActions.mjs'
@@ -54,6 +55,21 @@ import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '.
 
 const EMPTY_PAGE = { items: [], total: 0, counts: {} }
 const WAREHOUSE_WORK_SORT_FIELDS = { quantity: 'quantity' }
+
+function warehouseWorkProduct(row = {}) {
+  const name = row.product_name || '来源产品待核对'
+  const identity = (
+    <BusinessCellStack
+      primary={name}
+      secondary={[row.product_code, row.sku_code].filter(Boolean).join(' · ')}
+    />
+  )
+  return row.product_id > 0 ? (
+    <ProductIdentity productId={row.product_id} name={name}>
+      {identity}
+    </ProductIdentity>
+  ) : identity
+}
 
 function ReceiptReviewInitialization({ receipt }) {
   const form = Form.useFormInstance()
@@ -260,15 +276,9 @@ export default function WarehouseProductionWorkPage({ kind }) {
       {
         title: '存货 / 规格',
         key: 'product',
-        width: 230,
-        render: (_, row) => (
-          <BusinessCellStack
-            primary={row.product_name || '来源产品待核对'}
-            secondary={[row.product_code, row.sku_code]
-              .filter(Boolean)
-              .join(' · ')}
-          />
-        ),
+        width: 260,
+        className: 'erp-product-identity-cell',
+        render: (_, row) => warehouseWorkProduct(row),
       },
       {
         title: '仓库 / 批次',
@@ -468,9 +478,7 @@ export default function WarehouseProductionWorkPage({ kind }) {
               {
                 key: 'product',
                 label: '产品 / 规格',
-                children: [selected.product_name, selected.sku_code]
-                  .filter(Boolean)
-                  .join(' · '),
+                children: warehouseWorkProduct(selected),
               },
               {
                 key: 'status',
@@ -534,9 +542,7 @@ export default function WarehouseProductionWorkPage({ kind }) {
             {
               key: 'product',
               label: '产品 / 规格',
-              children: [receiptReview?.product_name, receiptReview?.sku_code]
-                .filter(Boolean)
-                .join(' · '),
+              children: receiptReview ? warehouseWorkProduct(receiptReview) : null,
             },
             {
               key: 'warehouse',

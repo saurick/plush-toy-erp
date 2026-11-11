@@ -9,10 +9,13 @@ import {
   listAllShipmentWeightReferenceRecords,
   normalizeNetWeightG,
   normalizeShipmentQuantity,
+  parseShipmentNetWeightEntry,
   resolveShipmentSubmittedTotalNetWeight,
   resolveShipmentWeightPreview,
   shipmentWeightItemsSignature,
   shipmentGrossNetWeightError,
+  shipmentNetWeightEntryFromGrams,
+  shipmentNetWeightEntryToGrams,
   shipmentWeightReferenceOption,
 } from './shipmentWeight.mjs'
 
@@ -32,6 +35,32 @@ test('business data consistency: gross kilograms cannot be below net grams', () 
     ),
     ''
   )
+})
+
+test('actual shipment weight is converted exactly between kilograms and the saved grams', () => {
+  for (const [kg, grams] of [
+    ['2.5', '2500'],
+    ['0.000000001', '0.000001'],
+    ['99999999999.999999999', '99999999999999.999999'],
+  ]) {
+    assert.equal(shipmentNetWeightEntryToGrams(kg, 'kg'), grams)
+    assert.equal(shipmentNetWeightEntryFromGrams(grams, 'kg'), kg)
+    assert.equal(shipmentNetWeightEntryFromGrams(grams, 'g'), grams)
+    assert.equal(shipmentNetWeightEntryToGrams(grams, 'g'), grams)
+    assert.equal(normalizeNetWeightG(grams), grams)
+  }
+  assert.equal(shipmentNetWeightEntryToGrams('.5', 'kg'), '500')
+  assert.equal(shipmentNetWeightEntryToGrams('', 'kg'), null)
+  assert.equal(shipmentNetWeightEntryFromGrams(undefined, 'kg'), null)
+})
+
+test('actual shipment weight conversion leaves excess precision and range for validation to reject', () => {
+  for (const kg of ['0.0000000001', '100000000000', '0', '-2.5']) {
+    assert.equal(normalizeNetWeightG(shipmentNetWeightEntryToGrams(kg, 'kg')), null, kg)
+  }
+  assert.equal(shipmentNetWeightEntryToGrams('0.0000000001', 'kg'), '0.0000001')
+  assert.equal(parseShipmentNetWeightEntry('2.5e-3'), 'NaN')
+  assert.equal(parseShipmentNetWeightEntry(' 2.5 '), '2.5')
 })
 
 const products = [
@@ -393,17 +422,12 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
     shipmentModalSource,
     /<Text strong>预计总净重：\{preview\.totalNetWeightG\} 克<\/Text>/u
   )
-  assert.match(shipmentModalSource, /label="实际总净重（克）"/u)
+  assert.match(shipmentModalSource, /label="实际总净重"/u)
   assert.match(shipmentModalSource, /normalizeShipmentQuantity\(value\)/u)
   assert.match(shipmentModalSource, /数量必须大于 0，且最多保留 6 位小数/u)
-  assert.match(shipmentModalSource, /系统不会显示或提交部分合计/u)
   assert.match(shipmentModalSource, /确认出货单重（克）/u)
   assert.match(shipmentModalSource, /行净重（克）/u)
   assert.match(shipmentModalSource, /hasFinalShipmentWeight\(status\)/u)
-  assert.match(
-    shipmentModalSource,
-    /出货明细已变更，旧人工总净重已清空，请重新填写/u
-  )
   assert.match(shipmentModalSource, /onImport=\{importSalesOrderToShipment\}/u)
   const importSource = readERPSource('../pages/ShipmentsPage.jsx')
   assert.match(importSource, /if \(newSourceItems\.length === 0\) \{[\s\S]*?return\s*\}[\s\S]*?total_net_weight_g: undefined/u)

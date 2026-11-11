@@ -2,8 +2,8 @@ import { styleRpcResult } from './rpcMockResult.mjs'
 
 export function createSearchCompositionScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }) {
   const cases = [
-    { name: 'design-reference', path: '/__dev/ui-design?view=specification&read=reference', label: '搜索设计图解或规范', queryKey: 'q' },
-    { name: 'design-guide', path: '/__dev/ui-design?view=rationale&read=guide', label: '搜索设计图解或规范', queryKey: 'q', themeMode: 'dark' },
+    { name: 'design-reference', path: '/__dev/ui-design?view=specification&read=reference', label: '搜索设计图解', queryKey: 'q' },
+    { name: 'design-guide', path: '/__dev/ui-design?view=rationale&read=guide', label: '搜索设计图解', queryKey: 'q', themeMode: 'dark' },
     { name: 'controls', path: '/__dev/ui-design?page=controls&control=components', label: '搜索控件设计', queryKey: 'controlq', width: 1280 },
     { name: 'skills', path: '/__dev/project-skills', label: '搜索任务或 Skill', queryKey: 'q' },
     { name: 'docs', path: '/__dev/docs', label: '搜索项目文档' },
@@ -17,8 +17,8 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
     { name: 'rules', path: '/__dev/testing?view=coverage&coverage=rules', label: '搜索关键规则', queryKey: 'ruleQuery' },
     { name: 'quality', path: '/__dev/quality-gates?view=governance', label: '搜索门禁名称或风险', queryKey: 'q' },
     { name: 'version-history', path: '/__dev/version-center?view=history', label: '搜索版本、SHA 或操作 ID', queryKey: 'history_q' },
-    { name: 'prototype-tools', path: '/__dev/ui-design?page=workbench', inputSelector: '#dev-design-search' },
-    { name: 'prototype-integration', path: '/__dev/ui-design?page=workbench', inputSelector: '[data-dev-integration-search]' },
+    { name: 'prototype-tools', path: '/__dev/ui-design?page=workbench&workbenchMode=preview', inputSelector: '#dev-design-search' },
+    { name: 'prototype-integration', path: '/__dev/ui-design?page=workbench&workbenchMode=preview', inputSelector: '[data-dev-integration-search]' },
     { name: 'prototype-help', path: '/__dev/ui-design?page=help', inputSelector: '#rh-manualSearch' },
     { name: 'prototype-statistics', path: '/__dev/ui-design', inputSelector: '#statistics-search' },
     { name: 'prototype-visual', path: '/__dev/ui-design', inputSelector: '#visual-search' },
@@ -31,9 +31,6 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
     deviceScaleFactor: 2,
     verify: async (page) => {
       if (name === 'definitions') await page.getByRole('button', { name: '搜索定义', exact: true }).click()
-      if (['prototype-tools', 'prototype-integration'].includes(name)) {
-        await page.getByLabel('工作台设计内容', { exact: true }).getByText('整体交互预览', { exact: true }).click()
-      }
       const frame = inputSelector ? page.frameLocator('iframe[title="ERP 最新可交互设计"]') : null
       if (frame) {
         await frame.locator('.app').waitFor()

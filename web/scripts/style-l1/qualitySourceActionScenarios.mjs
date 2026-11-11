@@ -704,7 +704,8 @@ viewport: { width: viewport.width, height: viewport.height },
           await expectHeading(page, '质量检验')
           await expectText(page, '暂无质量检验单')
 
-          await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
+          const filterTrigger = page.getByRole('button', { name: /^筛选(?:，|$)/u })
+          await filterTrigger.click()
           const filters = page.getByRole('dialog', { name: '筛选条件' })
           await filters
             .getByRole('group', { name: '检验类型', exact: true })
@@ -731,7 +732,7 @@ viewport: { width: viewport.width, height: viewport.height },
             '生产工序：车缝',
             '质量关口：皮套检验',
             'PLUSH-BEAR-WIP-L1 / 车缝中的小熊公仔',
-            '在制批次：WIP-SEWING-STYLE-L1-001',
+            'WIP-SEWING-STYLE-L1-001',
             '批次数量：128.5',
             '车缝完成后的皮套质量关口',
           ]) {
@@ -758,20 +759,13 @@ viewport: { width: viewport.width, height: viewport.height },
             }
           }
 
-          for (const filterLabel of ['全部仓库', '全部批次']) {
-            const filter = filters
-              .locator('.ant-select')
-              .filter({ hasText: filterLabel })
-              .first()
+          await filterTrigger.click()
+          for (const filterLabel of ['仓库', '批次']) {
+            const filter = filters.getByRole('combobox', { name: filterLabel, exact: true })
             await filter.waitFor({ state: 'visible', timeout: 10_000 })
-            assert.equal(
-              await filter.evaluate((node) =>
-                node.classList.contains('ant-select-disabled')
-              ),
-              true,
-              `生产分段质检下 ${filterLabel} 应禁用`
-            )
+            assert.equal(await filter.isDisabled(), true, `生产分段质检下 ${filterLabel} 应禁用`)
           }
+          await filters.getByRole('button', { name: '完成', exact: true }).click()
 
           await row.click()
           for (const technicalCopy of [

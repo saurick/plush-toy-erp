@@ -211,6 +211,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "expected_version",
   ]),
   "production_wip.get_production_wip": Object.freeze(["production_order_id"]),
+  "production_wip.list_warehouse_production_work": Object.freeze(["kind", "stage", "keyword", "limit", "offset"]),
   "production_wip.execute_production_wip_action": Object.freeze([
     "action",
     "production_order_id",
@@ -632,6 +633,13 @@ function normalizeProduction(source) {
       "production.completion.quantity",
     ),
   };
+  if (source.completion.checkpoint !== undefined) {
+    const checkpoint = source.completion.checkpoint;
+    if (!["pending-return", "draft-receipt", "pending-inspection", "pending-packaging"].includes(checkpoint) || source.rework) {
+      throw new SourceDrivenFactError("production completion checkpoint is invalid for this route");
+    }
+    completion.checkpoint = checkpoint;
+  }
   if (
     quantityUnits(completion.quantity, "production.completion.quantity") !==
     quantityUnits(plannedQuantity, "production.plannedQuantity")
@@ -2014,12 +2022,13 @@ async function createPostFact({
     createMethod,
   );
   const createdStatus = String(created.status || "").toUpperCase();
-  if (createdStatus === "POSTED") return created;
+  if (createdStatus === "POSTED" && postMethod) return created;
   if (createdStatus !== "DRAFT") {
     throw new SourceDrivenFactError(
       `${createMethod} expected DRAFT or POSTED, got ${created.status || "missing"}`,
     );
   }
+  if (!postMethod) return created;
   const posted = requireResult(
     await invoke(
       rpc,
@@ -2375,6 +2384,7 @@ async function advanceProductionWIPRoute({
     }
 
     if (String(operation.operation_code) === "PACKAGING") {
+      if (source.completion.checkpoint === "pending-packaging") return batch;
       const confirmations = state.confirmations.filter(
         (confirmation) =>
           Number(confirmation?.production_order_item_id) === itemID,
@@ -2425,6 +2435,9 @@ async function advanceProductionWIPRoute({
         operation.operation_code === "HANDWORK" &&
         ["WAITING_QUALITY", "ACCEPTED"].includes(status)
       ) {
+        return batch;
+      }
+      if (source.completion.checkpoint === "pending-return" && operation.operation_code === "FABRIC_PROCESSING" && status === "OUTSOURCED") {
         return batch;
       }
       if (status === "ACCEPTED") {
@@ -2558,12 +2571,31 @@ export async function ensureSourceDrivenProductionRoute({
 }) {
   const source = plan.phases.production.source;
   const identity = plan.identities.production;
+  const checkpoint = source.completion.checkpoint;
+  const orderID = positiveID(order.id, "production route order");
+  if (checkpoint === "pending-return") {
+    if (completion) throw new SourceDrivenFactError("return sample already has a finished goods receipt");
+    const detail = await invoke(rpc, "production_order", "get_production_order", { production_order_id: orderID });
+    const matched = matchProductionRequirements(detail, source);
+    const { item } = matched;
+    const state = await readProductionWIP(rpc, orderID, item.id, source);
+    const operation = state.operations.find((row) => row.operation_code === "FABRIC_PROCESSING");
+    const batch = operation ? exactNormalProductionWIPBatch(state, operation.id) : null;
+    if (batch?.status === "PLANNED" && apply && order.status === "RELEASED") {
+      await advanceProductionWIPRoute({ rpc, order, item, source, identity, fabricAllocation: productionFabricAllocation(source, matched) });
+      return;
+    }
+    if (batch?.status !== "OUTSOURCED") {
+      throw new SourceDrivenFactError("cutting sample is not awaiting outsourcing return");
+    }
+    return;
+  }
   if (
-    completion?.status !== "POSTED" ||
+    completion?.status !== (checkpoint === "draft-receipt" ? "DRAFT" : "POSTED") ||
     Number(completion.source_id) !== Number(order.id)
   )
     throw new SourceDrivenFactError(
-      "production route requires its exact posted completion",
+      "production route requires its exact completion at the expected status",
     );
   const itemID = positiveID(
     completion.production_order_item_id,
@@ -2571,23 +2603,33 @@ export async function ensureSourceDrivenProductionRoute({
   );
   const state = await readProductionWIP(
     rpc,
-    positiveID(order.id, "production route order"),
+    orderID,
     itemID,
     source,
   );
+  const packagingOperation = state.operations.at(-1);
+  const packaging = exactNormalProductionWIPBatch(state, packagingOperation.id, { optional: true });
+  const heldBeforeInspection = checkpoint === "pending-inspection" || checkpoint === "draft-receipt";
   for (const operation of state.operations.slice(0, -1)) {
+    const expectedStatus = heldBeforeInspection && operation.operation_code === "HANDWORK"
+      ? "WAITING_QUALITY"
+      : "ACCEPTED";
+    const status = exactNormalProductionWIPBatch(state, operation.id).status;
     if (
-      exactNormalProductionWIPBatch(state, operation.id).status !== "ACCEPTED"
+      status !== expectedStatus && !(apply && checkpoint === "pending-packaging" && !packaging && operation.operation_code === "HANDWORK" && status === "WAITING_QUALITY")
     )
       throw new SourceDrivenFactError(
-        "posted completion has an unfinished upstream operation",
+        `posted completion expected ${operation.operation_code} in ${expectedStatus}`,
       );
   }
-  const packaging = exactNormalProductionWIPBatch(
-    state,
-    state.operations.at(-1).id,
-    { optional: true },
-  );
+  if (heldBeforeInspection) {
+    if (packaging) throw new SourceDrivenFactError("inspection sample already entered packaging");
+    return;
+  }
+  if (checkpoint === "pending-packaging" && packaging) {
+    if (packaging?.status !== "PLANNED") throw new SourceDrivenFactError("packaging sample is not awaiting handling");
+    return;
+  }
   if (packaging?.status === "ACCEPTED") return;
   if (!apply)
     throw new SourceDrivenFactError(
@@ -2608,6 +2650,13 @@ export async function ensureSourceDrivenProductionRoute({
     identity,
     finishedGoodsReceipt: completion,
   });
+}
+
+function productionFabricAllocation(source, matched) {
+  const { item } = source.fabricOutsourcing;
+  const requirement = matched.requirements.find(({ budget }) => budget.materialId === item.materialId && budget.unitId === item.unitId)?.requirement;
+  if (!requirement) throw new SourceDrivenFactError("fabric production material requirement is missing");
+  return { outsourcingOrderItemId: item.id, productionMaterialRequirementId: requirement.id };
 }
 
 async function applyProduction(plan, rpc) {
@@ -2642,7 +2691,7 @@ async function applyProduction(plan, rpc) {
   const order = requireResult(
     create,
     "production_order",
-    "DRAFT",
+    null,
     "create_production_order",
   );
   const current = await invoke(
@@ -2713,22 +2762,7 @@ async function applyProduction(plan, rpc) {
   let fabricOutsourcingIssue;
   let fabricAllocation;
   if (source.fabricOutsourcing) {
-    const fabricBudget = source.materialIssues.find(
-      (record) =>
-        record.materialId ===
-          Number(source.fabricOutsourcing?.item?.materialId) &&
-        record.unitId === Number(source.fabricOutsourcing?.item?.unitId),
-    );
-    const requirement = matched.requirements.find(
-      (entry) =>
-        entry.budget.materialId === fabricBudget.materialId &&
-        entry.budget.unitId === fabricBudget.unitId,
-    )?.requirement;
-    if (!requirement) {
-      throw new SourceDrivenFactError(
-        "fabric production material requirement is missing",
-      );
-    }
+    fabricAllocation = productionFabricAllocation(source, matched);
     fabricOutsourcingIssue = await createPostFact({
       rpc,
       createMethod: "create_outsourcing_material_issue_from_order",
@@ -2745,10 +2779,6 @@ async function applyProduction(plan, rpc) {
       resultKey: "outsourcing_fact",
       postMethod: "post_outsourcing_fact",
     });
-    fabricAllocation = {
-      outsourcingOrderItemId: source.fabricOutsourcing.item.id,
-      productionMaterialRequirementId: requirement.id,
-    };
   }
   const completionWIPBatch = await advanceProductionWIPRoute({
     rpc,
@@ -2758,7 +2788,8 @@ async function applyProduction(plan, rpc) {
     identity,
     fabricAllocation,
   });
-  const completion = await createPostFact({
+  const checkpoint = source.completion.checkpoint;
+  const completion = checkpoint === "pending-return" ? undefined : await createPostFact({
     rpc,
     createMethod: "create_production_completion_from_order",
     createParams: customerParams({
@@ -2776,24 +2807,26 @@ async function applyProduction(plan, rpc) {
       note: SIMULATED_NOTE,
     }),
     resultKey: "production_fact",
-    postMethod: "post_production_fact",
+    postMethod: checkpoint === "draft-receipt" ? null : "post_production_fact",
   });
   if (
-    Number(completion.production_wip_batch_id) !== Number(completionWIPBatch.id)
+    completion && Number(completion.production_wip_batch_id) !== Number(completionWIPBatch.id)
   ) {
     throw new SourceDrivenFactError(
       "production completion does not match its accepted handwork WIP batch",
     );
   }
-  await advanceProductionWIPRoute({
-    rpc,
-    order,
-    item: matched.item,
-    source,
-    identity,
-    fabricAllocation,
-    finishedGoodsReceipt: completion,
-  });
+  if (completion?.status === "POSTED" && checkpoint !== "pending-inspection") {
+    await advanceProductionWIPRoute({
+      rpc,
+      order,
+      item: matched.item,
+      source,
+      identity,
+      fabricAllocation,
+      finishedGoodsReceipt: completion,
+    });
+  }
   let rework;
   if (source.rework) {
     rework = await createPostFact({

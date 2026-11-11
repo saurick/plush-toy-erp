@@ -58,9 +58,9 @@ const cases = [
     action: {
       action: 'prepare',
       payload: {
-        profileKey: 'core-demo',
+        profileKey: 'scenario-demo',
         targetKey: 'local-development',
-        idempotencyKey: `data-preparation:prepare:core-demo:local-development:${ID}`,
+        idempotencyKey: `data-preparation:prepare:scenario-demo:local-development:${ID}`,
       },
     },
   },

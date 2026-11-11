@@ -154,6 +154,38 @@ test('quality exports skip absent compound parts while preserving zero and warni
   assert.equal(columnValue(columns, 'decision_note', { decision_note: '-' }), '-')
 })
 
+test('receivables and payables use the returned outstanding amount and distinguish blank from settled', () => {
+  for (const type of ['RECEIVABLE', 'PAYABLE']) {
+    const columns = modules.facts.buildOperationalFactColumns('finance', type)
+    const outstanding = columns.find((column) => column.dataIndex === 'outstanding_amount')
+    const row = { amount: '1200', outstanding_amount: '275.50' }
+    assert.equal(outstanding.render(row.outstanding_amount), '275.5')
+    assert.equal(outstanding.render('0'), '0')
+    assert.equal(outstanding.render(undefined), '—')
+    assert.equal(columnValue(columns, 'outstanding_amount', row), '275.50')
+    assert.equal(columnValue(columns, 'outstanding_amount', { amount: '1200' }), '')
+    assert.ok(outstanding.sorter({ outstanding_amount: '10.01' }, { outstanding_amount: '9.99' }) > 0)
+  }
+  for (const type of ['INVOICE', 'RECONCILIATION']) {
+    assert.ok(!modules.facts.buildOperationalFactColumns('finance', type).some((column) => column.dataIndex === 'outstanding_amount'))
+  }
+})
+
+test('the quality list keeps stock batches and production batches on their own references', () => {
+  const columns = modules.quality.buildQualityInspectionDataColumns({
+    inventoryLotOptions: [{ value: 31, label: 'LOT-31 冻结' }],
+  })
+  const batch = columns.find((column) => column.dataIndex === 'inventory_lot_id')
+  const inspector = columns.find((column) => column.dataIndex === 'inspector_id')
+  const incoming = { inspection_type: 'INCOMING', inventory_lot_id: 31, inspector_name: '质检甲' }
+  const production = { inspection_type: 'PRODUCTION_STAGE', inventory_lot_id: 31, wip_batch_no: 'WIP-12' }
+  assert.equal(batch.render(31, incoming), 'LOT-31 冻结')
+  assert.equal(batch.render(31, production), 'WIP-12')
+  assert.equal(batch.render(31, { ...production, wip_batch_no: '' }), '—')
+  assert.equal(inspector.render(undefined, incoming), '质检甲')
+  assert.equal(inspector.render(undefined, { created_by: 1 }), '—')
+})
+
 test('CSV output keeps the header and column positions when all optional purchase fields are blank', () => {
   const columns = modules.purchase.buildPurchaseOrderColumns({ resolveSupplierName: resolver })
   const keys = ['purchase_order_no', 'expected_arrival_date', 'supplier_confirmed_arrival_date', 'payment_condition', 'invoice_preference', 'delivery_address']

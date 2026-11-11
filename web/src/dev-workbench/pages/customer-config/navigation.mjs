@@ -8,6 +8,7 @@ export const VIEW_IMPORT = 'import'
 export const PREFLIGHT_SECTION_PACKAGE = 'package'
 export const PREFLIGHT_SECTION_RUNTIME = 'runtime'
 export const PREFLIGHT_SECTION_FLOW = 'flow'
+export const PREFLIGHT_SECTION_EXTENSIONS = 'extensions'
 export const PREFLIGHT_SECTION_EVIDENCE = 'evidence'
 export const IMPORT_ACTION_DRY_RUN = 'dry-run'
 export const IMPORT_ACTION_TEST_APPLY = 'test-apply'
@@ -51,6 +52,7 @@ export const PREFLIGHT_SECTION_OPTIONS = Object.freeze([
   { label: '包结构', value: PREFLIGHT_SECTION_PACKAGE },
   { label: '运行设置', value: PREFLIGHT_SECTION_RUNTIME },
   { label: '流程策略', value: PREFLIGHT_SECTION_FLOW },
+  { label: '扩展登记', value: PREFLIGHT_SECTION_EXTENSIONS },
   { label: '评审依据', value: PREFLIGHT_SECTION_EVIDENCE },
 ])
 

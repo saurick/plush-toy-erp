@@ -32,20 +32,20 @@ export function getUIDesignStateOptions(page) {
   ].map(([key, label]) => ({ key, label }))
 }
 
-export const UI_DESIGN_PREVIEW_PAGES = Object.freeze([
-  { value: 'workspace', label: '业务界面' },
-  { value: 'production-hub', label: '生产管理' },
-  { value: 'task-handling', label: '任务处理' },
-  { value: 'mobile-tasks', label: '手机版任务' },
-  { value: 'workbench', label: '效能工作台' },
+export const UI_DESIGN_PREVIEW_MODES = Object.freeze([
+  { value: 'workspace', label: '桌面 ERP' },
+  { value: 'mobile-tasks', label: '手机版' },
   { value: 'login', label: '登录页' },
-  { value: 'help', label: '岗位帮助' },
 ])
 
+const DESKTOP_PREVIEW_ENTRIES = ['production-hub', 'task-handling', 'workbench', 'help']
+
+export function resolveUIDesignPreviewMode(page) {
+  return UI_DESIGN_PREVIEW_MODES.find((item) => item.value === page)?.value ?? 'workspace'
+}
+
 export function resolveUIDesignPreviewPage(page) {
-  return UI_DESIGN_PREVIEW_PAGES.some((item) => item.value === page)
-    ? page
-    : 'workspace'
+  return DESKTOP_PREVIEW_ENTRIES.includes(page) ? page : resolveUIDesignPreviewMode(page)
 }
 
 const SANDBOX_BOOTSTRAP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">

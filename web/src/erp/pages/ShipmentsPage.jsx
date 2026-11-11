@@ -183,6 +183,7 @@ import {
   normalizeShipmentQuantity,
   resolveShipmentSubmittedTotalNetWeight,
   resolveShipmentWeightPreview,
+  shipmentWeightItemsSignature,
   shipmentWeightReferenceOption,
 } from '../utils/shipmentWeight.mjs'
 import {
@@ -272,6 +273,9 @@ function shipmentFormValues(shipment = {}) {
     planned_ship_at:
       plannedShipAt > 0 ? unixSecondsToBusinessDate(plannedShipAt) : '',
     total_net_weight_g: shipment.total_net_weight_g,
+    total_net_weight_items_signature: shipment.total_net_weight_g
+      ? shipmentWeightItemsSignature(shipment.items)
+      : undefined,
     transport_method: shipment.transport_method || '',
     carrier_name: shipment.carrier_name || '',
     tracking_no: shipment.tracking_no || '',
@@ -785,7 +789,7 @@ export default function ShipmentsPage() {
         warehouseResult,
       ] = await Promise.all([
         listAllCustomers({ active_only: true }),
-        listAllInventoryLots(),
+        canViewInventory ? listAllInventoryLots() : null,
         listAllShipmentWeightReferenceRecords(listProducts, 'products'),
         listAllShipmentWeightReferenceRecords(listProductSKUs, 'product_skus'),
         listAllSalesOrders(),
@@ -817,7 +821,7 @@ export default function ShipmentsPage() {
       setSalesOrders([])
       setUnits([])
     }
-  }, [])
+  }, [canViewInventory])
 
   useEffect(() => {
     loadReferenceOptions()
@@ -2142,12 +2146,12 @@ export default function ShipmentsPage() {
         canCreate={canCreate}
         canUpdate={canUpdate}
         canImportSalesOrderSource={canImportSalesOrderSource}
+        canViewInventory={canViewInventory}
         customerOptions={customerOptions}
         form={shipmentForm}
         importSalesOrderToShipment={importSalesOrderToShipment}
         sourceImportUndoState={sourceImportUndo ? sourceImportUndo.invalidated ? 'changed' : 'ready' : ''}
         onUndoSourceImport={undoSourceImport}
-        inventoryLots={inventoryLots}
         inventoryLotOptions={inventoryLotOptions}
         isCreateModal={isCreateModal}
         isEditModal={isEditModal}

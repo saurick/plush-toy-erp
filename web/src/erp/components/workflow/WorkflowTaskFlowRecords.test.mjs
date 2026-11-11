@@ -85,8 +85,8 @@ test('flow records use the shared scope switch without replacing it across loadi
   const switchNode = container.querySelector(
     '.workflow-task-event-trail__scope'
   )
-  const taskScope = Array.from(container.querySelectorAll('label')).find(
-    (label) => label.textContent === '只看本任务'
+  const taskScope = Array.from(switchNode.querySelectorAll('button')).find(
+    (button) => button.textContent === '只看本任务'
   )
   assert.equal(Boolean(taskScope), true)
   await act(async () => taskScope.click())

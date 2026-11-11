@@ -19,6 +19,11 @@ const permissionSurfaces = new Set([
   'pages/DevPermissionRelationshipsPage.jsx',
   'components/DevRoleResponsibilityGraph.jsx',
 ])
+const controlExampleDestinations = new Set([
+  '/__dev/ui-design?page=controls&control=business-toolbar',
+  '/__dev/ui-design?page=login',
+  '/__dev/ui-design?view=specification&read=reference#business-toolbar-composition',
+])
 const navigationCallbacks = /\b(?:onOpenView|onOpenTopics|onExploreChain|onExploreStage|onExploreNode|onOpenRules|onOpenRecords|openRoleSettings|openChain|openDutyChain|onOpenRole|onOpenChain)\b/u
 const permissionCallbacks = /\b(?:openRoleSettings|openChain|openDutyChain|onOpenRole|onOpenChain)\b/u
 
@@ -80,13 +85,31 @@ test('工作台内容区只保留受控对象关联和岗位配置，不重复�
       if (node.type !== 'JSXOpeningElement' || node.name.type !== 'JSXIdentifier') return
       const attributes = node.attributes.filter((item) => item.type === 'JSXAttribute')
       const destination = attributes.find((item) => ['to', 'href'].includes(item.name.name))
-      const samePageExample = relative === 'components/DevSharedComponentGuide.jsx' && staticTarget(destination || {}).startsWith('/__dev/ui-design?')
-      const permissionLink = permissionSurfaces.has(relative) && permissionDestination(staticTarget(destination || {}))
+      const target = staticTarget(destination || {})
+      const expression = destination?.value?.expression
+      const samePageExample = (relative === 'components/DevSharedComponentGuide.jsx' && target.startsWith('/__dev/ui-design?')) ||
+        (relative === 'components/DevControlStandards.jsx' && controlExampleDestinations.has(target))
+      const permissionLink = permissionSurfaces.has(relative) && permissionDestination(target)
+      const approvalTab = expression?.type === 'TemplateLiteral' && expression.expressions.length === 1
+        ? expression.expressions[0]
+        : null
+      const customerApprovalLink = relative === 'pages/customer-config/CustomerApprovalPolicy.jsx' &&
+        target === '/erp/system/permissions?tab=' && approvalTab?.type === 'MemberExpression' &&
+        expression.quasis[1].value.cooked === '' && !approvalTab.computed &&
+        approvalTab.object.name === 'PERMISSION_CENTER_TAB_KEYS' && approvalTab.property.name === 'APPROVALS'
+      const skillSourceLink = relative === 'components/DevProjectSkillsDecisionGuide.jsx' &&
+        expression?.type === 'CallExpression' && expression.callee.name === 'buildDevDocsLocation' &&
+        expression.arguments.length === 1 && expression.arguments[0].type === 'ObjectExpression' &&
+        expression.arguments[0].properties.length === 2 &&
+        expression.arguments[0].properties.some(({ key, value }) => key?.name === 'path' && value?.name === 'sourcePath') &&
+        expression.arguments[0].properties.some(({ key, value }) => key?.name === 'headingId' &&
+          value?.type === 'MemberExpression' && value.object.name === 'note' && value.property.name === 'headingId')
       const controlledReadingLink = relative === 'components/DevReadingNavigation.jsx' &&
-        destination?.value?.expression?.type === 'Identifier' && destination.value.expression.name === 'to' &&
+        expression?.type === 'Identifier' && expression.name === 'to' &&
         source.includes('if (!isProductCoreReadingDestination(to)) return')
-      if (routerLinks.has(node.name.name) && !samePageExample && !permissionLink && !controlledReadingLink) violations.push(`${relative}:${node.loc.start.line} 内容区路由链接`)
-      if ((['Button', 'a'].includes(node.name.name) || routerLinks.has(node.name.name)) && destination && !attributes.some((item) => item.name.name === 'download') && /^\/(?:__dev|erp)(?:\/|\?|$)/u.test(staticTarget(destination)) && !samePageExample && !permissionLink) violations.push(`${relative}:${node.loc.start.line} 内容区跨页地址`)
+      const contextualLink = samePageExample || permissionLink || customerApprovalLink || skillSourceLink || controlledReadingLink
+      if (routerLinks.has(node.name.name) && !contextualLink) violations.push(`${relative}:${node.loc.start.line} 内容区路由链接`)
+      if ((['Button', 'a'].includes(node.name.name) || routerLinks.has(node.name.name)) && destination && !attributes.some((item) => item.name.name === 'download') && /^\/(?:__dev|erp)(?:\/|\?|$)/u.test(target) && !contextualLink) violations.push(`${relative}:${node.loc.start.line} 内容区跨页地址`)
       const click = attributes.find((item) => item.name.name === 'onClick')
       const clickSource = click ? source.slice(click.range[0], click.range[1]) : ''
       const permissionAction = permissionSurfaces.has(relative) && permissionCallbacks.test(clickSource)

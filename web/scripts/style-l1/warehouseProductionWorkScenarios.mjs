@@ -4,6 +4,7 @@ import {
   validateProductionWipAggregate,
 } from '../../src/erp/utils/productionWipModel.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { installImages } from './productIdentityScenarios.mjs'
 
 function workRow(values = {}) {
   return {
@@ -20,6 +21,7 @@ function workRow(values = {}) {
     production_wip_batch_id: 91003,
     batch_no: 'WIP-WAREHOUSE-TEST',
     operation_name: '手工制作',
+    product_id: 1,
     product_name: '模拟抱抱熊',
     product_code: 'P-WH-01',
     sku_code: 'SKU-WH-01',
@@ -159,6 +161,7 @@ export function createWarehouseProductionWorkScenarios(deps) {
         beforeNavigate: async (page) => {
           receipt = workRow()
           posts = []
+          await installImages(page)
           await page.route('**/rpc/*', async (route) => {
             const { method, params = {}, id } = route.request().postDataJSON()
             if (method === 'list_warehouse_production_work') {
@@ -188,12 +191,29 @@ export function createWarehouseProductionWorkScenarios(deps) {
         },
         verify: async (page) => {
           const table = page.locator('.erp-business-toolbar-workspace')
+          const rowImage = table.getByRole('button', { name: '查看模拟抱抱熊大图', exact: true })
+          await expect(rowImage.locator('img')).toBeVisible()
+          await rowImage.click()
+          await expect(page.locator('.erp-task-image-preview__stage img')).toBeVisible()
+          await page.getByRole('button', { name: '关闭图片预览', exact: true }).click()
+          await expect(table.locator('.ant-table-row-selected')).toHaveCount(0)
           await table.getByText('FG-WAREHOUSE-TEST', { exact: true }).click()
           await table
             .getByRole('button', { name: '确认成品入库', exact: true })
             .click()
           const dialog = page.getByRole('dialog').last()
-          await dialog.getByLabel(/^仓库实收数量\s*（只）$/u).fill('29')
+          const quantity = dialog.getByLabel(/^仓库实收数量\s*（只）$/u)
+          const checked = dialog.getByRole('checkbox', { name: '实物、仓库、批次与本次来源一致', exact: true })
+          await checked.check()
+          if (width === 1920) {
+            await page.screenshot({ path: deps.path.join(deps.outputDir, 'warehouse-receipt-confirm-4k.png') })
+          }
+          await quantity.fill('29')
+          await dialog.getByRole('button', { name: '查看模拟抱抱熊大图', exact: true }).click()
+          await expect(page.locator('.erp-task-image-preview__stage img')).toBeVisible()
+          await page.getByRole('button', { name: '关闭图片预览', exact: true }).click()
+          await expect(quantity).toHaveValue('29')
+          await expect(checked).toBeChecked()
           await dialog
             .getByRole('button', { name: '确认成品入库', exact: true })
             .click()
@@ -203,13 +223,7 @@ export function createWarehouseProductionWorkScenarios(deps) {
             })
           ).toBeVisible()
           deps.assert.equal(posts.length, 0)
-          await dialog.getByLabel(/^仓库实收数量\s*（只）$/u).fill('30')
-          await dialog
-            .getByRole('checkbox', {
-              name: '实物、仓库、批次与本次来源一致',
-              exact: true,
-            })
-            .check()
+          await quantity.fill('30')
           await dialog
             .getByRole('button', { name: '确认成品入库', exact: true })
             .click()
@@ -257,6 +271,7 @@ export function createWarehouseProductionWorkScenarios(deps) {
         let packingID = 91003
         let packingComplete = false
         page.__warehouseActions = []
+        await installImages(page)
         await page.route('**/rpc/production_wip', async (route) => {
           const { method, params = {}, id } = route.request().postDataJSON()
           if (method === 'list_warehouse_production_work') {
@@ -361,6 +376,7 @@ export function createWarehouseProductionWorkScenarios(deps) {
       },
       verify: async (page) => {
         const scope = page.locator('.erp-business-toolbar-workspace')
+        await expect(scope.getByRole('button', { name: '查看模拟抱抱熊大图', exact: true }).first().locator('img')).toBeVisible()
         await scope.getByText('MO-WAREHOUSE-TEST', { exact: true }).click()
         const response = page.waitForResponse(
           (res) => res.request().postDataJSON()?.method === 'get_production_wip'

@@ -34,6 +34,9 @@ func TestWarehouseProductionWorkReturnStagesDoNotPostInventory(t *testing.T) {
 	if page.Total != 1 || page.Items[0].Stage != biz.WarehouseProductionStageReturn || page.Items[0].Action != biz.ProductionWIPActionReceiveOutsourcingReturn {
 		t.Fatalf("return queue=%#v", page)
 	}
+	if page.Items[0].ProductID != f.client.ProductionOrderItem.GetX(ctx, batch.ProductionOrderItemID).ProductID {
+		t.Fatalf("return queue must identify the product on the batch's order line: %+v", page.Items[0])
+	}
 	f.client.ProductionWIPBatch.UpdateOneID(batch.ID).SetStatus(biz.ProductionWIPStatusWaitingQuality).SaveX(ctx)
 	page = list()
 	if page.Items[0].Stage != biz.WarehouseProductionStageQuality || page.Items[0].Action != "" {
@@ -82,7 +85,7 @@ func TestWarehouseProductionWorkReceiptStagesPaginationAndWarehouseScope(t *test
 		}
 	}
 	page = list(biz.WithWarehouseDataScope(ctx, biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{secondWarehouse.ID}}), biz.WarehouseProductionWorkFilter{})
-	if page.Total != 1 || page.Items[0].FactID != second.ID {
+	if page.Total != 1 || page.Items[0].FactID != second.ID || page.Items[0].ProductID != second.SubjectID {
 		t.Fatalf("warehouse scope leaked: %#v", page)
 	}
 	page = list(biz.WithWarehouseDataScope(ctx, biz.WarehouseDataScope{Mode: biz.DataScopeModeNone}), biz.WarehouseProductionWorkFilter{})

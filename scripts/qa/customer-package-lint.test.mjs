@@ -8,6 +8,8 @@ import { customerPackageCatalog } from "../../config/catalog/customerPackageCata
 import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
 import { referenceCustomerPackage } from "../../config/customers/reference-customer/customerPackage.mjs";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import { customerPackageFieldGuide } from "../../config/schemas/customerPackageFieldGuide.mjs";
+import { customerPackageSchema } from "../../config/schemas/customerPackageSchema.mjs";
 import {
   buildPreview,
   runCustomerPackageLint,
@@ -16,6 +18,19 @@ import {
   validatePackage,
   validatePreview,
 } from "./customer-package-lint.mjs";
+
+test("customer-package-lint: required package fields are documented and JSON examples pass lint", () => {
+  const byPath = new Map(customerPackageFieldGuide.flatMap((group) =>
+    group.fields.map((field) => [field.path, field]),
+  ));
+  for (const key of customerPackageSchema.requiredTopLevelKeys) {
+    const field = byPath.get(key);
+    assert(field?.required && field.description.trim(), `Missing required field explanation for ${key}`);
+  }
+  for (const group of customerPackageFieldGuide) {
+    if (group.example) validatePackage({ ...yoyoosunCustomerPackage, ...group.example });
+  }
+});
 
 test("customer-package-lint: yoyoosun package stays preview-only", () => {
   validateCatalog(customerPackageCatalog);

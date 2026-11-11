@@ -1,3 +1,7 @@
+.app-table.ant-table-wrapper.app-table--column-grow {
+  container-type: inline-size;
+}
+
 .app-table.ant-table-wrapper .ant-table-tbody > tr > .ant-table-cell,
 .app-table.ant-table-wrapper .ant-table-summary > tr > .ant-table-cell {
   vertical-align: middle;

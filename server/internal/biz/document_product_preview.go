@@ -11,15 +11,29 @@ const (
 
 // DocumentProductPreview is a read projection of linked products, not order lines or image content.
 type DocumentProductPreview struct {
-	DocumentID   int
-	ProductCount int
-	ProductID    int
-	ProductName  string
-	ProductCode  string
+	DocumentID      int
+	ProductCount    int
+	ProductID       int
+	ProductName     string
+	ProductCode     string
+	StyleNo         string
+	CustomerStyleNo string
+	Products        []DocumentProductIdentity
+}
+
+type DocumentProductIdentity struct {
+	ProductID   int
+	ProductName string
+	ProductCode string
+}
+
+type DocumentProductPreviewOptions struct {
+	IncludeProducts bool
+	ExpectedVersion int
 }
 
 type DocumentProductPreviewRepo interface {
-	ListDocumentProductPreviews(context.Context, string, []int) ([]DocumentProductPreview, error)
+	ListDocumentProductPreviews(context.Context, string, []int, DocumentProductPreviewOptions) ([]DocumentProductPreview, error)
 }
 
 func DocumentProductPreviewPermissions(source string) []string {
@@ -35,8 +49,12 @@ func DocumentProductPreviewPermissions(source string) []string {
 	}
 }
 
-func (uc *BusinessAttachmentUsecase) ListDocumentProductPreviews(ctx context.Context, source string, documentIDs []int) ([]DocumentProductPreview, error) {
+func (uc *BusinessAttachmentUsecase) ListDocumentProductPreviews(ctx context.Context, source string, documentIDs []int, options DocumentProductPreviewOptions) ([]DocumentProductPreview, error) {
 	if uc == nil || uc.repo == nil || len(DocumentProductPreviewPermissions(source)) == 0 || len(documentIDs) == 0 || len(documentIDs) > DocumentProductPreviewBatchLimit {
+		return nil, ErrBadParam
+	}
+	if options.ExpectedVersion < 0 || (options.ExpectedVersion != 0 && !options.IncludeProducts) ||
+		(options.IncludeProducts && (source != DocumentProductPreviewOutsourcingOrder || len(documentIDs) != 1)) {
 		return nil, ErrBadParam
 	}
 	repo, ok := uc.repo.(DocumentProductPreviewRepo)
@@ -52,5 +70,5 @@ func (uc *BusinessAttachmentUsecase) ListDocumentProductPreviews(ctx context.Con
 		seen[id] = true
 		ids = append(ids, id)
 	}
-	return repo.ListDocumentProductPreviews(ctx, source, ids)
+	return repo.ListDocumentProductPreviews(ctx, source, ids, options)
 }

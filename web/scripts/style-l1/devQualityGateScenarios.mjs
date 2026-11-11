@@ -87,6 +87,9 @@ const SERVER_CI_HISTORY = Object.freeze([
   { id: 41, result: 'success', gitSha: repository.commit },
   { id: 40, result: 'failed', gitSha: '1'.repeat(40) },
   { id: 39, result: 'running', gitSha: '2'.repeat(40) },
+  { id: 38, result: 'queued', gitSha: '3'.repeat(40) },
+  { id: 37, result: 'cancelled', gitSha: '4'.repeat(40) },
+  { id: 36, result: 'skipped', gitSha: '5'.repeat(40) },
 ].map((run) => ({ ...run, url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/${run.id}` })))
 const historicalRepository = Object.freeze({
   commit: 'f'.repeat(40),
@@ -788,11 +791,18 @@ export function createDevQualityGateScenarios({
         assert.equal(await serverPanel.getByRole('link', { name: '查看覆盖率 Job', exact: true }).getAttribute('href'), job.url)
         assert.equal(await serverPanel.getByRole('link', { name: '查看覆盖率制品', exact: true }).getAttribute('href'), `${job.url}/artifacts/browse/output/ci/reports/coverage/`)
         assert.equal(await serverPanel.locator('.erp-dev-quality-server-pipeline__dag, .erp-dev-ci-timeline').count(), 0)
-        const history = serverPanel.locator('details').filter({ hasText: '历史流水线记录（GitLab）' })
-        await history.locator('summary').click()
-        assert.equal(await history.getByRole('link').count(), SERVER_CI_HISTORY.length + 1)
-        assert.equal(await history.getByRole('link').first().getAttribute('target'), '_blank')
-        await history.locator('summary').click()
+        const history = serverPanel.getByRole('region', { name: '历史流水线记录（GitLab）', exact: true })
+        const historyTable = history.getByRole('table')
+        await historyTable.waitFor()
+        assert.equal(await historyTable.locator('tbody > tr').count(), 5)
+        const historyLink = historyTable.getByRole('link', { name: '#41', exact: true })
+        assert.equal(await historyLink.getAttribute('target'), '_blank')
+        assert.equal(await historyLink.getAttribute('href'), SERVER_CI_HISTORY[0].url)
+        await history.getByRole('button', { name: '下一页', exact: true }).click()
+        await historyTable.getByRole('link', { name: '#36', exact: true }).waitFor()
+        assert.equal(await historyTable.locator('tbody > tr').count(), 1)
+        await history.getByRole('button', { name: '上一页', exact: true }).click()
+        await historyLink.waitFor()
 
         const jobGuideButton = serverPanel.getByRole('button', {
           name: '流程与原理',
@@ -1008,11 +1018,13 @@ export function createDevQualityGateScenarios({
           document.activeElement?.textContent?.includes('流程与原理')
         )
         const panel = page.getByRole('region', { name: 'GitLab CI 质量证据' })
-        await page.getByRole('region', { name: '当前质量门禁上下文' }).getByRole('status').waitFor()
+        const currentStatus = page.getByRole('region', { name: '当前质量门禁上下文' }).getByRole('status')
+        await currentStatus.getByText('尚未证明：当前 exact SHA 的 GitLab 普通 push CI', { exact: true }).waitFor()
+        await currentStatus.getByText('下一步：等待该提交触发 CI。', { exact: true }).waitFor()
         assert.equal(await panel.getByRole('status').count(), 0, '当前 CI 空态由页面摘要统一表达')
         assert.equal(await panel.getByText(/耗时|结束时间|测试报告|覆盖率报告/u).count(), 0, '没有流水线时不展开流水线元数据与报告占位')
         assert.equal(await panel.getByRole('link', { name: '查看 GitLab 测试报告', exact: true }).count(), 0)
-        await panel.locator('summary').click()
+        await historyTable.getByRole('link', { name: '#40', exact: true }).waitFor()
         await panel.getByRole('link', { name: '查看全部历史流水线', exact: true }).waitFor()
         await assertNoHorizontalOverflow(page, 'dev-quality-gates-desktop-light')
 

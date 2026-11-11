@@ -13,6 +13,8 @@ import (
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/productionexceptiondecision"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productionorderitem"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 
@@ -783,13 +785,9 @@ func (r *operationalFactRepo) ListProductionExceptions(ctx context.Context, filt
 	if err != nil {
 		return nil, 0, err
 	}
-	out := make([]*biz.ProductionExceptionDecision, 0, len(rows))
-	for _, row := range rows {
-		item, err := hydrateProductionException(ctx, r.data.postgres, row)
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, item)
+	out, err := hydrateProductionExceptions(ctx, r.data.postgres, rows)
+	if err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }
@@ -820,13 +818,96 @@ func commitProductionException(ctx context.Context, tx *inventoryDBTx, id int) (
 }
 
 func hydrateProductionException(ctx context.Context, client *ent.Client, row *ent.ProductionExceptionDecision) (*biz.ProductionExceptionDecision, error) {
-	item := entProductionExceptionToBiz(row)
-	if row.ProductionWipBatchID == nil {
-		return item, nil
+	items, err := hydrateProductionExceptions(ctx, client, []*ent.ProductionExceptionDecision{row})
+	if err != nil {
+		return nil, err
 	}
-	hasStock, err := client.ProductionFact.Query().Where(productionfact.ProductionWipBatchID(*row.ProductionWipBatchID), productionfact.FactType(biz.ProductionFactFinishedGoodsReceipt), productionfact.StatusNEQ(biz.OperationalFactStatusCancelled)).Exist(ctx)
-	item.StockDispositionRequired = hasStock
-	return item, err
+	return items[0], nil
+}
+
+func hydrateProductionExceptions(ctx context.Context, client *ent.Client, rows []*ent.ProductionExceptionDecision) ([]*biz.ProductionExceptionDecision, error) {
+	var itemIDs, batchIDs, requirementIDs []int
+	for _, row := range rows {
+		if row.ProductionWipBatchID != nil {
+			batchIDs = append(batchIDs, *row.ProductionWipBatchID)
+		}
+		if row.DecisionType == biz.ProductionExceptionOverIssue {
+			if row.ProductionMaterialRequirementID != nil {
+				requirementIDs = append(requirementIDs, *row.ProductionMaterialRequirementID)
+			}
+		} else {
+			itemIDs = append(itemIDs, row.ProductionOrderItemID)
+		}
+	}
+	orderItems := map[int]*ent.ProductionOrderItem{}
+	if len(itemIDs) > 0 {
+		items, err := client.ProductionOrderItem.Query().Where(productionorderitem.IDIn(itemIDs...)).
+			Select(productionorderitem.FieldID, productionorderitem.FieldProductionOrderID, productionorderitem.FieldProductID,
+				productionorderitem.FieldProductNameSnapshot, productionorderitem.FieldProductCodeSnapshot, productionorderitem.FieldSkuCodeSnapshot).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range items {
+			orderItems[item.ID] = item
+		}
+	}
+	batches := map[int]*ent.ProductionWIPBatch{}
+	stocked := map[int]bool{}
+	if len(batchIDs) > 0 {
+		items, err := client.ProductionWIPBatch.Query().Where(productionwipbatch.IDIn(batchIDs...)).
+			Select(productionwipbatch.FieldID, productionwipbatch.FieldProductionOrderID, productionwipbatch.FieldProductionOrderItemID, productionwipbatch.FieldBatchNo).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, batch := range items {
+			batches[batch.ID] = batch
+		}
+		ids, err := client.ProductionFact.Query().Where(productionfact.ProductionWipBatchIDIn(batchIDs...),
+			productionfact.FactType(biz.ProductionFactFinishedGoodsReceipt), productionfact.StatusNEQ(biz.OperationalFactStatusCancelled)).
+			Unique(true).Select(productionfact.FieldProductionWipBatchID).Ints(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			stocked[id] = true
+		}
+	}
+	requirements := map[int]*ent.ProductionOrderMaterialRequirement{}
+	if len(requirementIDs) > 0 {
+		items, err := client.ProductionOrderMaterialRequirement.Query().Where(productionordermaterialrequirement.IDIn(requirementIDs...)).
+			Select(productionordermaterialrequirement.FieldID, productionordermaterialrequirement.FieldProductionOrderID,
+				productionordermaterialrequirement.FieldProductionOrderItemID, productionordermaterialrequirement.FieldMaterialID,
+				productionordermaterialrequirement.FieldMaterialNameSnapshot, productionordermaterialrequirement.FieldMaterialCodeSnapshot).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, requirement := range items {
+			requirements[requirement.ID] = requirement
+		}
+	}
+
+	out := make([]*biz.ProductionExceptionDecision, 0, len(rows))
+	for _, row := range rows {
+		item := entProductionExceptionToBiz(row)
+		if row.ProductionWipBatchID != nil {
+			item.StockDispositionRequired = stocked[*row.ProductionWipBatchID]
+		}
+		if row.DecisionType == biz.ProductionExceptionOverIssue {
+			if row.ProductionMaterialRequirementID != nil {
+				requirement := requirements[*row.ProductionMaterialRequirementID]
+				if requirement != nil && requirement.ProductionOrderID == row.ProductionOrderID && requirement.ProductionOrderItemID == row.ProductionOrderItemID {
+					item.SourceIdentity = &biz.ProductionExceptionSourceIdentity{SubjectType: biz.InventorySubjectMaterial, SubjectID: requirement.MaterialID, Name: requirement.MaterialNameSnapshot, Code: requirement.MaterialCodeSnapshot}
+				}
+			}
+		} else if row.ProductionWipBatchID != nil {
+			line, batch := orderItems[row.ProductionOrderItemID], batches[*row.ProductionWipBatchID]
+			if line != nil && batch != nil && line.ProductionOrderID == row.ProductionOrderID && batch.ProductionOrderID == row.ProductionOrderID && batch.ProductionOrderItemID == line.ID {
+				item.SourceIdentity = &biz.ProductionExceptionSourceIdentity{SubjectType: biz.InventorySubjectProduct, SubjectID: line.ProductID, Name: displayString(line.ProductNameSnapshot), Code: displayString(line.ProductCodeSnapshot), SKUCode: displayString(line.SkuCodeSnapshot), BatchNo: batch.BatchNo}
+			}
+		}
+		out = append(out, item)
+	}
+	return out, nil
 }
 
 func entProductionExceptionToBiz(row *ent.ProductionExceptionDecision) *biz.ProductionExceptionDecision {

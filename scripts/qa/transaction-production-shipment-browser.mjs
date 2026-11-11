@@ -1363,13 +1363,13 @@ export async function productionShipmentFlow(
     ).toContainText(source.salesOrder.order_no);
     await selectOption(
       page,
-      shipping.getByLabel("仓库", { exact: true }),
+      shipping.getByRole("combobox", { name: "第 1 行成品仓", exact: true }),
       new RegExp(source.finishedWarehouse.name, "u"),
     );
     await selectOption(
       page,
-      shipping.getByLabel("批次", { exact: true }),
-      `${source.prefix}-FG 可用`,
+      shipping.getByRole("combobox", { name: "第 1 行批次", exact: true }),
+      `${source.prefix}-FG 可用 · 可发 ${source.quantity}`,
     );
     await shipping
       .getByLabel("数量", { exact: true })

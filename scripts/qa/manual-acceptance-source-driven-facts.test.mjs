@@ -177,6 +177,7 @@ function createRPC({
   let deliveryProcess;
   let deliveryNodes;
   let productionOrderItem;
+  let releasedProduction;
   const productionWIPOperations = [
     [701, "FABRIC_PROCESSING"],
     [702, "SEWING"],
@@ -296,9 +297,9 @@ function createRPC({
           material_requirements_state: "NOT_REQUIRED",
         };
       case "get_production_order":
-        return { production_order: { id: 600, status: "DRAFT", version: 1 } };
+        return releasedProduction ?? { production_order: { id: 600, status: "DRAFT", version: 1 } };
       case "release_production_order":
-        return {
+        releasedProduction = {
           production_order: { id: 600, status: "RELEASED", version: 2 },
           production_order_items: [structuredClone(productionOrderItem)],
           production_material_requirements: [
@@ -313,6 +314,7 @@ function createRPC({
           ],
           material_requirements_state: "READY",
         };
+        return releasedProduction;
       case "get_production_wip":
         assert.equal(domain, "production_wip");
         assert.equal(params.production_order_id, 600);
@@ -896,6 +898,35 @@ test("posted completion resumes unfinished packaging without recreating ledger f
       }),
     /exact fixed route/u,
   );
+});
+
+test("warehouse specimens stop at actionable points without prematurely writing stock or packaging", async () => {
+  const checkpoints = [
+    { checkpoint: "pending-return", receiptStatus: undefined, returnAction: false, packTransfer: false },
+    { checkpoint: "draft-receipt", receiptStatus: "DRAFT", returnAction: true, packTransfer: false },
+    { checkpoint: "pending-inspection", receiptStatus: "POSTED", returnAction: true, packTransfer: false },
+    { checkpoint: "pending-packaging", receiptStatus: "POSTED", returnAction: true, packTransfer: true },
+  ];
+  for (const { checkpoint, receiptStatus, returnAction, packTransfer } of checkpoints) {
+    const report = sourceReport();
+    const base = buildSourceDrivenFactPlan(report, { enabledPhases: ["production"] });
+    const { rework: _rework, ...production } = base.phases.production.source;
+    const plan = buildSourceDrivenFactPlan(report, {
+      enabledPhases: ["production"],
+      production: { ...production, completion: { ...production.completion, checkpoint } },
+    });
+    const fixture = createRPC();
+    const run = await applySourceDrivenFactPlan(plan, {
+      rpc: fixture.rpc, confirmation: sourceDrivenFactConfirmation(plan), targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    });
+    assert.equal(run.results.production.completion?.status, receiptStatus, checkpoint);
+    assert.equal(fixture.calls.some(({ params }) => params?.action === "RECEIVE_OUTSOURCING_RETURN"), returnAction, checkpoint);
+    assert.equal(fixture.calls.some(({ params }) => Boolean(params?.finished_goods_receipt_id)), packTransfer, checkpoint);
+    assert.ok(!fixture.calls.some(({ params }) => params?.action === "CONFIRM_PACKAGING_MATERIAL"), checkpoint);
+    const before = fixture.calls.length;
+    await ensureSourceDrivenProductionRoute({ rpc: fixture.rpc, plan, order: run.results.production.order, completion: run.results.production.completion });
+    assert.ok(fixture.calls.slice(before).every(({ method }) => /^(?:get_|list_)/u.test(method)), checkpoint);
+  }
 });
 
 test("source candidates retain exact blocked readiness without becoming writable facts", () => {

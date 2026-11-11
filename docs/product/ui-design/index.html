@@ -618,6 +618,8 @@
     .field input:focus, .field ui-select:focus, .field textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(var(--brand-rgb), .1); }
     .field input:is([type="date"], [type="datetime-local"]) { cursor: pointer; }
     .date-range-control { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; }
+    .date-range-control--typed { grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); }
+    @media (max-width: 480px) { .date-range-control--typed { grid-template-columns: auto minmax(0, 1fr); } }
     .date-range-control > span { color: var(--text-3); font-size: 12px; }
     .date-range-control > input { min-width: 0; }
     .popover-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 6px; }
@@ -1610,9 +1612,14 @@
     .rm-callout { margin-top: 11px; padding: 10px; border-radius: 10px; font-size: 13px; line-height: 1.55; }
     .rm-callout.danger { color: var(--danger); background: var(--danger-soft); }
     .rm-callout.warning { color: var(--warning); background: var(--warning-soft); }
-    .shipment-weight-summary { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; }
-    .shipment-weight-summary > .rm-callout { flex: 1 1 320px; min-width: 0; margin: 0; }
-    .shipment-weight-summary > .field { flex: 0 1 240px; width: min(100%,240px); min-width: 0; }
+    .line-add-continuation[data-line-summary] { flex-wrap: wrap; }
+    .line-add-continuation__summary { width: 100%; min-width: 0; }
+    .shipment-weight-summary { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 0; overflow-wrap: anywhere; }
+    .shipment-weight-manual { padding: 12px 12px 8px; }
+    .shipment-weight-manual > .field { width: min(100%, 240px); min-width: 0; }
+    .shipment-weight-optional { margin-inline-start: 6px; color: var(--text-3); font-size: 12px; }
+    [data-shipment-demo-weight-help][data-cleared="true"] { color: var(--warning); }
+    .shipment-weight-entry { display: grid; grid-template-columns: minmax(0, 1fr) 84px; align-items: center; gap: 6px; }
     .rm-inline-action { margin-top: 11px; min-height: 42px; padding: 0 11px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line-strong); border-radius: 11px; background: var(--surface); }
     .rm-timeline { display: grid; }
     .rm-timeline-item { position: relative; padding: 0 0 14px 21px; line-height: 1.4; }
@@ -4145,7 +4152,7 @@
     const tasks = [
       { id: 'T01', task_no: 'RW20260925-0024', associations: [{ kind: 'product', name: '节庆毛绒礼盒', code: 'P-GIFT-01', orderNo: 'SO-20260925-001', imageSeed: 0 }], approval: true, sourcePage: 'sales', sourceRecordId: 'S01', actions: ['complete','reject','block','urge','assign'], candidates: [['engineer-peer','周敏 · 产品工程']], lane: 'normal', title: '审批工程用料申请', object: 'SO-20260925-001 · 节庆毛绒礼盒', role: '产品工程', time: '今天 10:20', state: '可执行', badge: 'info', reason: '' },
       { id: 'T02', task_no: 'RW20260925-0025', associations: [{ kind: 'material', name: '黑色塑料眼 12mm', code: 'EY-12' }], sourcePage: 'purchase', sourceRecordId: 'P02', sourceAction: '查看采购订单并登记到货', actions: [], lane: 'normal', title: '采购到货点数', object: 'PO-20260924-013 · 塑料眼 12mm', role: '仓库', time: '今天 11:40', state: '可执行', badge: 'info', reason: '' },
-      { id: 'T03', task_no: 'RW20260925-0026', sourcePage: 'sales', sourceRecordId: 'S04', actions: ['resume','urge','assign'], candidates: [['sales-peer','林晓 · 销售']], lane: 'blocked', title: '处理客供图确认阻塞', object: 'SO-20260922-003 · 品牌吉祥物 30cm', role: '销售', time: '进入岗位：销售 · 2 天', state: '阻塞', badge: 'danger', reason: '客户尚未确认最新绣花图稿，排产无法继续。' },
+      { id: 'T03', task_no: 'RW20260925-0026', associations: [{kind:'product',name:'品牌吉祥物 30cm',code:'P-MASCOT-03',imageSeed:1,auxiliaryOnly:true}], sourcePage: 'sales', sourceRecordId: 'S04', actions: ['resume','urge','assign'], candidates: [['sales-peer','林晓 · 销售']], lane: 'blocked', title: '处理客供图确认阻塞', object: 'SO-20260922-003 · 品牌吉祥物 30cm', role: '销售', time: '进入岗位：销售 · 2 天', state: '阻塞', badge: 'danger', reason: '客户尚未确认最新绣花图稿，排产无法继续。' },
       { id: 'T04', task_no: 'RW20260925-0027', approval: true, sourcePage: 'quality', sourceRecordId: 'quality-1', actions: ['resume','urge'], lane: 'blocked', title: '复核质检异常处置', object: 'QI-20260924-019 · 海洋系列抱枕', role: '质量', time: '进入岗位：质量 · 6 小时', state: '阻塞', badge: 'danger', reason: '抽检色差超出标准，需要质量负责人判定。' },
       { id: 'T05', task_no: 'RW20260925-0028', sourcePage: 'production', sourceRecordId: 'production-1', sourceAction: '打开生产订单安排排产', actions: [], lane: 'due', title: '安排生产订单排产', object: 'MO-20260922-026 · IP 联名公仔', role: 'PMC', time: '截止 今天 16:00', state: '到期提醒', badge: 'warning', reason: '' },
       { id: 'T06', task_no: 'RW20260925-0029', sourcePage: 'shipments', sourceRecordId: 'shipments-1', actions: ['complete','block','urge','assign'], candidates: [['warehouse-peer','王宁 · 仓库']], lane: 'due', title: '完成出货放行复核', object: 'SR-20260925-006 · 冬日动物系列', role: '仓库', time: '截止 明天 10:00', state: '到期提醒', badge: 'warning', reason: '' },
@@ -4345,7 +4352,21 @@
         rowAction: options.rowAction || '查看'
       };
       config.rows = makeGenericRows(config);
-      if(key==='quality') config.rows.forEach((row,index)=>{row.result=row.status==='passed'?(index%2?'PASS':'CONCESSION'):row.status==='rejected'?'REJECT':'';});
+      if (key === 'quality') config.rows.forEach((row, index) => {
+        row.result = row.status === 'passed' ? (index % 2 ? 'PASS' : 'CONCESSION') : row.status === 'rejected' ? 'REJECT' : '';
+        row.batch = ['LOT-L0925', 'W0918', 'WIP-2208', ''][index % 4];
+        row.inspector = row.result ? ['陈洁', '周宁'][index % 2] : '';
+        if (!row.result) row.date = '';
+      });
+      if (key === 'production') config.rows.forEach((row, index) => {
+        row.styleNo = ['PL-24017', 'PL-25011', 'PL-25032', 'PL-25036'][index % 4];
+      });
+      if (key === 'shipments') config.rows.forEach((row, index) => {
+        if (row.status === 'shipped') {
+          row.transport = '顺成物流 · 公路运输';
+          row.trackingNo = `SC-DEMO-${String(index + 1).padStart(3, '0')}`;
+        }
+      });
       return config;
     }
 
@@ -4395,7 +4416,7 @@
       quality: defineListPage('quality', '质检管理', '质量检验', '质检单', '来源类型', '检验对象', {
         kind: '事实单据', icon: 'shield', prefix: 'QI', dateLabel: '检验日期', metricLabel: '抽检数量', metricType: 'quantity', unit: '个', primary: null,
         statuses: makeStatuses([['draft', '草稿'], ['submitted', '已提交'], ['passed', '已通过'], ['rejected', '已拒绝'], ['cancelled', '已取消']]),
-        sampleParties: ['采购来料', '委外回货', '生产工序', '出货前成品'], sampleItems: ['短毛绒 2mm / 批次 L0925', '刺绣片 / 批次 W0918', '皮套 / WIP-2208', '冬日动物系列 / SH0925'],
+        sampleParties: ['采购来料', '委外回货', '生产工序', '出货前成品'], sampleItems: ['短毛绒 2mm', '刺绣片', '皮套', '冬日动物系列'],
         boundary: '质检状态变化不会自行增减库存总量；判定和库存处置必须分别留痕。'
       }),
       'inventory-operations': defineListPage('inventory-operations', '仓储管理', '库存作业', '盘点作业', '仓库', '存货与盘点范围', { boundary: '多行盘点及人工调整经他人复核后过账；零差异保留完成记录，库存变化时重新盘点。' }),
@@ -5134,6 +5155,8 @@
       } catch { return defaults; }
     }
     const initialAppearance = readPrototypeAppearance(window.__ERP_UI_DESIGN_ENTRY__ !== 'login');
+    const defaultListColumnOrder = ['gallery', 'no', 'party', 'status', 'batch', 'date', 'inspector', 'metric', 'outstanding', 'transport', 'owner', 'progress', 'risk'];
+    const defaultListVisibleColumns = defaultListColumnOrder.filter(key => key !== 'progress');
 
     const state = {
       authenticated: window.__ERP_UI_DESIGN_ENTRY__ !== 'login', loginPasswordVisible: false, loginError: '',
@@ -5149,11 +5172,12 @@
       formDisplay: initialAppearance.formDisplay,
       mode: initialAppearance.mode,
       accent: initialAppearance.accent,
-      visibleColumns: new Set(['gallery', 'no', 'party', 'status', 'date', 'metric', 'owner', 'risk']),
+      visibleColumns: new Set(defaultListVisibleColumns),
       columnDraft: null,
-      columnOrder: ['gallery', 'no', 'party', 'status', 'date', 'metric', 'owner', 'progress', 'risk'],
+      columnOrder: [...defaultListColumnOrder],
       exceptionType: 'all', exceptionExecution: 'all',
       filterParty: '', filterOwner: 'all', filterRisk: 'all', filterIncludeEnded: true, filterDateFrom: '', filterDateTo: '',
+      productionDateField: 'start',
       historySource: '客户档案',
       overlay: null, drawer: null, taskStep: 1, taskMaxStep: 1, taskAction: 'complete', boardStatus: 'all', boardPage: 1, boardPageSize: 20, boardMode: taskHandlingPreview ? 'todo' : 'all', boardSearch: '', boardRole: 'all', trackingFilters: {}, trackingPageSizes: {},
       handlingTaskId: null, handlingError:'', handlingConfirmation:null,
@@ -5321,8 +5345,8 @@
       return `<svg class="product-art" viewBox="0 0 120 120" role="img" aria-label="${escapeHTML(label)}产品图片"><rect width="120" height="120" rx="18" fill="${light}"/><circle cx="38" cy="33" r="17" fill="${soft}"/><circle cx="82" cy="33" r="17" fill="${soft}"/><circle cx="60" cy="49" r="34" fill="${soft}"/><ellipse cx="60" cy="88" rx="33" ry="27" fill="${soft}"/><circle cx="49" cy="46" r="4" fill="${strong}"/><circle cx="71" cy="46" r="4" fill="${strong}"/><ellipse cx="60" cy="59" rx="12" ry="9" fill="#fff" opacity=".72"/><circle cx="60" cy="57" r="4" fill="${strong}"/><path d="M53 67 Q60 73 67 67" fill="none" stroke="${strong}" stroke-width="3" stroke-linecap="round"/><path d="M39 88 Q60 99 81 88" fill="none" stroke="${strong}" stroke-width="5" stroke-linecap="round" opacity=".7"/></svg>`;
     }
 
-    function renderProductThumb(seed = 0, label = '产品') {
-      return `<button type="button" class="product-thumb" data-action="product-image-preview" data-seed="${Number(seed) || 0}" data-label="${escapeHTML(label)}" aria-label="查看${escapeHTML(label)}大图">${renderProductArt(seed,label)}</button>`;
+    function renderProductThumb(seed = 0, label = '产品', auxiliaryOnly = false) {
+      return `<button type="button" class="product-thumb${auxiliaryOnly?' rm-card-image':''}" data-action="product-image-preview" data-seed="${Number(seed) || 0}" data-label="${escapeHTML(label)}" aria-label="${auxiliaryOnly?`查看产品图：${escapeHTML(label)}`:`查看${escapeHTML(label)}大图`}" ${auxiliaryOnly?'data-photo-role="secondary"':''}>${auxiliaryOnly?`${icon('image')}<small>查看产品图</small>`:renderProductArt(seed,label)}</button>`;
     }
 
     function copyValue(value, content = escapeHTML(value)) {
@@ -5482,6 +5506,7 @@
     }
     function renderBusinessRecordActions(config,rows,detail=false) {
       const row=rows.length===1?rows[0]:null;
+      if(config.productWork) return detail?'':`<div class="business-record-actions"><button class="btn primary" data-action="open-selected" ${row?'':'disabled'}>${config.productWork.review}</button></div>`;
       const attrs=`data-page="${config.key}" data-id="${row?.id||''}"`;
       if(rows.length>1)return `<div class="business-record-actions"><button class="btn" data-action="batch-action" data-value="export">导出所选</button>${businessRecordActions[config.key].filter(spec=>spec.batch).map(spec=>`<button class="btn" data-action="business-record-action" data-operation="${spec.id}" data-page="${config.key}" ${rows.every(item=>!businessActionBlock(config,item,spec))?'':'disabled title="所选记录中包含不可执行的状态"'}>${spec.label}（${rows.length}）</button>`).join('')}<span class="data-note">其余操作请选择一条记录</span><button class="text-btn" data-action="clear-selection">清除选择</button></div>`;
       const pending=businessRecordTasks(config,row).filter(task=>task.lane!=='done').length;
@@ -5717,6 +5742,7 @@
       state.qualityResult = '';
       state.filterDateFrom = '';
       state.filterDateTo = '';
+      state.productionDateField = 'start';
       state.pageNo = 1;
     }
 
@@ -5806,8 +5832,8 @@
     function currentPageConfig() {
       if (state.page === 'entity-form') return listConfig[state.formSourcePage] || listConfig.sales;
       if (state.page === 'production-hub' && state.moduleTabs[state.page] !== 'production') return listPreviewConfig(productionRecordPreviewConfig());
-      if (moduleHubs[state.page]) return listPreviewConfig(listConfig[state.moduleTabs[state.page]]);
-      return listPreviewConfig(listConfig[state.page]) || null;
+      if (moduleHubs[state.page]) return listPreviewConfig(warehouseProductPreviewConfig(listConfig[state.moduleTabs[state.page]]));
+      return listPreviewConfig(warehouseProductPreviewConfig(listConfig[state.page])) || null;
     }
 
     function savePrototypeAppearance() {
@@ -5859,14 +5885,14 @@
       {key:'affected', purpose:'各类测试、执行入口与已有报告', area:'quality', title:'测试执行', source:'当前改动的受影响范围', status:'已核对', detail:'样例：空状态样式、手机任务列表和设计查看器；检查组件、页面恢复与窄屏。', path:'scripts/qa/affected.sh'},
       {key:'chain-audit', purpose:'从测试执行的链路实测页签查看批次、问题与逐步证据', area:'quality', title:'链路实测报告', source:'本地实跑批次与证据清单', status:'未复验', detail:'按批次查看链路结果、问题与复验、执行与证据三个 Tab；区分历史源码和当前工作区，登记场景不等于全部实跑通过。', path:'/__dev/business-chain-audit'},
       {key:'gates', purpose:'固定版本 CI 与本机诊断', area:'quality', title:'质量门禁', source:'固定版本的 CI 结果', status:'待核对', detail:'流程与并发原理可按需展开；样例版本尚缺完整 CI 终态，局部测试通过不代表发布资格。', path:'/__dev/quality-gates'},
-      {key:'data', purpose:'模拟数据、复用与批次结果', area:'quality', title:'测试数据', source:'隔离样例与验证资料', status:'已核对', detail:'按用途选择基础数据、业务场景或完整回归；就近处理阻断，准备后确认批次，执行记录单独查看。', path:'/__dev/data-preparation'},
+      {key:'data', purpose:'准备手测数据并查看结果', area:'quality', title:'测试数据', source:'统一手测数据配方与执行记录', status:'已核对', detail:'选择本地开发或服务器 Demo，核对覆盖内容后补齐缺项；执行记录保留原环境。', path:'/__dev/data-preparation'},
       {key:'config', purpose:'配置包预检、差异与测试应用', area:'delivery', title:'客户配置', source:'配置快照与固定版本', status:'已核对', detail:'核对客户配置和当前版本的关系；不把配置选择当成部署完成。', path:'/__dev/customer-config'},
       {key:'versions', purpose:'制品、部署与回滚', area:'delivery', title:'版本发布', source:'不可变制品与目标读回', status:'待核对', detail:'选择版本后核对目标、门禁与回滚点。操作指引在当前标签页进入，标题栏铺满页面，目录与正文齐顶；章节全部展开，目录只做同页定位。未完成目标读回前，保持未证明。', path:'/__dev/version-center'},
       {key:'migration', purpose:'备份恢复、升级计划与结果', area:'delivery', title:'数据库迁移', source:'迁移计划、备份与恢复验证', status:'待核对', detail:'计划准备就绪后才允许确认；失败保留恢复入口，不自动执行或重试迁移。', path:'/__dev/database-migration'},
       {key:'recovery', purpose:'目标安全、备份与恢复证据', area:'delivery', title:'安全与恢复', source:'安全合同、恢复点与演练回执', status:'未核验', detail:'只读核对应用、入口身份、异常监测及备份隔离；数据库恢复不能代替完整抗勒索核验。', path:'/__dev/drill-recovery'}
     ];
     const devDesignToolPages = {
-      affected: {label:'测试执行', views:[['overview','测试总览'],['plan','本轮验证'],['runs','覆盖报告'],['chains','链路实测'],['pressure','压力测试'],['server','服务器验证'],['guide','测试指引']]},
+      affected: {label:'测试执行', views:[['overview','测试总览'],['plan','本轮验证'],['runs','覆盖报告'],['chains','链路实测'],['full-acceptance','完整回归'],['pressure','压力测试'],['server','服务器验证'],['guide','测试指引']]},
       config: {label:'客户配置', views:[]},
       migration: {label:'数据库迁移', views:[]},
       versions: {label:'版本发布', views:[]},
@@ -5979,9 +6005,52 @@
     function renderDevVisualizationPreview(key) {
       const steps=(label,nodes)=>`<div class="dev-git-lock-flow" role="img" aria-label="${label}">${nodes.map((node,index)=>`${index?'<span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span>':''}<div class="dev-git-lock-flow__node">${escapeHTML(node)}</div>`).join('')}</div>`;
       if(key==='handling') return `<section><h3>任务办理</h3><p>任务清单按岗位、办理类型和手机支持范围筛选，点选事项在同行核对正式规则。电脑覆盖同权限下全部人工办理，手机提供适用子集。</p><p><a href="/__dev/task-handling" target="_top">打开任务清单</a></p></section>`;
-      if(key==='chain-audit') return `<section aria-label="链路实测报告页面说明"><p>默认只看链路、结果和首个未通过环节；点链路后查看步骤，关闭详情保留原范围。</p><table class="dev-tool-table"><thead><tr><th>报告详情页签</th><th>查看内容</th></tr></thead><tbody><tr><th>报告概况</th><td>批次结论、时间、环境、源码和覆盖边界；路径、定义核对及场景覆盖按需打开</td></tr><tr><th>问题与复验</th><td>原始问题、影响与有证据的复验；历史失败保留</td></tr><tr><th>执行与证据</th><td>实际执行记录、原始文件和完整证据包</td></tr></tbody></table><p class="data-note">身份未证明、未执行与缺失保持明确；本交互样例不读取报告或运行测试。</p></section>`;
-      if(key==='gates') return `<section><h3>质量门禁 · 环境与功能层级</h3><table class="dev-tool-table" aria-label="质量门禁环境与功能"><thead><tr><th>上层分组</th><th>功能</th><th>来源</th></tr></thead><tbody><tr><th>本地检查</th><td>本机诊断 / 改动缺口</td><td>本地执行回执与工作区改动</td></tr><tr><th>服务器 CI</th><td>CI 结果与 GitLab 精确入口</td><td>GitLab Runner · 已提交版本</td></tr><tr><th>门禁规则</th><td>门禁目录</td><td>通用规则 · 按工作区改动筛选</td></tr></tbody></table><p class="data-note">工作区版本与 CI 对应版本分别标明；独立工作台显示服务端检查与诊断历史。诊断标题与执行轨道使用同一执行端名称。以下仅为原理样例。</p><h3>阶段依赖总览 · 样例</h3>${steps('样例阶段依赖',['计划 · 1 个 Job','质量检查 · 3 个 Job','CI Gate · 1 个 Job'])}<p class="data-note">总览按阶段聚合，阶段内关系在完整图和明细核对。</p><details><summary>查看完整 Job 依赖图（5 个节点）</summary><div class="dev-git-lock-flow" role="img" aria-label="样例完整 Job 关系"><div class="dev-git-lock-flow__node">plan</div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__branches"><article>web</article><article>server</article></div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">browser：等待 web 与 server</div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">gate</div></div></details></section>`;
-      if(key==='data') return `<section data-dev-data-preview><h3>测试数据 · 操作示例</h3><p class="data-note" data-data-environment>数据目标：本地开发库 · 设计样例</p><div class="dev-design-toolbar" role="group" aria-label="测试数据视图示例"><button class="btn" data-action="dev-data-view" data-value="scope" aria-pressed="true">准备数据</button><button class="btn" data-action="dev-data-view" data-value="confirm" aria-pressed="false" hidden>当前批次</button><button class="btn" data-action="dev-data-view" data-value="receipts" aria-pressed="false">执行记录</button></div><div data-data-panel="scope"><table class="dev-tool-table" aria-label="数据准备方式示例"><thead><tr><th>准备范围</th><th>用途与保留</th><th>当前条件</th></tr></thead><tbody><tr><th>长期业务场景数据（默认）</th><td>固定批次补齐模拟业务数据，长期保留</td><td>本地开发 · 样例可准备</td></tr><tr><th>本地基础数据</th><td>演示账号、单位和仓库，长期保留</td><td>样例可准备</td></tr><tr><th>完整回归</th><td>新建隔离库，完成后清理</td><td>待处理：样例有未提交改动</td></tr></tbody></table><p>默认选择长期业务场景数据与本地开发；服务器 demo 演练环境需手动切换。核对所选范围后准备计划，确认后才执行。</p><button class="btn primary" data-action="dev-data-prepare">演示准备业务场景</button></div><div data-data-panel="confirm" hidden><h4>当前批次 · 业务场景样例</h4><p>固定目标：本地开发；内容：固定批次的模拟业务场景；保留：长期使用。</p><button class="btn" data-action="dev-data-view" data-value="scope">返回准备数据</button></div><div data-data-panel="receipts" hidden><p>尚无执行记录。准备计划不代表已经生成数据。</p></div><p class="data-note">仅演示查看与计划，不执行数据写入。</p></section><details><summary>复用判断与模块依赖</summary><h3>是否复用已有数据</h3>${steps('样例复用判断',['核对目标与旧回执','比较数据合同及逻辑指纹','按变化复用、重验或刷新','只读 readiness 与回执读回'])}<h3>哪些模块一起刷新</h3><div class="dev-git-lock-flow" role="img" aria-label="样例模块依赖"><div class="dev-git-lock-flow__node">来源单</div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__branches"><article>协同任务 → 附件</article><article>业务结果 → 采购质检与附件</article></div></div><p class="data-note">这里只演示分图阅读；实际范围由当前登记依赖和本次回执确定。</p></details>`;
+      if(key==='chain-audit') return `<section aria-label="链路实测报告页面说明"><p>链路摘要下方直接显示步骤；点链路筛选步骤，关闭详情保留原范围。</p><table class="dev-tool-table"><thead><tr><th>报告详情页签</th><th>查看内容</th></tr></thead><tbody><tr><th>报告概况</th><td>批次结论、时间、环境、源码和覆盖边界；路径、定义核对及场景覆盖按需打开</td></tr><tr><th>问题与复验</th><td>原始问题、影响与有证据的复验；历史失败保留</td></tr><tr><th>执行与证据</th><td>实际执行记录、原始文件和完整证据包</td></tr></tbody></table><p class="data-note">身份未证明、未执行与缺失保持明确；本交互样例不读取报告或运行测试。</p></section>`;
+      if(key==='gates') return `<section><h3>质量门禁 · 环境与功能层级</h3><table class="dev-tool-table" aria-label="质量门禁环境与功能"><thead><tr><th>上层分组</th><th>功能</th><th>来源</th></tr></thead><tbody><tr><th>本地检查</th><td>本机诊断 / 改动缺口</td><td>本地执行回执与工作区改动</td></tr><tr><th>服务器 CI</th><td>CI 结果与 GitLab 精确入口</td><td>GitLab Runner · 已提交版本</td></tr><tr><th>门禁规则</th><td>门禁目录</td><td>通用规则 · 按工作区改动筛选</td></tr></tbody></table>
+        <p class="data-note">工作区版本与 CI 对应版本分别标明；独立工作台显示服务端检查与诊断历史。</p>
+        <section class="dev-design-panel" aria-label="服务器 CI 页面样例">
+          <h3>服务器 CI · 结果样例</h3>
+          <div role="status"><strong>GitLab 连接正常 · 当前提交无 CI</strong><p class="data-note">已读取 GitLab；当前提交还没有对应的 CI 记录。下一步：等待该提交触发 CI。</p></div>
+          <h4>历史流水线记录（GitLab）</h4>
+          <p class="data-note">历史状态来自 GitLab；历史成功不能证明当前提交通过。正式页面每页 5 条，流水线编号打开对应记录。</p>
+          <table class="dev-tool-table" aria-label="历史流水线样例"><thead><tr><th scope="col">流水线</th><th scope="col">提交版本</th><th scope="col">GitLab 状态</th></tr></thead><tbody><tr><th scope="row">#42</th><td><code>demo-a1b2c3d</code></td><td>成功</td></tr><tr><th scope="row">#41</th><td><code>demo-c4d5e6f</code></td><td>失败</td></tr></tbody></table>
+        </section>
+        <h3>阶段依赖总览 · 原理样例</h3>${steps('样例阶段依赖',['计划 · 1 个 Job','质量检查 · 3 个 Job','CI Gate · 1 个 Job'])}<p class="data-note">总览按阶段聚合，阶段内关系在完整图和明细核对。</p><details><summary>查看完整 Job 依赖图（5 个节点）</summary><div class="dev-git-lock-flow" role="img" aria-label="样例完整 Job 关系"><div class="dev-git-lock-flow__node">plan</div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__branches"><article>web</article><article>server</article></div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">browser：等待 web 与 server</div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">gate</div></div></details></section>`;
+      if(key==='data') return `<section data-dev-data-preview><h3>测试数据 · 操作示例</h3>
+        <div class="dev-design-toolbar" role="group" aria-label="测试数据视图示例">
+          <button class="btn" data-action="dev-data-view" data-value="scope" aria-pressed="true">准备数据</button>
+          <button class="btn" data-action="dev-data-view" data-value="receipts" aria-pressed="false">执行记录</button>
+        </div>
+        <section data-data-panel="scope">
+          <p>本地和 Demo 使用同一套手测数据，只补齐缺项，保留已有记录。</p>
+          <div class="dev-design-toolbar" role="group" aria-label="数据目标">
+            <label><input type="radio" name="preview-data-target" value="本地开发" checked> 本地开发</label>
+            <label><input type="radio" name="preview-data-target" value="服务器 Demo"> 服务器 Demo</label>
+            <button class="btn primary" data-action="dev-data-prepare">补齐手测数据</button>
+          </div>
+          <p class="data-note" data-data-result role="status"></p>
+          <section class="dev-design-operation dev-design-panel" aria-labelledby="dev-data-preview-coverage">
+            <h4 id="dev-data-preview-coverage">覆盖内容</h4>
+            <p class="data-note">基础资料、岗位任务、产品图与附件，覆盖正常、异常和纠正场景。下方为两条业务链示例。</p>
+            <div class="dev-design-reading">
+              <nav aria-label="业务链范围目录">
+                <button class="btn" data-action="dev-data-chain" data-value="sales" aria-pressed="true">销售受理到生产准备</button>
+                <button class="btn" data-action="dev-data-chain" data-value="purchase" aria-pressed="false">采购下单到入库应付</button>
+              </nav>
+              <div>
+                <section data-data-chain-panel="sales"><h5>销售受理到生产准备</h5><details><summary>提交后启动受理</summary><p>订单提交后发起受理，按业务分支创建岗位任务。</p></details></section>
+                <section data-data-chain-panel="purchase" hidden><h5>采购下单到入库应付</h5><details><summary>收货后进入质检</summary><p>合格材料按采购收货过账入库，并保留应付依据。</p></details></section>
+              </div>
+            </div>
+          </section>
+        </section>
+        <section data-data-panel="receipts" hidden><p data-data-history>暂无执行记录</p></section>
+        <dialog aria-labelledby="dev-data-preview-confirm-title">
+          <h4 id="dev-data-preview-confirm-title">补齐手测数据</h4>
+          <p>已有业务记录会保留。当前仅为操作示例。</p>
+          <form method="dialog"><button class="btn">取消</button><button class="btn primary" value="confirm" data-action="dev-data-confirm">确认补齐</button></form>
+        </dialog>
+      </section>`;
 
       if(key==='topics') return `<section aria-label="业务专题页面说明"><p>业务专题保留独立入口：关系图与当前对象条件就近查看，数据与验证范围按需展开。</p><a class="btn" href="/__dev/business-topics" target="_top">打开当前业务专题</a><section class="dev-inline-panel" data-finance-workbench-preview><h3>财务关联概览</h3><p>销售与出货、采购与仓库、委外与生产三行分别展示四个业务步骤；节点仅保留名称和关键条件。</p><p>总览始终保留：步骤悬停、聚焦或点按只展开邻近说明；专题、规则与只读记录共用一个侧栏，顶部固定关闭入口，查阅不堆积返回历史。</p><p>账款以真实出货、入库或验收为来源，首款可先收付；仓库纠错不会直接改写已过账应付。</p><div class="dev-design-toolbar"><a class="btn" href="/__dev/business-topics?flow_topic=finance_relations" target="_top">查看三行关联概览</a><a class="btn" href="/__dev/business-topics?flow_topic=finance_relations&finance_topic=purchase" target="_top">采购退货与数量差额</a><a class="btn" href="/__dev/business-topics?flow_topic=finance_relations&finance_topic=terms" target="_top">月结与期间对账</a><a class="btn" href="/__dev/business-topics?flow_topic=finance_relations&finance_topic=permissions" target="_top">审批、权限与凭据</a></div><p class="data-note">这里只说明布局与规则；实际记录需在当前登录环境按权限查询，不使用演示金额充当真实凭证。</p></section></section>`;
       if(!['flows','rules'].includes(key)) return '';
@@ -6134,8 +6203,8 @@
     }
     function renderDevDeliveryTaskMap(view) {
       const tasks = {
-        config: [['总览','先看结论与验证状态，顶部任务统一切换'],['检查配置包','项目与结果直接比较，失败项直接显示实际值与要求，完整依据一次展开'],['查看变化','比较当前值、候选值与影响范围'],['页面配置预览','菜单、字段、编号和打印内容默认展开，保留原有手动收起、全部标识、字段依据与保护规则'],['试跑与发布','报告一次展开，通过检查后提供交接动作']],
-        migration: [['数据库升级','当前步骤与确认常显；最近一次升级默认展开时间、六步路径与恢复摘要，保留手动收起；完整事务边界按需查看'],['运行检查','没有待执行迁移时可从升级结论进入；核对后端与工具，未恢复时提供恢复操作'],['操作记录','查看独立的迁移与恢复证据']],
+        config: [['总览','先看验证状态与配置上线交接路径'],['检查配置包','用四条路径显示配置数量和使用去向；选择路径原位展开实际值。运行设置和评审直接显示完整清单，状态合成短行，阻断直接显示'],['查看变化','直接比较全部模块与列表字段，覆盖优先'],['页面配置预览','菜单、字段、编号和模板清单默认可读；标识和模板字段依据按需查看'],['测试验证','按样本试跑或本地应用查看输入、处理、产出和回执'],['发布交接','证据批次、当前检查与执行器交接分步可读；通过本次检查后提供交接动作']],
+        migration: [['数据库升级','当前步骤与确认常显；最近一次升级默认展开时间、六步路径与恢复摘要，可手动收起；「查看事务与恢复边界」独立展开流程图和失败处理'],['运行检查','没有待执行迁移时可从升级结论进入；核对后端与工具，未恢复时提供恢复操作'],['操作记录','查看独立的迁移与恢复证据']],
         versions: [['版本与部署','四列清单展示适用操作，制品信息按需查看'],['发布检查','核对候选、制品、目标、门禁及 test 数据方式'],['发布与部署耗时','查看 CI、制品发布与目标部署时间'],['操作记录','按动作、目标和结果查看回执']],
         recovery: [['安全核验','状态与下一步常显，完整证据从行内查看'],['恢复演练','建议在原行标记，点击名称查看详情与可用动作'],['备份记录','独立查看各环境的保留状态、分页与保护依据，往返保留选择'],['应急指引','处置顺序直接显示，接管说明按需查看']]
       };
@@ -6292,11 +6361,17 @@ active = new Set()
       return `<section class="surface dev-design-section dev-design-reading"><nav aria-label="测试指引目录">${devTestingGuideViews.map(([key,label])=>`<button class="btn dev-tool-link" aria-pressed="${key===selected[0]}" data-action="dev-guide-topic" data-value="${key}">${label}</button>`).join('')}</nav><div><h2>${selected[1]}</h2><p>${summaries[selected[0]]}</p><p>${descriptions[selected[0]]}</p>${selected[0]==='methods'?renderDevTestingMethods():''}<p class="data-note">交互样例，不运行检查。</p></div></section>`;
     }
     function renderDevChainAuditResults() {
-      const chains=[['purchase','采购下单到入库应付'],['correction','采购入库的退货、调整与冲正'],['quality','采购拒收处置']];
+      const chains=[
+        ['purchase','采购下单到入库应付','采购到货交接'],
+        ['correction','采购入库的退货、调整与冲正','核对退货与调整'],
+        ['quality','采购拒收处置','登记不合格品处置'],
+      ];
       const selected=chains.find(([key])=>key===state.devChainAuditChain);
-      const header=`<div class="dev-design-toolbar">${selected?'<button class="btn" data-action="dev-chain-all">收起步骤</button>':''}<h2>链路实测报告</h2><button class="btn" data-action="dev-evidence" data-value="chain-audit">报告详情</button></div>`;
-      const table=`<table class="dev-tool-table" aria-label="链路实测结果样例"><thead><tr><th>链路</th><th>结果</th><th>首个未通过环节</th></tr></thead><tbody>${chains.map(([key,label])=>`<tr><th><button class="btn dev-tool-link" data-action="dev-chain-select" data-value="${key}" aria-expanded="${selected?.[0]===key}">${label}</button></th><td>未采集</td><td>尚无实跑记录</td></tr>${selected?.[0]===key?'<tr><td colspan="3"><table class="dev-tool-table" aria-label="链路步骤样例"><thead><tr><th>环节</th><th>结果</th><th>实际操作与读回</th></tr></thead><tbody><tr><th>所选链路的交接</th><td>未采集</td><td>在正式页面按批次核对实际记录，展开同行查看岗位和事实边界。</td></tr></tbody></table></td></tr>':''}`).join('')}</tbody></table>`;
-      return `<section class="surface dev-design-section">${header}${table}<p class="data-note">交互样例，不表示真实测试结果。</p></section>`;
+      const header=`<div class="dev-design-toolbar"><h2>链路实测报告</h2><button class="btn" data-action="dev-evidence" data-value="chain-audit">报告详情</button></div>`;
+      const summary=`<table class="dev-tool-table" aria-label="链路实测结果样例"><thead><tr><th>链路</th><th>结果</th><th>首个未通过环节</th></tr></thead><tbody>${chains.map(([key,label])=>`<tr><th><button class="btn dev-tool-link" data-action="dev-chain-select" data-value="${key}" aria-current="${selected?.[0]===key}">${label}</button></th><td>未采集</td><td>尚无实跑记录</td></tr>`).join('')}</tbody></table>`;
+      const stepChains=selected?[selected]:chains;
+      const steps=`<div class="dev-design-toolbar"><span>${stepChains.length} 个步骤</span>${selected?'<button class="btn" data-action="dev-chain-clear">查看全部链路</button>':''}</div><table class="dev-tool-table" aria-label="链路步骤样例"><thead><tr><th>环节</th><th>结果</th><th>实际操作与读回</th></tr></thead><tbody>${stepChains.map(([,label,step])=>`<tr><th>${selected?'':`<small>${label}</small>`}<div>${step}</div></th><td>未采集</td><td>在正式页面按批次核对实际记录</td></tr>`).join('')}</tbody></table>`;
+      return `<section class="surface dev-design-section">${header}${summary}${steps}<p class="data-note">交互样例，不表示真实测试结果。</p></section>`;
     }
     function renderDevDesignContent() {
       if(state.devTool==='affected'&&state.devViews.quality==='guide')return renderDevTestingGuide();
@@ -6309,6 +6384,32 @@ active = new Set()
         if (view === 'server') return `<section class="surface dev-design-section"><h2>服务器验证</h2><table class="dev-tool-table" aria-label="服务器证据分类"><thead><tr><th>来源</th><th>版本</th><th>结果</th><th>详情</th></tr></thead><tbody>${[['ci','GitLab CI'],['demo','demo 环境'],['test','test 环境'],['erp','erp 正式环境']].map(([key,label])=>`<tr><th>${label}</th><td>—</td><td>未采集</td><td><button class="btn dev-tool-link" data-action="dev-testing-server-info" data-value="${key}">查看证据</button></td></tr>`).join('')}</tbody></table><p class="data-note">交互样例，不读取服务器。</p></section>`;
         if (view === 'overview') return renderDevTestingOverview();
         if (view === 'chains') return renderDevChainAuditResults();
+        if (view === 'full-acceptance') return `<section class="surface dev-design-section">
+          <div class="dev-design-grid">
+            <section class="dev-design-panel" aria-labelledby="dev-regression-preview-conditions">
+              <h3 id="dev-regression-preview-conditions">运行条件</h3>
+              <p>使用本地临时数据库，回归结束后自动清理。</p>
+              <p><span class="badge warning">样例 · 暂不能运行</span> 请先固定要验证的代码提交。</p>
+              <p class="data-note">在这里准备回归或重新检查。</p>
+            </section>
+            <div class="dev-design-panel">
+              <section aria-labelledby="dev-regression-preview-coverage">
+                <h3 id="dev-regression-preview-coverage">回归范围</h3>
+                <p>每次回归覆盖全部已登记场景。</p>
+              </section>
+              <section aria-labelledby="dev-regression-preview-records">
+                <h3 id="dev-regression-preview-records">执行记录</h3>
+                <details class="dev-design-settings"><summary>样例 · 计划待确认</summary><p>已生成本地回归计划，尚未运行。</p></details>
+              </section>
+            </div>
+          </div>
+          <section class="dev-design-panel" aria-labelledby="dev-regression-preview-chains">
+            <h3 id="dev-regression-preview-chains">业务链与步骤</h3>
+            <p>销售受理到生产准备</p>
+            <details class="dev-design-settings"><summary>1. 提交后启动受理</summary><p>销售提交订单后进入受理流程。</p></details>
+          </section>
+          <a class="btn" href="/__dev/testing?view=full-acceptance" target="_top">打开完整回归</a>
+        </section>`;
         if (view === 'pressure') return `<section class="surface dev-design-section"><div class="dev-step-actions"><label>数据规模 <ui-select id="dev-pressure-scale-preview" aria-label="数据规模示意" data-required-selection>${['基础 · 20 张历史单','增长 · 100 张历史单','高量 · 500 张历史单'].map(label=>`<option${state.devPressureScale===label?' selected':''}>${label}</option>`).join('')}</ui-select></label><label>负载档位 <ui-select id="dev-pressure-load-preview" aria-label="负载档位示意" data-required-selection><option value="quick"${state.devPressureLoad!=='capacity'?' selected':''}>短档回归</option><option value="capacity"${state.devPressureLoad==='capacity'?' selected':''}>10 分钟容量</option></ui-select></label><button class="btn primary" data-action="dev-pressure-preview">运行压测演示</button></div>${state.devPressurePreview?`<p><span class="badge">${state.devPressurePreview==='capacity'?'容量':'短档'}样例</span> <span class="badge warning">历史候选 · 当前源码未验证</span></p><table class="dev-tool-table" aria-label="压力测试关键结果样例"><thead><tr><th>指标</th><th>结果</th></tr></thead><tbody><tr><th>混合操作吞吐</th><td>3.2 次 / 秒</td></tr><tr><th>实际 API 吞吐</th><td>5.8 次 / 秒</td></tr><tr><th>完整业务流程</th><td>200 条</td></tr><tr><th>最高 API p95</th><td>520 ms</td></tr></tbody></table><button class="btn" data-action="dev-testing-pressure-info">报告详情</button>`:'<p class="data-note">尚未演示压力报告。</p>'}</section>`;
         if (view === 'plan') return `<section class="surface dev-design-section"><div class="dev-design-toolbar"><strong>验证计划</strong><button class="btn primary" data-action="dev-validate">演示本轮验证</button></div><p>${state.devQualityChecked?'样例检查已完成；固定版本 CI 单独核对。':'按本轮改动选择检查，每项结果独立记录。'}</p></section>`;
         return `<section class="surface dev-design-section"><div class="dev-design-toolbar"><h3>覆盖报告</h3><button class="btn" data-action="dev-testing-coverage-info">报告信息</button></div><table class="dev-tool-table" aria-label="覆盖报告关键结果样例"><thead><tr><th>检查</th><th>读数</th><th>结果</th></tr></thead><tbody><tr><th>后端 Go</th><td>—</td><td>未采集</td></tr><tr><th>前端 Web</th><td>—</td><td>未采集</td></tr></tbody></table><p class="data-note">交互样例，不读取覆盖报告。</p></section>`;
@@ -6332,13 +6433,23 @@ active = new Set()
         renderDevWorkbench(document.querySelector('#view'));
         document.querySelector('[data-action="'+action+'"][data-value="'+target.dataset.value+'"]')?.focus({preventScroll:true});return true;
       }
-      if(action==='dev-data-prepare'||action==='dev-data-view') {
+      if(['dev-data-prepare','dev-data-confirm','dev-data-view','dev-data-chain'].includes(action)) {
         const scope=target.closest('[data-dev-data-preview]');
-        const view=action==='dev-data-prepare'?'confirm':target.dataset.value;
-        scope.querySelector('[data-data-environment]').textContent=view==='receipts'?'本地与服务器记录 · 按每条回执分别核对目标':'数据目标：本地开发库 · 设计样例';
-        if(action==='dev-data-prepare') scope.querySelector('[data-action="dev-data-view"][data-value="confirm"]').hidden=false;
-        for(const button of scope.querySelectorAll('.dev-design-toolbar [data-action="dev-data-view"]')) button.setAttribute('aria-pressed',String(button.dataset.value===view));
-        for(const panel of scope.querySelectorAll('[data-data-panel]')) panel.hidden=panel.dataset.dataPanel!==view;
+        const selected=scope.querySelector('input[name="preview-data-target"]:checked').value;
+        if(action==='dev-data-prepare') {
+          scope.querySelector('#dev-data-preview-confirm-title').textContent='补齐手测数据 · '+selected;
+          scope.querySelector('dialog').showModal();
+        } else if(action==='dev-data-confirm') {
+          scope.querySelector('[data-data-result]').textContent=selected+' · 补齐完成（示例）';
+          scope.querySelector('[data-data-history]').textContent=scope.querySelector('[data-data-result]').textContent;
+          scope.querySelector('dialog').close();
+        } else if(action==='dev-data-chain') {
+          for(const button of scope.querySelectorAll('[data-action="dev-data-chain"]')) button.setAttribute('aria-pressed',String(button===target));
+          for(const panel of scope.querySelectorAll('[data-data-chain-panel]')) panel.hidden=panel.dataset.dataChainPanel!==target.dataset.value;
+        } else {
+          for(const button of scope.querySelectorAll('[data-action="dev-data-view"]')) button.setAttribute('aria-pressed',String(button.dataset.value===target.dataset.value));
+          for(const panel of scope.querySelectorAll('[data-data-panel]')) panel.hidden=panel.dataset.dataPanel!==target.dataset.value;
+        }
         return true;
       }
       if(action==='dev-relation-clear'){updateDevRelationExample(target.closest('[data-dev-relation-example]'),target.dataset.value);return true;}
@@ -6453,8 +6564,11 @@ active = new Set()
         if(!devTestingGroupViews.some(([key])=>key===target.dataset.value))return true;
         state.devViews.quality=target.dataset.value==='workspace'?(state.devTestingWorkspaceView||'overview'):target.dataset.value;
         renderDevWorkbench(document.querySelector('#view'));
-      } else if (action==='dev-chain-select'||action==='dev-chain-all') {
-        state.devChainAuditChain=action==='dev-chain-all'||state.devChainAuditChain===target.dataset.value?'':target.dataset.value;renderDevWorkbench(document.querySelector('#view'));
+      } else if (action==='dev-chain-select'||action==='dev-chain-clear') {
+        const focusKey=action==='dev-chain-clear'?state.devChainAuditChain:target.dataset.value;
+        state.devChainAuditChain=action==='dev-chain-clear'?'':focusKey;
+        renderDevWorkbench(document.querySelector('#view'));
+        document.querySelector(`[data-action="dev-chain-select"][data-value="${focusKey}"]`)?.focus();
       } else if (action==='dev-view') {
         if (state.devArea==='resources'&&state.devViews.resources==='integration'&&['inventory','changes','guide'].includes(target.dataset.value)) {
           state.devIntegrationView=target.dataset.value;renderDevWorkbench(document.querySelector('#view'));return true;
@@ -6564,8 +6678,8 @@ active = new Set()
         : `<div class="crumb"><strong>${titleForPage()}</strong></div>`;
     }
 
-    function renderPageActions() {
-      return `<div class="page-actions" role="group" aria-label="页面操作"><button class="btn icon-btn mobile-menu" data-action="open-nav" aria-label="打开导航" aria-controls="sidebar" aria-expanded="${document.body.classList.contains('nav-open')}">${icon('menu')}</button><button class="btn" data-action="refresh" aria-label="刷新当前页">${icon('refresh')}刷新</button></div>`;
+    function renderPageActions(extra = '') {
+      return `<div class="page-actions" role="group" aria-label="页面操作"><button class="btn icon-btn mobile-menu" data-action="open-nav" aria-label="打开导航" aria-controls="sidebar" aria-expanded="${document.body.classList.contains('nav-open')}">${icon('menu')}</button>${extra}<button class="btn" data-action="refresh" aria-label="刷新当前页">${icon('refresh')}刷新</button></div>`;
     }
 
     function renderTopbar() {
@@ -6587,7 +6701,8 @@ active = new Set()
         const ownerOk = state.filterOwner === 'all' || row.owner === state.filterOwner || row.role === state.filterOwner;
         const riskOk = state.filterRisk === 'all' || (state.filterRisk === 'near' ? row.risk === '临近交付' : state.filterRisk === 'blocked' ? ['阻塞','已阻塞'].includes(row.risk) || row.status === 'blocked' : row.risk === state.filterRisk);
         const endedOk = state.filterIncludeEnded || !endedStatuses.has(row.status);
-        const date = isoDay(rowDate(row));
+        const date = config.key === 'production' && state.productionDateField === 'start'
+          ? row.plannedStart : isoDay(rowDate(row));
         const fromOk = !state.filterDateFrom || (date && date >= state.filterDateFrom);
         const toOk = !state.filterDateTo || (date && date <= state.filterDateTo);
         return qualityOk && exceptionOk && statusOk && (!q || hay.includes(q)) && partyOk && historySourceOk && ownerOk && riskOk && endedOk && fromOk && toOk;
@@ -6845,6 +6960,7 @@ active = new Set()
       if (key === 'party') return rowParty(row, config);
       if (key === 'date') return rowDate(row);
       if (key === 'metric') return row.amount ?? row.metric ?? '';
+      if (key === 'outstanding') return row.finance?.outstanding ?? '';
       return row[key] ?? '';
     }
 
@@ -6854,7 +6970,13 @@ active = new Set()
         ['status', '状态', 'status'], ['date', config.dateLabel || '业务日期', 'date'], ['metric', config.metricLabel || '金额', 'metric'],
         ['owner', '负责人', 'owner'], ['progress', '当前进度', 'progress'], ['risk', '业务提醒', 'risk']
       ];
-      if (['sales','production','outsourcing','shipments'].includes(config.key)) defs.unshift(['gallery','产品图片','gallery']);
+      if (['sales','production','outsourcing','shipments'].includes(config.key)) defs.unshift(['gallery',config.key === 'production' ? '产品 / 款号' : '产品图片','gallery']);
+      if (config.key === 'quality') defs.push(['batch', '批次', 'batch'], ['inspector', '检验人', 'inspector']);
+      if (config.key === 'shipments') defs.push(['transport', '物流信息', 'transport']);
+      if (['receivables', 'payables'].includes(config.key)) {
+        defs.find(([key]) => key === 'metric')[1] = '原金额';
+        defs.push(['outstanding', '未结金额', 'outstanding']);
+      }
       if (config.key === 'sales') {
         defs.find(([key]) => key === 'no')[1] = '订单编号';
         defs.find(([key]) => key === 'party')[1] = '客户与跟单';
@@ -6865,8 +6987,8 @@ active = new Set()
         .filter(column => column && (config.key !== 'sales' || column[0] !== 'owner'));
     }
 
-    function listColumnWidth(key) {
-      return { gallery:180,no:180,party:220,status:120,date:140,metric:140,owner:120,progress:200,risk:180 }[key] || 160;
+    function listColumnWidth(key, config) {
+      return { gallery:config.key==='production'?320:180,no:180,party:220,status:120,batch:140,date:140,inspector:120,metric:140,outstanding:140,transport:220,owner:120,progress:200,risk:180 }[key] || 160;
     }
 
     function columnSettingsState(config, order = state.columnOrder, visible = state.visibleColumns) {
@@ -6966,7 +7088,7 @@ active = new Set()
     }
 
     function boundaryReadKey() {
-      return JSON.stringify([state.page,state.moduleTabs,state.salesView,state.purchaseView,state.financeDueView,state.productionView,state.search,state.status,state.pageNo,state.businessPageSize,state.sortKey,state.sortDir,state.filterParty,state.filterOwner,state.filterRisk,state.filterDateFrom,state.filterDateTo,state.filterIncludeEnded]);
+      return JSON.stringify([state.page,state.moduleTabs,state.salesView,state.purchaseView,state.financeDueView,state.productionView,state.search,state.status,state.pageNo,state.businessPageSize,state.sortKey,state.sortDir,state.filterParty,state.filterOwner,state.filterRisk,state.filterDateFrom,state.filterDateTo,state.productionDateField,state.filterIncludeEnded]);
     }
     function startBoundaryRead(key, succeed=false) {
       clearTimeout(boundaryRead.timer);
@@ -7073,6 +7195,45 @@ active = new Set()
       state.actionContext = null;
     }
 
+    const productWorkExamples = [
+      {name:'浅棕小熊',code:'PLS-018',sku:'奶油白 · 28 cm'},
+      {name:'月亮长耳兔',code:'PLS-023',sku:'浅杏 · 32 cm'},
+      {name:'奶油趴趴狗',code:'PLS-041',sku:'奶咖 · 30 cm'},
+    ];
+    const warehouseProductWorkViews = {
+      completion:{title:'成品入库',prefix:'FG',status:'待入库',review:'核对成品入库'},
+      'outsourcing-return':{title:'委外回货',prefix:'OR',status:'待核对',review:'查看回货详情'},
+      'process-return':{title:'工序回货',prefix:'WR',status:'待点数',review:'核对回货点数'},
+    };
+    function warehouseProductPreviewConfig(config) {
+      if (config?.key !== 'inbound' || config.productWork) return config;
+      const view=warehouseProductWorkViews[state.warehouseViews.inbound];
+      if (!view) return config;
+      const rows=productWorkExamples.map((productIdentity,index)=>({
+        ...config.rows[index],
+        no:`${view.prefix}-20260925-00${index+1}`,
+        party:`批次 WIP-0925-00${index+1}`,
+        item:productIdentity.name,
+        status:'draft',
+        statusText:view.status,
+        productIdentity,
+      }));
+      return {...config,title:view.title,party:'批次',item:'存货 / 规格',metricLabel:'本次数量',productWork:view,rows,
+        statuses:makeStatuses([['draft',view.status]],rows.length),boundary:'先核对本次产品、规格、批次和数量，再按当前记录办理。'};
+    }
+    function prototypeRecordProduct(row,config) {
+      if (row.productIdentity) return row.productIdentity;
+      if(row.previewOnly||!['production-records','exceptions','inventory-operations'].includes(config.key))return null;
+      const index=config.rows.findIndex(item=>item.id===row.id);
+      if(index<0)return null;
+      if(config.key==='production-records'&&index%4!==0)return productWorkExamples[(index-1)%3];
+      if(config.key==='exceptions'&&index%4!==2)return productWorkExamples[index%3];
+      if(config.key==='inventory-operations'&&index%4===0)return productWorkExamples[index%3];
+      return null;
+    }
+    function renderRecordProductIdentity(product, index = 0) {
+      return `<span class="product-cell">${renderProductThumb(index,product.name)}<span><strong>${escapeHTML(product.name)}</strong><span class="subline">${escapeHTML(product.code)} · ${escapeHTML(product.sku)}</span></span></span>`;
+    }
     function renderWarehouseViewNavigation(config) {
       const views = {
         inventory: [['balances','库存余额'],['lots','库存批次'],['txns','库存变动记录']],
@@ -7089,7 +7250,7 @@ active = new Set()
       if (!button || button.getAttribute('aria-selected') === 'true') return;
       const kind = button.dataset.warehouseView;
       if (kind === 'inventory') { state.inventoryView=button.dataset.value;state.inventoryDisplay='list'; }
-      else state.warehouseViews[kind]=button.dataset.value;
+      else { state.warehouseViews[kind]=button.dataset.value; if (kind === 'inbound') state.status='all'; }
       state.selected.clear();state.pageNo=1;renderView();
     });
 
@@ -7166,7 +7327,7 @@ active = new Set()
       return `${operation}<section class="surface data-surface arrival-plan-surface" aria-label="采购跟进"><div class="arrival-calendar-toolbar"><strong>跟进事项</strong><button class="btn" data-action="arrival-calendar" aria-expanded="${state.arrivalCalendarOpen}">${state.arrivalCalendarOpen?'收起日历':'到货日历'}</button></div>${calendar}<header class="arrival-results-head"><strong>${label} · ${selected.length} 项</strong></header><div class="table-wrap"><table data-table-lines="appearance"><thead><tr><th>来源单号</th><th>供应商</th><th>材料</th><th>数量</th><th>交期</th><th>跟进事项</th><th>岗位与下一步</th></tr></thead><tbody>${p.rows.map(item=>{const kind=purchaseFollowupKinds.find(([key])=>key===item.kind);return `<tr><td><button class="entity-link" data-action="arrival-open" data-id="${item.id}">${item.no}</button></td><td>${escapeHTML(item.supplier)}</td><td>${escapeHTML(item.material)}</td><td>${escapeHTML(item.quantity)}</td><td>${item.date?displayDate(item.date):'—'}</td><td>${kind[1]}</td><td>${kind[2]}</td></tr>`;}).join('')}</tbody></table>${selected.length?'':'<div class="empty">当前范围没有需要跟进的事项</div>'}</div>${selected.length?renderVisualPager(p,config.key):''}<p class="data-note arrival-results-head">同一明细可有多项跟进事项，按所列岗位办理。到货日历只计尚需到货的明细；待核对应付仍须核对结算条件。</p></section>`;
     }
     function renderListPage(config, hub = null) {
-      config = listPreviewConfig(config);
+      config = listPreviewConfig(warehouseProductPreviewConfig(config));
       if (config.key === 'sales' && state.salesView === 'delivery') return renderSalesDeliveryView(config);
       if (config.key === 'purchase' && state.purchaseView === 'followup') return renderPurchaseFollowup(config);
       if (['receivables','payables'].includes(config.key) && state.financeDueView === 'due') return renderFinanceDueView(config,hub);
@@ -7180,7 +7341,7 @@ active = new Set()
       const selectedLabel = selectedRows.length ? `已选择 ${selectedRows.length} 条 · ${selectedRows.map(row => row.no).slice(0, 2).join('、')}${selectedRows.length > 2 ? '…' : ''}` : '请选择一条记录后执行相关操作';
       const allVisibleSelected = pageRows.length > 0 && pageRows.every(row => state.selected.has(row.id));
       const cols = columnDefs(config).filter(([key]) => state.visibleColumns.has(key));
-      const tableWidth = 52 + cols.reduce((total,[key])=>total+listColumnWidth(key),0);
+      const tableWidth = 52 + cols.reduce((total,[key])=>total+listColumnWidth(key,config),0);
       const hasLocalFilter = Boolean(state.search.trim() || activeFilterCount());
       const resultTotal = rows.length;
       const singleAction = selectedRows.length === 1 ? getRecordAction(config, selectedRows[0]) : null;
@@ -7213,7 +7374,7 @@ active = new Set()
         return `${operation}<section class="surface inventory-distribution-preview" aria-label="仓库库存分布">${config.sampleParties.map(warehouse=>`<button class="btn" data-action="inventory-warehouse" data-value="${escapeHTML(warehouse)}"><strong>${escapeHTML(warehouse)}</strong><span>${rows.filter(row=>row.party===warehouse).length} 个样例库存项</span><span>查看明细 →</span></button>`).join('')}</section>`;
       }
       return `${operation}${readFeedback?.inline||''}<section class="surface data-surface" data-list-scroll aria-busy="${boundaryRead.status==='loading'&&state.previewState==='stress'}">
-        <div class="table-wrap"><table class="business-budget-table" style="--business-table-width:${tableWidth}px"><colgroup><col style="width:52px">${cols.map(([key],index)=>index===cols.length-1?'<col>':`<col style="width:${listColumnWidth(key)}px">`).join('')}</colgroup><thead><tr><th><input class="checkbox" type="checkbox" data-action="select-all" ${allVisibleSelected ? 'checked' : ''} aria-label="选择当前页全部记录" /></th>${cols.map(([key, label, sortKey]) => `<th><button class="sort-btn ${state.sortKey === sortKey ? 'active' : ''}" data-action="sort" data-key="${sortKey}">${label}<span class="sort-glyph">${state.sortKey === sortKey ? (state.sortDir === 'asc' ? '▲' : '▼') : '↕'}</span></button></th>`).join('')}</tr></thead><tbody>${pageRows.length ? pageRows.map(row => renderTableRow(row, config, cols)).join('') : `<tr><td colspan="${cols.length + 1}"><div class="empty"><div><strong>没有匹配的记录</strong><span>调整搜索或筛选条件后重试</span></div></div></td></tr>`}</tbody></table></div>
+        <div class="table-wrap"><table class="business-budget-table" style="--business-table-width:${tableWidth}px"><colgroup><col style="width:52px">${cols.map(([key],index)=>index===cols.length-1?'<col>':`<col style="width:${listColumnWidth(key,config)}px">`).join('')}</colgroup><thead><tr><th><input class="checkbox" type="checkbox" data-action="select-all" ${allVisibleSelected ? 'checked' : ''} aria-label="选择当前页全部记录" /></th>${cols.map(([key, label, sortKey]) => `<th><button class="sort-btn ${state.sortKey === sortKey ? 'active' : ''}" data-action="sort" data-key="${sortKey}">${label}<span class="sort-glyph">${state.sortKey === sortKey ? (state.sortDir === 'asc' ? '▲' : '▼') : '↕'}</span></button></th>`).join('')}</tr></thead><tbody>${pageRows.length ? pageRows.map(row => renderTableRow(row, config, cols)).join('') : `<tr><td colspan="${cols.length + 1}"><div class="empty"><div><strong>没有匹配的记录</strong><span>调整搜索或筛选条件后重试</span></div></div></td></tr>`}</tbody></table></div>
         <div class="mobile-card-list">${pageRows.length ? pageRows.map(row => renderMobileRow(row, config)).join('') : '<div class="empty"><div><strong>没有匹配的记录</strong><span>调整搜索或筛选条件后重试</span></div></div>'}</div>
         <footer class="table-footer"><span>${hasLocalFilter?'筛选结果':'业务总数'} ${resultTotal} 条 · 样例展示 ${pageRows.length ? `${page.start+1}–${page.start+pageRows.length} / ${rows.length}` : '0'}</span><span>已选 ${state.selected.size} 条</span><div class="pager"><ui-select id="business-page-size" aria-label="每页条数" data-required-selection>${[50, 100, 200, 300, 500].map(value=>`<option value="${value}" ${state.businessPageSize===value?'selected':''}>${value} 条/页</option>`).join('')}</ui-select>${renderPagerButtons(page.pageCount,state.pageNo)}</div></footer>
       </section>`;
@@ -7282,7 +7443,26 @@ active = new Set()
         cells.party = `<span class="strong">${escapeHTML(rowParty(row,config))}</span>${row.owner ? `<span class="subline">跟单：${escapeHTML(row.owner)}</span>` : ''}`;
         cells.status = `<span>订单：<span class="badge ${badgeClass(row)}">${row.statusText}</span></span>${row.materialStatus ? `<span class="subline">用料：${escapeHTML(row.materialStatus)}</span>` : ''}`;
       }
+      if (config.key === 'production') {
+        cells.gallery = `<span class="product-cell">${cells.gallery}<span><strong>${escapeHTML(rowItem(row,config))}</strong>${row.styleNo ? `<span class="subline">内部款号：${escapeHTML(row.styleNo)}</span>` : ''}</span></span>`;
+      }
+      if (config.key === 'quality') {
+        cells.batch = escapeHTML(row.batch || '—');
+        cells.inspector = escapeHTML(row.inspector || '—');
+      }
+      if (config.key === 'shipments') {
+        cells.transport = `${escapeHTML(row.transport || '—')}${row.trackingNo ? `<span class="subline">${escapeHTML(row.trackingNo)}</span>` : ''}`;
+      }
+      if (['receivables', 'payables'].includes(config.key)) {
+        cells.outstanding = `<span class="mono">${row.finance?.outstanding == null ? '—' : formatCurrency(row.finance.outstanding,row.currency)}</span>`;
+      }
       const titles = { party: `${rowParty(row,config)} · ${config.key === 'sales' ? `跟单：${row.owner || '-'}` : rowItem(row,config)}`, owner: row.owner || '', progress: row.progress || '', metric: rowMetric(row,config) };
+      const workProduct=prototypeRecordProduct(row,config);
+      if(workProduct&&(config.productWork||config.key==='production-records'&&['pending','draft'].includes(row.status))){
+        cells.party=`${renderRecordProductIdentity(workProduct,productIndex)}<span class="subline">${escapeHTML(rowParty(row,config))}</span>`;
+      }else if(workProduct&&config.key==='exceptions'){
+        cells.party=`<span class="strong">${escapeHTML(workProduct.name)} · ${escapeHTML(workProduct.code)}</span><span class="subline">${escapeHTML(rowItem(row,config))}</span>`;
+      }
       return `<tr class="${state.selected.has(row.id) ? 'selected' : ''}" data-row="${row.id}"><td><input class="checkbox" type="checkbox" data-action="select-row" data-id="${row.id}" ${state.selected.has(row.id) ? 'checked' : ''} aria-label="选择 ${row.no}" /></td>${cols.map(([key]) => `<td class="cell-${key}${config.key === 'sales' && ['no','party','status'].includes(key) ? ' cell-composite' : ''}${config.key === 'sales' && key === 'metric' ? ' cell-sales-amount' : ''}" ${titles[key]?`title="${escapeHTML(titles[key])}"`:''}><div class="cell-content">${cells[key]}</div></td>`).join('')}</tr>`;
     }
 
@@ -14051,6 +14231,10 @@ return {orders,financeCustomers};})();
       "title": "逐项填写与核对",
       "rows": [
         [
+          "材料库存类别",
+          "在筛选中按主料、辅料、包材或其他材料查库存。查未补齐类别的历史库存时，勾选“只看待分类”；补分类到材料档案办理。"
+        ],
+        [
           "账面、未预留与可执行数量",
           "账面余额来自已过账变动；未预留是扣除有效预留后的数量。材料看可领用，成品看可发货，另核对受限、待检和待包装数量。"
         ],
@@ -16785,7 +16969,8 @@ return {orders,financeCustomers};})();
     }
 
     function renderTaskReturnHeader(title, badge='', controls='') {
-      const label=state.floatingStack.at(-1)?.drawer?.type==='tracking'?'返回流程':state.page==='tasks'&&state.boardMode==='exceptions'?(state.exceptionView==='tasks'?'返回关联待办':'返回异常跟踪'):'返回列表';
+      const previous = state.floatingStack.at(-1);
+      const label=previous?.overlay==='task-handling-examples'?'返回办理样例':previous?.drawer?.type==='tracking'?'返回流程':state.page==='tasks'&&state.boardMode==='exceptions'?(state.exceptionView==='tasks'?'返回关联待办':'返回异常跟踪'):'返回列表';
       return `<header class="drawer-head task-return-head"><button class="btn ghost icon-btn" data-action="close-drawer" aria-label="${label}">${icon('left')}</button><strong>${title} ${badge}</strong>${controls}</header>`;
     }
 
@@ -17042,7 +17227,8 @@ return {orders,financeCustomers};})();
       const tracking = ['visible','started','participated'].includes(state.boardMode);
       const calendarSwitch=state.boardMode==='todo'?renderTaskCalendarSwitch():'';
       const scope = `<div class="segment" aria-label="任务范围">${[['todo','待我处理'],['approval','待我审批'],['all','全部任务'],['tracking','流程跟踪']].map(([key,label])=>`<button data-action="board-mode" data-value="${key}" class="${(tracking||state.boardMode==='exceptions'?'tracking':state.boardMode)===key?'active':''}" aria-pressed="${(tracking||state.boardMode==='exceptions'?'tracking':state.boardMode)===key}">${label}</button>`).join('')}</div>`;
-      const header = `<section class="module-tabs-row"><h1>任务管理</h1>${scope}${renderPageActions()}</section>`;
+      const examples = '<button type="button" class="btn" data-action="open-task-handling-examples" aria-haspopup="dialog">办理样例</button>';
+      const header = `<section class="module-tabs-row"><h1>任务管理</h1>${scope}${renderPageActions(examples)}</section>`;
       const trackingViews=`<div class="task-toolbar-view-switch"><div class="segment task-tracking-tabs" aria-label="跟踪内容">${[['tracking','流程进度'],['exceptions','异常跟踪']].map(([key,label])=>`<button data-action="tracking-view" data-value="${key}" class="${(state.boardMode==='exceptions'?'exceptions':'tracking')===key?'active':''}" aria-pressed="${(state.boardMode==='exceptions'?'exceptions':'tracking')===key}">${label}</button>`).join('')}</div></div>`;
       if (state.boardMode==='exceptions') return `${header}${renderExceptionRecordsDemo(trackingViews)}`;
       if (tracking) {
@@ -17112,8 +17298,8 @@ return {orders,financeCustomers};})();
       const aria=placement==='head'?`在顶部${label}`:label;
       return `<button class="btn line-add-button" type="button" data-action="${action}" aria-label="${aria}">${icon('plus')}${label}</button>`;
     }
-    function renderLineAddContinuation(label, action='add-line', count=state.lineCount, unit='条') {
-      return `<div class="line-add-continuation">${renderLineAddButton(label,action,'footer')}<span>已录入 ${count} ${unit}</span></div>`;
+    function renderLineAddContinuation(label, action='add-line', count=state.lineCount, unit='条', summary='') {
+      return `<div class="line-add-continuation" ${summary?'data-line-summary':''}>${summary?'<div class="line-add-continuation__summary">'+summary+'</div>':''}${renderLineAddButton(label,action,'footer')}<span>已录入 ${count} ${unit}</span></div>`;
     }
     function focusAppendedLine(row, focusTarget) {
       if(!row)return;
@@ -17490,13 +17676,58 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<span class="form-import-actions" data-form-import-group="${kind}">${undo?`<button class="btn" data-action="${kind}-import-undo" ${undo.invalidated?'disabled':''}>撤销本次导入</button>`:''}<button class="btn" data-action="${kind}-import">${icon('upload')}${label}</button></span>`;
     }
 
+    function shiftShipmentDemoWeight(value, places) {
+      const text=String(value??'');
+      if(!/^(?:\d+(?:\.\d*)?|\.\d+)$/u.test(text))return '';
+      const [whole,fraction='']=text.split('.');
+      const digits=whole+fraction,point=whole.length+places;
+      const integer=(point>0?digits.slice(0,point).padEnd(point,'0'):'0').replace(/^0+(?=\d)/u,'');
+      const tail=(point<0?'0'.repeat(-point)+digits:digits.slice(point)).replace(/0+$/u,'');
+      return tail?`${integer}.${tail}`:integer;
+    }
+
+    function shipmentDemoWeightHelp() {
+      if(Number(state.formValues['total-net-weight'])>0)return '修改出货明细会清空已填净重。';
+      return state.formValues['total-net-weight-cleared']?'出货明细已变更，原净重已清空，可按需重填。':'';
+    }
+
+    function updateShipmentDemoWeightHelp() {
+      const note=document.querySelector('[data-shipment-demo-weight-help]');
+      if(!note)return;
+      note.textContent=shipmentDemoWeightHelp();
+      note.hidden=!note.textContent;
+      note.dataset.cleared=String(Boolean(state.formValues['total-net-weight-cleared']));
+    }
+
+    function clearShipmentDemoWeight() {
+      if(!state.formValues['total-net-weight'])return;
+      state.formValues['total-net-weight']='';
+      state.formValues['total-net-weight-cleared']=true;
+      const input=document.querySelector('[data-shipment-demo-net-weight]');
+      if(input)input.value='';
+      updateShipmentDemoWeightHelp();
+    }
+
     function renderShipmentForm() {
       const isEdit = state.formMode === 'edit';
       const row = listConfig.shipments.rows.find(item=>item.id===state.formRecordId) || listConfig.shipments.rows[0];
+      const weightUnit=state.formValues['total-net-weight-unit']||'kg';
+      const weight=shiftShipmentDemoWeight(state.formValues['total-net-weight'],weightUnit==='kg'?-3:0);
+      const weightHelp=shipmentDemoWeightHelp();
+      const estimate=state.lineCount
+        ? '<p class="data-note shipment-weight-summary"><span><strong>预计总净重：</strong>暂无法计算</span><span>当前样例未维护可用单重。</span></p>'
+        : '<p class="data-note shipment-weight-summary">填写出货明细后显示预计总净重。</p>';
       const sections = [['basic','单据与客户'],['items','出货明细'],['delivery','收货信息'],['transport','运输与费用'],['remark','备注与附件']];
       return `<section class="form-view"><header class="form-head"><h1>${isEdit?'编辑':'新建'}出货单</h1>${renderPageActions()}<span class="badge ${isEdit?badgeClass(row):'info'}">${isEdit?row.statusText:'草稿'}</span></header><div class="form-main"><nav class="anchor-nav">${sections.map(([id,label],i)=>`<button class="${i===0?'active':''}" data-action="form-anchor" data-target="${id}">${label}</button>`).join('')}</nav><div class="form-scroll">
         <section class="form-section" id="basic"><h2 class="section-title"><span class="form-section-title-label">单据与客户</span></h2><div class="form-grid form-grid--adaptive"><div class="field required"><label>出货单号（自动）</label><input value="${isEdit?row.no:'SH-20260925-NEW'}" data-form-field="no" /></div><div class="field span-2"><label>销售来源</label><span>SO-20260924-006 · 星河文创有限公司 · 人民币（CNY）</span><input type="hidden" data-form-field="sales-order" value="SO-20260924-006" /><input type="hidden" data-form-field="party" value="星河文创有限公司" /><input type="hidden" data-form-field="customer-name" value="星河文创有限公司" /></div><div class="field required"><label>计划出货日期</label><input type="date" value="2026-10-03" data-form-field="ship-date" /></div></div></section>
-        <section class="form-section" id="items"><h2 class="section-title"><span class="form-section-title-label">出货明细</span> ${renderFormImportActions('shipment','从销售订单导入')}</h2><p class="data-note">确认出货时才会扣减相应库存。</p>${renderDocumentLines('shipments')}${renderLineAddContinuation('添加出货明细')}${state.lineCount?'<div class="shipment-weight-summary"><div class="rm-callout warning"><strong>预计总净重暂不可计算</strong><p>当前样例未提供产品单重；系统不会提交部分合计。请补齐档案或填写整单实称净重。</p></div><div class="field"><label>实际总净重（克）</label><input type="number" min="0" data-form-field="total-net-weight" /><span class="data-note">选填；明细变更后需重填。</span></div></div>':'<p class="data-note">填写出货明细后显示预计总净重。</p>'}</section>
+        <section class="form-section" id="items"><h2 class="section-title"><span class="form-section-title-label">出货明细</span> ${renderFormImportActions('shipment','从销售订单导入')}</h2><p class="data-note">确认出货时才会扣减相应库存。</p>${renderDocumentLines('shipments')}${renderLineAddContinuation('添加出货明细','add-line',state.lineCount,'条',estimate)}
+          ${state.lineCount?
+            `<div class="shipment-weight-manual"><div class="field"><label for="shipment-demo-net-weight">实际总净重<span class="shipment-weight-optional" aria-hidden="true">选填</span></label>
+              <div class="shipment-weight-entry"><input id="shipment-demo-net-weight" aria-label="实际总净重" aria-describedby="shipment-demo-weight-help" type="number" min="0" step="any" inputmode="decimal" placeholder="填写实测净重" value="${escapeHTML(weight)}" data-shipment-demo-net-weight />
+              <ui-select aria-label="实际总净重单位" data-shipment-demo-net-weight-unit><option value="kg" ${weightUnit==='kg'?'selected':''}>公斤</option><option value="g" ${weightUnit==='g'?'selected':''}>克</option></ui-select></div>
+              <span class="data-note" id="shipment-demo-weight-help" data-shipment-demo-weight-help data-cleared="${Boolean(state.formValues['total-net-weight-cleared'])}" ${weightHelp?'':'hidden'}>${weightHelp}</span></div></div>`:
+            ''}
+        </section>
         <section class="form-section" id="delivery"><h2 class="section-title"><span class="form-section-title-label">收货信息</span></h2><div class="form-grid form-grid--adaptive">${renderDeliveryAddressFields({country:'中国',recipient:'刘女士',phone:'13900001840',address:'样例园区 8 号'})}</div></section>
         <section class="form-section" id="transport"><h2 class="section-title"><span class="form-section-title-label">运输与费用</span></h2><div class="form-grid form-grid--adaptive"><div class="field"><label>运输方式</label><input data-form-field="transport" value="陆运" /></div><div class="field"><label>承运商</label><input data-form-field="carrier" value="顺丰物流" /></div><div class="field"><label>物流 / 提单号</label><input data-form-field="tracking" /></div><div class="field"><label>件数 / 箱数</label><input type="number" data-form-field="packages" value="80" /></div><div class="field"><label>毛重（千克）</label><input type="number" data-form-field="gross-weight" value="560" /></div><div class="field"><label>体积（立方米）</label><input type="number" data-form-field="volume" value="8.6" /></div><div class="field"><label>实际运费金额</label><input type="number" data-form-field="freight" value="680" /></div><div class="field span-2"><label>唛头</label><textarea data-form-field="shipping-mark">STARLIGHT / CARTON 1-80</textarea></div></div></section>
         <section class="form-section" id="remark"><h2 class="section-title"><span class="form-section-title-label">备注与附件</span></h2><div class="form-grid form-grid--support"><div class="field span-2"><label>备注</label><textarea data-form-field="remark" data-remark-input rows="2" maxlength="2000"></textarea></div><div class="field span-2"><label>出货附件</label><button class="control" data-action="fake-upload" style="justify-content:flex-start">${icon('paperclip')}上传附件</button></div></div></section>
@@ -17766,7 +17997,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const source = complete ? '' : `<span class="rm-card-source"><span class="rm-card-source-value">${escapeHTML(task.unavailable?'来源单据不可用':task.source||'未关联业务单据')}</span></span>`;
       if (!items.length) return `<div class="rm-card-body rm-card-body--empty"><span class="rm-card-image" aria-hidden="true">${icon('file')}</span>${content(`<span class="rm-card-summary"><span>${task.unavailable?'关联单据已不可用':'未关联产品／物料'}</span><span class="rm-card-metadata">${task.unavailable?'':source}</span></span>`)}</div>`;
       return (complete?items:items.slice(0,1)).map(item => {
-        const image = item.kind!=='material'&&Number.isInteger(item.imageSeed) ? renderProductThumb(item.imageSeed,item.name) : `<span class="rm-card-image" role="img" aria-label="${escapeHTML(item.name)}${item.kind==='material'?'物料':'暂无图片'}">${icon(item.kind==='material'?'box':'image')}<small>${item.kind==='material'?'物料':'暂无图'}</small></span>`;
+        const image = item.kind!=='material'&&Number.isInteger(item.imageSeed) ? renderProductThumb(item.imageSeed,item.name,item.auxiliaryOnly) : `<span class="rm-card-image" role="img" aria-label="${escapeHTML(item.name)}${item.kind==='material'?'物料':'暂无图片'}">${icon(item.kind==='material'?'box':'image')}<small>${item.kind==='material'?'物料':'暂无图'}</small></span>`;
         return `<div class="rm-card-body">${image}${content(`<span class="rm-card-summary"><strong class="rm-card-product">${escapeHTML(item.name)}${!complete&&items.length>1?`<button class="task-association-open task-association-count" data-action="task-associations" data-id="${task.id}" aria-label="查看${taskAssociationCount(items).replace(/^共 /,'')}" aria-haspopup="dialog">${taskAssociationCount(items)} ›</button>`:''}</strong><span class="rm-card-metadata">${item.kind==='product'||item.kind==='material'?`<span class="task-association-reference">${item.kind==='material'?'款号':'产品编号'} <b>${escapeHTML(item.code||'未填写')}</b></span>`:''}${source}</span>${item.orderNo&&item.orderNo!==task.source?`<span class="task-association-reference task-association-order">关联订单 <b>${escapeHTML(item.orderNo)}</b></span>`:''}</span>`)}</div>`;
       }).join('');
     }
@@ -17981,7 +18212,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
     function renderMobileTaskIdentityCard(task, statusLabel=task.state) {
       const source=getTaskListSource(task)?.no||task.source;
-      return `<section class="rm-section rm-task-identity"><div class="task-overview-heading"><h2>${escapeHTML(task.title)}</h2><span class="badge ${task.badge}">${escapeHTML(statusLabel)}</span></div><div class="product-cell">${renderProductThumb(0,task.object)}<div class="rm-identity">${copyValue(source)}<strong>${escapeHTML(task.object)}</strong>${task.productCode?copyValue(task.productCode):''}</div></div><dl class="rm-facts"><div class="rm-fact"><dt>负责岗位</dt><dd>${escapeHTML(task.role)}${task.assignee?` · ${escapeHTML(task.assignee)}`:''}</dd></div><div class="rm-fact"><dt>处理截止</dt><dd>${escapeHTML(task.deadline || '未设置截止')}</dd></div></dl>${task.reason?`<div class="rm-callout danger"><strong>阻塞原因：</strong>${escapeHTML(task.reason)}</div>`:''}</section>`;
+      const auxiliary = taskListAssociations(task).find(item=>item.kind==='product'&&item.auxiliaryOnly);
+      return `<section class="rm-section rm-task-identity"><div class="task-overview-heading"><h2>${escapeHTML(task.title)}</h2><span class="badge ${task.badge}">${escapeHTML(statusLabel)}</span></div><div class="product-cell">${renderProductThumb(auxiliary?.imageSeed??0,auxiliary?.name??task.object,Boolean(auxiliary))}<div class="rm-identity">${copyValue(source)}<strong>${escapeHTML(task.object)}</strong>${task.productCode?copyValue(task.productCode):''}</div></div><dl class="rm-facts"><div class="rm-fact"><dt>负责岗位</dt><dd>${escapeHTML(task.role)}${task.assignee?` · ${escapeHTML(task.assignee)}`:''}</dd></div><div class="rm-fact"><dt>处理截止</dt><dd>${escapeHTML(task.deadline || '未设置截止')}</dd></div></dl>${task.reason?`<div class="rm-callout danger"><strong>阻塞原因：</strong>${escapeHTML(task.reason)}</div>`:''}</section>`;
     }
 
     function renderMobileTaskDetail(task) {
@@ -18840,9 +19072,30 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function bindInputs() {
+      const shipmentWeight=document.querySelector('[data-shipment-demo-net-weight]');
+      const shipmentWeightUnit=document.querySelector('[data-shipment-demo-net-weight-unit]');
+      if(shipmentWeight&&shipmentWeightUnit){
+        shipmentWeight.addEventListener('input',()=>{
+          state.formValues['total-net-weight']=shiftShipmentDemoWeight(shipmentWeight.value,shipmentWeightUnit.value==='kg'?3:0);
+          if(Number(state.formValues['total-net-weight'])>0)state.formValues['total-net-weight-cleared']=false;
+          updateShipmentDemoWeightHelp();
+          invalidateFormImportUndo('shipment');
+        });
+        shipmentWeightUnit.addEventListener('input',()=>{
+          state.formValues['total-net-weight-unit']=shipmentWeightUnit.value;
+          shipmentWeight.value=shiftShipmentDemoWeight(state.formValues['total-net-weight'],shipmentWeightUnit.value==='kg'?-3:0);
+        });
+      }
       document.querySelectorAll('#view [data-fulfillment-role]').forEach(input=>input.onchange=event=>{state.fulfillmentRole=event.target.value;state.fulfillmentStage='';renderAll();});
+      if(shipmentWeight)document.querySelectorAll('[data-form-field]').forEach(el=>{
+        const field=el.dataset.formField;
+        if(!/^(?:item|sku|sales-line|unit|qty)-\d+$/u.test(field))return;
+        el.addEventListener('input',()=>{
+          if(state.formValues[field]!==el.value)clearShipmentDemoWeight();
+        });
+      });
       document.querySelectorAll('[data-form-field]').forEach(el=>el.addEventListener('input',()=>{
-        const previousType=state.formValues.party;captureFormDraft();if(state.formSourcePage==='shipments'&&(/-\d+$/.test(el.dataset.formField)||['sales-order','party','customer-name','recipient','recipient-phone','region','address-region','address','freight','total-net-weight'].includes(el.dataset.formField)))invalidateFormImportUndo('shipment');if(state.formSourcePage==='bom'&&(/-\d+$/.test(el.dataset.formField)||el.dataset.formField==='order-qty'))invalidateFormImportUndo('bom');if(state.formSourcePage==='purchase'&&(/-\d+$/.test(el.dataset.formField)||el.dataset.formField==='party'))invalidateFormImportUndo('purchase');
+        const previousType=state.formValues.party;captureFormDraft();if(state.formSourcePage==='shipments'&&(/-\d+$/.test(el.dataset.formField)||['sales-order','party','customer-name','recipient','recipient-phone','region','address-region','address','freight'].includes(el.dataset.formField)))invalidateFormImportUndo('shipment');if(state.formSourcePage==='bom'&&(/-\d+$/.test(el.dataset.formField)||el.dataset.formField==='order-qty'))invalidateFormImportUndo('bom');if(state.formSourcePage==='purchase'&&(/-\d+$/.test(el.dataset.formField)||el.dataset.formField==='party'))invalidateFormImportUndo('purchase');
         if(state.formSourcePage==='inventory'&&el.dataset.formField==='party'&&previousType!==el.value){
           for(const input of document.querySelectorAll('[data-form-field^="qty-"], [data-form-field^="to-"]')){state.formValues[input.dataset.formField]='';input.value='';}
         }
@@ -18980,15 +19233,16 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if (state.overlay === 'attachments') html += renderAttachmentModal();
       if (state.overlay === 'task-create') html += renderTaskCreateModal();
       if (state.overlay === 'related-tasks') html += renderRelatedTasksModal();
+      if (state.overlay === 'task-handling-examples') html += renderTaskHandlingExamples();
       if (state.overlay === 'task-create-confirm') html += renderTaskCreateConfirm();
       if (state.overlay === 'import-preview') html += renderImportPreviewModal();
       if (state.overlay === 'bom-import-format') html += renderBOMImportFormat();
       if (state.overlay === 'media-sort') html += renderMediaSortModal();
       if (state.overlay === 'permission-scope') html += renderPermissionDataScopeModal();
       if (state.overlay === 'info') html += renderInfoModal();
-      if (state.overlay === 'product-image-preview') html += renderProductImagePreview();
       if (state.overlay === 'account') html += renderAccountPopover();
       if (state.drawer?.type === 'detail') html += renderDetailModal(state.drawer.row);
+      if (state.overlay === 'product-image-preview') html += renderProductImagePreview();
       if (state.drawer?.type === 'task') html += renderTaskDrawer(state.drawer.task);
       if (state.drawer?.type === 'production-process') html += renderProductionProcessDrawer();
       if (state.drawer?.type === 'tracking') html += renderTrackingDrawer();
@@ -19041,8 +19295,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(config?.key==='exceptions')return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>筛选条件</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid">${renderDirectFilterChoices('异常类型',state.exceptionType,[['all','全部异常类型'],...config.sampleParties.map(type=>[type,type])],'demo-filter-choice','exceptionType')}${renderDirectFilterChoices('业务状态',state.exceptionExecution,[['all','全部业务状态'],['pending','待办理 / 额度生效'],['applied','业务已执行'],['reversed','业务已冲正']],'demo-filter-choice','exceptionExecution')}</div><div class="popover-foot"><button class="btn" data-action="clear-filter">清空筛选</button><button class="btn" data-action="close-overlay">完成</button></div></div>`;
       const qualityResults = config?.key==='quality' ? renderDirectFilterChoices('检验结果',state.qualityResult||'',[['','不限'],['PASS','合格'],['CONCESSION','让步接收','quality-concession'],['REJECT','不合格']],'demo-filter-choice','qualityResult') : '';
       const party = config?.party || '业务对象';
-      const dateLabel = config?.dateLabel || '业务日期';
-      return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid">${qualityResults}<div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><ui-select id="filter-owner" data-empty-value="all"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</ui-select></div>${renderDirectFilterChoices('业务提醒',state.filterRisk,[['all','全部'],['正常','正常'],['near','临近日期'],['已逾期','已逾期'],['blocked','阻塞']],'demo-filter-choice','filterRisk')}${renderDirectFilterChoices('包含结束记录',state.filterIncludeEnded?'yes':'no',[['no','否'],['yes','是']],'demo-filter-choice','filterIncludeEnded')}<div class="field span-2"><label>${dateLabel}范围</label><div class="date-range-control" role="group" aria-label="${dateLabel}范围"><input id="filter-date-from" aria-label="开始日期" type="date" value="${state.filterDateFrom}" max="${state.filterDateTo}"/><span aria-hidden="true">至</span><input id="filter-date-to" aria-label="结束日期" type="date" value="${state.filterDateTo}" min="${state.filterDateFrom}"/></div></div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn" data-action="close-overlay">关闭</button></div></div>`;
+      const productionDates = config?.key === 'production';
+      const dateLabel = productionDates ? '日期范围' : (config?.dateLabel || '业务日期') + '范围';
+      const dateType = productionDates
+        ? renderDirectFilterChoices('日期类型', state.productionDateField, [['start','计划开始'],['end','计划结束']], 'demo-filter-choice', 'productionDateField')
+        : `<label>${dateLabel}</label>`;
+      return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid">${qualityResults}<div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><ui-select id="filter-owner" data-empty-value="all"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</ui-select></div>${renderDirectFilterChoices('业务提醒',state.filterRisk,[['all','全部'],['正常','正常'],['near','临近日期'],['已逾期','已逾期'],['blocked','阻塞']],'demo-filter-choice','filterRisk')}${renderDirectFilterChoices('包含结束记录',state.filterIncludeEnded?'yes':'no',[['no','否'],['yes','是']],'demo-filter-choice','filterIncludeEnded')}<div class="field span-2">${dateType}<div class="date-range-control${productionDates?' date-range-control--typed':''}" role="group" aria-label="${dateLabel}">${productionDates?'<span aria-hidden="true">从</span>':''}<input id="filter-date-from" aria-label="开始日期" type="date" value="${state.filterDateFrom}" max="${state.filterDateTo}"/><span aria-hidden="true">至</span><input id="filter-date-to" aria-label="结束日期" type="date" value="${state.filterDateTo}" min="${state.filterDateFrom}"/></div></div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn" data-action="close-overlay">关闭</button></div></div>`;
     }
 
     function renderColumnsModal() {
@@ -19251,10 +19509,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if (state.overlay === 'task-create-confirm') { state.overlay='task-create'; renderFloating(); return; }
       if (state.overlay === 'attachments') { closeAttachmentManager(); return; }
       if (state.overlay === 'handling-confirm') { state.handlingConfirmation=null;state.handlingError=''; }
+      const restoreTaskExamples = state.overlay === 'task-handling-examples';
       state.overlay = null;
       state.pendingNav = null;
       state.permissionPending = null;
       renderFloating();
+      if (restoreTaskExamples) document.querySelector('[data-action="open-task-handling-examples"]')?.focus({preventScroll:true});
     }
 
     function renderTaskCreateConfirm() {
@@ -19392,8 +19652,16 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(560px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong>${title}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><p class="data-note">设置本岗位可查看和办理的仓库，仍需相应功能权限。${readOnly?'当前设置只读。':'关闭后保留调整，保存岗位设置后生效。'}</p><label class="field">仓库范围<ui-select id="permission-scope-type" aria-label="仓库范围模式" ${readOnly?'disabled':''} data-required-selection>${[['all','全部仓库'],['warehouses','指定仓库'],['none','不允许查看']].map(([key,label])=>`<option value="${key}" ${scope===key?'selected':''}>${label}</option>`).join('')}</ui-select></label>${scope==='warehouses'?`<fieldset class="field" id="permission-scope-value"><legend>允许的仓库</legend>${[['finished','成品仓'],['raw','原料仓']].map(([key,label])=>`<label><input type="checkbox" class="checkbox" data-permission-warehouse="${key}" value="${key}" ${selected.includes(key)?'checked':''} ${readOnly?'disabled':''}/> ${label}</label>`).join('')}${selected.length?'':'<p role="alert">请选择至少一个允许的仓库</p>'}</fieldset>`:''}</div><footer class="modal-foot"><button class="btn" data-action="close-overlay">关闭</button></footer></section></div>`;
     }
 
-    function renderInfoModal() {
-      const info = state.infoModal || { title: '交互说明', body: '这是本地交互演示，不会写入真实业务数据。' };
+    function renderTaskHandlingExamples() {
+      const rows = tasks.filter(task => task.handling).map(task => `<tr><td><button type="button" class="text-btn" data-action="open-task" data-id="${task.id}">${escapeHTML(task.title)}</button></td><td>${escapeHTML(task.role)}</td><td>${escapeHTML(task.state)}</td></tr>`).join('');
+      return renderInfoModal({
+        title: '办理样例',
+        confirmLabel: '返回任务管理',
+        html: `<div class="table-wrap business-task-panel__table"><table><thead><tr><th>样例任务</th><th>责任岗位</th><th>状态</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+      });
+    }
+
+    function renderInfoModal(info = state.infoModal || { title: '交互说明', body: '这是本地交互演示，不会写入真实业务数据。' }) {
       if(info.kind==='payment-methods'||info.kind==='warehouse-settings') return `<div class="overlay" data-action="overlay-bg"><section class="modal payment-catalogue-modal ${info.kind==='warehouse-settings'?'warehouse-settings-design':''} ${info.quick?'payment-catalogue-modal--quick':''}" role="dialog" aria-modal="true" aria-label="${info.title}"><header class="modal-head"><strong>${info.title}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body">${info.html}</div><footer class="modal-foot payment-catalogue-footer">${info.footer}</footer></section></div>`;
       if(info.kind==='progress') {
         const row=mobileProgressRows.find(item=>item.id===info.progressId)||mobileProgressRows[0];
@@ -19407,12 +19675,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderProductImagePreview() {
       const preview = state.productImagePreview || { seed: 0, label: '产品' };
       const scale = Math.max(1, Math.min(3, Number(state.productImageScale) || 1));
-      const products=preview.products || [{seed:preview.seed,label:preview.label,photoCount:2}];
+      const products=preview.products || [{seed:preview.seed,label:preview.label,photoCount:preview.auxiliaryOnly?1:2,auxiliaryOnly:preview.auxiliaryOnly}];
       const index=preview.productIndex || 0;
       const product=products[index];
       const photo=preview.photoIndex || 0;
       const choices=products.length>1?`<div class="product-gallery-choices" role="group" aria-label="切换产品">${products.map((item,i)=>`<button type="button" class="btn" data-action="product-gallery-product" data-index="${i}" aria-pressed="${i===index}">${item.photoCount?renderProductArt(item.seed,item.label):icon('image')}<span>${escapeHTML(item.label)}</span></button>`).join('')}</div>`:'';
-      const pictures=`<div class="product-gallery-photo-switch" role="group" aria-label="切换当前产品图片">${product.photoCount>1?`<button type="button" class="btn" data-action="product-gallery-photo" data-value="-1" aria-label="上一张图片" ${photo===0?'disabled':''}>${icon('left')}</button>`:''}<span aria-live="polite">${product.photoCount?`${photo?'辅图':'主图'} · ${photo+1} / ${product.photoCount} 张`:'暂无图片'}</span>${product.photoCount>1?`<button type="button" class="btn" data-action="product-gallery-photo" data-value="1" aria-label="下一张图片" ${photo>=product.photoCount-1?'disabled':''}>${icon('right')}</button>`:''}</div>`;
+      const pictures=`<div class="product-gallery-photo-switch" role="group" aria-label="切换当前产品图片">${product.photoCount>1?`<button type="button" class="btn" data-action="product-gallery-photo" data-value="-1" aria-label="上一张图片" ${photo===0?'disabled':''}>${icon('left')}</button>`:''}<span aria-live="polite">${product.photoCount?`${photo||product.auxiliaryOnly?'辅图':'主图'} · ${photo+1} / ${product.photoCount} 张`:'暂无图片'}</span>${product.photoCount>1?`<button type="button" class="btn" data-action="product-gallery-photo" data-value="1" aria-label="下一张图片" ${photo>=product.photoCount-1?'disabled':''}>${icon('right')}</button>`:''}</div>`;
       return `<div class="overlay" data-action="overlay-bg"><section class="modal product-image-preview ${products.length>1?'product-image-gallery':''}" role="dialog" aria-modal="true" aria-label="${escapeHTML(preview.label)}图片预览"><header class="modal-head"><strong>${escapeHTML(product.label)}</strong><span class="data-note">${products.length>1?`${escapeHTML(preview.label)} · 产品 ${index+1} / ${products.length}`:'产品图片预览'}</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭图片预览">${icon('close')}</button></header><div class="modal-body"><div class="product-image-preview-stage" style="--preview-scale:${scale}">${product.photoCount?renderProductArt(product.seed+photo,product.label):'<div class="empty">该产品暂无图片</div>'}</div></div><footer class="modal-foot product-image-preview-footer">${choices}<div class="product-image-preview-controls">${pictures}<div class="product-image-preview-tools"><button class="btn" data-action="product-image-zoom" data-value="out" ${scale<=1||!product.photoCount?'disabled':''}>缩小</button><button class="btn" data-action="product-image-zoom" data-value="reset" ${!product.photoCount?'disabled':''}>适应屏幕</button><span class="data-note">${Math.round(scale*100)}%</span><button class="btn" data-action="product-image-zoom" data-value="in" ${scale>=3||!product.photoCount?'disabled':''}>放大</button><details class="product-image-preview-help prototype-supplemental-help"><summary aria-label="查看看图操作帮助">${icon('info')}</summary><p>滚轮或双指缩放 · 放大后拖动查看<br>Esc 关闭说明，再按退出预览</p></details></div></div></footer></section></div>`;
     }
 
@@ -19496,7 +19764,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function renderDetailModal(row) {
-      const config = listConfig[state.drawer.page] || listConfig.sales;
+      const config = warehouseProductPreviewConfig(listConfig[state.drawer.page] || listConfig.sales);
       const tabs = [['basic','基本信息'],['lines','明细'],...(config.key==='products'?[['media','图片与附件']]:[]),['related','关联单据'],['history','操作记录']];
       let body = '';
       if (state.detailTab === 'lines') {
@@ -19511,6 +19779,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       } else {
         const details = `<dl class="detail-grid"><dt>${config.entity}号</dt><dd>${copyValue(row.no)}</dd><dt>${config.party}</dt><dd>${copyValue(rowParty(row,config))}</dd>${config.key==='sales'?`<dt>客户单号</dt><dd>${row.customerOrderNo?copyValue(row.customerOrderNo):'—'}</dd>`:''}<dt>负责人</dt><dd>${escapeHTML(row.owner||'—')}</dd><dt>${config.item}</dt><dd>${copyValue(rowItem(row,config))}</dd><dt>明细数量</dt><dd>${row.lines} 条</dd><dt>${config.dateLabel}</dt><dd>${rowDate(row)}</dd><dt>${config.metricLabel}</dt><dd>${rowMetric(row,config)}</dd><dt>备注</dt><dd class="record-long-copy">${escapeHTML(row.note||'—')}</dd><dt>当前进度</dt><dd>${escapeHTML(row.progress||'—')}</dd><dt>业务提醒</dt><dd><span class="badge ${row.risk==='已逾期'?'danger':row.risk==='临近交付'?'warning':''}">${row.risk}</span></dd></dl>`;
         body = `<section class="detail-section">${config.key==='products'?`<div class="product-detail-hero"><div class="product-main-image">${renderProductArt(config.rows.indexOf(row),rowParty(row,config))}</div><div><h3 style="margin:0 0 12px">${rowParty(row,config)}</h3>${details}</div></div>`:`<h3>${row.no}</h3>${details}`}</section><section class="detail-section"><h3>业务边界</h3><p style="margin:0;color:var(--text-2);line-height:1.7">${config.boundary}</p></section>`;
+      }
+      const detailProduct=prototypeRecordProduct(row,config);
+      if(state.detailTab==='basic'&&detailProduct){
+        body=`<section class="detail-section"><h3>核对${config.key==='exceptions'?'处置对象':'产品与规格'}</h3>${renderRecordProductIdentity(detailProduct,Math.max(0,config.rows.findIndex(item=>item.id===row.id)))}${config.key==='exceptions'?`<span class="subline">${escapeHTML(rowItem(row,config))}</span>`:''}</section>${body}`;
       }
       if(state.detailTab==='related'&&businessRecordActions[config.key]){
         const links=businessLinks(row),page=collectionSlice('related',row.id,links);
@@ -20032,7 +20304,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'open-columns') { state.columnDraft=columnSettingsState(currentPageConfig() || listConfig.sales);state.overlay = 'columns'; renderFloating(); }
       else if (action === 'open-theme') { state.overlay = 'theme'; renderFloating(); }
       else if (action === 'task-associations') { state.taskAssociationsId=target.dataset.id;state.overlay='task-associations';renderFloating(); }
-      else if (action === 'product-image-preview') { state.productImageReturnOverlay=state.overlay==='task-associations'?'task-associations':null;state.productImagePreview={seed:Number(target.dataset.seed)||0,label:target.dataset.label||'产品'};state.productImageScale=1;state.overlay='product-image-preview';renderFloating(); }
+      else if (action === 'product-image-preview') { state.productImageReturnOverlay=state.overlay==='task-associations'?'task-associations':null;state.productImagePreview={seed:Number(target.dataset.seed)||0,label:target.dataset.label||'产品',auxiliaryOnly:target.dataset.photoRole==='secondary'};state.productImageScale=1;state.overlay='product-image-preview';renderFloating(); }
       else if (action === 'product-gallery-preview') { const count=Math.max(1,Math.min(3,Number(target.dataset.count)||1));state.productImageReturnOverlay=null;state.productImagePreview={label:target.dataset.label||'单据产品',productIndex:0,photoIndex:0,products:[{seed:0,label:'浅棕小熊',photoCount:2},{seed:1,label:'长耳兔',photoCount:1},{seed:2,label:'节庆抱枕',photoCount:0}].slice(0,count)};state.productImageScale=1;state.overlay='product-image-preview';renderFloating(); }
       else if (action === 'product-gallery-product') { const index=Number(target.dataset.index)||0;state.productImagePreview.productIndex=index;state.productImagePreview.photoIndex=0;state.productImageScale=1;renderFloating();document.querySelector(`[data-action="product-gallery-product"][data-index="${index}"]`)?.focus(); }
       else if (action === 'product-gallery-photo') { const preview=state.productImagePreview;const product=(preview.products||[{photoCount:2}])[preview.productIndex||0];preview.photoIndex=Math.max(0,Math.min(product.photoCount-1,(preview.photoIndex||0)+Number(target.dataset.value)));state.productImageScale=1;renderFloating();document.querySelector('[data-action="close-overlay"][aria-label="关闭图片预览"]')?.focus(); }
@@ -20061,7 +20333,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'overlay-bg' && event.target === target) dismissOverlay();
       else if (action === 'toggle-column') { const draft=state.columnDraft;target.checked?draft.visible.add(target.dataset.key):draft.visible.delete(target.dataset.key);renderFloating();document.querySelector(`[data-action="toggle-column"][data-key="${target.dataset.key}"]`)?.focus(); }
       else if (action === 'all-columns') { state.columnDraft.visible=new Set(state.columnDraft.order);renderFloating(); }
-      else if (action === 'reset-columns') { state.columnDraft=columnSettingsState(currentPageConfig() || listConfig.sales,['no','party','status','date','metric','owner','progress','risk'],new Set(['no','party','status','date','metric','owner','risk']));renderFloating(); }
+      else if (action === 'reset-columns') { state.columnDraft=columnSettingsState(currentPageConfig() || listConfig.sales,defaultListColumnOrder,new Set(defaultListVisibleColumns));renderFloating(); }
       else if (action === 'save-columns') { const omitted=state.columnOrder.filter(key=>!state.columnDraft.order.includes(key));state.visibleColumns=new Set([...state.columnDraft.visible,...omitted.filter(key=>state.visibleColumns.has(key))]);const reordered=[...state.columnDraft.order];state.columnOrder=state.columnOrder.map(key=>omitted.includes(key)?key:reordered.shift());state.columnDraft=null;state.overlay=null;renderAll();toast('列设置已保存'); }
       else if (['column-first','column-up','column-down','column-last'].includes(action)) { const draft=state.columnDraft;const from=draft.order.indexOf(target.dataset.key);const to=action==='column-first'?0:action==='column-last'?draft.order.length-1:from+(action==='column-up'?-1:1);moveColumnDraft(target.dataset.key,to); }
       else if (action === 'set-accent') { state.accent = target.dataset.value; applyTheme(); renderAll(); }
@@ -20104,7 +20376,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'bom-import-mode') { state.bomImportMode=target.dataset.value;renderFloating(); }
       else if (action === 'bom-import-undo') { if(state.bomImportUndo&&!state.bomImportUndo.invalidated){captureFormDraft();applyFormRows(state.bomImportUndo.rows);state.formValues['order-qty']=state.bomImportUndo.quantity;state.bomImportUndo=null;renderAll();document.querySelector('[data-action="bom-import"]')?.focus();} }
       else if (action === 'shipment-import-undo') {
-        if(state.shipmentImportUndo&&!state.shipmentImportUndo.invalidated){captureFormDraft();applyFormRows(state.shipmentImportUndo.rows);state.formValues['total-net-weight']=state.shipmentImportUndo.weight;state.shipmentImportUndo=null;renderAll();document.querySelector('[data-action="shipment-import"]')?.focus();toast('已撤销本次导入，原有明细和无关填写已保留');}
+        if(state.shipmentImportUndo&&!state.shipmentImportUndo.invalidated){captureFormDraft();applyFormRows(state.shipmentImportUndo.rows);state.formValues['total-net-weight']=state.shipmentImportUndo.weight;state.formValues['total-net-weight-cleared']=state.shipmentImportUndo.weightCleared;state.shipmentImportUndo=null;renderAll();document.querySelector('[data-action="shipment-import"]')?.focus();toast('已撤销本次导入，原有明细和无关填写已保留');}
       }
       else if (action === 'purchase-import') { captureFormDraft();if(!state.formValues.party){toast('请先选择供应商');return;}state.importReviewFilter='';state.importReviewKeyword='';state.importOnlySelected=false;state.purchaseImportPage=1;state.purchaseImportSelected=[0,1];state.importMode='purchase';state.overlay='import-preview';renderFloating(); }
       else if (action === 'purchase-import-page') { updatePurchaseImportSelection(purchaseImportView().paged.map(material=>material.index),target.checked); }
@@ -20119,7 +20391,16 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         applyFormRows([...rows,...added]);state.formDirty=true;state.overlay=null;renderAll();toast('材料已添加，请填写数量与单价');
       }
       else if (action === 'shipment-import') { state.importReviewFilter='';state.importReviewKeyword=''; state.importMode='shipment';state.overlay='import-preview';renderFloating(); }
-      else if (action === 'confirm-import') { const isBom=state.importMode==='bom';if(isBom){if(state.bomImportTarget==='new'){openEntityForm('bom','create');state.lineCount=2;state.bomImportUndo=null;}else{state.bomImportUndo={rows:structuredClone(formRowData()),quantity:state.formValues['order-qty'],invalidated:false};state.lineCount=state.bomImportMode==='replace'?2:state.lineCount+2;}}else if(state.lineCount<3){state.shipmentImportUndo={rows:structuredClone(formRowData()),weight:state.formValues['total-net-weight'],invalidated:false};state.lineCount=3;state.formValues['total-net-weight']='';}state.formDirty=true;state.overlay=null;renderAll();toast(isBom?'已带入明细，请核对后保存草稿':'已带入可出货销售订单明细'); }
+      else if (action === 'confirm-import') {
+        const isBom=state.importMode==='bom';
+        if(isBom){if(state.bomImportTarget==='new'){openEntityForm('bom','create');state.lineCount=2;state.bomImportUndo=null;}else{state.bomImportUndo={rows:structuredClone(formRowData()),quantity:state.formValues['order-qty'],invalidated:false};state.lineCount=state.bomImportMode==='replace'?2:state.lineCount+2;}}
+        else if(state.lineCount<3){
+          state.shipmentImportUndo={rows:structuredClone(formRowData()),weight:state.formValues['total-net-weight'],weightCleared:state.formValues['total-net-weight-cleared'],invalidated:false};
+          state.lineCount=3;
+          clearShipmentDemoWeight();
+        }
+        state.formDirty=true;state.overlay=null;renderAll();toast(isBom?'已带入明细，请核对后保存草稿':'已带入可出货销售订单明细');
+      }
       else if (action === 'fake-upload') {
         if (state.overlay === 'import-preview') { openAttachmentManager('business', state.importMode === 'bom' ? '当前 BOM 草稿 · Excel 来源' : '当前出货草稿'); return; }
         const config = listConfig[state.taskCreatePage] || currentPageConfig();
@@ -20216,6 +20497,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'action-choice-info' || action === 'related-open') toast(`${target.dataset.value || '相关内容'}已打开（交互示意）`);
       else if (action === 'open-source-tracking') { pushBusinessContext();state.drawer={type:'tracking',sourcePage:target.dataset.page,sourceId:target.dataset.id};renderFloating(); }
       else if (action === 'open-tracking') { state.overlay=null; state.drawer={type:'tracking'}; renderFloating(); }
+      else if (action === 'open-task-handling-examples') { state.overlay='task-handling-examples'; renderFloating(); }
       else if (action === 'open-task' || action === 'open-tracking-task') { const task = action==='open-tracking-task'?(taskHandlingPreview?tasks.find(item=>item.id==='H01'):{...tasks[0],approval:false,title:'工程资料',role:'工程',actions:['complete','block','urge']}):tasks.find(item=>item.id===target.dataset.id); if (!task) return; if(state.overlay||state.drawer)state.floatingStack.push({overlay:state.overlay,drawer:state.drawer,returnFocus:{action:action,id:task.id}}); state.overlay=null; state.taskChainOverviewID=null;state.handlingTaskId=task.handling?task.id:null; state.handlingError=''; state.drawer = {type:'task',task}; state.taskStep=1; state.taskMaxStep=1; state.taskAction=taskActions(task)[0]||''; state.taskNote=''; state.taskTarget=''; state.taskError=''; renderFloating(); }
       else if (action === 'task-context-open') { const page=target.dataset.page; const row=listConfig[page]?.rows.find(item=>item.id===target.dataset.id); if(row)openLinkedRecord(page,row); }
       else if (action === 'task-prev') { state.taskStep = Math.max(1,state.taskStep-1); state.taskError=''; renderFloating(); }
@@ -20405,10 +20687,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     const viewFields = {
       sales:['salesView','deliveryFilter'], purchase:['purchaseView','arrivalSelected','arrivalFilter','arrivalStart','arrivalCalendarOpen'],
       'production-records':['productionRecordsView','productionRouteOrder','productionRouteFilter','productionRouteLayout'],
-      production:['productionView','productionOverviewFilter'],
+      production:['productionView','productionOverviewFilter','productionDateField'],
       receivables:['financeDueView','financeDueFilter'], payables:['financeDueView','financeDueFilter']
     };
-    const viewDefaults = {salesView:'list',deliveryFilter:'all',purchaseView:'list',arrivalSelected:'all',arrivalFilter:'all',arrivalStart:DEMO_TODAY,arrivalCalendarOpen:false,productionRecordsView:'list',productionRouteOrder:'MO-20260922-026',productionRouteFilter:'all',productionView:'list',productionOverviewFilter:'all',financeDueView:'list',financeDueFilter:'all'};
+    const viewDefaults = {salesView:'list',deliveryFilter:'all',purchaseView:'list',arrivalSelected:'all',arrivalFilter:'all',arrivalStart:DEMO_TODAY,arrivalCalendarOpen:false,productionRecordsView:'list',productionRouteOrder:'MO-20260922-026',productionRouteFilter:'all',productionView:'list',productionOverviewFilter:'all',productionDateField:'start',financeDueView:'list',financeDueFilter:'all'};
     Object.assign(state,{arrivalStart:DEMO_TODAY,arrivalCalendarOpen:false,arrivalSelected:'all',productionView:'list',productionOverviewFilter:'all',visualLarge:{},visualPages:{},formLineIds:[],lineSerial:0,formReturnContext:null,floatingStack:[],actionContext:null});
 
     function isoDay(value) {
@@ -20524,7 +20806,9 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(state.formSourcePage==='shipments')invalidateFormImportUndo('shipment');
       if(['bom','purchase'].includes(state.formSourcePage))invalidateFormImportUndo(state.formSourcePage);
       const rows=formRowData();const index=[...formLineElements()].indexOf(target.closest('tbody[data-form-row]') || target.closest('tr'));
-      rememberScroll();applyFormRows(mutateFormRows(rows,action,index,`line-${++state.lineSerial}`));state.formDirty=true;renderView();
+      const next=mutateFormRows(rows,action,index,`line-${++state.lineSerial}`);
+      if(state.formSourcePage==='shipments'&&(next.length!==rows.length||next.some((row,i)=>row.id!==rows[i]?.id)))clearShipmentDemoWeight();
+      rememberScroll();applyFormRows(next);state.formDirty=true;renderView();
       const focusIndex=action==='copy-line'?index+1:action==='remove-line'?Math.min(index,state.lineCount-1):action==='line-up'?Math.max(0,index-1):state.lineCount-1;
       const focusRow=formLineElements()[focusIndex];
       const focusTarget=focusRow?.querySelector('[data-form-field]');
@@ -20552,6 +20836,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       financeDueItems.forEach(item=>{const row=bind(item.type,item.fact,{party:item.party,item:item.source,source:item.source,owner:item.owner,date:item.due,amount:item.amount,currency:item.currency,status:item.outstanding===0?'settled':'posted',statusText:item.outstanding===0?'已结清':'已过账',progress:item.outstanding===0?'已结清':'待核对收付'});row.finance={outstanding:item.outstanding};const sourceKey=item.source.startsWith('SH-')?'shipments':item.source.startsWith('IN-')?'inbound':'outsourcing';bind(sourceKey,item.source,{party:item.party,item:'关联来源明细',amount:item.amount,currency:item.currency,status:sourceKey==='shipments'?'shipped':'posted',statusText:sourceKey==='shipments'?'已出货':'已过账',owner:item.owner,progress:'已形成来源记录',date:'2026/09/25'});});
       productionRouteRows.forEach(row=>{bind('production',row.order,{party:'SO-20260924-006',item:row.product,owner:row.owner,status:'released',statusText:'已发布',date:'2026/10/03',progress:'工序执行中'});row.processes=[row.stages[0],row.stages[1],row.stages[2],row.stages[4]].map((stage,index)=>({...stage,owner:['布料加工 · 外协','车缝 · 生产二组','手工 · 手工一组','包装 · 包装组'][index]}));row.quality={...row.stages[3],owner:'质检 · 质量组'};row.inbound={...row.stages[5],owner:'仓库 · 成品仓'};delete row.stages;});
       for(const order of new Set(productionRouteRows.map(row=>row.order))){const rows=productionRouteRows.filter(row=>row.order===order);const record=listConfig.production.rows.find(row=>row.no===order);Object.assign(record,{item:`${rows[0].product} 等 ${rows.length} 款`,lines:rows.length,owner:rows[0].owner,amount:rows.reduce((sum,row)=>sum+Number(row.quantity.replace(/[^\d.]/g,'')),0)});if(order==='MO-20260924-009')Object.assign(record,{date:'2026/09/24',party:'SO-20260923-011',progress:'质量结果待判定',risk:'已逾期'});}
+      listConfig.production.rows.forEach((row, index) => {
+        const end = isoDay(rowDate(row));
+        row.plannedStart = end ? addDays(end, -2 - index % 4) : '';
+      });
       for(const key of ['receivables','payables'])for(const row of listConfig[key].rows){delete row.metric;if(!row.source)row.item='待补充';}
       for(const key of ['sales','purchase','receivables','payables','production','outsourcing','quality','shipments','payments','invoices','reconciliation'])refreshStatusCounts(listConfig[key]);
     }

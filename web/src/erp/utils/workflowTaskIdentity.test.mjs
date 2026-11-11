@@ -256,3 +256,27 @@ test('unavailable projections discard stale identity fields before all consumers
   assert.equal(summary.first, undefined)
   assert.equal(summary.associationCount, 0)
 })
+test('a mixed source defaults to its actual product photo and still surfaces a material keyword match', () => {
+  const task = {
+    source_type: 'outsourcing_order',
+    display_context: {
+      available: true,
+      items: [
+        { kind: 'material', name: '牛皮色外箱', code: 'M-1' },
+        { kind: 'product', name: '雪花小鹿', product_id: 9, image_attachment_id: 91 },
+      ],
+    },
+  }
+  const summary = getWorkflowTaskIdentityPresentation(task)
+  assert.equal(summary.first.name, '雪花小鹿')
+  assert.equal(summary.first.imageAttachmentID, 91)
+  assert.equal(summary.associationCountLabel, '共 2 项关联内容')
+  assert.equal(summary.remainingItems[0].name, '牛皮色外箱')
+  assert.equal(getWorkflowTaskIdentityPresentation(task, '牛皮色').first.kind, 'material')
+  const purchase = getWorkflowTaskIdentityPresentation({ ...task, source_type: 'purchase_order' })
+  assert.equal(purchase.first.kind, 'material')
+  assert.equal(purchase.imageItem.imageAttachmentID, 91)
+  const materialOnly = { ...task, display_context: { ...task.display_context, items: [task.display_context.items[0]] } }
+  assert.equal(getWorkflowTaskIdentityPresentation(materialOnly).first.kind, 'material')
+  assert.equal(getWorkflowTaskIdentityPresentation({ ...materialOnly, source_type: 'purchase_order' }).imageItem.kind, 'material')
+})

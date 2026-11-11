@@ -1,5 +1,4 @@
-import React, { useState } from 'react'
-import { BranchesOutlined } from '@ant-design/icons'
+import { useState } from 'react'
 import { MermaidDiagram } from '@/common/components/markdown'
 
 const UPGRADE_FLOW = `flowchart TB
@@ -26,19 +25,16 @@ export default function DevDatabaseMigrationFlow() {
 
   return (
     <details
-      className="erp-dev-disclosure erp-dev-static-guidance erp-dev-database-migration-guide"
+      className="erp-dev-disclosure erp-dev-static-guidance"
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary>
-        <BranchesOutlined aria-hidden="true" />
-        <span>完整升级流程</span>
-        <small>查看事务边界与失败处理</small>
-      </summary>
+      <summary>查看事务与恢复边界</summary>
       {open ? (
         <div className="erp-dev-database-migration-guide__content">
           <figure className="erp-dev-database-migration-guide__diagram">
             <figcaption>
-              虚线框标出原库数据库事务的边界。此图说明执行顺序，实际进展以上方状态条与操作记录为准；无待执行迁移时跳过事务节点。
+              虚线框只覆盖原库迁移事务，恢复演练、业务验证和版本切换均在事务之外。无待执行迁移时跳过事务。
+              实际进展以页面步骤和操作记录为准，步骤仅在有完成证据时标为完成。
             </figcaption>
             <MermaidDiagram
               chart={UPGRADE_FLOW}

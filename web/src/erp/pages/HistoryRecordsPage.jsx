@@ -232,6 +232,7 @@ export default function HistoryRecordsPage() {
         dataIndex: 'primary',
         copyable: { label: '编号或名称' },
         width: 180,
+        widthGrow: 1,
       },
       {
         align: 'left',
@@ -239,6 +240,7 @@ export default function HistoryRecordsPage() {
         dataIndex: 'secondary',
         copyable: { label: '名称或往来方' },
         width: 180,
+        widthGrow: 2,
       },
       {
         title: '历史状态',
@@ -246,7 +248,7 @@ export default function HistoryRecordsPage() {
         width: 120,
         render: (value) => <Tag color="default">{value}</Tag>,
       },
-      { align: 'left', title: '摘要', dataIndex: 'summary', width: 260 },
+      { align: 'left', title: '摘要', dataIndex: 'summary', width: 260, widthGrow: 2 },
       {
         title: '最后更新',
         dataIndex: 'updatedAt',

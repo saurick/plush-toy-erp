@@ -30,6 +30,7 @@ export function getWorkflowTaskIdentity(task = {}) {
                   item.image_attachment_id > 0
                     ? item.image_attachment_id
                     : 0,
+                ...(item.has_product_images === true ? { hasProductImages: true } : {}),
               }
             : {}),
           name: text(item.name),
@@ -117,13 +118,18 @@ export function getWorkflowTaskIdentityPresentation(task = {}, keyword = '') {
   const preferredMatch = purchaseOrder
     ? matchedItems.find((item) => item.kind === 'material') || matchedItems[0]
     : matchedItems[0]
-  const firstIndex = preferredMatch
-    ? identity.items.indexOf(preferredMatch)
-    : purchaseOrder
-      ? identity.items.findIndex((item) => item.kind === 'material')
-      : 0
+  const leading = identity.items[0]
+  const preferredSummary = purchaseOrder
+    ? identity.items.find((item) => item.kind === 'material')
+    : leading?.kind === 'material'
+      ? identity.items.find((item) => item.kind === 'product' && item.imageAttachmentID > 0)
+      : leading
+  const firstIndex = identity.items.indexOf(preferredMatch || preferredSummary)
   const resolvedFirstIndex = firstIndex >= 0 ? firstIndex : 0
   const first = identity.items[resolvedFirstIndex]
+  const imageItem = purchaseOrder && first?.kind === 'material'
+    ? identity.items.find((item) => item.kind === 'product' && (item.imageAttachmentID > 0 || item.hasProductImages)) || first
+    : first
   const remainingItems = identity.items.filter(
     (_, index) => index !== resolvedFirstIndex
   )
@@ -148,6 +154,7 @@ export function getWorkflowTaskIdentityPresentation(task = {}, keyword = '') {
   return {
     ...identity,
     first,
+    imageItem,
     remainingItems,
     compactCountLabel,
     associationCount,

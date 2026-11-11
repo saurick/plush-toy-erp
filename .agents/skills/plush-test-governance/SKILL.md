@@ -27,7 +27,7 @@ DOM 测试比较存在性、文本、属性、数量或节点身份的布尔结�
 1. 先看 `GIT_OPTIONAL_LOCKS=0 git status --short`，确认本轮路径、其他 writer 和当前 repository identity。
 2. 按项目 `AGENTS.md` 的验证授权规则，以用户目标和实际改动为边界选择最小充分验证；当前目标必要的静态、同名测试、受影响模块、浏览器和 PDF 验证直接执行。共享环境配置、真实数据写入、Git 和发布动作仍按各自授权边界处理。
 3. 按实际风险选择验证：文档/Skill 做链接与合同检查；schema/migration 做生成、迁移和数据测试；领域/API/RBAC 做正常、边界、异常和权限；页面做 Web 与真实浏览器；发布做目标环境证据。
-4. 改动适合现有 affected 路由时，用 `bash scripts/qa/affected.sh --plan` 选计划再按需 `--run`；否则直接运行同名或专项检查，不为普通改动机械运行全站。
+4. 改动适合现有 affected 路由时，用 `bash scripts/qa/affected.sh --plan` 选计划再按需 `--run`；共享工作区的局部任务可用 `--file <仓库相对路径>`（可重复）按本轮文件和必要依赖选测。`--file` 只限定选测依据，实际命令仍读取所在工作区。需要证明混合工作区中的某组改动可独立交付时，在对应基线加精确候选的隔离副本验证。未匹配 affected 时直接运行相关专项检查。
 5. `full.sh`、`strict.sh`、Full Acceptance、全量页面或 PDF 回归只在目标和风险需要时执行。明显超出任务范围或资源预算时，一次说明新增范围、预计开销和停止条件；名称或覆盖数量本身不构成额外门禁。
 6. 任务涉及已授权的 commit/push、远端 exact-SHA CI、发布或 GPT 镜像审查时，按 `scripts/qa/README.md` 的当前合同收口；本 skill 不复制 remote、Runner、机器型号或镜像拓扑。失败修复后按受影响范围复验；CI 编排或缓存实验的同 SHA 复验按专项规则判断，不机械重复全量门禁。
 7. 对 `affected` 无法选择的生成命令、真实数据库、浏览器、migration 或发布检查显式补充；环境不具备时报告 `blocked` 或 `missing`，不要用另一类测试绿色代替。
@@ -39,7 +39,7 @@ DOM 测试比较存在性、文本、属性、数量或节点身份的布尔结�
 | --- | --- |
 | Workflow / ProcessRuntime | 状态、reason、版本/幂等、owner/assignee/RBAC、终态和 Workflow 不代写 Fact |
 | Fact 与 Source Document | 合法/非法状态、重复提交、事务回滚、取消/冲正、余额与事实一致性 |
-| Schema / migration | `make data`、生成零漂移、版本化 migration、fresh/upgrade 和目标库证据分离 |
+| Schema / migration / 数据转换 | 按[项目部署与迁移规则](../../../AGENTS.md#部署迁移与收口)完成适用的 `make data`、生成零漂移及 seed / fixture 核对。`make migrate_check` 检查工作区迁移合同，不连库；`make migrate_audit` 只读核对登记开发库的存量规则。涉及存量转换须用现库备份在隔离库验证升级，空库通过不能替代；实际 apply 单独报告 |
 | API / RBAC | 未登录、disabled、无权限、角色边界、super admin 和前端隐藏不是安全边界 |
 | 页面与样式 | 默认态、交互态、恢复态、相邻区域、长文本/异常数据和真实浏览器 |
 | Seed / Import / Config | 模拟与真实数据、dry-run、批次身份、readback、cleanup 和失败关闭 |

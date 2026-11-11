@@ -1,6 +1,5 @@
 import { createDevOperationUUID } from './devOperationIdentity.mjs'
 import { DEV_DATA_PREPARATION_ROUTE } from './devRoutes.mjs'
-import { buildDevCustomerScopeSearch } from './devCustomerScope.mjs'
 import manualAcceptanceContract from '../../../../server/internal/manualacceptance/contract.json' with { type: 'json' }
 
 export { DEV_DATA_PREPARATION_ROUTE }
@@ -12,33 +11,6 @@ export const DEV_DATA_PREPARATION_ACTION_API_PATH = `${DEV_DATA_PREPARATION_API_
 export const DEV_DATA_PREPARATION_OPERATION_API_PREFIX = `${DEV_DATA_PREPARATION_API_PREFIX}/operations`
 export const DEV_DATA_PREPARATION_SOURCE_PATH =
   'docs/engineering/研发效能工作台与CI-CD设计.md'
-
-// Static explanation only. Runtime status and refresh decisions still come
-// from the backend dataset contracts and persisted operation receipts.
-export const DEV_DATA_PREPARATION_INCREMENTAL_FLOW = String.raw`flowchart LR
-  A["读取目标、当前合同与上一批回执"] --> B{"目标身份与组件回执有效"}
-  B -- "否" --> X["停止复用和写入，重新生成计划"]
-  B -- "是" --> C{"本次变化属于哪一类"}
-  C -- "migration" --> D["刷新 baseline 与后续阶段"]
-  C -- "业务数据摘要或阶段逻辑指纹变化" --> E["定位直接变化模块，并按登记依赖图展开刷新闭包"]
-  C -- "仅验证合同变化" --> F["复用数据并重验相关合同"]
-  C -- "无相关变化" --> G["复用未变化模块"]
-  D --> H["实时核对 core"]
-  E --> H
-  F --> H
-  G --> H
-  H --> I["始终执行只读 readiness"]
-  I --> J["回执列出复用、直接变化、依赖刷新与最终刷新阶段"]`
-
-export const DEV_DATA_PREPARATION_MODULE_FLOW = String.raw`flowchart LR
-    Core["core 身份与基础"] --> Baseline["baseline 基线"]
-    Core --> Source["source 来源单"]
-    Role["role 岗位与责任"] --> Source
-    Source --> Task["task 协同任务"]
-    Source --> Facts["facts 正式业务结果"]
-    Task --> Attachments["attachments 附件"]
-    Facts --> Quality["purchase-quality 采购质检"]
-    Facts --> Attachments`
 
 export const DEV_DATA_PREPARATION_PROFILE_KEYS = Object.freeze({
   coreDemo: 'core-demo',
@@ -52,40 +24,7 @@ export const DEV_DATA_PREPARATION_TARGET_KEYS = Object.freeze({
   isolatedLocal: 'isolated-local',
 })
 
-export const DEV_DATA_PREPARATION_PROFILE_QUERY_KEY = 'dataProfile'
 export const DEV_DATA_PREPARATION_TARGET_QUERY_KEY = 'dataTarget'
-
-export function getDataPreparationEnvironment(targetKey, view = 'scope') {
-  if (view === 'receipts') {
-    return {
-      kind: 'reference',
-      label: '本地与服务器记录',
-      detail: '按每条回执的目标环境区分；不同目标的结果分别核对。',
-    }
-  }
-  if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133) {
-    return {
-      kind: 'server',
-      label: '数据目标：服务器 · demo 演练环境',
-      detail: '业务场景写入登记的 demo 目标；环境身份与执行结果以批次回执为准。',
-    }
-  }
-  if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal) {
-    return {
-      kind: 'local',
-      label: '数据目标：本地隔离环境',
-      detail: '完整回归使用本次新建的可丢弃数据库。',
-    }
-  }
-  if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment) {
-    return {
-      kind: 'local',
-      label: '数据目标：本地开发库',
-      detail: '基础数据与业务场景保存在登记的本地开发库。',
-    }
-  }
-  return { kind: 'reference', label: '数据目标尚未确认', detail: '读取批次回执后再核对目标环境。' }
-}
 
 export function resolveDataPreparationAvailability(
   summary,
@@ -94,13 +33,11 @@ export function resolveDataPreparationAvailability(
 ) {
   const profile = summary?.profiles?.find((item) => item.key === profileKey)
   const targetName =
-    profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo
-      ? 'coreDemo'
-      : profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
-        ? 'fullAcceptance'
-        : targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
-          ? 'scenarioDemo133'
-          : 'scenarioDemo'
+    profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+      ? 'fullAcceptance'
+      : targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
+        ? 'scenarioDemo133'
+        : 'scenarioDemo'
   const target = summary?.target?.[targetName]
   const blockers = []
   if (!profile || !summary.repository) {
@@ -114,7 +51,7 @@ export function resolveDataPreparationAvailability(
       code: 'full_acceptance_requires_clean_repository',
       title: '有未提交改动',
       message:
-        '当前有未提交改动。完整回归需要固定的干净提交；日常联调可选择基础数据或业务场景。',
+        '完整回归需要固定的干净提交。日常手测数据仍可在“测试数据”补齐。',
     })
   }
   const requiresTargetReadback =
@@ -163,113 +100,33 @@ const PROFILE_TARGET_KEYS = Object.freeze({
   ]),
 })
 
-export function buildDevDataPreparationSearch(
-  value,
-  { profileKey, targetKey, customerKey = '' } = {}
-) {
-  const allowedTargets = PROFILE_TARGET_KEYS[profileKey]
-  if (!allowedTargets) {
-    throw new Error('data preparation search requires a registered profile')
-  }
+export const ACTIVE_DATA_PREPARATION_PROFILES = Object.freeze([
+  DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
+  DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
+])
 
-  const searchParams = new URLSearchParams(value)
-  searchParams.set(DEV_DATA_PREPARATION_PROFILE_QUERY_KEY, profileKey)
-  if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo) {
-    if (!allowedTargets.includes(targetKey)) {
-      throw new Error(
-        'scenario data preparation search requires a registered target'
-      )
-    }
-    searchParams.set(DEV_DATA_PREPARATION_TARGET_QUERY_KEY, targetKey)
-    return customerKey
-      ? buildDevCustomerScopeSearch(searchParams, customerKey)
-      : searchParams
-  }
-
-  searchParams.delete(DEV_DATA_PREPARATION_TARGET_QUERY_KEY)
-  return searchParams
+export function supportsDataPreparationTarget(profileKey, targetKey) {
+  return ACTIVE_DATA_PREPARATION_PROFILES.includes(profileKey) &&
+    PROFILE_TARGET_KEYS[profileKey].includes(targetKey)
 }
 
 export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo]: Object.freeze({
     title: '本地长期基础数据',
-    shortTitle: 'Core Demo',
-    purpose: '本地演示账号、标准单位与仓库。',
-    retention: '稳定 upsert，可持续保留',
-    cleanup:
-      '不承诺按批次删除；退出时按账号停用、单据取消或冲正等正常生命周期处理。',
-    scope:
-      '演示账号及当前数据合同登记的标准单位、仓库引用；具体数量见数据合同。',
-    targetKey: 'coreDemo',
-    targetTitle: '本地开发目标',
-    badgeLabel: '长期保留',
-    badgeColor: 'default',
-    prepareButtonLabel: '准备不可变计划',
-    prepareDescription: '预检通过后生成不可变计划，不会立即写入。',
-    confirmationDescription:
-      '共享基础数据使用稳定 upsert；不提供批次删除，后续按正常业务生命周期退出。',
-    successDescription: '共享基础数据已稳定读回，可继续保留使用。',
-    cleanupBoundary: '不支持批次删除，按正常生命周期退出',
-    steps: Object.freeze([
-      '确认共享开发库身份与基础前置',
-      '稳定 upsert 演示账号、标准单位与仓库',
-      '读回固定数据计数并保留长期使用',
-    ]),
   }),
   [DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo]: Object.freeze({
-    title: '长期业务场景数据',
-    shortTitle: 'Scenario Demo',
-    purpose:
-      '本地或 demo 的长期模拟场景；不是完整验收。',
-    retention:
-      '固定批次同批精确复用 / 读回；只补齐缺项，不清空已有数据。岗位到期时间是固定快照，不会随当天滚动。',
-    cleanup:
-      '只向前补齐 / forward-only，不提供批次清理或重置；后续按正式业务生命周期退出。',
-    scope:
-      '正式 Source Document、可证明的 ProcessRuntime、模拟岗位任务，以及由领域 API 合法生成的 Fact。',
-    targetKey: 'scenarioDemo',
-    targetTitle: '长期场景目标',
-    badgeLabel: '长期保留',
-    badgeColor: 'default',
-    prepareButtonLabel: '生成业务场景测试数据',
-    prepareDescription:
-      '在当前目标卡内先权威读回目标身份，再打开二次确认；demo 不接受主机、端口、DSN 或命令参数。',
-    confirmationDescription:
-      '本地会通过正式配置 API 对齐跟踪配置；demo 必须同时绑定 release、migration、当前客户配置、数据版本与新回滚点。两端都不清空历史。',
-    successDescription:
-      '业务场景演示数据已精确读回并长期保留；人工验收仍未完成，本结果不是完整验收。',
-    cleanupBoundary: '只向前补齐，不支持批次清理或重置',
-    steps: Object.freeze([
-      '权威读回当前目标的 release、数据库、migration、客户配置与数据合同',
-      '本地稳定对齐跟踪配置；demo 在目标卡内核对 attestation 与新回滚点',
-      '通过正式 Source / ProcessRuntime / Fact 路径执行；固定批次精确复用 / 读回，半批或漂移阻断',
-    ]),
+    title: '手测数据',
+    purpose: '本地和 Demo 使用同一套手测数据，只补齐缺项，保留已有记录。',
+    scope: '基础资料、各岗位任务、产品多角度图片、业务附件，以及各菜单的正常、异常和纠正流程。',
+    prepareButtonLabel: '补齐手测数据',
+    confirmationDescription: '按当前项目的样本补齐所选环境，已有业务记录会保留。',
+    successDescription: '手测数据已补齐并核对，可以登录各岗位开始手测。',
   }),
   [DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance]: Object.freeze({
-    title: '按最新业务链完整回归',
-    shortTitle: 'Full Acceptance',
-    purpose: '在新隔离库回归全部已登记业务链与场景。',
-    retention: '每次执行都建立新批次，只接受 clean exact commit',
-    cleanup: '无论验收成功或失败都自动清理隔离库，不提供手工清理按钮。',
-    scope:
-      '全部已登记业务链、现有 9 个造数阶段、正式 Source / Fact API、页面回归与受控负向场景。',
-    targetKey: 'fullAcceptance',
-    targetTitle: '完整验收目标',
-    badgeLabel: '自动清理',
-    badgeColor: 'green',
-    prepareButtonLabel: '准备新批次',
-    prepareDescription:
-      '预检通过后生成绑定当前业务链合同与 clean exact commit 的新批次计划，不会立即写入。',
-    confirmationDescription:
-      '完整回归始终执行全部已登记场景合同；业务链选择只帮助核对计划。成功或失败后都必须完成自动清理读回。',
-    successDescription: '最新业务链回归、各阶段耗时与自动清理读回已记录。',
-    cleanupBoundary: '成功或失败后自动清理',
-    steps: Object.freeze([
-      '确认 clean exact commit 与专用隔离库',
-      '按当前业务链合同执行 9 个现有造数阶段和全部场景合同',
-      '运行现有完整 QA / 浏览器回归并记录总耗时与阶段耗时',
-      '成功或失败后自动清理隔离库并读回零残留',
-    ]),
+    title: '完整回归',
+    prepareButtonLabel: '准备完整回归',
+    confirmationDescription: '运行全部已登记的业务场景，结束后自动清理临时数据库。',
+    successDescription: '业务回归结果、各阶段耗时和临时数据库清理结果已记录。',
   }),
 })
 
@@ -298,7 +155,6 @@ const PROFILE_BOUNDARIES = Object.freeze({
   }),
 })
 const SUMMARY_TARGET_KEYS = Object.freeze([
-  'coreDemo',
   'scenarioDemo',
   'scenarioDemo133',
   'fullAcceptance',
@@ -331,7 +187,7 @@ const OPERATION_ID_PATTERN =
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
 const IDEMPOTENCY_KEY_PATTERN =
-  /^data-preparation:prepare:(core-demo|scenario-demo|full-acceptance):(local-development|customer-trial-133|isolated-local):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/u
+  /^data-preparation:prepare:(scenario-demo|full-acceptance):(local-development|customer-trial-133|isolated-local):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/u
 const HASH_PATTERN = /^[0-9a-f]{64}$/u
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/u
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{2,39}$/u
@@ -343,19 +199,6 @@ const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 50
 const SCENARIO_DEMO_CATALOG_READY_COUNT = 40
 const SCENARIO_DEMO_BROWSER_CHECKS_PENDING = 10
 const ACCEPTANCE_EXECUTION_SCOPE = 'all_registered_chains'
-
-export function dataPreparationBatchLabel(dataVersion, datasetRunId) {
-  if (
-    dataVersion === SCENARIO_DEMO_DATA_VERSION &&
-    datasetRunId === SCENARIO_DEMO_RUN_ID
-  ) {
-    const [, month, day] = manualAcceptanceContract.anchorDateUtc
-      .slice(0, 10)
-      .split('-')
-    return `${Number(month)} 月 ${Number(day)} 日手测数据（${manualAcceptanceContract.visiblePrefix}）`
-  }
-  return dataVersion || datasetRunId || null
-}
 
 function assertObject(value, field) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -1314,18 +1157,15 @@ export function validateDevDataPreparationSummary(summary) {
     }
   }
 
-  Object.values(DEV_DATA_PREPARATION_PROFILE_COPY).forEach((profileCopy) => {
-    validateTargetIdentity(
-      summary.target[profileCopy.targetKey],
-      `${profileCopy.targetKey} target identity`
-    )
+  SUMMARY_TARGET_KEYS.forEach((key) => {
+    validateTargetIdentity(summary.target[key], `${key} target identity`)
   })
   summary.profiles.forEach(validateProfile)
   const profileKeys = summary.profiles.map((profile) => profile.key)
   if (
-    profileKeys.length !== PROFILE_KEYS.size ||
-    new Set(profileKeys).size !== PROFILE_KEYS.size ||
-    !profileKeys.every((key) => PROFILE_KEYS.has(key))
+    profileKeys.length !== ACTIVE_DATA_PREPARATION_PROFILES.length ||
+    new Set(profileKeys).size !== ACTIVE_DATA_PREPARATION_PROFILES.length ||
+    !profileKeys.every((key) => ACTIVE_DATA_PREPARATION_PROFILES.includes(key))
   ) {
     throw new Error('data preparation profile set is invalid')
   }
@@ -1532,8 +1372,7 @@ export function createDevDataPreparationClient({
         String(idempotencyKey || '')
       )
       if (
-        !PROFILE_KEYS.has(profileKey) ||
-        !PROFILE_TARGET_KEYS[profileKey]?.includes(targetKey) ||
+        !supportsDataPreparationTarget(profileKey, targetKey) ||
         idempotencyMatch?.[1] !== profileKey ||
         idempotencyMatch?.[2] !== targetKey
       ) {
@@ -1543,12 +1382,13 @@ export function createDevDataPreparationClient({
     },
     execute(operationId, confirmation) {
       const confirmationMatch =
-        /^DATA_PREPARATION:(core-demo|scenario-demo|full-acceptance):(local-development|customer-trial-133|isolated-local):([a-z0-9][a-z0-9_]{2,39}):([0-9a-f]{64}):([0-9a-f-]{36})$/u.exec(
+        /^DATA_PREPARATION:(scenario-demo|full-acceptance):(local-development|customer-trial-133|isolated-local):([a-z0-9][a-z0-9_]{2,39}):([0-9a-f]{64}):([0-9a-f-]{36})$/u.exec(
           String(confirmation || '')
         )
       if (
         !OPERATION_ID_PATTERN.test(String(operationId || '')) ||
         !confirmationMatch ||
+        !supportsDataPreparationTarget(confirmationMatch[1], confirmationMatch[2]) ||
         confirmationMatch[5] !== operationId
       ) {
         throw new Error('数据准备执行参数无效')
@@ -1566,7 +1406,7 @@ export function createDataPreparationIdempotencyKey(
   targetKey,
   randomUuid = () => createDevOperationUUID()
 ) {
-  if (!PROFILE_TARGET_KEYS[profileKey]?.includes(targetKey)) {
+  if (!supportsDataPreparationTarget(profileKey, targetKey)) {
     throw new Error('data preparation profile target is invalid')
   }
   const uuid = String(randomUuid())
@@ -1622,36 +1462,24 @@ export function resolveDataPreparationExecutionConfirmation(
 }
 
 export function selectRecoverableDataPreparationOperation(
-  operations = [],
-  currentOperationId = '',
-  preferredProfileKey = '',
-  preferredTargetKey = ''
+  operations,
+  currentOperationId,
+  preferredProfileKey,
+  preferredTargetKey
 ) {
-  if (!Array.isArray(operations)) return null
-  const currentOperation = operations.find(
+  const matching = operations.filter((operation) =>
+    operation.profileKey === preferredProfileKey &&
+    operation.targetSummary?.targetKey === preferredTargetKey
+  ).toSorted((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+  const writing = matching.find(({ status }) => status === 'launching' || status === 'running')
+  if (writing) return writing
+  const currentOperation = matching.find(
     (operation) => operation.id === currentOperationId
   )
   if (currentOperation) return currentOperation
 
-  const recoverableOperations = operations
-    .filter((operation) => operation?.terminal === false)
-    .toSorted(
-      (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
-    )
-  if (!preferredProfileKey) return recoverableOperations[0] || null
-
-  return (
-    recoverableOperations.find((operation) =>
-      ['launching', 'running'].includes(operation.status)
-    ) ||
-    recoverableOperations.find(
-      (operation) =>
-        operation.profileKey === preferredProfileKey &&
-        (!preferredTargetKey ||
-          operation.targetSummary?.targetKey === preferredTargetKey)
-    ) ||
-    null
-  )
+  const latest = matching[0]
+  return latest?.terminal === false ? latest : null
 }
 
 export function dataPreparationStatusPresentation(status) {

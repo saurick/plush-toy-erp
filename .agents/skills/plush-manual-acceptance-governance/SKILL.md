@@ -28,6 +28,8 @@ description: 验收编排与证据（plush-toy-erp），目标环境操作使用
 
 每一步必须标注 `no-write`、`simulated-write`、`target-write` 或 `human-only`。不清楚时按高风险档位处理。下方流程只执行当前 profile 所需步骤：Local plan 不读取运行凭据或连接服务，已有批次的只读检查不重新准备数据；apply、目标访问、签收和 cleanup 各自核对需要与授权。
 
+整批模拟数据验收按完整覆盖要求核对图片、异常恢复和纠正证据；单页或局部验收只检查清单命中的项目。
+
 ## Workflow / 工作流
 
 1. 冻结 scope：customer、target、profile、dataset key/data version/run id、允许写入、禁止路径、验收与停止条件。先运行 `GIT_OPTIONAL_LOCKS=0 git status --short`，保留其他会话改动。
@@ -35,7 +37,7 @@ description: 验收编排与证据（plush-toy-erp），目标环境操作使用
 3. 检查环境门禁：URL/host、DB、migration、active customer config revision、账号/RBAC、凭据分离、报告目录和精确确认词。凭据只经环境变量传入，不写入命令记录、报告或仓库。
 4. 按当前脚本能力准备 source data、账号、任务、附件和 source-driven Fact。计划入口与 apply 入口分开；脚本声明 plan-only、retired 或 unsupported 的阶段立即停止，不用旧报告、generic RPC、直接 SQL 或局部事实代替。
 5. 每次写入后以同一 dataset/version/run id 做 readback。校验数量、状态、权限、幂等与报告绑定；单个子链绿色不能扩写为完整验收就绪。
-6. 运行 readiness，再按清单做浏览器/PDF 与人工判断。分别记录页面可达、数据满足、交互正确、PDF 合同、人工视觉/业务结果；截图或自动报告不能替代未执行的人工作业。
+6. 运行 readiness，再按清单做浏览器/PDF 与人工判断。按[完整模拟数据覆盖](../plush-seed-import-governance/references/full-dataset-coverage.md#coverage-contract)核对默认页实际取图，以及异常恢复和纠正的前后证据。分别记录页面可达、数据满足、交互正确、PDF 合同和人工结果；未执行的动作标为未验证。
 7. 目标试用与正式发布分开归档：目标报告绑定 target attestation；正式 release 仍需 commit/image、migration、health/ready、smoke、backup/restore 和 rollback evidence。
 8. 先 dry-run 再 retire/cleanup。只取消、归档或停用允许的模拟源数据；已过账事实和审计记录不物理删除。报告保留路径、未清对象与后续 owner。
 

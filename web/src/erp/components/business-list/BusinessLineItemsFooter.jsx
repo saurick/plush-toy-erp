@@ -77,6 +77,7 @@ function BusinessLineItemsFooter(
     addButtonClassName,
     addButtonProps,
     onAdd,
+    summary,
     stats = [],
     detailsLabel = '金额明细',
   },
@@ -88,6 +89,7 @@ function BusinessLineItemsFooter(
 
   return (
     <div className="erp-line-items-form__footer" ref={ref}>
+      {summary ? <div className="erp-line-items-form__footer-summary">{summary}</div> : null}
       <div className="erp-line-items-form__footer-actions">
         <BusinessLineItemsAddButton
           addLabel={addLabel}

@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -118,4 +119,22 @@ func IsWorkflowFollowupCreator(task *WorkflowTask, actorID int) bool {
 	return task != nil && task.TaskGroup == WorkflowFollowupTaskGroup && actorID > 0 &&
 		task.CreatedBy != nil && *task.CreatedBy == actorID && task.ConfigRevision == nil &&
 		task.ProcessInstanceID == nil && task.ProcessNodeInstanceID == nil
+}
+
+// IsTrustedWorkflowFollowupTask identifies a server-issued, source-bound
+// follow-up for read-only source projection.
+func IsTrustedWorkflowFollowupTask(task *WorkflowTask) bool {
+	if task == nil || task.CreatedBy == nil || !IsWorkflowFollowupCreator(task, *task.CreatedBy) ||
+		task.SourceID <= 0 || task.SourceNo == nil || strings.TrimSpace(*task.SourceNo) == "" {
+		return false
+	}
+	if _, ok := WorkflowFollowupSourceSpecFor(task.SourceType); !ok {
+		return false
+	}
+	digest, ok := strings.CutPrefix(task.TaskCode, "FOLLOWUP-")
+	if !ok || len(digest) != 40 || strings.ToLower(digest) != digest {
+		return false
+	}
+	_, err := hex.DecodeString(digest)
+	return err == nil
 }

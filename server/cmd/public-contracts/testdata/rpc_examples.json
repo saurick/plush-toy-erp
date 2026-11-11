@@ -2210,11 +2210,17 @@
     "data": {
       "previews": [
         {
+          "customer_style_no": "DEMO-CUSTOMER",
           "document_id": 11,
           "product_code": "DEMO-BEAR",
           "product_count": 2,
           "product_id": 7,
-          "product_name": "模拟小熊"
+          "product_name": "模拟小熊",
+          "products": [
+            { "product_code": "DEMO-BEAR", "product_id": 7, "product_name": "模拟小熊" },
+            { "product_code": "DEMO-RABBIT", "product_id": 8, "product_name": "模拟小兔" }
+          ],
+          "style_no": "DEMO-INTERNAL"
         }
       ]
     },
@@ -2223,9 +2229,11 @@
       "document_ids": [
         11
       ],
-      "source_type": "sales_order"
+      "expected_version": 3,
+      "include_products": true,
+      "source_type": "outsourcing_order"
     },
-    "test": "TestJsonrpcDocumentProductPreviews"
+    "test": "TestJsonrpcDocumentProductGallery"
   },
   "attachment.list_material_image_references": {
     "basis": "handler-fixture",
@@ -15579,7 +15587,9 @@
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 3,
-        "warehouse_id": 1
+        "warehouse_id": 1,
+        "subject_name": "",
+        "subject_code": ""
       }
     },
     "message": "OK",
@@ -15960,7 +15970,9 @@
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 0,
-        "warehouse_id": 1
+        "warehouse_id": 1,
+        "subject_name": "",
+        "subject_code": ""
       }
     },
     "message": "OK",
@@ -16037,7 +16049,9 @@
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 0,
-        "warehouse_id": 1
+        "warehouse_id": 1,
+        "subject_name": "",
+        "subject_code": ""
       }
     },
     "message": "OK",
@@ -16710,18 +16724,18 @@
     "basis": "backend-wire-shape",
     "data": {
       "production_exception": {
-        "approved_quantity": "DEMO",
+        "approved_quantity": "6",
         "decided_at": 1,
         "decided_by": 1,
-        "decision_no": "DEMO",
+        "decision_no": "PE-PHOTO-DEMO",
         "decision_reason": "DEMO",
-        "decision_type": "DEMO",
+        "decision_type": "SCRAP",
         "executed_at": 1,
         "executed_by": 1,
         "execution_reason": "DEMO",
-        "execution_status": "DEMO",
+        "execution_status": "PENDING",
         "id": 1,
-        "production_material_requirement_id": 1,
+        "production_material_requirement_id": null,
         "production_order_id": 1,
         "production_order_item_id": 1,
         "production_wip_batch_id": 1,
@@ -16729,15 +16743,23 @@
         "reason": "DEMO",
         "requested_at": 1,
         "requested_by": 1,
-        "requested_quantity": "DEMO",
+        "requested_quantity": "6",
         "reverse_reason": "DEMO",
         "reversed_at": 1,
         "reversed_by": 1,
-        "status": "DEMO",
+        "status": "APPROVED",
         "stock_disposition_required": false,
         "target_operation_id": 1,
         "target_supplier_id": 1,
-        "version": 1
+        "version": 1,
+        "source_identity": {
+          "subject_type": "PRODUCT",
+          "subject_id": 7,
+          "name": "模拟小熊",
+          "code": "PRODUCT-7",
+          "sku_code": "SKU-7",
+          "batch_no": "WIP-PHOTO-DEMO"
+        }
       }
     },
     "params": {
@@ -17205,7 +17227,9 @@
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 2,
-        "warehouse_id": 1
+        "warehouse_id": 1,
+        "subject_name": "",
+        "subject_code": ""
       }
     },
     "message": "OK",
@@ -17529,7 +17553,9 @@
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 0,
-        "warehouse_id": 1
+        "warehouse_id": 1,
+        "subject_name": "",
+        "subject_code": ""
       }
     },
     "params": {
@@ -17572,7 +17598,9 @@
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 0,
-        "warehouse_id": 1
+        "warehouse_id": 1,
+        "subject_name": "",
+        "subject_code": ""
       }
     },
     "params": {
@@ -22358,7 +22386,24 @@
         "created_by": null,
         "critical_path": false,
         "discovery": null,
-        "display_context": null,
+        "display_context": {
+          "available": true,
+          "source_no": "SO-PHOTO-DEMO",
+          "source_line_count": null,
+          "items": [
+            {
+              "kind": "product",
+              "name": "模拟小鹿",
+              "code": "PRODUCT-7",
+              "style_no": "",
+              "order_no": "",
+              "supplier_item_no": "",
+              "product_id": 7,
+              "image_attachment_id": 0,
+              "has_product_images": true
+            }
+          ]
+        },
         "due_at": null,
         "escalate_target_role_key": null,
         "escalated_at": null,
@@ -23285,9 +23330,42 @@
       "offset": 0
     },
     "data": {
-      "items": [],
-      "total": 0,
-      "counts": {}
+      "items": [
+        {
+          "id": 901,
+          "kind": "RECEIPT",
+          "stage": "AWAITING_INBOUND",
+          "production_order_id": 71,
+          "production_order_item_id": 7100,
+          "order_no": "MO-PHOTO-DEMO",
+          "fact_id": 901,
+          "fact_no": "FG-PHOTO-DEMO",
+          "fact_status": "DRAFT",
+          "fact_version": 1,
+          "production_wip_batch_id": 91003,
+          "batch_no": "WIP-PHOTO-DEMO",
+          "operation_name": "手工制作",
+          "product_id": 7,
+          "product_name": "模拟小熊",
+          "product_code": "PRODUCT-7",
+          "sku_code": "SKU-7",
+          "unit_name": "只",
+          "warehouse_id": 1,
+          "warehouse_name": "模拟成品仓",
+          "lot_no": "FG-LOT-DEMO",
+          "quantity": "30",
+          "pending_inspection_quantity": "0",
+          "pending_packaging_quantity": "0",
+          "packaging_confirmed": false,
+          "action_batch_id": 91003,
+          "action": ""
+        }
+      ],
+      "total": 1,
+      "counts": {
+        "": 1,
+        "AWAITING_INBOUND": 1
+      }
     },
     "message": "OK"
   }

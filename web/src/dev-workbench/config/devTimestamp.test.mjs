@@ -56,7 +56,7 @@ test('workbench runtime evidence pages use semantic source-backed timestamps', (
     ],
     [
       '../pages/DevDataPreparationPage.jsx',
-      ['summary?.generatedAt', 'operation.createdAt', 'event.at'],
+      ['operation.createdAt', 'operation.updatedAt', 'event.at'],
     ],
     [
       '../pages/delivery/migration/MigrationOperationDrawer.jsx',

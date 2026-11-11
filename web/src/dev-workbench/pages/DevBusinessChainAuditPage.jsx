@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Button,
@@ -9,7 +9,7 @@ import {
   Typography,
 } from 'antd'
 import { useLocation, useSearchParams } from 'react-router-dom'
-import { LeftOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ReloadOutlined } from '@ant-design/icons'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { WorkbenchFacts } from '../components/WorkbenchPattern.jsx'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_BUSINESS_CHAIN_AUDIT_ROUTE } from '../config/devRoutes.mjs'
@@ -277,54 +277,54 @@ function ChainReportContext({ data, chain }) {
   )
 }
 
-function ChainResults({ data, chain, status, keyword, stepKey, updateQuery }) {
+function ChainResults({ data, chain, updateQuery }) {
   const selectedIndex = data.report.chains.findIndex((item) => item.key === chain)
   const [page, setPage] = useState(() => selectedIndex < 0 ? 1 : Math.floor(selectedIndex / 10) + 1)
-  const renderSteps = (row) => <ChainSteps data={data} chain={row.key} status={status} keyword={keyword} stepKey={stepKey} updateQuery={updateQuery} />
   return (
-    <>
-      <Table
-        className="erp-dev-chain-audit__results"
-        rowKey="key"
-        size="middle"
-        dataSource={data.report.chains}
-        pagination={{
-          ...DEV_PAGINATION,
-          current: selectedIndex < 0 ? page : Math.floor(selectedIndex / 10) + 1,
-          pageSize: 10,
-          hideOnSinglePage: true,
-          onChange: (value) => { setPage(value); updateQuery({ chain: null, step: null, scope: null }) },
-        }}
-        expandable={{
-          expandedRowKeys: data.report.chains.some((item) => item.key === chain) ? [chain] : [],
-          showExpandColumn: false,
-          expandedRowRender: renderSteps,
-        }}
-        columns={[
-          {
-            title: '链路',
-            dataIndex: 'label',
-            width: '38%',
-            render: (label, row) => (
-              <Button type="link" className="erp-dev-chain-audit__chain-link" aria-expanded={chain === row.key} onClick={() => updateQuery({ chain: chain === row.key ? null : row.key, step: null, status: null, q: null, scope: null })}>{label}</Button>
-            ),
-          },
-          { title: '结果', dataIndex: 'status', width: 110, render: (value) => <ChainAuditState status={value} /> },
-          { title: '首个未通过环节', key: 'first', render: (_, row) => row.steps.find((step) => step.status !== 'passed')?.label || '本批次步骤均通过' },
-        ]}
-      />
-      <Button type="link" className="erp-dev-chain-audit__all-steps" onClick={() => updateQuery({ chain: null, step: null, scope: 'steps' })}>查看全部步骤</Button>
-    </>
+    <Table
+      className="erp-dev-chain-audit__results"
+      rowKey="key"
+      size="middle"
+      dataSource={data.report.chains}
+      pagination={{
+        ...DEV_PAGINATION,
+        current: selectedIndex < 0 ? page : Math.floor(selectedIndex / 10) + 1,
+        pageSize: 10,
+        hideOnSinglePage: true,
+        onChange: (value) => { setPage(value); updateQuery({ chain: null, step: null }) },
+      }}
+      columns={[
+        {
+          title: '链路',
+          dataIndex: 'label',
+          width: '38%',
+          render: (label, row) => (
+            <Button
+              type="link"
+              className="erp-dev-chain-audit__chain-link"
+              aria-current={chain === row.key ? 'true' : undefined}
+              onClick={() => updateQuery({ chain: row.key, step: null })}
+            >
+              {label}
+            </Button>
+          ),
+        },
+        { title: '结果', dataIndex: 'status', width: 110, render: (value) => <ChainAuditState status={value} /> },
+        { title: '首个未通过环节', key: 'first', render: (_, row) => row.steps.find((step) => step.status !== 'passed')?.label || '本批次步骤均通过' },
+      ]}
+    />
   )
 }
 
 function ChainSteps({ data, chain, status, keyword, stepKey, updateQuery }) {
+  const searchRef = useRef(null)
   const rows = useMemo(() => filterChainAuditSteps(data.report, { chain, status, keyword, stepKey }), [data.report, chain, status, keyword, stepKey])
   const selectedChain = data.report.chains.find((item) => item.key === chain)
+  const showChainLabel = chain === 'all' && data.report.chains.length > 1
   return (
-    <div className="erp-dev-chain-audit__stack">
+    <section className="erp-dev-chain-audit__stack" aria-label="步骤明细">
       <div className="erp-dev-chain-audit__toolbar">
-        <SearchInput allowClear placeholder="搜环节或岗位" searchHint="可搜索：环节、岗位、实际读回" aria-label="搜索环节、岗位或实际读回" value={keyword} onSearch={(value) => updateQuery({ q: value || null })} />
+        <SearchInput ref={searchRef} allowClear placeholder="搜环节或岗位" searchHint="可搜索：环节、岗位、实际读回" aria-label="搜索环节、岗位或实际读回" value={keyword} onSearch={(value) => updateQuery({ q: value || null })} />
         <FilterSelect
           emptyValue="all"
           label="步骤结果"
@@ -337,12 +337,22 @@ function ChainSteps({ data, chain, status, keyword, stepKey, updateQuery }) {
         />
         <Text type="secondary">{rows.length} 个步骤</Text>
         {stepKey ? <Button onClick={() => updateQuery({ step: null })}>取消交接定位</Button> : null}
+        {chain !== 'all' ? (
+          <Button
+            onClick={() => {
+              updateQuery({ chain: null, step: null })
+              searchRef.current?.focus({ preventScroll: true })
+            }}
+          >
+            查看全部链路
+          </Button>
+        ) : null}
       </div>
       {stepKey && !data.report.chains.some((item) => (chain === 'all' || item.key === chain) && item.steps.some((step) => step.key === stepKey)) ? (
         <Alert type="warning" showIcon message="所选批次没有这一步的执行记录；旧的合并步骤不能证明当前拆分后的交接。" />
       ) : null}
       {chain !== 'all' && !selectedChain ? (
-        <Alert type="warning" showIcon message="所选批次没有这条链路" action={<Button onClick={() => updateQuery({ chain: null, step: null, scope: null, q: null, status: null })}>查看全部链路</Button>} />
+        <Alert type="warning" showIcon message="所选批次没有这条链路" />
       ) : null}
       <Table
         className="erp-dev-chain-audit__steps"
@@ -351,14 +361,14 @@ function ChainSteps({ data, chain, status, keyword, stepKey, updateQuery }) {
         dataSource={rows}
         pagination={{ ...DEV_PAGINATION, pageSize: 10, hideOnSinglePage: true }}
         columns={[
-          { title: '环节', key: 'step', width: '34%', render: (_, row) => <>{!selectedChain ? <Text type="secondary">{row.chainLabel}</Text> : null}<div>{row.number}. {row.label}</div></> },
+          { title: '环节', key: 'step', width: '34%', render: (_, row) => <>{showChainLabel ? <Text type="secondary">{row.chainLabel}</Text> : null}<div>{row.number}. {row.label}</div></> },
           { title: '结果', dataIndex: 'status', width: 110, render: (value) => <ChainAuditState status={value} /> },
           { title: '实际操作与读回', dataIndex: 'observed' },
         ]}
         expandable={{ expandedRowRender: renderStepDetails }}
       />
       {selectedChain ? <ChainAuditEvidenceLinks data={data} items={selectedChain.evidence} /> : null}
-    </div>
+    </section>
   )
 }
 
@@ -395,7 +405,6 @@ export default function DevBusinessChainAuditPage() {
   const keyword = searchParams.get('q') || ''
   const stepKey = searchParams.get('step') || ''
   const detailsOpen = searchParams.get('details') === 'report' || view !== 'chains'
-  const showSteps = chain !== 'all' || Boolean(stepKey || keyword) || status !== 'all' || searchParams.get('scope') === 'steps'
   useEffect(() => {
     if (!batch || searchParams.get('batch') === batch) return
     const next = new URLSearchParams(searchParams)
@@ -468,17 +477,13 @@ export default function DevBusinessChainAuditPage() {
   const data = loaded.batch === batch ? loaded.data : null
   const error = loaded.batch === batch ? loaded.error : ''
   const report = data?.report
-  const selectedChain = report?.chains.find((item) => item.key === chain)
   const freshness = data?.freshness === 'historical' ? '历史报告' : data?.freshness === 'unknown' ? '源码身份未知' : '源码匹配未证明'
   const definition = data?.definitionComparison?.status === 'changed' ? '定义已变化，需复验' : data?.definitionComparison?.status !== 'unchanged' ? '定义待核对' : ''
   return (
     <div className="erp-dev-chain-audit" data-dev-chain-audit>
       <DevReadingReturn ready={!catalog.loading && (!batch || !loaded.loading)} />
       <header className="erp-dev-chain-audit__header">
-        <div className="erp-dev-chain-audit__heading">
-          {showSteps ? <Button type="text" icon={<LeftOutlined aria-hidden="true" />} onClick={() => updateQuery({ chain: null, step: null, q: null, status: null, scope: null })}>收起步骤</Button> : null}
-          <Title level={2}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_BUSINESS_CHAIN_AUDIT_ROUTE]}</Title>
-        </div>
+        <Title level={2}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_BUSINESS_CHAIN_AUDIT_ROUTE]}</Title>
         <Space wrap>
           {catalog.batches.length > 1 || (!batch && catalog.batches.length) || (batch && !catalog.batches.some((item) => item.id === batch)) ? (
             <Select
@@ -511,8 +516,8 @@ export default function DevBusinessChainAuditPage() {
             <span>{[freshness, definition].filter(Boolean).join(' · ')}</span>
             {report.findings.length ? <Button type="link" onClick={() => updateQuery({ view: 'findings', details: 'report' })}>{report.findings.length} 项问题</Button> : null}
           </p>
-          <ChainResults data={data} chain={chain} status={status} keyword={keyword} stepKey={stepKey} updateQuery={updateQuery} />
-          {showSteps && !selectedChain ? <ChainSteps data={data} chain={chain} status={status} keyword={keyword} stepKey={stepKey} updateQuery={updateQuery} /> : null}
+          <ChainResults data={data} chain={chain} updateQuery={updateQuery} />
+          <ChainSteps data={data} chain={chain} status={status} keyword={keyword} stepKey={stepKey} updateQuery={updateQuery} />
         </>
       ) : null}
       <Drawer title="报告详情" width={960} open={detailsOpen && Boolean(report) && !catalog.error} onClose={() => updateQuery({ details: null, view: null })} rootClassName="erp-dev-chain-audit-drawer" destroyOnHidden>

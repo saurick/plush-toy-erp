@@ -1,5 +1,13 @@
+export const visibleUIDesignFrame = 'iframe[title="ERP 最新可交互设计"]:visible'
+
+export async function chooseUIDesignMode(page, label) {
+  const modes = page.getByLabel('设计预览界面', { exact: true })
+  await modes.getByText(label, { exact: true }).click()
+  await modes.getByRole('radio', { name: label, exact: true, checked: true }).waitFor({ state: 'attached' })
+}
+
 export async function chooseUIDesignState(page, label) {
-  const select = page.locator('.erp-dev-ui-design-state-select')
+  const select = page.locator('.erp-dev-ui-design-state-select:visible')
   await select.locator('.ant-select-selector').click()
   const listId = await select.getByRole('combobox').getAttribute('aria-controls')
   const popup = page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id=${JSON.stringify(listId)}]`) })

@@ -70,13 +70,20 @@ export default function DevCustomerConfigPage() {
       <PreflightPanel
         consoleSummary={overview.packageConsoleSummary}
         customerPackageSummary={overview.customerPackageSummary}
+        menuSummary={overview.menuSummary}
+        fieldNumberingSummary={overview.fieldNumberingSummary}
         activeSection={route.activePreflightSection}
         onSectionChange={(section) => {
           if (!isMutationRunning) route.selectSection(section)
         }}
       />
     ),
-    diff: <DiffPanel consoleSummary={overview.packageConsoleSummary} />,
+    diff: (
+      <DiffPanel
+        consoleSummary={overview.packageConsoleSummary}
+        customerPackageSummary={overview.customerPackageSummary}
+      />
+    ),
     assets: (
       <AssetsPanel
         menuSummary={overview.menuSummary}

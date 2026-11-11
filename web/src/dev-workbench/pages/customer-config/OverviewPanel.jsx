@@ -1,5 +1,6 @@
 import { Button, Typography } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
+import { guardItemLabel } from './presentation.jsx'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -10,6 +11,9 @@ export function OverviewPanel({
   onNavigate,
 }) {
   const checked = overview.packageConsoleSummary.primaryStatus !== 'BLOCKED'
+  const firstBlockingBoundary = checked
+    ? null
+    : overview.customerPackageSummary.boundaries.find((item) => !item.ok)
   const sampleStatus = {
     idle: '本次未运行',
     running: '生成中',
@@ -25,14 +29,19 @@ export function OverviewPanel({
   return (
     <div className="erp-dev-customer-overview" data-dev-customer-view="总览">
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-start">
-        <div>
-          <div className="erp-dev-customer-panel__head">
-            <Title level={2}>
-              {checked ? '配置包可以继续验证' : '先处理配置包问题'}
-            </Title>
-          </div>
+        <div className="erp-dev-customer-start__copy">
+          <Title level={2}>
+            {checked ? '配置包可以继续验证' : '先处理配置包问题'}
+          </Title>
+          {firstBlockingBoundary ? (
+            <Text type="danger">
+              {guardItemLabel(firstBlockingBoundary, '客户配置包边界')}
+              {'：'}{firstBlockingBoundary.valueLabel}
+              {firstBlockingBoundary.expectedLabel ? `；要求：${firstBlockingBoundary.expectedLabel}` : ''}
+            </Text>
+          ) : null}
           <Text type="secondary">
-            当前为工作区配置；服务器生效状态请到版本发布核对。
+            当前为工作区配置；服务器生效状态见「版本发布」。
           </Text>
         </div>
         <Button

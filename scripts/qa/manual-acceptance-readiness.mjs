@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+import {
+  MANUAL_ACCEPTANCE_DAILY_ROLE_TASK_COUNT,
+  MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT,
+} from "./manual-acceptance-task-board-data.mjs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -1236,6 +1240,40 @@ function validateTaskReport(report) {
       ) &&
     runtimeEvidenceByCase.get("completed")?.processContext?.process_instance
       ?.status === "completed";
+  if (report.dailyTaskBoard) {
+    const samples = report.dailyTaskBoard.samples;
+    const wellFormed = Array.isArray(samples) && samples.length > 0 &&
+      new Set(samples.map((row) => row.id)).size === samples.length &&
+      samples.every((row) =>
+        TASK_ROLE_KEYS.includes(row.role) && Number.isSafeInteger(row.id) && row.id > 0 &&
+        String(row.taskCode || "").trim() && String(row.status || "").trim() &&
+        String(row.sourceType || "").trim() && Number.isSafeInteger(row.sourceID) && row.sourceID > 0 &&
+        String(row.sourceNo || "").trim() &&
+        Array.isArray(row.products) && row.products.length > 0 &&
+        row.products.every((product) => Number.isSafeInteger(product.id) && product.id > 0 &&
+          Number.isSafeInteger(product.attachmentId) && product.attachmentId > 0) &&
+        (row.role === "boss" || (row.group === "business_followup" && /^FOLLOWUP-[a-f0-9]{40}$/u.test(row.taskCode))),
+      );
+    if (
+      report.dailyTaskBoard.contract !== MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT ||
+      report.evidenceClass !== "mixed_formal_runtime_and_source_tasks" ||
+      report.mode !== "apply" || report.simulatedOnly !== true || report.realCustomerImport !== false ||
+      report.writesFacts !== false || !runtimeEvidenceIsExact || report.provesProcessRuntime !== true ||
+      !runId || !taskProfileContract || report.copyRevision !== taskProfileContract.copyRevision ||
+      prefix !== expectedIdentity?.prefix || report.sourceType !== TASK_SOURCE_TYPE ||
+      Number(report.sourceID) !== expectedIdentity?.sourceID ||
+      !wellFormed || report.summary?.total !== samples.length || report.summary?.persisted !== samples.length ||
+      !TASK_ROLE_KEYS.every((role) => {
+        const rows = samples.filter((row) => row.role === role);
+        return rows.length === report.summary.byRole?.[role] &&
+          (role === "boss" ? rows.filter((row) => row.status === "ready").length >= 20 :
+            rows.length === MANUAL_ACCEPTANCE_DAILY_ROLE_TASK_COUNT);
+      })
+    ) {
+      throw new CliError("长期手测岗位任务报告缺少精确来源或产品图证据", 2);
+    }
+    return report;
+  }
   if (
     report.mode !== "apply" ||
     report.simulatedOnly !== true ||
@@ -1755,6 +1793,37 @@ function resolveBatchEvidence(datasetId, blueprint, sourceReport, factReport) {
   return factReferenceEvidence(datasetId, blueprint, factReport);
 }
 
+function dailyRoleTaskProbe(taskReport, { id, roleKey, username }) {
+  const samples = taskReport.dailyTaskBoard.samples.filter((row) => row.role === roleKey);
+  const requiredStatusCounts = {};
+  for (const sample of samples) {
+    const status = sample.status.toUpperCase();
+    requiredStatusCounts[status] = (requiredStatusCounts[status] || 0) + 1;
+  }
+  return {
+    id, roleKey, username, domain: "workflow", method: "get_task",
+    includeCustomerKey: false, listKey: "tasks", statusField: "task_status_key",
+    expectedMinimum: samples.length, expectedExact: samples.length,
+    requiredStatuses: Object.keys(requiredStatusCounts), requiredStatusCounts,
+    batchEvidence: "exact_references", exactOwnerRoleKey: roleKey,
+    dailyTaskCodes: samples.map((sample) => sample.taskCode),
+    dailyOpenTaskCodes: samples.filter((sample) => ["ready", "blocked"].includes(sample.status)).map((sample) => sample.taskCode),
+    referenceQueries: samples.map((sample) => ({
+      method: "get_task", itemKey: "task", params: { task_id: sample.id }, referenceKey: sample.taskCode,
+    })),
+    expectedReferences: samples.map((sample) => ({
+      id: sample.id, key: sample.taskCode,
+      expectedFields: {
+        task_code: sample.taskCode, owner_role_key: roleKey, task_group: sample.group,
+        source_type: sample.sourceType, source_id: sample.sourceID, source_no: sample.sourceNo,
+        task_status_key: sample.status,
+        product_image_refs: sample.products.map((item) => `${item.id}:${item.attachmentId}`).sort().join(","),
+      },
+    })),
+    readOnly: true,
+  };
+}
+
 function buildDatasetProbes(
   catalog,
   sourceReport,
@@ -1825,7 +1894,12 @@ function buildDatasetProbes(
     declaredMinimum: null,
     readOnly: true,
   });
-  probes.push({
+  if (taskReport?.dailyTaskBoard) {
+    probes.push(dailyRoleTaskProbe(taskReport, {
+      id: "boss-dashboard-tasks", roleKey: "boss",
+      username: accountProjections.find((item) => item.roleKey === "boss").username,
+    }));
+  } else probes.push({
     id: "boss-dashboard-tasks",
     roleKey: "boss",
     username: accountProjections.find((item) => item.roleKey === "boss")
@@ -1872,6 +1946,10 @@ function buildDatasetProbes(
     (item) => item.mobilePermission,
   )) {
     const { username, roleKey } = account;
+    if (taskReport?.dailyTaskBoard) {
+      probes.push(dailyRoleTaskProbe(taskReport, { id: `mobile-tasks:${roleKey}`, roleKey, username }));
+      continue;
+    }
     probes.push({
       id: `mobile-tasks:${roleKey}`,
       roleKey,
@@ -2087,7 +2165,8 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
             prefix: taskReport.prefix,
             sourceType: taskReport.sourceType,
             sourceID: taskReport.sourceID,
-            taskGroupCoverageDigest: taskReport.coverage.catalogScenarioDigest,
+            taskGroupCoverageDigest: taskReport.coverage?.catalogScenarioDigest || null,
+            dailyTaskBoardContract: taskReport.dailyTaskBoard?.contract || null,
           }
         : null,
     },
@@ -2291,6 +2370,12 @@ export function evaluateManualAcceptanceDataset(probe, data) {
         continue;
       }
       const actualReferenceField = (field) => {
+        if (field === "product_image_refs" && probe.dailyTaskCodes) {
+          return (item.display_context?.items || [])
+            .filter((entry) => entry.kind === "product")
+            .map((entry) => `${entry.product_id}:${entry.image_attachment_id}`)
+            .sort().join(",");
+        }
         if (probe.id === "stock-reservations") {
           if (field === "source_type") return "SALES_ORDER";
           if (field === "source_id") return item?.sales_order_id;
@@ -2747,7 +2832,7 @@ async function readProbeData({ backendURL, probe, token, fetchImpl }) {
     const record = query.itemKey ? data?.[query.itemKey] : null;
     if (
       query.itemKey &&
-      (!record || Number(record.id) !== Number(query.params.id))
+      (!record || Number(record.id) !== Number(query.params.id ?? query.params.task_id))
     )
       throw new Error(
         `${probe.domain}.${query.method} 查询 ${query.referenceKey} 缺少匹配的 ${query.itemKey}`,
@@ -2943,7 +3028,8 @@ function mergeStatusCounts(results) {
   return counts;
 }
 
-function mobileTotalResult(mobileResults) {
+function mobileTotalResult(mobileResults, daily = false) {
+  const minimum = daily ? mobileResults.reduce((n, item) => n + (item.expectedExact || 0), 0) : MOBILE_TASK_TOTAL;
   const unproven = mobileResults.some((item) => item?.status === "not_proven");
   const actual = mobileResults.reduce(
     (sum, item) => sum + Number(item.actual || 0),
@@ -2957,10 +3043,10 @@ function mobileTotalResult(mobileResults) {
     id: MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.mobileTaskTotal,
     status: unproven
       ? "not_proven"
-      : allRolesPass && actual >= MOBILE_TASK_TOTAL
+      : allRolesPass && actual >= minimum
         ? "pass"
         : "fail",
-    expectedMinimum: MOBILE_TASK_TOTAL,
+    expectedMinimum: minimum,
     actual: unproven ? null : actual,
     returned: mobileResults.reduce(
       (sum, item) => sum + Number(item.returned || 0),
@@ -2971,11 +3057,11 @@ function mobileTotalResult(mobileResults) {
     statusKinds: Object.keys(counts).length,
     requiredStatuses,
     missingStatuses,
-    enoughRecords: !unproven && actual >= MOBILE_TASK_TOTAL,
+    enoughRecords: !unproven && actual >= minimum,
     enoughStatuses: !unproven && missingStatuses.length === 0,
     enoughSecondaryKinds: true,
     allRolesPass,
-    batchEvidence: unproven ? "not_proven" : "exact_task_codes",
+    batchEvidence: unproven ? "not_proven" : daily ? "exact_references" : "exact_task_codes",
     notProvenReason: unproven
       ? "未提供本次岗位任务写入报告，不能证明九个岗位的本批任务。"
       : null,
@@ -3052,8 +3138,9 @@ function taskGroupCoverageSummary(mobileResults, catalogScenarioDigest) {
 }
 
 function bossDashboardActiveResult(bossResult) {
-  const terminalStatuses = new Set(["DONE", "REJECTED"]);
-  const expectedCounts = taskStatusCountsForRole("boss");
+  const daily = Array.isArray(bossResult?.dailyTaskCodes);
+  const terminalStatuses = new Set(daily ? ["DONE", "REJECTED", "WITHDRAWN", "CANCELLED"] : ["DONE", "REJECTED"]);
+  const expectedCounts = daily ? bossResult.requiredStatusCounts : taskStatusCountsForRole("boss");
   const expectedMinimum = Object.entries(expectedCounts).reduce(
     (sum, [status, count]) =>
       terminalStatuses.has(status) ? sum : sum + Number(count || 0),
@@ -3068,7 +3155,7 @@ function bossDashboardActiveResult(bossResult) {
     (sum, count) => sum + Number(count || 0),
     0,
   );
-  const sourceProven = bossResult?.batchEvidence === "exact_task_codes";
+  const sourceProven = daily ? bossResult.batchEvidence === "exact_references" : bossResult?.batchEvidence === "exact_task_codes";
   const passed =
     bossResult?.status === "pass" && sourceProven && actual === expectedMinimum;
   return {
@@ -3088,7 +3175,8 @@ function bossDashboardActiveResult(bossResult) {
     enoughRecords: passed,
     enoughStatuses: passed,
     enoughSecondaryKinds: true,
-    batchEvidence: sourceProven ? "exact_task_codes" : "not_proven",
+    batchEvidence: sourceProven ? bossResult.batchEvidence : "not_proven",
+    ...(daily ? { dailyTaskCodes: bossResult.dailyOpenTaskCodes } : {}),
     exactSourceType: sourceProven ? bossResult.exactSourceType : null,
     exactSourceID: sourceProven ? bossResult.exactSourceID : null,
     exactTaskCodePrefix: sourceProven ? bossResult.exactTaskCodePrefix : null,
@@ -3138,6 +3226,7 @@ function sanitizeProbe(probe, result) {
     exactSourceType: probe.exactSourceType ?? null,
     exactSourceID: probe.exactSourceID ?? null,
     exactTaskCodePrefix: probe.exactTaskCodePrefix ?? null,
+    ...(probe.dailyTaskCodes ? { dailyTaskCodes: probe.dailyTaskCodes, dailyOpenTaskCodes: probe.dailyOpenTaskCodes } : {}),
     exactOwnerRoleKey: probe.exactOwnerRoleKey ?? null,
     exactTaskGroup: probe.exactTaskGroup ?? null,
     declaredMinimum: probe.declaredMinimum ?? null,
@@ -3485,11 +3574,17 @@ export async function verifyManualAcceptanceReadiness(
   const mobileResults = plan.probes
     .filter((probe) => probe.id.startsWith("mobile-tasks:"))
     .map((probe) => resultById.get(probe.id));
-  const taskGroupCoverage = taskGroupCoverageSummary(
-    mobileResults,
-    plan.reportInputs.taskReport?.taskGroupCoverageDigest || null,
-  );
-  const totalResult = mobileTotalResult(mobileResults);
+  const daily = plan.reportInputs.taskReport?.dailyTaskBoardContract === MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT;
+  const taskGroupCoverage = daily
+    ? {
+        contract: MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT,
+        complete: mobileResults.length === TASK_ROLE_KEYS.length && mobileResults.every((item) => item.status === "pass"),
+        byRole: Object.fromEntries(mobileResults.map((item) => [
+          item.id.replace("mobile-tasks:", ""), { actual: item.actual, statusCounts: item.statusCounts, taskGroupCounts: item.taskGroupCounts },
+        ])),
+      }
+    : taskGroupCoverageSummary(mobileResults, plan.reportInputs.taskReport?.taskGroupCoverageDigest || null);
+  const totalResult = mobileTotalResult(mobileResults, daily);
   resultById.set(totalResult.id, totalResult);
   const activeBossResult = bossDashboardActiveResult({
     ...plan.probes.find((probe) => probe.id === "boss-dashboard-tasks"),
@@ -3569,9 +3664,9 @@ export async function verifyManualAcceptanceReadiness(
       browserChecksCompleted: 0,
       manualAcceptanceCompleted: false,
       mobileRolePages: mobileResults.length,
-      mobileTasksPerRoleExpected: MOBILE_TASKS_PER_ROLE,
+      mobileTasksPerRoleExpected: daily ? null : MOBILE_TASKS_PER_ROLE,
       mobileActualByRole,
-      mobileTaskTotalExpected: MOBILE_TASK_TOTAL,
+      mobileTaskTotalExpected: totalResult.expectedMinimum,
       mobileTaskTotalActual: totalResult.actual,
       taskGroupCoverage,
       financeFieldEvidenceComplete,

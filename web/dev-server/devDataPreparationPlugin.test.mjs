@@ -35,9 +35,7 @@ import {
   buildScenarioDemoReadback,
 } from '../../scripts/qa/scenario-demo-data.mjs'
 import {
-  coreDemoExecutionCommands,
-  coreDemoPreflightCommand,
-  coreDemoTargetCommand,
+  developmentDatabaseTargetCommand,
   createDevDataPreparationMiddleware,
   createDevDataPreparationPlugin,
   createDevDataPreparationService,
@@ -138,29 +136,21 @@ function successfulRunner(calls) {
         stderr: '',
       }
     }
-    if (args.at(-1)?.endsWith('seed-role-demo-admins.sh')) {
-      return {
-        stdout:
-          'role demo admin seed completed accounts=10 password_source=default password_reset=false include_debug=false include_manual_acceptance_scenarios=false reset_local_super_admin=false\n',
-        stderr: '',
-      }
+    if (args[0]?.endsWith('scenario-demo-data.mjs') && !args.includes('--apply')) {
+      return { stdout: JSON.stringify(buildScenarioDemoPlan({
+        repository: REPOSITORY,
+        databaseTarget: {
+          databaseName: 'plush_erp',
+          host: '192.168.0.133',
+          port: 5432,
+          safeTarget: 'registered-development:plush_erp',
+          targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
+        },
+        migrationFingerprint: 'e'.repeat(64),
+        migrationVersion: '20260916090000',
+      })) }
     }
-    if (args.some((arg) => arg.endsWith('seed-core-demo-data.sh'))) {
-      return {
-        stdout:
-          `core demo seed completed prefix=${MANUAL_ACCEPTANCE_CORE_CONTRACT.visiblePrefix} units=${MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length} materials=0 products=0 warehouses=${MANUAL_ACCEPTANCE_CORE_CONTRACT.warehouses.length} processes=0 bom_headers=0\n` +
-          'simulated_only=true real_customer_import=false no_direct_fact_posting=true\n' +
-          'references_only=false scenario_references=true exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0\n',
-        stderr: '',
-      }
-    }
-    return {
-      stdout:
-        '[local-preflight] 工作区数据库规则检查通过\n' +
-        '[local-preflight] 开发数据库 migration 已是最新版本（20260729，10/10）\n' +
-        '[local-preflight] non-system-schema function=0 procedure=0 non-internal-trigger=0\n',
-      stderr: '',
-    }
+    throw new Error('unexpected command in data preparation test')
   }
 }
 
@@ -174,17 +164,10 @@ test('data preparation plugin is a Vite serve-only plugin', () => {
 })
 
 test('action contract rejects unknown profiles, shell/path/DSN fields, and loose execute payloads', () => {
-  assert.deepEqual(
-    validateDevDataPreparationAction({
-      action: 'prepare',
-      payload: {
-        profileKey: 'core-demo',
-        targetKey: 'local-development',
-        idempotencyKey: IDEMPOTENCY_KEY,
-      },
-    }).payload.profileKey,
-    'core-demo'
-  )
+  assert.throws(() => validateDevDataPreparationAction({
+    action: 'prepare',
+    payload: { profileKey: 'core-demo', targetKey: 'local-development', idempotencyKey: IDEMPOTENCY_KEY },
+  }), /invalid/u)
   assert.deepEqual(
     validateDevDataPreparationAction({
       action: 'prepare',
@@ -198,21 +181,21 @@ test('action contract rejects unknown profiles, shell/path/DSN fields, and loose
   )
   for (const payload of [
     {
-      profileKey: 'core-demo',
+      profileKey: 'scenario-demo',
       targetKey: 'local-development',
-      idempotencyKey: IDEMPOTENCY_KEY,
+      idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
       command: 'rm',
     },
     {
-      profileKey: 'core-demo',
+      profileKey: 'scenario-demo',
       targetKey: 'local-development',
-      idempotencyKey: IDEMPOTENCY_KEY,
+      idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
       path: '/tmp/output',
     },
     {
-      profileKey: 'core-demo',
+      profileKey: 'scenario-demo',
       targetKey: 'local-development',
-      idempotencyKey: IDEMPOTENCY_KEY,
+      idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
       databaseURL: FULL_DSN,
     },
     {
@@ -245,42 +228,10 @@ test('action contract rejects unknown profiles, shell/path/DSN fields, and loose
 
 test('fixed profile commands cannot receive browser shell, path, DSN, or API origin input', async () => {
   const root = '/repo'
-  assert.deepEqual(coreDemoTargetCommand(root), {
+  assert.deepEqual(developmentDatabaseTargetCommand(root), {
     command: 'go',
     args: ['run', './cmd/dburl', '-conf', './configs/dev/config.yaml'],
     options: { cwd: '/repo/server' },
-  })
-  const core = coreDemoExecutionCommands(root, 'plush_erp')
-  assert.deepEqual(
-    core.map(({ key, command, args }) => ({ key, command, args })),
-    [
-      {
-        key: 'role-seed',
-        command: 'bash',
-        args: ['/repo/scripts/seed-role-demo-admins.sh'],
-      },
-      {
-        key: 'core-seed',
-        command: 'bash',
-        args: [
-          '/repo/scripts/seed-core-demo-data.sh',
-          '--scenario-references',
-          '--expected-database',
-          'plush_erp',
-          '--confirm',
-          `SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:plush_erp:${MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion}:${MANUAL_ACCEPTANCE_CORE_CONTRACT.runId}`,
-        ],
-      },
-    ]
-  )
-  assert.throws(
-    () => coreDemoExecutionCommands(root, 'plush_erp_prod'),
-    /registered development target/u
-  )
-  assert.deepEqual(coreDemoPreflightCommand(root), {
-    command: process.execPath,
-    args: ['/repo/scripts/local-runtime-preflight.mjs', '--mode', 'database'],
-    options: { cwd: '/repo' },
   })
   assert.deepEqual(scenarioDemoPlanCommand(root), {
     command: process.execPath,
@@ -340,146 +291,6 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
     full.args.some((value) => String(value).includes('postgres://')),
     false
   )
-})
-
-test('core demo prepares an immutable plan, reuses idempotency, executes asynchronously, and records readback', async (t) => {
-  const fixture = createFixture(t)
-  const calls = []
-  const service = createDevDataPreparationService({
-    projectRoot: fixture.root,
-    operationStore: fixture.store,
-    commandRunner: successfulRunner(calls),
-    readRepositoryState: async () => REPOSITORY,
-    environment: {},
-    now: () => new Date('2026-07-29T02:03:04.000Z'),
-    random: fixedRandom,
-  })
-  const request = {
-    action: 'prepare',
-    payload: {
-      profileKey: 'core-demo',
-      targetKey: 'local-development',
-      idempotencyKey: IDEMPOTENCY_KEY,
-    },
-  }
-  const prepared = await service.act(request)
-  const reused = await service.act(request)
-  assert.equal(prepared.reused, false)
-  assert.equal(reused.reused, true)
-  assert.equal(reused.operation.id, prepared.operation.id)
-  assert.match(prepared.operation.planHash, /^[0-9a-f]{64}$/u)
-  assert.match(
-    prepared.operation.confirmationRequired,
-    /^DATA_PREPARATION:core-demo:/u
-  )
-  await assert.rejects(
-    service.act({
-      action: 'execute',
-      payload: {
-        operationId: prepared.operation.id,
-        confirmation: `${prepared.operation.confirmationRequired}-wrong`,
-      },
-    }),
-    /confirmation/u
-  )
-  const accepted = await service.act({
-    action: 'execute',
-    payload: {
-      operationId: prepared.operation.id,
-      confirmation: prepared.operation.confirmationRequired,
-    },
-  })
-  assert.equal(accepted.operation.status, 'launching')
-  const passed = await waitForOperation(
-    service,
-    prepared.operation.id,
-    'passed'
-  )
-  assert.deepEqual(passed.readback, {
-    schemaVersion: 'plush.dev-data-preparation-readback/v1',
-    profileKey: 'core-demo',
-    targetFingerprint: prepared.operation.targetSummary.targetFingerprint,
-    preflight: 'passed',
-    roleAccounts: 10,
-    core: {
-      units: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
-      materials: 0,
-      products: 0,
-      warehouses: 4,
-      processes: 0,
-      bomHeaders: 0,
-    },
-    stableUpsert: true,
-    cleanupSupported: false,
-  })
-  assert.deepEqual(passed.timing, {
-    startedAt: '2026-07-29T02:03:04.000Z',
-    completedAt: '2026-07-29T02:03:04.000Z',
-    durationMs: 0,
-  })
-  assert.deepEqual(
-    calls
-      .filter(({ command }) => command !== 'go')
-      .map(({ args }) => path.basename(args[0])),
-    [
-      'local-runtime-preflight.mjs',
-      'local-runtime-preflight.mjs',
-      'seed-role-demo-admins.sh',
-      'seed-core-demo-data.sh',
-    ]
-  )
-})
-
-test('core preparation rejects stale, missing, or incomplete migration proof before seeding', async (t) => {
-  const invalidProofs = {
-    staleGuard: (output) =>
-      output.replace(
-        '工作区数据库规则检查通过',
-        '工作区 schema/migration 守卫通过'
-      ),
-    missingGuard: (output) =>
-      output.replace('工作区数据库规则检查通过', '工作区数据库规则检查失败'),
-    incompleteMigration: (output) =>
-      output.replace(/（[^，]+，\d+\/\d+）/u, '（20260729，2/3）'),
-    programmableObject: (output) => output.replace('function=0', 'function=1'),
-  }
-  for (const [name, alter] of Object.entries(invalidProofs)) {
-    await t.test(name, async (subtest) => {
-      const fixture = createFixture(subtest)
-      const calls = []
-      const baseRunner = successfulRunner(calls)
-      const service = createDevDataPreparationService({
-        projectRoot: fixture.root,
-        operationStore: fixture.store,
-        readRepositoryState: async () => REPOSITORY,
-        commandRunner: async (...args) => {
-          const result = await baseRunner(...args)
-          return args[1][0]?.endsWith('local-runtime-preflight.mjs')
-            ? { ...result, stdout: alter(result.stdout) }
-            : result
-        },
-      })
-      await assert.rejects(
-        service.act({
-          action: 'prepare',
-          payload: {
-            profileKey: 'core-demo',
-            targetKey: 'local-development',
-            idempotencyKey: IDEMPOTENCY_KEY,
-          },
-        }),
-        /migration preflight contract/u
-      )
-      assert.equal(
-        calls.some(({ args }) =>
-          args.some((arg) =>
-            /seed-(?:core-demo-data|role-demo-admins)\.sh$/u.test(arg)
-          )
-        ),
-        false
-      )
-    })
-  }
 })
 
 test('scenario demo binds the current dataset plan, needs no browser credential input, and stores exact readback', async (t) => {
@@ -930,7 +741,7 @@ test('concurrent services atomically claim one idempotency key and return one op
   const calls = []
   const baseRunner = successfulRunner(calls)
   const commandRunner = async (command, args, options) => {
-    if (args.includes('--mode')) {
+    if (args[0]?.endsWith('scenario-demo-data.mjs')) {
       await new Promise((resolve) => setTimeout(resolve, 25))
     }
     return baseRunner(command, args, options)
@@ -949,9 +760,9 @@ test('concurrent services atomically claim one idempotency key and return one op
   const request = {
     action: 'prepare',
     payload: {
-      profileKey: 'core-demo',
+      profileKey: 'scenario-demo',
       targetKey: 'local-development',
-      idempotencyKey: IDEMPOTENCY_KEY,
+      idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
     },
   }
   const [first, second] = await Promise.all([
@@ -963,10 +774,10 @@ test('concurrent services atomically claim one idempotency key and return one op
   assert.equal(readdirSync(path.join(fixture.store, 'operations')).length, 1)
   assert.equal(readdirSync(path.join(fixture.store, 'idempotency')).length, 1)
   assert.equal(readdirSync(path.join(fixture.store, 'prepare-locks')).length, 0)
-  assert.equal(calls.filter(({ args }) => args.includes('--mode')).length, 1)
+  assert.equal(calls.filter(({ args }) => args[0]?.endsWith('scenario-demo-data.mjs')).length, 1)
 })
 
-test('core demo target is fixed to registered 133 development databases and rejects other 133 instances', async (t) => {
+test('scenario target is fixed to the registered 133 development database and rejects other 133 instances', async (t) => {
   const fixture = createFixture(t)
   const service = createDevDataPreparationService({
     projectRoot: fixture.root,
@@ -984,19 +795,19 @@ test('core demo target is fixed to registered 133 development databases and reje
     service.act({
       action: 'prepare',
       payload: {
-        profileKey: 'core-demo',
+        profileKey: 'scenario-demo',
         targetKey: 'local-development',
-        idempotencyKey: IDEMPOTENCY_KEY,
+        idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
       },
     }),
-    /registered development/u
+    /registered (?:non-disposable )?development/u
   )
   const summary = await service.summary()
-  assert.equal(summary.target.coreDemo.status, 'blocked')
+  assert.equal(summary.target.scenarioDemo.status, 'blocked')
   assert.equal(JSON.stringify(summary).includes('credential@'), false)
 })
 
-test('summary fails core demo closed when the migration preflight is not ready', async (t) => {
+test('summary fails local scenario closed when the migration preflight is not ready', async (t) => {
   const fixture = createFixture(t)
   const service = createDevDataPreparationService({
     projectRoot: fixture.root,
@@ -1012,12 +823,12 @@ test('summary fails core demo closed when the migration preflight is not ready',
   })
 
   const summary = await service.summary()
-  assert.equal(summary.target.coreDemo.status, 'blocked')
+  assert.equal(summary.target.scenarioDemo.status, 'blocked')
   assert.equal(
     summary.issues.some(
       (issue) =>
-        issue.code === 'core_demo_target_unavailable' &&
-        issue.message.includes('migration')
+        issue.code === 'scenario_demo_target_unavailable' &&
+        issue.message.includes('迁移')
     ),
     true
   )
@@ -1248,7 +1059,7 @@ test('summary isolates an unregistered operation contract and rejects its execut
   )
 })
 
-test('core demo rejects malformed registered-family aliases', async (t) => {
+test('scenario target rejects other development database names', async (t) => {
   const fixture = createFixture(t)
   const service = createDevDataPreparationService({
     projectRoot: fixture.root,
@@ -1266,12 +1077,12 @@ test('core demo rejects malformed registered-family aliases', async (t) => {
     service.act({
       action: 'prepare',
       payload: {
-        profileKey: 'core-demo',
+        profileKey: 'scenario-demo',
         targetKey: 'local-development',
-        idempotencyKey: IDEMPOTENCY_KEY,
+        idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
       },
     }),
-    /registered development/u
+    /registered (?:non-disposable )?development/u
   )
 })
 
@@ -1296,17 +1107,17 @@ test('full acceptance requires server-only database environment and exact clean 
     /environment/u
   )
   const summary = await missingEnvironment.summary()
-  assert.equal(summary.target.coreDemo.status, 'available')
+  assert.equal(summary.target.scenarioDemo.status, 'available')
   assert.equal(summary.target.fullAcceptance.status, 'blocked')
-  const corePrepared = await missingEnvironment.act({
+  const scenarioPrepared = await missingEnvironment.act({
     action: 'prepare',
     payload: {
-      profileKey: 'core-demo',
+      profileKey: 'scenario-demo',
       targetKey: 'local-development',
-      idempotencyKey: IDEMPOTENCY_KEY,
+      idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
     },
   })
-  assert.equal(corePrepared.operation.status, 'ready')
+  assert.equal(scenarioPrepared.operation.status, 'ready')
   const dirty = createDevDataPreparationService({
     projectRoot: fixture.root,
     operationStore: fixture.store,
@@ -1392,8 +1203,8 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
       trialDatabaseLifecycle: 'long-lived-registered-target',
     }
   )
-  assert.equal(summary.target.coreDemo.databaseName, 'plush_erp')
-  assert.equal(summary.target.coreDemo.migrationVersion, '20260729')
+  assert.equal(summary.target.scenarioDemo.databaseName, 'plush_erp')
+  assert.equal(summary.target.scenarioDemo.migrationVersion, '20260916090000')
 })
 
 test('full acceptance receipt binds the latest chain contract and nine stage timings', async (t) => {
@@ -1770,6 +1581,36 @@ test('a later authoritative scenario readback releases the resolved unknown outc
   }
 })
 
+test('only a provably different legacy database stops blocking current local preparation', () => {
+  const activeTarget = {
+    targetKey: 'local-development',
+    targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
+  }
+  const operation = {
+    id: 'new-plan', profileKey: 'scenario-demo', targetSummary: activeTarget,
+    createdAt: '2026-07-30T00:00:00.000Z',
+  }
+  const legacy = {
+    id: 'old-record', profileKey: 'scenario-demo', status: 'not_proven',
+    updatedAt: '2026-07-29T00:00:00.000Z',
+    targetSummary: {
+      safeTarget: 'host=192.168.0.200 port=5432 database=plush_erp',
+      targetFingerprint: createHash('sha256').update('postgres://192.168.0.200:5432/plush_erp').digest('hex'),
+      disposable: false, automaticCleanup: false,
+    },
+  }
+  assert.equal(unresolvedDataPreparationOutcomeBlocksExecution(operation, [legacy]), false)
+  for (const predecessor of [
+    { ...legacy, status: 'running' },
+    { ...legacy, profileKey: 'core-demo' },
+    { ...legacy, targetSummary: { ...legacy.targetSummary, targetKey: 'local-development' } },
+    { ...legacy, targetSummary: { ...legacy.targetSummary, targetFingerprint: 'f'.repeat(64) } },
+    { ...legacy, targetSummary: { ...legacy.targetSummary, safeTarget: 'unknown' } },
+  ]) {
+    assert.equal(unresolvedDataPreparationOutcomeBlocksExecution(operation, [predecessor]), true)
+  }
+})
+
 test('ready-plan projection uses the execution guard and never rewrites unresolved evidence', async (t) => {
   for (const targetKey of ['local-development', null]) {
     const fixture = createFixture(t)
@@ -1778,9 +1619,9 @@ test('ready-plan projection uses the execution guard and never rewrites unresolv
       preflightFingerprint: 'd'.repeat(64), disposable: false, automaticCleanup: false,
       ...(targetKey ? { targetKey } : {}),
     }
-    const input = { profileKey: 'scenario-demo', repository: REPOSITORY, runId: 'unregistered', targetSummary }
+    const input = { profileKey: 'core-demo', repository: REPOSITORY, runId: 'unregistered', targetSummary }
     const { operation } = createOrReuseDataPreparationOperation(fixture.store, {
-      ...input, planHash: hashDataPreparationPlan(input), idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
+      ...input, planHash: hashDataPreparationPlan(input), idempotencyKey: IDEMPOTENCY_KEY,
       operationId: '623e4567-e89b-42d3-a456-426614174000', now: '2026-07-29T02:00:00.000Z',
     })
     transitionDataPreparationOperation(fixture.store, operation.id, { status: 'launching', message: 'started', now: '2026-07-29T02:01:00.000Z' })
@@ -1793,7 +1634,7 @@ test('ready-plan projection uses the execution guard and never rewrites unresolv
       now: () => new Date('2026-07-29T02:07:04.000Z'), random: fixedRandom,
     })
     const prepared = await service.act({ action: 'prepare', payload: {
-      profileKey: 'core-demo', targetKey: 'local-development', idempotencyKey: IDEMPOTENCY_KEY,
+      profileKey: 'scenario-demo', targetKey: 'local-development', idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
     } })
     assert.equal(prepared.operation.status, 'ready')
     const blocker = prepared.operation.issues.find(({ code }) => code === 'unresolved_operation_outcome')
@@ -1814,27 +1655,16 @@ test('ready-plan projection uses the execution guard and never rewrites unresolv
 
 test('failed command receipts redact credentials and full DSNs', async (t) => {
   const fixture = createFixture(t)
-  let preflightCount = 0
+  const run = successfulRunner([])
+  let planChecks = 0
   const service = createDevDataPreparationService({
     projectRoot: fixture.root,
     operationStore: fixture.store,
-    commandRunner: async (command, args) => {
-      if (command === 'go') return { stdout: `${CORE_DSN}\n` }
-      if (args.includes('--mode')) {
-        preflightCount += 1
-        if (preflightCount > 1) {
-          throw new Error(
-            'Command failed:\npassword=hunter2\tdsn=postgres://admin:secret@192.168.0.133:5432/plush_erp\n/tmp/seed.log /home/dev/config /private/tmp/a /var/run/service'
-          )
-        }
-        return {
-          stdout:
-            '[local-preflight] 工作区数据库规则检查通过\n' +
-            '[local-preflight] 开发数据库 migration 已是最新版本（20260729，10/10）\n' +
-            '[local-preflight] non-system-schema function=0 procedure=0 non-internal-trigger=0\n',
-        }
+    commandRunner: async (command, args, options) => {
+      if (args[0]?.endsWith('scenario-demo-data.mjs') && ++planChecks > 1) {
+        throw new Error('Command failed: password=hunter2 dsn=postgres://admin:secret@192.168.0.133:5432/plush_erp /tmp/seed.log /home/dev/config /private/tmp/a /var/run/service')
       }
-      return { stdout: '' }
+      return run(command, args, options)
     },
     readRepositoryState: async () => REPOSITORY,
     environment: {},
@@ -1844,9 +1674,9 @@ test('failed command receipts redact credentials and full DSNs', async (t) => {
   const prepared = await service.act({
     action: 'prepare',
     payload: {
-      profileKey: 'core-demo',
+      profileKey: 'scenario-demo',
       targetKey: 'local-development',
-      idempotencyKey: IDEMPOTENCY_KEY,
+      idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
     },
   })
   await service.act({
@@ -1877,49 +1707,6 @@ test('failed command receipts redact credentials and full DSNs', async (t) => {
   )
 })
 
-test('core demo records partial completion when a later fixed seed step fails', async (t) => {
-  const fixture = createFixture(t)
-  const baseRunner = successfulRunner([])
-  const service = createDevDataPreparationService({
-    projectRoot: fixture.root,
-    operationStore: fixture.store,
-    commandRunner: async (command, args, options) => {
-      if (args.some((arg) => arg.endsWith('seed-core-demo-data.sh'))) {
-        throw new Error('core reference write failed')
-      }
-      return baseRunner(command, args, options)
-    },
-    readRepositoryState: async () => REPOSITORY,
-    environment: {},
-    now: () => new Date('2026-07-29T02:03:04.000Z'),
-    random: fixedRandom,
-  })
-  const prepared = await service.act({
-    action: 'prepare',
-    payload: {
-      profileKey: 'core-demo',
-      targetKey: 'local-development',
-      idempotencyKey: IDEMPOTENCY_KEY,
-    },
-  })
-  await service.act({
-    action: 'execute',
-    payload: {
-      operationId: prepared.operation.id,
-      confirmation: prepared.operation.confirmationRequired,
-    },
-  })
-
-  const failed = await waitForOperation(
-    service,
-    prepared.operation.id,
-    'failed'
-  )
-  assert.equal(failed.readback, null)
-  assert.match(failed.issues[0].message, /目标可能已部分更新/u)
-  assert.match(failed.issues[0].message, /role-seed/u)
-})
-
 test('repository identity requires an exact 40-character commit', async (t) => {
   const fixture = createFixture(t)
   const service = createDevDataPreparationService({
@@ -1938,9 +1725,9 @@ test('repository identity requires an exact 40-character commit', async (t) => {
     service.act({
       action: 'prepare',
       payload: {
-        profileKey: 'core-demo',
+        profileKey: 'scenario-demo',
         targetKey: 'local-development',
-        idempotencyKey: IDEMPOTENCY_KEY,
+        idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
       },
     }),
     /repository identity/u
@@ -2039,9 +1826,9 @@ test('middleware enforces loopback, same-origin CSRF, strict JSON, and request s
   const request = JSON.stringify({
     action: 'prepare',
     payload: {
-      profileKey: 'core-demo',
+      profileKey: 'scenario-demo',
       targetKey: 'local-development',
-      idempotencyKey: IDEMPOTENCY_KEY,
+      idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
     },
   })
   const missingOrigin = await invokeMiddleware(middleware, {
@@ -2070,9 +1857,9 @@ test('middleware enforces loopback, same-origin CSRF, strict JSON, and request s
     body: JSON.stringify({
       action: 'prepare',
       payload: {
-        profileKey: 'core-demo',
+        profileKey: 'scenario-demo',
         targetKey: 'local-development',
-        idempotencyKey: IDEMPOTENCY_KEY,
+        idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
         shell: 'bash',
       },
     }),
@@ -2113,12 +1900,6 @@ test('profile metadata states retention, cleanup, and browser-safe requirements 
         dataRetention: 'ephemeral',
         cleanupMode: 'automatic',
         exactCleanCommitRequired: true,
-      },
-      {
-        key: 'core-demo',
-        dataRetention: 'long-lived',
-        cleanupMode: 'not-supported',
-        exactCleanCommitRequired: false,
       },
       {
         key: 'scenario-demo',

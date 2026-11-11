@@ -1,6 +1,7 @@
 import React from 'react'
 import { Descriptions } from 'antd'
 import Table from '@/common/components/table/AppTable'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 export default function InventoryOperationDetails({ operation }) {
   const count = operation?.operation_type === 'CYCLE_COUNT'
@@ -24,7 +25,17 @@ export default function InventoryOperationDetails({ operation }) {
         scroll={{ x: 760 }}
         dataSource={operation?.items || []}
         columns={[
-      { title: '存货', dataIndex: 'subject_name', render: (value) => value || '名称暂不可用' },
+      {
+        title: '存货',
+        dataIndex: 'subject_name',
+        className: 'erp-product-identity-cell',
+        render: (value, row) => {
+          const name = value || '名称暂不可用'
+          return row.subject_type === 'PRODUCT' && row.subject_id > 0
+            ? <ProductIdentity productId={row.subject_id} name={name} compact />
+            : name
+        },
+      },
       { title: '规格', dataIndex: 'sku_code', render: (value) => value || '—' },
       { title: transfer ? '来源仓库' : '仓库', dataIndex: 'warehouse_name', render: (value) => value || '名称暂不可用' },
       ...(transfer ? [{ title: '目标仓库', dataIndex: 'to_warehouse_name', render: (value) => value || '名称暂不可用' }] : []),

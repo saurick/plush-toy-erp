@@ -1,5 +1,6 @@
 import { Alert, Button, Card, Space, Typography } from 'antd'
 import { StatusTag } from './shared.jsx'
+import DevDatabaseMigrationFlow from '../../../components/DevDatabaseMigrationFlow.jsx'
 import DevStaticGuidance from '../../../components/DevStaticGuidance.jsx'
 import DevTimestamp from '../../../components/DevTimestamp.jsx'
 
@@ -117,6 +118,7 @@ export function MigrationUpgradePanel({
         ) : null}
         </Card>
       )}
+      <DevDatabaseMigrationFlow />
     </section>
   )
 }

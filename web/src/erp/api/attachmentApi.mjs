@@ -72,10 +72,11 @@ export async function listMaterialImageReferences(params = {}, options = {}) {
   return requireRpcArray(result, 'images', '材料参考图数据不完整，请重新读取')
 }
 
-export async function listDocumentProductPreviews(params = {}) {
+export async function listDocumentProductPreviews(params = {}, options = {}) {
   const result = await attachmentRpc.call(
     RpcMethod.attachment.LIST_DOCUMENT_PRODUCT_PREVIEWS,
-    params
+    params,
+    options
   )
   return requireRpcArray(result, 'previews', '单据产品图片数据不完整，请重新读取')
 }

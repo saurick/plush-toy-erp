@@ -12,6 +12,7 @@ import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import Table from '@/common/components/table/AppTable'
+import { tableColumnsMinimumWidth } from '@/common/components/table/tableColumns.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import { normalizeStringList } from '../../utils/permissionCenterAccess.mjs'
 import {
@@ -42,6 +43,80 @@ function PermissionImpactMap({ permissions = [], permissionKeys = [] }) {
     ...new Set(values.map((item) => String(item || '').trim()).filter(Boolean)),
   ]
 
+  const columns = [
+    { align: 'left', title: '功能', dataIndex: 'label', width: 220 },
+    {
+      align: 'left',
+      title: '适用页面',
+      dataIndex: 'pages',
+      width: 220,
+      render: (items, record) => {
+        const pageLabels = uniqueLabels(
+          items.map(
+            (item) =>
+              getPermissionPageEntry({
+                key: item.key,
+                label: item.pageLabel,
+              }).label
+          )
+        )
+        if (pageLabels.length === 0) {
+          return record.usage?.backendOnly ? (
+            <Text type="secondary">不对应单独页面</Text>
+          ) : (
+            <Text type="secondary">尚未登记明确页面</Text>
+          )
+        }
+        return (
+          <Space wrap size={[4, 4]}>
+            {pageLabels.map((label) => (
+              <Tag key={label}>{label}</Tag>
+            ))}
+          </Space>
+        )
+      },
+    },
+    {
+      align: 'left',
+      title: '页面区域',
+      width: 180,
+      render: (_, record) => {
+        const sectionLabels = uniqueLabels(
+          record.pages.map((item) => item.sectionLabel)
+        )
+        return sectionLabels.length > 0
+          ? sectionLabels.join('、')
+          : '页面通用区域'
+      },
+    },
+    {
+      align: 'left',
+      title: '可用操作',
+      width: 190,
+      render: (_, record) => {
+        const actionLabels = uniqueLabels(
+          record.pages.map((item) => item.actionLabel)
+        )
+        return (
+          actionLabels.join('、') ||
+          record.usage?.defaultActionLabel ||
+          '进入页面后可使用'
+        )
+      },
+    },
+    {
+      title: '使用限制',
+      width: 260,
+      render: (_, record) => (
+        <Text type="secondary">
+          {record.usage?.restrictions?.length > 0
+            ? record.usage.restrictions.join('；')
+            : '以公司当前设置、业务状态和任务负责人为准'}
+        </Text>
+      ),
+    },
+  ]
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Paragraph type="secondary" className="erp-business-inline-note">
@@ -51,80 +126,12 @@ function PermissionImpactMap({ permissions = [], permissionKeys = [] }) {
         sticky
         rowKey="rowID"
         size="small"
+        tableLayout="fixed"
+        scroll={{ x: tableColumnsMinimumWidth(columns) }}
         pagination={false}
         dataSource={rows}
         locale={{ emptyText: <Empty description="当前岗位尚未选择功能" /> }}
-        columns={[
-          { align: 'left', title: '功能', dataIndex: 'label', width: 220 },
-          {
-            align: 'left',
-            title: '适用页面',
-            dataIndex: 'pages',
-            render: (items, record) => {
-              const pageLabels = uniqueLabels(
-                items.map(
-                  (item) =>
-                    getPermissionPageEntry({
-                      key: item.key,
-                      label: item.pageLabel,
-                    }).label
-                )
-              )
-              if (pageLabels.length === 0) {
-                return record.usage?.backendOnly ? (
-                  <Text type="secondary">不对应单独页面</Text>
-                ) : (
-                  <Text type="secondary">尚未登记明确页面</Text>
-                )
-              }
-              return (
-                <Space wrap size={[4, 4]}>
-                  {pageLabels.map((label) => (
-                    <Tag key={label}>{label}</Tag>
-                  ))}
-                </Space>
-              )
-            },
-          },
-          {
-            align: 'left',
-            title: '页面区域',
-            width: 180,
-            render: (_, record) => {
-              const sectionLabels = uniqueLabels(
-                record.pages.map((item) => item.sectionLabel)
-              )
-              return sectionLabels.length > 0
-                ? sectionLabels.join('、')
-                : '页面通用区域'
-            },
-          },
-          {
-            align: 'left',
-            title: '可用操作',
-            width: 190,
-            render: (_, record) => {
-              const actionLabels = uniqueLabels(
-                record.pages.map((item) => item.actionLabel)
-              )
-              return (
-                actionLabels.join('、') ||
-                record.usage?.defaultActionLabel ||
-                '进入页面后可使用'
-              )
-            },
-          },
-          {
-            title: '使用限制',
-            render: (_, record) => (
-              <Text type="secondary">
-                {record.usage?.restrictions?.length > 0
-                  ? record.usage.restrictions.join('；')
-                  : '以公司当前设置、业务状态和任务负责人为准'}
-              </Text>
-            ),
-          },
-        ]}
+        columns={columns}
       />
     </Space>
   )

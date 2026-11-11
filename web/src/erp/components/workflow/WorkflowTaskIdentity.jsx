@@ -53,10 +53,10 @@ function CompactIdentityCodes({ item, sourceNo, source, copyable, showStyleNo })
   )
 }
 
-function IdentityItem({ item, copyable = true, codeCopyable = copyable, summaryCopyable = copyable, source = null }) {
+function IdentityItem({ item, imageItem = item, copyable = true, codeCopyable = copyable, summaryCopyable = copyable, source = null }) {
   return (
     <span className="erp-task-identity__row">
-      <WorkflowTaskProductImage item={item} />
+      <WorkflowTaskProductImage item={imageItem} />
       <span className="erp-task-identity__item">
         {source}
         <span className="erp-task-identity__name">
@@ -123,7 +123,7 @@ export function WorkflowTaskAssociation({ task, keyword = '', copyable = false, 
   return (
     <>
       <span className="erp-task-identity__card-body" aria-label="任务关联内容">
-        <WorkflowTaskProductImage item={first} />
+        <WorkflowTaskProductImage item={identity.imageItem} />
         {renderContent(
           <span className="erp-task-identity__item">
             <span className="erp-task-identity__product">
@@ -227,7 +227,7 @@ export default function WorkflowTaskIdentity({
     return (
       <div className="erp-task-identity erp-task-identity--detail" aria-label="任务关联内容">
         <div className="erp-task-identity__summary">
-          <IdentityItem item={identity.first} copyable={false} codeCopyable={copyable} source={source} />
+          <IdentityItem item={identity.first} imageItem={identity.imageItem} copyable={false} codeCopyable={copyable} source={source} />
           {identity.items.length > 1 ? <Button type="link" className="erp-task-identity__count" aria-haspopup="dialog" aria-expanded={openedSourceKey === sourceKey} onClick={(event) => { event.stopPropagation(); event.currentTarget.focus({ preventScroll: true }); setOpenedSourceKey(sourceKey) }}>{identity.associationCountLabel}<RightOutlined aria-hidden="true" /></Button> : null}
         </div>
         <BusinessModal key={sourceKey} title={identity.associationTitle} open={openedSourceKey === sourceKey} onCancel={() => setOpenedSourceKey(null)} footer={null} size="recordDetails" destroyOnHidden className="erp-task-linked-items-modal">
@@ -240,7 +240,7 @@ export default function WorkflowTaskIdentity({
   }
   return (
     <div className="erp-task-identity" aria-label="任务关联内容">
-      <IdentityItem item={identity.first} copyable={copyable} summaryCopyable={summaryCopyable} />
+      <IdentityItem item={identity.first} imageItem={identity.imageItem} copyable={copyable} summaryCopyable={summaryCopyable} />
       {identity.remainingItems.length ? (
         <details key={task?.id} className="erp-task-identity__more">
           <summary>

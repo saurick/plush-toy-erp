@@ -62,6 +62,8 @@ export async function installAttachmentRpcMocks(page, context) {
           product_id: documentID === knownID ? productID : 0,
           product_name: documentID === knownID ? '样式产品' : '',
           product_code: documentID === knownID ? 'PROD-STYLE-L1' : '',
+          style_no: documentID === knownID ? 'STYLE-L1' : '',
+          customer_style_no: documentID === knownID ? 'CUSTOMER-STYLE-L1' : '',
         })) }
         break
       }

@@ -5,6 +5,7 @@ import { assertImportPickerGeometry, assertImportFilterPrompt, readImportPickerL
 import { assertBusinessSectionTitleBands, assertCurrentBusinessSection } from './businessFormSectionAssertions.mjs'
 import { chooseSelectOption } from './selectControlActions.mjs'
 import { mockShipmentSourceCandidates } from './factRpcMocks.mjs'
+import { styleRpcResult } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createShipmentSourceCandidateAssertions(deps) {
@@ -305,7 +306,7 @@ export function createShipmentWeightScenarios(deps) {
     verifyBusinessActionFormModal,
     customerRuntimeEffectiveSession,
   } = deps
-  const { assertLineItemAddActionScrollsToNewRow } =
+  const { assertLineItemAddActionScrollsToNewRow, findSelectionActionButton } =
     createBusinessFormalAssertions(deps)
   return [
     ...[
@@ -406,58 +407,107 @@ export function createShipmentWeightScenarios(deps) {
           afterOpen: async (modal) => {
             if (targetViewport) await page.setViewportSize(targetViewport)
             const summary = modal.locator('.erp-shipment-weight-summary')
-            const weight = modal.getByLabel('实际总净重（克）', { exact: true })
+            const entry = modal.locator('.erp-shipment-weight-entry')
+            const weight = modal.getByLabel('实际总净重', { exact: true })
+            const weightUnit = modal.getByRole('combobox', { name: '实际总净重单位', exact: true })
+            const prefillHelp = entry.getByText('修改出货明细会清空已填净重。', { exact: true })
+            const clearedHelp = entry.getByText('出货明细已变更，原净重已清空，可按需重填。', { exact: true })
             const quantity = modal.getByLabel('数量', { exact: true })
+            const unit = modal.locator('#items_0_unit_id')
             assert.equal(await weight.count(), 0, '空白明细不显示人工补录框')
             const emptyHeight = await summary.evaluate((node) => node.getBoundingClientRect().height)
             assert(emptyHeight <= 40, `空白重量区只占一行：${emptyHeight}`)
+            const sku = modal.getByRole('combobox', { name: 'SKU', exact: true })
+            assert.equal(await sku.isDisabled(), true)
+            const skuSelect = sku.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+            assert.equal(await skuSelect.locator('.ant-select-selection-placeholder').innerText(), '请先选择产品')
+            assert.equal(await modal.locator('#items_0_lot_id').isDisabled(), true, '未选产品和仓库不能选批次')
+            await chooseSelectOption(modal.locator('#items_0_product_id'), { label: /PROD-STYLE-L1/u })
+            const quantityField = quantity.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-form-item ")][1]')
+            const correction = summary.getByText('请先修正出货明细，再核对预计总净重。', { exact: true })
+            await quantity.fill('0')
+            await quantityField.getByText('数量必须大于 0，且最多保留 6 位小数', { exact: true }).waitFor()
+            await correction.waitFor()
+            assert.equal(await weight.count(), 0, '数量错误时不能提示用实际净重补录')
+            await quantity.fill('1.5')
+            await quantityField.getByText('当前单位只允许整数数量', { exact: true }).waitFor()
+            assert.equal(await weight.count(), 0, '数量精度错误时不应补录净重')
+            assert.equal(await summary.getByText(/^预计总净重：/u).count(), 0, '数量精度错误时不显示预计值')
             await quantity.fill('2')
+            await expectText(page, '预计总净重：850 克')
+            await chooseSelectOption(unit, { label: '只' })
+            await summary.getByText('预计总净重：暂无法计算', { exact: true }).waitFor()
+            await summary.getByText('明细 1 的出货单位与单重对应单位不一致。', { exact: true }).waitFor()
             await weight.waitFor({ state: 'visible' })
-            await weight.fill('1500')
-            await summary.scrollIntoViewIfNeeded()
-            const manualLayout = await summary.evaluate((node) => {
+            await entry.getByText('选填', { exact: true }).waitFor()
+            await entry.getByText('公斤', { exact: true }).waitFor()
+            assert.equal(await entry.locator('.ant-form-item-extra').count(), 0, '未填净重时只显示选填标记')
+            await weight.fill('2.5')
+            await prefillHelp.waitFor()
+            await weight.press('Tab')
+            assert.equal(await weightUnit.evaluate((input) => input === document.activeElement), true, '键盘可从净重直接移到单位')
+            await chooseSelectOption(weightUnit, { label: '克' })
+            assert.equal(await weight.inputValue(), '2500', '切换为克后重量等值')
+            await chooseSelectOption(weightUnit, { label: '公斤' })
+            assert.equal(await weight.inputValue(), '2.5', '切回公斤不发生取整')
+            await entry.scrollIntoViewIfNeeded()
+            const manualLayout = await entry.evaluate((node) => {
               const bounds = node.getBoundingClientRect()
-              const field = node.querySelector('.erp-shipment-weight-summary__field').getBoundingClientRect()
-              const notice = node.querySelector('.erp-shipment-weight-summary__notice').getBoundingClientRect()
+              const field = node.querySelector('.erp-shipment-weight-entry__field').getBoundingClientRect()
+              const details = node.parentElement.querySelector('.erp-shipment-modal-items')
+              const footer = details.querySelector('.erp-line-items-form__footer')
+              const notice = footer.querySelector('.erp-shipment-weight-summary').getBoundingClientRect()
+              const footerActions = footer.querySelector('.erp-line-items-form__footer-actions').getBoundingClientRect()
+              const amount = node.querySelector('.erp-shipment-net-weight-input__amount').getBoundingClientRect()
+              const entryUnit = node.querySelector('.erp-shipment-net-weight-input__unit').getBoundingClientRect()
+              const fieldHelp = node.querySelector('.ant-form-item-extra').getBoundingClientRect()
+              const controls = node.querySelector('.erp-shipment-net-weight-input').getBoundingClientRect()
               return {
-                summary: { width: bounds.width, height: bounds.height },
-                field: { left: field.left, right: field.right, width: field.width, top: field.top },
-                notice: { right: notice.right, bottom: notice.bottom, top: notice.top },
-                fits: field.left >= bounds.left - 1 && field.right <= bounds.right + 1 && notice.right <= bounds.right + 1,
+                fieldWidth: field.width,
+                distinctEntry: !details.contains(node) && field.top - details.getBoundingClientRect().bottom >= 10,
+                aligned: Math.abs(field.left - footerActions.left) <= 1 && Math.abs(notice.left - footerActions.left) <= 1,
+                fits: field.left >= bounds.left - 1 && field.right <= bounds.right + 1 &&
+                  notice.right <= footer.getBoundingClientRect().right + 1,
+                helpAttached: Math.abs(fieldHelp.left - amount.left) <= 1 &&
+                  fieldHelp.top >= controls.bottom - 1 && fieldHelp.top <= controls.bottom + 8,
+                unitAligned: entryUnit.left >= amount.right && entryUnit.right <= field.right + 1 &&
+                  Math.abs((entryUnit.top + entryUnit.height / 2) - (amount.top + amount.height / 2)) <= 1,
               }
             })
-            assert(manualLayout.field.width <= 241, `补录框不应随整页拉伸：${JSON.stringify(manualLayout)}`)
+            assert(manualLayout.fieldWidth <= 241, `补录框不应随整页拉伸：${JSON.stringify(manualLayout)}`)
             assert(manualLayout.fits, `重量提示和补录框应留在当前区域：${JSON.stringify(manualLayout)}`)
-            if (targetViewport) {
-              assert(manualLayout.field.top >= manualLayout.notice.bottom, '窄屏补录框应排在原因提示下方')
-            } else {
-              assert(Math.abs(manualLayout.field.top - manualLayout.notice.top) <= 1, '桌面提示和补录框应并排对齐')
-            }
-            await summary.screenshot({ path: path.join(outputDir, `shipment-net-weight-manual-${variant}.png`) })
+            assert(manualLayout.unitAligned, `单位应和数值同行且不覆盖相邻区域：${JSON.stringify(manualLayout)}`)
+            assert(manualLayout.distinctEntry && manualLayout.aligned, `预计净重应归明细页脚，补录区另起并对齐：${JSON.stringify(manualLayout)}`)
+            assert(manualLayout.helpAttached, `清空规则应贴着实测净重输入框：${JSON.stringify(manualLayout)}`)
+            assert.equal(await entry.locator('.ant-alert').count(), 0, '选填状态不使用整行警告框')
+            await modal.locator('[data-form-section="出货明细"]').screenshot({ path: path.join(outputDir, `shipment-net-weight-manual-${variant}.png`) })
             await assertNoHorizontalOverflow(page, `shipment-net-weight-manual-${variant}`)
             await quantity.fill('3')
-            await page.waitForFunction(() => document.querySelector('#total_net_weight_g')?.value === '')
-            await weight.fill('1600')
+            await clearedHelp.waitFor()
+            assert.equal(await weight.inputValue(), '')
+            assert.equal(await prefillHelp.count(), 0, '清空后原位反馈替换预告')
+            await weight.fill('1.6')
+            await prefillHelp.waitFor()
+            assert.equal(await clearedHelp.count(), 0, '重填后清除原清空反馈')
+            await weight.fill('')
+            await prefillHelp.waitFor({ state: 'hidden' })
+            assert.equal(await clearedHelp.count(), 0, '主动清空输入不应显示明细变更反馈')
+            await weight.fill('1.6')
             await quantity.fill('')
             await weight.waitFor({ state: 'hidden' })
             await quantity.fill('2')
             await weight.waitFor({ state: 'visible' })
             assert.equal(await weight.inputValue(), '', '清空明细再输入不能恢复旧人工重量')
-            await weight.fill('1700')
-            for (const name of ['SKU', '批次']) {
-              const input = modal.getByRole('combobox', { name, exact: true })
-              assert.equal(await input.isDisabled(), true)
-              const control = input.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
-              assert.equal(await control.locator('.ant-select-selection-placeholder').innerText(), '请先选择产品')
-            }
-            await modal.locator('#items_0_product_id').click()
-            await page.getByText('PROD-STYLE-L1').last().click()
+            await clearedHelp.waitFor()
+            await weight.fill('1.7')
+            await chooseSelectOption(unit, { label: '个' })
             await expectText(page, '预计总净重：850 克')
             await weight.waitFor({ state: 'hidden' })
-            await quantity.fill('')
+            await chooseSelectOption(unit, { label: '只' })
             await weight.waitFor({ state: 'visible' })
             assert.equal(await weight.inputValue(), '', '恢复自动计算时应清空旧人工重量')
-            await modal.getByLabel('数量').fill('10')
+            await chooseSelectOption(unit, { label: '个' })
+            await quantity.fill('10')
             await expectText(page, '预计总净重：4250 克')
             assert.equal(await weight.count(), 0, '完整自动计算时不显示补录框')
             const calculatedHeight = await summary.evaluate((node) => node.getBoundingClientRect().height)
@@ -488,6 +538,85 @@ export function createShipmentWeightScenarios(deps) {
         await assertNoHorizontalOverflow(page, `shipment-net-weight-${variant}`)
       },
     })),
+    {
+      name: 'shipment-net-weight-unit-save',
+      path: '/erp/warehouse/shipments',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        let draft = {
+          id: 1,
+          version: 1,
+          shipment_no: 'SHIP-STYLE-L1',
+          status: 'DRAFT',
+          finance_release_status: 'PENDING',
+          finance_release_version: 1,
+          total_net_weight_g: '2500',
+          gross_weight_kg: '3',
+          items: [{ id: 1, product_id: 1, warehouse_id: 1, unit_id: 501, quantity: '2' }],
+        }
+        const saves = []
+        await page.route('**/rpc/operational_fact', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method === 'save_shipment_draft') {
+            saves.push(params)
+            draft = { ...draft, ...params, version: draft.version + 1 }
+          } else if (method !== 'get_shipment' || params?.id !== draft.id) {
+            return route.fallback()
+          }
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ shipment: draft }) } })
+        })
+
+        const editor = page.getByRole('region', { name: '编辑出货草稿', exact: true })
+        const weight = editor.getByLabel('实际总净重', { exact: true })
+        const unit = editor.getByRole('combobox', { name: '实际总净重单位', exact: true })
+        const gross = editor.getByLabel('毛重（千克）', { exact: true })
+        const row = page.getByRole('row').filter({ hasText: 'SHIP-STYLE-L1' })
+        const selectedRow = row.and(page.locator('.ant-table-row-selected'))
+        const openDraft = async () => {
+          await row.waitFor()
+          if (!(await selectedRow.isVisible())) await row.click()
+          await selectedRow.waitFor()
+          const edit = await findSelectionActionButton(page, '编辑草稿')
+          await edit.click()
+          await weight.waitFor()
+        }
+
+        await openDraft()
+        assert.equal(await weight.inputValue(), '2.5', '克值回显为默认公斤')
+        assert.equal(await editor.getAttribute('data-unsaved'), 'false', '读取现有净重不修改草稿')
+        await chooseSelectOption(unit, { label: '克' })
+        assert.equal(await weight.inputValue(), '2500')
+        assert.equal(await editor.getAttribute('data-unsaved'), 'false', '只切换显示单位不修改草稿')
+        await weight.fill('2501')
+        await chooseSelectOption(unit, { label: '公斤' })
+        assert.equal(await weight.inputValue(), '2.501')
+        await weight.fill('2.8750000001')
+        await editor.getByText(/公斤最多 9 位小数/u).waitFor()
+        await weight.fill('2.875')
+        await gross.fill('2.874999')
+        const grossError = editor.getByText(/毛重不能小于总净重/u)
+        await grossError.waitFor()
+        const save = editor.getByRole('button', { name: '保存', exact: true })
+        await save.click()
+        await grossError.waitFor()
+        await gross.fill('2.875')
+        await grossError.waitFor({ state: 'hidden' })
+        await chooseSelectOption(unit, { label: '克' })
+        assert.equal(await weight.inputValue(), '2875')
+        await save.click()
+        await editor.waitFor({ state: 'hidden' })
+        assert.equal(saves.length, 1, '毛重低于净重时没有发出保存请求')
+        assert.equal(saves[0].total_net_weight_g, '2875')
+        assert.equal(saves[0].gross_weight_kg, '2.875')
+        assert(!Object.keys(saves[0]).some((key) => key.startsWith('total_net_weight') && key !== 'total_net_weight_g'))
+        await openDraft()
+        assert.equal(await weight.inputValue(), '2.875', '重开默认公斤且回显刚保存的重量')
+        await editor.getByRole('button', { name: '返回列表', exact: true }).click()
+        await editor.waitFor({ state: 'hidden' })
+      },
+    },
   ]
 }
 
@@ -639,27 +768,44 @@ id: body.id,
         await frame.locator('[data-action="new-record"]').click()
         const form = frame.locator('.form-view')
         const note = form.locator('[data-form-field="remark"]')
-        const weight = form.locator('[data-form-field="total-net-weight"]')
+        const weight = form.getByLabel('实际总净重', { exact: true })
+        const weightUnit = form.locator('[data-shipment-demo-net-weight-unit]')
+        const help = form.locator('[data-shipment-demo-weight-help]')
         const rows = () => form.locator('.line-items tbody[data-form-row], .line-items tbody:not([data-form-row]):not(.document-line-product-heading) > tr').count()
         if (await rows() === 0) {
           assert.equal(await weight.count(), 0, '设计样例的空明细不显示人工重量补录')
           await form.getByRole('button', { name: '添加出货明细', exact: true }).click()
         }
         const originalRows = await rows()
-        await weight.fill('1500')
+        const summary = await form.locator('.line-add-continuation .shipment-weight-summary').boundingBox()
+        const input = await weight.boundingBox()
+        assert(summary && input && Math.abs(summary.x - input.x) <= 1 && input.y > summary.y + summary.height, '设计样例应把计算原因归明细页脚，补录区另起')
+        assert.equal(await help.isVisible(), false, '空净重不显示清空预告')
+        assert.equal(await weightUnit.evaluate((select) => select.value), 'kg')
+        await weight.fill('1.5')
+        assert.equal(await help.innerText(), '修改出货明细会清空已填净重。')
+        await chooseSelectOption(weightUnit, 'g')
+        assert.equal(await weight.inputValue(), '1500')
         await form.locator('[data-action="shipment-import"]').click()
         await frame.locator('[data-action="confirm-import"]').click()
         assert.ok(await rows() > originalRows)
+        assert.equal(await weight.inputValue(), '')
+        assert.equal(await help.innerText(), '出货明细已变更，原净重已清空，可按需重填。')
+        await chooseSelectOption(weightUnit, 'kg')
         await note.fill('导入后保留的备注')
         await form.getByRole('button', { name: '撤销本次导入', exact: true }).click()
         assert.equal(await rows(), originalRows)
         assert.equal(await note.inputValue(), '导入后保留的备注')
-        assert.equal(await weight.inputValue(), '1500')
+        assert.equal(await weight.inputValue(), '1.5')
+        assert.equal(await help.innerText(), '修改出货明细会清空已填净重。')
         await form.locator('[data-action="shipment-import"]').click()
         await frame.locator('[data-action="confirm-import"]').click()
-        await weight.fill('1800')
+        await weight.fill('1.8')
         assert.equal(await form.getByRole('button', { name: '撤销本次导入', exact: true }).isDisabled(), true)
         assert.equal(await form.locator('[data-form-import-undo-hint="shipment"]').count(), 0)
+        await form.locator('[data-form-field="qty-0"]').fill('3')
+        assert.equal(await weight.inputValue(), '')
+        assert.equal(await help.innerText(), '出货明细已变更，原净重已清空，可按需重填。')
       },
     },
     {
@@ -692,6 +838,10 @@ id: body.id,
             const headingBand = editor.locator('[data-form-section="出货明细"] .erp-business-form-heading')
             const importedCount = editor.getByText(/^已导入 \d+ 行$/u)
             const twoImportedInHeading = headingBand.getByText('已导入 2 行', { exact: true })
+            const weight = editor.getByLabel('实际总净重', { exact: true })
+            const weightUnit = editor.getByRole('combobox', { name: '实际总净重单位', exact: true })
+            const clearedHelp = editor.getByText('出货明细已变更，原净重已清空，可按需重填。', { exact: true })
+            const prefillHelp = editor.getByText('修改出货明细会清空已填净重。', { exact: true })
             const importRows = async (indexes) => {
               await importButton.click()
               const picker = page.locator('.erp-source-import-picker-modal.ant-modal:visible').last()
@@ -708,8 +858,11 @@ id: body.id,
             assert.equal(await importedCount.count(), 0, '手工新建不显示导入行数')
             await editor.getByLabel('收货人', { exact: true }).fill('导入前收货人')
             await editor.locator('#note').fill('导入前备注')
+            await chooseSelectOption(editor.locator('#items_0_product_id'), { label: /PROD-STYLE-L1/u })
+            await chooseSelectOption(editor.locator('#items_0_unit_id'), { label: '只' })
             await editor.getByLabel('数量', { exact: true }).fill('2')
-            await editor.getByLabel('实际总净重（克）', { exact: true }).fill('1500')
+            await chooseSelectOption(weightUnit, { label: '克' })
+            await weight.fill('1500')
             await importRows([0, 1])
             await waitUndoReady()
             await assertImportUndoPlacement(editor)
@@ -726,6 +879,10 @@ id: body.id,
               }
             })
             assert.deepEqual(countPlacement, { besideTitle: true, smaller: true }, '桌面导入行数以小号文字排在标题旁')
+            assert.equal(await weight.inputValue(), '', '导入改变明细后清空原实际总净重')
+            await clearedHelp.waitFor()
+            await chooseSelectOption(weightUnit, { label: '公斤' })
+            assert.equal(await undoButton.isEnabled(), true, '仅改变显示单位不使导入撤销失效')
             await importButton.click()
             const duplicatePicker = page.locator('.erp-source-import-picker-modal.ant-modal:visible').last()
             await duplicatePicker.locator('.ant-table-row').first().locator('.ant-checkbox-wrapper').first()
@@ -751,7 +908,9 @@ id: body.id,
             assert.equal(await importedCount.count(), 0, '撤销全部来源后不保留导入行数')
             assert.equal(await editor.getByLabel('收货人', { exact: true }).inputValue(), '导入前收货人')
             assert.equal(await editor.locator('#note').inputValue(), '导入后另填的备注')
-            assert.equal(await editor.getByLabel('实际总净重（克）', { exact: true }).inputValue(), '1500')
+            assert.equal(await weight.inputValue(), '1.5')
+            await prefillHelp.waitFor()
+            assert.equal(await clearedHelp.count(), 0, '撤销恢复净重后不保留清空反馈')
 
             await importRows([0])
             await waitUndoReady()
@@ -794,6 +953,11 @@ id: body.id,
             assert.equal(await editor.getByRole('button', { name: '撤销本次导入', exact: true }).count(), 0)
             assert.equal(await editor.locator('#note').inputValue(), '')
             assert.equal(await editor.getByText(/^已导入 \d+ 行$/u).count(), 0)
+            await chooseSelectOption(editor.locator('#items_0_product_id'), { label: /PROD-STYLE-L1/u })
+            await chooseSelectOption(editor.locator('#items_0_unit_id'), { label: '只' })
+            await editor.getByLabel('数量', { exact: true }).fill('2')
+            await editor.getByLabel('实际总净重', { exact: true }).waitFor()
+            assert.equal(await editor.locator('.erp-shipment-weight-entry .ant-form-item-extra').count(), 0, '新草稿不继承上一个草稿的净重提示')
           },
         })
         assert.deepEqual(shipmentWrites, [], '导入、撤销与关闭只修改本地表单，不写业务事实')

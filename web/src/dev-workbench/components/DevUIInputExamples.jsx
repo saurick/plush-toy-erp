@@ -238,6 +238,7 @@ export function DateInputExample() {
         <h3>日期范围</h3>
         <DateRangeFilter
           key={`range-${resetKey}`}
+          typePresentation="inline"
           options={[
             { value: 'order', label: '下单日期' },
             { value: 'delivery', label: '交货日期' },

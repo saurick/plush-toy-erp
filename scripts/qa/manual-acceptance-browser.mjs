@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT } from "./manual-acceptance-task-board-data.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
@@ -442,6 +443,10 @@ function currentBatchProbeEvidence(probe = {}) {
       ? Number(probe.exactSourceID)
       : null,
     exactTaskCodePrefix: String(probe.exactTaskCodePrefix || "") || null,
+    ...(Array.isArray(probe.dailyTaskCodes) ? {
+      dailyTaskCodes: [...probe.dailyTaskCodes],
+      dailyOpenTaskCodes: [...(probe.dailyOpenTaskCodes || probe.dailyTaskCodes)],
+    } : {}),
     exactOwnerRoleKey: String(probe.exactOwnerRoleKey || "") || null,
     exactTaskGroup: String(probe.exactTaskGroup || "") || null,
     progressCounts:
@@ -1500,12 +1505,69 @@ export function browserProjectionBaselineProven(binding) {
   );
 }
 
+function dailyBrowserTaskProbe(currentBatch, roleKey) {
+  return currentBatch?.probes?.find((probe) =>
+    probe.exactOwnerRoleKey === roleKey && probe.batchEvidence === "exact_references" &&
+    probe.status === "pass" && probe.dailyOpenTaskCodes?.length > 0);
+}
+
+async function readDailyTaskPageEvidence(page, target, currentBatch, probe, { mobile = false, dashboard = false } = {}) {
+  if (currentBatch.dataStatus !== "pass" || currentBatch.actual <= 0) {
+    throw new BrowserAcceptanceError(`${target.title} 未绑定本批来源任务读回`);
+  }
+  const rowSelector = dashboard
+    ? ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]"
+    : mobile ? ".erp-mobile-list-item[data-task-code]" : ".erp-task-table-row[data-task-code]";
+  const found = await page.waitForFunction((selector) => {
+    const rows = [...document.querySelectorAll(selector)].filter((node) => {
+      const { width, height } = node.getBoundingClientRect();
+      return width > 0 && height > 0;
+    });
+    const withImages = rows.filter((node) =>
+      [...node.querySelectorAll(".erp-task-product-image img")].some((img) => img.complete && img.naturalWidth > 1));
+    return withImages.length ? {
+      rowCount: rows.length,
+      withImage: withImages.length,
+      codes: withImages.map((node) => node.getAttribute("data-task-code")),
+    } : false;
+  }, rowSelector, { timeout: PAGE_TIMEOUT_MS });
+  const defaults = await found.jsonValue();
+  let matched = defaults.codes.find((code) => probe.dailyOpenTaskCodes.includes(code));
+  if (!matched && !dashboard) {
+    matched = probe.dailyOpenTaskCodes[0];
+    const input = mobile
+      ? page.getByPlaceholder("搜任务或单号", { exact: true })
+      : page.locator('input[aria-label^="可搜索：任务编号"],input[placeholder*="搜单号"]').filter({ visible: true }).first();
+    await input.fill(matched);
+    await input.press("Enter");
+    await page.waitForFunction(({ selector, code }) => [...document.querySelectorAll(selector)].some((row) =>
+      row.getAttribute("data-task-code") === code && [...row.querySelectorAll(".erp-task-product-image img")]
+        .some((img) => img.complete && img.naturalWidth > 1)), { selector: rowSelector, code: matched },
+      { timeout: PAGE_TIMEOUT_MS });
+    await input.fill("");
+    await input.press("Enter");
+  }
+  if (!matched) throw new BrowserAcceptanceError(`${target.title} 默认任务中没有匹配的同批图样任务`);
+  return {
+    status: "minimum_proven",
+    minimumSatisfied: true,
+    currentBatchBound: true,
+    currentBatchActual: currentBatch.actual,
+    evidenceSource: "default task list decoded a product image and matched a current source task",
+    defaultRows: defaults.rowCount,
+    visibleDefaultImages: defaults.withImage,
+    matchedTaskCode: matched,
+  };
+}
+
 async function readDashboardEvidence(page, target, datasetBinding) {
   const currentBatch = requireCurrentBatchTargetEvidence(
     target,
     datasetBinding,
   );
   if (target.key === "global-dashboard") {
+    const daily = dailyBrowserTaskProbe(currentBatch, "boss");
+    if (daily) return readDailyTaskPageEvidence(page, target, currentBatch, daily, { dashboard: true });
     const taskCodePrefix = String(
       datasetBinding?.readiness?.taskVisibleCodePrefixes?.boss || "",
     ).trim();
@@ -1851,6 +1913,11 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
     target,
     datasetBinding,
   );
+  const daily = dailyBrowserTaskProbe(currentBatch, target.roleKey);
+  if (daily) {
+    await page.getByTestId("mobile-role-nav-tasks").click();
+    return readDailyTaskPageEvidence(page, target, currentBatch, daily, { mobile: true });
+  }
   const minimumRecords = target.minimumRecords;
   const taskCodePrefix = String(
     datasetBinding?.readiness?.taskVisibleCodePrefixes?.[target.roleKey] || "",
@@ -2530,7 +2597,10 @@ export function buildCurrentBatchDOMRecords({
     ).browserProfiles.map((account) => account.username),
   );
   let taskCodes = [];
-  if (task) {
+  if (task?.dailyTaskBoard?.contract === MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT) {
+    taskCodes = task.dailyTaskBoard.samples.filter((row) => row.role === "boss")
+      .map((row) => ({ key: "", identifier: row.taskCode }));
+  } else if (task) {
     const plan = buildManualAcceptanceTaskDataPlan({
       runId: task.runId,
       taskProfile: task.taskProfile,
@@ -3068,6 +3138,13 @@ async function readListEvidence(page, target, datasetBinding) {
       })
       .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
   }
+  if (target.key === "task-board") {
+    const daily = dailyBrowserTaskProbe(currentBatch, "boss");
+    if (daily) {
+      await page.getByRole("tab", { name: "待我处理", exact: true }).click();
+      return readDailyTaskPageEvidence(page, target, currentBatch, daily);
+    }
+  }
   const scope = await prepareListQuantityScope(page, target);
   if (target.key === "shipments") {
     if (expectedShipments?.exactCount !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT)
@@ -3557,6 +3634,23 @@ export function assertManualAcceptanceTaskGroupCoverage(
   const relevantProbes = (
     Array.isArray(readiness?.probes) ? readiness.probes : []
   ).filter((probe) => /^mobile-tasks:/u.test(probe?.id || ""));
+  if (taskInput?.dailyTaskBoardContract === MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT) {
+    const byRole = new Map(relevantProbes.map((probe) => [probe.exactOwnerRoleKey, probe]));
+    const valid = coverage?.contract === MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT &&
+      coverage.complete === true && byRole.size === expectedRoles.length &&
+      expectedRoles.every((role) => {
+        const probe = byRole.get(role);
+        const codes = probe?.dailyTaskCodes;
+        const expected = taskReportCoverage?.samples?.filter((row) => row.role === role).map((row) => row.taskCode);
+        return probe?.status === "pass" && probe.batchEvidence === "exact_references" &&
+          Array.isArray(codes) && codes.length > 0 && codes.length === probe.actual &&
+          new Set(codes).size === codes.length && coverage.byRole?.[role]?.actual === probe.actual &&
+          (!taskReportCoverage || (taskReportCoverage.contract === MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT &&
+            JSON.stringify(expected?.slice().sort()) === JSON.stringify(codes.slice().sort())));
+      });
+    if (!valid) throw new BrowserAcceptanceError("长期手测的九岗位没有精确关联任务读回");
+    return coverage;
+  }
   const validProbeCoverage =
     relevantProbes.length >= expectedRoles.length &&
     relevantProbes.every(
@@ -4522,21 +4616,20 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
     );
   }
 
-  const taskCoverageDigest = requiredText(
-    components.task.report?.coverage?.catalogScenarioDigest,
-    "task report coverage.catalogScenarioDigest",
-  );
-  if (
-    components.readiness.report?.reportInputs?.taskReport
-      ?.taskGroupCoverageDigest !== taskCoverageDigest
-  ) {
-    throw new BrowserAcceptanceError(
-      "task 与 readiness 的 taskGroup coverage digest 不一致",
+  const daily = components.task.report?.dailyTaskBoard;
+  if (!daily) {
+    const taskCoverageDigest = requiredText(
+      components.task.report?.coverage?.catalogScenarioDigest,
+      "task report coverage.catalogScenarioDigest",
     );
+    if (components.readiness.report?.reportInputs?.taskReport?.taskGroupCoverageDigest !== taskCoverageDigest) {
+      throw new BrowserAcceptanceError("task 与 readiness 的 taskGroup coverage digest 不一致");
+    }
+  } else if (components.readiness.report?.reportInputs?.taskReport?.dailyTaskBoardContract !== MANUAL_ACCEPTANCE_DAILY_TASK_CONTRACT) {
+    throw new BrowserAcceptanceError("task 与 readiness 没有绑定同一长期手测任务合同");
   }
   const taskGroupCoverage = assertManualAcceptanceTaskGroupCoverage(
-    components.readiness.report,
-    components.task.report.coverage,
+    components.readiness.report, daily || components.task.report.coverage,
   );
   let expectedTaskSchedule;
   try {

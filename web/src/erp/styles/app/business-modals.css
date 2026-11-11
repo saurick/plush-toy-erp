@@ -782,6 +782,11 @@
   min-width: 0;
 }
 
+.erp-line-items-form__footer-summary {
+  width: 100%;
+  min-width: 0;
+}
+
 @keyframes erp-line-item-appended {
   0% {
     background: color-mix(
@@ -1078,27 +1083,48 @@
 }
 
 .erp-shipment-weight-summary {
-  grid-column: 1 / -1;
+  --erp-business-inline-note-padding: 0;
+}
+
+.erp-shipment-weight-entry {
   min-width: 0;
+  padding: var(--erp-form-section-gap) 12px 8px;
 }
 
-.erp-shipment-weight-summary__manual {
-  display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-}
-
-.erp-shipment-weight-summary__notice {
-  flex: 1 1 320px;
-  min-width: 0;
-}
-
-.erp-shipment-weight-summary__field.ant-form-item {
-  flex: 0 1 240px;
+.erp-shipment-weight-entry__field.ant-form-item {
   width: min(100%, 240px);
   min-width: 0;
   margin: 0;
+}
+
+.erp-shipment-weight-entry__label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.erp-shipment-weight-entry__optional {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-shipment-weight-entry__cleared {
+  color: var(--erp-warning-text);
+}
+
+.erp-shipment-net-weight-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.erp-shipment-net-weight-input__amount {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.erp-shipment-net-weight-input__unit {
+  flex: 0 0 84px;
 }
 
 .erp-master-contact-list__head {

@@ -37,6 +37,8 @@ func TestOutsourcingFactFromOrderDerivesSourceAndRestrictsLineTypes(t *testing.T
 		t.Fatalf("create product SKU: %v", err)
 	}
 	source := createOutsourcingFactSourceFixtureWithSKU(t, ctx, client, fixtures, "DERIVE", decimal.NewFromInt(8), &productSKU.ID)
+	source.productLine = client.OutsourcingOrderItem.UpdateOneID(source.productLine.ID).
+		SetProductNameSnapshot("合同小熊").SetProductNoSnapshot("OUT-PHOTO-01").SaveX(ctx)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 	actor := client.AdminUser.Create().SetUsername("outsourcing-derive-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 
@@ -122,6 +124,9 @@ func TestOutsourcingFactFromOrderDerivesSourceAndRestrictsLineTypes(t *testing.T
 	for _, item := range listed {
 		if item.SourceNo == nil || *item.SourceNo != source.order.OutsourcingOrderNo {
 			t.Fatalf("listed outsourcing source number = %#v, want %q", item.SourceNo, source.order.OutsourcingOrderNo)
+		}
+		if item.ID == receipt.ID && (item.SubjectName != "合同小熊" || item.SubjectCode != "OUT-PHOTO-01") {
+			t.Fatalf("return must display the bound contract's product identity: %+v", item)
 		}
 	}
 	assertListedSnapshot := func(rows []*biz.OutsourcingFact, factID int, want *string) {

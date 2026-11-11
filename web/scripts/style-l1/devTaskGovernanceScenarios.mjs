@@ -67,17 +67,16 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
     viewport: mobile ? { width: 390, height: 844 } : { width: 1920, height: 1080 },
     deviceScaleFactor: 2,
     verify: async (page) => {
-      await page.getByRole('button', { name: /全屏预览/u }).click()
-      const navigation = await page.locator('.erp-dev-ui-design-toolbar .erp-dev-ui-design-page-select').evaluate((node) => {
-        const label = node.querySelector('.ant-select-selection-item')
-        const range = document.createRange()
-        range.selectNodeContents(label)
-        const text = range.getBoundingClientRect()
-        const box = label.getBoundingClientRect()
-        return { width: node.clientWidth, scrollWidth: node.scrollWidth, labels: [{ title: label.textContent, fits: text.left >= box.left - 1 && text.right <= box.right + 1 }] }
+      const navigation = await page.getByLabel('设计预览界面', { exact: true }).evaluate((node) => {
+        const labels = [...node.querySelectorAll('.ant-segmented-item-label')].map((label) => ({
+          title: label.textContent,
+          fits: label.scrollWidth <= label.clientWidth + 1,
+        }))
+        return { width: node.clientWidth, scrollWidth: node.scrollWidth, labels }
       })
       await writeFile(path.join(outputDir, `ui-preview-navigation-${mobile ? 'mobile' : 'desktop'}.json`), JSON.stringify(navigation, null, 2))
       assert(navigation.labels.every((label) => label.fits), `预览入口文字不应重叠：${JSON.stringify(navigation)}`)
+      await page.getByRole('button', { name: /全屏预览/u }).click()
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
       if (mobile) {
         await openUIDesignMobileTasks(frame)

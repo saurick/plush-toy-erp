@@ -2,6 +2,13 @@ export const customerPackageSchema = Object.freeze({
   schemaKey: "customer-package-schema-v1",
   status: "draft_schema",
   runtimeEnabled: false,
+  moduleStates: Object.freeze({
+    enabled: "启用",
+    read_only: "只读",
+    disabled: "关闭",
+  }),
+  defaultModuleState: "enabled",
+  defaultFieldVisible: true,
   requiredTopLevelKeys: Object.freeze([
     "customerKey",
     "packageKey",

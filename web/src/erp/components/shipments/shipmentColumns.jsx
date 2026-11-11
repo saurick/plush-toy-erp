@@ -241,7 +241,6 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '物流信息',
       exportTitle: '物流信息',
       key: 'transport',
-      defaultHidden: true,
       copyable: {
         label: '物流单号',
         resolveValue: (_value, record) => record?.tracking_no || '',

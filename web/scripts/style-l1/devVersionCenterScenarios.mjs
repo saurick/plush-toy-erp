@@ -525,6 +525,37 @@ export async function waitForView(page, view) {
   await page.locator('[role="tab"][aria-selected="true"]').filter({ hasText: label }).waitFor({ state: 'visible', timeout: 10_000 })
 }
 
+async function verifyTargetDataBoundaryHelp(page, assert, expectedText) {
+  const trigger = page.getByRole('button', { name: '查看数据保留方式说明', exact: true })
+  const content = page.getByText(expectedText, { exact: true })
+  const anchors = [
+    trigger,
+    page.getByLabel('切换当前操作目标'),
+    page.getByRole('button', { name: '生成发布制品', exact: true }),
+    page.locator('.erp-dev-version-workspace'),
+  ]
+  const measure = () => Promise.all(anchors.map((anchor) => anchor.boundingBox()))
+  assert.equal(await trigger.getAttribute('aria-expanded'), 'false')
+  const before = await measure()
+  const assertStable = async () => {
+    const current = await measure()
+    for (const [index, box] of before.entries()) {
+      assert(box && current[index], '页头控件和工作区保持可见')
+      for (const edge of ['x', 'y', 'width', 'height']) {
+        assert(Math.abs(box[edge] - current[index][edge]) <= 1, `数据说明不挤动页头或正文：位置 ${index} ${edge}`)
+      }
+    }
+  }
+  await trigger.click()
+  await content.waitFor({ state: 'visible' })
+  await assertStable()
+  await trigger.press('Escape')
+  await content.waitFor({ state: 'hidden' })
+  assert.equal(await trigger.getAttribute('aria-expanded'), 'false')
+  assert(await trigger.evaluate((node) => node === document.activeElement), '收起说明后保留按钮焦点')
+  await assertStable()
+}
+
 async function assertManualGuideViewport(page, assert) {
   const metrics = await page
     .locator('.erp-dev-version-guide-content')
@@ -765,6 +796,7 @@ export function createDevVersionCenterScenarios({
         )
         assert.equal(await page.getByRole('table', { name: '发布状态摘要' }).isVisible(), false)
         assert.equal(await page.getByRole('button', { name: '生成发布制品', exact: true }).count(), 1)
+        await verifyTargetDataBoundaryHelp(page, assert, '保留 seed / fixture / 模拟业务数据')
         assert.equal(await page.locator('.erp-dev-version-current-operation').count(), 0, 'another environment operation must not appear under demo')
         const versionTable = page.locator('.erp-dev-version-tab--versions .ant-table')
         assert.equal(await versionTable.getByRole('columnheader').count(), 4)
@@ -796,6 +828,7 @@ export function createDevVersionCenterScenarios({
         await page
           .getByText('普通部署默认保留现有数据', { exact: true })
           .waitFor()
+        await verifyTargetDataBoundaryHelp(page, assert, '普通部署默认保留现有数据；需要时独立清空并重建测试数据')
         assert.equal(
           await page
             .getByRole('button', { name: '清空并重建测试数据' })

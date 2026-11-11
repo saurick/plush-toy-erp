@@ -45,6 +45,8 @@ import {
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { canReadProductionExceptionDecisions, productionExceptionSummary } from '../../utils/productionRecordViews.mjs'
 import ProductionRecordDrawer from '../production-records/ProductionRecordDrawer.jsx'
+import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import useBusinessPageState from '../../hooks/useBusinessPageState.js'
 import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 import { resolveProductionExceptionActionAvailability } from '../../utils/operationalActionAvailability.mjs'
@@ -64,6 +66,21 @@ import {
   requireProductionExceptionPage,
   requireProductionExceptionRecord,
 } from '../../utils/productionExceptionListModel.mjs'
+
+function renderExceptionSource(record, showPhoto = false) {
+  const source = record?.source_identity
+  if (!source || !(source.subject_id > 0)) return '处置对象待核对'
+  const name = source.name || source.code || (source.subject_type === 'MATERIAL' ? '材料已关联' : '产品已关联')
+  const label = (
+    <BusinessCellStack
+      primary={name}
+      secondary={[source.code !== name ? source.code : '', source.sku_code, source.batch_no].filter(Boolean).join(' · ')}
+    />
+  )
+  return showPhoto && source.subject_type === 'PRODUCT' ? (
+    <ProductIdentity productId={source.subject_id} name={name}>{label}</ProductIdentity>
+  ) : label
+}
 
 const TYPE_LABELS = {
   SCRAP: '放弃本批（报废）',
@@ -486,6 +503,14 @@ export default function ProductionExceptionDecisionPanel({
         title: '异常类型',
         dataIndex: 'decision_type',
         render: (value) => TYPE_LABELS[value] || '生产异常',
+      },
+      {
+        defaultPriority: 25,
+        title: '处置对象 / 批次',
+        key: 'source_identity',
+        width: 255,
+        render: (_, record) => renderExceptionSource(record),
+        detailValue: (record) => renderExceptionSource(record, true),
       },
       {
         align: 'right',
@@ -911,6 +936,7 @@ export default function ProductionExceptionDecisionPanel({
       >
         <div className="erp-production-exception-context">
           <strong>{action?.record?.decision_no || '异常申请待核对'} · {TYPE_LABELS[action?.record?.decision_type] || '生产异常'}</strong>
+          {action?.record ? renderExceptionSource(action.record, true) : null}
           <p>{productionExceptionSummary(action?.record || {}).next}</p>
           <label htmlFor="production-exception-reason">{reasonLabel}</label>
           <Input.TextArea

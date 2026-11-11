@@ -3,11 +3,13 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { selectWarehouseView } from './warehouseNavigationActions.mjs'
 import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
+import { WAREHOUSE_HANDLING_VIEWS } from '../../src/erp/utils/warehouseViews.mjs'
 import { createOutsourcingSummaryScenarios } from './outsourcingSummaryScenarios.mjs'
 import { createWorkbenchSummaryScenarios } from './workbenchSummaryScenarios.mjs'
 import { createBusinessProgressScenarios } from './businessProgressScenarios.mjs'
 import { createBusinessStatisticsScenarios } from './businessStatisticsScenarios.mjs'
 import { assertStickyGeometry } from './businessListStickyScenarios.mjs'
+import { createWorkCenterTableScenarios } from './workCenterTableScenarios.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 const extraViews = [
@@ -19,7 +21,7 @@ const extraViews = [
   { key: 'progress-receivables', path: '/erp/business-dashboard?view=statistics&report=receivables&display=table' },
   { key: 'inventory-lots', path: '/erp/warehouse/inventory', tab: '库存批次' },
   { key: 'inventory-transactions', path: '/erp/warehouse/inventory', tab: '库存变动记录' },
-  { key: 'finance-credit-notes', path: '/erp/finance/payments', tab: '红冲记录' },
+  { key: 'finance-credit-notes', path: '/erp/finance/receivables?workspace=credits', selectedTab: '账款调整' },
   { key: 'purchase-arrival', path: '/erp/purchase/accessories', tab: '采购跟进' },
   { key: 'product-specifications', path: '/erp/master/products?catalog=product_skus' },
   { key: 'product-catalog', path: '/erp/master/products?catalog=products' },
@@ -32,29 +34,200 @@ const extraViews = [
   { key: 'help', path: '/erp/help-center' },
 ]
 
+const widthReviewViews = [
+  { key: 'task-tracking', path: '/erp/task-board?tracking=visible' },
+  { key: 'progress-statistics-products', path: '/erp/business-dashboard?view=statistics&display=table&group=product' },
+  { key: 'inventory-operations', path: '/erp/warehouse/inventory?workspace=operations' },
+  { key: 'receivables-due', path: '/erp/finance/receivables?workspace=due', selectedTab: '到期顺序' },
+  { key: 'payables-due', path: '/erp/finance/payables?workspace=due', selectedTab: '到期顺序' },
+  { key: 'payables-credits', path: '/erp/finance/payables?workspace=credits', selectedTab: '账款调整' },
+  { key: 'payables-source-adjustments', path: '/erp/finance/payables?workspace=source-adjustments', selectedTab: '采购待调整' },
+  { key: 'reconciliation-statement', path: '/erp/finance/reconciliation?workspace=statement', selectedTab: '期间对账' },
+  ...Object.entries(WAREHOUSE_HANDLING_VIEWS).flatMap(([direction, views]) =>
+    views.slice(1).map(({ key, label }) => ({
+      key: `warehouse-${direction}-${key}`,
+      path: `/erp/warehouse/${direction}?warehouse_view=${key}`,
+      selectedTab: label,
+    }))
+  ),
+].map((entry) => ({ ...entry, widthOnly: true }))
+
+const businessColumnFit = {
+  customers: {
+    compact: { 状态: 90, 付款条件: 180 },
+    growing: ['编号', '名称'],
+  },
+  processes: {
+    compact: { 状态: 90, 可委外: 90, 可内制: 90 },
+    growing: ['环节编号', '环节名称'],
+  },
+  history: {
+    compact: { 历史状态: 120, 最后更新: 180 },
+    growing: ['编号 / 名称', '名称 / 往来方', '摘要'],
+  },
+}
+
+function assertFocusedColumnFit(entry, widths) {
+  const rule = businessColumnFit[entry.key]
+  if (!rule && !entry.impact) return
+
+  const lookup = (table, label) => {
+    const column = table.columns.find((item) => item.label === label)
+    assert(column, `${entry.key} 缺少列：${label}`)
+    assert(Number.isFinite(column.bodyWidth) && Math.abs(column.bodyWidth - column.width) <= 1, `${entry.key} 的 ${label} 表头应与表体对齐`)
+    return column.width
+  }
+  const tables = widths.map((sample) => {
+    assert(sample.pageOverflow <= 1, `${entry.key} 在 ${sample.viewport}px 应只在表内滚动`)
+    const table = sample.tables.find((item) => entry.impact
+      ? item.columns.some(({ label }) => label === '适用页面')
+      : item.kind === 'business-list')
+    assert(table?.rows > 0, `${entry.key} 需要可测量的表格数据行`)
+    assert(Math.abs(table.headerWidth - table.tableWidth) <= 1, `${entry.key} 表头与表体应等宽`)
+    return table
+  })
+  const [wide, narrow] = tables
+  assert(Math.abs(wide.tableWidth - wide.availableWidth) <= 1 && wide.scrollRange <= 1, `${entry.key} 宽屏应铺满且无需横向滚动`)
+  assert(narrow.scrollRange > 1, `${entry.key} 窄窗应保留列宽并在表内滚动`)
+  if (entry.impact) {
+    for (const table of tables) {
+      assert(lookup(table, '适用页面') >= 219, '适用页面须保留可读列宽')
+      assert(lookup(table, '使用限制') >= 259, '使用限制须保留可读列宽')
+    }
+  } else {
+    for (const [label, budget] of Object.entries(rule.compact)) {
+      for (const table of tables) {
+        assert(Math.abs(lookup(table, label) - budget) <= 1, `${entry.key} 的 ${label} 应保持紧凑`)
+      }
+    }
+    for (const label of rule.growing) {
+      assert(lookup(wide, label) > lookup(narrow, label) + 1, `${entry.key} 的 ${label} 应分享宽屏余宽`)
+    }
+  }
+}
+
+async function verifyPermissionImpactScroll(page) {
+  const viewport = page.viewportSize()
+  const details = page.locator('.erp-role-permission-impact')
+  const body = details.locator('.ant-table-body')
+  const summary = details.locator(':scope > summary')
+  try {
+    await page.setViewportSize({ ...viewport, width: 1024 })
+    await details.getByRole('button', { name: '向右查看列', exact: true }).click()
+    await page.waitForFunction(() => document.querySelector('.erp-role-permission-impact .ant-table-body')?.scrollLeft > 0)
+    await body.evaluate((node) => { node.scrollLeft = node.scrollWidth })
+    await page.waitForFunction(() => {
+      const panel = document.querySelector('.erp-role-permission-impact')
+      const scroller = panel?.querySelector('.ant-table-body')
+      const column = panel?.querySelector('.ant-table-header th:last-child')
+      const cell = scroller?.querySelector('.ant-table-row td:last-child')
+      if (!scroller || !column || !cell) return false
+      const headerBox = column.getBoundingClientRect()
+      const cellBox = cell.getBoundingClientRect()
+      return cellBox.width >= 259 &&
+        Math.abs(headerBox.right - cellBox.right) <= 1 &&
+        cellBox.right <= scroller.getBoundingClientRect().right + 1
+    })
+    await summary.click()
+    await body.waitFor({ state: 'hidden' })
+    await summary.click()
+    await body.waitFor({ state: 'visible' })
+    const limits = details.getByRole('columnheader', { name: '使用限制', exact: true })
+    assert(await limits.evaluate((node) => node.getBoundingClientRect().width >= 259), '重新展开仍保留限制列')
+  } finally {
+    await page.setViewportSize(viewport)
+  }
+}
+
+async function collectWidthEvidence(page) {
+  const viewport = page.viewportSize()
+  const results = []
+  for (const width of [1920, 1024]) {
+    await page.setViewportSize({ ...viewport, width })
+    results.push(await page.locator('.erp-admin-content').evaluate(async (root) => {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      const tables = []
+      const round = (value) => Math.round(value * 10) / 10
+      for (const table of root.querySelectorAll('table')) {
+        if (!table.checkVisibility() || !table.tBodies.length ||
+          table.closest('[role="dialog"], .erp-business-form-page, [data-table-lines="fixed"]')) continue
+        const wrapper = table.closest('.ant-table-wrapper')
+        const scroller = table.closest('.ant-table-body, .ant-table-content') ||
+          (() => {
+            for (let node = table.parentElement; node && node !== root; node = node.parentElement) {
+              if (/auto|scroll/u.test(getComputedStyle(node).overflowX)) return node
+            }
+            return table.parentElement
+          })()
+        const headerTable = wrapper?.querySelector('.ant-table-header > table') || table
+        const headerRow = headerTable.tHead?.rows[0]
+        const dataRows = [...table.tBodies].flatMap((body) => [...body.rows]).filter((row) =>
+          !row.matches('.ant-table-measure-row, .ant-table-placeholder'))
+        const dataRow = dataRows[0]
+        const declaredWidths = [...table.querySelectorAll(':scope > colgroup > col')].map((col) => col.style.width)
+        const columns = Array.from(headerRow?.cells || []).filter((cell) =>
+          !cell.matches('.ant-table-cell-scrollbar')).map((cell) => {
+          const bounds = cell.getBoundingClientRect()
+          return {
+            label: cell.textContent.trim(),
+            width: round(bounds.width),
+            declaredWidth: declaredWidths[cell.cellIndex] || null,
+            bodyWidth: dataRow?.cells.length === headerRow.cells.length
+              ? round(dataRow.cells[cell.cellIndex].getBoundingClientRect().width)
+              : null,
+            overflow: Math.max(0, cell.scrollWidth - cell.clientWidth),
+          }
+        })
+        tables.push({
+          kind: wrapper?.closest('.erp-business-data-table-card') ? 'business-list' : wrapper ? 'app-table' : 'native',
+          rows: dataRows.length,
+          availableWidth: scroller.clientWidth,
+          tableWidth: round(table.getBoundingClientRect().width),
+          headerWidth: round(headerTable.getBoundingClientRect().width),
+          scrollRange: scroller.scrollWidth - scroller.clientWidth,
+          columns,
+        })
+      }
+      return {
+        viewport: innerWidth,
+        pageOverflow: Math.max(0, root.scrollWidth - root.clientWidth, document.documentElement.scrollWidth - innerWidth),
+        tables,
+      }
+    }))
+  }
+  await page.setViewportSize(viewport)
+  return results
+}
+
 export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSession, outputDir }) {
   const deps = { assert, customerRuntimeEffectiveSession, outputDir }
   const outsourcing = createOutsourcingSummaryScenarios(deps)[0]
   const summaries = createWorkbenchSummaryScenarios(deps)[0]
   const progress = createBusinessProgressScenarios(deps)[0]
   const statistics = createBusinessStatisticsScenarios(deps)[0]
+  const workCenter = createWorkCenterTableScenarios({ ...deps, path })
   const fixtures = {
+    'global-dashboard': workCenter.find(({ name }) => name === 'work-center-table-workbench'),
+    'task-board': workCenter.find(({ name }) => name === 'work-center-table-tasks-light'),
+    'task-tracking': workCenter.find(({ name }) => name === 'work-center-table-tracking'),
     'outsourcing-items': outsourcing,
     'workbench-sales-summary': summaries,
     'workbench-materials-summary': summaries,
     'business-dashboard': progress,
     'progress-production': progress,
     'progress-statistics': statistics,
+    'progress-statistics-products': statistics,
     'progress-receivables': statistics,
   }
   const pages = getNavigationSections().flatMap((section) => section.items || [])
-    .filter((item) => item.path?.startsWith('/erp/')).concat(extraViews)
+    .filter((item) => item.path?.startsWith('/erp/')).concat(extraViews, widthReviewViews)
   const scans = pages.map((entry) => ({
     name: `desktop-list-sticky-${entry.key}`,
     path: entry.path,
     auth: 'admin',
     effectiveSession: fixtures[entry.key]?.effectiveSession || customerRuntimeEffectiveSession,
     adminProfile: fixtures[entry.key]?.adminProfile,
+    workflowTaskFixtures: fixtures[entry.key]?.workflowTaskFixtures,
     beforeNavigate: fixtures[entry.key]?.beforeNavigate,
     viewport: { width: 1440, height: entry.key.startsWith('progress-statistics') || entry.key === 'progress-receivables' || entry.impact ? 600 : 900 },
     verify: async (page) => {
@@ -63,12 +236,13 @@ export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSessi
         if (entry.path.startsWith('/erp/warehouse/inventory')) await selectWarehouseView(page, entry.tab)
         else await page.getByRole('tab', { name: entry.tab, exact: true }).click()
       }
+      if (entry.selectedTab) await page.getByRole('tab', { name: entry.selectedTab, exact: true, selected: true }).waitFor()
       if (entry.impact) await page.locator('.erp-role-permission-impact > summary').click()
       await page.waitForFunction(() => [...document.querySelectorAll('.erp-admin-content .ant-spin-spinning, .erp-admin-content [aria-busy="true"]')].every((node) => !node.checkVisibility()))
       if (fixtures[entry.key]) await page.locator('.erp-admin-content tbody tr:not(.ant-table-measure-row)').first().waitFor()
       const tables = page.locator('.erp-admin-content .ant-table-wrapper, .erp-admin-content table:not(.ant-table-wrapper table)')
       const results = []
-      for (let index = 0; index < await tables.count(); index += 1) {
+      for (let index = 0; !entry.widthOnly && index < await tables.count(); index += 1) {
         const table = tables.nth(index)
         if (!await table.isVisible()) continue
         const result = await table.evaluate((node) => {
@@ -124,7 +298,11 @@ export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSessi
         }
         results.push(result)
       }
-      await writeFile(path.join(outputDir, `desktop-list-sticky-${entry.key}.json`), JSON.stringify({ path: entry.path, tables: results }, null, 2))
+      const widths = await collectWidthEvidence(page)
+      await writeFile(path.join(outputDir, `desktop-list-sticky-${entry.key}.json`), JSON.stringify({ path: entry.path, tables: results, widths }, null, 2))
+      assertFocusedColumnFit(entry, widths)
+      if (entry.impact) await verifyPermissionImpactScroll(page)
+      if (entry.widthOnly) return
       assert(results.every((result) => result.sticky), `${entry.path} 仍有未固定表头: ${JSON.stringify(results.filter((result) => !result.sticky))}`)
       assert(await page.locator('.erp-admin-content').evaluate((node) => node.scrollWidth <= node.clientWidth + 1), `${entry.path} 页面横向溢出`)
     },

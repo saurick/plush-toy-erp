@@ -151,7 +151,7 @@ export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEff
         await filters.getByRole('combobox', { name: '排序方式', exact: true }).press('ArrowDown')
         await page.locator('.ant-select-dropdown:visible').getByText('最早优先', { exact: true }).click()
         assert.equal(await trigger.getAttribute('aria-label'), '筛选，已应用 2 项', '非默认排序按一项计数')
-        await filters.getByRole('group', { name: '记录范围', exact: true }).getByRole('button', { name: '全部记录', exact: true }).click()
+        await filters.getByRole('group', { name: '记录范围', exact: true }).getByRole('button', { name: '不限', exact: true }).click()
         await ready(page, 2)
         assert.equal(await trigger.getAttribute('aria-label'), '筛选，已应用 3 项')
         await filters.getByRole('button', { name: '完成', exact: true }).click()

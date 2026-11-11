@@ -522,6 +522,8 @@ export async function installFactRpcMocks(page, context) {
       version: 2,
       subject_type: 'PRODUCT',
       subject_id: 1,
+      subject_name: '模拟委外小熊',
+      subject_code: 'OUT-PHOTO-01',
       product_sku_id: 201,
       sku_code_snapshot: 'SKU-OUTSOURCE-SNAPSHOT-L1',
       lot_id: 402,

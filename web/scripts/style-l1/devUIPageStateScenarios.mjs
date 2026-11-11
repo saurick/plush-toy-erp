@@ -1,7 +1,5 @@
 import { UI_DESIGN_MOBILE_STATES } from '../../src/dev-workbench/config/devUIDesign.mjs'
-import { chooseUIDesignState as simulate } from './devUIDesignNavigation.mjs'
-
-const frameSelector = 'iframe[title="ERP 最新可交互设计"]'
+import { chooseUIDesignMode, chooseUIDesignState as simulate, visibleUIDesignFrame as frameSelector } from './devUIDesignNavigation.mjs'
 
 async function choosePageState(page, label) {
   await page.locator('.erp-page-state-examples .ant-select-selector').click()
@@ -30,7 +28,7 @@ export function createDevUIPageStateScenarios({ assert, assertNoHorizontalOverfl
       verify: async (page) => {
         const requests = watchBusinessRequests(page)
         const frame = page.frameLocator(frameSelector)
-        const select = page.locator('.erp-dev-ui-design-state-select')
+        const select = page.locator('.erp-dev-ui-design-state-select:visible')
         const input = select.getByRole('combobox', { name: '状态模拟', exact: true })
         await input.waitFor()
         await frame.getByRole('button', { name: '销售管理', exact: true }).click()
@@ -58,6 +56,14 @@ export function createDevUIPageStateScenarios({ assert, assertNoHorizontalOverfl
         await page.getByRole('tab', { name: '设计说明', exact: true }).click()
         await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
         assert.equal(await select.locator('.ant-select-selection-item').innerText(), '无权限')
+        await chooseUIDesignMode(page, '手机版')
+        await page.locator(`${frameSelector}:not([aria-hidden])`).waitFor()
+        await simulate(page, '尚无记录')
+        await chooseUIDesignMode(page, '桌面 ERP')
+        assert.equal(await select.locator('.ant-select-selection-item').innerText(), '无权限')
+        await chooseUIDesignMode(page, '手机版')
+        assert.equal(await select.locator('.ant-select-selection-item').innerText(), '尚无记录')
+        await chooseUIDesignMode(page, '桌面 ERP')
         await page.getByRole('button', { name: /全屏预览/ }).click()
         await simulate(page, '正常')
         await select.locator('.ant-select-selector').click()
@@ -198,8 +204,9 @@ export function createDevUIPageStateScenarios({ assert, assertNoHorizontalOverfl
         assert.equal(await page.getByRole('link', { name: '查看图解说明', exact: true }).count(), 0)
         await page.getByRole('tab', { name: '设计说明', exact: true }).click()
         await page.getByRole('button', { name: '状态与异常恢复', exact: true }).click()
-        await page.getByText('规范原文', { exact: true }).click()
-        await page.getByRole('heading', { name: /状态与恢复/ }).waitFor()
+        await page.getByRole('group', { name: '当前图解的规范来源' })
+          .getByRole('button', { name: '读取与失败恢复', exact: true }).click()
+        await page.getByRole('heading', { name: '读取与失败恢复', exact: true }).waitFor()
         await page.getByText('同一查询刷新', { exact: true }).waitFor()
         await screenshot(page, 'page-states-design-specification')
       },
@@ -249,8 +256,7 @@ export function createDevUIPageStateScenarios({ assert, assertNoHorizontalOverfl
         assert.equal(await card.evaluate((node) => node.isConnected), true)
         assert.deepEqual(requests, [])
         assert.equal(await page.getByRole('link', { name: '页面状态样例', exact: true }).count(), 0)
-        await page.locator('.erp-dev-ui-design-page-select').click()
-        await page.locator('.ant-select-dropdown:visible').getByText('控件设计', { exact: true }).click()
+        await page.getByRole('tab', { name: '设计样例', exact: true }).click()
         await page.locator('.erp-control-library-directory').getByRole('button', { name: /^页面状态/u }).click()
         await page.getByRole('heading', { name: '页面状态', exact: true }).waitFor()
       },

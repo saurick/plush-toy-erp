@@ -9,6 +9,7 @@ import { loadDocumentGalleryProducts } from '../../api/documentProductGalleryApi
 import { DOCUMENT_PRODUCT_SOURCES } from '../../utils/businessProductGallery.mjs'
 import ProgressMetricHint from './ProgressMetricHint.jsx'
 import { WorkflowTaskBlockedTag } from '../workflow/WorkflowTaskBlocker.jsx'
+import WorkflowTaskImagePlaceholder from '../workflow/WorkflowTaskImagePlaceholder.jsx'
 import WorkflowTaskReason from '../workflow/WorkflowTaskReason.jsx'
 import {
   progressAttention,
@@ -30,9 +31,12 @@ export function ProgressProductIdentity({ row, compact = false, children }) {
     </BusinessProductGallery>
   ) : undefined
   const identity = progressIdentityPresentation(row)
+  const thumbnail = gallery ?? (identity.hasProduct && !(row.product_id > 0)
+    ? <WorkflowTaskImagePlaceholder item={{ name: row.product }} />
+    : undefined)
   const content = children ?? identity.product
   return identity.hasProduct ? (
-    <ProductIdentity className="erp-progress-product" productId={row.product_id} name={row.product} compact={compact} thumbnail={gallery}>
+    <ProductIdentity className="erp-progress-product" productId={row.product_id} name={row.product} compact={compact} thumbnail={thumbnail}>
       {content}
     </ProductIdentity>
   ) : <span className="erp-progress-product erp-progress-product--empty"><span className="erp-task-product-image erp-task-product-image--placeholder" aria-label="未关联产品／物料"><FileTextOutlined aria-hidden="true" /></span>{content}</span>

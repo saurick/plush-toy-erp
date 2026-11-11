@@ -587,6 +587,26 @@ async function fileExists(file) {
   }
 }
 
+async function ensureLocalScenarioReferences({ projectRoot, plan, environment, commandRunner }) {
+  const confirmation = [
+    "SEED_SCENARIO_DEMO_CORE_REFERENCES",
+    plan.targetAlias,
+    plan.databaseName,
+    plan.dataVersion,
+    plan.runId,
+  ].join(":");
+  await commandRunner(
+    "bash",
+    [
+      path.join(projectRoot, "scripts", "seed-core-demo-data.sh"),
+      "--scenario-references",
+      "--expected-database", plan.databaseName,
+      "--confirm", confirmation,
+    ],
+    { cwd: projectRoot, env: environment },
+  );
+}
+
 async function applyScenarioDemo({
   projectRoot,
   resolved,
@@ -596,6 +616,7 @@ async function applyScenarioDemo({
   readRepository,
   outputRoot,
   environment,
+  commandRunner,
 }) {
   const { plan } = resolved;
   const credentials =
@@ -630,6 +651,8 @@ async function applyScenarioDemo({
   await checkRepository();
   if (plan.targetAlias === PERSISTENT_SCENARIO_DATASET_TARGET) {
     await applyLocalCustomerConfig({ plan, credentials, fetchImpl });
+    await checkRepository();
+    await ensureLocalScenarioReferences({ projectRoot, plan, environment, commandRunner });
     await checkRepository();
   }
   const canonicalOutputRoot =
@@ -777,6 +800,7 @@ export async function runScenarioDemoCli(
       readRepository,
       outputRoot,
       environment,
+      commandRunner,
     });
     return {
       exitCode: 0,

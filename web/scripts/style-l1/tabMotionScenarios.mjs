@@ -11,6 +11,7 @@ import {
 
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { visibleUIDesignFrame } from './devUIDesignNavigation.mjs'
 
 const fixturePath = '/__tab-motion-fixture'
 const fixtureHTML = `<!doctype html><html><head><meta charset="utf-8">
@@ -556,9 +557,9 @@ export function createTabMotionScenarios({ outputDir }) {
           await sections.waitFor()
           await assertTaskTabPointerAndFocus(sections)
           await assertContentTabAffordance(sections)
-          await verifyMobileNavigationMotion(page, assert, '[aria-label="配置预检任务"]', 3)
+          await verifyMobileNavigationMotion(page, assert, '[aria-label="配置预检任务"]', (await sections.getByRole('tab').count()) - 1)
           await verifyMobileNavigationMotion(page, assert, '[aria-label="配置预检任务"]', 0, true)
-          await sections.getByRole('tab').nth(3).click()
+          await sections.getByRole('tab', { name: '评审依据', exact: true }).click()
           await page.waitForURL((url) => url.searchParams.get('section') === 'evidence')
           assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '页签不能撑宽页面')
           await page.reload()
@@ -581,20 +582,13 @@ export function createTabMotionScenarios({ outputDir }) {
         verify: async (page) => {
           const controls = page.getByRole('region', { name: '控件设计', exact: true })
           const directory = controls.getByRole('navigation', { name: '控件设计目录' })
-          const preview = page.locator('.erp-dev-ui-design-page-select:visible')
-          const openPreview = async () => {
-            await preview.click()
-            const listId = await preview.getByRole('combobox').getAttribute('aria-controls')
-            assert(listId, '预览入口须关联自己的选项列表')
-            return page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id="${listId}"]`) })
+          const returnToPreview = async () => {
+            await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
+            await page.locator(visibleUIDesignFrame).waitFor()
           }
-          const choosePreview = async (label, key) => {
-            const dropdown = await openPreview()
-            await dropdown.getByText(label, { exact: true }).click()
-            await dropdown.waitFor({ state: 'hidden' })
-            await page.waitForURL((url) => (url.searchParams.get('page') || 'workspace') === key)
-            if (key === 'controls') await controls.waitFor({ state: 'visible' })
-            else await page.locator('iframe[title="ERP 最新可交互设计"]:visible').waitFor()
+          const openSamples = async () => {
+            await page.getByRole('tab', { name: '设计样例', exact: true }).click()
+            await controls.waitFor()
           }
           const search = controls.getByRole('textbox', { name: '搜索控件设计' })
           const choose = async (name) => {
@@ -612,13 +606,7 @@ export function createTabMotionScenarios({ outputDir }) {
             '控件页面不应出现页面级横向溢出'
           )
           await controls.waitFor()
-          const initialPreview = await openPreview()
-          assert.deepEqual(
-            await initialPreview.locator('.ant-select-item-option').allTextContents(),
-            ['业务界面', '生产管理', '任务处理', '手机版任务', '效能工作台', '登录页', '岗位帮助', '控件设计']
-          )
-          await initialPreview.getByText('控件设计', { exact: true }).click()
-          await initialPreview.waitFor({ state: 'hidden' })
+          assert.equal(await page.getByLabel('设计样例分类', { exact: true }).getByRole('radio', { name: '控件设计' }).isChecked(), true)
           assert.equal(await page.getByRole('dialog').count(), 0)
           assert.equal(await page.getByRole('button', { name: '下载 HTML' }).count(), 0)
           await assertFits()
@@ -741,7 +729,7 @@ export function createTabMotionScenarios({ outputDir }) {
           await page.getByRole('tab', { name: '设计说明', exact: true }).click()
           await page.waitForURL((url) => url.searchParams.get('view') === 'specification')
           assert.equal(new URL(page.url()).searchParams.get('view'), 'specification')
-          await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
+          await page.getByRole('tab', { name: '设计样例', exact: true }).click()
           await controls.getByRole('heading', { name: '页签与视图', exact: true }).waitFor()
 
           await choose('按钮与动作')
@@ -782,15 +770,15 @@ export function createTabMotionScenarios({ outputDir }) {
           await controls.getByRole('button', { name: '重试读取' }).click()
           await controls.getByRole('button', { name: '选择核对样品资料', exact: true }).waitFor()
 
-          await choosePreview('业务界面', 'workspace')
-          const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+          await returnToPreview()
+          const frame = page.frameLocator(visibleUIDesignFrame)
           await frame.getByRole('button', { name: '销售管理', exact: true }).click()
           await frame.getByRole('group', { name: '销售订单视图', exact: true }).waitFor()
-          await choosePreview('控件设计', 'controls')
+          await openSamples()
           await page.getByRole('button', { name: /重置演示/ }).click()
-          await choosePreview('业务界面', 'workspace')
+          await returnToPreview()
           await frame.getByRole('group', { name: '销售订单视图', exact: true }).waitFor()
-          await choosePreview('控件设计', 'controls')
+          await openSamples()
           await choose('弹窗与反馈')
           await controls.getByRole('button', { name: '打开编辑弹窗', exact: true }).waitFor()
           await verifyStandardModal(page, controls, outputDir)

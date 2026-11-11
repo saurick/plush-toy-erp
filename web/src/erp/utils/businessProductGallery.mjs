@@ -24,8 +24,8 @@ export function normalizeGalleryProducts(items = []) {
   return [...products.values()].sort((left, right) => left.productID - right.productID)
 }
 
-// Only visible document IDs are coalesced. Settled results belong to the cell's
-// document revision, so save/refresh never reuses an old line count or product.
+// Batch visible IDs. A revised order can share a queued read, but needs a new
+// request once the previous read has started.
 export function createDocumentProductPreviewLoader(list) {
   const groups = new Map()
   let scheduled = false
@@ -58,7 +58,7 @@ export function createDocumentProductPreviewLoader(list) {
           for (const [, request] of entries) request.reject(error)
         } finally {
           for (const [id, request] of entries) {
-            if (group.pending.get(id) === request.promise) group.pending.delete(id)
+            if (group.pending.get(id) === request) group.pending.delete(id)
           }
         }
       })())
@@ -66,16 +66,23 @@ export function createDocumentProductPreviewLoader(list) {
     if ([...groups.values()].some((group) => group.queued.size)) schedule()
     await Promise.all(requests)
   }
-  return (source, documentID) => {
+  return (source, documentID, revision) => {
     if (!Object.values(DOCUMENT_PRODUCT_SOURCES).includes(source) || !Number.isSafeInteger(documentID) || documentID <= 0) return Promise.reject(new Error('单据产品参数无效'))
     if (!groups.has(source)) groups.set(source, { pending: new Map(), queued: new Map() })
     const group = groups.get(source)
-    if (group.pending.has(documentID)) return group.pending.get(documentID)
+    const queued = group.queued.get(documentID)
+    if (queued) {
+      queued.revision = revision
+      return queued.promise
+    }
+    const pending = group.pending.get(documentID)
+    if (pending && pending.revision === revision) return pending.promise
     let resolve
     let reject
     const promise = new Promise((yes, no) => { resolve = yes; reject = no })
-    group.pending.set(documentID, promise)
-    group.queued.set(documentID, { promise, resolve, reject })
+    const request = { revision, promise, resolve, reject }
+    group.pending.set(documentID, request)
+    group.queued.set(documentID, request)
     schedule()
     return promise
   }

@@ -1,7 +1,7 @@
 import React, { useImperativeHandle, useMemo, useRef } from 'react'
 import { Table } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
-import { normalizeTableColumns, tableColumnsMinimumWidth } from './tableColumns.mjs'
+import { normalizeTableColumns, resolveTableColumnSizing } from './tableColumns.mjs'
 import TableScrollControls from './TableScrollControls.jsx'
 import { useAppPagination } from '../pagination/AppPagination'
 import './app-table.css'
@@ -24,17 +24,22 @@ const AppTable = React.forwardRef(
     const pagination = useAppPagination(props.pagination)
     const hasRowSelection = Boolean(rowSelection)
     useImperativeHandle(ref, () => tableRef.current)
-    const alignedColumns = useMemo(
-      () => normalizeTableColumns(columns, { hasRowSelection }),
-      [columns, hasRowSelection]
+    const sizing = useMemo(
+      () => hasRowSelection ? resolveTableColumnSizing(columns, {
+        controlsWidth: TABLE_SELECTION_COLUMN_WIDTH + (props.expandable?.columnWidth || 0),
+        scrollX: props.scroll?.x,
+      }) : null,
+      [columns, hasRowSelection, props.scroll?.x, props.expandable?.columnWidth]
     )
-    const scroll = useMemo(() => {
-      const columnsWidth = hasRowSelection ? tableColumnsMinimumWidth(columns) : null
-      if (columnsWidth === null || typeof props.scroll?.x === 'string') return props.scroll
-      // 固定布局不采用列 minWidth，必须保留原有列宽预算，避免伸缩列被挤为零。
-      const minimumWidth = columnsWidth + TABLE_SELECTION_COLUMN_WIDTH + (props.expandable?.columnWidth || 0)
-      return { ...props.scroll, x: Math.max(Number(props.scroll?.x) || 0, minimumWidth) }
-    }, [columns, hasRowSelection, props.scroll, props.expandable?.columnWidth])
+    const alignedColumns = useMemo(
+      () => normalizeTableColumns(columns, { hasRowSelection, sizing }),
+      [columns, hasRowSelection, sizing]
+    )
+    // 固定布局不采用列 minWidth，横向滚动至少保留完整列宽预算。
+    const scroll = useMemo(
+      () => sizing ? { ...props.scroll, x: sizing.scrollX } : props.scroll,
+      [sizing, props.scroll]
+    )
     const selection = useMemo(
       () => rowSelection && { ...rowSelection, columnWidth: TABLE_SELECTION_COLUMN_WIDTH },
       [rowSelection]
@@ -67,7 +72,7 @@ const AppTable = React.forwardRef(
           {...props}
           pagination={pagination}
           ref={tableRef}
-          className={`app-table ${className}`.trim()}
+          className={`app-table${sizing?.growth ? ' app-table--column-grow' : ''} ${className}`.trim()}
           columns={alignedColumns}
           rowSelection={selection}
           scroll={scroll}

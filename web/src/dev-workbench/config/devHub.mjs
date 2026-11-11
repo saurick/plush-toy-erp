@@ -247,15 +247,12 @@ export const DEV_HUB_ITEMS = Object.freeze([
     truthSource: '计划回执、正式 Source / Fact API 与目标读回',
     status: '按目标受控写入 / Target-scoped writes',
     guardrails: Object.freeze([
-      '固定数据档位 / Fixed profiles',
-      '本地与服务器 demo 按登记目标区分 / Registered targets only',
-      '不可变计划确认 / Immutable plan confirmation',
-      '业务场景固定批次长期保留并复用、只向前补齐；完整回归使用隔离库',
+      '本地开发与服务器 Demo 分别按登记目标执行，共用手测数据配方',
+      '确认后只补齐缺项，保留已有记录',
       '禁止任意目标或命令 / No arbitrary target or shell',
       '不进生产构建 / No prod build',
     ]),
-    description:
-      '区分本地开发、隔离回归与服务器 demo，准备数据并核对各自回执',
+    description: '选本地开发或服务器 Demo，补齐手测数据并查看结果',
   }),
   Object.freeze({
     key: 'ui-design',

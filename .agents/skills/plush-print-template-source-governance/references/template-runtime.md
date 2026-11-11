@@ -33,7 +33,7 @@
 - 复用 `printWorkspace.js`、`PrintWorkspaceShell`、existing draft / mapper helpers、engineering template data structures、scoped print CSS 和 PDF utilities。
 - editor side padding 可以为了纸面比例收紧，但不能牺牲 toolbar readability 和 paper centering。
 - 修 layout 时不要隐藏或删除正式 docs / source files；只在 runtime template 中排除 duplicate source regions，并写明原因。
-- 约束 runtime cost：images / rows 只 normalize 一次，避免 repeated full-paper remeasure loops；localStorage / window snapshots 保持在现有 print workspace model 内；shared row / image model 足够时，不做 per-customer special branches。
+- 约束运行成本：图片与行只标准化一次，避免反复测量整页。沿用[草稿保存与恢复合同](../../../../docs/打印模板字段与编辑行为清单.md#草稿保存与恢复)：结构化草稿持久化使用 IndexedDB，窗口交接与旧草稿读取沿用现有路径，不重复保存整窗 HTML。共享行和图片模型足够时不加客户专用分支。
 - 新增 official template 或大改模板时，更新 coverage matrix：source version、template key、mapper / view model、renderer、PDF module guard、interaction coverage 和 known blind spots。
 
 ## Window Lifecycle / 打印验收窗口管理
@@ -56,10 +56,11 @@
 - Fixed / product / static images 要对比 source anchor、display box、aspect ratio 和 nearby cell geometry，不只看图片是否出现。
 - Sample rows 要确认重复行使用 compact default sample；长清单行为用 separate fixture / regression 覆盖。
 - Row operations 要覆盖 default row、section row、blank row、selected row、insert above / below、delete、add image、remove image 和 edit recovery。
+- 改到草稿读写或窗口交接时，复用[存储测试](../../../../web/src/erp/utils/printDraftStorage.test.mjs)和[打印工作台回归](../../../../web/scripts/style-l1/printWorkspaceControlScenarios.mjs)。区分确实无草稿、存储不可读和草稿损坏。存储受限但本次传入稿已核对范围时仍可编辑，保存失败如实提示；恢复后先核对原位置，保留未核实或损坏的原稿。
 - PDF / print 要确认使用同一份 current paper DOM，editor highlights / toolbars 不进入打印结果。
 - 发现噪点时先分类为 source / rendering / runtime product noise；不要把源噪点照搬进模板，也不要用“噪点”掩盖真实运行时错位、遮挡、缺字或错误选择。
 - 职业任务文案要检查模板标题、按钮、导出/PDF、帮助提示和正式打印件，确认业务用户看到的是岗位任务语言，不是开发者术语。
-- Performance / quality 要检查本轮最高风险 bound：image count / size、DOM node growth、localStorage snapshot size、image load 后 layout settling、无 repeated measurement loop、编辑区域无明显 lag。
+- 性能按本轮最高风险检查图片数量与大小、DOM 节点增长、结构化草稿或窗口交接数据大小、图片加载后的布局稳定及编辑响应。
 - Source provenance 输出 manifest / checksum 结果、workbook / PDF 结构证据、real used range decision，涉及图片时输出 image-anchor provenance。
 - Official template coverage 要确认 `printTemplates.mjs`、server PDF module gate、docs、tests、页面级浏览器回归场景（Style L1）和 blind-spot notes 对齐。
 - Skill-only / docs-only 改动检查相关文档与 scoped diff；触达项目 Skills 时按[维护与验证](../../README.md#skill-validation)运行项目 validator。progress 只在命中 `AGENTS.md` 的过程记录条件时更新。

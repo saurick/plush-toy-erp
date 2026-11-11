@@ -255,7 +255,10 @@ func (b *businessSearch) wip(id string) *sql.Predicate {
 func (b *businessSearch) outsourcing(c searchColumns, line string) *sql.Predicate {
 	return sql.Or(b.text(c, "outsourcing_order_no", "source_order_no"), b.jsonText(c("supplier_snapshot"), "name", "code", "short_name"), b.party("suppliers", c("supplier_id")), b.wip(c("source_wip_batch_id")),
 		b.items("outsourcing_order_items", "outsourcing_order_id", c("id"), line, func(i searchColumns) *sql.Predicate {
-			return sql.Or(b.text(i, "product_name_snapshot", "product_no_snapshot", "material_name_snapshot", "material_code_snapshot", "product_order_no_snapshot", "process_name_snapshot", "processing_item"), b.product(i, "product_id", "product_name_snapshot", "product_no_snapshot"), b.material(i, "material_id", "material_name_snapshot", "material_code_snapshot"))
+			return sql.Or(b.text(i, "product_name_snapshot", "product_no_snapshot", "material_name_snapshot", "material_code_snapshot", "product_order_no_snapshot", "process_name_snapshot", "processing_item"), b.product(i, "product_id", "product_name_snapshot", "product_no_snapshot"), b.material(i, "material_id", "material_name_snapshot", "material_code_snapshot"),
+				b.related("production_wip_outsourcing_allocations", func(a searchColumns) *sql.Predicate {
+					return sql.And(sql.ColumnsEQ(a("outsourcing_order_item_id"), i("id")), b.wip(a("production_wip_batch_id")))
+				}))
 		}))
 }
 

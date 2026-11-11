@@ -13,10 +13,28 @@ import (
 type purchaseEngineeringSource struct {
 	MaterialID        int    `json:"material_id"`
 	UnitID            int    `json:"unit_id"`
+	ProductID         int    `json:"product_id"`
 	CustomerProductNo string `json:"customer_product_no"`
 	ProductCode       string `json:"product_code"`
 	ProductName       string `json:"product_name"`
 	MaterialNote      string `json:"material_note"`
+}
+
+func purchaseEngineeringSourcesByMaterial(snapshot []map[string]any) (map[[2]int][]purchaseEngineeringSource, error) {
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil, err
+	}
+	var sources []purchaseEngineeringSource
+	if err := json.Unmarshal(encoded, &sources); err != nil {
+		return nil, err
+	}
+	byMaterial := make(map[[2]int][]purchaseEngineeringSource)
+	for _, source := range sources {
+		key := [2]int{source.MaterialID, source.UnitID}
+		byMaterial[key] = append(byMaterial[key], source)
+	}
+	return byMaterial, nil
 }
 
 // Generated orders retain the approval as their immutable display source. Reading
@@ -36,18 +54,9 @@ func purchaseOrderItemsWithEngineeringSource(ctx context.Context, client *ent.Cl
 	if request == nil || request.Status != biz.MaterialRequestApproved {
 		return nil, biz.ErrMaterialRequestNotReady
 	}
-	encoded, err := json.Marshal(request.SourceSnapshot)
+	byMaterial, err := purchaseEngineeringSourcesByMaterial(request.SourceSnapshot)
 	if err != nil {
 		return nil, err
-	}
-	var sources []purchaseEngineeringSource
-	if err := json.Unmarshal(encoded, &sources); err != nil {
-		return nil, err
-	}
-	byMaterial := make(map[[2]int][]purchaseEngineeringSource)
-	for _, source := range sources {
-		key := [2]int{source.MaterialID, source.UnitID}
-		byMaterial[key] = append(byMaterial[key], source)
 	}
 	for _, item := range items {
 		sources := byMaterial[[2]int{item.MaterialID, item.UnitID}]

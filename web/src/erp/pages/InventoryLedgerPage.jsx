@@ -14,6 +14,7 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Dropdown,
   Input,
   Popconfirm,
@@ -567,6 +568,13 @@ export default function InventoryLedgerPage() {
     if (action !== 'sort' || !sortFields) return
     const nextSort = readBusinessServerTableSort(sorter, sortFields)
     setSortByView((current) => ({ ...current, [activeView]: nextSort }))
+    resetCurrentPage()
+  }
+
+  const changeStockCategory = (value) => {
+    setStockCategory(value)
+    setSubjectID('')
+    if (value) setSubjectType('MATERIAL')
     resetCurrentPage()
   }
 
@@ -1457,23 +1465,25 @@ export default function InventoryLedgerPage() {
                 resetCurrentPage()
               }}
                 />
-                <SelectFilter
-                  className="erp-business-filter-control--status"
-                  aria-label="材料库存类别"
-                  value={stockCategory}
-                  disabled={subjectType === 'PRODUCT'}
-                  options={[
-                { value: '', label: '全部材料类别' },
-                ...MATERIAL_STOCK_CATEGORY_OPTIONS,
-                { value: 'UNCLASSIFIED', label: '待分类' },
-              ]}
-                  onChange={(value) => {
-                setStockCategory(value || '')
-                setSubjectID('')
-                if (value) setSubjectType('MATERIAL')
-                resetCurrentPage()
-              }}
-                />
+                <div className="erp-business-filter-field erp-business-filter-field--choices">
+                  <SelectFilter
+                    className="erp-business-filter-control--status"
+                    aria-label="材料库存类别"
+                    value={stockCategory}
+                    disabled={subjectType === 'PRODUCT'}
+                    options={MATERIAL_STOCK_CATEGORY_OPTIONS}
+                    onChange={changeStockCategory}
+                  />
+                  <Checkbox
+                    checked={stockCategory === 'UNCLASSIFIED'}
+                    disabled={subjectType === 'PRODUCT'}
+                    onChange={({ target }) =>
+                      changeStockCategory(target.checked ? 'UNCLASSIFIED' : '')
+                    }
+                  >
+                    只看待分类
+                  </Checkbox>
+                </div>
                 <RemoteReferenceSelect
                   component={SelectFilter}
                   referenceType={subjectType === 'PRODUCT' ? 'products' : 'materials'}

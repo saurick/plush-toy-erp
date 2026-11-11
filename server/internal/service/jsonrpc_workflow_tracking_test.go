@@ -182,6 +182,10 @@ func TestWorkflowTrackingCurrentTaskAccessMatchesTaskEndpoints(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			task := &biz.WorkflowTask{ID: 11, TaskName: "工程资料", OwnerRoleKey: biz.EngineeringRoleKey, TaskStatusKey: "ready", SourceType: "sales_order", SourceID: 1}
+			task.DisplayContext = &biz.WorkflowTaskDisplayContext{
+				Available: true, SourceNo: "SO-PHOTO-DEMO",
+				Items: []biz.WorkflowTaskDisplayItem{{Kind: "product", ProductID: 7, Name: "模拟小鹿", Code: "PRODUCT-7", HasProductImages: true}},
+			}
 			if tc.changeTask != nil {
 				tc.changeTask(task)
 			}
@@ -206,6 +210,10 @@ func TestWorkflowTrackingCurrentTaskAccessMatchesTaskEndpoints(t *testing.T) {
 				t.Fatalf("task read differs from tracking: %v err=%v", read, err)
 			}
 			if tc.canRead {
+				item := read.Data.AsMap()["task"].(map[string]any)["display_context"].(map[string]any)["items"].([]any)[0].(map[string]any)
+				if item["has_product_images"] != true || item["image_attachment_id"] != float64(0) {
+					t.Fatalf("auxiliary-only album must not invent a primary thumbnail: %v", item)
+				}
 				_, explain, err := d.handleWorkflow(ctx, "explain_action_access", "explain", params)
 				if err != nil || explain.Code != errcode.OK.Code {
 					t.Fatalf("action access=%v err=%v", explain, err)

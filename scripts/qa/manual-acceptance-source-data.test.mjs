@@ -24,6 +24,8 @@ import {
   buildSourceDrivenFactReferences,
   listAll,
   planBOMItemReconciliation,
+  planManualAcceptanceFormCoverageSources,
+  planManualAcceptanceShipmentCoverageSources,
   prepareManualAcceptancePaymentMethods,
   prepareManualAcceptanceSourceWrite,
   parseManualAcceptanceSourceDataArgs,
@@ -265,6 +267,64 @@ test("fresh source writes persist their identity before mutation and same-plan p
     await assert.rejects(() => prepareManualAcceptanceSourceWrite({ plan, sourceReportPath }), /semanticDigest does not match/u);
   } finally {
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("shipment coverage is additive and reserves the exact SKU, unit and quantity for the owner order", () => {
+  for (const sourceScaleProfile of ["acceptance", "volume"]) {
+    const baseline = buildManualAcceptanceSourceDataPlan({
+      dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+      runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+      sourceScaleProfile,
+    });
+    const { plan, specs } = planManualAcceptanceShipmentCoverageSources(baseline);
+    assert.equal(plan.semanticDigest, baseline.semanticDigest);
+    assert.equal(plan.records.salesOrders.length, baseline.scale.salesOrders);
+    const ready = specs.filter((order) => order.shipmentCoverage.kind === "ready");
+    assert.deepEqual(ready.map((order) => order.items.length), [3, 3, 3, 3]);
+    assert.deepEqual(specs.slice(4).map((order) => order.shipmentCoverage.kind), ["shortage", "frozen", "reserved-elsewhere"]);
+    assert(specs.every((order) => order.targetStatus === "ACTIVE" && !baseline.records.salesOrders.some((row) => row.order_no === order.order_no)));
+    const excluded = specs.find((order) => order.shipmentCoverage.kind === "reserved-elsewhere");
+    const owner = ready.find((order) => order.order_no === excluded.shipmentCoverage.reservedFromOrderNo);
+    const reserved = owner.items.find((item) => item.line_no === owner.shipmentCoverage.reserveLineNo);
+    assert.deepEqual(
+      [excluded.items[0].skuRef, excluded.items[0].unitKey, excluded.items[0].ordered_quantity],
+      [reserved.skuRef, reserved.unitKey, reserved.ordered_quantity],
+    );
+  }
+});
+
+test("form samples keep actionable warehouse, planning and photo cases separate from the canonical source plan", () => {
+  for (const sourceScaleProfile of ["acceptance", "volume"]) {
+    const baseline = buildManualAcceptanceSourceDataPlan({
+      dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+      runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+      sourceScaleProfile,
+    });
+    const { plan, specs } = planManualAcceptanceFormCoverageSources(baseline);
+    const shippedSources = planManualAcceptanceShipmentCoverageSources(baseline).specs;
+    assert.equal(plan.semanticDigest, baseline.semanticDigest);
+    assert.equal(new Set([...plan.records.salesOrders, ...shippedSources, ...specs].map((row) => row.order_no)).size,
+      plan.records.salesOrders.length + shippedSources.length + specs.length);
+    const [delivery, pending, ...rest] = specs;
+    const { alternateWarehouseLine } = delivery.formCoverage;
+    assert.equal(delivery.items.find((line) => line.line_no === alternateWarehouseLine).skuRef, shippedSources[1].items[0].skuRef);
+    assert.ok(delivery.delivery_snapshot.recipient && delivery.delivery_snapshot.address);
+    assert.deepEqual(pending.formCoverage.checkpoints, ["pending-inspection", "pending-packaging"]);
+    const plannable = rest.filter(({ formCoverage }) => !formCoverage.checkpoints.length && !formCoverage.mediaCase && !formCoverage.materialPreview);
+    assert.deepEqual(plannable.map(({ currency }) => currency), ["USD", "HKD", "CNY"]);
+    assert.ok(plannable.every((row) => row.targetStatus === "ACTIVE" && row.items.length >= 2));
+    const photos = rest.filter(({ formCoverage }) => formCoverage.mediaCase);
+    assert.equal(new Set(photos.map((row) => row.items[0].productRef)).size, 2);
+    assert.ok(photos.every((row) => row.items.length === 1 && !plan.records.products.some(({ code }) => code === row.items[0].productRef)));
+    assert.deepEqual(rest.filter(({ formCoverage }) => !formCoverage.postShipment).flatMap(({ formCoverage }) => formCoverage.checkpoints), ["draft-receipt", "pending-return"]);
+    const completedSources = rest.filter(({ formCoverage }) => formCoverage.postShipment);
+    assert.equal(completedSources.length, 2);
+    assert.ok(completedSources.every((row) => row.items.length === 1 && row.tax_mode === "NONE" && row.freight_terms === "INCLUDED"));
+    const materialRequests = rest.filter(({ formCoverage }) => formCoverage.materialPreview);
+    assert.equal(materialRequests.length, 20);
+    assert.ok(new Set(materialRequests.map((row) => row.customerRef)).size > 10);
+    assert.ok(materialRequests.every(({ items, formCoverage }) => items.length >= 2 && formCoverage.checkpoints.length === 0));
   }
 });
 

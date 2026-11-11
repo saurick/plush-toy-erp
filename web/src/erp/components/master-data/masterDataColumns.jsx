@@ -95,6 +95,7 @@ function productColumns({ unitDisplay }) {
       copyable: true,
       detailCopyable: true,
       width: 150,
+      widthGrow: 1,
       sorter: (a, b) => compareText(a?.code, b?.code),
     },
     {
@@ -105,6 +106,7 @@ function productColumns({ unitDisplay }) {
       dataIndex: 'name',
       copyable: true,
       width: 260,
+      widthGrow: 2,
       sorter: (a, b) => compareText(a?.name, b?.name),
       className: 'erp-product-identity-cell',
       render: (value, record) => (
@@ -145,6 +147,7 @@ function productColumns({ unitDisplay }) {
       copyable: true,
       detailCopyable: true,
       width: 160,
+      widthGrow: 1,
       sorter: (a, b) => compareText(a?.style_no, b?.style_no),
       render: (value) => value || '-',
     },
@@ -156,6 +159,7 @@ function productColumns({ unitDisplay }) {
       copyable: true,
       detailCopyable: true,
       width: 160,
+      widthGrow: 1,
       sorter: (a, b) => compareText(a?.customer_style_no, b?.customer_style_no),
       render: (value) => value || '-',
     },
@@ -308,6 +312,7 @@ function processColumns() {
       copyable: true,
       detailCopyable: true,
       width: 150,
+      widthGrow: 1,
       sorter: (a, b) => compareText(a?.code, b?.code),
     },
     {
@@ -318,6 +323,7 @@ function processColumns() {
       dataIndex: 'name',
       copyable: true,
       width: 220,
+      widthGrow: 2,
       sorter: (a, b) => compareText(a?.name, b?.name),
     },
     {
@@ -326,6 +332,7 @@ function processColumns() {
       exportTitle: '环节类别',
       dataIndex: 'category',
       width: 120,
+      widthGrow: 1,
       sorter: (a, b) => compareText(a?.category, b?.category),
       render: (value) => value || '-',
     },
@@ -334,6 +341,7 @@ function processColumns() {
       exportTitle: '标准路线位置',
       dataIndex: 'production_route_operation_code',
       width: 150,
+      widthGrow: 1,
       sorter: (a, b) =>
         compareText(
           PRODUCTION_ROUTE_OPERATION_LABELS[a?.production_route_operation_code],
@@ -399,6 +407,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             ? 'supplier_code'
             : undefined,
       width: 140,
+      widthGrow: type === 'customers' ? 1 : undefined,
       sorter: (a, b) => compareText(a?.code, b?.code),
     },
     {
@@ -409,6 +418,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
       dataIndex: 'name',
       copyable: true,
       width: 260,
+      widthGrow: type === 'customers' ? 2 : undefined,
       sorter: (a, b) => compareText(a?.name, b?.name),
     },
     ...(type === 'materials'
@@ -457,6 +467,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             effectiveFieldKey:
               type === 'customers' ? 'display_name' : undefined,
             width: 140,
+            widthGrow: type === 'customers' ? 1 : undefined,
             sorter: (a, b) => compareText(a?.short_name, b?.short_name),
             render: (value) => value || '-',
           },
@@ -492,6 +503,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             exportTitle: '国家 / 地区',
             dataIndex: 'country_region',
             width: 140,
+            widthGrow: 1,
             sorter: (a, b) => compareText(a?.country_region, b?.country_region),
             render: (value) => value || '-',
           },
@@ -502,6 +514,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             key: 'default_delivery',
             defaultHidden: true,
             width: 320,
+            widthGrow: 2,
             sorter: (a, b) =>
               compareText(
                 [

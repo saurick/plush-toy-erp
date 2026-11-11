@@ -11,12 +11,14 @@ export const DEV_TESTING_COVERAGE_COLLECT_COMMAND =
 export const DEV_TESTING_COVERAGE_SECTION_QUERY_KEY = 'coverage'
 export const DEV_TESTING_COMMAND_PAGE_QUERY_KEY = 'commandsPage'
 export const DEV_TESTING_COMMAND_PAGE_SIZE = 10
+export const DEV_TESTING_FULL_ACCEPTANCE_VIEW = 'full-acceptance'
 export const DEV_TESTING_PRIMARY_VIEWS = Object.freeze([
   { value: 'server', label: '服务器验证' },
   Object.freeze({ value: 'overview', label: '测试总览' }),
   Object.freeze({ value: 'tiers', label: '本轮验证' }),
   Object.freeze({ value: 'coverage', label: '覆盖报告' }),
   Object.freeze({ value: 'chains', label: '链路实测' }),
+  Object.freeze({ value: DEV_TESTING_FULL_ACCEPTANCE_VIEW, label: '完整回归' }),
   Object.freeze({ value: 'pressure', label: '压力测试' }),
   Object.freeze({ value: 'guide', label: '测试指引' }),
 ])

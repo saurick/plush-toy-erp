@@ -51,6 +51,7 @@ import {
   DEV_TESTING_COVERAGE_SNAPSHOT_API_PATH,
   DEV_TESTING_COVERAGE_COLLECT_COMMAND,
   DEV_TESTING_COVERAGE_SECTION_QUERY_KEY,
+  DEV_TESTING_FULL_ACCEPTANCE_VIEW,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
   DEV_TESTING_PRIMARY_VIEWS,
   DEV_TESTING_WORKSPACE_VIEWS,
@@ -92,6 +93,9 @@ import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 import useDevTestingOperations, { EMPTY_TESTING_OPERATIONS } from '../hooks/useDevTestingOperations.mjs'
 
 const { Paragraph, Text, Title } = Typography
+const FullAcceptanceWorkspace = React.lazy(() =>
+  import('./DevDataPreparationPage.jsx').then(({ FullAcceptanceWorkspace }) => ({ default: FullAcceptanceWorkspace }))
+)
 
 const VIEW_OVERVIEW = 'overview'
 const VIEW_TIERS = 'tiers'
@@ -1168,7 +1172,7 @@ function CoverageReportView({
 
       <WorkbenchReading
         label="覆盖证据类型"
-        detailLabel={sections.find((item) => item.value === section)?.label}
+        detailLabel="当前覆盖证据"
         className="erp-dev-testing-coverage-reading"
         items={sections.map(({ value, label, status }) => ({
           value,
@@ -1988,7 +1992,7 @@ export default function DevTestingPage() {
 
       <main className="erp-dev-testing-shell">
         <div className="erp-dev-testing-scope">
-          <DevTestingEnvironment view={view} compact />
+          {view !== DEV_TESTING_FULL_ACCEPTANCE_VIEW ? <DevTestingEnvironment view={view} compact /> : null}
           <div className="erp-dev-testing-primary-nav" hidden={viewGroup !== 'workspace' || isAuxiliaryView}>
             <SlidingTabList
               aria-label="测试验证工作区主视图"
@@ -2104,6 +2108,15 @@ export default function DevTestingPage() {
               onRun={runTestingAction}
               onReloadTesting={reloadTestingSummary}
             />
+          ) : null}
+          {view === DEV_TESTING_FULL_ACCEPTANCE_VIEW ? (
+            import.meta.env.PLUSH_STANDALONE_WORKBENCH
+              ? <WorkbenchNotice title="请在本地开发工作台运行完整回归" description="完整回归需要本机的临时数据库，结束后自动清理。" />
+              : (
+                <React.Suspense fallback={<Loading title="正在检查完整回归条件" />}>
+                  <FullAcceptanceWorkspace />
+                </React.Suspense>
+              )
           ) : null}
 
         </section>

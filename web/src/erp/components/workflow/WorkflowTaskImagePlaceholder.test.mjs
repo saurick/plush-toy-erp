@@ -12,6 +12,7 @@ test('image placeholders retain accessible states without reading attachments', 
     ['loading', '加载中', '图片加载中'],
     ['failed', '加载失败', '图片暂不可用'],
     ['denied', '无权限', '无图片读取权限'],
+    ['unlinked', '未关联产品', '仅有款式资料，未关联产品档案'],
   ]) {
     await harness.render(h(Placeholder, { item: { kind: 'product', productID: 13, imageAttachmentID: 17, name: '演示产品' }, state }))
     const root = document.querySelector('.erp-task-product-image')

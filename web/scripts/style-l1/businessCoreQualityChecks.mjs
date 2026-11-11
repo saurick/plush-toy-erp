@@ -88,9 +88,11 @@ export async function verifyBusinessCoreQuality(page, deps) {
       '质检单号',
       '状态 / 判定',
       '产品 / 材料 / 在制品',
+      '批次',
       '检验来源',
       '估算不良比例',
-      '检验信息',
+      '检验日期',
+      '检验人',
       '判定备注',
     ],
     `质量检验默认表头应合并为可扫读列: ${JSON.stringify(

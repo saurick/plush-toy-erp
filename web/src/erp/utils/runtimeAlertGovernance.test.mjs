@@ -96,7 +96,7 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
       0
     ) <= 15
   )
-  assert(occurrenceCount(shipment, '<Alert') <= 2)
+  assert(occurrenceCount(shipment, '<Alert') <= 1)
   assert(
     [finance, ...financeViews].reduce(
       (total, view) => total + occurrenceCount(view, '<Alert'),
@@ -109,7 +109,7 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
     read('web/src/erp/components/permission-center/PermissionAccessOverview.jsx'),
     /message="暂不能生成岗位菜单"/u
   )
-  assert.match(shipment, /message="预计总净重暂不可计算"/u)
+  assert.match(shipment, /message="最终总净重未记录"/u)
   assert.match(financeViews[1], /message="当前没有可核销的应收或应付记录"/u)
 })
 

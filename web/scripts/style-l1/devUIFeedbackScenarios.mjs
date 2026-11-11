@@ -237,13 +237,13 @@ export function createDevUIFeedbackScenarios({ assert, assertNoHorizontalOverflo
         await page.getByRole('slider', { name: '讲解正文留白' }).waitFor()
         await page.goForward()
         await page.getByRole('heading', { name: '内容区如何表现', exact: true }).waitFor()
-        const sources = page.getByRole('navigation', { name: '当前图解的规范来源' })
+        const sources = page.getByRole('group', { name: '当前图解的规范来源' })
         await sources.getByRole('button', { name: '弹窗结构与尺寸' }).click()
         await page.locator('.erp-design-prose').getByText('localAction', { exact: true }).waitFor()
         await page.reload()
         await page.locator('.erp-design-prose').getByText('localAction', { exact: true }).waitFor()
         await page.goBack()
-        const search = page.getByRole('textbox', { name: '搜索设计图解或规范' })
+        const search = page.getByRole('textbox', { name: '搜索设计图解' })
         await search.fill('Toast')
         await search.press('Enter')
         await page.waitForURL((url) => url.searchParams.get('q') === 'Toast')
@@ -274,14 +274,14 @@ export function createDevUIFeedbackScenarios({ assert, assertNoHorizontalOverflo
         for (const [title, chapter] of [
           ['Toast 与反馈选择', '反馈持续时间的取舍'],
           ['提交与恢复', '保留上下文与确认结果'],
-          ['关闭与焦点', '关闭保护与危险确认'],
+          ['关闭与焦点', '什么时候需要关闭保护'],
         ]) {
           await directory.getByRole('button', { name: title, exact: true }).click()
           await page.getByRole('heading', { name: title, exact: true }).waitFor()
           await sources.getByRole('button', { name: chapter, exact: true }).click()
           await page.locator('.erp-design-prose').getByRole('heading', { name: new RegExp(chapter, 'u') }).waitFor()
           await page.goBack()
-          await page.getByRole('heading', { name: title, exact: true }).waitFor()
+          await page.locator('.erp-design-prose').waitFor({ state: 'hidden' })
         }
       },
     },

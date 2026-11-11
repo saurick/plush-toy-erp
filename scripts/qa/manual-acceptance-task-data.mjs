@@ -2,6 +2,8 @@
 import { MANUAL_ACCEPTANCE_TASKS_PER_ROLE } from "./manual-acceptance-task-catalog.mjs";
 import { assertSeedBusinessValues } from "./seed-business-values.mjs";
 import { findSalesOrderAcceptanceExecution } from "./manual-acceptance-sales-order-process.mjs";
+import { manualAcceptanceRPCParams } from "./manual-acceptance-source-driven-facts.mjs";
+import { reconcileManualAcceptanceDailyTaskBoard } from "./manual-acceptance-task-board-data.mjs";
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -15,6 +17,7 @@ import { SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES } from "./manual-acceptance-sour
 
 import {
   CUSTOMER_TRIAL_133_TARGET,
+  SCENARIO_DEMO_TARGET,
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimeIdentityPrecondition,
@@ -1151,8 +1154,14 @@ function buildRoleTask({
   runId,
   nowSec,
   taskProfile,
+  localScenario,
 }) {
   const profile = ROLE_SCENARIOS[roleKey];
+  const context = { ...profile.context };
+  if (localScenario && roleKey === "engineering") {
+    delete context.product_name;
+    delete context.style_no;
+  }
   const targetStatus = targetStatusAt(roleKey, index);
   const idempotencyNamespace = taskIdempotencyNamespace(runId, taskProfile);
   const action = actionFor(
@@ -1184,7 +1193,7 @@ function buildRoleTask({
           : targetStatus === "done"
             ? "已完成，下一位可以继续处理。"
             : "确认无误后继续。",
-    ...profile.context,
+    ...context,
   };
   return {
     key: `${roleKey}-${pad(index)}`,
@@ -1617,6 +1626,7 @@ export function buildManualAcceptanceTaskDataPlan(options = {}) {
         sourceID,
         nowSec,
         taskProfile: taskProfile.key,
+        localScenario: targetPolicy.target === SCENARIO_DEMO_TARGET,
       }),
     ),
   );
@@ -1802,9 +1812,9 @@ async function rpcCall({
         id: `manual-acceptance-task-${domain}-${method}-${Date.now()}`,
         method,
         params:
-          domain === "auth" || domain === "workflow"
+          domain === "attachment" && method === "download_attachment"
             ? params
-            : { customer_key: CUSTOMER_KEY, ...params },
+            : manualAcceptanceRPCParams(domain, method, params),
       }),
     });
     if (response?.redirected === true) {
@@ -2729,7 +2739,24 @@ export async function applySalesOrderAcceptanceRuntimeEvidence({
   const evidence = [];
   for (let index = 0; index < caseKeys.length; index += 1) {
     const caseKey = caseKeys[index];
-    const source = sources[index];
+    const planned = sources[index];
+    const { sales_order: order } = await rpcCall({
+      backendURL: plan.backendURL,
+      domain: "sales_order",
+      method: "get_sales_order",
+      params: { id: planned.id },
+      token: accounts.sales.token,
+      fetchImpl,
+    });
+    const status = String(order?.lifecycle_status || "").toUpperCase();
+    if (
+      order?.id !== planned.id ||
+      order.order_no !== planned.orderNo ||
+      !SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES[index].includes(status)
+    ) {
+      throw new CliError(`${planned.orderNo} sales order is outside its forward-only replay states`);
+    }
+    const source = { ...planned, status };
     let started = null;
     if (source.status === "DRAFT") {
       started = await readSalesOrderAcceptanceStart({
@@ -2954,6 +2981,86 @@ export async function applySalesOrderAcceptanceRuntimeEvidence({
   return evidence;
 }
 
+async function applyLocalEngineeringImageTasks({ plan, sourceReport, accounts, fetchImpl }) {
+  if (plan.target !== SCENARIO_DEMO_TARGET || !sourceReport) return [];
+  if (
+    sourceReport.target !== plan.target ||
+    sourceReport.databaseName !== plan.databaseName ||
+    sourceReport.backendURL !== plan.backendURL ||
+    sourceReport.runId !== plan.runId ||
+    sourceReport.dataVersion !== plan.dataVersion ||
+    sourceReport.prefix !== MANUAL_ACCEPTANCE_CORE_CONTRACT.visiblePrefix
+  ) {
+    throw new CliError("engineering image samples require this run's local source receipt");
+  }
+
+  const topics = ROLE_SCENARIOS.engineering.topics;
+  const images = new Map((sourceReport.productImages?.records || []).map((image) => [image.productId, image]));
+  const samples = new Map();
+  for (const source of sourceReport.referenceRecords?.salesOrders || []) {
+    const image = images.get(source.items?.[0]?.productId);
+    if (!image || samples.has(image.productId)) continue;
+    if (!Number.isSafeInteger(source.id) || source.id <= 0 || !source.orderNo?.startsWith(`${sourceReport.prefix}-`)) {
+      throw new CliError("engineering image sample source is outside the current batch");
+    }
+    samples.set(image.productId, { source, image });
+    if (samples.size === topics.length) break;
+  }
+  if (samples.size !== topics.length) {
+    throw new CliError("engineering image samples require distinct products with main images");
+  }
+
+  const call = (account, domain, method, params) => rpcCall({
+    backendURL: plan.backendURL,
+    domain,
+    method,
+    params,
+    token: account.token,
+    fetchImpl,
+  });
+  const sourceParams = (source) => ({ source_type: "sales_order", source_id: source.id });
+  for (const { source } of samples.values()) {
+    const options = await call(accounts.pmc, "workflow", "get_task_create_options", sourceParams(source));
+    if (
+      options.source_no !== source.orderNo ||
+      options.can_create !== true ||
+      !options.roles?.some((role) => role.role_key === "engineering")
+    ) {
+      throw new CliError(`engineering cannot follow up source ${source.orderNo}`);
+    }
+  }
+
+  const evidence = [];
+  for (const [index, { source, image }] of [...samples.values()].entries()) {
+    const result = await call(accounts.pmc, "workflow", "create_followup_task", {
+      ...sourceParams(source),
+      task_name: topics[index],
+      description: "请对照订单上的产品图和款式资料办理。",
+      owner_role_key: "engineering",
+      due_at: plan.schedule.anchorUnix + plan.schedule.offsets.later,
+      priority: 0,
+      idempotency_key: `manual-acceptance:${plan.batchRunId}:engineering-image:${source.orderNo}`,
+    });
+    const created = requireTaskRecord(result, "create_followup_task");
+    const board = await call(accounts.engineering, "workflow", "get_task_board", {
+      owner_role_key: "engineering", keyword: created.task_code, todo_only: true, limit: 20, offset: 0,
+    });
+    const task = board.lanes?.flatMap((lane) => lane.tasks || []).find((item) => item.id === created.id);
+    const context = task?.display_context;
+    const product = context?.items?.find((item) => item.kind === "product" && item.product_id === image.productId);
+    if (context?.available !== true || task.source_no !== source.orderNo || product?.image_attachment_id !== image.attachmentId) {
+      throw new CliError(`engineering task ${created.task_code} did not resolve its source product image`);
+    }
+    const { attachment } = await call(accounts.engineering, "attachment", "download_attachment", { id: image.attachmentId });
+    const bytes = Buffer.from(attachment?.content_base64 || "", "base64");
+    if (!bytes.length || createHash("sha256").update(bytes).digest("hex") !== image.sha256) {
+      throw new CliError(`engineering task ${created.task_code} did not download its product image`);
+    }
+    evidence.push({ taskCode: created.task_code, sourceNo: source.orderNo, productCode: image.productCode, imageSha256: image.sha256 });
+  }
+  return evidence;
+}
+
 export async function applyManualAcceptanceTaskData(
   plan,
   {
@@ -2967,6 +3074,10 @@ export async function applyManualAcceptanceTaskData(
   } = {},
 ) {
   validateManualAcceptanceTaskPlan(plan);
+  const daily = plan.taskProfile === TASK_PROFILE_LONG_LIVED_WORKBENCH;
+  if (daily && !sourceReport) {
+    throw new CliError("长期手测任务必须使用同批业务单据报告", 2);
+  }
   assertManualAcceptanceMutationTarget(plan, {
     confirmation: targetConfirmation,
   });
@@ -3016,10 +3127,8 @@ export async function applyManualAcceptanceTaskData(
     includeSalesRuntime: Boolean(sourceReport),
     fetchImpl,
   });
-  const preflight = await preflightExistingBatch({
-    plan,
-    accounts,
-    fetchImpl,
+  const preflight = daily ? { plan } : await preflightExistingBatch({
+    plan, accounts, fetchImpl,
   });
   const effectivePlan = preflight.plan;
   const runtimeEvidence = sourceReport
@@ -3034,6 +3143,62 @@ export async function applyManualAcceptanceTaskData(
         fetchImpl,
       })
     : [];
+  if (daily) {
+    const call = (role, domain, method, params) => rpcCall({
+      backendURL: effectivePlan.backendURL,
+      domain,
+      method,
+      params,
+      token: role === "admin" ? runtimeAdmin.token : accounts[role].token,
+      fetchImpl,
+    });
+    const actorIDs = {
+      ...Object.fromEntries(Object.entries(accounts).map(([role, account]) => [role, account.id])),
+      admin: runtimeAdmin.id,
+    };
+    const dailyTaskBoard = await reconcileManualAcceptanceDailyTaskBoard({
+      plan: effectivePlan, sourceReport, actorIDs, call, apply: true,
+    });
+    const byRole = {};
+    const byStatus = {};
+    for (const sample of dailyTaskBoard.samples) {
+      byRole[sample.role] = (byRole[sample.role] || 0) + 1;
+      byStatus[sample.status] = (byStatus[sample.status] || 0) + 1;
+    }
+    const total = dailyTaskBoard.samples.length;
+    return {
+      mode: "apply",
+      generatedAt: new Date().toISOString(),
+      customerKey: CUSTOMER_KEY,
+      simulatedOnly: true,
+      realCustomerImport: false,
+      writesFacts: false,
+      directSQL: false,
+      evidenceClass: "mixed_formal_runtime_and_source_tasks",
+      provesProcessRuntime: true,
+      runId: effectivePlan.runId,
+      batchRunId: effectivePlan.batchRunId,
+      taskProfile: effectivePlan.taskProfile,
+      copyRevision: effectivePlan.copyRevision,
+      datasetKey: effectivePlan.datasetKey,
+      dataVersion: effectivePlan.dataVersion,
+      target: effectivePlan.target,
+      rolePasswordSource: roleCredential.source,
+      prefix: effectivePlan.prefix,
+      sourceType: effectivePlan.sourceType,
+      sourceID: effectivePlan.sourceID,
+      backendURL: effectivePlan.backendURL,
+      databaseName: effectivePlan.databaseName,
+      schedule: effectivePlan.schedule,
+      runtime,
+      runtimeEvidence,
+      dailyTaskBoard,
+      summary: {
+        total, byRole, byStatus, persisted: total, created: dailyTaskBoard.create,
+        processRuntimeCount: countManualAcceptanceProcessInstances(runtimeEvidence),
+      },
+    };
+  }
   const existingByCode = preflight.existingByCode;
   const steps = [];
   let createdCount = 0;
@@ -3085,6 +3250,9 @@ export async function applyManualAcceptanceTaskData(
     accounts,
     fetchImpl,
   });
+  const productLinkedTaskSamples = await applyLocalEngineeringImageTasks({
+    plan: effectivePlan, sourceReport, accounts, fetchImpl,
+  });
   return {
     mode: "apply",
     generatedAt: new Date().toISOString(),
@@ -3116,6 +3284,7 @@ export async function applyManualAcceptanceTaskData(
     scheduleBinding: preflight.scheduleBinding,
     runtime,
     runtimeEvidence,
+    productLinkedTaskSamples,
     displayOnlyTasks: {
       evidenceClass: "simulated_display_only",
       provesProcessRuntime: false,

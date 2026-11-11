@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FolderOpenOutlined } from '@ant-design/icons'
 import { Alert, AutoComplete, Button, Form, Input, InputNumber, Space, Tag, Typography } from 'antd'
 import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
@@ -8,8 +8,15 @@ import TaskSourceFacts from '../business-list/TaskSourceFacts.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
-import { ShipmentStatus } from '../../../common/consts/statuses.generated.mjs'
-import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
+import { InventoryLotStatus, ShipmentStatus, StockReservationStatus } from '../../../common/consts/statuses.generated.mjs'
+import { listAllInventoryBalances, listAllInventoryLots } from '../../api/inventoryApi.mjs'
+import { listAllStockReservations } from '../../api/operationalFactApi.mjs'
+import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
+import {
+  isQuantityTextWithinUnitPrecision,
+  unitPrecisionFromOptions,
+  unitQuantityRuleFromOptions,
+} from '../../utils/unitQuantity.mjs'
 import Table from '@/common/components/table/AppTable'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import DeliveryAddressFields from '../business-list/DeliveryAddressFields.jsx'
@@ -45,14 +52,18 @@ import {
   filterShipmentProductSKUOptions,
 } from '../../utils/businessLineItems.mjs'
 import { numeric20Scale6Units } from '../../utils/numeric20Scale6.mjs'
-import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
+import { inventoryLotOption, referenceLabel, uniqueReferenceOptions } from '../../utils/referenceSelectOptions.mjs'
 import {
   calculateShipmentLineNetWeightG,
   hasFinalShipmentWeight,
   normalizeNetWeightG,
   normalizeShipmentQuantity,
+  parseShipmentNetWeightEntry,
   resolveShipmentWeightPreview,
+  SHIPMENT_NET_WEIGHT_ENTRY_SCALE,
   shipmentGrossNetWeightError,
+  shipmentNetWeightEntryFromGrams,
+  shipmentNetWeightEntryToGrams,
   shipmentWeightItemsSignature,
 } from '../../utils/shipmentWeight.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -462,74 +473,154 @@ function shipmentWeightText(value, emptyText = '待补齐') {
   return text ? `${text} 克` : emptyText
 }
 
-function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
-  const items = Form.useWatch('items', form) || EMPTY_SHIPMENT_ITEMS
-  const manualWeight = Form.useWatch('total_net_weight_g', { form, preserve: true })
-  const manualItemsSignature = Form.useWatch(
-    'total_net_weight_items_signature',
-    form
-  )
+const SHIPMENT_NET_WEIGHT_ENTRY_UNITS = [
+  { value: 'kg', label: '公斤' },
+  { value: 'g', label: '克' },
+]
+
+const ShipmentNetWeightInput = React.forwardRef((
+  { value, onChange, unit, onUnitChange, disabled, ...inputProps },
+  ref
+) => (
+  <div className="erp-shipment-net-weight-input">
+    <InputNumber
+      {...inputProps}
+      ref={ref}
+      className="erp-shipment-net-weight-input__amount"
+      controls={false}
+      disabled={disabled}
+      inputMode="decimal"
+      parser={parseShipmentNetWeightEntry}
+      stringMode
+      value={shipmentNetWeightEntryFromGrams(value, unit)}
+      onChange={(amount) => onChange?.(shipmentNetWeightEntryToGrams(amount, unit))}
+    />
+    <Select
+      allowClear={false /* 不可清空：实际净重录入必须保留一个确定的计量单位。 */}
+      aria-label="实际总净重单位"
+      className="erp-shipment-net-weight-input__unit"
+      disabled={disabled}
+      options={SHIPMENT_NET_WEIGHT_ENTRY_UNITS}
+      value={unit}
+      onChange={onUnitChange}
+    />
+  </div>
+))
+
+function selectShipmentWeightDraft(values) {
+  return {
+    items: values.items,
+    manualWeight: values.total_net_weight_g,
+    manualItemsSignature: values.total_net_weight_items_signature,
+  }
+}
+
+function ShipmentWeightEditor({ form, products, productSKUs, unitOptions, baselineKey, renderLines }) {
+  const [weightEntryUnit, setWeightEntryUnit] = useState('kg')
+  const [clearedBaselineKey, setClearedBaselineKey] = useState(null)
+  const previousDraftRef = useRef(null)
+  const { items = EMPTY_SHIPMENT_ITEMS, manualWeight, manualItemsSignature } =
+    Form.useWatch(selectShipmentWeightDraft, { form, preserve: true }) || {}
   const itemsSignature = shipmentWeightItemsSignature(items)
-  const preview = resolveShipmentWeightPreview({ items, products, productSKUs })
+  const preview = useMemo(
+    () => resolveShipmentWeightPreview({ items, products, productSKUs }),
+    [items, products, productSKUs]
+  )
+  const hasManualWeight = String(manualWeight ?? '').trim() !== ''
+  const hasValidManualWeight = Boolean(normalizeNetWeightG(manualWeight))
+  const manualWeightMatchesItems = manualItemsSignature === itemsSignature
   const hasWeightInput = items.some((item) =>
     [item?.product_id, item?.product_sku_id, item?.sales_order_item_id, item?.quantity]
       .some((value) => String(value ?? '').trim() !== '')
   )
+  const referenceIssue = preview.issues.find(
+    ({ code }) => code === 'product_missing' || code === 'sku_unavailable'
+  )
+  const needsLineCorrection = Boolean(referenceIssue) ||
+    preview.issues.some(({ code }) => code === 'quantity_invalid') ||
+    items.some((item) => !isQuantityTextWithinUnitPrecision(
+      item?.quantity,
+      unitPrecisionFromOptions(unitOptions, item?.unit_id)
+    ))
 
   useEffect(() => {
-    const hasManualWeight = String(manualWeight ?? '').trim() !== ''
-    if (!hasManualWeight) return
-    if (preview.complete) {
+    const previous = previousDraftRef.current
+    previousDraftRef.current = { baselineKey, hasManualWeight, itemsSignature }
+    if (!hasManualWeight) {
+      // 导入可同时替换明细和清空净重，表单不会先呈现一份已失效的人工净重。
+      if (previous?.baselineKey === baselineKey && previous.hasManualWeight &&
+        previous.itemsSignature !== itemsSignature) {
+        setClearedBaselineKey(baselineKey)
+      }
+      return
+    }
+    if (preview.complete || !manualWeightMatchesItems) {
+      if (!manualWeightMatchesItems) setClearedBaselineKey(baselineKey)
       form.setFieldsValue({
         total_net_weight_g: undefined,
         total_net_weight_items_signature: undefined,
       })
-      message.info('当前明细已可自动计算，旧人工总净重已清空')
-      return
-    }
-    if (!manualItemsSignature) {
-      form.setFieldsValue({ total_net_weight_items_signature: itemsSignature })
-      return
-    }
-    if (manualItemsSignature !== itemsSignature) {
-      form.setFieldsValue({
-        total_net_weight_g: undefined,
-        total_net_weight_items_signature: undefined,
-      })
-      message.warning('出货明细已变更，旧人工总净重已清空，请重新填写')
+      if (preview.complete) {
+        message.info('当前明细已可自动计算，旧人工总净重已清空')
+      } else {
+        message.warning('出货明细已变更，已清空原实际总净重')
+      }
+    } else if (hasValidManualWeight) {
+      setClearedBaselineKey(null)
     }
   }, [
+    baselineKey,
     form,
+    hasManualWeight,
+    hasValidManualWeight,
     itemsSignature,
-    manualItemsSignature,
-    manualWeight,
+    manualWeightMatchesItems,
     preview.complete,
   ])
 
+  const canEnterManualWeight = hasWeightInput && !needsLineCorrection && !preview.complete
+  const manualWeightCleared = !hasManualWeight && clearedBaselineKey === baselineKey
+  const manualWeightHelp = manualWeightCleared
+    ? <span className="erp-shipment-weight-entry__cleared">出货明细已变更，原净重已清空，可按需重填。</span>
+    : hasValidManualWeight && manualWeightMatchesItems
+      ? '修改出货明细会清空已填净重。'
+      : undefined
+  const estimate = (
+    <div
+      className="erp-shipment-weight-summary erp-business-inline-note"
+      role={hasWeightInput ? 'status' : undefined}
+    >
+      {!hasWeightInput ? (
+        '填写出货明细后显示预计总净重。'
+      ) : needsLineCorrection ? (
+        referenceIssue ? `${referenceIssue.message}。` : '请先修正出货明细，再核对预计总净重。'
+      ) : preview.complete ? (
+        <Text strong>预计总净重：{preview.totalNetWeightG} 克</Text>
+      ) : (
+        <>
+          <span><Text strong>预计总净重：</Text>暂无法计算</span>
+          <span>{preview.issues[0].message}。</span>
+        </>
+      )}
+    </div>
+  )
+
   return (
-    <section className="erp-shipment-weight-summary">
+    <>
       <Form.Item name="total_net_weight_items_signature" hidden>
         <Input />
       </Form.Item>
-      {preview.complete ? (
-        <div className="erp-business-inline-note" role="note">
-          <Text strong>预计总净重：{preview.totalNetWeightG} 克</Text>
-        </div>
-      ) : hasWeightInput ? (
-        <div className="erp-shipment-weight-summary__manual">
-          <Alert
-            className="erp-shipment-weight-summary__notice"
-            showIcon
-            type="warning"
-            message="预计总净重暂不可计算"
-            description={`${
-              preview.issues[0]?.message || '当前明细缺少可用单重'
-            }。系统不会显示或提交部分合计；请补齐档案，或填写整单实称净重。`}
-          />
+      {renderLines(estimate)}
+      {canEnterManualWeight ? (
+        <div className="erp-shipment-weight-entry">
           <Form.Item
-            className="erp-business-action-form__field erp-shipment-weight-summary__field"
-            extra="选填；明细变更后需重填。"
-            label="实际总净重（克）"
+            className="erp-business-action-form__field erp-shipment-weight-entry__field"
+            extra={manualWeightHelp}
+            label={(
+              <span className="erp-shipment-weight-entry__label">
+                实际总净重<span className="erp-shipment-weight-entry__optional" aria-hidden="true">选填</span>
+              </span>
+            )}
             name="total_net_weight_g"
             rules={[
               {
@@ -538,15 +629,18 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
                     return
                   }
                   if (!normalizeNetWeightG(value)) {
-                    throw new Error('实际总净重必须大于 0，且最多保留 6 位小数')
+                    const { kg, g } = SHIPMENT_NET_WEIGHT_ENTRY_SCALE
+                    throw new Error(`实际总净重须大于 0 且在可保存范围内；公斤最多 ${kg} 位小数，克最多 ${g} 位小数`)
                   }
                 },
               },
             ]}
           >
-            <InputNumber
-              stringMode
-              style={{ width: '100%' }}
+            <ShipmentNetWeightInput
+              aria-label="实际总净重"
+              placeholder="填写实测净重"
+              unit={weightEntryUnit}
+              onUnitChange={setWeightEntryUnit}
               onChange={(value) =>
                 form.setFieldsValue({
                   total_net_weight_items_signature: String(value ?? '').trim()
@@ -557,10 +651,8 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
             />
           </Form.Item>
         </div>
-      ) : (
-        <p className="erp-business-inline-note">填写出货明细后显示预计总净重。</p>
-      )}
-    </section>
+      ) : null}
+    </>
   )
 }
 
@@ -626,18 +718,124 @@ function ShipmentItemFormFields(props) {
   const sourcePath = fieldPath('sales_order_item_id')
   const productPath = fieldPath('product_id')
   const skuPath = fieldPath('product_sku_id')
+  const warehousePath = fieldPath('warehouse_id')
+  const unitPath = fieldPath('unit_id')
 
   return (
-    <Form.Item noStyle dependencies={[sourcePath, productPath, skuPath]}>
+    <Form.Item noStyle dependencies={[sourcePath, productPath, skuPath, warehousePath, unitPath, 'sales_order_id']}>
       {({ getFieldValue }) => (
         <ShipmentItemFormContent
           {...props}
           sourceItemID={getFieldValue(sourcePath)}
           productID={getFieldValue(productPath)}
           productSkuID={getFieldValue(skuPath)}
+          warehouseID={getFieldValue(warehousePath)}
+          unitID={getFieldValue(unitPath)}
+          salesOrderID={getFieldValue('sales_order_id')}
         />
       )}
     </Form.Item>
+  )
+}
+
+function ShipmentLotSelect({ stockContext, canViewInventory, inventoryLotOptions, onBlur, ...fieldProps }) {
+  const { productID, productSkuID, warehouseID, unitID, salesOrderID, sourceItemID } = stockContext
+  const beginRequest = useLatestRequestCoordinator()
+  const scope = [productID, productSkuID, warehouseID, unitID, salesOrderID, sourceItemID].join(':')
+  const [result, setResult] = useState(null)
+  const [openScope, setOpenScope] = useState(null)
+  const [searchValue, setSearchValue] = useState('')
+  const current = result?.scope === scope ? result : null
+  const canLoad = canViewInventory && Boolean(productID && warehouseID && unitID)
+  const wantsOpen = canLoad && openScope === scope
+  const pending = wantsOpen && current?.loading
+  const close = useCallback(() => {
+    setOpenScope(null)
+    setSearchValue('')
+  }, [])
+
+  useEffect(close, [close, scope, canLoad])
+
+  const loadLots = useCallback(async () => {
+    const request = beginRequest('shipment-lots')
+    setResult({ scope, loading: true, options: [] })
+    const params = {
+      subject_type: 'PRODUCT',
+      subject_id: productID,
+      ...(productSkuID ? { product_sku_id: productSkuID } : {}),
+      warehouse_id: warehouseID,
+    }
+    const requestOptions = { signal: request.signal }
+    try {
+      const [{ inventory_balances: balances }, { inventory_lots: lots }] = await Promise.all([
+        listAllInventoryBalances(params, requestOptions),
+        listAllInventoryLots({ ...params, status: InventoryLotStatus.ACTIVE }, requestOptions),
+      ])
+      const hasReservedStock = balances.some((balance) => {
+        const reserved = numeric20Scale6Units(balance.active_reserved_quantity)
+        return Number(balance.unit_id) === Number(unitID) && reserved && reserved !== '0'
+      })
+      const reservations = salesOrderID && sourceItemID && hasReservedStock
+        ? (await listAllStockReservations({
+          status: StockReservationStatus.ACTIVE,
+          source_id: salesOrderID,
+          warehouse_id: warehouseID,
+          product_id: productID,
+        }, requestOptions)).stock_reservations
+        : []
+      const options = filterShipmentInventoryLotOptions(
+        uniqueReferenceOptions(lots, inventoryLotOption),
+        balances,
+        { productID, productSkuID, warehouseID, unitID, salesOrderID, sourceItemID, reservations }
+      )
+      if (request.isCurrent()) setResult({ scope, options })
+    } catch {
+      if (request.isCurrent()) setResult({ scope, failed: true, options: [] })
+    } finally {
+      request.finish()
+    }
+  }, [beginRequest, productID, productSkuID, salesOrderID, scope, sourceItemID, unitID, warehouseID])
+
+  const options = current?.options || []
+  const existing = inventoryLotOptions.find((option) => Number(option.value) === Number(fieldProps.value))
+  const displayOptions = existing && !options.some(({ value }) => value === existing.value)
+    ? [...options, { ...existing, label: current && !current.loading && !current.failed ? `${existing.label} · 暂不可发` : existing.label, disabled: true }]
+    : options
+  return (
+    <Select
+      {...fieldProps}
+      allowClear
+      presentation="reference"
+      disabled={!canLoad}
+      open={wantsOpen && Boolean(current) && !pending}
+      loading={pending}
+      aria-busy={Boolean(pending)}
+      optionFilterProp="label"
+      options={displayOptions}
+      placeholder={!canViewInventory ? '无库存查看权限' : !productID ? '先选产品' : !warehouseID ? '先选成品仓' : !unitID ? '先选单位' : '选择批次'}
+      notFoundContent={current?.failed ? '库存暂未读到，重新打开再试' : options.length ? undefined : '该仓库没有可出货的批次'}
+      onOpenChange={(open) => {
+        if (!open) close()
+        else if (canLoad && !wantsOpen) {
+          // The loading indicator stays on the trigger until the menu can open at its final size.
+          setOpenScope(scope)
+          loadLots()
+        }
+      }}
+      onBlur={(event) => {
+        if (pending) close()
+        onBlur?.(event)
+      }}
+      onInputKeyDown={(event) => {
+        if (pending && event.key === 'Escape') {
+          event.stopPropagation()
+          close()
+        }
+      }}
+      searchValue={searchValue}
+      onSearch={setSearchValue}
+      showSearch
+    />
   )
 }
 
@@ -647,7 +845,7 @@ function ShipmentItemFormContent({
   actions,
   field,
   form,
-  inventoryLots = [],
+  canViewInventory,
   inventoryLotOptions = [],
   products = [],
   productOptions = [],
@@ -658,6 +856,9 @@ function ShipmentItemFormContent({
   sourceItemID,
   productID,
   productSkuID,
+  warehouseID,
+  unitID,
+  salesOrderID,
   sourceSelectionDisabled = false,
   unitOptions = [],
   warehouseOptions = [],
@@ -671,11 +872,12 @@ function ShipmentItemFormContent({
     productSKUs,
     productID
   )
-  const filteredInventoryLotOptions = filterShipmentInventoryLotOptions(
-    inventoryLotOptions,
-    inventoryLots,
-    { productID, productSkuID }
-  )
+  const finishedWarehouseOptions = warehouseOptions.filter(({ type }) => type === 'FINISHED_GOODS')
+  const selectedWarehouse = warehouseOptions.find(({ value }) => Number(value) === Number(warehouseID))
+  const warehouseMatches = selectedWarehouse?.type === 'FINISHED_GOODS'
+  const editableWarehouseOptions = selectedWarehouse && !warehouseMatches
+    ? [...finishedWarehouseOptions, { ...selectedWarehouse, disabled: true }]
+    : finishedWarehouseOptions
   const applyItemPatch = (patch) => {
     if (!form || !field) return
     const current = form.getFieldValue(itemPath) || {}
@@ -739,9 +941,11 @@ function ShipmentItemFormContent({
         >
           <Select
             allowClear
+            aria-label={`第 ${index + 1} 行成品仓`}
             optionFilterProp="label"
-            options={warehouseOptions}
-            placeholder="仓库"
+            options={editableWarehouseOptions}
+            placeholder="成品仓"
+            onChange={(value) => applyItemPatch({ warehouse_id: value, lot_id: undefined })}
             showSearch
           />
         </Form.Item>,
@@ -750,13 +954,11 @@ function ShipmentItemFormContent({
           label="批次"
           name={fieldName('lot_id')}
         >
-          <Select
-            allowClear
-            disabled={!Number(productID || 0)}
-            optionFilterProp="label"
-            options={filteredInventoryLotOptions}
-            placeholder={Number(productID || 0) ? '选择批次' : '请先选择产品'}
-            showSearch
+          <ShipmentLotSelect
+            aria-label={`第 ${index + 1} 行批次`}
+            canViewInventory={canViewInventory}
+            inventoryLotOptions={inventoryLotOptions}
+            stockContext={{ productID, productSkuID, warehouseID: warehouseMatches ? warehouseID : undefined, unitID, salesOrderID, sourceItemID }}
           />
         </Form.Item>,
         <div className="erp-line-editor__quantity">
@@ -796,6 +998,7 @@ function ShipmentItemFormContent({
               optionFilterProp="searchText"
               options={unitOptions}
               placeholder="单位"
+              onChange={(value) => applyItemPatch({ unit_id: value, lot_id: undefined })}
               showSearch
             />
           </Form.Item>
@@ -853,7 +1056,7 @@ function ShipmentEditableLines({
     () => new Map(options.productOptions.map((option) => [Number(option.value), option])),
     [options.productOptions]
   )
-  const { inventoryLots, inventoryLotOptions, products, productSKUs, productSKUOptions, salesOrderItems, salesOrderItemOptions, unitOptions, warehouseOptions } = options
+  const { canViewInventory, inventoryLotOptions, products, productSKUs, productSKUOptions, salesOrderItems, salesOrderItemOptions, unitOptions, warehouseOptions } = options
   return (
     <BusinessGroupedLineItems
       title="出货明细"
@@ -890,7 +1093,7 @@ function ShipmentEditableLines({
           }
           field={field}
           form={form}
-          inventoryLots={inventoryLots}
+          canViewInventory={canViewInventory}
           inventoryLotOptions={inventoryLotOptions}
           products={products}
           productOptions={options.productOptions}
@@ -1015,12 +1218,12 @@ export default function ShipmentEditor({
   canCreate = false,
   canUpdate = false,
   canImportSalesOrderSource = false,
+  canViewInventory = false,
   customerOptions = [],
   form,
   importSalesOrderToShipment,
   sourceImportUndoState = '',
   onUndoSourceImport,
-  inventoryLots = [],
   inventoryLotOptions = [],
   isCreateModal = false,
   isEditModal = false,
@@ -1073,11 +1276,12 @@ export default function ShipmentEditor({
   const isWritableModal = isCreateModal || isEditModal
   const canSave = isCreateModal ? canCreate : isEditModal ? canUpdate : false
   const sourceImportButtonRef = useRef(null)
+  const baselineKey = `${modalSelectedShipment?.id || ''}:${modalSelectedShipment?.version || ''}`
 
   return (
     <BusinessFormPage
       form={form}
-      baselineKey={`${modalSelectedShipment?.id || ''}:${modalSelectedShipment?.version || ''}`}
+      baselineKey={baselineKey}
       readOnly={isViewModal}
       title={
         taskFocused ? '核对本次出货' : isCreateModal
@@ -1173,153 +1377,156 @@ export default function ShipmentEditor({
                 </section>
               ) : null}
               {isWritableModal ? (
-                <Form.List name="items">
-                  {(fields, { add, remove }) => (
-                    <section className="erp-sales-order-lines-form erp-shipment-modal-items">
-                      <SourceImportPickerModal
-                        open={salesOrderImportOpen}
-                        title={<BusinessHelpLabel label="从销售订单导入出货明细" description="选择同一张销售订单的来源行；导入后回到编辑页维护仓库和批次。产品、SKU、单位和订单行追溯沿用来源。" />}
-                        rows={salesOrderSources}
-                        columns={salesOrderImportColumns}
-                        multiple
-                        loading={sourceLoading}
-                        importDisabled={salesOrderSourceImportDisabled}
-                        importDisabledReason="销售订单加载失败，请重新加载"
-                        serverPagination
-                        total={salesOrderSourceTotal}
-                        current={salesOrderSourceCurrent}
-                        pageSize={salesOrderSourcePageSize}
-                        onPageChange={onSalesOrderSourcePageChange}
-                        onReload={onSalesOrderSourceReload}
-                        onSearchChange={onSalesOrderSourceSearchChange}
-                        onSelectAllFiltered={onSalesOrderSourceSelectAll}
-                        getSelectionGroup={(item) => item.sales_order_id}
-                        selectionGroup={selectedSalesOrder?.id || salesOrderSourceFilters.salesOrderID}
-                        selectAllDisabledReason={salesOrderSourceFilters.selectable === false ? '先返回可导入明细，再全选' : undefined}
-                        filterResetKey={JSON.stringify([selectedSalesOrder?.id, salesOrderSourceFilters, canImportSalesOrderSource])}
-                        hasActiveFilters={Boolean(salesOrderSourceFilters.customerID || salesOrderSourceFilters.salesOrderID || salesOrderSourceFilters.selectable === false)}
-                        onClearFilters={() => onSalesOrderSourceFiltersChange?.({ selectable: true }, { keyword: '' })}
-                        renderFilters={({ selectedRows, confirmSelectionReset }) => {
-                          const changeSource = (next) => {
-                            const apply = () => onSalesOrderSourceFiltersChange?.(next)
-                            const selected = selectedRows[0]
-                            if (selected && ((next.customerID && next.customerID !== selected.customer_id) ||
-                              (next.salesOrderID && next.salesOrderID !== selected.sales_order_id))) confirmSelectionReset(apply)
-                            else apply()
-                          }
-                          return [
-                            <Select
-                              key="customer"
-                              aria-label="导入来源客户"
-                              placeholder="按客户筛选"
-                              allowClear
-                              showSearch
-                              optionFilterProp="label"
-                              disabled={Boolean(selectedSalesOrder)}
-                              options={selectedSalesOrder ? customerOptions : salesOrderSourceCustomerOptions}
-                              value={selectedSalesOrder?.customer_id || salesOrderSourceFilters.customerID}
-                              onChange={(customerID) => changeSource({ ...salesOrderSourceFilters, customerID, salesOrderID: undefined })}
-                            />,
-                            <Select
-                              key="order"
-                              aria-label="导入来源销售订单"
-                              placeholder="按销售订单筛选"
-                              allowClear
-                              showSearch
-                              optionFilterProp="label"
-                              disabled={Boolean(selectedSalesOrder)}
-                              options={selectedSalesOrder ? salesOrderOptions : salesOrderSourceOrderOptions}
-                              value={selectedSalesOrder?.id || salesOrderSourceFilters.salesOrderID}
-                              onChange={(salesOrderID) => changeSource({ ...salesOrderSourceFilters, salesOrderID })}
-                            />,
-                            <Button
-                              key="eligibility"
-                              type="link"
-                              onClick={() => onSalesOrderSourceFiltersChange?.({ ...salesOrderSourceFilters, selectable: salesOrderSourceFilters.selectable === false })}
-                            >
-                              {salesOrderSourceFilters.selectable === false ? '返回可导入明细' : '查看不可导入原因'}
-                            </Button>,
-                          ]
-                        }}
-                        getSelectedLabel={(item) =>
-                          `${item.order_no} · 第 ${item?.line_no || '-'} 行 · ${item.product_name_snapshot || item.product_name || '产品'}`
-                        }
-                        getRowDisabledReason={(item) => item.disabledReason}
-                        isRowDisabled={(item) => Boolean(item.disabledReason)}
-                        searchPlaceholder="搜索订单"
-                        searchMaxLength={128}
-                        searchHint="可搜索：销售订单号、客户订单号、客户、产品"
-                        emptyDescription={salesOrderSourceEmptyDescription}
-                        filteredEmptyDescription={salesOrderSourceFilters.selectable === false ? '当前范围没有不可导入明细' : '没有符合条件的可导入明细'}
-                        loadError={salesOrderSourceLoadError}
-                        onCancel={() => setSalesOrderImportOpen(false)}
-                        onImport={importSalesOrderToShipment}
-                      />
-                      <ShipmentEditableLines
-                        headerActions={!taskFocused ? (
-                          <>
-                            {!canImportSalesOrderSource ? (
-                              <Text type="secondary" role="status">当前账号无权导入销售订单</Text>
-                            ) : null}
-                            <BusinessImportActions
-                              undoState={sourceImportUndoState}
-                              disabled={saving || sourceLoading || !canSave || !canImportSalesOrderSource}
-                              onUndo={() => {
-                                if (onUndoSourceImport?.()) sourceImportButtonRef.current?.focus()
-                              }}
-                            >
-                              <Button
-                                ref={sourceImportButtonRef}
-                                icon={<FolderOpenOutlined aria-hidden="true" />}
-                                className="erp-line-items-form__import-button erp-action-button"
-                                disabled={!canImportSalesOrderSource}
-                                onClick={onOpenSalesOrderImport}
-                              >
-                                从销售订单导入
-                              </Button>
-                            </BusinessImportActions>
-                          </>
-                        ) : null}
-                        fields={fields}
-                        form={form}
-                        remove={remove}
-                        registerLineItemRow={registerLineItemRow}
-                        requestLineItemScroll={requestLineItemScroll}
-                        selectedSalesOrder={selectedSalesOrder}
-                        shipmentSourceRows={shipmentSourceRows}
-                        inventoryLots={inventoryLots}
-                        inventoryLotOptions={inventoryLotOptions}
-                        products={products}
-                        productOptions={productOptions}
-                        productSKUs={productSKUs}
-                        productSKUOptions={productSKUOptions}
-                        salesOrderItems={salesOrderItems}
-                        salesOrderItemOptions={salesOrderItemOptions}
-                        unitOptions={unitOptions}
-                        warehouseOptions={warehouseOptions}
-                      />
-                      <BusinessLineItemsFooter
-                        addDisabled={Boolean(selectedSalesOrder)}
-                        addLabel="添加出货明细"
-                        onAdd={taskFocused ? undefined : () => appendShipmentItem(add, fields.length)}
-                        stats={[
-                          {
-                            key: 'count',
-                            label: '已录入',
-                            value: fields.length,
-                            suffix: '条',
-                          },
-                        ]}
-                      />
-                    </section>
-                  )}
-                </Form.List>
-              ) : null}
-              {isWritableModal ? (
-                <ShipmentWeightCreateSummary
+                <ShipmentWeightEditor
+                  baselineKey={baselineKey}
                   form={form}
                   products={products}
                   productSKUs={productSKUs}
+                  unitOptions={unitOptions}
+                  renderLines={(estimate) => (
+                    <Form.List name="items">
+                      {(fields, { add, remove }) => (
+                        <section className="erp-sales-order-lines-form erp-shipment-modal-items">
+                          <SourceImportPickerModal
+                            open={salesOrderImportOpen}
+                            title={<BusinessHelpLabel label="从销售订单导入出货明细" description="选择同一张销售订单的来源行；导入后回到编辑页维护仓库和批次。产品、SKU、单位和订单行追溯沿用来源。" />}
+                            rows={salesOrderSources}
+                            columns={salesOrderImportColumns}
+                            multiple
+                            loading={sourceLoading}
+                            importDisabled={salesOrderSourceImportDisabled}
+                            importDisabledReason="销售订单加载失败，请重新加载"
+                            serverPagination
+                            total={salesOrderSourceTotal}
+                            current={salesOrderSourceCurrent}
+                            pageSize={salesOrderSourcePageSize}
+                            onPageChange={onSalesOrderSourcePageChange}
+                            onReload={onSalesOrderSourceReload}
+                            onSearchChange={onSalesOrderSourceSearchChange}
+                            onSelectAllFiltered={onSalesOrderSourceSelectAll}
+                            getSelectionGroup={(item) => item.sales_order_id}
+                            selectionGroup={selectedSalesOrder?.id || salesOrderSourceFilters.salesOrderID}
+                            selectAllDisabledReason={salesOrderSourceFilters.selectable === false ? '先返回可导入明细，再全选' : undefined}
+                            filterResetKey={JSON.stringify([selectedSalesOrder?.id, salesOrderSourceFilters, canImportSalesOrderSource])}
+                            hasActiveFilters={Boolean(salesOrderSourceFilters.customerID || salesOrderSourceFilters.salesOrderID || salesOrderSourceFilters.selectable === false)}
+                            onClearFilters={() => onSalesOrderSourceFiltersChange?.({ selectable: true }, { keyword: '' })}
+                            renderFilters={({ selectedRows, confirmSelectionReset }) => {
+                              const changeSource = (next) => {
+                                const apply = () => onSalesOrderSourceFiltersChange?.(next)
+                                const selected = selectedRows[0]
+                                if (selected && ((next.customerID && next.customerID !== selected.customer_id) ||
+                                  (next.salesOrderID && next.salesOrderID !== selected.sales_order_id))) confirmSelectionReset(apply)
+                                else apply()
+                              }
+                              return [
+                                <Select
+                                  key="customer"
+                                  aria-label="导入来源客户"
+                                  placeholder="按客户筛选"
+                                  allowClear
+                                  showSearch
+                                  optionFilterProp="label"
+                                  disabled={Boolean(selectedSalesOrder)}
+                                  options={selectedSalesOrder ? customerOptions : salesOrderSourceCustomerOptions}
+                                  value={selectedSalesOrder?.customer_id || salesOrderSourceFilters.customerID}
+                                  onChange={(customerID) => changeSource({ ...salesOrderSourceFilters, customerID, salesOrderID: undefined })}
+                                />,
+                                <Select
+                                  key="order"
+                                  aria-label="导入来源销售订单"
+                                  placeholder="按销售订单筛选"
+                                  allowClear
+                                  showSearch
+                                  optionFilterProp="label"
+                                  disabled={Boolean(selectedSalesOrder)}
+                                  options={selectedSalesOrder ? salesOrderOptions : salesOrderSourceOrderOptions}
+                                  value={selectedSalesOrder?.id || salesOrderSourceFilters.salesOrderID}
+                                  onChange={(salesOrderID) => changeSource({ ...salesOrderSourceFilters, salesOrderID })}
+                                />,
+                                <Button
+                                  key="eligibility"
+                                  type="link"
+                                  onClick={() => onSalesOrderSourceFiltersChange?.({ ...salesOrderSourceFilters, selectable: salesOrderSourceFilters.selectable === false })}
+                                >
+                                  {salesOrderSourceFilters.selectable === false ? '返回可导入明细' : '查看不可导入原因'}
+                                </Button>,
+                              ]
+                            }}
+                            getSelectedLabel={(item) =>
+                              `${item.order_no} · 第 ${item?.line_no || '-'} 行 · ${item.product_name_snapshot || item.product_name || '产品'}`
+                            }
+                            getRowDisabledReason={(item) => item.disabledReason}
+                            isRowDisabled={(item) => Boolean(item.disabledReason)}
+                            searchPlaceholder="搜索订单"
+                            searchMaxLength={128}
+                            searchHint="可搜索：销售订单号、客户订单号、客户、产品"
+                            emptyDescription={salesOrderSourceEmptyDescription}
+                            filteredEmptyDescription={salesOrderSourceFilters.selectable === false ? '当前范围没有不可导入明细' : '没有符合条件的可导入明细'}
+                            loadError={salesOrderSourceLoadError}
+                            onCancel={() => setSalesOrderImportOpen(false)}
+                            onImport={importSalesOrderToShipment}
+                          />
+                          <ShipmentEditableLines
+                            headerActions={!taskFocused ? (
+                              <>
+                                {!canImportSalesOrderSource ? (
+                                  <Text type="secondary" role="status">当前账号无权导入销售订单</Text>
+                                ) : null}
+                                <BusinessImportActions
+                                  undoState={sourceImportUndoState}
+                                  disabled={saving || sourceLoading || !canSave || !canImportSalesOrderSource}
+                                  onUndo={() => {
+                                    if (onUndoSourceImport?.()) sourceImportButtonRef.current?.focus()
+                                  }}
+                                >
+                                  <Button
+                                    ref={sourceImportButtonRef}
+                                    icon={<FolderOpenOutlined aria-hidden="true" />}
+                                    className="erp-line-items-form__import-button erp-action-button"
+                                    disabled={!canImportSalesOrderSource}
+                                    onClick={onOpenSalesOrderImport}
+                                  >
+                                    从销售订单导入
+                                  </Button>
+                                </BusinessImportActions>
+                              </>
+                            ) : null}
+                            fields={fields}
+                            form={form}
+                            remove={remove}
+                            registerLineItemRow={registerLineItemRow}
+                            requestLineItemScroll={requestLineItemScroll}
+                            selectedSalesOrder={selectedSalesOrder}
+                            shipmentSourceRows={shipmentSourceRows}
+                            canViewInventory={canViewInventory}
+                            inventoryLotOptions={inventoryLotOptions}
+                            products={products}
+                            productOptions={productOptions}
+                            productSKUs={productSKUs}
+                            productSKUOptions={productSKUOptions}
+                            salesOrderItems={salesOrderItems}
+                            salesOrderItemOptions={salesOrderItemOptions}
+                            unitOptions={unitOptions}
+                            warehouseOptions={warehouseOptions}
+                          />
+                          <BusinessLineItemsFooter
+                            summary={estimate}
+                            addDisabled={Boolean(selectedSalesOrder)}
+                            addLabel="添加出货明细"
+                            onAdd={taskFocused ? undefined : () => appendShipmentItem(add, fields.length)}
+                            stats={[
+                              {
+                                key: 'count',
+                                label: '已录入',
+                                value: fields.length,
+                                suffix: '条',
+                              },
+                            ]}
+                          />
+                        </section>
+                      )}
+                    </Form.List>
+                  )}
                 />
               ) : null}
             </BusinessFormSection>

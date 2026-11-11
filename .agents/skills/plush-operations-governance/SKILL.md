@@ -3,6 +3,8 @@ name: plush-operations-governance
 description: 实时环境与运行操作（plush-toy-erp），不用于仅核对已有证据。Use for runtime fixes, live target checks, observability, secrets/privacy, migration, release or rollback.
 ---
 
+<a id="operations-scope"></a>
+
 # Plush 运行与发布治理 / Operations Governance
 
 只读回答“现在做到哪里、已有证据能证明什么”时切 `$plush-capability-evidence-audit`；本 skill 从实时运行态核验、敏感访问或任何配置、数据、migration、发布、回滚动作开始负责。
@@ -12,6 +14,7 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 - target、模块责任或运行入口不清时，才用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位。
 - 诊断或错误治理按需读相关服务 README、错误码真源、日志、代码和测试；发布、迁移或回滚才读取部署约定、发布门禁、deploy README 和当前 Compose/config。
 - 诊断先确认 environment 和最小请求/错误证据，再按失败层补查版本、config、DB/migration 或日志；发布/回滚结论须完整绑定制品、配置、迁移和目标运行证据。
+- 本地启动或共享开发库迁移按[项目部署与迁移规则](../../../AGENTS.md#部署迁移与收口)及[迁移入口](../../../scripts/README.md#推荐顺序)执行。启动预检失败或超时时保留恢复页，不自动迁移；登记共享库使用同一次 ready 计划，经确认后才执行。隔离库和正式目标走各自登记入口。
 
 ## Project Rules / 项目边界
 
@@ -23,6 +26,8 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 - 下载资源缓慢或停滞时，先按[来源与代理选择](../../../docs/部署约定.md#下载缓慢时的来源与代理选择--download-routing)比较可信来源、直连与已授权代理的实际吞吐，选择最快且稳定、校验通过的组合，再继续发布。
 - `full/strict`、本地 hook、仓库 workflow、历史 release note 都不是当前目标运行态；backup 存在也不等于 restore 已演练。
 - 客户配置运行态必须走 validate / publish / transition check / activate / effective-session readback 的正式链路；不直接改数据库或只改 live config。
+
+<a id="operations-routing"></a>
 
 ## Router / 分支路由
 
@@ -36,13 +41,18 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 
 先由本 Skill 固定 plush 真源与 target；表中配套 Skill 仅在当前分支需要其专项步骤时加载，已有充分规则和证据时直接完成。真实跨分支才组合。
 
+<a id="operations-workflow"></a>
+
 ## Shared Workflow / 共用工作流
 
 1. 明确分支、target/environment、允许写入、验收和停止条件。诊断默认只读；发布、migration apply、secret 变更、恢复和清理必须有明确授权。
 2. 按当前分支取证，不同时加载无关分支；只记录支撑本次判断需要的 revision、请求窗口、配置/迁移与凭据来源，不输出 secret、完整 token/DSN 或不必要 PII。
 3. 写动作前运行对应 preflight 并保留 before evidence；target、数据归属或 migration 状态不清时停止对应动作，不顺手修数据。
+   普通升级先核对所用发布入口能否将基础服务差异绑定到确认计划并在执行前复核。入口尚未支持时报告该次升级受阻，不在同一入口反复准备。入口支持时，按[晋级执行合同](../../../scripts/deploy/README.md#promotion-与传输)绑定镜像、资源及配置差异；执行前发现差异缺失、无法核实或发生变化，停止目标写入，待范围可核实时重新准备并确认。
 4. 从目标环境采集 after evidence；本地 QA、制品、migration/config、target runtime、recovery 和客户验收分开判定。
 5. 只按正式保留策略清理明确制品；不无条件 prune，不碰 volume、数据库、`/data`、env、证书或运行依赖。正式真源变化时同步相关文档与 `progress.md`。
+
+<a id="operations-stop"></a>
 
 ## Stop Conditions / 停止条件
 
@@ -51,6 +61,33 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 - preflight、migration status、health/ready、业务 smoke、readback 或数据对账失败；不得跳过失败继续宣称发布完成。
 - 只有本地 QA、历史报告或仓库配置，没有当前目标环境证据。此时最多报告本地/定义层完成。
 
+<a id="operations-output"></a>
+
 ## Output / 输出要求
 
 先给分支结论和证据链，再说明实际动作、验证、目标环境、敏感信息处理、回滚/恢复点及剩余盲区。发布结论必须分开 `local QA`、`artifact`、`migration/config`、`target runtime`、`recovery` 与 `customer acceptance`。
+
+## 选用决策图 / Decision Guide
+
+```mermaid
+flowchart LR
+  choose{"要做什么？"}
+  audit["只读能力审计"]
+  inspect["实时环境核验"]
+  gate{"写入条件齐备？"}
+  execute["执行并核对结果"]
+  stop["暂停写入"]
+
+  choose -->|评估已有证据| audit
+  choose -->|只查当前环境| inspect
+  choose -->|计划变更| gate
+  gate -->|满足| execute
+  gate -->|缺失或失败| stop
+```
+
+- `choose` [要做什么？](#operations-scope)：先区分已有证据、当前环境和计划写入，再选择工作路径。
+- `audit` [只读能力审计](#operations-scope)：只回答已有证据能证明什么时，使用已有证据的只读能力审计。
+- `inspect` [实时环境核验](#operations-routing)：使用当前 Skill 只读核验。先确认目标环境和最小复现证据，再按失败层查日志、版本、配置或迁移状态。
+- `gate` [写入条件齐备？](#operations-workflow)：发布、应用迁移、恢复等写入动作，先确认授权范围和目标身份，通过对应的写前检查，并保留执行前证据。
+- `execute` [执行并核对结果](#operations-output)：按正式入口执行，在目标环境核对结果。把本地验证、目标运行和恢复证据分开判断。
+- `stop` [暂停写入](#operations-stop)：授权、目标身份或必要恢复方案缺失，或写前检查失败时，暂停受影响的写入，保留证据并补齐条件。

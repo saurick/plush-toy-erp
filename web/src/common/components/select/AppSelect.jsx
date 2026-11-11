@@ -73,11 +73,30 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
   const selectRef = useRef(null)
   useImperativeHandle(ref, () => selectRef.current)
   const basePrefix = prefix ?? (label && hasSelectValue(currentValue) ? <span className="app-select__label">{label}</span> : undefined)
-  const popupWidth = useSelectPopupWidth(selectRef, props.mode, props.showSearch, referenceLayout || identities.size > 0, visible && (props.open ?? popupOpen))
-  const dropdownAlign = useOverlayPopupAlign(props.dropdownAlign)
+  const explicitPopupWidth = props.popupMatchSelectWidth ?? props.dropdownMatchSelectWidth
+  const remote = props.showSearch && props.filterOption === false
+  const fitPopup = Boolean(displayOptions) && !props.mode && !remote && !props.optionRender && !props.popupRender && !props.dropdownRender
+  const popupWidth = useSelectPopupWidth(selectRef, {
+    open: explicitPopupWidth === undefined && visible && (props.open ?? popupOpen),
+    mode: props.mode,
+    showSearch: props.showSearch,
+    hasIdentity: referenceLayout || identities.size > 0,
+    remote,
+    textOptions: fitPopup ? displayOptions : undefined,
+    fieldNames: props.fieldNames,
+    withIcon: hasOptionGroups || Boolean(props.menuItemSelectedIcon),
+    emptyLabel: typeof props.notFoundContent === 'string' ? props.notFoundContent : '暂无可选项',
+  })
+  const overlayAlign = useOverlayPopupAlign(props.dropdownAlign)
+  const dropdownAlign = useMemo(() => explicitPopupWidth === undefined && fitPopup ? {
+    ...overlayAlign,
+    htmlRegion: props.dropdownAlign?.htmlRegion ?? 'visible',
+    overflow: { adjustX: true, adjustY: true, shiftX: true, ...overlayAlign?.overflow },
+  } : overlayAlign, [explicitPopupWidth, fitPopup, overlayAlign, props.dropdownAlign?.htmlRegion])
   const select = (
     <Select
       {...props}
+      transitionName={props.transitionName ?? ''}
       dropdownAlign={dropdownAlign}
       notFoundContent={props.loading ? (
         <Empty variant="compact" state="loading" description="正在读取候选…" />
@@ -112,7 +131,7 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
       labelRender={reference ? referenceLabelRenderer(identities, referenceLayout) : props.labelRender}
       suffixIcon={referenceLayout && reference && props.disabled ? null : props.suffixIcon}
       allowClear={props.loading ? false : allowClear}
-      popupMatchSelectWidth={props.popupMatchSelectWidth ?? props.dropdownMatchSelectWidth ?? popupWidth}
+      popupMatchSelectWidth={explicitPopupWidth ?? popupWidth}
       className={`app-select ${referenceLayout ? 'app-select--reference' : ''} ${className}`.trim()}
     />
   )

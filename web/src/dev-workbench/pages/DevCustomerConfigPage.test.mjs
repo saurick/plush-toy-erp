@@ -5,6 +5,7 @@ import { act, createElement as h } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import {
+  createReactTestHarness,
   installTestDOM,
   registerJSXTestLoader,
 } from '../../../scripts/test/reactRuntime.mjs'
@@ -52,8 +53,7 @@ test('test apply retains canonical publish identity and transition CAS', () => {
     validationSource,
     /disabled=\{disabled \|\| !importSummary\.canApplyTestConfig\}/u
   )
-  assert.match(validationSource, /importSummary\.testApply\.note/u)
-  assert.match(validationSource, /当前只可预览和试跑，不会发布或激活/u)
+  assert.match(validationSource, /unavailableReason=\{importSummary\.testApply\.note\}/u)
 })
 
 test('route defaults preserve explicit invalid customer identity and clear stale task parameters', () => {
@@ -109,6 +109,40 @@ test('release deep links use the fifth step and returning to validation leaves r
   assert.equal(validation.activeStep, 'import')
   assert.equal(validation.activeImportAction, 'dry-run')
   assert.throws(() => customerConfigStepSearch('', '__proto__'), /Unknown/u)
+})
+
+test('preflight keeps strategy and extension states visible with different package contents', async (t) => {
+  const { container, render } = await createReactTestHarness(t)
+  const { buildCustomerConfigDevOverview, DEV_CUSTOMER_CONFIG_REGISTRY } = await import('../config/devCustomerConfig.mjs')
+  const { default: CustomerStrategyReview } = await import('./customer-config/CustomerStrategyReview.jsx')
+  const { CustomerExtensionRegistry } = await import('./customer-config/CustomerExtensionRegistry.jsx')
+  const { customerPackage } = DEV_CUSTOMER_CONFIG_REGISTRY.yoyoosun
+  const { customerPackageSummary } = buildCustomerConfigDevOverview({
+    customerKey: 'yoyoosun',
+    customerPackage: {
+      ...customerPackage,
+      processPolicies: [],
+      runtimeProcessSelections: [{ ...customerPackage.runtimeProcessSelections[0], variantKey: 'unmatched_variant' }],
+      extensionPoints: [{ key: 'test_extension', label: '样本扩展', status: 'preview_only', runtimeEnabled: false }],
+    },
+  })
+
+  await render(h(CustomerStrategyReview, { summary: customerPackageSummary }))
+  assert.match(container.textContent, /暂无流程策略草案/u)
+  assert.match(container.textContent, /发布候选 · 未核验目标/u)
+  assert.match(container.textContent, /此流程选择未匹配登记定义/u)
+
+  await render(h(CustomerStrategyReview, {
+    summary: { ...customerPackageSummary, runtimeProcessSelections: [] },
+  }))
+  assert.match(container.textContent, /暂无流程策略草案/u)
+  assert.match(container.textContent, /暂无发布候选流程/u)
+  assert.equal(Boolean(container.querySelector('[role="combobox"], [aria-label="当前流程或策略"]')), false)
+
+  await render(h(CustomerExtensionRegistry, { summary: customerPackageSummary }))
+  assert.match(container.textContent, /样本扩展/u)
+  assert.match(container.textContent, /仅记录待评审扩展候选，当前没有运行时实现/u)
+  assert.doesNotMatch(container.textContent, /暂无扩展登记/u)
 })
 
 test('release history is bound to the explicitly selected evidence batch', () => {

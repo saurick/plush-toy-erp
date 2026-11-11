@@ -187,21 +187,6 @@ export function FormalGateItem({ item }) {
   )
 }
 
-export function ImportAssetScopeItem({ item }) {
-  return (
-    <article className="erp-dev-customer-db-target">
-      <div className="erp-dev-customer-db-target__head">
-        <Text strong>{item.label}</Text>
-        <Space wrap size={4}>
-          <Tag>{item.value}</Tag>
-          <StatusTag status={item.status} />
-        </Space>
-      </div>
-      <Text type="secondary">{item.note}</Text>
-    </article>
-  )
-}
-
 export function RegistryCheckItem({ item }) {
   return (
     <article className="erp-dev-customer-formal-gate">
@@ -274,22 +259,6 @@ export function CustomerPackageSelector({
         </Text>
       ) : null}
     </div>
-  )
-}
-
-export function AssetTile({ item }) {
-  return (
-    <article className="erp-dev-customer-asset" key={item.key}>
-      <div className="erp-dev-customer-asset__top">
-        <Text type="secondary">{item.label}</Text>
-        <StatusTag status={item.status} />
-      </div>
-      <div className="erp-dev-customer-asset__value">
-        <span>{item.value}</span>
-        <small>{item.unit}</small>
-      </div>
-      <Text type="secondary">{item.note}</Text>
-    </article>
   )
 }
 
