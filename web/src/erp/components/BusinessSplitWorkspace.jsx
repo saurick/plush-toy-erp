@@ -66,7 +66,7 @@ function SplitNavigationGuard({ current }) {
 
 // 原页面始终保留 Outlet；附加页复用同一组路由和表单，互换只改变显示方向。
 function BusinessSplitWorkspace({
-  open, onOpenChange, activeSide, onActiveSideChange, location, navigate,
+  open, menuDragAvailable, onOpenChange, activeSide, onActiveSideChange, location, navigate,
   outletContext, leftGuard, leftRefresh, renderPage, sections, resolvePage, onRightLocationChange, taskWorkspace, children,
 }, ref) {
   const workspaceID = useId()
@@ -440,7 +440,7 @@ rightAllowed: rightAccess?.allowed,
     return null
   }
   const rightContent = useMemo(() => {
-    if (!rightLocation) return <Empty description="点击标题选择页面，或将左侧菜单拖到这里" detail="两栏分别编辑和保存。" />
+    if (!rightLocation) return <Empty description={menuDragAvailable ? '点击标题选择页面，或把菜单项右侧的六点手柄拖到这里' : '点击标题选择页面'} detail="两栏分别编辑和保存。" />
     return rightAccess?.allowed ? (
       <ERPPageActionsContext.Provider value={rightActions}>
         <RouterNavigationContext.Provider value={rightNavigation}>
@@ -459,7 +459,7 @@ rightAllowed: rightAccess?.allowed,
         </RouterNavigationContext.Provider>
       </ERPPageActionsContext.Provider>
     ) : <Alert type="warning" message="当前账号不能查看这个页面" />
-  }, [rightLocation, rightAccess, rightActions, rightNavigation, rightUIState, rightWorkspace, rightContext, renderPage, navigatePane, rightTitle])
+  }, [rightLocation, rightAccess, rightActions, rightNavigation, rightUIState, rightWorkspace, rightContext, renderPage, navigatePane, rightTitle, menuDragAvailable])
   const visibleSizes = !open ? [100, 0] : narrow ? activeSide === 'left' ? [100, 0] : [0, 100] : sizes
   const resizePanes = (values) => {
     const total = values[0] + values[1]

@@ -36,7 +36,7 @@ import {
   ToolOutlined,
   TruckOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Dropdown, Layout, Menu, Space, Tag, Typography } from 'antd'
+import { Alert, Button, Dropdown, Grid, Layout, Menu, Space, Tag, Tooltip, Typography } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import WorkflowTaskBusinessWorkspace from './workflow/WorkflowTaskBusinessWorkspace.jsx'
@@ -147,6 +147,36 @@ const { Paragraph, Text } = Typography
 const PROFILE_SYNC_INTERVAL_MS = 60 * 1000
 const PROFILE_BOOTSTRAP_RETRY_DELAYS_MS = [200, 600]
 const ADMIN_AUTH_STORAGE_KEYS = new Set(['admin_access_token', 'admin_user_id'])
+
+function SplitMenuGrip({ onDragPage }) {
+  const [interaction, setInteraction] = useState('idle')
+  return (
+    <Tooltip
+      title="拖到左栏或右栏打开"
+      placement="right"
+      arrow={false}
+      open={interaction === 'hint'}
+      onOpenChange={(visible) => setInteraction((current) =>
+        current === 'dragging' ? current : visible ? 'hint' : 'idle'
+      )}
+    >
+      <span
+        className="erp-split-menu-grip"
+        title=""
+        draggable
+        data-dragging={interaction === 'dragging' || undefined}
+        onClick={(event) => event.stopPropagation()}
+        onDragStart={(event) => {
+          onDragPage(event)
+          setInteraction('dragging')
+        }}
+        onDragEnd={() => setInteraction('idle')}
+      >
+        <HolderOutlined aria-hidden="true" />
+      </span>
+    </Tooltip>
+  )
+}
 
 const navIconRegistry = {
   'workspace-home': <HomeOutlined aria-hidden />,
@@ -358,6 +388,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
   const [loggingOut, setLoggingOut] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(false)
+  const { lg: wideDesktop } = Grid.useBreakpoint()
   const [systemVersionOpen, setSystemVersionOpen] = useState(false)
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
@@ -1034,6 +1065,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
     pathname: location.pathname,
   })
 
+  const showSplitMenuGrip = splitOpen && wideDesktop === true && !desktopNavCollapsed
   const menuItems = useMemo(() => {
     const buildMenuLeaf = (item) => {
       const taskEntry = item.path === '/erp/task-board' && taskCount.enabled
@@ -1051,15 +1083,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
           icon
         ),
         label: (
-          <span
-            className="erp-split-menu-label"
-            draggable={splitOpen}
-            onDragStart={(event) => {
-              event.currentTarget.dataset.dragging = 'true'
-              splitWorkspace.current?.dragPage(event, item.path)
-            }}
-            onDragEnd={(event) => { delete event.currentTarget.dataset.dragging }}
-          >
+          <span className="erp-split-menu-label">
             <span className="erp-split-menu-label__text">
               {taskEntry ? (
                 <span className="erp-menu-task-label">
@@ -1068,7 +1092,9 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
                 </span>
               ) : item.label}
             </span>
-            {splitOpen ? <HolderOutlined className="erp-split-menu-grip" aria-hidden="true" /> : null}
+            {showSplitMenuGrip ? (
+              <SplitMenuGrip onDragPage={(event) => splitWorkspace.current?.dragPage(event, item.path)} />
+            ) : null}
           </span>
         ),
         title: taskEntry
@@ -1077,7 +1103,8 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
         'aria-label': item.label,
         'aria-description': [
           taskEntry ? navigationCountDescription(taskCount) : null,
-          splitOpen ? '可拖到左栏或右栏打开，点击在当前栏打开' : null,
+          splitOpen ? '点击在当前栏打开' : null,
+          showSplitMenuGrip ? '拖动六点手柄可指定打开的栏' : null,
         ].filter(Boolean).join('；') || undefined,
       }
     }
@@ -1125,6 +1152,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
     shouldUseProductCoreNavigation,
     taskCount,
     splitOpen,
+    showSplitMenuGrip,
   ])
 
   const sidebarNavigationEntry = splitOpen && activeSplitSide === 'right' && splitRightLocation
@@ -1650,6 +1678,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
               <BusinessSplitWorkspace
                 ref={splitWorkspace}
                 open={splitOpen}
+                menuDragAvailable={showSplitMenuGrip}
                 onOpenChange={setSplitOpen}
                 activeSide={activeSplitSide}
                 onActiveSideChange={setActiveSplitSide}

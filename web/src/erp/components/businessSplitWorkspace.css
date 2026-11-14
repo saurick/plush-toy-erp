@@ -28,15 +28,14 @@
   display: none;
 }
 
-.erp-split-menu-label[draggable='true'] {
+.erp-split-menu-label:has(> .erp-split-menu-grip) {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  cursor: grab;
 }
 
-.erp-split-menu-label[draggable='true'] > .erp-split-menu-label__text {
+.erp-split-menu-label:has(> .erp-split-menu-grip) > .erp-split-menu-label__text {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -45,20 +44,30 @@
 }
 
 .erp-split-menu-grip {
-  flex: 0 0 14px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
   color: var(--erp-text-muted);
   font-size: 14px;
-  opacity: 0;
+  cursor: grab;
+  user-select: none;
 }
 
-.erp-split-menu-label[data-dragging='true'] > .erp-split-menu-grip,
-.erp-admin-menu .ant-menu-item:hover .erp-split-menu-grip,
-.erp-admin-menu .ant-menu-item:focus-visible .erp-split-menu-grip {
-  opacity: 1;
+.erp-split-menu-grip > .anticon {
+  pointer-events: none;
 }
 
-.erp-split-menu-label[draggable='true']:active,
-.erp-split-menu-label[draggable='true'][data-dragging='true'] {
+.erp-split-menu-grip:hover,
+.erp-split-menu-grip[data-dragging='true'] {
+  background: color-mix(in srgb, var(--erp-text) 14%, transparent);
+  color: var(--erp-text);
+}
+
+.erp-split-menu-grip:active,
+.erp-split-menu-grip[data-dragging='true'] {
   cursor: grabbing;
 }
 

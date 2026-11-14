@@ -167,7 +167,7 @@ export function createBusinessSplitPerformanceScenarios({ assert, customerRuntim
         evidence.operations.toggleCycles = cycles
         await open()
         await right.locator('.erp-split-page-title:visible .ant-select-clear').click()
-        await right.getByText('点击标题选择页面，或将左侧菜单拖到这里', { exact: true }).waitFor()
+        await right.getByText('点击标题选择页面，或把菜单项右侧的六点手柄拖到这里', { exact: true }).waitFor()
         await page.waitForLoadState('networkidle')
         await snapshot('right-page-cleared')
         await page.waitForTimeout(1000)

@@ -92,12 +92,90 @@ inputStyle = getComputedStyle(input)
     await expect(title.locator('.ant-select-selection-placeholder')).toBeVisible()
     await assertTitlePickerSpacing(pane)
   }
+  const verifyMenuDragGrip = async (page, name) => {
+    const left = page.locator('.erp-split-pane--left')
+    const right = page.locator('.erp-split-pane--right')
+    const emptyPage = right.getByText('点击标题选择页面，或把菜单项右侧的六点手柄拖到这里', { exact: true })
+    const sidebar = page.locator('.erp-admin-sider')
+    const menuItems = sidebar.getByRole('menuitem')
+    const grips = sidebar.locator('.erp-split-menu-grip')
+    const sales = sidebar.getByRole('menuitem', { name: '销售管理', exact: true })
+    const label = sales.getByText('销售管理', { exact: true })
+    const grip = sales.locator('.erp-split-menu-grip')
+    const hint = page.getByRole('tooltip').filter({ hasText: '拖到左栏或右栏打开' })
+    await expect(grips).toHaveCount(0)
+    await page.getByRole('button', { name: '分栏', exact: true }).first().click()
+    await expect(emptyPage).toBeVisible()
+    await expect(grips).toHaveCount(await menuItems.count())
+    const menuFit = await grips.evaluateAll((nodes) => nodes.map((node) => {
+      const bounds = node.getBoundingClientRect()
+      const row = node.closest('[role="menuitem"]')
+      const boundsRow = row.getBoundingClientRect()
+      const text = node.previousElementSibling
+      const style = getComputedStyle(node)
+      return {
+        label: row.getAttribute('aria-label'),
+        visible: bounds.width >= 22 && bounds.height >= 22 && style.visibility === 'visible' && Number(style.opacity) > 0,
+        fits: bounds.right <= boundsRow.right && text.scrollWidth <= text.clientWidth + 1,
+      }
+    }))
+    assert.deepEqual(menuFit.filter(({ visible, fits }) => !visible || !fits), [], '分栏打开后菜单文字和手柄应完整显示')
+
+    const initial = await grip.boundingBox()
+    const background = () => grip.evaluate((node) => getComputedStyle(node).backgroundColor)
+    const idleBackground = await background()
+    await label.hover()
+    assert.equal(await background(), idleBackground, '鼠标经过菜单文字时手柄不高亮')
+    await grip.hover()
+    await expect(hint).toBeVisible()
+    assert.notEqual(await background(), idleBackground, '只有手柄自身悬停才显示圆形底色')
+    assert.deepEqual(await grip.boundingBox(), initial, '悬停前后手柄位置与尺寸不变')
+    const tip = await hint.boundingBox()
+    assert.ok(tip.x >= initial.x + initial.width - 1 && tip.x + tip.width <= page.viewportSize().width, '手柄提示在侧栏外完整可见')
+    await waitForFiniteAnimations(page)
+    await page.screenshot({ path: `${outputDir}/${name}-hover.png`, clip: { x: 0, y: initial.y - 90, width: Math.ceil(tip.x + tip.width + 16), height: 220 } })
+    await label.dragTo(right, { steps: 10 })
+    await expect(emptyPage).toBeVisible()
+    await grip.click()
+    await expect(emptyPage).toBeVisible()
+
+    const target = await right.boundingBox()
+    const x = target.x + target.width / 2
+    const y = target.y + target.height / 2
+    await page.mouse.down()
+    await page.mouse.move(x, y, { steps: 12 })
+    await page.mouse.move(x + 3, y)
+    await expect(right).toHaveAttribute('data-drop-target', 'true')
+    await expect(hint).toBeHidden()
+    await page.mouse.up()
+    await expect(right.locator('.erp-split-page-title:visible .ant-select-selection-item')).toHaveText('销售订单')
+    await expect(left.locator('.erp-split-page-title:visible .ant-select-selection-item')).toHaveText('材料档案')
+    await grip.hover()
+    await expect(hint).toBeVisible()
+    await right.locator('.erp-split-page-title:visible .ant-select-clear').click()
+    await expect(emptyPage).toBeVisible()
+    await expect(right).not.toHaveAttribute('data-drop-target', 'true')
+
+    await sidebar.getByRole('button', { name: '收起侧边菜单' }).click()
+    await expect(grips).toHaveCount(0)
+    await expect(right.getByText('点击标题选择页面', { exact: true })).toBeVisible()
+    await sidebar.getByRole('button', { name: '展开侧边菜单' }).click()
+    await expect(grip).toBeVisible()
+    await label.click()
+    await expect(right.locator('.erp-split-page-title:visible .ant-select-selection-item')).toHaveText('销售订单')
+    await right.locator('.erp-split-page-title:visible .ant-select-clear').click()
+    await expect(emptyPage).toBeVisible()
+    await right.getByRole('button', { name: '收起分栏', exact: true }).click()
+    await expect(grips).toHaveCount(0)
+  }
   return [
     { name: 'business-split-title-fusion-spacing', path: '/erp/purchase/processing-contracts', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 },
     { name: 'business-split-title-fusion-custom-headers', path: '/erp/master/materials', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 },
     { name: 'business-split-title-fusion', path: '/erp/purchase/material-bom', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 },
     { name: 'business-split-title-fusion-dark', path: '/erp/purchase/material-bom', viewport: { width: 1440, height: 900 }, themeMode: 'dark' },
     { name: 'business-split-title-fusion-narrow', path: '/erp/purchase/material-bom', viewport: { width: 800, height: 700 } },
+    { name: 'business-split-menu-grip', path: '/erp/master/materials', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 },
+    { name: 'business-split-menu-grip-dark', path: '/erp/master/materials', viewport: { width: 1440, height: 900 }, themeMode: 'dark' },
     { name: 'business-split-header-actions', path: '/erp/master/materials', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 },
     { name: 'business-split-header-actions-dark', path: '/erp/master/materials', viewport: { width: 1440, height: 900 }, themeMode: 'dark' },
     { name: 'business-split-header-actions-narrow', path: '/erp/master/materials', viewport: { width: 800, height: 900 } },
@@ -142,11 +220,16 @@ inputStyle = getComputedStyle(input)
         })
       },
       verify: async (page) => {
+        if (definition.name.startsWith('business-split-menu-grip')) {
+          await verifyMenuDragGrip(page, definition.name)
+          return
+        }
         if (definition.name.startsWith('business-split-header-actions')) {
           const narrow = definition.viewport.width < 992
           const left = page.locator('.erp-split-pane--left')
           const right = page.locator('.erp-split-pane--right')
           const workspace = page.locator('.erp-split-workspace')
+          const emptyPage = right.getByText(narrow ? '点击标题选择页面' : '点击标题选择页面，或把菜单项右侧的六点手柄拖到这里', { exact: true })
           const showRight = async () => { if (narrow) await page.locator('.erp-split-switcher').getByText('右栏', { exact: true }).click() }
           const open = async () => {
             await page.getByRole('button', { name: '分栏', exact: true }).first().click()
@@ -196,7 +279,7 @@ inputStyle = getComputedStyle(input)
           await right.locator('.erp-split-page-title:visible .ant-select-clear').click()
           await confirmation.waitFor()
           await confirmation.getByRole('button', { name: '放弃修改', exact: true }).click()
-          await expect(right.getByText('点击标题选择页面，或将左侧菜单拖到这里', { exact: true })).toBeVisible()
+          await expect(emptyPage).toBeVisible()
           await expect(workspace).toHaveAttribute('data-split-open', 'true')
           await expect(right.getByRole('combobox', { name: /^选择[左右]栏页面$/u })).toBeFocused()
           await expect(right.locator('.erp-split-page-title:visible .ant-select-clear')).toHaveCount(0)
@@ -214,7 +297,7 @@ inputStyle = getComputedStyle(input)
           await input.fill('')
           await input.press('Escape')
           await input.press('Delete')
-          await expect(right.getByText('点击标题选择页面，或将左侧菜单拖到这里', { exact: true })).toBeVisible()
+          await expect(emptyPage).toBeVisible()
           await directClose().click()
           await expect(workspace).toHaveAttribute('data-split-open', 'false')
           assert.equal(await main.evaluate((node) => node.isConnected), true, '清空和收起不重建主页面')
