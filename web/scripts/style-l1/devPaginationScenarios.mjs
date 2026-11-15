@@ -1,4 +1,7 @@
-export function createDevPaginationScenarios({ assert, assertNoHorizontalOverflow }) {
+import { expect } from 'playwright/test'
+import { captureBusinessView } from './businessViewDetailAssertions.mjs'
+
+export function createDevPaginationScenarios({ assert, assertNoHorizontalOverflow, outputDir }) {
   return [{
     name: 'dev-ui-shared-pagination',
     path: '/__dev/ui-design?page=controls&control=components',
@@ -34,7 +37,28 @@ export function createDevPaginationScenarios({ assert, assertNoHorizontalOverflo
         assert(dimensions.overflow <= 1 && dimensions.childrenInside, `分页内容应在自身边界内：${JSON.stringify(dimensions)}`)
       }
 
+      const checkJumpControls = async (kind) => {
+        const next = pager.locator('.ant-pagination-jump-next')
+        await next.focus()
+        await expect(next).toBeFocused()
+        await next.press('Enter')
+        await expectRange('第 51-60 条 / 共 123 条', 10, '051')
+        assert.equal(await pager.locator('.ant-pagination-item-ellipsis').count(), 2, '中间页应同时提供前后跳页')
+        await page.mouse.move(0, 0)
+        await captureBusinessView(page, pager, `pagination-${kind}`, 1920, outputDir)
+        const previous = pager.locator('.ant-pagination-jump-prev')
+        await previous.hover()
+        await expect.poll(() => previous.locator('.ant-pagination-item-link-icon').evaluate((node) => getComputedStyle(node).opacity)).toBe('1')
+        await expect.poll(() => previous.locator('.ant-pagination-item-ellipsis').evaluate((node) => getComputedStyle(node).opacity)).toBe('0')
+        await previous.click()
+        await expectRange('第 1-10 条 / 共 123 条', 10, '001')
+      }
+
       await expectRange('第 1-10 条 / 共 123 条', 10, '001')
+      await checkJumpControls('table')
+      await selectState('独立分页')
+      await checkJumpControls('standalone')
+      await selectState('表格内分页')
       await pager.locator('.ant-pagination-item-2').focus()
       await page.keyboard.press('Enter')
       await expectRange('第 11-20 条 / 共 123 条', 10, '011')

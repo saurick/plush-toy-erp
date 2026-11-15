@@ -87,7 +87,7 @@ export function createDevSharedComponentScenarios({
     },
     ...createSelectOverflowScenarios({ assert, assertNoHorizontalOverflow, outputDir }),
     ...createGroupedSelectScenarios({ assert, assertNoHorizontalOverflow, outputDir }),
-    ...createDevPaginationScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createDevPaginationScenarios({ assert, assertNoHorizontalOverflow, outputDir }),
     ...createDevBusinessComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
     ...createDevToolbarExampleScenarios({ assert, assertNoHorizontalOverflow, outputDir }),
     {
