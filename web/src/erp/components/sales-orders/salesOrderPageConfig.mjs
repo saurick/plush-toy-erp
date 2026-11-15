@@ -14,6 +14,16 @@ export const SALES_ORDER_STATUS_FILTER_OPTIONS = [
   { label: '已取消', value: 'canceled' },
 ]
 
+export const SALES_DELIVERY_STATUS_FILTER_OPTIONS = [
+  { label: '全部明细', value: '' },
+  { label: '逾期', value: 'overdue' },
+  { label: '关闭未交完', value: 'closed' },
+  { label: '7 天内', value: 'dueSoon' },
+  { label: '未排交期', value: 'unscheduled' },
+  { label: '待核对', value: 'unknown' },
+  { label: '已交付', value: 'delivered' },
+]
+
 export const SALES_ORDER_DATE_FILTER_OPTIONS = [
   { label: '下单日期', value: 'order_date' },
   { label: '计划交付日期', value: 'planned_delivery_date' },

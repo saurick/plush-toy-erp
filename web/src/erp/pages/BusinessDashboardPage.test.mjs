@@ -118,7 +118,7 @@ test('progress lists and details share independently previewable product identit
   )
   assert.match(
     salesDelivery,
-    /<WorkflowTaskCard[\s\S]*?contentClassName="erp-business-visual-list__row-content"/u
+    /<Table\s+className="erp-sales-delivery-table"/u
   )
   assert.doesNotMatch(
     [source, mobilePanel, salesDelivery].join('\n'),

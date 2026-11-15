@@ -109,8 +109,7 @@
     .workflow-task-calendar__task,
     .erp-progress-row,
     .mobile-progress-card,
-    .mobile-workflow-tracking-card,
-    .erp-business-visual-list__row
+    .mobile-workflow-tracking-card
   ):has(> .erp-task-card__open:not(:disabled, [aria-disabled='true'], [aria-pressed='true'])):hover {
     border-color: var(--erp-interactive-border-hover);
   }

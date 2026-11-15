@@ -23,6 +23,53 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
   const returnToPreview = (page) => page.getByRole('tab', { name: '可交互设计', exact: true }).click()
   return [
     {
+      name: 'dev-ui-design-sales-delivery-table',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const frame = await waitReady(page)
+        await frame.getByRole('button', { name: '销售管理', exact: true }).click()
+        await frame.getByRole('button', { name: '交付进度', exact: true }).click()
+        const table = frame.getByRole('table', { name: '交付明细', exact: true })
+        await table.waitFor()
+        assert.deepEqual(await table.locator('thead th').allTextContents(), ['订单 / 客户', '产品', '交付日期', '出货进度', '剩余待交', '交付状态'])
+        const first = table.locator('tbody tr[data-delivery-id]').first()
+        await first.getByRole('button', { name: /查看.*大图/u }).click()
+        const preview = frame.getByRole('dialog', { name: /图片预览$/u })
+        await preview.waitFor()
+        await preview.getByRole('button', { name: '关闭图片预览', exact: true }).click()
+        await preview.waitFor({ state: 'hidden' })
+        const order = first.getByRole('button', { name: /^打开销售订单/u })
+        const orderNo = await order.innerText()
+        await order.click()
+        const details = frame.locator('.business-detail-modal')
+        await details.waitFor()
+        assert.ok((await details.innerText()).includes(orderNo))
+        await details.getByRole('button', { name: '关闭', exact: true }).click()
+        await details.waitFor({ state: 'hidden' })
+        await first.locator('td').nth(2).dblclick()
+        await details.waitFor()
+        await details.getByRole('button', { name: '关闭', exact: true }).click()
+        await details.waitFor({ state: 'hidden' })
+        await frame.locator('[data-action="delivery-filter"][data-value="delivered"]').click()
+        assert.ok((await table.locator('tbody tr[data-delivery-id]').count()) > 0)
+        await frame.locator('[data-action="delivery-filter"][data-value="all"]').click()
+        const filters = frame.getByRole('group', { name: '交付情况', exact: true })
+        assert.equal(await filters.getByRole('button').count(), 7)
+        assert.equal(await frame.getByRole('group', { name: '状态筛选', exact: true }).count(), 0)
+        const allCount = await filters.getByRole('button', { name: /^全部明细/u }).innerText()
+        await frame.locator('[data-action="open-filter"]').click()
+        const extra = frame.locator('#filter-popover')
+        await extra.getByRole('group', { name: '订单状态', exact: true }).getByRole('button', { name: '已生效', exact: true }).click()
+        await extra.getByRole('button', { name: '关闭', exact: true }).first().click()
+        await frame.getByRole('button', { name: '清除订单状态：已生效', exact: true }).click()
+        assert.equal(await filters.getByRole('button', { name: /^全部明细/u }).innerText(), allCount)
+        await assertNoHorizontalOverflow(page)
+        await page.screenshot({ path: path.join(outputDir, 'ui-design-sales-delivery-table-4k.png') })
+      },
+    },
+    {
       name: 'dev-ui-design-inbound-related-actions',
       path: '/__dev/ui-design',
       viewport: { width: 1920, height: 1080 },

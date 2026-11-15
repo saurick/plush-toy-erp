@@ -22,6 +22,7 @@ import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import FilterChip from '@/common/components/navigation/FilterChip'
 import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message, useModal } from '@/common/utils/antdApp'
@@ -98,6 +99,7 @@ import {
   SALES_ORDER_LIFECYCLE_ACTIONS,
   SALES_ORDER_SORT_FILTER_OPTIONS,
   SALES_ORDER_STATUS_FILTER_OPTIONS,
+  SALES_DELIVERY_STATUS_FILTER_OPTIONS,
   SALES_ORDERS_MODULE_KEY,
 } from '../components/sales-orders/salesOrderPageConfig.mjs'
 import { useSalesOrderPaymentReview } from '../components/sales-orders/useSalesOrderPaymentReview.mjs'
@@ -179,12 +181,22 @@ import {
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
 import SalesDeliveryProgress from '../components/business-visualizations/SalesDeliveryProgress.jsx'
+import { buildSalesDeliveryModel } from '../utils/businessVisualizationModels.mjs'
 import {
   BusinessViewSurface,
   BusinessViewSwitch,
 } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 
 const CUSTOMER_CONTACT_OWNER_TYPE = 'CUSTOMER'
+
+function AppliedOrderStatus({ value, onClear }) {
+  const label = SALES_ORDER_STATUS_FILTER_OPTIONS.find((option) => option.value === value)?.label
+  return (
+    <FilterChip selected removable onClick={onClear} aria-label={`清除订单状态：${label}`}>
+      订单状态：{label}
+    </FilterChip>
+  )
+}
 
 function salesOwnerOptionFromText(text) {
   const value = String(text || '').trim()
@@ -703,6 +715,17 @@ export default function SalesOrdersPage() {
     actionLabel: '加载销售交付进度',
   })
   const reloadDeliveryData = deliveryData.reload
+  const deliveryModel = useMemo(
+    () => buildSalesDeliveryModel(deliveryData.rows),
+    [deliveryData.rows]
+  )
+  const previousDeliveryQuery = useRef({ params: deliverySummaryParams, lifecycleScope })
+  useEffect(() => {
+    const previous = previousDeliveryQuery.current
+    if (previous.params === deliverySummaryParams && previous.lifecycleScope === lifecycleScope) return
+    previousDeliveryQuery.current = { params: deliverySummaryParams, lifecycleScope }
+    setDeliveryViewState((current) => ({ ...current, page: 1 }))
+  }, [deliverySummaryParams, lifecycleScope, setDeliveryViewState])
 
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
@@ -1418,9 +1441,10 @@ export default function SalesOrdersPage() {
 
   const activeFilterCount = [
     lifecycleScope !== LIFECYCLE_SCOPE.CURRENT,
+    contentView === 'delivery' && statusFilter,
     customerFilter,
     dateFilterStart || dateFilterEnd,
-    sortFilter !== 'updated_at:desc',
+    contentView === 'list' && sortFilter !== 'updated_at:desc',
   ].filter(Boolean).length
   const clearRouteContext = useCallback(
     (resetScope = false) => {
@@ -1438,15 +1462,15 @@ export default function SalesOrdersPage() {
   )
   const clearFilters = useCallback(() => {
     setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
-    setStatusFilter((current) => lifecycleScopeIncludesStatus(LIFECYCLE_SCOPE.CURRENT, current, ['closed', 'canceled']) ? current : '')
+    setStatusFilter((current) => contentView === 'list' && lifecycleScopeIncludesStatus(LIFECYCLE_SCOPE.CURRENT, current, ['closed', 'canceled']) ? current : '')
     setCustomerFilter('')
     setDateFilterField('order_date')
     setDateFilterStart('')
     setDateFilterEnd('')
-    setSortFilter('updated_at:desc')
+    if (contentView === 'list') setSortFilter('updated_at:desc')
     setSearchParams((current) => withLifecycleScopeSearchParam(current, LIFECYCLE_SCOPE.CURRENT), { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [setLifecycleScope, setStatusFilter, setCustomerFilter, setDateFilterField, setDateFilterStart, setDateFilterEnd, setSortFilter, setSearchParams, setPagination])
+  }, [contentView, setLifecycleScope, setStatusFilter, setCustomerFilter, setDateFilterField, setDateFilterStart, setDateFilterEnd, setSortFilter, setSearchParams, setPagination])
 
   const selectedOrderDisplayText = useMemo(() => {
     if (!selectedOrder) return '请先选择销售订单'
@@ -1594,20 +1618,59 @@ export default function SalesOrdersPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <BusinessStatusFilter
-              inline
-              counts={statusCounts}
-              loading={loading}
-              exact={Boolean(routeSalesOrderID)}
-              aria-label="销售订单状态"
-              className="erp-business-filter-control--status"
-              options={lifecycleStatusOptions}
-              value={statusFilter}
-              onChange={(nextStatus) => {
-                setStatusFilter(nextStatus)
-                resetBusinessPaginationCurrent(setPagination)
-              }}
-            />
+            {contentView === 'list' ? (
+              <BusinessStatusFilter
+                inline
+                counts={statusCounts}
+                countUnit="张"
+                loading={loading}
+                exact={Boolean(routeSalesOrderID)}
+                aria-label="销售订单状态"
+                options={lifecycleStatusOptions}
+                value={statusFilter}
+                onChange={(nextStatus) => {
+                  setStatusFilter(nextStatus)
+                  resetBusinessPaginationCurrent(setPagination)
+                }}
+              />
+            ) : (
+              <>
+                <BusinessStatusFilter
+                  inline
+                  allLabel="全部明细"
+                  allCount={deliveryData.error ? null : deliveryModel.counts.total}
+                  counts={deliveryData.error ? null : deliveryModel.counts}
+                  countUnit="条"
+                  loading={deliveryData.loading}
+                  disabled={Boolean(deliveryData.error)}
+                  aria-label="交付情况"
+                  options={SALES_DELIVERY_STATUS_FILTER_OPTIONS}
+                  value={deliveryViewState.filter === 'all' ? '' : deliveryViewState.filter || ''}
+                  onChange={(nextFilter) => setDeliveryViewState((current) => ({ ...current, filter: nextFilter || 'all', page: 1 }))}
+                />
+                <SelectFilter
+                  aria-label="订单状态"
+                  className="erp-business-filter-control--status"
+                  options={lifecycleStatusOptions}
+                  value={statusFilter}
+                  disabled={Boolean(routeSalesOrderID)}
+                  onChange={(nextStatus) => {
+                    setStatusFilter(nextStatus)
+                    resetBusinessPaginationCurrent(setPagination)
+                  }}
+                />
+                {statusFilter ? (
+                  <AppliedOrderStatus
+                    inline
+                    value={statusFilter}
+                    onClear={() => {
+                      setStatusFilter('')
+                      resetBusinessPaginationCurrent(setPagination)
+                    }}
+                  />
+                ) : null}
+              </>
+            )}
             <RemoteReferenceSelect
               referenceType="customers"
               component={SelectFilter}
@@ -1641,17 +1704,19 @@ export default function SalesOrdersPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
-              emptyValue="updated_at:desc"
-              aria-label="排序方式"
-              className="erp-business-filter-control--sort"
-              options={SALES_ORDER_SORT_FILTER_OPTIONS}
-              value={sortFilter}
-              onChange={(nextSort) => {
-                setSortFilter(nextSort)
-                resetBusinessPaginationCurrent(setPagination)
-              }}
-            />
+            {contentView === 'list' ? (
+              <SelectFilter
+                emptyValue="updated_at:desc"
+                aria-label="排序方式"
+                className="erp-business-filter-control--sort"
+                options={SALES_ORDER_SORT_FILTER_OPTIONS}
+                value={sortFilter}
+                onChange={(nextSort) => {
+                  setSortFilter(nextSort)
+                  resetBusinessPaginationCurrent(setPagination)
+                }}
+              />
+            ) : null}
           </>
         }
         actions={
@@ -1918,7 +1983,7 @@ export default function SalesOrdersPage() {
           <SalesDeliveryProgress
             viewState={deliveryViewState}
             onViewStateChange={setDeliveryViewState}
-            items={deliveryData.rows}
+            model={deliveryModel}
             loading={deliveryData.loading}
             error={deliveryData.error}
             onRetry={deliveryData.reload}

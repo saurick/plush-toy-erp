@@ -18,10 +18,35 @@ test('快捷状态显示独立选中反馈，再次选择仅取消该项；加�
   assert.equal(draft().querySelector('.erp-filter-chip__clear'), null)
   await harness.click(draft())
   assert.deepEqual(selected, ['', 'draft'])
-  for (const state of [{ loading: true }, { exact: true }]) {
+  for (const state of [{ loading: true }, { exact: true }, { disabled: true }]) {
     await harness.render(createElement(BusinessStatusFilter, { ...props, value: 'draft', ...state }))
     assert.ok([...document.querySelectorAll('button')].every((button) => button.disabled))
   }
+})
+
+test('快捷筛选保留显式计数口径、完整总数和未知值，失败禁用不表示仍在加载', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: BusinessStatusFilter } = await import('./BusinessStatusFilter.jsx')
+  const props = {
+    options: [{ value: 'overdue', label: '逾期' }],
+    allLabel: '全部明细',
+    allCount: 830,
+    counts: { overdue: 5, total: 830 },
+    countUnit: '条',
+  }
+  await harness.render(createElement(BusinessStatusFilter, props))
+  assert.equal(harness.button('全部明细 830 条').getAttribute('aria-label'), '全部明细，共 830 条')
+  assert.equal(harness.button('逾期 5 条').getAttribute('aria-label'), '逾期，共 5 条')
+  await harness.render(createElement(BusinessStatusFilter, {
+    ...props, allLabel: '全部订单', allCount: 307, countUnit: '张',
+  }))
+  assert.equal(harness.button('全部订单 307 张').getAttribute('aria-label'), '全部订单，共 307 张')
+  await harness.render(createElement(BusinessStatusFilter, {
+    ...props, allCount: null, counts: null, disabled: true,
+  }))
+  assert.equal(harness.button('全部明细 —').getAttribute('aria-label'), '全部明细，数量暂不可用')
+  assert.ok([...document.querySelectorAll('button')].every((button) => button.disabled))
+  assert.equal(document.querySelector('[role="group"]').getAttribute('aria-busy'), 'false')
 })
 
 test('固定单选按选项直接选择、清空和禁用，显式搜索与排序保留下拉能力', async (t) => {

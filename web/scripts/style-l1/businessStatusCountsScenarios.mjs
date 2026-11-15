@@ -97,17 +97,17 @@ export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEff
     await filter.waitFor()
     await page.waitForFunction((name) => [...document.querySelectorAll('[role="group"]')].some((el) => el.getAttribute('aria-label') === name && el.getAttribute('aria-busy') === 'false'), label)
     assert.equal(await filter.getByRole('combobox').count(), 0, '状态与数量应直接展示为快捷按钮')
-    const all = filter.getByRole('button', { name: `不限状态，共 ${total} 条`, exact: true })
+    const all = filter.getByRole('button', { name: `不限状态，共 ${total} ${label === '销售订单状态' ? '张' : '条'}`, exact: true })
     await all.waitFor()
     return all
   }
   const assertCounts = async (page, label, entries) => {
     const filter = group(page, label)
-    for (const [text, count] of entries) await filter.getByRole('button', { name: `${text}，共 ${count} 条`, exact: true }).waitFor()
+    for (const [text, count] of entries) await filter.getByRole('button', { name: `${text}，共 ${count} ${label === '销售订单状态' ? '张' : '条'}`, exact: true }).waitFor()
   }
   const choose = async (page, label, text, count) => {
     const filter = group(page, label)
-    await filter.getByRole('button', { name: `${text}，共 ${count} 条`, exact: true }).click()
+    await filter.getByRole('button', { name: `${text}，共 ${count} ${label === '销售订单状态' ? '张' : '条'}`, exact: true }).click()
   }
   const shared = { path: salesPath, auth: 'admin', effectiveSession: customerRuntimeEffectiveSession, beforeNavigate: installRoute }
   const applyDateRange = async (page, filters) => {
@@ -139,7 +139,7 @@ export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEff
         await ready(page, 2)
         await choose(page, '销售订单状态', '草稿', 1)
         await ready(page, 2)
-        const status = group(page).getByRole('button', { name: '草稿，共 1 条', exact: true })
+        const status = group(page).getByRole('button', { name: '草稿，共 1 张', exact: true })
         assert.equal(await status.getAttribute('aria-pressed'), 'true')
         assert.equal(await status.locator('.erp-filter-chip__clear').count(), 1)
         assert.equal(await trigger.getAttribute('aria-label'), '筛选')
@@ -231,15 +231,15 @@ viewport: { width: 1440, height: 900 },
         const before = await labels()
         assert(before.some((text) => text.startsWith('已生效，')))
         assert(!before.some((text) => /工程中|生产中|已阻塞/u.test(text)))
-        const counts = before.map((text) => Number(text.match(/共 (\d+) 条$/u)?.[1]))
+        const counts = before.map((text) => Number(text.match(/共 (\d+) 张$/u)?.[1]))
         assert.equal(counts[0], counts.slice(1).reduce((sum, value) => sum + value, 0))
         await filter.getByRole('button', { name: /^草稿，/u }).click()
         assert.deepEqual(await labels(), before)
         await frame.locator('#list-search').fill('SO-20260925-001')
         await frame.locator('#list-search').press('Enter')
-        await filter.getByRole('button', { name: '不限状态，共 1 条', exact: true }).waitFor()
-        assert((await labels()).includes('已生效，共 1 条'))
-        assert((await labels()).includes('草稿，共 0 条'))
+        await filter.getByRole('button', { name: '不限状态，共 1 张', exact: true }).waitFor()
+        assert((await labels()).includes('已生效，共 1 张'))
+        assert((await labels()).includes('草稿，共 0 张'))
         await assertNoHorizontalOverflow(page, 'business-status-counts-design')
       },
     },
@@ -259,8 +259,8 @@ viewport: { width: 1440, height: 900 },
         await ready(page, currentCount)
         assert.equal(await page.locator('.ant-table-tbody tr[data-row-key]').count(), 3)
         assert.equal(page.statusCountRequests.at(-1).params.offset, 0, '切换状态返回第一页')
-        assert.equal(await group(page).getByRole('button', { name: '已提交，共 3 条', exact: true }).getAttribute('aria-pressed'), 'true')
-        const all = group(page).getByRole('button', { name: `不限状态，共 ${currentCount} 条`, exact: true })
+        assert.equal(await group(page).getByRole('button', { name: '已提交，共 3 张', exact: true }).getAttribute('aria-pressed'), 'true')
+        const all = group(page).getByRole('button', { name: `不限状态，共 ${currentCount} 张`, exact: true })
         await all.focus()
         await all.press('Enter')
         await page.locator('.ant-table-tbody').getByText('SO-COUNT-001', { exact: true }).waitFor()

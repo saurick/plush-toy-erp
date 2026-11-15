@@ -146,38 +146,29 @@
   color: var(--erp-visual-danger-text, #b4232c);
 }
 
-.erp-business-visual-list__columns,
-.erp-business-visual-list__row-content {
-  display: grid;
-  grid-template-columns:
-    minmax(230px, 1.45fr) minmax(100px, 0.55fr) minmax(210px, 1.1fr)
-    minmax(100px, 0.55fr) minmax(105px, 0.55fr);
-  align-items: center;
-  gap: 16px;
+.erp-sales-delivery-order {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.erp-business-visual-list__columns {
-  padding: 8px 18px;
-  border-top: 1px solid var(--erp-border, #e5ece7);
-  border-bottom: 1px solid var(--erp-border, #e5ece7);
-  color: var(--erp-text-muted, #52627a);
+.erp-sales-delivery-order > span,
+.erp-sales-delivery-progress small {
+  color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
-  font-weight: 600;
 }
 
-.erp-business-visual-list__row {
+.erp-sales-delivery-progress {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
   width: 100%;
-  border: 0;
-  border-bottom: 1px solid var(--erp-border, #edf1ee);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.erp-business-visual-list__row-content {
-  padding: 11px 18px;
+  max-width: 220px;
+  font-variant-numeric: tabular-nums;
 }
 
 .erp-business-visual-identity {
@@ -200,41 +191,9 @@
 }
 
 .erp-business-visual-identity span,
-.erp-business-visual-identity small,
-.erp-business-visual-progress small {
+.erp-business-visual-identity small {
   color: var(--erp-text-muted, #52627a);
   font-size: var(--erp-font-caption);
-}
-
-.erp-business-visual-identity > .erp-product-identity {
-  margin-top: 5px;
-}
-
-.erp-business-visual-identity
-  > .erp-product-identity
-  .erp-product-identity__text {
-  gap: 0;
-}
-
-.erp-business-visual-progress {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.erp-business-visual-progress .ant-progress {
-  margin: 0;
-}
-
-.erp-business-visual-date,
-.erp-business-visual-quantity {
-  font-variant-numeric: tabular-nums;
-}
-
-.erp-business-visual-mobile-label {
-  display: none;
-  color: var(--erp-text-muted, #52627a);
 }
 
 .erp-business-visual-status {
@@ -1153,39 +1112,6 @@ button.erp-production-process__step {
   .erp-business-visual-metrics {
     width: 100%;
     justify-content: flex-start;
-  }
-
-  .erp-business-visual-list__columns {
-    display: none;
-  }
-
-  .erp-business-visual-list__row {
-    display: block;
-  }
-
-  .erp-business-visual-list__row-content {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas: 'identity status' 'date quantity' 'progress progress';
-  }
-
-  .erp-business-visual-list__row-content > :nth-child(1) {
-    grid-area: identity;
-  }
-  .erp-business-visual-list__row-content > :nth-child(2) {
-    grid-area: date;
-  }
-  .erp-business-visual-list__row-content > :nth-child(3) {
-    grid-area: progress;
-  }
-  .erp-business-visual-list__row-content > :nth-child(4) {
-    grid-area: quantity;
-  }
-  .erp-business-visual-list__row-content > :nth-child(5) {
-    grid-area: status;
-    justify-self: end;
-  }
-  .erp-business-visual-mobile-label {
-    display: block;
   }
 
   .erp-finance-due-list__row {

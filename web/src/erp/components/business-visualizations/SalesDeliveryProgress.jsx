@@ -1,99 +1,130 @@
-import React, { useMemo } from 'react'
-import { Progress } from 'antd'
-import {
-  buildSalesDeliveryModel,
-  paginateVisualizationRows,
-} from '../../utils/businessVisualizationModels.mjs'
+import React, { useCallback, useMemo } from 'react'
+import { Button, Progress } from 'antd'
+import Table from '@/common/components/table/AppTable.jsx'
+import { paginateVisualizationRows } from '../../utils/businessVisualizationModels.mjs'
 import {
   BusinessVisualizationFrame,
   VisualizationState,
   VisualizationStatus,
-  VisualizationPagination,
 } from './BusinessVisualizationFrame.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
-import WorkflowTaskCard from '../workflow/WorkflowTaskCard.jsx'
+import { useBusinessTableRecordOpen } from '../business-list/BusinessListLayout.jsx'
+import { ProgressHint } from './ProgressMetricHint.jsx'
 
 function quantityText(value, unitName) {
   return value === null ? '—' : `${value} ${unitName}`
 }
 
 export default function SalesDeliveryProgress({
-  items,
+  model,
   loading,
   error,
   onRetry,
   onOpen,
-  switcher,
   viewState = {},
   onViewStateChange,
 }) {
-  const model = useMemo(() => buildSalesDeliveryModel(items), [items])
   const filter = viewState.filter || 'all'
   const filtered = model.rows.filter(
     (row) => filter === 'all' || row.status.key === filter
   )
   const pagination = paginateVisualizationRows(filtered, viewState.page)
   const { rows } = pagination
-  const changeFilter = (next) =>
-    onViewStateChange?.({ ...viewState, filter: next, page: 1 })
+  const openOrder = useCallback((row, event) => {
+    const trigger = event.currentTarget.matches('button')
+      ? event.currentTarget
+      : event.currentTarget.querySelector('.erp-sales-delivery-order button')
+    trigger.focus({ preventScroll: true })
+    onOpen?.(row)
+  }, [onOpen])
+  const rowProps = useCallback(() => ({
+    title: '双击打开销售订单',
+  }), [])
+  const { onRow } = useBusinessTableRecordOpen({
+    dataSource: rows,
+    rowKey: 'id',
+    onRow: rowProps,
+    onOpenRecord: openOrder,
+  })
+  const columns = useMemo(() => [
+    {
+      title: '订单 / 客户',
+      key: 'order',
+      width: 220,
+      render: (_, row) => (
+        <div className="erp-sales-delivery-order">
+          <Button type="link" size="small" aria-label={`打开销售订单 ${row.orderNo}`} onClick={(event) => openOrder(row, event)}>
+            {row.orderNo}
+          </Button>
+          <span>{row.customerName}</span>
+        </div>
+      ),
+    },
+    {
+      title: '产品',
+      key: 'product',
+      width: 260,
+      className: 'erp-product-identity-cell',
+      render: (_, row) => (
+        <ProductIdentity productId={row.productID} name={row.productName} code={row.customerProductNo} compact />
+      ),
+    },
+    {
+      title: '交付日期',
+      dataIndex: 'deliveryDate',
+      width: 140,
+      render: (value) => value || '未填写',
+    },
+    {
+      title: '出货进度',
+      key: 'progress',
+      width: 240,
+      render: (_, row) => row.progressKnown ? (
+        <ProgressHint
+          className="erp-progress-metric-trigger erp-sales-delivery-progress"
+          label={`查看${row.orderNo} ${row.productName}出货进度`}
+          content={
+            <div className="erp-progress-metric-hint">
+              <strong>{row.orderNo} · {row.productName}</strong>
+              <span>已出货 {quantityText(row.shipped, row.unitName)} / 订购 {quantityText(row.ordered, row.unitName)}</span>
+              <span>剩余待交 {quantityText(row.remaining, row.unitName)}</span>
+              <span>完成比例 {row.percent}%</span>
+              <p>按实际出货数量计算，取消的出货不计入。</p>
+            </div>
+          }
+        >
+          <Progress
+            percent={row.percent}
+            showInfo={false}
+            status={row.status.key === 'overdue' ? 'exception' : 'normal'}
+            strokeColor={`var(--${row.status.key === 'overdue' ? 'erp-visual-danger-text' : row.status.key === 'delivered' ? 'erp-visual-success-text' : 'erp-visual-info-text'})`}
+            size="small"
+          />
+          <small>{quantityText(row.shipped, row.unitName)} / {quantityText(row.ordered, row.unitName)}</small>
+        </ProgressHint>
+      ) : <span className="erp-business-visual-unknown">出货数量待核对</span>,
+    },
+    {
+      title: '剩余待交',
+      dataIndex: 'remaining',
+      width: 140,
+      align: 'right',
+      render: (value, row) => quantityText(value, row.unitName),
+    },
+    {
+      title: '交付状态',
+      key: 'status',
+      width: 160,
+      render: (_, row) => <VisualizationStatus status={row.status} />,
+    },
+  ], [openOrder])
 
   return (
     <BusinessVisualizationFrame
       className="erp-sales-delivery-visual"
-      switcher={switcher}
       title="销售交付进度"
-      metricsLabel="交付明细"
-      countUnit="条"
       loading={loading}
       error={error}
-      metrics={[
-        {
-          key: 'all',
-          label: '全部明细',
-          value: model.counts.total,
-          tone: 'neutral',
-        },
-        {
-          key: 'overdue',
-          label: '逾期',
-          value: model.counts.overdue,
-          tone: 'danger',
-        },
-        {
-          key: 'closed',
-          label: '关闭未交完',
-          value: model.counts.closed,
-          tone: 'warning',
-        },
-        {
-          key: 'dueSoon',
-          label: '7 天内',
-          value: model.counts.dueSoon,
-          tone: 'warning',
-        },
-        {
-          key: 'unscheduled',
-          label: '未排交期',
-          value: model.counts.unscheduled,
-          tone: 'neutral',
-        },
-        {
-          key: 'unknown',
-          label: '待核对',
-          value: model.counts.unknown,
-          tone: 'neutral',
-        },
-        {
-          key: 'delivered',
-          label: '已交付',
-          value: model.counts.delivered,
-          tone: 'success',
-        },
-      ].map((metric) => ({
-        ...metric,
-        selected: filter === metric.key,
-        onClick: () => changeFilter(metric.key),
-      }))}
     >
       <VisualizationState
         loading={loading}
@@ -102,73 +133,24 @@ export default function SalesDeliveryProgress({
         onRetry={onRetry}
       />
       {!loading && !error && rows.length > 0 ? (
-        <div className="erp-business-visual-list">
-          <div className="erp-business-visual-list__columns" aria-hidden="true">
-            <span>订单 / 客户 / 产品</span>
-            <span>交付日期</span>
-            <span>出货进度</span>
-            <span>剩余待交</span>
-            <span>状态</span>
-          </div>
-          {rows.map((row) => (
-            <WorkflowTaskCard
-              as="article"
-              key={row.id}
-              className="erp-business-visual-list__row"
-              contentClassName="erp-business-visual-list__row-content"
-              label={`打开销售订单 ${row.orderNo}`}
-              onOpen={() => onOpen?.(row)}
-            >
-              <span className="erp-business-visual-identity">
-                <strong>{row.orderNo}</strong>
-                <span>{row.customerName}</span>
-                <ProductIdentity
-                  productId={row.productID}
-                  name={row.productName}
-                  code={row.customerProductNo}
-                  compact
-                />
-              </span>
-              <span className="erp-business-visual-date">
-                <small className="erp-business-visual-mobile-label">
-                  交付日期{' '}
-                </small>
-                {row.deliveryDate || '未填写'}
-              </span>
-              <span className="erp-business-visual-progress">
-                {row.progressKnown ? (
-                  <Progress
-                    percent={row.percent}
-                    showInfo={false}
-                    status={
-                      row.status.key === 'overdue' ? 'exception' : 'normal'
-                    }
-                    strokeColor={`var(--${row.status.key === 'overdue' ? 'erp-visual-danger-text' : row.status.key === 'delivered' ? 'erp-visual-success-text' : 'erp-visual-info-text'})`}
-                    size="small"
-                  />
-                ) : (
-                  <span className="erp-business-visual-unknown">—</span>
-                )}
-                <small>
-                  {row.progressKnown
-                    ? `${quantityText(row.shipped, row.unitName)} / ${quantityText(row.ordered, row.unitName)}`
-                    : '出货数量待核对'}
-                </small>
-              </span>
-              <span className="erp-business-visual-quantity">
-                <small className="erp-business-visual-mobile-label">
-                  剩余待交{' '}
-                </small>
-                {quantityText(row.remaining, row.unitName)}
-              </span>
-              <VisualizationStatus status={row.status} />
-            </WorkflowTaskCard>
-          ))}
-          <VisualizationPagination
-            pagination={pagination}
-            onChange={(page) => onViewStateChange?.({ ...viewState, page })}
-          />
-        </div>
+        <Table
+          className="erp-sales-delivery-table"
+          size="small"
+          rowKey="id"
+          columns={columns}
+          dataSource={rows}
+          tableLayout="fixed"
+          scroll={{ x: 1160 }}
+          scrollToolbar
+          onRow={onRow}
+          pagination={{
+            current: pagination.page,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: false,
+            onChange: (page) => onViewStateChange?.({ ...viewState, page }),
+          }}
+        />
       ) : null}
     </BusinessVisualizationFrame>
   )

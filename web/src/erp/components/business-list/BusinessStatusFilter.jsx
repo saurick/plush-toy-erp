@@ -9,6 +9,8 @@ export default function BusinessStatusFilter({
   counts = null,
   allCount,
   loading = false,
+  disabled = false,
+  countUnit = '',
   exact = false,
   removable = true,
   allLabel = '不限状态',
@@ -32,19 +34,24 @@ export default function BusinessStatusFilter({
             ? allCount
             : businessStatusCount(counts, option.value)
         const text = option.value === '' ? allLabel : option.label
-        const countText = count === null ? '—' : count.toLocaleString('zh-CN')
+        const countText = count === null
+          ? '—'
+          : `${count.toLocaleString('zh-CN')}${countUnit ? ` ${countUnit}` : ''}`
+        const countDescription = count === null
+          ? '数量暂不可用'
+          : `共 ${count} ${countUnit || '条'}`
         return (
           <FilterChip
             key={option.value}
             selected={value === option.value}
             removable={removable && option.value !== ''}
-            disabled={loading || exact || option.disabled}
+            disabled={disabled || loading || exact || option.disabled}
             count={countText}
-            aria-label={`${text}，${count === null ? '数量暂不可用' : `共 ${count} 条`}`}
+            aria-label={`${text}，${countDescription}`}
             title={
               exact
                 ? '当前查看指定记录，清除单据范围后可按状态查找'
-                : `${text}：当前查询范围内${count === null ? '数量暂不可用' : `共 ${count} 条记录`}`
+                : `${text}：当前查询范围内${countDescription}${count === null || countUnit ? '' : '记录'}`
             }
             onClick={() => {
               if (removable && value === option.value && option.value !== '') {
