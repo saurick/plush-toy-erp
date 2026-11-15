@@ -348,6 +348,11 @@
   color: var(--erp-text-muted);
 }
 
+/* 菜单文字自行截断，手柄可向菜单行的留白延伸。 */
+.erp-admin-menu.ant-menu .ant-menu-item > .ant-menu-title-content:has(.erp-split-menu-grip) {
+  overflow: visible;
+}
+
 .erp-admin-menu.ant-menu .ant-menu-item:hover,
 .erp-admin-menu.ant-menu .ant-menu-submenu-title:hover {
   background: var(--erp-surface-bg-muted);

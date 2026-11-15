@@ -47,8 +47,10 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
+  margin-block: -5px;
+  margin-inline-end: -10px;
   border-radius: 50%;
   color: var(--erp-text-muted);
   font-size: 14px;

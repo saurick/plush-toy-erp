@@ -103,10 +103,14 @@ inputStyle = getComputedStyle(input)
     const label = sales.getByText('销售管理', { exact: true })
     const grip = sales.locator('.erp-split-menu-grip')
     const hint = page.getByRole('tooltip').filter({ hasText: '拖到左栏或右栏打开' })
+    const rowHeights = () => menuItems.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height))
+    await expect(label).toBeVisible()
     await expect(grips).toHaveCount(0)
+    const beforeSplit = await rowHeights()
     await page.getByRole('button', { name: '分栏', exact: true }).first().click()
     await expect(emptyPage).toBeVisible()
     await expect(grips).toHaveCount(await menuItems.count())
+    assert.deepEqual(await rowHeights(), beforeSplit, '打开分栏不撑高菜单项')
     const menuFit = await grips.evaluateAll((nodes) => nodes.map((node) => {
       const bounds = node.getBoundingClientRect()
       const row = node.closest('[role="menuitem"]')
@@ -115,7 +119,7 @@ inputStyle = getComputedStyle(input)
       const style = getComputedStyle(node)
       return {
         label: row.getAttribute('aria-label'),
-        visible: bounds.width >= 22 && bounds.height >= 22 && style.visibility === 'visible' && Number(style.opacity) > 0,
+        visible: bounds.width >= 32 && bounds.height >= 32 && style.visibility === 'visible' && Number(style.opacity) > 0,
         fits: bounds.right <= boundsRow.right && text.scrollWidth <= text.clientWidth + 1,
       }
     }))
@@ -142,6 +146,7 @@ inputStyle = getComputedStyle(input)
     const target = await right.boundingBox()
     const x = target.x + target.width / 2
     const y = target.y + target.height / 2
+    await page.mouse.move(initial.x + initial.width - 3, initial.y + initial.height / 2)
     await page.mouse.down()
     await page.mouse.move(x, y, { steps: 12 })
     await page.mouse.move(x + 3, y)
