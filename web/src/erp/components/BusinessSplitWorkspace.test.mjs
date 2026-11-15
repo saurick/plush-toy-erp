@@ -27,7 +27,7 @@ test('lazy splitter preview clamps physical pointer offsets in both directions w
   }
 })
 
-async function setup(t) {
+async function setup(t, { modalHasChanges = true } = {}) {
   const nativeAbortController = globalThis.AbortController
   const ui = await createReactTestHarness(t)
   globalThis.AbortController = nativeAbortController
@@ -73,7 +73,7 @@ async function setup(t) {
     }, [name])
     useEffect(() => context.registerPageRefresh(refresh), [context, refresh])
     useEffect(() => name === 'two' ? context.registerPageLeaveGuard(() => !blockRight) : undefined, [context, name])
-    return h('div', { 'data-page': name }, !open ? h(PageHeaderCard, { title: name }) : null, h(BusinessModal, { open: modalOpen, hasChanges: true, title: `快捷编辑 ${name}`, onCancel: () => setModalOpen(false) }, h('input', { 'aria-label': '浮层草稿', defaultValue: '尚未保存' })), h('output', { 'data-query': name }, query.get('q') || ''), h('button', { 'data-query-button': name, onClick: () => setQuery({ q: '保留搜索' }) }, '筛选'), h(FormPage, { open, form, title: `编辑 ${name}`, onCancel: () => changeOpen(false) }, h(Form, { form, initialValues: { note: `${name} 初始内容`, qty: '12.5' } }, h(Form.Item, { name: 'note' }, h(Input, { 'aria-label': `${name} 备注` })), h(Form.Item, { name: 'qty' }, h(Input))
+    return h('div', { 'data-page': name }, !open ? h(PageHeaderCard, { title: name }) : null, h(BusinessModal, { open: modalOpen, hasChanges: modalHasChanges, title: `快捷编辑 ${name}`, onCancel: () => setModalOpen(false) }, h('input', { 'aria-label': '浮层草稿', defaultValue: '尚未保存' })), h('output', { 'data-query': name }, query.get('q') || ''), h('button', { 'data-query-button': name, onClick: () => setQuery({ q: '保留搜索' }) }, '筛选'), h(FormPage, { open, form, title: `编辑 ${name}`, onCancel: () => changeOpen(false) }, h(Form, { form, initialValues: { note: `${name} 初始内容`, qty: '12.5' } }, h(Form.Item, { name: 'note' }, h(Input, { 'aria-label': `${name} 备注` })), h(Form.Item, { name: 'qty' }, h(Input))
         )
       )
     )
@@ -451,6 +451,26 @@ test('a later write queues one fresh read and changing a page ignores the earlie
   assert.doesNotMatch(document.querySelector('.erp-split-pane--left').textContent, /关联页面更新失败/)
 })
 
+test('immediate browser back after a detail link ignores the already released source guard', async (t) => {
+  const ui = await setup(t, { modalHasChanges: false })
+  await ui.openModal('one')
+  let returned = false
+  const unsubscribe = ui.router.subscribe((state) => {
+    if (!returned && state.location.pathname === '/erp/three') {
+      returned = true
+      // 历史先更新，React 还未卸载来源详情；用户此时仍能按浏览器后退。
+      ui.router.navigate(-1)
+    }
+  })
+  t.after(unsubscribe)
+  await ui.act(async () => ui.router.navigate('/erp/three'))
+  await ui.settle()
+  assert.equal(returned, true)
+  assert.equal(ui.router.state.location.pathname, '/erp/one')
+  assert.equal(document.querySelectorAll('[data-page="one"]').length, 1)
+  assert.equal(ui.router.state.blockers.size, 1, '返回来源后仍保留当前页的离开检查')
+})
+
 test('browser back checks an open modal even before a second page is selected', async (t) => {
   const ui = await setup(t)
   await ui.act(async () => ui.router.navigate('/erp/two'))
@@ -467,6 +487,31 @@ test('browser back checks an open modal even before a second page is selected', 
   assert.equal(ui.router.state.location.pathname, '/erp/two')
   assert.equal(document.querySelector('input[aria-label="浮层草稿"]') === draft, true)
   assert.equal(draft.value, '尚未保存')
+  await ui.act(async () => ui.router.navigate(-1))
+  await ui.settle(350)
+  const retry = [...document.querySelectorAll('.ant-modal-confirm')].find((node) => !node.closest('[aria-hidden="true"], [inert]') && node.textContent.includes('放弃未保存的修改？'))
+  assert.equal(Boolean(retry), true)
+  await ui.act(async () => [...retry.querySelectorAll('button')].find((node) => node.textContent.replaceAll(' ', '') === '放弃修改').click())
+  await ui.settle(350)
+  assert.equal(ui.router.state.location.pathname, '/erp/one', '确认关闭浮层后完成原来的后退')
+  assert.equal(document.querySelectorAll('input[aria-label="浮层草稿"]').length, 0)
+})
+
+test('a single-page editor retains its leave guard before any secondary page or overlay opens', async (t) => {
+  const ui = await setup(t)
+  await ui.edit('one')
+  await ui.act(async () => ui.forms.one.setFieldValue('note', '保留未保存输入'))
+  await ui.settle()
+  for (const action of ['继续编辑', '放弃修改']) {
+    await ui.act(async () => ui.router.navigate('/erp/three'))
+    await ui.settle(350)
+    const confirmation = [...document.querySelectorAll('.ant-modal-confirm')].filter((node) => !node.closest('[aria-hidden="true"], [inert]') && node.textContent.includes('放弃未保存的修改？')).at(-1)
+    assert.equal(Boolean(confirmation), true)
+    await ui.act(async () => [...confirmation.querySelectorAll('button')].find((node) => node.textContent.replaceAll(' ', '') === action).click())
+    await ui.settle(350)
+    assert.equal(ui.router.state.location.pathname, action === '继续编辑' ? '/erp/one' : '/erp/three')
+    if (action === '继续编辑') assert.equal(ui.forms.one.getFieldValue('note'), '保留未保存输入')
+  }
 })
 
 test('clearing the auxiliary title respects its guard and keeps a focused empty split for choosing another page', async (t) => {

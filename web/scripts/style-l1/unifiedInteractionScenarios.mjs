@@ -39,6 +39,14 @@ async function respond(route, id, data) {
   })
 }
 
+async function closeAppearanceNavigation(page) {
+  const drawer = page.locator('.erp-admin-drawer:visible')
+  if (await drawer.count()) {
+    await page.keyboard.press('Escape')
+    await drawer.waitFor({ state: 'hidden' })
+  }
+}
+
 export function createUnifiedInteractionScenarios({
   assert,
   customerRuntimeEffectiveSession,
@@ -55,7 +63,7 @@ export function createUnifiedInteractionScenarios({
   let recoveryMode
   let releaseRecovery
   let recoveryRequested
-  return [
+  const scenarios = [
     ...createProductionTabStabilityScenarios({ common, outputDir, assertNoHorizontalOverflow, clickERPThemeOption }),
     {
       ...common,
@@ -776,11 +784,11 @@ export function createUnifiedInteractionScenarios({
         await page.waitForURL(/\/erp\/warehouse\/shipments/)
         assert.equal(new URL(page.url()).searchParams.get('shipment_id'), '1')
         await page.goBack()
-        await expectHeading(page, '财务管理')
-        await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
         await details.getByText(selectedFactNo, { exact: true }).waitFor()
         await details.getByRole('button', { name: /^关\s*闭$/u }).click()
         await details.waitFor({ state: 'hidden' })
+        await expectHeading(page, '财务管理')
+        await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
         assert.equal(
           await panel
             .getByRole('button', { name: /^金额待核对/ })
@@ -807,6 +815,7 @@ export function createUnifiedInteractionScenarios({
           )
         }
         await clickERPThemeOption(page, '暗色')
+        await closeAppearanceNavigation(page)
         await captureBusinessView(
           page,
           panel,
@@ -882,4 +891,44 @@ export function createUnifiedInteractionScenarios({
       },
     },
   ]
+  const finance = scenarios.find((scenario) => scenario.name === 'unified-finance-interactions')
+  return [...scenarios, {
+    ...finance,
+    name: 'finance-source-return',
+    verify: async (page) => {
+      for (const tabName of ['应收', '应付']) {
+        await expectHeading(page, '财务管理')
+        await page.locator('.erp-business-module-tabs').getByRole('tab', { name: tabName, exact: true }).click()
+        await page.locator('.erp-business-module-tabs').getByRole('tab', { name: tabName, exact: true, selected: true }).waitFor()
+        await page.getByText('到期顺序', { exact: true }).click()
+        const panel = page.getByRole('region', { name: '财务到期顺序', exact: true })
+        await panel.locator('.erp-finance-due-list__row').first().waitFor()
+        const filter = panel.getByRole('button', { name: /^金额待核对/u })
+        await filter.click()
+        await panel.locator('.ant-pagination-item-2').click()
+        await panel.locator('.ant-pagination-item-2.ant-pagination-item-active').waitFor()
+        const factNo = await panel.locator('.erp-finance-due-list__row strong').first().textContent()
+        const financeURL = page.url()
+        for (const immediate of [true, false]) {
+          await panel.locator('.erp-finance-due-list__row').first().click()
+          const details = page.getByRole('dialog')
+          await details.getByText(factNo, { exact: true }).waitFor()
+          await details.getByRole('button', { name: '查看来源单据', exact: true }).click()
+          await page.waitForURL(/\/erp\/warehouse\/shipments/u)
+          assert.equal(new URL(page.url()).searchParams.get('shipment_id'), '1')
+          if (!immediate) await expectHeading(page, '出货单')
+          await page.goBack()
+          await page.waitForURL(financeURL)
+          await details.getByText(factNo, { exact: true }).waitFor()
+          await details.getByRole('button', { name: /^关\s*闭$/u }).click()
+          await details.waitFor({ state: 'hidden' })
+          await expectHeading(page, '财务管理')
+          assert.equal(await filter.getAttribute('aria-pressed'), 'true', `${tabName}返回保留金额筛选`)
+          await panel.locator('.ant-pagination-item-2.ant-pagination-item-active').waitFor()
+          assert.equal(await panel.locator('.erp-finance-due-list__row strong').first().textContent(), factNo, `${tabName}返回保留页码与记录`)
+        }
+        await page.screenshot({ path: `${outputDir}/finance-source-return-${tabName}.png`, fullPage: false })
+      }
+    },
+  }]
 }

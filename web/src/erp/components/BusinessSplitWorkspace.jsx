@@ -122,7 +122,7 @@ function BusinessSplitWorkspace({
   const readScopes = useRef({})
   const focus = useRef(activeSide)
   const current = useRef({})
-  const ownsNavigation = Boolean(rightLocation || leftOverlayGuard || rightOverlayGuard)
+  const hasSecondaryPageOrOverlay = Boolean(rightLocation || leftOverlayGuard || rightOverlayGuard)
   const focusPane = useCallback((side) => {
     focus.current = side
     onActiveSideChange(side)
@@ -329,11 +329,11 @@ rightAllowed: rightAccess?.allowed,
     }
   }, [refreshPane, workspaceID])
   useImperativeHandle(ref, () => ({
-    ownsNavigation,
+    ownsNavigation: hasSecondaryPageOrOverlay,
     navigate: (to, options) => navigatePane(open ? focus.current : 'left', to, options),
     navigateAfterLeaveConfirmation: (to, options) => {
       // A leave dialog can register an overlay guard while its confirmation is pending.
-      if (ownsNavigation) current.current.permitted = createPath(resolvePath(to, current.current.location.pathname))
+      current.current.permitted = createPath(resolvePath(to, current.current.location.pathname))
       navigate(to, options)
     },
     confirmLeaveAll: async (options) => {
@@ -344,7 +344,7 @@ rightAllowed: rightAccess?.allowed,
     dragPage: (event, path) => event.dataTransfer.setData(SPLIT_PAGE_DRAG_TYPE, path),
     refresh: (side = 'left') => refreshPane(side, true),
     navigateMenu: (item) => navigatePane('right', resolveBusinessModuleMenuTarget(item, current.current.rightLocation || current.current.location, rightUIState.values, outletContext.visibleMenuPaths)),
-  }), [confirmAll, navigatePane, navigate, open, ownsNavigation, refreshPane, rightUIState, outletContext.visibleMenuPaths])
+  }), [confirmAll, navigatePane, navigate, open, hasSecondaryPageOrOverlay, refreshPane, rightUIState, outletContext.visibleMenuPaths])
   const rightNavigator = useMemo(() => ({
     createHref: createPath,
     encodeLocation: (to) => resolvePath(to, current.current.rightLocation?.pathname),
@@ -377,7 +377,7 @@ rightAllowed: rightAccess?.allowed,
       input.focus({ preventScroll: true })
     }
   }, [open, activeSide, rightLocation, rightVisible, rightOverlayGuard])
-  const paneContext = useMemo(() => ({ handlingNavigation: ownsNavigation, open, visible: leftVisible, active: activeSide === 'left', side: 'left', scope: `${workspaceID.replace(/:/gu, '')}-left`, openRelatedCreate: (request) => openRelatedCreate('left', request), relatedCreate: relatedCreates.left, completeRelatedCreate: (id, record) => completeRelatedCreate('left', id, record), cancelRelatedCreate: (id) => cancelRelatedCreate('left', id) }), [open, ownsNavigation, workspaceID, leftVisible, activeSide, openRelatedCreate, relatedCreates.left, completeRelatedCreate, cancelRelatedCreate])
+  const paneContext = useMemo(() => ({ handlingNavigation: true, open, visible: leftVisible, active: activeSide === 'left', side: 'left', scope: `${workspaceID.replace(/:/gu, '')}-left`, openRelatedCreate: (request) => openRelatedCreate('left', request), relatedCreate: relatedCreates.left, completeRelatedCreate: (id, record) => completeRelatedCreate('left', id, record), cancelRelatedCreate: (id) => cancelRelatedCreate('left', id) }), [open, workspaceID, leftVisible, activeSide, openRelatedCreate, relatedCreates.left, completeRelatedCreate, cancelRelatedCreate])
   const rightPaneContext = useMemo(() => ({ ...paneContext, visible: rightVisible, active: activeSide === 'right', side: 'right', scope: `${workspaceID.replace(/:/gu, '')}-right`, openRelatedCreate: (request) => openRelatedCreate('right', request), relatedCreate: relatedCreates.right, completeRelatedCreate: (id, record) => completeRelatedCreate('right', id, record), cancelRelatedCreate: (id) => cancelRelatedCreate('right', id) }), [paneContext, rightVisible, activeSide, workspaceID, openRelatedCreate, relatedCreates.right, completeRelatedCreate, cancelRelatedCreate])
   const rightActions = useMemo(() => ({
     ...inheritedActions,
@@ -386,13 +386,13 @@ rightAllowed: rightAccess?.allowed,
     refreshing: refreshing.right,
     refreshPending: pending.right && !errors.right,
   }), [inheritedActions, open, rightRefresh, refreshing.right, refreshPane, pending.right, errors.right])
-  const leftActions = useMemo(() => open || ownsNavigation ? ({
+  const leftActions = useMemo(() => open || hasSecondaryPageOrOverlay ? ({
     ...inheritedActions,
     onSplit: open ? null : inheritedActions?.onSplit,
     onRefresh: leftRefresh ? () => refreshPane('left', true) : null,
     refreshing: refreshing.left,
     refreshPending: pending.left && !errors.left,
-  }) : inheritedActions, [inheritedActions, open, ownsNavigation, leftRefresh, refreshing.left, refreshPane, pending.left, errors.left])
+  }) : inheritedActions, [inheritedActions, open, hasSecondaryPageOrOverlay, leftRefresh, refreshing.left, refreshPane, pending.left, errors.left])
   const choices = useMemo(() => groupSidebarNavigationSections(sections, { pageCatalog: true })
     .map((section) => ({ label: section.title, options: section.items.map((item) => ({ value: item.path, label: item.label })) })), [sections])
   const availableChoices = useMemo(() => rightLocation && !rightAccess?.allowed
@@ -484,7 +484,8 @@ rightAllowed: rightAccess?.allowed,
   return (
     <TaskBusinessWorkspaceContext.Provider value={taskWorkspace}>
       <BusinessSplitContext.Provider value={paneContext}>
-        {ownsNavigation ? <SplitNavigationGuard current={current} /> : null}
+        {/* 离开检查属于工作区；弹窗卸载时仍须完成正在处理的浏览器后退。 */}
+        <SplitNavigationGuard current={current} />
         <div className="erp-split-workspace" data-split-open={open} data-active-pane={activeSide}>
           {open ? (
             <div className="erp-split-switcher">
