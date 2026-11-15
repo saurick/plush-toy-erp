@@ -1865,27 +1865,14 @@
   }
 
   .erp-dev-flow-customer-review__legend li::before {
-    width: 3mm;
-    height: 3mm;
-    border: 0.75pt solid #2b8a3e;
-    border-radius: 0.75mm;
-    background: #edf8ef;
+    width: 6mm;
+    height: 0;
+    border-top: 0.75pt solid var(--erp-text-muted);
     content: '';
   }
 
-  .erp-dev-flow-customer-review__legend li[data-diagram-tone='person']::before {
-    border-color: #2f6fbd;
-    background: #eaf3ff;
-  }
-
   .erp-dev-flow-customer-review__legend li[data-diagram-tone='attention']::before {
-    border-color: #c86b16;
-    background: #fff4e6;
-  }
-
-  .erp-dev-flow-customer-review__legend li[data-diagram-tone='result']::before {
-    border-color: #7654b4;
-    background: #f3edff;
+    border-top-style: dashed;
   }
 
   .erp-dev-flow-customer-review__conditions {

@@ -282,15 +282,13 @@ export function buildChainAuditDiagram(diagram) {
     '    padding: 12',
     '---',
     'flowchart LR',
-    'classDef danger fill:#fff1f0,stroke:#cf1322,color:#a8071a',
-    'classDef success fill:#f6ffed,stroke:#389e0d,color:#135200',
   ]
   diagram.nodes.forEach((node) => {
     lines.push(
       `${ids.get(node.id)}["${formatBusinessGraphLabel([node.label, node.detail].filter(Boolean).join('\n'))}"]`
     )
     if (['danger', 'success'].includes(node.kind))
-      { lines.push(`class ${ids.get(node.id)} ${node.kind}`) }
+      { lines.push(`class ${ids.get(node.id)} ${node.kind === 'danger' ? 'diagramDanger' : 'diagramSuccess'}`) }
   })
   diagram.edges.forEach(([from, to, label]) => {
     if (ids.has(from) && ids.has(to))

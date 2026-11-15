@@ -43,6 +43,8 @@
   --erp-interactive-text-hover: var(--erp-primary-strong);
   --erp-focus-ring: color-mix(in srgb, var(--erp-accent) 16%, transparent);
   --erp-warning-text: #996015;
+  --erp-visual-success-text: #28734d;
+  --erp-visual-info-text: #326b9e;
   --erp-visual-danger-text: #bf3535;
   --erp-surface-shadow: 0 3px 14px rgb(35 65 45 / 3.5%);
   --erp-row-height: 52px;

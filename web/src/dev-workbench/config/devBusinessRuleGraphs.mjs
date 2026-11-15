@@ -35,11 +35,11 @@ export function buildFactRuleGraph(fact) {
   return {
     direction: 'LR',
     nodes: [
-      { key: 'source', label: '来源单据', summary: fact.sourceDocument },
-      { key: 'fact', label: fact.label, summary: fact.occurrenceCondition },
-      { key: 'voucher', label: '结果凭证', summary: fact.voucher },
-      { key: 'impact', label: '业务影响', summary: fact.businessImpact },
-      { key: 'correction', label: '纠正方式', summary: fact.correction },
+      { key: 'source', diagramType: 'document', label: '来源单据', summary: fact.sourceDocument },
+      { key: 'fact', diagramType: 'record', label: fact.label, summary: fact.occurrenceCondition },
+      { key: 'voucher', diagramType: 'record', label: '结果凭证', summary: fact.voucher },
+      { key: 'impact', diagramType: 'result', label: '业务影响', summary: fact.businessImpact },
+      { key: 'correction', diagramType: 'rule', risk: true, label: '纠正方式', summary: fact.correction },
     ],
     edges: [
       {
@@ -76,8 +76,8 @@ export function buildActionRelationGraph(action) {
     direction: 'LR',
     nodes: [
       { key: 'input', label: '上游输入', summary: action.input },
-      { key: 'action', label: action.label, summary: action.condition },
-      { key: 'result', label: '下游结果', summary: action.result },
+      { key: 'action', diagramType: 'business_action', label: action.label, summary: action.condition },
+      { key: 'result', diagramType: 'result', label: '下游结果', summary: action.result },
     ],
     edges: [
       {

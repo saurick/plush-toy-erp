@@ -474,7 +474,7 @@ export function buildHelpScenarioGraph(model, scenario) {
     direction: 'LR',
     nodes: [
       ...model.steps.map((step) => ({ key: step.id, label: `${step.number} · ${step.title}`, role: step.owner, role_keys: step.roles, summary: step.description, accessibleLabel: `查看步骤 ${step.number}：${step.title}`, data: { 'help-step': step.id } })),
-      { key: model.exception.id, label: model.exception.title, role: model.exception.owner, summary: scenario.exception.trigger, risk: true },
+      { key: model.exception.id, diagramType: 'rule', label: model.exception.title, role: model.exception.owner, summary: scenario.exception.trigger, risk: true },
     ],
     edges: [
       ...model.steps.slice(1).map((step, index) => ({ from: model.steps[index].id, to: step.id, label: '业务交接', condition: step.description })),

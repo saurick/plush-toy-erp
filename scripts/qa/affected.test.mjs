@@ -22,6 +22,16 @@ function ids(plan) {
   return plan.commands.map((item) => item.id);
 }
 
+test("shared diagram semantics select workbench and ERP consumer verification", () => {
+  for (const file of ["web/src/common/components/diagram/diagramSemantics.mjs", "web/src/common/components/markdown/mermaidIcons.jsx", "web/src/common/theme/erpThemePalette.mjs"]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const followUp = plan.followUps.find(({ id }) => id === "shared-visual-semantics-browser");
+    assert.ok(followUp, file);
+    for (const scenario of ["help-center-mermaid-mobile", "dev-business-chain-customer-review-print", "finance-visual-status-semantics"]) assert.ok(followUp.text.includes(scenario), `${file}: ${scenario}`);
+    assert.ok(plan.commands.some(({ args }) => args?.includes("web/src/common/components/markdown/mermaidSemantics.test.mjs")), file);
+  }
+});
+
 test("warehouse draft page consumers select source and recovery regression", () => {
   for (const file of ["web/src/erp/components/purchase-receipts/PurchaseReceiptExceptionModal.jsx", "web/src/erp/components/inventory/InventoryOperationModal.jsx", "web/src/erp/components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx"]) {
     const plan = buildAffectedPlan([file], { root: ROOT });

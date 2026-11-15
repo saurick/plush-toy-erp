@@ -7,7 +7,7 @@ test('only caller-declared diagram nodes receive click and keyboard actions', as
   const window = new Window()
   try {
     const canvas = window.document.createElement('div')
-    canvas.innerHTML = '<svg><g class="node" id="diagram-flowchart-N0-0"><rect class="label-container" style="fill: white"/><text>节点</text></g><g class="node" id="diagram-flowchart-N1-1"></g><g class="edgePath" id="diagram-flowchart-N0-2"></g></svg>'
+    canvas.innerHTML = '<svg><g class="node" id="diagram-flowchart-N0-0"><rect class="label-container" style="fill: white; stroke: orange; stroke-dasharray: 6 4"/><text>节点</text></g><g class="node" id="diagram-flowchart-N1-1"></g><g class="edgePath" id="diagram-flowchart-N0-2"></g></svg>'
     const selected = []
     const node = canvas.querySelector('g.node')
     const cleanup = bindMermaidNodeActions(canvas, [{ id: 'N0', label: '查看办理条件' }], (id) => selected.push(id), 'N0')
@@ -15,7 +15,12 @@ test('only caller-declared diagram nodes receive click and keyboard actions', as
     assert.equal(node.getAttribute('tabindex'), '0')
     assert.equal(node.getAttribute('aria-label'), '查看办理条件')
     assert.equal(node.getAttribute('aria-pressed'), 'true')
-    assert.equal(node.querySelector('rect').style.stroke, 'var(--erp-primary)')
+    assert.equal(node.querySelector('rect').style.outlineColor, 'var(--erp-primary)')
+    assert.equal(node.querySelector('rect').style.outlineStyle, 'solid')
+    assert.equal(node.querySelector('rect').style.outlineWidth, '3px')
+    assert.equal(node.querySelector('rect').style.stroke, 'orange', '选中轮廓保留分支边框')
+    assert.equal(node.querySelector('rect').style.strokeDasharray, '6 4')
+    assert.equal(node.querySelector('rect').style.fill, 'white')
     node.querySelector('text').dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
     for (const key of ['Enter', ' ']) {
       const event = new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
@@ -28,7 +33,7 @@ test('only caller-declared diagram nodes receive click and keyboard actions', as
     assert.deepEqual(selected, ['N0', 'N0', 'N0'])
     cleanup()
     assert.equal(node.hasAttribute('role'), false)
-    assert.equal(node.querySelector('rect').getAttribute('style'), 'fill: white')
+    assert.equal(node.querySelector('rect').getAttribute('style'), 'fill: white; stroke: orange; stroke-dasharray: 6 4')
     node.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
     assert.equal(selected.length, 3, '卸载后不能残留节点处理器')
   } finally { await window.happyDOM.close() }

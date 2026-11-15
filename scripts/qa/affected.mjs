@@ -886,6 +886,11 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
+    if (/^web\/src\/common\/(?:components\/(?:diagram\/(?:diagramSemantics|DiagramNodeIcon|DiagramTypeLegend)|markdown\/(?:index\.jsx|mermaid))|theme\/erpThemePalette)/u.test(file)) {
+      addNodeTests(state, ["web/src/common/components/markdown/mermaidSemantics.test.mjs", "web/src/common/components/markdown/mermaidTheme.test.mjs", "web/src/common/components/markdown/mermaidNodeActions.test.mjs", "web/src/common/theme/erpThemePalette.test.mjs", "web/src/dev-workbench/config/devBusinessFlowGraph.test.mjs", "web/src/erp/config/helpScenarioPresentation.test.mjs"], file, "T5");
+      addFollowUp(state, "shared-visual-semantics-browser", "T5",
+        "运行 STYLE_L1_SCENARIOS=dev-workbench-mermaid-accent,help-center-all-scenes-desktop-dark,help-center-mermaid-mobile,dev-business-chain-customer-review-print,unified-sales-interactions,finance-visual-status-semantics pnpm --dir web style:l1；核对对象图标尺寸、语义色、选中保留分支边框、明暗主题、手机操作和固定浅色打印。", file);
+    }
     if (/components\/(?:purchase-receipts\/PurchaseReceiptExceptionModal|inventory\/InventoryOperationModal|outsourcing-orders\/OutsourcingOrderSourceFactModal)\.jsx|warehouseDraftPageScenarios\.mjs/u.test(file)) {
       addNodeTests(state, ["web/src/erp/components/inventory/InventoryOperationModal.behavior.test.mjs", "web/src/erp/components/inventory/InventoryOperationRecordsModal.test.mjs", "web/src/erp/components/purchase-receipts/PurchaseReceiptExceptionModal.test.mjs", "web/src/erp/components/outsourcing-orders/OutsourcingOrderSourceFactModal.test.mjs"], file, "T5");
       addFollowUp(state, "warehouse-draft-form-pages-browser", "T5",

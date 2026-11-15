@@ -81,7 +81,7 @@ test('customer review paper parts preserve every relationship and original node 
         assert(diagram.db.getEdges().length <= 3, chain.key)
         assert(diagram.db.getVertices().size <= 6, chain.key)
         relationships += diagram.db.getEdges().length
-        const definitions = [...source.matchAll(/^\s*(N\d+)\["(\d+)\. /gmu)]
+        const definitions = [...source.matchAll(/^\s*(N\d+)\(?\["(?:fa:fa-erp-[a-z-]+ )?(\d+)\. /gmu)]
         assert.equal(definitions.length, diagram.db.getVertices().size, chain.key)
         const keys = new Map(definitions.map(([, id, number]) => [id, chain.nodes[Number(number) - 1].key]))
         definitions.forEach(([, , number]) => numbers.add(Number(number)))

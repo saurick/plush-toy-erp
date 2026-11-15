@@ -164,7 +164,7 @@
   width: calc(var(--mermaid-zoom, 1) * var(--mermaid-intrinsic-width, 100%));
 }
 
-.erp-markdown-mermaid__canvas svg {
+.erp-markdown-mermaid__canvas > svg {
   display: block;
   width: 100%;
   /* stylelint-disable-next-line declaration-no-important -- Mermaid 生成内联 max-width，缩放由组件接管。 */

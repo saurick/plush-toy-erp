@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { theme } from 'antd'
 import { ERP_ACCENTS } from './erpAppearance.mjs'
-import { ERP_DARK_PALETTE, getERPAccentTokens, getERPSurfaceTokens } from './erpThemePalette.mjs'
+import { ERP_DARK_PALETTE, ERP_LIGHT_PALETTE, getERPAccentTokens, getERPSurfaceTokens, getERPThemeScopeStyle } from './erpThemePalette.mjs'
 
 const themeCSS = readFileSync(
   new URL('../../erp/styles/app/theme-overrides.css', import.meta.url),
@@ -44,6 +44,22 @@ function assertVariable(source, variable, expected, label) {
     `${label} 未同步 ${variable}=${expected}`
   )
 }
+
+test('visual status colors stay readable and match CSS and isolated previews', () => {
+  const lightCSS = readFileSync(new URL('../../erp/styles/app/design-tokens.css', import.meta.url), 'utf8')
+  const variables = { success: 'erp-visual-success-text', info: 'erp-visual-info-text', warning: 'erp-warning-text', danger: 'erp-visual-danger-text' }
+  for (const isDark of [false, true]) {
+    const palette = isDark ? ERP_DARK_PALETTE : ERP_LIGHT_PALETTE
+    const preview = getERPThemeScopeStyle(isDark, ERP_ACCENTS.pink)
+    for (const [key, variable] of Object.entries(variables)) {
+      for (const background of ['surface', 'surfaceSoft']) {
+        assert(contrast(palette[key], palette[background]) >= 4.5, `${isDark}/${key}/${background}`)
+      }
+      assertVariable(isDark ? themeCSS : lightCSS, variable, palette[key], '可视化语义色')
+      assert.equal(preview[`--${variable}`], palette[key])
+    }
+  }
+})
 
 test('dark surfaces are layered and keep fields and text readable', () => {
   const neutralKeys = [

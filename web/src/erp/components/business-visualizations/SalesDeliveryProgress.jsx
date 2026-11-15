@@ -7,6 +7,7 @@ import {
 import {
   BusinessVisualizationFrame,
   VisualizationState,
+  VisualizationStatus,
   VisualizationPagination,
 } from './BusinessVisualizationFrame.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
@@ -142,6 +143,7 @@ export default function SalesDeliveryProgress({
                     status={
                       row.status.key === 'overdue' ? 'exception' : 'normal'
                     }
+                    strokeColor={`var(--${row.status.key === 'overdue' ? 'erp-visual-danger-text' : row.status.key === 'delivered' ? 'erp-visual-success-text' : 'erp-visual-info-text'})`}
                     size="small"
                   />
                 ) : (
@@ -159,11 +161,7 @@ export default function SalesDeliveryProgress({
                 </small>
                 {quantityText(row.remaining, row.unitName)}
               </span>
-              <span
-                className={`erp-business-visual-status erp-business-visual-status--${row.status.key}`}
-              >
-                {row.status.label}
-              </span>
+              <VisualizationStatus status={row.status} />
             </WorkflowTaskCard>
           ))}
           <VisualizationPagination

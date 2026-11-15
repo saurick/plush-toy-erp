@@ -214,7 +214,7 @@ deviceScaleFactor: 2,
         assert.equal(state.writes.length, 0)
         assert.equal(await page.getByRole('button', { name: '岗位配置', exact: true }).count(), 0)
         await page.getByRole('tab', { name: '关系图', exact: true }).click()
-        await page.getByRole('region', { name: '权限生效关系图', exact: true }).locator('.erp-markdown-mermaid__canvas svg').waitFor()
+        await page.getByRole('region', { name: '权限生效关系图', exact: true }).locator('.erp-markdown-mermaid__canvas > svg').waitFor()
         await assertNoHorizontalOverflow(page)
       },
     },
@@ -242,7 +242,7 @@ deviceScaleFactor: 2,
         assert.equal(await search.inputValue(), '确认入库')
         await page.getByRole('tab', { name: '关系图', exact: true }).click()
         const graph = page.getByRole('region', { name: '权限生效关系图', exact: true })
-        await graph.locator('.erp-markdown-mermaid__canvas svg').waitFor()
+        await graph.locator('.erp-markdown-mermaid__canvas > svg').waitFor()
         assert.equal(await page.getByRole('button', { name: '岗位配置', exact: true }).count(), 0)
         assert.equal(await page.getByRole('tab', { name: '关系图', exact: true }).getAttribute('aria-selected'), 'true')
         assert.equal(state.writes.length, 0)
@@ -290,7 +290,7 @@ deviceScaleFactor: 2,
       beforeNavigate: async (page) => { state = await install(page) },
       verify: async (page) => {
         const graph = page.getByRole('region', { name: '权限生效关系图', exact: true })
-        await graph.locator('.erp-markdown-mermaid__canvas svg').waitFor()
+        await graph.locator('.erp-markdown-mermaid__canvas > svg').waitFor()
         await page.getByRole('button', { name: '岗位职责', exact: true }).click()
         const drawer = page.getByRole('dialog')
         await drawer.getByRole('region', { name: '岗位与业务职责', exact: true }).waitFor()
@@ -328,7 +328,7 @@ deviceScaleFactor: 2,
         await page.goBack(); await page.waitForURL(originalURL)
         await drawer.getByRole('region', { name: '职责关联详情', exact: true }).getByText(label, { exact: true }).waitFor()
         await page.keyboard.press('Escape'); await drawer.waitFor({ state: 'hidden' })
-        await graph.locator('.erp-markdown-mermaid__canvas svg').waitFor()
+        await graph.locator('.erp-markdown-mermaid__canvas > svg').waitFor()
         assert.equal(new URL(page.url()).searchParams.get('module'), 'warehouse')
         await assertNoHorizontalOverflow(page)
       },

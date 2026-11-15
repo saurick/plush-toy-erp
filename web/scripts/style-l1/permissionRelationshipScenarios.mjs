@@ -158,12 +158,12 @@ export function createPermissionRelationshipScenarios({
         await graph
           .getByText('业务未授予“调试工具”模块权限', { exact: true })
           .waitFor()
-        assert.equal(await graph.locator('.erp-markdown-mermaid__canvas svg').count(), 0)
+        assert.equal(await graph.locator('.erp-markdown-mermaid__canvas > svg').count(), 0)
         const tabs = page.locator('.erp-permission-relationship__tabs > .ant-tabs-nav')
         const originalTabs = await tabs.elementHandle()
         const tabBox = await tabs.boundingBox()
         await selectGraphModule(page, '销售管理')
-        await graph.locator('.erp-markdown-mermaid__canvas svg').waitFor()
+        await graph.locator('.erp-markdown-mermaid__canvas > svg').waitFor()
         assert.match(await graph.innerText(), /查看销售订单/u)
         await selectGraphModule(page, '仓储')
         await graph.getByText(/功能：查看库存/u).waitFor()
@@ -491,7 +491,7 @@ export function createPermissionRelationshipScenarios({
           name: '权限生效关系图',
           exact: true,
         })
-        await graph.locator('.erp-markdown-mermaid__canvas svg').waitFor()
+        await graph.locator('.erp-markdown-mermaid__canvas > svg').waitFor()
         const layout = graph.getByRole('button', {
           name: /切换权限生效关系图为.*布局/u,
         })
@@ -568,7 +568,7 @@ export function createPermissionRelationshipScenarios({
       verify: async (page) => {
         await page
           .getByRole('region', { name: '权限生效关系图', exact: true })
-          .locator('.erp-markdown-mermaid__canvas svg')
+          .locator('.erp-markdown-mermaid__canvas > svg')
           .waitFor()
         await page
           .getByRole('button', { name: '岗位职责', exact: true })
@@ -618,7 +618,7 @@ export function createPermissionRelationshipScenarios({
         await page.getByRole('tab', { name: '关系图', exact: true }).click()
         await page
           .getByRole('region', { name: '权限生效关系图', exact: true })
-          .locator('.erp-markdown-mermaid__canvas svg')
+          .locator('.erp-markdown-mermaid__canvas > svg')
           .waitFor()
       },
     },

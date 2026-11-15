@@ -12,54 +12,36 @@ export const DEV_FLOW_STATE_PATH_GROUP_PRESENTATION = Object.freeze({
     key: 'outcome',
     label: '结束结果另记',
     tone: 'outcome',
-    diagramStroke: '#64748b',
-    diagramStrokeWidth: 2.25,
-    diagramStrokeDasharray: '',
     description: '结束状态与成功、驳回、取消或补偿结果分别读取。',
   }),
   normal: Object.freeze({
     key: 'normal',
     label: '正常推进',
     tone: 'normal',
-    diagramStroke: '#2b8a3e',
-    diagramStrokeWidth: 2.25,
-    diagramStrokeDasharray: '',
     description: '按对象主生命周期进入下一状态。',
   }),
   pause_restore: Object.freeze({
     key: 'pause_restore',
     label: '暂停与恢复',
     tone: 'pause',
-    diagramStroke: '#d46b08',
-    diagramStrokeWidth: 2.5,
-    diagramStrokeDasharray: '8 4',
     description: '暂停或继续同一协同与运行证据，不重写历史。',
   }),
   stop: Object.freeze({
     key: 'stop',
     label: '不通过与终止',
     tone: 'stop',
-    diagramStroke: '#cf1322',
-    diagramStrokeWidth: 2.75,
-    diagramStrokeDasharray: '',
     description: '本层不再继续，但不会自动改写其他对象。',
   }),
   correction: Object.freeze({
     key: 'correction',
     label: '纠正与退回',
     tone: 'correction',
-    diagramStroke: '#1677ff',
-    diagramStrokeWidth: 2.5,
-    diagramStrokeDasharray: '10 4',
     description: '保留既有历史，通过冲正、调整、退回或重开纠正。',
   }),
   rework: Object.freeze({
     key: 'rework',
     label: '返工与再处理',
     tone: 'rework',
-    diagramStroke: '#722ed1',
-    diagramStrokeWidth: 2.5,
-    diagramStrokeDasharray: '3 4',
     description: '形成新的受控处理轮次，不把原完成节点改回未完成。',
   }),
 })
@@ -69,63 +51,54 @@ export const DEV_FLOW_STATE_PATH_KIND_PRESENTATION = Object.freeze({
     key: 'blocked',
     label: '阻塞',
     diagramLabel: '阻塞 · 暂停',
-    color: 'orange',
     groupKey: 'pause_restore',
   }),
   resumed: Object.freeze({
     key: 'resumed',
     label: '恢复',
     diagramLabel: '恢复',
-    color: 'green',
     groupKey: 'pause_restore',
   }),
   rejected: Object.freeze({
     key: 'rejected',
     label: '退回或拒绝',
     diagramLabel: '退回 · 不通过',
-    color: 'red',
     groupKey: 'stop',
   }),
   cancelled: Object.freeze({
     key: 'cancelled',
     label: '取消',
     diagramLabel: '取消 · 终止',
-    color: 'red',
     groupKey: 'stop',
   }),
   reversed: Object.freeze({
     key: 'reversed',
     label: '冲正',
     diagramLabel: '冲正',
-    color: 'purple',
     groupKey: 'correction',
   }),
   adjusted: Object.freeze({
     key: 'adjusted',
     label: '调整',
     diagramLabel: '调整',
-    color: 'gold',
     groupKey: 'correction',
   }),
   returned: Object.freeze({
     key: 'returned',
     label: '退回、退货或回货',
     diagramLabel: '退回或回货',
-    color: 'blue',
     groupKey: 'correction',
   }),
   reopened: Object.freeze({
     key: 'reopened',
     label: '重开',
     diagramLabel: '重开',
-    color: 'cyan',
     groupKey: 'correction',
   }),
   rework: Object.freeze({
     key: 'rework',
     label: '返工',
     diagramLabel: '返工 · 新轮次',
-    color: 'magenta',
     groupKey: 'rework',
   }),
 })
@@ -170,24 +143,6 @@ function cleanText(value) {
 
 function unique(values) {
   return [...new Set(values)]
-}
-
-function escapeMermaidText(value) {
-  return String(value ?? '')
-    .trim()
-    .replaceAll('\\', '\\\\')
-    .replaceAll('"', '\\"')
-    .replaceAll('\n', ' ')
-}
-
-function getRequiredStateID(stateIDs, stateKey, location) {
-  const stateID = stateIDs.get(cleanText(stateKey))
-  if (!stateID) {
-    throw new Error(
-      `invalid dev flow state reference at ${location}: ${stateKey || '(empty)'}`
-    )
-  }
-  return stateID
 }
 
 function getDevFlowStateHumanCondition(value) {
@@ -330,91 +285,21 @@ export function getDevFlowStateTransitionDiagramLabel(transition) {
   return unique(labels).join(' · ')
 }
 
-export function buildDevFlowStateRuleMermaid(flow) {
-  if (!flow) return ''
-
-  const transitions = asArray(flow.transitions)
-  const states = asArray(flow.states)
-  const stateIDs = new Map()
-  states.forEach((state, index) => {
-    const stateKey = cleanText(state?.key)
-    if (!stateKey || stateIDs.has(stateKey)) {
-      throw new Error(
-        `invalid dev flow state key: ${stateKey || '(empty or duplicate)'}`
-      )
-    }
-    stateIDs.set(stateKey, `S${index}`)
-  })
-
-  const initialStates = asArray(flow.initialStates)
-  const terminalStates = asArray(flow.terminalStates)
-  const lines = ['flowchart LR']
-  if (initialStates.length > 0) lines.push('  STATE_START(["开始"])')
-  states.forEach((state) => {
-    lines.push(
-      `  ${stateIDs.get(cleanText(state.key))}["${escapeMermaidText(state.label || state.key)}"]`
-    )
-  })
-  if (terminalStates.length > 0) lines.push('  STATE_END(["结束"])')
-
-  let edgeIndex = 0
-  const transitionEdgesByGroup = new Map(
-    PATH_GROUP_ORDER.map((groupKey) => [groupKey, []])
-  )
-  const appendEdge = (source) => {
-    lines.push(source)
-    edgeIndex += 1
+export function buildDevFlowStateRuleGraph(flow) {
+  return {
+    direction: flow.transitions.length > 0 ? 'LR' : 'TB',
+    curve: 'basis',
+    nodes: flow.states.map((state) => ({
+      ...state,
+      kind: flow.terminalStates.includes(state.key) ? 'terminal' : 'state',
+    })),
+    edges: flow.transitions.map((transition) => ({
+      ...transition,
+      label: getDevFlowStateTransitionDiagramLabel(transition),
+      condition: transition.guard,
+      branch: getDevFlowStateTransitionPresentation(flow, transition).isExceptional,
+    })),
   }
-
-  initialStates.forEach((stateKey, index) => {
-    const targetID = getRequiredStateID(
-      stateIDs,
-      stateKey,
-      `initialStates[${index}]`
-    )
-    appendEdge(`  STATE_START --> ${targetID}`)
-  })
-
-  transitions.forEach((transition, index) => {
-    const sourceID = getRequiredStateID(
-      stateIDs,
-      transition?.from,
-      `transitions[${index}].from`
-    )
-    const targetID = getRequiredStateID(
-      stateIDs,
-      transition?.to,
-      `transitions[${index}].to`
-    )
-    const presentation = getDevFlowStateTransitionPresentation(flow, transition)
-    transitionEdgesByGroup.get(presentation.groupKey).push(edgeIndex)
-    appendEdge(
-      `  ${sourceID} -->|"${escapeMermaidText(getDevFlowStateTransitionDiagramLabel(transition))}"| ${targetID}`
-    )
-  })
-
-  terminalStates.forEach((stateKey, index) => {
-    const sourceID = getRequiredStateID(
-      stateIDs,
-      stateKey,
-      `terminalStates[${index}]`
-    )
-    appendEdge(`  ${sourceID} --> STATE_END`)
-  })
-
-  PATH_GROUP_ORDER.forEach((groupKey) => {
-    const edgeIndexes = transitionEdgesByGroup.get(groupKey)
-    if (edgeIndexes.length === 0) return
-    const group = DEV_FLOW_STATE_PATH_GROUP_PRESENTATION[groupKey]
-    const dashStyle = group.diagramStrokeDasharray
-      ? `,stroke-dasharray:${group.diagramStrokeDasharray}`
-      : ''
-    lines.push(
-      `  linkStyle ${edgeIndexes.join(',')} stroke:${group.diagramStroke},stroke-width:${group.diagramStrokeWidth}px${dashStyle}`
-    )
-  })
-
-  return lines.join('\n')
 }
 
 export function buildDevFlowStateNodeSummary(flow, state) {

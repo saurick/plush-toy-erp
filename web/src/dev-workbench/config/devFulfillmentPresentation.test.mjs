@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { buildBusinessFlowMermaid } from '../../common/components/markdown/mermaidGraph.mjs'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
-import { buildFulfillmentSubflow, buildSubflowMermaid } from './devFulfillmentSubflow.mjs'
+import { buildFulfillmentSubflow } from './devFulfillmentSubflow.mjs'
 import { buildFulfillmentExceptionDirectory, buildFulfillmentOverview, getFulfillmentStageContext, getFulfillmentSupplement, selectFulfillmentSubstep, selectFulfillmentException } from './devFulfillmentPresentation.mjs'
 
 const steps = catalog.fulfillment_flow
@@ -43,11 +44,9 @@ test('role focus selects concrete actions while preserving the selected stage an
   assert.equal(selectFulfillmentSubstep(flow, 'return', 'production').key, 'return')
   assert.equal(selectFulfillmentSubstep(flow, null, 'engineering').key, 'route')
   assert.deepEqual(flow.nodes.find((node) => node.key === 'route').role_keys, ['production'])
-  const diagram = buildSubflowMermaid(flow, { role: 'warehouse', compact: true, direction: 'LR' })
+  const diagram = buildBusinessFlowMermaid(flow, { role: 'warehouse' })
   assert.match(diagram.chart, /flowchart LR/u)
-  assert.match(diagram.chart, /class N3 fulfillmentRoleMatch/u)
-  assert.match(diagram.chart, /class N4 fulfillmentRoleMatch/u)
-  assert.doesNotMatch(diagram.chart, /class N0 /u)
+  assert.deepEqual(diagram.nodes.filter((node) => node.data['role-match']).map((node) => node.key), ['issue', 'return'])
   assert.deepEqual(diagram.nodes.map((node) => node.label), flow.nodes.map((node) => node.label))
 })
 

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Window } from 'happy-dom'
+import { buildBusinessFlowMermaid } from '../../common/components/markdown/mermaidGraph.mjs'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { ROLE_DISPLAY_NAMES } from '../../erp/utils/roleKeys.mjs'
 import { fulfillmentExceptionPath } from '../../erp/utils/workflowFulfillment.mjs'
-import { buildFulfillmentSubflow, buildSubflowMermaid } from './devFulfillmentSubflow.mjs'
+import { buildFulfillmentSubflow } from './devFulfillmentSubflow.mjs'
 
 const step = (key) => catalog.fulfillment_flow.find((item) => item.stage === key)
 
@@ -19,7 +20,7 @@ test('complex stages have bounded subflows and simple counting keeps direct inst
       assert(node.details.length && node.details.every((detail) => detail.text), `${item.stage}/${node.key}`)
       for (const role of node.role_keys || []) assert(Object.hasOwn(ROLE_DISPLAY_NAMES, role), role)
     }
-    const graph = buildSubflowMermaid(flow)
+    const graph = buildBusinessFlowMermaid(flow)
     assert.equal(new Set(graph.nodes.map((node) => node.id)).size, flow.nodes.length)
   }
 })
@@ -73,7 +74,7 @@ test('node details always read the existing handoff and approval text', () => {
   revised.handoffs[1] = '本次变更后的正式交接说明'
   assert(buildFulfillmentSubflow(revised).nodes.find((node) => node.key === 'actual').details.some((detail) => detail.text === revised.handoffs[1]))
   assert.throws(() => buildFulfillmentSubflow({ ...original, handoffs: [] }), /Unknown subflow detail/u)
-  assert.throws(() => buildSubflowMermaid({ nodes: [{ key: 'only', label: '唯一节点' }], edges: [{ from: 'only', to: 'missing' }] }), /Unknown subflow edge/u)
+  assert.throws(() => buildBusinessFlowMermaid({ nodes: [{ key: 'only', label: '唯一节点' }], edges: [{ from: 'only', to: 'missing' }] }), /Unknown business graph endpoint/u)
 })
 
 test('all normal and exception diagrams parse without inventing exception steps', async () => {
@@ -90,18 +91,18 @@ test('all normal and exception diagrams parse without inventing exception steps'
       }
     }
     for (const flow of flows) {
-      const graph = buildSubflowMermaid(flow)
+      const graph = buildBusinessFlowMermaid(flow)
       const parsed = await mermaid.mermaidAPI.getDiagramFromText(graph.chart)
       assert.equal(parsed.db.getVertices().size, flow.nodes.length)
       assert.equal(parsed.db.getEdges().length, flow.edges.length)
     }
     for (const flow of catalog.fulfillment_flow.map(buildFulfillmentSubflow).filter(Boolean)) {
-      const graph = buildSubflowMermaid(flow, { role: 'warehouse', compact: true, direction: 'LR' })
+      const graph = buildBusinessFlowMermaid(flow, { role: 'warehouse' })
       const parsed = await mermaid.mermaidAPI.getDiagramFromText(graph.chart)
       assert.equal(parsed.db.getVertices().size, flow.nodes.length)
       assert.equal(parsed.db.getEdges().length, flow.edges.length)
     }
-    const hostile = buildSubflowMermaid({ nodes: [{ key: 'safe', label: '"]; click N0 callback <script>alert(1)</script>' }], edges: [] })
+    const hostile = buildBusinessFlowMermaid({ nodes: [{ key: 'safe', label: '"]; click N0 callback <script>alert(1)</script>' }], edges: [] })
     assert.equal((await mermaid.mermaidAPI.getDiagramFromText(hostile.chart)).db.getVertices().size, 1)
     assert.doesNotMatch(hostile.chart, /<script>/u)
   } finally {

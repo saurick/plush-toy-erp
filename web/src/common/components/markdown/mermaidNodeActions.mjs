@@ -113,23 +113,16 @@ export function bindMermaidNodeActions(
       node.data?.['role-match'] ||
       node.data?.['runtime-current']
     const shape =
-      canSelect && (highlighted || node.data?.risk)
+      canSelect && highlighted
         ? element.querySelector('.label-container')
         : null
     const previousStyle = shape?.getAttribute('style')
     if (shape) {
-      // Mermaid scopes theme rules to an SVG id, so selection belongs on the node shape.
-      if (highlighted) {
-        shape.style.fill =
-          id === selectedId
-            ? 'var(--erp-primary-soft)'
-            : 'var(--erp-surface-bg-soft)'
-      }
-      shape.style.stroke = highlighted
-        ? 'var(--erp-primary)'
-        : 'var(--erp-warning-text)'
-      shape.style.strokeWidth =
-        id === selectedId || node.data?.['runtime-current'] ? '3px' : '2px'
+      // Selection surrounds the node; it must not replace its type/risk border.
+      shape.style.outlineColor = 'var(--erp-primary)'
+      shape.style.outlineStyle = 'solid'
+      shape.style.outlineWidth = `${id === selectedId || node.data?.['runtime-current'] ? 3 : 2}px`
+      shape.style.outlineOffset = '3px'
     }
     cleanups.push(() => {
       if (shape) {

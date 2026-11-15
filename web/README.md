@@ -85,6 +85,8 @@ pnpm install
 
 主应用、独立工作台及控件局部预览的 Ant Design 基线统一由 [`src/common/theme/erpAntdTheme.mjs`](src/common/theme/erpAntdTheme.mjs) 提供，入口只选择设备和工作台规格；局部预览的 CSS 变量复用同一色板，浮层保留预览作用域，页面布局继续由所属模块维护。
 
+工作台与 ERP 的节点图标、业务域分类及状态色按[可视化语义](../docs/engineering/可视化表达规范.md#visual-semantics)统一。[`DiagramNodeIcon`](src/common/components/diagram/DiagramNodeIcon.jsx) 和 [`diagramSemantics.mjs`](src/common/components/diagram/diagramSemantics.mjs) 复用本地 Ant Design 图标；Mermaid、流程探索和 ERP 状态标签使用同一套语义，编号步骤与统计数据点保持原有简洁表达。
+
 “开发资源”保留“工具清单 / 项目关系图”两个同级页签；`/__dev/development-resources?view=relationships` 默认按项目与目录、开发与交付、权限与业务选择主题，也可切换为按图模型浏览 DAG、有向有环图、无向关联和树／森林。点选节点查看关系；“接口契约与接入边界”示例共用生成的 RPC 入口标签，链接实际接口、授权和质量依据，外部接入明确标为待建设。
 
 图、分类和节点解释同源，模型、示例、节点及引用选项写入 URL；缩放、布局切换、全屏和正式依据入口继续复用现有能力。具体边界见[开发资源入口](../docs/engineering/研发效能工作台与CI-CD设计.md#development-resources)。

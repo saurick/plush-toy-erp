@@ -306,7 +306,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--erp-primary);
+  background: var(--erp-visual-info-text);
 }
 .erp-progress-attention {
   display: grid;
@@ -402,7 +402,7 @@
   overflow-wrap: anywhere;
 }
 .erp-progress-danger {
-  color: var(--erp-progress-danger-text, #bb3c45);
+  color: var(--erp-visual-danger-text);
 }
 .erp-progress-empty {
   display: grid;
@@ -545,10 +545,6 @@
   .erp-progress-drawer .ant-drawer-body {
     padding: 16px;
   }
-}
-[data-erp-theme='dark'] .erp-progress-board,
-[data-erp-theme='dark'] .erp-progress-drawer {
-  --erp-progress-danger-text: #fda4af;
 }
 
 .erp-progress-attention.is-blocked > strong,

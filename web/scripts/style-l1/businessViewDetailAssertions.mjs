@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { expect } from 'playwright/test'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { getContrastRatio } from './colorAssertions.mjs'
@@ -127,11 +128,11 @@ export async function assertBusinessViewMotion(page, name, outputDir, { presenta
     const tabs = group.getByRole('tab')
     await tabs.first().focus()
     await tabs.first().press('End')
-    assert.equal(await tabs.last().getAttribute('aria-selected'), 'true', `${name}: End 应切换到末项`)
+    await expect(tabs.last(), `${name}: End 应切换到末项`).toHaveAttribute('aria-selected', 'true')
     await tabs.last().press('Home')
-    assert.equal(await tabs.first().getAttribute('aria-selected'), 'true', `${name}: Home 应切换到首项`)
+    await expect(tabs.first(), `${name}: Home 应切换到首项`).toHaveAttribute('aria-selected', 'true')
     await tabs.first().press('ArrowRight')
-    assert.equal(await tabs.nth(1).getAttribute('aria-selected'), 'true', `${name}: 方向键应切换页签`)
+    await expect(tabs.nth(1), `${name}: 方向键应切换页签`).toHaveAttribute('aria-selected', 'true')
   }
   await writeFile(
     path.join(outputDir, `${name}-motion.json`),

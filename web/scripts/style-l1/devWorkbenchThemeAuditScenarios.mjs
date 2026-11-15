@@ -82,7 +82,7 @@ export function createDevWorkbenchThemeAuditScenarios({ assertNoHorizontalOverfl
             await selectAppearance(page, mode, accent)
             const diagram = `[data-mermaid-status="rendered"][data-mermaid-theme="${mode}"][data-mermaid-accent="${accent}"]`
             await page.locator(diagram).waitFor()
-            await assertPaint(page, `${diagram} g.node .label-container`, { stroke: '--erp-primary' })
+            await assertPaint(page, `${diagram} g.node .label-container`, { stroke: '--erp-text-muted' })
             const labels = await assertMermaidEdgeLabelContrast(page.locator(diagram), assert)
             evidence.push({ mode, accent, labels: labels.length, minimumContrast: Math.min(...labels.map(({ ratio }) => ratio)) })
             await assertPaint(page, '[data-project-graph-classification]', { color: '--erp-primary-strong', backgroundColor: '--erp-primary-soft' })
@@ -91,7 +91,7 @@ export function createDevWorkbenchThemeAuditScenarios({ assertNoHorizontalOverfl
         }
         await page.getByRole('button', { name: '全屏查看项目关系图', exact: true }).click()
         await page.locator('.erp-markdown-mermaid--fullscreen').waitFor()
-        await assertPaint(page, '.erp-markdown-mermaid--fullscreen g.node .label-container', { stroke: '--erp-primary' })
+        await assertPaint(page, '.erp-markdown-mermaid--fullscreen g.node .label-container', { stroke: '--erp-text-muted' })
         const viewer = page.locator('.erp-markdown-mermaid')
         await assertMermaidEdgeLabelContrast(viewer, assert)
         await switchMermaidLayout(page, viewer, assert)

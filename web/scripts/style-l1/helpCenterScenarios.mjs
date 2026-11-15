@@ -1549,10 +1549,7 @@ export function createHelpCenterScenarios({
             )
             await article.waitFor()
             const model = getHelpScenarioPresentation(scenario, guide.key)
-            assert.equal(
-              await article.locator('[data-help-step]').count(),
-              model.steps.length
-            )
+            await expect(article.locator('[data-help-step]')).toHaveCount(model.steps.length)
             for (const step of model.steps) {
               const button = article.getByRole('button', {
                 name: `查看步骤 ${step.number}：${step.title}`,

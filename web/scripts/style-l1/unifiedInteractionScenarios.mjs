@@ -4,6 +4,7 @@ import { moveBusinessDate } from '../../src/erp/utils/businessVisualizationModel
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { expectHeading } from './pageAssertions.mjs'
 import { purchaseFollowupFixture } from './purchaseFollowupFixtures.mjs'
+import { assertReadableOnBackground, parseRgb } from './colorAssertions.mjs'
 import {
   assertBusinessViewMotion,
   captureBusinessView,
@@ -44,6 +45,28 @@ async function closeAppearanceNavigation(page) {
   if (await drawer.count()) {
     await page.keyboard.press('Escape')
     await drawer.waitFor({ state: 'hidden' })
+  }
+}
+
+async function assertVisualStatuses(panel, assert) {
+  const statuses = await panel.locator('.erp-business-visual-status').evaluateAll((nodes) => nodes.map((node) => {
+    const style = getComputedStyle(node)
+    return {
+      label: node.textContent.trim(),
+      color: style.color,
+      background: style.backgroundColor,
+      semanticColor: style.getPropertyValue('--visual-status-color').trim(),
+      icons: node.querySelectorAll('.anticon[aria-hidden="true"]').length,
+      unknown: node.classList.contains('erp-business-visual-status--unknown'),
+      borderStyle: style.borderStyle,
+    }
+  }))
+  assert(statuses.length > 0)
+  for (const status of statuses) {
+    assert.equal(status.icons, 1, `${status.label} 同时保留状态文字和图标`)
+    assert.deepEqual(parseRgb(status.color), parseRgb(status.semanticColor), '状态色读取共享语义变量')
+    assertReadableOnBackground(status.color, status.background, status.label)
+    if (status.unknown) assert.equal(status.borderStyle, 'dashed', '未知不冒充成功或零值')
   }
 }
 
@@ -372,6 +395,7 @@ export function createUnifiedInteractionScenarios({
         await page.getByText('交付进度', { exact: true }).click()
         const panel = page.getByRole('region', { name: '销售交付进度' })
         await panel.locator('.erp-business-visual-list__row').first().waitFor()
+        await assertVisualStatuses(panel, assert)
         assert.equal(
           await panel.locator('.erp-business-visual-list__row').count(),
           25
@@ -454,7 +478,9 @@ export function createUnifiedInteractionScenarios({
           await captureBusinessView(page, panel, 'sales-view', width, outputDir)
         }
         await clickERPThemeOption(page, '暗色')
+        await closeAppearanceNavigation(page)
         await assertNoHorizontalOverflow(page, 'sales-dark')
+        await assertVisualStatuses(panel, assert)
         await captureBusinessView(
           page,
           panel,
@@ -707,7 +733,7 @@ export function createUnifiedInteractionScenarios({
               const { x, y, width, height, right, bottom } = node.getBoundingClientRect()
               return { x, y, width, height, right, bottom }
             }
-            const divider = getComputedStyle(view.closest('.erp-business-operation-panel__view-switch'), '::after')
+            const divider = getComputedStyle(view.closest('.erp-business-operation-panel__content-switch'), '::after')
             return {
               toolbar: box(element),
               view: box(view),
@@ -738,6 +764,7 @@ export function createUnifiedInteractionScenarios({
         await page.getByText('到期顺序', { exact: true }).click()
         const panel = page.getByRole('region', { name: '财务到期顺序' })
         await panel.locator('.erp-finance-due-list__row').first().waitFor()
+        await assertVisualStatuses(panel, assert)
         assert.equal(
           await panel.locator('.erp-finance-due-list__row').count(),
           25
@@ -823,6 +850,7 @@ export function createUnifiedInteractionScenarios({
           390,
           outputDir
         )
+        await assertVisualStatuses(panel, assert)
       },
     },
     {
@@ -928,6 +956,34 @@ export function createUnifiedInteractionScenarios({
           assert.equal(await panel.locator('.erp-finance-due-list__row strong').first().textContent(), factNo, `${tabName}返回保留页码与记录`)
         }
         await page.screenshot({ path: `${outputDir}/finance-source-return-${tabName}.png`, fullPage: false })
+      }
+    },
+  }, {
+    ...finance,
+    name: 'finance-visual-status-semantics',
+    verify: async (page) => {
+      await expectHeading(page, '财务管理')
+      await page.getByText('到期顺序', { exact: true }).click()
+      const panel = page.getByRole('region', { name: '财务到期顺序', exact: true })
+      await panel.locator('.erp-finance-due-list__row').first().waitFor()
+      await assertVisualStatuses(panel, assert)
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 900 })
+        await assertNoHorizontalOverflow(page, `finance-status-${width}`)
+        await assertVisualStatuses(panel, assert)
+        await captureBusinessView(page, panel, 'finance-status', width, outputDir)
+      }
+      await panel.getByRole('button', { name: /^金额待核对/u }).click()
+      await panel.locator('.erp-business-visual-status--unknown').first().waitFor()
+      assert.equal(await panel.locator('.erp-finance-due-list__amount').nth(2).textContent(), '未结金额—')
+      await clickERPThemeOption(page, '暗色')
+      await closeAppearanceNavigation(page)
+      await panel.getByRole('button', { name: /^全部/u }).click()
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 900 })
+        await assertVisualStatuses(panel, assert)
+        await assertNoHorizontalOverflow(page, `finance-status-dark-${width}`)
+        await captureBusinessView(page, panel, 'finance-status-dark', width, outputDir)
       }
     },
   }]

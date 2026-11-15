@@ -1,13 +1,4 @@
 import { getRoleDisplayName } from '../../erp/utils/roleKeys.mjs'
-import { fulfillmentStepMatchesRole } from '../../erp/utils/workflowFulfillment.mjs'
-import { getFulfillmentSubstepCopy } from './devFulfillmentPresentation.mjs'
-
-const escapeLabel = (value) => String(value)
-  .replaceAll('&', '#amp;')
-  .replaceAll('"', '#quot;')
-  .replaceAll('<', '#lt;')
-  .replaceAll('>', '#gt;')
-  .replaceAll('\n', ' ')
 
 function resolveDetail(step, reference) {
   if (reference === 'result' || reference === 'exception') {
@@ -45,33 +36,5 @@ export function buildFulfillmentSubflow(step) {
       exception: node.detail_refs.includes('exception'),
     })),
     edges: step.subflow.edges,
-  }
-}
-
-export function buildSubflowMermaid(flow, { role = 'all', compact = false, direction = flow.direction || 'LR' } = {}) {
-  const ids = new Map(flow.nodes.map((node, index) => [node.key, `N${index}`]))
-  if (ids.size !== flow.nodes.length) throw new Error('Duplicate subflow nodes')
-  const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 24', '    rankSpacing: 28', '---', `flowchart ${direction === 'LR' ? 'LR' : 'TB'}`]
-  for (const node of flow.nodes) {
-    const label = compact ? getFulfillmentSubstepCopy(node) : node.label
-    const wrap = (value) => {
-      const text = String(value)
-      const width = Math.max(1, Math.ceil(text.length / Math.ceil(text.length / 10)))
-      return text.match(new RegExp(`.{1,${width}}`, 'gu'))?.map(escapeLabel).join('<br/>') || ''
-    }
-    const owner = compact && node.role && node.kind !== 'main' ? `<br/>${wrap(node.role)}` : ''
-    const body = `"${compact ? wrap(label) : escapeLabel(label)}${owner}"`
-    lines.push(`  ${ids.get(node.key)}[${body}]`)
-    if (role !== 'all' && fulfillmentStepMatchesRole(node, role)) {
-      lines.push(`  class ${ids.get(node.key)} fulfillmentRoleMatch`)
-    }
-  }
-  for (const edge of flow.edges) {
-    if (!ids.has(edge.from) || !ids.has(edge.to)) throw new Error('Unknown subflow edge endpoint')
-    lines.push(`  ${ids.get(edge.from)} -->${edge.label ? `|"${escapeLabel(edge.label)}"|` : ''} ${ids.get(edge.to)}`)
-  }
-  return {
-    chart: lines.join('\n'),
-    nodes: flow.nodes.map((node) => ({ id: ids.get(node.key), key: node.key, label: node.label })),
   }
 }

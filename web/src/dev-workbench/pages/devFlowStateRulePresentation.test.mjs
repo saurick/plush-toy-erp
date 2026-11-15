@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { buildBusinessFlowMermaid } from '../../common/components/markdown/mermaidGraph.mjs'
 
 import {
   DEV_FLOW_PATH_KINDS,
@@ -11,12 +12,14 @@ import {
   buildDevFlowStateNodeSummary,
   buildDevFlowRecordRelationship,
   buildDevFlowStateRelatedViews,
-  buildDevFlowStateRuleMermaid,
+  buildDevFlowStateRuleGraph,
   getDevFlowStateHumanActionLabel,
   getDevFlowStateTransitionDiagramLabel,
   getDevFlowStateTransitionPresentation,
   listDevFlowStatePathGroups,
 } from './devFlowStateRulePresentation.mjs'
+
+const renderStateGraph = (flow) => buildBusinessFlowMermaid(buildDevFlowStateRuleGraph(flow)).chart
 
 test('不可变记录只投影反向记录到原记录的引用，不补造状态边', () => {
   for (const key of ['fact.finance_credit_note', 'fact.finance_allocation']) {
@@ -53,12 +56,10 @@ test('state rule presentation covers every registered exceptional path kind', ()
     assert(item.label)
     assert(item.diagramLabel)
     assert(item.groupKey)
-    assert(item.color)
   }
   for (const group of Object.values(DEV_FLOW_STATE_PATH_GROUP_PRESENTATION)) {
-    assert.match(group.diagramStroke, /^#[\da-f]{6}$/iu)
-    assert(group.diagramStrokeWidth >= 2)
-    assert.equal(typeof group.diagramStrokeDasharray, 'string')
+    assert(group.label)
+    assert(group.description)
   }
 })
 
@@ -157,35 +158,17 @@ test('diagram labels stay short while preserving cancellation, reversal, and con
   )
 })
 
-test('state rule Mermaid colors transition lines from the shared path presentation', () => {
-  const salesDiagram = buildDevFlowStateRuleMermaid(flow('source.sales_order'))
-  assert.match(salesDiagram, /^flowchart LR/u)
-  assert.match(salesDiagram, /STATE_START\(\["开始"\]\)/u)
-  assert.match(salesDiagram, /STATE_END\(\["结束"\]\)/u)
-  assert.match(salesDiagram, /S0 -->\|"启动流程"\| S1/u)
-  assert.match(
-    salesDiagram,
-    /linkStyle 1,2,5 stroke:#2b8a3e,stroke-width:2\.25px/u
-  )
-  assert.match(
-    salesDiagram,
-    /linkStyle 3,4,6 stroke:#cf1322,stroke-width:2\.75px/u
-  )
-  assert.doesNotMatch(salesDiagram, /undefined/u)
-
-  const workflowDiagram = buildDevFlowStateRuleMermaid(flow('workflow.task'))
-  assert.match(
-    workflowDiagram,
-    /stroke:#d46b08,stroke-width:2\.5px,stroke-dasharray:8 4/u
-  )
-  const productionDiagram = buildDevFlowStateRuleMermaid(
-    flow('fact.production')
-  )
-  assert.match(
-    productionDiagram,
-    /stroke:#2b8a3e,stroke-width:2\.25px/u
-  )
-  assert.doesNotMatch(productionDiagram, /stroke:#722ed1/u)
+test('state rules distinguish branches without implying a completed execution', () => {
+  for (const source of [flow('source.sales_order'), flow('workflow.task'), flow('fact.production')]) {
+    const model = buildDevFlowStateRuleGraph(source)
+    const graph = buildBusinessFlowMermaid(model)
+    assert.equal(graph.edges.length, source.transitions.length)
+    assert(model.edges.some((edge) => edge.branch), source.key)
+    assert.doesNotMatch(graph.chart, /fa:|diagramSuccess|diagramDanger|stroke:#/u)
+    for (const edge of model.edges) {
+      assert.equal(edge.branch, getDevFlowStateTransitionPresentation(source, source.transitions.find((item) => item.key === edge.key)).isExceptional)
+    }
+  }
 })
 
 test('用料退回保留异常分类，同接口下的业务动作仍可区分', () => {
@@ -201,7 +184,7 @@ test('有条件的返工保留正常过账与条件异常说明', () => {
   assert.equal(getDevFlowStateTransitionPresentation(production, post).groupKey, 'normal')
   assert.equal(getDevFlowStateTransitionPresentation(production, post).conditional, true)
   assert(listDevFlowStatePathGroups(production).some((item) => item.key === 'normal'))
-  assert.match(buildDevFlowStateRuleMermaid(production), /过账/u)
+  assert.match(renderStateGraph(production), /过账/u)
   const adjustment = flow('fact.inventory_operation')
   assert.equal(getDevFlowStateTransitionPresentation(adjustment, transition(adjustment, 'DRAFT->SUBMITTED')).groupKey, 'correction')
 })
@@ -227,14 +210,14 @@ test('state rule Mermaid fails closed when catalog transitions reference an unkn
   const salesOrder = flow('source.sales_order')
   assert.throws(
     () =>
-      buildDevFlowStateRuleMermaid({
+      renderStateGraph({
         ...salesOrder,
         transitions: [
           ...salesOrder.transitions,
-          { ...salesOrder.transitions[0], from: 'missing-state' },
+          { ...salesOrder.transitions[0], key: 'unknown-endpoint', from: 'missing-state' },
         ],
       }),
-    /invalid dev flow state reference at transitions\[6\]\.from/u
+    /Unknown business graph endpoint/u
   )
 })
 
@@ -286,20 +269,12 @@ test('related-view projection only creates exact catalog-backed destinations', (
   )
 })
 
-test('state diagrams retain every registered state and transition', () => {
+test('state diagrams retain disconnected states, terminals and every registered transition', () => {
   for (const source of DEV_FLOW_STATE_CATALOG.flows) {
-    const graph = buildDevFlowStateRuleMermaid(source)
-    assert.equal((graph.match(/ -->\|/gu) || []).length, source.transitions.length, source.key)
-    const ids = new Set([...graph.matchAll(/^ {2}(S\d+)\[/gmu)].map((match) => match[1]))
-    assert.equal(ids.size, source.states.length, source.key)
-    for (const edge of graph.matchAll(/(S\d+) -->\|[^\n]+\| (S\d+)/gu)) {
-      assert(ids.has(edge[1]) && ids.has(edge[2]), 'every visible transition retains both endpoints')
-    }
+    const model = buildDevFlowStateRuleGraph(source)
+    const graph = buildBusinessFlowMermaid(model)
+    assert.deepEqual(graph.nodes.map((node) => node.key), source.states.map((state) => state.key))
+    assert.deepEqual(graph.edges.map(({ from, to }) => [from, to]), source.transitions.map(({ from, to }) => [from, to]))
+    assert.deepEqual(model.nodes.filter((node) => node.kind === 'terminal').map((node) => node.key).sort(), [...source.terminalStates].sort())
   }
-})
-
-test('state diagrams retain disconnected states and registered start and end markers', () => {
-  const source = { states: [{ key: 'draft', label: '草稿' }, { key: 'active', label: '生效' }, { key: 'done', label: '结束' }], initialStates: ['draft'], terminalStates: ['done'], transitions: [] }
-  const graph = buildDevFlowStateRuleMermaid(source)
-  for (const label of ['生效', '草稿', '结束', 'STATE_START', 'STATE_END']) assert(graph.includes(label), label)
 })

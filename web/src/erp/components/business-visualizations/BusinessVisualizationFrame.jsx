@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, } from 'react-router-dom'
 import { Button } from 'antd'
+import { CheckCircleOutlined, ClockCircleOutlined, ExclamationCircleOutlined, MinusCircleOutlined, QuestionCircleOutlined, SyncOutlined } from '@ant-design/icons'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Pagination from '@/common/components/pagination/AppPagination'
@@ -8,6 +9,30 @@ import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import OverlayScopeProvider from '@/common/components/overlay/OverlayScopeProvider.jsx'
 import { useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
+
+const statusIcons = {
+  delivered: CheckCircleOutlined,
+  settled: CheckCircleOutlined,
+  overdue: ClockCircleOutlined,
+  dueSoon: ClockCircleOutlined,
+  unscheduled: ExclamationCircleOutlined,
+  draft: ClockCircleOutlined,
+  closed: ExclamationCircleOutlined,
+  cancelled: MinusCircleOutlined,
+  unknown: QuestionCircleOutlined,
+  inProgress: SyncOutlined,
+  open: ClockCircleOutlined,
+}
+
+export function VisualizationStatus({ status }) {
+  const Icon = statusIcons[status.key]
+  return (
+    <span className={`erp-business-visual-status erp-business-visual-status--${status.key}`}>
+      {Icon ? <Icon aria-hidden="true" /> : null}
+      {status.label}
+    </span>
+  )
+}
 
 export function BusinessViewPanel({ active, viewKey, pending = false, markView = true, children }) {
   const parent = useOverlayScope()

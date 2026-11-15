@@ -57,6 +57,8 @@
   --erp-warning-bg: #3c3428;
   --erp-warning-border: #5c4d36;
   --erp-warning-text: #e6c28e;
+  --erp-visual-success-text: #93d4ad;
+  --erp-visual-info-text: #9cc8f0;
   --erp-visual-danger-text: #f0aca6;
   --erp-theme-toggle-bg: var(--erp-surface-raised);
   --erp-theme-toggle-border: var(--erp-border-strong);

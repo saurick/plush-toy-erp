@@ -6,6 +6,7 @@ import {
 import {
   BusinessVisualizationFrame,
   VisualizationState,
+  VisualizationStatus,
   VisualizationPagination,
 } from './BusinessVisualizationFrame.jsx'
 
@@ -118,11 +119,7 @@ export default function FinanceDueOverview({
                 <small>未结金额</small>
                 <strong>{money(row.outstanding, row.currency)}</strong>
               </span>
-              <span
-                className={`erp-business-visual-status erp-business-visual-status--${row.dueStatus.key}`}
-              >
-                {row.dueStatus.label}
-              </span>
+              <VisualizationStatus status={row.dueStatus} />
             </button>
           ))}
           <VisualizationPagination

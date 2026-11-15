@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { buildBusinessFlowMermaid } from '../../common/components/markdown/mermaidGraph.mjs'
 
 import { yoyoosunRoleFlowMatrix } from '../../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import {
@@ -9,23 +10,21 @@ import {
   describeDevBusinessChainResponsibility,
   buildDevBusinessChainRoleGuide,
   buildDevBusinessChainTopics,
-  buildChainMermaid,
 } from './devBusinessChainProjection.mjs'
 import { DEV_FLOW_STATE_CATALOG } from './devFlowStateCatalog.mjs'
 
 test('compact topic diagrams keep all paths, branch conditions and fact-posting gates', () => {
   for (const chain of DEV_FLOW_STATE_CATALOG.businessChains) {
-    const compact = buildChainMermaid(chain, null, { compact: true }).replaceAll('<br/>', '')
-    assert.equal((compact.match(/ -->/gu) || []).length, chain.edges.length, chain.key)
+    const compact = buildBusinessFlowMermaid(chain).chart.replaceAll('<br/>', '')
+    assert.equal(buildBusinessFlowMermaid(chain).edges.length, chain.edges.length, chain.key)
     for (const edge of chain.edges) {
-      if (edge.condition) assert(compact.includes(edge.condition), `${chain.key}: ${edge.condition}`)
+      if (edge.condition) assert(buildBusinessFlowMermaid(chain).edges.some((item) => item.description === edge.condition), `${chain.key}: ${edge.condition}`)
       else if (edge.kind === 'posts_fact') assert(compact.includes(edge.label), `${chain.key}: ${edge.label}`)
     }
   }
   const delivery = DEV_FLOW_STATE_CATALOG.businessChains.find((chain) => chain.key === 'delivery_to_settlement')
-  const chart = buildChainMermaid(delivery, null, { compact: true }).replaceAll('<br/>', '')
-  assert(chart.includes('有效放行且发货条件满足'))
-  assert(chart.includes('审批决定为拒绝'))
+  assert(buildBusinessFlowMermaid(delivery).edges.some((edge) => edge.description.includes('有效放行且发货条件满足')))
+  assert(buildBusinessFlowMermaid(delivery).edges.some((edge) => edge.description.includes('审批决定为拒绝')))
 })
 
 test('business topics follow registered role duties and preserve complete handoffs', () => {

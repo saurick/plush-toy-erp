@@ -5,7 +5,7 @@ import {
 } from './devBusinessChainProjection.mjs'
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { buildFulfillmentOverview } from './devFulfillmentPresentation.mjs'
-import { formatBusinessGraphLabel, splitBusinessFlowForPrint } from '../../common/components/markdown/mermaidGraph.mjs'
+import { buildBusinessFlowMermaid, splitBusinessFlowForPrint } from '../../common/components/markdown/mermaidGraph.mjs'
 
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED = '当前正式合同未定义'
 
@@ -67,10 +67,8 @@ const LAYER_GUIDANCE = Object.freeze({
 })
 
 const DIAGRAM_LEGEND = freezeList([
-  { tone: 'normal', label: '业务资料或系统步骤' },
-  { tone: 'person', label: '需要人员办理' },
-  { tone: 'attention', label: '关键条件与异常分支' },
-  { tone: 'result', label: '正式业务结果' },
+  { tone: 'normal', label: '实线：正常关系' },
+  { tone: 'attention', label: '虚线：分支、退回与纠正' },
 ])
 
 const asArray = (value) => (Array.isArray(value) ? value : [])
@@ -182,60 +180,15 @@ function isAttentionEdge(chain, edge) {
   )
 }
 
-function diagramToneForNode(chain, node) {
-  if (node.layer === 'workflow_task') return 'person'
-  if (node.layer === 'fact_ledger' || node.layer === 'derived_result') {
-    return 'result'
-  }
-  if (
-    chain.edges.some(
-      (edge) =>
-        (edge.from === node.key || edge.to === node.key) &&
-        isAttentionEdge(chain, edge)
-    )
-  ) {
-    return 'attention'
-  }
-  return 'normal'
-}
-
-function appendDiagramStyles(lines) {
-  lines.push(
-    '  classDef normal fill:#edf8ef,stroke:#2b8a3e,color:#173f2a,stroke-width:1.5px',
-    '  classDef person fill:#eaf3ff,stroke:#2f6fbd,color:#17365d,stroke-width:1.5px',
-    '  classDef attention fill:#fff4e6,stroke:#c86b16,color:#6f3500,stroke-width:1.5px',
-    '  classDef result fill:#f3edff,stroke:#7654b4,color:#34205f,stroke-width:1.5px'
-  )
-}
-
 function buildChainDiagramSource(chain, steps, positions) {
-  const ids = new Map(
-    chain.nodes.map((node, index) => [node.key, `N${index + 1}`])
-  )
-  const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 24', '    rankSpacing: 24', '---', 'flowchart LR']
-  chain.nodes.forEach((node) => {
-    const index = positions.get(node.key)
-    lines.push(
-      `  ${ids.get(node.key)}["${formatBusinessGraphLabel(`${index + 1}. ${node.label}\n${steps[index].responsibleRole}`)}"]`
-    )
-  })
-  chain.edges.forEach((edge, index) => {
-    lines.push(
-      `  ${ids.get(edge.from)} -->|"${formatBusinessGraphLabel(edge.label)}"| ${ids.get(edge.to)}`
-    )
-    if (isAttentionEdge(chain, edge)) {
-      lines.push(
-        `  linkStyle ${index} stroke:#c86b16,stroke-width:2px,color:#6f3500`
-      )
-    }
-  })
-  appendDiagramStyles(lines)
-  chain.nodes.forEach((node) => {
-    lines.push(
-      `  class ${ids.get(node.key)} ${diagramToneForNode(chain, node)}`
-    )
-  })
-  return lines.join('\n')
+  return buildBusinessFlowMermaid({
+    ...chain,
+    nodes: chain.nodes.map((node) => {
+      const index = positions.get(node.key)
+      return { ...node, label: `${index + 1}. ${node.label}`, role: steps[index].responsibleRole }
+    }),
+    edges: chain.edges.map((edge) => ({ ...edge, branch: ATTENTION_EDGE_KINDS.has(edge.kind) || edge.branch })),
+  }).chart
 }
 
 function buildChainDiagram(chain, steps) {

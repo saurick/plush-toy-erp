@@ -1,3 +1,5 @@
+import { DIAGRAM_NODE_TYPES, DIAGRAM_DOMAINS, diagramIconLabel, diagramNodeType } from '../diagram/diagramSemantics.mjs'
+
 // IDs are generated locally; business keys and labels never become executable Mermaid syntax.
 export const escapeBusinessGraphLabel = (value) =>
   String(value ?? '').replace(
@@ -136,19 +138,22 @@ export function buildBusinessFlowMermaid(
     terminal: '结束',
   }
   const definition = (node) => {
+    const type = diagramNodeType(node)
     const subtitle = [
       ...new Set(
         [
-          node.role || layerLabels[node.kind || node.layer],
+          type ? DIAGRAM_NODE_TYPES[type] : layerLabels[node.kind || node.layer],
+          node.role,
           node.key === runtimeKey ? '实例所在' : '',
           (node.terminal || node.kind === 'terminal') && !String(node.label || '').trim().endsWith('结束') ? '结束' : '',
         ].filter(Boolean)
       ),
-    ].join(' · ')
+    ].join('\n')
     const label = formatBusinessGraphLabel(
       [node.label || node.key, subtitle].filter(Boolean).join('\n')
     )
-    return `  ${ids.get(node.key)}${node.terminal || node.kind === 'terminal' ? `(["${label}"])` : `["${label}"]`}`
+    const content = diagramIconLabel(label, type)
+    return `  ${ids.get(node.key)}${node.terminal || node.kind === 'terminal' ? `(["${content}"])` : `["${content}"]`}`
   }
   const grouped = new Set()
   for (const [index, group] of (flow.groups || []).entries()) {
@@ -171,7 +176,7 @@ export function buildBusinessFlowMermaid(
     const branch = Boolean(
       edge.branch ||
       edge.dasharray ||
-      ['return', 'returns', 'reverses', 'terminates', 'branches_to'].includes(
+      ['return', 'returns', 'reworks', 'reverses', 'terminates', 'branches_to'].includes(
         edge.kind
       )
     )
@@ -180,9 +185,6 @@ export function buildBusinessFlowMermaid(
     lines.push(
       `  ${ids.get(edge.from)} ${id}@${branch ? '-.->' : '-->'}${edgeLabel ? `|"${formatBusinessGraphLabel(edgeLabel)}"|` : ''} ${ids.get(edge.to)}`
     )
-    if (/^#[\da-f]{3,8}$/iu.test(edge.stroke || '')) {
-      lines.push(`  linkStyle ${index} stroke:${edge.stroke}`)
-    }
     return {
       id,
       label: `查看条件：${edge.label || `${labelByKey.get(edge.from)} → ${labelByKey.get(edge.to)}`}`,
@@ -207,7 +209,10 @@ export function buildBusinessFlowMermaid(
         ? matchingKeys.has(node.key)
         : role !== 'all' && node.role_keys?.includes(role))
     )
-    const classes = [node.risk || node.exception_guide ? 'branch' : ''].filter(
+    const classes = [
+      node.risk || node.exception_guide ? 'diagramBranch' :
+        DIAGRAM_DOMAINS[node.domain] ? `diagramDomain_${node.domain}` : '',
+    ].filter(
       Boolean
     )
     if (classes.length) {
@@ -228,6 +233,7 @@ export function buildBusinessFlowMermaid(
       },
     }
   })
-  lines.push('  classDef branch stroke-dasharray:4 4')
-  return { chart: lines.join('\n'), nodes, edges: interactiveEdges, ids }
+  const types = [...new Set(flow.nodes.map(diagramNodeType).filter(Boolean))]
+  const domains = [...new Set(flow.nodes.filter((node) => !node.risk && !node.exception_guide && DIAGRAM_DOMAINS[node.domain]).map((node) => node.domain))]
+  return { chart: lines.join('\n'), nodes, edges: interactiveEdges, ids, types, domains }
 }

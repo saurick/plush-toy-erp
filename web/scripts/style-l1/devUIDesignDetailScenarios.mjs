@@ -144,7 +144,7 @@ export function createDevUIDesignDetailScenarios({
         const panel = page.locator('.erp-design-document-content')
         const trigger = page.getByRole('button', { name: '查找与返回的主线', exact: true })
         const article = page.getByRole('article', { name: '查找与返回的主线', exact: true })
-        const chart = article.locator('.erp-markdown-mermaid__canvas svg')
+        const chart = article.locator('.erp-markdown-mermaid__canvas > svg')
         const close = article.getByRole('button', { name: '收起规则', exact: true })
         const openRule = async () => {
           await trigger.scrollIntoViewIfNeeded()
@@ -373,7 +373,7 @@ export function createDevUIDesignDetailScenarios({
           assert.equal(await button.getAttribute('aria-current'), 'page')
           assert.equal(await panel.evaluate((node) => node.scrollTop), 0)
         }
-        const diagram = page.locator('.erp-markdown-mermaid__canvas svg')
+        const diagram = page.locator('.erp-markdown-mermaid__canvas > svg')
         await page
           .getByRole('heading', { name: '页面骨架：先分工，再分配空间' })
           .waitFor()

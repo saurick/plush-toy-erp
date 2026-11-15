@@ -39,6 +39,7 @@ import {
 import './mermaid.css'
 import { bindMermaidNodeActions } from './mermaidNodeActions.mjs'
 import { getMermaidTheme } from './mermaidTheme.mjs'
+import { prepareMermaidSource } from './mermaidSemantics.mjs'
 
 export { extractMarkdownHeadings }
 
@@ -341,7 +342,11 @@ export function MermaidDiagram({
       try {
         const mermaidModule = await import('mermaid')
         const mermaid = mermaidModule.default || mermaidModule
-        const renderTheme = getMermaidTheme({ mode: theme, accent, fixed: fixedTheme })
+        if (source.includes('fa:fa-erp-') && useFlowchartHtmlLabels) {
+          const { mermaidIconPack } = await import('./mermaidIcons.jsx')
+          mermaid.registerIconPacks([{ name: 'fa', icons: mermaidIconPack }])
+        }
+        const renderTheme = getMermaidTheme({ mode: theme })
         const { svg } = await enqueueMermaidRender(async () => {
           mermaid.initialize({
             startOnLoad: false,
@@ -354,7 +359,7 @@ export function MermaidDiagram({
             ...renderTheme,
           })
           const renderId = `${diagramId}-${theme}-${useFlowchartHtmlLabels ? 'html' : 'svg'}-${Date.now()}`
-          return mermaid.render(renderId, source)
+          return mermaid.render(renderId, prepareMermaidSource(source, { mode: theme, htmlLabels: useFlowchartHtmlLabels }))
         })
         if (!cancelled) {
           // Mermaid HTML labels contain HTML void tags such as <br>, not XML.
@@ -370,7 +375,6 @@ export function MermaidDiagram({
           setRenderState({
             status: 'rendered',
             theme,
-            accent: accent || 'fixed',
             chart,
             source: renderedChart,
             svg,
@@ -394,7 +398,7 @@ export function MermaidDiagram({
     return () => {
       cancelled = true
     }
-  }, [chart, renderedChart, diagramId, theme, accent, fixedTheme, useFlowchartHtmlLabels])
+  }, [chart, renderedChart, diagramId, theme, useFlowchartHtmlLabels])
 
   useEffect(() => {
     if (renderState.chart !== chart || !interactiveNodes?.length) {
@@ -507,7 +511,7 @@ export function MermaidDiagram({
         .join(' ')}
       data-mermaid-status={renderState.status}
       data-mermaid-theme={renderState.theme || theme}
-      data-mermaid-accent={renderState.accent}
+      data-mermaid-accent={accent || 'fixed'}
       data-mermaid-html-labels={useFlowchartHtmlLabels ? 'true' : 'false'}
       data-mermaid-direction={activeDirection || undefined}
       data-mermaid-fullscreen={fullscreenOpen ? 'true' : 'false'}

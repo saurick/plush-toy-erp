@@ -1,6 +1,5 @@
 import {
   OperationalFactStatus,
-  ProductionOrderStatus,
   ProductionWIPStatus,
   QualityInspectionStatus,
   SalesOrderItemStatus,
@@ -338,88 +337,6 @@ export function buildInventoryDistributionModel(
         (sum, row) => sum + row.unavailableRecordCount,
         0
       ),
-    },
-  }
-}
-
-const PRODUCTION_ORDER_STATUS_META = Object.freeze({
-  [ProductionOrderStatus.DRAFT]: Object.freeze({ label: '草稿', tone: 'draft' }),
-  [ProductionOrderStatus.RELEASED]: Object.freeze({ label: '生产中', tone: 'inProgress' }),
-  [ProductionOrderStatus.CLOSED]: Object.freeze({ label: '已关闭', tone: 'delivered' }),
-  [ProductionOrderStatus.CANCELLED]: Object.freeze({ label: '已取消', tone: 'cancelled' }),
-})
-
-function productionScheduleStatus(row, today) {
-  if (row.orderStatus === ProductionOrderStatus.CANCELLED) {
-    return { key: 'cancelled', label: '已取消', rank: 7 }
-  }
-  if (row.orderStatus === ProductionOrderStatus.CLOSED) {
-    return { key: 'delivered', label: '已完成', rank: 6 }
-  }
-  if (row.orderStatus === ProductionOrderStatus.DRAFT) {
-    return { key: 'draft', label: '待发布', rank: 4 }
-  }
-  if (!row.plannedEndDate) {
-    return { key: 'unscheduled', label: '未排计划结束', rank: 0 }
-  }
-  const days = dayDistance(today, row.plannedEndDate)
-  if (days !== null && days < 0) {
-    return {
-      key: 'overdue',
-      label: `计划逾期 ${Math.abs(days)} 天`,
-      rank: 0,
-    }
-  }
-  if (days !== null && days <= 7) {
-    return {
-      key: 'dueSoon',
-      label: days === 0 ? '计划今天结束' : `计划 ${days} 天后结束`,
-      rank: 1,
-    }
-  }
-  return { key: 'inProgress', label: '按计划生产', rank: 3 }
-}
-
-export function buildProductionOrderOverviewModel(orders = [], options = {}) {
-  const today = options.today || currentBusinessDate()
-  const rows = (Array.isArray(orders) ? orders : []).map((order) => {
-    const orderStatus = normalizedText(order?.status).toUpperCase()
-    const orderStatusMeta = PRODUCTION_ORDER_STATUS_META[orderStatus] || {
-      label: '状态待核对',
-      tone: 'unknown',
-    }
-    const row = {
-      id: Number(order?.id || 0),
-      orderNo: normalizedText(order?.order_no, '生产订单未编号'),
-      orderStatus,
-      orderStatusMeta,
-      plannedStartDate: unixDateKey(order?.planned_start_at),
-      plannedEndDate: unixDateKey(order?.planned_end_at),
-      note: normalizedText(order?.note),
-    }
-    return { ...row, scheduleStatus: productionScheduleStatus(row, today) }
-  })
-
-  rows.sort((left, right) => {
-    const riskOrder =
-      left.scheduleStatus.rank - right.scheduleStatus.rank ||
-      (left.plannedEndDate || '9999-12-31').localeCompare(
-        right.plannedEndDate || '9999-12-31'
-      )
-    return riskOrder || left.orderNo.localeCompare(right.orderNo, 'zh-CN')
-  })
-
-  return {
-    rows,
-    counts: {
-      total: rows.length,
-      overdue: rows.filter((row) => row.scheduleStatus.key === 'overdue')
-        .length,
-      dueSoon: rows.filter((row) => row.scheduleStatus.key === 'dueSoon')
-        .length,
-      unscheduled: rows.filter(
-        (row) => row.scheduleStatus.key === 'unscheduled'
-      ).length,
     },
   }
 }

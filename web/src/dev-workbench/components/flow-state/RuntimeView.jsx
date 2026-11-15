@@ -59,6 +59,7 @@ export function ProcessDefinitionCard({ definition }) {
       nodes: definition.nodes.map((node) => ({
         ...node,
         kind: 'state',
+        diagramType: node.type === 'task' ? 'task' : node.source?.type === 'domain_command' ? 'system' : undefined,
         terminal: node.type === 'end',
         role: node.ownerPool ? getProcessOwnerPoolLabel(node.ownerPool) : null,
       })),

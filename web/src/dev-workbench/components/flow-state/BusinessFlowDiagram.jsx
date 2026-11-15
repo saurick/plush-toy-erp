@@ -1,5 +1,6 @@
 import React, { useContext, useMemo, useState } from 'react'
 import { MermaidDiagram } from '@/common/components/markdown'
+import DiagramTypeLegend from '@/common/components/diagram/DiagramTypeLegend.jsx'
 import {
   buildBusinessFlowMermaid,
   splitBusinessFlowForPrint,
@@ -126,6 +127,7 @@ export default function BusinessFlowDiagram({
           }}
         />
       )}
+      <DiagramTypeLegend types={graph.types} domains={graph.domains} />
       <p className="erp-dev-business-flow__legend">
         {legend ??
           (relationships

@@ -225,6 +225,11 @@ test('role view connects accounts, role, final permissions, pages, scope and app
     /关联账号（3）：小林（sales01）、小周（sales02）、小吴（warehouse01）｜可用 1/u
   )
   assert.match(model.chart, /岗位：业务员/u)
+  for (const type of ['account', 'role', 'rule', 'permission', 'scope', 'task']) {
+    assert(model.chart.includes(`fa:fa-erp-${type}`), `${type} 节点沿用声明的对象类型图标`)
+  }
+  assert.match(model.chart, /diagramSuccess/u)
+  assert.match(model.chart, /diagramWarning/u)
   assert.match(model.chart, /功能：查看销售订单｜最终可用/u)
   assert.match(model.chart, /功能：确认报价 ”A” ＜内部＞｜｜当前受限/u)
   assert.match(model.chart, /页面：销售订单｜可进入/u)

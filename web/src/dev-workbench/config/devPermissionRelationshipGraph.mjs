@@ -1,3 +1,4 @@
+import { diagramIconLabel } from '../../common/components/diagram/diagramSemantics.mjs'
 import {
   ADMIN_ACCOUNT_STATUS,
   getAdminAccountStatus,
@@ -161,10 +162,12 @@ function createGraphBuilder() {
   const lines = ['flowchart LR']
   let sequence = 0
 
-  const addNode = (label, className = 'source') => {
+  const addNode = (label, className, nodeType) => {
     sequence += 1
     const id = `N${sequence}`
-    lines.push(`  ${id}["${graphLabel(label)}"]:::${className}`)
+    const type = nodeType === undefined ? { account: 'account', inactive: 'account', role: 'role', source: 'rule', scope: 'scope', approval: 'task', system: 'system' }[className] : nodeType
+    const tone = { inactive: 'diagramMuted', effective: 'diagramSuccess', blocked: 'diagramWarning' }[className]
+    lines.push(`  ${id}["${diagramIconLabel(graphLabel(label), type)}"]${tone ? `:::${tone}` : ''}`)
     return id
   }
 
@@ -175,32 +178,7 @@ function createGraphBuilder() {
     )
   }
 
-  const finish = () => {
-    lines.push(
-      '  classDef account fill:#eff6ff,stroke:#2563eb,color:#1e3a8a,stroke-width:1.5px'
-    )
-    lines.push(
-      '  classDef inactive fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:1.5px'
-    )
-    lines.push(
-      '  classDef role fill:#f5f3ff,stroke:#7c3aed,color:#4c1d95,stroke-width:1.5px'
-    )
-    lines.push(
-      '  classDef source fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3'
-    )
-    lines.push(
-      '  classDef effective fill:#ecfdf5,stroke:#059669,color:#065f46,stroke-width:1.5px'
-    )
-    lines.push(
-      '  classDef blocked fill:#fff7ed,stroke:#ea580c,color:#9a3412,stroke-width:1.5px'
-    )
-    lines.push('  classDef scope fill:#f0fdfa,stroke:#0f766e,color:#134e4a')
-    lines.push('  classDef approval fill:#fefce8,stroke:#ca8a04,color:#713f12')
-    lines.push(
-      '  classDef system fill:#fdf4ff,stroke:#c026d3,color:#701a75,stroke-width:2px'
-    )
-    return lines.join('\n')
-  }
+  const finish = () => lines.join('\n')
 
   return { addNode, addEdge, finish }
 }
@@ -665,7 +643,7 @@ function approvalAppliesToAccountRole(item = {}, account = {}, roleKey = '') {
 
 function emptyModel(message = '请选择要查看的岗位或账号') {
   const graph = createGraphBuilder()
-  graph.addNode(message, 'source')
+  graph.addNode(message, 'source', null)
   return {
     chart: graph.finish(),
     rows: [],
@@ -809,7 +787,7 @@ export function buildPermissionRelationshipModel({
         )}；岗位分配仍保留，但登录和实际使用受账号状态阻断。`
       )
     } else if (selectedRoles.length === 0) {
-      const emptyRoleNode = graph.addNode('未分配岗位', 'blocked')
+      const emptyRoleNode = graph.addNode('未分配岗位', 'blocked', 'role')
       graph.addEdge(accountNode, emptyRoleNode, '当前分配')
       addRow({
         kind: 'account',
@@ -833,7 +811,8 @@ export function buildPermissionRelationshipModel({
     const roleDisabled = role?.disabled === true
     const roleNode = graph.addNode(
       `岗位：${roleName}${roleDisabled ? '｜已停用' : ''}`,
-      roleDisabled ? 'inactive' : 'role'
+      roleDisabled ? 'inactive' : 'role',
+      'role'
     )
     relatedRoleKeys.add(roleKey)
 
@@ -891,7 +870,8 @@ export function buildPermissionRelationshipModel({
 
     const sourceNode = graph.addNode(
       accessSourceLabel(access),
-      access?.is_final === true ? 'source' : 'blocked'
+      access?.is_final === true ? 'source' : 'blocked',
+      'rule'
     )
     graph.addEdge(sourceNode, roleNode, '共同决定')
 
@@ -942,7 +922,8 @@ export function buildPermissionRelationshipModel({
         const effective = !blocked && decision?.effective === true
         const permissionNode = graph.addNode(
           `功能：${detail.name}｜${effective ? '最终可用' : '当前受限'}`,
-          effective ? 'effective' : 'blocked'
+          effective ? 'effective' : 'blocked',
+          'permission'
         )
         graph.addEdge(roleNode, permissionNode, '最终结果')
         if (effective) {
@@ -969,7 +950,7 @@ export function buildPermissionRelationshipModel({
             .filter(Boolean)
         )
         if (pages.length === 0) {
-          const backendNode = graph.addNode('无独立页面的受控操作', 'source')
+          const backendNode = graph.addNode('无独立页面的受控操作', 'source', 'business_action')
           graph.addEdge(permissionNode, backendNode, '控制')
           addRow({
             kind: 'action',
@@ -995,7 +976,8 @@ export function buildPermissionRelationshipModel({
           const pageEffective = !blocked && pageDecision?.effective === true
           const pageNode = graph.addNode(
             `页面：${pageName}｜${pageEffective ? '可进入' : '不可进入'}`,
-            pageEffective ? 'effective' : 'blocked'
+            pageEffective ? 'effective' : 'blocked',
+            null
           )
           graph.addEdge(permissionNode, pageNode, '影响')
           if (pageEffective) {
@@ -1050,7 +1032,8 @@ export function buildPermissionRelationshipModel({
       if (moduleSummaries.length > 0) {
         const moduleNode = graph.addNode(
           `功能汇总：${moduleSummaries.length} 个模块｜可用 ${moduleEffectiveTotal} / 已选 ${moduleTotal}`,
-          moduleEffectiveTotal > 0 ? 'effective' : 'blocked'
+          moduleEffectiveTotal > 0 ? 'effective' : 'blocked',
+          'permission'
         )
         graph.addEdge(roleNode, moduleNode, '汇总')
       }
@@ -1090,7 +1073,8 @@ export function buildPermissionRelationshipModel({
               .join('、')
         const approvalNode = graph.addNode(
           `审批责任：${approvalName}｜${approvalBlocked ? '当前受限' : '已配置'}`,
-          approvalBlocked ? 'blocked' : 'approval'
+          approvalBlocked ? 'blocked' : 'approval',
+          'task'
         )
         graph.addEdge(roleNode, approvalNode, '承担')
         approvalKeys.add(normalizeText(item?.approval_key) || approvalName)

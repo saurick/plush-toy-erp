@@ -20,7 +20,7 @@ import {
   buildDevFlowRecordRelationship,
   buildDevFlowStateRelatedViews,
   getDevFlowStateTransitionPresentation,
-  getDevFlowStateTransitionDiagramLabel,
+  buildDevFlowStateRuleGraph,
 } from '../../pages/devFlowStateRulePresentation.mjs'
 import './stateRules.css'
 
@@ -47,7 +47,7 @@ function StateTransitionCard({
       data-exceptional={presentation.isExceptional ? 'true' : 'false'}
       data-selected-related={selectedRelated ? 'true' : 'false'}
       style={{
-        '--erp-dev-state-path-color': presentation.group.diagramStroke,
+        '--erp-dev-state-path-color': presentation.isExceptional ? 'var(--erp-warning-text)' : 'var(--erp-text-muted)',
       }}
     >
       <header className="erp-dev-flow-transition-heading">
@@ -61,7 +61,7 @@ function StateTransitionCard({
             <Tag>{presentation.actionLabel}</Tag>
           ) : null}
           {presentation.pathKinds.map((item) => (
-            <Tag key={item.key} color={item.color}>
+            <Tag key={item.key}>
               {item.label}
             </Tag>
           ))}
@@ -156,13 +156,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
     () => new Map(flow.transitions.map((item, index) => [item.key, index])),
     [flow]
   )
-  const graph = useMemo(() => ({
-    direction: flow.transitions.length > 0 ? 'LR' : 'TB',
-    curve: 'basis',
-    entryNodeKeys: flow.initialStates,
-    nodes: flow.states.map((item) => ({ ...item, kind: flow.terminalStates.includes(item.key) ? 'terminal' : 'state' })),
-    edges: flow.transitions.map((item) => { const { group } = getDevFlowStateTransitionPresentation(flow, item); return { ...item, label: getDevFlowStateTransitionDiagramLabel(item), condition: item.guard, stroke: group.diagramStroke, dasharray: group.diagramStrokeDasharray } }),
-  }), [flow])
+  const graph = useMemo(() => buildDevFlowStateRuleGraph(flow), [flow])
   const focusedTransitions = state ? flow.transitions.filter((item) => item.from === state.key || item.to === state.key) : []
   const recordRelationship = useMemo(() => buildDevFlowRecordRelationship(flow), [flow])
   const related = useMemo(() => buildDevFlowStateRelatedViews(catalog, flow), [catalog, flow])

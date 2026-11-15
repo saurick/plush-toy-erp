@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { ERP_ACCENTS } from '../../theme/erpAppearance.mjs'
+import { ERP_DARK_PALETTE, ERP_LIGHT_PALETTE } from '../../theme/erpThemePalette.mjs'
 import { getMermaidTheme } from './mermaidTheme.mjs'
 import { getContrastRatio, parseRgb } from '../../../../scripts/style-l1/colorAssertions.mjs'
 
@@ -13,12 +14,14 @@ function assertEdgeLabelReadable(variables) {
 }
 
 for (const mode of ['light', 'dark']) {
-  for (const [accent, palette] of Object.entries(ERP_ACCENTS)) {
-    test(`Mermaid ${mode}/${accent} follows the shared accent palette`, () => {
+  for (const accent of Object.keys(ERP_ACCENTS)) {
+    test(`Mermaid ${mode}/${accent} keeps static relationships neutral`, () => {
+      const palette = mode === 'dark' ? ERP_DARK_PALETTE : ERP_LIGHT_PALETTE
       const rendered = getMermaidTheme({ mode, accent })
       assert.equal(rendered.theme, 'base')
       assert.equal(rendered.themeVariables.darkMode, mode === 'dark')
-      assert.equal(rendered.themeVariables.primaryBorderColor, mode === 'dark' ? palette.dark : palette.primary)
+      assert.equal(rendered.themeVariables.primaryBorderColor, palette.textMuted)
+      assert.equal(rendered.themeVariables.lineColor, palette.textMuted)
       assert.notEqual(rendered.themeVariables.primaryColor, rendered.themeVariables.primaryTextColor)
       assertEdgeLabelReadable(rendered.themeVariables)
     })
@@ -31,6 +34,6 @@ test('fixed presentation is independent of the screen accent in either mode', ()
     assertEdgeLabelReadable(getMermaidTheme({ mode, fixed: true }).themeVariables)
   }
   const paper = getMermaidTheme({ mode: 'light', fixed: true })
-  assert.equal(paper.themeVariables.lineColor, '#2f6f4e')
+  assert.equal(paper.themeVariables.lineColor, ERP_LIGHT_PALETTE.textMuted)
   assert.equal(paper.themeVariables.tertiaryColor, '#ffffff')
 })

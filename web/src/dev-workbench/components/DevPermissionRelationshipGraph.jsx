@@ -1,5 +1,6 @@
 import React from 'react'
 import { Button, Space, Tag } from 'antd'
+import DiagramNodeIcon from '@/common/components/diagram/DiagramNodeIcon.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import { MermaidDiagram } from '@/common/components/markdown'
 import { WorkbenchEmpty } from './WorkbenchPattern.jsx'
@@ -32,12 +33,12 @@ export default function DevPermissionRelationshipGraph({
           onChange={onChangeModule}
         />
         <Space wrap size={[6, 6]} aria-label="权限关系图例">
-          <Tag color="blue">账号</Tag>
-          <Tag color="purple">岗位</Tag>
+          <Tag icon={<DiagramNodeIcon type="account" />}>账号</Tag>
+          <Tag icon={<DiagramNodeIcon type="role" />}>岗位</Tag>
           <Tag color="green">最终可用</Tag>
           <Tag color="orange">岗位已选但受限</Tag>
-          <Tag color="cyan">数据范围</Tag>
-          <Tag color="gold">审批责任</Tag>
+          <Tag icon={<DiagramNodeIcon type="scope" />}>数据范围</Tag>
+          <Tag icon={<DiagramNodeIcon type="task" />}>审批责任</Tag>
         </Space>
       </div>
       <section

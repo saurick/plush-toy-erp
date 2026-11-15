@@ -66,7 +66,8 @@ export function createDevBusinessChainPrintScenarios({ assert, assertNoHorizonta
             const normalize = (value) => value.replace(/\s+/gu, '')
             const nodeText = (await diagrams.locator('.erp-markdown-mermaid__canvas > svg .node').allTextContents()).map(normalize)
             const edgeText = (await diagrams.locator('.erp-markdown-mermaid__canvas > svg .edgeLabels > .edgeLabel').allTextContents()).map(normalize)
-            for (const step of expectedReview.chain.steps) assert(nodeText.some((text) => text.includes(normalize(`${step.number}. ${step.name}${step.responsibleRole}`))), `${chain} 完整保留节点编号、名称与岗位：${step.number}`)
+            for (const step of expectedReview.chain.steps) assert(nodeText.some((text) => text.includes(normalize(`${step.number}. ${step.name}`)) && text.includes(normalize(step.responsibleRole))), `${chain} 同一节点完整保留编号、名称与岗位：${step.number}`)
+            assert(nodeText.every((text) => !text.includes('fa:fa-erp-')), '打印不泄露图标语法')
             for (const edge of DEV_FLOW_STATE_CATALOG.businessChains.find((item) => item.key === chain).edges) assert(edgeText.some((text) => text.includes(normalize(edge.label))), `${chain} 完整保留关系标签：${edge.key}`)
           }
           const printText = await printRoot.innerText()

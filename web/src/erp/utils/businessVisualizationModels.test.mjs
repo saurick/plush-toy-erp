@@ -3,7 +3,6 @@ import test from 'node:test'
 import {
   buildFinanceDueModel,
   buildInventoryDistributionModel,
-  buildProductionOrderOverviewModel,
   buildProductionProcessModel,
   buildSalesDeliveryModel,
   moveBusinessDate,
@@ -162,39 +161,6 @@ test('inventory distribution identifies historical warehouses missing from activ
   ])
 
   assert.equal(model.rows[0].warehouseName, '仓库资料未提供')
-})
-
-test('production overview ranks plan risk without inventing completion progress', () => {
-  const model = buildProductionOrderOverviewModel(
-    [
-      {
-        id: 1,
-        order_no: 'MO-OVERDUE',
-        status: 'RELEASED',
-        planned_start_at: unix('2026-09-10'),
-        planned_end_at: unix('2026-09-20'),
-      },
-      {
-        id: 2,
-        order_no: 'MO-DRAFT',
-        status: 'DRAFT',
-      },
-      {
-        id: 3,
-        order_no: 'MO-CLOSED',
-        status: 'CLOSED',
-        planned_end_at: unix('2026-09-18'),
-      },
-    ],
-    { today: '2026-09-22' }
-  )
-
-  assert.equal(model.rows[0].orderNo, 'MO-OVERDUE')
-  assert.equal(model.rows[0].scheduleStatus.key, 'overdue')
-  assert.equal(model.counts.total, 3)
-  assert.equal(model.counts.overdue, 1)
-  assert.equal(model.rows.find((row) => row.orderStatus === 'DRAFT').orderNo, 'MO-DRAFT')
-  assert.equal(Object.hasOwn(model.rows[0], 'progress'), false)
 })
 
 test('production process derives each product lane from authoritative operations and batches', () => {

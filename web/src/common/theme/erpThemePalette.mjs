@@ -9,6 +9,10 @@ export const ERP_LIGHT_PALETTE = Object.freeze({
   text: '#1f2a24',
   textMuted: '#4d5d53',
   textSubtle: '#65756b',
+  success: '#28734d',
+  info: '#326b9e',
+  warning: '#996015',
+  danger: '#bf3535',
 })
 
 export const ERP_DARK_PALETTE = Object.freeze({
@@ -25,6 +29,10 @@ export const ERP_DARK_PALETTE = Object.freeze({
   textMuted: '#c2cad1',
   textSubtle: '#a9b4bf',
   onAccent: '#161a1e',
+  success: '#93d4ad',
+  info: '#9cc8f0',
+  warning: '#e6c28e',
+  danger: '#f0aca6',
 })
 
 export function getERPAccentTokens(isDark, accent) {
@@ -81,6 +89,10 @@ export function getERPThemeScopeStyle(isDark, accent) {
     '--erp-text': palette.text,
     '--erp-text-muted': palette.textMuted,
     '--erp-text-subtle': palette.textSubtle,
+    '--erp-visual-success-text': palette.success,
+    '--erp-visual-info-text': palette.info,
+    '--erp-warning-text': palette.warning,
+    '--erp-visual-danger-text': palette.danger,
     '--erp-accent-hover': tokens.colorPrimaryHover,
     '--erp-on-accent': isDark ? palette.onAccent : accent.onPrimary,
     '--erp-primary': tokens.colorPrimary,

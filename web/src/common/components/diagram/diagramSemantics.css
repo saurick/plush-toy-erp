@@ -1,0 +1,4 @@
+.erp-diagram-node-icon { flex: none; font-size: 1em; }
+.erp-diagram-type-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
+.erp-diagram-type-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.erp-diagram-type-legend__domain { width: 12px; height: 12px; border: 2px solid; border-radius: 3px; }
